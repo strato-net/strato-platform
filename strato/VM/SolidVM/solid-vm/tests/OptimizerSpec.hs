@@ -46,7 +46,7 @@ import Text.RawString.QQ
 --Helper Functions
 --------------------
 
-instance (Keccak256 `A.Alters` DBCode) m => (Keccak256 `A.Alters` DBCode) (MainChainT (MemAddressStateDB m)) where
+instance {-# OVERLAPPING #-} (Keccak256 `A.Alters` DBCode) m => (Keccak256 `A.Alters` DBCode) (MainChainT (MemAddressStateDB m)) where
   lookup p = lift . lift . A.lookup p
   insert p k = lift . lift . A.insert p k
   delete p = lift . lift . A.delete p

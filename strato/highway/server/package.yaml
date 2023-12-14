@@ -20,53 +20,30 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
 - base
-- blockapps-highway-api
-- bytestring
 - common-log
-- conduit
-- conduit-extra
-- filepath
-- http-client-tls
-- http-conduit
-- monad-logger
-- servant
-- servant-client
-- servant-client-core
-- servant-multipart
-- servant-multipart-api
-- servant-multipart-client
-- raw-strings-qq
-- resourcet
 - unliftio-core
 
 library:
   source-dirs: src
   dependencies:
-    - aeson
     - aws
+    - blockapps-highway-api
     - bytestring
-    - cache
-    - clock
-    - cryptonite
+    - common-log
+    - conduit
+    - filepath
     - http-client
-    - lens
-    - monad-control
+    - http-conduit
+    - monad-logger
     - mtl
-    - opaleye
-    - product-profunctors
-    - profunctors
-    - saltine
+    - resourcet
     - servant-multipart
-    - servant-swagger
     - strato-model
-    - swagger2
     - transformers
     - unliftio
-    - resource-pool
-    - secp256k1-haskell == 0.2.0
     - servant-server
     - text
-    - yaml
+    - unliftio-core
 
 executables:
   blockapps-highway-server:
@@ -74,18 +51,20 @@ executables:
     main: Main.hs
     other-modules: [Options]
     dependencies:
+      - blockapps-highway-api
       - blockapps-highway-server
       - blockapps-init
-      - cache
-      - clock
+      - bytestring
+      - common-log
       - hflags
       - http-client
-      - resource-pool
-      - servant-options
+      - http-client-tls
+      - raw-strings-qq
+      - servant-multipart-client
       - servant-server
       - text
+      - unliftio-core
       - wai-cors
-      - wai-extra
       - wai-middleware-prometheus
       - warp
     ghc-options: -threaded 
@@ -94,12 +73,3 @@ tests:
   highway-spec:
     source-dirs: test/
     main: Spec.hs
-    dependencies:
-      - blockapps-data
-      - bytestring
-      - clockwork
-      - cryptonite
-      - hspec
-      - labeled-error
-      - secp256k1-haskell
-      - strato-model

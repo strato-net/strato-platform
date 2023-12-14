@@ -4,6 +4,7 @@
 -- the sequencer becomes more testable as it does not require a kafka setup to run,
 -- and the sequencer does not have to worry about long blocking reads from kafka
 -- preventing other events from being processed.
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -13,6 +14,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeOperators #-}
+
 {-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
 
 module Blockchain.Sequencer.Gregor
@@ -39,12 +41,17 @@ import Control.Concurrent.Async.Lifted (race_)
 import Control.Concurrent.Extra (Lock, newLock, withLock)
 import Control.Concurrent.STM (flushTQueue)
 import Control.Lens hiding (op)
-import qualified Control.Monad.Change.Modify as Mod
-import Control.Monad.State
+import Control.Monad
+import Control.Monad.Composable.Base
+import Control.Monad.Composable.Kafka
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Resource
 import Data.Default
 import Data.Foldable (for_)
 import Data.List.Extra (chunksOf)
+import Data.Maybe
+import Data.String
 import qualified Data.Text as T
 import qualified Network.Kafka as K
 import qualified Network.Kafka.Protocol as KP
@@ -61,8 +68,7 @@ data GregorConfig = GregorConfig
   }
 
 data GregorContext = GregorContext
-  { _gregorKafkaState :: K.KafkaState,
-    _gregorConsumerGroup :: KP.ConsumerGroup,
+  { _gregorConsumerGroup :: KP.ConsumerGroup,
     _gregorUnseq :: TBQueue IngestEvent,
     _gregorUnseqCheckpoints :: TQueue Checkpoint,
     _gregorSeqP2P :: TQueue P2pEvent,
@@ -71,62 +77,65 @@ data GregorContext = GregorContext
 
 makeLenses ''GregorContext
 
-type GregorM = StateT GregorContext (ResourceT (LoggingT IO))
+type GregorM = ReaderT GregorContext
+
+type HasGregorContext m = AccessibleEnv GregorContext m
 
 convert :: GregorConfig -> GregorContext
 convert GregorConfig {..} =
-  let kState = case kafkaAddress of
-        Nothing -> EC.mkConfiguredKafkaState kafkaClientId
-        Just addr -> K.mkKafkaState kafkaClientId addr
-   in GregorContext
-        { _gregorKafkaState = kState,
-          _gregorConsumerGroup = kafkaConsumerGroup,
+    GregorContext
+        { _gregorConsumerGroup = kafkaConsumerGroup,
           _gregorUnseq = unseqEvents cablePackage,
           _gregorUnseqCheckpoints = unseqCheckpoints cablePackage,
           _gregorSeqP2P = seqP2PEvents cablePackage,
           _gregorSeqVM = seqVMEvents cablePackage
         }
 
-runGregorM :: GregorConfig -> GregorM a -> IO a
-runGregorM cfg = runGregorM' (convert cfg)
-
-runGregorM' :: GregorContext -> GregorM a -> IO a
-runGregorM' ctx =
+runGregorM :: MonadUnliftIO m =>
+              GregorConfig -> KafkaM (GregorM (ResourceT (LoggingT m))) a -> m a
+runGregorM cfg = do
+  let ethConf' = EC.kafkaConfig EC.ethConf
+      kafkaAddress' = fromMaybe (fromString $ EC.kafkaHost ethConf', fromIntegral $ EC.kafkaPort ethConf')
+                      $ kafkaAddress cfg
+      
   runLoggingT
     . runResourceT
-    . flip evalStateT ctx
+    . flip runReaderT (convert cfg :: GregorContext)
+    . runKafkaM (kafkaClientId cfg) kafkaAddress'
 
-instance Mod.Modifiable K.KafkaState GregorM where
-  get _ = use gregorKafkaState
-  put _ = assign gregorKafkaState
 
-getKafkaConsumerGroup :: GregorM KP.ConsumerGroup
-getKafkaConsumerGroup = use gregorConsumerGroup
+getKafkaConsumerGroup :: (Functor m, HasGregorContext m) =>
+                         m KP.ConsumerGroup
+getKafkaConsumerGroup = fmap _gregorConsumerGroup accessEnv
 
-readUnseqEvents' :: GregorM (KP.Offset, [IngestEvent])
+readUnseqEvents' :: (MonadLogger m, P.MonadMonitor m, HasKafka m, HasGregorContext m) =>
+                    m (KP.Offset, [IngestEvent])
 readUnseqEvents' = do
   offset <- getNextIngestedOffset
   $logInfoS "readUnseqEvents'" . T.pack $ "Fetching unseqevents from " ++ show offset
-  ret <- K.withKafkaRetry1s $ SK.readUnseqEvents offset
+  ret <- execKafka $ SK.readUnseqEvents offset
   let count = length ret
   P.unsafeAddCounter gregorUnseqRead $ fromIntegral count
   return (offset + fromIntegral count, ret)
 
-writeSeqVmEvents :: [VmEvent] -> GregorM ()
+writeSeqVmEvents :: (HasKafka m, P.MonadMonitor m) => [VmEvent] -> m ()
 writeSeqVmEvents events = do
-  void $ K.withKafkaRetry1s (SK.writeSeqVmEvents events)
+  void $ execKafka (SK.writeSeqVmEvents events)
   P.unsafeAddCounter gregorVMWrite (fromIntegral (length events))
 
-writeSeqP2pEvents :: [P2pEvent] -> GregorM ()
+writeSeqP2pEvents :: (HasKafka m, P.MonadMonitor m) => [P2pEvent] -> m ()
 writeSeqP2pEvents events = do
-  void $ K.withKafkaRetry1s (SK.writeSeqP2pEvents events)
+  void $ execKafka (SK.writeSeqP2pEvents events)
   P.unsafeAddCounter gregorP2PWrite (fromIntegral (length events))
 
-assertTopicCreation :: GregorM ()
-assertTopicCreation = void $ K.withKafkaRetry1s SK.assertTopicCreation
+assertTopicCreation :: HasKafka m => m ()
+assertTopicCreation = void $ execKafka SK.assertTopicCreation
 
-getNextIngestedOffset :: GregorM KP.Offset
-getNextIngestedOffset = fst <$> getNextOffsetAndMetadata
+getNextIngestedOffset :: (MonadLogger m, HasKafka m, HasGregorContext m) =>
+                         m KP.Offset
+getNextIngestedOffset = do
+  group <- getKafkaConsumerGroup
+  fst <$> getNextOffsetAndMetadata group
 
 encodeMeta :: Checkpoint -> KP.Metadata
 encodeMeta = KP.Metadata . KP.KString . encodeCheckpoint
@@ -134,26 +143,21 @@ encodeMeta = KP.Metadata . KP.KString . encodeCheckpoint
 decodeMeta :: KP.Metadata -> Either String Checkpoint
 decodeMeta (KP.Metadata (KP.KString bs)) = decodeCheckpoint bs
 
-getNextOffsetAndMetadata :: GregorM (KP.Offset, KP.Metadata)
-getNextOffsetAndMetadata = do
-  group <- getKafkaConsumerGroup
+getNextOffsetAndMetadata :: HasKafka m =>
+                            KP.ConsumerGroup -> m (KP.Offset, KP.Metadata)
+getNextOffsetAndMetadata group = do
   ret <-
-    K.withKafkaRetry1s (K.fetchSingleOffset group SK.unseqEventsTopicName 0) >>= \case
+    execKafka (K.fetchSingleOffset group SK.unseqEventsTopicName 0) >>= \case
       Left KP.UnknownTopicOrPartition ->
         -- we've never committed an Offset
-        setNextOffsetAndMetadata 0 (encodeMeta def) >> getNextOffsetAndMetadata
+        setNextOffsetAndMetadata group 0 (encodeMeta def) >> getNextOffsetAndMetadata group
       Left err -> error $ "Unexpected response when fetching offset for " ++ show SK.unseqEventsTopicName ++ ": " ++ show err
       Right om -> return om
-  P.incCounter gregorKafkaCheckpointReads
   return ret
 
-setNextOffsetAndMetadata :: KP.Offset -> KP.Metadata -> GregorM ()
-setNextOffsetAndMetadata newOffset newMeta = do
-  group <- getKafkaConsumerGroup
-  $logInfoS "setNextIngestedOffset" . T.pack $ "Setting checkpoint to " ++ show newOffset
-  P.incCounter gregorKafkaCheckpointWrites
-  P.setGauge gregorUnseqOffset (fromIntegral newOffset)
-  op <- K.withKafkaRetry1s $ K.commitSingleOffset group SK.unseqEventsTopicName 0 newOffset newMeta
+setNextOffsetAndMetadata :: HasKafka m => KP.ConsumerGroup -> KP.Offset -> KP.Metadata -> m ()
+setNextOffsetAndMetadata group newOffset newMeta = do
+  op <- execKafka $ K.commitSingleOffset group SK.unseqEventsTopicName 0 newOffset newMeta
   op & \case
     Left err ->
       error $ "Unexpected response when setting the offset to " ++ show newOffset ++ ": " ++ show err
@@ -167,9 +171,11 @@ runTheGregor cfg =
 
 -- When a checkpoint already exists, the arguments are ignored. They might
 -- be stale if the validator pool has expanded.
-initializeCheckpoint :: [ChainMemberParsedSet] -> GregorM Checkpoint
+initializeCheckpoint :: (MonadLogger m, HasKafka m, HasGregorContext m) =>
+                        [ChainMemberParsedSet] -> m Checkpoint
 initializeCheckpoint vals = do
-  meta <- snd <$> getNextOffsetAndMetadata
+  group <- getKafkaConsumerGroup
+  meta <- snd <$> getNextOffsetAndMetadata group
   let overrideVals c = c {checkpointValidators = vals}
   $logDebugLS "initializeCheckpoint" meta
   case (meta, decodeMeta meta) of
@@ -184,12 +190,13 @@ initializeCheckpoint vals = do
           return $ overrideVals kafkaCkpt
         else return kafkaCkpt
 
-unseqReader :: GregorM ()
+unseqReader :: (MonadLogger m, HasKafka m, P.MonadMonitor m, HasGregorContext m) =>
+               m ()
 unseqReader = forever . timeAction gregorUnseqTiming $ do
   (nextOff, inEvents) <- readUnseqEvents'
   P.withLabel gregorLoop "unseq_events" P.incCounter
   $logInfoS "gregor" . T.pack $ "Fetched " ++ show (length inEvents) ++ " unseq events"
-  ch <- use gregorUnseq
+  ch <- fmap _gregorUnseq accessEnv
   forM_ (chunksOf (fromIntegral queueDepth `div` 4) inEvents) $ \chnk -> do
     atomically . forM_ chnk $ writeTBQueue ch
     P.unsafeAddCounter gregorUnseqWrite (fromIntegral (length chnk))
@@ -205,11 +212,12 @@ unseqReader = forever . timeAction gregorUnseqTiming $ do
 data ImOnlyUsedInSeqWriters a b c = VM a | P2P b | KafkaCheckpoint c
   deriving (Foldable)
 
-seqWriters :: GregorM ()
+seqWriters :: (MonadLogger m, P.MonadMonitor m, HasKafka m, HasGregorContext m) =>
+              m ()
 seqWriters = forever . timeAction gregorSeqTiming $ do
-  vmq <- use gregorSeqVM
-  p2pq <- use gregorSeqP2P
-  ckptq <- use gregorUnseqCheckpoints
+  vmq <- fmap _gregorSeqVM accessEnv
+  p2pq <- fmap _gregorSeqP2P accessEnv
+  ckptq <- fmap _gregorUnseqCheckpoints accessEnv
   events <-
     atomically $
       fmap VM (blockFlushTQueue vmq)
@@ -245,20 +253,29 @@ blockFlushTQueue ch = do
 unseqEventsLock :: Lock
 unseqEventsLock = unsafePerformIO newLock
 
-updateOffset_locked :: KP.Offset -> GregorM ()
+updateOffset_locked :: (MonadLogger m, HasKafka m, HasGregorContext m) =>
+                       KP.Offset -> m ()
 updateOffset_locked off = do
-  ctx <- get
-  -- This is unsafe in that the state changes made in the runGregorM' will be discarded.
-  -- For now, only the KafkaState would be mutated and that is okay.
-  liftIO . withLock unseqEventsLock . runGregorM' ctx $ do
-    (_, meta) <- getNextOffsetAndMetadata
-    setNextOffsetAndMetadata off meta
+  ctx <- accessEnv
 
-updateMetadata_locked :: KP.Metadata -> GregorM ()
+  group <- getKafkaConsumerGroup
+
+  $logInfoS "setNextIngestedOffset" . T.pack $ "Setting checkpoint to " ++ show off
+
+  liftIO $ withLock unseqEventsLock . runKafkaMUsingEnv (KafkaEnv ctx) $ do
+    (_, meta) <- getNextOffsetAndMetadata group
+    setNextOffsetAndMetadata group off meta
+
+updateMetadata_locked :: (MonadLogger m, HasKafka m, HasGregorContext m) =>
+                         KP.Metadata -> m ()
 updateMetadata_locked meta = do
-  ctx <- get
-  -- This is unsafe in that the state changes made in the runGregorM' will be discarded.
-  -- For now, only the KafkaState would be mutated and that is okay.
-  liftIO . withLock unseqEventsLock . runGregorM' ctx $ do
-    (off, _) <- getNextOffsetAndMetadata
-    setNextOffsetAndMetadata off meta
+  ctx <- accessEnv
+
+  group <- getKafkaConsumerGroup
+
+  liftIO $ withLock unseqEventsLock . runKafkaMUsingEnv (KafkaEnv ctx) $ do
+    (off, _) <- getNextOffsetAndMetadata group
+    setNextOffsetAndMetadata group off meta
+
+
+

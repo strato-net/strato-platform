@@ -6,9 +6,9 @@ dependencies:
 
 library:
   source-dirs: src
-  dependencies: 
+  dependencies:
+  - composable-monads-base
   - milena
-  - monad-alter
   - mtl
   - transformers
   - unliftio-core

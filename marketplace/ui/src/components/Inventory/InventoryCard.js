@@ -106,7 +106,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
   };
 
   const getCategory = () => {
-    return inventory.category;
+    const parts = inventory.contract_name.split('-');
+    return parts[parts.length - 1];
   };
 
   const categoricalProperties = () => {
@@ -123,27 +124,18 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
             </div>
           </div>
         );
-      case "Carbon":
-        return (
-          <>
-            {/* <div className="flex mt-1.5 items-center">
-              <p className="text-primaryC text-sm w-40">Project Type</p>
-              <p className="text-secondryB text-sm">
-                :
-              </p>
-              <p className="text-secondryB text-sm ml-3">
-                {itemData.projectType}
-              </p>
-            </div> */}
-            <div className="flex mt-1.5 items-center">
-              <p className="text-primaryC text-sm w-40">Quantity Owned</p>
-              <p className="text-secondryB text-sm">
-                :
-              </p>
-              <p className="text-secondryB text-sm ml-3">{inventory.quantity}</p>
-            </div>
-          </>
-        );
+      // case "Carbon":
+      //   return (
+      //     <>
+      //       <div className="flex mt-1.5 items-center">
+      //         <p className="text-primaryC text-sm w-40">Quantity Owned</p>
+      //         <p className="text-secondryB text-sm">
+      //           :
+      //         </p>
+      //         <p className="text-secondryB text-sm ml-3">{inventory.quantity}</p>
+      //       </div>
+      //     </>
+      //   );
       case "Clothing":
         return (
           <div>
@@ -199,20 +191,20 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
             </div>
           </>
         )
-      case "CarbonDAO":
-        return (
-          <>
-            <div className="flex mt-1.5 items-center">
-              <p className="text-primaryC text-sm w-40">Units</p>
-              <p className="text-secondryB text-sm">
-                :
-              </p>
-              <p className="text-secondryB text-sm ml-3">
-                {inventory.quantity}
-              </p>
-            </div>
-          </>
-        )
+      // case "CarbonDAO":
+      //   return (
+      //     <>
+      //       <div className="flex mt-1.5 items-center">
+      //         <p className="text-primaryC text-sm w-40">Quantity</p>
+      //         <p className="text-secondryB text-sm">
+      //           :
+      //         </p>
+      //         <p className="text-secondryB text-sm ml-3">
+      //           {inventory.quantity}
+      //         </p>
+      //       </div>
+      //     </>
+      //   )
       default:
         break;
     }
@@ -297,7 +289,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
                       onClick={showResellModal}
                     >
                       <PieChartOutlined />
-                      <p className="ml-3">Resell</p>
+                      <p className="ml-3">Mint</p>
                     </div>) : (<div></div>)}
                     <div
                       className="flex items-center mt-2 cursor-pointer"
@@ -334,6 +326,17 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
               </p>
               <p className="text-secondryB text-sm ml-3">
                 {inventory.saleQuantity}
+              </p>
+            </div> : <></>
+          }
+          { inventory.quantity ? 
+            <div className="flex mt-1 items-center">
+              <p className="text-primaryC text-sm w-40">Quantity Owned</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">
+                {inventory.quantity}
               </p>
             </div> : <></>
           }

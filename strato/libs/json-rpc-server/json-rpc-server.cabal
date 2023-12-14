@@ -82,7 +82,6 @@ test-suite tests
                        bytestring,
                        mtl,
                        text,
-                       vector,
-                       unordered-containers
+                       vector
   ghc-options:         -Wall
   other-extensions:    CPP, OverloadedStrings

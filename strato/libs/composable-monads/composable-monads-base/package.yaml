@@ -1,0 +1,21 @@
+name:                composable-monads-base
+version:             0.1.0.0
+
+dependencies:
+- base >= 4.7 && < 5
+- mtl
+- transformers
+
+ghc-options:
+- -Wall
+- -Wcompat
+- -Widentities
+- -Wincomplete-record-updates
+- -Wincomplete-uni-patterns
+- -Wmissing-export-lists
+- -Wmissing-home-modules
+- -Wpartial-fields
+- -Wredundant-constraints
+
+library:
+  source-dirs: src
