@@ -18,26 +18,19 @@ const clientErrorHandler = (err, req, res, next) => {
 
   if (statusCode) {
     const message = get(err, 'raw.message');
-    console.log(`Unhandled API error. Status: ${statusCode}. Message: ${message}`)
-    console.log(`Request: ${req}`)
-    console.log(`Response: ${res}`)
-    return res.status(statusCode).json({ success: false, error: message })
+    console.log(`Unhandled API error. Status: ${statusCode}. Message: ${message}`);
+    console.log(`Request: ${req}`);
+    console.log(`Response: ${res}`);
+    return res.status(statusCode).json({ success: false, error: message });
   }
 
   return next(err)
 }
 
 const commonErrorHandler = (err, req, res, next) => {
-  const statusCode = get(err, 'statusCode');
-
-  if (statusCode) {
-    const message = get(err, 'raw.message')
-    console.log(`Server error. Status: ${statusCode}. Message: ${message}`)
-    return res.status(statusCode).json({ success: false, error: message })
-  }
-
-  console.log(err.stack)
-  return next(err)
+  console.log(`Server error. ${err}`);
+  console.log(err.stack);
+  return res.status(500).json({ success: false, error: err.message });
 }
 
 module.exports = {

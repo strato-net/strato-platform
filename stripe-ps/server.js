@@ -6,13 +6,14 @@ const expressWinston = require('express-winston');
 const helmet = require('helmet');
 const winston = require('winston');
 
+const { HOST_URL } = require('./helpers/constants');
 const { clientErrorHandler, commonErrorHandler } = require('./helpers/utils');
 const routes = require('./routes');
 
 const config = {
     name: 'Payment Server (Stripe)',
     port: process.env.PORT || 8018,
-    host: '127.0.0.1',
+    host: HOST_URL,
 };
 
 const app = express();

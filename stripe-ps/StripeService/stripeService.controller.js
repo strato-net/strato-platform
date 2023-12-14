@@ -50,7 +50,23 @@ class StripeServiceController {
 
   static async stripeWebhook(req, res, next) {
     try {
-      res.status(200).send('TODO');
+      const event = req.body;
+
+      switch(event.type) {
+        case 'account.application.deauthorized':
+          break;
+        case 'account.updated':
+          break;
+        case 'account.external_account.deleted':
+          break;
+        case 'account.external_account.updated':
+          break;
+        default:
+          console.log(`Unhandled event type ${event.type}`);
+      }
+      res.status(200).json({
+        received: true,
+      });
       return next();
     } catch (e) {
       next(e);
