@@ -901,87 +901,92 @@ checkOverrides ::
 checkOverrides cc c funcName f =
   let ctx = f ^. funcContext
       mOs = f ^. funcOverrides
+      mModifiers = map fst (f ^. funcModifiers)
       tFuncName = T.pack funcName
       parentsWithSameFunc =
         catMaybes $
           sequence . (_contractName &&& (M.lookup funcName . _functions))
             <$> catMaybes (flip M.lookup (cc ^. contracts) <$> c ^. parents)
-   in case parentsWithSameFunc of
-        [] -> case mOs of
-          Nothing -> functionType cc ctx funcName f
-          Just _ -> bottom $ "Function " <> tFuncName <> " is declared override, but none of its parents have a function by the same name" <$ ctx
-        p : ps -> case mOs of
-          Nothing ->
-            bottom $
-              T.concat
-                [ "Function ",
-                  tFuncName,
-                  " is not marked as override, but its parent(s) ",
-                  T.intercalate ", " $ T.pack . fst <$> parentsWithSameFunc,
-                  " have a function by the same name"
-                ]
-                <$ ctx
-          Just [] -> case ps of
-            [] -> typecheckFuncs cc ctx funcName f $ snd p
-            _ ->
+      nonExistentModifiers = filter (\m -> not (M.member m (_modifiers c))) mModifiers
+   in if not (null nonExistentModifiers) then
+    bottom $ "Non-existent modifiers used in function " <> tFuncName <> ": " <> T.intercalate ", " (map T.pack nonExistentModifiers) <$ ctx
+      else
+        case parentsWithSameFunc of
+          [] -> case mOs of
+            Nothing -> functionType cc ctx funcName f
+            Just _ -> bottom $ "Function " <> tFuncName <> " is declared override, but none of its parents have a function by the same name" <$ ctx
+          p : ps -> case mOs of
+            Nothing ->
               bottom $
                 T.concat
                   [ "Function ",
                     tFuncName,
-                    " is marked as override, but does not specify which base contract to override. Options include ",
-                    T.intercalate ", " $ T.pack . fst <$> parentsWithSameFunc
+                    " is not marked as override, but its parent(s) ",
+                    T.intercalate ", " $ T.pack . fst <$> parentsWithSameFunc,
+                    " have a function by the same name"
                   ]
                   <$ ctx
-          Just os ->
-            let parentMap = M.fromList parentsWithSameFunc
-                parentFuncs = flip M.lookup parentMap <$> os
-                invalidParentFuncs =
-                  foldr
-                    ( \a (ns, vs, es) -> case a of
-                        (o, Nothing) -> (o : ns, vs, es)
-                        (o, Just f') ->
-                          if f' ^. funcVirtual
-                            then case typecheckFuncs cc ctx funcName f f' of
-                              Bottom e -> (ns, vs, (o, e) : es)
-                              _ -> (ns, vs, es)
-                            else (ns, o : vs, es)
-                    )
-                    ([], [], [])
-                    $ zip os parentFuncs
-             in case invalidParentFuncs of
-                  ([], [], []) -> functionType cc ctx funcName f
-                  (ns, vs, es) ->
-                    let nMsg =
-                          T.concat
-                            [ "The following parent contracts don't have a function named ",
-                              tFuncName,
-                              ": ",
-                              T.intercalate ", " $ labelToText <$> ns,
-                              "\n"
-                            ]
-                        vMsg =
-                          T.concat
-                            [ "The following parent contracts don't have ",
-                              tFuncName,
-                              " marked as virtual: ",
-                              T.intercalate ", " $ labelToText <$> vs,
-                              "\n"
-                            ]
-                        eMsg =
-                          T.concat
-                            [ "The following parent contracts' signatures for ",
-                              tFuncName,
-                              " don't match the one found in ",
-                              labelToText $ c ^. contractName,
-                              ": ",
-                              T.intercalate ", " $ (\(o, e) -> "In " <> labelToText o <> ":\n  " <> T.pack (concatMap (("\n  " ++) . show) e)) <$> es,
-                              "\n"
-                            ]
-                     in bottom $
-                          bool nMsg "" (null ns)
-                            <> bool vMsg "" (null vs)
-                            <> bool eMsg "" (null es)
-                            <$ ctx
+            Just [] -> case ps of
+              [] -> typecheckFuncs cc ctx funcName f $ snd p
+              _ ->
+                bottom $
+                  T.concat
+                    [ "Function ",
+                      tFuncName,
+                      " is marked as override, but does not specify which base contract to override. Options include ",
+                      T.intercalate ", " $ T.pack . fst <$> parentsWithSameFunc
+                    ]
+                    <$ ctx
+            Just os ->
+              let parentMap = M.fromList parentsWithSameFunc
+                  parentFuncs = flip M.lookup parentMap <$> os
+                  invalidParentFuncs =
+                    foldr
+                      ( \a (ns, vs, es) -> case a of
+                          (o, Nothing) -> (o : ns, vs, es)
+                          (o, Just f') ->
+                            if f' ^. funcVirtual
+                              then case typecheckFuncs cc ctx funcName f f' of
+                                Bottom e -> (ns, vs, (o, e) : es)
+                                _ -> (ns, vs, es)
+                              else (ns, o : vs, es)
+                      )
+                      ([], [], [])
+                      $ zip os parentFuncs
+              in case invalidParentFuncs of
+                    ([], [], []) -> functionType cc ctx funcName f
+                    (ns, vs, es) ->
+                      let nMsg =
+                            T.concat
+                              [ "The following parent contracts don't have a function named ",
+                                tFuncName,
+                                ": ",
+                                T.intercalate ", " $ labelToText <$> ns,
+                                "\n"
+                              ]
+                          vMsg =
+                            T.concat
+                              [ "The following parent contracts don't have ",
+                                tFuncName,
+                                " marked as virtual: ",
+                                T.intercalate ", " $ labelToText <$> vs,
+                                "\n"
+                              ]
+                          eMsg =
+                            T.concat
+                              [ "The following parent contracts' signatures for ",
+                                tFuncName,
+                                " don't match the one found in ",
+                                labelToText $ c ^. contractName,
+                                ": ",
+                                T.intercalate ", " $ (\(o, e) -> "In " <> labelToText o <> ":\n  " <> T.pack (concatMap (("\n  " ++) . show) e)) <$> es,
+                                "\n"
+                              ]
+                      in bottom $
+                            bool nMsg "" (null ns)
+                              <> bool vMsg "" (null vs)
+                              <> bool eMsg "" (null es)
+                              <$ ctx
 
 functionHelper ::
   Annotated CodeCollectionF ->
