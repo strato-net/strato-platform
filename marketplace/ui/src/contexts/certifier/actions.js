@@ -27,6 +27,12 @@ const actions = {
         return;
       } else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({ type: actionDescriptors.fetchCertifiersFailed, error: "Error while fetching Certifiers" });
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.fetchCertifiersFailed, 
+          error: "Unauthorized while fetching Certifiers" 
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({ type: actionDescriptors.fetchCertifiersFailed, error: body.error });

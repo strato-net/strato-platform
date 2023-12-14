@@ -216,10 +216,9 @@ async function updatePaymentProvider(admin, contract, _args, baseOptions) {
         return agg;
     }
   }, 0);
-
   const callArgs = {
     contract,
-    method: "updatePaymentProvider",
+    method: "update",
     args: util.usc({
       scheme,
       ...args,

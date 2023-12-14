@@ -22,6 +22,8 @@ HEALTHCHECK --interval=5s --timeout=1s --start-period=180s \
 
 COPY nginx.tpl.conf openid.tpl.lua /tmp/
 
+COPY docker-run.sh /
+
 COPY licenses /licenses
 
 ENTRYPOINT ["/docker-run.sh"]

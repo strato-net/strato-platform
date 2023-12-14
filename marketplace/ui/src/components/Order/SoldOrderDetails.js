@@ -99,7 +99,7 @@ const SoldOrderDetails = ({ user, users }) => {
           address: prod.address,
           chainId: prod.chainId,
           key: prod.address,
-          productImage: prod.images.length > 0 ? prod.images[0] : image_placeholder,
+          productImage: prod.images && prod.images.length > 0 ? prod.images[0] : image_placeholder,
           productName: prod,
           unitPrice: prod.price,
           quantity: prod.quantity,
@@ -216,7 +216,7 @@ const SoldOrderDetails = ({ user, users }) => {
     let isDone=false;
 
     body = {
-      saleOrderAddress: details.order.address,
+      orderAddress: details.order.address,
       fulfillmentDate: dayjs(selectedDate).unix(),
       comments: comment,
     };

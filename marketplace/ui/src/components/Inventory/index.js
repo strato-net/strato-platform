@@ -73,7 +73,7 @@ const Inventory = ({ user }) => {
   }, [dispatch, limit, offset, debouncedSearchTerm]);
 
   useEffect(() => {
-    actions.sellerStripeStatus(dispatch, user?.organization);
+    actions.sellerStripeStatus(dispatch, user?.commonName);
   }, [dispatch, user]);
   
   useEffect(() => {
@@ -189,7 +189,6 @@ const Inventory = ({ user }) => {
               <Title level={3} className="mt-2">
                 No inventory found
               </Title>
-              <Text className="text-sm">Start adding your inventory</Text>
               <div className="flex items-center">
                 <Button
                   type="primary"
@@ -306,6 +305,7 @@ const Inventory = ({ user }) => {
                           category={category}
                           key={index}
                           debouncedSearchTerm={debouncedSearchTerm}
+                          paymentProviderAddress={stripeStatus ? stripeStatus.paymentProviderAddress : undefined }
                         />
                       );
                     })}

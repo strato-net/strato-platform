@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useFormik, getIn } from "formik";
-import { Form, Modal, Input, Select, Radio, Button, Spin } from "antd";
+import { Form, Modal, Input, Select, Radio, Button, Spin, Tag } from "antd";
 import getSchema from "./UpdateInventorySchema";
 import { actions } from "../../contexts/inventory/actions";
 import {
@@ -13,7 +13,6 @@ import {
 } from "../../contexts/category";
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { useProductState } from "../../contexts/product";
-import { INVENTORY_STATUS } from "../../helpers/constants";
 import TagManager from "react-gtm-module";
 
 
@@ -35,7 +34,7 @@ const UpdateInventoryModal = ({
     useProductState();
   
 
-  const { isinventoryUpdating } =
+  const { isinventoryUpdating, isReselling } =
     useInventoryState();
 
   const initialValues = {
@@ -43,19 +42,12 @@ const UpdateInventoryModal = ({
       name: null,
       address: null,
     },
-    subCategory: {
-      name: null,
-      address: "",
-    },
     productName: {
       name: null,
       address: "",
     },
     availableQuantity: null,
-    pricePerUnit: "",
     batchId: "",
-    serialNumber: null,
-    status: true,
   };
 
   const formik = useFormik({
@@ -78,6 +70,7 @@ const UpdateInventoryModal = ({
 
   useEffect(() => {
     if (inventoryToUpdate) {
+      const data = inventoryToUpdate.inventory.data ? JSON.parse(inventoryToUpdate.inventory.data) : {};
       let nextState = {
         category: {
           name: getCategory(),
@@ -86,11 +79,8 @@ const UpdateInventoryModal = ({
           name: decodeURIComponent(inventoryToUpdate.inventory.name),
           address: inventoryToUpdate.inventory.productId,
         },
-        availableQuantity: inventoryToUpdate.inventory.availableQuantity,
-        pricePerUnit: inventoryToUpdate.inventory.pricePerUnit,
+        availableQuantity: data?.quantity ?? null,
         batchId: inventoryToUpdate.inventory.batchId,
-        serialNumber: null,
-        status: inventoryToUpdate.inventory.status === 1 ? true : false,
       };
     
       setFormState(nextState);
@@ -99,21 +89,19 @@ const UpdateInventoryModal = ({
 
   const handleUpdateFormSubmit = async (values) => {
     const body = {
-      productAddress: values.productName.address,
-      inventory: inventoryToUpdate.inventory.address,
+      itemContract: values.category.name,
+      itemAddress: inventoryToUpdate.inventory.address,
       updates: {
-        pricePerUnit: values.pricePerUnit,
-        status: values.status ? INVENTORY_STATUS['PUBLISHED'] : INVENTORY_STATUS['UNPUBLISHED'],
       },
     };
-
+  
     window.LOQ = window.LOQ || []
     window.LOQ.push(['ready', async LO => {
         // Track an event
         await LO.$internal.ready('events')
         LO.events.track('Update Inventory', {category: values.category.name, product: values.productName.name})
     }])
-
+  
     TagManager.dataLayer({
       dataLayer: {
         event: 'update_inventory',
@@ -142,7 +130,7 @@ const UpdateInventoryModal = ({
             onClick={formik.handleSubmit}
             disabled={isinventoryUpdating}
           >
-            {isinventoryUpdating ? <Spin /> : "Update Inventory"}
+            {isinventoryUpdating || isReselling ? <Spin /> : "Update Inventory"}
           </Button>
         </div>,
       ]}
@@ -158,7 +146,7 @@ const UpdateInventoryModal = ({
       ) : (
         <Form layout="vertical" className="mt-5" onSubmit={formik.handleSubmit}>
           <div className="w-full mb-3">
-            <div className="flex justify-between ">
+            <div className="flex justify-between mt-4 ">
               <Form.Item label="Category" name="category" className="w-72">
                 <Select
                   placeholder="Select Category"
@@ -186,8 +174,6 @@ const UpdateInventoryModal = ({
                     </span>
                   )}
               </Form.Item>
-            </div>
-            <div className="flex justify-between mt-4 ">
               <Form.Item
                 label="Product Name"
                 name="productName"
@@ -231,6 +217,8 @@ const UpdateInventoryModal = ({
                     </span>
                   )}
               </Form.Item>
+            </div>
+            <div className="flex justify-between mt-4 ">
               <Form.Item label="Quantity" name="availableQuantity" className="w-72">
                 <Input
                   label="availableQuantity"
@@ -247,67 +235,6 @@ const UpdateInventoryModal = ({
                 )}
               </Form.Item>
             </div>
-            <div className="flex justify-between mt-4 ">
-              <Form.Item
-                label="Price Per Unit"
-                name="pricePerUnit "
-                className="w-72"
-              >
-                <Input
-                  label="pricePerUnit"
-                  placeholder="Enter Price"
-                  name="pricePerUnit"
-                  value={formik.values.pricePerUnit}
-                  onChange={formik.handleChange}
-                />
-                {formik.touched.pricePerUnit && formik.errors.pricePerUnit && (
-                  <span className="text-error text-xs">
-                    {formik.errors.pricePerUnit}
-                  </span>
-                )}
-              </Form.Item>
-              <Form.Item label="Batch ID" name="batchId" className="w-72">
-                <Input
-                  label="batchId"
-                  placeholder="Enter Batch ID"
-                  name="batchId"
-                  disabled={true}
-                  value={formik.values.batchId}
-                  onChange={formik.handleChange}
-                />
-                {formik.touched.batchId && formik.errors.batchId && (
-                  <span className="text-error text-xs">
-                    {formik.errors.batchId}
-                  </span>
-                )}
-              </Form.Item>
-            </div>
-            {/* <div className="mt-4 flex justify-between items-center">
-              <div>Enter Serial Numbers</div>
-            </div>
-            <TextArea
-              label="serialNumbers"
-              className="mt-2"
-              disabled={true}
-              // value={formik.values.serialNumber}
-              placeholder="Enter serial numbers as comma separated values 1232WE13W43,1232WE13W434,1232WE13W45"
-            /> */}
-            <Form.Item label="Status" name="status" className="mt-4">
-              <Radio.Group
-                value={formik.values.status}
-                onChange={formik.handleChange}
-                name="status"
-              >
-                <Radio value={true}>Publish</Radio>
-                <Radio value={false}>Unpublish</Radio>
-              </Radio.Group>
-
-              {formik.touched.status && formik.errors.status && (
-                <span className="text-error text-xs">
-                  {formik.errors.status}
-                </span>
-              )}
-            </Form.Item>
           </div>
         </Form>
       )}

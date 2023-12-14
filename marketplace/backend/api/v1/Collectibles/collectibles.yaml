@@ -1,0 +1,55 @@
+paths:
+  /collectibles/:
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - Collectibles
+      summary: Retrieve collectible
+      produces:
+        - application/json
+      responses:
+        200:
+          description: Array of collectibles
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Collectibles
+      summary: Create a collectible
+      produces:
+        - application/json
+      requestBody:
+        description: It enables user to create collectibles
+        required: true
+        content:
+          'application/json':
+            schema:
+              $ref: '#/definitions/createCollectible'
+      responses:
+        200:
+          description: Object of create collectible
+
+definitions:
+  createCollectible:
+    type: object
+    properties:
+      machineArgs:
+        type: object
+        properties:
+          serialNumber:
+            type: string
+          name:
+            type: string
+          description:
+            type: string
+          images:
+            type: array
+            items:
+              type: string
+          price:
+            type: number
+          paymentTypes:
+            type: array
+            items:
+              type: number

@@ -27,7 +27,6 @@ dependencies:
   - extra
   - format
   - ghc
-  - integer-gmp
   - lens
   - merkle-patricia-db
   - monad-alter

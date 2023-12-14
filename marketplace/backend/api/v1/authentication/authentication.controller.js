@@ -1,5 +1,5 @@
 import jwtDecode from 'jwt-decode'
-import { oauthUtil, rest } from 'blockapps-rest'
+import { rest } from 'blockapps-rest'
 import RestStatus from 'http-status-codes'
 import config from '/load.config'
 
@@ -14,6 +14,7 @@ import certificateJs from '/dapp/certificates/certificate'
 const options = { config }
 class AuthenticationController {
   static async callback(req, res, next) {
+    const oauth = req.app.oauth
     const { code } = req.query
     const { app } = req
 
@@ -28,7 +29,7 @@ class AuthenticationController {
     let adminUserPassword = process.env.GLOBAL_ADMIN_PASSWORD
 
     try {
-      const tokensResponse = await req.app.oauth.getAccessTokenByAuthCode(code)
+      const tokensResponse = await oauth.getAccessTokenByAuthCode(code)
       accessToken = tokensResponse.token[
         config.nodes[0].oauth.tokenField
           ? config.nodes[0].oauth.tokenField
@@ -80,20 +81,20 @@ class AuthenticationController {
       rest.response.status(RestStatus.FORBIDDEN, res)
       return next()
     }
-
-    res.cookie(req.app.oauth.getCookieNameAccessToken(), accessToken, {
+    
+    res.cookie(oauth.getCookieNameAccessToken(), accessToken, {
       maxAge: config.nodes[0].oauth.appTokenCookieMaxAge,
       httpOnly: true,
     })
-    res.cookie(req.app.oauth.getCookieNameAccessTokenExpiry(), accessTokenExpiration, {
+    res.cookie(oauth.getCookieNameAccessTokenExpiry(), accessTokenExpiration, {
       maxAge: config.nodes[0].oauth.appTokenCookieMaxAge,
       httpOnly: true,
     })
-    res.cookie(req.app.oauth.getCookieNameRefreshToken(), refreshToken, {
+    res.cookie(oauth.getCookieNameRefreshToken(), refreshToken, {
       maxAge: config.nodes[0].oauth.appTokenCookieMaxAge,
       httpOnly: true,
     })
-
+    
     // check if user exists - if not, create them
 
     // bind to dapp as service user (to have permissions to create user if needed)
@@ -146,15 +147,16 @@ class AuthenticationController {
   }
 
   static async logout(req, res) {
+    const oauth = req.app.oauth
     let oauthSignOutUrl
     if (config.dockerized) {
       oauthSignOutUrl = '/auth/logout'
     } else {
-      oauthSignOutUrl = req.app.oauth.getLogOutUrl()
+      oauthSignOutUrl = oauth.getLogOutUrl()
     }
-    res.clearCookie(req.app.oauth.getCookieNameAccessToken())
-    res.clearCookie(req.app.oauth.getCookieNameAccessTokenExpiry())
-    res.clearCookie(req.app.oauth.getCookieNameRefreshToken())
+    res.clearCookie(oauth.getCookieNameAccessToken())
+    res.clearCookie(oauth.getCookieNameAccessTokenExpiry())
+    res.clearCookie(oauth.getCookieNameRefreshToken())
 
     rest.response.status200(res, { logoutUrl: oauthSignOutUrl })
   }

@@ -27,9 +27,6 @@ def deployStratoWithS3(nodeData, versionTag) {
           OAUTH_CLIENT_SECRET="${nodeData.OAUTH_CLIENT_SECRET}" \\
           VAULT_URL="https://vault.blockapps.net:8093" \\
           certInfo='{"orgName":"BlockApps","orgUnit":"Mercata","commonName":"${nodeData.COMMON_NAME}","access":true}' \\
-          EXT_STORAGE_S3_ACCESS_KEY_ID='${AWS_IAM_USER_KEY_ID}' \\
-          EXT_STORAGE_S3_SECRET_ACCESS_KEY='${AWS_IAM_USER_ACCESS_KEY}' \\
-          EXT_STORAGE_S3_BUCKET='mercata-testnet2' \\
           STRIPE_PUBLISHABLE_KEY='${STRIPE_PUBLISHABLE_KEY}' \\
           STRIPE_SECRET_KEY='${STRIPE_SECRET_KEY}' \\
           CLIENT_URL="https://${nodeData.STRATO_HOSTNAME}" \\
@@ -1131,6 +1128,8 @@ def generateGenesisBlock(stratoPlatformPath='.', stratoGSPath='strato-getting-st
       cd $(<_stratogs_path_tmp)
       myPub=$(./strato --get-pubkey)
       cd ..
+      sudo docker cp $(<_platform_path_tmp)/.docker-work/usr/local/bin/genesis-builder strato-strato-1:/usr/local/bin/
+      sudo docker cp $(<_platform_path_tmp)/.docker-work/usr/local/bin/x509-generator strato-strato-1:/usr/local/bin/
       sudo docker cp $(<_platform_path_tmp)/strato/tools/genesis-builder strato-strato-1:/
       sudo docker cp $(<_platform_path_tmp)/strato/tools/x509-generator strato-strato-1:/
       sudo docker exec -e pubkey="${myPub}" strato-strato-1 bash -c 'sed "s/<PUBKEY>/$pubkey/g" /x509-generator/subject.tpl.json > /x509-generator/subject.json'

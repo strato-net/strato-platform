@@ -8,6 +8,7 @@ library:
   source-dirs: src
   dependencies: 
   - blockapps-data
+  - composable-monads-base
   - monad-logger
   - mtl
   - persistent-postgresql

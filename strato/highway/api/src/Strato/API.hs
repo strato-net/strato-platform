@@ -13,10 +13,10 @@ module Strato.API
   )
 where
 
-import qualified Data.ByteString.Char8              as DBC8
 import qualified Data.ByteString.Lazy               as DBL
 import qualified Data.List.NonEmpty                 as NE
-import           Blockchain.Strato.Model.Keccak256
+import qualified Data.Text                          as T
+import           Data.Text.Encoding                 (encodeUtf8)
 import           Network.HTTP.Media ((//), (/:))
 import           Servant.API
 import           Servant.API.ContentTypes
@@ -31,11 +31,13 @@ instance Accept Web where
                    , "text"        // "css" /: ("charset", "utf-8")
                    , "text"        // "javascript"
                    , "text"        // "javascript" /: ("charset", "utf-8")
+                   , "text"        // "plain"
                    , "application" // "json"
                    , "application" // "json" /: ("charset", "utf-8")
                    , "application" // "octet-stream"
                    , "application" // "font-woff"
                    , "application" // "font-woff2"
+                   , "application" // "pdf"
                    , "image"       // "png"
                    , "image"       // "jpeg"
                    , "image"       // "jpg"
@@ -54,19 +56,14 @@ data ContentTypeAndBody = ContentTypeAndBody { contentTypeHeader :: DBL.ByteStri
 instance MimeRender Web ContentTypeAndBody where --Is this correct?
   mimeRender _ (ContentTypeAndBody _ b) = b
 
-instance MimeUnrender Web ContentTypeAndBody where
-  mimeUnrender a bs = Right $ ContentTypeAndBody { contentTypeHeader = DBL.fromStrict $ DBC8.pack $ show a --Need to double check
-                                                 , contentTypeBody   = bs                                  --both of these
-                                                 } 
-
-instance MimeRender Web () where
-  mimeRender _ _ = DBL.empty
+instance MimeRender Web T.Text where
+  mimeRender _ = DBL.fromStrict . encodeUtf8
 
 instance AllCTRender '[Web] ContentTypeAndBody where
   handleAcceptH _ _ (ContentTypeAndBody h c) = Just (h,c)
 
-type HighwayGetS3File = "gets3file" :> Capture "hash" Keccak256 :> Get '[Web] ContentTypeAndBody
+type HighwayGetS3File = "highway" :> Capture "filename" T.Text :> Get '[Web] ContentTypeAndBody
 
-type HighwayPutS3File = "puts3file" :> MultipartForm Mem (MultipartData Mem) :> Put '[Web] ()
+type HighwayPutS3File = "highway" :> MultipartForm Mem (MultipartData Mem) :> Post '[Web] T.Text
 
 type HighwayPing      = "ping" :> Get '[JSON] Int

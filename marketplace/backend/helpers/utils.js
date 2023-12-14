@@ -248,7 +248,13 @@ export const setSearchQueryOptionsPrime = (args) => {
     
     if (key === 'notEqualsValue') {
       const { notEqualsField, notEqualsValue } = args
-      result.push({ key: notEqualsField, value: notEqualsValue, predicate: 'neq' })
+      if (Array.isArray(args[key])) {
+        notEqualsField.map((field, i) => {
+          result.push({ key: field, value: notEqualsValue[i], predicate: 'neq' })
+        })
+      } else {
+        result.push({ key: notEqualsField, value: notEqualsValue, predicate: 'neq' })
+      }
     }
 
     return result
@@ -319,7 +325,7 @@ export const setSearchQueryOptionsLike = (args = {}, _queryOptionsArray) => {
 }
 
 export const searchAllWithQueryArgs = async (contractName, args, options, user) => {
-  const nonQueryOptions = ['queryValue', 'queryFields', 'queryOptions', 'limit', 'offset', 'sort', 'range', 'gteField', 'gteValue', 'notEqualsField', 'notEqualsValue']
+  const nonQueryOptions = ['queryValue', 'queryFields', 'queryOptions', 'limit', 'offset', 'sort', 'range', 'gteField', 'gteValue', 'lteField', 'lteValue', 'notEqualsField', 'notEqualsValue']
   const queryArgs = setSearchQueryOptions(args, Object.keys(args).reduce((result, key) => {
     if (!nonQueryOptions.includes(key) && key != 'category') {
       if (Array.isArray(args[key])) {
@@ -351,9 +357,20 @@ export const searchAllWithQueryArgs = async (contractName, args, options, user) 
       result.push({ key: gteField, value: gteValue, predicate: 'gte' })
     }
 
+    if (key === 'lteValue') {
+      const { lteField, lteValue } = args
+      result.push({ key: lteField, value: lteValue, predicate: 'lte' })
+    }
+
     if (key === 'notEqualsValue') {
       const { notEqualsField, notEqualsValue } = args
-      result.push({ key: notEqualsField, value: notEqualsValue, predicate: 'neq' })
+      if (Array.isArray(args[key])) {
+        notEqualsField.map((field, i) => {
+          result.push({ key: field, value: notEqualsValue[i], predicate: 'neq' })
+        })
+      } else {
+        result.push({ key: notEqualsField, value: notEqualsValue, predicate: 'neq' })
+      }
     }
 
     if (key === 'sort') {
@@ -379,6 +396,7 @@ export const searchAllWithQueryArgs = async (contractName, args, options, user) 
   }, []))
 
   const { category, ...restQueryArgs } = queryArgs;
+  console.log('#### REST QUERY ARGS', JSON.stringify(restQueryArgs))
   const results = await searchAll(contractName, restQueryArgs, options, user)
 
   return results

@@ -19,12 +19,7 @@ dependencies:
 library:
   source-dirs: src
   dependencies:
-  - aeson
-  - aeson-casing
-  - bytestring
-  - labeled-error
   - servant
-  - servant-server
   - strato-model
   - text
 

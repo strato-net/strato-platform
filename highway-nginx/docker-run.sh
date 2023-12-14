@@ -4,12 +4,11 @@ set -e
 
 ssl=${ssl:-false}
 sslCertFileType=${sslCertFileType:-pem}
-# OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-NULL}
-# OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-NULL}
-# OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
-# OAUTH_SCOPE=${OAUTH_SCOPE:-openid email profile}
-HIGHWAY_PROVIDER_HOSTNAME=${HIGHWAY_PROVIDER_HOSTNAME:-highway-provider}
-HIGHWAY_PORT=${HIGHWAY_PORT:-8014}
+OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-NULL}
+OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-NULL}
+OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
+OAUTH_SCOPE=${OAUTH_SCOPE:-openid email profile}
+HIGHWAY_HOST=${HIGHWAY_HOST:-highway:8080}
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
@@ -31,10 +30,8 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     sed -i '/#TEMPLATE_MARK_LOGS/d' /tmp/nginx.conf
   fi
 
-  # Replacing HOST NAME PLACEHOLDERS
-  sed -i "s/__HIGHWAY_PROVIDER_HOSTNAME__/$HIGHWAY_PROVIDER_HOSTNAME/g" /tmp/nginx.conf
-  sed -i "s/__HIGHWAY_PORT__/$HIGHWAY_PORT/g" /tmp/nginx.conf
-
+  # Replacing HOST PLACEHOLDERS
+  sed -i "s/__HIGHWAY_HOST__/$HIGHWAY_HOST/g" /tmp/nginx.conf
 
   ########
   ### Generate .lua scripts from templates according to configuration provided
@@ -42,6 +39,9 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   cp /tmp/openid.tpl.lua /tmp/openid.lua
 
   sed -i "s/<OAUTH_DISCOVERY_URL_PLACEHOLDER>/$OAUTH_DISCOVERY_URL/" /tmp/openid.lua
+  sed -i 's*<CLIENT_ID_PLACEHOLDER>*'"$OAUTH_CLIENT_ID"'*g' /tmp/openid.lua
+  sed -i 's*<CLIENT_SECRET_PLACEHOLDER>*'"$OAUTH_CLIENT_SECRET"'*g' /tmp/openid.lua
+  sed -i 's*<OAUTH_SCOPE_PLACEHOLDER>*'"$OAUTH_SCOPE"'*g' /tmp/openid.lua
 
   if [ "$ssl" = true ] ; then
     sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/openid.lua
