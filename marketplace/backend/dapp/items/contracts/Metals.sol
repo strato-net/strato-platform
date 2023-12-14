@@ -3,10 +3,28 @@ pragma strict;
 
 import <a3d9911aeffee71e0c6cd37946d80f3864b49d45>;
 
+contract UnitOfMeasurement {
+enum UnitOfMeasurement {
+    NULL,
+    TON,
+    POUND,
+    OUNCE,
+    TONNE,
+    KG,
+    G   
+}
+}
+
 /// @title A representation of Metals assets
-contract Metals is Asset {
-    string public serialNumber;
-    string public source;
+contract Metals is Mintable, UnitOfMeasurement{
+
+    event OwnershipUpdate(string seller, string newOwner, uint ownershipStartDate, address itemAddress);
+
+    //categorical
+    UnitOfMeasurement public unitOfMeasurement;
+    uint public leastSellableUnits;
+    string public source; 
+    string purity;
 
     constructor(
         string _name,
@@ -14,10 +32,37 @@ contract Metals is Asset {
         string[] _images,
         string[] _files,
         uint _createdDate,
+        uint _quantity,
+        UnitOfMeasurement _unitOfMeasurement,
+        uint _leastSellableUnits,
         string _source,
-        string _serialNumber
-    ) public Asset(_name, _description, _images, _files, _createdDate, 1) {
-        serialNumber = _serialNumber;
+        string _purity
+    ) Mintable (
+        _name,
+        _description,
+        _images,
+        _files,
+        _createdDate,
+        _quantity) 
+    {
+        unitOfMeasurement = _unitOfMeasurement;
+        leastSellableUnits = _leastSellableUnits;
         source = _source;
+        purity = _purity;
     }
+
+    function mint(uint splitQuantity) internal override returns (UTXO) {
+        Metals newAsset = new Metals(name,
+                              description, 
+                              images, 
+                              files, 
+                              createdDate, 
+                              splitQuantity,
+                              unitOfMeasurement,
+                              leastSellableUnits,
+                              source,
+                              purity
+                              );
+        return UTXO(address(newAsset)); 
+}
 }

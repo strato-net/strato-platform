@@ -142,7 +142,9 @@ const actions = {
     minQty,
     maxQty,
     minPrice,
-    maxPrice
+    maxPrice,
+    limit,
+    offset
   ) => {
     dispatch({ type: actionDescriptors.fetchMarketplace });
 
@@ -157,12 +159,12 @@ const actions = {
       : "";
 
     const productQuery = products ? `&productId[]=${products}` : "";
-    const qtyQuery = `range[]=quantity,${minQty},${maxQty}`;
-    const priceQuery = `&range[]=pricePerUnit,${minPrice},${maxPrice}`;
+    const qtyQuery = `&range[]=quantity,${minQty},${maxQty}`;
+    // const priceQuery = `&range[]=pricePerUnit,${minPrice},${maxPrice}`;
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace?${qtyQuery}${priceQuery}${categoryQuery}${subCategoryQuery}${productQuery}${manufacturerQuery}`,
+        `${apiUrl}/marketplace?limit=${limit}&offset=${offset}${qtyQuery}${categoryQuery}${subCategoryQuery}${productQuery}${manufacturerQuery}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -210,7 +212,9 @@ const actions = {
     minQty,
     maxQty,
     minPrice,
-    maxPrice
+    maxPrice,
+    limit,
+    offset
   ) => {
     dispatch({ type: actionDescriptors.fetchMarketplaceLoggedIn });
 
@@ -225,12 +229,12 @@ const actions = {
       : "";
 
     const productIdQuery = products ? `&name[]=${products}` : "";
-    const qtyQuery = `range[]=units,${minQty},${maxQty}`;
-    const priceQuery = `&range[]=price,${minPrice},${maxPrice}`;
+    const qtyQuery = `&range[]=quantity,${minQty},${maxQty}`;
+    // const priceQuery = `&range[]=price,${minPrice},${maxPrice}`;
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace/all?${qtyQuery}${priceQuery}${categoryQuery}${subCategoryQuery}${productIdQuery}${manufacturerQuery}`,
+        `${apiUrl}/marketplace/all?limit=${limit}&offset=${offset}${qtyQuery}${categoryQuery}${subCategoryQuery}${productIdQuery}${manufacturerQuery}`,
         {
           method: HTTP_METHODS.GET,
         }

@@ -20,6 +20,7 @@ const CategoryCard = () => {
     Images["Material-category"],
     Images["Clothing-category"],
     Images["Material-category"],
+    Images["collectibles"],
   ];
 
   return (
