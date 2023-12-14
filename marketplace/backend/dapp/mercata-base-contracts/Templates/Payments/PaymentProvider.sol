@@ -7,7 +7,7 @@ import "../Enums/RestStatus.sol";
 import "../Utils/Utils.sol";
 
 /// @title A representation of PaymentProvider_1 assets
-contract PaymentProvider is Utils {
+abstract contract PaymentProvider is Utils {
     address public owner;
     string public ownerCommonName;
 

@@ -633,8 +633,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       const { orderList, orderTotal: recievedOrderTotal } = args;
 
-      const newOptions = { ...options, app: paymentProviderJs.contractName }
-
       const assetAddresses = orderList.map(o => o.assetAddress);
 
       const assets = await inventoryJs.getAll(rawAdmin, { assetAddresses: assetAddresses }, options);
@@ -663,7 +661,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           name: SERVICE_PROVIDERS.STRIPE, ownerCommonName: sellerName,
           accountDeauthorized: false
         },
-        newOptions)
+        options)
 
       /*  check if an accountId already exists for the user org */
       if (Object.keys(sellerStripeDetails).length == 0 || !sellerStripeDetails.chargesEnabled || !sellerStripeDetails.detailsSubmitted || !sellerStripeDetails.payoutsEnabled) {
@@ -699,7 +697,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         expiresAt: stripePaymentSession.expires_at,
         createdDate: stripePaymentSession.created,
       }
-      await paymentProviderJs.createPayment(rawAdmin, paymentParameters, newOptions);
+      await paymentProviderJs.createPayment(rawAdmin, paymentParameters, options);
       return stripePaymentSession
 
     } catch (error) {
@@ -729,9 +727,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getPaymentSession = async function (args, options = defaultOptions) {
     try {
-      const newOptions = { ...options, app: contractName }
       const { session_id } = args
-      const paymentDetail = await paymentProviderJs.getPaymentSession(rawAdmin, { paymentSessionId: session_id }, newOptions);
+      const paymentDetail = await paymentProviderJs.getPaymentSession(rawAdmin, { paymentSessionId: session_id }, options);
       const paymentSession = await StripeService.getPaymentSession(session_id, paymentDetail.sellerAccountId);
       const paymentIntent = await StripeService.getPaymentIntent(paymentSession.payment_intent, paymentDetail.sellerAccountId);
       const paymentMethod = await StripeService.getPaymentMethod(paymentIntent.payment_method, paymentDetail.sellerAccountId);

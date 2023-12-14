@@ -5,7 +5,8 @@ import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } f
 // import dayjs from 'dayjs';
 
 
-const contractName = 'StripePaymentProvider';
+const contractName = 'PaymentProvider';
+const stripeContractName = 'StripePaymentProvider';
 const paymentContractName = 'StripePaymentProvider.StripePaymentInitialized';
 const contractFilename = `${util.cwd}/dapp/mercata-base-contracts/Templates/Payments/StripePaymentProvider.sol`;
 
@@ -20,7 +21,7 @@ async function uploadContract(user, _constructorArgs, options) {
     const constructorArgs = marshalIn(_constructorArgs);
 
     const contractArgs = {
-        name: contractName,
+        name: stripeContractName,
         source: await importer.combine(contractFilename),
         args: util.usc(constructorArgs),
     };
@@ -152,7 +153,7 @@ function bindAddress(user, address, options) {
 
 async function get(user, args, defaultOptions) {
     const { ownerCommonName, name, address, accountId, accountDeauthorized, ...restArgs } = args;
-    const options = { ...defaultOptions, org: 'BlockApps', app: contractName }
+    const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
     let paymentProvider;
 
     if (address) {
@@ -193,7 +194,7 @@ async function getState(user, contract, options) {
 
 async function getPaymentSession(user, args, defaultOptions) {
     const { paymentSessionId, ...restArgs } = args;
-    const options = { ...defaultOptions, org: 'BlockApps', app: undefined }
+    const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
     const searchArgs = setSearchQueryOptions(restArgs, { key: 'paymentSessionId', value: paymentSessionId });
     const paymentProvider = await searchOne(paymentContractName, searchArgs, options, user);
 
@@ -203,7 +204,7 @@ async function getPaymentSession(user, args, defaultOptions) {
 
 async function createPayment(user, args, options) {
     const { address, ...restArgs } = args;
-    const contract = { name: contractName, address }
+    const contract = { name: stripeContractName, address }
     const callArgs = {
       contract,
       method: "initializePayment",
@@ -224,7 +225,7 @@ async function createPayment(user, args, options) {
 
 async function finalizePayment(user, args, options) {
     const { address, ...restArgs } = args;
-    const contract = { name: contractName, ..._contract }
+    const contract = { name: stripeContractName, ..._contract }
     const callArgs = {
       contract,
       method: "finalizePayment",
@@ -246,6 +247,7 @@ async function finalizePayment(user, args, options) {
 export default {
     uploadContract,
     contractName,
+    stripeContractName,
     contractFilename,
     bindAddress,
     get,
