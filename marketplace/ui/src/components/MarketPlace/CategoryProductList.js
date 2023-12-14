@@ -128,7 +128,7 @@ const CategoryProductList = ({ user }) => {
   };
   //============================Marketplace================================//
   const marketplaceDispatch = useMarketplaceDispatch();
-  const { marketplaceList, isMarketplaceLoading } = useMarketplaceState();
+  const { marketplaceList, isMarketplaceLoading, marketplaceListCount } = useMarketplaceState();
   useEffect(() => {
     if (category !== "" && hasChecked && !isAuthenticated) {
         actions.fetchMarketplace(
@@ -140,7 +140,7 @@ const CategoryProductList = ({ user }) => {
           debouncedMinQty,
           debouncedMaxQty,
           debouncedMinPrice,
-          debouncedMaxPrice
+          debouncedMaxPrice         
         );
     } else if (category !== "") {
         actions.fetchMarketplaceLoggedIn(
@@ -167,12 +167,14 @@ const CategoryProductList = ({ user }) => {
     debouncedMaxPrice,
     category,
     hasChecked,
-    isAuthenticated,
+    isAuthenticated,    
   ]);
 
   //============================Manufacturers/Brands=============================//
   useEffect(() => {
-    if (marketplaceList.length > 0) {
+    console.log('MPList 2', marketplaceList)
+    if (marketplaceList?.length > 0) {
+      
       var uniqueBrands =
         marketplaceList.map((p) => p.manufacturer)
           .filter(
@@ -196,7 +198,7 @@ const CategoryProductList = ({ user }) => {
     setSelectedBrands([]);
     setSubCategories([]);
   };
-
+  
   //=============================================================================//
   const checkValues = (e, arr) => {
     let tempValues = [...arr];
@@ -445,7 +447,7 @@ const CategoryProductList = ({ user }) => {
             )} */}
 
             {/* Panel - Product */}
-            {marketplaceList.length > 0 && (
+            {marketplaceList?.length > 0 && (
               <>
                 <Collapse
                   bordered={false}
@@ -517,10 +519,10 @@ const CategoryProductList = ({ user }) => {
             <div className="flex items-center">
               <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
               <Text className="text-gray-800 ml-1 text-xl font-semibold ">
-                {marketplaceList.length} Results
+                {marketplaceList?.length} Results
               </Text>
             </div>
-            {marketplaceList.length > 0 ? (
+            {marketplaceList?.length > 0 ? (
               <div className={`mt-4 mb-8 grid gap-16 ${openFilter ? "grid-cols-3" : "grid-cols-4"}`} id="product-list">
                 {marketplaceList.map((product, index) => {
                   const prodCategory = categorys.find(
@@ -539,7 +541,7 @@ const CategoryProductList = ({ user }) => {
               <div className="h-96 flex justify-center items-center" id="product-list">
                 No data found
               </div>
-            )}
+            )}            
           </div>
         )}
       </div>
