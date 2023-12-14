@@ -43,9 +43,6 @@ library:
   - mtl
   - quickcheck-instances
   - semver-range
-  - servant
-  - servant-docs
-  - source-tools
   - swagger2
 
 

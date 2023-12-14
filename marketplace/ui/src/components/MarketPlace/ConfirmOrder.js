@@ -627,7 +627,8 @@ const ConfirmOrder = () => {
                     
               }
             </div>
-            {stripeStatus == null || userAddresses.length === 0 ? <div></div> : <Row className=" justify-center md:justify-end mt-12">
+            {/* TODO: add user address later */}
+            {stripeStatus == null ? <div></div> : <Row className=" justify-center md:justify-end mt-12">
               {/* <div id="pay-later-button" className="cursor-pointer justify-center flex items-center w-44 h-9 bg-white text-primary border border-primary rounded hover:bg-primary hover:text-white mr-4"
                 onClick={() => {
                   setOpen(true);

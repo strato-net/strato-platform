@@ -20,23 +20,20 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
 - base
-- blockapps-vault-wrapper-api
-- common-log
-- postgresql-simple
 
 library:
   source-dirs: src
   dependencies:
-    - aeson
+    - blockapps-vault-wrapper-api
     - bytestring
     - cache
-    - clock
+    - common-log
     - cryptonite
     - http-client
     - lens
-    - monad-control
     - mtl
     - opaleye
+    - postgresql-simple
     - product-profunctors
     - profunctors
     - saltine
@@ -46,10 +43,8 @@ library:
     - transformers
     - unliftio
     - resource-pool
-    - secp256k1-haskell == 0.2.0
     - servant-server
     - text
-    - yaml
 
 
 executables:
@@ -58,12 +53,15 @@ executables:
     main: Main.hs
     other-modules: [Options]
     dependencies:
+      - blockapps-vault-wrapper-api
       - blockapps-vault-wrapper-server
       - blockapps-init
       - cache
       - clock
+      - common-log
       - hflags
       - http-client
+      - postgresql-simple
       - resource-pool
       - servant-options
       - servant-server
@@ -78,12 +76,14 @@ executables:
     main: MigrateKeys.hs
     other-modules: [Options]
     dependencies:
+      - blockapps-vault-wrapper-api
       - blockapps-vault-wrapper-server
       - bytestring
       - csv
       - hflags
       - lens
       - opaleye
+      - postgresql-simple
       - text
 
   migrate-nodekey:
@@ -91,12 +91,13 @@ executables:
     main: MigrateNodeKey.hs
     other-modules: [Options]
     dependencies:
+      - blockapps-vault-wrapper-api
       - blockapps-vault-wrapper-server
       - base64-bytestring
       - bytestring
-      - cryptonite
       - hflags
       - opaleye
+      - postgresql-simple
       - saltine
       - strato-model
       - text
@@ -106,34 +107,32 @@ executables:
     main: MigrateMercata.hs
     other-modules: [Options]
     dependencies:
+      - blockapps-vault-wrapper-api
       - blockapps-vault-wrapper-server
       - bytestring
       - hflags
       - lens
       - opaleye
+      - postgresql-simple
       - saltine
       - strato-model
       - text
-      - resource-pool
-      - http-client
 
   migrate-salt:
     source-dirs: app
     main: MigrateSalt.hs
     other-modules: [Options]
     dependencies:
+      - blockapps-vault-wrapper-api
       - blockapps-vault-wrapper-server
       - bytestring
       - hflags
       - lens
       - opaleye
+      - postgresql-simple
       - saltine
       - strato-model
       - text
-      - cache
-      - resource-pool
-      - http-client
-      - clock
       
 
 tests:
@@ -142,7 +141,6 @@ tests:
     main: Spec.hs
     dependencies:
       - blockapps-data
-      - blockapps-vault-wrapper-server
       - bytestring
       - clockwork
       - cryptonite

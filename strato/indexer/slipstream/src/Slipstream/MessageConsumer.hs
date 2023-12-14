@@ -23,7 +23,6 @@ import Control.Monad.Change.Alter
 import Control.Monad.Change.Modify
 import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.SQL
-import Control.Monad.IO.Unlift
 import qualified Data.Aeson as JSON
 import qualified Data.ByteString.Lazy as BL
 import Data.IORef
@@ -50,7 +49,7 @@ lookupGroup :: KPrtcl.ConsumerGroup
 lookupGroup = "slipstream"
 
 getStatediffOffset ::
-  (MonadIO m, MonadLogger m, HasKafka m) =>
+  (MonadLogger m, HasKafka m) =>
   m KPrtcl.Offset
 getStatediffOffset = do
   resp <- execKafka $ fetchSingleOffset lookupGroup lookupTopic lookupPartition
@@ -65,7 +64,7 @@ getStatediffOffset = do
     Right (off, _) -> return off
 
 putStatediffOffset ::
-  (MonadIO m, MonadLogger m, HasKafka m) =>
+  (MonadLogger m, HasKafka m) =>
   KPrtcl.Offset ->
   m ()
 putStatediffOffset off = do
