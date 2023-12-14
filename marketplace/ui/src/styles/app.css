@@ -222,3 +222,13 @@ border : 1px solid #E9E9E9 !important;
   display: none;
   scroll-behavior: smooth;
 }
+
+.orders_responsive_cards {
+  width: 100%;
+}
+
+.orders_responsive_cards .ant-spin-container{
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}

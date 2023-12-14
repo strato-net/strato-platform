@@ -5,7 +5,6 @@ import SoldOrdersTable from "./SoldOrdersTable";
 import BoughtOrdersTable from "./BoughtOrdersTable";
 import TransfersTable from "./TransfersTable";
 import dayjs from "dayjs";
-import { SearchOutlined } from "@ant-design/icons";
 import routes from "../../helpers/routes";
 import ClickableCell from "../ClickableCell";
 
@@ -29,7 +28,7 @@ const Order = ({ user }) => {
 
   return (
     <div>
-      <div className="px-20 py-10">
+      <div className="px-4 md:px-20 py-2 md:py-10">
       <Breadcrumb>
         <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
           <ClickableCell href={routes.Marketplace.url}>
@@ -44,11 +43,11 @@ const Order = ({ user }) => {
       </Breadcrumb>
       </div>
       <Tabs
-        className="mx-20 mt-0"
+        className="mx-4 md:mx-20 mt-0"
         defaultActiveKey={state == null ? "Sold" : state.defaultKey}
         onChange={onChange}
         tabBarExtraContent={              
-          <div className="text-xs flex items-center">
+          <div className="text-xs md:flex items-center hidden">
             <DatePicker
               value={
                 selectedDate
@@ -66,31 +65,19 @@ const Order = ({ user }) => {
         }
         items={[
           {
-            label: <p id="sold-tab" className="font-semibold text-base">Orders (Sold)</p>,
+            label: <p id="sold-tab" className="font-semibold text-sm md:text-base">Orders (Sold)</p>,
             key: "Sold",
-            children: 
-            <div className="flex flex-col mt-3">
-                <Input className="text-base orders_searchbar mb-5 p-3 rounded-full bg-[#F6F6F6]" prefix={<SearchOutlined />} placeholder="Search Markeplace" />
-                <SoldOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()}/>
-            </div>,
+            children: <SoldOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} onDateChange={onDateChange}/>
           },
           {
-            label: <p id="bought-tab" className="font-semibold text-base">Orders (Bought)</p>,
+            label: <p id="bought-tab" className="font-semibold text-sm md:text-base">Orders (Bought)</p>,
             key: "Bought",
-            children: 
-            <div className="flex flex-col mt-3">
-                <Input className="text-base orders_searchbar mb-5 p-3 rounded-full bg-[#F6F6F6]" prefix={<SearchOutlined />} placeholder="Search Markeplace" />
-                <BoughtOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()}/>
-            </div>,
+            children: <BoughtOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} onDateChange={onDateChange}/>
           },
           {
-            label: <p id="transfers-tab" className="font-semibold text-base">Transfers</p>,
+            label: <p id="transfers-tab" className="font-semibold text-sm md:text-base">Transfers</p>,
             key: "Transfers",
-            children: 
-            <div className="flex flex-col mt-3">
-                <Input className="text-base orders_searchbar mb-5 p-3 rounded-full bg-[#F6F6F6]" prefix={<SearchOutlined />} placeholder="Search Markeplace" />
-                <TransfersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()}/>
-            </div>,
+            children: <TransfersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()}/>
           }
         ]}
       />
