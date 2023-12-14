@@ -1,4 +1,5 @@
 const dayjs = require('dayjs');
+const Joi = require('@hapi/joi');
 const stripeService = require('./stripe.service');
 
 class StripeServiceController {
@@ -52,6 +53,33 @@ class StripeServiceController {
     }
   }
 
+  static async stripeGetSession(req, res, next) {
+    try {
+      StripeServiceController.validateStripeGetSessionArgs(req.body);
+
+      const { sessionId, sellerAccountId } = req.body;
+      const session = await stripeService.getPaymentSession(sessionId, sellerAccountId);
+      res.status(200).json({ ...session });
+      return next();
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  static async stripeCheckout(req, res, next) {
+    try {
+      StripeServiceController.validateStripeCheckoutArgs(req.body);
+
+      const { cartData, orderDetail, accountId } = req.body;
+
+      const session = await stripeService.initiatePayment(cartData, orderDetail, accountId);
+      res.status(200).send(session);
+      return next();
+    } catch (e) {
+      next(e);
+    }
+  }
+
   static async stripeWebhook(req, res, next) {
     try {
       const event = req.body;
@@ -83,6 +111,45 @@ class StripeServiceController {
       return next();
     } catch (e) {
       next(e);
+    }
+  }
+
+  // ********* VALIDATION ***********
+  static validateStripeCheckoutArgs(args) {
+    const stripeCheckoutSchema = Joi.object({
+      cartData: Joi.array().items(
+        Joi.object({
+          quantity: Joi.number().min(1).required(),
+          assetAddress: Joi.string().required(),
+        })
+      ),
+      orderDetail: Joi.array().items(
+        Joi.object({
+          productName: Joi.string().required(),
+          unitPrice: Joi.number().min(1).required(),
+          quantity: Joi.number().min(1).required(),
+        })
+      ),
+      accountId: Joi.string().required(),
+    });
+
+    const validation = stripeCheckoutSchema.validate(args);
+
+    if (validation.error) {
+      throw new Error(`Missing args or bad format in GET request /checkout: ${validation.error.message}`);
+    }
+  }
+
+  static validateStripeGetSessionArgs(args) {
+    const stripeGetSessionSchema = Joi.object({
+      sessionId: Joi.string().required(),
+      sellerAccountId: Joi.string().required(),
+    })
+
+    const validation = stripeGetSessionSchema.validate(args);
+
+    if (validation.error) {
+      throw new Error(`Missing args or bad format in GET request /session: ${validation.error.message}`);
     }
   }
 

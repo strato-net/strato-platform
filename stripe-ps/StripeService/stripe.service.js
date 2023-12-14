@@ -58,26 +58,6 @@ class StripeService {
         }
     }
 
-    static getPaymentIntent(paymentIntentId, CONNECTED_ACCOUNT_ID) {
-        try {
-            return stripe.paymentIntents.retrieve(paymentIntentId, {
-                stripeAccount: CONNECTED_ACCOUNT_ID,
-            });
-        } catch (e) {
-            throw new Error(`Stripe error: ${e.message}`)
-        }
-    }
-
-    static getPaymentMethod(paymentMethodId, CONNECTED_ACCOUNT_ID) {
-        try {
-            return stripe.paymentMethods.retrieve(paymentMethodId, {
-                stripeAccount: CONNECTED_ACCOUNT_ID,
-            });
-        } catch (e) {
-            throw new Error(`Stripe error: ${e.message}`);
-        }
-    }
-
     static generateStripeAccountId(type = 'standard') {
         try {
             return stripe.accounts.create({ type });

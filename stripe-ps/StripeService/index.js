@@ -13,6 +13,16 @@ router.get(
   StripeServiceController.stripeConnectStatus
 );
 
+router.get(
+  '/checkout',
+  StripeServiceController.stripeCheckout
+)
+
+router.get(
+  '/session',
+  StripeServiceController.stripeGetSession
+)
+
 router.post(
   '/webhook',
   StripeServiceController.stripeWebhook
