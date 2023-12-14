@@ -167,6 +167,18 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
             </div>
           </div>
         );
+        case "Collectibles":
+          return (
+            <div className="flex mt-1 items-center">
+              <p className="text-primaryC text-sm w-40">Condition</p>
+              <p className="text-secondryB text-sm">
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">
+                {itemData.condition?.toUpperCase()}
+              </p>
+            </div>
+          );
       case "Metals":
         return (
           <>
