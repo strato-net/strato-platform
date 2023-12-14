@@ -301,19 +301,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return artJs.getAll(rawAdmin, args, getOptions);
   };
 
-  // contract.transferOwnershipArt = async function (args, options = defaultOptions) {
-  //   const { address, chainId, newOwner } = args;
-  //   const contract = { name: artJs.contractName, address: address, };
-  //   const chainOptions = { chainIds: [chainId], ...options };
-  //   return artJs.transferOwnership(rawAdmin, contract, chainOptions, newOwner);
-  // };
-
-  // contract.updateArt = async function (args, options = defaultOptions) {
-  //   const { address, chainId, updates } = args;
-  //   const contract = { name: artJs.contractName, address: address, };
-  //   const chainOptions = { chainIds: [chainId], ...options };
-  //   return artJs.update(rawAdmin, contract, updates, chainOptions);
-  // };
   // ------------------------------ ART ENDS --------------------------------
 
   // ------------------------------ CARBON STARTS------------------------------
