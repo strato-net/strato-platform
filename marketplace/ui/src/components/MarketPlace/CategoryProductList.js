@@ -7,6 +7,7 @@ import {
   Spin,
   InputNumber,
   Space,
+  Pagination
 } from "antd";
 import CategoryProductCard from "./CategoryProductCard";
 //categories
@@ -53,6 +54,9 @@ const CategoryProductList = ({ user }) => {
   const debouncedMinPrice = useDebounce(minPrice, 1000);
   const [subCategories, setSubCategories] = useState([]);
   const [uniqueProductNames, setUniqueProductNames] = useState([]);
+  const limit = 10;
+  const [offset, setOffset] = useState(0);
+  const [page, setPage] = useState(1);
   //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
   const { categorys } = useCategoryState();
@@ -118,7 +122,7 @@ const CategoryProductList = ({ user }) => {
   };
   //============================Marketplace================================//
   const marketplaceDispatch = useMarketplaceDispatch();
-  const { marketplaceList, isMarketplaceLoading } = useMarketplaceState();
+  const { marketplaceList, isMarketplaceLoading, marketplaceListCount } = useMarketplaceState();
   useEffect(() => {
     if (category !== "" && hasChecked && !isAuthenticated) {
         actions.fetchMarketplace(
@@ -130,7 +134,9 @@ const CategoryProductList = ({ user }) => {
           debouncedMinQty,
           debouncedMaxQty,
           debouncedMinPrice,
-          debouncedMaxPrice
+          debouncedMaxPrice,
+          limit,
+          offset
         );
     } else if (category !== "") {
         actions.fetchMarketplaceLoggedIn(
@@ -142,7 +148,9 @@ const CategoryProductList = ({ user }) => {
           debouncedMinQty,
           debouncedMaxQty,
           debouncedMinPrice,
-          debouncedMaxPrice
+          debouncedMaxPrice,
+          limit,
+          offset
           );
     }
   }, [
@@ -158,11 +166,12 @@ const CategoryProductList = ({ user }) => {
     category,
     hasChecked,
     isAuthenticated,
+    offset,
   ]);
 
   //============================Manufacturers/Brands=============================//
   useEffect(() => {
-    if (marketplaceList.length > 0) {
+    if (marketplaceList?.length > 0) {
       var uniqueBrands =
         marketplaceList.map((p) => p.manufacturer)
           .filter(
@@ -185,6 +194,11 @@ const CategoryProductList = ({ user }) => {
     setSelectedProducts([]);
     setSelectedBrands([]);
     setSubCategories([]);
+  };
+  
+  const onPageChange = (page) => {
+    setOffset((page - 1) * limit);
+    setPage(page);
   };
 
   //=============================================================================//
@@ -327,7 +341,7 @@ const CategoryProductList = ({ user }) => {
             )} */}
 
             {/* Panel - Product */}
-            {marketplaceList.length > 0 && (
+            {marketplaceList?.length > 0 && (
               <>
                 <Collapse
                   bordered={false}
@@ -396,9 +410,9 @@ const CategoryProductList = ({ user }) => {
         ) : (
           <div className="w-9/12 mb-12">
             <Text className="text-sm text-secondryB">
-              {marketplaceList.length} Products found
+              {marketplaceListCount} Products found
             </Text>
-            {marketplaceList.length > 0 ? (
+            {marketplaceList?.length > 0 ? (
               <div className="mt-4 mb-8 mr-10" id="product-list">
                 {marketplaceList.map((product, index) => {
                   const prodCategory = categorys.find(
@@ -418,6 +432,13 @@ const CategoryProductList = ({ user }) => {
                 No data found
               </div>
             )}
+            <Pagination
+              current={page}
+              onChange={onPageChange}
+              total={marketplaceListCount}
+              showSizeChanger={false}
+              className="flex justify-center my-5 "
+            />
           </div>
         )}
       </div>
