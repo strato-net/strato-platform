@@ -5,7 +5,7 @@ import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } f
 // import dayjs from 'dayjs';
 
 
-const contractName = 'PaymentProvider';
+const contractName = 'BasePaymentProvider';
 const stripeContractName = 'StripePaymentProvider';
 const paymentContractName = 'StripePaymentProvider.StripePaymentInitialized';
 const contractFilename = `${util.cwd}/dapp/mercata-base-contracts/Templates/Payments/StripePaymentProvider.sol`;
@@ -157,10 +157,10 @@ async function get(user, args, defaultOptions) {
     let paymentProvider;
 
     if (address) {
-        const searchArgs = setSearchQueryOptions(restArgs, [{ key: 'address', value: address }, {key: 'order', value: 'chargesEnabled.desc'}]);
+        const searchArgs = setSearchQueryOptions(restArgs, [{ key: 'address', value: address }, {key: 'order', value: 'chargesEnabled.desc,block_timestamp.desc'}]);
         paymentProvider = await searchOne(contractName, searchArgs, options, user);
     } else if (ownerCommonName) {
-        let searchValues = [{ key: 'ownerCommonName', value: ownerCommonName }, { key: 'name', value: name }, {key: 'order', value: 'chargesEnabled.desc'}];
+        let searchValues = [{ key: 'ownerCommonName', value: ownerCommonName }, { key: 'name', value: name }, {key: 'order', value: 'chargesEnabled.desc,block_timestamp.desc'}];
         if (accountDeauthorized != undefined) {
             searchValues.push({ key: 'accountDeauthorized', value: accountDeauthorized })
         }
@@ -168,7 +168,7 @@ async function get(user, args, defaultOptions) {
         paymentProvider = await searchOne(contractName, searchArgs, options, user);
     } else if (accountId) {
 
-        const searchArgs = setSearchQueryOptions(restArgs, [{ key: 'accountId', value: accountId }, { key: 'name', value: name }, {key: 'order', value: 'chargesEnabled.desc'}]);
+        const searchArgs = setSearchQueryOptions(restArgs, [{ key: 'accountId', value: accountId }, { key: 'name', value: name }, {key: 'order', value: 'chargesEnabled.desc,block_timestamp.desc'}]);
         paymentProvider = await searchOne(contractName, searchArgs, options, user);
     }
     if (!paymentProvider) {
