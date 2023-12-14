@@ -242,7 +242,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
               </p>
               {itemData.isMint && itemData.isMint == 'True' ? (<div className="flex ml-2">
                 <div className="text-primary bg-[#EBFFF7] text-center py-1 rounded w-20 text-xs">
-                  <p>RESELLABLE</p>
+                  <p>Original Issuer</p>
                 </div>
               </div>) : (<div></div>)}
             </div>
