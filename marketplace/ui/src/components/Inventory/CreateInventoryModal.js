@@ -744,7 +744,7 @@ const CreateInventoryModal = ({
                 <div className="flex items-start">
                   <p className="mt-1 text-xs italic font-medium ">Note:</p>
                   <p className="mt-1 text-xs italic ml-1 mr-4">
-                    use jpg, png format of size less than 1mb
+                    use jpg, png format of size less than 1mb. Limit of 10.
                   </p>
                 </div>
                 {formik.touched.images && formik.errors.images && (
@@ -777,7 +777,7 @@ const CreateInventoryModal = ({
                 <div className="flex items-start">
                   <p className="mt-1 text-xs italic font-medium ">Note:</p>
                   <p className="mt-1 text-xs italic ml-1 mr-4">
-                    use pdf format of size less than 1mb
+                    use pdf format of size less than 1mb. Limit of 10.
                   </p>
                 </div>
                 {formik.touched.images && formik.errors.images && (
