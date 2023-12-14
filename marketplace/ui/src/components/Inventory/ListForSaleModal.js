@@ -86,18 +86,20 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
                         ))}
                     </Select>
                 )
-            }]
+            },
+            {
+                title: "Quantity",
+                align: "center",
+                render: () => (
+                    <InputNumber value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
+                )
+            },
+        
+        ]
         switch (getCategory()) {
             case 'Carbon':
                 finalColumns = finalColumns.concat(
                     [
-                        {
-                            title: "Quantity",
-                            align: "center",
-                            render: () => (
-                                <InputNumber value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
-                            )
-                        },
                         {
                             title: "Set Price Per Unit",
                             align: "center",
