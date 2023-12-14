@@ -43,10 +43,8 @@ class StripeService {
                 stripeAccount: CONNECTED_ACCOUNT_ID
             })
 
-        } catch (e) {
-            // If there is an error send it to the client
-            console.error(`Stripe error: ${e}`)
-            throw new Error(RestStatus.BAD_REQUEST, `Stripe error: ${e.message}`)
+        } catch (error) {
+            throw new Error(RestStatus.BAD_REQUEST, `Stripe error: ${error.message}`)
         }
     }
 
@@ -56,30 +54,27 @@ class StripeService {
                 stripeAccount: CONNECTED_ACCOUNT_ID
             });
         } catch (error) {
-            console.error(`Stripe error: ${e}`)
-            throw new Error(RestStatus.BAD_REQUEST, `Stripe error: ${e.message}`)
+            throw new Error(RestStatus.BAD_REQUEST, `Stripe error: ${error.message}`)
         }
     }
 
     static getPaymentIntent(paymentIntentId, CONNECTED_ACCOUNT_ID) {
         try {
             return stripe.paymentIntents.retrieve(paymentIntentId, {
-                stripeAccount: CONNECTED_ACCOUNT_ID
+                stripeAccount: CONNECTED_ACCOUNT_ID,
             });
         } catch (error) {
-            console.error(`Stripe error: ${e}`)
-            throw new Error(RestStatus.BAD_REQUEST, `Stripe error: ${e.message}`)
+            throw new Error(RestStatus.BAD_REQUEST, `Stripe error: ${error.message}`)
         }
     }
 
     static getPaymentMethod(paymentMethodId, CONNECTED_ACCOUNT_ID) {
         try {
             return stripe.paymentMethods.retrieve(paymentMethodId, {
-                stripeAccount: CONNECTED_ACCOUNT_ID
+                stripeAccount: CONNECTED_ACCOUNT_ID,
             });
         } catch (error) {
-            console.error(`Stripe error: ${e}`)
-            throw new Error(RestStatus.BAD_REQUEST, `Stripe error: ${e.message}`)
+            throw new Error(RestStatus.BAD_REQUEST, `Stripe error: ${error.message}`);
         }
     }
 
@@ -87,8 +82,7 @@ class StripeService {
         try {
             return stripe.accounts.create({ type });
         } catch (error) {
-            console.error(`Stripe error: ${e}`)
-            throw new Error(RestStatus.BAD_REQUEST, `Stripe error: ${e.message}`)
+            throw new Error(RestStatus.BAD_REQUEST, `Stripe error: ${error.message}`);
         }
     }
 
@@ -101,17 +95,15 @@ class StripeService {
                 type: 'account_onboarding',
             });
         } catch (error) {
-            console.error(`Stripe error: ${e}`)
-            throw new Error(RestStatus.BAD_REQUEST, `Stripe error: ${e.message}`)
+            throw new Error(RestStatus.BAD_REQUEST, `Stripe error: ${error.message}`);
         }
     }
 
     static getStripeConnectAccountDetail(accountId) {
         try {
-            return stripe.accounts.retrieve(accountId)
+            return stripe.accounts.retrieve(accountId);
         } catch (error) {
-            console.error(`Stripe error: ${e}`)
-            throw new Error(RestStatus.BAD_REQUEST, `Stripe error: ${e.message}`)
+            throw new Error(RestStatus.BAD_REQUEST, `Stripe error: ${error.message}`);
         }
     }
 }

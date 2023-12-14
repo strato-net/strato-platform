@@ -6,6 +6,7 @@ const expressWinston = require('express-winston');
 const helmet = require('helmet');
 const winston = require('winston');
 
+const { clientErrorHandler, commonErrorHandler } = require('./helpers/utils');
 const routes = require('./routes');
 
 const config = {
@@ -16,9 +17,12 @@ const config = {
 
 const app = express();
 
+// Middleware
 app.use(helmet());
 app.use(bodyParser.json());
 app.use(cors());
+
+// Logging
 app.use(
   expressWinston.logger({
     transports: [new winston.transports.Console()],
@@ -27,7 +31,12 @@ app.use(
   })
 );
 
+// Routes
 app.use('/', routes);
+
+// Error Handlers
+app.use(clientErrorHandler);
+app.use(commonErrorHandler);
 
 app.listen(config.port, config.host, (e)=> {
     if(e) {

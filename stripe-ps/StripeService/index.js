@@ -9,7 +9,7 @@ router.get(
 );
 
 router.get(
-  '/status', 
+  '/status/:accountId', 
   StripeServiceController.stripeConnectStatus
 );
 

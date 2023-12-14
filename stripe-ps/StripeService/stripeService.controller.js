@@ -23,22 +23,27 @@ class StripeServiceController {
       else {
         const connectLink = await stripeService.generateStripeAccountConnectLink(accountId);
         res.status(200).json({
-          connectLink: connectLink
+          connectLink: connectLink,
         });
       }
       return next();
     } catch (e) {
-      console.error(`${e}`);
       next(e);
     }
   }
 
   static async stripeConnectStatus(req, res, next) {
     try {
-      res.status(200).send('TODO');
+      const accountId = req.params.accountId;
+
+      const userStripeAccount = await stripeService.getStripeConnectAccountDetail(accountId);
+      res.status(200).json({
+        chargesEnabled: userStripeAccount.charges_enabled,
+        detailsSubmitted: userStripeAccount.details_submitted,
+        payoutsEnabled: userStripeAccount.payouts_enabled,
+      });
       return next();
     } catch (e) {
-      console.error(`${e}`);
       next(e);
     }
   }
@@ -48,7 +53,6 @@ class StripeServiceController {
       res.status(200).send('TODO');
       return next();
     } catch (e) {
-      console.error(`${e}`);
       next(e);
     }
   }
@@ -58,7 +62,6 @@ class StripeServiceController {
       res.status(200).send('TODO');
       return next();
     } catch (e) {
-      console.error(`${e}`);
       next(e);
     }
   }
