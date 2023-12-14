@@ -172,7 +172,6 @@ const CategoryProductList = ({ user }) => {
 
   //============================Manufacturers/Brands=============================//
   useEffect(() => {
-    console.log('MPList 2', marketplaceList)
     if (marketplaceList?.length > 0) {
       
       var uniqueBrands =
