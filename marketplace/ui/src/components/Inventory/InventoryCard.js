@@ -241,7 +241,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
                 ({getCategory()})
               </p>
               {itemData.isMint && itemData.isMint == 'True' ? (<div className="flex ml-2">
-                <div className="text-primary bg-[#EBFFF7] text-center py-1 rounded w-20 text-xs">
+                <div className="text-primary bg-[#EBFFF7] text-center py-1 rounded w-25 text-s">
                   <p>Original Issuer</p>
                 </div>
               </div>) : (<div></div>)}
