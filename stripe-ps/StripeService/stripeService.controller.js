@@ -34,6 +34,10 @@ class StripeServiceController {
 
   static async stripeConnectStatus(req, res, next) {
     try {
+      if (!req.params.accountId) {
+        throw new Error('Missing account ID in GET request /status/:accountId');
+      }
+      
       const accountId = req.params.accountId;
 
       const userStripeAccount = await stripeService.getStripeConnectAccountDetail(accountId);

@@ -4,7 +4,6 @@ class CustomerAddressController {
 
   static async getAddresses(req, res, next) {
     try {
-      // Common name should exist
       if (!req.params.commonName) {
         throw new Error('Missing common name in GET request /address/:commonName');
       }
@@ -78,10 +77,10 @@ class CustomerAddressController {
   static async deleteAddress(req, res, next) {
     try {
       if (!req.params.id) {
-        throw new Error('Missing common name in POST request /address/delete/:id');
+        throw new Error('Missing address ID in DELETE request /address/delete/:id');
       }
 
-      const sql = 'DELETE FROM customer_address WHERE id = ?';
+      const sql = 'DELETE FROM customer_address WHERE address_id = ?';
       const params = [req.params.id];
       db.run(sql, params, function (err, row) {
         if (err) {
@@ -113,7 +112,7 @@ class CustomerAddressController {
     const validation = addAddressSchema.validate(args);
 
     if (validation.error) {
-      throw new Error(`Missing args or bad format: ${validation.error.message}`);
+      throw new Error(`Missing args or bad format in POST request /address: ${validation.error.message}`);
     }
   }
 
