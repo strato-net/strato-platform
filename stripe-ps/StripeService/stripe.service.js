@@ -1,4 +1,4 @@
-const { STRIPE_ENV } = require('./constants');
+const { STRIPE_ENV } = require('../helpers/constants');
 const Stripe = require('stripe');
 const stripe = Stripe(STRIPE_ENV.CREDENTIALS.STRIPE_SECRET_KEY);
 
@@ -57,7 +57,7 @@ class StripeService {
             });
         } catch (error) {
             console.error(`Stripe error: ${e}`)
-            throw new rest.RestError(RestStatus.BAD_REQUEST, `Stripe error: ${e.message}`)
+            throw new Error(RestStatus.BAD_REQUEST, `Stripe error: ${e.message}`)
         }
     }
 
@@ -68,7 +68,7 @@ class StripeService {
             });
         } catch (error) {
             console.error(`Stripe error: ${e}`)
-            throw new rest.RestError(RestStatus.BAD_REQUEST, `Stripe error: ${e.message}`)
+            throw new Error(RestStatus.BAD_REQUEST, `Stripe error: ${e.message}`)
         }
     }
 
@@ -79,7 +79,7 @@ class StripeService {
             });
         } catch (error) {
             console.error(`Stripe error: ${e}`)
-            throw new rest.RestError(RestStatus.BAD_REQUEST, `Stripe error: ${e.message}`)
+            throw new Error(RestStatus.BAD_REQUEST, `Stripe error: ${e.message}`)
         }
     }
 
@@ -88,7 +88,7 @@ class StripeService {
             return stripe.accounts.create({ type });
         } catch (error) {
             console.error(`Stripe error: ${e}`)
-            throw new rest.RestError(RestStatus.BAD_REQUEST, `Stripe error: ${e.message}`)
+            throw new Error(RestStatus.BAD_REQUEST, `Stripe error: ${e.message}`)
         }
     }
 
@@ -102,7 +102,7 @@ class StripeService {
             });
         } catch (error) {
             console.error(`Stripe error: ${e}`)
-            throw new rest.RestError(RestStatus.BAD_REQUEST, `Stripe error: ${e.message}`)
+            throw new Error(RestStatus.BAD_REQUEST, `Stripe error: ${e.message}`)
         }
     }
 
@@ -111,7 +111,7 @@ class StripeService {
             return stripe.accounts.retrieve(accountId)
         } catch (error) {
             console.error(`Stripe error: ${e}`)
-            throw new rest.RestError(RestStatus.BAD_REQUEST, `Stripe error: ${e.message}`)
+            throw new Error(RestStatus.BAD_REQUEST, `Stripe error: ${e.message}`)
         }
     }
 }
