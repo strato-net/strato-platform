@@ -19,6 +19,7 @@ import ResellModal from "./ResellModal";
 import TransferModal from "./TransferModal";
 import routes from "../../helpers/routes";
 import image_placeholder from "../../images/resources/image_placeholder.png";
+import { getUnitNameByIndex } from "../../helpers/constants";
 
 const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentProviderAddress }) => {
   const [openPop, setOpenPop] = useState(false);
@@ -168,6 +169,27 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
         );
       case "Metals":
         return (
+          <>
+          <div className="flex mt-1.5 items-center">
+              <p className="text-primaryC text-sm w-40">Purity</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">
+                {itemData.purity}
+              </p>
+            </div>
+            <div className="flex mt-1.5 items-center">
+              <p className="text-primaryC text-sm w-40">Unit Of Measurement</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">
+              {getUnitNameByIndex(itemData.unitOfMeasurement)}
+       
+                
+              </p>
+            </div>
           <div className="flex mt-1.5 items-center">
             <p className="text-primaryC text-sm w-40">Source</p>
             <p className="text-secondryB text-sm">
@@ -176,7 +198,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
             <p className="text-secondryB text-sm ml-3">
               {itemData.source}
             </p>
-          </div>)
+          </div>
+          </>)
       case 'Membership':
         return (
           <>
