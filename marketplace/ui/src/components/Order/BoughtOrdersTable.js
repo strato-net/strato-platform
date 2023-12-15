@@ -16,6 +16,7 @@ import "./ordersTable.css"
 import { FilterIcon } from "../../images/SVGComponents";
 import { ResponsiveOrderCard } from "./ResponsiveOrdersCard";
 import dayjs from "dayjs";
+import { ResponsiveBoughtOrderCard } from "./ResponsiveBoughtOrdersCard";
 
 
 const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
@@ -241,11 +242,9 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
         </div>
       </div>
       <div className="flex md:hidden order_responsive">
-        <ResponsiveOrderCard
-          columns={column}
+        <ResponsiveBoughtOrderCard
           data={data}
           isLoading={isordersLoading}
-          category={"Bought"}
         />
       </div>
       <div className="hidden md:block">

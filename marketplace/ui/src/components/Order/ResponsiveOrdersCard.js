@@ -5,7 +5,28 @@ import routes from "../../helpers/routes";
 
 export const ResponsiveOrderCard = ({ data, isLoading, category}) => {
     const navigate = useNavigate();
-    console.log(data, "data")
+
+    const statusComponent = (status) => {
+        let classes
+        switch (status) {
+            case 'Closed':
+                classes = "text-[#119B2D]"
+                break;
+            case 'Awaiting Fulfillment':
+                classes = "text-[#FF8C00]"
+                break;
+            case 'Cancelled':
+                classes = "text-[#FF0000]]"
+                break;
+            case 'Awaiting Shipment':
+                classes = "text-[#13188A]"
+                break;
+            default:
+                classes = "text-[#202020]"
+                break;
+        }
+        return classes;
+    }
     return (
         <Spin wrapperClassName="orders_responsive_cards" spinning={isLoading} delay={500} size="large">
             { data.length > 0 ? data.map((item) => {
@@ -38,9 +59,9 @@ export const ResponsiveOrderCard = ({ data, isLoading, category}) => {
                         </div>
                         <div className={`p-2 px-4 w-full flex justify-between`}>
                             <Typography>{category == 'Transfer' ? 'Product Name' : 'Status'}</Typography>
-                            <Typography
-                                className={`${item.status == 'Closed' ? 'text-[#119B2D]' : item.status == 'Awaiting Fulfillment' ? 'text-[#FF8C00]' : item.status == 'Cancelled' ? 'text-[#FF0000]' : item.status == 'Awaiting Shipment' ? 'text-[#13188A]' : 'text-[#202020]'}`}
-                            >{category == 'Transfer' ? item?.productName : item?.status || 'N/A'}</Typography>
+                            <Typography className={statusComponent(item?.status)}>
+                                {category == 'Transfer' ? item?.productName : item?.status || 'N/A'}
+                            </Typography>
                         </div>
                         {category == 'Transfer' && <div className={`p-2 px-4 w-full flex justify-between`}>
                             <Typography>Quantity</Typography>

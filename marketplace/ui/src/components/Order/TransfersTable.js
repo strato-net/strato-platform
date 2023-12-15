@@ -8,6 +8,7 @@ import { Input, Pagination } from "antd";
 import "./ordersTable.css"
 import { DownOutlined, SearchOutlined, UpOutlined } from "@ant-design/icons";
 import { ResponsiveOrderCard } from "./ResponsiveOrdersCard";
+import { ResponsiveTransferOrderCard } from "./ResponsiveTransferOrdersCard";
 
 
 const TransfersTable = ({ user, selectedDate }) => {
@@ -119,11 +120,9 @@ const TransfersTable = ({ user, selectedDate }) => {
     <div>
       <Input className="text-base orders_searchbar mb-5 rounded-full bg-[#F6F6F6]" prefix={<SearchOutlined />} placeholder="Search Markeplace" />
       <div className="flex md:hidden order_responsive">
-        <ResponsiveOrderCard
-          columns={column}
+        <ResponsiveTransferOrderCard
           data={data}
           isLoading={isFetchingItemTransfers}
-          category={"Transfer"}
         />
       </div>
       <div className="hidden md:block">

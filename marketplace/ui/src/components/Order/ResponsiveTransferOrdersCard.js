@@ -4,27 +4,7 @@ import { useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
 
 export const ResponsiveTransferOrderCard = ({ data, isLoading}) => {
-    const statusComponent = (status) => {
-        let classes
-        switch (status) {
-            case 'Closed':
-                classes = "text-[#119B2D]"
-                break;
-            case 'Awaiting Fulfillment':
-                classes = "text-[#FF8C00]"
-                break;
-            case 'Cancelled':
-                classes = "text-[#FF0000]]"
-                break;
-            case 'Awaiting Shipment':
-                classes = "text-[#13188A]"
-                break;
-            default:
-                classes = "text-[#202020]"
-                break;
-        }
-        return classes;
-    }
+    
     return (
         <Spin wrapperClassName="orders_responsive_cards" spinning={isLoading} delay={500} size="large">
             { data.length > 0 ? data.map((item) => {
