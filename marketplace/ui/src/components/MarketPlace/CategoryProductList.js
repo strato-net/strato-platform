@@ -291,7 +291,7 @@ const CategoryProductList = ({ user }) => {
         <Breadcrumb.Item href="" onClick={e => setSelectedCategories([])}>
           <ClickableCell href={routes.MarketplaceProductList.url}>
             <p href={routes.MarketplaceProductList.url} className="text-primaryB hover:bg-transparent">
-              MarketPlace
+              Marketplace
             </p>
           </ClickableCell>  
         </Breadcrumb.Item>

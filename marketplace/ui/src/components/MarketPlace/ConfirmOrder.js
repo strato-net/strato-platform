@@ -283,16 +283,6 @@ const ConfirmOrder = () => {
         <p className="text-center">{text}</p>
       ),
       // width: "12%"
-    },{
-      title: (
-        <Text className="text-[#202020] text-base font-semibold">Measurement (Unit)</Text>
-      ),
-      dataIndex: "sellersCommonName",
-      align: "center",
-      render: (text) => (
-        <p className="">lb</p>
-      ),
-  //  width: "12%"
     },
     {
       title: <Text className="text-[#202020] text-base font-semibold">Unit Price($)</Text>,
@@ -301,7 +291,7 @@ const ConfirmOrder = () => {
       render: (text) => <p className=" text-sm text-[#202020] font-medium font-sans">{text}</p>,
     },
     {
-      title: <Text className="text-[#202020] text-base font-semibold">QUANTITY</Text>,
+      title: <Text className="text-[#202020] text-base font-semibold">Quantity</Text>,
       dataIndex: "qty",
       align: "center",
       render: (text) => <p className="text-sm text-[#202020] font-medium font-sans">{text}</p>,
@@ -315,13 +305,13 @@ const ConfirmOrder = () => {
       render: (text) => <p className="text-sm font-medium text-[#202020] ">{text}</p>,
     },
     {
-      title: <Text className="text-[#202020] text-base font-semibold">TAX($)</Text>,
+      title: <Text className="text-[#202020] text-base font-semibold">Tax($)</Text>,
       dataIndex: "tax",
       align: "center",
       render: (text) => <p className="text-sm font-medium text-[#202020]">{text}</p>,
     },
     {
-      title: <Text className="text-[#202020] text-base font-semibold">AMOUNT($)</Text>,
+      title: <Text className="text-[#202020] text-base font-semibold">Amount($)</Text>,
       dataIndex: "amount",
       align: "center",
       render: (text) => <p className="text-sm font-medium text-[#202020]">{text}</p>  
