@@ -13,7 +13,7 @@ import {
 
 
 
-const AddAddressModel = ({open , close }) => {
+const AddAddressModal = ({open , close }) => {
     const [showAddress, setshowAddress] = useState(false);
     const marketplaceDispatch = useMarketplaceDispatch();
     const ShippingDetailsSchema = () => {
@@ -272,4 +272,4 @@ const AddAddressModel = ({open , close }) => {
   )
 }
 
-export default AddAddressModel
+export default AddAddressModal

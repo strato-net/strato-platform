@@ -11,7 +11,7 @@ import TagManager from "react-gtm-module";
 import { setCookie } from "../../helpers/cookie";
 import { Images } from '../../images';
 
-const NewTrendingCard = ({topSellingProduct, addItemToCart}) => {
+const NewTrendingCard = ({topSellingProduct, addItemToCart, parent = ""}) => {
     const [quantity, setQuantity] = useState(0)
 
     let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
@@ -20,12 +20,12 @@ const NewTrendingCard = ({topSellingProduct, addItemToCart}) => {
     const navigate = useNavigate();
 
     return(
-        <div className='trending_cards_container_card bg-white p-3 px-4 min-w-[230px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max'>
+        <div className={`trending_cards_container_card bg-white p-3 px-4 ${parent == 'Marketplace' ? 'min-w-[300px]' : 'min-w-[230px]'} md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}>
             <img 
               onClick={() =>
                 navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
               }
-              className='md:h-[200px] md:w-[30vw] w-[200px] h-[110px]' 
+              className='md:h-[200px] md:w-[40vw] h-[110px] object-cover' 
               src={topSellingProduct.images ? topSellingProduct?.images[0] : ""} 
             />
             <div className='flex justify-between'>
