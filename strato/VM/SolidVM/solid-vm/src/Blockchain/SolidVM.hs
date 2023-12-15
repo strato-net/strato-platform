@@ -3296,17 +3296,14 @@ solidityExceptionHandler catchBlockMap ex = do
             case M.lookup "Nill" cbm of
               Nothing -> errFunc s1 s2
               Just (_, stmts) -> do
-                popCallInfo
                 res' <-  runStatementBlock stmts
                 return res'
           Just (mVar, block) -> do
             case mVar of
               Nothing -> do
-                popCallInfo
                 res' <-  runStatementBlock block
                 return res'
               Just (varName, varType) -> do
-                popCallInfo
                 addLocalVariable varType varName (SInteger errCode)
                 res <- runStatementBlock block
                 return res
@@ -3342,17 +3339,14 @@ solidityExceptionHandler catchBlockMap ex = do
           case M.lookup "Nill" catchBlockMap of
             Nothing -> arityMismatch s1 i1 i2
             Just (_, stmts) -> do
-              popCallInfo
               res' <-  runStatementBlock stmts
               return res'
         Just (mVar, block) -> do
           case mVar of
             Nothing -> do
-              popCallInfo
               res' <-  runStatementBlock block
               return res'
             Just (varName, varType) -> do
-              popCallInfo
               addLocalVariable varType varName (SInteger 9)
               res <- runStatementBlock block
               return res
@@ -3368,17 +3362,14 @@ solidityExceptionHandler catchBlockMap ex = do
           case M.lookup "Nill" catchBlockMap of
             Nothing -> divideByZero s1
             Just (_, stmts) -> do
-              popCallInfo
               res' <-  runStatementBlock stmts
               return res'
         Just (mVar, block) -> do
           case mVar of
             Nothing -> do
-              popCallInfo
               res' <-  runStatementBlock block
               return res'
             Just (varName, varType) -> do
-              popCallInfo
               addLocalVariable varType varName (SInteger 12)
               res <- runStatementBlock block
               return res
@@ -3390,17 +3381,14 @@ solidityExceptionHandler catchBlockMap ex = do
               _ <- require False s1
               return Nothing
             Just (_, stmts) -> do
-              popCallInfo
               res' <-  runStatementBlock stmts
               return res'
         Just (mVar, block) -> do
           case mVar of
             Nothing -> do
-              popCallInfo
               res' <-  runStatementBlock block
               return res'
             Just (varName, varType) -> do
-              popCallInfo
               addLocalVariable varType varName (SString (fromMaybe "Require Error" s1))
               res <- runStatementBlock block
               return res
@@ -3412,17 +3400,14 @@ solidityExceptionHandler catchBlockMap ex = do
               _ <- assert False
               return Nothing
             Just (_, stmts) -> do
-              popCallInfo
               res' <-  runStatementBlock stmts
               return res'
         Just (mVar, block) -> do
           case mVar of
             Nothing -> do
-              popCallInfo
               res' <-  runStatementBlock block
               return res'
             Just (varName, varType) -> do
-              popCallInfo
               addLocalVariable varType varName (SString "Assertion Error")
               res <- runStatementBlock block
               return res
