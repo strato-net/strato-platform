@@ -9,7 +9,7 @@ import product from './Product'
 import inventory from './Inventory'
 import item from './Item'
 import art from './Art'
-import carbon from './Carbon'
+import carbonOffset from './CarbonOffset'
 import metals from './Metals'
 import clothing from './Clothing'
 import membership from './Membership'
@@ -34,7 +34,7 @@ import {
   Inventory,
   Item,
   Art,
-  Carbon,
+  CarbonOffset,
   Metals,
   Clothing,
   Membership,
@@ -60,7 +60,7 @@ router.use(Product.prefix, product)
 router.use(Inventory.prefix, inventory)
 router.use(Item.prefix, item)
 router.use(Art.prefix, art)
-router.use(Carbon.prefix, carbon)
+router.use(CarbonOffset.prefix, carbonOffset)
 router.use(Clothing.prefix, clothing)
 router.use(Membership.prefix, membership)
 router.use(CarbonDAO.prefix, carbonDAO)

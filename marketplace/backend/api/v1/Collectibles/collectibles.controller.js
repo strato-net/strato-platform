@@ -39,7 +39,6 @@ class CollectibleController {
   static validateCreateCollectibleArgs(args) {
     const createCollectibleSchema = Joi.object({
       itemArgs: Joi.object({
-        serialNumber: Joi.string().allow("").optional(),
         name: Joi.string().required(),
         description: Joi.string().required(),
         condition: Joi.string().required(),

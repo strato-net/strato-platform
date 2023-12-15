@@ -75,8 +75,8 @@ export const Art = {
   create: '/'
 }
 
-export const Carbon = {
-  prefix: '/carbon',
+export const CarbonOffset = {
+  prefix: '/carbonOffset',
   getAll: '/',
   create: '/'
 }

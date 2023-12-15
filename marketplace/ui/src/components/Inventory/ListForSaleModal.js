@@ -86,18 +86,32 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
                         ))}
                     </Select>
                 )
-            }]
+            },
+            {
+                title: "Quantity",
+                align: "center",
+                render: () => (
+                    <InputNumber value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
+                )
+            },
+        
+        ]
         switch (getCategory()) {
-            case 'Carbon':
+            case 'CarbonOffset':
                 finalColumns = finalColumns.concat(
                     [
                         {
-                            title: "Quantity",
+                            title: "Set Price Per Unit",
                             align: "center",
                             render: () => (
-                                <InputNumber value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
+                                <InputNumber value={pricePerUnit} controls={false} min={1} onChange={(value) => setpricePerUnit(value)} />
                             )
-                        },
+                        }
+                    ])
+                break;
+            case 'Metals':
+                finalColumns = finalColumns.concat(
+                    [
                         {
                             title: "Set Price Per Unit",
                             align: "center",
