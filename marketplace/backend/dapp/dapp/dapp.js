@@ -10,7 +10,7 @@ import RestStatus from 'http-status-codes';
 import certificateJs from "/dapp/certificates/certificate";
 
 import artJs from "/dapp/items/art";
-import carbonJs from "/dapp/items/carbon";
+import carbonOffsetJs from "/dapp/items/carbonOffset";
 import metalsJs from "/dapp/items/metals";
 import clothingJs from "/dapp/items/clothing";
 import membershipJs from "/dapp/items/membership";
@@ -301,38 +301,25 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return artJs.getAll(rawAdmin, args, getOptions);
   };
 
-  // contract.transferOwnershipArt = async function (args, options = defaultOptions) {
-  //   const { address, chainId, newOwner } = args;
-  //   const contract = { name: artJs.contractName, address: address, };
-  //   const chainOptions = { chainIds: [chainId], ...options };
-  //   return artJs.transferOwnership(rawAdmin, contract, chainOptions, newOwner);
-  // };
-
-  // contract.updateArt = async function (args, options = defaultOptions) {
-  //   const { address, chainId, updates } = args;
-  //   const contract = { name: artJs.contractName, address: address, };
-  //   const chainOptions = { chainIds: [chainId], ...options };
-  //   return artJs.update(rawAdmin, contract, updates, chainOptions);
-  // };
   // ------------------------------ ART ENDS --------------------------------
 
-  // ------------------------------ CARBON STARTS------------------------------
+  // ------------------------------ CARBONOFFSET STARTS------------------------------
 
-  contract.createCarbon = async function (args, options = defaultOptions) {
+  contract.createCarbonOffset = async function (args, options = defaultOptions) {
     const createdDate = Math.floor(Date.now() / 1000);
     const newArgs = {
       ...args.itemArgs,
       createdDate,
     };
-    return carbonJs.uploadContract(rawAdmin, newArgs, options);
+    return carbonOffsetJs.uploadContract(rawAdmin, newArgs, options);
   };
 
-  contract.getCarbons = async function (args = {}, options = optionsNoChainIds) {
+  contract.getCarbonOffsets = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName, };
-    return carbonJs.getAll(rawAdmin, args, getOptions);
+    return carbonOffsetJs.getAll(rawAdmin, args, getOptions);
   };
 
-  // ------------------------------ CARBON ENDS--------------------------------
+  // ------------------------------ CARBONOFFSET ENDS--------------------------------
 
   // ------------------------------ METALS STARTS------------------------------
 
@@ -360,8 +347,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const newArgs = {
       ...args.itemArgs,
       createdDate,
-      owner: rawAdmin.address,
-      status: 1
     };
     return clothingJs.uploadContract(rawAdmin, newArgs, options);
   };
@@ -420,8 +405,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const newArgs = {
       ...args.itemArgs,
       createdDate,
-      owner: rawAdmin.address,
-      status: 1
     };
     return collectibleJs.uploadContract(rawAdmin, newArgs, options);
   };

@@ -39,7 +39,6 @@ class ClothingController {
   static validateCreateClothingArgs(args) {
     const createClothingSchema = Joi.object({
       itemArgs: Joi.object({
-        serialNumber: Joi.string().allow("").optional(),
         name: Joi.string().required(),
         description: Joi.string().required(),
         clothingType: Joi.string().required(),
