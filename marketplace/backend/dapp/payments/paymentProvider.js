@@ -1,7 +1,7 @@
 import { util, rest, importer } from '/blockapps-rest-plus';
 // import config from '/load.config';
 import RestStatus from 'http-status-codes';
-import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } from '/helpers/utils';
+import { setSearchQueryOptions, search, searchOne, searchAll, searchAllWithQueryArgs } from '/helpers/utils';
 // import dayjs from 'dayjs';
 
 
@@ -158,24 +158,24 @@ async function get(user, args, defaultOptions) {
 
     if (address) {
         const searchArgs = setSearchQueryOptions(restArgs, [{ key: 'address', value: address }, {key: 'order', value: 'chargesEnabled.desc,block_timestamp.desc'}]);
-        paymentProvider = await searchOne(contractName, searchArgs, options, user);
+        paymentProvider = await search(contractName, searchArgs, options, user);
     } else if (ownerCommonName) {
         let searchValues = [{ key: 'ownerCommonName', value: ownerCommonName }, { key: 'name', value: name }, {key: 'order', value: 'chargesEnabled.desc,block_timestamp.desc'}];
         if (accountDeauthorized != undefined) {
             searchValues.push({ key: 'accountDeauthorized', value: accountDeauthorized })
         }
         const searchArgs = setSearchQueryOptions(restArgs, searchValues);
-        paymentProvider = await searchOne(contractName, searchArgs, options, user);
+        paymentProvider = await search(contractName, searchArgs, options, user);
     } else if (accountId) {
 
         const searchArgs = setSearchQueryOptions(restArgs, [{ key: 'accountId', value: accountId }, { key: 'name', value: name }, {key: 'order', value: 'chargesEnabled.desc,block_timestamp.desc'}]);
-        paymentProvider = await searchOne(contractName, searchArgs, options, user);
+        paymentProvider = await search(contractName, searchArgs, options, user);
     }
     if (!paymentProvider) {
-        return {};
+        return [];
     }
 
-    return marshalOut({ ...paymentProvider, });
+    return paymentProvider.map((p) => marshalOut({ ...p, }));
 }
 
 async function getAll(admin, args = {}, options) {
