@@ -5,7 +5,6 @@ import <a3d9911aeffee71e0c6cd37946d80f3864b49d45>;
 
 /// @title A representation of Clothing assets
 contract Clothing is Mintable {
-    string public serialNumber;
     string public clothingType; 
     string public size; 
     string public skuNumber; 
@@ -26,14 +25,12 @@ contract Clothing is Mintable {
         string[] _files,
         uint _createdDate,
         uint _quantity,
-        string _serialNumber,
         string _clothingType,
         string _size,
         string _skuNumber,
         string _condition,
         string _brand
     ) public Mintable(_name, _description, _images, _files, _createdDate, _quantity) {
-        serialNumber = _serialNumber;
         clothingType = _clothingType;
         size = _size;
         skuNumber = _skuNumber;
@@ -49,24 +46,21 @@ contract Clothing is Mintable {
             files,
             createdDate,
             _quantity,
-            serialNumber,
             clothingType,
             size,
             skuNumber,
             condition,
             brand
         );
-        return UTXO(newAsset);
+        return UTXO(address(newAsset));
     }
 
     // TODO: Finish the update function. 
     function updateClothing(
         string[] _images, 
         string[] _files, 
-        string _serialNumber,
         string _clothingType
     ) public requireOwner("update clothing") returns (uint) {
-        serialNumber = _serialNumber;
         clothingType = _clothingType;
         updateAsset(_images, _files);
         return RestStatus.OK;

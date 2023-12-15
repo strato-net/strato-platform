@@ -360,8 +360,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const newArgs = {
       ...args.itemArgs,
       createdDate,
-      owner: rawAdmin.address,
-      status: 1
     };
     return clothingJs.uploadContract(rawAdmin, newArgs, options);
   };
@@ -420,8 +418,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const newArgs = {
       ...args.itemArgs,
       createdDate,
-      owner: rawAdmin.address,
-      status: 1
     };
     return collectibleJs.uploadContract(rawAdmin, newArgs, options);
   };
