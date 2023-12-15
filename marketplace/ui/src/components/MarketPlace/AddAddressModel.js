@@ -188,7 +188,7 @@ const AddAddressModel = ({open , close }) => {
             name=""
             className=""
           >
-            <p className="text-left text-[#202020] font-medium">addressLine2</p>
+            <p className="text-left text-[#202020] font-medium">Address Line 2</p>
             <Input
               className="h-[42px] w-[330px] lg:w-[354px] "
               name="addressLine2"
