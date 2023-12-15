@@ -3,7 +3,6 @@ import {
   Row,
   Card,
   Breadcrumb,
-  Image,
   Button,
   Typography,
   Tabs,
@@ -54,8 +53,6 @@ import "react-responsive-carousel/lib/styles/carousel.min.css"; // requires a lo
 import {Carousel} from "react-responsive-carousel"
 import { Images } from "../../images";
 
-
-
 const ProductDetails = ({ user, users }) => {
   const { state, pathname } = useLocation();
 
@@ -76,7 +73,7 @@ const ProductDetails = ({ user, users }) => {
   const [serialNumber, setSerialNumber] = useState(false);
   const limit = 10, offset = 0;
   const debouncedSearchTerm = useDebounce("", 1000);
-  const { inventoryEvents, isInventoryEventsLoading, eventDetails, iseventDetailsLoading } =
+  const { inventoryEvents, isInventoryEventsLoading,inventoryOwnershipHistory, eventDetails, iseventDetailsLoading } =
     useEventState();
   const eventDispatch = useEventDispatch();
 
@@ -114,7 +111,7 @@ const ProductDetails = ({ user, users }) => {
   const { categorys, iscategorysLoading } = useCategoryState();
   const {
     inventoryDetails, 
-    inventoryOwnershipHistory, 
+  
     isInventoryDetailsLoading,
     isInventoryOwnershipHistoryLoading,
   } = useInventoryState();
@@ -136,8 +133,6 @@ const ProductDetails = ({ user, users }) => {
     path: routes.InventoryDetail.url,
     strict: true,
   });
-
-
   useEffect(() => {
     if (isCalledFromInventory) setId(routeMatch1?.params?.id);
     else setId(routeMatch?.params?.address);
@@ -452,10 +447,11 @@ const ProductDetails = ({ user, users }) => {
 
   const DescriptionComponent = () => {
     const categoryName = getCategory(details);
+    console.log(itemData,"this is the items data")
     switch (categoryName) {
       case "Art":
         return (
-          <Space direction="vertical">
+          <Space direction="vertical" className="py-[15px] px-[14px]  border border-[#E9E9E9] rounded-md">
             <Space>
               <DescTitle text="Artist" />
               <DescTitle text=":" />
@@ -464,7 +460,7 @@ const ProductDetails = ({ user, users }) => {
           </Space>)
       case "Carbon":
         return (
-          <Space direction="vertical">
+          <Space direction="vertical" className="py-[15px] px-[14px]  border border-[#E9E9E9] rounded-md">
             {/* <Space>
               <DescTitle text="Project Type" />
               <DescTitle text="                      :" />
@@ -478,7 +474,7 @@ const ProductDetails = ({ user, users }) => {
           </Space>)
       case "Clothing":
         return (
-          <Space direction="vertical">
+          <Space direction="vertical" className="py-[15px] px-[14px]  border border-[#E9E9E9] rounded-md">
             <Space>
               <DescTitle text="Brand" />
               <DescTitle text="                      :" />
@@ -488,7 +484,7 @@ const ProductDetails = ({ user, users }) => {
       case "Metals":
         return (
           <>
-          <Space direction="vertical">
+          <Space direction="vertical" className="py-[15px] px-[14px]  border border-[#E9E9E9] rounded-md">
             <Space>
               <DescTitle text="Source" />
               <DescTitle text=":" />
@@ -510,7 +506,7 @@ const ProductDetails = ({ user, users }) => {
             </Text>
             </Space> */}
 
-            <Space>
+            <Space className="py-[15px] px-[14px]  border border-[#E9E9E9] rounded-md">
               <DescTitle text="Purity" />
               <DescTitle text=":" />
               <Text className="text-[13px]">{itemData?.purity}</Text>
@@ -519,7 +515,7 @@ const ProductDetails = ({ user, users }) => {
           </>)
       case "Membership":
         return (
-          <Space direction="vertical">
+          <Space direction="vertical" className="py-[15px] px-[14px]  border border-[#E9E9E9] rounded-md">
            <Space>
               <DescTitle text="Units" />
               <DescTitle text="                      :" />
@@ -528,7 +524,7 @@ const ProductDetails = ({ user, users }) => {
           </Space>)
       case "CarbonDAO":
         return (
-          <Space direction="vertical">
+          <Space direction="vertical" className="py-[15px] px-[14px]  border border-[#E9E9E9] rounded-md">
             <Space>
               <DescTitle text="Units" />
               <DescTitle text="                      :" />
@@ -548,7 +544,6 @@ const ProductDetails = ({ user, users }) => {
       </Col>
     );
   };
-
   const onTabChange = (tab) => {
     if (tab === "1") {
       if (isEventSelected) setIsEventSelected(false)
@@ -614,21 +609,21 @@ const ProductDetails = ({ user, users }) => {
               </Breadcrumb.Item>
             </Breadcrumb>
           </Row>
-          <div className="  flex w-full flex-col  px-4 sm:px-8 md:px-0  items-center md:items-start  md:w-[735px] lg:w-[835px]  md:mx-auto ">
-          <div className="  flex   md:justify-center gap-[15px] lg:gap-6 flex-col md:flex-row   ">
-            <Carousel  className="product_detail w-full  sm:w-[417px]   lg:h-[348px] md:w-[317px] lg:w-[417px]" showStatus={false} showArrows swipeable emulateTouch infiniteLoop >
+          <div className="  flex w-full flex-col  px-4 sm:px-8 md:px-0  items-center lg:items-start  md:w-[750px] lg:w-[835px] xl:w-[858px]  md:mx-auto ">
+          <div className="  flex   md:justify-center gap-[15px] lg:gap-6 flex-col lg:flex-row   ">
+            <Carousel  className="product_detail w-full  sm:w-[417px]   lg:h-[348px] md:w-[343px] lg:w-[417px]" showStatus={false} showArrows swipeable emulateTouch infiniteLoop >
              {details.images && details.images.map((element,  index)=>{
-                  return ( <div key={index} className="h-[212px] md:h-[348px]  lg:h-[348px]  md:w-[317px] lg:w-[417px] w-full rounded-md flex items-center justify-center overflow-hidden">
-                  <Image  width={"100%"} style={{ objectFit: "contain" }} className="   h-full " src={element} />
-               </div>)
+                  return ( <><div key={index} className="sm:w-[343px ] sm:h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
+                  <img  width={"100%"}  className="  rounded-md h-full " src={element} />
+               </div></>)
              }) }
               </Carousel>
 
-            <div className=" w-full lg:w-1/2  " id="">
+            <div className=" w-full lg:w-1/2">
               <div className=" lg:border-b lg:border-[#E9E9E9] pb-[6px]">
                 <Text className="font-semibold text-base lg:text-3xl text-[#202020]">
                   
-                  {decodeURIComponent(details.name)}
+                  {decodeURIComponent(details?.name)}
                 </Text>
                 <div className="flex pt-[6px] ">
                 <Text  className="text-[#202020] text-xs  font-medium">Owned By:</Text>
@@ -638,7 +633,7 @@ const ProductDetails = ({ user, users }) => {
             <div className=" pt-4 lg:pt-[22px]">
              
               <Text level={4} className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold">
-                {details.price ? <>$ {details.price}</> : "No Price Available"}
+                {details?.price ? <>$ {details?.price}</> : "No Price Available"}
               </Text>
               </div> 
               <div className=" pt-6 lg:pt-[18px]">
@@ -663,11 +658,11 @@ const ProductDetails = ({ user, users }) => {
                     <div
                       onClick={subtract}
                       className="h-9 w-9 md:h-10 md:w-10 lg:h-[46px] lg:w-[46px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer" style={{ borderColor: qty > 1 ? '#1777FF' : '#E3E3E3' }}>
- <p className=" text-2xl md:text-3xl lg:text-5xl font-semibold lg:text-[#202020] text-[#989898]">
+ <p className=" text-2xl md:text-3xl lg:text-4xl font-semibold lg:text-[#202020] text-[#989898]">
                        -
                         </p> 
                     </div>
-                    <InputNumber className=" w-full lg:w-[295px] h-9  md:h-10  lg:h-[46px]  border text-[#6A6A6A] border-[#00000029] text-center flex flex-col justify-center" min={1} max={availableQuantity} value={`Quantity (LB) ${qty}`} defaultValue={`Quantity (LB) ${qty}`} controls={false}
+                    <InputNumber className=" w-full md:w-[295px]  h-9  md:h-10  lg:h-[46px]  border text-[#6A6A6A] border-[#00000029] text-center flex flex-col justify-center" min={1} max={availableQuantity} value={`Quantity (LB) ${qty}`} defaultValue={`Quantity (LB) ${qty}`} controls={false}
                       onChange={e => {
                         if (e < availableQuantity) {
                           setQty(e)
@@ -683,7 +678,7 @@ const ProductDetails = ({ user, users }) => {
                     <div
                       onClick={add}
                       className="ml-0.5 h-9 w-9 md:h-10 md:w-10 lg:h-[46px] lg:w-[46px] rounded-lg  flex justify-center items-center border border-[#00000029] text-center cursor-pointer" style={{ borderColor: availableQuantity > qty ? '#1777FF' : '#E3E3E3' }}>
-                       <p className="text-2xl md:text-3xl lg:text-5xl font-semibold lg:text-[#202020] text-[#989898]">
+                       <p className="text-2xl md:text-3xl lg:text-4xl font-semibold lg:text-[#202020] text-[#989898]">
                        +
                         </p> 
                     </div>
@@ -757,9 +752,9 @@ const ProductDetails = ({ user, users }) => {
                         TagManager.dataLayer({
                           dataLayer: {
                             event: 'add_to_cart_from_product_details',
-                            product_name: details.name,
-                            category: details.category,
-                            productId: details.productId
+                            product_name: details?.name,
+                            category: details?.category,
+                            productId: details?.productId
                           },
                         });
                         addItemToCart();
@@ -781,17 +776,17 @@ const ProductDetails = ({ user, users }) => {
                           // Track an event
                           await LO.$internal.ready('events')
                           LO.events.track('Add to Cart (from Product Details)', {
-                            product: details.name,
-                            category: details.category,
-                            productId: details.productId
+                            product: details?.name,
+                            category: details?.category,
+                            productId: details?.productId
                           })
                         }])
                         TagManager.dataLayer({
                           dataLayer: {
                             event: 'add_to_cart_from_product_details',
-                            product_name: details.name,
-                            category: details.category,
-                            productId: details.productId
+                            product_name: details?.name,
+                            category: details?.category,
+                            productId: details?.productId
                           },
                         });
                         addItemToCart();
@@ -812,17 +807,17 @@ const ProductDetails = ({ user, users }) => {
                       window.LOQ.push(['ready', async LO => {
                         await LO.$internal.ready('events')
                         LO.events.track('Contact Sales (from Product Details)', {
-                          product: details.name,
-                          category: details.category,
-                          productId: details.productId
+                          product: details?.name,
+                          category: details?.category,
+                          productId: details?.productId
                         })
                       }])
                       TagManager.dataLayer({
                         dataLayer: {
                           event: 'contact_sales_from_product_details',
-                          product_name: details.name,
-                          category: details.category,
-                          productId: details.productId
+                          product_name: details?.name,
+                          category: details?.category,
+                          productId: details?.productId
                         },
                       });
                     }}>
@@ -833,8 +828,7 @@ const ProductDetails = ({ user, users }) => {
           }
             </div>
           </div>
-
-          <div className=" pt-9 lg:pt-10 w-full sm:w-[75%]  md:w-full">
+          <div className=" mt-9 lg:mt-10 w-full md:w-[750px] sm:px-[10%] md:px-[15%] lg:px-0 pb-5 lg:w-[835px]  ">
           <Tabs
           className="product_detail"
                 defaultActiveKey="1"

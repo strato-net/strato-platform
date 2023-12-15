@@ -190,13 +190,28 @@ display:  none;
   background-color: white;
 }
 
-.ant-table-tbody tr > td {
+/* .ant-table-tbody tr > td { */
+:ant-table-row:hover{
+  background: #EEEFFA !important;
+}
+
+
+/* Hover effect */
+.ant-table-tbody tr:hover {
+  background-color: #EEEFFA; /* Set your desired hover background color */
+}
+.ant-table-tbody tr{
   background-color: white;
   border-bottom: none !important;
 }
 
+.ant-table-tbody tr:Active{
+  background-color: #EEEFFA;
+}
 
-
+.ant-table-tbody tr:focus{
+  background-color: #EEEFFA;
+}
 
 .ant-table   {
   overflow: auto;
