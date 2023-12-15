@@ -298,7 +298,7 @@ async function get(user, args, options) {
         return undefined;
     }
 
-    const sale = await saleJs.get(user, { assetToBeSold: inventory.address, state: 1 }, newOptions);
+    const sale = await saleJs.get(user, { assetToBeSold: inventory.address, isOpen: true }, newOptions);
 
     if (sale) {
         inventory = {
@@ -339,6 +339,7 @@ async function getAll(admin, args = {}, defaultOptions) {
         inventories = await searchAllWithQueryArgs(contractName, 
             { 
                 ...restArgs, 
+                range,
             }, options, admin);
     }
 
@@ -346,7 +347,7 @@ async function getAll(admin, args = {}, defaultOptions) {
         const assetAddresses = inventories.map((inventory) => inventory.address);
         sales = await saleJs.getAll(admin, { assetAddresses }, options);
         inventories.forEach(inventory => {
-            const itemSale = sales.find(sale => sale.assetToBeSold == inventory.address && sale.state == 1);
+            const itemSale = sales.find(sale => sale.assetToBeSold == inventory.address && sale.isOpen);
             if (itemSale) {
                 finalInventory.push({
                     ...inventory,

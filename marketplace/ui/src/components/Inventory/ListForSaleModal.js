@@ -8,7 +8,7 @@ const { Option } = Select;
 
 const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddress }) => {
     const [data, setData] = useState([inventory]);
-    const [quantity, setQuantity] = useState(inventory.saleQuantity ? inventory.saleQuantity : 1);
+    const [quantity, setQuantity] = useState(inventory.quantity);
     const [paymentTypes, setPaymentTypes] = useState([]);
     const [pricePerUnit, setpricePerUnit] = useState(inventory.price ? inventory.price : inventory.pricePerUnit);
     const inventoryDispatch = useInventoryDispatch();
@@ -86,9 +86,30 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
                         ))}
                     </Select>
                 )
-            }]
+            },
+            {
+                title: "Quantity",
+                align: "center",
+                render: () => (
+                    <InputNumber value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
+                )
+            },
+        
+        ]
         switch (getCategory()) {
-            case 'Carbon':
+            case 'CarbonOffset':
+                finalColumns = finalColumns.concat(
+                    [
+                        {
+                            title: "Set Price Per Unit",
+                            align: "center",
+                            render: () => (
+                                <InputNumber value={pricePerUnit} controls={false} min={1} onChange={(value) => setpricePerUnit(value)} />
+                            )
+                        }
+                    ])
+                break;
+            case 'Metals':
                 finalColumns = finalColumns.concat(
                     [
                         {
@@ -136,18 +157,10 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
         } else {
             body = { ...body, assetToBeSold: inventory.address }
         }
-        if (getCategory() === "Carbon") {
-            body = {
-                ...body,
-                quantity,
-            }
-        } else {
-            body = {
-                ...body,
-                quantity: 1,
-            }
+        body = {
+            ...body,
+            quantity,
         }
-
         let isDone
         if (inventory.saleAddress) {
             isDone = await actions.updateSale(inventoryDispatch, body);

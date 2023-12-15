@@ -15,18 +15,18 @@ const CategoryCard = () => {
   const { categorys } = useCategoryState();
 
   const categoryImages = [
-    Images.art,
-    Images.carbon,
-    Images.metals,
-    Images.clothing,
-    Images.membership,
-    Images.collectibles
+    Images["Art-category"],
+    Images["Carbon-category"],
+    Images["Material-category"],
+    Images["Clothing-category"],
+    Images["Material-category"],
+    Images["collectibles"],
   ];
 
   return (
-    <Card className="w-full">
-      <div className="flex justify-between mb-5">
-        <Title level={3}>Categories</Title>
+    <>
+      <div className="mb-5 md:px-10">
+        <Title level={3} ><span className="text-xl md:text-4xl font-semibold ">Shop by Categories </span></Title>
         {/* <Space size="large">
           <div className="cursor-pointer w-9 h-9 rounded-full shadow-[0px_0px_2px_0_rgba(0,0,0,0.3)] flex justify-center items-center">
             <LeftArrow />
@@ -36,13 +36,13 @@ const CategoryCard = () => {
           </div>
         </Space> */}
       </div>
-      <div className="flex justify-evenly px-2">
+      <div className="flex justify-start gap-4 lg:gap-[15px] flex-wrap px-[4px] md:px-10">
         {categorys.map((category, index) => {
           return (
             <div
               id={category.name}
               key={index}
-              className="w-48 h-44 border border-tertiaryB rounded-md py-5 mx-3 cursor-pointer"
+              className=" w-[162px] md:w-[228px] xl:w-[280px] h-[160px] md:h-[185px] xl:h-[200px] border border-tertiaryB shadow-category   rounded-lg cursor-pointer"
               onClick={() => {
                 navigate(`${naviroute.replace(":category", category.name)}`);
                 window.LOQ.push(['ready', async LO => {
@@ -58,22 +58,25 @@ const CategoryCard = () => {
                 }
               }
             >
-              <div className="flex flex-col items-center text-center">
-                <Image
+              <div className="flex flex-col">
+                <img
                   src={categoryImages[index]}
-                  height={108}
-                  width={150}
+                  className="rounded-t-lg px-[9px] py-[6px] lg:px-[0px] lg:py-[0px] h-[110px] md:h-[140px]"
                   preview={false}
                 />
-                <Text type="secondary" className="mt-2 text-sm !text-primaryB">
+                <div className="py-2 xl:py-3 flex justify-center md:justify-start ">
+                <Text type="secondary" className="text-lg md:text-xl lg:text-2xl !text-primaryB font-semibold" >
+                  <span className="p-3 font-sans">
                   {category.name}
+                    </span>
                 </Text>
+                  </div>
               </div>
             </div>
           );
         })}
       </div>
-    </Card>
+    </>
   );
 };
 

@@ -20,3 +20,23 @@
 .anticon svg{
   display: block;
 }
+
+.ant-menu-title-content div{
+  color: gray;
+}
+
+.ant-input-affix-wrapper input{
+  background: #f6f6f6;
+}
+.login_btn button{
+  padding: 2px 10px;
+}
+.ant-avatar{
+  background-color: white;
+}
+.anticon-shopping-cart{
+  color: #6A6A6A;
+}
+.anticon-user{
+  color: #6A6A6A;
+}

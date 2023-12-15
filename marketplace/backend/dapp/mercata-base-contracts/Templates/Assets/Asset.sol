@@ -12,8 +12,6 @@ abstract contract Asset is Utils {
     address public originAddress; // For NFTS, this will always be address(this), but this should be the mint address for UTXOs
     string public name;
     string public description;
-    string public category;
-    string public subCategory;
     string[] public images;
     string[] public files;
     uint public createdDate;
@@ -35,8 +33,6 @@ abstract contract Asset is Utils {
     constructor(
         string _name,
         string _description,
-        string _category,
-        string _subCategory,
         string[] _images,
         string[] _files,
         uint _createdDate,
@@ -47,8 +43,6 @@ abstract contract Asset is Utils {
         ownerCommonName = getCommonName(msg.sender);
         name = _name;
         description = _description;
-        category = _category;
-        subCategory = _subCategory;
         images = _images;
         files = _files;
         createdDate = _createdDate;
@@ -103,15 +97,6 @@ abstract contract Asset is Utils {
         _;
     }
 
-    modifier requireWhitelisted(string action) {
-        bool isWhitelisted = isSaleWhitelisted(msg.sender);
-        string err = "Only a whitelisted Sale contract can "
-                   + action
-                   + ".";
-        require(isWhitelisted, err);
-        _;
-    }
-
     // Updated function to add a sale to the whitelist
     function attachSale() public requireOwnerOrigin("attach sale") {
         require(sale == address(0), "Sale is already assigned for this asset");
@@ -120,6 +105,10 @@ abstract contract Asset is Utils {
 
     // Updated function to remove a sale from the whitelist
     function closeSale() public fromSale("close sale") {
+        close();
+    }
+
+    function close() internal {
         sale = address(0);
     }
 
@@ -136,7 +125,7 @@ abstract contract Asset is Utils {
         );
         owner = _newOwner;
         ownerCommonName = newOwnerCommonName;
-        closeSale();
+        close();
     }
     
     function transferOwnership(address _newOwner, uint _quantity) public fromSale("transfer ownership") {

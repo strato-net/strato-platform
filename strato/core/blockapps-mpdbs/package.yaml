@@ -9,7 +9,6 @@ description: The client described in the Ethereum Yellowpaper
 
 dependencies:
   - base
-  - x509-certs
 
 
 
@@ -29,7 +28,6 @@ library:
   - data-default
   - deepseq
   - ethereum-rlp
-  - extra
   - fastMP
   - format
   - lens
@@ -43,7 +41,6 @@ library:
   - strato-model
   - text
   - transformers
-  - x509-certs
   - unliftio-core
   - monad-logger
 
@@ -57,7 +54,6 @@ tests:
       - bytestring
       - common-log
       - containers
-      - deepseq
       - directory
       - hspec
       - hspec-expectations-lifted

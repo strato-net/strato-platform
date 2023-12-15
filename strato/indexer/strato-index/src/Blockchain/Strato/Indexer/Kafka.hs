@@ -2,9 +2,7 @@
 
 module Blockchain.Strato.Indexer.Kafka
   ( indexEventsTopicName,
-    assertTopicCreation,
     readIndexEvents,
-    readIndexEventsFromTopic,
     writeIndexEvents,
   )
 where
@@ -22,9 +20,6 @@ import qualified Network.Kafka.Protocol as KP
 
 indexEventsTopicName :: KP.TopicName
 indexEventsTopicName = lookupTopic "indexevents"
-
-assertTopicCreation :: K.Kafka k => k ()
-assertTopicCreation = K.updateMetadata indexEventsTopicName
 
 readIndexEvents :: K.Kafka k => KP.Offset -> k [IndexEvent]
 readIndexEvents = readIndexEventsFromTopic indexEventsTopicName

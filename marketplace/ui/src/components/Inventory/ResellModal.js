@@ -55,11 +55,11 @@ const ResellModal = ({ open, handleCancel, inventory }) => {
         <Modal
             open={open}
             onCancel={handleCancel}
-            title={`Resell - ${decodeURIComponent(inventory.name)}`}
+            title={`Mint - ${decodeURIComponent(inventory.name)}`}
             width={650}
             footer={[
                 <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canResell || inventory.status === "1"} loading={isReselling}>
-                    Resell
+                    Mint
                 </Button>
             ]}
         >

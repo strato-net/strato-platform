@@ -23,7 +23,7 @@ import {
   useInventoryState,
 } from "../../contexts/inventory";
 import routes from "../../helpers/routes";
-import { UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
+import { UNIT_OF_MEASUREMENTS, getUnitNameByIndex } from "../../helpers/constants";
 //categories
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { actions as marketPlaceActions } from "../../contexts/marketplace/actions";
@@ -459,7 +459,7 @@ const ProductDetails = ({ user, users }) => {
               <Text className="text-[13px]">{itemData?.artist}</Text>
             </Space>
           </Space>)
-      case "Carbon":
+      case "CarbonOffset":
         return (
           <Space direction="vertical">
             {/* <Space>
@@ -494,13 +494,36 @@ const ProductDetails = ({ user, users }) => {
           </Space>)
       case "Metals":
         return (
+          <>
           <Space direction="vertical">
             <Space>
               <DescTitle text="Source" />
               <DescTitle text=":" />
               <Text className="text-[13px]">{itemData?.source}</Text>
             </Space>
-          </Space>)
+          
+            {
+              // TODO
+            /* <Space>
+              <DescTitle text="Quantity Remaining" />
+              <DescTitle text=":" />
+              <Text className="text-[13px]">
+                
+              {parseInt(itemData?.quantity) > 1
+                ? parseInt(itemData?.quantity)+` ${getUnitNameByIndex(itemData?.unitOfMeasurement)}S`
+                : parseInt(itemData?.quantity)+` ${getUnitNameByIndex(itemData?.unitOfMeasurement)}`
+              
+              }
+            </Text>
+            </Space> */}
+
+            <Space>
+              <DescTitle text="Purity" />
+              <DescTitle text=":" />
+              <Text className="text-[13px]">{itemData?.purity}</Text>
+            </Space>
+          </Space>
+          </>)
       case "Membership":
         return (
           <Space direction="vertical">

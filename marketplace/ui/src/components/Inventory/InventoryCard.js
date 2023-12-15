@@ -19,6 +19,7 @@ import ResellModal from "./ResellModal";
 import TransferModal from "./TransferModal";
 import routes from "../../helpers/routes";
 import image_placeholder from "../../images/resources/image_placeholder.png";
+import { getUnitNameByIndex } from "../../helpers/constants";
 
 const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentProviderAddress }) => {
   const [openPop, setOpenPop] = useState(false);
@@ -106,7 +107,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
   };
 
   const getCategory = () => {
-    return inventory.category;
+    const parts = inventory.contract_name.split('-');
+    return parts[parts.length - 1];
   };
 
   const categoricalProperties = () => {
@@ -123,27 +125,18 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
             </div>
           </div>
         );
-      case "Carbon":
-        return (
-          <>
-            {/* <div className="flex mt-1.5 items-center">
-              <p className="text-primaryC text-sm w-40">Project Type</p>
-              <p className="text-secondryB text-sm">
-                :
-              </p>
-              <p className="text-secondryB text-sm ml-3">
-                {itemData.projectType}
-              </p>
-            </div> */}
-            <div className="flex mt-1.5 items-center">
-              <p className="text-primaryC text-sm w-40">Quantity Owned</p>
-              <p className="text-secondryB text-sm">
-                :
-              </p>
-              <p className="text-secondryB text-sm ml-3">{inventory.quantity}</p>
-            </div>
-          </>
-        );
+      // case "Carbon":
+      //   return (
+      //     <>
+      //       <div className="flex mt-1.5 items-center">
+      //         <p className="text-primaryC text-sm w-40">Quantity Owned</p>
+      //         <p className="text-secondryB text-sm">
+      //           :
+      //         </p>
+      //         <p className="text-secondryB text-sm ml-3">{inventory.quantity}</p>
+      //       </div>
+      //     </>
+      //   );
       case "Clothing":
         return (
           <div>
@@ -174,8 +167,41 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
             </div>
           </div>
         );
+        case "Collectibles":
+          return (
+            <div className="flex mt-1 items-center">
+              <p className="text-primaryC text-sm w-40">Condition</p>
+              <p className="text-secondryB text-sm">
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">
+                {itemData.condition?.toUpperCase()}
+              </p>
+            </div>
+          );
       case "Metals":
         return (
+          <>
+          <div className="flex mt-1.5 items-center">
+              <p className="text-primaryC text-sm w-40">Purity</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">
+                {itemData.purity}
+              </p>
+            </div>
+            <div className="flex mt-1.5 items-center">
+              <p className="text-primaryC text-sm w-40">Unit Of Measurement</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">
+              {getUnitNameByIndex(itemData.unitOfMeasurement)}
+       
+                
+              </p>
+            </div>
           <div className="flex mt-1.5 items-center">
             <p className="text-primaryC text-sm w-40">Source</p>
             <p className="text-secondryB text-sm">
@@ -184,7 +210,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
             <p className="text-secondryB text-sm ml-3">
               {itemData.source}
             </p>
-          </div>)
+          </div>
+          </>)
       case 'Membership':
         return (
           <>
@@ -199,24 +226,34 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
             </div>
           </>
         )
-      case "CarbonDAO":
-        return (
-          <>
-            <div className="flex mt-1.5 items-center">
-              <p className="text-primaryC text-sm w-40">Units</p>
-              <p className="text-secondryB text-sm">
-                :
-              </p>
-              <p className="text-secondryB text-sm ml-3">
-                {inventory.quantity}
-              </p>
-            </div>
-          </>
-        )
+      // case "CarbonDAO":
+      //   return (
+      //     <>
+      //       <div className="flex mt-1.5 items-center">
+      //         <p className="text-primaryC text-sm w-40">Quantity</p>
+      //         <p className="text-secondryB text-sm">
+      //           :
+      //         </p>
+      //         <p className="text-secondryB text-sm ml-3">
+      //           {inventory.quantity}
+      //         </p>
+      //       </div>
+      //     </>
+      //   )
       default:
         break;
     }
   };
+
+/*
+                    <div
+                      className="flex items-center mt-2 cursor-pointer"
+                      onClick={showEditModal}
+                    >
+                      <FormOutlined />
+                      <p className="ml-3">Edit Inventory</p>
+                    </div>
+*/
 
   return (
     <Card className="w-full mt-6">
@@ -239,8 +276,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
                 ({getCategory()})
               </p>
               {itemData.isMint && itemData.isMint == 'True' ? (<div className="flex ml-2">
-                <div className="text-primary bg-[#EBFFF7] text-center py-1 rounded w-20 text-xs">
-                  <p>RESELLABLE</p>
+                <div className="text-primary bg-[#EBFFF7] text-center py-1 rounded w-25 text-s">
+                  <p>Original Issuer</p>
                 </div>
               </div>) : (<div></div>)}
             </div>
@@ -260,13 +297,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
                 onOpenChange={handleOpenChange}
                 title={
                   <div className="font-medium">
-                    <div
-                      className="flex items-center mt-2 cursor-pointer"
-                      onClick={showEditModal}
-                    >
-                      <FormOutlined />
-                      <p className="ml-3">Edit Inventory</p>
-                    </div>
                     {inventory.price ? (<div>
                       <div
                         className="flex items-center mt-2 cursor-pointer"
@@ -280,7 +310,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
                         onClick={showUnlistModal}
                       >
                         <StopOutlined />
-                        <p className="ml-3">Cancel Listing</p>
+                        <p className="ml-3">Unlist</p>
                       </div>
                     </div>) : paymentProviderAddress ? (<div
                       className="flex items-center mt-2 cursor-pointer"
@@ -294,7 +324,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
                       onClick={showResellModal}
                     >
                       <PieChartOutlined />
-                      <p className="ml-3">Resell</p>
+                      <p className="ml-3">Mint</p>
                     </div>) : (<div></div>)}
                     <div
                       className="flex items-center mt-2 cursor-pointer"
@@ -331,6 +361,17 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
               </p>
               <p className="text-secondryB text-sm ml-3">
                 {inventory.saleQuantity}
+              </p>
+            </div> : <></>
+          }
+          { inventory.quantity ? 
+            <div className="flex mt-1 items-center">
+              <p className="text-primaryC text-sm w-40">Quantity Owned</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">
+                {inventory.quantity}
               </p>
             </div> : <></>
           }

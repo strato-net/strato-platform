@@ -1,10 +1,10 @@
 pragma es6;
 pragma strict;
 
-import <1d2bdc27fe948a302ced772409305ff42bd76582>;
+import <a3d9911aeffee71e0c6cd37946d80f3864b49d45>;
 
 /// @title A representation of Membership assets
-contract Membership is ItemStatus, PaymentType, SemiFungible {
+contract Membership is SemiFungible {
     uint expirationPeriodInMonths;
     uint expirationDate;
     constructor(
@@ -14,9 +14,8 @@ contract Membership is ItemStatus, PaymentType, SemiFungible {
         string[] _files,
         uint _createdDate,
         uint _quantity,
-        string _serialNumber,
         uint _expirationPeriodInMonths
-    ) public SemiFungible(_name, _description, "Membership", "Membership", _images, _files, _createdDate, _quantity, _serialNumber) {
+    ) public SemiFungible(_name, _description, _images, _files, _createdDate, _quantity) {
         expirationPeriodInMonths = _expirationPeriodInMonths;
         expirationDate = block.timestamp + (expirationPeriodInMonths*2592000);
     }
@@ -30,9 +29,13 @@ contract Membership is ItemStatus, PaymentType, SemiFungible {
             files,
             createdDate,
             _quantity,
-            serialNumber,
             expirationPeriodInMonths
         );
         return UTXO(newAsset);
+    }
+
+    function checkCondition() internal override returns (bool){
+        bool conditon = block.timestamp <= expirationDate;
+        return conditon;
     }
 }

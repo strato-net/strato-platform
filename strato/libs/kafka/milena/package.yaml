@@ -72,7 +72,6 @@ tests:
       - base
       - milena
       - mtl
-      - network
       - bytestring
       - lens
       - tasty
