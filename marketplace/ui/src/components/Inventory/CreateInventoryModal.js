@@ -531,7 +531,7 @@ const CreateInventoryModal = ({
             >
               <Input
                 label="purity"
-                placeholder="Enter Purity"
+                placeholder="Enter Purity (Ex: 999/1000)"
                 name="purity"
                 value={formik.values.purity}
                 onChange={formik.handleChange}

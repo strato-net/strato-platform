@@ -94,7 +94,7 @@ const SoldOrderDetails = ({ user, users }) => {
       }
 
       let items = [];
-      orderDetails.assets.forEach((prod) => {
+      orderDetails.assets.forEach((prod, index) => {
         items.push({
           address: prod.address,
           chainId: prod.chainId,
@@ -102,9 +102,9 @@ const SoldOrderDetails = ({ user, users }) => {
           productImage: prod.images && prod.images.length > 0 ? prod.images[0] : image_placeholder,
           productName: prod,
           unitPrice: prod.price,
-          quantity: prod.quantity,
+          quantity: parseInt(orderDetails.order.quantities[index]),
           shippingCharges: prod.shippingCharges ? prod.shippingCharges : 0,
-          amount: prod.amount,
+          amount: prod.price * parseInt(orderDetails.order.quantities[index]),
           serialNumber: prod,
           tax: prod.tax ? prod.tax : 0,
         });
