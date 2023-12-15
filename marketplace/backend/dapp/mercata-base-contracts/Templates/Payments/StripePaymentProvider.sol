@@ -1,7 +1,7 @@
 pragma es6;
 pragma strict;
 
-import <9171f04844f9c3d8883821cbcdf91983a5d1d522>;
+import <eddd7c9aa884a3b1b8595f0897608c07a8e770b1>;
 
 /// @title A representation of Carbon assets
 contract StripePaymentProvider is BasePaymentProvider {
