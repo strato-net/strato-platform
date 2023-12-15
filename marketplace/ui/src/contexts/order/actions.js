@@ -277,9 +277,10 @@ const actions = {
       query = filter !== 0 ? query.concat(`&status=${filter}`) : query;
     }
 
+    const encodedCommonName = encodeURIComponent(commonName);
     try {
       const response = await fetch(
-        `${apiUrl}/order?limit=${limit}&offset=${offset}&order=${order}&purchasersCommonName=${commonName}${query}`,
+        `${apiUrl}/order?limit=${limit}&offset=${offset}&order=${order}&purchasersCommonName=${encodedCommonName}${query}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -308,7 +309,7 @@ const actions = {
 
   fetchOrderSold: async (dispatch, limit, offset, commonName, selectedDate, filter, order) => {
     dispatch({ type: actionDescriptors.fetchOrderSold });
-
+    const encodedCommonName = encodeURIComponent(commonName);
     let query = "";
     if (selectedDate) {
       let end = selectedDate + 86400;
@@ -320,7 +321,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/order?&limit=${limit}&offset=${offset}&order=${order}&sellersCommonName=${commonName}${query}`,
+        `${apiUrl}/order?&limit=${limit}&offset=${offset}&order=${order}&sellersCommonName=${encodedCommonName}${query}`,
         {
           method: HTTP_METHODS.GET,
         }
