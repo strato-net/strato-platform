@@ -187,10 +187,7 @@ const CreateInventoryModal = ({
             artist: "",
             source: "",
             leastSellableUnits: 1,
-            unitOfMeasurement: {
-              name: "TON",
-              value: 1,
-            },
+            unitOfMeasurement: 1,
             purity: "",
             quantity: 1,
             expirationPeriodInMonths: 1,
