@@ -106,9 +106,8 @@ const CartComponent = ({ columns, data }) => {
                             </Row>
                         </Col>
                     </Row>
-                
+                {/* //As per the  design we have two display two time 'total value' */}
                     <Row className="flex   justify-evenly items-center pr-[51px] py-[18px]">
-
                        <div className="w-[1px] h-[100%] bg-[#202020] mx-5 "></div>
                      <div className="flex gap-5">
                      <p className="text-base font-semibold  w-36 text-[#6A6A6A] ">Total:</p>

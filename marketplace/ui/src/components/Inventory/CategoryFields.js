@@ -28,7 +28,7 @@ const CategoryFields = ({ category, handleClothingTypeChange, clothingType, size
                     </Form.Item>
                 </div>
             }
-            {category === "Carbon" &&
+            {category === "CarbonOffset" &&
                 <div className="flex justify-between mt-4 ">
                     <Form.Item
                         label="Quantity"
