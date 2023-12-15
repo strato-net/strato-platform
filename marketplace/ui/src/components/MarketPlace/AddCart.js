@@ -28,7 +28,7 @@ import routes from "../../helpers/routes";
 import CartComponent from "./CartComponent";
 import TagManager from "react-gtm-module";
 import image_placeholder from "../../images/resources/image_placeholder.png";
-import New_ResponsiveCart from "./New_ResponsiveCart";
+import ResponsiveCart from "./ResponsiveCart";
 
 const { Title, Text } = Typography;
 
@@ -432,7 +432,7 @@ const ValueQty = (product , e)=>{
               </Title>
             </div> : mapData.map(e  => <React.Fragment  key={e.key}>
             
-<div className="hidden  lg:block"><CartComponent columns={columns} data={e.value} /> </div> <div className="lg:hidden"><div className="flex gap-3 flex-col"><New_ResponsiveCart data={e.value}    AddQty={AddQty} MinusQty={MinusQty} ValueQty={ValueQty} removeCartList={removeCartList}/></div></div></React.Fragment>)
+<div className="hidden  lg:block"><CartComponent columns={columns} data={e.value} /> </div> <div className="lg:hidden"><div className="flex gap-3 flex-col"><ResponsiveCart data={e.value}    AddQty={AddQty} MinusQty={MinusQty} ValueQty={ValueQty} removeCartList={removeCartList}/></div></div></React.Fragment>)
           }
         </div>
       )}
