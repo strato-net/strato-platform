@@ -1,7 +1,5 @@
 const { getEnvVariable } = require('./utils');
 
-const HOST_URL = getEnvVariable('HOST_URL');
-
 const MARKETPLACE_URL = getEnvVariable('MARKETPLACE_URL');
 
 const STRIPE_ENV = {
@@ -21,5 +19,4 @@ const STRIPE_ENV = {
   }
 }
 
-module.exports.HOST_URL = HOST_URL;
 module.exports.STRIPE_ENV = STRIPE_ENV;

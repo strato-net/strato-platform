@@ -6,14 +6,12 @@ const expressWinston = require('express-winston');
 const helmet = require('helmet');
 const winston = require('winston');
 
-const { HOST_URL } = require('./helpers/constants');
 const { clientErrorHandler, commonErrorHandler } = require('./helpers/utils');
 const routes = require('./routes');
 
 const config = {
     name: 'Payment Server (Stripe)',
     port: process.env.PORT || 8018,
-    host: HOST_URL,
 };
 
 const app = express();
@@ -39,9 +37,9 @@ app.use('/', routes);
 app.use(clientErrorHandler);
 app.use(commonErrorHandler);
 
-app.listen(config.port, config.host, (e)=> {
+app.listen(config.port, (e)=> {
     if(e) {
         throw new Error('Internal Server Error');
     }
-    console.log(`Listening on ${config.host}:${config.port}`)
+    console.log(`Listening on ${config.port}`)
 });
