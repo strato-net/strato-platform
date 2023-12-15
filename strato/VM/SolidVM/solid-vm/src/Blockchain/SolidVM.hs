@@ -330,9 +330,7 @@ create' creator newAccount ch cc contractName' argExps createBuiltinCall = do
         "Gas left: " ++ (C.red $ show (_gasLeft gasInfo))
       ]
 
-  addCallInfo newAccount contract' (stringToLabel $ labelToString contractName' ++ " constructor") ch cc M.empty False False
-
-  popCallInfo
+  void . withCallInfo newAccount contract' (stringToLabel $ labelToString contractName' ++ " constructor") ch cc M.empty False False $ pure ()
 
   -- set creator
   (\env -> setCreator (Env.origin env) newAccount contract' (blockDataNumber $ Env.blockHeader env)) =<< getEnv
@@ -342,13 +340,10 @@ create' creator newAccount ch cc contractName' argExps createBuiltinCall = do
 
   onTraced $ liftIO $ putStrLn $ C.green $ "Done Creating Contract: " ++ show newAccount ++ " of type " ++ labelToString contractName'
 
-  addCallInfo newAccount contract' (stringToLabel $ labelToString contractName' ++ " constructor") ch cc M.empty False False
-  -- blockdataNumber $ BlockHeader . Env
-  -- set creator again, in case the caller's cert changed during constructor execution
-  (\env -> setCreator (Env.origin env) newAccount contract' (blockDataNumber $ Env.blockHeader env)) =<< getEnv
-
-  -- popcallinfo to remove info from stack
-  popCallInfo
+  void . withCallInfo newAccount contract' (stringToLabel $ labelToString contractName' ++ " constructor") ch cc M.empty False False $ do
+    -- blockdataNumber $ BlockHeader . Env
+    -- set creator again, in case the caller's cert changed during constructor execution
+    (\env -> setCreator (Env.origin env) newAccount contract' (blockDataNumber $ Env.blockHeader env)) =<< getEnv
 
   env <- getEnv
   let origin' = Env.origin env
@@ -670,14 +665,12 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
             -- right now I just ignore this and allow anything to be called as a getter
             case null args' of
               False -> do
-                addCallInfo to contract (functionName ++ "()") hsh cc M.empty True False
-                let valPath' = Just $ SReference $ apSnocList (AccountPath to . MS.singleton $ BC.pack $ labelToString functionName) args'
-                popCallInfo
+                valPath' <- withCallInfo to contract (functionName ++ "()") hsh cc M.empty True False $ do
+                  pure . Just $ SReference $ apSnocList (AccountPath to . MS.singleton $ BC.pack $ labelToString functionName) args'
                 return (pure valPath', OrderedVals [])
               True -> do
-                addCallInfo to contract functionName hsh cc M.empty True False
-                val <- fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack $ labelToString functionName
-                popCallInfo
+                val <- withCallInfo to contract functionName hsh cc M.empty True False $ do
+                  fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack $ labelToString functionName
                 return (pure val, OrderedVals [])
           Nothing ->
             ( case M.lookup "fallback" functionsIncludingConstructor of
@@ -695,16 +688,15 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
   when
     isRCC
     ( do
-        addCallInfo to contract' (stringToLabel $ labelToString (contract' ^. CC.contractName) ++ " constructor") hsh cc M.empty False False
-        forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, e) -> do
-          v <- expToVar e
-          setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
-        forM_ [(n, theType) | (n, CC.VariableDecl theType _ Nothing _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, theType) -> do
-          case theType of
-            SVMType.Mapping _ _ _ -> return ()
-            SVMType.Array _ _ -> return ()
-            _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) MS.BDefault
-        popCallInfo
+        void . withCallInfo to contract' (stringToLabel $ labelToString (contract' ^. CC.contractName) ++ " constructor") hsh cc M.empty False False $ do
+          forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, e) -> do
+            v <- expToVar e
+            setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
+          forM_ [(n, theType) | (n, CC.VariableDecl theType _ Nothing _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, theType) -> do
+            case theType of
+              SVMType.Mapping _ _ _ -> return ()
+              SVMType.Array _ _ -> return ()
+              _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) MS.BDefault
     )
   when (fnCalltype == CC.DelegateCall) $ addDelegatecall from to' (T.pack org) (T.pack parentName')
   ((org, parentName'),) <$> logFunctionCall args to contract functionName f
@@ -3018,56 +3010,54 @@ runTheConstructors from to hsh cc contractName' argExps = do
           var <- createVar correctedVal
           return (n, (t, var))
 
-  addCallInfo to contract' (stringToLabel $ labelToString contractName' ++ " constructor") hsh cc (M.fromList zipped) False False
+  void . withCallInfo to contract' (stringToLabel $ labelToString contractName' ++ " constructor") hsh cc (M.fromList zipped) False False $ do
 
-  forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, e) -> do
-    v <- expToVar e
-    setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
+    forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, e) -> do
+      v <- expToVar e
+      setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
 
-  forM_ [(n, theType) | (n, CC.VariableDecl theType _ Nothing _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, theType) -> do
-    case theType of
-      SVMType.Mapping _ _ _ -> return ()
-      SVMType.Array _ _ -> return ()
-      t -> do
-        defVal <- createDefaultValue cc contract' t
-        for_ (toBasic defVal) $ markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n])
-  -- SVMType.Bool -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) $ MS.BBool False
+    forM_ [(n, theType) | (n, CC.VariableDecl theType _ Nothing _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, theType) -> do
+      case theType of
+        SVMType.Mapping _ _ _ -> return ()
+        SVMType.Array _ _ -> return ()
+        t -> do
+          defVal <- createDefaultValue cc contract' t
+          for_ (toBasic defVal) $ markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n])
+    -- SVMType.Bool -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) $ MS.BBool False
 
-  forM_ (reverse $ contract' ^. CC.parents) $ \parent -> do
-    let args =
-          CC.OrderedArgs
-            . fromMaybe []
-            $ M.lookup parent =<< (fmap CC._funcConstructorCalls $ contract' ^. CC.constructor)
-    runTheConstructors from to hsh cc parent args
+    forM_ (reverse $ contract' ^. CC.parents) $ \parent -> do
+      let args =
+            CC.OrderedArgs
+              . fromMaybe []
+              $ M.lookup parent =<< (fmap CC._funcConstructorCalls $ contract' ^. CC.constructor)
+      runTheConstructors from to hsh cc parent args
 
-  case contract' ^. CC.constructor of
-    Just theFunction -> do
-      let theModifierNames = map fst $ (CC._funcModifiers theFunction)
-      !theModifiers' <- forM theModifierNames $ \name -> do
-        case M.lookup name (contract' ^. CC.modifiers) of
-          Just theModifier -> do
-            --args' <- argsToVals contract' theModifier argExps
-            return $ Just theModifier
-          Nothing -> do
-            if name `elem` contract' ^. CC.parents then return Nothing else missingField "modifier not found" name
-      let theModifiers = catMaybes theModifiers'
-      !commands <- case CC._funcContents theFunction of
-        Nothing -> missingField "contract constructor has been declared but not defined" contractName'
-        Just cms -> pure cms
-      -- let modifierArgs = map CC.modifierArgs theModifiers
-      let !modContentsList = map (\m -> fromMaybe (missingField "Function call: Modifier has been declared but not defined" m) (CC._modifierContents m)) theModifiers
-      let isNotModExec = \case
-            CC.ModifierExecutor _ -> False
-            _ -> True
-      let (lhs, rhs) = foldr (\(a, b) (c, d) -> (a ++ c, b ++ d)) ([], []) (map (span isNotModExec) modContentsList)
-      logVals lhs rhs
-      _ <- runStatementBlock' lhs
-      _ <- pushSender from $ runStatementBlock commands
-      _ <- runStatementBlock' rhs
-      pure ()
-    Nothing -> return ()
-
-  popCallInfo
+    case contract' ^. CC.constructor of
+      Just theFunction -> do
+        let theModifierNames = map fst $ (CC._funcModifiers theFunction)
+        !theModifiers' <- forM theModifierNames $ \name -> do
+          case M.lookup name (contract' ^. CC.modifiers) of
+            Just theModifier -> do
+              --args' <- argsToVals contract' theModifier argExps
+              return $ Just theModifier
+            Nothing -> do
+              if name `elem` contract' ^. CC.parents then return Nothing else missingField "modifier not found" name
+        let theModifiers = catMaybes theModifiers'
+        !commands <- case CC._funcContents theFunction of
+          Nothing -> missingField "contract constructor has been declared but not defined" contractName'
+          Just cms -> pure cms
+        -- let modifierArgs = map CC.modifierArgs theModifiers
+        let !modContentsList = map (\m -> fromMaybe (missingField "Function call: Modifier has been declared but not defined" m) (CC._modifierContents m)) theModifiers
+        let isNotModExec = \case
+              CC.ModifierExecutor _ -> False
+              _ -> True
+        let (lhs, rhs) = foldr (\(a, b) (c, d) -> (a ++ c, b ++ d)) ([], []) (map (span isNotModExec) modContentsList)
+        logVals lhs rhs
+        _ <- runStatementBlock' lhs
+        _ <- pushSender from $ runStatementBlock commands
+        _ <- runStatementBlock' rhs
+        pure ()
+      Nothing -> return ()
 
   return ()
 
@@ -3139,85 +3129,85 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
       newVar <- liftIO $ fmap Variable $ newIORef v
       return (n, (t, newVar))
 
-  addCallInfo address' contract' funcName hsh cc (M.fromList localVars1) ro ff -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
-  matchedArgvals <- forM theModifiers $ \modi -> do
-    let !margList =
-          CC.OrderedArgs
-            . fromMaybe []
-            $ M.lookup (T.unpack (CC._modifierSelector modi)) $ M.fromList $ CC._funcModifiers theFunction
-    margVals <- argsToValsModifiers contract' modi margList
-    case margVals of
-      OrderedVals vs -> do
-        let argMeta = map (\(n, CC.IndexedType _ t) -> (n, t)) $ M.toList $ CC._modifierArgs modi
-        return (zipWith (\(n, t) v -> (n, (t, v))) argMeta vs)
-      NamedVals ns -> do
-        let strTypes = M.fromList $ map (\(theName, y) -> (theName, y)) $ M.toList $ CC._modifierArgs modi
-            typeAndVal =
-              M.merge
-                (M.mapMissing (curry $ invalidArguments "missing argument"))
-                (M.mapMissing (curry $ invalidArguments "extra argument"))
-                (M.zipWithMatched $ \_k t v -> (t, v))
-                strTypes
-                $ M.mapKeys T.pack $ M.fromList ns
-            -- These probably don't need to be sorted by argument index, as they are turned into a map
-            -- when added to the call info.
-            !sortedArgs =
-              map snd . sortWith fst
-                . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
-                $ M.toList typeAndVal
-        return sortedArgs
-  -- ++ (map (\(x,y) -> (T.unpack x, y)) (concat matchedArgvals)) --modArgsToBeLocals
+  val' <- withCallInfo address' contract' funcName hsh cc (M.fromList localVars1) ro ff $ do -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
+    matchedArgvals <- forM theModifiers $ \modi -> do
+      let !margList =
+            CC.OrderedArgs
+              . fromMaybe []
+              $ M.lookup (T.unpack (CC._modifierSelector modi)) $ M.fromList $ CC._funcModifiers theFunction
+      margVals <- argsToValsModifiers contract' modi margList
+      case margVals of
+        OrderedVals vs -> do
+          let argMeta = map (\(n, CC.IndexedType _ t) -> (n, t)) $ M.toList $ CC._modifierArgs modi
+          return (zipWith (\(n, t) v -> (n, (t, v))) argMeta vs)
+        NamedVals ns -> do
+          let strTypes = M.fromList $ map (\(theName, y) -> (theName, y)) $ M.toList $ CC._modifierArgs modi
+              typeAndVal =
+                M.merge
+                  (M.mapMissing (curry $ invalidArguments "missing argument"))
+                  (M.mapMissing (curry $ invalidArguments "extra argument"))
+                  (M.zipWithMatched $ \_k t v -> (t, v))
+                  strTypes
+                  $ M.mapKeys T.pack $ M.fromList ns
+              -- These probably don't need to be sorted by argument index, as they are turned into a map
+              -- when added to the call info.
+              !sortedArgs =
+                map snd . sortWith fst
+                  . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
+                  $ M.toList typeAndVal
+          return sortedArgs
+    -- ++ (map (\(x,y) -> (T.unpack x, y)) (concat matchedArgvals)) --modArgsToBeLocals
 
-  onTraced $ do
-    liftIO $ putStrLn $ "            args: " ++ show (map fst args)
-    when (not $ null returns) $ liftIO $ putStrLn $ "    named return: " ++ show (map fst returns)
+    onTraced $ do
+      liftIO $ putStrLn $ "            args: " ++ show (map fst args)
+      when (not $ null returns) $ liftIO $ putStrLn $ "    named return: " ++ show (map fst returns)
 
-  -- let myCombinerForEfficiency xs [] = return xs
-  --     myCombinerForEfficiency xs ((n,(t,v)):ys) = do
-  --       newVar <- liftIO $ fmap Variable $ newIORef v
-  --       myCombinerForEfficiency ((n, (t, newVar)) : xs) ys
+    -- let myCombinerForEfficiency xs [] = return xs
+    --     myCombinerForEfficiency xs ((n,(t,v)):ys) = do
+    --       newVar <- liftIO $ fmap Variable $ newIORef v
+    --       myCombinerForEfficiency ((n, (t, newVar)) : xs) ys
 
-  forM_ (map (\(x, y) -> (T.unpack x, y)) (concat matchedArgvals)) $ \(n, (t, v)) -> do
-    addLocalVariable t n v
+    forM_ (map (\(x, y) -> (T.unpack x, y)) (concat matchedArgvals)) $ \(n, (t, v)) -> do
+      addLocalVariable t n v
 
-  -- theCallInfo <- getCurrentCallInfo
-  -- when (True || (not $ null matchedArgvals)) $ error (show theCallInfo)
-  let !commands = fromMaybe (missingField "Function call: function has been declared but not defined" funcName) $ CC._funcContents theFunction
-  let modContentsList = map (\m -> fromMaybe (missingField "Function call: Modifier has been declared but not defined" m) (CC._modifierContents m)) theModifiers
-  let isNotModExec = \case
-        CC.ModifierExecutor _ -> False
-        _ -> True
-  let (lhs, rhs) = foldr (\(a, b) (c, d) -> (a ++ c, b ++ d)) ([], []) (map (span isNotModExec) modContentsList)
-  logVals lhs rhs
-  _ <- runStatementBlock' lhs
-  val <- runStatementBlock commands
-  _ <- runStatementBlock' rhs
+    -- theCallInfo <- getCurrentCallInfo
+    -- when (True || (not $ null matchedArgvals)) $ error (show theCallInfo)
+    let !commands = fromMaybe (missingField "Function call: function has been declared but not defined" funcName) $ CC._funcContents theFunction
+    let modContentsList = map (\m -> fromMaybe (missingField "Function call: Modifier has been declared but not defined" m) (CC._modifierContents m)) theModifiers
+    let isNotModExec = \case
+          CC.ModifierExecutor _ -> False
+          _ -> True
+    let (lhs, rhs) = foldr (\(a, b) (c, d) -> (a ++ c, b ++ d)) ([], []) (map (span isNotModExec) modContentsList)
+    logVals lhs rhs
+    _ <- runStatementBlock' lhs
+    val <- runStatementBlock commands
+    _ <- runStatementBlock' rhs
 
-  let findNamedReturns = do
-        case returns of
-          [] -> return Nothing
-          [(name, _)] -> do
-            -- We have to break this up because
-            -- SolidVM cannot distinguish between
-            -- a value and single-tupled value
-            currentCallInfo <- getCurrentCallInfo
-            let mReturnVar = M.lookup name $ localVariables currentCallInfo
-            case mReturnVar of
-              Nothing -> unknownVariable "findNamedReturns" name
-              Just returnVar -> Just <$> getVar (snd returnVar)
-          xs ->
-            Just . STuple . V.fromList <$> do
+    let findNamedReturns = do
+          case returns of
+            [] -> return Nothing
+            [(name, _)] -> do
+              -- We have to break this up because
+              -- SolidVM cannot distinguish between
+              -- a value and single-tupled value
               currentCallInfo <- getCurrentCallInfo
-              for (fst <$> xs) $ \name -> do
-                let mReturnVar = M.lookup name $ localVariables currentCallInfo
-                case mReturnVar of
-                  Nothing -> unknownVariable "findNamedReturns" name
-                  Just returnVar -> Constant <$> getVar (snd returnVar)
-  val' <- case val of
-    Nothing -> findNamedReturns
-    Just SNULL -> findNamedReturns
-    Just {} -> return val
-  popCallInfo
+              let mReturnVar = M.lookup name $ localVariables currentCallInfo
+              case mReturnVar of
+                Nothing -> unknownVariable "findNamedReturns" name
+                Just returnVar -> Just <$> getVar (snd returnVar)
+            xs ->
+              Just . STuple . V.fromList <$> do
+                currentCallInfo <- getCurrentCallInfo
+                for (fst <$> xs) $ \name -> do
+                  let mReturnVar = M.lookup name $ localVariables currentCallInfo
+                  case mReturnVar of
+                    Nothing -> unknownVariable "findNamedReturns" name
+                    Just returnVar -> Constant <$> getVar (snd returnVar)
+    val' <- case val of
+      Nothing -> findNamedReturns
+      Just SNULL -> findNamedReturns
+      Just {} -> return val
+    pure val'
 
   return val'
 
