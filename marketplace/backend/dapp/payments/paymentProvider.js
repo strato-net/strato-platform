@@ -194,7 +194,8 @@ async function getState(user, contract, options) {
 
 async function getPaymentSession(user, args, defaultOptions) {
     const { paymentSessionId, ...restArgs } = args;
-    const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
+    const {app, ...defaultOptions1} = defaultOptions
+    const options = { ...defaultOptions1, org: 'BlockApps'}
     const searchArgs = setSearchQueryOptions(restArgs, { key: 'paymentSessionId', value: paymentSessionId });
     const paymentProvider = await searchOne(paymentContractName, searchArgs, options, user);
 
