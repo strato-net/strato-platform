@@ -123,10 +123,7 @@ const ResponsiveCart = ({ data , confirm ,  AddQty ,  MinusQty ,  ValueQty ,  re
                <div className={`overflow-hidden transition-max-height ease-in-out duration-500 ${faqOpenState[index] ? 'max-h-[120px]' : 'max-h-0'}`}>
 
                <div className={` border-t bg-[#E9E9E9] flex flex-col gap-2 p-2 `}>
-                     <div className="flex justify-between">
-                         <Typography>Measurement(unit):</Typography>
-                         <Typography>{element?.unitOfMeasure}</Typography>
-                     </div><div className="flex justify-between">
+                    <div className="flex justify-between">
                          <Typography>Unit price($):</Typography>
                          <Typography>{element?.unitPrice}</Typography>
                      </div><div className="flex justify-between">

@@ -157,7 +157,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
   }, [user])
 
   const subMenuItems = [
-    {value: "marketplace", path: routes.MarketplaceProductList.url, label: "MarketPlace"},
+    {value: "marketplace", path: routes.MarketplaceProductList.url, label: "Marketplace"},
     {value: "orders", path: routes.Orders.url, label: "Orders"},
     {value: "mystore", path: "/inventories", label: "My Store"},
     user ? {value: "logout", path: "/logout", label: "Logout"} : null,
