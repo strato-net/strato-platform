@@ -5,7 +5,7 @@ import <509>;
 import "../Assets/Asset.sol";
 import "../Enums/RestStatus.sol";
 import "../Orders/Order.sol";
-import "../Payments/PaymentProvider.sol";
+import "../Payments/BasePaymentProvider.sol";
 import "../Utils/Utils.sol";
 
 abstract contract Sale is Utils { 
