@@ -9,7 +9,8 @@ import {
   Space,
   Avatar,
   Input,
-  notification
+  notification,
+  Pagination
 } from "antd";
 import CategoryProductCard from "./CategoryProductCard";
 //categories
@@ -35,7 +36,7 @@ import { useMatch } from "react-router-dom";
 import { MAX_QUANTITY, MAX_PRICE } from "../../helpers/constants";
 import ClickableCell from "../ClickableCell";
 import { useAuthenticateState } from "../../contexts/authentication";
-import {SearchOutlined, DownOutlined } from "@ant-design/icons";
+import {SearchOutlined, CloseOutlined } from "@ant-design/icons";
 import NewTrendingCard from "./NewTrendingCard";
 import { FilterIcon } from "../../images/SVGComponents";
 
@@ -276,13 +277,10 @@ const CategoryProductList = ({ user }) => {
     }
   };
 
-  const handleSortClick = () => {
-    setSortBy(!sortBy);
-  };
-
   return (
     <div>
-      <Breadcrumb className="text-xs ml-14 mt-14">
+      <div className="fixed bg-white w-full top-7 z-10 md:static">
+        <Breadcrumb className="text-xs ml-4 md:ml-14 mt-14">
       <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
           <ClickableCell href={routes.Marketplace.url}>
             <p href={routes.Marketplace.url} className="text-primaryB hover:bg-transparent">
@@ -290,19 +288,21 @@ const CategoryProductList = ({ user }) => {
             </p>
           </ClickableCell>
         </Breadcrumb.Item>
-        <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-            <p className="text-primaryB hover:bg-transparent">
+        <Breadcrumb.Item href="" onClick={e => setSelectedCategories([])}>
+          <ClickableCell href={routes.MarketplaceProductList.url}>
+            <p href={routes.MarketplaceProductList.url} className="text-primaryB hover:bg-transparent">
               MarketPlace
             </p>
+          </ClickableCell>  
         </Breadcrumb.Item>
         {selectedCategories?.map((category, index) => (
           <Breadcrumb.Item key={index} className="text-primary">
             {category ? category : ""}
           </Breadcrumb.Item>
         ))}
-      </Breadcrumb>
-
-      <div className="flex items-center justify-center ml-14 mr-14 mt-4 gap-4">
+        </Breadcrumb>
+  
+        <div className="flex items-center justify-center ml-4 md:ml-14 mr-14 mt-4 gap-4">
         <div className="border border-solid border-[#6A6A6A] rounded-md cursor-pointer" onClick={handleFilterClick}>
           <Avatar
             className="flex items-center justify-center"
@@ -318,12 +318,20 @@ const CategoryProductList = ({ user }) => {
             className="bg-[#F6F6F6] border-none rounded-2xl p-[10px] "
           />
         </div>
+        </div>
+  
+        <div className="flex items-center ml-4 mt-2 md:ml-14 md:hidden">
+          <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
+          <Text className="text-gray-800 ml-1 text-xl">
+            {marketplaceList?.length} Results
+          </Text>
+        </div>
       </div>
 
-      <div className="flex pt-4 ml-14 mr-14 mt-4">
+      <div className="flex pt-4 mx-14 mt-[60px] md:mt-4 ">
         {/* Filter section */}
         {openFilter && 
-        <div className="mr-6 w-1/3">
+        <div className="mr-6 w-1/3 hidden md:flex md:flex-col">
           <div className="flex items-center">
               <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
               <Text className="text-xl font-semibold pr-7 ml-1">Filters</Text>
@@ -493,7 +501,7 @@ const CategoryProductList = ({ user }) => {
             <div className="pb-24"></div>
           </div>
         </div>}
-      
+
         {/* Product list section */}
 
         {isMarketplaceLoading ? (
@@ -501,7 +509,7 @@ const CategoryProductList = ({ user }) => {
             <Spin spinning={isMarketplaceLoading} size="large" />
           </div>
         ) : (
-          <div className=" mb-12">
+          <div className=" mb-12 w-full">
             <div className="flex items-center">
               <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
               <Text className="text-gray-800 ml-1 text-xl font-semibold ">
@@ -509,7 +517,7 @@ const CategoryProductList = ({ user }) => {
               </Text>
             </div>
             {marketplaceList?.length > 0 ? (
-              <div className={`mt-4 mb-8 grid gap-16 ${openFilter ? "grid-cols-3" : "grid-cols-4"}`} id="product-list">
+              <div className={` mt-8 md:mt-4 mb-8 flex w-full md:grid flex-col items-center ${openFilter ? "grid-cols-1 gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 lg:gap-14 " : " sm:grid-cols-1 gap-4 md:grid-cols-2 md:gap-14 lg:grid-cols-3 lg:gap-16 xl:grid-cols-4"}`} id="product-list">
                 {marketplaceList.map((product, index) => {
                   const prodCategory = categorys.find(
                     (c) => c.name === product.category
@@ -519,6 +527,7 @@ const CategoryProductList = ({ user }) => {
                       topSellingProduct={product} 
                       key={index} 
                       addItemToCart={addItemToCart}
+                      parent={"Marketplace"}
                     />
                   );
                 })}
@@ -531,6 +540,127 @@ const CategoryProductList = ({ user }) => {
           </div>
         )}
       </div>
+
+      {openFilter && 
+        <div className="mr-6 fixed w-full z-50 md:hidden top-16">
+          <div className="bg-white shadow-[2px_-2px_4px_0_rgba(0,0,0,0.05)] mb-24">
+          <div className="flex items-center justify-between pt-5">
+              <Text className="text-xl font-semibold pr-7 pl-7 ml-1">Select</Text>
+              <Avatar icon={<CloseOutlined />} style={{ color: "#202020" }} className="flex items-center pr-12" onClick={handleFilterClick}/>
+          </div>
+            <Divider className="m-0 mt-5" />
+
+            {/* Panel - Category */}
+            {categorys.length > 0 && (
+              <>
+                <Collapse
+                  bordered={false}
+                  expandIconPosition="end"
+                  ghost="true"
+                  reverse={false}
+                  className="pl-8 pr-7"
+                >
+                  <Panel header={<Text strong>Categories</Text>} key="1">
+                    <Checkbox.Group
+                      onChange={onChangeCategory}
+                      value={selectedCategories}
+                    >
+                      <div className="flex flex-col gap-3">
+                        {categorys.map((category, index) => (
+                          <Checkbox value={category.name} key={index} className="m-0">
+                            {category.name}
+                          </Checkbox>
+                        ))}
+                      </div>
+                    </Checkbox.Group>
+                  </Panel>
+                </Collapse>
+                <Divider className="m-0" />
+              </>
+            )}
+
+            {/* Panel - Price */}
+            <Collapse
+              bordered={false}
+              expandIconPosition="end"
+              ghost="true"
+              reverse={false}
+              className="pl-8 pr-7"
+            >
+              <Panel header={<Text strong>Price</Text>} key="1">
+                <Space>
+                  <InputNumber min={0} prefix='$' placeholder="min" onChange={(e) => {
+                    e === null ? setMinPrice(0) : setMinPrice(e)
+                  }} />
+                  -
+                  <InputNumber min={minPrice} prefix='$' placeholder="max" onChange={(e) => {
+                    e === null ? setMaxPrice(MAX_PRICE) : setMaxPrice(e)
+                  }} />
+                </Space>
+              </Panel>
+            </Collapse>
+            <Divider className="m-0" />
+
+            {/* Panel - Quantity */}
+            <Collapse
+              bordered={false}
+              expandIconPosition="end"
+              ghost="true"
+              reverse={false}
+              className="pl-8 pr-7"
+            >
+              <Panel header={<Text strong>Quantity</Text>} key="1">
+              <Space>
+                  <InputNumber min={0} placeholder="min" onChange={(e) => {
+                    e === null ? setMinQty(0) : setMinQty(e)
+                  }} />
+                  -
+                  <InputNumber min={minPrice} placeholder="max" onChange={(e) => {
+                    e === null ? setMaxQty(MAX_QUANTITY) : setMaxQty(e)
+                  }} />
+                </Space>
+              </Panel>
+            </Collapse>
+            <Divider className="m-0" />
+
+            {/* Panel - Product */}
+            {marketplaceList?.length > 0 && (
+              <>
+                <Collapse
+                  bordered={false}
+                  expandIconPosition="end"
+                  ghost="true"
+                  reverse={false}
+                  className="pl-8 pr-7"
+                >
+                  <Panel header={<Text strong>Product</Text>} key="1">
+                    <Checkbox.Group
+                      // onChange={onChangeProduct}
+                      value={selectedProducts}
+                    >
+                      <div className="flex flex-col gap-3">
+                        {uniqueProductNames.map((product, index) => (
+                          <Checkbox value={product} key={index} className="m-0" onChange={onChangeProduct}>
+                            {decodeURIComponent(product)}
+                          </Checkbox>
+                        ))}
+                      </div>
+                    </Checkbox.Group>
+                  </Panel>
+                </Collapse>
+                <Divider className="m-0" />
+              </>
+            )}
+            <div className="pb-8"></div>
+          </div>
+        </div>
+      }
+      <Pagination
+        current={1}
+        onChange={3}
+        total={10}
+        className="flex justify-center my-5"
+      />
     </div>
   );
 };
