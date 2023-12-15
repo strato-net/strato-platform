@@ -1,7 +1,5 @@
-import { Button, Spin, Typography } from "antd";
+import { Spin, Typography } from "antd";
 import React from "react";
-import { useNavigate } from "react-router-dom";
-import routes from "../../helpers/routes";
 
 export const ResponsiveTransferOrderCard = ({ data, isLoading}) => {
     
