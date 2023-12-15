@@ -1,23 +1,23 @@
 import express from "express";
-import CarbonController from "./carbon.controller";
-import { Carbon } from "../endpoints";
+import CarbonOffsetController from "./carbonOffset.controller";
+import { CarbonOffset } from "../endpoints";
 import authHandler from "../../middleware/authHandler";
 import loadDapp from "../../middleware/loadDappHandler";
 
 const router = express.Router();
 
 router.get(
-  Carbon.getAll,
+  CarbonOffset.getAll,
   authHandler.authorizeRequest(true),
   loadDapp,
-  CarbonController.getAll
+  CarbonOffsetController.getAll
 );
 
 router.post(
-  Carbon.create,
+  CarbonOffset.create,
   authHandler.authorizeRequest(),
   loadDapp,
-  CarbonController.create
+  CarbonOffsetController.create
 );
 
 export default router;

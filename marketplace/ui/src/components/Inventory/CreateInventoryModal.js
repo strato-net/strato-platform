@@ -141,7 +141,7 @@ const CreateInventoryModal = ({
               artist: values.artist,
             },
           });
-        case "Carbon":
+        case "CarbonOffset":
           const {serialNumber, ...restArgs} = body.itemArgs;
           return (body = {
             itemArgs: {
@@ -334,7 +334,7 @@ const CreateInventoryModal = ({
             </Form.Item>
           </div>
         );
-      case "Carbon":
+      case "CarbonOffset":
         return (
           <div className="flex justify-between mt-4 ">
             <Form.Item

@@ -459,7 +459,7 @@ const ProductDetails = ({ user, users }) => {
               <Text className="text-[13px]">{itemData?.artist}</Text>
             </Space>
           </Space>)
-      case "Carbon":
+      case "CarbonOffset":
         return (
           <Space direction="vertical">
             {/* <Space>
