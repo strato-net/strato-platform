@@ -318,19 +318,6 @@ const CategoryProductList = ({ user }) => {
             className="bg-[#F6F6F6] border-none rounded-2xl p-[10px] "
           />
         </div>
-
-        <div className="relative">
-          <div className="flex items-center justify-center border border-solid border-[#E9E9E9] rounded-md p-2 gap-4 cursor-pointer" onClick={handleSortClick}>
-            <Typography className="text-[#6A6A6A]">Sort by</Typography>
-            <DownOutlined className={`text-[#6A6A6A] ${sortBy ? "-rotate-180" : "rotate-0"}`}/>
-          </div>
-          {sortBy && 
-            <div className="flex flex-col gap-2 sort_conatiner py-1 absolute bg-white shadow-card_shadow top-10 right-0 p-2 w-max rounded-md">
-              <Typography >Price low to high</Typography>
-              <Typography >Price high to low</Typography>
-              <Typography >Best offer</Typography>
-            </div>}
-        </div>
       </div>
 
       <div className="flex pt-4 ml-14 mr-14 mt-4">
