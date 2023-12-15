@@ -105,6 +105,10 @@ body::-webkit-scrollbar {
   text-align: center;
 }
 
+.custom-input-number input {
+  text-align: left !important; 
+}
+
 .ant-input:hover {
   border-color: #181eac;
 }
