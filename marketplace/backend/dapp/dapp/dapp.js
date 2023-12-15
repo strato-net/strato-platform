@@ -10,7 +10,7 @@ import RestStatus from 'http-status-codes';
 import certificateJs from "/dapp/certificates/certificate";
 
 import artJs from "/dapp/items/art";
-import carbonJs from "/dapp/items/carbon";
+import carbonOffsetJs from "/dapp/items/carbonOffset";
 import metalsJs from "/dapp/items/metals";
 import clothingJs from "/dapp/items/clothing";
 import membershipJs from "/dapp/items/membership";
@@ -316,23 +316,23 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   // };
   // ------------------------------ ART ENDS --------------------------------
 
-  // ------------------------------ CARBON STARTS------------------------------
+  // ------------------------------ CARBONOFFSET STARTS------------------------------
 
-  contract.createCarbon = async function (args, options = defaultOptions) {
+  contract.createCarbonOffset = async function (args, options = defaultOptions) {
     const createdDate = Math.floor(Date.now() / 1000);
     const newArgs = {
       ...args.itemArgs,
       createdDate,
     };
-    return carbonJs.uploadContract(rawAdmin, newArgs, options);
+    return carbonOffsetJs.uploadContract(rawAdmin, newArgs, options);
   };
 
-  contract.getCarbons = async function (args = {}, options = optionsNoChainIds) {
+  contract.getCarbonOffsets = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName, };
-    return carbonJs.getAll(rawAdmin, args, getOptions);
+    return carbonOffsetJs.getAll(rawAdmin, args, getOptions);
   };
 
-  // ------------------------------ CARBON ENDS--------------------------------
+  // ------------------------------ CARBONOFFSET ENDS--------------------------------
 
   // ------------------------------ METALS STARTS------------------------------
 

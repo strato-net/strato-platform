@@ -97,7 +97,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
         
         ]
         switch (getCategory()) {
-            case 'Carbon':
+            case 'CarbonOffset':
                 finalColumns = finalColumns.concat(
                     [
                         {
@@ -108,6 +108,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
                             )
                         }
                     ])
+                break;
             case 'Metals':
                 finalColumns = finalColumns.concat(
                     [
