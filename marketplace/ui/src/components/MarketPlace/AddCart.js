@@ -284,16 +284,6 @@ const ValueQty = (product , e)=>{
         <p className="text-center">{text}</p>
       ),
       // width: "12%"
-    },{
-      title: (
-        <Text className="text-[#202020] text-base font-semibold">Measurement (Unit)</Text>
-      ),
-      dataIndex: "sellersCommonName",
-      align: "center",
-      render: (text) => (
-        <p className="">lb</p>
-      ),
-  //  width: "12%"
     },
     {
       title: <Text className="text-[#202020] text-base font-semibold">Unit Price($)</Text>,
@@ -344,13 +334,13 @@ const ValueQty = (product , e)=>{
       render: (text) => <p className="text-sm font-medium text-[#202020] ">{text}</p>,
     },
     {
-      title: <Text className="text-[#202020] text-base font-semibold">TAX($)</Text>,
+      title: <Text className="text-[#202020] text-base font-semibold">Tax($)</Text>,
       dataIndex: "tax",
       align: "center",
       render: (text) => <p className="text-sm font-medium text-[#202020]">{text}</p>,
     },
     {
-      title: <Text className="text-[#202020] text-base font-semibold">AMOUNT($)</Text>,
+      title: <Text className="text-[#202020] text-base font-semibold">Amount($)</Text>,
       dataIndex: "amount",
       align: "left",
       render: (text) => <p className="text-sm font-medium text-[#202020]">{text}</p>  
