@@ -50,6 +50,7 @@ library:
   - blockstanbul
   - bytestring
   - common-log
+  - composable-monads-base
   - conduit
   - containers
   - data-default

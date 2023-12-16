@@ -13,6 +13,7 @@ dependencies:
 library:
   source-dirs: src/
   exposed-modules:
+    - Blockchain.Strato.Discovery.Data.MemPeerDB
     - Blockchain.Strato.Discovery.Data.Peer
     - Blockchain.Strato.Discovery.Data.PeerIOWiring
     - Blockchain.Strato.Discovery.ContextLite
@@ -32,6 +33,7 @@ library:
     - bytestring
     - common-log
     - composable-monads-base
+    - containers
     - cpu
     - crypto-pubkey-types
     - either
