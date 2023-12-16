@@ -1,4 +1,5 @@
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Blockchain.Strato.Discovery.Data.MemPeerDB where
 
@@ -16,7 +17,7 @@ data MemPeerDBEnv = MemPeerDBEnv {
 
 type MemPeerDBM = ReaderT MemPeerDBEnv
 
-type HasMemPeerDB = AccessibleEnv MemPeerDBEnv
+type HasMemPeerDB m = (MonadIO m, AccessibleEnv MemPeerDBEnv m)
 
 createMemPeerDBEnv :: MonadIO m =>
                       [PPeer] -> m MemPeerDBEnv
