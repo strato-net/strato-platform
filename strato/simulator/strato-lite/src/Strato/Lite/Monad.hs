@@ -12,6 +12,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -915,14 +916,14 @@ fromActivityState :: ActivityState -> Int
 fromActivityState Active = 1
 fromActivityState Inactive = 0
 
-instance (MonadIO m, MonadLogger m, MonadReader P2PPeer m) => RunsClient (MonadP2PTest m) where
+instance (MonadLogger m, MonadReader P2PPeer m, HasMemPeerDB m) => RunsClient (MonadP2PTest m) where
   runClientConnection ipAsText@(IPAsText ip) tcpPort@(TCPPort p) sSource f = do
     inet <- lift $ asks _p2pPeerInternet
     mSock <- M.lookup (ipAsText, tcpPort) . _tcpPorts <$> readTVarIO inet
     case mSock of
       Nothing -> $logErrorS "runClientConnection" $ "No socket exists for " <> T.pack (show ip) <> ":" <> T.pack (show p)
       Just s -> do
-        myIP <- lift $ asks _p2pMyIPAddress
+        myIP <- accessEnvVar p2pMyIPAddress
         i <- liftIO $ newTQueueIO
         o <- liftIO $ newTQueueIO
         let pSource = sourceTQueue o
@@ -931,10 +932,10 @@ instance (MonadIO m, MonadLogger m, MonadReader P2PPeer m) => RunsClient (MonadP
         atomically $ writeTQueue s (v, myIP)
         f $ P2pConduits pSource pSink sSource
 
-instance (MonadUnliftIO m, MonadLogger m, MonadReader P2PPeer m) => RunsServer (MonadP2PTest m) (LoggingT IO) where
+instance (MonadUnliftIO m, MonadLogger m, MonadReader P2PPeer m, HasMemPeerDB m) => RunsServer (MonadP2PTest m) (LoggingT IO) where
   runServer tcpPort@(TCPPort p) runner f = runner $ \sSource -> do
     inet <- lift $ asks _p2pPeerInternet
-    myIP@(IPAsText ip) <- lift $ asks _p2pMyIPAddress
+    myIP@(IPAsText ip) <- accessEnvVar p2pMyIPAddress
     mSock <- liftIO $ M.lookup (myIP, tcpPort) . _tcpPorts <$> readTVarIO inet
     case mSock of
       Nothing -> $logErrorS "runServer" $ "No socket exists for " <> T.pack (show ip) <> ":" <> T.pack (show p)
@@ -980,16 +981,16 @@ ipAndPortToSockAddr (IPAsText ip) (UDPPort port) =
        in Just $ SockAddrInet (fromIntegral port) addr
     _ -> Nothing
 
-instance MonadReader P2PPeer m => A.Selectable (Maybe IPAsText, UDPPort) SockAddr (MonadP2PTest m) where
+instance (MonadReader P2PPeer m, HasMemPeerDB m) => A.Selectable (Maybe IPAsText, UDPPort) SockAddr (MonadP2PTest m) where
   select _ (Just ip, udpPort) = pure $ ipAndPortToSockAddr ip udpPort
   select _ (Nothing, udpPort) = do
-    myIP <- lift $ asks _p2pMyIPAddress
+    myIP <- accessEnvVar p2pMyIPAddress
     pure $ ipAndPortToSockAddr myIP udpPort
 
 instance
-  ( MonadIO m,
-    MonadLogger m,
-    MonadReader P2PPeer m
+  ( MonadLogger m,
+    MonadReader P2PPeer m,
+    HasMemPeerDB m
   ) =>
   A.Replaceable SockAddr B.ByteString (MonadP2PTest m)
   where
@@ -1001,7 +1002,7 @@ instance
       case mSock of
         Nothing -> $logErrorS "runServer" $ "No socket exists for " <> ipText <> ":" <> T.pack (show port')
         Just s -> do
-          ip' <- lift $ asks _p2pMyIPAddress
+          ip' <- accessEnvVar p2pMyIPAddress
           case ipAndPortToSockAddr ip' (UDPPort 30303) of
             Nothing -> pure ()
             Just myAddr -> atomically $ writeTQueue s (msg, myAddr)
@@ -1021,14 +1022,15 @@ instance
 instance
   ( MonadUnliftIO m,
     MonadLogger m,
-    MonadReader P2PPeer m
+    MonadReader P2PPeer m,
+    HasMemPeerDB m
   ) =>
   A.Selectable (IPAsText, UDPPort, B.ByteString) Point (MonadP2PTest m)
   where
   select _ (ip@(IPAsText ip'), port@(UDPPort p), bs) = do
     inet <- lift $ asks _p2pPeerInternet
     mSock <- M.lookup (ip, port) . _udpPorts <$> readTVarIO inet
-    myIP@(IPAsText myip) <- lift $ asks _p2pMyIPAddress
+    myIP@(IPAsText myip) <- accessEnvVar p2pMyIPAddress
     case mSock of
       Nothing -> do
         $logWarnS "getPubKey" $ "No socket exists for " <> ip' <> ":" <> T.pack (show p)
@@ -1046,15 +1048,12 @@ instance
 
 ------------------ BEGIN HasPeerDB
 
-instance HasMemPeerDB m => Mod.Accessible AvailablePeers (MonadTest m) where
+instance HasMemPeerDB m => Mod.Accessible AvailablePeers m where
   access _ = do
     currentTime <- liftIO getCurrentTime
-    IPAsText ip <- asks _p2pMyIPAddress
+    IPAsText ip <- accessEnvVar p2pMyIPAddress
     peerMap <- readIORef =<< fmap stringPPeerMap accessEnv
     return $ AvailablePeers $ filter ((< currentTime) . pPeerEnableTime) $ filter ((/= ip) . pPeerIp) $ M.elems peerMap
-
-instance (Monad m, Mod.Accessible AvailablePeers m) => Mod.Accessible AvailablePeers (MonadP2PTest m) where
-  access = lift . Mod.access
 
 instance A.Replaceable (IPAsText, TCPPort) ActivityState m where
   replace = error "'A.Replaceable (IPAsText, TCPPort) ActivityState m' not implemented"
@@ -1086,38 +1085,29 @@ instance HasMemPeerDB m => A.Replaceable (IPAsText, TCPPort) PeerBondingState m 
     peerMap <- fmap stringPPeerMap accessEnv
     modifyIORef peerMap $ at ip . _Just %~ (\p -> p {pPeerBondState = s})
 
-instance HasMemPeerDB m => Mod.Accessible BondedPeers (MonadTest m) where
+instance HasMemPeerDB m => Mod.Accessible BondedPeers m where
   access _ = do
     currentTime <- liftIO getCurrentTime
-    IPAsText ip <- asks _p2pMyIPAddress
+    IPAsText ip <- accessEnvVar p2pMyIPAddress
     let f p = pPeerBondState p == 2 && pPeerEnableTime p < currentTime && pPeerIp p /= ip
     peerMap <- readIORef =<< fmap stringPPeerMap accessEnv
     return $ BondedPeers $ filter f $ M.elems peerMap
     
-instance (Monad m, Mod.Accessible BondedPeers m) => Mod.Accessible BondedPeers (MonadP2PTest m) where
-  access = lift . Mod.access
-
-instance HasMemPeerDB m => Mod.Accessible BondedPeersForUDP (MonadTest m) where
+instance HasMemPeerDB m => Mod.Accessible BondedPeersForUDP m where
   access _ = do
     currentTime <- liftIO getCurrentTime
-    IPAsText ip <- asks _p2pMyIPAddress
+    IPAsText ip <- accessEnvVar p2pMyIPAddress
     let f p = pPeerBondState p == 2 && pPeerUdpEnableTime p < currentTime && pPeerIp p /= ip
     peerMap <- readIORef =<< fmap stringPPeerMap accessEnv
     return $ BondedPeersForUDP $ filter f $ M.elems peerMap
 
-instance (Monad m, Mod.Accessible BondedPeersForUDP m) => Mod.Accessible BondedPeersForUDP (MonadP2PTest m) where
-  access = lift . Mod.access
-
-instance HasMemPeerDB m => Mod.Accessible UnbondedPeers (MonadTest m) where
+instance HasMemPeerDB m => Mod.Accessible UnbondedPeers m where
   access _ = do
     currentTime <- liftIO getCurrentTime
-    IPAsText ip <- asks _p2pMyIPAddress
+    IPAsText ip <- accessEnvVar p2pMyIPAddress
     let f p = pPeerBondState p == 0 && pPeerEnableTime p < currentTime && pPeerIp p /= ip
     peerMap <- readIORef =<< fmap stringPPeerMap accessEnv
     return $ UnbondedPeers $ filter f $ M.elems $ peerMap
-
-instance (Monad m, Mod.Accessible UnbondedPeers m) => Mod.Accessible UnbondedPeers (MonadP2PTest m) where
-  access = lift . Mod.access
 
 instance HasMemPeerDB m => A.Selectable IPAsText ClosestPeers m where
   select _ (IPAsText t) = do
@@ -1293,7 +1283,6 @@ data P2PPeer = P2PPeer
     _p2pTestContext :: TVar TestContext,
     _p2pPeerDB :: MemPeerDBEnv,
     _p2pPeerInternet :: TVar Internet,
-    _p2pMyIPAddress :: IPAsText,
     _p2pMyUDPSocket :: TQueue (B.ByteString, SockAddr),
     _p2pPeerSeqTimerSource :: TestContextM (),
     _p2pPeerSequencer :: TestContextM (),
@@ -1637,7 +1626,7 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAs
       unseq ies = do
         atomically . writeTQueue unseqSource $ UnseqEvent <$> ies
 
-  memPeerDBEnv <- createMemPeerDBEnv $ map (\(IPAsText ip) -> buildPeer (Nothing, T.unpack ip, 30303)) bootNodes
+  memPeerDBEnv <- createMemPeerDBEnv ipAsText $ map (\(IPAsText ip) -> buildPeer (Nothing, T.unpack ip, 30303)) bootNodes
         
   pure $
     P2PPeer
@@ -1654,7 +1643,6 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAs
       testContextTVar
       memPeerDBEnv
       inet
-      ipAsText
       udpVSock
       seqTimerSource
       sequencer
