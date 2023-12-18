@@ -54,7 +54,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                     </Typography>
                     <Typography>{quantity}</Typography>
                     <Typography className='px-2 bg-[#EEEFFA] cursor-pointer' onClick={() => {
-                        if (quantity + 1 <= topSellingProduct.quantity) {
+                        if (quantity + 1 <= topSellingProduct.saleQuantity) {
                             setQuantity(quantity + 1)
                         }
                         else {
