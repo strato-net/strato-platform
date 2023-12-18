@@ -10,6 +10,8 @@ import {
   Spin,
   Upload,
   notification,
+  Typography,
+  Switch,
 } from "antd";
 import {
   useInventoryDispatch,
@@ -21,6 +23,7 @@ import getSchema from "./InventorySchema";
 import { usePapaParse } from "react-papaparse";
 import TagManager from "react-gtm-module";
 import { CATEGORIES, PAYMENT_TYPE, unitOfMeasures } from "../../helpers/constants";
+import { Images } from "../../images";
 
 const { Option } = Select;
 
@@ -741,86 +744,29 @@ const CreateInventoryModal = ({
         onCancel={handleCancel}
         width={673}
         footer={[
-          <div className="flex justify-center">
+          <div className="flex justify-center border-t border-[#BABABA] pt-5">
             <Button
-              className="w-40"
+              className="w-[150px] h-9"
               key="submit"
               type="primary"
               onClick={formik.handleSubmit}
               disabled={disabled}
             >
-              {disabled ? <Spin /> : "Create Item"}
+              {disabled ? <Spin /> : "Add Product"}
             </Button>
           </div>,
         ]}
       >
-        <h1 className="text-center font-semibold text-lg text-primaryB">
-          Add Item
+        <h1 className="font-semibold text-xl text-[#202020] border-b pb-[14px] border-[#BABABA]">
+        Add Product
         </h1>
-        <hr className="text-secondryD mt-3" />
+       <div className="flex gap-4">
+        <div className="w-[60%]">
+
         <Form layout="vertical" className="mt-5" onSubmit={formik.handleSubmit}>
           <div className="w-full mb-3">
-            <div className="flex justify-between mt-4 ">
-              <Form.Item label="Name" name="name" className="w-72">
-                <Input
-                  label="name"
-                  placeholder="Enter Name"
-                  name="name"
-                  disabled={false}
-                  value={formik.values.name}
-                  onChange={formik.handleChange}
-                />
-                {formik.touched.name && formik.errors.name && (
-                  <span className="text-error text-xs">
-                    {formik.errors.name}
-                  </span>
-                )}
-              </Form.Item>
-              <Form.Item label="Category" name="category" className="w-72">
-                <Select
-                  id="category"
-                  placeholder="Select Category"
-                  allowClear
-                  name="category"
-                  value={formik.values.category}
-                  onChange={(value) => {
-                    formik.setFieldValue("category", value);
-                  }}
-                >
-                  {CATEGORIES.map((e, index) => (
-                    <Option value={e} key={index}>
-                      {e}
-                    </Option>
-                  ))}
-                </Select>
-                {getIn(formik.touched, "category") &&
-                  getIn(formik.errors, "category") && (
-                    <span className="text-error text-xs">
-                      {getIn(formik.errors, "category")}
-                    </span>
-                  )}
-              </Form.Item>
-            </div>
-            {categoricalProperties()}
-            <div className="flex justify-between mt-4 ">
-              <Form.Item label="Description" name="description" className="w-full">
-                <TextArea
-                  label="description"
-                  placeholder="Enter Description"
-                  name="description"
-                  value={formik.values.description}
-                  onChange={formik.handleChange}
-                />
-                {formik.touched.description && formik.errors.description && (
-                  <span className="text-error text-xs">
-                    {formik.errors.description}
-                  </span>
-                )}
-              </Form.Item>
-            </div>
-            <div className="mt-4 flex justify-between">
-              <Form.Item label="Upload Images" name="images" className="w-72">
-                <div className="p-4 border-secondryD border rounded flex flex-col justify-around">
+          <Form.Item label="Upload Images" name="images" className="w-full">
+                <div className="p-4 border-[#BABABA] border rounded flex flex-col justify-around">
                   <Upload
                     onChange={(es) => {
                       if (es && es.fileList && es.fileList.length > 0) {
@@ -853,42 +799,178 @@ const CreateInventoryModal = ({
                   </span>
                 )}
               </Form.Item>
-              <Form.Item label="Upload Files" name="files" className="w-72">
-                <div className="p-4 border-secondryD border rounded flex flex-col justify-around">
-                  <Upload
-                    onChange={(es) => {
-                      if (es && es.fileList && es.fileList.length > 0) {
-                        setSelectedFiles(es.fileList);
-                        formik.setFieldValue("files", es.fileList.map((e) => e.originFileObj));
-                      }
-                    }}
-                    fileList={selectedFiles}
-                    accept="application/pdf"
-                    multiple={true}
-                    maxCount={10}
-                    beforeUpload={beforeFileUpload}
-                  >
-                    <div className="text-primary border border-primary rounded px-4 py-2 text-center hover:text-white hover:bg-primary cursor-pointer">
-                      Browse Files
-                    </div>
-                  </Upload>
-                </div>
-
-                <div className="flex items-start">
-                  <p className="mt-1 text-xs italic font-medium ">Note:</p>
-                  <p className="mt-1 text-xs italic ml-1 mr-4">
-                    use pdf format of size less than 1mb. Limit of 10.
-                  </p>
-                </div>
-                {formik.touched.images && formik.errors.images && (
+            <div className="flex justify-between  gap-4 mt-6 ">
+              <Form.Item label="Name" name="name" className="w-full text-[#202020] font-medium">
+                <Input
+                  label="name"
+                  placeholder="BlockApps"
+                  name="name"
+                  disabled={false}
+                  value={formik.values.name}
+                  onChange={formik.handleChange}
+                />
+                {formik.touched.name && formik.errors.name && (
                   <span className="text-error text-xs">
-                    {formik.errors.images}
+                    {formik.errors.name}
+                  </span>
+                )}
+              </Form.Item>
+              <Form.Item label="Category" name="category" className="w-full">
+                <Select
+                  id="category"
+                  placeholder="Face Lift package"
+                  allowClear
+                  name="category"
+                  value={formik.values.category}
+                  onChange={(value) => {
+                    formik.setFieldValue("category", value);
+                  }}
+                >
+                  {CATEGORIES.map((e, index) => (
+                    <Option value={e} key={index}>
+                      {e}
+                    </Option>
+                  ))}
+                </Select>
+                {getIn(formik.touched, "category") &&
+                  getIn(formik.errors, "category") && (
+                    <span className="text-error text-xs">
+                      {getIn(formik.errors, "category")}
+                    </span>
+                  )}
+              </Form.Item>
+            </div>
+            <div className="flex justify-between  gap-4 mt-6 ">
+              <Form.Item label="Sub Category" name="subcategory" className="w-full text-[#202020] font-medium">
+                <Input
+                  label="subCategory"
+                  placeholder="BlockApps"
+                  name="subcategory"
+                  disabled={false}
+                  value={formik.values.name}
+                  onChange={formik.handleChange}
+                />
+                {formik.touched.name && formik.errors.name && (
+                  <span className="text-error text-xs">
+                    {formik.errors.name}
+                  </span>
+                )}
+              </Form.Item>
+              <Form.Item label="Manufacturer" name="Manufacturer" className="w-full text-[#202020] font-medium">
+                <Input
+                  label="Manufacturer"
+                  placeholder="Face Lift package"
+                  name="Manufacturer"
+                  disabled={false}
+                  value={formik.values.name}
+                  onChange={formik.handleChange}
+                />
+                {formik.touched.name && formik.errors.name && (
+                  <span className="text-error text-xs">
+                    {formik.errors.name}
+                  </span>
+                )}
+              </Form.Item>
+
+            </div>
+            <div className="flex justify-between gap-4 mt-6 ">
+              <Form.Item label="Unit of Measurement" name="measurement" className="w-72 text-[#202020] font-medium">
+                <Input
+                  label="measurement"
+                  placeholder="BlockApps"
+                  name="measurement"
+                  disabled={false}
+                  value={formik.values.name}
+                  onChange={formik.handleChange}
+                />
+                {formik.touched.name && formik.errors.name && (
+                  <span className="text-error text-xs">
+                    {formik.errors.name}
+                  </span>
+                )}
+              </Form.Item>
+              <Form.Item label="Least sellable Unit" name="saleable" className="w-72 text-[#202020] font-medium">
+                <Input
+                  label="saleable"
+                  placeholder="BlockApps"
+                  name="saleable"
+                  disabled={false}
+                  value={formik.values.name}
+                  onChange={formik.handleChange}
+                />
+                {formik.touched.name && formik.errors.name && (
+                  <span className="text-error text-xs">
+                    {formik.errors.name}
+                  </span>
+                )}
+              </Form.Item>
+
+            </div>
+            {categoricalProperties()}
+            <div className="flex justify-between mt-4 ">
+              <Form.Item label="Description" name="description" className="w-full">
+                <TextArea
+                  label="description"
+                  placeholder="Enter Description"
+                  name="description"
+                  value={formik.values.description}
+                  onChange={formik.handleChange}
+                />
+                {formik.touched.description && formik.errors.description && (
+                  <span className="text-error text-xs">
+                    {formik.errors.description}
                   </span>
                 )}
               </Form.Item>
             </div>
+            <div className="flex justify-between items-center mt-6 gap-4">
+              <Form.Item label="Unique product code" name="productCode" className="w-full text-[#202020] font-medium">
+                <Input
+                  label="Product Code "
+                  placeholder="BlockApps"
+                  name="productCode"
+                  disabled={false}
+                  value={formik.values.name}
+                  onChange={formik.handleChange}
+                />
+                {formik.touched.name && formik.errors.name && (
+                  <span className="text-error text-xs">
+                    {formik.errors.name}
+                  </span>
+                )}
+              </Form.Item>
+             <Switch label="helo" className="border"  prefixCls="bg-red-800" />
+
+            </div>
           </div>
         </Form>
+        </div>
+        {/* //! preview */}
+        <div className="w-[40%] flex justify-end">
+          <div>
+          <Typography className="text-[#13188A] font-semibold pt-6 pb-2">Live Preview</Typography>
+          <div className="p-3 rounded-lg  shadow-card_shadow">
+                    <div>
+                      <img src={Images.random} alt="" className="rounded-md w-full"/>
+                    </div>
+                    <div className="pt-3">
+                      <div className="flex justify-between">
+                        <Typography className="text-[#202020] font-semibold">{formik.values.name}</Typography>
+                        <img src={Images.Verified} className="w-4 h-4"/> 
+                      </div>
+                      <div className="pt-2 flex gap-2 items-center ">
+                        <div className="w-2 h-2 rounded-full bg-[#119B2D]"></div>
+                        <Typography className="text-[#202020] font-medium text-xs">Live</Typography>
+                      </div>
+                    </div>
+                    <div className="pt-2  w-[184px] h-12 overflow-hidden">
+                      <Typography className="text-[#989898] text-xs">{formik.values.description}</Typography>
+                    </div>
+          </div>
+
+          </div>
+        </div>
+        </div>
       </Modal>
       {uploadErr && openToast("bottom")}
     </>

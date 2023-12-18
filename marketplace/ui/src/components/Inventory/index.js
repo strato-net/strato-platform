@@ -8,7 +8,8 @@ import {
   Spin,
   Typography,
   Image,
-  Tooltip
+  Tooltip,
+  Tabs
 } from "antd";
 import InventoryCard from "./InventoryCard";
 import CreateInventoryModal from "./CreateInventoryModal";
@@ -29,6 +30,7 @@ import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
 import { useAuthenticateState } from "../../contexts/authentication";
+import CategoryCard from "../MarketPlace/CategoryCard";
 
 const { Search } = Input;
 
@@ -88,6 +90,7 @@ const Inventory = ({ user }) => {
       if (!( isOnboardedSuccess || isOnboardNotStarted ) ) {
         
         setTimeout(() => {
+         
           api.error({
             key: 1,
             message: "Something went wrong with your Stripe account.",
@@ -115,6 +118,7 @@ const Inventory = ({ user }) => {
   const handleCancel = () => {
     setOpen(false);
   };
+  
 
   const openToast = (placement) => {
     if (success) {
@@ -182,7 +186,7 @@ const Inventory = ({ user }) => {
           <Spin size="large" />
         </div>
       ) : (
-        <div className="mx-16 mt-14">
+        <div className="mt-[42px] ">
           {!isSearch && inventories.length === 0 && offset === 0 ? (
             <div className="h-screen justify-center flex flex-col items-center">
               <Image src={Images.noProductSymbol} preview={false} />
@@ -234,20 +238,22 @@ const Inventory = ({ user }) => {
             </div>
           ) : (
             <>
-              <div className="flex justify-between">
-                <Breadcrumb>
+             
+                <Breadcrumb className="sm:lg:mx-14">
                   <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
                     <ClickableCell href={routes.Marketplace.url}>
-                      Home
+                    <p className="text-[#13188A] font-semibold">
+                    Home
+                      </p> 
                     </ClickableCell>
                   </Breadcrumb.Item>
                   <Breadcrumb.Item>
-                    <p className=" text-primary">
-                      Inventory
+                    <p className=" text-[#202020] font-medium">
+                      Store                      
                     </p>
                   </Breadcrumb.Item>
                 </Breadcrumb>
-                <div className="flex">
+                {/* <div className="flex">
                   <Search
                     placeholder="Search"
                     className="w-80 mr-6"
@@ -289,38 +295,102 @@ const Inventory = ({ user }) => {
                       </Button>
                     </div>
                   </Tooltip>
-                </div>
+                </div> */}
+             <div className="w-full h-[116px] py-4 px-4 md:h-[96px] bg-[#F6F6F6] flex flex-col md:flex-row md:px-14  justify-between items-center mt-11">
+              <div className="flex justify-between w-full">
+                  <Button className="flex items-center flex-row-reverse gap-[6px] text-2xl font-medium text-[#13188A]" type="link" icon={<img src={Images.ForwardIcon} alt="inventory" className="w-6 h-6"/>}> Inventory
+                    </Button>
+                    <div className="md:hidden">
+              <Button  type="link" className="flex items-center gap-2 text-sm font-medium text-[#13188A] flex-row-reverse" icon={<img src={Images.ForwardIcon} alt="view all" className="w-[18px] h-[18px]" />}>view All</Button>
+
               </div>
+              </div>
+                    <Button type="primary" className="w-[174px] h-9 flex items-center gap-[6px] " icon={<img  src={Images.CreateInventory} alt="Inventory"  className="w-[18px] h-[18px]"/>
+                      }  onClick={() => {
+                        if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                          window.location.href = loginUrl;
+                        } else {
+                          showModal()
+                        }
+                      }}
+                      disabled={!stripeStatus.chargesEnabled || !stripeStatus.detailsSubmitted || !stripeStatus.payoutsEnabled}>Create Inventory</Button>
+
+             </div>
+             <div className="pt-6 mx-4 md:mx-5 md:px-14  lg:mx-1 mb-5 ">
+              <Tabs defaultActiveKey="1"
+                 className="store"
+                items={[
+                  {
+                      label :"Art",
+                      key : 1 ,
+                      children :  
+                      <div className="my-4 grid grid-cols-1 md:grid-cols-2    gap-6 max-w-full" >
+                        {inventories.map((inventory, index) => {
+                          // console.log(inventory,"this ")
+                          let category = categorys.find(
+                            (c) => c.name === inventory.category
+                          );
+                          return (
+                            <InventoryCard
+                              id={index}
+                              inventory={inventory}
+                              category={category}
+                              key={index}
+                              debouncedSearchTerm={debouncedSearchTerm}
+                              paymentProviderAddress={stripeStatus ? stripeStatus.paymentProviderAddress : undefined }
+                            />
+                          );
+                        })}
+                        </div>
+                  },{
+                      label :"Carbon",
+                      key : 2 ,
+                      children : <></>
+                  },{
+                      label :"Clothing",
+                      key : 3 ,
+                      children : <></>
+                  },{
+                      label :"Material",
+                      key : 4 ,
+                      children : <></>
+                  },
+                  {
+                      label :"Collectibles",
+                      key : 5 ,
+                      children : <></>
+                  },
+                ]}
+                ></Tabs>
+                 <div className="md:flex justify-end pt-6 mx-14 hidden ">
+              <Button  type="link" className="flex items-center gap-2 text-sm font-medium text-[#13188A] flex-row-reverse" icon={<img src={Images.ForwardIcon} alt="view all" className="w-[18px] h-[18px]" />}>view All</Button>
+             </div>
+             </div>
               <>
-                {inventories.length !== 0 ? (
-                  <div className="my-4" id="inventory-list">
-                    {inventories.map((inventory, index) => {
-                      let category = categorys.find(
-                        (c) => c.name === inventory.category
-                      );
-                      return (
-                        <InventoryCard
-                          id={index}
-                          inventory={inventory}
-                          category={category}
-                          key={index}
-                          debouncedSearchTerm={debouncedSearchTerm}
-                          paymentProviderAddress={stripeStatus ? stripeStatus.paymentProviderAddress : undefined }
-                        />
-                      );
-                    })}
-                  </div>
+                {/* {inventories.length !== 0 ? (
+                  <></>
+                  // <div className="my-4" id="inventory-list">
+                  //   {inventories.map((inventory, index) => {
+                  //     let category = categorys.find(
+                  //       (c) => c.name === inventory.category
+                  //     );
+                  //     return (
+                  //       <InventoryCard
+                  //         id={index}
+                  //         inventory={inventory}
+                  //         category={category}
+                  //         key={index}
+                  //         debouncedSearchTerm={debouncedSearchTerm}
+                  //         paymentProviderAddress={stripeStatus ? stripeStatus.paymentProviderAddress : undefined }
+                  //       />
+                  //     );
+                  //   })}
+                  // </div>
                 ) : (
                   <p className="flex justify-center my-10"> No data found</p>
-                )}
-                <Pagination
-                  current={page}
-                  onChange={onPageChange}
-                  total={inventoriesTotal}
-                  showSizeChanger={false}
-                  className="flex justify-center my-5 "
-                />
-                <div className="pb-12"></div>
+                )} */}
+                
+              
               </>
             </>
           )}
