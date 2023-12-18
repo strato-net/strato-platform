@@ -11,7 +11,7 @@ services:
     image: ${STRIPE_PS_IMAGE:-<REPO_URL>stripe-ps:<VERSION>}
     container_name: stripe-ps
     ports:
-      - "8018:8018"
+      - "80:8018"
     restart: unless-stopped
     logging:
       driver: "json-file"
