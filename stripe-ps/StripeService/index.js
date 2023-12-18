@@ -13,7 +13,7 @@ router.get(
   StripeServiceController.stripeConnectStatus
 );
 
-router.get(
+router.post(
   '/checkout',
   StripeServiceController.stripeCheckout
 )

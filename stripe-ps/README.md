@@ -11,7 +11,7 @@ Get all addresses associated with a customer's `commonName`.
 **Returns** a list of addresses in the `data` field of the response.
 
 ##### POST `/customer/address`
-Adds an address using information from the JSON body.
+Adds an address using the following information from the JSON body:
 ```
 {
   commonName: string,
@@ -39,12 +39,20 @@ Onboard a user, `accountId` optional.
 Get the status of a stripe account given the `accountId` in the call URL.  
 **Returns** the status of `chargesEnabled`, `detailsSubmitted`, and `payoutsEnabled` of the Stripe account.
 
-##### GET `/stripe/checkout`
-Create a checkout session given the `cartData`, `orderDetail`, and `accountId` in a JSON body.  
+##### POST `/stripe/checkout`
+Create a checkout session given the following information from the order:
+```
+{
+  cartData: list of cart items,
+  orderDetail: list of order invoices,
+  accountId: string
+}
+```
+`cartData`, `orderDetail`, and `accountId` in a JSON body.  
 **Returns** a new Stripe checkout session for the provided order.
 
-##### GET `/stripe/session`
-Get a stripe session given the `sessionId` and the `sellerAccountId` in a JSON body.  
+##### GET `/stripe/session/:sessionId/:sellerId`
+Get a stripe session given the `sessionId` and the `sellerId` in a JSON body.  
 **Returns** the session information.
 
 ##### POST `/stripe/webhook`

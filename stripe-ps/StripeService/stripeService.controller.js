@@ -55,9 +55,10 @@ class StripeServiceController {
 
   static async stripeGetSession(req, res, next) {
     try {
-      StripeServiceController.validateStripeGetSessionArgs(req.body);
+      StripeServiceController.validateStripeGetSessionArgs(req.params);
 
-      const { sessionId, sellerAccountId } = req.body;
+      const { sessionId, sellerAccountId } = req.params;
+      
       const session = await stripeService.getPaymentSession(sessionId, sellerAccountId);
       res.status(200).json({ ...session });
       return next();
