@@ -679,7 +679,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         options)
 
       /*  check if an accountId already exists for the user org */
-      if (Object.keys(sellerStripeDetails).length == 0 || !sellerStripeDetails.chargesEnabled || !sellerStripeDetails.detailsSubmitted || !sellerStripeDetails.payoutsEnabled) {
+      if (sellerStripeDetails.length === 0 || !sellerStripeDetails[0].chargesEnabled || !sellerStripeDetails[0].detailsSubmitted || !sellerStripeDetails[0].payoutsEnabled) {
         throw new rest.RestError(RestStatus.CONFLICT, "Seller hasn't activated this payment method")
       }
 
@@ -701,11 +701,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         const checkoutBody = {
           cartData: args,
           orderDetail: invoices,
-          accountId: sellerStripeDetails.accountId,
+          accountId: sellerStripeDetails[0].accountId,
         }
         stripePaymentSession = await axios.post(`${STRIPE_PAYMENT_SERVER_URL}/stripe/checkout`, checkoutBody)
           .then(function (res) {
-            console.log("checkout", res);
             if (res.status === 200) {
               return res.data;
             } else {
@@ -716,7 +715,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         throw new rest.RestError(err.statusCode, err.message);
       }
       const paymentParameters = {
-        address: sellerStripeDetails.address,
+        address: sellerStripeDetails[0].address,
         saleAddresses,
         paymentSessionId: stripePaymentSession.id,
         paymentStatus: stripePaymentSession.payment_status,
@@ -773,6 +772,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       await axios.post(`${STRIPE_PAYMENT_SERVER_URL}/customer/address`, { commonName: userCert.commonName, ...args })
         .then(function (res) {
           if (res.status === 200) {
+            console.log(res.data);
           } else {
             throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
           }

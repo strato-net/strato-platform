@@ -30,7 +30,8 @@ const clientErrorHandler = (err, req, res, next) => {
 const commonErrorHandler = (err, req, res, next) => {
   console.log(`Server error. ${err}`);
   console.log(err.stack);
-  return res.status(500).json({ success: false, error: err.message });
+  res.status(500).json({ success: false, error: err });
+  return next(err);
 }
 
 module.exports = {

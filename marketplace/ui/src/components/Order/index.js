@@ -70,7 +70,7 @@ const Order = ({ user }) => {
             key: "Sold",
             children: 
             <div className="flex flex-col mt-3">
-                <Input className="text-base orders_searchbar mb-5 p-3 rounded-full bg-[#F6F6F6]" prefix={<SearchOutlined />} placeholder="Search Markeplace" />
+                <Input className="text-base orders_searchbar mb-5 p-3 rounded-full bg-[#F6F6F6]" prefix={<SearchOutlined />} placeholder="Search Marketplace" />
                 <SoldOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()}/>
             </div>,
           },
@@ -79,7 +79,7 @@ const Order = ({ user }) => {
             key: "Bought",
             children: 
             <div className="flex flex-col mt-3">
-                <Input className="text-base orders_searchbar mb-5 p-3 rounded-full bg-[#F6F6F6]" prefix={<SearchOutlined />} placeholder="Search Markeplace" />
+                <Input className="text-base orders_searchbar mb-5 p-3 rounded-full bg-[#F6F6F6]" prefix={<SearchOutlined />} placeholder="Search Marketplace" />
                 <BoughtOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()}/>
             </div>,
           },
@@ -88,7 +88,7 @@ const Order = ({ user }) => {
             key: "Transfers",
             children: 
             <div className="flex flex-col mt-3">
-                <Input className="text-base orders_searchbar mb-5 p-3 rounded-full bg-[#F6F6F6]" prefix={<SearchOutlined />} placeholder="Search Markeplace" />
+                <Input className="text-base orders_searchbar mb-5 p-3 rounded-full bg-[#F6F6F6]" prefix={<SearchOutlined />} placeholder="Search Marketplace" />
                 <TransfersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()}/>
             </div>,
           }

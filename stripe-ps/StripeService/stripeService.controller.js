@@ -118,12 +118,18 @@ class StripeServiceController {
   // ********* VALIDATION ***********
   static validateStripeCheckoutArgs(args) {
     const stripeCheckoutSchema = Joi.object({
-      cartData: Joi.array().items(
-        Joi.object({
-          quantity: Joi.number().min(1).required(),
-          assetAddress: Joi.string().required(),
-        })
-      ),
+      cartData: Joi.object({
+        buyerOrganization: Joi.string().required(),
+        orderList: Joi.array().min(1).items(Joi.object({
+              quantity: Joi.number().required(),
+              assetAddress: Joi.string().required(),
+            })).required(),
+        orderTotal: Joi.number().required(),
+        shippingAddressId: Joi.number().min(1).required(),
+        tax: Joi.number().required(),
+        user: Joi.string().required(),
+        email: Joi.string().required(),
+      }),
       orderDetail: Joi.array().items(
         Joi.object({
           productName: Joi.string().required(),

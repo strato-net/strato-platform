@@ -252,7 +252,7 @@ class OrderController {
             assetAddress: Joi.string().required(),
           })).required(),
       orderTotal: Joi.number().required(),
-      shippingAddress: Joi.string().required().allow(''),
+      shippingAddressId: Joi.number().min(1).required(),
       tax: Joi.number().required(),
       user: Joi.string().required(),
       email: Joi.string().required(),

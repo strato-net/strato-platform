@@ -8,15 +8,15 @@ class CustomerAddressController {
         throw new Error('Missing common name in GET request /address/:commonName');
       }
 
-      const sql = 'SELECT * FROM customer_address WHERE commonName = ?';
+      const sql = 'SELECT * FROM customer_address WHERE commonName = ? ORDER BY createdDate DESC';
       const params = [req.params.commonName];
-      db.get(sql, params, (err, row) => {
+      db.all(sql, params, (err, rows) => {
         if (err) {
           throw new Error(`DB Error: ${err.message}`);
         }
         res.status(200).json({
           'message': 'success',
-          'data': row ? row : [],
+          'data': rows ? rows : [],
         });
         return next();
       });

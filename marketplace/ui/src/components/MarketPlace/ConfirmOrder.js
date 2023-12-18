@@ -334,7 +334,7 @@ const ConfirmOrder = () => {
       buyerOrganization: userOrganization,
       orderList,
       orderTotal: total + tax + shipping,
-      shippingAddress: '', // userAddresses[selectedAddress].address,
+      shippingAddressId: userAddresses[selectedAddress].id,
       tax: tax,
       user: user.commonName,
       email: user.preferred_username,
@@ -625,8 +625,8 @@ const ConfirmOrder = () => {
                 }}>
                 Pay Later
               </div> */}
-              <div className="w-full h-[1px] mb-[30px] bg-[#00000020] "></div>
-              <div id="pay-now-button" className={` h-[54px] w-[217px]${stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled ? activeButtonClass : disabledButtonClass}`}
+              <div className="w-full h-[1px] mb-[30px] bg-[#00000020]"></div>
+              <div id="pay-now-button" className={`h-[54px] w-[217px] ${stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled ? activeButtonClass : disabledButtonClass}`}
                 onClick={() => {
                   if (stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled) {
                     handlePaymentConfirm();
