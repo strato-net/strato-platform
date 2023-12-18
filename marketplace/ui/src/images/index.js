@@ -40,7 +40,7 @@ export const Images = {
   'Backward' :  require("./resources/Backward.png"),
   'Forward' :  require("./resources/Forward.png"),
   'AddBlack' :  require("./resources/AddBlack.png"),
-  'Matel' : require("./resources/categories/matel.png"),
+  'Metal' : require("./resources/categories/metal.png"),
   'Metal_card' : require("./resources/categories/metal_card.png"),
   'art_card' : require("./resources/categories/art_card.png"),
   'carbon_card' : require("./resources/categories/carbon_card.png"),
