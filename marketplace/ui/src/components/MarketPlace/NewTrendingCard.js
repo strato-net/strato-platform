@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import {
     Typography,
     Button,
+    notification
 } from "antd";
 import { useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
@@ -13,6 +14,7 @@ import { Images } from '../../images';
 
 const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
     const [quantity, setQuantity] = useState(1)
+    const [api, contextHolder] = notification.useNotification();
 
     let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
 
@@ -21,6 +23,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
 
     return (
         <div className={`trending_cards_container_card bg-white p-3 px-4 ${parent == 'Marketplace' ? 'min-w-[300px]' : 'min-w-[230px]'} md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}>
+            {contextHolder}
             <img
                 onClick={() =>
                     navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
@@ -44,9 +47,25 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
             <div className='flex justify-between items-center bg-[#EEEFFA] p-2'>
                 <Typography>Quantity</Typography>
                 <div className='flex gap-3 p-1 bg-white'>
-                    <Typography className='px-2 bg-[#EEEFFA] cursor-pointer' onClick={() => setQuantity(quantity == 1 ? quantity : quantity - 1)}>-</Typography>
+                    <Typography className='px-2 bg-[#EEEFFA] cursor-pointer' onClick={() => {
+                        setQuantity(quantity == 1 ? quantity : quantity - 1)
+                    }}>
+                        -
+                    </Typography>
                     <Typography>{quantity}</Typography>
-                    <Typography className='px-2 bg-[#EEEFFA] cursor-pointer' onClick={() => setQuantity(quantity + 1)}>+</Typography>
+                    <Typography className='px-2 bg-[#EEEFFA] cursor-pointer' onClick={() => {
+                        if (quantity + 1 <= topSellingProduct.quantity) {
+                            setQuantity(quantity + 1)
+                        }
+                        else {
+                            api.error({
+                                message: "Cannot add more than available quantity",
+                                placement: "bottom",
+                            });
+                        }
+                    }}>
+                        +
+                    </Typography>
                 </div>
             </div>
             <div className='flex gap-4'>
