@@ -5,6 +5,7 @@ const rp = require('request-promise');
 const moment = require('moment');
 const si = require('systeminformation');
 const config = require('../config/app.config');
+const { Registry, collectDefaultMetrics } = require('prom-client');
 
 // TODO: do the mass-refactoring of the daemon. Use the OOP! Really, don't even try refactoring this without the main Object (SingleCheck object with methods and shared params). Don't change any db data formats.
 
@@ -16,6 +17,7 @@ const neededJobs = {
   // TODO: add vault-proxy in prometheus
   "core-api": "core-api"
 }
+const pushgatewayAddress = 'http://prometheus-packager-pushgateway-1:9091';
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
@@ -62,6 +64,18 @@ function getPrometheusMetrics() {
   };
   return rp(options);
 }
+
+const pushMetrics = async () => {
+  try {
+    await rp.post({
+      uri: `${pushgatewayAddress}/metrics/job/${job}/instance/${instance}`,
+      body: await register.metrics(),
+    });
+    console.log('Metrics pushed successfully.');
+  } catch (error) {
+    console.error('Error pushing metrics:', error.message);
+  }
+};
 
 async function checkIfGlobalPasswordSet() {
   const options = {

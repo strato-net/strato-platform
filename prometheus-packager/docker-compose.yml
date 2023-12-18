@@ -1,0 +1,22 @@
+version: '3'
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./strato_prometheus.yml:/etc/prometheus/strato_prometheus.yml
+      - /prometheus
+    ports:
+      - '9090:9090'
+    environment:
+      - NODE_HOST=localhost
+    command:
+    - '--config.file=/etc/prometheus/strato_prometheus.yml'
+    - '--storage.tsdb.path=/prometheus'
+    - '--web.external-url=http://anything/prometheus'
+    - '--web.route-prefix=/prometheus'
+    - '--web.enable-lifecycle'
+  pushgateway:
+    image: prom/pushgateway:latest
+    ports:
+      - '9091:9091'
