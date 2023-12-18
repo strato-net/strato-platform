@@ -55,4 +55,8 @@ abstract contract Mintable is UTXO {
         UTXO newAsset = mint(_quantity);
         Asset(newAsset).transferOwnership(_newOwner, _quantity);
     }
+    
+    function checkCondition() internal virtual override returns (bool){
+        return true;   
+    }
 }

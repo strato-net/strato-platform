@@ -66,7 +66,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
   ];
 
   const navUrls = [
-    routes.Marketplace.url,
+    routes.MarketplaceProductList.url,
     routes.Orders.url,
     routes.Inventories.url,
     routes.Products.url,
@@ -157,14 +157,14 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
   }, [user])
 
   const subMenuItems = [
-    {value: "marketplace", path: "/marketplace", label: "Marketplace"},
-    user ? {value: "orders", path: "/orders", label: "Orders"} : null,
-    user ? {value: "inventories", path: "/inventories", label: "Inventories"} : null,
+    {value: "marketplace", path: routes.MarketplaceProductList.url, label: "Marketplace"},
+    {value: "orders", path: routes.Orders.url, label: "Orders"},
+    {value: "mystore", path: "/inventories", label: "My Store"},
     user ? {value: "logout", path: "/logout", label: "Logout"} : null,
   ]
 
   const handleIntMenuTab = (data) => {
-    data.value == 'logout' ? logout() : navigate(data.path)
+    data.value == 'logout' ? logout() : data.value == 'orders' ? navigate(routes.Orders.url, { state: { defaultKey: "Sold" } }) : navigate( data.path)
     handleMenuTab(data)
   }
 

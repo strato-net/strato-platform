@@ -7,6 +7,11 @@ const getSchema = () => {
     description: yup.string().required("Description is required"),
     artist: yup.string(),
     source: yup.string(),
+    unitOfMeasurement: yup.object().shape({
+      name: yup.string(),
+      value: yup.number().positive("Measurement Value must be a positive number"),
+    }),
+    purity: yup.string(),
     // clothingType: yup.string().nullable().required("The clothing type is required"),
     // size: yup.string().nullable().required("A size is required"),
     // skuNumber: yup.string().nullable().required("An SKU is required"),
