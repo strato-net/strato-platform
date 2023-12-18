@@ -320,18 +320,12 @@ class OrderController {
 
   static validateCreateUserAddressArgs(args) {
     const createUserAddressSchema = Joi.object({
-      shippingName: Joi.string().required(),
-      shippingZipcode: Joi.string().required(),
-      shippingState: Joi.string().required(),
-      shippingCity: Joi.string().required(),
-      shippingAddressLine1: Joi.string().required(),
-      shippingAddressLine2: Joi.string().allow(""),
-      billingName: Joi.string().required(),
-      billingZipcode: Joi.string().required(),
-      billingState: Joi.string().required(),
-      billingCity: Joi.string().required(),
-      billingAddressLine1: Joi.string().required(),
-      billingAddressLine2: Joi.string().allow("")
+      name: Joi.string().required(),
+      zipcode: Joi.string().required(),
+      state: Joi.string().required(),
+      city: Joi.string().required(),
+      addressLine1: Joi.string().required(),
+      addressLine2: Joi.string().allow(""),
     }).required();
 
     const validation = createUserAddressSchema.validate(args);

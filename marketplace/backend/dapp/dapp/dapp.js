@@ -770,10 +770,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.createUserAddress = async function (args, options = defaultOptions) {
     try {
-      await axios.post(`${STRIPE_PAYMENT_SERVER_URL}/customer/address`, args).then(function (res) {
-          console.log("create address", res);
+      await axios.post(`${STRIPE_PAYMENT_SERVER_URL}/customer/address`, { commonName: userCert.commonName, ...args })
+        .then(function (res) {
           if (res.status === 200) {
-            console.log("Create Address", res.body);
           } else {
             throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
           }
@@ -789,15 +788,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getAllUserAddress = async function (args, options = optionsNoChainIds) {
     try {
-      await axios.get(`${STRIPE_PAYMENT_SERVER_URL}/customer/address/${userCert.commonName}`).then(function (res) {
-        console.log("get addresses", res);
+      const userAddresses = await axios.get(`${STRIPE_PAYMENT_SERVER_URL}/customer/address/${userCert.commonName}`).then(function (res) {
         if (res.status === 200) {
-          return res.body;
+          return res.data.data;
         } else {
           throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
         }
       });
-      return {}
+      return userAddresses;
     } catch (error) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
