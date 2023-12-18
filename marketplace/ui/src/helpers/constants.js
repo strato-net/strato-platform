@@ -109,16 +109,14 @@ export const CATEGORIES = [
 ]
 
 export const PAYMENT_TYPE = [
-  { name: "---SELECT ALL---", value: 0 },
   { 
     name: "Card", 
     value: 1, 
     options: [
-      <AMEX width="20px" height="14px"/>,
-      <Discover width="20px" height="14px"/>,
-      <Mastercard width="20px" height="14px"/>,
-      <VISA width="20px" height="14px"/>
+      <AMEX width="30px" height="20px"/>,
+      <Discover width="30px" height="20px"/>,
+      <Mastercard width="30px" height="20px"/>,
+      <VISA width="30px" height="20px"/>
     ]
-  },
-  { name: "STRAT", value: 2 }
+  }
 ]
