@@ -40,25 +40,35 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
             onClose={onClose}
             className="flex items-center mr-1"
           >
-            {PAYMENT_TYPE[value].icon ? PAYMENT_TYPE[value].icon : <></>}
+            {renderIcon(value)}
             <p className="ml-1">{label}</p>
           </Tag>
         );
     };
+    const renderIcon = (value) => {
+        if (PAYMENT_TYPE[value].name === "Card") {
+          return PAYMENT_TYPE[value].options.map((IconComponent, index) => (
+            <span key={index} className="ml-1">{IconComponent}</span>
+          ));
+        } else {
+          return PAYMENT_TYPE[value].icon ? PAYMENT_TYPE[value].icon : <></>;
+        }
+      };
 
     const handleSelectAll = (value) => {
-        if (value.includes(0)) {
+        if (value.includes(0)) { 
           if (value.length === PAYMENT_TYPE.length) {
             setPaymentTypes([]);
-            return []
+            return [];
           }
-          setPaymentTypes([1, 2, 3, 4, 5]);
-          return [1, 2, 3, 4, 5];
+          const allValues = PAYMENT_TYPE.filter(type => type.value !== 0).map(type => type.value);
+          setPaymentTypes(allValues);
+          return allValues;
         } else {
           setPaymentTypes(value);
           return value;
         }
-    }
+      }; 
 
     const columns = () => {
         let finalColumns = [
