@@ -52,7 +52,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
       items: [
         { label: <div id="Marketplace">Marketplace</div>, key: '0' },
         { label: <div id="Orders">Orders</div>, key: '1' },
-        { label: <div id="Inventory">Inventory</div>, key: '2' },
+        { label: <div id="Inventory">My Store</div>, key: '2' },
         // { label: <div id="Products">Products</div>, key: '3' },
         // { label: <div id="Events">Events</div>, key: '4' }, // hiding events from marketplace
       ]
@@ -68,7 +68,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
   const navUrls = [
     routes.MarketplaceProductList.url,
     routes.Orders.url,
-    routes.Inventories.url,
+    routes.MyStore.url,
     routes.Products.url,
     routes.Events.url,
   ];

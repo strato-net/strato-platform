@@ -288,7 +288,7 @@ const ValueQty = (product , e)=>{
     {
       title: <Text className="text-[#202020] text-base font-semibold">Unit Price($)</Text>,
       dataIndex: "unitPrice",
-      align: "left",
+      align: "center",
       render: (text) => <p className=" text-sm text-[#202020] font-medium font-sans">{text}</p>,
     },
     {
@@ -342,7 +342,7 @@ const ValueQty = (product , e)=>{
     {
       title: <Text className="text-[#202020] text-base font-semibold">Amount($)</Text>,
       dataIndex: "amount",
-      align: "left",
+      align: "center",
       render: (text) => <p className="text-sm font-medium text-[#202020]">{text}</p>  
 ,
   

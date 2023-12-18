@@ -40,4 +40,7 @@ export const Images = {
   'Backward' :  require("./resources/Backward.png"),
   'Forward' :  require("./resources/Forward.png"),
   'AddBlack' :  require("./resources/AddBlack.png"),
+  'CreateInventory' :  require("./resources/createInventory.png"),
+  'ForwardIcon' : require("./resources/Forward.png"),
+  'random' :  require("./resources/random.png"),
 };

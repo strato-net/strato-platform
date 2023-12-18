@@ -175,7 +175,7 @@ const AuthenticatedRoutes = ({ user, users }) => {
       />
       <Route
         exact
-        path={routes.Inventories.url}
+        path={routes.MyStore.url}
         element={
           <UsersProvider>
             <CertifiersProvider>

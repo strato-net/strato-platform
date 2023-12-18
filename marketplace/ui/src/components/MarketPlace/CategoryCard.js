@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Card, Typography, Image, Space } from "antd";
 import { LeftArrow, RightArrow } from "../../images/SVGComponents";
 import routes from "../../helpers/routes";
@@ -13,6 +13,7 @@ const CategoryCard = () => {
   const navigate = useNavigate();
   const naviroute = routes.MarketplaceProductList.url;
   const { categorys } = useCategoryState();
+  const {inventoryPopup , setInventoryPopup} =  useState(false);
 
   const categoryImages = [
     Images["Art-category"],
@@ -22,27 +23,17 @@ const CategoryCard = () => {
     Images["Material-category"],
     Images["collectibles"],
   ];
+  
 
   return (
     <>
-      <div className="mb-5 md:px-10">
-        <Title level={3} ><span className="text-xl md:text-4xl font-semibold ">Shop by Categories </span></Title>
-        {/* <Space size="large">
-          <div className="cursor-pointer w-9 h-9 rounded-full shadow-[0px_0px_2px_0_rgba(0,0,0,0.3)] flex justify-center items-center">
-            <LeftArrow />
-          </div>
-          <div className="cursor-pointer w-9 h-9 rounded-full shadow-[0px_0px_2px_0_rgba(0,0,0,0.3)] flex justify-center items-center">
-            <RightArrow />
-          </div>
-        </Space> */}
-      </div>
-      <div className="flex justify-start gap-4 lg:gap-[15px] flex-wrap px-[4px] md:px-10">
+      <div className="flex justify-start gap-4 lg:gap-[15px] flex-wrap px-[4px] md:px-10 xl:grid xl:grid-cols-6">
         {categorys.map((category, index) => {
           return (
             <div
               id={category.name}
               key={index}
-              className=" w-[162px] md:w-[228px] xl:w-[280px] h-[160px] md:h-[185px] xl:h-[200px] border border-tertiaryB shadow-category   rounded-lg cursor-pointer"
+              className=" w-[162px] md:w-[228px] xl:w-[200px] 2xl:w-[248px] 2xl:h-[200px]   h-[160px] md:h-[185px] xl:h-[161px] border border-tertiaryB shadow-category   rounded-lg cursor-pointer"
               onClick={() => {
                 navigate(`${naviroute.replace(":category", category.name)}`);
                 window.LOQ.push(['ready', async LO => {
@@ -61,7 +52,7 @@ const CategoryCard = () => {
               <div className="flex flex-col">
                 <img
                   src={categoryImages[index]}
-                  className="rounded-t-lg px-[9px] py-[6px] lg:px-[0px] lg:py-[0px] h-[110px] md:h-[140px]"
+                  className="rounded-t-lg px-[9px] py-[6px] lg:px-[0px] lg:py-[0px] h-[110px] md:h-[140px] xl:h-[105px] 2xl:h-[140px]"
                   preview={false}
                 />
                 <div className="py-2 xl:py-3 flex justify-center md:justify-start ">
