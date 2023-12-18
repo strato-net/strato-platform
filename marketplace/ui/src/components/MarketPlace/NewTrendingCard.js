@@ -33,11 +33,11 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                     onClick={() =>
                         navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
                     }
-                    className='font-semibold max-h-4 overflow-hidden cursor-pointer'
+                    className='font-semibold overflow-hidden cursor-pointer'
                 >
                     {topSellingProduct?.name || "N/A"}
                 </Typography>
-                <img src={Images.Verified} alt='' />
+                <img className='w-5' src={Images.Verified} alt='' />
             </div>
             <Typography className='font-semibold'>{'$' + topSellingProduct?.price || "N/A"}</Typography>
             <Typography className='#989898 opacity-40 max-h-4 overflow-hidden'>{topSellingProduct?.description || "N/A"}</Typography>
