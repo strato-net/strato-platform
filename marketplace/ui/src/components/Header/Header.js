@@ -288,14 +288,18 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
       </Space>
     </Header>
     {showMenu &&
-            <div className="bg-white border-t absolute w-full z-50 md:hidden top-16">
+      <div>
+        <div className="bg-white border-t absolute w-full z-50 md:hidden top-16">
               {subMenuItems.map((item) => {
                 return (
                   <Typography onClick={()=>handleIntMenuTab(item)} className={`text-base py-3 px-4 cursor-pointer ${item ? '' : 'hidden'}`} >{item?.label}</Typography>
                 )
               })}
-            </div>}
-    </>
+        </div>
+        <div className="h-[100vh] w-full bg-[#00000020] absolute top-0 md:hidden z-40" onClick={handleMenuTab}></div>
+      </div>
+    }
+    </> 
 
   );
 };
