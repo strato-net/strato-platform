@@ -116,6 +116,8 @@ function bind(user, _contract, options) {
     orderJs.getAll(user, args, _options);
   contract.createOrder = async (args) =>
     createOrder(user, contract, args, options);
+  contract.updateOrderStatus = async (args) =>
+    updateOrderStatus(user, contract, args, options);
   contract.updateBuyerDetails = async (args) =>
     updateBuyerDetails(user, contract, args, options);
   contract.updateSellerDetails = async (args) =>
@@ -213,7 +215,33 @@ async function createOrder(admin, contract, _args, baseOptions) {
 }
 
 
+/**
+ * Update order status for an order
+ */
+async function updateOrderStatus(admin, contract, _args, baseOptions) {
+  const callArgs = {
+    contract,
+    method: "updateOrderStatus",
+    args: util.usc({
+      ..._args,
+    }),
+  };
+  const options = {
+    ...baseOptions,
+    history: [contractName],
+  };
 
+  const [restStatus] = await rest.call(
+    admin,
+    callArgs,
+    options
+  );
+
+  if (parseInt(restStatus, 10) !== RestStatus.OK)
+    throw new rest.RestError(restStatus, 0, { callArgs });
+
+  return [restStatus];
+}
 /**
  * Update seller order details
  */

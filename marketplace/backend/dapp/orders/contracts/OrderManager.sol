@@ -50,4 +50,11 @@ contract OrderManager is RestStatus,OrderStatus{
         OrderLine_2 orderLine = OrderLine_2(_orderLineId);
         return orderLine.addOrderLineItems(_orderLineId,_items,_createdDate);
     }
+
+    function updateOrderStatus(address _orderAddress, OrderStatus _status) public returns(uint)
+    {
+        Order order = Order(_orderAddress);
+        order.updateOrderStatus(_status);
+        return RestStatus.OK;
+    }
 }

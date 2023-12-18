@@ -23,6 +23,9 @@ const actionDescriptors = {
   fetchOrderLineItemDetails: "fetch_order_line_item_details",
   fetchOrderLineItemDetailsSuccessful: "fetch_order_line_item_details_successful",
   fetchOrderLineItemDetailsFailed: "fetch_order_line_item_details_failed",
+  updateOrderStatus: "update_order_status",
+  updateOrderStatusSuccessful: "update_order_status_successful",
+  updateOrderStatusFailure: "update_order_status_failure",
   updateBuyerDetails: "update_buyer_details",
   updateBuyerDetailsSuccessful: "update_buyer_details_successful",
   updateBuyerDetailsFailed: "update_buyer_details_failed",
@@ -267,7 +270,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/order?limit=${limit}&offset=${offset}&${query}&order=${order}&buyerOrganization=${organization}`,
+        `${apiUrl}/order?limit=${limit}&offset=${offset}&${query}&buyerOrganization=${organization}&order=${order}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -305,7 +308,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/order?&limit=${limit}&offset=${offset}&order=${order}&${query}&sellerOrganization=${organization}`,
+        `${apiUrl}/order?&limit=${limit}&offset=${offset}&order=${order}&sellerOrganization=${organization}&${query}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -429,7 +432,47 @@ const actions = {
       });
       actions.setMessage(dispatch, "Error while updating Order");
     }
-  }
+  },
+
+  updateOrderStatus: async (dispatch, payload) => {
+    dispatch({ type: actionDescriptors.updateOrderStatus });
+
+    try {
+      const response = await fetch(`${apiUrl}/order/updateOrderStatus`, {
+        method: HTTP_METHODS.PUT,
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.updateOrderStatusSuccessful,
+          payload: body.data,
+        });
+        actions.setMessage(dispatch, "Order Status has been updated", true);
+        return true;
+      }
+
+      dispatch({
+        type: actionDescriptors.updateOrderStatusFailure,
+        error: body.error,
+      });
+      actions.setMessage(dispatch, body.error);
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.updateOrderStatusFailure,
+        error: "Error while updating Order",
+      });
+      actions.setMessage(dispatch, "Error while updating Order");
+    }
+  },
 };
 
 export { actionDescriptors, actions };

@@ -169,6 +169,19 @@ const reducer = (state, action) => {
         error: action.error,
         issellerDetailsUpdating: false,
       };
+    case actionDescriptors.updateOrderStatus:
+      return {
+        ...state
+      };
+    case actionDescriptors.updateOrderStatusSuccessful:
+      return {
+        ...state
+      };
+    case actionDescriptors.updateOrderStatusFailure:
+      return {
+        ...state,
+        error: action.error
+      };
     default:
       throw new Error(`Unhandled action: '${action.type}'`);
   }

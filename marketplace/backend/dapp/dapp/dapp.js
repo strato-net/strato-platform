@@ -947,10 +947,28 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     }
   };
 
+  contract.getPaymentIntent = async function (args, options = defaultOptions) {
+    try {
+      const newOptions = { ...options, org: managers.cirrusOrg, app: contractName }
+      const { session_id, paymentIntentId } = args
+      const paymentDetail = await managers.paymentManager.get({ paymentSessionId: session_id }, newOptions);
+      
+      const session = await StripeService.getPaymentSession(session_id, paymentDetail.sellerAccountId);
+  
+      // Use the StripeService method to get the PaymentIntent details
+      const paymentIntent = await StripeService.getPaymentIntent(session.payment_intent, paymentDetail.sellerAccountId);
+  
+      return paymentIntent;
+    } catch (error) {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while fetching PaymentIntent", { message: "Error while fetching PaymentIntent" });
+    }
+  };
+    
+
   contract.createOrder = async function (args, options = defaultOptions) {
 
     try {
-      const { buyerOrganization, orderList, orderTotal: recievedOrderTotal, paymentSessionId = "", shippingAddress } = args;
+      const { buyerOrganization, orderList, orderTotal: recievedOrderTotal, paymentSessionId = "", shippingAddress, status } = args;
       const currentTimestamp = Math.floor(Date.now() / 1000);
 
       const [createdDate, orderDate] = Array(2).fill(currentTimestamp);
@@ -1026,7 +1044,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           orderDate,
           orderTotal,
           orderShippingCharges: shippingCharge,
-          status: ORDER_STATUS.AWAITING_FULFILLMENT,
+          status: status,
           amountPaid,
           buyerComments: '',
           sellerComments: '',
@@ -1091,6 +1109,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     }
   };
 
+  contract.updateOrderStatus = async function (args, options = defaultOptions) {
+    const { orderAddress, status } = args;
+    return await managers.orderManager.updateOrderStatus({ orderAddress, status });
+  }
   contract.updateSellerDetails = async function (args, options = defaultOptions) {
     try {
       const { address, chainId, updates } = args;

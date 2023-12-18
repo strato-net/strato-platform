@@ -64,7 +64,7 @@ contract Order is OrderStatus {
         orderDate = _orderDate;
         orderTotal = _orderTotal;
         orderShippingCharges = _orderShippingCharges;
-        status = OrderStatus.AWAITING_FULFILLMENT;
+        status = _status;
         amountPaid = _amountPaid;
         buyerComments = _buyerComments;
         sellerComments = _sellerComments;
@@ -185,6 +185,10 @@ contract Order is OrderStatus {
           }
       }else if(status == OrderStatus.AWAITING_SHIPMENT){
           if (newStatus == OrderStatus.CLOSED) {
+              status = newStatus;
+          } 
+      }else if(status == OrderStatus.PAYMENT_PENDING){
+          if (newStatus == OrderStatus.CANCELED) {
               status = newStatus;
           } 
       }

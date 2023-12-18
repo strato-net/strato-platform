@@ -10,6 +10,11 @@ class StripeService {
             // Create a checkout session with Stripe
             return stripe.checkout.sessions.create({
                 payment_method_types: STRIPE_ENV.CHECKOUT.PAYMENT_METHOD_TYPES,
+                payment_method_options: {
+                    us_bank_account: {
+                      verification_method: 'instant',
+                  },
+                },
                 // For each item use the id to get it's information
                 // Take that information and convert it to Stripe's format
                 // shipping_address_collection: { allowed_countries: ['US'] },
@@ -61,6 +66,18 @@ class StripeService {
             throw new rest.RestError(RestStatus.BAD_REQUEST, `Stripe error: ${e.message}`)
         }
     }
+
+    static async getPaymentIntent(paymentIntentId, CONNECTED_ACCOUNT_ID) {
+        try {
+          const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, {
+            stripeAccount: CONNECTED_ACCOUNT_ID
+          });
+          return paymentIntent;
+        } catch (error) {
+          console.error(`Stripe error: ${error.message}`);
+          throw new rest.RestError(RestStatus.BAD_REQUEST, `Stripe error: ${error.message}`);
+        }
+      }
 
     static generateStripeAccountId(type = 'standard') {
         try {
