@@ -521,11 +521,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const sellerStripeDetails = await paymentProviderJs.get(rawAdmin, { name: SERVICE_PROVIDERS.STRIPE, accountDeauthorized: false }, getOptions)
 
       /*  check if an accountId already exists for the user org */
-      if (Object.keys(sellerStripeDetails).length > 0) {
+      if (sellerStripeDetails.length > 0 && Object.keys(sellerStripeDetails[0]).length > 0) {
         throw new rest.RestError(RestStatus.CONFLICT, "User has already connected their stripe account.")
       }
 
-      if (Object.keys(sellerStripeDetails).length == 0) {
+      if (sellerStripeDetails.length == 0 || Object.keys(sellerStripeDetails[0]).length == 0) {
         userStripeAccount = await StripeService.generateStripeAccountId();
         // save generated account id
         const accountDetails = {
@@ -550,32 +550,43 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const getOptions = { ...options, app: contractName };
 
       // get user paymentProvider details from cirrus
-      const paymentProvider = await paymentProviderJs.get(rawAdmin, { name: SERVICE_PROVIDERS.STRIPE, accountDeauthorized: false, ...args }, getOptions);
+      const paymentProviders = await paymentProviderJs.get(rawAdmin, { name: SERVICE_PROVIDERS.STRIPE, accountDeauthorized: false, ...args }, getOptions);
 
       /* TODO check if the provider contract exists on then initiate a update */
-      if (Object.keys(paymentProvider).length == 0) {
+      if (paymentProviders.length == 0 || Object.keys(paymentProviders[0]).length == 0) {
         // throw new rest.RestError(RestStatus.NOT_FOUND, "User hasn't started their stripe setup.")
         return {}
       }
-      const connectedStripeAccountStatus = { accountId: paymentProvider.accountId, paymentProviderAddress: paymentProvider.address, chargesEnabled: false, detailsSubmitted: false, payoutsEnabled: false, accountDeauthorized: false, eventTime: Date.now() }
 
-      try {
-        const userStripeAccount = await StripeService.getStripeConnectAccountDetail(paymentProvider.accountId);
-        connectedStripeAccountStatus.chargesEnabled = userStripeAccount.charges_enabled
-        connectedStripeAccountStatus.detailsSubmitted = userStripeAccount.details_submitted
-        connectedStripeAccountStatus.payoutsEnabled = userStripeAccount.payouts_enabled
+      let returnedStripeAccountStatus = paymentProviders[0]
+      for (const paymentProvider of paymentProviders) {
+        const connectedStripeAccountStatus = { accountId: paymentProvider.accountId, paymentProviderAddress: paymentProvider.address, chargesEnabled: false, detailsSubmitted: false, payoutsEnabled: false, accountDeauthorized: false, eventTime: Date.now() }
 
-      } catch (error) {
-        if (error.code == 'account_invalid') {
-          connectedStripeAccountStatus.accountDeauthorized = true
+        try {
+          const userStripeAccount = await StripeService.getStripeConnectAccountDetail(paymentProvider.accountId);
+          connectedStripeAccountStatus.chargesEnabled = userStripeAccount.charges_enabled
+          connectedStripeAccountStatus.detailsSubmitted = userStripeAccount.details_submitted
+          connectedStripeAccountStatus.payoutsEnabled = userStripeAccount.payouts_enabled
+
+        } catch (error) {
+          if (error.code == 'account_invalid') {
+            connectedStripeAccountStatus.accountDeauthorized = true
+          }
         }
-      }
-      const { detailsSubmitted, chargesEnabled, payoutsEnabled, accountDeauthorized } = connectedStripeAccountStatus
-      if (paymentProvider.detailsSubmitted !== detailsSubmitted || paymentProvider.chargesEnabled !== chargesEnabled || paymentProvider.payoutsEnabled !== payoutsEnabled || paymentProvider.accountDeauthorized !== accountDeauthorized) {
-        await paymentManagerJs.updatePaymentProvider(rawAdmin, paymentProvider, connectedStripeAccountStatus, options)
+        const { detailsSubmitted, chargesEnabled, payoutsEnabled, accountDeauthorized } = connectedStripeAccountStatus
+        if (paymentProvider.detailsSubmitted !== detailsSubmitted || paymentProvider.chargesEnabled !== chargesEnabled || paymentProvider.payoutsEnabled !== payoutsEnabled || paymentProvider.accountDeauthorized !== accountDeauthorized) {
+          await paymentManagerJs.updatePaymentProvider(rawAdmin, paymentProvider, connectedStripeAccountStatus, options)
+        }
+
+        if (connectedStripeAccountStatus.detailsSubmitted
+           && connectedStripeAccountStatus.chargesEnabled
+           && connectedStripeAccountStatus.payoutsEnabled
+           ) {
+            returnedStripeAccountStatus = connectedStripeAccountStatus
+           }
       }
 
-      return connectedStripeAccountStatus
+      return returnedStripeAccountStatus
 
     } catch (error) {
       console.error(`${error}`)
@@ -616,8 +627,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       const { orderList, orderTotal: recievedOrderTotal } = args;
 
-      const newOptions = { ...options, app: paymentProviderJs.contractName }
-
       const assetAddresses = orderList.map(o => o.assetAddress);
 
       const assets = await inventoryJs.getAll(rawAdmin, { assetAddresses: assetAddresses }, options);
@@ -646,7 +655,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           name: SERVICE_PROVIDERS.STRIPE, ownerCommonName: sellerName,
           accountDeauthorized: false
         },
-        newOptions)
+        options)
 
       /*  check if an accountId already exists for the user org */
       if (Object.keys(sellerStripeDetails).length == 0 || !sellerStripeDetails.chargesEnabled || !sellerStripeDetails.detailsSubmitted || !sellerStripeDetails.payoutsEnabled) {
@@ -682,7 +691,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         expiresAt: stripePaymentSession.expires_at,
         createdDate: stripePaymentSession.created,
       }
-      await paymentProviderJs.createPayment(rawAdmin, paymentParameters, newOptions);
+      await paymentProviderJs.createPayment(rawAdmin, paymentParameters, options);
       return stripePaymentSession
 
     } catch (error) {
@@ -712,9 +721,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getPaymentSession = async function (args, options = defaultOptions) {
     try {
-      const newOptions = { ...options, app: contractName }
       const { session_id } = args
-      const paymentDetail = await paymentProviderJs.getPaymentSession(rawAdmin, { paymentSessionId: session_id }, newOptions);
+      const paymentDetail = await paymentProviderJs.getPaymentSession(rawAdmin, { paymentSessionId: session_id }, options);
       const paymentSession = await StripeService.getPaymentSession(session_id, paymentDetail.sellerAccountId);
       const paymentIntent = await StripeService.getPaymentIntent(paymentSession.payment_intent, paymentDetail.sellerAccountId);
       const paymentMethod = await StripeService.getPaymentMethod(paymentIntent.payment_method, paymentDetail.sellerAccountId);

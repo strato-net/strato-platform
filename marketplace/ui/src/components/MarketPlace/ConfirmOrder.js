@@ -2,17 +2,14 @@ import {
   Breadcrumb,
   Typography,
   Row,
-  Divider,
   notification,
   Spin,
-  Card,
   Button,
 } from "antd";
 import {
   useMarketplaceState,
   useMarketplaceDispatch,
 } from "../../contexts/marketplace";
-import { useNavigate } from "react-router-dom";
 import { useOrderState, useOrderDispatch } from "../../contexts/order";
 import { useAuthenticateState } from "../../contexts/authentication";
 import { actions } from "../../contexts/marketplace/actions";
@@ -38,16 +35,11 @@ import routes from "../../helpers/routes";
 import AddressComponent from "./AddressComponent";
 import { PlusCircleOutlined, MinusCircleOutlined } from "@ant-design/icons";
 import TagManager from "react-gtm-module";
-import New_ResponsiveCart from "./New_ResponsiveCart";
+import ResponsiveCart from "./ResponsiveCart";
 import { Images } from "../../images";
-import AddAddressModel from "./AddAddressModel";
+import AddAddressModal from "./AddAddressModal";
 import ResponsiveAddAddress from "./ResponsiveAddAddress";
-
-
 const { TextArea } = Input;
-
-
-
 const ShippingDetailsSchema = () => {
   return yup.object().shape({
     name: yup.string().required("Name is required"),
@@ -102,14 +94,13 @@ const ConfirmOrder = () => {
   const inventoryDispatch = useInventoryDispatch();
   const { isLoadingStripeStatus, stripeStatus } = useInventoryState();
   const { success: marketplaceSuccess, message: marketplaceMessage } = useMarketplaceState();
-  const [modelAddress ,  setModelAddress] =  useState(false);
-
+  const [modalAddress ,  setmodalAddress] =  useState(false);
   const [responsiveAddress ,  setResponsiveAddress] =  useState(false);
   const [showAddress, setshowAddress] = useState(false);
  
 
   const CloseAddressModel   =()=>{
-    setModelAddress(false);
+    setmodalAddress(false);
     setshowAddress(false);
   }
 
@@ -292,16 +283,6 @@ const ConfirmOrder = () => {
         <p className="text-center">{text}</p>
       ),
       // width: "12%"
-    },{
-      title: (
-        <Text className="text-[#202020] text-base font-semibold">Measurement (Unit)</Text>
-      ),
-      dataIndex: "sellersCommonName",
-      align: "center",
-      render: (text) => (
-        <p className="">lb</p>
-      ),
-  //  width: "12%"
     },
     {
       title: <Text className="text-[#202020] text-base font-semibold">Unit Price($)</Text>,
@@ -310,7 +291,7 @@ const ConfirmOrder = () => {
       render: (text) => <p className=" text-sm text-[#202020] font-medium font-sans">{text}</p>,
     },
     {
-      title: <Text className="text-[#202020] text-base font-semibold">QUANTITY</Text>,
+      title: <Text className="text-[#202020] text-base font-semibold">Quantity</Text>,
       dataIndex: "qty",
       align: "center",
       render: (text) => <p className="text-sm text-[#202020] font-medium font-sans">{text}</p>,
@@ -324,13 +305,13 @@ const ConfirmOrder = () => {
       render: (text) => <p className="text-sm font-medium text-[#202020] ">{text}</p>,
     },
     {
-      title: <Text className="text-[#202020] text-base font-semibold">TAX($)</Text>,
+      title: <Text className="text-[#202020] text-base font-semibold">Tax($)</Text>,
       dataIndex: "tax",
       align: "center",
       render: (text) => <p className="text-sm font-medium text-[#202020]">{text}</p>,
     },
     {
-      title: <Text className="text-[#202020] text-base font-semibold">AMOUNT($)</Text>,
+      title: <Text className="text-[#202020] text-base font-semibold">Amount($)</Text>,
       dataIndex: "amount",
       align: "center",
       render: (text) => <p className="text-sm font-medium text-[#202020]">{text}</p>  
@@ -434,7 +415,7 @@ const ConfirmOrder = () => {
             />
           </div>
           <div className="lg:hidden">
-            <New_ResponsiveCart data={data} key={data} confirm={true}  />
+            <ResponsiveCart data={data} key={data} confirm={true}  />
           </div>
 
           <div className="bg-[#EEEFFA] rounded-b-md py-[15px] px-4  hidden lg:flex lg:justify-end ">
@@ -475,7 +456,7 @@ const ConfirmOrder = () => {
               <div className=" hidden md:block"><Button type="link"  icon={<img src={Images.AddBlack}  className=" w-4 h-4 lg:w-6 lg:h-6 " alt="add"/>}
                 onClick={() => {
                   setshowAddress(true);
-                  setModelAddress(true);
+                  setmodalAddress(true);
                 }}
               /></div>
               <div className="  md:hidden"><Button type="link"  icon={<img src={Images.AddBlack}  className=" w-4 h-4 lg:w-6 lg:h-6 " alt="add"/>}
@@ -490,7 +471,7 @@ const ConfirmOrder = () => {
               </> 
             }
           </Row>
-          {modelAddress &&  <AddAddressModel open={modelAddress} close={CloseAddressModel}/>} 
+          {modalAddress &&  <AddAddressModal open={modalAddress} close={CloseAddressModel}/>} 
           <div>
             <div className="mt-4">
               {

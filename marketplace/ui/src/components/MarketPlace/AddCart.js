@@ -28,7 +28,7 @@ import routes from "../../helpers/routes";
 import CartComponent from "./CartComponent";
 import TagManager from "react-gtm-module";
 import image_placeholder from "../../images/resources/image_placeholder.png";
-import New_ResponsiveCart from "./New_ResponsiveCart";
+import ResponsiveCart from "./ResponsiveCart";
 
 const { Title, Text } = Typography;
 
@@ -284,16 +284,6 @@ const ValueQty = (product , e)=>{
         <p className="text-center">{text}</p>
       ),
       // width: "12%"
-    },{
-      title: (
-        <Text className="text-[#202020] text-base font-semibold">Measurement (Unit)</Text>
-      ),
-      dataIndex: "sellersCommonName",
-      align: "center",
-      render: (text) => (
-        <p className="">lb</p>
-      ),
-  //  width: "12%"
     },
     {
       title: <Text className="text-[#202020] text-base font-semibold">Unit Price($)</Text>,
@@ -344,13 +334,13 @@ const ValueQty = (product , e)=>{
       render: (text) => <p className="text-sm font-medium text-[#202020] ">{text}</p>,
     },
     {
-      title: <Text className="text-[#202020] text-base font-semibold">TAX($)</Text>,
+      title: <Text className="text-[#202020] text-base font-semibold">Tax($)</Text>,
       dataIndex: "tax",
       align: "center",
       render: (text) => <p className="text-sm font-medium text-[#202020]">{text}</p>,
     },
     {
-      title: <Text className="text-[#202020] text-base font-semibold">AMOUNT($)</Text>,
+      title: <Text className="text-[#202020] text-base font-semibold">Amount($)</Text>,
       dataIndex: "amount",
       align: "left",
       render: (text) => <p className="text-sm font-medium text-[#202020]">{text}</p>  
@@ -432,7 +422,7 @@ const ValueQty = (product , e)=>{
               </Title>
             </div> : mapData.map(e  => <React.Fragment  key={e.key}>
             
-<div className="hidden  lg:block"><CartComponent columns={columns} data={e.value} /> </div> <div className="lg:hidden"><div className="flex gap-3 flex-col"><New_ResponsiveCart data={e.value}    AddQty={AddQty} MinusQty={MinusQty} ValueQty={ValueQty} removeCartList={removeCartList}/></div></div></React.Fragment>)
+<div className="hidden  lg:block"><CartComponent columns={columns} data={e.value} /> </div> <div className="lg:hidden"><div className="flex gap-3 flex-col"><ResponsiveCart data={e.value}    AddQty={AddQty} MinusQty={MinusQty} ValueQty={ValueQty} removeCartList={removeCartList}/></div></div></React.Fragment>)
           }
         </div>
       )}

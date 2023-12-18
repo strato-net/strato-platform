@@ -41,4 +41,8 @@ abstract contract SemiFungible is Mintable {
         }
         
     }
+
+    function checkCondition() internal virtual override returns (bool){
+        return true;   
+    }
 }

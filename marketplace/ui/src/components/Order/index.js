@@ -14,7 +14,7 @@ const { Search } = Input;
 const Order = ({ user }) => {
   // const naviroute = routes.OrderDetail.url;
   const { state } = useLocation();
-  const [activeTab, setActiveTab] = useState(state?.defaultKey)
+  const [activeTab, setActiveTab] = useState(state?.defaultKey || 'Sold')
 
   const onChange = (key) => {
     setActiveTab(key)
