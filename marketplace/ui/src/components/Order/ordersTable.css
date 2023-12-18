@@ -9,18 +9,16 @@
     /* Change to the desired gray color */
 }
 
-.orders_searchbar input{
-    background-color: #F6F6F6;
-}
-
 .ant-picker{
-    background-color: #F6F6F6;
-    padding: 8px 20px;
+    padding: 3px;
+    border: 1px solid #6A6A6A;
+    border-radius: 6px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 .ant-picker-input{
-    display: flex !important;
-    justify-content: space-between;
-    gap: 60px;
+    padding: 4px 2px;
 }
 .ant-picker-input input{
     color: #989898;
@@ -60,7 +58,7 @@
 .sort_conatiner article{
     cursor: pointer;
     color: #6A6A6A;
-    padding: 12px;
+    padding: 10px 12px;
 }
 .sort_conatiner article:hover{
     background-color: #EEEFFA;

@@ -42,7 +42,7 @@ const MarketPlace = () => {
               </div>
             </Button>
           </div>
-          <img className="absolute inset-0 object-cover z-10 h-[222px] md:h-[380px] md:w-[90%] rounded-md md:rounded-[14px]" height={380} width="100%" src={Images.carousel_first} preview={false} />
+          <img className="absolute inset-0 z-10 h-[222px] md:h-[380px] md:w-[90%] rounded-md md:rounded-[14px]" height={380} width="100%" src={Images.art_card} preview={false} />
         </div>
         <div className="relative p-2 h-[222px] md:h-[380px] mx-6">
           <div className="flex flex-col gap-3 backdrop-blur-2xl text-left p-4 px-3 md:px-8 mt-28 h-[90%] w-[90%] sm:w-[60%] md:h-52 rounded-3xl md:w-[480px] absolute left-6 md:left-12 md:top-12 -top-[104px] bg-[rgba(256,256,256,0.17)] z-50">
@@ -80,7 +80,45 @@ const MarketPlace = () => {
               </div>
             </Button>
           </div>
-          <img className="absolute inset-0 object-cover z-10 h-[222px] md:h-[380px] md:w-[90%] rounded-md md:rounded-[14px]" height={380} width="100%" src={Images.carousel_first} preview={false} />
+          <img className="absolute inset-0 z-10 h-[222px] md:h-[380px] md:w-[90%] rounded-md md:rounded-[14px]" height={380} width="100%" src={Images.carbon_card} preview={false} />
+        </div>
+        <div className="relative p-2 h-[222px] md:h-[380px] mr-3">
+          <div className="flex flex-col gap-3 backdrop-blur-2xl text-left p-4 px-3 md:px-8 mt-28 h-[90%] w-[90%] sm:w-[60%] md:h-52 rounded-3xl md:w-[480px] absolute left-6 md:left-12 md:top-12 -top-[104px] bg-[rgba(256,256,256,0.17)] z-50">
+            <Typography.Text className="text-base md:text-2xl md:leading-[60px] text-white font-semibold">
+              Welcome to Mercata Marketplace!
+            </Typography.Text>
+            <Typography.Text className="md:text-sm text-white pr-0">
+              Explore trending real-world assets
+            </Typography.Text>
+            <Button
+              id="viewMore"
+              onClick={() => navigate(routes.MarketplaceProductList.url)}
+              className="group w-[135px] h-11 border border-primary bg-white opacity-80">
+              <div className="text-primary font-semibold text-lg">
+                View More
+              </div>
+            </Button>
+          </div>
+          <img className="absolute inset-0 object-cover z-10 h-[222px] md:h-[380px] md:w-[90%] rounded-md md:rounded-[14px]" height={380} width="100%" src={Images.Metal_card} preview={false} />
+        </div>
+        <div className="relative p-2 h-[222px] md:h-[380px] mr-3">
+          <div className="flex flex-col gap-3 backdrop-blur-2xl text-left p-4 px-3 md:px-8 mt-28 h-[90%] w-[90%] sm:w-[60%] md:h-52 rounded-3xl md:w-[480px] absolute left-6 md:left-12 md:top-12 -top-[104px] bg-[rgba(256,256,256,0.17)] z-50">
+            <Typography.Text className="text-base md:text-2xl md:leading-[60px] text-white font-semibold">
+              Welcome to Mercata Marketplace!
+            </Typography.Text>
+            <Typography.Text className="md:text-sm text-white pr-0">
+              Explore trending real-world assets
+            </Typography.Text>
+            <Button
+              id="viewMore"
+              onClick={() => navigate(routes.MarketplaceProductList.url)}
+              className="group w-[135px] h-11 border border-primary bg-white opacity-80">
+              <div className="text-primary font-semibold text-lg">
+                View More
+              </div>
+            </Button>
+          </div>
+          <img className="absolute inset-0 object-cover z-10 h-[222px] md:h-[380px] md:w-[90%] rounded-md md:rounded-[14px]" height={380} width="100%" src={Images.collectibles} preview={false} />
         </div>
       </Carousel>
       {iscategorysLoading ? (
