@@ -112,6 +112,7 @@ tests:
       - blockapps-privacy
       - blockstanbul
       - bytestring
+      - composable-monads-base
       - conduit
       - containers
       - crypto-pubkey-types
