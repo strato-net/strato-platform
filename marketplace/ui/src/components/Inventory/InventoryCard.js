@@ -248,10 +248,10 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
   return (
 <div className="mt-6 p-[18px] border border-[#E9E9E9] rounded-lg  ">
           <div className="bg-[#F2F2F9] rounded-md px-[14px] pb-[13px] pt-2 w-full">
-            <p className="text-xl font-semibold text-[#202020]">{inventory?.name}</p>
+            <p className="text-xl font-semibold text-[#202020]">{inventory?.name  || "N/A"}</p>
             <div className=" lg:justify-between justify-end pt-[5px]  flex">
               <div className="hidden lg:block ">
-              <p className="text-xs text-[#6A6A6A]">{inventory?.description}</p>
+              <p className="text-xs text-[#6A6A6A]">{ inventory?.description || "N/A" }</p>
               </div> 
                <Popover
                 placement="bottomLeft"
@@ -343,22 +343,22 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
           <p className="text-[#4D4D4D] text-xs">PUBLISHED</p>
         </div>
           <div className="pt-5 w-full lg:hidden">
-          <p className="text-xs text-[#6A6A6A]">{inventory?.description}</p>
+          <p className="text-xs text-[#6A6A6A]">{inventory?.description || "N/A"}</p>
           </div>
         <div className="flex flex-col gap-4 px-[18px] py-4 border border-[#E9E9E9] rounded-md w-full ">
         <div className="flex justify-between  ">
           <p className="text-[#6A6A6A]">Sub Category</p>
-             <p className="text-[#202020] font-medium">{inventory.subCategory}</p>
+             <p className="text-[#202020] font-medium">{inventory.subCategory || "N/A"}</p>
         </div> <div className="flex justify-between  ">
           <p className="text-[#6A6A6A]">Quantity Owned</p>
-             <p className="text-[#202020] font-medium">{inventory.quantity}</p>
+             <p className="text-[#202020] font-medium">{inventory.quantity || "N/A"}</p>
         </div> <div className="flex justify-between  ">
           <p className="text-[#6A6A6A]">Quantity for Sale </p>
-             <p className="text-[#202020] font-medium">{inventory.saleQuantity}</p>
+             <p className="text-[#202020] font-medium">{inventory.saleQuantity || "N/A"}</p>
         </div>
          <div className="flex justify-between  ">
           <p className="text-[#6A6A6A]">price</p>
-             <p className="text-[#202020] font-medium">{inventory?.price}</p>
+             <p className="text-[#202020] font-medium">{inventory?.price || "N/A"}</p>
         </div>
        
           </div>
