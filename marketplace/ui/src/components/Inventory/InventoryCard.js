@@ -171,7 +171,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
       case "Metals":
         return (
           <>
-          <div className="flex mt-1.5 items-center">
+            <div className="flex mt-1.5 items-center">
               <p className="text-primaryC text-sm w-40">Purity</p>
               <p text-secondryB text-sm>
                 :
@@ -186,20 +186,20 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
                 :
               </p>
               <p className="text-secondryB text-sm ml-3">
-              {getUnitNameByIndex(itemData.unitOfMeasurement)}
-       
-                
+                {getUnitNameByIndex(itemData.unitOfMeasurement)}
+
+
               </p>
             </div>
-          <div className="flex mt-1.5 items-center">
-            <p className="text-primaryC text-sm w-40">Source</p>
-            <p className="text-secondryB text-sm">
-              :
-            </p>
-            <p className="text-secondryB text-sm ml-3">
-              {itemData.source}
-            </p>
-          </div>
+            <div className="flex mt-1.5 items-center">
+              <p className="text-primaryC text-sm w-40">Source</p>
+              <p className="text-secondryB text-sm">
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">
+                {itemData.source}
+              </p>
+            </div>
           </>)
       case 'Membership':
         return (
@@ -234,80 +234,80 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
     }
   };
 
-/*
-                    <div
-                      className="flex items-center mt-2 cursor-pointer"
-                      onClick={showEditModal}
-                    >
-                      <FormOutlined />
-                      <p className="ml-3">Edit Inventory</p>
-                    </div>
-*/
+  /*
+                      <div
+                        className="flex items-center mt-2 cursor-pointer"
+                        onClick={showEditModal}
+                      >
+                        <FormOutlined />
+                        <p className="ml-3">Edit Inventory</p>
+                      </div>
+  */
 
 
   return (
-<div className="mt-6 p-[18px] border border-[#E9E9E9] rounded-lg  ">
-          <div className="bg-[#F2F2F9] rounded-md px-[14px] pb-[13px] pt-2 w-full">
-            <p className="text-xl font-semibold text-[#202020] cursor-default" onClick={callDetailPage}>{inventory?.name  || "N/A"}</p>
-            <div className=" lg:justify-between justify-end pt-[5px]  flex">
-              <div className="hidden lg:block ">
-              <p className="text-xs text-[#6A6A6A]">{ inventory?.description || "N/A" }</p>
-              </div> 
-               <Popover
-                placement="bottomLeft"
-                open={openPop}
-                className="ml-2"
-                id="sideMenu"
-                onOpenChange={handleOpenChange}
-                title={
-                  <div className="font-medium">
-                    {inventory.price ? (<div>
-                      <div
-                        className="flex items-center mt-2 cursor-pointer"
-                        onClick={showListModal}
-                      >
-                        <EditOutlined />
-                        <p className="ml-3">Edit Listing</p>
-                      </div>
-                      <div
-                        className="flex items-center mt-2 cursor-pointer"
-                        onClick={showUnlistModal}
-                      >
-                        <StopOutlined />
-                        <p className="ml-3">Unlist</p>
-                      </div>
-                    </div>) : paymentProviderAddress ? (<div
-                      className="flex items-center mt-2 cursor-pointer"
-                      onClick={showListModal}
-                    >
-                      <DollarOutlined />
-                      <p className="ml-3">List for Sale</p>
-                    </div>) : (<div></div>)}
-                    {itemData.isMint && itemData.isMint == 'True' ? (<div
-                      className="flex items-center mt-2 cursor-pointer"
-                      onClick={showResellModal}
-                    >
-                      <PieChartOutlined />
-                      <p className="ml-3">Mint</p>
-                    </div>) : (<div></div>)}
-                    <div
-                      className="flex items-center mt-2 cursor-pointer"
-                      onClick={showTransferModal}
-                    >
-                      <SwapOutlined />
-                      <p className="ml-3">Transfer</p>
-                    </div>
-                  </div>
-                }
-                trigger="click"
-              >
-                <MoreOutlined />
-              </Popover>
-            </div>
+    <div className="mt-6 p-[18px] border border-[#E9E9E9] rounded-lg  ">
+      <div className="bg-[#F2F2F9] rounded-md px-[14px] pb-[13px] pt-2 w-full">
+        <p className="text-xl font-semibold text-[#202020] cursor-default" onClick={callDetailPage}>{inventory?.name || "N/A"}</p>
+        <div className=" lg:justify-between justify-end pt-[5px]  flex">
+          <div className="hidden lg:block ">
+            <p className="text-xs text-[#6A6A6A]">{inventory?.description || "N/A"}</p>
           </div>
-        <div className="pt-[14px] flex md:flex-row  flex-col items-center gap-y-4 md:gap-[18px]">
-        
-            {/* <Carousel className="w-[161px] h-[161px] inventory rounded-md">
+          <Popover
+            placement="bottomLeft"
+            open={openPop}
+            className="ml-2"
+            id="sideMenu"
+            onOpenChange={handleOpenChange}
+            title={
+              <div className="font-medium">
+                {inventory.price ? (<div>
+                  <div
+                    className="flex items-center mt-2 cursor-pointer"
+                    onClick={showListModal}
+                  >
+                    <EditOutlined />
+                    <p className="ml-3">Edit Listing</p>
+                  </div>
+                  <div
+                    className="flex items-center mt-2 cursor-pointer"
+                    onClick={showUnlistModal}
+                  >
+                    <StopOutlined />
+                    <p className="ml-3">Unlist</p>
+                  </div>
+                </div>) : paymentProviderAddress ? (<div
+                  className="flex items-center mt-2 cursor-pointer"
+                  onClick={showListModal}
+                >
+                  <DollarOutlined />
+                  <p className="ml-3">List for Sale</p>
+                </div>) : (<div></div>)}
+                {itemData.isMint && itemData.isMint == 'True' ? (<div
+                  className="flex items-center mt-2 cursor-pointer"
+                  onClick={showResellModal}
+                >
+                  <PieChartOutlined />
+                  <p className="ml-3">Mint</p>
+                </div>) : (<div></div>)}
+                <div
+                  className="flex items-center mt-2 cursor-pointer"
+                  onClick={showTransferModal}
+                >
+                  <SwapOutlined />
+                  <p className="ml-3">Transfer</p>
+                </div>
+              </div>
+            }
+            trigger="click"
+          >
+            <MoreOutlined />
+          </Popover>
+        </div>
+      </div>
+      <div className="pt-[14px] flex md:flex-row  flex-col items-center gap-y-4 md:gap-[18px]">
+
+        {/* <Carousel className="w-[161px] h-[161px] inventory rounded-md">
             <div>
             <img 
           className="rounded-md object-contain w-[161px] h-[161px] "
@@ -328,49 +328,49 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
         />
           </div> 
             </Carousel> */}
-            <div>
-            <img 
-          className="rounded-md object-contain w-[161px] h-[161px] "
-          alt=""
-          src={
-            inventory.images && inventory.images.length > 0
-              ? inventory.images[0]
-              : image_placeholder }
-        />
-          </div>
-          <div className="pt-[7px] lg:hidden flex items-center gap-[5px]">
+        <div>
+          <img
+            className="rounded-md object-contain w-[161px] h-[161px] "
+            alt=""
+            src={
+              inventory.images && inventory.images.length > 0
+                ? inventory.images[0]
+                : image_placeholder}
+          />
+        </div>
+        <div className="pt-[7px] lg:hidden flex items-center gap-[5px]">
           <div className="w-[10px] h-[10px] rounded-sm bg-[#119B2D]"></div>
           <p className="text-[#4D4D4D] text-xs">PUBLISHED</p>
         </div>
-          <div className="pt-5 w-full lg:hidden">
+        <div className="pt-5 w-full lg:hidden">
           <p className="text-xs text-[#6A6A6A]">{inventory?.description || "N/A"}</p>
-          </div>
+        </div>
         <div className="flex flex-col gap-4 px-[18px] py-4 border border-[#E9E9E9] rounded-md w-full ">
-        <div className="flex justify-between  ">
-          <p className="text-[#6A6A6A]">Sub Category</p>
-             <p className="text-[#202020] font-medium">{inventory.subCategory || "N/A"}</p>
-        </div> <div className="flex justify-between  ">
-          <p className="text-[#6A6A6A]">Quantity Owned</p>
-             <p className="text-[#202020] font-medium">{inventory.quantity || "N/A"}</p>
-        </div> <div className="flex justify-between  ">
-          <p className="text-[#6A6A6A]">Quantity for Sale </p>
-             <p className="text-[#202020] font-medium">{inventory.saleQuantity || "N/A"}</p>
-        </div>
-         <div className="flex justify-between  ">
-          <p className="text-[#6A6A6A]">Price</p>
-             <p className="text-[#202020] font-medium">{inventory?.price || "N/A"}</p>
-        </div>
-       
+          <div className="flex justify-between  ">
+            <p className="text-[#6A6A6A]">Sub Category</p>
+            <p className="text-[#202020] font-medium">{getCategory() || "N/A"}</p>
+          </div> <div className="flex justify-between  ">
+            <p className="text-[#6A6A6A]">Quantity Owned</p>
+            <p className="text-[#202020] font-medium">{inventory.quantity || "N/A"}</p>
+          </div> <div className="flex justify-between  ">
+            <p className="text-[#6A6A6A]">Quantity for Sale </p>
+            <p className="text-[#202020] font-medium">{inventory.saleQuantity || "N/A"}</p>
+          </div>
+          <div className="flex justify-between  ">
+            <p className="text-[#6A6A6A]">Price</p>
+            <p className="text-[#202020] font-medium">{inventory?.price || "N/A"}</p>
           </div>
 
         </div>
-        <div className="flex justify-between">
+
+      </div>
+      <div className="flex justify-between">
         <div className="pt-[7px] hidden lg:flex items-center gap-[5px]">
           <div className="w-[10px] h-[10px] rounded-sm bg-[#119B2D]"></div>
           <p className="text-[#4D4D4D] text-xs">PUBLISHED</p>
         </div>
-             <Button type="link" className="text-[#13188A] font-semibold" onClick={callDetailPage}>preview</Button>
-        </div>
+        <Button type="link" className="text-[#13188A] font-semibold" onClick={callDetailPage}>preview</Button>
+      </div>
       {/* <div className="flex" id={id}>
         <img
           className="w-52 object-contain"
