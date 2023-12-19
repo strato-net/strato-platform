@@ -765,7 +765,7 @@ const CreateInventoryModal = ({
 
         <Form layout="vertical" className="mt-5" onSubmit={formik.handleSubmit}>
           <div className="w-full mb-3">
-          <Form.Item label="Upload Images" name="images" className="w-full">
+          <Form.Item label="Upload photos" name="images" className="w-full">
                 <div className="p-4 border-[#BABABA] border rounded flex flex-col justify-around">
                   <Upload
                     onChange={(es) => {
@@ -892,7 +892,7 @@ const CreateInventoryModal = ({
               <Form.Item label="Least sellable Unit" name="saleable" className="w-72 text-[#202020] font-medium">
                 <Input
                   label="saleable"
-                  placeholder="BlockApps"
+                  placeholder="Face Lift package"
                   name="saleable"
                   disabled={false}
                   value={formik.values.name}
@@ -939,7 +939,6 @@ const CreateInventoryModal = ({
                   </span>
                 )}
               </Form.Item>
-             <Switch label="helo" className="border"  prefixCls="bg-red-800" />
 
             </div>
           </div>
@@ -948,7 +947,7 @@ const CreateInventoryModal = ({
         {/* //! preview */}
         <div className="w-[40%] flex justify-end">
           <div>
-          <Typography className="text-[#13188A] font-semibold pt-6 pb-2">Live Preview</Typography>
+          <Typography className="text-[#13188A] font-semibold pt-6 pb-2 text-center">Live Preview</Typography>
           <div className="p-3 rounded-lg  shadow-card_shadow">
                     <div>
                       <img src={Images.random} alt="" className="rounded-md w-full"/>
