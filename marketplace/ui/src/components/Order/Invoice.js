@@ -43,7 +43,6 @@ const Invoice = () => {
 
   useEffect(() => {
     if (orderDetails) {
-      console.log(orderDetails);
       marketplaceActions.fetchUserAddress(marketplaceDispatch, orderDetails.order.shippingAddressId);
     }
   }, [orderDetails]);
