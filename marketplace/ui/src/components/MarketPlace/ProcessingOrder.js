@@ -159,9 +159,9 @@ const ProcessingOrder = () => {
     htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
 
     // Prepare order data to be sent to order controller
-    let saleAddresses = [];
+    let assetAddresses = [];
     const orderList = storedConfirmList.map(o => {
-      saleAddresses.push(o.key);
+      assetAddresses.push(o.key);
       return { saleAddress: o.saleAddress, quantity: o.qty };
     });
     
@@ -173,15 +173,18 @@ const ProcessingOrder = () => {
       subject: "Your Order Confirmation",
       htmlContents: htmlContents,
     }
+    console.log(assetAddresses);
 
     let isDone = await orderActions.createSaleOrder(orderDispatch, body);
     if (isDone) {
       let updatedCart = [];
       storedData.forEach(cart => {
-        if (!saleAddresses.includes(cart.product.saleAddress)) {
+        console.log(cart);
+        if (!assetAddresses.includes(cart.product.address)) {
           updatedCart.push(cart);
         }
       });
+      console.log(updatedCart);
       actions.addItemToCart(marketplaceDispatch, updatedCart);
       navigate(routes.Orders.url, { state: { defaultKey: "Bought" } });
     } else {
