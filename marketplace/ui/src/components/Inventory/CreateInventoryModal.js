@@ -42,7 +42,7 @@ const CreateInventoryModal = ({
   const [uploadErr, setUploadErr] = useState("");
   const { isCreateInventorySubmitting, isUploadImageSubmitting } =
     useInventoryState();
-  const [selectedImages, setSelectedImages] = useState(null);
+  const [selectedImages, setSelectedImages] = useState([]);
   const [selectedFiles, setSelectedFiles] = useState(null);
   const [clothingType, setClothingType] = useState(null);
   const [sizeOptions, setSizeOptions] = useState([]);
@@ -615,11 +615,11 @@ const CreateInventoryModal = ({
             </div>);
       case 'Membership':
         return (
-          <div className="flex justify-between mt-4 ">
+          <div className="flex justify-between mt-4 gap-4">
             <Form.Item
               label="Expiration (in months)"
               name="expirationPeriodInMonths"
-              className="w-72"
+              className=""
             >
               <Input
                 label="expirationPeriodInMonths"
@@ -638,7 +638,7 @@ const CreateInventoryModal = ({
             <Form.Item
               label="Quantity"
               name="quantity"
-              className="w-72"
+              className=""
             >
               <Input
                 label="quantity"
@@ -944,14 +944,15 @@ const CreateInventoryModal = ({
           </div>
         </Form>
         </div>
+        
         {/* //! preview */}
         <div className="w-[40%] flex justify-end">
           <div>
-          <Typography className="text-[#13188A] font-semibold pt-6 pb-2 text-center">Live Preview</Typography>
+          <Typography className="text-[#13188A] font-semibold pt-6 pb-2 ">Live Preview</Typography>
           <div className="p-3 rounded-lg  shadow-card_shadow">
-                    <div>
-                      <img src={Images.random} alt="" className="rounded-md w-full"/>
-                    </div>
+            <div className="rounded-md  w-[184px] h-[132px] overflow-hidden">
+                      <img src={selectedImages[0]?.thumbUrl} alt="" className="w-full h-full object-none"/>
+            </div>
                     <div className="pt-3">
                       <div className="flex justify-between">
                         <Typography className="text-[#202020] font-semibold">{formik.values.name}</Typography>
