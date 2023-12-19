@@ -722,7 +722,19 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getPaymentSession = async function (args, options = defaultOptions) {
     try {
       const { session_id } = args
-      const paymentDetail = await paymentProviderJs.getPaymentSession(rawAdmin, { paymentSessionId: session_id }, options);
+      const buyerStripeDetails = await paymentProviderJs.get(rawAdmin,
+        {
+          name: SERVICE_PROVIDERS.STRIPE, transaction_sender: rawAdmin.address,
+          accountDeauthorized: false
+        },
+        options)
+      buyerStripeDetails[0].contract_name
+      
+      // Extract the substring before the last hyphen
+      const parts = buyerStripeDetails[0].contract_name.split('-');
+      const result = parts.slice(0, -1).join('-');
+      
+      const paymentDetail = await paymentProviderJs.getPaymentSession(rawAdmin, { paymentSessionId: session_id, contractName:result }, options);
       const paymentSession = await StripeService.getPaymentSession(session_id, paymentDetail.sellerAccountId);
       const paymentIntent = await StripeService.getPaymentIntent(paymentSession.payment_intent, paymentDetail.sellerAccountId);
       const paymentMethod = await StripeService.getPaymentMethod(paymentIntent.payment_method, paymentDetail.sellerAccountId);
