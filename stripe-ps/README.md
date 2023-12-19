@@ -59,6 +59,10 @@ Create a checkout session given the following information from the order:
 Get a stripe session given the `sessionId` and the `sellerId` in a JSON body.  
 **Returns** the session information.
 
+##### GET `/stripe/intent/:sessionId/:sellerId`
+Get the stripe payment intent given the `sessionId` and the `sellerId` in a JSON body.  
+**Returns** the payment intent information.
+
 ##### POST `/stripe/webhook`
 TODO
 
