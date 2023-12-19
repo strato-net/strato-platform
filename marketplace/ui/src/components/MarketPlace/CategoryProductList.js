@@ -416,7 +416,7 @@ const CategoryProductList = ({ user }) => {
             <Divider className="m-0" />
 
             {/* Panel - SubCategory */}
-            {/* {currentCategory && (
+            { currentCategory && (
               <>
                 <Collapse
                   bordered={false}
@@ -432,13 +432,18 @@ const CategoryProductList = ({ user }) => {
                       value={selectedSubCategories}
                     >
                       <div className="flex flex-col gap-3">
+                        {subCategories.map((subcategory, index) => (
+                          <Checkbox value={subcategory.contract} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
+                            {subcategory.name}
+                          </Checkbox>
+                        ))}
                       </div>
                     </Checkbox.Group>
                   </Panel>
                 </Collapse>
                 <Divider className="m-0" />
               </>
-            )} */}
+            )}
 
             {/* Panel - Product */}
             {marketplaceList?.length > 0 && (
