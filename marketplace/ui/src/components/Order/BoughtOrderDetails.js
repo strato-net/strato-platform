@@ -478,13 +478,13 @@ const BoughtOrderDetails = ({ user, users }) => {
                             <div className="flex items-center">
                               <EyeOutlined className="mr-1 -mt-3 hover:text-primaryHover cursor-pointer" />
                               <p
-                                onClick={() => {
-                                  navigate(
-                                    `${routes.SoldOrderItemDetail.url.replace(":id", data?.address)}`,
-                                    { state: { orderId: orderDetails.orderId, address: Id } }
-                                  );
-                                }}
-                                className="hover:text-primaryHover cursor-pointer"
+                                // onClick={() => {
+                                //   navigate(
+                                //     `${routes.SoldOrderItemDetail.url.replace(":id", data?.address)}`,
+                                //     { state: { orderId: orderDetails.orderId, address: Id } }
+                                //   );
+                                // }}
+                                className="hover:text-primaryHover"
                               >
                                 View
                               </p>
