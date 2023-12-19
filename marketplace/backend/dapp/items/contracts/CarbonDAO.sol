@@ -1,7 +1,7 @@
 pragma es6;
 pragma strict;
 
-import <eddd7c9aa884a3b1b8595f0897608c07a8e770b1>;
+import <e5c8511b96a78f9ab8b67d233cc8fc831f6ece36>;
 
 /// @title A representation of CarbonDAO assets
 contract CarbonDAO is SemiFungible {
