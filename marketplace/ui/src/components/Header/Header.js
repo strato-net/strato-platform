@@ -263,7 +263,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
         }
         {
           roleIndex === undefined || roleIndex === 1 ? (
-            loginUrl ? <a href={loginUrl} id="Login" className=" text-base text-white flex gap-3 items-center"
+            loginUrl ? <a href={loginUrl} id="Login" className="text-base text-white flex gap-3 items-center"
               onClick={() => {
                 TagManager.dataLayer({
                   dataLayer: {
@@ -271,7 +271,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
                   }
                 })
               }} >
-            <Button size="large" className="hidden sm:flex login_btn w-[70%] md:w-[100%]">Login</Button>
+            <Button size="large" className="hidden sm:flex login_btn w-[70%] md:w-[100%] hover:bg-primary">Login</Button>
             <Button size="large" className="hidden sm:flex bg-primary text-white w-[70%] md:w-[100%]">Register</Button>
             <Button size="large" className="flex sm:hidden bg-primary text-white w-[90%] h-[30%] text-xs justify-center items-center">Login/Register</Button>
             </a> : null
@@ -288,14 +288,18 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
       </Space>
     </Header>
     {showMenu &&
-            <div className="bg-white border-t absolute w-full z-50 md:hidden top-16">
+      <div>
+        <div className="bg-white border-t absolute w-full z-50 md:hidden top-16">
               {subMenuItems.map((item) => {
                 return (
-                  <Typography onClick={()=>handleIntMenuTab(item)} className="text-base py-3 px-4 cursor-pointer" >{item.label}</Typography>
+                  <Typography onClick={()=>handleIntMenuTab(item)} className={`text-base py-3 px-4 cursor-pointer ${item ? '' : 'hidden'}`} >{item?.label}</Typography>
                 )
               })}
-            </div>}
-    </>
+        </div>
+        <div className="h-[100vh] w-full bg-[#00000020] absolute top-0 md:hidden z-40" onClick={handleMenuTab}></div>
+      </div>
+    }
+    </> 
 
   );
 };

@@ -32,6 +32,7 @@ const CreateInventoryModal = ({
   resetPage,
   page,
 }) => {
+
   const schema = getSchema();
   const dispatch = useInventoryDispatch();
   const { readString } = usePapaParse();
@@ -62,6 +63,7 @@ const CreateInventoryModal = ({
     images: null,
     files: null,
     category: "Art",
+    subCategory: "",
     size: null,
     skuNumber: null,
     condition: null,
@@ -133,7 +135,7 @@ const CreateInventoryModal = ({
     };
 
     const finalBody = (body) => {
-      switch (values.category) {
+      switch (values.subCategory) {
         case "Art":
           return (body = {
             itemArgs: {
@@ -223,7 +225,7 @@ const CreateInventoryModal = ({
     let isDone = await actions.createItem(
       dispatch,
       finalBody(body),
-      values.category
+      values.subCategory
     );
 
     if (isDone) {
@@ -314,7 +316,7 @@ const CreateInventoryModal = ({
   };
 
   const categoricalProperties = () => {
-    switch (formik.values.category) {
+    switch (formik.values.subCategory) {
       case "Art":
         return (
           <div className="flex justify-between mt-4 ">
@@ -761,7 +763,7 @@ const CreateInventoryModal = ({
         <Form layout="vertical" className="mt-5" onSubmit={formik.handleSubmit}>
           <div className="w-full mb-3">
             <div className="flex justify-between mt-4 ">
-              <Form.Item label="Name" name="name" className="w-72">
+              <Form.Item label="Name" name="name" className="w-72 mr-5">
                 <Input
                   label="name"
                   placeholder="Enter Name"
@@ -776,7 +778,8 @@ const CreateInventoryModal = ({
                   </span>
                 )}
               </Form.Item>
-              <Form.Item label="Category" name="category" className="w-72">
+
+              <Form.Item label="Category" name="category" className="w-72 mr-5">
                 <Select
                   id="category"
                   placeholder="Select Category"
@@ -785,11 +788,12 @@ const CreateInventoryModal = ({
                   value={formik.values.category}
                   onChange={(value) => {
                     formik.setFieldValue("category", value);
+                    formik.setFieldValue("subCategory", null);
                   }}
                 >
-                  {CATEGORIES.map((e, index) => (
-                    <Option value={e} key={index}>
-                      {e}
+                  {categorys.map((e, index) => (
+                    <Option value={e.name} key={index}>
+                      {e.name}
                     </Option>
                   ))}
                 </Select>
@@ -797,6 +801,41 @@ const CreateInventoryModal = ({
                   getIn(formik.errors, "category") && (
                     <span className="text-error text-xs">
                       {getIn(formik.errors, "category")}
+                    </span>
+                  )}
+              </Form.Item>
+              
+             
+
+              <Form.Item label="Sub-Category" name="subCategory" className="w-72 mr-5">
+                <Select
+                  id="subCategory"
+                  placeholder="Select Sub-Category"
+                  allowClear
+                  name="subCategory"
+                  value={formik.values.subCategory}
+                  onChange={(value) => {
+                    formik.setFieldValue("subCategory", value);
+                  }}
+                >
+                {categorys.map((category) =>
+                    category.name === formik.values.category ? category.subCategories.map((e, index) => (
+                      <Option value={e.contract} key={index}>
+                        {e.name}
+                      </Option>
+                    )) : null
+                  )}
+
+                  {/* {CATEGORIES.map((e, index) => (
+                    <Option value={e} key={index}>
+                      {e}
+                    </Option>
+                  ))} */}
+                </Select>
+                {getIn(formik.touched, "subCategory") &&
+                  getIn(formik.errors, "subCategory") && (
+                    <span className="text-error text-xs">
+                      {getIn(formik.errors, "subCategory")}
                     </span>
                   )}
               </Form.Item>

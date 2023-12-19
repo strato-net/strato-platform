@@ -4,9 +4,11 @@ import { getStringDate } from "../../helpers/utils";
 import { actions } from "../../contexts/item/actions";
 import { useItemDispatch, useItemState } from "../../contexts/item";
 import { US_DATE_FORMAT } from "../../helpers/constants";
-import { Pagination } from "antd";
+import { Input, Pagination } from "antd";
 import "./ordersTable.css"
-import { DownOutlined, UpOutlined } from "@ant-design/icons";
+import { DownOutlined, SearchOutlined, UpOutlined } from "@ant-design/icons";
+import { ResponsiveOrderCard } from "./ResponsiveOrdersCard";
+import { ResponsiveTransferOrderCard } from "./ResponsiveTransferOrdersCard";
 
 
 const TransfersTable = ({ user, selectedDate }) => {
@@ -116,15 +118,24 @@ const TransfersTable = ({ user, selectedDate }) => {
 
   return (
     <div>
-      <DataTableComponent
-        columns={column}
-        data={data}
-        isLoading={isFetchingItemTransfers}
-        pagination={false}
-        scrollX="100%"
-        rowKey={record => record.transferNumber}
-        onChange={onChange}
-      />
+      <Input className="text-base orders_searchbar mb-5 rounded-full bg-[#F6F6F6]" prefix={<SearchOutlined />} placeholder="Search Markeplace" />
+      <div className="flex md:hidden order_responsive">
+        <ResponsiveTransferOrderCard
+          data={data}
+          isLoading={isFetchingItemTransfers}
+        />
+      </div>
+      <div className="hidden md:block">
+        <DataTableComponent
+          columns={column}
+          data={data}
+          isLoading={isFetchingItemTransfers}
+          pagination={false}
+          scrollX="100%"
+          rowKey={record => record.transferNumber}
+          onChange={onChange}
+        />
+      </div>
       <Pagination
         current={page}
         onChange={onPageChange}

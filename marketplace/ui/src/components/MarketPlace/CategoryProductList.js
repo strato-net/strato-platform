@@ -278,7 +278,7 @@ const CategoryProductList = ({ user }) => {
   };
 
   return (
-    <div>
+    <div className={`${openFilter ? 'overflow-y-hidden h-[67.5vh] w-[100vw] bg-[#00000020] relative mt-24 md:bg-white md:mt-[auto] md:overflow-scroll' : 'null'}`}>
       <div className="fixed bg-white w-full top-7 z-10 md:static">
         <Breadcrumb className="text-xs ml-4 md:ml-14 mt-14">
       <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
@@ -369,6 +369,36 @@ const CategoryProductList = ({ user }) => {
               </>
             )}
 
+            {/* Panel - SubCategory */}
+            { currentCategory && (
+              <>
+                <Collapse
+                  bordered={false}
+                  defaultActiveKey={1}
+                  expandIconPosition="end"
+                  ghost="true"
+                  reverse={false}
+                  className="pl-8 pr-7"
+                >
+                  <Panel header={<Text strong>Sub-Category</Text>} key="1">
+                    <Checkbox.Group
+                      // onChange={onChangeSubCategory}
+                      value={selectedSubCategories}
+                    >
+                      <div className="flex flex-col gap-3">
+                        {subCategories.map((subcategory, index) => (
+                          <Checkbox value={subcategory.contract} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
+                            {subcategory.name}
+                          </Checkbox>
+                        ))}
+                      </div>
+                    </Checkbox.Group>
+                  </Panel>
+                </Collapse>
+                <Divider className="m-0" />
+              </>
+            )}
+
             {/* Panel - Price */}
             <Collapse
               bordered={false}
@@ -414,31 +444,6 @@ const CategoryProductList = ({ user }) => {
               </Panel>
             </Collapse>
             <Divider className="m-0" />
-
-            {/* Panel - SubCategory */}
-            {/* {currentCategory && (
-              <>
-                <Collapse
-                  bordered={false}
-                  defaultActiveKey={1}
-                  expandIconPosition="end"
-                  ghost="true"
-                  reverse={false}
-                  className="pl-8 pr-7"
-                >
-                  <Panel header={<Text strong>Sub-Category</Text>} key="1">
-                    <Checkbox.Group
-                      // onChange={onChangeSubCategory}
-                      value={selectedSubCategories}
-                    >
-                      <div className="flex flex-col gap-3">
-                      </div>
-                    </Checkbox.Group>
-                  </Panel>
-                </Collapse>
-                <Divider className="m-0" />
-              </>
-            )} */}
 
             {/* Panel - Product */}
             {marketplaceList?.length > 0 && (
@@ -542,7 +547,8 @@ const CategoryProductList = ({ user }) => {
       </div>
 
       {openFilter && 
-        <div className="mr-6 fixed w-full z-50 md:hidden top-16">
+      <div>
+        <div className="mr-6 fixed w-full h-full z-50 top-16 overflow-scroll md:hidden ">
           <div className="bg-white shadow-[2px_-2px_4px_0_rgba(0,0,0,0.05)] mb-24">
           <div className="flex items-center justify-between pt-5">
               <Text className="text-xl font-semibold pr-7 pl-7 ml-1">Select</Text>
@@ -654,6 +660,8 @@ const CategoryProductList = ({ user }) => {
             <div className="pb-8"></div>
           </div>
         </div>
+        <div className="h-full w-full bg-[#00000020] absolute top-0 md:hidden"></div>
+      </div>
       }
       <Pagination
         current={1}
