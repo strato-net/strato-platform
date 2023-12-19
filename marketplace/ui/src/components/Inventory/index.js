@@ -24,7 +24,7 @@ import {
 import { Images } from "../../images";
 //items
 import { actions as itemActions } from "../../contexts/item/actions";
-import { useItemDispatch, useItemState} from "../../contexts/item";
+import { useItemDispatch, useItemState } from "../../contexts/item";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
@@ -75,18 +75,18 @@ const Inventory = ({ user }) => {
   useEffect(() => {
     actions.sellerStripeStatus(dispatch, user?.commonName);
   }, [dispatch, user]);
-  
+
   useEffect(() => {
     const placement = 'bottom'; // Set placement to 'bottomCenter'
-  
+
     if (stripeStatus !== null && stripeStatus !== undefined) {
       const { chargesEnabled, detailsSubmitted, payoutsEnabled } = stripeStatus;
-      
-      const isOnboardedSuccess = ( chargesEnabled && detailsSubmitted && payoutsEnabled ) 
-      const isOnboardNotStarted = ( !chargesEnabled && !detailsSubmitted && !payoutsEnabled )
-  
-      if (!( isOnboardedSuccess || isOnboardNotStarted ) ) {
-        
+
+      const isOnboardedSuccess = (chargesEnabled && detailsSubmitted && payoutsEnabled)
+      const isOnboardNotStarted = (!chargesEnabled && !detailsSubmitted && !payoutsEnabled)
+
+      if (!(isOnboardedSuccess || isOnboardNotStarted)) {
+
         setTimeout(() => {
           api.error({
             key: 1,
@@ -98,7 +98,7 @@ const Inventory = ({ user }) => {
         }, 1000);
       }
     }
-  }, [stripeStatus]);  
+  }, [stripeStatus]);
 
   useEffect(() => {
     let len = inventories.length;
@@ -211,7 +211,7 @@ const Inventory = ({ user }) => {
                       : "Please connect to Stripe first"
                   }
                   placement="bottom"
-                  >
+                >
                   <div>
                     <Button
                       id="add-inventory-button"
@@ -250,7 +250,7 @@ const Inventory = ({ user }) => {
                 <div className="flex">
                   <Search
                     placeholder="Search"
-                    className="w-80 mr-6"
+                    className="inventory-search w-80 mr-6"
                     allowClear
                     onSearch={queryHandle}
                   />
@@ -305,7 +305,7 @@ const Inventory = ({ user }) => {
                           category={category}
                           key={index}
                           debouncedSearchTerm={debouncedSearchTerm}
-                          paymentProviderAddress={stripeStatus ? stripeStatus.paymentProviderAddress : undefined }
+                          paymentProviderAddress={stripeStatus ? stripeStatus.paymentProviderAddress : undefined}
                         />
                       );
                     })}
