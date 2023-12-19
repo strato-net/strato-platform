@@ -763,7 +763,7 @@ const CreateInventoryModal = ({
         <Form layout="vertical" className="mt-5" onSubmit={formik.handleSubmit}>
           <div className="w-full mb-3">
             <div className="flex justify-between mt-4 ">
-              <Form.Item label="Name" name="name" className="w-72">
+              <Form.Item label="Name" name="name" className="w-72 mr-5">
                 <Input
                   label="name"
                   placeholder="Enter Name"
@@ -778,9 +778,8 @@ const CreateInventoryModal = ({
                   </span>
                 )}
               </Form.Item>
-              </div>
-              <div className="flex justify-between mt-4 ">
-              <Form.Item label="Category" name="category" className="w-72">
+
+              <Form.Item label="Category" name="category" className="w-72 mr-5">
                 <Select
                   id="category"
                   placeholder="Select Category"
@@ -805,8 +804,10 @@ const CreateInventoryModal = ({
                     </span>
                   )}
               </Form.Item>
+              
+             
 
-              <Form.Item label="Sub-Category" name="subCategory" className="w-72">
+              <Form.Item label="Sub-Category" name="subCategory" className="w-72 mr-5">
                 <Select
                   id="subCategory"
                   placeholder="Select Sub-Category"
