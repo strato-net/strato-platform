@@ -9,7 +9,7 @@ const db = new sqlite3.Database(DBSOURCE, (err) => {
       throw err
     }else{
         console.log('Connected to the SQLite database.')
-        db.run(`CREATE TABLE customer_address (
+        db.run(`CREATE TABLE IF NOT EXISTS customer_address (
             address_id INTEGER PRIMARY KEY AUTOINCREMENT,
             commonName text, 
             name text, 
