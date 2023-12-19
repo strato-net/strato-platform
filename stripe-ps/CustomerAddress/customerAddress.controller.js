@@ -58,7 +58,8 @@ class CustomerAddressController {
               state, 
               city, 
               addressLine1, 
-              addressLine2 
+              addressLine2,
+              country
             } = req.body;
 
       const sql = `
@@ -69,9 +70,10 @@ class CustomerAddressController {
           state,
           city,
           addressLine1,
-          addressLine2
+          addressLine2,
+          country
         ) VALUES (
-          ?,?,?,?,?,?,?
+          ?,?,?,?,?,?,?,?
         );
       `;
       const params = [ commonName, 
@@ -80,7 +82,8 @@ class CustomerAddressController {
                        state, 
                        city, 
                        addressLine1, 
-                       addressLine2
+                       addressLine2,
+                       country
                       ];
       db.run(sql, params, function (err, row) {
         if (err) {
@@ -130,6 +133,7 @@ class CustomerAddressController {
       city: Joi.string().required(),
       addressLine1: Joi.string().required(),
       addressLine2: Joi.string().allow("").optional(),
+      country: Joi.string().required(),
     });
 
     const validation = addAddressSchema.validate(args);

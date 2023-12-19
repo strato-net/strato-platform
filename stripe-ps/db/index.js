@@ -18,6 +18,7 @@ const db = new sqlite3.Database(DBSOURCE, (err) => {
             city text,
             addressLine1 text,
             addressLine2 text,
+            country text,
             createdDate DATETIME DEFAULT CURRENT_TIMESTAMP
             )`,
         (err) => {

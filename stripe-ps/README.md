@@ -20,7 +20,8 @@ Adds an address using the following information from the JSON body:
   state: string,
   city: string,
   addressLine1: string,
-  addressLine2: string optional
+  addressLine2: string optional,
+  country: string
 }
 ```
 **Returns** the `id` of the newly added address in the table.

@@ -340,6 +340,7 @@ class OrderController {
       city: Joi.string().required(),
       addressLine1: Joi.string().required(),
       addressLine2: Joi.string().allow(""),
+      country: Joi.string().required(),
     }).required();
 
     const validation = createUserAddressSchema.validate(args);
