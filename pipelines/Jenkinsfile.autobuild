@@ -106,7 +106,7 @@ pipeline {
                 VAULT_URL=https://\$(</host):8093 \\
                 VAULT_PROXY_DEBUG=true \\
                 certInfo='{"orgName":"BlockApps","orgUnit":"Engineering","commonName":"Test"}' \\
-                STRIPE_PAYMENT_SERVER_URL:'http://payments.mercata-testnet2.blockapps.net' \\
+                STRIPE_PAYMENT_SERVER_URL='http://payments.mercata-testnet2.blockapps.net' \\
                 GLOBAL_ADMIN_NAME='${GLOBAL_ADMIN_NAME}' \\
                 GLOBAL_ADMIN_PASSWORD='${GLOBAL_ADMIN_PASSWORD}' \\
                 MP_IS_BOOTNODE='true' \\
