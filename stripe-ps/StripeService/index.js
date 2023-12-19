@@ -19,7 +19,7 @@ router.post(
 )
 
 router.get(
-  '/session',
+  '/session/:sessionId/:sellerId',
   StripeServiceController.stripeGetSession
 )
 

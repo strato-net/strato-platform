@@ -137,7 +137,7 @@ class OrderController {
 
       OrderController.validatePaymentSessionArgs(params)
 
-      const result = await dapp.getPaymentSession({ session_id: params.session_id })
+      const result = await dapp.getPaymentSession(params)
       rest.response.status200(res, result)
 
       return next()
@@ -270,7 +270,8 @@ class OrderController {
 
   static validatePaymentSessionArgs(args) {
     const paymentSchema = Joi.object({
-      session_id: Joi.string().required()
+      session_id: Joi.string().required(),
+      sellersCommonName: Joi.string().required(),
     }).required();
 
     const validation = paymentSchema.validate(args);

@@ -65,14 +65,16 @@ const ProcessingOrder = () => {
 
   const getCartData = async () => {
     try {
+      const sellersCommonName = storedConfirmList[0].sellersCommonName;
       const response = await fetch(
-        `${apiUrl}/order/payment/session/${sessionId}`,
+        `${apiUrl}/order/payment/session/${sessionId}/${sellersCommonName}`,
         {
           method: HTTP_METHODS.GET,
         }
       );
 
       const body = await response.json();
+      console.log(body);
       if (response.status === RestStatus.OK) {
         try {
           const cartObject = JSON.parse(body.data.metadata.cart);

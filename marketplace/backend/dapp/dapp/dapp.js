@@ -22,8 +22,6 @@ import saleOrderJs from "/dapp/orders/saleOrder";
 
 import inventoryJs from "/dapp/products/inventory";
 import marketplaceJs from "/dapp/marketplace/marketplace.js";
-import userAddressJs from "/dapp/addresses/userAddress.js";
-import paymentManagerJs from "/dapp/payments/paymentManager";
 import paymentProviderJs from '/dapp/payments/paymentProvider';
 
 const allAssetNames = [];
@@ -680,7 +678,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       /*  check if an accountId already exists for the user org */
       if (sellerStripeDetails.length === 0 || !sellerStripeDetails[0].chargesEnabled || !sellerStripeDetails[0].detailsSubmitted || !sellerStripeDetails[0].payoutsEnabled) {
-        throw new rest.RestError(RestStatus.CONFLICT, "Seller hasn't activated this payment method")
+        throw new rest.RestError(RestStatus.CONFLICT, "Seller hasn't activated this payment method");
       }
 
       const invoices = []; 
@@ -750,13 +748,17 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getPaymentSession = async function (args, options = defaultOptions) {
     try {
-      const { session_id } = args
-      const paymentDetail = await paymentProviderJs.getPaymentSession(rawAdmin, { paymentSessionId: session_id }, options);
-      const paymentSession = await axios.get(`${STRIPE_PAYMENT_SERVER_URL}/stripe/session/${session_id}/${paymentDetail.sellerAccountId}`)
+      const { session_id, sellersCommonName } = args;
+      const paymentDetail = await paymentProviderJs.get(rawAdmin, 
+        { name: 'STRIPE', ownerCommonName: sellersCommonName, accountDeauthorized: false }, 
+        options);
+      if (paymentDetail.length === 0) {
+        throw new rest.RestError(RestStatus.CONFLICT, "Seller payment details cannot be found.");
+      }
+      const paymentSession = await axios.get(`${STRIPE_PAYMENT_SERVER_URL}/stripe/session/${session_id}/${paymentDetail[0].accountId}`)
         .then(function (res) {
-          console.log("session", res);
           if (res.status === 200) {
-            return res.body;
+            return res.data;
           } else {
             throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
           }

@@ -120,7 +120,7 @@ export const Order = {
   updateBuyerDetails: '/updateBuyerDetails',
   updateSellerDetails: '/updateSellerDetails',
   payment: '/payment',
-  paymentSession: '/payment/session/:session_id',
+  paymentSession: '/payment/session/:session_id/:sellersCommonName',
   userAddress: '/userAddress',
   getAllUserAddress: '/userAddresses/user',
   createSaleOrder: '/sale',

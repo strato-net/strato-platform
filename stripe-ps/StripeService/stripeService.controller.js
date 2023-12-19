@@ -57,9 +57,9 @@ class StripeServiceController {
     try {
       StripeServiceController.validateStripeGetSessionArgs(req.params);
 
-      const { sessionId, sellerAccountId } = req.params;
+      const { sessionId, sellerId } = req.params;
       
-      const session = await stripeService.getPaymentSession(sessionId, sellerAccountId);
+      const session = await stripeService.getPaymentSession(sessionId, sellerId);
       res.status(200).json({ ...session });
       return next();
     } catch (e) {
@@ -150,7 +150,7 @@ class StripeServiceController {
   static validateStripeGetSessionArgs(args) {
     const stripeGetSessionSchema = Joi.object({
       sessionId: Joi.string().required(),
-      sellerAccountId: Joi.string().required(),
+      sellerId: Joi.string().required(),
     })
 
     const validation = stripeGetSessionSchema.validate(args);
