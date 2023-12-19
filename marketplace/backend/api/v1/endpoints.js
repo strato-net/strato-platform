@@ -123,6 +123,7 @@ export const Order = {
   paymentSession: '/payment/session/:session_id/:sellersCommonName',
   userAddress: '/userAddress',
   getAllUserAddress: '/userAddresses/user',
+  getAddressFromId: '/userAddress/:id',
   createSaleOrder: '/sale',
   cancelSaleOrder: '/sale/cancel',
   executeSale: '/closeSale',

@@ -25,6 +25,29 @@ class CustomerAddressController {
     }
   }
 
+  static async getAddress(req, res, next) {
+    try {
+      if (!req.params.id) {
+        throw new Error('Missing address ID in GET request /address/:id');
+      }
+
+      const sql = 'SELECT * FROM customer_address WHERE id = ?';
+      const params = [req.params.id];
+      db.get(sql, params, (err, row) => {
+        if (err) {
+          throw new Error(`DB Error: ${err.message}`);
+        }
+        res.status(200).json({
+          'message': 'success',
+          'data': row ? row : [],
+        });
+        return next();
+      });
+    } catch (e) {
+      next(e);
+    }
+  }
+
   static async addAddress(req, res, next) {
     try {
       CustomerAddressController.validateAddAddressArgs(req.body);

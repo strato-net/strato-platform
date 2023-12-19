@@ -806,6 +806,25 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     }
   };
 
+  contract.getAddressFromId = async function (args, options = defaultOptions) {
+    try {
+      const { id } = args;
+      const userAddress = await axios.get(`${STRIPE_PAYMENT_SERVER_URL}/customer/address/id/${id}`).then(function (res) {
+        if (res.status === 200) {
+          return res.data.data;
+        } else {
+          throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+        }
+      });
+      return userAddress;
+    }catch (error) {
+      if (error.response) {
+        throw new rest.RestError(error.response.status, error.response.statusText);
+      }
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching address: ${JSON.stringify(err)} `);
+    }
+  };
+
   return contract;
 };
 

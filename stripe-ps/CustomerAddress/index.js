@@ -13,8 +13,13 @@ router.post(
   CustomerAddressController.addAddress
 );
 
+router.get(
+  '/address/id/:id',
+  CustomerAddressController.getAddress
+);
+
 router.delete(
-  '/address/:id', 
+  '/address/id/:id', 
   CustomerAddressController.deleteAddress
 );
 

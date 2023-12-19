@@ -159,6 +159,19 @@ class OrderController {
     }
   }
 
+  static async getAddressFromId(req, res, next) {
+    try {
+      const { dapp, query } = req
+
+      const orders = await dapp.getAddressFromId({ ...query })
+      rest.response.status200(res, orders)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
   static async createSaleOrder(req, res, next) {
     try {
       const { dapp, body } = req

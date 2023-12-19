@@ -25,7 +25,11 @@ Adds an address using the following information from the JSON body:
 ```
 **Returns** the `id` of the newly added address in the table.
 
-##### DELETE `/customer/address/:id`
+##### GET `/customer/address/id/:id`
+Gets an address given the table `id` of the address. 
+**Returns** the address in the `data` field of the response.
+
+##### DELETE `/customer/address/id/:id`
 Deletes an address given the table `id` of the address.  
 **Returns** the number of `changes` made after the deletion.
 
