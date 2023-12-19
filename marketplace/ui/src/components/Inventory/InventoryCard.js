@@ -248,7 +248,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
   return (
 <div className="mt-6 p-[18px] border border-[#E9E9E9] rounded-lg  ">
           <div className="bg-[#F2F2F9] rounded-md px-[14px] pb-[13px] pt-2 w-full">
-            <p className="text-xl font-semibold text-[#202020]">{inventory?.name  || "N/A"}</p>
+            <p className="text-xl font-semibold text-[#202020] cursor-default" onClick={callDetailPage}>{inventory?.name  || "N/A"}</p>
             <div className=" lg:justify-between justify-end pt-[5px]  flex">
               <div className="hidden lg:block ">
               <p className="text-xs text-[#6A6A6A]">{ inventory?.description || "N/A" }</p>

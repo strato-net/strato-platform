@@ -758,7 +758,7 @@ const CreateInventoryModal = ({
         ]}
       >
         <h1 className="font-semibold text-xl text-[#202020] border-b pb-[14px] border-[#BABABA]">
-        Add Product
+        Create Inventory
         </h1>
         <Form layout="vertical" className="mt-5" onSubmit={formik.handleSubmit}>
           <div className="w-full mb-3">
