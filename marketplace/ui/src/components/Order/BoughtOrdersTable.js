@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import classNames from "classnames";
-import { EyeOutlined, DownOutlined, UpOutlined, FilterFilled } from "@ant-design/icons";
+import { EyeOutlined, DownOutlined, UpOutlined, FilterFilled, SearchOutlined } from "@ant-design/icons";
 import routes from "../../helpers/routes";
 import DataTableComponent from "../DataTableComponent";
 import { getStatus } from "./constant";
@@ -10,13 +10,16 @@ import { actions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import useDebounce from "../UseDebounce";
 import { US_DATE_FORMAT } from "../../helpers/constants";
-import { Pagination, Button, Radio, Space, Typography} from "antd";
+import { Pagination, Button, Radio, Space, Typography, Input, DatePicker} from "antd";
 import TagManager from "react-gtm-module";
 import "./ordersTable.css"
 import { FilterIcon } from "../../images/SVGComponents";
+import { ResponsiveOrderCard } from "./ResponsiveOrdersCard";
+import dayjs from "dayjs";
+import { ResponsiveBoughtOrderCard } from "./ResponsiveBoughtOrdersCard";
 
 
-const BoughtOrdersTable = ({ user, selectedDate }) => {
+const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
   const dispatch = useOrderDispatch();
   const debouncedSearchTerm = useDebounce("", 1000);
   const limit = 10;
@@ -26,6 +29,7 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
   const [filter, setFilter] = useState(0)
   const [selectedValue, setSelectedValue] = useState(null);
   const [dropdownVisible, setDropdownVisible] = useState(false);
+  const [mDropdownVisible, setMDropdownVisible] = useState(false);
 
   const { orders, isordersLoading, orderBoughtTotal} = useOrderState();
 
@@ -71,6 +75,19 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
     setSelectedValue(data)
     setFilter(data);
     setDropdownVisible(false)
+    setMDropdownVisible(false)
+  }
+
+  const Sorting = (classes) => {
+    return (
+      <div className={classes.className}>
+        <Typography onClick={() => handleSort(0)}>All</Typography>
+        <Typography onClick={() => handleSort(1)}>Awaiting Fulfillment</Typography>
+        <Typography onClick={() => handleSort(2)}>Awaiting Shipment</Typography>
+        <Typography onClick={() => handleSort(3)}>Closed</Typography>
+        <Typography onClick={() => handleSort(4)}>Canceled</Typography>
+      </div>
+    )
   }
 
   const column = [
@@ -156,15 +173,7 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
       dataIndex: "status",
       key: "status",
       render: (text) => statusComponent(text),
-      filterDropdown: ({confirm}) => ( dropdownVisible && (
-          <div className="flex flex-col gap-2 sort_conatiner py-1">
-            <Typography onClick={()=>handleSort(0)}>All</Typography>
-            <Typography onClick={()=>handleSort(1)}>Awaiting Fulfillment</Typography>
-            <Typography onClick={()=>handleSort(2)}>Awaiting Shipment</Typography>
-            <Typography onClick={()=>handleSort(3)}>Closed</Typography>
-            <Typography onClick={()=>handleSort(4)}>Canceled</Typography>
-          </div>
-      )),
+      filterDropdown: ({confirm}) => dropdownVisible && <Sorting className="hidden md:flex flex-col gap-1 sort_conatiner py-1" />,
       filterIcon: () => (<FilterIcon />),
       onFilterDropdownOpenChange: (visible) => {setDropdownVisible(visible)},
       filterSearch: true,
@@ -211,13 +220,42 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
 
   return (
     <div>
-      <DataTableComponent
-        columns={column}
-        data={data}
-        pagination={false}
-        isLoading={isordersLoading}
-        scrollX="100%"
-      />
+      <div className="flex gap-2 items-center mb-5">
+        <Input className="text-base orders_searchbar md:p-3 rounded-full bg-[#F6F6F6]" prefix={<SearchOutlined />} placeholder="Search Markeplace" />
+        <div className="text-xs flex items-center md:hidden">
+          <DatePicker
+            disabledDate={(current) => {
+              const currentDate = dayjs().startOf('day'); // Get the start of today
+              const selectedDate = dayjs(current).startOf('day');
+
+              return selectedDate.isAfter(currentDate);
+            }}
+            onChange={onDateChange}
+            disabled={false}
+          />
+        </div>
+        <div className="relative">
+          <div onClick={() => setMDropdownVisible(!mDropdownVisible)} className="h-[30px] w-8 rounded-md border border-[#6A6A6A] flex md:hidden justify-center items-center">
+            <FilterIcon />
+          </div>
+          {mDropdownVisible && <Sorting className="md:hidden flex flex-col gap-1 absolute right-0 top-10 w-max shadow-card_shadow z-[99999] bg-white sort_conatiner py-1" />}
+        </div>
+      </div>
+      <div className="flex md:hidden order_responsive">
+        <ResponsiveBoughtOrderCard
+          data={data}
+          isLoading={isordersLoading}
+        />
+      </div>
+      <div className="hidden md:block">
+        <DataTableComponent
+          columns={column}
+          data={data}
+          isLoading={isordersLoading}
+          pagination={false}
+          scrollX="100%"
+        />
+      </div>
       <Pagination
         current={page}
         onChange={onPageChange}

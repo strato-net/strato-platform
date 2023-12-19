@@ -43,4 +43,8 @@ export const Images = {
   'CreateInventory' :  require("./resources/createInventory.png"),
   'ForwardIcon' : require("./resources/Forward.png"),
   'random' :  require("./resources/random.png"),
+  'Metal' : require("./resources/categories/metal.png"),
+  'Metal_card' : require("./resources/categories/metal_card.png"),
+  'art_card' : require("./resources/categories/art_card.png"),
+  'carbon_card' : require("./resources/categories/carbon_card.png"),
 };
