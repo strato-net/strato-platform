@@ -760,9 +760,6 @@ const CreateInventoryModal = ({
         <h1 className="font-semibold text-xl text-[#202020] border-b pb-[14px] border-[#BABABA]">
         Add Product
         </h1>
-       <div className="flex gap-4">
-        <div className="w-[60%]">
-
         <Form layout="vertical" className="mt-5" onSubmit={formik.handleSubmit}>
           <div className="w-full mb-3">
           <Form.Item label="Upload photos" name="images" className="w-full">
@@ -840,72 +837,6 @@ const CreateInventoryModal = ({
                   )}
               </Form.Item>
             </div>
-            <div className="flex justify-between  gap-4 mt-6 ">
-              <Form.Item label="Sub Category" name="subcategory" className="w-full text-[#202020] font-medium">
-                <Input
-                  label="subCategory"
-                  placeholder="BlockApps"
-                  name="subcategory"
-                  disabled={false}
-                  value={formik.values.name}
-                  onChange={formik.handleChange}
-                />
-                {formik.touched.name && formik.errors.name && (
-                  <span className="text-error text-xs">
-                    {formik.errors.name}
-                  </span>
-                )}
-              </Form.Item>
-              <Form.Item label="Manufacturer" name="Manufacturer" className="w-full text-[#202020] font-medium">
-                <Input
-                  label="Manufacturer"
-                  placeholder="Face Lift package"
-                  name="Manufacturer"
-                  disabled={false}
-                  value={formik.values.name}
-                  onChange={formik.handleChange}
-                />
-                {formik.touched.name && formik.errors.name && (
-                  <span className="text-error text-xs">
-                    {formik.errors.name}
-                  </span>
-                )}
-              </Form.Item>
-
-            </div>
-            <div className="flex justify-between gap-4 mt-6 ">
-              <Form.Item label="Unit of Measurement" name="measurement" className="w-72 text-[#202020] font-medium">
-                <Input
-                  label="measurement"
-                  placeholder="BlockApps"
-                  name="measurement"
-                  disabled={false}
-                  value={formik.values.name}
-                  onChange={formik.handleChange}
-                />
-                {formik.touched.name && formik.errors.name && (
-                  <span className="text-error text-xs">
-                    {formik.errors.name}
-                  </span>
-                )}
-              </Form.Item>
-              <Form.Item label="Least sellable Unit" name="saleable" className="w-72 text-[#202020] font-medium">
-                <Input
-                  label="saleable"
-                  placeholder="Face Lift package"
-                  name="saleable"
-                  disabled={false}
-                  value={formik.values.name}
-                  onChange={formik.handleChange}
-                />
-                {formik.touched.name && formik.errors.name && (
-                  <span className="text-error text-xs">
-                    {formik.errors.name}
-                  </span>
-                )}
-              </Form.Item>
-
-            </div>
             {categoricalProperties()}
             <div className="flex justify-between mt-4 ">
               <Form.Item label="Description" name="description" className="w-full">
@@ -923,54 +854,10 @@ const CreateInventoryModal = ({
                 )}
               </Form.Item>
             </div>
-            <div className="flex justify-between items-center mt-6 gap-4">
-              <Form.Item label="Unique product code" name="productCode" className="w-full text-[#202020] font-medium">
-                <Input
-                  label="Product Code "
-                  placeholder="BlockApps"
-                  name="productCode"
-                  disabled={false}
-                  value={formik.values.name}
-                  onChange={formik.handleChange}
-                />
-                {formik.touched.name && formik.errors.name && (
-                  <span className="text-error text-xs">
-                    {formik.errors.name}
-                  </span>
-                )}
-              </Form.Item>
-
-            </div>
+            
           </div>
         </Form>
-        </div>
         
-        {/* //! preview */}
-        <div className="w-[40%] flex justify-end">
-          <div>
-          <Typography className="text-[#13188A] font-semibold pt-6 pb-2 ">Live Preview</Typography>
-          <div className="p-3 rounded-lg  shadow-card_shadow">
-            <div className="rounded-md  w-[184px] h-[132px] overflow-hidden">
-                      <img src={selectedImages[0]?.thumbUrl} alt="" className="w-full h-full object-none"/>
-            </div>
-                    <div className="pt-3">
-                      <div className="flex justify-between">
-                        <Typography className="text-[#202020] font-semibold">{formik.values.name}</Typography>
-                        <img src={Images.Verified} className="w-4 h-4"/> 
-                      </div>
-                      <div className="pt-2 flex gap-2 items-center ">
-                        <div className="w-2 h-2 rounded-full bg-[#119B2D]"></div>
-                        <Typography className="text-[#202020] font-medium text-xs">Live</Typography>
-                      </div>
-                    </div>
-                    <div className="pt-2  w-[184px] h-12 overflow-hidden">
-                      <Typography className="text-[#989898] text-xs">{formik.values.description}</Typography>
-                    </div>
-          </div>
-
-          </div>
-        </div>
-        </div>
       </Modal>
       {uploadErr && openToast("bottom")}
     </>

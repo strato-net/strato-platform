@@ -359,3 +359,7 @@ body::-webkit-scrollbar {
     bottom: 10% !important;
   }
 }
+
+.head .ant-table-thead .ant-table-cell{
+  background: #EEEFFA !important;
+}
