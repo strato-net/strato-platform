@@ -43,7 +43,6 @@ const Inventory = ({ user }) => {
   const limit = 10;
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(10);
   const dispatch = useInventoryDispatch();
   const [api, contextHolder] = notification.useNotification();
   const [isSearch, setIsSearch] = useState(false);
@@ -102,14 +101,6 @@ const Inventory = ({ user }) => {
       }
     }
   }, [stripeStatus]);
-
-  useEffect(() => {
-    let len = inventories.length;
-    let total;
-    if (len === limit) total = page * 10 + limit;
-    else total = (page - 1) * 10 + limit;
-    setTotal(total);
-  }, [inventories]);
 
   const showModal = () => {
     setOpen(true);
@@ -309,7 +300,7 @@ const Inventory = ({ user }) => {
               <Pagination
                 current={page}
                 onChange={onPageChange}
-                total={total}
+                total={inventoriesTotal}
                 showSizeChanger={false}
                 className="flex justify-center my-5 "
               />
