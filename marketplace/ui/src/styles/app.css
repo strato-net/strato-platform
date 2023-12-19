@@ -326,6 +326,28 @@ body::-webkit-scrollbar {
   width: 100%;
 }
 
+
+
+.store .ant-tabs .ant-tabs-tab {
+  font-size: 20px !important;
+}
+
+.store .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
+  font-size: 20px !important;
+  font-weight: 600;
+  color: #13188A;
+}
+
+.store .ant-tabs-tab.ant-tabs-tab .ant-tabs-tab-btn {
+  font-size: 20px !important;
+  font-weight: 500;
+  color: #6A6A6A;
+} 
+
+.ant-table-body {
+  margin-top: 5px;
+  margin-bottom: 10px;
+}
 .orders_responsive_cards .ant-spin-container {
   display: flex;
   flex-direction: column;
@@ -336,4 +358,8 @@ body::-webkit-scrollbar {
   .product_detail .carousel .control-dots {
     bottom: 10% !important;
   }
+}
+
+.head .ant-table-thead .ant-table-cell{
+  background: #EEEFFA !important;
 }

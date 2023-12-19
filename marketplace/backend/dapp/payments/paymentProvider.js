@@ -152,7 +152,7 @@ function bindAddress(user, address, options) {
 
 
 async function get(user, args, defaultOptions) {
-    const { ownerCommonName, name, address, accountId, accountDeauthorized, ...restArgs } = args;
+    const { ownerCommonName, name, address, accountId, accountDeauthorized, transaction_sender, ...restArgs } = args;
     const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
     let paymentProvider;
 
@@ -169,6 +169,9 @@ async function get(user, args, defaultOptions) {
     } else if (accountId) {
 
         const searchArgs = setSearchQueryOptions(restArgs, [{ key: 'accountId', value: accountId }, { key: 'name', value: name }, {key: 'order', value: 'chargesEnabled.desc,block_timestamp.desc'}]);
+        paymentProvider = await search(contractName, searchArgs, options, user);
+    } else if (transaction_sender) {
+        const searchArgs = setSearchQueryOptions(restArgs, [{ key: 'transaction_sender', value: transaction_sender }, { key: 'name', value: name }, {key: 'order', value: 'chargesEnabled.desc,block_timestamp.desc'}]);
         paymentProvider = await search(contractName, searchArgs, options, user);
     }
     if (!paymentProvider) {
@@ -193,8 +196,9 @@ async function getState(user, contract, options) {
 }
 
 async function getPaymentSession(user, args, defaultOptions) {
-    const { paymentSessionId, ...restArgs } = args;
-    const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
+    const { paymentSessionId, contractName, ...restArgs } = args;
+    const {app, ...defaultOptions1} = defaultOptions
+    const options = { ...defaultOptions1, org: contractName}
     const searchArgs = setSearchQueryOptions(restArgs, { key: 'paymentSessionId', value: paymentSessionId });
     const paymentProvider = await searchOne(paymentContractName, searchArgs, options, user);
 

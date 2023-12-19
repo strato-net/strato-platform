@@ -111,7 +111,6 @@ const ProductDetails = ({ user, users }) => {
   const { categorys, iscategorysLoading } = useCategoryState();
   const {
     inventoryDetails, 
-  
     isInventoryDetailsLoading,
     isInventoryOwnershipHistoryLoading,
   } = useInventoryState();
@@ -130,9 +129,11 @@ const ProductDetails = ({ user, users }) => {
   });
 
   const routeMatch1 = useMatch({
+  
     path: routes.InventoryDetail.url,
     strict: true,
   });
+
   useEffect(() => {
     if (isCalledFromInventory) setId(routeMatch1?.params?.id);
     else setId(routeMatch?.params?.address);
@@ -447,7 +448,6 @@ const ProductDetails = ({ user, users }) => {
 
   const DescriptionComponent = () => {
     const categoryName = getCategory(details);
-    console.log(itemData,"this is the items data")
     switch (categoryName) {
       case "Art":
         return (
@@ -595,11 +595,11 @@ const ProductDetails = ({ user, users }) => {
               {
                 isCalledFromInventory ?
                   <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-                    <ClickableCell href={routes.Inventories.url}>
+                    <ClickableCell href={routes.MyStore.url}>
                       <p
                         className="text-[#13188A]  text-sm font-semibold "
                       >
-                        Inventory
+                        My Store
                       </p>
                     </ClickableCell>
                   </Breadcrumb.Item> : null
@@ -610,16 +610,18 @@ const ProductDetails = ({ user, users }) => {
             </Breadcrumb>
           </Row>
           <div className="  flex w-full flex-col  px-4 sm:px-8 md:px-0  items-center lg:items-start  md:w-[750px] lg:w-[835px] xl:w-[858px]  md:mx-auto ">
-          <div className="  flex   md:justify-center gap-[15px] lg:gap-6 flex-col lg:flex-row   ">
+          <div className="  flex w-full  md:justify-center gap-[15px] lg:gap-6 flex-col lg:flex-row   ">
             <Carousel  className="product_detail w-full  sm:w-[417px]   lg:h-[348px] md:w-[343px] lg:w-[417px]" showStatus={false} showArrows swipeable emulateTouch infiniteLoop >
-             {details.images && details.images.map((element,  index)=>{
+             { details.images.length > 0  ? details.images.map((element,  index)=>{
                   return ( <><div key={index} className="sm:w-[343px ] sm:h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
-                  <img  width={"100%"}  className="  rounded-md h-full " src={element} />
+                  <img  width={"100%"}  className="  rounded-md h-full " src={element ? element : image_placeholder} />
                </div></>)
-             }) }
+             })  : <><div  className="sm:w-[343px ] sm:h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
+             <img  width={"100%"}  className="  rounded-md h-full " src={ image_placeholder} />
+          </div></> }
               </Carousel>
 
-            <div className=" w-full lg:w-1/2">
+            <div className=" w-full lg:w-1/2 ">
               <div className=" lg:border-b lg:border-[#E9E9E9] pb-[6px]">
                 <Text className="font-semibold text-base lg:text-3xl text-[#202020]">
                   
@@ -689,8 +691,6 @@ const ProductDetails = ({ user, users }) => {
                 If you are interested in purchasing this item, please contact our sales team at sales@blockapps.net
               </Paragraph>
               }
-            
-
 {availableQuantity !== 0 ?
                 <div className="flex gap-4 justify-between lg:justify-start  pt-4 w-full">
                   <Button

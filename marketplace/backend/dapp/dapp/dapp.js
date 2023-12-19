@@ -627,7 +627,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         return false
       }
 
-      if (paymentProvider.eventTime > eventTime) {
+      if (paymentProvider[0].eventTime > eventTime) {
         return true;
       }
 
