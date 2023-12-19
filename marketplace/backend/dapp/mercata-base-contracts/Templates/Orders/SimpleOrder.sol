@@ -8,13 +8,15 @@ contract SimpleOrder is Order {
         address[] _saleAddresses, 
         uint[] _quantities,
         uint _createdDate,
-        string _shippingAddress
+        uint _shippingAddressId,
+        string _paymentSessionId
     ) Order (
         _orderId,
         _saleAddresses,
         _quantities,
         _createdDate,
-        _shippingAddress
+        _shippingAddressId,
+        _paymentSessionId
     ) {
     }
 }
