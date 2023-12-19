@@ -74,7 +74,6 @@ const ProcessingOrder = () => {
       );
 
       const body = await response.json();
-      console.log(body);
       if (response.status === RestStatus.OK) {
         try {
           const cartObject = JSON.parse(body.data.metadata.cart);
@@ -167,8 +166,8 @@ const ProcessingOrder = () => {
     
     const body = {
       items: orderList,
-      shippingAddress: cartData.shippingAddress,
-      // paymentSessionId: cartData.paymentSessionId,
+      shippingAddressId: cartData.shippingAddressId,
+      paymentSessionId: cartData.paymentSessionId,
       to: customerEmail,
       subject: "Your Order Confirmation",
       htmlContents: htmlContents,

@@ -99,16 +99,16 @@ const BoughtOrderDetails = ({ user, users }) => {
   const getData = async () => {
     const data = await actions.fetchOrderDetails(dispatch, Id);
     if (data != null) {
-      getPaymentStatus(data.order.paymentSessionId);
+      getPaymentStatus(data.order.paymentSessionId, data.order.sellersCommonName);
     }
   }
 
-  const getPaymentStatus = async (paymentSessionId) => {
+  const getPaymentStatus = async (paymentSessionId, sellersCommonName) => {
     if (paymentSessionId !== "") {
       try {
         setisLoadingPaymentStatus(true);
         const response = await fetch(
-          `${apiUrl}/order/payment/session/${paymentSessionId}`,
+          `${apiUrl}/order/payment/session/${paymentSessionId}/${sellersCommonName}`,
           {
             method: HTTP_METHODS.GET,
           }

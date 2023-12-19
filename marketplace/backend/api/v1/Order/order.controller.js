@@ -344,7 +344,8 @@ class OrderController {
         quantity: Joi.number().required(),
         saleAddress: Joi.string().required(),
       })).required(),
-      shippingAddress: Joi.string().required().allow(''),
+      shippingAddressId: Joi.number().min(1).required(),
+      paymentSessionId: Joi.string().required(),
     }).required();
 
     const validation = createSaleOrderSchema.validate(args);
