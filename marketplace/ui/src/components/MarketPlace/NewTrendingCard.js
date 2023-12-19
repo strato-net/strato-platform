@@ -99,7 +99,9 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                             }
                         }
                     }}
-                >Buy Now</Button>
+                >
+                    Buy Now
+                </Button>
                 <Button
                     onClick={() => {
                         if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
