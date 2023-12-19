@@ -58,6 +58,17 @@ class StripeService {
         }
     }
 
+    static async getPaymentIntent(paymentIntentId, CONNECTED_ACCOUNT_ID) {
+        try {
+          const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, {
+            stripeAccount: CONNECTED_ACCOUNT_ID
+          });
+          return paymentIntent;
+        } catch (error) {
+          throw new Error(`Stripe error: ${error.message}`);
+        }
+      }
+
     static generateStripeAccountId(type = 'standard') {
         try {
             return stripe.accounts.create({ type });

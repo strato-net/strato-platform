@@ -23,6 +23,11 @@ router.get(
   StripeServiceController.stripeGetSession
 )
 
+router.get(
+  '/intent/:sessionId/:sellerId',
+  StripeServiceController.stripeGetIntent
+)
+
 router.post(
   '/webhook',
   StripeServiceController.stripeWebhook

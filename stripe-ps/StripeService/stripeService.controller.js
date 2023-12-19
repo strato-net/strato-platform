@@ -67,6 +67,22 @@ class StripeServiceController {
     }
   }
 
+  static async stripeGetIntent(req, res, next) {
+    try {
+      StripeServiceController.validateStripeGetIntentArgs(req.params);
+
+      const { sessionId, sellerId } = req.params;
+      
+      const session = await stripeService.getPaymentSession(sessionId, sellerId);
+      const intent = await stripeService.getPaymentIntent(session.payment_intent, sellerId);
+      res.status(200).json({ ...intent });
+      return next();
+    } catch (e) {
+      next(e);
+    }
+  }
+
+
   static async stripeCheckout(req, res, next) {
     try {
       StripeServiceController.validateStripeCheckoutArgs(req.body);
@@ -157,6 +173,19 @@ class StripeServiceController {
 
     if (validation.error) {
       throw new Error(`Missing args or bad format in GET request /session: ${validation.error.message}`);
+    }
+  }
+
+  static validateStripeGetIntentArgs(args) {
+    const stripeGetIntentSchema = Joi.object({
+      sessionId: Joi.string().required(),
+      sellerId: Joi.string().required(),
+    })
+
+    const validation = stripeGetIntentSchema.validate(args);
+
+    if (validation.error) {
+      throw new Error(`Missing args or bad format in GET request /intent: ${validation.error.message}`);
     }
   }
 
