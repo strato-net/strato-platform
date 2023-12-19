@@ -10,8 +10,6 @@ import {
   Spin,
   Upload,
   notification,
-  Typography,
-  Switch,
 } from "antd";
 import {
   useInventoryDispatch,
@@ -23,7 +21,6 @@ import getSchema from "./InventorySchema";
 import { usePapaParse } from "react-papaparse";
 import TagManager from "react-gtm-module";
 import { CATEGORIES, PAYMENT_TYPE, unitOfMeasures } from "../../helpers/constants";
-import { Images } from "../../images";
 
 const { Option } = Select;
 
@@ -35,6 +32,7 @@ const CreateInventoryModal = ({
   resetPage,
   page,
 }) => {
+
   const schema = getSchema();
   const dispatch = useInventoryDispatch();
   const { readString } = usePapaParse();
@@ -42,7 +40,7 @@ const CreateInventoryModal = ({
   const [uploadErr, setUploadErr] = useState("");
   const { isCreateInventorySubmitting, isUploadImageSubmitting } =
     useInventoryState();
-  const [selectedImages, setSelectedImages] = useState([]);
+  const [selectedImages, setSelectedImages] = useState(null);
   const [selectedFiles, setSelectedFiles] = useState(null);
   const [clothingType, setClothingType] = useState(null);
   const [sizeOptions, setSizeOptions] = useState([]);
@@ -65,6 +63,7 @@ const CreateInventoryModal = ({
     images: null,
     files: null,
     category: "Art",
+    subCategory: "",
     size: null,
     skuNumber: null,
     condition: null,
@@ -136,7 +135,7 @@ const CreateInventoryModal = ({
     };
 
     const finalBody = (body) => {
-      switch (values.category) {
+      switch (values.subCategory) {
         case "Art":
           return (body = {
             itemArgs: {
@@ -145,7 +144,7 @@ const CreateInventoryModal = ({
             },
           });
         case "CarbonOffset":
-          const {serialNumber, ...restArgs} = body.itemArgs;
+          const { serialNumber, ...restArgs } = body.itemArgs;
           return (body = {
             itemArgs: {
               ...restArgs,
@@ -174,7 +173,7 @@ const CreateInventoryModal = ({
           });
         case "Metals":
           const selectedUOM = unitOfMeasures.find(u => u.value === values.unitOfMeasurement.value);
-      
+
           return (body = {
             itemArgs: {
               ...body.itemArgs,
@@ -226,7 +225,7 @@ const CreateInventoryModal = ({
     let isDone = await actions.createItem(
       dispatch,
       finalBody(body),
-      values.category
+      values.subCategory
     );
 
     if (isDone) {
@@ -317,7 +316,7 @@ const CreateInventoryModal = ({
   };
 
   const categoricalProperties = () => {
-    switch (formik.values.category) {
+    switch (formik.values.subCategory) {
       case "Art":
         return (
           <div className="flex justify-between mt-4 ">
@@ -507,77 +506,77 @@ const CreateInventoryModal = ({
           </div>
         );
       case "Metals":
-          return (<div className="flex flex-wrap gap-4 mt-4">
-            <Form.Item
-              label="Source"
+        return (<div className="flex flex-wrap gap-4 mt-4">
+          <Form.Item
+            label="Source"
+            name="source"
+            className="mr-8 w-72"
+          >
+            <Input
+              label="source"
+              placeholder="Enter Material Source"
               name="source"
-              className="mr-8 w-72"
-            >
-              <Input
-                label="source"
-                placeholder="Enter Material Source"
-                name="source"
-                value={formik.values.source}
-                onChange={formik.handleChange}
-              />
-              {formik.touched.source &&
-                formik.errors.source && (
-                  <span className="text-error text-xs">
-                    {formik.errors.source}
-                  </span>
-                )}
-            </Form.Item>
-            <Form.Item
-              label="Purity"
+              value={formik.values.source}
+              onChange={formik.handleChange}
+            />
+            {formik.touched.source &&
+              formik.errors.source && (
+                <span className="text-error text-xs">
+                  {formik.errors.source}
+                </span>
+              )}
+          </Form.Item>
+          <Form.Item
+            label="Purity"
+            name="purity"
+            className="w-72"
+          >
+            <Input
+              label="purity"
+              placeholder="Enter Purity (Ex: 999/1000)"
               name="purity"
-              className="w-72"
+              value={formik.values.purity}
+              onChange={formik.handleChange}
+            />
+            {formik.touched.purity &&
+              formik.errors.purity && (
+                <span className="text-error text-xs">
+                  {formik.errors.purity}
+                </span>
+              )}
+          </Form.Item>
+          <div className="flex justify-between mt-4">
+            <Form.Item
+              label="Unit of Measurement "
+              name="unitOfMeasurement "
+              className="w-30 mr-14"
             >
-              <Input
-                label="purity"
-                placeholder="Enter Purity (Ex: 999/1000)"
-                name="purity"
-                value={formik.values.purity}
-                onChange={formik.handleChange}
-              />
-              {formik.touched.purity &&
-                formik.errors.purity && (
+              <Select
+                id="unitOfMeasurement"
+                placeholder="Select Unit of Measurement "
+                allowClear
+                className="w-35"
+                name="unitOfMeasurement.name"
+                value={formik.values.unitOfMeasurement.name}
+                onChange={(value) => {
+                  let selectedUOM = unitOfMeasures.find(u => u.value === value);
+                  formik.setFieldValue("unitOfMeasurement.name", selectedUOM.name);
+                  formik.setFieldValue("unitOfMeasurement.value", value);
+                }}
+              >
+                {unitOfMeasures.map((e, index) => (
+                  <Option value={e.value} key={index}>
+                    {e.name}
+                  </Option>
+                ))}
+              </Select>
+              {getIn(formik.touched, "unitofmeasurement.name") &&
+                getIn(formik.errors, "unitofmeasurement.name") && (
                   <span className="text-error text-xs">
-                    {formik.errors.purity}
+                    {getIn(formik.errors, "unitofmeasurement.name")}
                   </span>
                 )}
             </Form.Item>
-            <div className="flex justify-between mt-4">
-            <Form.Item
-                label="Unit of Measurement "
-                name="unitOfMeasurement "
-                className="w-30 mr-14"
-              >
-                <Select
-                  id="unitOfMeasurement"
-                  placeholder="Select Unit of Measurement "
-                  allowClear
-                  className="w-35"
-                  name="unitOfMeasurement.name"
-                  value={formik.values.unitOfMeasurement.name}
-                  onChange={(value) => {
-                    let selectedUOM = unitOfMeasures.find(u => u.value === value);
-                    formik.setFieldValue("unitOfMeasurement.name", selectedUOM.name);
-                    formik.setFieldValue("unitOfMeasurement.value", value);
-                  }}
-                >
-                  {unitOfMeasures.map((e, index) => (
-                    <Option value={e.value} key={index}>
-                      {e.name}
-                    </Option>
-                  ))}
-                </Select>
-                {getIn(formik.touched, "unitofmeasurement.name") &&
-                  getIn(formik.errors, "unitofmeasurement.name") && (
-                    <span className="text-error text-xs">
-                      {getIn(formik.errors, "unitofmeasurement.name")}
-                    </span>
-                  )}
-              </Form.Item>
             <Form.Item
               label="Least Sellable Unit(s)"
               name="leastSellableUnits"
@@ -611,15 +610,15 @@ const CreateInventoryModal = ({
                 </span>
               )}
             </Form.Item>
-            </div>
-            </div>);
+          </div>
+        </div>);
       case 'Membership':
         return (
-          <div className="flex justify-between mt-4 gap-4">
+          <div className="flex justify-between mt-4 ">
             <Form.Item
               label="Expiration (in months)"
               name="expirationPeriodInMonths"
-              className=""
+              className="w-72"
             >
               <Input
                 label="expirationPeriodInMonths"
@@ -638,7 +637,7 @@ const CreateInventoryModal = ({
             <Form.Item
               label="Quantity"
               name="quantity"
-              className=""
+              className="w-72"
             >
               <Input
                 label="quantity"
@@ -664,9 +663,9 @@ const CreateInventoryModal = ({
               className="w-72"
             >
               <Input
-                 label="quantity"
-                 placeholder="Enter Quantity"
-                 name="quantity"
+                label="quantity"
+                placeholder="Enter Quantity"
+                name="quantity"
                 value={formik.values.quantity}
                 onChange={formik.handleChange}
               />
@@ -744,26 +743,123 @@ const CreateInventoryModal = ({
         onCancel={handleCancel}
         width={673}
         footer={[
-          <div className="flex justify-center border-t border-[#BABABA] pt-5">
+          <div className="flex justify-center">
             <Button
-              className="w-[150px] h-9"
+              className="w-40"
               key="submit"
               type="primary"
               onClick={formik.handleSubmit}
               disabled={disabled}
             >
-              {disabled ? <Spin /> : "Add Product"}
+              {disabled ? <Spin /> : "Create Item"}
             </Button>
           </div>,
         ]}
       >
-        <h1 className="font-semibold text-xl text-[#202020] border-b pb-[14px] border-[#BABABA]">
-        Create Inventory
+        <h1 className="text-center font-semibold text-lg text-primaryB">
+          Add Item
         </h1>
+        <hr className="text-secondryD mt-3" />
         <Form layout="vertical" className="mt-5" onSubmit={formik.handleSubmit}>
           <div className="w-full mb-3">
-          <Form.Item label="Upload photos" name="images" className="w-full">
-                <div className="p-4 border-[#BABABA] border rounded flex flex-col justify-around">
+            <div className="flex justify-between mt-4 ">
+              <Form.Item label="Name" name="name" className="w-72 mr-5">
+                <Input
+                  label="name"
+                  placeholder="Enter Name"
+                  name="name"
+                  disabled={false}
+                  value={formik.values.name}
+                  onChange={formik.handleChange}
+                />
+                {formik.touched.name && formik.errors.name && (
+                  <span className="text-error text-xs">
+                    {formik.errors.name}
+                  </span>
+                )}
+              </Form.Item>
+
+              <Form.Item label="Category" name="category" className="w-72 mr-5">
+                <Select
+                  id="category"
+                  placeholder="Select Category"
+                  allowClear
+                  name="category"
+                  value={formik.values.category}
+                  onChange={(value) => {
+                    formik.setFieldValue("category", value);
+                    formik.setFieldValue("subCategory", null);
+                  }}
+                >
+                  {categorys.map((e, index) => (
+                    <Option value={e.name} key={index}>
+                      {e.name}
+                    </Option>
+                  ))}
+                </Select>
+                {getIn(formik.touched, "category") &&
+                  getIn(formik.errors, "category") && (
+                    <span className="text-error text-xs">
+                      {getIn(formik.errors, "category")}
+                    </span>
+                  )}
+              </Form.Item>
+
+
+
+              <Form.Item label="Sub-Category" name="subCategory" className="w-72 mr-5">
+                <Select
+                  id="subCategory"
+                  placeholder="Select Sub-Category"
+                  allowClear
+                  name="subCategory"
+                  value={formik.values.subCategory}
+                  onChange={(value) => {
+                    formik.setFieldValue("subCategory", value);
+                  }}
+                >
+                  {categorys.map((category) =>
+                    category.name === formik.values.category ? category.subCategories.map((e, index) => (
+                      <Option value={e.contract} key={index}>
+                        {e.name}
+                      </Option>
+                    )) : null
+                  )}
+
+                  {/* {CATEGORIES.map((e, index) => (
+                    <Option value={e} key={index}>
+                      {e}
+                    </Option>
+                  ))} */}
+                </Select>
+                {getIn(formik.touched, "subCategory") &&
+                  getIn(formik.errors, "subCategory") && (
+                    <span className="text-error text-xs">
+                      {getIn(formik.errors, "subCategory")}
+                    </span>
+                  )}
+              </Form.Item>
+            </div>
+            {categoricalProperties()}
+            <div className="flex justify-between mt-4 ">
+              <Form.Item label="Description" name="description" className="w-full">
+                <TextArea
+                  label="description"
+                  placeholder="Enter Description"
+                  name="description"
+                  value={formik.values.description}
+                  onChange={formik.handleChange}
+                />
+                {formik.touched.description && formik.errors.description && (
+                  <span className="text-error text-xs">
+                    {formik.errors.description}
+                  </span>
+                )}
+              </Form.Item>
+            </div>
+            <div className="mt-4 flex justify-between">
+              <Form.Item label="Upload Images" name="images" className="w-72">
+                <div className="p-4 border-secondryD border rounded flex flex-col justify-around">
                   <Upload
                     onChange={(es) => {
                       if (es && es.fileList && es.fileList.length > 0) {
@@ -796,68 +892,42 @@ const CreateInventoryModal = ({
                   </span>
                 )}
               </Form.Item>
-            <div className="flex justify-between  gap-4 mt-6 ">
-              <Form.Item label="Name" name="name" className="w-full text-[#202020] font-medium">
-                <Input
-                  label="name"
-                  placeholder="BlockApps"
-                  name="name"
-                  disabled={false}
-                  value={formik.values.name}
-                  onChange={formik.handleChange}
-                />
-                {formik.touched.name && formik.errors.name && (
+              <Form.Item label="Upload Files" name="files" className="w-72">
+                <div className="p-4 border-secondryD border rounded flex flex-col justify-around">
+                  <Upload
+                    onChange={(es) => {
+                      if (es && es.fileList && es.fileList.length > 0) {
+                        setSelectedFiles(es.fileList);
+                        formik.setFieldValue("files", es.fileList.map((e) => e.originFileObj));
+                      }
+                    }}
+                    fileList={selectedFiles}
+                    accept="application/pdf"
+                    multiple={true}
+                    maxCount={10}
+                    beforeUpload={beforeFileUpload}
+                  >
+                    <div className="text-primary border border-primary rounded px-4 py-2 text-center hover:text-white hover:bg-primary cursor-pointer">
+                      Browse Files
+                    </div>
+                  </Upload>
+                </div>
+
+                <div className="flex items-start">
+                  <p className="mt-1 text-xs italic font-medium ">Note:</p>
+                  <p className="mt-1 text-xs italic ml-1 mr-4">
+                    use pdf format of size less than 1mb. Limit of 10.
+                  </p>
+                </div>
+                {formik.touched.images && formik.errors.images && (
                   <span className="text-error text-xs">
-                    {formik.errors.name}
-                  </span>
-                )}
-              </Form.Item>
-              <Form.Item label="Category" name="category" className="w-full">
-                <Select
-                  id="category"
-                  placeholder="Face Lift package"
-                  allowClear
-                  name="category"
-                  value={formik.values.category}
-                  onChange={(value) => {
-                    formik.setFieldValue("category", value);
-                  }}
-                >
-                  {CATEGORIES.map((e, index) => (
-                    <Option value={e} key={index}>
-                      {e}
-                    </Option>
-                  ))}
-                </Select>
-                {getIn(formik.touched, "category") &&
-                  getIn(formik.errors, "category") && (
-                    <span className="text-error text-xs">
-                      {getIn(formik.errors, "category")}
-                    </span>
-                  )}
-              </Form.Item>
-            </div>
-            {categoricalProperties()}
-            <div className="flex justify-between mt-4 ">
-              <Form.Item label="Description" name="description" className="w-full">
-                <TextArea
-                  label="description"
-                  placeholder="Enter Description"
-                  name="description"
-                  value={formik.values.description}
-                  onChange={formik.handleChange}
-                />
-                {formik.touched.description && formik.errors.description && (
-                  <span className="text-error text-xs">
-                    {formik.errors.description}
+                    {formik.errors.images}
                   </span>
                 )}
               </Form.Item>
             </div>
-            
           </div>
         </Form>
-        
       </Modal>
       {uploadErr && openToast("bottom")}
     </>

@@ -370,6 +370,36 @@ const CategoryProductList = ({ user }) => {
               </>
             )}
 
+            {/* Panel - SubCategory */}
+            { currentCategory && (
+              <>
+                <Collapse
+                  bordered={false}
+                  defaultActiveKey={1}
+                  expandIconPosition="end"
+                  ghost="true"
+                  reverse={false}
+                  className="pl-8 pr-7"
+                >
+                  <Panel header={<Text strong>Sub-Category</Text>} key="1">
+                    <Checkbox.Group
+                      // onChange={onChangeSubCategory}
+                      value={selectedSubCategories}
+                    >
+                      <div className="flex flex-col gap-3">
+                        {subCategories.map((subcategory, index) => (
+                          <Checkbox value={subcategory.contract} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
+                            {subcategory.name}
+                          </Checkbox>
+                        ))}
+                      </div>
+                    </Checkbox.Group>
+                  </Panel>
+                </Collapse>
+                <Divider className="m-0" />
+              </>
+            )}
+
             {/* Panel - Price */}
             <Collapse
               bordered={false}
@@ -415,31 +445,6 @@ const CategoryProductList = ({ user }) => {
               </Panel>
             </Collapse>
             <Divider className="m-0" />
-
-            {/* Panel - SubCategory */}
-            {/* {currentCategory && (
-              <>
-                <Collapse
-                  bordered={false}
-                  defaultActiveKey={1}
-                  expandIconPosition="end"
-                  ghost="true"
-                  reverse={false}
-                  className="pl-8 pr-7"
-                >
-                  <Panel header={<Text strong>Sub-Category</Text>} key="1">
-                    <Checkbox.Group
-                      // onChange={onChangeSubCategory}
-                      value={selectedSubCategories}
-                    >
-                      <div className="flex flex-col gap-3">
-                      </div>
-                    </Checkbox.Group>
-                  </Panel>
-                </Collapse>
-                <Divider className="m-0" />
-              </>
-            )} */}
 
             {/* Panel - Product */}
             {marketplaceList?.length > 0 && (
