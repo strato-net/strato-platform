@@ -111,7 +111,6 @@ const ProductDetails = ({ user, users }) => {
   const { categorys, iscategorysLoading } = useCategoryState();
   const {
     inventoryDetails, 
-  
     isInventoryDetailsLoading,
     isInventoryOwnershipHistoryLoading,
   } = useInventoryState();
@@ -130,9 +129,11 @@ const ProductDetails = ({ user, users }) => {
   });
 
   const routeMatch1 = useMatch({
+  
     path: routes.InventoryDetail.url,
     strict: true,
   });
+
   useEffect(() => {
     if (isCalledFromInventory) setId(routeMatch1?.params?.id);
     else setId(routeMatch?.params?.address);
@@ -447,7 +448,6 @@ const ProductDetails = ({ user, users }) => {
 
   const DescriptionComponent = () => {
     const categoryName = getCategory(details);
-    console.log(itemData,"this is the items data")
     switch (categoryName) {
       case "Art":
         return (
@@ -595,11 +595,11 @@ const ProductDetails = ({ user, users }) => {
               {
                 isCalledFromInventory ?
                   <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-                    <ClickableCell href={routes.Inventories.url}>
+                    <ClickableCell href={routes.MyStore.url}>
                       <p
                         className="text-[#13188A]  text-sm font-semibold "
                       >
-                        Inventory
+                        My Store
                       </p>
                     </ClickableCell>
                   </Breadcrumb.Item> : null
@@ -691,8 +691,6 @@ const ProductDetails = ({ user, users }) => {
                 If you are interested in purchasing this item, please contact our sales team at sales@blockapps.net
               </Paragraph>
               }
-            
-
 {availableQuantity !== 0 ?
                 <div className="flex gap-4 justify-between lg:justify-start  pt-4 w-full">
                   <Button

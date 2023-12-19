@@ -321,7 +321,7 @@ const Inventory = ({ user }) => {
                  className="store"
                 items={[
                   {
-                      label :"Art",
+                      label :"All",
                       key : 1 ,
                       children :  
                       <div className="my-4 grid grid-cols-1 md:grid-cols-2    gap-6 max-w-full" >
@@ -359,11 +359,26 @@ const Inventory = ({ user }) => {
                       label :"Collectibles",
                       key : 5 ,
                       children : <></>
-                  },
+                  }, {
+                    label :"Art",
+                    key : 6 ,
+                    children : <></>
+                },
+                {
+                  label :"Membership",
+                  key : 7,
+                  children : <></>
+              },
                 ]}
                 ></Tabs>
-                 <div className="md:flex justify-end pt-6 mx-14 hidden ">
-              <Button  type="link" className="flex items-center gap-2 text-sm font-medium text-[#13188A] flex-row-reverse" icon={<img src={Images.ForwardIcon} alt="view all" className="w-[18px] h-[18px]" />}>view All</Button>
+                 <div className="md:flex justify-center pt-6  hidden ">
+                 <Pagination
+        current={page}
+        onChange={onPageChange}
+        total={total}
+        showSizeChanger={false}
+        className="flex justify-center my-5 "
+      />
              </div>
              </div>
               <>

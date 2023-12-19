@@ -11,7 +11,7 @@ import {
 } from "@ant-design/icons";
 import PreviewInventoryModal from "./PreviewInventoryModal";
 import AddEventModal from "./AddEventModal";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import UpdateInventoryModal from "./UpdateInventoryModal";
 import ListForSaleModal from "./ListForSaleModal";
 import UnlistModal from "./UnlistModal";
@@ -357,16 +357,19 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
              <p className="text-[#202020] font-medium">{inventory.saleQuantity || "N/A"}</p>
         </div>
          <div className="flex justify-between  ">
-          <p className="text-[#6A6A6A]">price</p>
+          <p className="text-[#6A6A6A]">Price</p>
              <p className="text-[#202020] font-medium">{inventory?.price || "N/A"}</p>
         </div>
        
           </div>
 
         </div>
+        <div className="flex justify-between">
         <div className="pt-[7px] hidden lg:flex items-center gap-[5px]">
           <div className="w-[10px] h-[10px] rounded-sm bg-[#119B2D]"></div>
           <p className="text-[#4D4D4D] text-xs">PUBLISHED</p>
+        </div>
+             <Button type="link" className="text-[#13188A] font-semibold" onClick={callDetailPage}>preview</Button>
         </div>
       {/* <div className="flex" id={id}>
         <img
