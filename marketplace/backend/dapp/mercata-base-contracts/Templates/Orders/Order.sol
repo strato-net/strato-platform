@@ -26,7 +26,7 @@ abstract contract Order is Utils {
     uint public createdDate;
     uint public totalPrice;
     OrderStatus public status;
-    string public shippingAddress;
+    uint public shippingAddressId;
     string public paymentSessionId;
     uint public fulfillmentDate;
     string public comments;
@@ -38,7 +38,8 @@ abstract contract Order is Utils {
         address[] _saleAddresses, 
         uint[] _quantities,
         uint _createdDate,
-        string _shippingAddress
+        uint _shippingAddressId,
+        string _paymentSessionId
     ) external{
         require(_saleAddresses.length == _quantities.length, "Number of sales doesn't match number of quantities.");
         orderId = _orderId;
@@ -64,7 +65,8 @@ abstract contract Order is Utils {
             outstandingSales++;
         }
         status = OrderStatus.AWAITING_FULFILLMENT;
-        shippingAddress = _shippingAddress;
+        shippingAddressId = _shippingAddressId;
+        paymentSessionId = _paymentSessionId;
     }
 
     function completeOrder(uint _fulfillmentDate, string _comments) external returns (uint) {

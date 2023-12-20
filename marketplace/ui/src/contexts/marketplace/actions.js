@@ -392,12 +392,12 @@ const actions = {
     }
   },
 
-  fetchUserAddress: async (dispatch, address) => {
+  fetchUserAddress: async (dispatch, addressId) => {
     dispatch({ type: actionDescriptors.fetchUserAddress });
 
     try {
       const response = await fetch(
-        `${apiUrl}/order/${address}`,
+        `${apiUrl}/order/userAddress/${addressId}`,
         {
           method: HTTP_METHODS.GET,
         }
