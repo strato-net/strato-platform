@@ -1222,10 +1222,9 @@ insertEventTables globalsIORef evs = do
           account = Action.evContractAccount $ event
           org = Action.evContractOrganization $ event
           app = Action.evContractApplication $ event
-          cName = Action.evContractName $ event
           appName =
               if T.null $ T.pack app
-                then cName
+                then Action.evContractName $ event
                 else app
       maybeContract <- select (Proxy @Contract) account
       maybeCodeCollection <- select (Proxy @CodeCollection) account
@@ -1233,7 +1232,7 @@ insertEventTables globalsIORef evs = do
         (Just contract, Just codeCollection) ->
           let parents = getAbstractParentsFromContract contract codeCollection
           -- Process parents to create a list of new events
-              newEvents = processParents (T.pack org) (T.pack app) (map (T.pack . _contractName) parents) aggEvent
+              newEvents = processParents (T.pack org) (T.pack appName) (map (T.pack . _contractName) parents) aggEvent
           -- Return the complete list of events (original event + new events)
           in return (aggEvent : newEvents)
         _ -> return [aggEvent]

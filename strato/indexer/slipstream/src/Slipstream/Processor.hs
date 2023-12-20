@@ -83,7 +83,6 @@ import Slipstream.QueryFormatHelper
 import SolidVM.CodeCollectionTools
 import SolidVM.Model.CodeCollection hiding (contractName)
 import qualified SolidVM.Model.CodeCollection as CC (contractName)
-import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType
 import Text.Format
 import Text.Tools (boringBox, multilineLog)
