@@ -315,7 +315,7 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, defaultOptions) {
-    const { range, ownerCommonName, assetAddresses, status, ...restArgs } = args;
+    const { range, ownerCommonName, assetAddresses, status, isMarketplaceSearch, ...restArgs } = args;
     let inventories;
     let sales;
     let finalInventory = [];
@@ -339,13 +339,12 @@ async function getAll(admin, args = {}, defaultOptions) {
         inventories = await searchAllWithQueryArgs(contractName, 
             { 
                 ...restArgs, 
-                range,
             }, options, admin);
     }
 
     if (inventories) {
         const assetAddresses = inventories.map((inventory) => inventory.address);
-        sales = await saleJs.getAll(admin, { assetAddresses }, options);
+        sales = await saleJs.getAll(admin, { assetAddresses, range }, options);
         inventories.forEach(inventory => {
             const itemSale = sales.find(sale => sale.assetToBeSold == inventory.address && sale.isOpen);
             if (itemSale) {
@@ -355,7 +354,7 @@ async function getAll(admin, args = {}, defaultOptions) {
                     saleAddress: itemSale?.address,
                     saleQuantity: itemSale?.quantity,
                 })
-            } else {
+            } else if (!itemSale && !isMarketplaceSearch) {
                 finalInventory.push(inventory);
             }
         });
