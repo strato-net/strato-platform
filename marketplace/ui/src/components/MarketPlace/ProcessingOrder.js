@@ -173,18 +173,15 @@ const ProcessingOrder = () => {
       subject: "Your Order Confirmation",
       htmlContents: htmlContents,
     }
-    console.log(assetAddresses);
 
     let isDone = await orderActions.createSaleOrder(orderDispatch, body);
     if (isDone) {
       let updatedCart = [];
       storedData.forEach(cart => {
-        console.log(cart);
         if (!assetAddresses.includes(cart.product.address)) {
           updatedCart.push(cart);
         }
       });
-      console.log(updatedCart);
       actions.addItemToCart(marketplaceDispatch, updatedCart);
       navigate(routes.Orders.url, { state: { defaultKey: "Bought" } });
     } else {
