@@ -12,6 +12,7 @@ import {
   Spin,
   notification,
   InputNumber,
+  List,
 } from "antd";
 import {EyeOutlined } from "@ant-design/icons";
 import { useMatch } from "react-router-dom";
@@ -171,6 +172,7 @@ const ProductDetails = ({ user, users }) => {
   }, [marketplaceDispatch, cartList]);
 
   const details = inventoryDetails;
+  console.log("details: ", details)
 
   useEffect(() => {
     if (categorys.length && details) {
@@ -864,6 +866,25 @@ const ProductDetails = ({ user, users }) => {
                       </div>
                     ),
                   },
+                  {
+                    label: "Files",
+                    key: "4",
+                    children: (
+                      <div>
+                        <List 
+                          size="small"
+                          boardered
+                          dataSource={!details.files ? [] : details.files}
+                          renderItem={(item) => 
+                          <List.Item>
+                            <a href={item} rel="noreferrer" target="_blank">
+                              {item}
+                            </a>
+                          </List.Item>}
+                        />
+                      </div>
+                    )
+                  }
                   ]}
               />
           </div>
