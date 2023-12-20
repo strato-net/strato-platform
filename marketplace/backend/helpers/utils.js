@@ -306,12 +306,19 @@ export const setSearchQueryOptionsLike = (args = {}, _queryOptionsArray) => {
         [key]: `eq.${value}`,
       }
     } else {
-      let searchedValue = value
-      if (predicate === 'like') {
-        searchedValue = `*${value}*`
+      if (key === 'category') {
+        option = {
+          ["contract_name"]: `ilike.*${value}*`,
+        }
       }
-      option = {
-        [key]: `${predicate}.${searchedValue}`,
+      else{
+        let searchedValue = value
+        if (predicate === 'like') {
+          searchedValue = `*${value}*`
+        }
+        option = {
+          [key]: `${predicate}.${searchedValue}`,
+        }
       }
     }
     return {
