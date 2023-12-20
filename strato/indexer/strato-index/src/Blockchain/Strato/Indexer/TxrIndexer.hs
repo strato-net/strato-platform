@@ -5,7 +5,11 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Blockchain.Strato.Indexer.TxrIndexer where
+module Blockchain.Strato.Indexer.TxrIndexer (
+  TxrResult(..),
+  txrIndexerMainLoop,
+  indexEventToTxrResults
+  ) where
 
 import BlockApps.Logging
 import BlockApps.X509.Certificate
@@ -15,7 +19,6 @@ import qualified Blockchain.Data.LogDB as LogDB
 import Blockchain.Data.TransactionDef (formatChainId)
 import Blockchain.Data.ValidatorRef
 import Blockchain.EthConf (lookupConsumerGroup)
-import Blockchain.MilenaTools
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Blockchain.Strato.Indexer.IContext
@@ -37,8 +40,6 @@ import Data.Either.Extra (eitherToMaybe)
 import qualified Data.List as List
 import Data.Maybe (fromMaybe, maybeToList)
 import qualified Data.Text as T
-import Network.Kafka
-import Network.Kafka.Protocol
 import Text.Format
 
 logF :: MonadLogger m => [String] -> m ()
@@ -120,12 +121,8 @@ doValidatorRemoved bHash cm = do
 txrIndexerMainLoop :: (MonadLogger m, HasKafka m, HasRedis m, HasSQL m) =>
                       m ()
 txrIndexerMainLoop = forever $ do
-  $logInfoS "txrIndexer" "About to fetch IndexEvents"
-  (offset, idxEvents) <- getUnprocessedIndexEvents
-  logF ["Fetched ", show (length idxEvents), " events starting from ", show offset]
-  runConduit $ yieldMany idxEvents .| process .| output
-  let nextOffset' = offset + fromIntegral (length idxEvents)
-  setKafkaCheckpoint nextOffset'
+  consume "txrIndexer" (lookupConsumerGroup "strato-txr-indexer") targetTopicName $ \idxEvents ->
+    runConduit $ yieldMany idxEvents .| process .| output
   where
     process = awaitForever $ yieldMany . indexEventToTxrResults
     output = awaitForever $ lift . txrResultHandler
@@ -216,29 +213,3 @@ txrResultHandler = \case
 --         , format $ transactionResultBlockHash r
 --         ]
 --    void $ TxrDB.putTransactionResult r
-
-kafkaClientIds :: (KafkaClientId, ConsumerGroup)
-kafkaClientIds = ("strato-txr-indexer", lookupConsumerGroup "strato-txr-indexer")
-
-getKafkaCheckpoint :: (MonadLogger m, HasKafka m) =>
-                      m Offset
-getKafkaCheckpoint =
-  execKafka (fetchSingleOffset (snd kafkaClientIds) targetTopicName 0) >>= \case
-    Left UnknownTopicOrPartition -> setKafkaCheckpoint 0 >> getKafkaCheckpoint
-    Left err -> error $ "Unexpected response when fetching offset for " ++ show targetTopicName ++ ": " ++ show err
-    Right (ofs, _) -> return ofs
-
-setKafkaCheckpoint :: (MonadLogger m, HasKafka m) =>
-                      Offset -> m ()
-setKafkaCheckpoint ofs = do
-  $logInfoS "setKafkaCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs
-  execKafka (commitSingleOffset (snd kafkaClientIds) targetTopicName 0 ofs "") >>= \case
-    Left err -> error $ "Unexpected response when setting checkpoint to " ++ show ofs ++ ": " ++ show err
-    Right () -> return ()
-
-getUnprocessedIndexEvents :: (MonadLogger m, HasKafka m) =>
-                             m (Offset, [IndexEvent])
-getUnprocessedIndexEvents = do
-  ofs <- getKafkaCheckpoint
-  evs <- execKafka (readIndexEvents ofs)
-  return (ofs, evs)

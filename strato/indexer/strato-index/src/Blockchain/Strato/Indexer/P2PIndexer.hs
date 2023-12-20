@@ -5,13 +5,15 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Blockchain.Strato.Indexer.P2PIndexer where
+module Blockchain.Strato.Indexer.P2PIndexer (
+  p2pIndexerMainLoop,
+  indexP2P
+  ) where
 
 import BlockApps.Logging
 import Blockchain.Data.Block (BestBlock (..), Private (..))
 import Blockchain.Data.ChainInfo
 import Blockchain.EthConf (lookupConsumerGroup)
-import Blockchain.MilenaTools
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Indexer.IContext
 import Blockchain.Strato.Indexer.Kafka
@@ -28,8 +30,6 @@ import Control.Monad.Composable.Kafka
 import qualified Data.Map.Strict as M
 import Data.Maybe (fromJust)
 import qualified Data.Text as T
-import Network.Kafka
-import Network.Kafka.Protocol
 import Text.Format
 
 p2pIndexerMainLoop ::
@@ -43,12 +43,8 @@ p2pIndexerMainLoop ::
   ) =>
   m ()
 p2pIndexerMainLoop = forever $ do
-  $logInfoS "p2pIndexer" "About to fetch IndexEvents"
-  (offset, idxEvents) <- getUnprocessedIndexEvents
-  $logInfoS "p2pIndexer" . T.pack $ "Fetched " ++ show (length idxEvents) ++ " events starting from " ++ show offset
-  indexP2P idxEvents
-  let nextOffset' = offset + fromIntegral (length idxEvents)
-  setKafkaCheckpoint nextOffset'
+  consume "p2pIndexer" (lookupConsumerGroup "strato-p2p-indexer") targetTopicName $ \idxEvents ->
+    indexP2P idxEvents
 
 indexP2P ::
   ( MonadLogger m,
@@ -81,29 +77,3 @@ indexP2P idxEvents = do
       let cMembers = members $ chainInfo cInfo
       A.insert (A.Proxy @(P2P ChainMembers)) cId (P2P $ cMembers)
     _ -> return ()
-
-kafkaClientIds :: (KafkaClientId, ConsumerGroup)
-kafkaClientIds = ("strato-p2p-indexer", lookupConsumerGroup "strato-p2p-indexer")
-
-getKafkaCheckpoint :: (MonadLogger m, HasKafka m) =>
-                      m Offset
-getKafkaCheckpoint =
-  execKafka (fetchSingleOffset (snd kafkaClientIds) targetTopicName 0) >>= \case
-    Left UnknownTopicOrPartition -> setKafkaCheckpoint 0 >> getKafkaCheckpoint
-    Left err -> error $ "Unexpected response when fetching offset for " ++ show targetTopicName ++ ": " ++ show err
-    Right (ofs, _) -> return ofs
-
-setKafkaCheckpoint :: (MonadLogger m, HasKafka m) =>
-                      Offset -> m ()
-setKafkaCheckpoint ofs = do
-  $logInfoS "setKafkaCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs
-  execKafka (commitSingleOffset (snd kafkaClientIds) targetTopicName 0 ofs "") >>= \case
-    Left err -> error $ "Unexpected response when setting checkpoint to " ++ show ofs ++ ": " ++ show err
-    Right () -> return ()
-
-getUnprocessedIndexEvents :: (MonadLogger m, HasKafka m) =>
-                             m (Offset, [IndexEvent])
-getUnprocessedIndexEvents = do
-  ofs <- getKafkaCheckpoint
-  evs <- execKafka (readIndexEvents ofs)
-  return (ofs, evs)

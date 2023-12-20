@@ -1,6 +1,5 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -17,7 +16,6 @@ where
 import BlockApps.Logging
 import Blockchain.Data.ChainInfo
 import Blockchain.EthConf (lookupConsumerGroup)
-import Blockchain.MilenaTools
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Indexer.IContext
 import Blockchain.Strato.Indexer.Kafka
@@ -29,11 +27,8 @@ import Control.Arrow ((&&&))
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Composable.Kafka
-import qualified Data.ByteString.Char8 as S8
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
-import Network.Kafka
-import Network.Kafka.Protocol
 
 apiIndexerMainLoop :: ( MonadLogger m,
                         HasKafka m,
@@ -43,13 +38,8 @@ apiIndexerMainLoop :: ( MonadLogger m,
                       ) =>
                       m ()
 apiIndexerMainLoop = 
-  forever $ do
-    $logInfoS "apiIndexer" "About to fetch blocks"
-    (offset, idxEvents) <- getUnprocessedIndexEvents
-    $logInfoS "apiIndexer" . T.pack $ "Fetched " ++ show (length idxEvents) ++ " events starting from " ++ show offset
+  consume "apiIndexer" (snd kafkaClientIds) targetTopicName $ \idxEvents -> do
     indexAPI idxEvents
-    let nextOffset' = offset + fromIntegral (length idxEvents)
-    setKafkaCheckpoint nextOffset'
 
 indexAPI ::
   ( MonadLogger m,
@@ -83,32 +73,7 @@ indexAPI idxEvents = do
 kafkaClientIds :: (KafkaClientId, ConsumerGroup)
 kafkaClientIds = ("strato-api-indexer", lookupConsumerGroup "strato-api-indexer")
 
-getKafkaCheckpoint :: HasKafka m =>
-                      m Offset
-getKafkaCheckpoint =
-  execKafka (fetchSingleOffset (snd kafkaClientIds) targetTopicName 0) >>= \case
-    Left UnknownTopicOrPartition -> error "ApiIndexerBestBlock was never initialized in strato-setup!"
-    Left err -> error $ "Unexpected response when fetching offset for " ++ show targetTopicName ++ ": " ++ show err
-    Right r -> pure $ fst r
-
-setKafkaCheckpoint :: (MonadLogger m, HasKafka m) =>
-                      Offset -> m ()
-setKafkaCheckpoint ofs = do
-  $logInfoS "setKafkaCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs
-  op <- execKafka (setKafkaCheckpoint' ofs)
-  case op of
-    Left err -> error $ "Client error: " ++ show err
-    Right _ -> return ()
-
+{-
 indexerMetadata :: Metadata
 indexerMetadata = Metadata $ KString S8.empty
-
-setKafkaCheckpoint' :: Kafka k => Offset -> k (Either KafkaError ())
-setKafkaCheckpoint' = commitSingleOffset (snd kafkaClientIds) targetTopicName 0 `flip` indexerMetadata
-
-getUnprocessedIndexEvents :: HasKafka m =>
-                             m (Offset, [IndexEvent])
-getUnprocessedIndexEvents = do
-  ofs <- getKafkaCheckpoint
-  evs <- execKafka $ readIndexEvents ofs
-  return (ofs, evs)
+-}

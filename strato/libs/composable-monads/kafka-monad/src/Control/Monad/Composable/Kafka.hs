@@ -4,8 +4,25 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 
-module Control.Monad.Composable.Kafka where
+module Control.Monad.Composable.Kafka (
+  KafkaM,
+  HasKafka,
+  KafkaEnv(..),
+  runKafkaM,
+  runKafkaMUsingEnv,
+  execKafka,
+  commitSingleOffset,
+  fetchSingleOffset,
+  KafkaString(..),
+  KafkaAddress,
+  KafkaClientId,
+  Offset,
+  Metadata(..),
+  ConsumerGroup,
+  KafkaError(..)
+  ) where
 
+import Blockchain.MilenaTools
 import Control.Monad.Composable.Base
 import Control.Monad.IO.Unlift
 import Control.Monad.Reader
@@ -14,6 +31,8 @@ import Control.Monad.Trans.State
 import Data.IORef
 import Network.Kafka
 import Network.Kafka.Protocol
+
+
 
 type KafkaM = ReaderT (IORef KafkaState)
 
@@ -43,7 +62,7 @@ runKafkaMUsingEnv :: KafkaEnv -> KafkaM m a -> m a
 runKafkaMUsingEnv env f =
   runReaderT f $ kafkaStateIORef env
 
-runKafkaM :: MonadIO m => KafkaString -> KafkaAddress -> KafkaM m a -> m a
+runKafkaM :: MonadIO m => KafkaClientId -> KafkaAddress -> KafkaM m a -> m a
 runKafkaM x y f = flip runKafkaMUsingEnv f =<< createKafkaEnv x y
 
 execKafka ::
