@@ -33,7 +33,7 @@ import Blockchain.Data.RLP
 import Blockchain.Data.ValidatorRef
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.Database.MerklePatricia.ForEach as MP
-import Blockchain.EthConf (runKafkaConfigured)
+import Blockchain.EthConf
 import Blockchain.Generation
   ( insertCertRegistryContract,
     insertMercataGovernanceContract,
@@ -41,7 +41,6 @@ import Blockchain.Generation
     readCertsFromGenesisInfo,
     readValidatorsFromGenesisInfo,
   )
-import Blockchain.MilenaTools (commitSingleOffset)
 import Blockchain.Sequencer.Bootstrap (bootstrapSequencer)
 import Blockchain.Sequencer.Event (OutputBlock)
 import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
@@ -65,16 +64,17 @@ import Blockchain.Stream.VMEvent
 import Blockchain.Stream.VMOutput
 import Control.Monad
 import Control.Monad.Change.Alter (Alters, Selectable)
+import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.Redis
 import Control.Monad.IO.Class
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Char8 as C8
-import Data.Either (isLeft)
 import qualified Data.Map as Map
 import Data.Map.Strict (Map)
 import Data.Maybe
 import qualified Data.Sequence as S
+import Data.String
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Network.Kafka as K
@@ -318,10 +318,14 @@ bootstrapIndexer obGB =
         commit >>= \case
           Right (Right _) -> do
             putStrLn "bootstrapIndex API checkpoint successful!"
+            let k = kafkaConfig ethConf
+
+            putStrLn "About to bootstrap index events"
+
             res <-
-              runKafkaConfigured clientId $
-                IdxKafka.produce [IdxModel.RanBlock obGB]
-            when (isLeft res) . error $ "bootstrapping index events failed: " ++ show res
+              runKafkaM clientId (fromString $ kafkaHost k, fromIntegral $ kafkaPort k) $
+                IdxKafka.produceIndexEvents [IdxModel.RanBlock obGB]
+
             print res
             putStrLn "bootstrapIndex genesis seed successful!"
           Right (Left l) -> do
