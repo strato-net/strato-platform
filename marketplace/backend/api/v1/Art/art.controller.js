@@ -43,8 +43,8 @@ class ArtController {
         name: Joi.string().required(),
         description: Joi.string().required(),
         artist: Joi.string().required(),
-        images: Joi.array().items(Joi.string().optional()).required(),
-        files: Joi.array().items(Joi.string().optional()).required(),
+        images: Joi.array().items(Joi.string()).required(),
+        files: Joi.array().items(Joi.string()).required(),
       }).required()
     });
 
