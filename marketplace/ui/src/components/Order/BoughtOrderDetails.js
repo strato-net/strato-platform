@@ -436,22 +436,6 @@ const BoughtOrderDetails = ({ user, users }) => {
                           </Text>
                           {statusComponent(status)}
                         </Col>
-                        <Divider type="vertical" className="h-14 bg-secondryD" />
-                        <div className="text-xs order_detail_date">
-                          <Text className="block text-primaryC text-[13px] mb-0">
-                            ORDER CLOSE DATE
-                          </Text>
-                          <DatePicker
-                            value={
-                              selectedDate
-                            }
-                            disabledDate={(current) => {
-                              return current && current < dayjs().endOf('day');
-                            }}
-                            onChange={onDateChange}
-                            disabled={details.order.status === "3" || details.order.status === "4"}
-                          />
-                        </div>
                       </Row>
                       <Row className="my-2 md:hidden flex-col gap-2 justify-between p-4 pb-2 rounded">
                         <div className="flex gap-4">
@@ -461,17 +445,6 @@ const BoughtOrderDetails = ({ user, users }) => {
                         <div className="flex gap-4">
                           <NewOrderData className="w-2/4" title="SELLER" value={details.order.sellersCommonName} />
                           <NewOrderData className="w-2/4" title="TOTAL ($)" value={details.order.totalPrice} />
-                        </div>
-                        <div className="flex justify-between">
-                          <NewOrderData className="w-2/4" title="DATE" value={getStringDate(details.order.createdDate, US_DATE_FORMAT)} />
-                          <NewOrderData className="w-2/4" title="ORDER CLOSE DATE"
-                            value={
-                              <DatePicker
-                                value={selectedDate}
-                                disabledDate={(current) => { return current && current < dayjs().endOf('day'); }}
-                                onChange={onDateChange}
-                                disabled={details.order.status === "3" || details.order.status === "4"}
-                              />} />
                         </div>
                         <div className="flex justify-between">
                           <NewOrderData className="w-2/4" title={"Invoice"} value={

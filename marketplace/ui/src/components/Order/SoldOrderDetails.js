@@ -618,7 +618,7 @@ const SoldOrderDetails = ({ user, users }) => {
                                 return current && current < dayjs().endOf('day');
                               }}
                               onChange={onDateChange}
-                              disabled={details.order.status === "3" || details.order.status === "4"}
+                              disabled={details.order.status === 3 || details.order.status === 4}
                             />
                           </div>
                         </Row>
@@ -639,7 +639,7 @@ const SoldOrderDetails = ({ user, users }) => {
                                 value={selectedDate}
                                 disabledDate={(current) => {return current && current < dayjs().endOf('day');}}
                                 onChange={onDateChange}
-                                disabled={details.order.status === "3" || details.order.status === "4"}
+                                disabled={details.order.status === 3 || details.order.status === 4}
                               />}/>
                             </div>
                           <div className="flex justify-between">
@@ -674,7 +674,7 @@ const SoldOrderDetails = ({ user, users }) => {
                               placeholder="Enter Comments"
                               value={decodeURIComponent(comment)}
                               disabled={
-                                details.order.status === "3" || details.order.status === "4"
+                                details.order.status === 3 || details.order.status === 4
                               }
                               onChange={(event) => {
                                 setcomment(encodeURIComponent(event.target.value));
