@@ -58,7 +58,6 @@ const CreateInventoryModal = ({
     purity: "",
     quantity: 1,
     expirationPeriodInMonths: 1,
-    brand: "",
     clothingType: null,
     images: null,
     files: null,
@@ -103,7 +102,6 @@ const CreateInventoryModal = ({
     return isPdf && isLt1M;
   }
 
-  console.log(formik.errors);
   const handleCreateFormSubmit = async (values) => {
     let imageKeys = []
     if (values.images && values.images.length > 0) {
@@ -111,7 +109,9 @@ const CreateInventoryModal = ({
         const formData = new FormData();
         formData.append(img.name, img);
         const imageData = await actions.uploadImage(dispatch, formData);
-        imageKeys.push(imageData);
+        // Sometimes the image fits the criteria and the upload fails. 
+        // These should be checked before submitting the form
+        if (imageData) imageKeys.push(imageData);
       }
     }
 
@@ -121,7 +121,7 @@ const CreateInventoryModal = ({
         const formData = new FormData();
         formData.append(file.name, file);
         const fileData = await actions.uploadImage(dispatch, formData);
-        fileKeys.push(fileData);
+        if (fileData) fileKeys.push(fileData);
       }
     }
 
@@ -129,8 +129,8 @@ const CreateInventoryModal = ({
       itemArgs: {
         name: values.name,
         description: values.description,
-        images: imageKeys,
-        files: fileKeys,
+        images: imageKeys || [],
+        files: fileKeys || [],
       },
     };
 
@@ -320,7 +320,7 @@ const CreateInventoryModal = ({
       case "Art":
         return (
           <div className="flex justify-between mt-4 ">
-            <Form.Item label="Artist" name="artist" className="w-72">
+            <Form.Item label="Artist" className="w-72">
               <Input
                 label="artist"
                 placeholder="Enter Artist"
@@ -341,7 +341,6 @@ const CreateInventoryModal = ({
           <div className="flex justify-between mt-4 ">
             <Form.Item
               label="Quantity"
-              name="quantity"
               className="w-72"
             >
               <Input
@@ -363,7 +362,7 @@ const CreateInventoryModal = ({
       case "Clothing":
         return (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            <Form.Item label="Type" name="clothingType">
+            <Form.Item label="Type">
               <Select
                 id="clothingType"
                 label="clothingType"
@@ -384,7 +383,7 @@ const CreateInventoryModal = ({
                 </span>
               )}
             </Form.Item>
-            <Form.Item label="Brand" name="brand">
+            <Form.Item label="Brand" >
               <Input
                 id="brand"
                 name="brand"
@@ -398,7 +397,7 @@ const CreateInventoryModal = ({
                 </span>
               )}
             </Form.Item>
-            <Form.Item label="Size" name="size">
+            <Form.Item label="Size">
               <Select
                 id="size"
                 label="size"
@@ -418,7 +417,7 @@ const CreateInventoryModal = ({
                 <span className="text-error text-xs">{formik.errors.size}</span>
               )}
             </Form.Item>
-            <Form.Item label="Condition" name="condition">
+            <Form.Item label="Condition">
               <Select
                 id="condition"
                 name="condition"
@@ -437,7 +436,7 @@ const CreateInventoryModal = ({
                 </span>
               )}
             </Form.Item>
-            <Form.Item label="SKU" name="skuNumber">
+            <Form.Item label="SKU">
               <Input
                 id="skuNumber"
                 name="skuNumber"
@@ -451,7 +450,7 @@ const CreateInventoryModal = ({
                 </span>
               )}
             </Form.Item>
-            <Form.Item label="Quantity" name="quantity">
+            <Form.Item label="Quantity">
               <Input
                 id="quantity"
                 name="quantity"
@@ -470,7 +469,7 @@ const CreateInventoryModal = ({
       case "Collectibles":
         return (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            <Form.Item label="Condition" name="condition">
+            <Form.Item label="Condition">
               <Select
                 id="condition"
                 name="condition"
@@ -489,7 +488,7 @@ const CreateInventoryModal = ({
                 </span>
               )}
             </Form.Item>
-            <Form.Item label="Quantity" name="quantity">
+            <Form.Item label="Quantity">
               <Input
                 id="quantity"
                 name="quantity"
@@ -509,7 +508,6 @@ const CreateInventoryModal = ({
         return (<div className="flex flex-wrap gap-4 mt-4">
           <Form.Item
             label="Source"
-            name="source"
             className="mr-8 w-72"
           >
             <Input
@@ -528,7 +526,6 @@ const CreateInventoryModal = ({
           </Form.Item>
           <Form.Item
             label="Purity"
-            name="purity"
             className="w-72"
           >
             <Input
@@ -579,7 +576,6 @@ const CreateInventoryModal = ({
             </Form.Item>
             <Form.Item
               label="Least Sellable Unit(s)"
-              name="leastSellableUnits"
               className="w-30 mr-14"
             >
               <Input
@@ -596,7 +592,7 @@ const CreateInventoryModal = ({
                   </span>
                 )}
             </Form.Item>
-            <Form.Item label="Quantity" name="quantity">
+            <Form.Item label="Quantity">
               <Input
                 id="quantity"
                 name="quantity"
@@ -617,7 +613,6 @@ const CreateInventoryModal = ({
           <div className="flex justify-between mt-4 ">
             <Form.Item
               label="Expiration (in months)"
-              name="expirationPeriodInMonths"
               className="w-72"
             >
               <Input
@@ -636,7 +631,6 @@ const CreateInventoryModal = ({
             </Form.Item>
             <Form.Item
               label="Quantity"
-              name="quantity"
               className="w-72"
             >
               <Input
@@ -659,7 +653,6 @@ const CreateInventoryModal = ({
           <div className="flex justify-between mt-4 ">
             <Form.Item
               label="Quantity"
-              name="quantity"
               className="w-72"
             >
               <Input
@@ -763,7 +756,7 @@ const CreateInventoryModal = ({
         <Form layout="vertical" className="mt-5" onSubmit={formik.handleSubmit}>
           <div className="w-full mb-3">
             <div className="flex justify-between mt-4 ">
-              <Form.Item label="Name" name="name" className="w-72 mr-5">
+              <Form.Item label="Name" className="w-72 mr-5">
                 <Input
                   label="name"
                   placeholder="Enter Name"
@@ -779,7 +772,7 @@ const CreateInventoryModal = ({
                 )}
               </Form.Item>
 
-              <Form.Item label="Category" name="category" className="w-72 mr-5">
+              <Form.Item label="Category" className="w-72 mr-5">
                 <Select
                   id="category"
                   placeholder="Select Category"
@@ -807,7 +800,10 @@ const CreateInventoryModal = ({
 
 
 
-              <Form.Item label="Sub-Category" name="subCategory" className="w-72 mr-5">
+              <Form.Item
+                label="Sub-Category"
+                className="w-72 mr-5"
+              >
                 <Select
                   id="subCategory"
                   placeholder="Select Sub-Category"
@@ -842,7 +838,10 @@ const CreateInventoryModal = ({
             </div>
             {categoricalProperties()}
             <div className="flex justify-between mt-4 ">
-              <Form.Item label="Description" name="description" className="w-full">
+              <Form.Item
+                label="Description"
+                className="w-full"
+              >
                 <TextArea
                   label="description"
                   placeholder="Enter Description"
@@ -858,14 +857,17 @@ const CreateInventoryModal = ({
               </Form.Item>
             </div>
             <div className="mt-4 flex justify-between">
-              <Form.Item label="Upload Images" name="images" className="w-72">
+              <Form.Item label="Upload Images" className="w-72">
                 <div className="p-4 border-secondryD border rounded flex flex-col justify-around">
                   <Upload
                     onChange={(es) => {
-                      if (es && es.fileList && es.fileList.length > 0) {
-                        setSelectedImages(es.fileList);
-                        formik.setFieldValue("images", es.fileList.map((e) => e.originFileObj));
-                      }
+                      // TODO: these files need to be sent to the file server to be uploaded correctly. 
+                      // We should be checking the response and updating the file status accordingly. 
+                      setSelectedImages(es.fileList);
+                      formik.setFieldValue(
+                        "images",
+                        es.fileList.map((e) => e.originFileObj || null)
+                      );
                     }}
                     fileList={selectedImages}
                     accept="image/png, image/jpeg"
@@ -879,7 +881,6 @@ const CreateInventoryModal = ({
                     </div>
                   </Upload>
                 </div>
-
                 <div className="flex items-start">
                   <p className="mt-1 text-xs italic font-medium ">Note:</p>
                   <p className="mt-1 text-xs italic ml-1 mr-4">
@@ -892,14 +893,18 @@ const CreateInventoryModal = ({
                   </span>
                 )}
               </Form.Item>
-              <Form.Item label="Upload Files" name="files" className="w-72">
+
+              <Form.Item label="Upload Files" className="w-72">
                 <div className="p-4 border-secondryD border rounded flex flex-col justify-around">
                   <Upload
                     onChange={(es) => {
-                      if (es && es.fileList && es.fileList.length > 0) {
-                        setSelectedFiles(es.fileList);
-                        formik.setFieldValue("files", es.fileList.map((e) => e.originFileObj));
-                      }
+                      // TODO: these files need to be sent to the file server to be uploaded correctly. 
+                      // We should be checking the response and updating the file status accordingly. 
+                      setSelectedFiles(es.fileList);
+                      formik.setFieldValue(
+                        "files",
+                        es.fileList.map((e) => e.originFileObj || null)
+                      );
                     }}
                     fileList={selectedFiles}
                     accept="application/pdf"
@@ -912,16 +917,15 @@ const CreateInventoryModal = ({
                     </div>
                   </Upload>
                 </div>
-
                 <div className="flex items-start">
                   <p className="mt-1 text-xs italic font-medium ">Note:</p>
                   <p className="mt-1 text-xs italic ml-1 mr-4">
                     use pdf format of size less than 1mb. Limit of 10.
                   </p>
                 </div>
-                {formik.touched.images && formik.errors.images && (
+                {formik.touched.files && formik.errors.files && (
                   <span className="text-error text-xs">
-                    {formik.errors.images}
+                    {formik.errors.files}
                   </span>
                 )}
               </Form.Item>

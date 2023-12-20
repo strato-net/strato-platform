@@ -82,16 +82,14 @@ const AddAddressModal = ({open , close }) => {
     
       const body = {
         //shipping address
-        shippingName: encodeURIComponent(values.name),
-        shippingZipcode: values.zipcode,
-        shippingState: encodeURIComponent(values.state),
-        shippingCity: encodeURIComponent(values.city),
-        shippingAddressLine1: encodeURIComponent(values.addressLine1),
-        shippingAddressLine2: encodeURIComponent(values.addressLine2),
-        shippingCountry: encodeURIComponent(values.country),
-    
-        //billing address
-        ...billingAddr
+        name: encodeURIComponent(values.name),
+        zipcode: values.zipcode,
+        state: encodeURIComponent(values.state),
+        city: encodeURIComponent(values.city),
+        addressLine1: encodeURIComponent(values.addressLine1),
+        addressLine2: encodeURIComponent(values.addressLine2),
+
+        // billing address
       };
     
       window.LOQ.push(['ready', async LO => {

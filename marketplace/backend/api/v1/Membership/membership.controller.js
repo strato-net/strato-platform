@@ -44,8 +44,8 @@ class MembershipController {
         description: Joi.string().required(),
         expirationPeriodInMonths: Joi.number().integer().min(1).required(),
         quantity: Joi.number().integer().min(1).required(),
-        images: Joi.array().items(Joi.string().optional()).required(),
-        files: Joi.array().items(Joi.string().optional()).required(),
+        images: Joi.array().items(Joi.string().allow(null)).required(),
+        files: Joi.array().items(Joi.string().allow(null)).required(),
       }).required()
     });
 

@@ -46,8 +46,8 @@ class ClothingController {
         skuNumber: Joi.string().required(),
         condition: Joi.string().required(),
         brand: Joi.string().required(),
-        images: Joi.array().items(Joi.string().optional()).required(),
-        files: Joi.array().items(Joi.string().optional()).required(),
+        images: Joi.array().items(Joi.string().allow(null)).required(),
+        files: Joi.array().items(Joi.string().allow(null)).required(),
         quantity: Joi.number().positive().required(),
       }).required()
     });
