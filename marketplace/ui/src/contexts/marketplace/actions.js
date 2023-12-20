@@ -142,9 +142,7 @@ const actions = {
     minQty,
     maxQty,
     minPrice,
-    maxPrice,
-    limit,
-    offset
+    maxPrice    
   ) => {
     dispatch({ type: actionDescriptors.fetchMarketplace });
 
@@ -164,7 +162,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace?limit=${limit}&offset=${offset}${qtyQuery}${categoryQuery}${subCategoryQuery}${productQuery}${manufacturerQuery}`,
+        `${apiUrl}/marketplace?${qtyQuery}${categoryQuery}${subCategoryQuery}${productQuery}${manufacturerQuery}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -212,9 +210,7 @@ const actions = {
     minQty,
     maxQty,
     minPrice,
-    maxPrice,
-    limit,
-    offset
+    maxPrice    
   ) => {
     dispatch({ type: actionDescriptors.fetchMarketplaceLoggedIn });
 
@@ -234,7 +230,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace/all?limit=${limit}&offset=${offset}${qtyQuery}${categoryQuery}${subCategoryQuery}${productIdQuery}${manufacturerQuery}`,
+        `${apiUrl}/marketplace/all?${qtyQuery}${categoryQuery}${subCategoryQuery}${productIdQuery}${manufacturerQuery}`,
         {
           method: HTTP_METHODS.GET,
         }

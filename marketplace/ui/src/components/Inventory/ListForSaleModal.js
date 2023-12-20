@@ -9,7 +9,7 @@ const { Option } = Select;
 const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddress }) => {
     const [data, setData] = useState([inventory]);
     const [quantity, setQuantity] = useState(inventory.quantity);
-    const [paymentTypes, setPaymentTypes] = useState([]);
+    const [paymentTypes, setPaymentTypes] = useState([PAYMENT_TYPE[0].value]);
     const [pricePerUnit, setpricePerUnit] = useState(inventory.price ? inventory.price : inventory.pricePerUnit);
     const inventoryDispatch = useInventoryDispatch();
     const [canList, setCanList] = useState(true);
@@ -28,7 +28,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
     }, [quantity])
 
     const tagRender = (props) => {
-        const { label, value, closable, onClose } = props;
+        const { value, closable, onClose } = props;
         const onPreventMouseDown = (event) => {
           event.preventDefault();
           event.stopPropagation();
@@ -40,25 +40,31 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
             onClose={onClose}
             className="flex items-center mr-1"
           >
-            {PAYMENT_TYPE[value].icon ? PAYMENT_TYPE[value].icon : <></>}
-            <p className="ml-1">{label}</p>
+            {renderIcon(value)}
+            {/* (...) Indicates More options in addition to available icons */}
+            <p className="ml-1">...</p> 
           </Tag>
         );
     };
-
-    const handleSelectAll = (value) => {
-        if (value.includes(0)) {
-          if (value.length === PAYMENT_TYPE.length) {
-            setPaymentTypes([]);
-            return []
+    const renderIcon = (value) => {
+        const paymentType = PAYMENT_TYPE.find(type => type.value === value);
+      
+        if (paymentType) {
+          if (paymentType.name === "Card") {
+            return paymentType.options.map((IconComponent, index) => (
+              <span key={index} className="ml-1">{IconComponent}</span>
+            ));
+          } else {
+            return paymentType.icon ? paymentType.icon : <></>;
           }
-          setPaymentTypes([1, 2, 3, 4, 5]);
-          return [1, 2, 3, 4, 5];
-        } else {
-          setPaymentTypes(value);
-          return value;
-        }
-    }
+        } 
+      };    
+
+    const handleSelectAll = () => {
+          const allValues = PAYMENT_TYPE.filter(type => type.value !== 0).map(type => type.value);
+          setPaymentTypes(allValues);
+          return allValues;
+        }; 
 
     const columns = () => {
         let finalColumns = [
@@ -71,7 +77,6 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
                         mode="multiple"
                         tagRender={tagRender}
                         placeholder="Select Payment Types"
-                        allowClear
                         name="paymentTypes"
                         maxTagCount="responsive"
                         value={paymentTypes}
@@ -97,7 +102,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
         
         ]
         switch (getCategory()) {
-            case 'Carbon':
+            case 'CarbonOffset':
                 finalColumns = finalColumns.concat(
                     [
                         {
@@ -108,16 +113,10 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
                             )
                         }
                     ])
+                break;
             case 'Metals':
                 finalColumns = finalColumns.concat(
                     [
-                        {
-                            title: "Quantity",
-                            align: "center",
-                            render: () => (
-                                <InputNumber value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
-                            )
-                        },
                         {
                             title: "Set Price Per Unit",
                             align: "center",
@@ -184,11 +183,13 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
                 </Button>
             ]}
         >
+              <div className="head">
             <Table
                 columns={columns()}
                 dataSource={data}
                 pagination={false}
             />
+            </div>
         </Modal>
     )
 }

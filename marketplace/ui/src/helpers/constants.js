@@ -6,7 +6,7 @@ export const apiUrl = process.env.REACT_APP_URL
 
 export const fileServerUrl = process.env.FILE_SERVER_URL
   ? process.env.FILE_SERVER_URL
-  : "http://fileserver.mercata-testnet2.blockapps.net/highway/"; // TODO: Don't hardcode this here?
+  : "https://fileserver.mercata-testnet2.blockapps.net/highway/"; // TODO: Don't hardcode this here?
 
 export const cirrusUrl = process.env.REACT_APP_URL
   ? process.env.REACT_APP_URL + "/cirrus/search"
@@ -100,7 +100,7 @@ export const APPROVAL_STATUS = {
 
 export const CATEGORIES = [
   "Art",
-  "Carbon",
+  "CarbonOffset",
   "Metals",
   "Clothing",
   "Membership",
@@ -109,10 +109,14 @@ export const CATEGORIES = [
 ]
 
 export const PAYMENT_TYPE = [
-  { name: "---SELECT ALL---", value: 0},
-  { name: "AMEX", value: 1, icon: <AMEX width="20px" height="14px"/> },
-  { name: "Discover", value: 2, icon: <Discover width="20px" height="14px"/> },
-  { name: "Mastercard", value: 3, icon: <Mastercard width="20px" height="14px"/> },
-  { name: "STRAT", value: 4 },
-  { name: "VISA", value: 5, icon: <VISA width="20px" height="14px"/> },
+  { 
+    name: "Card", 
+    value: 1, 
+    options: [
+      <AMEX width="30px" height="20px"/>,
+      <Discover width="30px" height="20px"/>,
+      <Mastercard width="30px" height="20px"/>,
+      <VISA width="30px" height="20px"/>
+    ]
+  }
 ]

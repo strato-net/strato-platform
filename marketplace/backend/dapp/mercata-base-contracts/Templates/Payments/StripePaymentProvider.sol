@@ -1,10 +1,10 @@
 pragma es6;
 pragma strict;
 
-import <a3d9911aeffee71e0c6cd37946d80f3864b49d45>;
+import <eddd7c9aa884a3b1b8595f0897608c07a8e770b1>;
 
 /// @title A representation of Carbon assets
-contract StripePaymentProvider is PaymentProvider {
+contract StripePaymentProvider is BasePaymentProvider {
     /* struct StripePaymentInfo {
         address[] saleAddresses;
         string paymentStatus;
@@ -49,7 +49,7 @@ contract StripePaymentProvider is PaymentProvider {
             string _name
         ,   string _accountId
         ,   uint _createdDate
-    ) public PaymentProvider(_name, _accountId, _createdDate) {
+    ) public BasePaymentProvider(_name, _accountId, _createdDate) {
     }
 
     function initializePayment (

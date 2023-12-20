@@ -1,8 +1,9 @@
 import { ShoppingCartOutlined } from '@ant-design/icons'
 import React, { useState } from "react";
 import {
-  Typography,
-  Button,
+    Typography,
+    Button,
+    notification
 } from "antd";
 import { useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
@@ -11,42 +12,60 @@ import TagManager from "react-gtm-module";
 import { setCookie } from "../../helpers/cookie";
 import { Images } from '../../images';
 
-const NewTrendingCard = ({topSellingProduct, addItemToCart}) => {
-    const [quantity, setQuantity] = useState(0)
+const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
+    const [quantity, setQuantity] = useState(1)
+    const [api, contextHolder] = notification.useNotification();
 
     let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
 
-    const naviroute = routes.MarketplaceProductDetail.url;  
+    const naviroute = routes.MarketplaceProductDetail.url;
     const navigate = useNavigate();
 
-    return(
-        <div className='trending_cards_container_card bg-white p-3 px-4 min-w-[230px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max'>
-            <img 
-              onClick={() =>
-                navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
-              }
-              className='md:h-[200px] md:w-[30vw] w-[200px] h-[110px]' 
-              src={topSellingProduct.images ? topSellingProduct?.images[0] : ""} 
+    return (
+        <div className={`trending_cards_container_card bg-white p-3 px-4 ${parent == 'Marketplace' ? 'min-w-[300px]' : 'min-w-[230px]'} md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}>
+            {contextHolder}
+            <img
+                onClick={() =>
+                    navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
+                }
+                className='md:h-[200px] md:w-[40vw] h-[110px] object-cover'
+                src={topSellingProduct.images ? topSellingProduct?.images[0] : ""}
             />
             <div className='flex justify-between'>
-                <Typography 
-                  onClick={() =>
-                    navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
-                  } 
-                  className='font-semibold max-h-4 overflow-hidden cursor-pointer'
+                <Typography
+                    onClick={() =>
+                        navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
+                    }
+                    className='font-semibold overflow-hidden cursor-pointer'
                 >
-                  {topSellingProduct?.name || "N/A"}
+                    {topSellingProduct?.name || "N/A"}
                 </Typography>
-                <img src={Images.Verified} alt='' />
+                <img className='w-5' src={Images.Verified} alt='' />
             </div>
-            <Typography className='font-semibold'>{'$'+topSellingProduct?.price || "N/A"}</Typography>
+            <Typography className='font-semibold'>{'$' + topSellingProduct?.price || "N/A"}</Typography>
             <Typography className='#989898 opacity-40 max-h-4 overflow-hidden'>{topSellingProduct?.description || "N/A"}</Typography>
             <div className='flex justify-between items-center bg-[#EEEFFA] p-2'>
                 <Typography>Quantity</Typography>
                 <div className='flex gap-3 p-1 bg-white'>
-                    <Typography className='px-2 bg-[#EEEFFA] cursor-pointer' onClick={()=>setQuantity(quantity == 0 ? quantity : quantity - 1)}>-</Typography>
+                    <Typography className='px-2 bg-[#EEEFFA] cursor-pointer' onClick={() => {
+                        setQuantity(quantity == 1 ? quantity : quantity - 1)
+                    }}>
+                        -
+                    </Typography>
                     <Typography>{quantity}</Typography>
-                    <Typography className='px-2 bg-[#EEEFFA] cursor-pointer' onClick={()=>setQuantity(quantity + 1)}>+</Typography>
+                    <Typography className='px-2 bg-[#EEEFFA] cursor-pointer' onClick={() => {
+                        if ((quantity + 1 <= topSellingProduct.saleQuantity) && (quantity + 1 <= topSellingProduct.quantity)) {
+                            setQuantity(quantity + 1)
+                        }
+                        else {
+                            api.error({
+                                message: "Cannot add more than available quantity",
+                                placement: "bottom",
+                            });
+                        }
+                    }}>
+                        +
+                    </Typography>
                 </div>
             </div>
             <div className='flex gap-4'>
@@ -108,7 +127,7 @@ const NewTrendingCard = ({topSellingProduct, addItemToCart}) => {
                     }}
                     type='primary'
                 >
-                    <ShoppingCartOutlined style={{ color: 'white' }} />
+                    <ShoppingCartOutlined style={{ color: '#EEEFFA' }} />
                 </Button>
             </div>
         </div>

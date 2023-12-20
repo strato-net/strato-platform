@@ -83,7 +83,7 @@ const App = () => {
             handleMenuTab={handleMenuTab}
           />
         </UsersProvider>
-        <Content className={`${showMenu ? 'overflow-y-hidden md:overflow-auto h-[90vh] md:h-auto w-[100vw] md:w-auto bg-[#00000020] md:bg-white relative mt-24 md:mt-28' : 'mt-24 d:mt-32'}`}>
+        <Content className={`${showMenu ? 'overflow-y-hidden md:overflow-auto h-[83.5vh] md:h-auto w-[100vw] md:w-auto bg-[#00000020] md:bg-white relative mt-24 md:mt-28' : 'mt-24 d:mt-32'}`}>
           <AuthenticatedRoutes user={user} users={users} />
         </Content>
       </Layout>
