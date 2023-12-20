@@ -1201,7 +1201,10 @@ expandEventTable globalsIORef (o, a, n) evName ev = do
 insertEventTables :: 
   ( OutputM m,
     Selectable Account CodeCollection m,
-    Selectable Account Contract m
+    Selectable Account Contract m,
+    Selectable Account AddressState m,
+    Selectable Word256 ParentChainIds m,
+    Selectable HS.StorageFilterParams [HS.StorageAddress] m
   ) =>
   IORef Globals ->
   [AggregateEvent] ->
@@ -1213,7 +1216,10 @@ insertEventTables globalsIORef evs = do
     getAllEvents :: 
       ( OutputM m, 
         Selectable Account CodeCollection m, 
-        Selectable Account Contract m
+        Selectable Account Contract m,
+        Selectable Account AddressState m,
+        Selectable Word256 ParentChainIds m,
+        Selectable HS.StorageFilterParams [HS.StorageAddress] m
       ) => 
       AggregateEvent -> 
       m [AggregateEvent]
@@ -1229,20 +1235,30 @@ insertEventTables globalsIORef evs = do
       maybeContract <- select (Proxy @Contract) account
       maybeCodeCollection <- select (Proxy @CodeCollection) account
       case (maybeContract, maybeCodeCollection) of
-        (Just contract, Just codeCollection) ->
+        (Just contract, Just codeCollection) -> do
           let parents = getAbstractParentsFromContract contract codeCollection
-              newEvents = processParents (T.pack org) (T.pack appName) parents aggEvent
+          newEvents <-  processParents (T.pack org) (T.pack appName) parents aggEvent
           -- Return the complete list of events (original event + new events)
-          in return (aggEvent : newEvents)
+          return (aggEvent : newEvents)
         _ -> return [aggEvent]
 
-    processParents :: Text -> Text -> [Contract] -> AggregateEvent -> [AggregateEvent]
-    processParents org app parents ae = map createNewEvent parents
+    processParents :: 
+      ( OutputM m,
+        Selectable Account AddressState m,
+        Selectable Word256 ParentChainIds m,
+        Selectable HS.StorageFilterParams [HS.StorageAddress] m
+      ) => Text -> Text -> [Contract] -> AggregateEvent -> m [AggregateEvent]
+    processParents org app parents ae = mapM createNewEvent parents
       where
-        createNewEvent :: Contract -> AggregateEvent
+        createNewEvent :: 
+          ( OutputM m, 
+            Selectable Account AddressState m,
+            Selectable Word256 ParentChainIds m,
+            Selectable HS.StorageFilterParams [HS.StorageAddress] m
+          ) => Contract -> m AggregateEvent
         createNewEvent parentName = do
           (o', a', n') <- resolveNameParts org app parentName
-          ae {
+          return $ ae {
               eventEvent = (eventEvent ae) {
                 Action.evContractOrganization = T.unpack o',
                 Action.evContractApplication = T.unpack a',
