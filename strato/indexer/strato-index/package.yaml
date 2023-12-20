@@ -23,7 +23,6 @@ library:
   - format
   - kafka-monad
   - milena
-  - milena-tools
   - monad-alter
   - redis-monad
   - seqevents

@@ -71,7 +71,6 @@ executables:
       - blockapps-init
       - hflags
       - kafka-monad
-      - milena
       - persistent-postgresql
       - postgresql-typed
       - slipstream
