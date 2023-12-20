@@ -411,14 +411,14 @@ const ProductDetails = ({ user, users }) => {
 
   const ownershipDetailColumn = [
     {
-      title: <Text className="text-primaryC text-[13px]">SELLER</Text>,
+      title: <Text className="text-primaryC text-[13px]">Seller</Text>,
       dataIndex: "sellerCommonName",
       key: "sellerCommonName",
       align: "center",
       render: (text) => <p>{text}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">OWNER</Text>,
+      title: <Text className="text-primaryC text-[13px]">Owner</Text>,
       dataIndex: "purchaserCommonName",
       key: "purchaserCommonName",
       align: "center",
@@ -427,7 +427,7 @@ const ProductDetails = ({ user, users }) => {
     {
       title: (
         <Text className="text-primaryC text-[13px]">
-          OWNERSHIP START DATE
+          Ownership Start Date
         </Text>
       ),
       dataIndex: "block_timestamp",
