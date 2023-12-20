@@ -46,6 +46,7 @@ const Inventory = ({ user }) => {
   const dispatch = useInventoryDispatch();
   const [api, contextHolder] = notification.useNotification();
   const [isSearch, setIsSearch] = useState(false);
+  const [category, setCategory] = useState(undefined);
 
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
@@ -69,9 +70,9 @@ const Inventory = ({ user }) => {
 
   useEffect(() => {
     if (isSearch) {
-      actions.fetchInventorySearch(dispatch, limit, offset, debouncedSearchTerm);
-    } else actions.fetchInventory(dispatch, limit, offset, "");
-  }, [dispatch, limit, offset, debouncedSearchTerm]);
+      actions.fetchInventorySearch(dispatch, limit, offset, category, debouncedSearchTerm);
+    } else actions.fetchInventory(dispatch, limit, offset, category, "");
+  }, [dispatch, limit, offset, debouncedSearchTerm, category]);
 
   useEffect(() => {
     actions.sellerStripeStatus(dispatch, user?.commonName);
@@ -168,6 +169,38 @@ const Inventory = ({ user }) => {
   const onboardSeller = async () => {
     navigate(routes.OnboardingSellerToStripe.url)
   }
+  
+  // ---------- Inventory Category Tab Start ----------
+  const contracts = [ "Carbon", "Clothing", "Material", "Collectibles", "Art", "Membership" ];
+  const handleTabSelect = (key) => {
+    // Your logic to handle tab selection goes here
+    console.log(`Tab ${key} selected`);
+    console.log("hello")
+    setCategory(key);
+    // setOffset(0);
+    // setPage(1);
+    return;
+  };
+  
+  const CommonTabContent = ({ inventories, categorys, debouncedSearchTerm, stripeStatus }) => (
+    <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 max-w-full">
+      {inventories.map((inventory, index) => {
+        let category = categorys.find((c) => c.name === inventory.category);
+        return (
+          <InventoryCard
+            id={index}
+            inventory={inventory}
+            category={category}
+            key={index}
+            debouncedSearchTerm={debouncedSearchTerm}
+            paymentProviderAddress={stripeStatus ? stripeStatus.paymentProviderAddress : undefined}
+          />
+        );
+      })}
+    </div>
+  );
+  
+  // ---------- Inventory Category Tab END ----------
 
   return (
     <>
@@ -243,56 +276,40 @@ const Inventory = ({ user }) => {
             </div>
           </div>
           <div className="pt-6 mx-4 md:mx-5 md:px-14  lg:mx-1 mb-5 ">
-            <Tabs defaultActiveKey="1"
+            <Tabs defaultActiveKey={category}
               className="store"
+              onChange={(key) => handleTabSelect(key)}
               items={[
                 {
                   label: "All",
-                  key: 1,
-                  children:
-                    <div className="my-4 grid grid-cols-1 md:grid-cols-2    gap-6 max-w-full" >
-                      {inventories.map((inventory, index) => {
-                        let category = categorys.find(
-                          (c) => c.name === inventory.category
-                        );
-                        return (
-                          <InventoryCard
-                            id={index}
-                            inventory={inventory}
-                            category={category}
-                            key={index}
-                            debouncedSearchTerm={debouncedSearchTerm}
-                            paymentProviderAddress={stripeStatus ? stripeStatus.paymentProviderAddress : undefined}
-                          />
-                        );
-                      })}
-                    </div>
+                  key: "undefined",
+                  children: <CommonTabContent inventories={inventories} categorys={categorys} debouncedSearchTerm={debouncedSearchTerm} stripeStatus={stripeStatus} />
                 }, {
                   label: "Carbon",
-                  key: 2,
-                  children: <></>
+                  key: "carbon",
+                  children: <CommonTabContent inventories={inventories} categorys={categorys} debouncedSearchTerm={debouncedSearchTerm} stripeStatus={stripeStatus} />
                 }, {
                   label: "Clothing",
-                  key: 3,
-                  children: <></>
+                  key: "clothing",
+                  children: <CommonTabContent inventories={inventories} categorys={categorys} debouncedSearchTerm={debouncedSearchTerm} stripeStatus={stripeStatus} />
                 }, {
-                  label: "Material",
-                  key: 4,
-                  children: <></>
+                  label: "Metals",
+                  key: "metals",
+                  children: <CommonTabContent inventories={inventories} categorys={categorys} debouncedSearchTerm={debouncedSearchTerm} stripeStatus={stripeStatus} />
                 },
                 {
                   label: "Collectibles",
-                  key: 5,
-                  children: <></>
+                  key: "collectibles",
+                  children: <CommonTabContent inventories={inventories} categorys={categorys} debouncedSearchTerm={debouncedSearchTerm} stripeStatus={stripeStatus} />
                 }, {
                   label: "Art",
-                  key: 6,
-                  children: <></>
+                  key: "art",
+                  children: <CommonTabContent inventories={inventories} categorys={categorys} debouncedSearchTerm={debouncedSearchTerm} stripeStatus={stripeStatus} />
                 },
                 {
                   label: "Membership",
-                  key: 7,
-                  children: <></>
+                  key: "membership",
+                  children: <CommonTabContent inventories={inventories} categorys={categorys} debouncedSearchTerm={debouncedSearchTerm} stripeStatus={stripeStatus} />
                 },
               ]}
             />

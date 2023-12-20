@@ -154,10 +154,9 @@ export const setSearchQueryOptions = (args = {}, _queryOptionsArray) => {
       }
     }
     if (key === 'category') {
-      const categoryQueries = value.map(category => 'contract_name.like.' + category);
       return {
         ...agg,
-        ['or']: `(${categoryQueries.join(',')})`
+        contract_name: `ilike.*${value}*`
       }
     }
     if (key === 'subcategory' || key === 'subCategory') {
@@ -342,9 +341,11 @@ export const searchAllWithQueryArgs = async (contractName, args, options, user) 
       }
     }
 
-    if (key === 'category' && Array.isArray(args[key])) {
-      const categories = args[key][0].split(',').map(category => '%-' + category);
-      result.push({ key, value: categories, predicate: 'or', subPredicate: 'like'})
+    if (key === 'category') {
+      // console.log('#### REST category1', JSON.stringify(args[key]))
+      // const categories = args[key].split(',').map(category => '%-' + category);
+      // console.log('#### REST categories', JSON.stringify(categories))
+      result.push({ key, value: args[key]})
     }
 
     if (key === 'subCategory' && Array.isArray(args[key])) {
@@ -407,9 +408,9 @@ export const searchAllWithQueryArgs = async (contractName, args, options, user) 
     return result
   }, []))
 
-  const { category, ...restQueryArgs } = queryArgs;
-  console.log('#### REST QUERY ARGS', JSON.stringify(restQueryArgs))
-  const results = await searchAll(contractName, restQueryArgs, options, user)
+  // const { category, ...restQueryArgs } = queryArgs;
+  console.log('#### REST QUERY ARGS', JSON.stringify(queryArgs))
+  const results = await searchAll(contractName, queryArgs, options, user)
 
   return results
 }

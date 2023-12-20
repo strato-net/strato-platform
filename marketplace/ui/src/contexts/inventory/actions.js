@@ -160,14 +160,14 @@ const actions = {
     }
   },
 
-  fetchInventory: async (dispatch, limit, offset, queryValue) => {
+  fetchInventory: async (dispatch, limit, offset, category, queryValue) => {
     const query = queryValue ? `&productId=${queryValue}` : "";
-
+    const categoryQuery = category !== "undefined" ? `&category=${category}` : "";
     dispatch({ type: actionDescriptors.fetchInventory });
 
     try {
       const response = await fetch(
-        `${apiUrl}/inventory?limit=${limit}&offset=${offset}${query}`,
+        `${apiUrl}/inventory?limit=${limit}&offset=${offset}${categoryQuery}${query}`,
         {
           method: HTTP_METHODS.GET,
         }
