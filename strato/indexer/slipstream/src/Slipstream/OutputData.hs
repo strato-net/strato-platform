@@ -37,7 +37,8 @@ module Slipstream.OutputData (
   cirrusInfo,
   historyTableName,
   tableColumns,
-  resolveNameParts
+  resolveNameParts,
+  getAbstractParentsFromContract
   ) where
 
 
@@ -46,6 +47,7 @@ import           Conduit
 import           Control.Arrow                   ((***))
 import           Control.Lens ((^.))
 import           Control.Monad
+import           Control.Monad.Extra             (concatMapM)
 import           Control.Monad.Change.Alter
 import qualified Data.Aeson                      as Aeson
 import qualified Data.ByteString.Base16         as Base16
@@ -79,7 +81,7 @@ import           Slipstream.Metrics
 import           Slipstream.Options
 import           Slipstream.QueryFormatHelper
 import           Slipstream.SolidityValue
-import           SolidVM.Model.CodeCollection    hiding (contractName, contracts)
+import           SolidVM.Model.CodeCollection    hiding (contractName)
 import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type              as SVMType
 import           Text.Printf
@@ -281,6 +283,21 @@ mappingTableName :: Text -> Text -> Text -> Text -> TableName
 mappingTableName o a n m =
   let (o', a', n') = constructTableNameParameters o a n
    in MappingTableName o' a' n' m
+
+getContractsForParents :: [SolidString] -> Map.Map SolidString (ContractF a) -> [ContractF a]
+getContractsForParents parents' cc =
+  let getContractForParent parent = Map.lookup parent cc
+   in mapMaybe getContractForParent parents'
+   
+getAbstractParentsFromContract :: Contract -> CodeCollection -> [Contract]
+getAbstractParentsFromContract c cc =
+  -- recursively obtain parent + grandparent contracts
+  -- ex. B is A, C is B, then C should also be A
+  let go [] = []
+      go xs = xs ++ (go $ getContractsForParents (concatMap (^. parents) xs) ccc)
+      ccc = cc ^. contracts
+      parents' = c ^. parents
+   in filter ((== AbstractType) . _contractType) (go $ getContractsForParents parents' ccc)
 
 resolveNameParts ::
   ( MonadLogger m,
@@ -1183,12 +1200,49 @@ expandEventTable globalsIORef (o, a, n) evName ev = do
         yield $ expandTableQuery tableName extrasWithType
 
 insertEventTables ::
-  OutputM m =>
+  (OutputM m,
+  Selectable Account CodeCollection m,
+  Selectable Account Contract m) =>
   IORef Globals ->
   [AggregateEvent] ->
   ConduitM () Text m ()
 insertEventTables globalsIORef evs = do
-  yieldMany . catMaybes =<< lift (mapM (insertEventTable globalsIORef) evs)
+  processedEvents <- concatMapM getAllEvents evs
+  yieldMany . catMaybes =<< lift (mapM (insertEventTable globalsIORef) processedEvents)
+  where
+    getAllEvents:: (OutputM m, Selectable Account CodeCollection m, Selectable Account Contract m) => AggregateEvent -> m [AggregateEvent]
+    getAllEvents aggEvent = do
+      let event = eventEvent aggEvent
+          account = Action.evContractAccount $ event
+          org = Action.evContractOrganization $ event
+          app = Action.evContractApplication $ event
+          cName = Action.evContractName $ event
+          appName =
+              if T.null $ T.pack app
+                then cName
+                else app
+      maybeContract <- select (Proxy @Contract) account
+      maybeCodeCollection <- select (Proxy @CodeCollection) account
+      case (maybeContract, maybeCodeCollection) of
+        (Just contract, Just codeCollection) ->
+          let parents = getAbstractParentsFromContract contract codeCollection
+          -- Process parents to create a list of new events
+              newEvents = processParents (T.pack org) (T.pack app) (map (T.pack . _contractName) parents) aggEvent
+          -- Return the complete list of events (original event + new events)
+          in return (aggEvent : newEvents)
+        _ -> return [aggEvent]
+
+    processParents :: Text -> Text -> [Text] -> AggregateEvent -> [AggregateEvent]
+    processParents org app parents ae = map createNewEvent parents
+      where
+        createNewEvent :: Text -> AggregateEvent
+        createNewEvent parentName = ae {
+          eventEvent = (eventEvent ae) {
+            Action.evContractOrganization = T.unpack org,
+            Action.evContractApplication = T.unpack app,
+            Action.evContractName = T.unpack parentName
+          }
+        }
 
 insertEventTable ::
   OutputM m =>
