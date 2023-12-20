@@ -849,7 +849,7 @@ const ProductDetails = ({ user, users }) => {
                   },
                   {
                     label: `Ownership History`,
-                    key: "3",
+                    key: "2",
                     children: (
                       <div>
                         <DataTableComponent
@@ -867,8 +867,8 @@ const ProductDetails = ({ user, users }) => {
                     ),
                   },
                   {
-                    label: "Files",
-                    key: "4",
+                    label: "Additional Information",
+                    key: "3",
                     children: (
                       <div>
                         <List 
