@@ -634,8 +634,7 @@ const SoldOrderDetails = ({ user, users }) => {
                               <NewOrderData className="w-2/4" title="ORDER CLOSE DATE" 
                               value={
                               <DatePicker
-                                value={selectedDate}
-                                disabledDate={(current) => {return current && current < dayjs().endOf('day');}}
+                                value={selectedDate}                                
                                 onChange={onDateChange}
                                 disabled={details.order.status === "3" || details.order.status === "4"}
                               />}/>
