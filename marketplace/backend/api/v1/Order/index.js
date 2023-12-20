@@ -64,6 +64,13 @@ router.post(
 )
 
 router.get(
+  Order.getAddressFromId,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  OrderController.getAddressFromId
+)
+
+router.get(
   Order.getAllUserAddress,
   authHandler.authorizeRequest(),
   loadDapp,
