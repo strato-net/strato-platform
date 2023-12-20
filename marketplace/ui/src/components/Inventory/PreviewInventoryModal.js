@@ -44,7 +44,7 @@ const PreviewInventoryModal = ({ open, handleCancel, inventory, category }) => {
             </div>
           </div>
         );
-      case "Carbon":
+      case "CarbonOffset":
         return (
           <>
             {/* <div>

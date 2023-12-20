@@ -10,7 +10,7 @@ import RestStatus from 'http-status-codes';
 import certificateJs from "/dapp/certificates/certificate";
 
 import artJs from "/dapp/items/art";
-import carbonJs from "/dapp/items/carbon";
+import carbonOffsetJs from "/dapp/items/carbonOffset";
 import metalsJs from "/dapp/items/metals";
 import clothingJs from "/dapp/items/clothing";
 import membershipJs from "/dapp/items/membership";
@@ -301,38 +301,25 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return artJs.getAll(rawAdmin, args, getOptions);
   };
 
-  // contract.transferOwnershipArt = async function (args, options = defaultOptions) {
-  //   const { address, chainId, newOwner } = args;
-  //   const contract = { name: artJs.contractName, address: address, };
-  //   const chainOptions = { chainIds: [chainId], ...options };
-  //   return artJs.transferOwnership(rawAdmin, contract, chainOptions, newOwner);
-  // };
-
-  // contract.updateArt = async function (args, options = defaultOptions) {
-  //   const { address, chainId, updates } = args;
-  //   const contract = { name: artJs.contractName, address: address, };
-  //   const chainOptions = { chainIds: [chainId], ...options };
-  //   return artJs.update(rawAdmin, contract, updates, chainOptions);
-  // };
   // ------------------------------ ART ENDS --------------------------------
 
-  // ------------------------------ CARBON STARTS------------------------------
+  // ------------------------------ CARBONOFFSET STARTS------------------------------
 
-  contract.createCarbon = async function (args, options = defaultOptions) {
+  contract.createCarbonOffset = async function (args, options = defaultOptions) {
     const createdDate = Math.floor(Date.now() / 1000);
     const newArgs = {
       ...args.itemArgs,
       createdDate,
     };
-    return carbonJs.uploadContract(rawAdmin, newArgs, options);
+    return carbonOffsetJs.uploadContract(rawAdmin, newArgs, options);
   };
 
-  contract.getCarbons = async function (args = {}, options = optionsNoChainIds) {
+  contract.getCarbonOffsets = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName, };
-    return carbonJs.getAll(rawAdmin, args, getOptions);
+    return carbonOffsetJs.getAll(rawAdmin, args, getOptions);
   };
 
-  // ------------------------------ CARBON ENDS--------------------------------
+  // ------------------------------ CARBONOFFSET ENDS--------------------------------
 
   // ------------------------------ METALS STARTS------------------------------
 
@@ -360,8 +347,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const newArgs = {
       ...args.itemArgs,
       createdDate,
-      owner: rawAdmin.address,
-      status: 1
     };
     return clothingJs.uploadContract(rawAdmin, newArgs, options);
   };
@@ -400,9 +385,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const createdDate = Math.floor(Date.now() / 1000);
     const newArgs = {
       ...args.itemArgs,
-      createdDate,
-      owner: rawAdmin.address,
-      status: 1,
+      createdDate
     };
     console.log("newArgs", newArgs);
     return carbonDAOJs.uploadContract(rawAdmin, newArgs, options);
@@ -422,8 +405,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const newArgs = {
       ...args.itemArgs,
       createdDate,
-      owner: rawAdmin.address,
-      status: 1
     };
     return collectibleJs.uploadContract(rawAdmin, newArgs, options);
   };
@@ -540,11 +521,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const sellerStripeDetails = await paymentProviderJs.get(rawAdmin, { name: SERVICE_PROVIDERS.STRIPE, accountDeauthorized: false }, getOptions)
 
       /*  check if an accountId already exists for the user org */
-      if (Object.keys(sellerStripeDetails).length > 0) {
+      if (sellerStripeDetails.length > 0 && Object.keys(sellerStripeDetails[0]).length > 0) {
         throw new rest.RestError(RestStatus.CONFLICT, "User has already connected their stripe account.")
       }
 
-      if (Object.keys(sellerStripeDetails).length == 0) {
+      if (sellerStripeDetails.length == 0 || Object.keys(sellerStripeDetails[0]).length == 0) {
         userStripeAccount = await StripeService.generateStripeAccountId();
         // save generated account id
         const accountDetails = {
@@ -569,32 +550,43 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const getOptions = { ...options, app: contractName };
 
       // get user paymentProvider details from cirrus
-      const paymentProvider = await paymentProviderJs.get(rawAdmin, { name: SERVICE_PROVIDERS.STRIPE, accountDeauthorized: false, ...args }, getOptions);
+      const paymentProviders = await paymentProviderJs.get(rawAdmin, { name: SERVICE_PROVIDERS.STRIPE, accountDeauthorized: false, ...args }, getOptions);
 
       /* TODO check if the provider contract exists on then initiate a update */
-      if (Object.keys(paymentProvider).length == 0) {
+      if (paymentProviders.length == 0 || Object.keys(paymentProviders[0]).length == 0) {
         // throw new rest.RestError(RestStatus.NOT_FOUND, "User hasn't started their stripe setup.")
         return {}
       }
-      const connectedStripeAccountStatus = { accountId: paymentProvider.accountId, paymentProviderAddress: paymentProvider.address, chargesEnabled: false, detailsSubmitted: false, payoutsEnabled: false, accountDeauthorized: false, eventTime: Date.now() }
 
-      try {
-        const userStripeAccount = await StripeService.getStripeConnectAccountDetail(paymentProvider.accountId);
-        connectedStripeAccountStatus.chargesEnabled = userStripeAccount.charges_enabled
-        connectedStripeAccountStatus.detailsSubmitted = userStripeAccount.details_submitted
-        connectedStripeAccountStatus.payoutsEnabled = userStripeAccount.payouts_enabled
+      let returnedStripeAccountStatus = paymentProviders[0]
+      for (const paymentProvider of paymentProviders) {
+        const connectedStripeAccountStatus = { accountId: paymentProvider.accountId, paymentProviderAddress: paymentProvider.address, chargesEnabled: false, detailsSubmitted: false, payoutsEnabled: false, accountDeauthorized: false, eventTime: Date.now() }
 
-      } catch (error) {
-        if (error.code == 'account_invalid') {
-          connectedStripeAccountStatus.accountDeauthorized = true
+        try {
+          const userStripeAccount = await StripeService.getStripeConnectAccountDetail(paymentProvider.accountId);
+          connectedStripeAccountStatus.chargesEnabled = userStripeAccount.charges_enabled
+          connectedStripeAccountStatus.detailsSubmitted = userStripeAccount.details_submitted
+          connectedStripeAccountStatus.payoutsEnabled = userStripeAccount.payouts_enabled
+
+        } catch (error) {
+          if (error.code == 'account_invalid') {
+            connectedStripeAccountStatus.accountDeauthorized = true
+          }
         }
-      }
-      const { detailsSubmitted, chargesEnabled, payoutsEnabled, accountDeauthorized } = connectedStripeAccountStatus
-      if (paymentProvider.detailsSubmitted !== detailsSubmitted || paymentProvider.chargesEnabled !== chargesEnabled || paymentProvider.payoutsEnabled !== payoutsEnabled || paymentProvider.accountDeauthorized !== accountDeauthorized) {
-        await paymentManagerJs.updatePaymentProvider(rawAdmin, paymentProvider, connectedStripeAccountStatus, options)
+        const { detailsSubmitted, chargesEnabled, payoutsEnabled, accountDeauthorized } = connectedStripeAccountStatus
+        if (paymentProvider.detailsSubmitted !== detailsSubmitted || paymentProvider.chargesEnabled !== chargesEnabled || paymentProvider.payoutsEnabled !== payoutsEnabled || paymentProvider.accountDeauthorized !== accountDeauthorized) {
+          await paymentManagerJs.updatePaymentProvider(rawAdmin, paymentProvider, connectedStripeAccountStatus, options)
+        }
+
+        if (connectedStripeAccountStatus.detailsSubmitted
+           && connectedStripeAccountStatus.chargesEnabled
+           && connectedStripeAccountStatus.payoutsEnabled
+           ) {
+            returnedStripeAccountStatus = connectedStripeAccountStatus
+           }
       }
 
-      return connectedStripeAccountStatus
+      return returnedStripeAccountStatus
 
     } catch (error) {
       console.error(`${error}`)
@@ -618,10 +610,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         return false
       }
 
-      if (paymentProvider.eventTime > eventTime) {
+      if (paymentProvider[0].eventTime > eventTime) {
         return true;
       }
-      await paymentManagerJs.updatePaymentProvider(rawAdmin, paymentProvider, { paymentProviderAddress: paymentProvider.address, chargesEnabled, detailsSubmitted, payoutsEnabled, accountDeauthorized, eventTime }, chainOptions)
+      await paymentManagerJs.updatePaymentProvider(rawAdmin, paymentProvider[0], { paymentProviderAddress: paymentProvider[0].address, chargesEnabled, detailsSubmitted, payoutsEnabled, accountDeauthorized, eventTime }, chainOptions)
 
     } catch (error) {
       console.error(error);
@@ -634,8 +626,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     try {
 
       const { orderList, orderTotal: recievedOrderTotal } = args;
-
-      const newOptions = { ...options, app: paymentProviderJs.contractName }
 
       const assetAddresses = orderList.map(o => o.assetAddress);
 
@@ -665,10 +655,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           name: SERVICE_PROVIDERS.STRIPE, ownerCommonName: sellerName,
           accountDeauthorized: false
         },
-        newOptions)
+        options)
 
       /*  check if an accountId already exists for the user org */
-      if (Object.keys(sellerStripeDetails).length == 0 || !sellerStripeDetails.chargesEnabled || !sellerStripeDetails.detailsSubmitted || !sellerStripeDetails.payoutsEnabled) {
+      if (Object.keys(sellerStripeDetails).length == 0 || !sellerStripeDetails[0].chargesEnabled || !sellerStripeDetails[0].detailsSubmitted || !sellerStripeDetails[0].payoutsEnabled) {
         throw new rest.RestError(RestStatus.CONFLICT, "Seller hasn't activated this payment method")
       }
 
@@ -687,12 +677,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       let stripePaymentSession;
       try {
 
-        stripePaymentSession = await StripeService.initiatePayment(args, invoices, sellerStripeDetails.accountId);
+        stripePaymentSession = await StripeService.initiatePayment(args, invoices, sellerStripeDetails[0].accountId);
       } catch (err) {
         throw new rest.RestError(err.statusCode, err.message)
       }
       const paymentParameters = {
-        address: sellerStripeDetails.address,
+        address: sellerStripeDetails[0].address,
         saleAddresses,
         paymentSessionId: stripePaymentSession.id,
         paymentStatus: stripePaymentSession.payment_status,
@@ -701,7 +691,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         expiresAt: stripePaymentSession.expires_at,
         createdDate: stripePaymentSession.created,
       }
-      await paymentProviderJs.createPayment(rawAdmin, paymentParameters, newOptions);
+      await paymentProviderJs.createPayment(rawAdmin, paymentParameters, options);
       return stripePaymentSession
 
     } catch (error) {
@@ -731,9 +721,20 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getPaymentSession = async function (args, options = defaultOptions) {
     try {
-      const newOptions = { ...options, app: contractName }
       const { session_id } = args
-      const paymentDetail = await paymentProviderJs.getPaymentSession(rawAdmin, { paymentSessionId: session_id }, newOptions);
+      const buyerStripeDetails = await paymentProviderJs.get(rawAdmin,
+        {
+          name: SERVICE_PROVIDERS.STRIPE, transaction_sender: rawAdmin.address,
+          accountDeauthorized: false
+        },
+        options)
+      buyerStripeDetails[0].contract_name
+      
+      // Extract the substring before the last hyphen
+      const parts = buyerStripeDetails[0].contract_name.split('-');
+      const result = parts.slice(0, -1).join('-');
+      
+      const paymentDetail = await paymentProviderJs.getPaymentSession(rawAdmin, { paymentSessionId: session_id, contractName:result }, options);
       const paymentSession = await StripeService.getPaymentSession(session_id, paymentDetail.sellerAccountId);
       const paymentIntent = await StripeService.getPaymentIntent(paymentSession.payment_intent, paymentDetail.sellerAccountId);
       const paymentMethod = await StripeService.getPaymentMethod(paymentIntent.payment_method, paymentDetail.sellerAccountId);

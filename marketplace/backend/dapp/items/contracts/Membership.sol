@@ -1,7 +1,7 @@
 pragma es6;
 pragma strict;
 
-import <86483be23fa65cf7f992d9cb35eca840e74090bc>;
+import <eddd7c9aa884a3b1b8595f0897608c07a8e770b1>;
 
 /// @title A representation of Membership assets
 contract Membership is SemiFungible {
@@ -14,15 +14,13 @@ contract Membership is SemiFungible {
         string[] _files,
         uint _createdDate,
         uint _quantity,
-        string _serialNumber,
         uint _expirationPeriodInMonths
-    ) public SemiFungible(_name, _description, _images, _files, _createdDate, _quantity, _serialNumber) {
+    ) public SemiFungible(_name, _description, _images, _files, _createdDate, _quantity) {
         expirationPeriodInMonths = _expirationPeriodInMonths;
         expirationDate = block.timestamp + (expirationPeriodInMonths*2592000);
     }
 
     function mint(uint _quantity) internal override returns(UTXO) {
-        require(block.timestamp < expirationDate, "Membership is expired");
         Membership newAsset = new Membership(
             name,
             description,
@@ -30,9 +28,13 @@ contract Membership is SemiFungible {
             files,
             createdDate,
             _quantity,
-            serialNumber,
             expirationPeriodInMonths
         );
-        return UTXO(newAsset);
+        return UTXO(address(newAsset));
+    }
+
+    function checkCondition() internal override returns (bool){
+        bool conditon = block.timestamp <= expirationDate;
+        return conditon;
     }
 }

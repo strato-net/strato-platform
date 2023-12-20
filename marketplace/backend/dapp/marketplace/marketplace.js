@@ -56,7 +56,8 @@ function marshalOut(_args) {
 
 async function getAll(admin, args = {}, options) {
     const inventoryResults = await inventoryJs.getAll(admin, { ...args }, options);
-    return inventoryResults.map(inventory => marshalOut(inventory));
+    const inventoryCount = await inventoryJs.inventoryCount(admin, { ...args }, options);
+    return {inventoryResults: inventoryResults.map(inventory => marshalOut(inventory)), inventoryCount: inventoryCount};
 }
 
 async function getTopSellingProducts(admin, args = {}, options) {

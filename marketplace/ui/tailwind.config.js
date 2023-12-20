@@ -7,6 +7,7 @@ module.exports = {
       md: "768px",
       lg: "976px",
       xl: "1440px",
+      "2xl":"1600px" 
     },
     colors: {
       black: "#000",
@@ -29,6 +30,12 @@ module.exports = {
       error: "#FF0000",
       blue: "#0E3BDA",
       orange: "#FF8C00",
+    },
+    boxShadow: {
+      form  : "0px 4px 59px 10px #73737326" ,
+      card_shadow : "0px 0px 14px 0px #00000015",
+      category : "0px 4px 14px 0px #00000026",
+      header : "0px 4px 6px 0px #00000010"
     },
     fontFamily: {
       sans: ["Montserrat", "sans-serif"],

@@ -338,3 +338,21 @@ export const VISA = (props) => {
     </svg>
   )
 }
+
+export const FilterIcon = () => {
+  return (
+    <svg width="18" height="19" viewBox="0 1 16 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M4.05078 1.57422H13.9508C14.7758 1.57422 15.4508 2.24922 15.4508 3.07422V4.72422C15.4508 5.32422 15.0758 6.07422 14.7008 6.44922L11.4758 9.29923C11.0258 9.67423 10.7258 10.4242 10.7258 11.0242V14.2492C10.7258 14.6992 10.4258 15.2992 10.0508 15.5242L9.00077 16.1992C8.02577 16.7992 6.67578 16.1242 6.67578 14.9242V10.9492C6.67578 10.4242 6.37578 9.74923 6.07578 9.37423L3.22578 6.37422C2.85078 5.99922 2.55078 5.32422 2.55078 4.87422V3.14922C2.55078 2.24922 3.22578 1.57422 4.05078 1.57422Z" stroke="#202020" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+  )
+}
+
+export const ProfileIcon = () => {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+      <path d="M12 21C16.9706 21 21 16.9706 21 12C21 7.02944 16.9706 3 12 3C7.02944 3 3 7.02944 3 12C3 16.9706 7.02944 21 12 21Z" stroke="#6A6A6A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M12 15C14.0711 15 15.75 13.3211 15.75 11.25C15.75 9.17893 14.0711 7.5 12 7.5C9.92893 7.5 8.25 9.17893 8.25 11.25C8.25 13.3211 9.92893 15 12 15Z" stroke="#6A6A6A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M6 18.6943C6.56429 17.5828 7.42534 16.6493 8.4877 15.9972C9.55005 15.3452 10.7722 15 12.0188 15C13.2653 15 14.4874 15.3452 15.5498 15.9972C16.6122 16.6493 17.4732 17.5828 18.0375 18.6943" stroke="#6A6A6A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+  )
+}

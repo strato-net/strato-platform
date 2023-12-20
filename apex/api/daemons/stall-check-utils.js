@@ -4,7 +4,6 @@ const winston = require('winston-color');
 const models = require('../models');
 const Promise = require('bluebird');
 const rp = require('request-promise');
-const env = process.env.NODE_ENV || 'development';
 const moment = require('moment');
 
 const config = require('../config/app.config');

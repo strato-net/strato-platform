@@ -41,9 +41,7 @@ const DataTableComponent = ({
           
         }}
         size="middle"
-        rowClassName={(record, index) =>
-          index % 2 === 0 ? "bg-white " : "bg-secondry"
-        }
+        rowClassName={"bg-white"}
         rowKey={rowKey}
         rowSelection={rowSelection}
         onChange={onChange}

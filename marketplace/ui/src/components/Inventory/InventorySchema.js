@@ -7,6 +7,11 @@ const getSchema = () => {
     description: yup.string().required("Description is required"),
     artist: yup.string(),
     source: yup.string(),
+    unitOfMeasurement: yup.object().shape({
+      name: yup.string(),
+      value: yup.number().positive("Measurement Value must be a positive number"),
+    }),
+    purity: yup.string(),
     // clothingType: yup.string().nullable().required("The clothing type is required"),
     // size: yup.string().nullable().required("A size is required"),
     // skuNumber: yup.string().nullable().required("An SKU is required"),
@@ -14,7 +19,7 @@ const getSchema = () => {
     // brand: yup.string().nullable().required("A brand is required"),
     quantity: yup.number().positive("Quantity must be a positive number").required("Quantity is required"),
     expirationPeriodInMonths: yup.number().positive("Expiration period must be a positive number").required("Expiration period is required"),
-    images: yup.mixed().optional().nullable(),
+    images: yup.mixed().required("Image is required"),
     files: yup.mixed().optional().nullable(),
     category: yup.string().required("Category is required"),
   });

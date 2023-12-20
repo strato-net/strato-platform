@@ -2,17 +2,14 @@ import {
   Breadcrumb,
   Typography,
   Row,
-  Divider,
   notification,
   Spin,
-  Card,
   Button,
 } from "antd";
 import {
   useMarketplaceState,
   useMarketplaceDispatch,
 } from "../../contexts/marketplace";
-import { useNavigate } from "react-router-dom";
 import { useOrderState, useOrderDispatch } from "../../contexts/order";
 import { useAuthenticateState } from "../../contexts/authentication";
 import { actions } from "../../contexts/marketplace/actions";
@@ -38,16 +35,11 @@ import routes from "../../helpers/routes";
 import AddressComponent from "./AddressComponent";
 import { PlusCircleOutlined, MinusCircleOutlined } from "@ant-design/icons";
 import TagManager from "react-gtm-module";
-import New_ResponsiveCart from "./New_ResponsiveCart";
+import ResponsiveCart from "./ResponsiveCart";
 import { Images } from "../../images";
-import AddAddressModel from "./AddAddressModel";
+import AddAddressModal from "./AddAddressModal";
 import ResponsiveAddAddress from "./ResponsiveAddAddress";
-
-
 const { TextArea } = Input;
-
-
-
 const ShippingDetailsSchema = () => {
   return yup.object().shape({
     name: yup.string().required("Name is required"),
@@ -102,14 +94,13 @@ const ConfirmOrder = () => {
   const inventoryDispatch = useInventoryDispatch();
   const { isLoadingStripeStatus, stripeStatus } = useInventoryState();
   const { success: marketplaceSuccess, message: marketplaceMessage } = useMarketplaceState();
-  const [modelAddress ,  setModelAddress] =  useState(false);
-
-  const [responsiveAddress ,  setResponsiveAddress] =  useState(false);
+  const [modalAddress, setmodalAddress] = useState(false);
+  const [responsiveAddress, setResponsiveAddress] = useState(false);
   const [showAddress, setshowAddress] = useState(false);
- 
 
-  const CloseAddressModel   =()=>{
-    setModelAddress(false);
+
+  const CloseAddressModel = () => {
+    setmodalAddress(false);
     setshowAddress(false);
   }
 
@@ -117,7 +108,7 @@ const ConfirmOrder = () => {
     setOpen(false);
   };
 
-  const closeResponsiveAddress = ()=>{
+  const closeResponsiveAddress = () => {
     setResponsiveAddress(false)
   }
   useEffect(() => {
@@ -247,7 +238,7 @@ const ConfirmOrder = () => {
       //billing address
       ...billingAddr
     };
-    
+
     window.LOQ.push(['ready', async LO => {
       // Track an event
       await LO.$internal.ready('events')
@@ -267,18 +258,18 @@ const ConfirmOrder = () => {
 
 
   const columns = [
-    
+
     {
       title: <Text className="text-[#202020] text-base font-semibold px-6">Item</Text>,
       dataIndex: "item",
-     
+
       render: (text) => {
         return (
-          <div className="flex gap-3 items-center"> 
-              <img className="w-14 h-14 object-contain rounded-[4px]" alt="" src={text.image}  />
-              <p className="text-primary text-sm font-semibold">{decodeURIComponent(text.name)}</p>
+          <div className="flex gap-3 items-center">
+            <img className="w-14 h-14 object-contain rounded-[4px]" alt="" src={text.image} />
+            <p className="text-primary text-sm font-semibold">{decodeURIComponent(text.name)}</p>
           </div>
-          
+
         );
       },
     },
@@ -292,16 +283,6 @@ const ConfirmOrder = () => {
         <p className="text-center">{text}</p>
       ),
       // width: "12%"
-    },{
-      title: (
-        <Text className="text-[#202020] text-base font-semibold">Measurement (Unit)</Text>
-      ),
-      dataIndex: "sellersCommonName",
-      align: "center",
-      render: (text) => (
-        <p className="">lb</p>
-      ),
-  //  width: "12%"
     },
     {
       title: <Text className="text-[#202020] text-base font-semibold">Unit Price($)</Text>,
@@ -310,7 +291,7 @@ const ConfirmOrder = () => {
       render: (text) => <p className=" text-sm text-[#202020] font-medium font-sans">{text}</p>,
     },
     {
-      title: <Text className="text-[#202020] text-base font-semibold">QUANTITY</Text>,
+      title: <Text className="text-[#202020] text-base font-semibold">Quantity</Text>,
       dataIndex: "qty",
       align: "center",
       render: (text) => <p className="text-sm text-[#202020] font-medium font-sans">{text}</p>,
@@ -324,25 +305,25 @@ const ConfirmOrder = () => {
       render: (text) => <p className="text-sm font-medium text-[#202020] ">{text}</p>,
     },
     {
-      title: <Text className="text-[#202020] text-base font-semibold">TAX($)</Text>,
+      title: <Text className="text-[#202020] text-base font-semibold">Tax($)</Text>,
       dataIndex: "tax",
       align: "center",
       render: (text) => <p className="text-sm font-medium text-[#202020]">{text}</p>,
     },
     {
-      title: <Text className="text-[#202020] text-base font-semibold">AMOUNT($)</Text>,
+      title: <Text className="text-[#202020] text-base font-semibold">Amount($)</Text>,
       dataIndex: "amount",
       align: "center",
-      render: (text) => <p className="text-sm font-medium text-[#202020]">{text}</p>  
-,
-  
+      render: (text) => <p className="text-sm font-medium text-[#202020]">{text}</p>
+      ,
+
     },
   ];
 
   const handlePaymentConfirm = async () => {
     let orderList = [];
     confirmOrderList.forEach((item) => {
-    // These additional fields need to be sent to form the request after stripe. 
+      // These additional fields need to be sent to form the request after stripe. 
       orderList.push({
         quantity: item.qty,
         assetAddress: item.key,
@@ -360,7 +341,7 @@ const ConfirmOrder = () => {
     };
 
     //Add
-    
+
     window.LOQ.push(['ready', async LO => {
       // Track an event
       await LO.$internal.ready('events')
@@ -384,137 +365,139 @@ const ConfirmOrder = () => {
     }
   }, [inventoryDispatch, data]);
 
-  const activeButtonClass = "cursor-pointer justify-center flex items-center w-44 h-9  border border-primary rounded bg-primary hover:bg-primaryHover text-white mr-4";
-  const disabledButtonClass = "cursor-not-allowed justify-center flex items-center w-44 h-9  border border-[#999999] rounded bg-[#cccccc] text-[#666666] mr-4";
-
   return (
     <>
-  {responsiveAddress ? <ResponsiveAddAddress  back={closeResponsiveAddress} /> :
-    <div className="h-screen md:mx-10 md:mt-10 mt-5 mx-5 lg:mx-14   lg:mt-14">
-      {contextHolder}
-      {isCreateOrderSubmitting || isCreatePaymentSubmitting ? (
-        <div className="h-screen flex justify-center items-center">
-          <Spin spinning={isCreateOrderSubmitting || isCreatePaymentSubmitting} size="large" />
-        </div>
-      ) : (
-        <div className="pb-[30px]">
-          <Breadcrumb>
-            <Breadcrumb.Item href="javascript:;">
-              <ClickableCell href={routes.Marketplace.url}>
-                Home
-              </ClickableCell>
-            </Breadcrumb.Item>
-            <Breadcrumb.Item
-              href="javascript:;"
-            >
-              <ClickableCell href={routes.Checkout.url}>
-                Checkout
-              </ClickableCell>
-            </Breadcrumb.Item>
-            <Breadcrumb.Item>
-              <p className="hover:text-primaryHover text-primary font-medium cursor-pointer">
-                Confirm Order
-              </p>
-            </Breadcrumb.Item>
-          </Breadcrumb>
-          <div className="pt-[38px]">
-            <Typography className="text-[#202020] text-2xl font-semibold">My Cart</Typography>
-          </div>
-          <div className="pt-4 hidden lg:block border-top">
-            <DataTableComponent
-              isLoading={false}
-              // rowSelection={{
-              //   type: "checkbox",
-              //   ...rowSelection,
-              // }}
-              scrollX="100%"
-              columns={columns}
-              data={data}
-              pagination={false}
-            />
-          </div>
-          <div className="lg:hidden">
-            <New_ResponsiveCart data={data} key={data} confirm={true}  />
-          </div>
+      {responsiveAddress ? <ResponsiveAddAddress back={closeResponsiveAddress} /> :
+        <div className="h-screen md:mx-10 md:mt-10 mt-5 mx-5 lg:mx-14   lg:mt-14">
+          {contextHolder}
+          {isCreateOrderSubmitting || isCreatePaymentSubmitting ? (
+            <div className="h-screen flex justify-center items-center">
+              <Spin spinning={isCreateOrderSubmitting || isCreatePaymentSubmitting} size="large" />
+            </div>
+          ) : (
+            <div className="pb-[30px]">
+              <Breadcrumb>
+                <Breadcrumb.Item href="javascript:;">
+                  <ClickableCell href={routes.Marketplace.url}>
+                  <p className="text-[#13188A] font-semibold">
+                    Home
+                    </p>
+                  </ClickableCell>
+                </Breadcrumb.Item>
+                <Breadcrumb.Item
+                  href="javascript:;"
+                >
+                  <ClickableCell href={routes.Checkout.url}>
+                    <p className="text-[#13188A] font-semibold">
 
-          <div className="bg-[#EEEFFA] rounded-b-md py-[15px] px-4  hidden lg:flex lg:justify-end ">
-          <div className="w-[235px] flex flex-col gap-[10px]">
-          <Row className="justify-between ">
-            <p className="text-base text-[#6A6A6A]  ">Sub Total:</p>
-            
-            <p className="text-xl text-[#202020]   text-right">${total}</p>
-          </Row>
-          <Row className="justify-between ">
-            <p className="text-base text-[#6A6A6A]  ">Tax:</p>
-           
-            <p className="text-xl text-[#202020]   text-right">${tax}</p>
-          </Row>
-          <Row className="justify-between ">
-            <p className="text-base text-[#6A6A6A] ">Shipping Charges:</p>
-          
-            <p className="text-xl text-[#202020]  text-right">${shipping}</p>
-          </Row>
-      
-          <Row className="justify-between">
-            <p className="text-base text-[#6A6A6A] ">Total:</p>
-          
-            <p className="text-xl text-[#202020]   text-right">
-              ${total + tax + shipping}
-            </p>
-          </Row>
-          </div>
-          </div> 
-          <Row align="middle pt-10 flex gap-3 items-center">
-            <p className="text-2xl text-[#202020] font-semibold ">Address Details</p>
-            {
-               showAddress ? <MinusCircleOutlined className="text-xl text-primary"
-                onClick={() => {
-                  setshowAddress(false);
-                }}
-              /> :<>
-              <div className=" hidden md:block"><Button type="link"  icon={<img src={Images.AddBlack}  className=" w-4 h-4 lg:w-6 lg:h-6 " alt="add"/>}
-                onClick={() => {
-                  setshowAddress(true);
-                  setModelAddress(true);
-                }}
-              /></div>
-              <div className="  md:hidden"><Button type="link"  icon={<img src={Images.AddBlack}  className=" w-4 h-4 lg:w-6 lg:h-6 " alt="add"/>}
-                onClick={() => {
-                  setshowAddress(true);
+                    Checkout
+                    </p>
+                  </ClickableCell>
+                </Breadcrumb.Item>
+                <Breadcrumb.Item>
+                  <p className="text-[#202020] font-medium">
+                    Confirm Order
+                  </p>
+                </Breadcrumb.Item>
+              </Breadcrumb>
+              <div className="pt-[38px]">
+                <Typography className="text-[#202020] text-2xl font-semibold">My Cart</Typography>
+              </div>
+              <div className="pt-4 hidden lg:block border-top">
+                <DataTableComponent
+                  isLoading={false}
+                  // rowSelection={{
+                  //   type: "checkbox",
+                  //   ...rowSelection,
+                  // }}
+                  scrollX="100%"
+                  columns={columns}
+                  data={data}
+                  pagination={false}
+                />
+              </div>
+              <div className="lg:hidden">
+                <ResponsiveCart data={data} key={data} confirm={true} />
+              </div>
 
-                  setResponsiveAddress(true);
-                 
-                }}
-              /></div>
-              
-              </> 
-            }
-          </Row>
-          {modelAddress &&  <AddAddressModel open={modelAddress} close={CloseAddressModel}/>} 
-          <div>
-            <div className="mt-4">
-              {
-                isAddingShippingAddress || isLoadingUserAddresses || isLoadingStripeStatus ?
-                  <div className="h-80 flex justify-center items-center">
-                    <Spin spinning={isAddingShippingAddress || isLoadingUserAddresses || isLoadingStripeStatus} size="large" />
-                  </div> :
-                  userAddresses.length !== 0 ?
-                    <div className="  grid grid-rows-2 grid-flow-col gap-4 lg:flex  lg:flex-wrap overflow-x-auto lg:overflow-y-auto hide-Scroll lg:gap-x-6 lg:gap-y-[20px] pt-4 h-[50%] lg:h-[44vh]">
-                      {
-                        userAddresses.map((add, index) =>
-                          <div key={index}>
-                            <div className={`w-[307px] h-[200px] overflow-x-auto hide-Scroll py-3 px-[14px] rounded-[4px] ${index !== selectedAddress ? " cursor-pointer border border-[#0000002E] " : " border border-primary cursor-pointer"}`} onClick={() => { setSelectedAddress(index) }}>
-                              <AddressComponent userAddress={add} />
-                            </div>
-                          </div>
-                        )
-                      }
-                    </div> :
-                    <div className="flex justify-center items-center h-48 ">
-                      <p className="text-2xl font-semibold text-[#202020]">
-                        Please Add Address
-                      </p>
-                       </div>
+              <div className="bg-[#EEEFFA] rounded-b-md py-[15px] px-4  hidden lg:flex lg:justify-end ">
+                <div className="w-[235px] flex flex-col gap-[10px]">
+                  <Row className="justify-between ">
+                    <p className="text-base text-[#6A6A6A]  ">Sub Total:</p>
+
+                    <p className="text-xl text-[#202020]   text-right">${total}</p>
+                  </Row>
+                  <Row className="justify-between ">
+                    <p className="text-base text-[#6A6A6A]  ">Tax:</p>
+
+                    <p className="text-xl text-[#202020]   text-right">${tax}</p>
+                  </Row>
+                  <Row className="justify-between ">
+                    <p className="text-base text-[#6A6A6A] ">Shipping Charges:</p>
+
+                    <p className="text-xl text-[#202020]  text-right">${shipping}</p>
+                  </Row>
+
+                  <Row className="justify-between">
+                    <p className="text-base text-[#6A6A6A] ">Total:</p>
+
+                    <p className="text-xl text-[#202020]   text-right">
+                      ${total + tax + shipping}
+                    </p>
+                  </Row>
+                </div>
+              </div>
+              <Row align="middle pt-10 flex gap-3 items-center">
+                <p className="text-2xl text-[#202020] font-semibold ">Address Details</p>
+                {
+                  showAddress ? <MinusCircleOutlined className="text-xl text-primary"
+                    onClick={() => {
+                      setshowAddress(false);
+                    }}
+                  /> : <>
+                    <div className=" hidden md:block"><Button type="link" icon={<img src={Images.AddBlack} className=" w-4 h-4 lg:w-6 lg:h-6 " alt="add" />}
+                      onClick={() => {
+                        setshowAddress(true);
+                        setmodalAddress(true);
+                      }}
+                    /></div>
+                    <div className="  md:hidden"><Button type="link" icon={<img src={Images.AddBlack} className=" w-4 h-4 lg:w-6 lg:h-6 " alt="add" />}
+                      onClick={() => {
+                        setshowAddress(true);
+
+                        setResponsiveAddress(true);
+
+                      }}
+                    /></div>
+
+                  </>
+                }
+              </Row>
+              {modalAddress && <AddAddressModal open={modalAddress} close={CloseAddressModel} />}
+              <div>
+                <div className="mt-4">
+                  {
+                    isAddingShippingAddress || isLoadingUserAddresses || isLoadingStripeStatus ?
+                      <div className="h-80 flex justify-center items-center">
+                        <Spin spinning={isAddingShippingAddress || isLoadingUserAddresses || isLoadingStripeStatus} size="large" />
+                      </div> :
+                      userAddresses.length !== 0 ?
+                        <div className="  grid grid-rows-2 grid-flow-col gap-4 lg:flex  lg:flex-wrap overflow-x-auto lg:overflow-y-auto hide-Scroll lg:gap-x-6 lg:gap-y-[20px] pt-4 h-[50%] lg:h-[44vh]">
+                          {
+                            userAddresses.map((add, index) =>
+                              <div key={index}>
+                                <div className={`w-[307px] h-[200px] overflow-x-auto hide-Scroll py-3 px-[14px] rounded-[4px] ${index !== selectedAddress ? " cursor-pointer border border-[#0000002E] " : " border border-primary cursor-pointer"}`} onClick={() => { setSelectedAddress(index) }}>
+                                  <AddressComponent userAddress={add} />
+                                </div>
+                              </div>
+                            )
+                          }
+                        </div> :
+                        <div className="flex justify-center items-center h-48 ">
+                          <p className="text-2xl font-semibold text-[#202020]">
+                            Please Add Address
+                          </p>
+                        </div>
                     // <Card className="w-3/5 mt-4">
                     //   <Form layout="vertical" className="mt-5">
                     //     <div>
@@ -633,33 +616,34 @@ const ConfirmOrder = () => {
                     //     </div>
                     //   </Form>
                     // </Card>
-                    
-              }
-            </div>
-            {stripeStatus == null || userAddresses.length === 0 ? <div></div> : <Row className=" justify-center md:justify-end mt-12">
-              {/* <div id="pay-later-button" className="cursor-pointer justify-center flex items-center w-44 h-9 bg-white text-primary border border-primary rounded hover:bg-primary hover:text-white mr-4"
+
+                  }
+                </div>
+                {/* TODO: add user address later */}
+                {stripeStatus == null ? <div></div> : <Row className=" justify-center md:justify-end mt-12">
+                  {/* <div id="pay-later-button" className="cursor-pointer justify-center flex items-center w-44 h-9 bg-white text-primary border border-primary rounded hover:bg-primary hover:text-white mr-4"
                 onClick={() => {
                   setOpen(true);
                 }}>
                 Pay Later
               </div> */}
-              <div className="w-full h-[1px] mb-[30px] bg-[#00000020] "></div>
-              <div id="pay-now-button" className={` h-[54px] w-[217px]${stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled ? activeButtonClass : disabledButtonClass}`}
-                onClick={() => {
-                  if (stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled) {
-                    handlePaymentConfirm();
-                  }
-                }}
-              >
-                Review and Submit
+                  <div className="w-full h-[1px] mb-[30px] bg-[#00000020] "></div>
+                  <button id="pay-now-button" className={`p-4 rounded border ${stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled ? 'border-primary bg-primary hover:bg-primaryHover text-white' : 'cursor-not-allowed border-[#999999] rounded bg-[#cccccc] text-[#666666]'}`}
+                    onClick={() => {
+                      if (stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled) {
+                        handlePaymentConfirm();
+                      }
+                    }}
+                  >
+                    Review and Submit
+                  </button>
+                </Row>}
               </div>
-            </Row>}
-          </div>
-        </div>
-      )}
-      {marketplaceMessage && openToastMarketplace("Bottom")}
-      {message && openToastOrder("bottom")}
-    </div> }
+            </div>
+          )}
+          {marketplaceMessage && openToastMarketplace("Bottom")}
+          {message && openToastOrder("bottom")}
+        </div>}
     </>
   );
 };
@@ -670,8 +654,8 @@ export default ConfirmOrder;
 
 
 
-  {/* <p className="mt-2 text-sm text-primaryC">{userAddresses.length !== 0 ? "Select an address" : "Create a new address"}</p> */}
-          {/* {
+{/* <p className="mt-2 text-sm text-primaryC">{userAddresses.length !== 0 ? "Select an address" : "Create a new address"}</p> */ }
+{/* {
             showAddress ? <Card className="w-3/5 mt-4">
               <Form layout="vertical" className="mt-5">
                 <div>

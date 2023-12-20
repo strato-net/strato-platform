@@ -1,10 +1,10 @@
 pragma es6;
 pragma strict;
 
-import <86483be23fa65cf7f992d9cb35eca840e74090bc>;
+import <eddd7c9aa884a3b1b8595f0897608c07a8e770b1>;
 
-/// @title A representation of Carbon assets
-contract Carbon is Mintable {
+/// @title A representation of CarbonOffset assets
+contract CarbonOffset is Mintable {
     event OwnershipUpdate(string seller, string newOwner, uint ownershipStartDate, address itemAddress);
 
     constructor(
@@ -25,7 +25,7 @@ contract Carbon is Mintable {
     }
 
     function mint(uint splitQuantity) internal override returns (UTXO) {
-        Carbon c = new Carbon(name,
+        CarbonOffset c = new CarbonOffset(name,
                               description, 
                               images, 
                               files, 
