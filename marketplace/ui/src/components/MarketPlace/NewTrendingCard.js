@@ -43,7 +43,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                 <img className='w-5' src={Images.Verified} alt='' />
             </div>
             <Typography className='font-semibold'>{'$' + topSellingProduct?.price || "N/A"}</Typography>
-            <Typography className='#989898 opacity-40 max-h-4 overflow-hidden'>{topSellingProduct?.description || "N/A"}</Typography>
+            <Typography className='#989898 opacity-40 max-h-5 overflow-hidden'>{topSellingProduct?.description || "N/A"}</Typography>
             <div className='flex justify-between items-center bg-[#EEEFFA] p-2'>
                 <Typography>Quantity</Typography>
                 <div className='flex gap-3 p-1 bg-white'>

@@ -52,15 +52,10 @@ const CategoryProductList = ({ user }) => {
   const [selectedBrands, setSelectedBrands] = useState([]);
   const [maxPrice, setMaxPrice] = useState(MAX_PRICE);
   const [minPrice, setMinPrice] = useState(0);
-  const [maxQty, setMaxQty] = useState(MAX_QUANTITY);
-  const [minQty, setMinQty] = useState(0);
-  const debouncedMaxQty = useDebounce(maxQty, 1000);
-  const debouncedMinQty = useDebounce(minQty, 1000);
-  const debouncedMaxPrice = useDebounce(maxPrice, 1000);
-  const debouncedMinPrice = useDebounce(minPrice, 1000);
   const [subCategories, setSubCategories] = useState([]);
   const [uniqueProductNames, setUniqueProductNames] = useState([]);
-  const [openFilter, setOpenFilter] = useState(true)
+  const [desktopOpenFilter, setDesktopOpenFilter] = useState(true);
+  const [mobileOpenFilter, setMobileOpenFilter] = useState(false);
   const [sortBy, setSortBy] = useState(false)
   //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
@@ -134,10 +129,8 @@ const CategoryProductList = ({ user }) => {
         arrayToStr(selectedSubCategories),
         arrayToStr(selectedProducts),
         arrayToStr(selectedBrands),
-        debouncedMinQty,
-        debouncedMaxQty,
-        debouncedMinPrice,
-        debouncedMaxPrice
+        minPrice,
+        maxPrice
       );
     } else if (category !== "") {
       actions.fetchMarketplaceLoggedIn(
@@ -146,10 +139,8 @@ const CategoryProductList = ({ user }) => {
         arrayToStr(selectedSubCategories),
         arrayToStr(selectedProducts),
         arrayToStr(selectedBrands),
-        debouncedMinQty,
-        debouncedMaxQty,
-        debouncedMinPrice,
-        debouncedMaxPrice
+        minPrice,
+        maxPrice
       );
     }
   }, [
@@ -158,14 +149,22 @@ const CategoryProductList = ({ user }) => {
     selectedSubCategories,
     selectedProducts,
     selectedBrands,
-    debouncedMinQty,
-    debouncedMaxQty,
-    debouncedMinPrice,
-    debouncedMaxPrice,
+    minPrice,
+    maxPrice,
     category,
     hasChecked,
     isAuthenticated,
   ]);
+
+  useEffect(() => {
+    if (marketplaceList?.length > 0) {
+      const uniqueNames = marketplaceList.map((p) => p.name)
+        .filter(
+          (name, index, arr) => arr.indexOf(name) == index
+        );
+      setUniqueProductNames(uniqueNames);
+    }
+  }, [marketplaceList]);
 
   //=========================Other functions===============================//
 
@@ -192,7 +191,8 @@ const CategoryProductList = ({ user }) => {
   //============================================================================//
 
   const handleFilterClick = () => {
-    setOpenFilter(!openFilter);
+    setDesktopOpenFilter(!desktopOpenFilter);
+    setMobileOpenFilter(!mobileOpenFilter);
   };
 
   const addItemToCart = (product) => {
@@ -307,7 +307,7 @@ const CategoryProductList = ({ user }) => {
 
       <div className="flex pt-4 mx-14 mt-[60px] md:mt-4 ">
         {/* Filter section */}
-        {openFilter &&
+        {desktopOpenFilter &&
           <div className="mr-6 w-1/3 hidden md:flex md:flex-col">
             <div className="flex items-center">
               <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
@@ -440,14 +440,14 @@ const CategoryProductList = ({ user }) => {
           </div>
         ) : (
           <div className=" mb-12 w-full">
-            <div className="flex items-center">
+            <div className="hidden md:flex items-center">
               <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
-              <Text className="text-gray-800 ml-1 text-xl font-semibold ">
+              <Text className="text-gray-800 ml-1 text-xl font-semibold">
                 {marketplaceList?.length} Results
               </Text>
             </div>
             {marketplaceList?.length > 0 ? (
-              <div className={` mt-8 md:mt-4 mb-8 flex w-full md:grid flex-col items-center ${openFilter ? "grid-cols-1 gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 lg:gap-14 " : " sm:grid-cols-1 gap-4 md:grid-cols-2 md:gap-14 lg:grid-cols-3 lg:gap-16 xl:grid-cols-4"}`} id="product-list">
+              <div className={` mt-8 md:mt-4 mb-8 flex w-full md:grid flex-col items-center ${desktopOpenFilter ? "grid-cols-1 gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 lg:gap-14 " : " sm:grid-cols-1 gap-4 md:grid-cols-2 md:gap-14 lg:grid-cols-3 lg:gap-16 xl:grid-cols-4"}`} id="product-list">
                 {marketplaceList.map((product, index) => {
                   const prodCategory = categorys.find(
                     (c) => c.name === product.category
@@ -471,7 +471,7 @@ const CategoryProductList = ({ user }) => {
         )}
       </div>
 
-      {openFilter &&
+      {mobileOpenFilter &&
         <div>
           <div className="mr-6 fixed w-full h-full z-50 top-16 overflow-scroll md:hidden ">
             <div className="bg-white shadow-[2px_-2px_4px_0_rgba(0,0,0,0.05)] mb-24">
