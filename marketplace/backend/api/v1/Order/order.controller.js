@@ -326,12 +326,14 @@ class OrderController {
       shippingCity: Joi.string().required(),
       shippingAddressLine1: Joi.string().required(),
       shippingAddressLine2: Joi.string().allow(""),
+      shippingCountry: Joi.string().required(),
       billingName: Joi.string().required(),
       billingZipcode: Joi.string().required(),
       billingState: Joi.string().required(),
       billingCity: Joi.string().required(),
       billingAddressLine1: Joi.string().required(),
-      billingAddressLine2: Joi.string().allow("")
+      billingAddressLine2: Joi.string().allow(""),
+      billingCountry: Joi.string().required(),
     }).required();
 
     const validation = createUserAddressSchema.validate(args);
