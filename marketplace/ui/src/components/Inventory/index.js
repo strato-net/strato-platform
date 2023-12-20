@@ -172,7 +172,6 @@ const Inventory = ({ user }) => {
   
   // ------------------ Tabs Start------------------
   const handleTabSelect = (key) => {
-    console.log("key: ", key);
     setCategory(key);
     setOffset(0);
     setPage(1);
@@ -187,21 +186,28 @@ const Inventory = ({ user }) => {
       key: category.name,
       children: (
         <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 max-w-full">
-          {inventories.map((inventory, index) => {
-            let category = categorys.find((c) => c.name === inventory.category);
-            return (
-              <InventoryCard
-                id={index}
-                inventory={inventory}
-                category={category}
-                key={index}
-                debouncedSearchTerm={debouncedSearchTerm}
-                paymentProviderAddress={
-                  stripeStatus ? stripeStatus.paymentProviderAddress : undefined
-                }
-              />
-            );
-          })}
+          { !isInventoriesLoading ? (
+              inventories.map((inventory, index) => {
+                let category = categorys.find((c) => c.name === inventory.category);
+                return (
+                  <InventoryCard
+                    id={index}
+                    inventory={inventory}
+                    category={category}
+                    key={index}
+                    debouncedSearchTerm={debouncedSearchTerm}
+                    paymentProviderAddress={
+                      stripeStatus ? stripeStatus.paymentProviderAddress : undefined
+                    }
+                  />
+                );
+              })
+            ) : (
+              <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 max-w-full">
+                <Spin size="large" />
+              </div>
+            )
+        }
         </div>
       ),
     };
@@ -211,7 +217,7 @@ const Inventory = ({ user }) => {
   return (
     <>
       {contextHolder}
-      {stripeStatus == null || isInventoriesLoading || isLoadingStripeStatus ? (
+      {stripeStatus == null || isLoadingStripeStatus ? (
         <div className="h-screen flex justify-center items-center">
           <Spin size="large" />
         </div>
