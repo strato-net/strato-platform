@@ -1,6 +1,6 @@
 pragma es6;
 pragma strict;
-import <eddd7c9aa884a3b1b8595f0897608c07a8e770b1>;
+import <e5c8511b96a78f9ab8b67d233cc8fc831f6ece36>;
 
 contract SimpleOrder is Order {
     constructor(
@@ -8,13 +8,15 @@ contract SimpleOrder is Order {
         address[] _saleAddresses, 
         uint[] _quantities,
         uint _createdDate,
-        string _shippingAddress
+        uint _shippingAddressId,
+        string _paymentSessionId
     ) Order (
         _orderId,
         _saleAddresses,
         _quantities,
         _createdDate,
-        _shippingAddress
+        _shippingAddressId,
+        _paymentSessionId
     ) {
     }
 }

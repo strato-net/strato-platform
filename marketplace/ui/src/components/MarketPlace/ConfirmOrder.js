@@ -334,7 +334,7 @@ const ConfirmOrder = () => {
       buyerOrganization: userOrganization,
       orderList,
       orderTotal: total + tax + shipping,
-      shippingAddress: '', // userAddresses[selectedAddress].address,
+      shippingAddressId: userAddresses[selectedAddress].id,
       tax: tax,
       user: user.commonName,
       email: user.preferred_username,
