@@ -46,7 +46,7 @@ const SoldOrderDetails = ({ user, users }) => {
   const [selectedDate, setSelectedDate] = useState("");
   const [status, setStatus] = useState(getStatus(1));
   const [selectedStatus, setSelectedStatus] = useState(null);
-  const [paid, setPaid] = useState(false);
+  const [paid, setPaid] = useState("Processing");
   const [isLoadingPaymentStatus, setisLoadingPaymentStatus] = useState(false)
   const [comment, setcomment] = useState("");
   const { TextArea } = Input;
@@ -153,7 +153,7 @@ const SoldOrderDetails = ({ user, users }) => {
         if (response.status === RestStatus.OK) {
 
           if (body.data["payment_status"] === "paid") {
-            setPaid(true);
+            setPaid("Paid");
           }
 
         }
@@ -305,6 +305,33 @@ const SoldOrderDetails = ({ user, users }) => {
       </div>
     );
   };
+
+  const statusComponentForPayment = (status) => {
+    let textClass = "bg-[#FFF6EC]";
+    if (status === "Processing"){
+      textClass = "bg-[#FF8C0033]"
+    } else if (status === "Paid") {
+      textClass = "bg-[#119B2D33]";
+    } else if (status === "Payment Failed") {
+      textClass = "bg-[#FFF0F0]";
+    }
+    let bgClass = "bg-[#119B2D]";
+    if (status === "Processing"){
+      bgClass = "bg-[#FF8C00]"
+    } else if (status === "Paid") {
+      bgClass = "bg-[#119B2D]";
+    } else if (status === "Payment Failed") {
+      bgClass = "bg-[#FF0000]";
+    }
+      
+  return (
+    <div className={classNames(textClass, "status_contain w-max h-max text-center py-1 px-3 rounded-md md:rounded-xl flex justify-start items-center gap-1 p-1")}>
+      <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
+      <p className="!mb-0 text-xs md:text-sm">{status}</p>
+    </div>
+  );
+};
+
 
   const onChange = (key) => {
     navigate(routes.Orders.url, { state: { defaultKey: key } })
@@ -488,12 +515,7 @@ const SoldOrderDetails = ({ user, users }) => {
                           <div className="flex flex-col">
                             <div className="flex">
                               <Text className="bg-[#E9E9E9] md:bg-white py-2 px-3 md:w-1/4 w-full md:bg-none font-semibold text-sm md:text-lg text-primaryB flex gap-4 items-center">Order Details</Text>
-                              <Text className="hidden md:flex">{statusComponent(status) }</Text>
-                              {
-                                !paid ? <div /> : <div className={classNames("text-success  bg-[#EAFFEE]", "ml-4 w-20 text-center text-xs p-1 rounded")}>
-                                  <p>Paid</p>
-                                </div>
-                              }
+                              <Text className="hidden md:flex">{statusComponentForPayment(paid) }</Text>
                             </div>
                             <Text className="text-[#6A6A6A] md:text-black px-3 my-2 text-xs md:text-sm md:font-semibold">Please enter the fulfillment date to close the order</Text>
                             
@@ -616,7 +638,7 @@ const SoldOrderDetails = ({ user, users }) => {
                                 selectedDate
                               }
                               onChange={onDateChange}
-                              disabled={details.order.status === "3" || details.order.status === "4"}
+                              disabled={details.order.status === 3 || details.order.status === 4}
                             />
                           </div>
                         </Row>
@@ -636,7 +658,7 @@ const SoldOrderDetails = ({ user, users }) => {
                               <DatePicker
                                 value={selectedDate}                                
                                 onChange={onDateChange}
-                                disabled={details.order.status === "3" || details.order.status === "4"}
+                                disabled={details.order.status === 3 || details.order.status === 4}
                               />}/>
                             </div>
                           <div className="flex justify-between">
@@ -658,7 +680,7 @@ const SoldOrderDetails = ({ user, users }) => {
                             <NewOrderData className="w-2/4" title="STATUS" value={statusComponent(status)} />
                           </div>
                           <div className="flex justify-between">
-                            <NewOrderData className="w-2/4" title="PAYMENT STATUS" value={statusComponent(status)} />
+                            <NewOrderData className="w-2/4" title="PAYMENT STATUS" value={statusComponentForPayment(paid)} />
                           </div>
                         </Row>
                         <Row className="flex-nowrap items-center justify-between mb-2 md:mb-6 p-2">
@@ -671,7 +693,7 @@ const SoldOrderDetails = ({ user, users }) => {
                               placeholder="Enter Comments"
                               value={decodeURIComponent(comment)}
                               disabled={
-                                details.order.status === "3" || details.order.status === "4"
+                                details.order.status === 3 || details.order.status === 4
                               }
                               onChange={(event) => {
                                 setcomment(encodeURIComponent(event.target.value));
