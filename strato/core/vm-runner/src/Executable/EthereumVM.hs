@@ -37,7 +37,7 @@ import Blockchain.JsonRpcCommand
 import qualified Blockchain.MilenaTools as K
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
-import Blockchain.Strato.Indexer.Kafka (writeIndexEvents)
+import Blockchain.Strato.Indexer.Kafka (produce)
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import qualified Blockchain.Strato.Model.Keccak256 as Keccak256
 import Blockchain.Strato.StateDiff.Database (commitSqlDiffs)
@@ -208,13 +208,13 @@ sendOutEvent (OutAction act) = do
       vmes = ccEvents ++ dcEvents ++ actionEvents
   contx <- accessEnv
   void . liftIO $ enqueue (_stateDiffQueue contx) (VME vmes)
-sendOutEvent (OutIndexEvent e) = void . execKafka $ writeIndexEvents [e]
+sendOutEvent (OutIndexEvent e) = void . execKafka $ produce [e]
 sendOutEvent (OutToStateDiff cId cInfo bHash org app) = withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo org app
 sendOutEvent (OutStateDiff diff) = do
   contx <- accessEnv
   void . liftIO $ enqueue (_stateDiffQueue contx) (SD diff)
-sendOutEvent (OutLog l) = loopTimeit "flushLogEntries" $ void . execKafka $ writeIndexEvents [LogDBEntry l]
-sendOutEvent (OutEvent e) = loopTimeit "flushEventEntries" $ void . execKafka $ writeIndexEvents [EventDBEntry e]
+sendOutEvent (OutLog l) = loopTimeit "flushLogEntries" $ void . execKafka $ produce [LogDBEntry l]
+sendOutEvent (OutEvent e) = loopTimeit "flushEventEntries" $ void . execKafka $ produce [EventDBEntry e]
 sendOutEvent (OutTXR tr) = do
   contx <- accessEnv
   void . liftIO $ enqueue (_stateDiffQueue contx) (TXR tr)

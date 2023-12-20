@@ -5,8 +5,7 @@
 
 module Blockchain.Strato.Indexer.Kafka
   ( indexEventsTopicName,
-    readIndexEvents,
-    writeIndexEvents,
+    produce,
     consume
   )
 where
@@ -36,8 +35,8 @@ readIndexEvents topicName = readIndexEventsFromTopic topicName
 readIndexEventsFromTopic :: (Binary a, Kafka k) => KP.TopicName -> KP.Offset -> k [a]
 readIndexEventsFromTopic topic offset = setDefaultKafkaState >> map (decode . L.fromStrict) <$> fetchBytes topic offset
 
-writeIndexEvents :: (Binary a, Kafka k) => [a] -> k [KP.ProduceResponse]
-writeIndexEvents events = do
+produce :: (Binary a, Kafka k) => [a] -> k [KP.ProduceResponse]
+produce events = do
   results <-
     KW.produceMessagesAsSingletonSets $
       (K.TopicAndMessage indexEventsTopicName . KW.makeMessage . L.toStrict . encode) <$> events
@@ -49,18 +48,18 @@ consume :: (Binary a, MonadLogger m, HasKafka m) =>
 consume name consumerGroup topicName f = 
   forever $ do
     $logInfoS name "About to fetch blocks"
-    (offset, idxEvents) <- getUnprocessedIndexEvents consumerGroup topicName
+    (offset, idxEvents) <- fetch consumerGroup topicName
     $logInfoS name . T.pack $ "Fetched " ++ show (length idxEvents) ++ " events starting from " ++ show offset
     f idxEvents
     let nextOffset' = offset + fromIntegral (length idxEvents)
     setKafkaCheckpoint consumerGroup topicName nextOffset' ""
 
 
-getKafkaCheckpoint :: HasKafka m =>
+getKafkaCheckpoint :: (MonadLogger m, HasKafka m) =>
                       KP.ConsumerGroup -> KP.TopicName -> m Offset
 getKafkaCheckpoint consumerGroup topicName =
   execKafka (fetchSingleOffset consumerGroup topicName 0) >>= \case
-    Left UnknownTopicOrPartition -> error "ApiIndexerBestBlock was never initialized in strato-setup!"
+    Left UnknownTopicOrPartition -> setKafkaCheckpoint consumerGroup topicName 0 "" >> getKafkaCheckpoint consumerGroup topicName
     Left err -> error $ "Unexpected response when fetching offset for " ++ show consumerGroup ++ ": " ++ show err
     Right r -> pure $ fst r
 
@@ -76,9 +75,9 @@ setKafkaCheckpoint consumerGroup topicName ofs md = do
 setKafkaCheckpoint' :: Kafka k => KP.ConsumerGroup -> KP.TopicName -> Offset -> Metadata -> k (Either KafkaError ())
 setKafkaCheckpoint' consumerGroup targetTopicName offset md = commitSingleOffset consumerGroup targetTopicName 0 `flip` md $ offset
 
-getUnprocessedIndexEvents :: (Binary a, HasKafka m) =>
-                             KP.ConsumerGroup -> KP.TopicName -> m (Offset, [a])
-getUnprocessedIndexEvents consumerGroup topicName = do
+fetch :: (Binary a, MonadLogger m, HasKafka m) =>
+         KP.ConsumerGroup -> KP.TopicName -> m (Offset, [a])
+fetch consumerGroup topicName = do
   ofs <- getKafkaCheckpoint consumerGroup topicName
   evs <- execKafka $ readIndexEvents topicName ofs
   return (ofs, evs)

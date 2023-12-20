@@ -320,7 +320,7 @@ bootstrapIndexer obGB =
             putStrLn "bootstrapIndex API checkpoint successful!"
             res <-
               runKafkaConfigured clientId $
-                IdxKafka.writeIndexEvents [IdxModel.RanBlock obGB]
+                IdxKafka.produce [IdxModel.RanBlock obGB]
             when (isLeft res) . error $ "bootstrapping index events failed: " ++ show res
             print res
             putStrLn "bootstrapIndex genesis seed successful!"
