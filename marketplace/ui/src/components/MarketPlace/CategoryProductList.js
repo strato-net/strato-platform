@@ -45,7 +45,6 @@ const { Text } = Typography;
 
 const CategoryProductList = ({ user }) => {
   const [category, setCategory] = useState("");
-  const [brands, setBrands] = useState([]);
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [selectedSubCategories, setSelectedSubCategories] = useState([]);
   const [selectedProducts, setSelectedProducts] = useState([]);
@@ -56,7 +55,6 @@ const CategoryProductList = ({ user }) => {
   const [uniqueProductNames, setUniqueProductNames] = useState([]);
   const [desktopOpenFilter, setDesktopOpenFilter] = useState(true);
   const [mobileOpenFilter, setMobileOpenFilter] = useState(false);
-  const [sortBy, setSortBy] = useState(false)
   //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
   const { categorys } = useCategoryState();
@@ -122,7 +120,11 @@ const CategoryProductList = ({ user }) => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const { marketplaceList, isMarketplaceLoading, marketplaceListCount } = useMarketplaceState();
   useEffect(() => {
-    if (category !== "" && hasChecked && !isAuthenticated) {
+    let subCategoriesString = "";
+    subCategorys.map((sub) => subCategoriesString += sub.contract + ",");
+    if (category !== "" && hasChecked && !isAuthenticated &&
+      ((selectedSubCategories.length === 0 && selectedCategories.length === 0)
+        || (selectedSubCategories.length !== 0 && selectedCategories.length !== 0))) {
       actions.fetchMarketplace(
         marketplaceDispatch,
         arrayToStr(selectedCategories),
@@ -132,7 +134,8 @@ const CategoryProductList = ({ user }) => {
         minPrice,
         maxPrice
       );
-    } else if (category !== "") {
+    } else if (category !== "" && ((selectedSubCategories.length === 0 && selectedCategories.length === 0)
+      || (selectedSubCategories.length !== 0 && selectedCategories.length !== 0))) {
       actions.fetchMarketplaceLoggedIn(
         marketplaceDispatch,
         arrayToStr(selectedCategories),
@@ -142,11 +145,31 @@ const CategoryProductList = ({ user }) => {
         minPrice,
         maxPrice
       );
+    } else if (selectedSubCategories.length === 0 && selectedCategories.length > 0 && hasChecked && !isAuthenticated) {
+      actions.fetchMarketplace(
+        marketplaceDispatch,
+        arrayToStr(selectedCategories),
+        subCategoriesString,
+        arrayToStr(selectedProducts),
+        arrayToStr(selectedBrands),
+        minPrice,
+        maxPrice
+      );
+    } else if (selectedSubCategories.length === 0 && selectedCategories.length > 0) {
+      actions.fetchMarketplaceLoggedIn(
+        marketplaceDispatch,
+        arrayToStr(selectedCategories),
+        subCategoriesString,
+        arrayToStr(selectedProducts),
+        arrayToStr(selectedBrands),
+        minPrice,
+        maxPrice
+      );
     }
   }, [
     marketplaceDispatch,
-    selectedCategories,
     selectedSubCategories,
+    subCategorys,
     selectedProducts,
     selectedBrands,
     minPrice,

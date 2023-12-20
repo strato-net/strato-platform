@@ -224,7 +224,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace/all?${priceQuery}${categoryQuery}${subCategoryQuery}${productIdQuery}${manufacturerQuery}`,
+        `${apiUrl}/marketplace/all?${categoryQuery}${subCategoryQuery}${productIdQuery}${manufacturerQuery}`,
         {
           method: HTTP_METHODS.GET,
         }
