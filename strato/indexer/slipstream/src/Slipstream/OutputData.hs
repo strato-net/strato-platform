@@ -1231,23 +1231,24 @@ insertEventTables globalsIORef evs = do
       case (maybeContract, maybeCodeCollection) of
         (Just contract, Just codeCollection) ->
           let parents = getAbstractParentsFromContract contract codeCollection
-          -- Process parents to create a list of new events
-              newEvents = processParents (T.pack org) (T.pack appName) (map (T.pack . _contractName) parents) aggEvent
+              newEvents = processParents (T.pack org) (T.pack appName) parents aggEvent
           -- Return the complete list of events (original event + new events)
           in return (aggEvent : newEvents)
         _ -> return [aggEvent]
 
-    processParents :: Text -> Text -> [Text] -> AggregateEvent -> [AggregateEvent]
+    processParents :: Text -> Text -> [Contract] -> AggregateEvent -> [AggregateEvent]
     processParents org app parents ae = map createNewEvent parents
       where
-        createNewEvent :: Text -> AggregateEvent
-        createNewEvent parentName = ae {
-          eventEvent = (eventEvent ae) {
-            Action.evContractOrganization = T.unpack org,
-            Action.evContractApplication = T.unpack app,
-            Action.evContractName = T.unpack parentName
-          }
-        }
+        createNewEvent :: Contract -> AggregateEvent
+        createNewEvent parentName = do
+          (o', a', n') <- resolveNameParts org app parentName
+          ae {
+              eventEvent = (eventEvent ae) {
+                Action.evContractOrganization = T.unpack o',
+                Action.evContractApplication = T.unpack a',
+                Action.evContractName = T.unpack n'
+                  }
+              }
 
 insertEventTable ::
   OutputM m =>
