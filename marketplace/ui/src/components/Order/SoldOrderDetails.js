@@ -495,7 +495,8 @@ const SoldOrderDetails = ({ user, users }) => {
                                 </div>
                               }
                             </div>
-                            <Text className="text-[#6A6A6A] md:text-black px-3 my-2 text-xs md:text-sm md:font-semibold">Please upload serial number(s) (if any) and/or enter the fulfillment date to close the order</Text>
+                            <Text className="text-[#6A6A6A] md:text-black px-3 my-2 text-xs md:text-sm md:font-semibold">Please enter the fulfillment date to close the order</Text>
+                            
                           </div>
                           <Button
                             id="save-button"
@@ -614,9 +615,6 @@ const SoldOrderDetails = ({ user, users }) => {
                               value={
                                 selectedDate
                               }
-                              disabledDate={(current) => {
-                                return current && current < dayjs().endOf('day');
-                              }}
                               onChange={onDateChange}
                               disabled={details.order.status === "3" || details.order.status === "4"}
                             />
