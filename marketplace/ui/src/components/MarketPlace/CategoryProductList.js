@@ -120,8 +120,9 @@ const CategoryProductList = ({ user }) => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const { marketplaceList, isMarketplaceLoading, marketplaceListCount } = useMarketplaceState();
   useEffect(() => {
-    let subCategoriesString = "";
-    subCategorys.map((sub) => subCategoriesString += sub.contract + ",");
+    let subCategoriesOfSelectedCategories = "";
+    subCategorys.map((sub) => subCategoriesOfSelectedCategories += sub.contract + ",");
+
     if (category !== "" && hasChecked && !isAuthenticated &&
       ((selectedSubCategories.length === 0 && selectedCategories.length === 0)
         || (selectedSubCategories.length !== 0 && selectedCategories.length !== 0))) {
@@ -149,7 +150,7 @@ const CategoryProductList = ({ user }) => {
       actions.fetchMarketplace(
         marketplaceDispatch,
         arrayToStr(selectedCategories),
-        subCategoriesString,
+        subCategoriesOfSelectedCategories,
         arrayToStr(selectedProducts),
         arrayToStr(selectedBrands),
         minPrice,
@@ -159,7 +160,7 @@ const CategoryProductList = ({ user }) => {
       actions.fetchMarketplaceLoggedIn(
         marketplaceDispatch,
         arrayToStr(selectedCategories),
-        subCategoriesString,
+        subCategoriesOfSelectedCategories,
         arrayToStr(selectedProducts),
         arrayToStr(selectedBrands),
         minPrice,

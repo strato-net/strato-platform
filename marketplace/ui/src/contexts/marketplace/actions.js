@@ -159,7 +159,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace?${priceQuery}${categoryQuery}${subCategoryQuery}${productQuery}${manufacturerQuery}`,
+        `${apiUrl}/marketplace?${categoryQuery}${subCategoryQuery}${productQuery}${manufacturerQuery}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -221,6 +221,7 @@ const actions = {
 
     const productIdQuery = products ? `&name[]=${products}` : "";
     const priceQuery = `&range[]=price,${minPrice},${maxPrice}`;
+    const qtyQuery = `&range[]=quantity,${minPrice},${maxPrice}`;
 
     try {
       const response = await fetch(

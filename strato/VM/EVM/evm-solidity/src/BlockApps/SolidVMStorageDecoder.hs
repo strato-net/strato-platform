@@ -136,7 +136,7 @@ replayDeltas ((StoragePath (Field f : sp), bv) : rs) ts =
     Just sv -> do
       ts' <- (\v' -> HM.insert f v' ts) <$> applyDelta (StoragePath sp) bv sv
       replayDeltas rs ts'
-    Nothing -> return $ HM.insert f (constructFromNothing' sp bv) ts
+    Nothing -> replayDeltas rs $ HM.insert f (constructFromNothing' sp bv) ts
 replayDeltas ((p, _) : _) _ = Left $ MissingPath p
 
 applyDelta :: StoragePath -> BasicValue -> V.Value -> Either ReplayFailure V.Value
