@@ -1,0 +1,20 @@
+#stripe-ps-version:<VERSION>
+#strato-getting-started-min-version:4.2.1
+version: '3'
+services:
+  stripe-ps:
+    environment:
+    - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
+    - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+    - MARKETPLACE_URL=${MARKETPLACE_URL}
+    build: .
+    image: ${STRIPE_PS_IMAGE:-<REPO_URL>stripe-ps:<VERSION>}
+    container_name: stripe-ps
+    ports:
+      - "80:8018"
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"

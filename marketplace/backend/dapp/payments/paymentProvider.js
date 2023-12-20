@@ -248,6 +248,53 @@ async function finalizePayment(user, args, options) {
     return finalizeStatus;
 }
 
+async function updatePaymentProvider(admin, contract, _args, baseOptions) {
+    const args = { ..._args }
+  
+    const scheme = Object.keys(_args).reduce((agg, key) => {
+      const base = 1;
+      switch (key) {
+        case "chargesEnabled":
+          return agg | (base << 0);
+        case "detailsSubmitted":
+          return agg | (base << 1);
+        case "payoutsEnabled":
+          return agg | (base << 2);
+        case "eventTime":
+          return agg | (base << 3);
+        case "accountDeauthorized":
+          return agg | (base << 4);
+        default:
+          return agg;
+      }
+    }, 0);
+    
+    const callArgs = {
+      contract,
+      method: "update",
+      args: util.usc({
+        scheme,
+        ...args,
+      }),
+    };
+  
+    const options = {
+      ...baseOptions,
+      history: [contractName],
+    };
+  
+    const [restStatus, paymentProviderAddress] = await rest.call(
+      admin,
+      callArgs,
+      options
+    );
+  
+    if (parseInt(restStatus, 10) !== RestStatus.OK)
+      throw new rest.RestError(restStatus, 0, { callArgs });
+  
+    return [restStatus, paymentProviderAddress];
+  }
+
 export default {
     uploadContract,
     contractName,
@@ -256,11 +303,11 @@ export default {
     bindAddress,
     get,
     getAll,
-    getState,
     marshalIn,
     marshalOut,
     getHistory,
     getPaymentSession,
     createPayment,
-    finalizePayment
+    finalizePayment,
+    updatePaymentProvider,
 }

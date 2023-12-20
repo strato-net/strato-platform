@@ -65,14 +65,16 @@ const ProcessingOrder = () => {
 
   const getCartData = async () => {
     try {
+      const sellersCommonName = storedConfirmList[0].sellersCommonName;
       const response = await fetch(
-        `${apiUrl}/order/payment/session/${sessionId}`,
+        `${apiUrl}/order/payment/session/${sessionId}/${sellersCommonName}`,
         {
           method: HTTP_METHODS.GET,
         }
       );
 
       const body = await response.json();
+      console.log(body);
       if (response.status === RestStatus.OK) {
         try {
           const cartObject = JSON.parse(body.data.metadata.cart);
@@ -157,16 +159,16 @@ const ProcessingOrder = () => {
     htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
 
     // Prepare order data to be sent to order controller
-    let saleAddresses = [];
+    let assetAddresses = [];
     const orderList = storedConfirmList.map(o => {
-      saleAddresses.push(o.key);
+      assetAddresses.push(o.key);
       return { saleAddress: o.saleAddress, quantity: o.qty };
     });
     
     const body = {
       items: orderList,
-      shippingAddress: cartData.shippingAddress,
-      // paymentSessionId: cartData.paymentSessionId,
+      shippingAddressId: cartData.shippingAddressId,
+      paymentSessionId: cartData.paymentSessionId,
       to: customerEmail,
       subject: "Your Order Confirmation",
       htmlContents: htmlContents,
@@ -176,7 +178,7 @@ const ProcessingOrder = () => {
     if (isDone) {
       let updatedCart = [];
       storedData.forEach(cart => {
-        if (!saleAddresses.includes(cart.product.saleAddress)) {
+        if (!assetAddresses.includes(cart.product.address)) {
           updatedCart.push(cart);
         }
       });

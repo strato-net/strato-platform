@@ -137,7 +137,7 @@ class OrderController {
 
       OrderController.validatePaymentSessionArgs(params)
 
-      const result = await dapp.getPaymentSession({ session_id: params.session_id })
+      const result = await dapp.getPaymentSession(params)
       rest.response.status200(res, result)
 
       return next()
@@ -151,6 +151,19 @@ class OrderController {
       const { dapp, query } = req
 
       const orders = await dapp.getAllUserAddress({ ...query })
+      rest.response.status200(res, orders)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
+  static async getAddressFromId(req, res, next) {
+    try {
+      const { dapp, params } = req
+
+      const orders = await dapp.getAddressFromId(params)
       rest.response.status200(res, orders)
 
       return next()
@@ -252,7 +265,7 @@ class OrderController {
             assetAddress: Joi.string().required(),
           })).required(),
       orderTotal: Joi.number().required(),
-      shippingAddress: Joi.string().required().allow(''),
+      shippingAddressId: Joi.number().min(1).required(),
       tax: Joi.number().required(),
       user: Joi.string().required(),
       email: Joi.string().required(),
@@ -270,7 +283,8 @@ class OrderController {
 
   static validatePaymentSessionArgs(args) {
     const paymentSchema = Joi.object({
-      session_id: Joi.string().required()
+      session_id: Joi.string().required(),
+      sellersCommonName: Joi.string().required(),
     }).required();
 
     const validation = paymentSchema.validate(args);
@@ -320,18 +334,13 @@ class OrderController {
 
   static validateCreateUserAddressArgs(args) {
     const createUserAddressSchema = Joi.object({
-      shippingName: Joi.string().required(),
-      shippingZipcode: Joi.string().required(),
-      shippingState: Joi.string().required(),
-      shippingCity: Joi.string().required(),
-      shippingAddressLine1: Joi.string().required(),
-      shippingAddressLine2: Joi.string().allow(""),
-      billingName: Joi.string().required(),
-      billingZipcode: Joi.string().required(),
-      billingState: Joi.string().required(),
-      billingCity: Joi.string().required(),
-      billingAddressLine1: Joi.string().required(),
-      billingAddressLine2: Joi.string().allow("")
+      name: Joi.string().required(),
+      zipcode: Joi.string().required(),
+      state: Joi.string().required(),
+      city: Joi.string().required(),
+      addressLine1: Joi.string().required(),
+      addressLine2: Joi.string().allow(""),
+      country: Joi.string().required(),
     }).required();
 
     const validation = createUserAddressSchema.validate(args);
@@ -349,7 +358,8 @@ class OrderController {
         quantity: Joi.number().required(),
         saleAddress: Joi.string().required(),
       })).required(),
-      shippingAddress: Joi.string().required().allow(''),
+      shippingAddressId: Joi.number().min(1).required(),
+      paymentSessionId: Joi.string().required(),
     }).required();
 
     const validation = createSaleOrderSchema.validate(args);
