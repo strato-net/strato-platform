@@ -63,11 +63,15 @@ const ResellModal = ({ open, handleCancel, inventory }) => {
                 </Button>
             ]}
         >
+            <div className="head">
+
             <Table
+            
                 columns={columns()}
                 dataSource={[inventory]}
                 pagination={false}
             />
+            </div>
         </Modal>
     )
 }

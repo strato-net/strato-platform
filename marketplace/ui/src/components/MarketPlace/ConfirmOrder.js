@@ -379,18 +379,23 @@ const ConfirmOrder = () => {
               <Breadcrumb>
                 <Breadcrumb.Item href="javascript:;">
                   <ClickableCell href={routes.Marketplace.url}>
+                  <p className="text-[#13188A] font-semibold">
                     Home
+                    </p>
                   </ClickableCell>
                 </Breadcrumb.Item>
                 <Breadcrumb.Item
                   href="javascript:;"
                 >
                   <ClickableCell href={routes.Checkout.url}>
+                    <p className="text-[#13188A] font-semibold">
+
                     Checkout
+                    </p>
                   </ClickableCell>
                 </Breadcrumb.Item>
                 <Breadcrumb.Item>
-                  <p className="hover:text-primaryHover text-primary font-medium cursor-pointer">
+                  <p className="text-[#202020] font-medium">
                     Confirm Order
                   </p>
                 </Breadcrumb.Item>

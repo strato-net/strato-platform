@@ -9,6 +9,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
     mkdir -p /usr/local/openresty/nginx/lua && \
     wget -P /usr/local/openresty/nginx/lua https://raw.githubusercontent.com/knyar/nginx-lua-prometheus/0.20181120/prometheus.lua && \
+    rm /usr/local/openresty/nginx/conf/nginx.conf && \
     opm get zmartzone/lua-resty-openidc=1.7.4 && \
     opm remove bungle/lua-resty-session && \
     opm get bungle/lua-resty-session=3.10    

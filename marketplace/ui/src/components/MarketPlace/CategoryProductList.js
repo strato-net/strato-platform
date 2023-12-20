@@ -283,20 +283,21 @@ const CategoryProductList = ({ user }) => {
         <Breadcrumb className="text-xs ml-4 md:ml-14 mt-14">
       <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
           <ClickableCell href={routes.Marketplace.url}>
-            <p href={routes.Marketplace.url} className="text-primaryB hover:bg-transparent">
+            <p href={routes.Marketplace.url} className="text-[#13188A]  font-semibold ">
               Home
             </p>
           </ClickableCell>
         </Breadcrumb.Item>
         <Breadcrumb.Item href="" onClick={e => setSelectedCategories([])}>
           <ClickableCell href={routes.MarketplaceProductList.url}>
-            <p href={routes.MarketplaceProductList.url} className="text-primaryB hover:bg-transparent">
+            <p href={routes.MarketplaceProductList.url} className="text-[#202020]  font-medium ">
+              
               Marketplace
             </p>
           </ClickableCell>  
         </Breadcrumb.Item>
         {selectedCategories?.map((category, index) => (
-          <Breadcrumb.Item key={index} className="text-primary">
+          <Breadcrumb.Item key={index} className="text-[#202020] font-medium">
             {category ? category : ""}
           </Breadcrumb.Item>
         ))}
@@ -369,6 +370,36 @@ const CategoryProductList = ({ user }) => {
               </>
             )}
 
+            {/* Panel - SubCategory */}
+            { currentCategory && (
+              <>
+                <Collapse
+                  bordered={false}
+                  defaultActiveKey={1}
+                  expandIconPosition="end"
+                  ghost="true"
+                  reverse={false}
+                  className="pl-8 pr-7"
+                >
+                  <Panel header={<Text strong>Sub-Category</Text>} key="1">
+                    <Checkbox.Group
+                      // onChange={onChangeSubCategory}
+                      value={selectedSubCategories}
+                    >
+                      <div className="flex flex-col gap-3">
+                        {subCategories.map((subcategory, index) => (
+                          <Checkbox value={subcategory.contract} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
+                            {subcategory.name}
+                          </Checkbox>
+                        ))}
+                      </div>
+                    </Checkbox.Group>
+                  </Panel>
+                </Collapse>
+                <Divider className="m-0" />
+              </>
+            )}
+
             {/* Panel - Price */}
             <Collapse
               bordered={false}
@@ -414,31 +445,6 @@ const CategoryProductList = ({ user }) => {
               </Panel>
             </Collapse>
             <Divider className="m-0" />
-
-            {/* Panel - SubCategory */}
-            {/* {currentCategory && (
-              <>
-                <Collapse
-                  bordered={false}
-                  defaultActiveKey={1}
-                  expandIconPosition="end"
-                  ghost="true"
-                  reverse={false}
-                  className="pl-8 pr-7"
-                >
-                  <Panel header={<Text strong>Sub-Category</Text>} key="1">
-                    <Checkbox.Group
-                      // onChange={onChangeSubCategory}
-                      value={selectedSubCategories}
-                    >
-                      <div className="flex flex-col gap-3">
-                      </div>
-                    </Checkbox.Group>
-                  </Panel>
-                </Collapse>
-                <Divider className="m-0" />
-              </>
-            )} */}
 
             {/* Panel - Product */}
             {marketplaceList?.length > 0 && (
