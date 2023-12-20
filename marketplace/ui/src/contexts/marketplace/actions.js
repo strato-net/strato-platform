@@ -156,10 +156,11 @@ const actions = {
 
     const productQuery = products ? `&productId[]=${products}` : "";
     const priceQuery = `&range[]=pricePerUnit,${minPrice},${maxPrice}`;
+    const sortLatest = "&order=createdDate.desc"
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace?${priceQuery}${categoryQuery}${subCategoryQuery}${productQuery}${manufacturerQuery}`,
+        `${apiUrl}/marketplace?${priceQuery}${categoryQuery}${subCategoryQuery}${productQuery}${manufacturerQuery}${sortLatest}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -221,10 +222,11 @@ const actions = {
 
     const productIdQuery = products ? `&name[]=${products}` : "";
     const priceQuery = `&range[]=price,${minPrice},${maxPrice}`;
+    const sortLatest = "&order=createdDate.desc"
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace/all?${priceQuery}${categoryQuery}${subCategoryQuery}${productIdQuery}${manufacturerQuery}`,
+        `${apiUrl}/marketplace/all?${priceQuery}${categoryQuery}${subCategoryQuery}${productIdQuery}${manufacturerQuery}${sortLatest}`,
         {
           method: HTTP_METHODS.GET,
         }
