@@ -46,4 +46,5 @@ export const Images = {
   'Metal_card' : require("./resources/categories/metal_card.png"),
   'art_card' : require("./resources/categories/art_card.png"),
   'carbon_card' : require("./resources/categories/carbon_card.png"),
+  'membership_card' : require("./resources/categories/membership_card.jpg"),
 };
