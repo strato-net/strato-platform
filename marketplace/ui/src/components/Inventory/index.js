@@ -46,7 +46,7 @@ const Inventory = ({ user }) => {
   const dispatch = useInventoryDispatch();
   const [api, contextHolder] = notification.useNotification();
   const [isSearch, setIsSearch] = useState(false);
-  const [category, setCategory] = useState(undefined);
+  const [category, setCategory] = useState("undefined");
 
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
