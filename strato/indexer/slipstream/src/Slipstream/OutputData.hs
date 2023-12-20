@@ -47,7 +47,6 @@ import           Conduit
 import           Control.Arrow                   ((***))
 import           Control.Lens ((^.))
 import           Control.Monad
-import           Control.Monad.Extra             (concatMapM)
 import           Control.Monad.Change.Alter
 import qualified Data.Aeson                      as Aeson
 import qualified Data.ByteString.Base16         as Base16
@@ -81,7 +80,7 @@ import           Slipstream.Metrics
 import           Slipstream.Options
 import           Slipstream.QueryFormatHelper
 import           Slipstream.SolidityValue
-import           SolidVM.Model.CodeCollection    hiding (contractName)
+import           SolidVM.Model.CodeCollection    hiding (contractName, contracts, parents)
 import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type              as SVMType
 import           Text.Printf
@@ -294,9 +293,9 @@ getAbstractParentsFromContract c cc =
   -- recursively obtain parent + grandparent contracts
   -- ex. B is A, C is B, then C should also be A
   let go [] = []
-      go xs = xs ++ (go $ getContractsForParents (concatMap (^. parents) xs) ccc)
-      ccc = cc ^. contracts
-      parents' = c ^. parents
+      go xs = xs ++ (go $ getContractsForParents (concatMap (_parents) xs) ccc)
+      ccc = _contracts cc
+      parents' = _parents c
    in filter ((== AbstractType) . _contractType) (go $ getContractsForParents parents' ccc)
 
 resolveNameParts ::
@@ -1199,18 +1198,25 @@ expandEventTable globalsIORef (o, a, n) evName ev = do
             ]
         yield $ expandTableQuery tableName extrasWithType
 
-insertEventTables ::
-  (OutputM m,
-  Selectable Account CodeCollection m,
-  Selectable Account Contract m) =>
+insertEventTables :: 
+  ( OutputM m,
+    Selectable Account CodeCollection m,
+    Selectable Account Contract m
+  ) =>
   IORef Globals ->
   [AggregateEvent] ->
   ConduitM () Text m ()
 insertEventTables globalsIORef evs = do
-  processedEvents <- concatMapM getAllEvents evs
+  processedEvents <- concat <$> mapM (lift . getAllEvents) evs
   yieldMany . catMaybes =<< lift (mapM (insertEventTable globalsIORef) processedEvents)
   where
-    getAllEvents:: (OutputM m, Selectable Account CodeCollection m, Selectable Account Contract m) => AggregateEvent -> m [AggregateEvent]
+    getAllEvents :: 
+      ( OutputM m, 
+        Selectable Account CodeCollection m, 
+        Selectable Account Contract m
+      ) => 
+      AggregateEvent -> 
+      m [AggregateEvent]
     getAllEvents aggEvent = do
       let event = eventEvent aggEvent
           account = Action.evContractAccount $ event
