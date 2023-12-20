@@ -628,7 +628,7 @@ const ProductDetails = ({ user, users }) => {
                   {decodeURIComponent(details?.name)}
                 </Text>
                 <div className="flex pt-[6px] ">
-                <Text  className="text-[#202020] text-xs  font-medium">Owned By:</Text>
+                <Text  className="text-[#202020] text-xs  font-medium">Owned By: {details?.ownerCommonName}</Text>
                  <Text className="text-[#202020] text-xs  font-medium" >{details?.ownerOrganization}</Text>
                 </div>
               </div>
