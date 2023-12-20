@@ -158,8 +158,7 @@ const ProductDetails = ({ user, users }) => {
     if (inventoryDetails) {
       actions.fetchInventoryOwnershipHistory(
         dispatch,
-        { contract_name: inventoryDetails.contract_name,
-          originAddress: inventoryDetails.originAddress,
+        { originAddress: inventoryDetails.originAddress,
           minItemNumber: inventoryDetails.itemNumber,
           maxItemNumber: inventoryDetails.itemNumber + inventoryDetails.quantity - 1
         }
