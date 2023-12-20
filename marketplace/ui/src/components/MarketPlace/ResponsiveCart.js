@@ -10,6 +10,7 @@ import {
 } from "../../contexts/marketplace";
 import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
+import image_placeholder from "../../images/resources/image_placeholder.png"
 
 const ResponsiveCart = ({ data, confirm, AddQty, MinusQty, ValueQty, removeCartList }) => {
 
@@ -67,7 +68,7 @@ const ResponsiveCart = ({ data, confirm, AddQty, MinusQty, ValueQty, removeCartL
             <div className="flex justify-between ">
               <div className="flex gap-x-3 items-center">
                 <img
-                  src={element?.item?.image}
+                  src={element?.item?.image || image_placeholder}
                   alt={element?.item?.name}
                   className="w-12 h-12 rounded-[4px] object-contain "
                 />
@@ -147,7 +148,7 @@ const ResponsiveCart = ({ data, confirm, AddQty, MinusQty, ValueQty, removeCartL
       })}
 
       <div className=" flex flex-col w-full sm:w-[95%] md:w-[90%]">
-        <Row className="   mt-2  bg-[#F6F6F6]">
+        <Row className="p-3 mt-2  bg-[#F6F6F6]">
           <Col className="w-full  bg-[#F6F6F6]">
             <Row className="justify-between ">
               <p className="text-sm w-36 mr-2">Item Total</p>
