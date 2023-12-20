@@ -164,7 +164,7 @@ const actions = {
     const query = queryValue ? `&productId=${queryValue}` : "";
     
     let temp = [category]
-    const categoryQuery = category && category !== "All" ? `&category[]=${temp}` : "";
+    const categoryQuery = category ? `&category[]=${temp}` : "";
 
     dispatch({ type: actionDescriptors.fetchInventory });
 

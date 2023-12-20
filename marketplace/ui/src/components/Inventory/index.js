@@ -183,7 +183,7 @@ const Inventory = ({ user }) => {
   const tabItems = [allCategory, ...categorys].map((category, index) => {
     return {
       label: category.name,
-      key: category.name,
+      key: category.name === "All" ? undefined : category.name,
       children: (
         <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 max-w-full">
           { !isInventoriesLoading ? (
