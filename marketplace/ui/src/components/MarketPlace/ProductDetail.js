@@ -645,7 +645,7 @@ const ProductDetails = ({ user, users }) => {
               </div>
               <div className="pt-[7px]">
               <Paragraph
-                className="text-[#202020] text-sm  h-[60px]"
+                className="text-[#202020] text-sm  h-[60px] overflow-auto"
               >
                 {decodeURIComponent(details.description).split('\n').map((line, index) => (
                   <React.Fragment key={index}>
@@ -666,7 +666,7 @@ const ProductDetails = ({ user, users }) => {
                        -
                         </p> 
                     </div>
-                    <InputNumber className=" w-full md:w-[295px]  h-9  md:h-10  lg:h-[46px]  border text-[#6A6A6A] border-[#00000029] text-center flex flex-col justify-center" min={1} max={availableQuantity} value={`Quantity (LB) ${qty}`} defaultValue={`Quantity (LB) ${qty}`} controls={false}
+                    <InputNumber className=" w-full md:w-[295px]  h-9  md:h-10  lg:h-[46px]  border text-[#6A6A6A] border-[#00000029] text-center flex flex-col justify-center" min={1} max={availableQuantity} value={`${qty}`} defaultValue={`${qty}`} controls={false}
                       onChange={e => {
                         if (e < availableQuantity) {
                           setQty(e)
@@ -837,18 +837,18 @@ const ProductDetails = ({ user, users }) => {
                 onChange={onTabChange}
                 items={!user ?
                   [{
-                    label: `Description`,
+                    label: <span className="text-sm md:text-base">Description</span>,
                     key: "1",
                     children: <DescriptionComponent />,
                   }]
                   :
                   [{
-                    label: `Description`,
+                    label: <span className="text-sm md:text-base">Description</span>,
                     key: "1",
                     children: <DescriptionComponent />,
                   },
                   {
-                    label: `Ownership History`,
+                    label: <span className="text-sm md:text-base">Ownership History</span>,
                     key: "3",
                     children: (
                       <div>
@@ -867,7 +867,7 @@ const ProductDetails = ({ user, users }) => {
                     ),
                   },
                   {
-                    label: "Files",
+                    label: <span className="text-sm md:text-base">Additional Information</span>,
                     key: "4",
                     children: (
                       <div>
@@ -877,7 +877,7 @@ const ProductDetails = ({ user, users }) => {
                           dataSource={!details.files ? [] : details.files}
                           renderItem={(item) => 
                           <List.Item>
-                            <a href={item} rel="noreferrer" target="_blank">
+                            <a href={item} rel="noreferrer" target="_blank" className="hover:underline break-all text-[#1e40af]">
                               {item}
                             </a>
                           </List.Item>}
