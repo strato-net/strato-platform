@@ -160,7 +160,7 @@ const actions = {
     }
   },
 
-  fetchInventory: async (dispatch, limit, offset, category, queryValue) => {
+  fetchInventory: async (dispatch, limit, offset, category = "undefined", queryValue) => {
     const query = queryValue ? `&productId=${queryValue}` : "";
     const categoryQuery = category !== "undefined" ? `&category=${category}` : "";
     dispatch({ type: actionDescriptors.fetchInventory });

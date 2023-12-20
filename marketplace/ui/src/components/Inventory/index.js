@@ -70,7 +70,7 @@ const Inventory = ({ user }) => {
 
   useEffect(() => {
     if (isSearch) {
-      actions.fetchInventorySearch(dispatch, limit, offset, category, debouncedSearchTerm);
+      actions.fetchInventorySearch(dispatch, limit, offset, debouncedSearchTerm);
     } else actions.fetchInventory(dispatch, limit, offset, category, "");
   }, [dispatch, limit, offset, debouncedSearchTerm, category]);
 
