@@ -160,21 +160,24 @@ const actions = {
     }
   },
 
-  fetchInventory: async (dispatch, limit, offset, queryValue) => {
+  fetchInventory: async (dispatch, limit, offset, queryValue, category) => {
     const query = queryValue ? `&productId=${queryValue}` : "";
+    
+    let temp = [category]
+    const categoryQuery = category && category !== "All" ? `&category[]=${temp}` : "";
 
     dispatch({ type: actionDescriptors.fetchInventory });
 
     try {
       const response = await fetch(
-        `${apiUrl}/inventory?limit=${limit}&offset=${offset}${query}`,
+        `${apiUrl}/inventory?limit=${limit}&offset=${offset}${query}${categoryQuery}`,
         {
           method: HTTP_METHODS.GET,
         }
       );
 
       const body = await response.json();
-
+      console.log(body)
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchInventorySuccessful,

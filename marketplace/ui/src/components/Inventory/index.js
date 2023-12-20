@@ -46,6 +46,7 @@ const Inventory = ({ user }) => {
   const dispatch = useInventoryDispatch();
   const [api, contextHolder] = notification.useNotification();
   const [isSearch, setIsSearch] = useState(false);
+  const [category, setCategory] = useState(undefined);
 
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
@@ -70,8 +71,8 @@ const Inventory = ({ user }) => {
   useEffect(() => {
     if (isSearch) {
       actions.fetchInventorySearch(dispatch, limit, offset, debouncedSearchTerm);
-    } else actions.fetchInventory(dispatch, limit, offset, "");
-  }, [dispatch, limit, offset, debouncedSearchTerm]);
+    } else actions.fetchInventory(dispatch, limit, offset, "", category);
+  }, [dispatch, limit, offset, debouncedSearchTerm, category]);
 
   useEffect(() => {
     actions.sellerStripeStatus(dispatch, user?.commonName);
@@ -168,6 +169,44 @@ const Inventory = ({ user }) => {
   const onboardSeller = async () => {
     navigate(routes.OnboardingSellerToStripe.url)
   }
+  
+  // ------------------ Tabs Start------------------
+  const handleTabSelect = (key) => {
+    console.log("key: ", key);
+    setCategory(key);
+    setOffset(0);
+    setPage(1);
+    return;
+  };
+  
+  const allCategory = { name: "All" };
+
+  const tabItems = [allCategory, ...categorys].map((category, index) => {
+    return {
+      label: category.name,
+      key: category.name,
+      children: (
+        <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 max-w-full">
+          {inventories.map((inventory, index) => {
+            let category = categorys.find((c) => c.name === inventory.category);
+            return (
+              <InventoryCard
+                id={index}
+                inventory={inventory}
+                category={category}
+                key={index}
+                debouncedSearchTerm={debouncedSearchTerm}
+                paymentProviderAddress={
+                  stripeStatus ? stripeStatus.paymentProviderAddress : undefined
+                }
+              />
+            );
+          })}
+        </div>
+      ),
+    };
+  });
+  // ------------------ Tabs END------------------
 
   return (
     <>
@@ -243,58 +282,10 @@ const Inventory = ({ user }) => {
             </div>
           </div>
           <div className="pt-6 mx-4 md:mx-5 md:px-14  lg:mx-1 mb-5 ">
-            <Tabs defaultActiveKey="1"
+            <Tabs defaultActiveKey={category ? category : "All"}
               className="store"
-              items={[
-                {
-                  label: "All",
-                  key: 1,
-                  children:
-                    <div className="my-4 grid grid-cols-1 md:grid-cols-2    gap-6 max-w-full" >
-                      {inventories.map((inventory, index) => {
-                        let category = categorys.find(
-                          (c) => c.name === inventory.category
-                        );
-                        return (
-                          <InventoryCard
-                            id={index}
-                            inventory={inventory}
-                            category={category}
-                            key={index}
-                            debouncedSearchTerm={debouncedSearchTerm}
-                            paymentProviderAddress={stripeStatus ? stripeStatus.paymentProviderAddress : undefined}
-                          />
-                        );
-                      })}
-                    </div>
-                }, {
-                  label: "Carbon",
-                  key: 2,
-                  children: <></>
-                }, {
-                  label: "Clothing",
-                  key: 3,
-                  children: <></>
-                }, {
-                  label: "Material",
-                  key: 4,
-                  children: <></>
-                },
-                {
-                  label: "Collectibles",
-                  key: 5,
-                  children: <></>
-                }, {
-                  label: "Art",
-                  key: 6,
-                  children: <></>
-                },
-                {
-                  label: "Membership",
-                  key: 7,
-                  children: <></>
-                },
-              ]}
+              onChange={(key) => handleTabSelect(key)}
+              items={tabItems}
             />
             <div className="md:flex justify-center pt-6  hidden ">
               <Pagination
