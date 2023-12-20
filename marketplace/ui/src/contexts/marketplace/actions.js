@@ -159,10 +159,11 @@ const actions = {
     const productQuery = products ? `&productId[]=${products}` : "";
     const qtyQuery = `&range[]=quantity,${minQty},${maxQty}`;
     // const priceQuery = `&range[]=pricePerUnit,${minPrice},${maxPrice}`;
+    const sortLatest = "&order=createdDate.desc"
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace?${qtyQuery}${categoryQuery}${subCategoryQuery}${productQuery}${manufacturerQuery}`,
+        `${apiUrl}/marketplace?${qtyQuery}${categoryQuery}${subCategoryQuery}${productQuery}${manufacturerQuery}${sortLatest}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -227,10 +228,12 @@ const actions = {
     const productIdQuery = products ? `&name[]=${products}` : "";
     const qtyQuery = `&range[]=quantity,${minQty},${maxQty}`;
     // const priceQuery = `&range[]=price,${minPrice},${maxPrice}`;
+    const sortLatest = "&order=createdDate.desc"
+
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace/all?${qtyQuery}${categoryQuery}${subCategoryQuery}${productIdQuery}${manufacturerQuery}`,
+        `${apiUrl}/marketplace/all?${qtyQuery}${categoryQuery}${subCategoryQuery}${productIdQuery}${manufacturerQuery}${sortLatest}`,
         {
           method: HTTP_METHODS.GET,
         }
