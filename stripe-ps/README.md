@@ -48,6 +48,7 @@ Get the status of a stripe account given the `accountId` in the call URL.
 Create a checkout session given the following information from the order:
 ```
 {
+  paymentTypes: list of payment types,
   cartData: list of cart items,
   orderDetail: list of order invoices,
   accountId: string

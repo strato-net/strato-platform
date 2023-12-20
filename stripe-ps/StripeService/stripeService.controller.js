@@ -87,9 +87,9 @@ class StripeServiceController {
     try {
       StripeServiceController.validateStripeCheckoutArgs(req.body);
 
-      const { cartData, orderDetail, accountId } = req.body;
+      const { paymentTypes, cartData, orderDetail, accountId } = req.body;
 
-      const session = await stripeService.initiatePayment(cartData, orderDetail, accountId);
+      const session = await stripeService.initiatePayment(paymentTypes, cartData, orderDetail, accountId);
       res.status(200).send(session);
       return next();
     } catch (e) {
@@ -134,6 +134,7 @@ class StripeServiceController {
   // ********* VALIDATION ***********
   static validateStripeCheckoutArgs(args) {
     const stripeCheckoutSchema = Joi.object({
+      paymentTypes: Joi.array().min(1).items(Joi.string().required()).required(),
       cartData: Joi.object({
         buyerOrganization: Joi.string().required(),
         orderList: Joi.array().min(1).items(Joi.object({

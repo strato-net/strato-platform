@@ -8,7 +8,6 @@ const STRIPE_ENV = {
     STRIPE_SECRET_KEY: getEnvVariable('STRIPE_SECRET_KEY'),
   },
   CHECKOUT: {
-    PAYMENT_METHOD_TYPES: ['card'],
     SUCCESS_URL: `${MARKETPLACE_URL}/order/status?session_id={CHECKOUT_SESSION_ID}`,
     CANCEL_URL: `${MARKETPLACE_URL}/checkout`
   },
