@@ -37,7 +37,8 @@ module Slipstream.OutputData (
   cirrusInfo,
   historyTableName,
   tableColumns,
-  resolveNameParts
+  resolveNameParts,
+  getAbstractParentsFromContract
   ) where
 
 
@@ -79,7 +80,7 @@ import           Slipstream.Metrics
 import           Slipstream.Options
 import           Slipstream.QueryFormatHelper
 import           Slipstream.SolidityValue
-import           SolidVM.Model.CodeCollection    hiding (contractName, contracts)
+import           SolidVM.Model.CodeCollection    hiding (contractName, contracts, parents)
 import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type              as SVMType
 import           Text.Printf
@@ -281,6 +282,21 @@ mappingTableName :: Text -> Text -> Text -> Text -> TableName
 mappingTableName o a n m =
   let (o', a', n') = constructTableNameParameters o a n
    in MappingTableName o' a' n' m
+
+getContractsForParents :: [SolidString] -> Map.Map SolidString (ContractF a) -> [ContractF a]
+getContractsForParents parents' cc =
+  let getContractForParent parent = Map.lookup parent cc
+   in mapMaybe getContractForParent parents'
+   
+getAbstractParentsFromContract :: Contract -> CodeCollection -> [Contract]
+getAbstractParentsFromContract c cc =
+  -- recursively obtain parent + grandparent contracts
+  -- ex. B is A, C is B, then C should also be A
+  let go [] = []
+      go xs = xs ++ (go $ getContractsForParents (concatMap (_parents) xs) ccc)
+      ccc = _contracts cc
+      parents' = _parents c
+   in filter ((== AbstractType) . _contractType) (go $ getContractsForParents parents' ccc)
 
 resolveNameParts ::
   ( MonadLogger m,
@@ -1182,13 +1198,73 @@ expandEventTable globalsIORef (o, a, n) evName ev = do
             ]
         yield $ expandTableQuery tableName extrasWithType
 
-insertEventTables ::
-  OutputM m =>
+insertEventTables :: 
+  ( OutputM m,
+    Selectable Account CodeCollection m,
+    Selectable Account Contract m,
+    Selectable Account AddressState m,
+    Selectable Word256 ParentChainIds m,
+    Selectable HS.StorageFilterParams [HS.StorageAddress] m
+  ) =>
   IORef Globals ->
   [AggregateEvent] ->
   ConduitM () Text m ()
 insertEventTables globalsIORef evs = do
-  yieldMany . catMaybes =<< lift (mapM (insertEventTable globalsIORef) evs)
+  processedEvents <- concat <$> mapM (lift . getAllEvents) evs
+  yieldMany . catMaybes =<< lift (mapM (insertEventTable globalsIORef) processedEvents)
+  where
+    getAllEvents :: 
+      ( OutputM m, 
+        Selectable Account CodeCollection m, 
+        Selectable Account Contract m,
+        Selectable Account AddressState m,
+        Selectable Word256 ParentChainIds m,
+        Selectable HS.StorageFilterParams [HS.StorageAddress] m
+      ) => 
+      AggregateEvent -> 
+      m [AggregateEvent]
+    getAllEvents aggEvent = do
+      let event = eventEvent aggEvent
+          account = Action.evContractAccount $ event
+          org = Action.evContractOrganization $ event
+          app = Action.evContractApplication $ event
+          appName =
+              if T.null $ T.pack app
+                then Action.evContractName $ event
+                else app
+      maybeContract <- select (Proxy @Contract) account
+      maybeCodeCollection <- select (Proxy @CodeCollection) account
+      case (maybeContract, maybeCodeCollection) of
+        (Just contract, Just codeCollection) -> do
+          let parents = getAbstractParentsFromContract contract codeCollection
+          newEvents <-  processParents (T.pack org) (T.pack appName) parents aggEvent
+          -- Return the complete list of events (original event + new events)
+          return (aggEvent : newEvents)
+        _ -> return [aggEvent]
+
+    processParents :: 
+      ( OutputM m,
+        Selectable Account AddressState m,
+        Selectable Word256 ParentChainIds m,
+        Selectable HS.StorageFilterParams [HS.StorageAddress] m
+      ) => Text -> Text -> [Contract] -> AggregateEvent -> m [AggregateEvent]
+    processParents org app parents ae = mapM createNewEvent parents
+      where
+        createNewEvent :: 
+          ( OutputM m, 
+            Selectable Account AddressState m,
+            Selectable Word256 ParentChainIds m,
+            Selectable HS.StorageFilterParams [HS.StorageAddress] m
+          ) => Contract -> m AggregateEvent
+        createNewEvent parentName = do
+          (o', a', n') <- resolveNameParts org app parentName
+          return $ ae {
+              eventEvent = (eventEvent ae) {
+                Action.evContractOrganization = T.unpack o',
+                Action.evContractApplication = T.unpack a',
+                Action.evContractName = T.unpack n'
+                  }
+              }
 
 insertEventTable ::
   OutputM m =>
