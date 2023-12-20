@@ -107,11 +107,14 @@ const TransferModal = ({ open, handleCancel, inventory }) => {
                 </Button>
             ]}
         >
+            <div className="head">
+
             <Table
                 columns={columns}
                 dataSource={data}
                 pagination={false}
             />
+            </div>
         </Modal>
     )
 }

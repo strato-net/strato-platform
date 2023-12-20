@@ -303,7 +303,7 @@ const CategoryProductList = ({ user }) => {
             {marketplaceList?.length} Results
           </Text>
         </div>
-      </div>
+      </div >
 
       <div className="flex pt-4 mx-14 mt-[60px] md:mt-4 ">
         {/* Filter section */}
@@ -471,7 +471,8 @@ const CategoryProductList = ({ user }) => {
         )}
       </div>
 
-      {mobileOpenFilter &&
+      {
+        mobileOpenFilter &&
         <div>
           <div className="mr-6 fixed w-full h-full z-50 top-16 overflow-scroll md:hidden ">
             <div className="bg-white shadow-[2px_-2px_4px_0_rgba(0,0,0,0.05)] mb-24">
@@ -572,7 +573,7 @@ const CategoryProductList = ({ user }) => {
         total={10}
         className="flex justify-center my-5"
       />
-    </div>
+    </div >
   );
 };
 
