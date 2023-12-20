@@ -171,14 +171,10 @@ const Inventory = ({ user }) => {
   }
   
   // ---------- Inventory Category Tab Start ----------
-  const contracts = [ "Carbon", "Clothing", "Material", "Collectibles", "Art", "Membership" ];
   const handleTabSelect = (key) => {
-    // Your logic to handle tab selection goes here
-    console.log(`Tab ${key} selected`);
-    console.log("hello")
     setCategory(key);
-    // setOffset(0);
-    // setPage(1);
+    setOffset(0);
+    setPage(1);
     return;
   };
   
