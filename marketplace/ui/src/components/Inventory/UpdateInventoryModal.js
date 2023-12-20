@@ -110,7 +110,7 @@ const UpdateInventoryModal = ({
     let isDone = await actions.updateInventory(dispatch, body);
 
     if (isDone) {
-      actions.fetchInventory(dispatch, 10, 0, debouncedSearchTerm);
+      actions.fetchInventory(dispatch, 10, 0, debouncedSearchTerm, undefined);
       handleCancel();
     }
   };
