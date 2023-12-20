@@ -610,10 +610,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         return false
       }
 
-      if (paymentProvider.eventTime > eventTime) {
+      if (paymentProvider[0].eventTime > eventTime) {
         return true;
       }
-      await paymentManagerJs.updatePaymentProvider(rawAdmin, paymentProvider, { paymentProviderAddress: paymentProvider.address, chargesEnabled, detailsSubmitted, payoutsEnabled, accountDeauthorized, eventTime }, chainOptions)
+      await paymentManagerJs.updatePaymentProvider(rawAdmin, paymentProvider[0], { paymentProviderAddress: paymentProvider[0].address, chargesEnabled, detailsSubmitted, payoutsEnabled, accountDeauthorized, eventTime }, chainOptions)
 
     } catch (error) {
       console.error(error);
@@ -658,7 +658,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         options)
 
       /*  check if an accountId already exists for the user org */
-      if (Object.keys(sellerStripeDetails).length == 0 || !sellerStripeDetails.chargesEnabled || !sellerStripeDetails.detailsSubmitted || !sellerStripeDetails.payoutsEnabled) {
+      if (Object.keys(sellerStripeDetails).length == 0 || !sellerStripeDetails[0].chargesEnabled || !sellerStripeDetails[0].detailsSubmitted || !sellerStripeDetails[0].payoutsEnabled) {
         throw new rest.RestError(RestStatus.CONFLICT, "Seller hasn't activated this payment method")
       }
 
@@ -677,12 +677,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       let stripePaymentSession;
       try {
 
-        stripePaymentSession = await StripeService.initiatePayment(args, invoices, sellerStripeDetails.accountId);
+        stripePaymentSession = await StripeService.initiatePayment(args, invoices, sellerStripeDetails[0].accountId);
       } catch (err) {
         throw new rest.RestError(err.statusCode, err.message)
       }
       const paymentParameters = {
-        address: sellerStripeDetails.address,
+        address: sellerStripeDetails[0].address,
         saleAddresses,
         paymentSessionId: stripePaymentSession.id,
         paymentStatus: stripePaymentSession.payment_status,
@@ -722,7 +722,19 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getPaymentSession = async function (args, options = defaultOptions) {
     try {
       const { session_id } = args
-      const paymentDetail = await paymentProviderJs.getPaymentSession(rawAdmin, { paymentSessionId: session_id }, options);
+      const buyerStripeDetails = await paymentProviderJs.get(rawAdmin,
+        {
+          name: SERVICE_PROVIDERS.STRIPE, transaction_sender: rawAdmin.address,
+          accountDeauthorized: false
+        },
+        options)
+      buyerStripeDetails[0].contract_name
+      
+      // Extract the substring before the last hyphen
+      const parts = buyerStripeDetails[0].contract_name.split('-');
+      const result = parts.slice(0, -1).join('-');
+      
+      const paymentDetail = await paymentProviderJs.getPaymentSession(rawAdmin, { paymentSessionId: session_id, contractName:result }, options);
       const paymentSession = await StripeService.getPaymentSession(session_id, paymentDetail.sellerAccountId);
       const paymentIntent = await StripeService.getPaymentIntent(paymentSession.payment_intent, paymentDetail.sellerAccountId);
       const paymentMethod = await StripeService.getPaymentMethod(paymentIntent.payment_method, paymentDetail.sellerAccountId);

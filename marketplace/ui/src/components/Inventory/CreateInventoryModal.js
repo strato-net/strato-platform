@@ -144,7 +144,7 @@ const CreateInventoryModal = ({
             },
           });
         case "CarbonOffset":
-          const {serialNumber, ...restArgs} = body.itemArgs;
+          const { serialNumber, ...restArgs } = body.itemArgs;
           return (body = {
             itemArgs: {
               ...restArgs,
@@ -173,7 +173,7 @@ const CreateInventoryModal = ({
           });
         case "Metals":
           const selectedUOM = unitOfMeasures.find(u => u.value === values.unitOfMeasurement.value);
-      
+
           return (body = {
             itemArgs: {
               ...body.itemArgs,
@@ -505,74 +505,75 @@ const CreateInventoryModal = ({
           </div>
         );
       case "Metals":
-          return (<div className="flex flex-wrap gap-4 mt-4">
+        return (<div className="flex flex-wrap gap-4 mt-4">
+          <Form.Item
+            label="Source"
+            className="mr-8 w-72"
+          >
+            <Input
+              label="source"
+              placeholder="Enter Material Source"
+              name="source"
+              value={formik.values.source}
+              onChange={formik.handleChange}
+            />
+            {formik.touched.source &&
+              formik.errors.source && (
+                <span className="text-error text-xs">
+                  {formik.errors.source}
+                </span>
+              )}
+          </Form.Item>
+          <Form.Item
+            label="Purity"
+            className="w-72"
+          >
+            <Input
+              label="purity"
+              placeholder="Enter Purity (Ex: 999/1000)"
+              name="purity"
+              value={formik.values.purity}
+              onChange={formik.handleChange}
+            />
+            {formik.touched.purity &&
+              formik.errors.purity && (
+                <span className="text-error text-xs">
+                  {formik.errors.purity}
+                </span>
+              )}
+          </Form.Item>
+          <div className="flex justify-between mt-4">
             <Form.Item
-              label="Source"
-              className="mr-8 w-72"
+              label="Unit of Measurement "
+              name="unitOfMeasurement "
+              className="w-30 mr-14"
             >
-              <Input
-                label="source"
-                placeholder="Enter Material Source"
-                name="source"
-                value={formik.values.source}
-                onChange={formik.handleChange}
-              />
-              {formik.touched.source &&
-                formik.errors.source && (
-                  <span className="text-error text-xs">
-                    {formik.errors.source}
-                  </span>
-                )}
-            </Form.Item>
-            <Form.Item
-              label="Purity"
-              className="w-72"
-            >
-              <Input
-                label="purity"
-                placeholder="Enter Purity (Ex: 999/1000)"
-                name="purity"
-                value={formik.values.purity}
-                onChange={formik.handleChange}
-              />
-              {formik.touched.purity &&
-                formik.errors.purity && (
-                  <span className="text-error text-xs">
-                    {formik.errors.purity}
-                  </span>
-                )}
-            </Form.Item>
-            <div className="flex justify-between mt-4">
-            <Form.Item
-                label="Unit of Measurement "
-                className="w-30 mr-14"
+              <Select
+                id="unitOfMeasurement"
+                placeholder="Select Unit of Measurement "
+                allowClear
+                className="w-35"
+                name="unitOfMeasurement.name"
+                value={formik.values.unitOfMeasurement.name}
+                onChange={(value) => {
+                  let selectedUOM = unitOfMeasures.find(u => u.value === value);
+                  formik.setFieldValue("unitOfMeasurement.name", selectedUOM.name);
+                  formik.setFieldValue("unitOfMeasurement.value", value);
+                }}
               >
-                <Select
-                  id="unitOfMeasurement"
-                  placeholder="Select Unit of Measurement "
-                  allowClear
-                  className="w-35"
-                  name="unitOfMeasurement.name"
-                  value={formik.values.unitOfMeasurement.name}
-                  onChange={(value) => {
-                    let selectedUOM = unitOfMeasures.find(u => u.value === value);
-                    formik.setFieldValue("unitOfMeasurement.name", selectedUOM.name);
-                    formik.setFieldValue("unitOfMeasurement.value", value);
-                  }}
-                >
-                  {unitOfMeasures.map((e, index) => (
-                    <Option value={e.value} key={index}>
-                      {e.name}
-                    </Option>
-                  ))}
-                </Select>
-                {getIn(formik.touched, "unitofmeasurement.name") &&
-                  getIn(formik.errors, "unitofmeasurement.name") && (
-                    <span className="text-error text-xs">
-                      {getIn(formik.errors, "unitofmeasurement.name")}
-                    </span>
-                  )}
-              </Form.Item>
+                {unitOfMeasures.map((e, index) => (
+                  <Option value={e.value} key={index}>
+                    {e.name}
+                  </Option>
+                ))}
+              </Select>
+              {getIn(formik.touched, "unitofmeasurement.name") &&
+                getIn(formik.errors, "unitofmeasurement.name") && (
+                  <span className="text-error text-xs">
+                    {getIn(formik.errors, "unitofmeasurement.name")}
+                  </span>
+                )}
+            </Form.Item>
             <Form.Item
               label="Least Sellable Unit(s)"
               className="w-30 mr-14"
@@ -605,8 +606,8 @@ const CreateInventoryModal = ({
                 </span>
               )}
             </Form.Item>
-            </div>
-            </div>);
+          </div>
+        </div>);
       case 'Membership':
         return (
           <div className="flex justify-between mt-4 ">
@@ -655,9 +656,9 @@ const CreateInventoryModal = ({
               className="w-72"
             >
               <Input
-                 label="quantity"
-                 placeholder="Enter Quantity"
-                 name="quantity"
+                label="quantity"
+                placeholder="Enter Quantity"
+                name="quantity"
                 value={formik.values.quantity}
                 onChange={formik.handleChange}
               />
@@ -797,6 +798,8 @@ const CreateInventoryModal = ({
                   )}
               </Form.Item>
 
+
+
               <Form.Item
                 label="Sub-Category"
                 className="w-72 mr-5"
@@ -812,13 +815,11 @@ const CreateInventoryModal = ({
                   }}
                 >
                   {categorys.map((category) =>
-                    category.name === formik.values.category
-                      ? category.subCategories.map((e, index) => (
-                          <Option value={e.contract} key={index}>
-                            {e.name}
-                          </Option>
-                        ))
-                      : null
+                    category.name === formik.values.category ? category.subCategories.map((e, index) => (
+                      <Option value={e.contract} key={index}>
+                        {e.name}
+                      </Option>
+                    )) : null
                   )}
 
                   {/* {CATEGORIES.map((e, index) => (

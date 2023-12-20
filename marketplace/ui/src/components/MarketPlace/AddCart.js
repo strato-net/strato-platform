@@ -342,9 +342,9 @@ const Checkout = ({ user }) => {
       title: <Text className="text-[#202020] text-base font-semibold">Amount($)</Text>,
       dataIndex: "amount",
       align: "center",
-      render: (text) => <p className="text-sm font-medium text-[#202020]">{text}</p>
-      ,
-
+      render: (text) => <p className="text-sm font-medium text-[#202020]">{text}</p>  
+,
+  
     },
     {
       title: <Text className="text-[#202020] text-base font-semibold "></Text>,
@@ -400,11 +400,13 @@ const Checkout = ({ user }) => {
           <Breadcrumb>
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
               <ClickableCell href={routes.Marketplace.url}>
+                <p className="text-[#13188A] font-semibold">
                 Home
+                  </p>
               </ClickableCell>
             </Breadcrumb.Item>
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-              <p className=" text-primary">
+              <p className=" font-medium text-[#202020]">
                 Add to Cart
               </p>
             </Breadcrumb.Item>

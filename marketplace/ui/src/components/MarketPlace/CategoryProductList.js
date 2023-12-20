@@ -283,20 +283,21 @@ const CategoryProductList = ({ user }) => {
         <Breadcrumb className="text-xs ml-4 md:ml-14 mt-14">
       <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
           <ClickableCell href={routes.Marketplace.url}>
-            <p href={routes.Marketplace.url} className="text-primaryB hover:bg-transparent">
+            <p href={routes.Marketplace.url} className="text-[#13188A]  font-semibold ">
               Home
             </p>
           </ClickableCell>
         </Breadcrumb.Item>
         <Breadcrumb.Item href="" onClick={e => setSelectedCategories([])}>
           <ClickableCell href={routes.MarketplaceProductList.url}>
-            <p href={routes.MarketplaceProductList.url} className="text-primaryB hover:bg-transparent">
+            <p href={routes.MarketplaceProductList.url} className="text-[#202020]  font-medium ">
+              
               Marketplace
             </p>
           </ClickableCell>  
         </Breadcrumb.Item>
         {selectedCategories?.map((category, index) => (
-          <Breadcrumb.Item key={index} className="text-primary">
+          <Breadcrumb.Item key={index} className="text-[#202020] font-medium">
             {category ? category : ""}
           </Breadcrumb.Item>
         ))}
