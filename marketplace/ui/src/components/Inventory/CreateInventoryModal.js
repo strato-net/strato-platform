@@ -754,7 +754,7 @@ const CreateInventoryModal = ({
         <Form layout="vertical" className="mt-5" onSubmit={formik.handleSubmit}>
           <div className="w-full mb-3">
             <div className="flex flex-wrap sm:flex-nowrap justify-between gap-4 mt-4 ">
-              <Form.Item label="Name" name="name" className="w-full sm:w-[200px] md:w-72 ">
+              <Form.Item label="Name" className="w-full sm:w-[200px] md:w-72 ">
                 <Input
                   label="name"
                   placeholder="Enter Name"
@@ -770,7 +770,7 @@ const CreateInventoryModal = ({
                 )}
               </Form.Item>
 
-              <Form.Item label="Category" name="category" className=" w-full sm:w-[200px] md:w-72 ">
+              <Form.Item label="Category" className=" w-full sm:w-[200px] md:w-72 ">
                 <Select
                   id="category"
                   placeholder="Select Category"
@@ -886,7 +886,7 @@ const CreateInventoryModal = ({
                   </span>
                 )}
               </Form.Item>
-              <Form.Item label="Upload Files" name="files" className="w-full sm:w-[200px] md:w-72">
+              <Form.Item label="Upload Files" className="w-full sm:w-[200px] md:w-72">
                 <div className="p-4 border-secondryD border rounded flex flex-col justify-around">
                   <Upload
                     onChange={(es) => {
