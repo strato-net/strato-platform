@@ -37,6 +37,7 @@ import image_placeholder from "../../images/resources/image_placeholder.png";
 import BoughtOrdersTable from "./BoughtOrdersTable";
 import TransfersTable from "./TransfersTable";
 import { ResponsiveOrderDetailCard } from "./ResponsiveOrderDetailCard";
+import { LeftArrow } from "../../images/SVGComponents";
 
 const SoldOrderDetails = ({ user, users }) => {
   const [Id, setId] = useState(undefined);
@@ -510,6 +511,7 @@ const SoldOrderDetails = ({ user, users }) => {
                   key: "Sold",
                   children:
                     <div className="mb-10">
+                      <Button type="ghost" onClick={()=>onChange('Sold')} className="cursor-pointer px-2 flex md:hidden items-center gap-2"><LeftArrow /> Back</Button>
                       <Card className="md:p-2 mb-4 md:mb-14 md:shadow-card_shadow order_detail_card">
                         <div className="flex flex-col md:flex-row md:justify-between">
                           <div className="flex flex-col">

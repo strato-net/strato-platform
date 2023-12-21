@@ -34,6 +34,7 @@ import dayjs from "dayjs";
 import TransfersTable from "./TransfersTable";
 import SoldOrdersTable from "./SoldOrdersTable";
 import { ResponsiveOrderDetailCard } from "./ResponsiveOrderDetailCard";
+import { LeftArrow } from "../../images/SVGComponents";
 
 const BoughtOrderDetails = ({ user, users }) => {
   const [comment, setcomment] = useState("");
@@ -407,6 +408,7 @@ const BoughtOrderDetails = ({ user, users }) => {
                 key: "Bought",
                 children:
                   <div className="mb-10">
+                    <Button type="ghost" onClick={()=>onChange('Bought')} className="cursor-pointer mb-1 px-2 flex md:hidden items-center gap-2"><LeftArrow /> Back</Button>
                     <Card className="md:p-2 mb-4 md:mb-14 md:shadow-card_shadow order_detail_card">
                       <div className="flex flex-col md:flex-row md:justify-between">
                         <div className="flex flex-col">
