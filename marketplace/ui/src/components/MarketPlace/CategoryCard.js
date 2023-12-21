@@ -13,11 +13,11 @@ const CategoryCard = () => {
   const { categorys } = useCategoryState();
 
   const categoryImages = [
-    Images["Art-category"],
     Images["Carbon-category"],
     Images["Metal"],
     Images["Clothing-category"],
     Images["collectibles"],
+    Images["Art-category"],
     Images["membership_card"],
   ];
   
