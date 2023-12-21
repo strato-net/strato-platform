@@ -343,7 +343,7 @@ export const searchAllWithQueryArgs = async (contractName, args, options, user) 
     }
 
     if (key === 'category' && Array.isArray(args[key])) {
-      const categories = args[key][0].split(',').map(category => '%-' + category);
+      const categories = args[key][0].split(',').map(category => '%-' + category + '%');
       result.push({ key, value: categories, predicate: 'or', subPredicate: 'like'})
     }
 

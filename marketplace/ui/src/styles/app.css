@@ -363,3 +363,44 @@ body::-webkit-scrollbar {
 .head .ant-table-thead .ant-table-cell{
   background: #EEEFFA !important;
 }
+
+.ant-form-item .ant-form-item-label{
+  padding-bottom: 4px !important;
+}
+
+.inventory_modal .ant-input{
+  height: 42px !important;
+}
+.ant-select-selector{
+  height: 42px !important; 
+}
+
+
+@media screen and (max-width :  780px){
+  .store .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
+    font-size: 16px !important;
+    font-weight: 600;
+    color: #13188A;
+  }
+  
+  .store .ant-tabs-tab.ant-tabs-tab .ant-tabs-tab-btn {
+    font-size: 16px !important;
+    font-weight: 500;
+    color: #6A6A6A;
+  } 
+  .ant-tabs .ant-tabs-tab+.ant-tabs-tab {
+    margin-right : 6px !important;
+  }
+}
+
+@media screen and (min-width: 976px) and (max-width: 1200px) {
+  .inventoryCard  {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+.inventory_card .ant-input-number .ant-input-number-input{
+  text-align: left;
+  height: 42px;
+}

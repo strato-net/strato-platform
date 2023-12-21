@@ -334,7 +334,7 @@ const ConfirmOrder = () => {
       buyerOrganization: userOrganization,
       orderList,
       orderTotal: total + tax + shipping,
-      shippingAddressId: userAddresses[selectedAddress].id,
+      shippingAddressId: userAddresses[selectedAddress].address_id,
       tax: tax,
       user: user.commonName,
       email: user.preferred_username,
@@ -376,10 +376,10 @@ const ConfirmOrder = () => {
             </div>
           ) : (
             <div className="pb-[30px]">
-              <Breadcrumb>
+                <Breadcrumb>
                 <Breadcrumb.Item href="javascript:;">
                   <ClickableCell href={routes.Marketplace.url}>
-                  <p className="text-[#13188A] font-semibold">
+                  <p className="text-sm text-[#13188A] font-semibold">
                     Home
                     </p>
                   </ClickableCell>
@@ -388,21 +388,30 @@ const ConfirmOrder = () => {
                   href="javascript:;"
                 >
                   <ClickableCell href={routes.Checkout.url}>
-                    <p className="text-[#13188A] font-semibold">
+                    <p className="text-sm text-[#13188A] font-semibold">
 
                     Checkout
                     </p>
                   </ClickableCell>
                 </Breadcrumb.Item>
                 <Breadcrumb.Item>
-                  <p className="text-[#202020] font-medium">
+                  <p className="text-sm text-[#202020] font-medium">
                     Confirm Order
                   </p>
                 </Breadcrumb.Item>
               </Breadcrumb>
-              <div className="pt-[38px]">
-                <Typography className="text-[#202020] text-2xl font-semibold">My Cart</Typography>
-              </div>
+              <div className="flex justify-between items-center pt-6 md:pb-2">
+                <Typography className="text-[#202020] text-lg md:text-2xl font-semibold">My Cart</Typography>
+              {stripeStatus && <button id="pay-now-button" className={`p-1 md:p-3 h-max rounded border ${stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled ? 'border-primary bg-primary hover:bg-primaryHover text-white' : 'cursor-not-allowed border-[#999999] rounded bg-[#cccccc] text-[#666666]'}`}
+                    onClick={() => {
+                      if (stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled) {
+                        handlePaymentConfirm();
+                      }
+                    }}
+                  >
+                    Review and Submit
+                  </button>}
+                  </div>
               <div className="pt-4 hidden lg:block border-top">
                 <DataTableComponent
                   isLoading={false}
@@ -498,146 +507,15 @@ const ConfirmOrder = () => {
                             Please Add Address
                           </p>
                         </div>
-                    // <Card className="w-3/5 mt-4">
-                    //   <Form layout="vertical" className="mt-5">
-                    //     <div>
-                    //       <div className="flex justify-between mb-4">
-                    //         <Form.Item label="Name" name="name" className="w-72">
-                    //           <Input
-                    //             label="name"
-                    //             name="name"
-                    //             placeholder="Enter Name"
-                    //             value={formik.values.name}
-                    //             onChange={formik.handleChange}
-                    //           />
-                    //           {formik.touched.name && formik.errors.name && (
-                    //             <span className="text-error text-xs">
-                    //               {formik.errors.name}
-                    //             </span>
-                    //           )}
-                    //         </Form.Item>
-
-                    //         <Form.Item label="Zipcode" name="zipcode" className="w-72">
-                    //           <Input
-                    //             label="zipcode"
-                    //             name="zipcode"
-                    //             placeholder="Enter Zipcode"
-                    //             value={formik.values.zipcode}
-                    //             onChange={formik.handleChange}
-                    //             maxLength={15}
-                    //           />
-                    //           {formik.touched.zipcode && formik.errors.zipcode && (
-                    //             <span className="text-error text-xs">
-                    //               {formik.errors.zipcode}
-                    //             </span>
-                    //           )}
-                    //         </Form.Item>
-                    //       </div>
-
-                    //       <div className="flex justify-between mb-4">
-                    //         <Form.Item label="State" name="state" className="w-72">
-                    //           <Input
-                    //             label="state"
-                    //             name="state"
-                    //             placeholder="Enter State"
-                    //             value={formik.values.state}
-                    //             onChange={formik.handleChange}
-                    //           />
-                    //           {formik.touched.state && formik.errors.state && (
-                    //             <span className="text-error text-xs">
-                    //               {formik.errors.state}
-                    //             </span>
-                    //           )}
-                    //         </Form.Item>
-
-                    //         <Form.Item label="City" name="city" className="w-72">
-                    //           <Input
-                    //             label="city"
-                    //             name="city"
-                    //             placeholder="Enter City"
-                    //             value={formik.values.city}
-                    //             onChange={formik.handleChange}
-                    //           />
-                    //           {formik.touched.city && formik.errors.city && (
-                    //             <span className="text-error text-xs">
-                    //               {formik.errors.city}
-                    //             </span>
-                    //           )}
-                    //         </Form.Item>
-                    //       </div>
-
-                    //       <div className="flex justify-between items-start mb-4">
-                    //         <Form.Item
-                    //           label="Address Line 1"
-                    //           name="addressLine1"
-                    //           className="w-72"
-                    //         >
-                    //           <TextArea
-                    //             rows={3}
-                    //             name="addressLine1"
-                    //             placeholder="Enter Address Line 1"
-                    //             value={formik.values.addressLine1}
-                    //             onChange={formik.handleChange}
-                    //           />
-                    //           {formik.touched.addressLine1 && formik.errors.addressLine1 && (
-                    //             <span className="text-error text-xs">
-                    //               {formik.errors.addressLine1}
-                    //             </span>
-                    //           )}
-                    //         </Form.Item>
-
-                    //         <Form.Item
-                    //           label="Address Line 2"
-                    //           name="addressLine2"
-                    //           className="w-72"
-                    //         >
-                    //           <TextArea
-                    //             rows={3}
-                    //             name="addressLine2"
-                    //             placeholder="Enter Address Line 2"
-                    //             value={formik.values.addressLine2}
-                    //             onChange={formik.handleChange}
-                    //           />
-                    //           {formik.touched.addressLine2 && formik.errors.addressLine2 && (
-                    //             <span className="text-error text-xs">
-                    //               {formik.errors.addressLine2}
-                    //             </span>
-                    //           )}
-                    //         </Form.Item>
-
-                    //       </div>
-
-                    //     </div>
-                    //     <div className="flex justify-end mt-8">
-                    //       <div id="add-address-button" className="cursor-pointer justify-center flex items-center w-44 h-9  border border-primary rounded bg-primary hover:bg-primaryHover text-white"
-                    //         onClick={formik.handleSubmit}>
-                    //         Add address
-                    //       </div>
-                    //     </div>
-                    //   </Form>
-                    // </Card>
-
                   }
                 </div>
                 {/* TODO: add user address later */}
-                {stripeStatus == null ? <div></div> : <Row className=" justify-center md:justify-end mt-12">
                   {/* <div id="pay-later-button" className="cursor-pointer justify-center flex items-center w-44 h-9 bg-white text-primary border border-primary rounded hover:bg-primary hover:text-white mr-4"
                 onClick={() => {
                   setOpen(true);
                 }}>
                 Pay Later
               </div> */}
-                  <div className="w-full h-[1px] mb-[30px] bg-[#00000020] "></div>
-                  <button id="pay-now-button" className={`p-4 rounded border ${stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled ? 'border-primary bg-primary hover:bg-primaryHover text-white' : 'cursor-not-allowed border-[#999999] rounded bg-[#cccccc] text-[#666666]'}`}
-                    onClick={() => {
-                      if (stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled) {
-                        handlePaymentConfirm();
-                      }
-                    }}
-                  >
-                    Review and Submit
-                  </button>
-                </Row>}
               </div>
             </div>
           )}

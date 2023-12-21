@@ -74,7 +74,7 @@ const ProductDetails = ({ user, users }) => {
   const [serialNumber, setSerialNumber] = useState(false);
   const limit = 10, offset = 0;
   const debouncedSearchTerm = useDebounce("", 1000);
-  const { inventoryEvents, isInventoryEventsLoading,inventoryOwnershipHistory, eventDetails, iseventDetailsLoading } =
+  const { inventoryEvents, isInventoryEventsLoading, eventDetails, iseventDetailsLoading } =
     useEventState();
   const eventDispatch = useEventDispatch();
 
@@ -114,6 +114,7 @@ const ProductDetails = ({ user, users }) => {
     inventoryDetails, 
     isInventoryDetailsLoading,
     isInventoryOwnershipHistoryLoading,
+    inventoryOwnershipHistory
   } = useInventoryState();
   const marketplaceDispatch = useMarketplaceDispatch();
   const { cartList } = useMarketplaceState();
@@ -158,8 +159,7 @@ const ProductDetails = ({ user, users }) => {
     if (inventoryDetails) {
       actions.fetchInventoryOwnershipHistory(
         dispatch,
-        { contract_name: inventoryDetails.contract_name,
-          originAddress: inventoryDetails.originAddress,
+        { originAddress: inventoryDetails.originAddress,
           minItemNumber: inventoryDetails.itemNumber,
           maxItemNumber: inventoryDetails.itemNumber + inventoryDetails.quantity - 1
         }
@@ -413,14 +413,14 @@ const ProductDetails = ({ user, users }) => {
 
   const ownershipDetailColumn = [
     {
-      title: <Text className="text-primaryC text-[13px]">SELLER</Text>,
+      title: <Text className="text-primaryC text-[13px]">Seller</Text>,
       dataIndex: "sellerCommonName",
       key: "sellerCommonName",
       align: "center",
       render: (text) => <p>{text}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">OWNER</Text>,
+      title: <Text className="text-primaryC text-[13px]">Owner</Text>,
       dataIndex: "purchaserCommonName",
       key: "purchaserCommonName",
       align: "center",
@@ -429,7 +429,7 @@ const ProductDetails = ({ user, users }) => {
     {
       title: (
         <Text className="text-primaryC text-[13px]">
-          OWNERSHIP START DATE
+          Ownership Start Date
         </Text>
       ),
       dataIndex: "block_timestamp",
@@ -453,44 +453,40 @@ const ProductDetails = ({ user, users }) => {
     switch (categoryName) {
       case "Art":
         return (
-          <Space direction="vertical" className="py-[15px] px-[14px]  border border-[#E9E9E9] rounded-md">
-            <Space>
+          <Space direction="vertical" className="py-[15px] px-[14px] w-full sm:w-[388px] md:w-[417px] border border-[#E9E9E9] rounded-md">
+            <Space className="flex justify-between">
               <DescTitle text="Artist" />
-              <DescTitle text=":" />
-              <Text className="text-[13px]">{itemData?.artist}</Text>
+              <Text className="text-[13px] text-[#202020] font-medium">{itemData?.artist}</Text>
             </Space>
           </Space>)
       case "CarbonOffset":
         return (
-          <Space direction="vertical" className="py-[15px] px-[14px]  border border-[#E9E9E9] rounded-md">
+          <Space direction="vertical" className="py-[15px] px-[14px] w-full sm:w-[388px] md:w-[417px] border border-[#E9E9E9] rounded-md">
             {/* <Space>
               <DescTitle text="Project Type" />
               <DescTitle text="                      :" />
               <Text className="text-[13px]">{itemData?.projectType}</Text>
             </Space> */}
-            <Space>
+            <Space className="flex justify-between">
               <DescTitle text="Quantity" />
-              <DescTitle text=":" />
-              <Text className="text-[13px]">{availableQuantity}</Text>
+              <Text className="text-[13px] text-[#202020] font-medium">{availableQuantity}</Text>
             </Space>
           </Space>)
       case "Clothing":
         return (
-          <Space direction="vertical" className="py-[15px] px-[14px]  border border-[#E9E9E9] rounded-md">
-            <Space>
+          <Space direction="vertical" className="py-[15px] px-[14px] w-full sm:w-[388px] md:w-[417px] border border-[#E9E9E9] rounded-md">
+            <Space className="flex justify-between">
               <DescTitle text="Brand" />
-              <DescTitle text="                      :" />
-              <Text className="text-[13px]">{itemData?.brand}</Text>
+              <Text className="text-[13px] text-[#202020] font-medium">{itemData?.brand}</Text>
             </Space>
           </Space>)
       case "Metals":
         return (
           <>
-          <Space direction="vertical" className="py-[15px] px-[14px]  border border-[#E9E9E9] rounded-md">
-            <Space>
+          <Space direction="vertical" className="py-[15px] px-[14px] w-full sm:w-[388px] md:w-[417px] border border-[#E9E9E9] rounded-md">
+            <Space className="flex justify-between">
               <DescTitle text="Source" />
-              <DescTitle text=":" />
-              <Text className="text-[13px]">{itemData?.source}</Text>
+              <Text className="text-[13px] text-[#202020] font-medium">{itemData?.source}</Text>
             </Space>
           
             {
@@ -508,29 +504,26 @@ const ProductDetails = ({ user, users }) => {
             </Text>
             </Space> */}
 
-            <Space className="py-[15px] px-[14px]  border border-[#E9E9E9] rounded-md">
+            <Space className="flex justify-between py-[15px] px-[14px]  border border-[#E9E9E9] rounded-md">
               <DescTitle text="Purity" />
-              <DescTitle text=":" />
-              <Text className="text-[13px]">{itemData?.purity}</Text>
+              <Text className="text-[13px] text-[#202020] font-medium">{itemData?.purity}</Text>
             </Space>
           </Space>
           </>)
       case "Membership":
         return (
-          <Space direction="vertical" className="py-[15px] px-[14px]  border border-[#E9E9E9] rounded-md">
-           <Space>
+          <Space direction="vertical" className="py-[15px] px-[14px] w-full sm:w-[388px] md:w-[417px] border border-[#E9E9E9] rounded-md">
+           <Space className="flex justify-between">
               <DescTitle text="Units" />
-              <DescTitle text="                      :" />
-              <Text className="text-[13px]">{availableQuantity}</Text>
+              <Text className="text-[13px] text-[#202020] font-medium">{availableQuantity}</Text>
             </Space>
           </Space>)
       case "CarbonDAO":
         return (
-          <Space direction="vertical" className="py-[15px] px-[14px]  border border-[#E9E9E9] rounded-md">
-            <Space>
+          <Space direction="vertical" className="py-[15px] px-[14px] w-full sm:w-[388px] md:w-[417px] border border-[#E9E9E9] rounded-md">
+            <Space className="flex justify-between">
               <DescTitle text="Units" />
-              <DescTitle text="                      :" />
-              <Text className="text-[13px]">{availableQuantity}</Text>
+              <Text className="text-[13px] text-[#202020] font-medium">{availableQuantity}</Text>
             </Space>
           </Space>)
       default:
@@ -611,11 +604,11 @@ const ProductDetails = ({ user, users }) => {
               </Breadcrumb.Item>
             </Breadcrumb>
           </Row>
-          <div className="  flex w-full flex-col  px-4 sm:px-8 md:px-0  items-center lg:items-start  md:w-[750px] lg:w-[835px] xl:w-[858px]  md:mx-auto ">
-          <div className="  flex w-full  md:justify-center gap-[15px] lg:gap-6 flex-col lg:flex-row   ">
+          <div className="flex w-full flex-col  px-4 sm:px-8 md:px-0  items-center lg:items-start  md:w-[750px] lg:w-[835px] xl:w-[858px]  md:mx-auto ">
+          <div className="flex md:justify-center gap-[15px] lg:gap-6 flex-col lg:flex-row   ">
             <Carousel  className="product_detail w-full  sm:w-[417px]   lg:h-[348px] md:w-[343px] lg:w-[417px]" showStatus={false} showArrows swipeable emulateTouch infiniteLoop >
              { details.images.length > 0  ? details.images.map((element,  index)=>{
-                  return ( <><div key={index} className="sm:w-[343px ] sm:h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
+                  return ( <><div key={index} className="sm:w-[343px ] h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
                   <img  width={"100%"}  className="  rounded-md h-full " src={element ? element : image_placeholder} />
                </div></>)
              })  : <><div  className="sm:w-[343px ] sm:h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
@@ -630,7 +623,7 @@ const ProductDetails = ({ user, users }) => {
                   {decodeURIComponent(details?.name)}
                 </Text>
                 <div className="flex pt-[6px] ">
-                <Text  className="text-[#202020] text-xs  font-medium">Owned By:</Text>
+                <Text  className="text-[#202020] text-xs  font-medium">Owned By: {details?.ownerCommonName}</Text>
                  <Text className="text-[#202020] text-xs  font-medium" >{details?.ownerOrganization}</Text>
                 </div>
               </div>
@@ -645,7 +638,7 @@ const ProductDetails = ({ user, users }) => {
               </div>
               <div className="pt-[7px]">
               <Paragraph
-                className="text-[#202020] text-sm  h-[60px]"
+                className="text-[#202020] text-sm  h-[60px] overflow-auto"
               >
                 {decodeURIComponent(details.description).split('\n').map((line, index) => (
                   <React.Fragment key={index}>
@@ -666,7 +659,7 @@ const ProductDetails = ({ user, users }) => {
                        -
                         </p> 
                     </div>
-                    <InputNumber className=" w-full md:w-[295px]  h-9  md:h-10  lg:h-[46px]  border text-[#6A6A6A] border-[#00000029] text-center flex flex-col justify-center" min={1} max={availableQuantity} value={`Quantity (LB) ${qty}`} defaultValue={`Quantity (LB) ${qty}`} controls={false}
+                    <InputNumber className=" w-full md:w-[295px]  h-9  md:h-10  lg:h-[46px]  border text-[#6A6A6A] border-[#00000029] text-center flex flex-col justify-center" min={1} max={availableQuantity} value={`${qty}`} defaultValue={`${qty}`} controls={false}
                       onChange={e => {
                         if (e < availableQuantity) {
                           setQty(e)
@@ -837,18 +830,18 @@ const ProductDetails = ({ user, users }) => {
                 onChange={onTabChange}
                 items={!user ?
                   [{
-                    label: `Description`,
+                    label: <span className="text-sm md:text-base">Description</span>,
                     key: "1",
                     children: <DescriptionComponent />,
                   }]
                   :
                   [{
-                    label: `Description`,
+                    label: <span className="text-sm md:text-base">Description</span>,
                     key: "1",
                     children: <DescriptionComponent />,
                   },
                   {
-                    label: `Ownership History`,
+                    label: <span className="text-sm md:text-base">Ownership History</span>,
                     key: "3",
                     children: (
                       <div>
@@ -867,7 +860,7 @@ const ProductDetails = ({ user, users }) => {
                     ),
                   },
                   {
-                    label: "Files",
+                    label: <span className="text-sm md:text-base">Additional Information</span>,
                     key: "4",
                     children: (
                       <div>
@@ -877,7 +870,7 @@ const ProductDetails = ({ user, users }) => {
                           dataSource={!details.files ? [] : details.files}
                           renderItem={(item) => 
                           <List.Item>
-                            <a href={item} rel="noreferrer" target="_blank">
+                            <a href={item} rel="noreferrer" target="_blank" className="hover:underline break-all text-[#1e40af]">
                               {item}
                             </a>
                           </List.Item>}

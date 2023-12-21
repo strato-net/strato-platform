@@ -46,6 +46,7 @@ const Inventory = ({ user }) => {
   const dispatch = useInventoryDispatch();
   const [api, contextHolder] = notification.useNotification();
   const [isSearch, setIsSearch] = useState(false);
+  const [category, setCategory] = useState(undefined);
 
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
@@ -70,8 +71,8 @@ const Inventory = ({ user }) => {
   useEffect(() => {
     if (isSearch) {
       actions.fetchInventorySearch(dispatch, limit, offset, debouncedSearchTerm);
-    } else actions.fetchInventory(dispatch, limit, offset, "");
-  }, [dispatch, limit, offset, debouncedSearchTerm]);
+    } else actions.fetchInventory(dispatch, limit, offset, "", category);
+  }, [dispatch, limit, offset, debouncedSearchTerm, category]);
 
   useEffect(() => {
     actions.sellerStripeStatus(dispatch, user?.commonName);
@@ -168,11 +169,55 @@ const Inventory = ({ user }) => {
   const onboardSeller = async () => {
     navigate(routes.OnboardingSellerToStripe.url)
   }
+  
+  // ------------------ Tabs Start------------------
+  const handleTabSelect = (key) => {
+    setCategory(key);
+    setOffset(0);
+    setPage(1);
+    return;
+  };
+  
+  const allCategory = { name: "All" };
+
+  const tabItems = [allCategory, ...categorys].map((category, index) => {
+    return {
+      label: category.name,
+      key: category.name === "All" ? undefined : category.name,
+      children: (
+        <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 inventoryCard  max-w-full">
+          { !isInventoriesLoading ? (
+              inventories.map((inventory, index) => {
+                let category = categorys.find((c) => c.name === inventory.category);
+                return (
+                  <InventoryCard
+                    id={index}
+                    inventory={inventory}
+                    category={category}
+                    key={index}
+                    debouncedSearchTerm={debouncedSearchTerm}
+                    paymentProviderAddress={
+                      stripeStatus ? stripeStatus.paymentProviderAddress : undefined
+                    }
+                  />
+                );
+              })
+            ) : (
+              <div className="absolute left-[50%] md:top-4 ">
+                <Spin size="large" />
+              </div>
+            )
+        }
+        </div>
+      ),
+    };
+  });
+  // ------------------ Tabs END------------------
 
   return (
     <>
       {contextHolder}
-      {stripeStatus == null || isInventoriesLoading || isLoadingStripeStatus ? (
+      {stripeStatus == null || isLoadingStripeStatus ? (
         <div className="h-screen flex justify-center items-center">
           <Spin size="large" />
         </div>
@@ -181,13 +226,13 @@ const Inventory = ({ user }) => {
           <Breadcrumb className="sm:lg:mx-14">
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
               <ClickableCell href={routes.Marketplace.url}>
-                <p className="text-[#13188A] font-semibold">
+                <p className="text-sm text-[#13188A] font-semibold">
                   Home
                 </p>
               </ClickableCell>
             </Breadcrumb.Item>
             <Breadcrumb.Item>
-              <p className=" text-[#202020] font-medium">
+              <p className="text-sm text-[#202020] font-medium">
                 My Store
               </p>
             </Breadcrumb.Item>
@@ -243,60 +288,12 @@ const Inventory = ({ user }) => {
             </div>
           </div>
           <div className="pt-6 mx-4 md:mx-5 md:px-14  lg:mx-1 mb-5 ">
-            <Tabs defaultActiveKey="1"
+            <Tabs defaultActiveKey={category ? category : "All"}
               className="store"
-              items={[
-                {
-                  label: "All",
-                  key: 1,
-                  children:
-                    <div className="my-4 grid grid-cols-1 md:grid-cols-2    gap-6 max-w-full" >
-                      {inventories.map((inventory, index) => {
-                        let category = categorys.find(
-                          (c) => c.name === inventory.category
-                        );
-                        return (
-                          <InventoryCard
-                            id={index}
-                            inventory={inventory}
-                            category={category}
-                            key={index}
-                            debouncedSearchTerm={debouncedSearchTerm}
-                            paymentProviderAddress={stripeStatus ? stripeStatus.paymentProviderAddress : undefined}
-                          />
-                        );
-                      })}
-                    </div>
-                }, {
-                  label: "Carbon",
-                  key: 2,
-                  children: <></>
-                }, {
-                  label: "Clothing",
-                  key: 3,
-                  children: <></>
-                }, {
-                  label: "Material",
-                  key: 4,
-                  children: <></>
-                },
-                {
-                  label: "Collectibles",
-                  key: 5,
-                  children: <></>
-                }, {
-                  label: "Art",
-                  key: 6,
-                  children: <></>
-                },
-                {
-                  label: "Membership",
-                  key: 7,
-                  children: <></>
-                },
-              ]}
+              onChange={(key) => handleTabSelect(key)}
+              items={tabItems}
             />
-            <div className="md:flex justify-center pt-6  hidden ">
+            <div className="flex justify-center pt-6">
               <Pagination
                 current={page}
                 onChange={onPageChange}

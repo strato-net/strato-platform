@@ -396,17 +396,17 @@ const Checkout = ({ user }) => {
           <Spin spinning={isCreateOrderSubmitting} size="large" />
         </div>
       ) : (
-        <div>
+        <div className="pb-8">
           <Breadcrumb>
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
               <ClickableCell href={routes.Marketplace.url}>
-                <p className="text-[#13188A] font-semibold">
+                <p className="text-sm text-[#13188A] font-semibold">
                 Home
                   </p>
               </ClickableCell>
             </Breadcrumb.Item>
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-              <p className=" font-medium text-[#202020]">
+              <p className="text-sm text-[#202020] font-medium">
                 Add to Cart
               </p>
             </Breadcrumb.Item>

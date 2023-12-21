@@ -160,14 +160,17 @@ const actions = {
     }
   },
 
-  fetchInventory: async (dispatch, limit, offset, queryValue) => {
+  fetchInventory: async (dispatch, limit, offset, queryValue, category) => {
     const query = queryValue ? `&productId=${queryValue}` : "";
+    
+    let temp = [category]
+    const categoryQuery = category ? `&category[]=${temp}` : "";
 
     dispatch({ type: actionDescriptors.fetchInventory });
 
     try {
       const response = await fetch(
-        `${apiUrl}/inventory?limit=${limit}&offset=${offset}${query}`,
+        `${apiUrl}/inventory?limit=${limit}&offset=${offset}${query}${categoryQuery}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -570,12 +573,11 @@ const actions = {
 
     try {
       const {
-        contract_name,
         originAddress,
         minItemNumber,
         maxItemNumber
       } = payload
-      const queryStr = `?contract_name=${contract_name}&originAddress=${originAddress}&minItemNumber=${minItemNumber}&maxItemNumber=${maxItemNumber}`
+      const queryStr = `?originAddress=${originAddress}&minItemNumber=${minItemNumber}&maxItemNumber=${maxItemNumber}`
       const response = await fetch(`${apiUrl}/inventory/ownership/history${queryStr}`, {
         method: HTTP_METHODS.GET,
       });

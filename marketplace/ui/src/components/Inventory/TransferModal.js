@@ -89,7 +89,7 @@ const TransferModal = ({ open, handleCancel, inventory }) => {
         if (quantity > 0 && quantity <= inventory.quantity && userAddress) {
             let isDone = await actions.transferInventory(inventoryDispatch, body);
             if (isDone) {
-                actions.fetchInventory(inventoryDispatch, 10, 0, "");
+                actions.fetchInventory(inventoryDispatch, 10, 0, "", undefined);
                 handleCancel();
             }
         }
@@ -102,18 +102,50 @@ const TransferModal = ({ open, handleCancel, inventory }) => {
             title={`Transfer - ${decodeURIComponent(inventory.name)}`}
             width={650}
             footer={[
-                <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canTransfer} loading={isTransferring}>
-                    Transfer
-                </Button>
+                <div className="flex justify-center md:block">
+                    <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canTransfer} loading={isTransferring}>
+                        Transfer
+                    </Button>
+                </div>
             ]}
         >
-            <div className="head">
+            <div className="head hidden md:block">
 
-            <Table
-                columns={columns}
-                dataSource={data}
-                pagination={false}
-            />
+                <Table
+                    columns={columns}
+                    dataSource={data}
+                    pagination={false}
+                />
+            </div>
+            <div className="flex flex-col gap-[18px] md:hidden mt-5">
+                <div> <p className="text-[#202020] font-medium text-sm">quantity Available</p>
+                    <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center ">
+
+                        <p className="px-5 "> {inventory?.quantity}</p>
+                    </div>
+                </div>
+                <div>
+
+                    <p className="text-[#202020] font-medium text-sm">Set Quantity</p>
+                    <div className="inventory_card">
+                        <InputNumber className="w-full " value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
+                    </div>
+                </div>
+                <div>
+                    <p className="text-[#202020] font-medium text-sm">Select recipient</p>
+                    <Select
+                        className="w-full"
+                        showSearch
+                        onSelect={handleSelect}
+                        options={filteredUsersList}
+                        optionFilterProp="value"
+                        filterOption={(input, option) =>
+                            (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                        }
+                    />
+
+                </div>
+
             </div>
         </Modal>
     )

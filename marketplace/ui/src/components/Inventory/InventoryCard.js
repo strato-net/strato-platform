@@ -250,8 +250,12 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
       <div className="bg-[#F2F2F9] rounded-md px-[14px] pb-[13px] pt-2 w-full">
         <p className="text-xl font-semibold text-[#202020] cursor-default" onClick={callDetailPage}>{inventory?.name || "N/A"}</p>
         <div className=" lg:justify-between justify-end pt-[5px]  flex">
-          <div className="hidden lg:block ">
-            <p className="text-xs text-[#6A6A6A]">{inventory?.description || "N/A"}</p>
+          <div className="hidden lg:block">
+            <div className="text-xs text-[#6A6A6A] h-[30px] overflow-y-hidden">{inventory?.description.substring(0, 180) || "N/A"}
+              {inventory?.description.length > 180 && (
+                <span className="text-[#13188A]">...</span>
+              )}
+            </div>
           </div>
           <Popover
             placement="bottomLeft"
@@ -305,7 +309,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
           </Popover>
         </div>
       </div>
-      <div className="pt-[14px] flex md:flex-row  flex-col items-center gap-y-4 md:gap-[18px]">
+      <div className="pt-[14px] flex lg:flex-row  flex-col items-center gap-y-4 md:gap-[18px]">
 
         {/* <Carousel className="w-[161px] h-[161px] inventory rounded-md">
             <div>
@@ -330,7 +334,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
             </Carousel> */}
         <div>
           <img
-            className="rounded-md object-contain w-[161px] h-[161px] "
+            className="rounded-md object-contain w-[161px] h-[161px]"
             alt=""
             src={
               inventory.images && inventory.images.length > 0
@@ -339,11 +343,24 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
           />
         </div>
         <div className="pt-[7px] lg:hidden flex items-center gap-[5px]">
-          <div className="w-[10px] h-[10px] rounded-sm bg-[#119B2D]"></div>
-          <p className="text-[#4D4D4D] text-xs">PUBLISHED</p>
+          {inventory.price ?
+            <div className="flex items-center gap-2">
+              <div className="w-[10px] h-[10px] rounded-sm bg-[#119B2D]"></div>
+              <p className="text-[#4D4D4D] text-xs">PUBLISHED</p>
+            </div>
+            :
+            <div className="flex items-center gap-2">
+              <div className="w-[10px] h-[10px] rounded-sm bg-[#ff4d4f]"></div>
+              <p className="text-[#4D4D4D] text-xs">UNPUBLISHED</p>
+            </div>
+          }
         </div>
         <div className="pt-5 w-full lg:hidden">
-          <p className="text-xs text-[#6A6A6A]">{inventory?.description || "N/A"}</p>
+          <div className="text-xs text-[#6A6A6A] h-[30px] overflow-y-hidden">{inventory?.description.substring(0, 180) || "N/A"}
+            {inventory?.description.length > 180 && (
+              <span className="text-[#13188A]">...</span>
+            )}
+          </div>
         </div>
         <div className="flex flex-col gap-4 px-[18px] py-4 border border-[#E9E9E9] rounded-md w-full ">
           <div className="flex justify-between  ">
@@ -365,10 +382,18 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
 
       </div>
       <div className="flex justify-between">
-        <div className="pt-[7px] hidden lg:flex items-center gap-[5px]">
-          <div className="w-[10px] h-[10px] rounded-sm bg-[#119B2D]"></div>
-          <p className="text-[#4D4D4D] text-xs">PUBLISHED</p>
-        </div>
+        {inventory.price ?
+          <div className="pt-[7px] hidden lg:flex items-center gap-[5px]">
+            <div className="w-[10px] h-[10px] rounded-sm bg-[#119B2D]"></div>
+            <p className="text-[#4D4D4D] text-xs"> PUBLISHED </p>
+          </div>
+          :
+          <div className="pt-[7px] hidden lg:flex items-center gap-[5px]">
+            <div className="w-[10px] h-[10px] rounded-sm bg-[#ff4d4f]"></div>
+            <p className="text-[#4D4D4D] text-xs"> UNPUBLISHED </p>
+          </div>
+        }
+
         <Button type="link" className="text-[#13188A] font-semibold" onClick={callDetailPage}>preview</Button>
       </div>
       {/* <div className="flex" id={id}>

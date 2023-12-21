@@ -167,20 +167,20 @@ function bindAddress(user, address, options) {
 async function unlistItem(user, _contract, args, options) {
     const contract = { name: saleContractName, ..._contract }
     const callArgs = {
-      contract,
-      method: "closeSale",
-      args: util.usc({ ...args }),
+        contract,
+        method: "closeSale",
+        args: util.usc({ ...args }),
     };
     const unlistStatus = await rest.call(user, callArgs, options);
-  
+
     if (parseInt(unlistStatus, 10) !== RestStatus.OK) {
-      throw new rest.RestError(
-        unlistStatus,
-        "You cannot unlist the item because it's already published",
-        { callArgs }
-      );
+        throw new rest.RestError(
+            unlistStatus,
+            "You cannot unlist the item because it's already published",
+            { callArgs }
+        );
     }
-  
+
     return unlistStatus;
 }
 
@@ -243,38 +243,38 @@ async function updateInventory(user, contract, args, options) {
 }
 
 async function updateSale(admin, contract, _args, options) {
-  // const args = paymentJs.marshalIn(_args)
-  const args = { ..._args }
-  const scheme = Object.keys(_args).reduce((agg, key) => {
-    const base = 1
-    switch (key) {
-      case 'quantity':
-        return agg | (base << 0)
-      case 'price':
-        return agg | (base << 1)
-      case 'paymentProviders':
-        return agg | (base << 2)
-      default:
-        return agg
+    // const args = paymentJs.marshalIn(_args)
+    const args = { ..._args }
+    const scheme = Object.keys(_args).reduce((agg, key) => {
+        const base = 1
+        switch (key) {
+            case 'quantity':
+                return agg | (base << 0)
+            case 'price':
+                return agg | (base << 1)
+            case 'paymentProviders':
+                return agg | (base << 2)
+            default:
+                return agg
+        }
+    }, 0)
+
+    const callArgs = {
+        contract,
+        method: 'update',
+        args: util.usc({
+            scheme,
+            ...args
+        }),
     }
-  }, 0)
 
-  const callArgs = {
-    contract,
-    method: 'update',
-    args: util.usc({
-      scheme,
-      ...args
-    }),
-  }
+    const restStatus = await rest.call(admin, callArgs, options)
 
-  const restStatus = await rest.call(admin, callArgs, options)
+    if (parseInt(restStatus, 10) !== RestStatus.OK) {
+        throw new rest.RestError(restStatus, 0, { callArgs })
+    }
 
-  if (parseInt(restStatus, 10) !== RestStatus.OK) {
-    throw new rest.RestError(restStatus, 0, { callArgs })
-  }
-
-  return restStatus;
+    return restStatus;
 }
 
 /**
@@ -315,37 +315,36 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, defaultOptions) {
-    const { range, ownerCommonName, assetAddresses, status, ...restArgs } = args;
+    const { range, ownerCommonName, assetAddresses, status, isMarketplaceSearch, ...restArgs } = args;
     let inventories;
     let sales;
     let finalInventory = [];
-    const options = {...defaultOptions, org: 'BlockApps', app: 'Mercata'}
+    const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
 
     if (ownerCommonName) {
         inventories = await searchAllWithQueryArgs(contractName,
             {
                 ...restArgs,
-                ownerCommonName: ownerCommonName, 
+                ownerCommonName: ownerCommonName,
             }, options, admin);
     }
     else if (assetAddresses) {
         inventories = await searchAllWithQueryArgs(contractName,
             {
                 ...restArgs,
-                address: assetAddresses, 
+                address: assetAddresses,
             }, options, admin);
     }
     else {
-        inventories = await searchAllWithQueryArgs(contractName, 
-            { 
-                ...restArgs, 
-                range,
+        inventories = await searchAllWithQueryArgs(contractName,
+            {
+                ...restArgs,
             }, options, admin);
     }
 
     if (inventories) {
         const assetAddresses = inventories.map((inventory) => inventory.address);
-        sales = await saleJs.getAll(admin, { assetAddresses }, options);
+        sales = await saleJs.getAll(admin, { assetAddresses, range }, options);
         inventories.forEach(inventory => {
             const itemSale = sales.find(sale => sale.assetToBeSold == inventory.address && sale.isOpen);
             if (itemSale) {
@@ -355,6 +354,9 @@ async function getAll(admin, args = {}, defaultOptions) {
                     saleAddress: itemSale?.address,
                     saleQuantity: itemSale?.quantity,
                 })
+            }
+            else if (isMarketplaceSearch) {
+                //skip
             } else {
                 finalInventory.push(inventory);
             }
@@ -365,8 +367,8 @@ async function getAll(admin, args = {}, defaultOptions) {
 }
 
 async function getOwnershipHistory(user, args, options) {
-    const { contract_name , originAddress, minItemNumber, maxItemNumber } = args;
-    const newOptions = { ...options, org: undefined, app: undefined }
+    const { originAddress, minItemNumber, maxItemNumber } = args;
+    const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
     const searchArgs = {
         originAddress,
         gteField: 'maxItemNumber',
@@ -376,12 +378,12 @@ async function getOwnershipHistory(user, args, options) {
         sort: '+block_timestamp'
     };
 
-    const history = await searchAllWithQueryArgs(`${contract_name}.OwnershipTransfer`, searchArgs, newOptions, user);
+    const history = await searchAllWithQueryArgs(`${contractName}.OwnershipTransfer`, searchArgs, newOptions, user);
     return history;
 }
 
 async function inventoryCount(admin, args = {}, defaultOptions) {
-    const options = {...defaultOptions, org: 'BlockApps', app: 'Mercata'}
+    const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
     const queryArgs = setSearchQueryOptionsPrime({
         ...args,
         limit: undefined,

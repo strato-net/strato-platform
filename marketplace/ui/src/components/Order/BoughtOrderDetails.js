@@ -34,6 +34,7 @@ import dayjs from "dayjs";
 import TransfersTable from "./TransfersTable";
 import SoldOrdersTable from "./SoldOrdersTable";
 import { ResponsiveOrderDetailCard } from "./ResponsiveOrderDetailCard";
+import { LeftArrow } from "../../images/SVGComponents";
 
 const BoughtOrderDetails = ({ user, users }) => {
   const [comment, setcomment] = useState("");
@@ -44,7 +45,7 @@ const BoughtOrderDetails = ({ user, users }) => {
   const [api, contextHolder] = notification.useNotification();
   const [status, setStatus] = useState(getStatus(0));
   const { TextArea } = Input;
-  const [paid, setPaid] = useState(false)
+  const [paid, setPaid] = useState("Processing");
   const [isLoadingPaymentStatus, setisLoadingPaymentStatus] = useState(false);
   const [selectedDate, setSelectedDate] = useState("");
   const { state } = useLocation()
@@ -120,7 +121,7 @@ const BoughtOrderDetails = ({ user, users }) => {
         if (response.status === RestStatus.OK) {
 
           if (body.data["payment_status"] === "paid") {
-            setPaid(true);
+            setPaid("Paid");
           }
 
         }
@@ -211,6 +212,32 @@ const BoughtOrderDetails = ({ user, users }) => {
     } else if (status === "Canceled") {
       bgClass = "bg-[#FF0000]";
     }
+    return (
+      <div className={classNames(textClass, "status_contain w-max h-max text-center py-1 px-3 rounded-md md:rounded-xl flex justify-start items-center gap-1 p-1")}>
+        <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
+        <p className="!mb-0 text-xs md:text-sm">{status}</p>
+      </div>
+    );
+  };
+
+    const statusComponentForPayment = (status) => {
+      let textClass = "bg-[#FFF6EC]";
+      if (status === "Processing"){
+        textClass = "bg-[#FF8C0033]"
+      } else if (status === "Paid") {
+        textClass = "bg-[#119B2D33]";
+      } else if (status === "Payment Failed") {
+        textClass = "bg-[#FFF0F0]";
+      }
+      let bgClass = "bg-[#119B2D]";
+      if (status === "Processing"){
+        bgClass = "bg-[#FF8C00]"
+      } else if (status === "Paid") {
+        bgClass = "bg-[#119B2D]";
+      } else if (status === "Payment Failed") {
+        bgClass = "bg-[#FF0000]";
+      }
+        
     return (
       <div className={classNames(textClass, "status_contain w-max h-max text-center py-1 px-3 rounded-md md:rounded-xl flex justify-start items-center gap-1 p-1")}>
         <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
@@ -346,7 +373,7 @@ const BoughtOrderDetails = ({ user, users }) => {
           <Breadcrumb className="text-sm ml-4 md:ml-20 mt-4 md:mt-14 mb-8">
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
               <ClickableCell href={routes.Marketplace.url}>
-                <p className="text-[#13188A] font-semibold">
+                <p className="text-sm text-[#13188A] font-semibold">
 
                 Home
                 </p>
@@ -354,13 +381,13 @@ const BoughtOrderDetails = ({ user, users }) => {
             </Breadcrumb.Item>
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
               <div onClick={() => { navigate(routes.Orders.url, { state: { defaultKey: "Bought" } }); }}>
-                <p className="text-[#13188A] font-semibold">
+                <p className="text-sm text-[#13188A] font-semibold">
 
                 Orders (Bought)
                 </p>
               </div>
             </Breadcrumb.Item>
-            <Breadcrumb.Item className="font-medium text-[#202020]">
+            <Breadcrumb.Item className="text-sm font-medium text-[#202020]">
               {details.order.orderId}
             </Breadcrumb.Item>
           </Breadcrumb>
@@ -381,24 +408,20 @@ const BoughtOrderDetails = ({ user, users }) => {
                 key: "Bought",
                 children:
                   <div className="mb-10">
+                    <Button type="ghost" onClick={()=>onChange('Bought')} className="cursor-pointer mb-1 px-2 flex md:hidden items-center gap-2"><LeftArrow /> Back</Button>
                     <Card className="md:p-2 mb-4 md:mb-14 md:shadow-card_shadow order_detail_card">
                       <div className="flex flex-col md:flex-row md:justify-between">
                         <div className="flex flex-col">
                           <div className="flex">
-                            <Text className="bg-[#E9E9E9] md:bg-white py-2 px-3 w-full md:w-1/4 md:bg-none font-semibold text-sm md:text-lg text-primaryB flex gap-4 items-center">Order Details</Text>
-                            <Text className="hidden md:flex mt-2">{statusComponent(status)}</Text>
-                            {
-                              !paid ? <div /> : <div className={classNames("text-success  bg-[#EAFFEE]", "ml-4 w-20 text-center text-xs p-1 rounded")}>
-                                <p>Paid</p>
-                              </div>
-                            }
+                            <Text className="bg-[#E9E9E9] md:bg-white py-2 px-3 w-full md:w-2/5 md:bg-none font-semibold text-sm md:text-lg text-primaryB flex gap-4 items-center">Order Details</Text>
+                            <Text className="hidden md:flex mt-2">{statusComponentForPayment(paid)}</Text>
                           </div>
-                          <Text className="text-[#6A6A6A] md:text-black px-3 my-2 text-xs md:text-sm md:font-semibold">Please upload serial number(s) (if any) and/or enter the fulfillment date to close the order</Text>
+                          <Text className="text-[#6A6A6A] md:text-black px-3 my-2 text-xs md:text-sm md:font-semibold">Please enter the fulfillment date to close the order</Text>
                         </div>
                         <Button
                         id="cancel-order-button"
                         type="primary"
-                        className="md:flex w-1/3 md:w-48 h-9 ml-2 md:ml-6 md:mr-2 md:mt-3 bg-primary !hover:bg-primaryHover"
+                        className="min-w-max w-max h-9 px-[2%] ml-2 bg-primary !hover:bg-primaryHover"
                         disabled={status !== getStatus(1) || comment === "" || details.order.paymentSessionId !== ""}
                         onClick={() => {
                           handleCancelOrder()
@@ -442,22 +465,6 @@ const BoughtOrderDetails = ({ user, users }) => {
                           </Text>
                           {statusComponent(status)}
                         </Col>
-                        <Divider type="vertical" className="h-14 bg-secondryD" />
-                        <div className="text-xs order_detail_date">
-                          <Text className="block text-primaryC text-[13px] mb-0">
-                            ORDER CLOSE DATE
-                          </Text>
-                          <DatePicker
-                            value={
-                              selectedDate
-                            }
-                            disabledDate={(current) => {
-                              return current && current < dayjs().endOf('day');
-                            }}
-                            onChange={onDateChange}
-                            disabled={details.order.status === "3" || details.order.status === "4"}
-                          />
-                        </div>
                       </Row>
                       <Row className="my-2 md:hidden flex-col gap-2 justify-between p-4 pb-2 rounded">
                         <div className="flex gap-4">
@@ -467,17 +474,6 @@ const BoughtOrderDetails = ({ user, users }) => {
                         <div className="flex gap-4">
                           <NewOrderData className="w-2/4" title="SELLER" value={details.order.sellersCommonName} />
                           <NewOrderData className="w-2/4" title="TOTAL ($)" value={details.order.totalPrice} />
-                        </div>
-                        <div className="flex justify-between">
-                          <NewOrderData className="w-2/4" title="DATE" value={getStringDate(details.order.createdDate, US_DATE_FORMAT)} />
-                          <NewOrderData className="w-2/4" title="ORDER CLOSE DATE"
-                            value={
-                              <DatePicker
-                                value={selectedDate}
-                                disabledDate={(current) => { return current && current < dayjs().endOf('day'); }}
-                                onChange={onDateChange}
-                                disabled={details.order.status === "3" || details.order.status === "4"}
-                              />} />
                         </div>
                         <div className="flex justify-between">
                           <NewOrderData className="w-2/4" title={"Invoice"} value={
@@ -498,7 +494,7 @@ const BoughtOrderDetails = ({ user, users }) => {
                           <NewOrderData className="w-2/4" title="STATUS" value={statusComponent(status)} />
                         </div>
                         <div className="flex justify-between">
-                          <NewOrderData className="w-2/4" title="PAYMENT STATUS" value={statusComponent(status)} />
+                          <NewOrderData className="w-2/4" title="PAYMENT STATUS" value={statusComponentForPayment(paid)} />
                         </div>
                       </Row>
                       <Row className="flex-nowrap items-center justify-between mb-2 md:mb-6 p-2">
