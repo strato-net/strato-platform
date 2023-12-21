@@ -1,16 +1,6 @@
 {
     "categories": [
         {
-            "name": "Art",
-            "imageKey": "",
-            "subCategories": [
-                {
-                    "name": "Art",
-                    "contract": "Art"
-                }
-            ]
-        },
-        {
             "name": "Carbon",
             "imageKey": "",
             "subCategories": [
@@ -53,6 +43,16 @@
                     "contract": "Collectibles"
                 }
             ]           
+        },
+        {
+            "name": "Art",
+            "imageKey": "",
+            "subCategories": [
+                {
+                    "name": "Art",
+                    "contract": "Art"
+                }
+            ]
         },
         {
             "name": "Membership",

@@ -1,6 +1,4 @@
-import React, { useState } from "react";
-import { Card, Typography, Image, Space } from "antd";
-import { LeftArrow, RightArrow } from "../../images/SVGComponents";
+import { Typography} from "antd";
 import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
 import { useCategoryState } from "../../contexts/category";
@@ -13,15 +11,14 @@ const CategoryCard = () => {
   const navigate = useNavigate();
   const naviroute = routes.MarketplaceProductList.url;
   const { categorys } = useCategoryState();
-  const {inventoryPopup , setInventoryPopup} =  useState(false);
 
   const categoryImages = [
-    Images["Art-category"],
     Images["Carbon-category"],
     Images["Metal"],
     Images["Clothing-category"],
-    Images["membership_card"],
     Images["collectibles"],
+    Images["Art-category"],
+    Images["membership_card"],
   ];
   
 
