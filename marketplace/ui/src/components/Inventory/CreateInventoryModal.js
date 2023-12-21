@@ -751,7 +751,7 @@ const CreateInventoryModal = ({
           Create Inventory
         </h1>
         <hr className="text-secondryD mt-3" />
-        <Form layout="vertical" className="mt-5" onSubmit={formik.handleSubmit}>
+        <Form layout="vertical" className="mt-5 inventory_modal" onSubmit={formik.handleSubmit}>
           <div className="w-full mb-3">
             <div className="flex flex-wrap sm:flex-nowrap justify-between gap-4 mt-4 ">
               <Form.Item label="Name" className="w-full sm:w-[200px] md:w-72 ">
