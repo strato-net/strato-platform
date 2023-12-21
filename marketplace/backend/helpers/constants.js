@@ -3,6 +3,8 @@ import config from '/load.config'
 
 export default {
   baseUrl: `/api/v1`,
+  marketplaceUrl: getEnvVariable('MP_SERVER_HOST'),
+  marketplaceProtocol: getEnvVariable('MP_SERVER_SSL'),
   deployParamName: "deploy",
   governanceAddress: '0000000000000000000000000000000000000100',
   zeroAddress: '0000000000000000000000000000000000000000',

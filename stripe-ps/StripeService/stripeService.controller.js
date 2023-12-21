@@ -6,6 +6,7 @@ class StripeServiceController {
 
   static async stripeOnboarding(req, res, next) {
     try {
+      const marketplaceUrl = req.headers.marketplace_url;
       const accountId = req.params.accountId;
 
       if (!accountId) {
@@ -15,14 +16,14 @@ class StripeServiceController {
           accountId: userStripeAccount.id, status: "", createdDate: dayjs().unix(),
         };
         userStripeAccount = userStripeAccount.id;
-        const connectLink = await stripeService.generateStripeAccountConnectLink(userStripeAccount);
+        const connectLink = await stripeService.generateStripeAccountConnectLink(marketplaceUrl, userStripeAccount);
         res.status(200).json({
           connectLink: connectLink, 
           accountDetails: accountDetails,
         });
       }
       else {
-        const connectLink = await stripeService.generateStripeAccountConnectLink(accountId);
+        const connectLink = await stripeService.generateStripeAccountConnectLink(marketplaceUrl, accountId);
         res.status(200).json({
           connectLink: connectLink,
         });
@@ -85,11 +86,13 @@ class StripeServiceController {
 
   static async stripeCheckout(req, res, next) {
     try {
+      const marketplaceUrl = req.headers.marketplace_url;
+
       StripeServiceController.validateStripeCheckoutArgs(req.body);
 
-      const { cartData, orderDetail, accountId } = req.body;
+      const { paymentTypes, cartData, orderDetail, accountId } = req.body;
 
-      const session = await stripeService.initiatePayment(cartData, orderDetail, accountId);
+      const session = await stripeService.initiatePayment(marketplaceUrl, paymentTypes, cartData, orderDetail, accountId);
       res.status(200).send(session);
       return next();
     } catch (e) {
@@ -134,6 +137,7 @@ class StripeServiceController {
   // ********* VALIDATION ***********
   static validateStripeCheckoutArgs(args) {
     const stripeCheckoutSchema = Joi.object({
+      paymentTypes: Joi.array().min(1).items(Joi.string().required()).required(),
       cartData: Joi.object({
         buyerOrganization: Joi.string().required(),
         orderList: Joi.array().min(1).items(Joi.object({

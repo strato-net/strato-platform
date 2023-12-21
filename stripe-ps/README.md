@@ -83,7 +83,6 @@ Report and update dependencies if needed.
 
 The server requires the following environmental variables to run:
 ```
-`MARKETPLACE_URL` for checkout callbacks
 `STRIPE_PUBLISHABLE_KEY` for Stripe API
 `STRIPE_SECRET_KEY` for Stripe API
 ```
