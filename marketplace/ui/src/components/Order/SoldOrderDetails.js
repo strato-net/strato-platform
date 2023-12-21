@@ -486,17 +486,17 @@ const SoldOrderDetails = ({ user, users }) => {
       ) : (
         <div>
           <Breadcrumb className="text-sm ml-4 md:ml-20 mt-4 md:mt-14 mb-8">
-            <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+            <Breadcrumb.Item className="text-sm text-primary font-semibold" href="" onClick={e => e.preventDefault()}>
               <ClickableCell href={routes.Marketplace.url}>
                 Home
               </ClickableCell>
             </Breadcrumb.Item>
-            <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+            <Breadcrumb.Item className="text-sm text-primary font-semibold" href="" onClick={e => e.preventDefault()}>
               <div onClick={() => { navigate(routes.Orders.url, { state: { defaultKey: "Sold" } }); }}>
                 Orders (Sold)
               </div>
             </Breadcrumb.Item>
-            <Breadcrumb.Item className="text-primary">
+            <Breadcrumb.Item className="text-sm text-[#202020] font-medium">
               {details.order.orderId}
             </Breadcrumb.Item>
           </Breadcrumb>

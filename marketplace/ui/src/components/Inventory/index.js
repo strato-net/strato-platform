@@ -226,13 +226,13 @@ const Inventory = ({ user }) => {
           <Breadcrumb className="sm:lg:mx-14">
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
               <ClickableCell href={routes.Marketplace.url}>
-                <p className="text-[#13188A] font-semibold">
+                <p className="text-sm text-[#13188A] font-semibold">
                   Home
                 </p>
               </ClickableCell>
             </Breadcrumb.Item>
             <Breadcrumb.Item>
-              <p className=" text-[#202020] font-medium">
+              <p className="text-sm text-[#202020] font-medium">
                 My Store
               </p>
             </Breadcrumb.Item>

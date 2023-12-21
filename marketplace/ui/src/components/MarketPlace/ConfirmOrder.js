@@ -379,7 +379,7 @@ const ConfirmOrder = () => {
                 <Breadcrumb>
                 <Breadcrumb.Item href="javascript:;">
                   <ClickableCell href={routes.Marketplace.url}>
-                  <p className="text-[#13188A] font-semibold">
+                  <p className="text-sm text-[#13188A] font-semibold">
                     Home
                     </p>
                   </ClickableCell>
@@ -388,14 +388,14 @@ const ConfirmOrder = () => {
                   href="javascript:;"
                 >
                   <ClickableCell href={routes.Checkout.url}>
-                    <p className="text-[#13188A] font-semibold">
+                    <p className="text-sm text-[#13188A] font-semibold">
 
                     Checkout
                     </p>
                   </ClickableCell>
                 </Breadcrumb.Item>
                 <Breadcrumb.Item>
-                  <p className="text-[#202020] font-medium">
+                  <p className="text-sm text-[#202020] font-medium">
                     Confirm Order
                   </p>
                 </Breadcrumb.Item>

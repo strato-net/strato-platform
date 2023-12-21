@@ -373,7 +373,7 @@ const BoughtOrderDetails = ({ user, users }) => {
           <Breadcrumb className="text-sm ml-4 md:ml-20 mt-4 md:mt-14 mb-8">
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
               <ClickableCell href={routes.Marketplace.url}>
-                <p className="text-[#13188A] font-semibold">
+                <p className="text-sm text-[#13188A] font-semibold">
 
                 Home
                 </p>
@@ -381,13 +381,13 @@ const BoughtOrderDetails = ({ user, users }) => {
             </Breadcrumb.Item>
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
               <div onClick={() => { navigate(routes.Orders.url, { state: { defaultKey: "Bought" } }); }}>
-                <p className="text-[#13188A] font-semibold">
+                <p className="text-sm text-[#13188A] font-semibold">
 
                 Orders (Bought)
                 </p>
               </div>
             </Breadcrumb.Item>
-            <Breadcrumb.Item className="font-medium text-[#202020]">
+            <Breadcrumb.Item className="text-sm font-medium text-[#202020]">
               {details.order.orderId}
             </Breadcrumb.Item>
           </Breadcrumb>
