@@ -368,7 +368,7 @@ body::-webkit-scrollbar {
   padding-bottom: 4px !important;
 }
 
-.ant-input{
+.inventory_modal .ant-input{
   height: 42px !important;
 }
 .ant-select-selector{
@@ -390,5 +390,12 @@ body::-webkit-scrollbar {
   } 
   .ant-tabs .ant-tabs-tab+.ant-tabs-tab {
     margin-right : 6px !important;
+  }
+}
+
+@media screen and (min-width: 976px) and (max-width: 1200px) {
+  .inventoryCard  {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 }
