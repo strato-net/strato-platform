@@ -8,7 +8,7 @@ import {
   Spin,
   Typography,
   Image,
-  Tooltip,
+  Tooltip, 
   Tabs
 } from "antd";
 import InventoryCard from "./InventoryCard";
@@ -292,6 +292,56 @@ const Inventory = ({ user }) => {
               className="store"
               onChange={(key) => handleTabSelect(key)}
               items={tabItems}
+              // items={[
+              //   {
+              //     label: "All",
+              //     key: 1,
+              //     children:
+              //       <div className="my-4 grid grid-cols-1 lg:grid-cols-3   xl:grid-cols-3 gap-6 max-w-full" >
+              //         {inventories.map((inventory, index) => {
+              //           let category = categorys.find(
+              //             (c) => c.name === inventory.category
+              //           );
+              //           return (
+              //             <InventoryCard
+              //               id={index}
+              //               inventory={inventory}
+              //               category={category}
+              //               key={index}
+              //               debouncedSearchTerm={debouncedSearchTerm}
+              //               paymentProviderAddress={stripeStatus ? stripeStatus.paymentProviderAddress : undefined}
+              //             />
+              //           );
+              //         })}
+              //       </div>
+              //   }, {
+              //     label: "Carbon",
+              //     key: 2,
+              //     children: <></>
+              //   }, {
+              //     label: "Clothing",
+              //     key: 3,
+              //     children: <></>
+              //   }, {
+              //     label: "Material",
+              //     key: 4,
+              //     children: <></>
+              //   },
+              //   {
+              //     label: "Collectibles",
+              //     key: 5,
+              //     children: <></>
+              //   }, {
+              //     label: "Art",
+              //     key: 6,
+              //     children: <></>
+              //   },
+              //   {
+              //     label: "Membership",
+              //     key: 7,
+              //     children: <></>
+              //   },
+              // ]}
             />
             <div className="md:flex justify-center pt-6  hidden ">
               <Pagination
