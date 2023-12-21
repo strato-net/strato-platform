@@ -159,7 +159,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
   const subMenuItems = [
     {value: "marketplace", path: routes.MarketplaceProductList.url, label: "Marketplace"},
     {value: "orders", path: routes.Orders.url, label: "Orders"},
-    {value: "mystore", path: "/inventories", label: "My Store"},
+    {value: "mystore", path: "/mystore", label: "My Store"},
     user ? {value: "logout", path: "/logout", label: "Logout"} : null,
   ]
 

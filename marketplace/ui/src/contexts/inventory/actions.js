@@ -573,12 +573,11 @@ const actions = {
 
     try {
       const {
-        contract_name,
         originAddress,
         minItemNumber,
         maxItemNumber
       } = payload
-      const queryStr = `?contract_name=${contract_name}&originAddress=${originAddress}&minItemNumber=${minItemNumber}&maxItemNumber=${maxItemNumber}`
+      const queryStr = `?originAddress=${originAddress}&minItemNumber=${minItemNumber}&maxItemNumber=${maxItemNumber}`
       const response = await fetch(`${apiUrl}/inventory/ownership/history${queryStr}`, {
         method: HTTP_METHODS.GET,
       });

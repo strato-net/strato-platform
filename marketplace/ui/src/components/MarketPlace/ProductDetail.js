@@ -158,8 +158,7 @@ const ProductDetails = ({ user, users }) => {
     if (inventoryDetails) {
       actions.fetchInventoryOwnershipHistory(
         dispatch,
-        { contract_name: inventoryDetails.contract_name,
-          originAddress: inventoryDetails.originAddress,
+        { originAddress: inventoryDetails.originAddress,
           minItemNumber: inventoryDetails.itemNumber,
           maxItemNumber: inventoryDetails.itemNumber + inventoryDetails.quantity - 1
         }
@@ -611,11 +610,11 @@ const ProductDetails = ({ user, users }) => {
               </Breadcrumb.Item>
             </Breadcrumb>
           </Row>
-          <div className="  flex w-full flex-col  px-4 sm:px-8 md:px-0  items-center lg:items-start  md:w-[750px] lg:w-[835px] xl:w-[858px]  md:mx-auto ">
-          <div className="  flex w-full  md:justify-center gap-[15px] lg:gap-6 flex-col lg:flex-row   ">
+          <div className="flex w-full flex-col  px-4 sm:px-8 md:px-0  items-center lg:items-start  md:w-[750px] lg:w-[835px] xl:w-[858px]  md:mx-auto ">
+          <div className="flex md:justify-center gap-[15px] lg:gap-6 flex-col lg:flex-row   ">
             <Carousel  className="product_detail w-full  sm:w-[417px]   lg:h-[348px] md:w-[343px] lg:w-[417px]" showStatus={false} showArrows swipeable emulateTouch infiniteLoop >
              { details.images.length > 0  ? details.images.map((element,  index)=>{
-                  return ( <><div key={index} className="sm:w-[343px ] sm:h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
+                  return ( <><div key={index} className="sm:w-[343px ] h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
                   <img  width={"100%"}  className="  rounded-md h-full " src={element ? element : image_placeholder} />
                </div></>)
              })  : <><div  className="sm:w-[343px ] sm:h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
@@ -645,7 +644,7 @@ const ProductDetails = ({ user, users }) => {
               </div>
               <div className="pt-[7px]">
               <Paragraph
-                className="text-[#202020] text-sm  h-[60px]"
+                className="text-[#202020] text-sm  h-[60px] overflow-auto"
               >
                 {decodeURIComponent(details.description).split('\n').map((line, index) => (
                   <React.Fragment key={index}>
@@ -666,7 +665,7 @@ const ProductDetails = ({ user, users }) => {
                        -
                         </p> 
                     </div>
-                    <InputNumber className=" w-full md:w-[295px]  h-9  md:h-10  lg:h-[46px]  border text-[#6A6A6A] border-[#00000029] text-center flex flex-col justify-center" min={1} max={availableQuantity} value={`Quantity (LB) ${qty}`} defaultValue={`Quantity (LB) ${qty}`} controls={false}
+                    <InputNumber className=" w-full md:w-[295px]  h-9  md:h-10  lg:h-[46px]  border text-[#6A6A6A] border-[#00000029] text-center flex flex-col justify-center" min={1} max={availableQuantity} value={`${qty}`} defaultValue={`${qty}`} controls={false}
                       onChange={e => {
                         if (e < availableQuantity) {
                           setQty(e)
@@ -837,19 +836,19 @@ const ProductDetails = ({ user, users }) => {
                 onChange={onTabChange}
                 items={!user ?
                   [{
-                    label: `Description`,
+                    label: <span className="text-sm md:text-base">Description</span>,
                     key: "1",
                     children: <DescriptionComponent />,
                   }]
                   :
                   [{
-                    label: `Description`,
+                    label: <span className="text-sm md:text-base">Description</span>,
                     key: "1",
                     children: <DescriptionComponent />,
                   },
                   {
-                    label: `Ownership History`,
-                    key: "2",
+                    label: <span className="text-sm md:text-base">Ownership History</span>,
+                    key: "3",
                     children: (
                       <div>
                         <DataTableComponent
@@ -867,8 +866,8 @@ const ProductDetails = ({ user, users }) => {
                     ),
                   },
                   {
-                    label: "Additional Information",
-                    key: "3",
+                    label: <span className="text-sm md:text-base">Additional Information</span>,
+                    key: "4",
                     children: (
                       <div>
                         <List 
@@ -877,7 +876,7 @@ const ProductDetails = ({ user, users }) => {
                           dataSource={!details.files ? [] : details.files}
                           renderItem={(item) => 
                           <List.Item>
-                            <a href={item} rel="noreferrer" target="_blank">
+                            <a href={item} rel="noreferrer" target="_blank" className="hover:underline break-all text-[#1e40af]">
                               {item}
                             </a>
                           </List.Item>}

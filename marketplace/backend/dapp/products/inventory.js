@@ -367,8 +367,8 @@ async function getAll(admin, args = {}, defaultOptions) {
 }
 
 async function getOwnershipHistory(user, args, options) {
-    const { contract_name, originAddress, minItemNumber, maxItemNumber } = args;
-    const newOptions = { ...options, org: undefined, app: undefined }
+    const { originAddress, minItemNumber, maxItemNumber } = args;
+    const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
     const searchArgs = {
         originAddress,
         gteField: 'maxItemNumber',
@@ -378,7 +378,7 @@ async function getOwnershipHistory(user, args, options) {
         sort: '+block_timestamp'
     };
 
-    const history = await searchAllWithQueryArgs(`${contract_name}.OwnershipTransfer`, searchArgs, newOptions, user);
+    const history = await searchAllWithQueryArgs(`${contractName}.OwnershipTransfer`, searchArgs, newOptions, user);
     return history;
 }
 

@@ -279,7 +279,7 @@ const CategoryProductList = ({ user }) => {
   };
 
   return (
-    <div>
+    <div className={`${openFilter ? 'overflow-y-hidden h-[67.5vh] md:h-[100vh] w-[100vw] bg-[#00000020] relative mt-24 md:bg-white md:mt-[auto] md:overflow-scroll' : 'null'}`}>
       <div className="fixed bg-white w-full top-7 z-10 md:static">
         <Breadcrumb className="text-xs ml-4 md:ml-14 mt-14">
           <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
