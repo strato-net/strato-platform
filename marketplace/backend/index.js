@@ -29,9 +29,9 @@ let server
     throw new Error(`Deploy file '${config.configDirPath}/${config.deployFilename}' not found`);
   }
 
-  const marketplaceURL = `${process.env.MP_SERVER_SSL === 'true' ? 'https' : 'http'}://${process.env.MP_SERVER_HOST}/marketplace`
-  axios.defaults.headers.common['marketplace_url'] = marketplaceURL;
-  
+  const marketplaceUrl = constants.marketplaceSSL === 'true' ? `https://${constants.marketplaceHost}/marketplace` : `http://${constants.marketplaceHost}/marketplace`;
+  axios.defaults.headers.common['Referer'] = marketplaceUrl;
+
   app.set(deployParamName, deploy);
   
   // Setup middleware

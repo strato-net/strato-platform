@@ -6,7 +6,7 @@ class StripeServiceController {
 
   static async stripeOnboarding(req, res, next) {
     try {
-      const marketplaceUrl = req.headers.marketplace_url;
+      const marketplaceUrl = req.headers.referer;
       const accountId = req.params.accountId;
 
       if (!accountId) {
@@ -86,7 +86,7 @@ class StripeServiceController {
 
   static async stripeCheckout(req, res, next) {
     try {
-      const marketplaceUrl = req.headers.marketplace_url;
+      const marketplaceUrl = req.headers.referer;
 
       StripeServiceController.validateStripeCheckoutArgs(req.body);
 
