@@ -2,17 +2,6 @@ const dotenv = require('dotenv');
 const { get } = require('lodash');
 dotenv.config();
 
-/**
- * @param {string} name of the variable to be fetched from env
- * @returns {string} variable value
- */
-
-function getEnvVariable(name) {
-  const value = process.env[name] || '';
-  if (value == '') throw new Error("Missing env var for " + name);
-  return value;
-}
-
 const clientErrorHandler = (err, req, res, next) => {
   const statusCode = get(err, 'statusCode');
 

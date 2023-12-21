@@ -29,8 +29,8 @@ let server
     throw new Error(`Deploy file '${config.configDirPath}/${config.deployFilename}' not found`);
   }
 
-  const marketplaceUrl = constants.marketplaceProtocol === 'true' ? `https://${constants.marketplaceUrl}/marketplace` : `http://${constants.marketplaceUrl}/marketplace`;
-  axios.defaults.headers.common['marketplace_url'] = marketplaceUrl;
+  const marketplaceURL = `${process.env.MP_SERVER_SSL === 'true' ? 'https' : 'http'}://${process.env.MP_SERVER_HOST}/marketplace`
+  axios.defaults.headers.common['marketplace_url'] = marketplaceURL;
   
   app.set(deployParamName, deploy);
   
