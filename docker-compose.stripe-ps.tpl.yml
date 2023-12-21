@@ -13,7 +13,7 @@ services:
     build: .
     image: ${STRIPE_PS_IMAGE:-<REPO_URL>stripe-ps:<VERSION>}
     volumes:
-    - sqlitedb:/usr/src/stripe-ps/db.sqlite
+    - sqlitedb:/sqlitedb
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -33,7 +33,7 @@ services:
     build: .
     image: ${STRIPEPSNGINX_IMAGE:-<REPO_URL>stripe-ps-nginx:<VERSION>}
     ports:
-    # - ${HTTP_PORT:-80}:80 #TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT
+    - ${HTTP_PORT:-80}:80 #TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT
     - ${HTTPS_PORT:-443}:443 #TAG_REMOVE_WHEN_NO_SSL
     volumes:
     - ./ssl:/tmp/ssl:ro
