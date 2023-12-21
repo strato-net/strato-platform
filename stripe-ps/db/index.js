@@ -1,6 +1,6 @@
 const sqlite3 = require('sqlite3').verbose();
 
-const DBSOURCE = "db.sqlite";
+const DBSOURCE = process.env.DOCKERIZED === "true" ? "/sqlitedb/db.sqlite" : "db.sqlite";
 
 const db = new sqlite3.Database(DBSOURCE, (err) => {
     if (err) {

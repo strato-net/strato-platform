@@ -36,8 +36,8 @@ const MarketPlace = () => {
             <Button
               id="viewMore"
               onClick={() => navigate(routes.MarketplaceProductList.url)}
-              className="group w-[135px] h-11 border border-primary bg-white opacity-80">
-              <div className="text-primary font-semibold text-lg">
+              className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
+              <div className="text-primary font-semibold md:text-lg">
                 View More
               </div>
             </Button>
@@ -55,8 +55,8 @@ const MarketPlace = () => {
             <Button
               id="viewMore"
               onClick={() => navigate(routes.MarketplaceProductList.url)}
-              className="group w-[135px] h-11 border border-primary bg-white opacity-80">
-              <div className="text-primary font-semibold text-lg">
+              className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
+              <div className="text-primary font-semibold md:text-lg">
                 View More
               </div>
             </Button>
@@ -74,8 +74,8 @@ const MarketPlace = () => {
             <Button
               id="viewMore"
               onClick={() => navigate(routes.MarketplaceProductList.url)}
-              className="group w-[135px] h-11 border border-primary bg-white opacity-80">
-              <div className="text-primary font-semibold text-lg">
+              className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
+              <div className="text-primary font-semibold md:text-lg">
                 View More
               </div>
             </Button>
@@ -93,8 +93,8 @@ const MarketPlace = () => {
             <Button
               id="viewMore"
               onClick={() => navigate(routes.MarketplaceProductList.url)}
-              className="group w-[135px] h-11 border border-primary bg-white opacity-80">
-              <div className="text-primary font-semibold text-lg">
+              className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
+              <div className="text-primary font-semibold md:text-lg">
                 View More
               </div>
             </Button>
@@ -112,8 +112,8 @@ const MarketPlace = () => {
             <Button
               id="viewMore"
               onClick={() => navigate(routes.MarketplaceProductList.url)}
-              className="group w-[135px] h-11 border border-primary bg-white opacity-80">
-              <div className="text-primary font-semibold text-lg">
+              className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
+              <div className="text-primary font-semibold md:text-lg">
                 View More
               </div>
             </Button>

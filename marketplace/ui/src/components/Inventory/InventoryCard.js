@@ -343,8 +343,17 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
           />
         </div>
         <div className="pt-[7px] lg:hidden flex items-center gap-[5px]">
-          <div className="w-[10px] h-[10px] rounded-sm bg-[#119B2D]"></div>
-          <p className="text-[#4D4D4D] text-xs">PUBLISHED</p>
+          {inventory.price ?
+            <div className="flex items-center gap-2">
+              <div className="w-[10px] h-[10px] rounded-sm bg-[#119B2D]"></div>
+              <p className="text-[#4D4D4D] text-xs">PUBLISHED</p>
+            </div>
+            :
+            <div className="flex items-center gap-2">
+              <div className="w-[10px] h-[10px] rounded-sm bg-[#ff4d4f]"></div>
+              <p className="text-[#4D4D4D] text-xs">UNPUBLISHED</p>
+            </div>
+          }
         </div>
         <div className="pt-5 w-full lg:hidden">
           <div className="text-xs text-[#6A6A6A] h-[30px] overflow-y-hidden">{inventory?.description.substring(0, 180) || "N/A"}
@@ -373,10 +382,18 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
 
       </div>
       <div className="flex justify-between">
-        <div className="pt-[7px] hidden lg:flex items-center gap-[5px]">
-          <div className="w-[10px] h-[10px] rounded-sm bg-[#119B2D]"></div>
-          <p className="text-[#4D4D4D] text-xs">PUBLISHED</p>
-        </div>
+        {inventory.price ?
+          <div className="pt-[7px] hidden lg:flex items-center gap-[5px]">
+            <div className="w-[10px] h-[10px] rounded-sm bg-[#119B2D]"></div>
+            <p className="text-[#4D4D4D] text-xs"> PUBLISHED </p>
+          </div>
+          :
+          <div className="pt-[7px] hidden lg:flex items-center gap-[5px]">
+            <div className="w-[10px] h-[10px] rounded-sm bg-[#ff4d4f]"></div>
+            <p className="text-[#4D4D4D] text-xs"> UNPUBLISHED </p>
+          </div>
+        }
+
         <Button type="link" className="text-[#13188A] font-semibold" onClick={callDetailPage}>preview</Button>
       </div>
       {/* <div className="flex" id={id}>

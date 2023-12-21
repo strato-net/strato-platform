@@ -524,7 +524,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       }
 
       if (sellerStripeDetails.length == 0 || Object.keys(sellerStripeDetails[0]).length == 0) {
-        await axios.get(`${STRIPE_PAYMENT_SERVER_URL}/stripe/onboard`)
+        await axios.get(new URL('/stripe/onboard', STRIPE_PAYMENT_SERVER_URL).href)
           .then(async function (res) {
             if (res.status === 200) {
               const { accountDetails } = res.data;
@@ -536,7 +536,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             }
           });
       } else {
-          await axios.get(`${STRIPE_PAYMENT_SERVER_URL}/stripe/onboard/${sellerStripeDetails.accountId}`)
+          await axios.get(new URL(`/stripe/onboard/${sellerStripeDetails.accountId}`, STRIPE_PAYMENT_SERVER_URL).href)
             .then(function (res) {
               if (res.status === 200) {
                 connectLink = res.data.connectLink;
@@ -569,7 +569,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         const connectedStripeAccountStatus = { chargesEnabled: false, detailsSubmitted: false, payoutsEnabled: false, accountDeauthorized: false, eventTime: Date.now() }
         const paymentProviderContract = { name: paymentProviderJs.contractName, address: paymentProvider.address }
         try {
-          await axios.get(`${STRIPE_PAYMENT_SERVER_URL}/stripe/status/${paymentProvider.accountId}`)
+          await axios.get(new URL(`/stripe/status/${paymentProvider.accountId}`, STRIPE_PAYMENT_SERVER_URL).href)
             .then(function (res) {
               if (res.status === 200) {
                 connectedStripeAccountStatus.chargesEnabled = res.data.chargesEnabled;
@@ -702,7 +702,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           orderDetail: invoices,
           accountId: sellerStripeDetails[0].accountId,
         }
-        stripePaymentSession = await axios.post(`${STRIPE_PAYMENT_SERVER_URL}/stripe/checkout`, checkoutBody)
+        stripePaymentSession = await axios.post(new URL('/stripe/checkout', STRIPE_PAYMENT_SERVER_URL).href, checkoutBody)
           .then(function (res) {
             if (res.status === 200) {
               return res.data;
@@ -756,7 +756,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       if (paymentDetail.length === 0) {
         throw new rest.RestError(RestStatus.CONFLICT, "Seller payment details cannot be found.");
       }
-      const paymentSession = await axios.get(`${STRIPE_PAYMENT_SERVER_URL}/stripe/session/${session_id}/${paymentDetail[0].accountId}`)
+      const paymentSession = await axios.get(new URL(`/stripe/session/${session_id}/${paymentDetail[0].accountId}`, STRIPE_PAYMENT_SERVER_URL).href)
         .then(function (res) {
           if (res.status === 200) {
             return res.data;
@@ -772,7 +772,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.createUserAddress = async function (args, options = defaultOptions) {
     try {
-      await axios.post(`${STRIPE_PAYMENT_SERVER_URL}/customer/address`, { commonName: userCert.commonName, ...args })
+      await axios.post(new URL(`/customer/address`, STRIPE_PAYMENT_SERVER_URL).href, { commonName: userCert.commonName, ...args })
         .then(function (res) {
           if (res.status === 200) {
             console.log(res.data);
@@ -791,7 +791,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getAllUserAddress = async function (args, options = optionsNoChainIds) {
     try {
-      const userAddresses = await axios.get(`${STRIPE_PAYMENT_SERVER_URL}/customer/address/${userCert.commonName}`).then(function (res) {
+      const userAddresses = await axios.get(new URL(`/customer/address/${userCert.commonName}`, STRIPE_PAYMENT_SERVER_URL).href).then(function (res) {
         if (res.status === 200) {
           return res.data.data;
         } else {
@@ -810,7 +810,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getAddressFromId = async function (args, options = defaultOptions) {
     try {
       const { id } = args;
-      const userAddress = await axios.get(`${STRIPE_PAYMENT_SERVER_URL}/customer/address/id/${id}`).then(function (res) {
+      const userAddress = await axios.get(new URL(`/customer/address/id/${id}`, STRIPE_PAYMENT_SERVER_URL).href).then(function (res) {
         if (res.status === 200) {
           return res.data.data;
         } else {

@@ -185,7 +185,7 @@ const Inventory = ({ user }) => {
       label: category.name,
       key: category.name === "All" ? undefined : category.name,
       children: (
-        <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 max-w-full">
+        <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 inventoryCard  max-w-full">
           { !isInventoriesLoading ? (
               inventories.map((inventory, index) => {
                 let category = categorys.find((c) => c.name === inventory.category);
@@ -203,7 +203,7 @@ const Inventory = ({ user }) => {
                 );
               })
             ) : (
-              <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 max-w-full">
+              <div className="absolute left-[50%] md:top-4 ">
                 <Spin size="large" />
               </div>
             )
@@ -226,13 +226,13 @@ const Inventory = ({ user }) => {
           <Breadcrumb className="sm:lg:mx-14">
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
               <ClickableCell href={routes.Marketplace.url}>
-                <p className="text-[#13188A] font-semibold">
+                <p className="text-sm text-[#13188A] font-semibold">
                   Home
                 </p>
               </ClickableCell>
             </Breadcrumb.Item>
             <Breadcrumb.Item>
-              <p className=" text-[#202020] font-medium">
+              <p className="text-sm text-[#202020] font-medium">
                 My Store
               </p>
             </Breadcrumb.Item>
@@ -293,7 +293,7 @@ const Inventory = ({ user }) => {
               onChange={(key) => handleTabSelect(key)}
               items={tabItems}
             />
-            <div className="md:flex justify-center pt-6  hidden ">
+            <div className="flex justify-center pt-6">
               <Pagination
                 current={page}
                 onChange={onPageChange}

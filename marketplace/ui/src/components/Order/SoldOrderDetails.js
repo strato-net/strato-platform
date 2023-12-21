@@ -37,6 +37,7 @@ import image_placeholder from "../../images/resources/image_placeholder.png";
 import BoughtOrdersTable from "./BoughtOrdersTable";
 import TransfersTable from "./TransfersTable";
 import { ResponsiveOrderDetailCard } from "./ResponsiveOrderDetailCard";
+import { LeftArrow } from "../../images/SVGComponents";
 
 const SoldOrderDetails = ({ user, users }) => {
   const [Id, setId] = useState(undefined);
@@ -485,17 +486,17 @@ const SoldOrderDetails = ({ user, users }) => {
       ) : (
         <div>
           <Breadcrumb className="text-sm ml-4 md:ml-20 mt-4 md:mt-14 mb-8">
-            <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+            <Breadcrumb.Item className="text-sm text-primary font-semibold" href="" onClick={e => e.preventDefault()}>
               <ClickableCell href={routes.Marketplace.url}>
                 Home
               </ClickableCell>
             </Breadcrumb.Item>
-            <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+            <Breadcrumb.Item className="text-sm text-primary font-semibold" href="" onClick={e => e.preventDefault()}>
               <div onClick={() => { navigate(routes.Orders.url, { state: { defaultKey: "Sold" } }); }}>
                 Orders (Sold)
               </div>
             </Breadcrumb.Item>
-            <Breadcrumb.Item className="text-primary">
+            <Breadcrumb.Item className="text-sm text-[#202020] font-medium">
               {details.order.orderId}
             </Breadcrumb.Item>
           </Breadcrumb>
@@ -510,12 +511,13 @@ const SoldOrderDetails = ({ user, users }) => {
                   key: "Sold",
                   children:
                     <div className="mb-10">
+                      <Button type="ghost" onClick={()=>onChange('Sold')} className="cursor-pointer px-2 flex md:hidden items-center gap-2"><LeftArrow /> Back</Button>
                       <Card className="md:p-2 mb-4 md:mb-14 md:shadow-card_shadow order_detail_card">
                         <div className="flex flex-col md:flex-row md:justify-between">
                           <div className="flex flex-col">
                             <div className="flex">
-                              <Text className="bg-[#E9E9E9] md:bg-white py-2 px-3 md:w-1/4 w-full md:bg-none font-semibold text-sm md:text-lg text-primaryB flex gap-4 items-center">Order Details</Text>
-                              <Text className="hidden md:flex">{statusComponentForPayment(paid) }</Text>
+                              <Text className="bg-[#E9E9E9] md:bg-white py-2 px-3 md:w-2/5 w-full md:bg-none font-semibold text-sm md:text-lg text-primaryB flex gap-4 items-center">Order Details</Text>
+                              <Text className="hidden md:flex mt-2">{statusComponentForPayment(paid) }</Text>
                             </div>
                             <Text className="text-[#6A6A6A] md:text-black px-3 my-2 text-xs md:text-sm md:font-semibold">Please enter the fulfillment date to close the order</Text>
                             
@@ -538,7 +540,7 @@ const SoldOrderDetails = ({ user, users }) => {
                                 },
                               });
                             }}
-                            className="md:flex w-1/3 md:w-48 h-9 ml-2 md:ml-6 md:mt-3 bg-primary !hover:bg-primaryHover"
+                            className="min-w-max w-max h-9 px-[3%] ml-2 bg-primary !hover:bg-primaryHover"
                           >
                             Save
                           </Button>

@@ -1,6 +1,4 @@
-import React, { useState } from "react";
-import { Card, Typography, Image, Space } from "antd";
-import { LeftArrow, RightArrow } from "../../images/SVGComponents";
+import { Typography} from "antd";
 import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
 import { useCategoryState } from "../../contexts/category";
@@ -13,15 +11,14 @@ const CategoryCard = () => {
   const navigate = useNavigate();
   const naviroute = routes.MarketplaceProductList.url;
   const { categorys } = useCategoryState();
-  const {inventoryPopup , setInventoryPopup} =  useState(false);
 
   const categoryImages = [
-    Images["Art-category"],
     Images["Carbon-category"],
     Images["Metal"],
     Images["Clothing-category"],
-    Images["membership_card"],
     Images["collectibles"],
+    Images["Art-category"],
+    Images["membership_card"],
   ];
   
 
@@ -30,7 +27,7 @@ const CategoryCard = () => {
      <Title className="md:px-10 !text-xl md:!text-4xl !text-left py-5">
      Shop by Category
         </Title>
-      <div className="flex justify-start gap-4 lg:gap-[15px] flex-wrap px-[4px] md:px-10 xl:grid xl:grid-cols-6">
+      <div className="flex justify-center md:justify-start gap-4 lg:gap-[15px] flex-wrap px-[4px] md:px-10 xl:grid xl:grid-cols-6">
         {categorys.map((category, index) => {
           return (
             <div
