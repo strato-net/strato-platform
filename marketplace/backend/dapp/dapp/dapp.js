@@ -569,7 +569,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         const connectedStripeAccountStatus = { chargesEnabled: false, detailsSubmitted: false, payoutsEnabled: false, accountDeauthorized: false, eventTime: Date.now() }
         const paymentProviderContract = { name: paymentProviderJs.contractName, address: paymentProvider.address }
         try {
-          await axios.get(`${STRIPE_PAYMENT_SERVER_URL}/stripe/status/${paymentProvider.accountId}`)
+          await axios.get(`${STRIPE_PAYMENT_SERVER_URL}stripe/status/${paymentProvider.accountId}`)
             .then(function (res) {
               if (res.status === 200) {
                 connectedStripeAccountStatus.chargesEnabled = res.data.chargesEnabled;
