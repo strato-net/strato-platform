@@ -9,13 +9,13 @@ const STRIPE_ENV = {
   },
   CHECKOUT: {
     PAYMENT_METHOD_TYPES: ['card'],
-    SUCCESS_URL: `${MARKETPLACE_URL}/order/status?session_id={CHECKOUT_SESSION_ID}`,
-    CANCEL_URL: `${MARKETPLACE_URL}/checkout`
+    SUCCESS_URL: new URL(`/order/status?session_id={CHECKOUT_SESSION_ID}`, MARKETPLACE_URL).href,
+    CANCEL_URL: new URL(`/checkout`, MARKETPLACE_URL).href
   },
   ACCOUNT_ONBOARDING: {
     TYPE: 'accountOnboarding',
-    REFRESH_URL: `${MARKETPLACE_URL}/inventories/stripe/onboarding`,
-    RETURN_URL: `${MARKETPLACE_URL}/inventories`
+    REFRESH_URL: new URL(`/inventories/stripe/onboarding`, MARKETPLACE_URL).href,
+    RETURN_URL: new URL(`/inventories`, MARKETPLACE_URL).href
   }
 }
 
