@@ -31,7 +31,7 @@ class CustomerAddressController {
         throw new Error('Missing address ID in GET request /address/:id');
       }
 
-      const sql = 'SELECT * FROM customer_address WHERE id = ?';
+      const sql = 'SELECT * FROM customer_address WHERE address_id = ?';
       const params = [req.params.id];
       db.get(sql, params, (err, row) => {
         if (err) {

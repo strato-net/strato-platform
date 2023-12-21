@@ -697,6 +697,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       let stripePaymentSession;
       try {
         const checkoutBody = {
+          paymentTypes: ['card'],
           cartData: args,
           orderDetail: invoices,
           accountId: sellerStripeDetails[0].accountId,
@@ -784,7 +785,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
       }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while adding address: ${JSON.stringify(err)} `);
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while adding address: ${JSON.stringify(error)} `);
     }
   };
 
