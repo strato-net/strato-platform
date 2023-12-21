@@ -3,7 +3,7 @@ const path = require('path');
 
 const DBSOURCE = process.env.DOCKERIZED === "true" ? "/sqlitedb/db.sqlite" : "db.sqlite";
 
-const db = new sqlite3.Database(path.resolve(__dirname, 'db.sqlite'), (err) => {
+const db = new sqlite3.Database(path.resolve(__dirname, DBSOURCE), (err) => {
     if (err) {
       // Cannot open database
       console.error(err.message)
