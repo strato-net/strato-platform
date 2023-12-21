@@ -139,10 +139,8 @@ const actions = {
     subCategorys,
     products,
     manufacturers,
-    minQty,
-    maxQty,
     minPrice,
-    maxPrice    
+    maxPrice
   ) => {
     dispatch({ type: actionDescriptors.fetchMarketplace });
 
@@ -157,20 +155,19 @@ const actions = {
       : "";
 
     const productQuery = products ? `&productId[]=${products}` : "";
-    const qtyQuery = `&range[]=quantity,${minQty},${maxQty}`;
-    // const priceQuery = `&range[]=pricePerUnit,${minPrice},${maxPrice}`;
+    const priceQuery = `&range[]=pricePerUnit,${minPrice},${maxPrice}`;
     const sortLatest = "&order=createdDate.desc"
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace?${qtyQuery}${categoryQuery}${subCategoryQuery}${productQuery}${manufacturerQuery}${sortLatest}`,
+        `${apiUrl}/marketplace?${priceQuery}${categoryQuery}${subCategoryQuery}${productQuery}${manufacturerQuery}${sortLatest}`,
         {
           method: HTTP_METHODS.GET,
         }
       );
 
       const body = await response.json();
-      
+
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchMarketplaceSuccessful,
@@ -182,10 +179,10 @@ const actions = {
           type: actionDescriptors.fetchMarketplaceFailed,
           error: "Error while fetching marketplace products",
         });
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchMarketplaceFailed, 
-          error: "Unauthorized while fetching marketplace products" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchMarketplaceFailed,
+          error: "Unauthorized while fetching marketplace products"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -208,10 +205,8 @@ const actions = {
     subCategorys,
     products,
     manufacturers,
-    minQty,
-    maxQty,
     minPrice,
-    maxPrice    
+    maxPrice
   ) => {
     dispatch({ type: actionDescriptors.fetchMarketplaceLoggedIn });
 
@@ -226,21 +221,19 @@ const actions = {
       : "";
 
     const productIdQuery = products ? `&name[]=${products}` : "";
-    const qtyQuery = `&range[]=quantity,${minQty},${maxQty}`;
-    // const priceQuery = `&range[]=price,${minPrice},${maxPrice}`;
+    const priceQuery = `&range[]=price,${minPrice},${maxPrice}`;
     const sortLatest = "&order=createdDate.desc"
-
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace/all?${qtyQuery}${categoryQuery}${subCategoryQuery}${productIdQuery}${manufacturerQuery}${sortLatest}`,
+        `${apiUrl}/marketplace/all?${priceQuery}${categoryQuery}${subCategoryQuery}${productIdQuery}${manufacturerQuery}${sortLatest}`,
         {
           method: HTTP_METHODS.GET,
         }
       );
 
       const body = await response.json();
-      
+
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchMarketplaceLoggedInSuccessful,
@@ -252,14 +245,14 @@ const actions = {
           type: actionDescriptors.fetchMarketplaceLoggedInFailed,
           error: "Error while fetching marketplace products",
         });
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchMarketplaceLoggedInFailed, 
-          error: "Unauthorized while fetching marketplace products" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchMarketplaceLoggedInFailed,
+          error: "Unauthorized while fetching marketplace products"
         });
         window.location.href = body.error.loginUrl;
       }
-      
+
 
       dispatch({
         type: actionDescriptors.fetchMarketplaceLoggedInFailed,
@@ -284,7 +277,7 @@ const actions = {
         }
       );
 
-      const body = await response.json();      
+      const body = await response.json();
 
       if (response.status === RestStatus.OK) {
         dispatch({
@@ -292,10 +285,10 @@ const actions = {
           payload: body.data,
         });
         return;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchTopSellingProductsFailed, 
-          error: "Unauthorized while fetching topselling products" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchTopSellingProductsFailed,
+          error: "Unauthorized while fetching topselling products"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -322,7 +315,7 @@ const actions = {
         }
       );
 
-      const body = await response.json();      
+      const body = await response.json();
 
       if (response.status === RestStatus.OK) {
         dispatch({
@@ -330,10 +323,10 @@ const actions = {
           payload: body.data,
         });
         return;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchTopSellingProductsLoggedInFailed, 
-          error: "Unauthorized while fetching topselling products" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchTopSellingProductsLoggedInFailed,
+          error: "Unauthorized while fetching topselling products"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -378,10 +371,10 @@ const actions = {
         });
         actions.setMessage(dispatch, "Error while adding Shipping address");
         return null;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.addShippingAddressFailed, 
-          error: "Unauthorized while adding Shipping address" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.addShippingAddressFailed,
+          error: "Unauthorized while adding Shipping address"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -412,7 +405,7 @@ const actions = {
         }
       );
 
-      const body = await response.json();   
+      const body = await response.json();
 
       if (response.status === RestStatus.OK) {
         dispatch({
@@ -427,10 +420,10 @@ const actions = {
         });
         actions.setMessage(dispatch, "Error while getting Shipping address");
         return false;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchUserAddressFailed, 
-          error: "Unauthorized while getting Shipping address" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchUserAddressFailed,
+          error: "Unauthorized while getting Shipping address"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -475,10 +468,10 @@ const actions = {
         });
         actions.setMessage(dispatch, "Error while getting Shipping address");
         return false;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchUserAddressesFailed, 
-          error: "Unauthorized while getting Shipping address" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchUserAddressesFailed,
+          error: "Unauthorized while getting Shipping address"
         });
         window.location.href = body.error.loginUrl;
       }

@@ -111,7 +111,7 @@ async function get(user, args, options) {
     let searchArgs;
 
     if (assetToBeSold) {
-        searchArgs = setSearchQueryOptions(restArgs, 
+        searchArgs = setSearchQueryOptions(restArgs,
             [{
                 key: "assetToBeSold",
                 value: assetToBeSold,
@@ -123,7 +123,7 @@ async function get(user, args, options) {
             ]);
     }
     else {
-        searchArgs = setSearchQueryOptions(restArgs, 
+        searchArgs = setSearchQueryOptions(restArgs,
             [{
                 key: "address",
                 value: address,
@@ -148,13 +148,14 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, defaultOptions) {
-    const { saleAddresses, assetAddresses, isOpen, ...restArgs } = args;
-    const options = {...defaultOptions, org: 'BlockApps', app: 'Mercata'}
+    const { saleAddresses, assetAddresses, isOpen, range, ...restArgs } = args;
+    const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
     let sales;
     if (assetAddresses) {
-        sales = await searchAllWithQueryArgs(contractName, { 
-            assetToBeSold: assetAddresses, 
+        sales = await searchAllWithQueryArgs(contractName, {
+            assetToBeSold: assetAddresses,
             isOpen: isOpen ? isOpen : true,
+            range: range
         }, options, admin);
     }
     else {

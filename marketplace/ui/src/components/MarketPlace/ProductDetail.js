@@ -412,14 +412,14 @@ const ProductDetails = ({ user, users }) => {
 
   const ownershipDetailColumn = [
     {
-      title: <Text className="text-primaryC text-[13px]">SELLER</Text>,
+      title: <Text className="text-primaryC text-[13px]">Seller</Text>,
       dataIndex: "sellerCommonName",
       key: "sellerCommonName",
       align: "center",
       render: (text) => <p>{text}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">OWNER</Text>,
+      title: <Text className="text-primaryC text-[13px]">Owner</Text>,
       dataIndex: "purchaserCommonName",
       key: "purchaserCommonName",
       align: "center",
@@ -428,7 +428,7 @@ const ProductDetails = ({ user, users }) => {
     {
       title: (
         <Text className="text-primaryC text-[13px]">
-          OWNERSHIP START DATE
+          Ownership Start Date
         </Text>
       ),
       dataIndex: "block_timestamp",
@@ -629,7 +629,7 @@ const ProductDetails = ({ user, users }) => {
                   {decodeURIComponent(details?.name)}
                 </Text>
                 <div className="flex pt-[6px] ">
-                <Text  className="text-[#202020] text-xs  font-medium">Owned By:</Text>
+                <Text  className="text-[#202020] text-xs  font-medium">Owned By: {details?.ownerCommonName}</Text>
                  <Text className="text-[#202020] text-xs  font-medium" >{details?.ownerOrganization}</Text>
                 </div>
               </div>
