@@ -452,44 +452,40 @@ const ProductDetails = ({ user, users }) => {
     switch (categoryName) {
       case "Art":
         return (
-          <Space direction="vertical" className="py-[15px] px-[14px]  border border-[#E9E9E9] rounded-md">
-            <Space>
+          <Space direction="vertical" className="py-[15px] px-[14px] w-full sm:w-[388px] md:w-[417px] border border-[#E9E9E9] rounded-md">
+            <Space className="flex justify-between">
               <DescTitle text="Artist" />
-              <DescTitle text=":" />
-              <Text className="text-[13px]">{itemData?.artist}</Text>
+              <Text className="text-[13px] text-[#202020] font-medium">{itemData?.artist}</Text>
             </Space>
           </Space>)
       case "CarbonOffset":
         return (
-          <Space direction="vertical" className="py-[15px] px-[14px]  border border-[#E9E9E9] rounded-md">
+          <Space direction="vertical" className="py-[15px] px-[14px] w-full sm:w-[388px] md:w-[417px] border border-[#E9E9E9] rounded-md">
             {/* <Space>
               <DescTitle text="Project Type" />
               <DescTitle text="                      :" />
               <Text className="text-[13px]">{itemData?.projectType}</Text>
             </Space> */}
-            <Space>
+            <Space className="flex justify-between">
               <DescTitle text="Quantity" />
-              <DescTitle text=":" />
-              <Text className="text-[13px]">{availableQuantity}</Text>
+              <Text className="text-[13px] text-[#202020] font-medium">{availableQuantity}</Text>
             </Space>
           </Space>)
       case "Clothing":
         return (
-          <Space direction="vertical" className="py-[15px] px-[14px]  border border-[#E9E9E9] rounded-md">
-            <Space>
+          <Space direction="vertical" className="py-[15px] px-[14px] w-full sm:w-[388px] md:w-[417px] border border-[#E9E9E9] rounded-md">
+            <Space className="flex justify-between">
               <DescTitle text="Brand" />
-              <DescTitle text="                      :" />
-              <Text className="text-[13px]">{itemData?.brand}</Text>
+              <Text className="text-[13px] text-[#202020] font-medium">{itemData?.brand}</Text>
             </Space>
           </Space>)
       case "Metals":
         return (
           <>
-          <Space direction="vertical" className="py-[15px] px-[14px]  border border-[#E9E9E9] rounded-md">
-            <Space>
+          <Space direction="vertical" className="py-[15px] px-[14px] w-full sm:w-[388px] md:w-[417px] border border-[#E9E9E9] rounded-md">
+            <Space className="flex justify-between">
               <DescTitle text="Source" />
-              <DescTitle text=":" />
-              <Text className="text-[13px]">{itemData?.source}</Text>
+              <Text className="text-[13px] text-[#202020] font-medium">{itemData?.source}</Text>
             </Space>
           
             {
@@ -507,29 +503,26 @@ const ProductDetails = ({ user, users }) => {
             </Text>
             </Space> */}
 
-            <Space className="py-[15px] px-[14px]  border border-[#E9E9E9] rounded-md">
+            <Space className="flex justify-between py-[15px] px-[14px]  border border-[#E9E9E9] rounded-md">
               <DescTitle text="Purity" />
-              <DescTitle text=":" />
-              <Text className="text-[13px]">{itemData?.purity}</Text>
+              <Text className="text-[13px] text-[#202020] font-medium">{itemData?.purity}</Text>
             </Space>
           </Space>
           </>)
       case "Membership":
         return (
-          <Space direction="vertical" className="py-[15px] px-[14px]  border border-[#E9E9E9] rounded-md">
-           <Space>
+          <Space direction="vertical" className="py-[15px] px-[14px] w-full sm:w-[388px] md:w-[417px] border border-[#E9E9E9] rounded-md">
+           <Space className="flex justify-between">
               <DescTitle text="Units" />
-              <DescTitle text="                      :" />
-              <Text className="text-[13px]">{availableQuantity}</Text>
+              <Text className="text-[13px] text-[#202020] font-medium">{availableQuantity}</Text>
             </Space>
           </Space>)
       case "CarbonDAO":
         return (
-          <Space direction="vertical" className="py-[15px] px-[14px]  border border-[#E9E9E9] rounded-md">
-            <Space>
+          <Space direction="vertical" className="py-[15px] px-[14px] w-full sm:w-[388px] md:w-[417px] border border-[#E9E9E9] rounded-md">
+            <Space className="flex justify-between">
               <DescTitle text="Units" />
-              <DescTitle text="                      :" />
-              <Text className="text-[13px]">{availableQuantity}</Text>
+              <Text className="text-[13px] text-[#202020] font-medium">{availableQuantity}</Text>
             </Space>
           </Space>)
       default:
