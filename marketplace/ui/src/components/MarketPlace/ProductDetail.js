@@ -74,7 +74,7 @@ const ProductDetails = ({ user, users }) => {
   const [serialNumber, setSerialNumber] = useState(false);
   const limit = 10, offset = 0;
   const debouncedSearchTerm = useDebounce("", 1000);
-  const { inventoryEvents, isInventoryEventsLoading,inventoryOwnershipHistory, eventDetails, iseventDetailsLoading } =
+  const { inventoryEvents, isInventoryEventsLoading, eventDetails, iseventDetailsLoading } =
     useEventState();
   const eventDispatch = useEventDispatch();
 
@@ -114,6 +114,7 @@ const ProductDetails = ({ user, users }) => {
     inventoryDetails, 
     isInventoryDetailsLoading,
     isInventoryOwnershipHistoryLoading,
+    inventoryOwnershipHistory
   } = useInventoryState();
   const marketplaceDispatch = useMarketplaceDispatch();
   const { cartList } = useMarketplaceState();
