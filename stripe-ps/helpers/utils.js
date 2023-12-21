@@ -24,7 +24,6 @@ const commonErrorHandler = (err, req, res, next) => {
 }
 
 module.exports = {
-  getEnvVariable,
   clientErrorHandler,
   commonErrorHandler,
 }
