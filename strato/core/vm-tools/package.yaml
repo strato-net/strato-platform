@@ -37,6 +37,7 @@ library:
     - aeson
     - ansi-wl-pprint
     - binary
+    - binary-instances
     - blockapps-data
     - blockapps-datadefs
     - blockapps-init

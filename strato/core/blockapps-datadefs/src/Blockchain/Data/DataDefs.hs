@@ -135,6 +135,10 @@ instance ToSchema LogDB where
     return $
       NamedSchema (Just "LogDB") mempty
 
+instance BIN.Binary LogDB
+
+instance BIN.Binary EventDB
+
 instance Pretty BS.ByteString where
   pretty = blue . text . BC.unpack . B16.encode
 
