@@ -147,6 +147,7 @@ const BoughtOrderDetails = ({ user, users }) => {
           key: prod.address,
           productImage: prod.images && prod.images.length > 0 ? prod.images[0] : image_placeholder,
           productName: prod,
+          name: prod.name,
           unitPrice: prod.price,
           quantity: parseInt(orderDetails.order.quantities[index]),
           shippingCharges: prod.shippingCharges ? prod.shippingCharges : 0,
@@ -215,7 +216,7 @@ const BoughtOrderDetails = ({ user, users }) => {
     return (
       <div className={classNames(textClass, "status_contain w-max h-max text-center py-1 px-3 rounded-md md:rounded-xl flex justify-start items-center gap-1 p-1")}>
         <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
-        <p className="!mb-0 text-xs md:text-sm">{status}</p>
+        <p className="!mb-0 text-[11px] md:text-sm">{status}</p>
       </div>
     );
   };
@@ -476,24 +477,7 @@ const BoughtOrderDetails = ({ user, users }) => {
                           <NewOrderData className="w-2/4" title="TOTAL ($)" value={details.order.totalPrice} />
                         </div>
                         <div className="flex justify-between">
-                          <NewOrderData className="w-2/4" title={"Invoice"} value={
-                            <div className="flex items-center">
-                              <EyeOutlined className="mr-1 -mt-3 hover:text-primaryHover cursor-pointer" />
-                              <p
-                                // onClick={() => {
-                                //   navigate(
-                                //     `${routes.SoldOrderItemDetail.url.replace(":id", data?.address)}`,
-                                //     { state: { orderId: orderDetails.orderId, address: Id } }
-                                //   );
-                                // }}
-                                className="hover:text-primaryHover"
-                              >
-                                View
-                              </p>
-                            </div>} />
                           <NewOrderData className="w-2/4" title="STATUS" value={statusComponent(status)} />
-                        </div>
-                        <div className="flex justify-between">
                           <NewOrderData className="w-2/4" title="PAYMENT STATUS" value={statusComponentForPayment(paid)} />
                         </div>
                       </Row>
