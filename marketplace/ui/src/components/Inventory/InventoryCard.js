@@ -394,7 +394,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
           </div>
         }
 
-        <Button type="link" className="text-[#13188A] font-semibold" onClick={callDetailPage}>preview</Button>
+        <Button type="link" className="text-[#13188A] font-semibold" onClick={callDetailPage}>Preview</Button>
       </div>
       {/* <div className="flex" id={id}>
         <img

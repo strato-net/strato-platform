@@ -26,6 +26,9 @@
     padding: 2px 10px;
     display: none !important;
 }
+.mobile_order_detail_card .ant-picker-input input{
+    display: flex !important;
+}
 .ant-picker-suffix{
     color: #6A6A6A;
     margin-left: 1px !important;

@@ -118,7 +118,7 @@ const TransferModal = ({ open, handleCancel, inventory }) => {
                 />
             </div>
             <div className="flex flex-col gap-[18px] md:hidden mt-5">
-                <div> <p className="text-[#202020] font-medium text-sm">quantity Available</p>
+                <div> <p className="text-[#202020] font-medium text-sm">Quantity Available</p>
                     <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center ">
 
                         <p className="px-5 "> {inventory?.quantity}</p>
