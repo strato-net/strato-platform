@@ -268,7 +268,7 @@ const BoughtOrderDetails = ({ user, users }) => {
       render: (text) => <img className="w-[75px] h-[60px] object-contain" alt="" src={text} />,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">PRODUCT NAME</Text>,
+      title: <Text className="text-primaryC text-[13px]">Product Name</Text>,
       dataIndex: "productName",
       key: "productName",
       render: (text) => (
@@ -282,7 +282,7 @@ const BoughtOrderDetails = ({ user, users }) => {
       ),
     },
     {
-      title: <Text className="text-primaryC text-[13px]">SERIAL NUMBER</Text>,
+      title: <Text className="text-primaryC text-[13px]">Serial Number</Text>,
       dataIndex: "serialNumber",
       key: "serialNumber",
       align: "center",
@@ -306,14 +306,14 @@ const BoughtOrderDetails = ({ user, users }) => {
       ),
     },
     {
-      title: <Text className="text-primaryC text-[13px]">UNIT PRICE($)</Text>,
+      title: <Text className="text-primaryC text-[13px]">Unit Price($)</Text>,
       dataIndex: "unitPrice",
       key: "unitPrice",
       align: "center",
       render: (text) => <p>{text}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">QUANTITY</Text>,
+      title: <Text className="text-primaryC text-[13px]">Quantity</Text>,
       dataIndex: "quantity",
       key: "quantity",
       align: "center",
@@ -321,7 +321,7 @@ const BoughtOrderDetails = ({ user, users }) => {
     },
     {
       title: (
-        <Text className="text-primaryC text-[13px]">SHIPPING CHARGES($)</Text>
+        <Text className="text-primaryC text-[13px]">Shipping Charges($)</Text>
       ),
       dataIndex: "shippingCharges",
       key: "shippingCharges",
@@ -329,14 +329,14 @@ const BoughtOrderDetails = ({ user, users }) => {
       render: (text) => <p>{text}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">TAX($)</Text>,
+      title: <Text className="text-primaryC text-[13px]">Tax($)</Text>,
       dataIndex: "tax",
       key: "tax",
       align: "center",
       render: (text) => <p>{text}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">AMOUNT($)</Text>,
+      title: <Text className="text-primaryC text-[13px]">Amount($)</Text>,
       dataIndex: "amount",
       key: "amount",
       align: "center",
@@ -441,50 +441,50 @@ const BoughtOrderDetails = ({ user, users }) => {
                       </Button>
                       </div>
                       <Row className="hidden md:flex my-6 justify-between bg-[#F6F6F6] p-4 pb-2 rounded">
-                        <OrderData title="NUMBER" value={`#${details.order.orderId}`} />
+                        <OrderData title="Order Number" value={`#${details.order.orderId}`} />
                         <Divider type="vertical" className="h-14 bg-secondryD" />
                         <OrderData
-                          title="BUYER"
+                          title="Buyer"
                           value={details.order.purchasersCommonName}
                         />
                         <Divider type="vertical" className="h-14 bg-secondryD" />
                         <OrderData
-                          title="SELLER"
+                          title="Seller"
                           value={details.order.sellersCommonName}
                         />
                         <Divider type="vertical" className="h-14 bg-secondryD" />
-                        <OrderData title="TOTAL ($)" value={details.order.totalPrice} />
+                        <OrderData title="Total ($)" value={details.order.totalPrice} />
                         <Divider type="vertical" className="h-14 bg-secondryD" />
                         <OrderData
-                          title="DATE"
+                          title="Date"
                           value={getStringDate(details.order.createdDate, US_DATE_FORMAT)}
                         />
                         <Divider type="vertical" className="h-14 bg-secondryD" />
                         <Col>
                           <Text className="block text-primaryC text-[13px] mb-2">
-                            STATUS
+                            Status
                           </Text>
                           {statusComponent(status)}
                         </Col>
                       </Row>
                       <Row className="my-2 md:hidden flex-col gap-[6px] justify-between p-4 pb-0 rounded">
                         <div className="flex gap-4">
-                          <NewOrderData className="w-2/4" title="ORDER NUMBER" value={'#' + details.order.orderId} />
-                          <NewOrderData className="w-2/4" title="BUYER" value={details.order.purchasersCommonName} />
+                          <NewOrderData className="w-2/4" title="Order Number" value={'#' + details.order.orderId} />
+                          <NewOrderData className="w-2/4" title="Buyer" value={details.order.purchasersCommonName} />
                         </div>
                         <div className="flex gap-4">
-                          <NewOrderData className="w-2/4" title="SELLER" value={details.order.sellersCommonName} />
-                          <NewOrderData className="w-2/4" title="TOTAL ($)" value={'$' + details.order.totalPrice} />
+                          <NewOrderData className="w-2/4" title="Seller" value={details.order.sellersCommonName} />
+                          <NewOrderData className="w-2/4" title="Total ($)" value={'$' + details.order.totalPrice} />
                         </div>
                         <div className="flex justify-between">
-                          <NewOrderData className="w-2/4" title="STATUS" value={statusComponent(status)} />
-                          <NewOrderData className="w-2/4" title="PAYMENT STATUS" value={statusComponentForPayment(paid)} />
+                          <NewOrderData className="w-2/4" title="Status" value={statusComponent(status)} />
+                          <NewOrderData className="w-2/4" title="Payment Status" value={statusComponentForPayment(paid)} />
                         </div>
                       </Row>
                       <Row className="flex-nowrap items-center justify-between mb-2 md:mb-6 p-2">
                         <div className="w-full">
                           <Text className="block text-primaryC text-[13px] mb-2">
-                            COMMENTS
+                            Comments
                           </Text>
                           <TextArea
                             rows={2}
