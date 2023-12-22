@@ -346,12 +346,12 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
           {inventory.price ?
             <div className="flex items-center gap-2">
               <div className="w-[10px] h-[10px] rounded-sm bg-[#119B2D]"></div>
-              <p className="text-[#4D4D4D] text-xs">PUBLISHED</p>
+              <p className="text-[#4D4D4D] text-xs">Published</p>
             </div>
             :
             <div className="flex items-center gap-2">
               <div className="w-[10px] h-[10px] rounded-sm bg-[#ff4d4f]"></div>
-              <p className="text-[#4D4D4D] text-xs">UNPUBLISHED</p>
+              <p className="text-[#4D4D4D] text-xs">Unpublished</p>
             </div>
           }
         </div>
@@ -385,12 +385,12 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
         {inventory.price ?
           <div className="pt-[7px] hidden lg:flex items-center gap-[5px]">
             <div className="w-[10px] h-[10px] rounded-sm bg-[#119B2D]"></div>
-            <p className="text-[#4D4D4D] text-xs"> PUBLISHED </p>
+            <p className="text-[#4D4D4D] text-xs"> Published </p>
           </div>
           :
           <div className="pt-[7px] hidden lg:flex items-center gap-[5px]">
             <div className="w-[10px] h-[10px] rounded-sm bg-[#ff4d4f]"></div>
-            <p className="text-[#4D4D4D] text-xs"> UNPUBLISHED </p>
+            <p className="text-[#4D4D4D] text-xs"> Unpublished </p>
           </div>
         }
 

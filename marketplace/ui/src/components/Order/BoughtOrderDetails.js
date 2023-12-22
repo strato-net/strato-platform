@@ -148,7 +148,7 @@ const BoughtOrderDetails = ({ user, users }) => {
           productImage: prod.images && prod.images.length > 0 ? prod.images[0] : image_placeholder,
           productName: prod,
           name: prod.name,
-          unitPrice: prod.price,
+          unitPrice: '$' + prod.price,
           quantity: parseInt(orderDetails.order.quantities[index]),
           shippingCharges: prod.shippingCharges ? prod.shippingCharges : 0,
           amount: prod.price * parseInt(orderDetails.order.quantities[index]),
@@ -409,7 +409,7 @@ const BoughtOrderDetails = ({ user, users }) => {
                 key: "Bought",
                 children:
                   <div className="mb-10">
-                    <Button type="ghost" onClick={()=>onChange('Bought')} className="cursor-pointer mb-1 px-2 flex md:hidden items-center gap-2"><LeftArrow /> Back</Button>
+                    <Button type="ghost" onClick={()=>onChange('Bought')} className="cursor-pointer mb-1 px-2 flex md:hidden items-center gap-2 text-sm font-semibold"><LeftArrow /> Back</Button>
                     <Card className="md:p-2 mb-4 md:mb-14 md:shadow-card_shadow order_detail_card">
                       <div className="flex flex-col md:flex-row md:justify-between">
                         <div className="flex flex-col">
@@ -467,14 +467,14 @@ const BoughtOrderDetails = ({ user, users }) => {
                           {statusComponent(status)}
                         </Col>
                       </Row>
-                      <Row className="my-2 md:hidden flex-col gap-2 justify-between p-4 pb-2 rounded">
+                      <Row className="my-2 md:hidden flex-col gap-[6px] justify-between p-4 pb-0 rounded">
                         <div className="flex gap-4">
-                          <NewOrderData className="w-2/4" title="ORDER NUMBER" value={`#${details.order.orderId}`} />
+                          <NewOrderData className="w-2/4" title="ORDER NUMBER" value={'#' + details.order.orderId} />
                           <NewOrderData className="w-2/4" title="BUYER" value={details.order.purchasersCommonName} />
                         </div>
                         <div className="flex gap-4">
                           <NewOrderData className="w-2/4" title="SELLER" value={details.order.sellersCommonName} />
-                          <NewOrderData className="w-2/4" title="TOTAL ($)" value={details.order.totalPrice} />
+                          <NewOrderData className="w-2/4" title="TOTAL ($)" value={'$' + details.order.totalPrice} />
                         </div>
                         <div className="flex justify-between">
                           <NewOrderData className="w-2/4" title="STATUS" value={statusComponent(status)} />
