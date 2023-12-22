@@ -1,5 +1,4 @@
-import { Button, Row, Col, Typography, Divider, InputNumber } from "antd";
-import { MinusOutlined, PlusOutlined } from "@ant-design/icons";
+import { Button, Row,  Typography, InputNumber } from "antd";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { actions } from "../../contexts/marketplace/actions";
@@ -10,7 +9,7 @@ import {
 } from "../../contexts/marketplace";
 import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
-import image_placeholder from "../../images/resources/image_placeholder.png";
+
 
 const ResponsiveCart = ({
   data,
@@ -62,21 +61,21 @@ const ResponsiveCart = ({
   });
 
   return (
-    <div className=" border border-[#E9E9E9]  rounded-md mt-3 flex flex-col gap-[18px] items-center    ">
+    <div className=" border border-[#E9E9E9]  rounded-md mt-3 flex flex-col gap-[18px]   sm:w-[400px] md:w-[450px]  items-center    ">
       {data.map((element, index) => {
         let qty = element.qty;
         let product = element;
         return (
           <div className="p-3 w-full">
             <div
-              className="p-3  border border-[#E9E9E9] rounded-md w-full "
+              className="p-3  border border-[#E9E9E9]  rounded-md w-full "
               key={index}
             >
               <div className="flex justify-between ">
                 <div className="flex gap-x-3 ">
                   <img
                     src={element?.item?.image}
-                    className="w-12 h-12 rounded-[4px] border "
+                    className="w-12 h-12 rounded-[4px]  "
                   />
                   <Typography className="text-[#13188A] text-base mt-[-4px] font-semibold ">
                     {element?.item?.name}
@@ -100,7 +99,7 @@ const ResponsiveCart = ({
                 </div>
               </div>
 
-              <div className="flex justify-between ml-[20%]  items-center pt-[6px]">
+              <div className="flex justify-between ml-[20%]  items-baseline pt-[6px]">
                 <Typography className="font-semibold text-[#202020] text-sm">{`$${element?.unitPrice}`}</Typography>
                 <div>
                   <div className="flex items-center justify-center mt-2">
@@ -108,7 +107,7 @@ const ResponsiveCart = ({
                       onClick={() => {
                         MinusQty(qty, product);
                       }}
-                      className="  w-5 h-5    bg-[#E9E9E9] flex justify-center items-center cursor-pointer rounded-full"
+                      className="  w-6 h-6    bg-[#E9E9E9] flex justify-center items-center cursor-pointer rounded-full"
                     >
                       <p className="text-lg text-[#202020] font-medium">-</p>
                     </div>
@@ -126,7 +125,7 @@ const ResponsiveCart = ({
                       onClick={() => {
                         AddQty(product);
                       }}
-                      className="  w-5 h-5    bg-[#E9E9E9] flex justify-center items-center cursor-pointer rounded-full"
+                      className="  w-6 h-6    bg-[#E9E9E9] flex justify-center items-center cursor-pointer rounded-full"
                     >
                      <p className="text-lg text-[#202020] font-medium">+</p>
                     </div>
@@ -134,7 +133,7 @@ const ResponsiveCart = ({
                 </div>
               </div>
 
-              <div className="px-3 h-10 flex justify-between items-center rounded-md mt-[18px] bg-[#F6F6F6]">
+              <div className="px-3 h-10 flex justify-between items-center rounded-md mt-[14px] bg-[#F6F6F6]">
                 <Typography className="text-[#202020] text-sm font-semibold ">
                   Details
                 </Typography>
@@ -157,22 +156,23 @@ const ResponsiveCart = ({
 
               {faqOpenState[index] && (
                 <div
-                  className={`overflow-hidden  ${
-                    faqOpenState[index] ? "" : "max-h-0"
+                  className={`overflow-hidden   ${
+                    faqOpenState[index] ? "max-h-[145px] open" : "max-h-0 faq-container"
                   }`}
                 >
                   <div
-                    className={` border-t bg-[#F6F6F6] rounded-b-md flex flex-col gap-3 p-2 `}
+                    className={`  bg-[#F6F6F6] rounded-b-md flex flex-col gap-3 px-3 py-2 `}
                   >
+                    <div className="w-full bg-[#BABABA] h-[1px]"></div>
                     <div className="flex justify-between">
                       <Typography className="text-sm text-[#202020] font-medium">Seller:</Typography>
                       <Typography className="text-sm text-[#202020] font-semibold">{element?.sellersCommonName}</Typography>
                     </div><div className="flex justify-between">
-                      <Typography className="text-sm text-[#202020] font-medium">Unit price($):</Typography>
+                      <Typography className="text-sm text-[#202020] font-medium">Unit Price($):</Typography>
                       <Typography className="text-sm text-[#202020] font-semibold">{`$${element?.unitPrice}`}</Typography>
                     </div>
                     <div className="flex justify-between">
-                      <Typography className="text-sm text-[#202020] font-medium">shipping Charges:</Typography>
+                      <Typography className="text-sm text-[#202020] font-medium">Shipping Charges:</Typography>
                       <Typography className="text-sm text-[#202020] font-semibold">{element?.shippingCharges}</Typography>
                     </div>
                     <div className="flex justify-between">
@@ -214,7 +214,7 @@ const ResponsiveCart = ({
           </div>
           <div className="w-full h-[1px] bg-[#E9E9E9]"></div>
           <div className="flex justify-between">
-            <p className="text-sm font-medium ">Total</p>
+            <p className="text-sm font-medium ">Total:</p>
 
             <p className="text-sm   font-semibold  text-right">
               ${total + tax + shipping}
@@ -251,7 +251,7 @@ const ResponsiveCart = ({
               }}
               disabled={data.length === 0}
             >
-              Submit Order
+            Submit & Checkout
             </Button>
           </Row>
         )}
