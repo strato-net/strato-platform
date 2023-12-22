@@ -4,7 +4,7 @@ const stripe = Stripe(STRIPE_ENV.CREDENTIALS.STRIPE_SECRET_KEY);
 
 class StripeService {
     // TODO implement orderDetail to create actual order line items 
-    static initiatePayment(paymentTypes, cartData, orderDetail, CONNECTED_ACCOUNT_ID = '') {
+    static initiatePayment(marketplaceUrl, paymentTypes, cartData, orderDetail, CONNECTED_ACCOUNT_ID = '') {
         try {
             // Create a checkout session with Stripe
             return stripe.checkout.sessions.create({
@@ -38,8 +38,8 @@ class StripeService {
                     // },
                 },
                 mode: "payment",
-                success_url: STRIPE_ENV.CHECKOUT.SUCCESS_URL,
-                cancel_url: STRIPE_ENV.CHECKOUT.CANCEL_URL,
+                success_url: `${marketplaceUrl}/order/status?session_id={CHECKOUT_SESSION_ID}`,
+                cancel_url: `${marketplaceUrl}/checkout`,
             }, {
                 stripeAccount: CONNECTED_ACCOUNT_ID
             })
@@ -78,12 +78,12 @@ class StripeService {
         }
     }
 
-    static generateStripeAccountConnectLink(stripeAccountId) {
+    static generateStripeAccountConnectLink(marketplaceUrl, stripeAccountId) {
         try {
             return stripe.accountLinks.create({
                 account: stripeAccountId,
-                refresh_url: STRIPE_ENV.ACCOUNT_ONBOARDING.REFRESH_URL,
-                return_url: STRIPE_ENV.ACCOUNT_ONBOARDING.RETURN_URL,
+                refresh_url: `${marketplaceUrl}/inventories/stripe/onboarding`,
+                return_url: `${marketplaceUrl}/inventories`,
                 type: 'account_onboarding',
             });
         } catch (e) {

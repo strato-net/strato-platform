@@ -6,6 +6,7 @@ class StripeServiceController {
 
   static async stripeOnboarding(req, res, next) {
     try {
+      const marketplaceUrl = req.headers.referer;
       const accountId = req.params.accountId;
 
       if (!accountId) {
@@ -15,14 +16,14 @@ class StripeServiceController {
           accountId: userStripeAccount.id, status: "", createdDate: dayjs().unix(),
         };
         userStripeAccount = userStripeAccount.id;
-        const connectLink = await stripeService.generateStripeAccountConnectLink(userStripeAccount);
+        const connectLink = await stripeService.generateStripeAccountConnectLink(marketplaceUrl, userStripeAccount);
         res.status(200).json({
           connectLink: connectLink, 
           accountDetails: accountDetails,
         });
       }
       else {
-        const connectLink = await stripeService.generateStripeAccountConnectLink(accountId);
+        const connectLink = await stripeService.generateStripeAccountConnectLink(marketplaceUrl, accountId);
         res.status(200).json({
           connectLink: connectLink,
         });
@@ -85,11 +86,13 @@ class StripeServiceController {
 
   static async stripeCheckout(req, res, next) {
     try {
+      const marketplaceUrl = req.headers.referer;
+
       StripeServiceController.validateStripeCheckoutArgs(req.body);
 
       const { paymentTypes, cartData, orderDetail, accountId } = req.body;
 
-      const session = await stripeService.initiatePayment(paymentTypes, cartData, orderDetail, accountId);
+      const session = await stripeService.initiatePayment(marketplaceUrl, paymentTypes, cartData, orderDetail, accountId);
       res.status(200).send(session);
       return next();
     } catch (e) {
