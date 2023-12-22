@@ -273,7 +273,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
               }} >
             <Button size="large" className="hidden sm:flex login_btn w-[70%] md:w-[100%] hover:bg-primary">Login</Button>
             <Button size="large" className="hidden sm:flex bg-primary text-white w-[70%] md:w-[100%]">Register</Button>
-            <Button size="large" className="flex sm:hidden bg-primary text-white w-[90%] h-[30%] text-xs justify-center items-center">Login/Register</Button>
+            <Button size="large" className="flex sm:hidden bg-primary text-white w-[90%] !h-[25%] !text-sm justify-center items-center">Login/Register</Button>
             </a> : null
           ) :
             <Dropdown menu={{ items }} placement="bottomRight" trigger={["click"]} overlayStyle={{ marginTop: "40px" }}>
