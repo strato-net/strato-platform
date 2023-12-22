@@ -155,7 +155,7 @@ const actions = {
       : "";
 
     const productQuery = products ? `&productId[]=${products}` : "";
-    const priceQuery = `&range[]=pricePerUnit,${minPrice},${maxPrice}`;
+    const priceQuery = `&range[]=price,${minPrice},${maxPrice}`;
     const sortLatest = "&order=createdDate.desc"
 
     try {
