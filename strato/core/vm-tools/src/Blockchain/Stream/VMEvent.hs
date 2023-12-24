@@ -12,23 +12,15 @@ where
 import Blockchain.Data.TransactionResult
 import Blockchain.EthConf
 import Blockchain.KafkaTopics
-import Blockchain.MilenaTools
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Stream.Action (Action, Delegatecall)
-import Blockchain.Stream.Raw
 import Conduit
-import Control.Exception
-import Control.Monad.State
+import Control.Monad.Composable.Kafka
 import qualified Data.Aeson as JSON
 import Data.Binary
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
-import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
 import GHC.Generics
-import Network.Kafka
-import Network.Kafka.Producer
 import Network.Kafka.Protocol hiding (Key)
 import Text.Format
 import Text.Tools
@@ -70,38 +62,8 @@ instance JSON.ToJSON VMEvent
 
 instance JSON.FromJSON VMEvent
 
--- todo: refactor this to consume produceVMEventsM
-produceVMEvents :: (MonadIO m) => [VMEvent] -> m Offset
-produceVMEvents vmEvents = do
-  result <- -- type Either KafkaClientError [ProduceResponse]
-    liftIO $
-      runKafkaConfigured "blockapps-data" $
-        fmap concat $
-          forM vmEvents $ \e -> produceMessagesAsSingletonSets [TopicAndMessage (lookupTopic "vmevents") . makeMessage . BL.toStrict . JSON.encode $ e]
-  case result of
-    Left kce -> liftIO $ throwIO kce
-    Right res -> do
-      -- [ProduceResponse]
-      liftIO $ mapM_ parseKafkaResponse res
-      return offset
-      where
-        -- where [offset] = concatMap (map (\(_, _, x') -> x') . concatMap snd . _produceResponseFields) res
-        offset = case concatMap (map (\(_, _, x') -> x') . concatMap snd . _produceResponseFields) res of
-          [theOffset] -> theOffset
-          _ -> error "produceVMEvents: unexpected response from Kafka"
+produceVMEvents :: MonadIO m => [VMEvent] -> m [ProduceResponse]
+produceVMEvents = runKafkaMConfigured "blockapps-data" . produceItems (lookupTopic "vmevents")
 
--- parsedResults = map parseKafkaResponse res
-
--- | Reads VMEvents from `defaultVMEventsTopicName`
-fetchVMEvents :: Kafka k => Offset -> k [VMEvent]
-fetchVMEvents = fetchVMEventsFromTopic defaultVMEventsTopicName
-
-fetchVMEventsFromTopic :: Kafka k => TopicName -> Offset -> k [VMEvent]
-fetchVMEventsFromTopic topic offset = map bytestringToVMEvent <$> fetchBytes topic offset
-
-defaultVMEventsTopicName :: TopicName
-defaultVMEventsTopicName = lookupTopic "vmevents"
-
-bytestringToVMEvent :: B.ByteString -> VMEvent
-bytestringToVMEvent x =
-  fromMaybe (error $ "bytestringToVMEvent called on invalid data: " ++ show x) . JSON.decode . BL.fromStrict $ x
+fetchVMEvents :: HasKafka k => Offset -> k [VMEvent]
+fetchVMEvents = fetchItems $ lookupTopic "vmevents"

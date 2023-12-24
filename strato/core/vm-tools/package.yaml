@@ -59,6 +59,7 @@ library:
     - format
     - generic-arbitrary
     - hedis
+    - kafka-monad
     - lens
     - leveldb-haskell
     - lrucache

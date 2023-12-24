@@ -116,7 +116,7 @@ getAndProcessMessages' ::
 getAndProcessMessages' env conn offset errorCounter = do
   $logInfoS "getAndProcessMessages'" $ T.pack $ "#### fetching VMEvents: Offset=" ++ show offset
   recordOffset offset
-  messages <- execKafka $ fetchVMEvents offset
+  messages <- fetchVMEvents offset
   recordKafkaMessages messages
   cache <- access (Proxy @(IORef Globals))
   forceGlobalEval cache

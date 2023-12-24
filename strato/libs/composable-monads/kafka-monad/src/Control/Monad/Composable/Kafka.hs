@@ -15,10 +15,11 @@ module Control.Monad.Composable.Kafka (
   runKafkaM,
   runKafkaMUsingEnv,
   execKafka,
-  consume,
-  produceItems,
   commitSingleOffset,
   fetchSingleOffset,
+  produceItems,
+  consume,
+  fetchItems,
   KafkaString(..),
   KafkaAddress,
   KafkaClientId,
@@ -97,32 +98,9 @@ execKafka f = do
       return v
 
 
-
-readIndexEvents :: (Binary a, Kafka k) => TopicName -> Offset -> k [a]
-readIndexEvents topicName = readIndexEventsFromTopic topicName
-
-readIndexEventsFromTopic :: (Binary a, Kafka k) => TopicName -> Offset -> k [a]
-readIndexEventsFromTopic topic offset = setDefaultKafkaState >> map (decode . BL.fromStrict) <$> fetchBytes topic offset
-
-produceItems :: (Binary a, HasKafka m) => TopicName -> [a] -> m [ProduceResponse]
-produceItems topicName events = do
-  results <-
-    execKafka $ produceMessagesAsSingletonSets $
-      (TopicAndMessage topicName . makeMessage . BL.toStrict . encode) <$> events
-  liftIO $ mapM_ parseKafkaResponse results
-  return results
-
-consume :: (Binary a, MonadLogger m, HasKafka m) =>
-           Text -> ConsumerGroup -> TopicName -> ([a] -> m ()) -> m ()
-consume name consumerGroup topicName f = 
-  forever $ do
-    $logInfoS name "About to fetch blocks"
-    (offset, idxEvents) <- fetchItems consumerGroup topicName
-    $logInfoS name . T.pack $ "Fetched " ++ show (length idxEvents) ++ " events starting from " ++ show offset
-    f idxEvents
-    let nextOffset' = offset + fromIntegral (length idxEvents)
-    setKafkaCheckpoint consumerGroup topicName nextOffset' ""
-
+----------------------
+--   Checkpoints    --
+----------------------
 
 getKafkaCheckpoint :: (MonadLogger m, HasKafka m) =>
                       ConsumerGroup -> TopicName -> m Offset
@@ -144,25 +122,44 @@ setKafkaCheckpoint consumerGroup topicName ofs md = do
 setKafkaCheckpoint' :: Kafka k => ConsumerGroup -> TopicName -> Offset -> Metadata -> k (Either KafkaError ())
 setKafkaCheckpoint' consumerGroup targetTopicName offset md = commitSingleOffset consumerGroup targetTopicName 0 `flip` md $ offset
 
-fetchItems :: (Binary a, MonadLogger m, HasKafka m) =>
-              ConsumerGroup -> TopicName -> m (Offset, [a])
-fetchItems consumerGroup topicName = do
-  ofs <- getKafkaCheckpoint consumerGroup topicName
-  evs <- execKafka $ readIndexEvents topicName ofs
-  return (ofs, evs)
 
-setDefaultKafkaState :: Kafka k => k ()
-setDefaultKafkaState = do
-  stateRequiredAcks .= -1
-  stateWaitSize .= 1
-  stateWaitTime .= 100000
+----------------------
+--    Producing     --
+----------------------
 
-fetchBytes :: Kafka k => TopicName -> Offset -> k [B.ByteString]
-fetchBytes topic offset = fetchBytes' topic offset >>= (\ts -> return $ snd <$> ts)
+produceItems :: (Binary a, HasKafka m) => TopicName -> [a] -> m [ProduceResponse]
+produceItems topicName events = do
+  results <-
+    execKafka $ produceMessagesAsSingletonSets $
+      (TopicAndMessage topicName . makeMessage . BL.toStrict . encode) <$> events
+  liftIO $ mapM_ parseKafkaResponse results
+  return results
 
-fetchBytes' :: Kafka k => TopicName -> Offset -> k [(Offset, B.ByteString)]
-fetchBytes' topic offset = do
-  fetched <- fetch offset 0 topic
+
+
+----------------------
+--Consuming/Fetching--
+----------------------
+
+consume :: (Binary a, MonadLogger m, HasKafka m) =>
+           Text -> ConsumerGroup -> TopicName -> ([a] -> m ()) -> m ()
+consume name consumerGroup topicName f = 
+  forever $ do
+    $logInfoS name "About to fetch blocks"
+    offset <- getKafkaCheckpoint consumerGroup topicName
+    idxEvents <- fetchItems topicName offset
+    $logInfoS name . T.pack $ "Fetched " ++ show (length idxEvents) ++ " events starting from " ++ show offset
+    f idxEvents
+    let nextOffset' = offset + fromIntegral (length idxEvents)
+    setKafkaCheckpoint consumerGroup topicName nextOffset' ""
+
+fetchItems :: (Binary a, HasKafka m) =>
+              TopicName -> Offset -> m [a]
+fetchItems topicName offset = map (decode . BL.fromStrict) <$> fetchBytes topicName offset
+
+fetchBytes :: HasKafka m => TopicName -> Offset -> m [B.ByteString]
+fetchBytes topic offset = do
+  fetched <- execKafka $ fetch offset 0 topic
 
   let errorStatuses = concat $ map (^.. _2 . folded . _2) (fetched ^. fetchResponseFields)
   --If the Kafka fetch fails, this is a critical error, we have no choice but to halt the program.
@@ -172,5 +169,5 @@ fetchBytes' topic offset = do
     Just e -> error $ "There was a critical Kafka error while fetching messages: " ++ show e ++ "\ntopic = " ++ BC.unpack (topic ^. tName ^. kString) ++ ", offset = " ++ show offset
     _ -> return ()
 
-  return $ zip [offset ..] $ fetchResponseToPayload [offset] fetched
+  return $ fetchResponseToPayload [offset] fetched
 
