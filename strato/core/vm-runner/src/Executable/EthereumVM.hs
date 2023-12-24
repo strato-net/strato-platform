@@ -67,7 +67,6 @@ import Data.List
 import qualified Data.Map as M
 import Data.Maybe
 import Data.Proxy
-import Data.String
 import qualified Data.Text as T
 import Debugger
 import Executable.EthereumVM2
@@ -83,8 +82,7 @@ import UnliftIO (race_)
 ethereumVM :: Maybe DebugSettings -> LoggingT IO ()
 ethereumVM d = runResourceT $ do
   ctx <- initContext d
-  let k = kafkaConfig ethConf
-  race_ (deployCommitsSqlDiffs ctx) . runSQLM . runKafkaM "ethereum-vm" (fromString $ kafkaHost k, fromIntegral $ kafkaPort k) . execContextM' ctx $ do
+  race_ (deployCommitsSqlDiffs ctx) . runSQLM . runKafkaMConfigured "ethereum-vm" . execContextM' ctx $ do
     Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
     (cpOffsetStart, EVMCheckpoint cpHash cpHead cpBBI cpSR) <- getCheckpoint
     $logInfoLS "ethereumVM/getCheckpoint" (cpHash, cpBBI, cpSR)

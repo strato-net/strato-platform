@@ -74,7 +74,6 @@ import qualified Data.Map as Map
 import Data.Map.Strict (Map)
 import Data.Maybe
 import qualified Data.Sequence as S
-import Data.String
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Network.Kafka as K
@@ -318,12 +317,11 @@ bootstrapIndexer obGB =
         commit >>= \case
           Right (Right _) -> do
             putStrLn "bootstrapIndex API checkpoint successful!"
-            let k = kafkaConfig ethConf
 
             putStrLn "About to bootstrap index events"
 
             res <-
-              runKafkaM clientId (fromString $ kafkaHost k, fromIntegral $ kafkaPort k) $
+              runKafkaMConfigured clientId $
                 IdxKafka.produceIndexEvents [IdxModel.RanBlock obGB]
 
             print res
