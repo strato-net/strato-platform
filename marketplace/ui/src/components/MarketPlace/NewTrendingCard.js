@@ -41,20 +41,20 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                 >
                     {topSellingProduct?.name || "N/A"}
                 </Typography>
-                <img className='w-5' src={Images.Verified} alt='' />
+                <img className='w-4 h-4' src={Images.Verified} alt='' />
             </div>
             <Typography className='font-semibold'>{'$' + topSellingProduct?.price || "N/A"}</Typography>
             <Typography className='#989898 opacity-40 max-h-5 overflow-hidden'>{topSellingProduct?.description || "N/A"}</Typography>
             <div className='flex justify-between items-center bg-[#EEEFFA] p-2'>
-                <Typography>Quantity</Typography>
+                <Typography>Quantity:</Typography>
                 <div className='flex gap-3 p-1 bg-white'>
-                    <Typography className='px-2 bg-[#EEEFFA] cursor-pointer' onClick={() => {
+                    <Typography className='px-2 bg-[#EEEFFA] cursor-pointer rounded-sm' onClick={() => {
                         setQuantity(quantity == 1 ? quantity : quantity - 1)
                     }}>
                         -
                     </Typography>
                     <Typography>{quantity}</Typography>
-                    <Typography className='px-2 bg-[#EEEFFA] cursor-pointer' onClick={() => {
+                    <Typography className='px-2 bg-[#EEEFFA] cursor-pointer rounded-sm' onClick={() => {
                         if ((quantity + 1 <= topSellingProduct.saleQuantity) && (quantity + 1 <= topSellingProduct.quantity)) {
                             setQuantity(quantity + 1)
                         }
@@ -73,7 +73,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                 <Button
                     id={`${topSellingProduct.name.replace(/ /g, "_")}-buy-now`}
                     type='primary'
-                    className='flex-1'
+                    className='flex-1 h-9 !bg-[#13188A] !text-white'
                     onClick={() => {
                         if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                             setCookie("returnUrl", `/marketplace/productList/${topSellingProduct.address}`, 10);
@@ -104,6 +104,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                     Buy Now
                 </Button>
                 <Button
+                className='h-9 w-9 flex items-center justify-center !bg-[#13188A] '
                     onClick={() => {
                         if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                             setCookie("returnUrl", `/marketplace/productList/${topSellingProduct.address}`, 10);
@@ -130,7 +131,10 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                     }}
                     type='primary'
                 >
-                    <ShoppingCartOutlined style={{ color: '#EEEFFA' }} />
+                   
+                    <img src={Images.Cart} alt='Cart' width={18} height={18} className='max-w-[18px]'/>
+                    
+                    {/* <ShoppingCartOutlined style={{ color: '#EEEFFA' , width:'18px' ,  height:'18px' }} /> */}
                 </Button>
             </div>
         </div>
