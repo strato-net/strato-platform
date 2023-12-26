@@ -395,7 +395,7 @@ const ConfirmOrder = () => {
                 </Breadcrumb.Item>
               </Breadcrumb>
               <div className="flex justify-between items-center pt-6 md:pb-2">
-                <Typography className="text-[#202020] text-lg md:text-2xl font-semibold">My Cart</Typography>
+                <Typography className="text-[#202020] text-base md:text-xl lg:text-2xl  font-bold lg:font-semibold">My Cart</Typography>
                 {stripeStatus && <button id="pay-now-button" className={`p-1 md:p-3 h-max rounded-lg border ${stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled ? 'border-primary bg-primary hover:bg-primaryHover text-white' : 'cursor-not-allowed border-[#999999] rounded bg-[#cccccc] text-[#666666]'}`}
                   onClick={() => {
                     if (stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled) {
@@ -415,7 +415,7 @@ const ConfirmOrder = () => {
                   pagination={false}
                 />
               </div>
-              <div className="lg:hidden">
+              <div className=" grid sm:place-items-center grid-cols-1 lg:hidden ">
                 <ResponsiveCart data={data} key={data} confirm={true} />
               </div>
 
@@ -442,7 +442,7 @@ const ConfirmOrder = () => {
                 </div>
               </div>
               <Row align="middle pt-10 flex gap-3 items-center">
-                <p className="text-2xl text-[#202020] font-semibold ">Address Details</p>
+                <p className="text-base md:text-xl lg:text-2xl text-[#202020] font-semibold ">Address Details</p>
                 {showAddress ?
                   <MinusCircleOutlined className="text-xl text-primary"
                     onClick={() => {
@@ -476,7 +476,7 @@ const ConfirmOrder = () => {
                     </div>
                     :
                     userAddresses.length !== 0 ?
-                      <div className="  grid grid-rows-2 grid-flow-col gap-4 lg:flex  lg:flex-wrap overflow-x-auto lg:overflow-y-auto hide-Scroll lg:gap-x-6 lg:gap-y-[20px] pt-4 h-[50%] lg:h-[44vh]">
+                      <div className="grid grid-rows-2 sm:grid-rows-1 grid-flow-col gap-4 lg:flex  lg:flex-wrap overflow-x-auto lg:overflow-y-auto hide-Scroll lg:gap-x-6 lg:gap-y-[20px] pt-4 h-[50%] lg:h-[44vh]">
                         {
                           userAddresses.map((add, index) =>
                             <div key={index}>
