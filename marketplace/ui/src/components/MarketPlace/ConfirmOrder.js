@@ -28,7 +28,7 @@ import DataTableComponent from "../DataTableComponent";
 import { useFormik } from "formik";
 import * as yup from "yup";
 import "./index.css";
-import { UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
+import { PAYMENT_LIST } from "../../helpers/constants";
 import ConfirmOrderModel from "./ConfirmOrderModel";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
@@ -331,6 +331,7 @@ const ConfirmOrder = () => {
     });
     // These additional fields need to be sent to form the request after stripe. 
     let body = {
+      paymentList: PAYMENT_LIST,
       buyerOrganization: userOrganization,
       orderList,
       orderTotal: total + tax + shipping,

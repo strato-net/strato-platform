@@ -3,13 +3,13 @@ import classNames from "classnames";
 import { EyeOutlined, DownOutlined, UpOutlined, FilterFilled, SearchOutlined } from "@ant-design/icons";
 import routes from "../../helpers/routes";
 import DataTableComponent from "../DataTableComponent";
-import { getStatus } from "./constant";
+import { getStatus, getStatusByName } from "./constant";
 import { getStringDate } from "../../helpers/utils";
 import { useNavigate, Link } from "react-router-dom";
 import { actions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import useDebounce from "../UseDebounce";
-import { US_DATE_FORMAT } from "../../helpers/constants";
+import { apiUrl, HTTP_METHODS, US_DATE_FORMAT } from "../../helpers/constants";
 import { Pagination, Button, Radio, Space, Typography, Input, DatePicker} from "antd";
 import TagManager from "react-gtm-module";
 import "./ordersTable.css"
@@ -17,6 +17,7 @@ import { FilterIcon } from "../../images/SVGComponents";
 import { ResponsiveOrderCard } from "./ResponsiveOrdersCard";
 import dayjs from "dayjs";
 import { ResponsiveBoughtOrderCard } from "./ResponsiveBoughtOrdersCard";
+import RestStatus from "http-status-codes";
 
 
 const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
@@ -30,6 +31,8 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
   const [selectedValue, setSelectedValue] = useState(null);
   const [dropdownVisible, setDropdownVisible] = useState(false);
   const [mDropdownVisible, setMDropdownVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); 
+
 
   const { orders, isordersLoading, orderBoughtTotal} = useOrderState();
 
@@ -52,25 +55,62 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
 
   const navigate = useNavigate();
   const [data, setdata] = useState([]);
+
+
+  const validatePayment = async (order) =>{
+    const response = await fetch(
+      `${apiUrl}/order/payment/session/${order.paymentSessionId}/${order.sellersCommonName}`,
+      {
+        method: HTTP_METHODS.GET,
+      }
+    );
+
+    const body = await response.json();
+    
+    if (response.status === RestStatus.OK) {
+      if (
+        body.data["payment_status"] === "paid" &&
+        getStatus(parseInt(order.status)) === getStatusByName("Payment Pending")
+      ) {
+        // Update order status
+        const isDone = await actions.updateOrderStatus(dispatch, {
+          saleOrderAddress: order.address,
+          status: 1,
+        });
+      }
+    }
+  } 
   useEffect(() => {
-
-    let items = [];
-    orders.forEach((order) => {
-      items.push({
-        address: order.address,
-        chainId: order.chainId,
-        key: order.address,
-        orderNumber: order,
-        sellersCommonName: order.sellersCommonName,
-        orderTotal: order.totalPrice,
-        date: getStringDate(order.createdDate, US_DATE_FORMAT),
-        status: getStatus(parseInt(order.status)),
-        invoice: order,
-      });
-    });
-    setdata(items);
+    const fetchDataBought = async () => {
+      const updatedDataBought = await Promise.all(
+        orders.map(async (order) => {
+          if (order.paymentSessionId !== "" && getStatus(parseInt(order.status)) === getStatusByName("Payment Pending")) {
+            try {
+              setIsLoading(true);
+              await validatePayment(order);          
+            } catch (err) {
+              console.error(err);
+            }
+          }
+          return {
+            address: order.address,
+            chainId: order.chainId,
+            key: order.address,
+            orderNumber: order,
+            sellersCommonName: order.sellersCommonName,
+            orderTotal: order.totalPrice,
+            date: getStringDate(order.createdDate, US_DATE_FORMAT),
+            status: getStatus(parseInt(order.status)),
+            invoice: order
+          };
+        })
+      );
+      setIsLoading(false);
+      setdata(updatedDataBought);
+    };
+  
+    fetchDataBought();
   }, [orders]);
-
   const handleSort = (data) => {
     setSelectedValue(data)
     setFilter(data);
@@ -86,6 +126,7 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
         <Typography onClick={() => handleSort(2)}>Awaiting Shipment</Typography>
         <Typography onClick={() => handleSort(3)}>Closed</Typography>
         <Typography onClick={() => handleSort(4)}>Canceled</Typography>
+        <Typography onClick={() => handleSort(5)}>Payment Pending</Typography>
       </div>
     )
   }
@@ -189,6 +230,8 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
       textClass = "bg-[#EBF7FF]";
     } else if (status === "Awaiting Fulfillment"){
       textClass = "bg-[#FF8C0033]"
+    } else if (status === "Payment Pending"){
+      textClass = "bg-[#FF8C0033]"
     } else if (status === "Closed") {
       textClass = "bg-[#119B2D33]";
     } else if (status === "Canceled") {
@@ -197,6 +240,8 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
     let bgClass = "bg-[#119B2D]";
     if (status === "Awaiting Shipment") {
       bgClass = "bg-[#13188A]";
+    } else if (status === "Payment Pending"){
+      bgClass = "bg-[#FF8C00]"
     } else if (status === "Awaiting Fulfillment"){
       bgClass = "bg-[#FF8C00]"
     } else if (status === "Closed") {
@@ -244,14 +289,14 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
       <div className="flex md:hidden order_responsive">
         <ResponsiveBoughtOrderCard
           data={data}
-          isLoading={isordersLoading}
+          isLoading={isordersLoading || isLoading}
         />
       </div>
       <div className="hidden md:block">
         <DataTableComponent
           columns={column}
           data={data}
-          isLoading={isordersLoading}
+          isLoading={isordersLoading || isLoading}
           pagination={false}
           scrollX="100%"
         />
