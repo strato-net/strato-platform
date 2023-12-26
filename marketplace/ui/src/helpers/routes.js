@@ -17,7 +17,7 @@ export default {
   ConfirmOrder: { label: "Confirm Order", url: "/confirmOrder" },
   Products: { label: "Product", url: "/products" },
   ProductDetail: { label: "Product Detail", url: "/products/:id" },
-  Inventories: { label: "Inventory", url: "/inventories" },
+  MyStore: { label: "Inventory", url: "/mystore" },
   InventoryDetail: { label: "Inventory Detail", url: "/inventories/:id" },
   InventoryEventSerialNumberList: { label: "Inventory Event Serial Numbers", url: "/inventories/events/serialNumbers" },
   Items: { label: "Item", url: "/items" },
@@ -51,5 +51,4 @@ export default {
   ProcessingOrder: { label: "Processing Order", url: "/order/status" },
   Invoice: { label: "Invoice", url: "/orders/invoice/:id" },
   OnboardingSellerToStripe: { label: "Onboarding Seller to Stripe", url: "/inventories/stripe/onboarding" },
-  Storage: { label: "Storage", url: "/storage" },
 };

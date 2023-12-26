@@ -1,10 +1,12 @@
+import React from "react";
 import {
   Breadcrumb,
   Typography,
   notification,
   Spin,
   Image,
-  InputNumber
+  InputNumber,
+  Button
 } from "antd";
 import { MinusOutlined, PlusOutlined } from "@ant-design/icons";
 import {
@@ -17,7 +19,7 @@ import { actions } from "../../contexts/marketplace/actions";
 import { actions as orderActions } from "../../contexts/order/actions";
 import { Images } from "../../images";
 import { useState, useEffect, useMemo } from "react";
-import { DeleteOutlined } from "@ant-design/icons";
+//   import { DeleteOutlined } from "@ant-design/icons";
 import "./index.css";
 import ConfirmOrderModel from "./ConfirmOrderModel";
 import { CHARGES, UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
@@ -25,6 +27,8 @@ import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import CartComponent from "./CartComponent";
 import TagManager from "react-gtm-module";
+import image_placeholder from "../../images/resources/image_placeholder.png";
+import ResponsiveCart from "./ResponsiveCart";
 
 const { Title, Text } = Typography;
 
@@ -46,11 +50,11 @@ const Checkout = ({ user }) => {
   };
 
   const calculateTax = (item) => {
-    return (item.product.pricePerUnit * item.qty * CHARGES.TAX) / 100;
+    return (item.product.price * CHARGES.TAX) / 100;
   };
 
   const calculateShipping = (item) => {
-    return (item.product.pricePerUnit * item.qty * CHARGES.SHIPPING) / 100;
+    return (item.product.price * CHARGES.SHIPPING) / 100;
   };
 
   const storedData = useMemo(() => {
@@ -66,7 +70,7 @@ const Checkout = ({ user }) => {
       // Handle JSON parsing error
       console.error("Error parsing cartList data:", error);
     }
-    
+
     return cartList;
   }, []);
 
@@ -77,7 +81,7 @@ const Checkout = ({ user }) => {
   useEffect(() => {
     const map = new Map();
     for (const obj of cartList) {
-      const org = obj.product.ownerOrganization;
+      const org = obj.product.ownerCommonName;
       if (!map.has(org)) {
         map.set(org, []);
       }
@@ -88,22 +92,25 @@ const Checkout = ({ user }) => {
       const [key, value] = entry;
       let modifiedValue = [];
       value.forEach(item => {
+        const parts = item.product.contract_name.split('-');
+
         modifiedValue.push({
           key: item.product.address,
           item: {
             name: item.product.name,
-            image: item.product.imageUrl,
-            status: item.product.isActive ? "Active" : "Inactive",
+            image: item.product.images && item.product.images.length > 0 ? item.product.images[0] : image_placeholder,
+            status: "Active",
           },
-          subCategory: item.product.subCategory,
-          sellerOrganization: item.product.ownerOrganization,
+          category: parts[parts.length - 1],
+          sellersCommonName: item.product.ownerCommonName,
           unitOfMeasure: item.product.unitOfMeasurement,
-          unitPrice: item.product.pricePerUnit,
-          quantity: item.product.address,
+          unitPrice: item.product.price,
+          quantity: item.product.saleQuantity,
+          saleAddress: item.product.saleAddress,
           tax: calculateTax(item),
           shippingCharges: calculateShipping(item),
           amount:
-            item.product.pricePerUnit * item.qty +
+            item.product.price * item.qty +
             calculateShipping(item) +
             calculateTax(item),
           action: item.product.address,
@@ -115,7 +122,6 @@ const Checkout = ({ user }) => {
       return { key: key, value: modifiedValue };
     });
     setmapData(mapDataArray)
-
     let t = 0;
     cartList.forEach((item) => {
       t += calculateTax(item);
@@ -128,11 +134,95 @@ const Checkout = ({ user }) => {
     setShipping(s);
     let sum = 0;
     cartList.forEach((item) => {
-      sum += item.product.pricePerUnit * item.qty;
+      sum += item.product.price;
     });
     setTotal(sum);
   }, [marketplaceDispatch, cartList]);
 
+  const MinusQty = (qty, product) => {
+    if (qty === 1) {
+      return;
+    }
+
+    let items = [...cartList];
+    cartList.forEach((element, index) => {
+      if (element.product.address === product.key) {
+        const availableQuantity = product.quantity ? product.quantity : 1;
+        if (items[index].qty - 1 <= availableQuantity) {
+          items[index].qty -= 1;
+          actions.addItemToCart(marketplaceDispatch, items);
+        } else {
+          openToast(
+            "bottom",
+            true,
+            "Cannot add more than available quantity"
+          );
+          return;
+        }
+      }
+    });
+  }
+
+  const AddQty = (product) => {
+    let items = [...cartList];
+    cartList.forEach((element, index) => {
+      if (element.product.address === product.key) {
+        const availableQuantity = product.quantity ? product.quantity : 1;
+        if (items[index].qty + 1 <= availableQuantity) {
+          items[index].qty += 1;
+          actions.addItemToCart(marketplaceDispatch, items);
+        } else {
+          openToast(
+            "bottom",
+            true,
+            "Cannot add more than available quantity"
+          );
+          return;
+        }
+      }
+    });
+  }
+
+  const removeCartList = (text) => {
+    let items = [...cartList];
+    items.splice(
+      items.findIndex(function (i) {
+        window.LOQ = window.LOQ || []
+        window.LOQ.push(['ready', async LO => {
+          // Track an event
+          await LO.$internal.ready('events')
+          LO.events.track('Delete Cart Item', { product: i.product.name, category: i.product.category })
+        }])
+        TagManager.dataLayer({
+          dataLayer: {
+            event: 'delete_item_from_cart',
+            product_name: i.product.name,
+            category: i.product.category
+          },
+        });
+        return i.product.address === text;
+      }),
+      1
+    );
+    actions.deleteCartItem(marketplaceDispatch, items);
+  }
+
+  const ValueQty = (product, e) => {
+    let items = [...cartList];
+    cartList.forEach((element, index) => {
+      if (element.product.address === product.key) {
+        const availableQuantity = product.quantity ? product.quantity : 1;
+        if (e <= availableQuantity) {
+          items[index].qty = e;
+          actions.addItemToCart(marketplaceDispatch, items);
+        } else {
+          openToast("bottom", true, "Cannot add more than available quantity");
+          items[index].qty = availableQuantity;
+          actions.addItemToCart(marketplaceDispatch, items);
+        }
+      }
+    });
+  }
   const openToast = (placement, isError, msg) => {
     if (isError) {
       api.error({
@@ -168,188 +258,109 @@ const Checkout = ({ user }) => {
   };
 
   const columns = [
+
     {
-      title: <Text className="text-primaryC text-[13px]"></Text>,
+      title: <Text className="text-[#202020] text-base font-semibold px-6">Item</Text>,
       dataIndex: "item",
+
       render: (text) => {
         return (
-          <img className="w-16 h-16 object-cover" alt="" src={text.image} />
+          <div className="flex gap-3 items-center">
+            <img className=" w-10 h-10 md:w-[52px] md:h-[52px] lg:w-14 lg:h-14  object-contain rounded-[4px]" alt="" src={text.image} />
+            <p className="text-primary text-sm font-semibold">{decodeURIComponent(text.name)}</p>
+          </div>
+
         );
       },
     },
-    {
-      title: <Text className="text-primaryC text-[13px]">ITEM</Text>,
-      dataIndex: "item",
-      render: (text) => {
-        return (
-          <p className="text-primary text-[17px]">{decodeURIComponent(text.name)}</p>
-        );
-      },
-    },
+
     {
       title: (
-        <Text className="text-primaryC text-[13px]">SELLER ORGANIZATION</Text>
+        <Text className="text-[#202020] text-base font-semibold">Seller</Text>
       ),
-      dataIndex: "sellerOrganization",
-      align: "center",
-      render: (text) => <p className="text-center">{text}</p>,
-      width: "12%"
-    },
-    {
-      title: (
-        <Text className="text-primaryC text-[13px]">UNIT OF MEASUREMENT</Text>
-      ),
-      dataIndex: "unitOfMeasure",
+      dataIndex: "sellersCommonName",
       align: "center",
       render: (text) => (
-        <p className="text-center">{UNIT_OF_MEASUREMENTS[text]}</p>
+        <p className="text-center">{text}</p>
       ),
-      width: "12%"
+      // width: "12%"
     },
     {
-      title: <Text className="text-primaryC text-[13px]">UNIT PRICE($)</Text>,
+      title: <Text className="text-[#202020] text-base font-semibold">Unit Price($)</Text>,
       dataIndex: "unitPrice",
       align: "center",
-      render: (text) => <p className="text-center">{text}</p>,
+      render: (text) => <p className=" text-sm text-[#202020] font-medium font-sans">{text}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">QUANTITY</Text>,
+      title: <Text className="text-[#202020] text-base font-semibold">Quantity</Text>,
       dataIndex: "quantity",
       align: "center",
-      width: "160px",
-      render: (text) => {
-        let qty = 0;
-        let product;
-        let availableQuantity;
-        cartList.forEach((element) => {
-          if (element.product.address === text) {
-            qty = element.qty;
-            product = element.product;
-            availableQuantity = element.product.availableQuantity;
-          }
-        });
+      render: (text, product) => {
+
+        let qty = product.qty;
         return (
-          <div className="flex items-center mt-2">
+          <div className="flex items-center justify-center mt-2">
             <div
               onClick={() => {
-                if (qty === 1) {
-                  return;
-                }
-                let items = [...cartList];
-                cartList.forEach((element, index) => {
-                  if (element.product.address === product.address) {
-                    if (items[index].qty - 1 <= product.availableQuantity) {
-                      items[index].qty -= 1;
-                      actions.addItemToCart(marketplaceDispatch, items);
-                    } else {
-                      openToast(
-                        "bottom",
-                        true,
-                        "Cannot add more than available quantity"
-                      );
-                      return;
-                    }
-                  }
-                });
+                MinusQty(qty, product)
               }}
-              className="h-[32px] w-[27px] pt-1 border text-center cursor-pointer" style={{ borderColor: qty > 1 ? '#1777FF' : '#E3E3E3' }}>
-              <MinusOutlined className="text-xs text-secondryD" style={{ color: qty > 1 ? '#1777FF' : '#E3E3E3' }}/>
+              className="  w-6 h-6    bg-[#E9E9E9] flex justify-center items-center cursor-pointer rounded-full">
+              <MinusOutlined className="text-[17px] text-[#202020] font-medium" />
             </div>
-            <InputNumber className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center"
-                min={1} value={qty} defaultValue={qty} controls={false}
-                onChange={e => {
-                  let items = [...cartList];
-                  cartList.forEach((element, index) => {
-                    if (element.product.address === product.address) {
-                      if (e <= product?.availableQuantity) {
-                        items[index].qty = e;
-                        actions.addItemToCart(marketplaceDispatch, items);
-                      } else {
-                        openToast("bottom", true, "Cannot add more than available quantity");
-                        items[index].qty = product?.availableQuantity;
-                        actions.addItemToCart(marketplaceDispatch, items);
-                      }
-                    }
-                  });
-                }} />
+            <InputNumber className="w-[43px] border-none text-[#202020]  bg-none font-medium text-sm text-center flex flex-col justify-center"
+              min={1} value={qty} defaultValue={qty} controls={false}
+              onChange={e => {
+                ValueQty(product);
+              }} />
             <div
               onClick={() => {
-                let items = [...cartList];
-                cartList.forEach((element, index) => {
-                  if (element.product.address === product.address) {
-                    if (items[index].qty + 1 <= product.availableQuantity) {
-                      items[index].qty += 1;
-                      actions.addItemToCart(marketplaceDispatch, items);
-                    } else {
-                      openToast(
-                        "bottom",
-                        true,
-                        "Cannot add more than available quantity"
-                      );
-                      return;
-                    }
-                  }
-                });
+                AddQty(product);
               }}
-              className="ml-0.5 h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer" style={{ borderColor: availableQuantity > qty ? '#1777FF' : '#E3E3E3' }}>
-              <PlusOutlined className="text-xs text-secondryC" style={{ color: availableQuantity > qty ? '#1777FF' : '#E3E3E3' }}/>
+              className="  w-6 h-6    bg-[#E9E9E9] flex justify-center items-center cursor-pointer rounded-full">
+              <PlusOutlined className="text-[17px] text-[#202020] font-medium" />
             </div>
           </div>
         );
       },
     },
-    {
-      title: <Text className="text-primaryC text-[13px]">TAX($)</Text>,
-      dataIndex: "tax",
-      align: "center",
-      render: (text) => <p className="text-center">{text}</p>,
-    },
+
     {
       title: (
-        <Text className="text-primaryC text-[13px]">SHIPPING CHARGES($)</Text>
+        <Text className="text-[#202020] text-base font-semibold">Shipping Charges</Text>
       ),
       dataIndex: "shippingCharges",
       align: "center",
-      render: (text) => <p className="text-center">{text}</p>,
+      render: (text) => <p className="text-sm font-medium text-[#202020] ">{text}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">AMOUNT($)</Text>,
+      title: <Text className="text-[#202020] text-base font-semibold">Tax($)</Text>,
+      dataIndex: "tax",
+      align: "center",
+      render: (text) => <p className="text-sm font-medium text-[#202020]">{text}</p>,
+    },
+    {
+      title: <Text className="text-[#202020] text-base font-semibold">Amount($)</Text>,
       dataIndex: "amount",
       align: "center",
-      render: (text) => <p className="text-center">{text}</p>,
+      render: (text) => <p className="text-sm font-medium text-[#202020]">{text}</p>  
+,
+  
     },
     {
-      title: <Text className="text-primaryC text-[13px]">ACTION</Text>,
+      title: <Text className="text-[#202020] text-base font-semibold "></Text>,
       dataIndex: "action",
       align: "center",
-      render: (text) => (
-        <DeleteOutlined
+      render: (text) => {
+        return (<Button
+          type="link"
+          icon={<img src={Images.RemoveIcon} alt="remove" className="" />}
           onClick={() => {
-            let items = [...cartList];
-            items.splice(
-              items.findIndex(function (i) {
-                window.LOQ = window.LOQ || []
-                window.LOQ.push(['ready', async LO => {
-                    // Track an event
-                    await LO.$internal.ready('events')
-                    LO.events.track('Delete Cart Item', { product: i.product.name, category: i.product.category })
-                }])
-                TagManager.dataLayer({
-                  dataLayer: {
-                    event: 'delete_item_from_cart',
-                    product_name: i.product.name,
-                    category: i.product.category
-                  },
-                });
-                return i.product.address === text;
-              }),
-              1
-            );
-            actions.deleteCartItem(marketplaceDispatch, items);
+            removeCartList(text)
           }}
           className="hover:text-error cursor-pointer text-xl"
-        />
-      ),
+        />)
+      },
+      with: "12%"
     },
   ];
 
@@ -363,7 +374,7 @@ const Checkout = ({ user }) => {
       orderList.push({ inventoryId: item.product.address, quantity: item.qty });
     });
     const body = {
-      buyerOrganization: user.organization,
+      buyerCommonName: user.commonName,
       orderList,
       orderTotal: total + tax + shipping,
     };
@@ -378,33 +389,41 @@ const Checkout = ({ user }) => {
   };
 
   return (
-    <div className="h-screen mx-14  mt-14">
+    <div className="h-screen  mx-4 my-4 lg:mx-14  lg:mt-14">
       {contextHolder}
       {isCreateOrderSubmitting ? (
         <div className="h-screen flex justify-center items-center">
           <Spin spinning={isCreateOrderSubmitting} size="large" />
         </div>
       ) : (
-        <div>
+        <div className="pb-8">
           <Breadcrumb>
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
               <ClickableCell href={routes.Marketplace.url}>
+                <p className="text-sm text-[#13188A] font-semibold">
                 Home
+                  </p>
               </ClickableCell>
             </Breadcrumb.Item>
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-              <p className=" text-primary">
+              <p className="text-sm text-[#202020] font-medium">
                 Add to Cart
               </p>
             </Breadcrumb.Item>
           </Breadcrumb>
+
+          <div className=" pt-[18px] lg:pt-6 ">
+            <p className="text-2xl font-semibold leading-9">My Cart</p>
+          </div>
           {
-            mapData.length === 0 ? <div className="h-screen justify-center flex flex-col items-center">
+            mapData.length === 0 ? <div className="h-screen justify-center flex flex-col  items-center">
               <Image src={Images.noProductSymbol} preview={false} />
               <Title level={3} className="mt-2">
                 No item found
               </Title>
-            </div> : mapData.map(e => <CartComponent columns={columns} data={e.value} />)
+            </div> : mapData.map(e => <React.Fragment key={e.key}>
+
+              <div className="hidden  lg:block"><CartComponent columns={columns} data={e.value} /> </div> <div className="lg:hidden"><div className="flex gap-3 flex-col"><ResponsiveCart data={e.value} AddQty={AddQty} MinusQty={MinusQty} ValueQty={ValueQty} removeCartList={removeCartList} /></div></div></React.Fragment>)
           }
         </div>
       )}

@@ -1,38 +1,33 @@
 import { Button, Select, InputNumber, Modal, Table } from "antd";
 import { useEffect, useState } from "react";
 import { actions } from "../../contexts/inventory/actions";
-import { actions as itemActions } from "../../contexts/item/actions";
 import { actions as userActions } from "../../contexts/users/actions";
-import { useInventoryDispatch } from "../../contexts/inventory";
-import { useItemDispatch, useItemState } from "../../contexts/item";
+import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import { useUsersDispatch, useUsersState } from "../../contexts/users";
 import { useAuthenticateState } from "../../contexts/authentication";
-
 
 const TransferModal = ({ open, handleCancel, inventory }) => {
     const [data, setData] = useState([inventory]);
     const [quantity, setQuantity] = useState(1);
     const [userAddress, setUserAddress] = useState("");
     const inventoryDispatch = useInventoryDispatch();
-    const itemDispatch = useItemDispatch();
     const userDispatch = useUsersDispatch();
     const [canTransfer, setCanTransfer] = useState(true);
-    const {
-        items,
-        isTransferringItems
-    } = useItemState();
     const {
         user
     } = useAuthenticateState();
     const {
         users
     } = useUsersState();
+    const {
+        isTransferring
+    } = useInventoryState();
 
     const filterDuplicateUserAddresses = (arr) => {
         return [...new Map(arr.map((u) => [u.value, u])).values()];
     };
 
-    const usersList = users.map((record) => (user.organization !== record.organization ? { label: `${record.commonName} - ${record.organization}`, value: record.userAddress } : {}));
+    const usersList = users.map((record) => (user.commonName !== record.commonName ? { label: `${record.commonName} - ${record.organization}`, value: record.userAddress } : {}));
     const filteredUsersList = filterDuplicateUserAddresses(usersList);
 
     const handleSelect = (userAddress) => {
@@ -40,12 +35,11 @@ const TransferModal = ({ open, handleCancel, inventory }) => {
     }
 
     useEffect(() => {
-        itemActions.fetchItem(itemDispatch, "", 0, inventory.address);
         userActions.fetchUsers(userDispatch);
     }, [])
 
     useEffect(() => {
-        if (quantity > inventory.availableQuantity || quantity <= 0 || !userAddress) {
+        if (quantity > inventory.quantity || quantity <= 0 || !userAddress) {
             setCanTransfer(false);
         }
         else {
@@ -56,7 +50,7 @@ const TransferModal = ({ open, handleCancel, inventory }) => {
     const columns = [
         {
             title: "Quantity Available",
-            dataIndex: "availableQuantity",
+            dataIndex: "quantity",
             align: "center"
         },
         {
@@ -86,27 +80,16 @@ const TransferModal = ({ open, handleCancel, inventory }) => {
 
 
     const handleSubmit = async () => {
-        let itemsAddress = [];
-        if (inventory.inventoryType === "Individual") {
-            for (let i = 0; i < quantity; i++) {
-                itemsAddress.push(items[i].address);
-            }
-        }
-        else {
-            itemsAddress.push(items[0].address);
-        }
-
         const body = {
-            inventoryId: inventory.address,
-            itemsAddress: itemsAddress,
+            assetAddress: inventory.address,
             newOwner: userAddress,
-            newQuantity: quantity
+            quantity
         };
 
-        if (quantity > 0 && quantity <= inventory.availableQuantity && userAddress) {
-            let isDone = await itemActions.transferOwnership(itemDispatch, body);
+        if (quantity > 0 && quantity <= inventory.quantity && userAddress) {
+            let isDone = await actions.transferInventory(inventoryDispatch, body);
             if (isDone) {
-                actions.fetchInventory(inventoryDispatch, 10, 0, "");
+                actions.fetchInventory(inventoryDispatch, 10, 0, "", undefined);
                 handleCancel();
             }
         }
@@ -119,16 +102,51 @@ const TransferModal = ({ open, handleCancel, inventory }) => {
             title={`Transfer - ${decodeURIComponent(inventory.name)}`}
             width={650}
             footer={[
-                <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canTransfer} loading={isTransferringItems}>
-                    Transfer
-                </Button>
+                <div className="flex justify-center md:block">
+                    <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canTransfer} loading={isTransferring}>
+                        Transfer
+                    </Button>
+                </div>
             ]}
         >
-            <Table
-                columns={columns}
-                dataSource={data}
-                pagination={false}
-            />
+            <div className="head hidden md:block">
+
+                <Table
+                    columns={columns}
+                    dataSource={data}
+                    pagination={false}
+                />
+            </div>
+            <div className="flex flex-col gap-[18px] md:hidden mt-5">
+                <div> <p className="text-[#202020] font-medium text-sm">quantity Available</p>
+                    <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center ">
+
+                        <p className="px-5 "> {inventory?.quantity}</p>
+                    </div>
+                </div>
+                <div>
+
+                    <p className="text-[#202020] font-medium text-sm">Set Quantity</p>
+                    <div className="inventory_card">
+                        <InputNumber className="w-full " value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
+                    </div>
+                </div>
+                <div>
+                    <p className="text-[#202020] font-medium text-sm">Select recipient</p>
+                    <Select
+                        className="w-full"
+                        showSearch
+                        onSelect={handleSelect}
+                        options={filteredUsersList}
+                        optionFilterProp="value"
+                        filterOption={(input, option) =>
+                            (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                        }
+                    />
+
+                </div>
+
+            </div>
         </Modal>
     )
 }

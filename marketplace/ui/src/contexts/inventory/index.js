@@ -13,9 +13,14 @@ const InventoriesProvider = ({ children }) => {
     isInventoriesLoading: false,
     inventoryUpdateObject: null,
     isinventoryUpdating: false,
+    isListing: false,
+    isUnlisting: false,
     isReselling: false,
+    isTransferring: false,
     inventoryDetails: null,
+    inventoryOwnershipHistory: [],
     isInventoryDetailsLoading: false,
+    isInventoryOwnershipHistoryLoading: false,
     error: undefined,
     success: false,
     message: null,
@@ -23,6 +28,8 @@ const InventoriesProvider = ({ children }) => {
     onboardedSeller: null,
     stripeStatus: null,
     isLoadingStripeStatus: false,
+    uploadedImg : null,
+    isUploadImageSubmitting: false,
   };
 
   const [state, dispatch] = useReducer(reducer, initialState);

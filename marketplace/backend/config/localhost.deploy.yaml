@@ -1,5 +1,5 @@
-url: https://node1.mercata-testnet2.blockapps.net
+url: http://localhost
 dapp:
   contract:
-    name: Dapp
-    address: 65dddac0ed48d68ca669878af5747392c48612a9
+    name: Mercata
+    address: eddd7c9aa884a3b1b8595f0897608c07a8e770b1

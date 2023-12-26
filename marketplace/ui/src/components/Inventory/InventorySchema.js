@@ -2,46 +2,26 @@ import * as yup from "yup";
 
 const getSchema = () => {
   return yup.object().shape({
-    category: yup.object().shape({
-      name: yup.string().required("Category is required").nullable(),
+    serialNumber: yup.string().optional().nullable(),
+    name: yup.string().required("Name is required"),
+    description: yup.string().required("Description is required"),
+    artist: yup.string(),
+    source: yup.string(),
+    unitOfMeasurement: yup.object().shape({
+      name: yup.string(),
+      value: yup.number().positive("Measurement Value must be a positive number"),
     }),
-    subCategory: yup.object().shape({
-      name: yup.string().required("Sub-Category is required").nullable(),
-    }),
-    productName: yup.object().shape({
-      name: yup.string().required("Product Name is required").nullable(),
-    }),
-    quantity: yup.number().required("Quantity is required").nullable(),
-    pricePerUnit: yup.number().required("Price per unit is required"),
-    batchId: yup.string().required("Batch ID is required").test('no-double-quotes', 'Batch ID cannot contain double quotes', value => {
-      return value === undefined || !value.includes('"');
-    }),
-    status: yup.boolean().required("Status is required"),
-    inventoryType: yup.string().required("Inventory type is required"),
-    serialNumber: yup.object().shape({
-      serialNumStr: yup
-        .string()
-        .optional()
-        .nullable(),
-      serialNumArr: yup.array()
-        .optional()
-        .of(
-          yup.object({
-            itemSerialNumber: yup.string().required("Serial Number is required"),
-            rawMaterials: yup.array()
-              .required("Raw material is required")
-              .of(
-                yup.object({
-                  rawMaterialProductName: yup.string().required("Raw material product name is required"),
-                  rawMaterialProductId: yup.string().required("Raw material product code is required"),
-                  rawMaterialSerialNumbers: yup.array()
-                    .required("Raw material serial number is required")
-                    .of(yup.string())
-                })
-              )
-          })
-        )
-    }),
+    purity: yup.string(),
+    // clothingType: yup.string().nullable().required("The clothing type is required"),
+    // size: yup.string().nullable().required("A size is required"),
+    // skuNumber: yup.string().nullable().required("An SKU is required"),
+    // condition: yup.string().nullable().required("The condition is required"),
+    // brand: yup.string().nullable().required("A brand is required"),
+    quantity: yup.number().positive("Quantity must be a positive number").required("Quantity is required"),
+    expirationPeriodInMonths: yup.number().positive("Expiration period must be a positive number").required("Expiration period is required"),
+    images: yup.mixed().required("Image is required"),
+    files: yup.mixed().optional().nullable(),
+    category: yup.string().required("Category is required"),
   });
 };
 

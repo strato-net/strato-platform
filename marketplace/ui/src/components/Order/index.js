@@ -1,23 +1,26 @@
-import { Input, Tabs, Typography, DatePicker } from "antd";
+import { Input, Tabs, Typography, DatePicker, Breadcrumb } from "antd";
 import React, { useState } from "react";
 import { useLocation } from "react-router-dom";
 import SoldOrdersTable from "./SoldOrdersTable";
 import BoughtOrdersTable from "./BoughtOrdersTable";
 import TransfersTable from "./TransfersTable";
 import dayjs from "dayjs";
+import routes from "../../helpers/routes";
+import ClickableCell from "../ClickableCell";
 
 const { Search } = Input;
 
 const Order = ({ user }) => {
   // const naviroute = routes.OrderDetail.url;
+  const { state } = useLocation();
+  const [activeTab, setActiveTab] = useState(state?.defaultKey || 'Sold')
 
   const onChange = (key) => {
-   
+    setActiveTab(key)
   };
   
   const [selectedDate, setSelectedDate] = useState("");
   const { Text } = Typography;
-  const { state } = useLocation();
 
   const onDateChange = (date) => {
     setSelectedDate(date);
@@ -25,15 +28,29 @@ const Order = ({ user }) => {
 
   return (
     <div>
+      <div className="px-4 md:px-20 py-2 md:py-10">
+      <Breadcrumb>
+        <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+          <ClickableCell href={routes.Marketplace.url}>
+            <p className="text-sm text-[#13188A] font-semibold">
+
+            Home
+            </p>
+          </ClickableCell>
+        </Breadcrumb.Item>
+        <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+          <p className=" text-sm text-[#202020] font-medium">
+            {'Orders (' + activeTab + ')'}
+          </p>
+        </Breadcrumb.Item>
+      </Breadcrumb>
+      </div>
       <Tabs
-        className="mx-16 mt-14"
+        className="mx-4 md:mx-20 mt-0"
         defaultActiveKey={state == null ? "Sold" : state.defaultKey}
         onChange={onChange}
         tabBarExtraContent={              
-          <div className="text-xs flex items-center">
-            <Text className="block text-primaryC text-[13px] mr-2">
-              SEARCH BY DATE
-            </Text>
+          <div className="text-xs md:flex items-center hidden">
             <DatePicker
               value={
                 selectedDate
@@ -51,19 +68,19 @@ const Order = ({ user }) => {
         }
         items={[
           {
-            label: <p id="sold-tab" className="font-medium text-base">Orders (Sold)</p>,
+            label: <p id="sold-tab" className="font-semibold text-sm md:text-base">Orders (Sold)</p>,
             key: "Sold",
-            children: <SoldOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()}/>,
+            children: <SoldOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} onDateChange={onDateChange}/>
           },
           {
-            label: <p id="bought-tab" className="font-medium text-base">Orders (Bought)</p>,
+            label: <p id="bought-tab" className="font-semibold text-sm md:text-base">Orders (Bought)</p>,
             key: "Bought",
-            children: <BoughtOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()}/>,
+            children: <BoughtOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} onDateChange={onDateChange}/>
           },
           {
-            label: <p id="transfers-tab" className="font-medium text-base">Transfers</p>,
+            label: <p id="transfers-tab" className="font-semibold text-sm md:text-base">Transfers</p>,
             key: "Transfers",
-            children: <TransfersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()}/>,
+            children: <TransfersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()}/>
           }
         ]}
       />

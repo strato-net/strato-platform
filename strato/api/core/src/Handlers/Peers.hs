@@ -8,6 +8,7 @@ module Handlers.Peers
 where
 
 import Blockchain.Strato.Discovery.Data.Peer
+import Blockchain.Strato.Discovery.Data.PeerIOWiring ()
 import Control.Monad.IO.Class
 import Data.Aeson
 import qualified Data.Aeson.Key as DAK

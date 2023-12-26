@@ -64,10 +64,38 @@ router.post(
 )
 
 router.get(
+  Order.getAddressFromId,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  OrderController.getAddressFromId
+)
+
+router.get(
   Order.getAllUserAddress,
   authHandler.authorizeRequest(),
   loadDapp,
   OrderController.getAllUserAddress
+)
+
+router.post(
+  Order.createSaleOrder,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  OrderController.createSaleOrder,
+)
+
+router.post(
+  Order.cancelSaleOrder,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  OrderController.cancelSaleOrder,
+)
+
+router.post(
+  Order.executeSale,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  OrderController.executeSale
 )
 
 

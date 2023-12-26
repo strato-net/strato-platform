@@ -9,27 +9,8 @@ description:
     A toolkit for x509 usage in STRATO
 
 dependencies:
-  - aeson
   - base >= 4 && < 5
-  - base16-bytestring
-  - bloc2api
-  - blockapps-data
-  - blockapps-datadefs
-  - blockapps-vault-wrapper-api
-  - blockapps-vault-wrapper-server
   - bytestring
-  - containers
-  - cryptonite
-  - hourglass
-  - http-client
-  - optparse-applicative
-  - raw-strings-qq
-  - saltine
-  - servant-client
-  - source-tools
-  - strato-model
-  - text
-  - transformers
   - x509-certs
 
 
@@ -40,12 +21,20 @@ executables:
     source-dirs: exec_src/
     main: X509CertGenerator.hs
     other-modules: []
+    dependencies:
+      - aeson
+      - hourglass
+      - strato-model
+      - transformers
 
   x509-keygen:
     source-dirs: exec_src/
     main: X509Keygen.hs
     other-modules: []
-
+    dependencies:
+      - aeson
+      - strato-model
+    
   x509-info:
     source-dirs: exec_src/
     main: X509CertInfo.hs
@@ -55,8 +44,27 @@ executables:
     source-dirs: exec_src/
     main: X509CertRegistry.hs
     other-modules: []
+    dependencies:
+      - aeson
+      - bloc2api
+      - blockapps-data
+      - blockapps-datadefs
+      - containers
+      - http-client
+      - optparse-applicative
+      - raw-strings-qq
+      - servant-client
+      - source-tools
+      - strato-model
+      - text
 
   x509-saltine-decrypt:
     source-dirs: exec_src/
     main: X509SaltineDecrypt.hs
     other-modules: []
+    dependencies:
+      - base16-bytestring
+      - blockapps-vault-wrapper-api
+      - blockapps-vault-wrapper-server
+      - optparse-applicative
+      - saltine

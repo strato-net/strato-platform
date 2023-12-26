@@ -4,7 +4,6 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
-import           Control.Concurrent.Chan.Unagi
 import           Control.Monad.IO.Class
 import           Control.Concurrent.Async.Lifted.Safe
 import           Blockchain.VMOptions       ()
@@ -20,6 +19,7 @@ import           Blockchain.Strato.Model.Options()
 import           Blockchain.Participation (p2pApp, setParticipationMode)
 import           Blockchain.SeqEventNotify
 import           Blockchain.Strato.Discovery.Data.Peer (resetPeers)
+import           Blockchain.Strato.Discovery.Data.PeerIOWiring ()
 import           Executable.StratoP2P
 import           BlockApps.Init
 import           BlockApps.Logging as BL
@@ -37,12 +37,7 @@ initP2P = do
   setParticipationMode flags_participationMode
   wireMessagesRef <- liftIO $ newIORef empty
   cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
-  context <- liftIO $ readIORef $ configContext cfg
-  let contextkafkastate = contextKafkaState context
-  let contextkafkamiddleman = contextKafkaMiddleman context
-  _ <- async $ runContextM cfg $ seqEventNotificationSourceChanFill contextkafkastate ((\(a,_) -> a) contextkafkamiddleman)
-  let sSource = seqEventNotificationSourceChanPour ((\(a,_) -> a) contextkafkamiddleman)
-                                                   dupChan
+  let sSource  = seqEventNotificationSource $ contextKafkaState initContext
       runner f = runContextM cfg $ f sSource
   liftIO $
     race_

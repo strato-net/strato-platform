@@ -1,38 +1,26 @@
 {
     "categories": [
         {
-            "name": "Art",
-            "imageKey": "",
-            "subCategories": [
-                {
-                    "name": "Art"
-                }
-            ]
-        },
-        {
             "name": "Carbon",
             "imageKey": "",
             "subCategories": [
                 {
-                    "name": "Carbon Credit"
+                    "name": "Carbon Offset",
+                    "contract": "CarbonOffset"
                 },
                 {
-                    "name": "Membership DAO"
+                    "name": "Carbon DAO",
+                    "contract": "CarbonDAO"
                 }
             ]
         },
         {
-            "name": "Materials",
+            "name": "Metals",
             "imageKey": "",
             "subCategories": [
                 {
-                    "name": "Nickel Reserve"
-                },
-                {
-                    "name": "Nickel"
-                },
-                {
-                    "name": "Silver"
+                    "name": "Metals",
+                    "contract": "Metals"
                 }
             ]
         },
@@ -41,19 +29,8 @@
             "imageKey": "",
             "subCategories": [
                 {
-                    "name": "Sneakers"
-                },
-                {
-                    "name": "Shirts"
-                },
-                {
-                    "name": "Pants"
-                },
-                {
-                    "name": "Jackets"
-                },
-                {
-                    "name": "Accessories"
+                    "name": "Clothing",
+                    "contract": "Clothing"
                 }
             ]
         },
@@ -62,21 +39,30 @@
             "imageKey": "",
             "subCategories": [
                 {
-                    "name": "Trading Cards"
-                },
+                    "name": "Collectibles",
+                    "contract": "Collectibles"
+                }
+            ]           
+        },
+        {
+            "name": "Art",
+            "imageKey": "",
+            "subCategories": [
                 {
-                    "name": "Toys"
-                },
-                {
-                    "name": "Video Games"
-                },
-                {
-                    "name": "Vinyls"
-                },
-                {
-                    "name": "Other"
+                    "name": "Art",
+                    "contract": "Art"
                 }
             ]
+        },
+        {
+            "name": "Membership",
+            "imageKey": "",
+            "subCategories": [
+                {
+                    "name": "Membership",
+                    "contract": "Membership"
+                }
+            ]            
         }
     ]
 }

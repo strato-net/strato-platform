@@ -1,37 +1,33 @@
 import { rest, util, importer } from "blockapps-rest";
 const { createContract } = rest;
-import constants, { CHARGES, ITEM_STATUS, ORDER_STATUS, SERVICE_PROVIDERS } from "/helpers/constants";
+import { SERVICE_PROVIDERS, STRIPE_PAYMENT_SERVER_URL } from "/helpers/constants";
 import { yamlWrite, yamlSafeDumpSync, getYamlFile } from "/helpers/config";
 import { pollingHelper } from "/helpers/utils";
 
-import StripeService from "/payment-service/stripe.service";
+import axios from 'axios';
 import dayjs from 'dayjs';
 import RestStatus from 'http-status-codes';
 import certificateJs from "/dapp/certificates/certificate";
 
-import itemJs from "/dapp/items/item";
-import orderJs from "/dapp/orders/order";
-import orderLineJs from "/dapp/orders/orderLine";
+import artJs from "/dapp/items/art";
+import carbonOffsetJs from "/dapp/items/carbonOffset";
+import metalsJs from "/dapp/items/metals";
+import clothingJs from "/dapp/items/clothing";
+import membershipJs from "/dapp/items/membership";
+import carbonDAOJs from "/dapp/items/carbonDAO";
+import collectibleJs from "dapp/items/collectibles";
 
-import eventTypeJs from "/dapp/eventType/eventType";
-import eventTypeManagerJs from "/dapp/eventType/eventTypeManager";
-import itemManagerJs from "/dapp/items/itemManager";
-import productManagerJs from "/dapp/products/productManager";
+import saleJs from "/dapp/orders/sale";
+import saleOrderJs from "/dapp/orders/saleOrder";
+
+import inventoryJs from "/dapp/products/inventory";
 import marketplaceJs from "/dapp/marketplace/marketplace.js";
-import userAddressJs from "/dapp/addresses/userAddress.js";
-import paymentManagerJs from "/dapp/payments/paymentManager";
 import paymentProviderJs from '/dapp/payments/paymentProvider';
-import orderManagerJs from '/dapp/orders/orderManager';
 
-const allAssetNames = [
-  orderJs.contractName,
-  // orderLineItemJs.contractName,
-  eventTypeJs.contractName,
-  eventTypeManagerJs.contractName,
-];
+const allAssetNames = [];
 
-const contractName = "Dapp";
-const contractFileName = `dapp/dapp/contracts/Dapp.sol`;
+const contractName = "Mercata";
+const contractFileName = `dapp/mercata-base-contracts/BaseCodeCollection.sol`;
 
 const balance = 100000000000000000000;
 let userCert = null;
@@ -113,23 +109,11 @@ async function uploadContract(token, options) {
   return await bind(token, contract, options);
 }
 
-async function getManagersAndCirrusInfo(admin, contract, options) {
-  const state = await rest.getState(admin, contract, options);
-  const itemManager = await itemManagerJs.bindAddress(admin, state["itemManager"], options);
-  const productManager = await productManagerJs.bindAddress(admin, state["productManager"], options);
-  const eventTypeManager = await eventTypeManagerJs.bindAddress(admin, state.eventTypeManager, options);
-  const paymentManager = await paymentManagerJs.bindAddress(admin, state.paymentManager, options)
-  const orderManager = await orderManagerJs.bindAddress(admin, state.orderManager, options)
-
-  const cirrusOrg = state.bootUserOrganization !== "" ? state.bootUserOrganization : undefined;
-
-  return { cirrusOrg, productManager, eventTypeManager, itemManager, paymentManager, orderManager };
-}
-
 async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   const contract = _contract;
-  console.log(contract)
+  console.debug(contract)
   let userOrganization
+  let userCommonName
 
   if (!serviceUser) {
 
@@ -138,30 +122,23 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     //We are not guaranteed the user will have a certificate
     //99% chance they do, but if this this their first login
     //the node might not have a certificate in time
-    if (!(userCertificate === null || userCertificate === undefined || userCertificate.organization === null || userCertificate.organization === undefined)) {
+    if (!(userCertificate === null || userCertificate === undefined || userCertificate.commonName === null || userCertificate.commonName === undefined)) {
       contract.userOrganization = userCertificate.organization
       userOrganization = userCertificate.organization
+      userCommonName = userCertificate.commonName
       userCert = userCertificate;//Attaching user cert to dapp to save from needing make another call to get it
-      console.log('dapp - userCertificate.organization', userCertificate.organization)
     }
   }
 
-  const managers = await getManagersAndCirrusInfo(rawAdmin, contract, _defaultOptions)
   // includes the org+app for cirrus namespacing (helpers/utils.js will prepend to cirrus queries)
-  const defaultOptions = { ..._defaultOptions, org: managers.cirrusOrg, app: contractName, chainIds: [], };
+  const defaultOptions = { ..._defaultOptions, app: contractName, chainIds: [], };
   // for querying data not on the dapp shard
   const optionsNoChainIds = {
     ...defaultOptions,
     chainIds: [],
   };
 
-  const dappAddress = contract.address;
-  const admin = { dappAddress, ...rawAdmin };
-
-  contract.managers = managers;
-  contract.chainId = defaultOptions.chainIds
-    ? defaultOptions.chainIds[0]
-    : undefined;
+  const admin = { ...rawAdmin };
 
   // --------------------------- DAPP MANAGEMENT --------------------------------
   // governance - single add
@@ -224,527 +201,350 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return certificateJs.getCertificates(admin, args);
   };
 
-  // ------------------------------ ITEMS --------------------------------
-  contract.addItem = async function (args, options = defaultOptions) {
+  // -------------------------- INVENTORY --------------------------------
+
+  contract.getInventory = async function (args, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName, };
+    return inventoryJs.get(rawAdmin, { ...args }, getOptions);
+  };
+
+  contract.getInventories = async function (args, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName };
+    const inventories = await inventoryJs.getAll(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
+    const inventoryCount = await inventoryJs.inventoryCount(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
+    return { inventories: inventories, inventoryCount: inventoryCount }
+  };
+
+  contract.getOwnershipHistory = async function (args, options = optionsNoChainIds) {
+    console.log('#### GET OWNERSHIP HISTORY ARGS', JSON.stringify(args))
+    return inventoryJs.getOwnershipHistory(rawAdmin, args, options);
+  };
+
+  contract.listItem = async function (args, options = defaultOptions) {
+    return inventoryJs.uploadSaleContract(rawAdmin, args, options);
+  }
+
+  contract.unlistItem = async function (args, options = defaultOptions) {
+    const { saleAddress, ...restArgs } = args;
+    const contract = { address: saleAddress };
+    return inventoryJs.unlistItem(rawAdmin, contract, restArgs, options);
+  }
+
+  contract.resellItem = async function (args, options = defaultOptions) {
+    const { assetAddress, ...restArgs } = args;
+    const contract = { address: assetAddress };
+    return inventoryJs.resellItem(rawAdmin, contract, restArgs, options);
+  }
+
+  contract.transferItem = async function (args, options = defaultOptions) {
+    const { assetAddress, ...restArgs } = args;
+    const contract = { address: assetAddress };
+    return inventoryJs.transferItem(rawAdmin, contract, restArgs, options);
+  }
+
+  contract.updateSale = async function (args, options = defaultOptions) {
+    const { saleAddress, ...restArgs } = args;
+    const contract = { address: saleAddress };
+    return inventoryJs.updateSale(rawAdmin, contract, restArgs, options);
+  }
+
+  contract.updateInventory = async function (args, options = defaultOptions) {
+    const { itemContract, itemAddress, ...restArgs } = args;
+    const contract = { name: itemContract, address: itemAddress };
+    return inventoryJs.updateInventory(rawAdmin, contract, restArgs, options);
+  }
+
+  // ------------------------------ INVENTORY ENDS--------------------------------
+
+  contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName };
+    const newArgs = { ...args, notEqualsField: 'sale', notEqualsValue: '0000000000000000000000000000000000000000' }
+    return marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
+  };
+
+  contract.getMarketplaceInventoriesLoggedIn = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName };
+    const newArgs = { ...args, notEqualsField: ['sale', 'ownerCommonName'],
+                      notEqualsValue: ['0000000000000000000000000000000000000000', userCommonName] }
+    return marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
+  };
+
+  contract.getTopSellingProducts = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName }
+    const newArgs = { ...args, notEqualsField: 'sale', notEqualsValue: '0000000000000000000000000000000000000000' }
+    return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions)
+  }
+
+  contract.getTopSellingProductsLoggedIn = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName }
+    const newArgs = { ...args, notEqualsField: ['sale', 'ownerCommonName'],
+                      notEqualsValue: ['0000000000000000000000000000000000000000', userCommonName] }
+    return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions)
+  }
+
+  // ------------------------------ ART STARTS ------------------------------
+
+  contract.createArt = async function (args, options = defaultOptions) {
     const createdDate = Math.floor(Date.now() / 1000);
-    return managers.itemManager.addItem({ ...args.itemArgs, createdDate: createdDate, });
-  };
-  contract.updateItem = async function (args, options = defaultOptions) {
-    return managers.itemManager.updateItem(args);
-  };
-  contract.getItems = async function (args = {}, options = defaultOptions) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return managers.itemManager.getItems({ ...args }, getOptions);
+    const newArgs = {
+      ...args.itemArgs,
+      createdDate,
+      owner: rawAdmin.address,
+    };
+    return artJs.uploadContract(rawAdmin, newArgs, options);
   };
 
-  // ------------------------------ EVENTS --------------------------------
-  contract.createEvent = async function (args, options = optionsNoChainIds) {
-    try {
+  contract.getArts = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName, };
+    return artJs.getAll(rawAdmin, args, getOptions);
+  };
 
-      const { productId, serialNumbers } = args;
-      const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
+  // ------------------------------ ART ENDS --------------------------------
 
-      const eventBatchId = util.uid();
-      const createdDate = Math.floor(Date.now() / 1000);
+  // ------------------------------ CARBONOFFSET STARTS------------------------------
 
-      const serialNosBatch = 200
-      const itemsAddressArr = []
+  contract.createCarbonOffset = async function (args, options = defaultOptions) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const newArgs = {
+      ...args.itemArgs,
+      createdDate,
+    };
+    return carbonOffsetJs.uploadContract(rawAdmin, newArgs, options);
+  };
 
-      for (let i = 0; i < serialNumbers.length; i += serialNosBatch) {
-        const serialNumberArr = serialNumbers.slice(i, i + serialNosBatch);
+  contract.getCarbonOffsets = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName, };
+    return carbonOffsetJs.getAll(rawAdmin, args, getOptions);
+  };
 
-        const items = await managers.itemManager.getItems({ productId: productId, serialNumber: serialNumberArr }, getOptions)
+  // ------------------------------ CARBONOFFSET ENDS--------------------------------
 
-        if (items.length != serialNumberArr.length) {
-          throw new rest.RestError(RestStatus.CONFLICT,
-            "Invalid serial numbers for product")
-        }
-        items.forEach(item => itemsAddressArr.push(item.address))
+  // ------------------------------ METALS STARTS------------------------------
+
+  contract.createMetals = async function (args, options = defaultOptions) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const newArgs = {
+      ...args.itemArgs,
+      createdDate,
+      owner: rawAdmin.address,
+    };
+    return metalsJs.uploadContract(rawAdmin, newArgs, options);
+  };
+
+  contract.getMetals = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName, };
+    return metalsJs.getAll(rawAdmin, args, getOptions);
+  };
+
+  // ------------------------------ MATERIALS ENDS--------------------------------
+
+  // ------------------------------ CLOTHING STARTS------------------------------
+
+  contract.createClothing = async function (args, options = defaultOptions) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const newArgs = {
+      ...args.itemArgs,
+      createdDate,
+    };
+    return clothingJs.uploadContract(rawAdmin, newArgs, options);
+  };
+
+  contract.getClothings = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName, };
+    return clothingJs.getAll(rawAdmin, args, getOptions);
+  };
+
+  // ------------------------------ CLOTHING ENDS--------------------------------
+
+  // ------------------------------ MEMBERSHIP STARTS------------------------------
+
+  contract.createMembership = async function (args, options = defaultOptions) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const newArgs = {
+      ...args.itemArgs,
+      createdDate,
+      owner: rawAdmin.address,
+      status: 1,
+    };
+    console.log("newArgs", newArgs);
+    return membershipJs.uploadContract(rawAdmin, newArgs, options);
+  };
+
+  contract.getMemberships = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName, };
+    return membershipJs.getAll(rawAdmin, args, getOptions);
+  };
+
+  // ------------------------------ MEMBERSHIP ENDS--------------------------------
+
+  // ------------------------------ CARBONDAO STARTS------------------------------
+
+  contract.createCarbonDAO = async function (args, options = defaultOptions) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const newArgs = {
+      ...args.itemArgs,
+      createdDate
+    };
+    console.log("newArgs", newArgs);
+    return carbonDAOJs.uploadContract(rawAdmin, newArgs, options);
+  };
+
+  contract.getCarbonDAOs = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName, };
+    return carbonDAOJs.getAll(rawAdmin, args, getOptions);
+  };
+
+  // ------------------------------ CARBONDAO ENDS--------------------------------
+
+  // ------------------------------ COLLECTIBLES STARTS------------------------------
+
+  contract.createCollectible = async function (args, options = defaultOptions) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const newArgs = {
+      ...args.itemArgs,
+      createdDate,
+    };
+    return collectibleJs.uploadContract(rawAdmin, newArgs, options);
+  };
+
+  contract.getCollectibles = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName, };
+    return collectibleJs.getAll(rawAdmin, args, getOptions);
+  };
+
+  // ------------------------------ COLLECTIBLES ENDS--------------------------------
+
+  // ------------------------------ SALE TEST STARTS ------------------------------
+
+  contract.createSaleOrder = async function (args, options = defaultOptions) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const { items, ...restArgs } = args;
+    const saleAddresses = items.map(item => {
+      return item.saleAddress;
+    })
+    const quantities = items.map(item => {
+      return item.quantity;
+    })
+    /*
+    const sales = await saleJs.getAll(rawAdmin, { assetAddresses, paymentMethod }, options);
+    const sellersAddress = sales[0].sellersAddress;
+    const sellersCommonName = sales[0].sellersCommonName;
+    const saleAddresses = await Promise.all(sales.map(async (sale) => {
+      const orderForSale = orderList.find(order => order.assetAddress === sale.assetToBeSold);
+      const saleData = JSON.parse(sale.data);
+      if (saleData.units && orderForSale.quantity < saleData.units) {
+        const contract = { name: orderForSale.category, address: orderForSale.assetAddress }
+        const splitSaleAddress = await saleJs.createSplitSale(rawAdmin, {
+          paymentType: parseInt(PAYMENT_TYPES[paymentMethod]),
+          price: sale.price,
+          units: orderForSale.quantity,
+        }, options, contract);
+        return splitSaleAddress;
       }
+      else {
+        return sale.address;
+      }
+    }));
+    */
+    const newArgs = {
+      ...restArgs,
+      saleAddresses,
+      quantities,
+      orderId: util.uid(),
+      createdDate: createdDate,
+    }
+    return saleOrderJs.uploadContract(rawAdmin, newArgs, options);
+  }
 
-      if (!args.certifier) args.certifier = constants.zeroAddress
-      return managers.itemManager.addEvent({ itemsAddress: itemsAddressArr, ...args, eventBatchId: eventBatchId, createdDate: createdDate, });
+  contract.cancelSaleOrder = async function (args, options = defaultOptions) {
+    const { saleOrderAddress, comments, ...restArgs } = args;
+    const contract = { name: saleOrderJs.contractName, address: saleOrderAddress }
+    return saleOrderJs.cancelOrder(rawAdmin, contract, options, comments);
+  }
+
+  contract.getSaleOrders = async function (args, options = defaultOptions) {
+    const getOptions = { ...options, app: contractName, };
+    return saleOrderJs.getAll(rawAdmin, args, getOptions);
+  }
+
+  contract.getOrder = async function (args, options = defaultOptions) {
+    try {
+      const order = await saleOrderJs.get(rawAdmin, args, options);
+      const sales = await saleJs.getAll(rawAdmin, { saleAddresses: order.saleAddresses }, options);
+      const assetAddresses = sales.map(sale => {
+        return sale.assetToBeSold;
+      })
+      let assets = [];
+      const assetsWithoutQuantity = await inventoryJs.getAll(rawAdmin, { assetAddresses: assetAddresses }, options);
+      assetsWithoutQuantity.map(asset => {
+        const saleForAsset = sales.find(sale => sale.assetToBeSold === asset.address);
+        assets.push({
+          ...asset,
+          price: saleForAsset.price,
+          saleQuantity: saleForAsset.quantity,
+          saleAddress: saleForAsset.address,
+          amount: saleForAsset.quantity * saleForAsset.price,
+        })
+      })
+      const result = { userContactAddress: order.shippingAddress, order, assets };
+
+      return result;
     } catch (error) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
       }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while Creating event");
+      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while fetching the order");
     }
   };
 
-  // TODO:getEvents need to be revisited for performance related issues.
-  contract.getEvents = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = {
-      ...options,
-      org: managers.cirrusOrg,
-      app: contractName,
-    };
-
-    const { filterByCertifier, ...restArgs } = args
-    if (filterByCertifier) {
-      restArgs.certifier = rawAdmin.address;
-    }
-
-    const events = await managers.itemManager.getEvents({
-
-      ...restArgs,
-      limit: 3000,
-    }, getOptions);
-
-    const eventTypeIdSet = new Set()
-    const groupByEventBatchId = events.reduce((group, event) => {
-      const { eventBatchId } = event;
-      if (!group[eventBatchId]) {
-        group[eventBatchId] = {
-          eventTypeId: event.eventTypeId,
-          eventBatchId: event.eventBatchId,
-          summary: event.summary,
-          date: event.date,
-          certifier: event.certifier,
-          certifiedDate: event.certifiedDate,
-          certifierComment: event.certifierComment,
-          serialNo: [event.itemSerialNumber]
-        };
-      } else {
-        group[eventBatchId].serialNo.push(event.itemSerialNumber)
-      }
-      if (!eventTypeIdSet.has(event.eventTypeId)) {
-        eventTypeIdSet.add(event.eventTypeId)
-      }
-      return group;
-    }, {});
-
-    const eventTypes = await managers.eventTypeManager.getAll({
-
-      address: [...eventTypeIdSet],
-    }, getOptions);
-
-    const response = []
-    for (const key in groupByEventBatchId) {
-      if (Object.hasOwnProperty.call(groupByEventBatchId, key)) {
-        const element = groupByEventBatchId[key];
-        const eventTypeId = element.eventTypeId
-        const eventTypesData = eventTypes.find(eventType => eventType.address == eventTypeId);
-        element.eventTypename = eventTypesData.name
-        element.eventTypeDescription = eventTypesData.description
-        response.push(element)
-      }
-    }
-
-    const certifiers = response.map(({ certifier }) => certifier);
-    const users = await certificateJs.getCertificates(admin, { userAddress: certifiers });
-
-    const certifierUsersObj = users.reduce((acc, { commonName, userAddress }) => {
-      acc[userAddress] = { commonName, userAddress };
-      return acc;
-    }, {});
-
-    const updatedResponse = response.map(cert => {
-      const certifierUser = certifierUsersObj[cert.certifier];
-      if (certifierUser) cert.certifierName = certifierUser.commonName;
-      return cert;
-    });
-
-    return updatedResponse;
-  };
-
-
-  contract.getInventoryEventTypes = async function (args = {}, options = optionsNoChainIds) {
-    const { inventoryId } = args;
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-
-    const items = await managers.itemManager.getItems({ inventoryId }, getOptions);
-
-    const itemsAddress = items.map((item) => item.address);
-    const events = await managers.itemManager.getEvents({ limit: 3000, itemAddress: [...itemsAddress] }, getOptions);
-
-    const eventTypeIdSet = new Set()
-    events.forEach((event) => {
-      if (!eventTypeIdSet.has(event.eventTypeId)) {
-        eventTypeIdSet.add(event.eventTypeId)
-      }
-    });
-
-    const eventTypes = await managers.eventTypeManager.getAll({
-
-      address: [...eventTypeIdSet]
-    }, getOptions);
-
-    const response = eventTypes.map((eventType) => {
-      return {
-        eventTypeName: eventType.name,
-        eventTypeDescription: eventType.description,
-        eventTypeId: eventType.address
-      }
-    })
-
-    return response
-  };
-
-  contract.getInventoryEventTypeDetails = async function (args = {}, options = optionsNoChainIds) {
-    const { inventoryId, eventTypeId } = args;
-
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    const items = await managers.itemManager.getItems({ inventoryId }, getOptions);
-
-    const itemsAddress = items.map((item) => item.address);
-    const events = await managers.itemManager.getEvents({ limit: 3000, eventTypeId, itemAddress: [...itemsAddress] }, getOptions);
-
-    const groupByEventBatchId = events.reduce((group, event) => {
-      const { eventBatchId } = event;
-      if (!group[eventBatchId]) {
-        group[eventBatchId] = {
-          eventTypeId: event.eventTypeId,
-          eventBatchId: event.eventBatchId,
-          summary: event.summary,
-          date: event.date,
-          certifier: event.certifier,
-          certifiedDate: event.certifiedDate,
-          certifierComment: event.certifierComment,
-          serialNo: [event.itemSerialNumber]
-        };
-      } else {
-        group[eventBatchId].serialNo.push(event.itemSerialNumber)
-      }
-      return group;
-    }, {});
-
-    const eventType = await managers.eventTypeManager.get({
-
-      address: eventTypeId
-    }, getOptions);
-
-    const eventsData = []
-    for (const key in groupByEventBatchId) {
-      if (Object.hasOwnProperty.call(groupByEventBatchId, key)) {
-        const element = groupByEventBatchId[key];
-        eventsData.push(element)
-      }
-    }
-
-    const certifiers = eventsData.map(({ certifier }) => certifier);
-    const users = await certificateJs.getCertificates(admin, { userAddress: certifiers });
-
-    const certifierUsersObj = users.reduce((acc, { commonName, userAddress }) => {
-      acc[userAddress] = { commonName, userAddress };
-      return acc;
-    }, {});
-
-    const updatedEventsData = eventsData.map(cert => {
-      const certifierUser = certifierUsersObj[cert.certifier];
-      if (certifierUser) cert.certifierName = certifierUser.commonName;
-      return cert;
-    });
-
-    const response = {
-      eventTypeName: eventType.name,
-      eventTypeDescription: eventType.description,
-      events: updatedEventsData
-    }
-
-    return response;
-  };
-
-
-  // --------------------------------- ASSETS ---------------------------------
-  // ------------------------------ PRODUCT MANAGER --------------------------------
-  contract.createProduct = async function (args, options = defaultOptions) {
-    const createdDate = Math.floor(Date.now() / 1000);
-    const newArgs = { uniqueProductCode: parseInt(util.uid()), ...args.productArgs }
-    return managers.productManager.createProduct({ ...newArgs, createdDate: createdDate });
-  };
-  contract.updateProduct = async function (args, options = defaultOptions) {
-    return managers.productManager.updateProduct(args);
-  };
-  contract.deleteProduct = async function (args, options = defaultOptions) {
-    return managers.productManager.deleteProduct(args);
-  };
-  contract.createInventory = async function (args, options = defaultOptions) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    const createdDate = Math.floor(Date.now() / 1000);
-    const { serialNumber, ...restArgs } = args;
-    const newArgs = { ...restArgs, batchId: util.uid() };
-
-
-    const serialNo = [];
-    const repeatedSerialNumber = [];
-    const serialNumbers = []
-    let transformedArray = [];
-
-    if (serialNumber.length !== 0 || serialNumber.length !== undefined) {
-      for (let i = 0; i < serialNumber.length; i += 200) {
-        serialNo.push(serialNumber[i].itemSerialNumber)
-        const serialNumberArr = serialNo.slice(i, i + 200);
-        const items = await contract.getItems({ productId: restArgs.productAddress, serialNumber: serialNumberArr });
-
-        items.forEach(obj => {
-          const item = serialNumberArr.find(num => num === obj.serialNumber);
-          if (item) {
-            repeatedSerialNumber.push(item);
-          }
-        });
-      }
-    }
-    if (repeatedSerialNumber.length != 0) {
-      throw new rest.RestError(RestStatus.CONFLICT, { message: "repeated serial numbers found", data: repeatedSerialNumber },);
-    }
-
-    const productDetail = await managers.productManager.getProduct({ address: restArgs.productAddress }, getOptions);
-
-    if (serialNumber.length !== 0 || serialNumber.length !== undefined) {
-      serialNumber.forEach(function (item) {
-        let rawMaterialProductNameArray = [];
-        let rawMaterialSerialNumberArray = [];
-        let rawMaterialProductIdArray = [];
-
-        if (item.rawMaterials.length != 0) {
-          item.rawMaterials.forEach(function (rawMaterial) {
-            let rawMaterialProductName = rawMaterial.rawMaterialProductName;
-            let rawMaterialSerialNumbers = rawMaterial.rawMaterialSerialNumbers;
-            let rawMaterialProductId = rawMaterial.rawMaterialProductId;
-
-            for (const element of rawMaterialSerialNumbers) {
-              rawMaterialProductNameArray.push(rawMaterialProductName);
-              rawMaterialSerialNumberArray.push(element);
-              rawMaterialProductIdArray.push(rawMaterialProductId);
-            }
-          });
-        }
-
-        transformedArray.push({
-          "itemNumber": parseInt(util.uid()),
-          "serialNumber": item.itemSerialNumber,
-          "rawMaterialProductName": rawMaterialProductNameArray,
-          "rawMaterialSerialNumber": rawMaterialSerialNumberArray,
-          "rawMaterialProductId": rawMaterialProductIdArray
-        });
-        serialNumbers.push(item.itemSerialNumber)
-      });
-    }
-
-    if ((serialNumber.length === 0 || serialNumber.length === undefined) && newArgs.inventoryType === "Batch") {
-      transformedArray.push({
-        "itemNumber": parseInt(util.uid()),
-        "serialNumber": "",
-        "rawMaterialProductName": [],
-        "rawMaterialSerialNumber": [],
-        "rawMaterialProductId": []
-      });
-    }
-    else if ((serialNumber.length === 0 || serialNumber.length === undefined) && newArgs.inventoryType === "Individual") {
-      for (let i = 0; i < newArgs.quantity; i++) {
-        transformedArray.push({
-          "itemNumber": parseInt(util.uid()),
-          "serialNumber": "",
-          "rawMaterialProductName": [],
-          "rawMaterialSerialNumber": [],
-          "rawMaterialProductId": []
-        })
-      }
-    }
-
-    const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...newArgs, createdDate, serialNumbers });
-
-    /* hacky hacky hacky - temporary, only way to do it without a contract change */
-    if (args.quantity === 0) {
-      return [
-        createInventoryStatus,
-        createdInventoryAddress,
-      ]
-    }
-
-    const itemParams = {
-      itemObject: transformedArray,
-      createdDate,
-      comment: "",
-      productId: restArgs.productAddress,
-      status: restArgs.status,
-      inventoryId: createdInventoryAddress,
-
-      uniqueProductCode: productDetail.uniqueProductCode
-    };
-    const [itemStatus, itemAddress, repeatedSerialNumbers] = await managers.itemManager.addItem(itemParams);
-
-    return [
-      itemStatus,
-      createdInventoryAddress,
-      itemAddress.slice(0, -1),
-      repeatedSerialNumbers.slice(0, -1),
-    ];
-
-  };
-  contract.updateInventory = async function (args, options = defaultOptions) {
-    const { inventory: inventoryId } = args;
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    const items = await managers.itemManager.getItems({ inventoryId }, getOptions);
-    const itemsAddress = items.map((item) => item.address);
-    await managers.productManager.updateInventory(args);
-    const itemParams = { itemsAddress, comment: "", status: args.updates.status, };
-    return await managers.itemManager.updateItem(itemParams);
-  };
-  contract.resellInventory = async function (args, options = defaultOptions) {
-    const { inventoryId, quantity, price, itemsAddress } = args;
-    const newItemNumber = parseInt(util.uid());
-    return await managers.productManager.resellInventory({ existingInventory: inventoryId, quantity, price, itemNumber: newItemNumber, itemsAddress: itemsAddress });
-  };
-  contract.getProduct = async function (args, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return managers.productManager.getProduct({ ...args, ownerOrganization: userOrganization }, getOptions);
-  };
-  contract.getProducts = async function (args, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
-    console.log('dapp.getProducts - userOrganization', userOrganization)
-    const products = await managers.productManager.getProducts(
-      { ...args, sort: '-createdDate', ownerOrganization: userOrganization, notEqualsField: 'category', notEqualsValue: 'Membership' },
-      getOptions
-    );
-    const productCount = await managers.productManager.count(
-      { ...args, sort: '-createdDate', ownerOrganization: userOrganization, notEqualsField: 'category', notEqualsValue: 'Membership' },
-      getOptions
-    );
-    return { products: products, productCount: productCount }
-  };
-  contract.getProductNames = async function (args, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return managers.productManager.getProducts(
-      { ...args, sort: '-createdDate' },
-      getOptions
-    );
-  };
-  contract.getInventory = async function (args, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return managers.productManager.getInventory({ ...args, ownerOrganization: userOrganization }, getOptions);
-  };
-  contract.getInventories = async function (args, options = optionsNoChainIds) {
-    const { userAddress, ...restArgs } = args
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    
-    const inventories = await managers.productManager.getInventories(
-      { ...restArgs, sort: '-createdDate', ownerOrganization: userOrganization },
-      getOptions
-    );
-    const inventoryCount = await managers.productManager.inventoryCount(
-      { ...args, sort: '-createdDate', ownerOrganization: userOrganization },
-      getOptions
-    );
-    return {inventories: inventories, inventoryCount: inventoryCount}
-  };
-  contract.getInventoriesSearch = async function (args, options = optionsNoChainIds) {
-    const { userAddress, queryValue, ...restArgs } = args;
-    const encodedQueryValue = encodeURIComponent(queryValue);
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    const productList = await managers.productManager.getProducts({ ...restArgs, limit: 2000, offset: 0, ownerOrganization: userOrganization, queryValue: encodedQueryValue }, getOptions);
-    const productIds = productList.map(product => product.address);
-    const { queryFields, ...restArgsPrime } = restArgs
-    const inventories = await managers.productManager.getInventories({ ...restArgsPrime, sort: '-createdDate', ownerOrganization: userOrganization, productId: productIds }, getOptions);
-    const inventoryCount = await managers.productManager.inventoryCount(
-      { ...restArgsPrime, sort: '-createdDate', ownerOrganization: userOrganization, productId: productIds },
-      getOptions
-    );
-    return {inventories: inventories, inventoryCount: inventoryCount}
-  };
-  // ------------------------------ PRODUCT MANAGER ENDS--------------------------------
-
-  contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
-    return marketplaceJs.getAll(rawAdmin, { ...args }, getOptions);
-  };
-
-  contract.getMarketplaceInventoriesLoggedIn = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
-    return marketplaceJs.getAll(rawAdmin, { ...args, notEqualsField: 'ownerOrganization', notEqualsValue: userOrganization }, getOptions);
-  };
-
-  contract.getTopSellingProducts = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName }
-    // The issue with this is coming from the notEqualsValue. ServiceTokenUser gives BlockApps which returns nothing. Blockapps lowercase is needed to make the request work. 
-    return marketplaceJs.getTopSellingProducts(rawAdmin, { ...args }, getOptions)
+  contract.cancelSaleOrder = async function (args, options = defaultOptions) {
+    const { saleOrderAddress, comments, ...restArgs } = args;
+    const contract = { name: saleOrderJs.contractName, address: saleOrderAddress }
+    return saleOrderJs.cancelOrder(rawAdmin, contract, options, comments);
   }
 
-  contract.getTopSellingProductsLoggedIn = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName }
-    return marketplaceJs.getTopSellingProducts(rawAdmin, { ...args, notEqualsField: 'ownerOrganization', notEqualsValue: userOrganization }, getOptions)
-  }
-
-  contract.getItem = async function (args, options = optionsNoChainIds) {
-    return itemJs.get(rawAdmin, args, { ...options, org: managers.cirrusOrg, app: contractName });
+  contract.completeOrder = async function (args, options = defaultOptions) {
+    return saleOrderJs.completeOrder(rawAdmin, args, options);
   };
 
-  contract.getItems = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return itemJs.getAll(rawAdmin, { ...args, }, getOptions);
-  };
+  // ------------------------------ SALE TEST ENDS ------------------------------
 
-  contract.getItemOwnershipHistory = function (args, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return itemJs.getAllOwnershipEvents(rawAdmin, { ...args, }, getOptions);
-  };
-
-  contract.transferOwnershipItem = async function (args, options = defaultOptions) {
-    const { newQuantity, inventoryId, ...newArgs } = args
-    const inventoryIdArray = [inventoryId];
-    const quantityArray = [newQuantity];
-    const itemNumber = parseInt(util.uid());
-    const transferNumber = parseInt(util.uid());
-
-    await managers.productManager.updateInventoriesQuantities({ inventories: inventoryIdArray, quantities: quantityArray, isReduce: true })
-    return managers.itemManager.transferOwnership({ ...newArgs, dappAddress: contract.address, isUserTransfer: true, itemNumber: itemNumber, newQuantity: newQuantity, transferNumber: transferNumber });
-  };
-
-  contract.getAllItemTransferEvents = function (args, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return managers.itemManager.getAllItemTransferEvents(args, getOptions);
-  };
-
-  contract.auditItem = async function (args, options = defaultOptions) {
-    const { address, chainId } = args;
-    const auditOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return itemJs.getHistory(rawAdmin, chainId, address, auditOptions);
-  };
-
-  contract.updateItem = async function (args, options = defaultOptions) {
-    const { address, chainId, updates } = args;
-    const contract = { name: itemJs.contractName, address: address, };
-    const chainOptions = { chainIds: [chainId], ...options };
-    return itemJs.update(rawAdmin, contract, updates, chainOptions);
-  };
-
-  contract.getRawMaterials = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return managers.itemManager.getRawMaterials({
-
-      ...args,
-    },
-      getOptions
-    );
-  };
 
   /* ------------------------ Stripe account connect starts here ------------------------ */
   contract.stripeOnboarding = async function (args, options = defaultOptions) {
     try {
-      const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
-      let userStripeAccount, generatedAccountLink;
+      const getOptions = { ...options, app: contractName };
+      let userStripeAccount, connectLink;
       // get user paymentProvider details from cirrus
-      const sellerStripeDetails = await paymentProviderJs.get(rawAdmin, { name: SERVICE_PROVIDERS.STRIPE, ownerOrganization: userOrganization, accountDeauthorized: false }, getOptions)
+      const sellerStripeDetails = await paymentProviderJs.get(rawAdmin, { name: 'STRIPE', accountDeauthorized: false }, getOptions)
 
       /*  check if an accountId already exists for the user org */
-      if (Object.keys(sellerStripeDetails).length > 0 && sellerStripeDetails.accountLinked) {
+      if (sellerStripeDetails.length > 0 && Object.keys(sellerStripeDetails[0]).length > 0) {
         throw new rest.RestError(RestStatus.CONFLICT, "User has already connected their stripe account.")
       }
 
-      if (Object.keys(sellerStripeDetails).length == 0) {
-        userStripeAccount = await StripeService.generateStripeAccountId();
-        // save generated account id
-        const accountDetails = {
-          name: SERVICE_PROVIDERS.STRIPE,
-          accountId: userStripeAccount.id, status: "", createdDate: dayjs().unix(),
-        }
-        userStripeAccount = userStripeAccount.id
-        await managers.paymentManager.createPaymentProvider(accountDetails)
+      if (sellerStripeDetails.length == 0 || Object.keys(sellerStripeDetails[0]).length == 0) {
+        await axios.get(new URL('/stripe/onboard', STRIPE_PAYMENT_SERVER_URL).href)
+          .then(async function (res) {
+            if (res.status === 200) {
+              const { accountDetails } = res.data;
+              userStripeAccount = accountDetails.accountId;
+              await paymentProviderJs.uploadContract(rawAdmin, accountDetails, options);
+              connectLink = res.data.connectLink;
+            } else {
+              throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+            }
+          });
       } else {
-        userStripeAccount = sellerStripeDetails.accountId
+          await axios.get(new URL(`/stripe/onboard/${sellerStripeDetails.accountId}`, STRIPE_PAYMENT_SERVER_URL).href)
+            .then(function (res) {
+              if (res.status === 200) {
+                connectLink = res.data.connectLink;
+              } else {
+                throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+              }
+            });
       }
-      const connectLink = StripeService.generateStripeAccountConnectLink(userStripeAccount);
       return connectLink
     } catch (error) {
       console.error(`${error}`)
@@ -754,35 +554,56 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getStripeOnboardingStatus = async function (args, options = defaultOptions) {
     try {
-      const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
+      const getOptions = { ...options, app: contractName };
 
       // get user paymentProvider details from cirrus
-      const paymentProvider = await paymentProviderJs.get(rawAdmin, { name: SERVICE_PROVIDERS.STRIPE, accountDeauthorized: false, ...args }, getOptions);
-
+      const paymentProviders = await paymentProviderJs.get(rawAdmin, { name: 'STRIPE', accountDeauthorized: false, ...args }, getOptions);
       /* TODO check if the provider contract exists on then initiate a update */
-      if (Object.keys(paymentProvider).length == 0) {
+      if (paymentProviders.length == 0 || Object.keys(paymentProviders[0]).length == 0) {
         // throw new rest.RestError(RestStatus.NOT_FOUND, "User hasn't started their stripe setup.")
         return {}
       }
-      const connectedStripeAccountStatus = { accountId: paymentProvider.accountId, paymentProviderAddress: paymentProvider.address, chargesEnabled: false, detailsSubmitted: false, payoutsEnabled: false, accountDeauthorized: false, eventTime: Date.now() }
 
-      try {
-        const userStripeAccount = await StripeService.getStripeConnectAccountDetail(paymentProvider.accountId);
-        connectedStripeAccountStatus.chargesEnabled = userStripeAccount.charges_enabled
-        connectedStripeAccountStatus.detailsSubmitted = userStripeAccount.details_submitted
-        connectedStripeAccountStatus.payoutsEnabled = userStripeAccount.payouts_enabled
-
-      } catch (error) {
-        if (error.code == 'account_invalid') {
-          connectedStripeAccountStatus.accountDeauthorized = true
+      let returnedStripeAccountStatus = paymentProviders[0];
+      for (const paymentProvider of paymentProviders) {
+        const connectedStripeAccountStatus = { chargesEnabled: false, detailsSubmitted: false, payoutsEnabled: false, accountDeauthorized: false, eventTime: Date.now() }
+        const paymentProviderContract = { name: paymentProviderJs.contractName, address: paymentProvider.address }
+        try {
+          await axios.get(new URL(`/stripe/status/${paymentProvider.accountId}`, STRIPE_PAYMENT_SERVER_URL).href)
+            .then(function (res) {
+              if (res.status === 200) {
+                connectedStripeAccountStatus.chargesEnabled = res.data.chargesEnabled;
+                connectedStripeAccountStatus.detailsSubmitted = res.data.detailsSubmitted;
+                connectedStripeAccountStatus.payoutsEnabled = res.data.payoutsEnabled;
+              } else {
+                throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+              }
+            }, (error) => {
+              console.log(error);
+            });
+        } catch (error) {
+          if (error.code == 'account_invalid') {
+            connectedStripeAccountStatus.accountDeauthorized = true
+          }
         }
-      }
-      const { detailsSubmitted, chargesEnabled, payoutsEnabled, accountDeauthorized } = connectedStripeAccountStatus
-      if (paymentProvider.detailsSubmitted !== detailsSubmitted || paymentProvider.chargesEnabled !== chargesEnabled || paymentProvider.payoutsEnabled !== payoutsEnabled || paymentProvider.accountDeauthorized !== accountDeauthorized) {
-        await managers.paymentManager.updatePaymentProvider(connectedStripeAccountStatus, options)
+        const { detailsSubmitted, chargesEnabled, payoutsEnabled, accountDeauthorized } = connectedStripeAccountStatus;
+        if (paymentProvider.detailsSubmitted !== detailsSubmitted || paymentProvider.chargesEnabled !== chargesEnabled || paymentProvider.payoutsEnabled !== payoutsEnabled || paymentProvider.accountDeauthorized !== accountDeauthorized) {
+          await paymentProviderJs.updatePaymentProvider(rawAdmin, paymentProviderContract, connectedStripeAccountStatus, options);
+        }
+
+        if (connectedStripeAccountStatus.detailsSubmitted
+           && connectedStripeAccountStatus.chargesEnabled
+           && connectedStripeAccountStatus.payoutsEnabled
+           ) {
+            returnedStripeAccountStatus = { 
+              accountId: paymentProvider.accountId, 
+              paymentProviderAddress: paymentProvider.address, 
+              ...connectedStripeAccountStatus 
+            }
+           }
       }
 
-      return connectedStripeAccountStatus
+      return returnedStripeAccountStatus
 
     } catch (error) {
       console.error(`${error}`)
@@ -793,12 +614,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.updateStripeOnboardingStatus = async function (args, options = defaultOptions) {
     try {
       // get user paymentProvider details from cirrus
-      const { accountId, chargesEnabled, detailsSubmitted, payoutsEnabled, accountDeauthorized, eventTime } = args
+      const { accountId, ...restArgs } = args
 
-      const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
+      const getOptions = { ...options, app: contractName };
       const chainOptions = { ...options, chainIds: [contract.chainId] };
 
-      const paymentProvider = await paymentProviderJs.get(rawAdmin, { name: SERVICE_PROVIDERS.STRIPE, accountId }, getOptions);
+      const paymentProvider = await paymentProviderJs.get(rawAdmin, { name: 'STRIPE', accountId }, getOptions);
 
       /* TODO check if the provider contract exists on then initiate a update */
       if (!paymentProvider) {
@@ -806,613 +627,207 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         return false
       }
 
-      if (paymentProvider.eventTime > eventTime) {
+      if (paymentProvider[0].eventTime > eventTime) {
         return true;
       }
 
-      await managers.paymentManager.updatePaymentProvider({ paymentProviderAddress: paymentProvider.address, chargesEnabled, detailsSubmitted, payoutsEnabled, accountDeauthorized, eventTime }, chainOptions)
+      const paymentProviderContract = { name: paymentProviderJs.contractName, address: paymentProvider.address }
+      await paymentProviderJs.updatePaymentProvider(rawAdmin, paymentProviderContract, restArgs, chainOptions);
 
     } catch (error) {
       console.error(error);
       throw new rest.RestError(error.response.status, error.response.statusText)
     }
   }
-  //-----------------------------Order starts here -------------------------------
+  // //-----------------------------PAYMENT starts here -------------------------------
 
-  //TODO implement payment contract creation inside dapp and use payment services there
   contract.paymentCheckout = async function (args, options = defaultOptions) {
     try {
 
-      const { buyerOrganization, orderList, orderTotal: recievedOrderTotal } = args;
+      const { orderList, orderTotal: recievedOrderTotal } = args;
 
-      const newOptions = { ...options, org: managers.cirrusOrg, app: contractName }
-      // TODO
+      const assetAddresses = orderList.map(o => o.assetAddress);
 
-      const inventoriesAddresses = orderList.map(order => order.inventoryId);
-      const inventoriesList = await managers.productManager.getInventories({ address: inventoriesAddresses }, newOptions);
+      const assets = await inventoryJs.getAll(rawAdmin, { assetAddresses: assetAddresses }, options);
 
-      if (inventoriesList.length == 0 || inventoriesList.length != orderList.length) {
+      const saleAddresses = assets.map(a => a.saleAddress);
+
+      if (assets.length == 0 || assets.length != orderList.length) {
         throw new rest.RestError(RestStatus.NOT_FOUND, "Inventory not found")
       }
 
-      const inventoryOrganization = inventoriesList[0].ownerOrganization;
-      for (const curr_inventory of inventoriesList) {
+      const sellerName = assets[0].ownerCommonName;
+      for (const currInventory of assets) {
 
-        if (curr_inventory.ownerOrganization == userOrganization) {
+        if (currInventory.ownerCommonName == userCert.commonName) {
           throw new rest.RestError(RestStatus.BAD_REQUEST, "Seller cannot buy his own product",);
         }
 
         /* User shouldn't be allowed buy products from multiple sellers  */
-        if (inventoryOrganization != curr_inventory.ownerOrganization) {
+        if (sellerName != currInventory.ownerCommonName) {
           throw new rest.RestError(RestStatus.BAD_REQUEST, "Cannot buy products from multiple sellers in the same Order/Checkout",);
         }
       }
       // const chainOptions = { ...options, chainIds: [contract.chainId] };
       const sellerStripeDetails = await paymentProviderJs.get(rawAdmin,
         {
-          name: SERVICE_PROVIDERS.STRIPE, ownerOrganization: inventoryOrganization,
+          name: 'STRIPE', ownerCommonName: sellerName,
           accountDeauthorized: false
         },
-        newOptions)
+        options)
 
       /*  check if an accountId already exists for the user org */
-      if (Object.keys(sellerStripeDetails).length == 0 || !sellerStripeDetails.chargesEnabled || !sellerStripeDetails.detailsSubmitted || !sellerStripeDetails.payoutsEnabled) {
-        throw new rest.RestError(RestStatus.CONFLICT, "Seller hasn't activated this payment method")
+      if (sellerStripeDetails.length === 0 || !sellerStripeDetails[0].chargesEnabled || !sellerStripeDetails[0].detailsSubmitted || !sellerStripeDetails[0].payoutsEnabled) {
+        throw new rest.RestError(RestStatus.CONFLICT, "Seller hasn't activated this payment method");
       }
 
-      const productAddresses = inventoriesList.map(d => d.productId)
-      const productList = await managers.productManager.getProducts({ address: productAddresses }, newOptions);
+      const invoices = []; 
+      let calculatedOrderTotal = 0;
 
-      const invoices = []; let calculatedOrderTotal = 0
+      orderList.forEach(item => {
+        const inventoryItem = assets.find(asset => asset.address == item.assetAddress);
+        invoices.push({ productName: decodeURIComponent(inventoryItem.name), unitPrice: inventoryItem.price, quantity: item.quantity });
 
-      orderList.forEach(orderLine => {
-        const inventoryItem = inventoriesList.find(inven => inven.address == orderLine.inventoryId)
-        const product = productList.find(item => item.address === inventoryItem.productId)
-        invoices.push({ productName: decodeURIComponent(product.name), unitPrice: inventoryItem.pricePerUnit, quantity: orderLine.quantity })
-
-        calculatedOrderTotal += (inventoryItem.pricePerUnit * orderLine.quantity)
+        calculatedOrderTotal += (inventoryItem.price * item.quantity);
       })
 
       if (calculatedOrderTotal != recievedOrderTotal) {
-        throw new rest.RestError(RestStatus.BAD_REQUEST, "Incorrect order value.")
+        throw new rest.RestError(RestStatus.BAD_REQUEST, "Incorrect order value.");
       }
       let stripePaymentSession;
       try {
-        const { orderList, ...rest } = args;
-
-        // Convert orderList into an object with keys like 'orderList_0', 'orderList_1', ...
-        const orderListObject = orderList.reduce((acc, item, index) => {
-          acc[`orderList_${index}`] = JSON.stringify(item);
-          return acc;
-        }, {});
-
-        // Merge the orderListObject with the rest of the properties
-        const cartData = { ...rest, ...orderListObject };
-        Object.keys(cartData).forEach(key => {
-          cartData[key] = String(cartData[key]);
-        });
-
-        stripePaymentSession = await StripeService.initiatePayment(cartData, invoices, sellerStripeDetails.accountId);
+        const checkoutBody = {
+          paymentTypes: ['card'],
+          cartData: args,
+          orderDetail: invoices,
+          accountId: sellerStripeDetails[0].accountId,
+        }
+        stripePaymentSession = await axios.post(new URL('/stripe/checkout', STRIPE_PAYMENT_SERVER_URL).href, checkoutBody)
+          .then(function (res) {
+            if (res.status === 200) {
+              return res.data;
+            } else {
+              throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+            }
+          });
       } catch (err) {
-        throw new rest.RestError(err.statusCode, err.message)
+        throw new rest.RestError(err.statusCode, err.message);
       }
       const paymentParameters = {
-
+        address: sellerStripeDetails[0].address,
+        saleAddresses,
         paymentSessionId: stripePaymentSession.id,
-        paymentProvider: "stripe",
         paymentStatus: stripePaymentSession.payment_status,
         sessionStatus: stripePaymentSession.status,
         amount: stripePaymentSession.amount_total.toString(),
         expiresAt: stripePaymentSession.expires_at,
         createdDate: stripePaymentSession.created,
-        sellerAccountId: sellerStripeDetails.accountId
       }
-      const paymentContract = await managers.paymentManager.createPayment(paymentParameters)
-      return stripePaymentSession
+      await paymentProviderJs.createPayment(rawAdmin, paymentParameters, options);
+      return stripePaymentSession;
 
     } catch (error) {
       console.log(error);
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
       }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while updating  the Order");
+      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while updating the order");
     }
   };
 
+  // Stripe Webhook TODO
+
   contract.updatePayment = async function (args, options = defaultOptions, token) {
     try {
-      const chainOptions = { ...options, chainIds: [contract.chainId] };
-      return managers.paymentManager.updatePayment(args, chainOptions)
+      return paymentProviderJs.finalizePayment(args, options)
     } catch (error) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while updating payment status", { message: "Error while updating payment status" })
     }
   };
 
-  contract.getPayment = async function (args, options = defaultOptions) {
-    try {
-      return managers.paymentManager.get(args, { ...options, org: managers.cirrusOrg, app: contractName });
-    } catch (error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while fetching payment", { message: "Error while fetching payment" })
-    }
-  };
+  // Stripe Webhook End
 
   contract.getPaymentSession = async function (args, options = defaultOptions) {
     try {
-      const newOptions = { ...options, org: managers.cirrusOrg, app: contractName }
-      const { session_id } = args
-      const paymentDetail = await managers.paymentManager.get({ paymentSessionId: session_id }, newOptions);
-      return StripeService.getPaymentSession(session_id, paymentDetail.sellerAccountId);
+      const { session_id, sellersCommonName } = args;
+      const paymentDetail = await paymentProviderJs.get(rawAdmin, 
+        { name: 'STRIPE', ownerCommonName: sellersCommonName, accountDeauthorized: false }, 
+        options);
+      if (paymentDetail.length === 0) {
+        throw new rest.RestError(RestStatus.CONFLICT, "Seller payment details cannot be found.");
+      }
+      const paymentSession = await axios.get(new URL(`/stripe/session/${session_id}/${paymentDetail[0].accountId}`, STRIPE_PAYMENT_SERVER_URL).href)
+        .then(function (res) {
+          if (res.status === 200) {
+            return res.data;
+          } else {
+            throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+          }
+        });
+      return { ...paymentSession }
     } catch (error) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while fetching payment session", { message: "Error while fetching payment" })
     }
   };
 
-  contract.createOrder = async function (args, options = defaultOptions) {
-
-    try {
-      const { buyerOrganization, orderList, orderTotal: recievedOrderTotal, paymentSessionId = "", shippingAddress } = args;
-      const currentTimestamp = Math.floor(Date.now() / 1000);
-
-      const [createdDate, orderDate] = Array(2).fill(currentTimestamp);
-
-      const createOptions = { ...optionsNoChainIds, org: managers.cirrusOrg }
-      const orderOptions = { ..._defaultOptions, org: managers.cirrusOrg }
-
-      if (paymentSessionId.length > 1) {
-        const order = await managers.orderManager.getOrders(rawAdmin, { paymentSessionId }, createOptions);
-        if (order.orders.length > 0) {
-          throw new rest.RestError(RestStatus.BAD_REQUEST, `Order already placed for payment_id ${paymentSessionId}`)
-        }
-      }
-
-      // get inventories data
-      const inventoryIdArray = orderList.map(order => order.inventoryId);
-      const inventories = await managers.productManager.getInventories(
-        { address: [...inventoryIdArray] },
-        createOptions
-      );
-
-      if (!Array.isArray(inventories)) {
-        throw new rest.RestError(RestStatus.NOT_FOUND, "Inventory not found")
-      }
-
-      const quantitiesToReduce = orderList.map(order => order.quantity);
-
-      // reducing quantity inside inventories to place order and checking the buyerOrganization should not be equal to inventory organization
-      inventories.forEach(inventory => {
-        if (buyerOrganization == inventory.ownerOrganization) {
-          throw new rest.RestError(RestStatus.BAD_REQUEST, "Seller can not buy his own product");
-        }
-        const orderItem = orderList.find(item => item.inventoryId === inventory.address);
-        if (orderItem) {
-          inventory.quantity = orderItem.quantity;
-        }
-
-      });
-
-      const groupedData = inventories.reduce((acc, inventory) => {
-        if (!acc[inventory.ownerOrganization]) {
-          acc[inventory.ownerOrganization] = { ownerOrganization: inventory.ownerOrganization, data: [] };
-        }
-        acc[inventory.ownerOrganization].data.push(inventory);
-        return acc;
-      }, {});
-
-      const inventoriesData = Object.values(groupedData);
-      const total = inventoriesData.reduce((acc, obj) => {
-        const result = obj.data.reduce((total, curr) => total + curr.pricePerUnit * curr.quantity, 0);
-        return acc + result;
-      }, 0);
-
-      if (total != recievedOrderTotal) {
-        throw new rest.RestError(RestStatus.BAD_REQUEST, "Order Total is not matching");
-      }
-
-      let orders = [];
-      for (const inventory of inventoriesData) {
-        const inventoryTotal = inventory.data.reduce((acc, curr) => acc + (curr.pricePerUnit * curr.quantity), 0);
-        const shippingCharge = inventoryTotal * CHARGES.SHIPPING;
-        const tax = inventoryTotal * CHARGES.TAX;
-
-        // shipping charge for order 
-        const orderTotal = inventoryTotal + shippingCharge + tax;
-        const amountPaid = orderTotal;  // need to remove if no further use
-
-        const orderArgs = {
-
-          orderId: util.uid(),
-          buyerOrganization,
-          sellerOrganization: inventory.ownerOrganization,
-          orderDate,
-          orderTotal,
-          orderShippingCharges: shippingCharge,
-          status: ORDER_STATUS.AWAITING_FULFILLMENT,
-          amountPaid,
-          buyerComments: '',
-          sellerComments: '',
-          createdDate, paymentSessionId, shippingAddress
-        }
-
-        const [statusCode, orderAddress] = await managers.orderManager.createOrder(orderArgs);
-        orders.push([statusCode, orderAddress]);
-
-        // add orderLine for inventories
-        for (const inventoryObject of inventory.data) {
-
-          const shippingCharges = (inventoryObject.pricePerUnit * inventoryObject.quantity) * CHARGES.SHIPPING;
-          const tax = (inventoryObject.pricePerUnit * inventoryObject.quantity) * CHARGES.SHIPPING;
-
-          await managers.orderManager.addOrderLine({
-            orderAddress,
-            productId: inventoryObject.productId,
-            inventoryId: inventoryObject.address,
-            quantity: inventoryObject.quantity,
-            pricePerUnit: inventoryObject.pricePerUnit,
-            shippingCharges,
-            tax,
-            createdDate
-          });
-        };
-      }
-      await managers.productManager.updateInventoriesQuantities({ inventories: inventoryIdArray, quantities: quantitiesToReduce, isReduce: true })
-      return orders;
-    } catch (error) {
-      if (error.response) {
-        throw new rest.RestError(error.response.status, error.response.statusText);
-      }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while creating the order");
-    }
-  }
-
-  contract.updateBuyerDetails = async function (args, options = defaultOptions) {
-    try {
-      const { address, chainId, updates } = args;
-
-      const contract = { name: orderJs.contractName, address: address };
-
-      const createOptions = { ...options, org: managers.cirrusOrg, app: contractName };
-      if (updates.status == ORDER_STATUS.CANCELED) {
-        const [statusResponse, inventoryAddresses, quantitiesToUpdate] =
-          await managers.orderManager.updateBuyerDetails({ orderAddress: address, ...updates });
-
-        const inventories = inventoryAddresses.split(",").slice(0, -1);
-        const quantities = quantitiesToUpdate.split(",").slice(0, -1);
-        const [status] = await managers.productManager.updateInventoriesQuantities({ inventories, quantities, isReduce: false, });
-
-        return { status };
-      }
-
-      return managers.orderManager.updateBuyerDetails({ orderAddress: address, updates });
-    } catch (error) {
-      if (error.response) {
-        throw new rest.RestError(error.response.status, error.response.statusText);
-      }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while updating  the Order");
-    }
-  };
-
-  contract.updateSellerDetails = async function (args, options = defaultOptions) {
-    try {
-      const { address, chainId, updates } = args;
-      const contract = { name: orderJs.contractName, address: address, };
-
-      const createOptions = { ...options, org: managers.cirrusOrg, app: contractName };
-      if (updates.status == ORDER_STATUS.CANCELED) {
-        const [statusResponse, inventoryAddresses, quantitiesToUpdate] =
-          await managers.orderManager.updateSellerDetails({ orderAddress: address, ...updates });
-
-        const inventories = inventoryAddresses.split(",").slice(0, -1);
-        const quantities = quantitiesToUpdate.split(",").slice(0, -1);
-        const [status] = await managers.productManager.updateInventoriesQuantities({ inventories, quantities, isReduce: false, });
-
-        return { status };
-      } else if (updates.status == ORDER_STATUS.CLOSED) {
-
-        const [statusResponse, inventoryAddresses, quantitiesToUpdate] = await managers.orderManager.updateSellerDetails({ orderAddress: address, ...updates });
-
-        const orderLines = await managers.orderManager.getOrderLines({ orderAddress: address }, createOptions);
-
-        let result = []
-        const newOwner = orderLines[0].owner
-        const itemNumber = parseInt(util.uid());
-
-        for (let orderLine of orderLines) {
-          const orderLineItems = await managers.orderManager.getOrderLineItems({ orderLineId: orderLine.address }, createOptions);
-          const itemAddresses = orderLineItems.map(orderLineItem => orderLineItem.itemId);
-
-          // Since this is called from the selling flow this should never be a gifted transfer and we don't need a transfer number.
-          const [status, productId, inventoryId] = await managers.itemManager.transferOwnership({ itemsAddress: itemAddresses, newOwner, newQuantity: orderLine.quantity, dappAddress, itemNumber, isUserTransfer: false, transferNumber: 0 });
-          result.push({ status, productId, inventoryId });
-        }
-        return result;
-      }
-
-      return managers.orderManager.updateSellerDetails({ orderAddress: address, ...updates });
-    } catch (error) {
-      if (error.response) {
-        throw new rest.RestError(error.response.status, error.response.statusText);
-      }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while updating  the Order");
-    }
-  };
-
-  contract.getOrder = async function (args, options = optionsNoChainIds) {
-    try {
-
-      const { address, ...newArgs } = args;
-
-      const createOptions = { ...options, org: managers.cirrusOrg, app: contractName };
-      const optionsWithChainId = { ...options, org: managers.cirrusOrg };
-
-      const order = managers.orderManager.getOrder(args, createOptions);
-      const orderLines = managers.orderManager.getOrderLines({ orderAddress: address }, createOptions);
-
-      const response = await Promise.allSettled([order, orderLines]);
-      const userContactAddress = await userAddressJs.get(rawAdmin, { address: response[0].value.shippingAddress }, createOptions)
-      const result = { userContactAddress, ...response[0].value, orderLines: response[1].value, };
-
-      for (let i = 0; i < result.orderLines.length; i++) {
-        const { productId, inventoryId } = result.orderLines[i];
-        const items = await managers.itemManager.getItems({ productId, inventoryId }, createOptions);
-
-        if (items === null || items === undefined || items.length === 0) {
-          result.orderLines[i].containsSerialNumber = false;
-        }
-        else if (items.length > 0 && items[0].serialNumber == "") {
-          result.orderLines[i].containsSerialNumber = false;
-        } else {
-          result.orderLines[i].containsSerialNumber = true;
-        }
-      }
-
-      const productIds = [
-        ...new Set(result.orderLines.map((orderLines) => orderLines.productId)),
-      ];
-      const { chainIds, ...newOptions } = options;
-
-      const products = await managers.productManager.getProducts({ address: [...productIds], chainId: contract.chainId }, createOptions);
-
-      if (!products || products.length === 0) {
-        throw new rest.RestError(RestStatus.NOT_FOUND, "Products not found");
-      }
-
-      result.orderLines.forEach((orderLine) => {
-        const product = products.find(
-          (product) => product.address === orderLine.productId
-        );
-        if (product) {
-          orderLine.productName = product.name;
-          orderLine.manufacturer = product.manufacturer;
-          orderLine.imageKey = product.imageKey;
-          orderLine.amount = orderLine.pricePerUnit * orderLine.quantity + orderLine.shippingCharges + orderLine.tax;
-        }
-      });
-
-      return result;
-    } catch (error) {
-      if (error.response) {
-        throw new rest.RestError(error.response.status, error.response.statusText);
-      }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while Fetching  the Order");
-    }
-  };
-
-  contract.getOrders = async function (args = {}, options = optionsNoChainIds) {
-    try {
-      const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-      return managers.orderManager.getOrders(rawAdmin, args, getOptions);
-    } catch (error) {
-      if (error.response) {
-        throw new rest.RestError(error.response.status, error.response.statusText);
-      }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while Fetching  the Orders");
-    }
-  };
-
-  // TODO : add error handling 
-  contract.transferOwnershipOrder = async function (args, options = defaultOptions) {
-    const { address, chainId, newOwner } = args;
-    const contract = { name: orderJs.contractName, address: address, };
-    const chainOptions = { chainIds: [chainId], ...options };
-    return orderJs.transferOwnership(rawAdmin, contract, chainOptions, newOwner);
-  };
-
-  contract.createOrderLineItem = async function (args, options = defaultOptions) {
-    try {
-      const { orderLineId, serialNumber } = args;
-      const quantity = args.quantity || 0;
-      const chainOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-
-      const orderLine = await managers.orderManager.getOrderLine({ address: orderLineId }, chainOptions);
-      const { productId, inventoryId } = orderLine
-
-      // If no serial numbers are passed, a quantity is passed from the front end. 
-      // This will allow us to get the first n items from the inventory
-      // quantity is set to 0 if serial numbers are provided, so we can get the items by serial number
-      let items;
-      if (quantity > 0) {
-        items = await managers.itemManager.getItems(
-          {
-            productId,
-            inventoryId,
-            offset: 0,
-            limit: quantity,
-            status: 1
-          },
-          chainOptions
-        );
-      } else {
-        items = await managers.itemManager.getItems(
-          {
-            productId,
-            inventoryId,
-            serialNumber: [...serialNumber]
-          },
-          chainOptions
-        );
-      }
-      if (serialNumber && serialNumber.length !== 0 && serialNumber.length !== items.length) {
-        throw new rest.RestError(RestStatus.CONFLICT, "Serial numbers are different than the actual inventory");
-      }
-
-      const _contract = { name: orderLineJs.contractName, address: orderLineId };
-
-      // const items = await managers.itemManager.getItems(
-      //   {
-      //     productId,
-      //     inventoryId,
-      //     offset: 0,
-      //     limit: quantity,
-      //     status: 1
-      //   },
-      //   chainOptions
-      // );
-
-      const itemsAddresses = items.map(_item => _item.address);
-
-
-      const _args = {
-        orderLineId,
-        items: itemsAddresses,
-        createdDate: Math.floor(Date.now() / 1000),
-      };
-
-      const [status, orderLineItems, _items] = await managers.orderManager.addOrderLineItems(_args);
-      const result = orderLineItems.split(",");
-      const inventory = await contract.getInventory({ address: items[0].inventoryId, });
-      if (inventory.inventoryType === "Individual" || !inventory.inventoryType) {
-        const [soldStatus] = await managers.itemManager.updateItem({
-          itemsAddress: itemsAddresses,
-          status: ITEM_STATUS.SOLD,
-          comment: "",
-        });
-        if (soldStatus !== "200") {
-          throw new rest.RestError(RestStatus.BAD_REQUEST, "Sold status was not updated");
-        }
-      }
-
-      return result;
-    } catch (error) {
-      if (error.response) {
-        throw new rest.RestError(error.response.status, error.response.statusText);
-      }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while creating the Order Line Item");
-    }
-  };
-
-  contract.getOrderLine = async function (args = {}, options = optionsNoChainIds) {
-    try {
-
-      const { address } = args;
-      const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-      const orderLine = await managers.orderManager.getOrderLine({ ...args, }, getOptions);
-
-      const inventory = await contract.getInventory({ address: orderLine.inventoryId, });
-      const orderLineItems = await managers.orderManager.getOrderLineItems({ orderLineId: orderLine.address, }, getOptions);
-
-      return { ...inventory, items: orderLineItems, };
-    } catch (error) {
-      if (error.response) {
-        throw new rest.RestError(error.response.status, error.response.statusText);
-      }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while Fetching  the OrderLine");
-    }
-  };
-
-  contract.getOrderLineItem = async function (args, options = optionsNoChainIds) {
-    try {
-      return managers.orderManager.getOrderLineItem(args, { ...options, org: managers.cirrusOrg, app: contractName });
-    } catch (error) {
-      if (error.response) {
-        throw new rest.RestError(error.response.status, error.response.statusText);
-      }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while Fetching  the OrderLineItem");
-    }
-  };
-
-
-  contract.getOrderLineItems = async function (args = {}, options = optionsNoChainIds) {
-    try {
-      const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-      return managers.orderManager.getOrderLineItems({ ...args, }, getOptions);
-    } catch (error) {
-      if (error.response) {
-        throw new rest.RestError(error.response.status, error.response.statusText);
-      }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while Fetching the OrderLineItems");
-    }
-  };
   contract.createUserAddress = async function (args, options = defaultOptions) {
     try {
-      const createdDate = Math.floor(Date.now() / 1000);
-      return managers.paymentManager.createUserAddress({ ...args, createdDate: createdDate, });
-    } catch (err) {
+      await axios.post(new URL(`/customer/address`, STRIPE_PAYMENT_SERVER_URL).href, { commonName: userCert.commonName, ...args })
+        .then(function (res) {
+          if (res.status === 200) {
+            console.log(res.data);
+          } else {
+            throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+          }
+        });
+      return {}
+    } catch (error) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
       }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while adding address: ${JSON.stringify(err)} `);
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while adding address: ${JSON.stringify(error)} `);
     }
   };
 
   contract.getAllUserAddress = async function (args, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName }
-    return userAddressJs.getAll(rawAdmin, { ownerOrganization: userOrganization, ...args }, getOptions);
-  };
-
-
-  //-----------------------------Order ends here -------------------------------
-  contract.createEventType = async function (args, options = defaultOptions) {
     try {
-
-      const createdDate = Math.floor(Date.now() / 1000);
-      return managers.eventTypeManager.createEventType({ ...args, createdDate, });
+      const userAddresses = await axios.get(new URL(`/customer/address/${userCert.commonName}`, STRIPE_PAYMENT_SERVER_URL).href).then(function (res) {
+        if (res.status === 200) {
+          return res.data.data;
+        } else {
+          throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+        }
+      });
+      return userAddresses;
     } catch (error) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
       }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while Fetching the OrderLineItems");
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching addresses: ${JSON.stringify(err)} `);
     }
   };
 
-  contract.getEventTypes = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return managers.eventTypeManager.getAll({ ...args, ownerOrganization: userOrganization }, getOptions);
-  };
-
-  contract.transferOwnershipEvent = async function (args, options = defaultOptions) {
-    const { address, chainId, newOwner } = args;
-
-    const contract = { name: eventJs.contractName, address: address, };
-    const chainOptions = { chainIds: [chainId], ...options };
-    return eventJs.transferOwnership(rawAdmin, contract, chainOptions, newOwner);
-  };
-
-  contract.certifyEvent = async function (args, options = defaultOptions) {
-    const { eventBatchId, updates } = args;
-    const certifiedDate = Math.floor(Date.now() / 1000);
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    const eventAddress = [];
-    const events = await managers.itemManager.getEvents({ eventBatchId: [...eventBatchId] }, getOptions);
-
-    events.forEach(event => {
-      if (event.certifiedDate !== null) {
-        throw new rest.RestError(RestStatus.CONFLICT, { message: "events are already certified" });
+  contract.getAddressFromId = async function (args, options = defaultOptions) {
+    try {
+      const { id } = args;
+      const userAddress = await axios.get(new URL(`/customer/address/id/${id}`, STRIPE_PAYMENT_SERVER_URL).href).then(function (res) {
+        if (res.status === 200) {
+          return res.data.data;
+        } else {
+          throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+        }
+      });
+      return userAddress;
+    }catch (error) {
+      if (error.response) {
+        throw new rest.RestError(error.response.status, error.response.statusText);
       }
-      eventAddress.push(event.address)
-    });
-
-    return managers.itemManager.certifyEvent({ eventAddress, certifiedDate, updates });
-  };
-
-  contract.auditEvent = async function (args, options = defaultOptions) {
-    const { address, chainId } = args;
-    const auditOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return eventJs.getHistory(rawAdmin, chainId, address, auditOptions);
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching address: ${JSON.stringify(err)} `);
+    }
   };
 
   return contract;
-}
-
+};
 
 /**
  * Add a new organization to a tCommerce contract/chain.

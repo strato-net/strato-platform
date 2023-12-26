@@ -43,14 +43,17 @@ export const Product = {
 
 export const Inventory = {
   prefix: '/inventory',
-  search: '/search',
+  getOwnershipHistory: '/ownership/history',
   get: '/:address',
   getAll: '/',
   create: '/',
   update: '/update',
+  list: '/list',
+  unlist: '/unlist',
   resell: '/resell',
+  transfer: '/transfer',
+  updateSale: '/updateSale',
   // audit: '/:address/:chainId/audit',
-  // transferOwnership: '/transferOwnership',
 }
 
 export const Item = {
@@ -66,6 +69,48 @@ export const Item = {
   getRawMaterials: '/rawmaterials'
 }
 
+export const Art = {
+  prefix: '/art',
+  getAll: '/',
+  create: '/'
+}
+
+export const CarbonOffset = {
+  prefix: '/carbonOffset',
+  getAll: '/',
+  create: '/'
+}
+
+export const Metals = {
+  prefix: '/metals',
+  getAll: '/',
+  create: '/'
+}
+
+export const Clothing = {
+  prefix: '/clothing',
+  getAll: '/',
+  create: '/'
+}
+
+export const Membership = {
+  prefix: '/membership',
+  getAll: '/',
+  create: '/'
+}
+
+export const CarbonDAO = {
+  prefix: '/carbonDAO',
+  getAll: '/',
+  create: '/'
+}
+
+export const Collectibles = {
+  prefix: '/collectibles',
+  getAll: '/',
+  create: '/'
+}
+
 export const Order = {
   prefix: '/order',
   get: '/:address',
@@ -75,9 +120,13 @@ export const Order = {
   updateBuyerDetails: '/updateBuyerDetails',
   updateSellerDetails: '/updateSellerDetails',
   payment: '/payment',
-  paymentSession: '/payment/session/:session_id',
+  paymentSession: '/payment/session/:session_id/:sellersCommonName',
   userAddress: '/userAddress',
   getAllUserAddress: '/userAddresses/user',
+  getAddressFromId: '/userAddress/:id',
+  createSaleOrder: '/sale',
+  cancelSaleOrder: '/sale/cancel',
+  executeSale: '/closeSale',
 }
 
 export const OrderLine = {
@@ -112,12 +161,6 @@ export const Event = {
   transferOwnership: '/transferOwnership',
 }
 
-export const Image = {
-  prefix: '/image',
-  upload: '/',
-  update: '/:fileKey',
-}
-
 export const Marketplace = {
   prefix: '/marketplace',
   getAll: '/',
@@ -129,7 +172,7 @@ export const Marketplace = {
 export const PaymentService = {
   prefix: '/payment',
   stripeOnboarding: '/stripe/account',
-  stripeConnectStatus: '/stripe/account/status/:ownerOrganization',
+  stripeConnectStatus: '/stripe/account/status/:ownerCommonName',
   stripeWebhook: '/stripe/webhook',
   stripeWebhookConnect: '/stripe/webhook/connect',
 }

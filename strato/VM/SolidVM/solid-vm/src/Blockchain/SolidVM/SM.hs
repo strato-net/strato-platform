@@ -2,6 +2,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE IncoherentInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -22,10 +23,7 @@ module Blockchain.SolidVM.SM
     action,
     runSM,
     getCurrentAccount,
-    addCallInfo,
-    dupCallInfo,
-    uncheckedCallInfo,
-    popCallInfo,
+    withCallInfo,
     withTempCallInfo,
     withUncheckedCallInfo,
     pushLocalVars,
@@ -606,6 +604,26 @@ getTypeOfName' s (CC.CodeCollection ccs _ _ enms strcts _ _ _) =
 getTypeOfName :: MonadSM m => SolidString -> m Typo
 getTypeOfName s = getTypeOfName' s . codeCollection <$> getCurrentCallInfo
 
+withCallInfo ::
+  MonadSM m =>
+  Account ->
+  CC.Contract ->
+  SolidString ->
+  Keccak256 ->
+  CC.CodeCollection ->
+  Map SolidString (SVMType.Type, Variable) ->
+  Bool ->
+  Bool ->
+  m a ->
+  m a
+withCallInfo a c fn hsh cc initialLocalVariables ro ff f = do
+  addCallInfo a c fn hsh cc initialLocalVariables ro ff
+  eRes <- try f
+  popCallInfo
+  case eRes of
+    Left (e :: SomeException) -> throwIO e
+    Right res -> pure res
+
 addCallInfo ::
   MonadSM m =>
   Account ->
@@ -678,16 +696,20 @@ popLocalVars = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
 withTempCallInfo :: MonadSM m => Bool -> m a -> m a
 withTempCallInfo ro f = do
   dupCallInfo ro
-  result <- f
+  eResult <- try f
   popCallInfo
-  pure result
+  case eResult of
+    Left (e :: SomeException) -> throwIO e
+    Right result -> pure result
 
 withUncheckedCallInfo :: MonadSM m => m a -> m a
 withUncheckedCallInfo f = do
   uncheckedCallInfo
-  result <- f
+  eResult <- try f
   popCallInfo
-  pure result
+  case eResult of
+    Left (e :: SomeException) -> throwIO e
+    Right result -> pure result
 
 getCurrentCallInfo :: MonadSM m => m CallInfo
 getCurrentCallInfo = do

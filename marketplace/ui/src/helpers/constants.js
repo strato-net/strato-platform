@@ -1,20 +1,16 @@
-import { env } from "../env";
+import { AMEX, Discover, Mastercard, VISA } from "../images/SVGComponents";
 
 export const apiUrl = process.env.REACT_APP_URL
   ? process.env.REACT_APP_URL + "/api/v1"
   : "/api/v1";
 
+export const fileServerUrl = process.env.FILE_SERVER_URL
+  ? process.env.FILE_SERVER_URL
+  : "https://fileserver.mercata-testnet2.blockapps.net/highway/"; // TODO: Don't hardcode this here?
+
 export const cirrusUrl = process.env.REACT_APP_URL
   ? process.env.REACT_APP_URL + "/cirrus/search"
   : "/cirrus/search"
-
-export const assetTableName = env.REACT_APP_ASSET_TABLE_NAME
-  ? env.REACT_APP_ASSET_TABLE_NAME
-  : "Asset"
-
-export const saleTableName = env.REACT_APP_SALE_TABLE_NAME
-  ? env.REACT_APP_SALE_TABLE_NAME
-  : "Sale"
 
 export const HTTP_METHODS = {
   GET: "GET",
@@ -45,22 +41,22 @@ export const MAX_PRICE = 100000000;
 export const INVENTORY_STATUS = {
   PUBLISHED: 1,
   UNPUBLISHED: 2,
-  1: "Published",
-  2: "Unpublished",
+  "1": "Published",
+  "2": "Unpublished",
+};
+
+export const getUnitNameByIndex = (index) => {
+  const unit = unitOfMeasures.find((measure) => measure.value === parseInt(index));
+  return unit ? unit.name : null;
 };
 
 export const unitOfMeasures = [
-  { name: "LB", value: 1 },
-  { name: "Ounce", value: 2 },
-  { name: "Ton", value: 3 },
-  { name: "Bag", value: 4 },
-  { name: "Box", value: 5 },
-  { name: "Piece", value: 6 },
-  { name: "Bale", value: 7 },
-  { name: "Gallon", value: 8 },
-  { name: "Pound", value: 9 },
-  { name: "Yard", value: 10 },
-  { name: "Kilogram", value: 11 }
+  { name: "TON", value: 1 },
+  { name: "POUND", value: 2 },
+  { name: "OUNCE", value: 3 },
+  { name: "TONNE", value: 4 },
+  { name: "KG", value: 5 },
+  { name: "G", value: 6 }
 ];
 
 export const CHARGES = {
@@ -101,3 +97,26 @@ export const APPROVAL_STATUS = {
   "Accept": 1,
   "Reject": 2,
 };
+
+export const CATEGORIES = [
+  "Art",
+  "CarbonOffset",
+  "Metals",
+  "Clothing",
+  "Membership",
+  "CarbonDAO",
+  "Collectibles"
+]
+
+export const PAYMENT_TYPE = [
+  { 
+    name: "Card", 
+    value: 1, 
+    options: [
+      <AMEX width="30px" height="20px"/>,
+      <Discover width="30px" height="20px"/>,
+      <Mastercard width="30px" height="20px"/>,
+      <VISA width="30px" height="20px"/>
+    ]
+  }
+]

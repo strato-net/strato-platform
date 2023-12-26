@@ -4,8 +4,11 @@ import { getStringDate } from "../../helpers/utils";
 import { actions } from "../../contexts/item/actions";
 import { useItemDispatch, useItemState } from "../../contexts/item";
 import { US_DATE_FORMAT } from "../../helpers/constants";
-import { Pagination } from "antd";
+import { Input, Pagination } from "antd";
 import "./ordersTable.css"
+import { DownOutlined, SearchOutlined, UpOutlined } from "@ant-design/icons";
+import { ResponsiveOrderCard } from "./ResponsiveOrdersCard";
+import { ResponsiveTransferOrderCard } from "./ResponsiveTransferOrdersCard";
 
 
 const TransfersTable = ({ user, selectedDate }) => {
@@ -51,18 +54,18 @@ const TransfersTable = ({ user, selectedDate }) => {
   
   const column = [
     {
-      title: "TRANSFER NUMBER",
+      title: "Transfer Number",
       dataIndex: "transferNumber",
       key: "transferNumber",
       render: (text) => <p>{text}</p>,
     },
     {
-      title: "FROM",
+      title: "From",
       key: "oldOwnerCommonName",
       render: (text, record) => <p>{record.oldOwnerOrganization.startsWith("Mercata Account") ? record.oldOwnerCommonName : record.oldOwnerOrganization}</p>,
     },
     {
-      title: "TO",
+      title: "To",
       key: "newOwnerCommonName",
       render: (text, record) => <p>{record.newOwnerOrganization.startsWith("Mercata Account") ? record.newOwnerCommonName : record.newOwnerOrganization}</p>,
     },
@@ -70,18 +73,27 @@ const TransfersTable = ({ user, selectedDate }) => {
       dataIndex: "transferDate",
       key: "transferDate",
       render: (text) => <p>{text}</p>,
-      title: "DATE",
-      sorter: true,
-      sortDirections: ["ascend", "descend", "ascend" ]
+      title: (
+        <div style={{ display: "flex" }}>
+          <div className="mt-1.5">{"Date"}</div>
+          <div>
+            {order === "desc" ? (
+              <UpOutlined className="icon-container icon-hover" onClick={() => setOrder("asc")} />
+            ) : (
+              <DownOutlined className="icon-container icon-hover" onClick={() => setOrder("desc")} />
+            )}
+          </div>
+        </div>
+      ),
     },
     {
-      title: "PRODUCT NAME",
+      title: "Product Name",
       dataIndex: "productName",
       key: "productName",
       render: (text) => <p>{text}</p>,
     },
     {
-      title: "QUANTITY",
+      title: "Quantity",
       dataIndex: "quantity",
       key: "quantity",
       render: (text) => <p>{text}</p>,
@@ -106,15 +118,24 @@ const TransfersTable = ({ user, selectedDate }) => {
 
   return (
     <div>
-      <DataTableComponent
-        columns={column}
-        data={data}
-        isLoading={isFetchingItemTransfers}
-        pagination={false}
-        scrollX="100%"
-        rowKey={record => record.transferNumber}
-        onChange={onChange}
-      />
+      <Input className="text-base orders_searchbar mb-5 rounded-full bg-[#F6F6F6]" prefix={<SearchOutlined />} placeholder="Search Markeplace" />
+      <div className="flex md:hidden order_responsive">
+        <ResponsiveTransferOrderCard
+          data={data}
+          isLoading={isFetchingItemTransfers}
+        />
+      </div>
+      <div className="hidden md:block">
+        <DataTableComponent
+          columns={column}
+          data={data}
+          isLoading={isFetchingItemTransfers}
+          pagination={false}
+          scrollX="100%"
+          rowKey={record => record.transferNumber}
+          onChange={onChange}
+        />
+      </div>
       <Pagination
         current={page}
         onChange={onPageChange}

@@ -63,7 +63,7 @@ function generateHtmlContent(customerFirstName, concatenatedOrderString) {
             <div class="signature">
             <img class="logo" src="https://blockapps.net/wp-content/uploads/2022/08/blockapps-avatar.jpg" alt="Logo" />
 
-                <h3 class="logo-text">BlockApps Marketplace <a href="https://blockapps.net/products/strato-mercata/" rel="noopener noreferrer"><em>powered by STATO Mercata™</em><a></h3>
+                <h3 class="logo-text">BlockApps Mercata Marketplace <a href="https://blockapps.net/products/strato-mercata/" rel="noopener noreferrer"><em>powered by STRATO Mercata™</em><a></h3>
             </div>
             <p class="footer">This email was sent from a notification-only address and cannot accept incoming email. Please do not reply to this message.</p>
         </div>
@@ -140,7 +140,7 @@ function generateHtmlContentNickel(customerFirstName, nickel ) {
             <div class="signature">
             <img class="logo" src="https://blockapps.net/wp-content/uploads/2022/08/blockapps-avatar.jpg" alt="Logo" />
 
-                <h3 class="logo-text">BlockApps Marketplace <a href="https://blockapps.net/products/strato-mercata/" rel="noopener noreferrer"><em>powered by STATO Mercata™</em><a></h3>
+                <h3 class="logo-text">BlockApps Mercata Marketplace <a href="https://blockapps.net/products/strato-mercata/" rel="noopener noreferrer"><em>powered by STRATO Mercata™</em><a></h3>
             </div>
             <p class="footer">This email was sent from a notification-only address and cannot accept incoming email. Please do not reply to this message.</p>
         </div>

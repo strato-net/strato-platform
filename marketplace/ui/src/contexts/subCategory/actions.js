@@ -44,6 +44,12 @@ const actions = {
         });
         actions.setMessage(dispatch, "SubCategory created successfully", true)
         return true;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.createSubCategoryFailed, 
+          error: "Unauthorized while fetching category" 
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({ type: actionDescriptors.createSubCategoryFailed, error: 'Error while creating SubCategory' });

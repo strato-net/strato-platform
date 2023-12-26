@@ -7,13 +7,6 @@ import loadDapp from "../../middleware/loadDappHandler";
 const router = express.Router();
 
 router.get(
-  Inventory.search,
-  authHandler.authorizeRequest(),
-  loadDapp,
-  InventoryController.search
-);
-
-router.get(
   Inventory.get,
   authHandler.authorizeRequest(true),
   loadDapp,
@@ -27,11 +20,32 @@ router.get(
   InventoryController.getAll
 );
 
+router.get(
+  Inventory.getOwnershipHistory,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  InventoryController.getOwnershipHistory
+);
+
 router.post(
   Inventory.create,
   authHandler.authorizeRequest(),
   loadDapp,
   InventoryController.create
+);
+
+router.post(
+  Inventory.list,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  InventoryController.list
+);
+
+router.post(
+  Inventory.unlist,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  InventoryController.unlist
 );
 
 router.post(
@@ -41,11 +55,25 @@ router.post(
   InventoryController.resell
 );
 
+router.post(
+  Inventory.transfer,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  InventoryController.transfer
+);
+
 router.put(
   Inventory.update,
   authHandler.authorizeRequest(),
   loadDapp,
   InventoryController.update
+)
+
+router.put(
+  Inventory.updateSale,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  InventoryController.updateSale
 )
 
 export default router;

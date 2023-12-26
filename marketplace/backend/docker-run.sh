@@ -12,15 +12,9 @@ echo 'STRATO is available via nginx'
 
 # Validate configuration
 if [ "${MP_IS_BOOTNODE}" = "false" ]; then
-  if [ -z ${MP_DAPP_ADDRESS} ]; then
-    echo "MP_IS_BOOTNODE=false but there was no MP_DAPP_ADDRESS value provided. Exit."
-    exit 53
-  else
-    if [ ! -f "${CONFIG_DIR_PATH}/${DEPLOY_FILE_NAME}" ]; then
-      cp ./config/template.deploy.tpl.yaml ${CONFIG_DIR_PATH}/${DEPLOY_FILE_NAME}
-      sed -i 's*__DAPP_CONTRACT_ADDRESS__*'"${MP_DAPP_ADDRESS}"'*g' "${CONFIG_DIR_PATH}/${DEPLOY_FILE_NAME}"
-      sed -i 's*__URL__*'"${STRATO_NODE_PROTOCOL}"'://'"${STRATO_NODE_HOST}"'*g' 
-    fi
+  if [ ! -f "${CONFIG_DIR_PATH}/${DEPLOY_FILE_NAME}" ]; then
+    cp ./config/template.deploy.tpl.yaml ${CONFIG_DIR_PATH}/${DEPLOY_FILE_NAME}
+    sed -i 's*__URL__*'"${STRATO_NODE_PROTOCOL}"'://'"${STRATO_NODE_HOST}"'*g' 
   fi
 else
   if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
@@ -87,14 +81,9 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
     exit 16
   fi
   
-  if [[ -z "${STRIPE_PUBLISHABLE_KEY}" || -z "${STRIPE_SECRET_KEY}" ]]; then
-    echo "One or both of STRIPE_PUBLISHABLE_KEY, STRIPE_SECRET_KEY vars are empty, but are required values"
+  if [ -z "${STRIPE_PAYMENT_SERVER_URL}" ]; then
+    echo "STRIPE_PAYMENT_SERVER_URL is empty, but is a required value"
     exit 17
-  fi
-  
-  if [[ -z "${EXT_STORAGE_S3_ACCESS_KEY_ID}" || -z "${EXT_STORAGE_S3_SECRET_ACCESS_KEY}" || -z "${EXT_STORAGE_S3_BUCKET}" ]]; then
-    echo "One or few of EXT_STORAGE_S3_ACCESS_KEY_ID, EXT_STORAGE_S3_SECRET_ACCESS_KEY, EXT_STORAGE_S3_BUCKET vars are empty, but are required values"
-    exit 18
   fi
 
   # Create /etc/hosts record to resolve STRATO_HOST to STRATO_LOCAL_IP

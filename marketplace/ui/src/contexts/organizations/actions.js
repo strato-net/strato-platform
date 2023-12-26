@@ -24,6 +24,12 @@ const actions = {
           payload: body.data,
         });
         return;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.fetchOrganizationsFailed, 
+          error: "Unauthorized while fetching organizations" 
+        });
+        window.location.href = body.error.loginUrl;
       }
       dispatch({ type: actionDescriptors.fetchOrganizationsFailed, payload: 'organization request failed' });
     } catch (err) {

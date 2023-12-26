@@ -1,0 +1,103 @@
+const { STRIPE_ENV } = require('../helpers/constants');
+const Stripe = require('stripe');
+const stripe = Stripe(STRIPE_ENV.CREDENTIALS.STRIPE_SECRET_KEY);
+
+class StripeService {
+    // TODO implement orderDetail to create actual order line items 
+    static initiatePayment(marketplaceUrl, paymentTypes, cartData, orderDetail, CONNECTED_ACCOUNT_ID = '') {
+        try {
+            // Create a checkout session with Stripe
+            return stripe.checkout.sessions.create({
+                payment_method_types: paymentTypes,
+                payment_method_options: {
+                    us_bank_account: {
+                      verification_method: 'instant',
+                  },
+                },
+                line_items: orderDetail.map(({ productName, unitPrice, quantity }) => {
+                    return {
+                        price_data: {
+                            currency: "usd",
+                            product_data: {
+                                name: productName,
+                            },
+                            unit_amount: unitPrice * 100,
+                        },
+                        quantity: quantity,
+                    }
+                }),
+                metadata: {
+                    cart: JSON.stringify(cartData)
+                },
+                payment_intent_data: {
+                    /* 3% of OrderTotal in Cents */
+                    application_fee_amount: Math.round(3 * cartData.orderTotal),
+                    /* To be used in case of destination charge */
+                    // transfer_data: {
+                    //     destination: CONNECTED_ACCOUNT_ID
+                    // },
+                },
+                mode: "payment",
+                success_url: `${marketplaceUrl}/order/status?session_id={CHECKOUT_SESSION_ID}`,
+                cancel_url: `${marketplaceUrl}/checkout`,
+            }, {
+                stripeAccount: CONNECTED_ACCOUNT_ID
+            })
+
+        } catch (e) {
+            throw new Error(`Stripe error: ${e.message}`)
+        }
+    }
+
+    static getPaymentSession(session_id, CONNECTED_ACCOUNT_ID) {
+        try {
+            return stripe.checkout.sessions.retrieve(session_id, {
+                stripeAccount: CONNECTED_ACCOUNT_ID
+            });
+        } catch (e) {
+            throw new Error(`Stripe error: ${e.message}`)
+        }
+    }
+
+    static async getPaymentIntent(paymentIntentId, CONNECTED_ACCOUNT_ID) {
+        try {
+          const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, {
+            stripeAccount: CONNECTED_ACCOUNT_ID
+          });
+          return paymentIntent;
+        } catch (error) {
+          throw new Error(`Stripe error: ${error.message}`);
+        }
+      }
+
+    static generateStripeAccountId(type = 'standard') {
+        try {
+            return stripe.accounts.create({ type });
+        } catch (error) {
+            throw new Error(`Stripe error: ${error.message}`);
+        }
+    }
+
+    static generateStripeAccountConnectLink(marketplaceUrl, stripeAccountId) {
+        try {
+            return stripe.accountLinks.create({
+                account: stripeAccountId,
+                refresh_url: `${marketplaceUrl}/inventories/stripe/onboarding`,
+                return_url: `${marketplaceUrl}/inventories`,
+                type: 'account_onboarding',
+            });
+        } catch (e) {
+            throw new Error(`Stripe error: ${e.message}`);
+        }
+    }
+
+    static getStripeConnectAccountDetail(accountId) {
+        try {
+            return stripe.accounts.retrieve(accountId);
+        } catch (e) {
+            throw new Error(`Stripe error: ${e.message}`);
+        }
+    }
+}
+
+module.exports = StripeService;

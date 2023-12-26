@@ -7,7 +7,6 @@ import BlockApps.Crossmon
 import BlockApps.Logging (LoggingT)
 import Control.Concurrent
 import Control.Monad
-import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Resource (ResourceT)
 import Data.List (intercalate)
 import Data.Text hiding (intercalate)
@@ -18,8 +17,8 @@ import Prometheus
 import System.IO
 import System.Posix.Signals
 
-instance MonadMonitor (ResourceT (LoggingT IO)) where
-  doIO = liftIO
+instance (MonadMonitor m) => MonadMonitor (ResourceT m)
+instance (MonadMonitor m) => MonadMonitor (LoggingT m)
 
 foreign import ccall unsafe "execvp"
   c_execvp :: CString -> Ptr CString -> IO CInt

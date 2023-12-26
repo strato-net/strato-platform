@@ -15,8 +15,10 @@ module.exports = {
     cleanFrequency: 5 * 60 * 1000, //clean db every 5 mins
     retentionHours: 1 * 24,
     stallCheckProgressWindow: 10 * 60 * 1000,
-    memoryUsageBound: 20, // Alert when available space / total space < 20%
-    diskUsageBound: 20,
+    memoryUsedAlertLevel: 80, // Alert when used memory (RAM) >= N%
+    diskspaceUsedAlertLevel: 80, // Alert when used diskspace >= N%
+    cpuAvgLoadAlertLevel: 0.8, // Alert when cpu avg load > N (0.0-1.0)
+    cpuCurrentLoadAlertLevel: 97, // Alert when cpu current load > N%
   },
   // Unused code notice. Node stats disabled, to be deprecated  #node-stats-deprecation
   // statistics: {

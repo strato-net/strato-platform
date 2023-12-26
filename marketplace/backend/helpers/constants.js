@@ -1,8 +1,10 @@
-import { getEnvVariable } from 'helpers/utils'
-import config from '/load.config'
+import { getEnvVariable } from 'helpers/utils';
+import config from '/load.config';
 
 export default {
   baseUrl: `/api/v1`,
+  marketplaceHost: getEnvVariable('MP_SERVER_HOST'),
+  marketplaceSSL: getEnvVariable('MP_SERVER_SSL'),
   deployParamName: "deploy",
   governanceAddress: '0000000000000000000000000000000000000100',
   zeroAddress: '0000000000000000000000000000000000000000',
@@ -22,26 +24,13 @@ export default {
   s3ParamName: "s3",
   tempUploadDir: "./temp",
   buyerOrgName: "rejolut",
-  sellerOrgName: "blockapps"
+  sellerOrgName: "blockapps",
+  assetTableName: "Asset",
+  saleTableName: "Sale",
+  orderTableName: "Order",
 };
 
-export const STRIPE_ENV = {
-  CREDENTIALS: {
-    STRIPE_PUBLISHABLE_KEY: getEnvVariable("STRIPE_PUBLISHABLE_KEY"),
-    STRIPE_SECRET_KEY: getEnvVariable("STRIPE_SECRET_KEY"),
-  },
-  CHECKOUT: {
-    PAYMENT_METHOD_TYPES: ["card"],
-    SUCCESS_URL: `${config.serverHost}${config.marketplaceUiUrlPrefix}/order/status?session_id={CHECKOUT_SESSION_ID}`,
-    CANCEL_URL: `${config.serverHost}${config.marketplaceUiUrlPrefix}/checkout`
-  },
-  ACCOUNT_ONBOARDING: {
-    TYPE: 'accountOnboarding',
-    REFRESH_URL: `${config.serverHost}${config.marketplaceUiUrlPrefix}/inventories/stripe/onboarding`,
-    RETURN_URL: `${config.serverHost}${config.marketplaceUiUrlPrefix}/inventories`
-  }
-}
-Object.freeze(STRIPE_ENV)
+export const STRIPE_PAYMENT_SERVER_URL = getEnvVariable('STRIPE_PAYMENT_SERVER_URL');
 
 export const unitOfMeasurement = {}
 unitOfMeasurement[unitOfMeasurement['LB'] = 1] = 'LB';
@@ -75,6 +64,14 @@ export const ITEM_STATUS = {
   "UNPUBLISHED": 2,
   "REMOVED": 3,
   "SOLD": 4
+}
+
+export const PAYMENT_TYPES = {
+  "amex": "1",
+  "discover": "2",
+  "mastercard": "3",
+  "strat": "4",
+  "visa": "5",
 }
 
 export const SERVICE_PROVIDERS = {}
