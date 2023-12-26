@@ -154,12 +154,12 @@ async function getAll(admin, args = {}, defaultOptions) {
     if (assetAddresses) {
         sales = await searchAllWithQueryArgs(contractName, {
             assetToBeSold: assetAddresses,
-            isOpen: isOpen ? isOpen : true,
+            isOpen: isOpen,
             range: range
         }, options, admin);
     }
     else {
-        sales = await searchAllWithQueryArgs(contractName, { address: saleAddresses, isOpen: isOpen ? isOpen : true }, options, admin);
+        sales = await searchAllWithQueryArgs(contractName, { address: saleAddresses, isOpen: isOpen }, options, admin);
     }
 
     return sales ? sales.map((sale) => marshalOut(sale)) : undefined;

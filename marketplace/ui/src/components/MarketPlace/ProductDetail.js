@@ -630,11 +630,11 @@ const ProductDetails = ({ user, users }) => {
             <div className=" pt-4 lg:pt-[22px]">
              
               <Text level={4} className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold">
-                {details?.price ? <>$ {details?.price}</> : "No Price Available"}
+                {details?.price ? <>${details?.price}</> : "No Price Available"}
               </Text>
               </div> 
-              <div className=" pt-6 lg:pt-[18px]">
-                <Typography  className="text-xl hidden lg:block font-medium text-[#202020]">Description</Typography>
+              <div className=" pt-6 lg:pt-[18px] lg:block hidden">
+                <Typography  className="text-xl font-semibold text-[#202020]">Description</Typography>
               </div>
               <div className="pt-[7px]">
               <Paragraph
@@ -654,12 +654,12 @@ const ProductDetails = ({ user, users }) => {
                   <div className="flex justify-between lg:justify-start  w-full gap-3 lg:gap-[15px]" id="quantity">
                     <div
                       onClick={subtract}
-                      className="h-9 w-9 md:h-10 md:w-10 lg:h-[46px] lg:w-[46px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer" style={{ borderColor: qty > 1 ? '#1777FF' : '#E3E3E3' }}>
+                      className="h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer" style={{ borderColor: qty > 1 ? '#1777FF' : '#E3E3E3' }}>
  <p className=" text-2xl md:text-3xl lg:text-4xl font-semibold lg:text-[#202020] text-[#989898]">
                        -
                         </p> 
                     </div>
-                    <InputNumber className=" w-full md:w-[295px]  h-9  md:h-10  lg:h-[46px]  border text-[#6A6A6A] border-[#00000029] text-center flex flex-col justify-center" min={1} max={availableQuantity} value={`${qty}`} defaultValue={`${qty}`} controls={false}
+                    <InputNumber className="w-full md:w-[295px] h-9 md:h-10 lg:h-[46px] border text-[#6A6A6A] border-[#00000029] text-center flex flex-col justify-center font-semibold" min={1} max={availableQuantity} value={`${qty}`} defaultValue={`${qty}`} controls={false}
                       onChange={e => {
                         if (e < availableQuantity) {
                           setQty(e)
@@ -674,7 +674,7 @@ const ProductDetails = ({ user, users }) => {
                       }} /> 
                     <div
                       onClick={add}
-                      className="ml-0.5 h-9 w-9 md:h-10 md:w-10 lg:h-[46px] lg:w-[46px] rounded-lg  flex justify-center items-center border border-[#00000029] text-center cursor-pointer" style={{ borderColor: availableQuantity > qty ? '#1777FF' : '#E3E3E3' }}>
+                      className="ml-0.5 h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg  flex justify-center items-center border border-[#00000029] text-center cursor-pointer" style={{ borderColor: availableQuantity > qty ? '#1777FF' : '#E3E3E3' }}>
                        <p className="text-2xl md:text-3xl lg:text-4xl font-semibold lg:text-[#202020] text-[#989898]">
                        +
                         </p> 

@@ -266,12 +266,12 @@ const actions = {
     }
   },
 
-  fetchTopSellingProducts: async (dispatch, offset) => {
+  fetchTopSellingProducts: async (dispatch, offset, limit) => {
     dispatch({ type: actionDescriptors.fetchTopSellingProducts });
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace/topselling?offset=${offset}`,
+        `${apiUrl}/marketplace/topselling?offset=${offset}&limit=${limit}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -304,12 +304,12 @@ const actions = {
     }
   },
 
-  fetchTopSellingProductsLoggedIn: async (dispatch, offset) => {
+  fetchTopSellingProductsLoggedIn: async (dispatch, offset, limit) => {
     dispatch({ type: actionDescriptors.fetchTopSellingProductsLoggedIn });
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace/user/topselling?offset=${offset}`,
+        `${apiUrl}/marketplace/user/topselling?offset=${offset}&limit=${limit}`,
         {
           method: HTTP_METHODS.GET,
         }
