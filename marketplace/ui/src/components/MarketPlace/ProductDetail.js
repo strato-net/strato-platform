@@ -504,7 +504,7 @@ const ProductDetails = ({ user, users }) => {
             </Text>
             </Space> */}
 
-            <Space className="flex justify-between py-[15px] px-[14px]  border border-[#E9E9E9] rounded-md">
+            <Space className="flex justify-between">
               <DescTitle text="Purity" />
               <Text className="text-[13px] text-[#202020] font-medium">{itemData?.purity}</Text>
             </Space>
