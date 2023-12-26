@@ -11,10 +11,6 @@ export const ResponsiveOrderDetailCard = ({data}) => {
                 <Typography className="font-semibold">{data?.name || "N/A"}</Typography>
             </div>
             <div className="flex justify-between py-2">
-                <Typography className="text-[#6A6A6A]">Manufacturer</Typography>
-                <Typography className="font-semibold">{data?.value || "N/A"}</Typography>
-            </div>
-            <div className="flex justify-between py-2">
                 <Typography className="text-[#6A6A6A]">Quantity</Typography>
                 <Typography className="font-semibold">{data?.quantity || "N/A"}</Typography>
             </div>
