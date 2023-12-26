@@ -29,7 +29,7 @@ let server
     throw new Error(`Deploy file '${config.configDirPath}/${config.deployFilename}' not found`);
   }
 
-  const marketplaceUrl = config.dockerized ? config.nodes[0].url : `http://localhost/marketplace`;
+  const marketplaceUrl = config.dockerized ? `https://${config.nodes[0].label}/marketplace` : `http://${config.nodes[0].label}/marketplace`;
   axios.defaults.headers.common['Referer'] = marketplaceUrl;
 
   app.set(deployParamName, deploy);
