@@ -190,7 +190,7 @@ const ResponsiveAddAddress = ({ back }) => {
               Country
             </p>
             <Input
-              label="state"
+              label="country"
               className="h-[42px] w-full  "
               name="country"
               placeholder="Enter Country"
