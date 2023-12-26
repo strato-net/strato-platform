@@ -344,7 +344,7 @@ async function getAll(admin, args = {}, defaultOptions) {
 
     if (inventories) {
         const assetAddresses = inventories.map((inventory) => inventory.address);
-        sales = await saleJs.getAll(admin, { assetAddresses, range }, options);
+        sales = await saleJs.getAll(admin, { assetAddresses, range, isOpen: true }, options);
         inventories.forEach(inventory => {
             const itemSale = sales.find(sale => sale.assetToBeSold == inventory.address && sale.isOpen);
             if (itemSale) {
