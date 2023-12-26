@@ -22,7 +22,7 @@ router.get(
 
 router.get(
   Inventory.getOwnershipHistory,
-  authHandler.authorizeRequest(),
+  authHandler.authorizeRequest(true),
   loadDapp,
   InventoryController.getOwnershipHistory
 );
