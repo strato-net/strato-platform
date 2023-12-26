@@ -21,65 +21,22 @@ const ResponsiveAddAddress = ({ back }) => {
       addressLine2: yup.string().notRequired(),
       city: yup.string().required("City is required"),
       state: yup.string().required("State is required"),
-      sameAddress: yup.boolean(),
-      name_b: yup.string().when("sameAddress", {
-        is: false,
-        then: yup.string().required("Name is required"),
-      }),
-      zipcode_b: yup.number().when("sameAddress", {
-        is: false,
-        then: yup.string().max(15).required("Zipcode is required"),
-      }),
-      addressLine1_b: yup.string().when("sameAddress", {
-        is: false,
-        then: yup.string().required("Address Line 1 is required"),
-      }),
-      addressLine2_b: yup.string().notRequired(),
-      city_b: yup.string().when("sameAddress", {
-        is: false,
-        then: yup.string().required("City is required"),
-      }),
-      state_b: yup.string().when("sameAddress", {
-        is: false,
-        then: yup.string().required("State is required"),
-      }),
+      country: yup.string().required("Country is required"),
     });
   };
 
   const handleFormSubmit = async (values) => {
     setshowAddress(false);
-    let billingAddr;
-    if (values.sameAddress) {
-      billingAddr = {
-        billingName: encodeURIComponent(values.name),
-        billingZipcode: values.zipcode,
-        billingState: encodeURIComponent(values.state),
-        billingCity: encodeURIComponent(values.city),
-        billingAddressLine1: encodeURIComponent(values.addressLine1),
-        billingAddressLine2: encodeURIComponent(values.addressLine2),
-      };
-    } else {
-      billingAddr = {
-        billingName: encodeURIComponent(values.name_b),
-        billingZipcode: values.zipcode_b,
-        billingState: encodeURIComponent(values.state_b),
-        billingCity: encodeURIComponent(values.city_b),
-        billingAddressLine1: encodeURIComponent(values.addressLine1_b),
-        billingAddressLine2: encodeURIComponent(values.addressLine2_b),
-      };
-    }
 
     const body = {
       //shipping address
-      shippingName: encodeURIComponent(values.name),
-      shippingZipcode: values.zipcode,
-      shippingState: encodeURIComponent(values.state),
-      shippingCity: encodeURIComponent(values.city),
-      shippingAddressLine1: encodeURIComponent(values.addressLine1),
-      shippingAddressLine2: encodeURIComponent(values.addressLine2),
-
-      //billing address
-      ...billingAddr,
+      name: encodeURIComponent(values.name),
+      zipcode: values.zipcode,
+      state: encodeURIComponent(values.state),
+      city: encodeURIComponent(values.city),
+      country: encodeURIComponent(values.country),
+      addressLine1: encodeURIComponent(values.addressLine1),
+      addressLine2: encodeURIComponent(values.addressLine2),
     };
 
     window.LOQ.push([
@@ -95,6 +52,7 @@ const ResponsiveAddAddress = ({ back }) => {
         event: "add_shipping_address",
       },
     });
+    console.log(body, "body")
     let res = await actions.addShippingAddress(marketplaceDispatch, body);
     if (res != null) {
       await actions.fetchUserAddresses(marketplaceDispatch);
@@ -110,12 +68,7 @@ const ResponsiveAddAddress = ({ back }) => {
       addressLine1: "",
       addressLine2: "",
       city: "",
-      state_b: "",
-      name_b: "",
-      zipcode_b: "",
-      addressLine1_b: "",
-      addressLine2_b: "",
-      city_b: "",
+      country: "",
     },
     validationSchema: ShippingDetailsSchema,
     onSubmit: function (values) {

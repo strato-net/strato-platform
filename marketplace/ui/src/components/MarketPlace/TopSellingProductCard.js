@@ -20,6 +20,7 @@ const { Title } = Typography;
 const TopSellingProductCard = () => {
   const containerRef = useRef(null)
   const [offset, setOffset] = useState(0);
+  const limit = 25;
 
   const marketplaceDispatch = useMarketplaceDispatch();
   const { topSellingProducts, isTopSellingProductsLoading, cartList } = useMarketplaceState();
@@ -28,15 +29,14 @@ const TopSellingProductCard = () => {
 
   useEffect(() => {
     if (!isAuthenticated) {
-      actions.fetchTopSellingProducts(marketplaceDispatch, offset);
+      actions.fetchTopSellingProducts(marketplaceDispatch, offset, limit);
     } else {
-      actions.fetchTopSellingProductsLoggedIn(marketplaceDispatch, offset);
+      actions.fetchTopSellingProductsLoggedIn(marketplaceDispatch, offset, limit);
     }
   }, [marketplaceDispatch, offset, hasChecked, isAuthenticated, loginUrl]);
 
   const naviroute = routes.MarketplaceProductDetail.url;
 
-  const limit = 3;
 
   const navigate = useNavigate();
 
