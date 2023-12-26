@@ -154,13 +154,13 @@ const actions = {
       ? `&manufacturer[]=${manufacturers}`
       : "";
 
-    const productQuery = products ? `&productId[]=${products}` : "";
+    const productIdQuery = products ? `&name[]=${products}` : "";
     const priceQuery = `&range[]=price,${minPrice},${maxPrice}`;
     const sortLatest = "&order=createdDate.desc"
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace?${priceQuery}${categoryQuery}${subCategoryQuery}${productQuery}${manufacturerQuery}${sortLatest}`,
+        `${apiUrl}/marketplace?${priceQuery}${categoryQuery}${subCategoryQuery}${productIdQuery}${manufacturerQuery}${sortLatest}`,
         {
           method: HTTP_METHODS.GET,
         }
