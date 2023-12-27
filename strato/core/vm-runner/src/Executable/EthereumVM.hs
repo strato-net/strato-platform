@@ -222,6 +222,9 @@ sendOutEvent (OutBlock o) = void . execKafka $ writeUnseqEvents [IEBlock $ block
 consumerGroup :: KP.ConsumerGroup
 consumerGroup = lookupConsumerGroup "ethereum-vm"
 
+metadataConsumerGroup :: KP.ConsumerGroup
+metadataConsumerGroup = lookupConsumerGroup "ethereum-vm-metadata"
+
 getFirstBlockFromSequencer :: (MonadLogger m, MonadFail m, HasKafka m) => m OutputBlock
 getFirstBlockFromSequencer = do
   (VmBlock block) <- head <$> getUnprocessedKafkaEvents (KP.Offset 0)
@@ -240,9 +243,9 @@ getCheckpoint :: (MonadLogger m, MonadFail m, HasKafka m, HasContext m) => m (KP
 getCheckpoint = do
   let topic = seqVmEventsTopicName
       topic' = show topic
-      cg' = show consumerGroup
+      cg' = show metadataConsumerGroup
   $logInfoS "getCheckpoint" . T.pack $ "Getting checkpoint for " ++ topic' ++ "#0 for " ++ cg'
-  execKafka (K.fetchSingleOffset consumerGroup topic 0) >>= \case
+  execKafka (K.fetchSingleOffset metadataConsumerGroup topic 0) >>= \case
     Left KP.UnknownTopicOrPartition -> initializeCheckpointAndBlockSummaryKafka >> getCheckpoint
     Left err -> error $ "Unexpected response when fetching checkpoint: " ++ show err
     Right (ofs, md) -> do
@@ -253,7 +256,7 @@ getCheckpoint = do
 setMetadata :: (MonadLogger m, HasKafka m) => KP.TopicName -> EVMCheckpoint -> m ()
 setMetadata topic checkpoint = do
   ofs <-
-    execKafka (K.fetchSingleOffset consumerGroup topic 0) >>= \case
+    execKafka (K.fetchSingleOffset metadataConsumerGroup topic 0) >>= \case
         Left KP.UnknownTopicOrPartition -> return 1
         Left err -> error $ "Unexpected response when fetching checkpoint: " ++ show err
         Right (ofs, _) -> return ofs
@@ -261,14 +264,14 @@ setMetadata topic checkpoint = do
   let kMetadata = toKafkaMetadata checkpoint
 
   $logInfoS "setMetadata" . T.pack $ "Setting checkpoint/metadata to " ++ show ofs ++ "/" ++ show kMetadata
-  ret <- execKafka $ K.commitSingleOffset consumerGroup seqVmEventsTopicName 0 ofs kMetadata
+  ret <- execKafka $ K.commitSingleOffset metadataConsumerGroup seqVmEventsTopicName 0 ofs kMetadata
   either (error . show) return ret
 
 setCheckpoint :: (MonadLogger m, HasKafka m) => KP.Offset -> EVMCheckpoint -> m ()
 setCheckpoint ofs checkpoint = do
   $logInfoS "setCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs ++ " / " ++ format checkpoint
   let kMetadata = toKafkaMetadata checkpoint
-  ret <- execKafka $ K.commitSingleOffset consumerGroup seqVmEventsTopicName 0 ofs kMetadata
+  ret <- execKafka $ K.commitSingleOffset metadataConsumerGroup seqVmEventsTopicName 0 ofs kMetadata
   either (error . show) return ret
 
 getUnprocessedKafkaEvents :: (MonadLogger m, HasKafka m) => KP.Offset -> m [VmEvent]
