@@ -95,7 +95,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                                     productId: topSellingProduct.productId
                                 },
                             });
-                            if (addItemToCart(topSellingProduct)) {
+                            if (addItemToCart(topSellingProduct, quantity)) {
                                 navigate("/checkout")
                             }
                         }
@@ -126,7 +126,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                                     productId: topSellingProduct.productId
                                 },
                             });
-                            addItemToCart(topSellingProduct);
+                            addItemToCart(topSellingProduct, quantity);
                         }
                     }}
                     type='primary'
