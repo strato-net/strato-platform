@@ -223,7 +223,7 @@ const Inventory = ({ user }) => {
         </div>
       ) : (
         <>
-          <Breadcrumb className="mx-5 md:mx-14">
+          <Breadcrumb className="mx-5 md:mx-14 mt-4">
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
               <ClickableCell href={routes.Marketplace.url}>
                 <p className="text-sm text-[#13188A] font-semibold">
