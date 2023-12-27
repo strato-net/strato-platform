@@ -50,7 +50,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
         const paymentType = PAYMENT_TYPE.find(type => type.value === value);
       
         if (paymentType) {
-          if (paymentType.name === "Card") {
+          if (paymentType.name === "Card | ACH") {
             return paymentType.options.map((IconComponent, index) => (
               <span key={index} className="ml-1">{IconComponent}</span>
             ));

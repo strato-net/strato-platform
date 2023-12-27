@@ -1,4 +1,4 @@
-import { AMEX, Discover, Mastercard, VISA } from "../images/SVGComponents";
+import { AMEX, Discover, Mastercard, VISA, BANK } from "../images/SVGComponents";
 
 export const apiUrl = process.env.REACT_APP_URL
   ? process.env.REACT_APP_URL + "/api/v1"
@@ -110,13 +110,24 @@ export const CATEGORIES = [
 
 export const PAYMENT_TYPE = [
   { 
-    name: "Card", 
+    name: "Card | ACH", 
     value: 1, 
     options: [
       <AMEX width="30px" height="20px"/>,
       <Discover width="30px" height="20px"/>,
       <Mastercard width="30px" height="20px"/>,
-      <VISA width="30px" height="20px"/>
+      <VISA width="30px" height="20px"/>,
+      <BANK width="30px" height="20px"/>
     ]
   }
 ]
+
+export const ORDER_STATUS = {
+  "AWAITING_FULFILLMENT": 1,
+  "AWAITING_SHIPMENT": 2,
+  "CLOSED": 3,
+  "CANCELED": 4,
+  "PAYMENT_PENDING": 5
+}
+
+export const PAYMENT_LIST = ['card','us_bank_account']

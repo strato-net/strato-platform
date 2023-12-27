@@ -1,7 +1,7 @@
 import { Spin, notification } from "antd";
 import React, { useEffect, useState, useMemo } from "react";
 import RestStatus from "http-status-codes";
-import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
+import { apiUrl, HTTP_METHODS, ORDER_STATUS } from "../../helpers/constants";
 import { useNavigate, useMatch, useLocation } from "react-router-dom";
 import routes from "../../helpers/routes";
 import {generateHtmlContent, generateHtmlContentNickel} from "../../helpers/emailTemplate";
@@ -82,7 +82,13 @@ const ProcessingOrder = () => {
             if (body.data["payment_status"] === "paid") {
               const customerEmail = body.data["customer_details"]["email"];
               const cart = JSON.parse(body.data.metadata.cart);
-              let object = { paymentSessionId: sessionId, paymentMethod: body.data.payment_method, ...cart };
+              let object = { paymentSessionId: sessionId, status:ORDER_STATUS.AWAITING_FULFILLMENT, paymentMethod: body.data.payment_method, ...cart };
+              handleOrderConfirm(object, customerEmail);
+            }
+            else if (body.data["payment_method_options"].hasOwnProperty("us_bank_account")) {
+              const customerEmail = body.data["customer_details"]["email"];
+              const cart = JSON.parse(body.data.metadata.cart);
+              let object = { paymentSessionId: sessionId, status:ORDER_STATUS.PAYMENT_PENDING, paymentMethod: body.data.payment_method, ...cart };
               handleOrderConfirm(object, customerEmail);
             }
           }
@@ -166,6 +172,7 @@ const ProcessingOrder = () => {
     });
     
     const body = {
+      status: cartData.status,
       items: orderList,
       shippingAddressId: cartData.shippingAddressId,
       paymentSessionId: cartData.paymentSessionId,

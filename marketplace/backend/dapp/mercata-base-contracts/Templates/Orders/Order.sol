@@ -12,6 +12,7 @@ abstract contract Order is Utils {
         AWAITING_SHIPMENT,
         CLOSED,
         CANCELED,
+        PAYMENT_PENDING,
         MAX
     }
 
@@ -39,7 +40,8 @@ abstract contract Order is Utils {
         uint[] _quantities,
         uint _createdDate,
         uint _shippingAddressId,
-        string _paymentSessionId
+        string _paymentSessionId,
+        OrderStatus _status
     ) external{
         require(_saleAddresses.length == _quantities.length, "Number of sales doesn't match number of quantities.");
         orderId = _orderId;
@@ -64,7 +66,7 @@ abstract contract Order is Utils {
             quantities.push(q);
             outstandingSales++;
         }
-        status = OrderStatus.AWAITING_FULFILLMENT;
+        status = _status;
         shippingAddressId = _shippingAddressId;
         paymentSessionId = _paymentSessionId;
     }
@@ -98,12 +100,31 @@ abstract contract Order is Utils {
         }
     }
 
-    function onCancel() internal virtual {}
 
-    function cancelOrder() external returns (uint) {
+    function updateOrderStatus(OrderStatus _status) external returns (uint) {
+        require((tx.origin == purchasersAddress || getCommonName(tx.origin) == sellersCommonName), "Only the purchaser/seller can update the order status");
+        if(status == OrderStatus.AWAITING_FULFILLMENT){
+            if (_status == OrderStatus.AWAITING_SHIPMENT) {
+                status = _status;
+            } 
+        }else if(status == OrderStatus.AWAITING_SHIPMENT){
+            if (_status == OrderStatus.CLOSED) {
+                status = _status;
+            } 
+        }else if(status == OrderStatus.PAYMENT_PENDING){
+            if (_status == OrderStatus.AWAITING_FULFILLMENT) {
+                status = _status;
+            } 
+        }
+        return RestStatus.OK;
+    }
+
+    function onCancel(string _comments) internal virtual {}
+
+    function cancelOrder(string _comments) external returns (uint) {
         require(status != OrderStatus.CLOSED && status != OrderStatus.CANCELED, "Order already closed.");
-        require(tx.origin == purchasersAddress, "Only the purchaser can cancel the order");
-        onCancel();
+        require((tx.origin == purchasersAddress || getCommonName(tx.origin) == sellersCommonName), "Only the purchaser/seller can cancel the order");
+        onCancel(_comments);
         unlockSales();
         status = OrderStatus.CANCELED;
         return RestStatus.OK;

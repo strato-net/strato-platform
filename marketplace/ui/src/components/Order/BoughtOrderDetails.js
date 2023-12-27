@@ -22,7 +22,7 @@ import classNames from "classnames";
 import { EyeOutlined } from "@ant-design/icons";
 import DataTableComponent from "../DataTableComponent";
 import { getStringDate } from "../../helpers/utils";
-import { getStatus } from "./constant";
+import { getStatus, getStatusByName } from "./constant";
 import { useNavigate } from "react-router-dom";
 import { US_DATE_FORMAT } from "../../helpers/constants";
 import ClickableCell from "../ClickableCell";
@@ -36,6 +36,7 @@ import SoldOrdersTable from "./SoldOrdersTable";
 import { ResponsiveOrderDetailCard } from "./ResponsiveOrderDetailCard";
 import { LeftArrow } from "../../images/SVGComponents";
 
+
 const BoughtOrderDetails = ({ user, users }) => {
   const [comment, setcomment] = useState("");
   const [Id, setId] = useState(undefined);
@@ -48,6 +49,7 @@ const BoughtOrderDetails = ({ user, users }) => {
   const [paid, setPaid] = useState("Processing");
   const [isLoadingPaymentStatus, setisLoadingPaymentStatus] = useState(false);
   const [selectedDate, setSelectedDate] = useState("");
+  const [shouldCheckPaymentStatus, setShouldCheckPaymentStatus] = useState(false);
   const { state } = useLocation()
 
   const navigate = useNavigate();
@@ -97,40 +99,91 @@ const BoughtOrderDetails = ({ user, users }) => {
       getData();
     }
   }, [Id, dispatch]);
-
+  
   const getData = async () => {
     const data = await actions.fetchOrderDetails(dispatch, Id);
     if (data != null) {
-      getPaymentStatus(data.order.paymentSessionId, data.order.sellersCommonName);
+      setShouldCheckPaymentStatus(true);
     }
-  }
+  };
+  
+  useEffect(() => {
+    if (shouldCheckPaymentStatus && orderDetails) {
+      getPaymentStatus(orderDetails.order.paymentSessionId, orderDetails.order.sellersCommonName);
+      setShouldCheckPaymentStatus(false);
+    }
+  }, [shouldCheckPaymentStatus, orderDetails]);
 
-  const getPaymentStatus = async (paymentSessionId, sellersCommonName) => {
-    if (paymentSessionId !== "") {
+
+  const validatePayment = async (paymentSessionId) => {
+    if (!paymentSessionId || !orderDetails) return;
+
+    const currentStatus = getStatus(parseInt(orderDetails.order.status));
+    const isPendingOrCanceled = currentStatus === getStatusByName("Payment Pending") || currentStatus === getStatusByName("Canceled");
+    const isCanceled = currentStatus === getStatusByName("Canceled");
+
+
+    if (isPendingOrCanceled) {
       try {
-        setisLoadingPaymentStatus(true);
         const response = await fetch(
-          `${apiUrl}/order/payment/session/${paymentSessionId}/${sellersCommonName}`,
-          {
-            method: HTTP_METHODS.GET,
-          }
+          `${apiUrl}/order/payment/intent/${paymentSessionId}/${orderDetails.order.sellersCommonName}`,
+          { method: HTTP_METHODS.GET }
         );
+        const intentBody = await response.json();
+        const paymentErrorAndRequiresMethod = intentBody.data.last_payment_error?.message && intentBody.data.status === 'requires_payment_method';
 
-        const body = await response.json();
-        setisLoadingPaymentStatus(false);
-        if (response.status === RestStatus.OK) {
-
-          if (body.data["payment_status"] === "paid") {
-            setPaid("Paid");
-          }
-
+        if (paymentErrorAndRequiresMethod && isCanceled) {
+          setPaid("Payment Failed");
+          setcomment(encodeURIComponent('Stripe: ' + intentBody.data.last_payment_error.message))
         }
-
+        else if(paymentErrorAndRequiresMethod && !isCanceled)
+        {
+          setisLoadingPaymentStatus(true)
+          const body = {
+            saleOrderAddress: orderDetails.order.address,
+            comments: encodeURIComponent('Stripe: ' + intentBody.data.last_payment_error.message),
+          };
+          //Update Order Details and change the Order Status to 'Canceled' from 'Payment Pending'
+          let isDone = await actions.cancelSale(dispatch, body);
+          setcomment(`Stripe: ${orderDetails.order.comments}`);
+          if (isDone) {
+            setStatus("Canceled");
+            setPaid("Payment Failed");
+            await actions.fetchOrderDetails(dispatch, Id);
+            setisLoadingPaymentStatus(false);
+            }
+        }
+        
       } catch (err) {
+        console.error(`Error: ${err}`);
       }
     }
+  };
 
-  }
+  const getPaymentStatus = async (paymentSessionId, sellersCommonName) => {
+    if (!paymentSessionId) return;
+
+    setisLoadingPaymentStatus(true);
+    try {
+      const response = await fetch(
+        `${apiUrl}/order/payment/session/${paymentSessionId}/${sellersCommonName}`,
+        { method: HTTP_METHODS.GET }
+      );
+
+      const body = await response.json();
+      if (response.status === RestStatus.OK) {
+        if (body.data["payment_status"] === "paid") {
+          setPaid("Paid");
+        } else {
+          await validatePayment(paymentSessionId);
+        }
+      }
+    } catch (err) {
+      console.error(`Error: ${err}`);
+    } finally {
+      setisLoadingPaymentStatus(false);
+    }
+  };
 
 
 
@@ -198,6 +251,8 @@ const BoughtOrderDetails = ({ user, users }) => {
       textClass = "bg-[#EBF7FF]";
     } else if (status === "Awaiting Fulfillment"){
       textClass = "bg-[#FF8C0033]"
+    } else if (status === "Payment Pending"){
+      textClass = "bg-[#FF8C0033]"
     } else if (status === "Closed") {
       textClass = "bg-[#119B2D33]";
     } else if (status === "Canceled") {
@@ -206,6 +261,8 @@ const BoughtOrderDetails = ({ user, users }) => {
     let bgClass = "bg-[#119B2D]";
     if (status === "Awaiting Shipment") {
       bgClass = "bg-[#13188A]";
+    } else if (status === "Payment Pending"){
+      bgClass = "bg-[#FF8C00]"
     } else if (status === "Awaiting Fulfillment"){
       bgClass = "bg-[#FF8C00]"
     } else if (status === "Closed") {
@@ -363,13 +420,13 @@ const BoughtOrderDetails = ({ user, users }) => {
     <div>
       {contextHolder}
       {details === null || isorderDetailsLoading || isbuyerDetailsUpdating || isLoadingPaymentStatus ? (
-        <div className="h-screen flex justify-center items-center">
-          <Spin
-            spinning={isorderDetailsLoading || isbuyerDetailsUpdating || isLoadingPaymentStatus}
-            size="large"
-          />
-        </div>
-      ) : (
+      <div className="h-screen flex justify-center items-center">
+        <Spin
+          spinning={isorderDetailsLoading || isbuyerDetailsUpdating || isLoadingPaymentStatus}
+          size="large"
+        />
+      </div>
+    ) : (
         <div>
           <Breadcrumb className="text-sm ml-4 md:ml-20 mt-4 md:mt-14 mb-8">
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>

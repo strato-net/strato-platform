@@ -28,6 +28,8 @@ import DataTableComponent from "../DataTableComponent";
 import { useFormik } from "formik";
 import * as yup from "yup";
 import "./index.css";
+import { PAYMENT_LIST } from "../../helpers/constants";
+import ConfirmOrderModel from "./ConfirmOrderModel";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import AddressComponent from "./AddressComponent";
@@ -326,7 +328,8 @@ const ConfirmOrder = () => {
       });
       // These additional fields need to be sent to form the request after stripe. 
       let body = {
-        buyerOrganization: userOrganization,
+        paymentList: PAYMENT_LIST,
+      buyerOrganization: userOrganization,
         orderList,
         orderTotal: total + tax + shipping,
         shippingAddressId: userAddresses[selectedAddress].address_id,
