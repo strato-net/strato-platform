@@ -11,7 +11,7 @@ import {
   Button,
   Typography
 } from "antd";
-import { ArrowLeftOutlined, LogoutOutlined, MenuOutlined, SearchOutlined, ShoppingCartOutlined } from "@ant-design/icons";
+import { ArrowLeftOutlined, LogoutOutlined,  SearchOutlined, ShoppingCartOutlined } from "@ant-design/icons";
 import { Images } from "../../images";
 import "./header.css";
 import { useNavigate } from "react-router-dom";
@@ -242,7 +242,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
       />
       <Space size="large" className="!gap-0 md:!gap-4 mr-0 -ml-3">
         {<div className="flex md:hidden mx-2" onClick={()=>handleSearchShow(true)}>
-          <SearchOutlined />
+         <img src={Images.Responsive_search} className="w-6 h-6" /> 
         </div>}
         {roleIndex === undefined || roleIndex === 1 ? null : <Badge
           className="cursor-pointer"

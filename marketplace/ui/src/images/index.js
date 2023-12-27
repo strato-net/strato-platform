@@ -48,4 +48,5 @@ export const Images = {
   'carbon_card' : require("./resources/categories/carbon_card.png"),
   'membership_card' : require("./resources/categories/membership_card.jpg"),
   'menu_icon' : require("./resources/Ham_menu.png"),
+  'Responsive_search' :  require("./resources/Responsive_Search.png"),
 };
