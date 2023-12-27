@@ -51,4 +51,5 @@ export const Images = {
   'Responsive_search' :  require("./resources/Responsive_Search.png"),
   'Responsive_cart'  : require("./resources/Responive_Cart.png"),
   'Header_cart' :  require("./resources/Header_Cart.png"),
+  'Header_Search' :  require("./resources/Search.png"),
 };

@@ -186,7 +186,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
           <Input
             size="large"
             placeholder="Search"
-            prefix={showSearch ? <ArrowLeftOutlined onClick={()=>handleSearchShow(false)} /> : <SearchOutlined style={{ color: "#989898" }} />}
+            prefix={showSearch ? <ArrowLeftOutlined onClick={()=>handleSearchShow(false)} /> : <img src={Images.Header_Search} className="w-[18px] h-[18px]" />}
             className="bg-[#F6F6F6] border-none rounded-2xl md:!w-[35%] lg:w-[40%] absolute p-[10px] "
           />
         </div>
