@@ -31,9 +31,9 @@ $(info )
 
 all: build_all docker-compose eks
 
-build_all: strato apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx
+build_all: strato apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx stripe-ps stripe-ps-nginx
 
-.PHONY: strato apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx build_buildbase build_common build_common_profiled eks
+.PHONY: strato apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx stripe-ps stripe-ps-nginx build_buildbase build_common build_common_profiled eks
 
 apex:
 	@echo Now building apex...
@@ -63,12 +63,22 @@ marketplace-ui:
 	@echo Now building marketplace-ui...
 	BASIL_DOCKER_TAG=${REPO_URL}marketplace-ui:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}marketplace-ui:${VERSION} make --directory=marketplace/ui/
 
+stripe-ps:
+	@echo Now building stripe-ps...
+	BASIL_DOCKER_TAG=${REPO_URL}stripe-ps:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}stripe-ps:${VERSION} make --directory=stripe-ps/
+
+stripe-ps-nginx:
+	@echo Now building stripe-ps-nginx...
+	BASIL_DOCKER_TAG=${REPO_URL}stripe-ps-nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}stripe-ps-nginx:${VERSION} make --directory=stripe-ps-nginx/
+
 eks:
 	@echo Now generating eks manifest files
 	cd devops/eks/strato && sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' strato-platform-manifest.tpl.yaml > strato-platform-manifest.yaml
 	cd devops/eks/vault && sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' eks-vault-deployment.tpl.yaml > eks-vault-deployment.yaml
 	#TODO: create eks manifest for identity server
 	#cd devops/eks/identity && sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' eks-identity-deployment.tpl.yaml > eks-identity-deployment.yaml
+	#TODO: create eks manifest for highway server
+	#TODO: create eks manifest for stripe-ps server
 
 build_buildbase:
 	@echo building buildbase...
@@ -178,6 +188,8 @@ docker-compose:
 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.identity.tpl.yml > docker-compose.identity.push.ecr.yml
 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.highway.tpl.yml > docker-compose.highway.push.yml
 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.highway.tpl.yml > docker-compose.highway.push.ecr.yml
+	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.stripe-ps.tpl.yml > docker-compose.stripe-ps.push.yml
+	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.stripe-ps.tpl.yml > docker-compose.stripe-ps.push.ecr.yml
 
 	@echo Creating the final docker-compose.yml...
 	awk '/build: ./{getline} 1' docker-compose.push.yml > docker-compose.yml
@@ -188,6 +200,8 @@ docker-compose:
 	awk '/build: ./{getline} 1' docker-compose.identity.push.ecr.yml > docker-compose.identity.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.highway.push.yml > docker-compose.highway.yml
 	awk '/build: ./{getline} 1' docker-compose.highway.push.ecr.yml > docker-compose.highway.ecr.yml
+	awk '/build: ./{getline} 1' docker-compose.stripe-ps.push.yml > docker-compose.stripe-ps.yml
+	awk '/build: ./{getline} 1' docker-compose.stripe-ps.push.ecr.yml > docker-compose.stripe-ps.ecr.yml
 
 docker-build:
 	cp -fr strato/licenses ${STRATODIR}

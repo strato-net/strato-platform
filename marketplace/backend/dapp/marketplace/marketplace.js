@@ -55,13 +55,13 @@ function marshalOut(_args) {
 }
 
 async function getAll(admin, args = {}, options) {
-    const inventoryResults = await inventoryJs.getAll(admin, { ...args }, options);
+    const inventoryResults = await inventoryJs.getAll(admin, { ...args, isMarketplaceSearch: true }, options);
     const inventoryCount = await inventoryJs.inventoryCount(admin, { ...args }, options);
     return {inventoryResults: inventoryResults.map(inventory => marshalOut(inventory)), inventoryCount: inventoryCount};
 }
 
 async function getTopSellingProducts(admin, args = {}, options) {
-    const inventoryResults = await inventoryJs.getAll(admin, { ...args }, options);
+    const inventoryResults = await inventoryJs.getAll(admin, { ...args, isMarketplaceSearch: true }, options);
     return inventoryResults.map(inventory => marshalOut(inventory));
 }
 

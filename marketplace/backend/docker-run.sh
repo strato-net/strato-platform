@@ -81,8 +81,8 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
     exit 16
   fi
   
-  if [[ -z "${STRIPE_PUBLISHABLE_KEY}" || -z "${STRIPE_SECRET_KEY}" ]]; then
-    echo "One or both of STRIPE_PUBLISHABLE_KEY, STRIPE_SECRET_KEY vars are empty, but are required values"
+  if [ -z "${STRIPE_PAYMENT_SERVER_URL}" ]; then
+    echo "STRIPE_PAYMENT_SERVER_URL is empty, but is a required value"
     exit 17
   fi
 

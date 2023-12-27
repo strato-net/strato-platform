@@ -1,6 +1,4 @@
-import React, { useState } from "react";
-import { Card, Typography, Image, Space } from "antd";
-import { LeftArrow, RightArrow } from "../../images/SVGComponents";
+import { Typography} from "antd";
 import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
 import { useCategoryState } from "../../contexts/category";
@@ -13,30 +11,29 @@ const CategoryCard = () => {
   const navigate = useNavigate();
   const naviroute = routes.MarketplaceProductList.url;
   const { categorys } = useCategoryState();
-  const {inventoryPopup , setInventoryPopup} =  useState(false);
 
   const categoryImages = [
-    Images["Art-category"],
     Images["Carbon-category"],
     Images["Metal"],
     Images["Clothing-category"],
     Images["collectibles"],
-    Images["membership"],
+    Images["Art-category"],
+    Images["membership_card"],
   ];
   
 
   return (
     <>
-     <Title className="md:px-10 !text-xl md:!text-4xl !text-left py-5">
-     Shop by Category
-        </Title>
-      <div className="flex justify-start gap-4 lg:gap-[15px] flex-wrap px-[4px] md:px-10 xl:grid xl:grid-cols-6">
+      <Title className="md:px-10 !text-xl md:!text-4xl !text-left py-2">
+        Shop by Category
+      </Title>
+      <div className="flex justify-center md:justify-start gap-4 lg:gap-[15px] flex-wrap px-[4px] md:px-10 xl:grid xl:grid-cols-6">
         {categorys.map((category, index) => {
           return (
             <div
               id={category.name}
               key={index}
-              className=" w-[162px] md:w-[228px] xl:w-[200px] 2xl:w-[248px] 2xl:h-[200px]   h-[160px] md:h-[185px] xl:h-[161px] border border-tertiaryB shadow-category   rounded-lg cursor-pointer"
+              className=" w-[162px] md:w-[210px] 2xl:w-[248px] h-[160px] md:h-[180px] 2xl:h-[200px] border border-tertiaryB shadow-category rounded-lg cursor-pointer"
               onClick={() => {
                 navigate(`${naviroute.replace(":category", category.name)}`);
                 window.LOQ.push(['ready', async LO => {
@@ -55,7 +52,7 @@ const CategoryCard = () => {
               <div className="flex flex-col">
                 <img
                   src={categoryImages[index]}
-                  className="rounded-t-lg px-[9px] py-[6px] lg:px-[0px] lg:py-[0px] h-[110px] md:h-[140px] xl:h-[105px] 2xl:h-[140px]"
+                  className="rounded-t-lg px-[9px] py-[6px] lg:px-[0px] lg:py-[0px] h-[110px] md:h-[125px] 2xl:h-[140px]"
                   preview={false}
                 />
                 <div className="py-2 xl:py-3 flex justify-center md:justify-start ">

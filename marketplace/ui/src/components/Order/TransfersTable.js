@@ -54,18 +54,18 @@ const TransfersTable = ({ user, selectedDate }) => {
   
   const column = [
     {
-      title: "TRANSFER NUMBER",
+      title: "Transfer Number",
       dataIndex: "transferNumber",
       key: "transferNumber",
       render: (text) => <p>{text}</p>,
     },
     {
-      title: "FROM",
+      title: "From",
       key: "oldOwnerCommonName",
       render: (text, record) => <p>{record.oldOwnerOrganization.startsWith("Mercata Account") ? record.oldOwnerCommonName : record.oldOwnerOrganization}</p>,
     },
     {
-      title: "TO",
+      title: "To",
       key: "newOwnerCommonName",
       render: (text, record) => <p>{record.newOwnerOrganization.startsWith("Mercata Account") ? record.newOwnerCommonName : record.newOwnerOrganization}</p>,
     },
@@ -75,7 +75,7 @@ const TransfersTable = ({ user, selectedDate }) => {
       render: (text) => <p>{text}</p>,
       title: (
         <div style={{ display: "flex" }}>
-          <div className="mt-1.5">{"Date".toUpperCase()}</div>
+          <div className="mt-1.5">{"Date"}</div>
           <div>
             {order === "desc" ? (
               <UpOutlined className="icon-container icon-hover" onClick={() => setOrder("asc")} />
@@ -87,13 +87,13 @@ const TransfersTable = ({ user, selectedDate }) => {
       ),
     },
     {
-      title: "PRODUCT NAME",
+      title: "Product Name",
       dataIndex: "productName",
       key: "productName",
       render: (text) => <p>{text}</p>,
     },
     {
-      title: "QUANTITY",
+      title: "Quantity",
       dataIndex: "quantity",
       key: "quantity",
       render: (text) => <p>{text}</p>,

@@ -47,6 +47,15 @@ abstract contract Mintable is UTXO {
     function mintNewUnits(uint _quantity) public returns (uint) {
         require(isMint, "Only the mint contract can mint new units");
         require(getCommonName(msg.sender) == minterCommonName, "Only the minter can mint new units");
+        emit OwnershipTransfer(
+            originAddress,
+            address(0),
+            "",
+            owner,
+            ownerCommonName,
+            itemNumber + quantity,
+            itemNumber + quantity + _quantity - 1
+        );
         quantity += _quantity;
         return RestStatus.OK;
     }

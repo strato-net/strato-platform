@@ -11,6 +11,7 @@ import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
 import { setCookie } from "../../helpers/cookie";
 import { Images } from '../../images';
+import images_placeholder from "../../images/resources/image_placeholder.png"
 
 const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
     const [quantity, setQuantity] = useState(1)
@@ -22,14 +23,14 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
     const navigate = useNavigate();
 
     return (
-        <div className={`trending_cards_container_card bg-white p-3 px-4 ${parent == 'Marketplace' ? 'min-w-[300px]' : 'min-w-[230px]'} md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}>
+        <div className={`trending_cards_container_card bg-white p-3 px-4 ${parent == 'Marketplace' ? 'w-[300px]' : 'min-w-[230px]'} md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}>
             {contextHolder}
             <img
                 onClick={() =>
                     navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
                 }
-                className='md:h-[200px] md:w-[40vw] h-[110px] object-cover'
-                src={topSellingProduct.images ? topSellingProduct?.images[0] : ""}
+                className='md:h-[200px] md:w-[40vw] h-[150px]'
+                src={topSellingProduct.images ? topSellingProduct?.images[0] : images_placeholder}
             />
             <div className='flex justify-between'>
                 <Typography
@@ -40,20 +41,20 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                 >
                     {topSellingProduct?.name || "N/A"}
                 </Typography>
-                <img className='w-5' src={Images.Verified} alt='' />
+                <img className='w-4 h-4' src={Images.Verified} alt='' />
             </div>
             <Typography className='font-semibold'>{'$' + topSellingProduct?.price || "N/A"}</Typography>
-            <Typography className='#989898 opacity-40 max-h-4 overflow-hidden'>{topSellingProduct?.description || "N/A"}</Typography>
+            <Typography className='#989898 opacity-40 max-h-5 overflow-hidden'>{topSellingProduct?.description || "N/A"}</Typography>
             <div className='flex justify-between items-center bg-[#EEEFFA] p-2'>
-                <Typography>Quantity</Typography>
+                <Typography>Quantity:</Typography>
                 <div className='flex gap-3 p-1 bg-white'>
-                    <Typography className='px-2 bg-[#EEEFFA] cursor-pointer' onClick={() => {
+                    <Typography className='px-2 bg-[#EEEFFA] cursor-pointer rounded-sm' onClick={() => {
                         setQuantity(quantity == 1 ? quantity : quantity - 1)
                     }}>
                         -
                     </Typography>
                     <Typography>{quantity}</Typography>
-                    <Typography className='px-2 bg-[#EEEFFA] cursor-pointer' onClick={() => {
+                    <Typography className='px-2 bg-[#EEEFFA] cursor-pointer rounded-sm' onClick={() => {
                         if ((quantity + 1 <= topSellingProduct.saleQuantity) && (quantity + 1 <= topSellingProduct.quantity)) {
                             setQuantity(quantity + 1)
                         }
@@ -72,7 +73,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                 <Button
                     id={`${topSellingProduct.name.replace(/ /g, "_")}-buy-now`}
                     type='primary'
-                    className='flex-1'
+                    className='flex-1 h-9 !bg-[#13188A] !text-white'
                     onClick={() => {
                         if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                             setCookie("returnUrl", `/marketplace/productList/${topSellingProduct.address}`, 10);
@@ -99,8 +100,11 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                             }
                         }
                     }}
-                >Buy Now</Button>
+                >
+                    Buy Now
+                </Button>
                 <Button
+                className='h-9 w-9 flex items-center justify-center !bg-[#13188A] '
                     onClick={() => {
                         if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                             setCookie("returnUrl", `/marketplace/productList/${topSellingProduct.address}`, 10);
@@ -127,7 +131,10 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                     }}
                     type='primary'
                 >
-                    <ShoppingCartOutlined style={{ color: '#EEEFFA' }} />
+                   
+                    <img src={Images.Cart} alt='Cart' width={18} height={18} className='max-w-[18px]'/>
+                    
+                    {/* <ShoppingCartOutlined style={{ color: '#EEEFFA' , width:'18px' ,  height:'18px' }} /> */}
                 </Button>
             </div>
         </div>

@@ -92,7 +92,7 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
 
   const column = [
     {
-      title: "Order Number".toUpperCase(),
+      title: "Order Number",
       dataIndex: "orderNumber",
       key: "orderNumber",
       render: (order) => (
@@ -110,13 +110,13 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
       ),
     },
     {
-      title: "seller".toUpperCase(),
+      title: "Seller",
       dataIndex: "sellersCommonName",
       key: "sellersCommonName",
       render: (text) => <p>{text}</p>,
     },
     {
-      title: "order total ($)".toUpperCase(),
+      title: "Order Total ($)",
       dataIndex: "orderTotal",
       key: "orderTotal",
       render: (text) => <p>{text}</p>,
@@ -127,7 +127,7 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
       render: (text) => <p>{text}</p>,
       title: (
         <div style={{ display: "flex" }}>
-          <div className="mt-1.5">{"Date".toUpperCase()}</div>
+          <div className="mt-1.5">{"Date"}</div>
           <div>
             {order === "createdDate.desc" ? (
               <UpOutlined className="icon-container icon-hover" onClick={() => setOrder("createdDate.asc")} />
@@ -139,7 +139,7 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
       ),
     },
     {
-      title: "invoice".toUpperCase(),
+      title: "Invoice",
       dataIndex: "invoice",
       key: "invoice",
       render: (text) => (
@@ -169,7 +169,7 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
       ),
     },
     {
-      title: "status".toUpperCase(),
+      title: "Status",
       dataIndex: "status",
       key: "status",
       render: (text) => statusComponent(text),

@@ -396,25 +396,28 @@ const Checkout = ({ user }) => {
           <Spin spinning={isCreateOrderSubmitting} size="large" />
         </div>
       ) : (
-        <div>
+        <div className="pb-8">
           <Breadcrumb>
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
               <ClickableCell href={routes.Marketplace.url}>
-                <p className="text-[#13188A] font-semibold">
+                <p className="text-sm text-[#13188A] font-semibold">
                 Home
                   </p>
               </ClickableCell>
             </Breadcrumb.Item>
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-              <p className=" font-medium text-[#202020]">
+              <p className="text-sm text-[#202020] font-medium">
                 Add to Cart
               </p>
             </Breadcrumb.Item>
           </Breadcrumb>
 
           <div className=" pt-[18px] lg:pt-6 ">
-            <p className="text-2xl font-semibold leading-9">My Cart</p>
+            <p className=" text-base md:text-xl lg:text-2xl font-bold lg:font-semibold leading-9">My Cart</p>
           </div>
+          <div className="grid grid-cols-1 sm:place-items-center  lg:block gap-3 ">
+
+        
           {
             mapData.length === 0 ? <div className="h-screen justify-center flex flex-col  items-center">
               <Image src={Images.noProductSymbol} preview={false} />
@@ -422,9 +425,9 @@ const Checkout = ({ user }) => {
                 No item found
               </Title>
             </div> : mapData.map(e => <React.Fragment key={e.key}>
-
-              <div className="hidden  lg:block"><CartComponent columns={columns} data={e.value} /> </div> <div className="lg:hidden"><div className="flex gap-3 flex-col"><ResponsiveCart data={e.value} AddQty={AddQty} MinusQty={MinusQty} ValueQty={ValueQty} removeCartList={removeCartList} /></div></div></React.Fragment>)
+              <div className="hidden  lg:block"><CartComponent columns={columns} data={e.value} /> </div> <div className="lg:hidden"><ResponsiveCart data={e.value} AddQty={AddQty} MinusQty={MinusQty} ValueQty={ValueQty} removeCartList={removeCartList} /></div></React.Fragment>)
           }
+            </div>
         </div>
       )}
       <ConfirmOrderModel
