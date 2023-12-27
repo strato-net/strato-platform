@@ -11,7 +11,7 @@ import {
   Button,
   Typography
 } from "antd";
-import { ArrowLeftOutlined, LogoutOutlined,  SearchOutlined, ShoppingCartOutlined } from "@ant-design/icons";
+import { ArrowLeftOutlined, CarOutlined, LogoutOutlined,  SearchOutlined, ShoppingCartOutlined } from "@ant-design/icons";
 import { Images } from "../../images";
 import "./header.css";
 import { useNavigate } from "react-router-dom";
@@ -256,9 +256,16 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
             navigate("/checkout");
           }}
         >
+          <div className="lg:hidden">
           <Avatar
-            icon={<ShoppingCartOutlined />}
+            icon={<img src={Images.Responsive_cart} alt="" className="w-6 h-6" /> }
           />
+          </div>
+          <div className="hidden lg:inline-block">
+          <Avatar
+            icon={ <img src={Images.Responsive_cart} alt="" className="w-6 h-6" />}
+          />
+          </div>
         </Badge>
         }
         {
