@@ -110,7 +110,7 @@ export const CATEGORIES = [
 
 export const PAYMENT_TYPE = [
   { 
-    name: "Card | ACH", 
+    name: "Credit Card / ACH", 
     value: 1, 
     options: [
       <AMEX width="30px" height="20px"/>,
