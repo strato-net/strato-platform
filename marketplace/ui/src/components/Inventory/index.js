@@ -185,7 +185,7 @@ const Inventory = ({ user }) => {
       label: category.name,
       key: category.name === "All" ? undefined : category.name,
       children: (
-        <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 inventoryCard  max-w-full">
+        <div className="my-2 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 inventoryCard sm:place-items-center md:place-items-start   max-w-full">
           { !isInventoriesLoading ? (
               inventories.map((inventory, index) => {
                 let category = categorys.find((c) => c.name === inventory.category);
@@ -237,7 +237,7 @@ const Inventory = ({ user }) => {
               </p>
             </Breadcrumb.Item>
           </Breadcrumb>
-          <div className="w-full h-[116px] py-4 px-4 md:h-[96px] bg-[#F6F6F6] flex flex-col md:flex-row md:px-14  justify-between items-center mt-11">
+          <div className="w-full h-[116px] py-4 px-4 md:h-[96px] bg-[#F6F6F6] flex flex-col md:flex-row md:px-14  justify-between items-center mt-6 lg:mt-11">
             <div className="flex justify-between w-full">
               <Button className="!px-1 md:!px-0 flex items-center flex-row-reverse gap-[6px] text-lg md:text-2xl font-semibold text-[#13188A]" type="link" icon={<img src={Images.ForwardIcon} alt="inventory" className="hidden md:block w-6 h-6" />}> Inventory
               </Button>
@@ -283,61 +283,11 @@ const Inventory = ({ user }) => {
               </Tooltip>
             </div>
           </div>
-          <div className="pt-6 mx-6 md:mx-5 md:px-10 mb-5 ">
+          <div className="pt-6 mx-4 md:mx-5 md:px-10 mb-5 ">
             <Tabs defaultActiveKey={category ? category : "All"}
               className="store"
               onChange={(key) => handleTabSelect(key)}
               items={tabItems}
-              // items={[
-              //   {
-              //     label: "All",
-              //     key: 1,
-              //     children:
-              //       <div className="my-4 grid grid-cols-1 lg:grid-cols-3   xl:grid-cols-3 gap-6 max-w-full" >
-              //         {inventories.map((inventory, index) => {
-              //           let category = categorys.find(
-              //             (c) => c.name === inventory.category
-              //           );
-              //           return (
-              //             <InventoryCard
-              //               id={index}
-              //               inventory={inventory}
-              //               category={category}
-              //               key={index}
-              //               debouncedSearchTerm={debouncedSearchTerm}
-              //               paymentProviderAddress={stripeStatus ? stripeStatus.paymentProviderAddress : undefined}
-              //             />
-              //           );
-              //         })}
-              //       </div>
-              //   }, {
-              //     label: "Carbon",
-              //     key: 2,
-              //     children: <></>
-              //   }, {
-              //     label: "Clothing",
-              //     key: 3,
-              //     children: <></>
-              //   }, {
-              //     label: "Material",
-              //     key: 4,
-              //     children: <></>
-              //   },
-              //   {
-              //     label: "Collectibles",
-              //     key: 5,
-              //     children: <></>
-              //   }, {
-              //     label: "Art",
-              //     key: 6,
-              //     children: <></>
-              //   },
-              //   {
-              //     label: "Membership",
-              //     key: 7,
-              //     children: <></>
-              //   },
-              // ]}
             />
             <div className="flex justify-center pt-6">
               <Pagination
