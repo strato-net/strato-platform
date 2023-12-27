@@ -1068,15 +1068,12 @@ instance A.Replaceable (IPAsText, TCPPort) ActivityState m where
 instance Mod.Accessible ActivePeers m where
   access = error "'Mod.Accessible ActivePeers m' not implemented"
   
-instance MonadIO m => A.Replaceable Point PeerBondingState (MonadTest m) where
-  replace _ point (PeerBondingState s) = do
-    mPeer <- use $ pointPPeerMap . at point
-    case pPeerIp <$> mPeer of 
-      Just ip -> stringPPeerMap . at (T.unpack ip) . _Just %= (\p -> p {pPeerBondState = s})
-      Nothing -> return ()
+instance MonadIO m => A.Replaceable (IPAsText, Point) PeerBondingState (MonadTest m) where
+  replace _ (IPAsText ip, point) (PeerBondingState s) = do
+    stringPPeerMap . at (T.unpack ip) . _Just %= (\p -> p {pPeerBondState = s})
     pointPPeerMap . at point . _Just %= (\p -> p {pPeerBondState = s})
 
-instance (Monad m, A.Replaceable Point PeerBondingState m) => A.Replaceable Point PeerBondingState (MonadP2PTest m) where
+instance (Monad m, A.Replaceable (IPAsText, Point) PeerBondingState m) => A.Replaceable (IPAsText, Point) PeerBondingState (MonadP2PTest m) where
   replace p k = lift . A.replace p k
 
 instance MonadIO m => A.Replaceable (IPAsText, TCPPort) PeerBondingState (MonadTest m) where

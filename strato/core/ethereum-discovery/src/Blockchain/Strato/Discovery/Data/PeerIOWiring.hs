@@ -63,10 +63,10 @@ instance MonadIO m => Mod.Accessible ActivePeers m where
       flip runSqlPool sqldb $
         SQL.selectList [PPeerActiveState SQL.==. fromEnum Active, PPeerEnableTime SQL.<. currentTime] []
 
-instance MonadIO m => (A.Replaceable Point PeerBondingState) m where
-  replace _ point (PeerBondingState state) = liftIO $ withGlobalSQLPool $ \sqldb -> do
+instance MonadIO m => (A.Replaceable (IPAsText, Point) PeerBondingState) m where
+  replace _ (IPAsText ip, point) (PeerBondingState state) = liftIO $ withGlobalSQLPool $ \sqldb -> do
     flip runSqlPool sqldb $
-      SQL.updateWhere [PPeerPubkey SQL.==. Just point] [PPeerBondState SQL.=. state]
+      SQL.updateWhere [PPeerIp SQL.==. ip, PPeerPubkey SQL.==. Just point] [PPeerBondState SQL.=. state]
 
 instance MonadIO m => (A.Replaceable (IPAsText, TCPPort) PeerBondingState) m where
   replace _ (IPAsText ip, TCPPort port) (PeerBondingState state) = liftIO $ withGlobalSQLPool $ \sqldb -> do
