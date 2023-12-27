@@ -10,7 +10,6 @@ import {
   Avatar,
   Input,
   notification,
-  Pagination
 } from "antd";
 import CategoryProductCard from "./CategoryProductCard";
 //categories
@@ -39,6 +38,8 @@ import { useAuthenticateState } from "../../contexts/authentication";
 import { SearchOutlined, CloseOutlined } from "@ant-design/icons";
 import NewTrendingCard from "./NewTrendingCard";
 import { FilterIcon } from "../../images/SVGComponents";
+import { Images } from "../../images";
+import './index.css'
 
 const { Panel } = Collapse;
 const { Text } = Typography;
@@ -279,7 +280,7 @@ const CategoryProductList = ({ user }) => {
   };
 
   return (
-    <div>
+    <div className={`${mobileOpenFilter ? 'overflow-y-hidden h-[67.5vh] md:h-[100vh] w-[100vw] bg-[#00000020] relative mt-24 md:bg-white md:mt-[auto] md:overflow-scroll trending_cards' : ' '}`}>
       <div className="fixed bg-white w-full top-7 z-10 md:static">
         <Breadcrumb className="text-xs ml-4 md:ml-14 mt-14">
           <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
@@ -304,11 +305,8 @@ const CategoryProductList = ({ user }) => {
         </Breadcrumb>
 
         <div className="flex items-center justify-center ml-4 md:ml-14 mr-14 mt-4 gap-4">
-          <div className="border border-solid border-[#6A6A6A] rounded-md cursor-pointer" onClick={handleFilterClick}>
-            <Avatar
-              className="flex items-center justify-center"
-              icon={<FilterIcon />}
-            />
+          <div className="border border-solid border-[#6A6A6A] rounded-md cursor-pointer p-1 md:p-2" onClick={handleFilterClick}>
+            <img src={Images.filter} alt="filter" className=" w-5 h-5 md:w-6 md:h-6"/>
           </div>
 
           <div className={`flex-1 `}>
@@ -323,11 +321,11 @@ const CategoryProductList = ({ user }) => {
 
         <div className="flex items-center ml-4 mt-2 md:ml-14 md:hidden">
           <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
-          <Text className="text-gray-800 ml-1 text-xl">
+          <Text className="text-gray-800 ml-1 text-sm font-normal">
             {marketplaceList?.length} Results
           </Text>
         </div>
-      </div >
+      </div>
 
       <div className="flex pt-4 mx-14 mt-[60px] md:mt-4 ">
         {/* Filter section */}
@@ -337,7 +335,7 @@ const CategoryProductList = ({ user }) => {
               <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
               <Text className="text-xl font-semibold pr-7 ml-1">Filters</Text>
             </div>
-            <div className="bg-white shadow-[2px_-2px_4px_0_rgba(0,0,0,0.05)] my-6 mb-24">
+            <div className="bg-white border border-solid border-[#E9E9E9] my-6 mb-24">
 
               {/* Panel - Category */}
               {categorys.length > 0 && (
@@ -348,9 +346,11 @@ const CategoryProductList = ({ user }) => {
                     expandIconPosition="end"
                     ghost="true"
                     reverse={false}
-                    className="pl-8 pr-7"
+                    expandIcon={({ isActive }) =>
+                      isActive ? <img src={Images.Dropdown} alt="img" style={{width:"24px", height:"24px", transform:"rotate(180deg)"}} /> : <img src={Images.Dropdown} alt="img" style={{width:"24px", height:"24px"}}/>
+                    }
                   >
-                    <Panel header={<Text strong>Categories</Text>} key="1">
+                    <Panel header={<Text strong className="text-base">Categories</Text>} key="1">
                       <Checkbox.Group
                         onChange={onChangeCategory}
                         value={selectedCategories}
@@ -365,9 +365,85 @@ const CategoryProductList = ({ user }) => {
                       </Checkbox.Group>
                     </Panel>
                   </Collapse>
-                  <Divider className="m-0" />
+                  <Divider className="m-auto w-[94%] min-w-[80%]" />
                 </>
               )}
+
+              {/* Panel - Price */}
+              <Collapse
+                bordered={false}
+                defaultActiveKey={1}
+                expandIconPosition="end"
+                ghost="true"
+                reverse={false}
+                expandIcon={({ isActive }) =>
+                      isActive ? <img src={Images.Dropdown} alt="img" style={{width:"24px", height:"24px", transform:"rotate(180deg)"}} /> : <img src={Images.Dropdown} alt="img" style={{width:"24px", height:"24px"}}/>
+                    }
+              >
+                <Panel header={<Text strong className="text-base">Price ($)</Text>} key="1">
+                  <Space>
+                    <InputNumber min={0} prefix='$' placeholder="min" onChange={(e) => {
+                      e === null ? setMinPrice(0) : setMinPrice(e)
+                    }} />
+                    -
+                    <InputNumber min={minPrice} prefix='$' placeholder="max" onChange={(e) => {
+                      e === null ? setMaxPrice(MAX_PRICE) : setMaxPrice(e)
+                    }} />
+                  </Space>
+                </Panel>
+              </Collapse>
+              <Divider className="m-auto w-[94%] min-w-[80%]" />
+
+              {/* Panel - Quantity */}
+              <Collapse
+                bordered={false}
+                defaultActiveKey={1}
+                expandIconPosition="end"
+                ghost="true"
+                reverse={false}
+                expandIcon={({ isActive }) =>
+                      isActive ? <img src={Images.Dropdown} alt="img" style={{width:"24px", height:"24px", transform:"rotate(180deg)"}} /> : <img src={Images.Dropdown} alt="img" style={{width:"24px", height:"24px"}}/>
+                    }
+              >
+                <Panel header={<Text strong className="text-base">Quantity</Text>} key="1">
+                  <Space className="flex flex-col">
+                  <div className="flex flex-col">
+                    <Text>Min</Text>
+                    <InputNumber min={0} controls={false} prefix="$" 
+                    addonAfter={
+                    <div className="flex flex-row gap-[1px]">
+                      <Typography className='px-2 bg-[#EEEFFA] cursor-pointer text-xl flex items-center'>
+                        -
+                      </Typography> 
+                      <Typography className='px-2 bg-[#EEEFFA] cursor-pointer text-xl flex items-center'>
+                        +
+                      </Typography>
+                    </div>
+                    } 
+                    className="w-full"/>
+                  </div>
+                    
+                  <div className="flex flex-col gap-[1px]">
+                  <Text>Max</Text>
+                    <InputNumber min={minPrice} prefix="$" 
+                    controls={false}
+                    addonAfter={
+                    <div className="flex flex-row">
+                      <Typography className='px-2 bg-[#EEEFFA] cursor-pointer text-xl flex items-center'>
+                        -
+                      </Typography> 
+                      <Typography className='px-2 bg-[#EEEFFA] cursor-pointer text-xl flex items-center'>
+                        +
+                      </Typography>
+                    </div>
+                    } 
+                    className="w-full"/>
+                  </div>
+                  </Space>
+                </Panel>
+              </Collapse>
+              <Divider className="m-auto w-[94%] min-w-[80%]" />
+
               {/* Panel - SubCategory */}
               {subCategories.length > 0 && (
                 <>
@@ -377,9 +453,11 @@ const CategoryProductList = ({ user }) => {
                     expandIconPosition="end"
                     ghost="true"
                     reverse={false}
-                    className="pl-8 pr-7"
+                    expandIcon={({ isActive }) =>
+                      isActive ? <img src={Images.Dropdown} alt="img" style={{width:"24px", height:"24px", transform:"rotate(180deg)"}} /> : <img src={Images.Dropdown} alt="img" style={{width:"24px", height:"24px"}}/>
+                    }
                   >
-                    <Panel header={<Text strong>Sub-Category</Text>} key="1">
+                    <Panel header={<Text strong className="text-base">Sub-Category</Text>} key="1">
                       <Checkbox.Group
                         // onChange={onChangeSubCategory}
                         value={selectedSubCategories}
@@ -394,32 +472,10 @@ const CategoryProductList = ({ user }) => {
                       </Checkbox.Group>
                     </Panel>
                   </Collapse>
-                  <Divider className="m-0" />
+                  <Divider className="m-auto w-[94%] min-w-[80%]" />
                 </>
               )}
-
-              {/* Panel - Price */}
-              <Collapse
-                bordered={false}
-                defaultActiveKey={1}
-                expandIconPosition="end"
-                ghost="true"
-                reverse={false}
-                className="pl-8 pr-7"
-              >
-                <Panel header={<Text strong>Price</Text>} key="1">
-                  <Space>
-                    <InputNumber min={0} prefix='$' placeholder="min" onChange={(e) => {
-                      e === null ? setMinPrice(0) : setMinPrice(e)
-                    }} />
-                    -
-                    <InputNumber min={minPrice} prefix='$' placeholder="max" onChange={(e) => {
-                      e === null ? setMaxPrice(MAX_PRICE) : setMaxPrice(e)
-                    }} />
-                  </Space>
-                </Panel>
-              </Collapse>
-              <Divider className="m-0" />
+              <Divider className="m-auto w-[94%] min-w-[80%]" />
 
               {/* Panel - Product */}
               {marketplaceList?.length > 0 && (
@@ -430,9 +486,11 @@ const CategoryProductList = ({ user }) => {
                     expandIconPosition="end"
                     ghost="true"
                     reverse={false}
-                    className="pl-8 pr-7"
+                    expandIcon={({ isActive }) =>
+                      isActive ? <img src={Images.Dropdown} alt="img" style={{width:"24px", height:"24px", transform:"rotate(180deg)"}} /> : <img src={Images.Dropdown} alt="img" style={{width:"24px", height:"24px"}}/>
+                    }
                   >
-                    <Panel header={<Text strong>Product</Text>} key="1">
+                    <Panel header={<Text strong className="text-base">Product</Text>} key="1">
                       <Checkbox.Group
                         // onChange={onChangeProduct}
                         value={selectedProducts}
@@ -447,11 +505,11 @@ const CategoryProductList = ({ user }) => {
                       </Checkbox.Group>
                     </Panel>
                   </Collapse>
-                  <Divider className="m-0" />
+                  <Divider className="m-auto w-[94%] min-w-[80%]" />
                 </>
               )}
 
-              <div className="pb-24"></div>
+              <div className="pb-2"></div>
             </div>
           </div>}
 
@@ -470,7 +528,7 @@ const CategoryProductList = ({ user }) => {
               </Text>
             </div>
             {marketplaceList?.length > 0 ? (
-              <div className={` mt-8 md:mt-4 mb-8 flex w-full md:grid flex-col items-center ${desktopOpenFilter ? "grid-cols-1 gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 lg:gap-14 " : " sm:grid-cols-1 gap-4 md:grid-cols-2 md:gap-14 lg:grid-cols-3 lg:gap-16 xl:grid-cols-4"}`} id="product-list">
+              <div className={`mt-[61px] md:mt-4 mb-8 flex w-full md:grid flex-col items-center ${desktopOpenFilter ? "grid-cols-1 gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 lg:gap-14 " : " sm:grid-cols-1 gap-4 md:grid-cols-2 md:gap-14 lg:grid-cols-3 lg:gap-16 xl:grid-cols-4"}`} id="product-list">
                 {marketplaceList.map((product, index) => {
                   const prodCategory = categorys.find(
                     (c) => c.name === product.category
@@ -497,13 +555,13 @@ const CategoryProductList = ({ user }) => {
       {
         mobileOpenFilter &&
         <div>
-          <div className="mr-6 fixed w-full h-full z-50 top-16 overflow-scroll md:hidden ">
+          <div className="mr-6 fixed w-full h-full z-50 top-16 overflow-scroll md:hidden">
             <div className="bg-white shadow-[2px_-2px_4px_0_rgba(0,0,0,0.05)] mb-24">
               <div className="flex items-center justify-between pt-5">
-                <Text className="text-xl font-semibold pr-7 pl-7 ml-1">Select</Text>
+                <Text className="text-base font-semibold pr-7 pl-7 ml-1">Select</Text>
                 <Avatar icon={<CloseOutlined />} style={{ color: "#202020" }} className="flex items-center pr-12" onClick={handleFilterClick} />
               </div>
-              <Divider className="m-0 mt-5" />
+              <Divider className="m-0 mt-3" />
 
               {/* Panel - Category */}
               {categorys.length > 0 && (
@@ -513,7 +571,7 @@ const CategoryProductList = ({ user }) => {
                     expandIconPosition="end"
                     ghost="true"
                     reverse={false}
-                    className="pl-8 pr-7"
+                    className="pl-4 pr-4"
                   >
                     <Panel header={<Text strong>Categories</Text>} key="1">
                       <Checkbox.Group
@@ -568,9 +626,9 @@ const CategoryProductList = ({ user }) => {
                 expandIconPosition="end"
                 ghost="true"
                 reverse={false}
-                className="pl-8 pr-7"
+                className="pl-4 pr-4"
               >
-                <Panel header={<Text strong>Price</Text>} key="1">
+                <Panel header={<Text strong>Price ($)</Text>} key="1">
                   <Space>
                     <InputNumber min={0} prefix='$' placeholder="min" onChange={(e) => {
                       e === null ? setMinPrice(0) : setMinPrice(e)
@@ -584,6 +642,81 @@ const CategoryProductList = ({ user }) => {
               </Collapse>
               <Divider className="m-0" />
 
+              {/* Panel - Quantity */}
+              <Collapse
+                bordered={false}
+                expandIconPosition="end"
+                ghost="true"
+                reverse={false}
+                className="pl-4 pr-4"
+              >
+                <Panel header={<Text strong>Quantity</Text>} key="1">
+                  <Space className="flex flex-row justify-center">
+                  <div className="flex flex-col">
+                    <Text>Min</Text>
+                    <InputNumber min={0} controls={false} prefix="$" 
+                    addonAfter={
+                    <div className="flex flex-row gap-[1px]">
+                      <Typography className='px-2 bg-[#EEEFFA] cursor-pointer text-xl flex items-center'>
+                        -
+                      </Typography> 
+                      <Typography className='px-2 bg-[#EEEFFA] cursor-pointer text-xl flex items-center'>
+                        +
+                      </Typography>
+                    </div>
+                    } className="w-full"/>
+                  </div>
+                    
+                  <div className="flex flex-col">
+                  <Text>Max</Text>
+                    <InputNumber min={minPrice} prefix="$" 
+                    controls={false}
+                    addonAfter={
+                    <div className="flex flex-row gap-[1px]">
+                      <Typography className='px-2 bg-[#EEEFFA] cursor-pointer text-xl flex items-center'>
+                        -
+                      </Typography> 
+                      <Typography className='px-2 bg-[#EEEFFA] cursor-pointer text-xl flex items-center'>
+                        +
+                      </Typography>
+                    </div>
+                    }
+                    className="w-full"/>
+                  </div>
+                  </Space>
+                </Panel>
+              </Collapse>
+              <Divider className="m-0" />
+
+              {/* Panel - SubCategory */}
+              {currentCategory && (
+                <>
+                  <Collapse
+                    bordered={false}
+                    expandIconPosition="end"
+                    ghost="true"
+                    reverse={false}
+                    className="pl-4 pr-4"
+                  >
+                    <Panel header={<Text strong>Sub-Category</Text>} key="1">
+                      <Checkbox.Group
+                        // onChange={onChangeSubCategory}
+                        value={selectedSubCategories}
+                      >
+                        <div className="flex flex-col gap-3">
+                          {subCategories.map((subcategory, index) => (
+                            <Checkbox value={subcategory.contract} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
+                              {subcategory.name}
+                            </Checkbox>
+                          ))}
+                        </div>
+                      </Checkbox.Group>
+                    </Panel>
+                  </Collapse>
+                  <Divider className="m-0" />
+                </>
+              )}
+
               {/* Panel - Product */}
               {marketplaceList?.length > 0 && (
                 <>
@@ -592,7 +725,7 @@ const CategoryProductList = ({ user }) => {
                     expandIconPosition="end"
                     ghost="true"
                     reverse={false}
-                    className="pl-8 pr-7"
+                    className="pl-4 pr-4"
                   >
                     <Panel header={<Text strong>Product</Text>} key="1">
                       <Checkbox.Group
@@ -618,12 +751,6 @@ const CategoryProductList = ({ user }) => {
           <div className="h-full w-full bg-[#00000020] absolute top-0 md:hidden"></div>
         </div>
       }
-      <Pagination
-        current={1}
-        onChange={3}
-        total={10}
-        className="flex justify-center my-5"
-      />
     </div >
   );
 };

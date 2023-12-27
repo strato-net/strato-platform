@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Card, Popover, Button } from "antd";
+import { Card, Popover, Button, Typography } from "antd";
 import {
   DollarOutlined,
   MoreOutlined,
@@ -246,21 +246,20 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
 
 
   return (
-    <div className="mt-6 p-[18px] border border-[#E9E9E9] rounded-lg  ">
-      <div className="bg-[#F2F2F9] rounded-md px-[14px] pb-[13px] pt-2 w-full">
-        <p className="text-xl font-semibold text-[#202020] cursor-default" onClick={callDetailPage}>{inventory?.name || "N/A"}</p>
-        <div className=" lg:justify-between justify-end pt-[5px]  flex">
-          <div className="hidden lg:block">
-            <div className="text-xs text-[#6A6A6A] h-[30px] overflow-y-hidden">{inventory?.description.substring(0, 180) || "N/A"}
-              {inventory?.description.length > 180 && (
-                <span className="text-[#13188A]">...</span>
-              )}
-            </div>
-          </div>
+    <div className=" p-3 md:p-[18px] border border-[#BABABA] md:border-[#E9E9E9] rounded-lg sm:w-[343px] md:w-full  ">
+      <div className="bg-[#F2F2F9] rounded-md px-[14px] flex justify-between items-center pb-[13px] pt-2 w-full">
+        <div>
+        <p className="text-lg lg:text-xl font-semibold text-[#202020] cursor-default" onClick={callDetailPage}>{inventory?.name || "N/A"}</p>
+        <Typography className="pt-1">{`(${getCategory()})`}</Typography>
+        </div>
+        <div className=" pt-[5px]  flex">
+          
+          <div className="flex  items-center">
+          <Button type="link" className="text-[#13188A] font-semibold text-base h-6" onClick={callDetailPage}>Preview</Button>
           <Popover
             placement="bottomLeft"
             open={openPop}
-            className="ml-2"
+            className=""
             id="sideMenu"
             onOpenChange={handleOpenChange}
             title={
@@ -307,61 +306,35 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
           >
             <MoreOutlined />
           </Popover>
+          </div>
         </div>
       </div>
       <div className="pt-[14px] flex lg:flex-row  flex-col items-center gap-y-4 md:gap-[18px]">
-
-        {/* <Carousel className="w-[161px] h-[161px] inventory rounded-md">
-            <div>
-            <img 
-          className="rounded-md object-contain w-[161px] h-[161px] "
-          alt=""
-          src={
-            inventory.images && inventory.images.length > 0
-              ? inventory.images[0]
-              : image_placeholder }
-        />
-          </div> <div>
-            <img 
-          className="rounded-md object-contain w-[161px] h-[161px] "
-          alt=""
-          src={
-            inventory.images && inventory.images.length > 0
-              ? inventory.images[0]
-              : image_placeholder }
-        />
-          </div> 
-            </Carousel> */}
         <div>
           <img
-            className="rounded-md object-contain w-[161px] h-[161px]"
+            className="rounded-md  w-[161px] h-[161px] md:object-contain"
             alt=""
             src={
               inventory.images && inventory.images.length > 0
                 ? inventory.images[0]
                 : image_placeholder}
+                
           />
         </div>
         <div className="pt-[7px] lg:hidden flex items-center gap-[5px]">
           {inventory.price ?
-            <div className="flex items-center gap-2">
-              <div className="w-[10px] h-[10px] rounded-sm bg-[#119B2D]"></div>
-              <p className="text-[#4D4D4D] text-xs">Published</p>
+            <div className="flex items-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
+              <div className="w-[7px] h-[7px] rounded-full bg-[#119B2D]"></div>
+              <p className="text-[#4D4D4D] text-[8px]" >Published</p>
             </div>
             :
-            <div className="flex items-center gap-2">
-              <div className="w-[10px] h-[10px] rounded-sm bg-[#ff4d4f]"></div>
-              <p className="text-[#4D4D4D] text-xs">Unpublished</p>
+            <div className="flex items-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
+              <div className="w-[7px] h-[7px] rounded-full bg-[#ff4d4f]"></div>
+              <p className="text-[#4D4D4D] text-[8px]">Unpublished</p>
             </div>
           }
         </div>
-        <div className="pt-5 w-full lg:hidden">
-          <div className="text-xs text-[#6A6A6A] h-[30px] overflow-y-hidden">{inventory?.description.substring(0, 180) || "N/A"}
-            {inventory?.description.length > 180 && (
-              <span className="text-[#13188A]">...</span>
-            )}
-          </div>
-        </div>
+       
         <div className="flex flex-col gap-4 px-[18px] py-4 border border-[#E9E9E9] rounded-md w-full ">
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Sub Category</p>
@@ -383,18 +356,18 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
       </div>
       <div className="flex justify-between">
         {inventory.price ?
-          <div className="pt-[7px] hidden lg:flex items-center gap-[5px]">
-            <div className="w-[10px] h-[10px] rounded-sm bg-[#119B2D]"></div>
+          <div className="pt-[7px] hidden lg:flex items-center gap-[5px] bg-[#1548C329] p-[6px] rounded-md">
+            <div className="w-[10px] h-[10px] rounded-full  bg-[#119B2D]"></div>
             <p className="text-[#4D4D4D] text-xs"> Published </p>
           </div>
           :
-          <div className="pt-[7px] hidden lg:flex items-center gap-[5px]">
-            <div className="w-[10px] h-[10px] rounded-sm bg-[#ff4d4f]"></div>
+          <div className="pt-[7px] hidden lg:flex items-center gap-[5px] bg-[#1548C329] p-[6px] rounded-md">
+            <div className="w-[10px] h-[10px] rounded-full bg-[#ff4d4f]"></div>
             <p className="text-[#4D4D4D] text-xs"> Unpublished </p>
           </div>
         }
 
-        <Button type="link" className="text-[#13188A] font-semibold" onClick={callDetailPage}>Preview</Button>
+       
       </div>
       {/* <div className="flex" id={id}>
         <img
