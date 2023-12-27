@@ -53,4 +53,5 @@ export const Images = {
   'Header_cart' :  require("./resources/Header_Cart.png"),
   'Header_Search' :  require("./resources/Search.png"),
   'Setting_icon' :  require("./resources/Setting.png"),
+  'filter' : require('./resources/Filter.png'),
 };
