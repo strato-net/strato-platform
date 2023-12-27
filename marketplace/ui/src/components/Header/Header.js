@@ -180,7 +180,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
           className="mt-4 mr-5 md:mt-0 cursor-pointer flex-grow-0 w-max md:w-[170px] h-[44px]"
           onClick={() => { navigate(routes.Marketplace.url) }}
         >
-          <img src={Images.newLogo} className="h-[31px] w-[120px] md:w-[170px] md:h-[44px]" height={'full'} width={'full'} preview={false} />
+          <img src={Images.newLogo} className="h-[31px] w-[120px] md:w-[170px] md:h-[44px]"  preview={false} />
         </div>
         <div className={`lg:ml-28 md:ml-1 flex-1 ${showSearch ? '-mt-[6px] fixed top-[13px] left-0 flex w-[100vw] z-50 mb-4' : 'hidden md:flex mb-10'}`}>
           <Input
@@ -283,7 +283,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
             </Dropdown>
         }
         {<div className="block md:hidden px-1" onClick={handleSubMenu}>
-          <MenuOutlined className="menu_outlined" />
+          <img src={Images.menu_icon} alt="" className="w-6 h-6"/> 
           </div>}
       </Space>
     </Header>
