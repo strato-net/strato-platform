@@ -462,6 +462,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return saleOrderJs.cancelOrder(rawAdmin, contract, options, comments);
   }
 
+  contract.updateOrderStatus = async function (args, options = defaultOptions) {
+    const { saleOrderAddress, status, ...restArgs } = args;
+    const contract = { name: saleOrderJs.contractName, address: saleOrderAddress }
+    return saleOrderJs.updateOrderStatus(rawAdmin, contract, options, status);
+  }
+
   contract.getSaleOrders = async function (args, options = defaultOptions) {
     const getOptions = { ...options, app: contractName, };
     return saleOrderJs.getAll(rawAdmin, args, getOptions);
@@ -695,10 +701,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         throw new rest.RestError(RestStatus.BAD_REQUEST, "Incorrect order value.");
       }
       let stripePaymentSession;
+      const {paymentList,...restArgs} = args;
       try {
         const checkoutBody = {
-          paymentTypes: ['card'],
-          cartData: args,
+          paymentTypes: paymentList,
+          cartData: restArgs,
           orderDetail: invoices,
           accountId: sellerStripeDetails[0].accountId,
         }
@@ -769,6 +776,29 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while fetching payment session", { message: "Error while fetching payment" })
     }
   };
+
+  contract.getPaymentIntent = async function (args, options = defaultOptions) {
+    try {
+      const { session_id, sellersCommonName } = args;
+      const paymentDetail = await paymentProviderJs.get(rawAdmin, 
+        { name: 'STRIPE', ownerCommonName: sellersCommonName, accountDeauthorized: false }, 
+        options);
+      if (paymentDetail.length === 0) {
+        throw new rest.RestError(RestStatus.CONFLICT, "Seller payment details cannot be found.");
+      }
+      const paymentIntent = await axios.get(new URL(`/stripe/intent/${session_id}/${paymentDetail[0].accountId}`, STRIPE_PAYMENT_SERVER_URL).href)
+        .then(function (res) {
+          if (res.status === 200) {
+            return res.data;
+          } else {
+            throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+          }
+        });
+      return { ...paymentIntent }
+    } catch (error) {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while fetching payment intent", { message: "Error while fetching payment intent" })
+    }
+  };  
 
   contract.createUserAddress = async function (args, options = defaultOptions) {
     try {

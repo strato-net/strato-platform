@@ -15,7 +15,10 @@ export const ResponsiveBoughtOrderCard = ({ data, isLoading }) => {
             case 'Awaiting Fulfillment':
                 classes = "text-[#FF8C00]"
                 break;
-            case 'Cancelled':
+            case 'Payment Pending':
+                classes = "text-[#FF8C00]"
+                break;
+            case 'Canceled':
                 classes = "text-[#FF0000]]"
                 break;
             case 'Awaiting Shipment':

@@ -25,7 +25,7 @@ import { getStringDate } from "../../helpers/utils";
 import { useNavigate } from "react-router-dom";
 import UploadSerialNumberModal from "./UploadSerialNumber";
 import DataTableComponent from "../DataTableComponent";
-import { getStatus, getStatusByValue } from "./constant";
+import { getStatus, getStatusByValue, getStatusByName } from "./constant";
 import dayjs from "dayjs";
 import ConfirmStatusModal from "./ConfirmStatusModal";
 import { US_DATE_FORMAT } from "../../helpers/constants";
@@ -56,6 +56,7 @@ const SoldOrderDetails = ({ user, users }) => {
     useState(false);
   const [isConfirmStatusModalOpen, toggleConfirmStatusModal] = useState(false);
   const [selectedProd, setselectedProd] = useState(null);
+  const [shouldCheckPaymentStatus, setShouldCheckPaymentStatus] = useState(false);
   const state = useLocation()
 
   const openToast = (placement, isError, msg) => {
@@ -108,7 +109,7 @@ const SoldOrderDetails = ({ user, users }) => {
           productImage: prod.images && prod.images.length > 0 ? prod.images[0] : image_placeholder,
           productName: prod,
           name: prod.name,
-          unitPrice: prod.price,
+          unitPrice: '$' + prod.price,
           quantity: parseInt(orderDetails.order.quantities[index]),
           shippingCharges: prod.shippingCharges ? prod.shippingCharges : 0,
           amount: prod.price * parseInt(orderDetails.order.quantities[index]),
@@ -134,37 +135,87 @@ const SoldOrderDetails = ({ user, users }) => {
   const getData = async () => {
     const data = await actions.fetchOrderDetails(dispatch, Id);
     if (data != null) {
-      getPaymentStatus(data.order.paymentSessionId, data.order.sellersCommonName);
+      setShouldCheckPaymentStatus(true);
     }
-  }
+  };
+  
+  useEffect(() => {
+    if (shouldCheckPaymentStatus && orderDetails) {
+      getPaymentStatus(orderDetails.order.paymentSessionId, orderDetails.order.sellersCommonName);
+      setShouldCheckPaymentStatus(false);
+    }
+  }, [shouldCheckPaymentStatus, orderDetails]);
 
-  const getPaymentStatus = async (paymentSessionId, sellersCommonName) => {
-    if (paymentSessionId !== "") {
+
+  const validatePayment = async (paymentSessionId) => {
+    if (!paymentSessionId || !orderDetails) return;
+
+    const currentStatus = getStatus(parseInt(orderDetails.order.status));
+    const isPendingOrCanceled = currentStatus === getStatusByName("Payment Pending") || currentStatus === getStatusByName("Canceled");
+    const isCanceled = currentStatus === getStatusByName("Canceled");
+
+
+    if (isPendingOrCanceled) {
       try {
-        setisLoadingPaymentStatus(true);
         const response = await fetch(
-          `${apiUrl}/order/payment/session/${paymentSessionId}/${sellersCommonName}`,
-          {
-            method: HTTP_METHODS.GET,
-          }
+          `${apiUrl}/order/payment/intent/${paymentSessionId}/${orderDetails.order.sellersCommonName}`,
+          { method: HTTP_METHODS.GET }
         );
+        const intentBody = await response.json();
+        const paymentErrorAndRequiresMethod = intentBody.data.last_payment_error?.message && intentBody.data.status === 'requires_payment_method';
 
-        const body = await response.json();
-        setisLoadingPaymentStatus(false);
-        if (response.status === RestStatus.OK) {
-
-          if (body.data["payment_status"] === "paid") {
-            setPaid("Paid");
-          }
-
+        if (paymentErrorAndRequiresMethod && isCanceled) {
+          setPaid("Payment Failed");
+          setcomment(encodeURIComponent('Stripe: ' + intentBody.data.last_payment_error.message))
         }
-
+        else if(paymentErrorAndRequiresMethod && !isCanceled)
+        {
+          setisLoadingPaymentStatus(true)
+          const body = {
+            saleOrderAddress: orderDetails.order.address,
+            comments: encodeURIComponent('Stripe: ' + intentBody.data.last_payment_error.message),
+          };
+          //Update Order Details and change the Order Status to 'Canceled' from 'Payment Pending'
+          let isDone = await actions.cancelSale(dispatch, body);
+          setcomment(`Stripe: ${orderDetails.order.comments}`);
+          if (isDone) {
+            setStatus("Canceled");
+            setPaid("Payment Failed");
+            await actions.fetchOrderDetails(dispatch, Id);
+            setisLoadingPaymentStatus(false);
+            }
+        }
+        
       } catch (err) {
-
+        console.error(`Error: ${err}`);
       }
     }
+  };
 
-  }
+  const getPaymentStatus = async (paymentSessionId, sellersCommonName) => {
+    if (!paymentSessionId) return;
+
+    setisLoadingPaymentStatus(true);
+    try {
+      const response = await fetch(
+        `${apiUrl}/order/payment/session/${paymentSessionId}/${sellersCommonName}`,
+        { method: HTTP_METHODS.GET }
+      );
+
+      const body = await response.json();
+      if (response.status === RestStatus.OK) {
+        if (body.data["payment_status"] === "paid") {
+          setPaid("Paid");
+        } else {
+          await validatePayment(paymentSessionId);
+        }
+      }
+    } catch (err) {
+      console.error(`Error: ${err}`);
+    } finally {
+      setisLoadingPaymentStatus(false);
+    }
+  };
 
 
 
@@ -284,6 +335,8 @@ const SoldOrderDetails = ({ user, users }) => {
       textClass = "bg-[#EBF7FF]";
     } else if (status === "Awaiting Fulfillment"){
       textClass = "bg-[#FF8C0033]"
+    } else if (status === "Payment Pending"){
+      textClass = "bg-[#FF8C0033]"
     } else if (status === "Closed") {
       textClass = "bg-[#119B2D33]";
     } else if (status === "Canceled") {
@@ -292,6 +345,8 @@ const SoldOrderDetails = ({ user, users }) => {
     let bgClass = "bg-[#119B2D]";
     if (status === "Awaiting Shipment") {
       bgClass = "bg-[#13188A]";
+    } else if (status === "Payment Pending"){
+      bgClass = "bg-[#FF8C00]"
     } else if (status === "Awaiting Fulfillment"){
       bgClass = "bg-[#FF8C00]"
     } else if (status === "Closed") {
@@ -300,9 +355,9 @@ const SoldOrderDetails = ({ user, users }) => {
       bgClass = "bg-[#FF0000]";
     }
     return (
-      <div className={classNames(textClass, "status_contain w-max text-center py-0 px-3 rounded-md md:rounded-xl flex justify-start items-center gap-1 p-1")}>
+      <div className={classNames(textClass, "status_contain w-max text-center py-1 px-2 rounded-md md:rounded-xl flex justify-start items-center gap-1 p-1")}>
         <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
-        <p className="!mb-0 text-xs md:text-sm">{status}</p>
+        <p className="!mb-0 text-[11px] md:text-sm">{status}</p>
       </div>
     );
   };
@@ -326,9 +381,9 @@ const SoldOrderDetails = ({ user, users }) => {
     }
       
   return (
-    <div className={classNames(textClass, "status_contain w-max h-max text-center py-1 px-3 rounded-md md:rounded-xl flex justify-start items-center gap-1 p-1")}>
+    <div className={classNames(textClass, "status_contain w-max h-max text-center py-1 px-2 rounded-md md:rounded-xl flex justify-start items-center gap-1 p-1")}>
       <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
-      <p className="!mb-0 text-xs md:text-sm">{status}</p>
+      <p className="!mb-0 text-[11px] md:text-sm">{status}</p>
     </div>
   );
 };
@@ -348,7 +403,7 @@ const SoldOrderDetails = ({ user, users }) => {
       render: (text) => <img className="w-[75px] h-[60px] object-contain" alt="" src={text} />,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">PRODUCT NAME</Text>,
+      title: <Text className="text-primaryC text-[13px]">Product Name</Text>,
       dataIndex: "productName",
       key: "productName",
       render: (text) => (
@@ -362,7 +417,7 @@ const SoldOrderDetails = ({ user, users }) => {
       ),
     },
     {
-      title: <Text className="text-primaryC text-[13px]">SERIAL NUMBER</Text>,
+      title: <Text className="text-primaryC text-[13px]">Serial Number</Text>,
       dataIndex: "serialNumber",
       key: "serialNumber",
       align: "center",
@@ -409,14 +464,14 @@ const SoldOrderDetails = ({ user, users }) => {
       }
     },
     {
-      title: <Text className="text-primaryC text-[13px]">UNIT PRICE($)</Text>,
+      title: <Text className="text-primaryC text-[13px]">Unit Price($)</Text>,
       dataIndex: "unitPrice",
       key: "unitPrice",
       align: "center",
       render: (text) => <p>{text}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">QUANTITY</Text>,
+      title: <Text className="text-primaryC text-[13px]">Quantity</Text>,
       dataIndex: "quantity",
       key: "quantity",
       align: "center",
@@ -424,7 +479,7 @@ const SoldOrderDetails = ({ user, users }) => {
     },
     {
       title: (
-        <Text className="text-primaryC text-[13px]">SHIPPING CHARGES($)</Text>
+        <Text className="text-primaryC text-[13px]">Shipping Charges($)</Text>
       ),
       dataIndex: "shippingCharges",
       key: "shippingCharges",
@@ -432,14 +487,14 @@ const SoldOrderDetails = ({ user, users }) => {
       render: (text) => <p>{text}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">TAX($)</Text>,
+      title: <Text className="text-primaryC text-[13px]">Tax($)</Text>,
       dataIndex: "tax",
       key: "tax",
       align: "center",
       render: (text) => <p>{text}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">AMOUNT($)</Text>,
+      title: <Text className="text-primaryC text-[13px]">Amount($)</Text>,
       dataIndex: "amount",
       key: "amount",
       align: "center",
@@ -511,7 +566,7 @@ const SoldOrderDetails = ({ user, users }) => {
                   key: "Sold",
                   children:
                     <div className="mb-10">
-                      <Button type="ghost" onClick={()=>onChange('Sold')} className="cursor-pointer px-2 flex md:hidden items-center gap-2"><LeftArrow /> Back</Button>
+                      <Button type="ghost" onClick={()=>onChange('Sold')} className="cursor-pointer px-2 flex md:hidden items-center gap-2 text-xs font-semibold"><LeftArrow /> Back</Button>
                       <Card className="md:p-2 mb-4 md:mb-14 md:shadow-card_shadow order_detail_card">
                         <div className="flex flex-col md:flex-row md:justify-between">
                           <div className="flex flex-col">
@@ -527,7 +582,7 @@ const SoldOrderDetails = ({ user, users }) => {
                             type="primary"
                             // Disable the button here if the serial numbers aren't uploaded. We don't want the user closing the order without providing the serial numbers.
                             loading={issellerDetailsUpdating || isCreateOrderLineItem}
-                            disabled={status === getStatus(3) || allSerialNumbersUploaded() === false }
+                            disabled={status === getStatus(3) || status === getStatus(4) || allSerialNumbersUploaded() === false }
                             onClick={() => {
                               handleUpdateComment()
                               window.LOQ.push(['ready', async LO => {
@@ -546,22 +601,22 @@ const SoldOrderDetails = ({ user, users }) => {
                           </Button>
                         </div>
                         <Row className="hidden md:flex my-6 justify-between bg-[#F6F6F6] p-4 pb-2 rounded">
-                          <OrderData title="ORDER NUMBER" value={`#${details.order.orderId}`} />
+                          <OrderData title="Order Number" value={`#${details.order.orderId}`} />
                           <Divider type="vertical" className="h-14 bg-secondryD" />
                           <OrderData
-                            title="BUYER"
+                            title="Buyer"
                             value={details.order.purchasersCommonName}
                           />
                           <Divider type="vertical" className="h-14 bg-secondryD" />
                           <OrderData
-                            title="SELLER"
+                            title="Seller"
                             value={details.order.sellersCommonName}
                           />
                           <Divider type="vertical" className="h-14 bg-secondryD" />
-                          <OrderData title="TOTAL ($)" value={details.order.totalPrice} />
+                          <OrderData title="Total ($)" value={details.order.totalPrice} />
                           <Divider type="vertical" className="h-14 bg-secondryD" />
                           <OrderData
-                            title="DATE"
+                            title="Date"
                             value={getStringDate(details.order.createdDate, US_DATE_FORMAT)}
                           />
                           <Divider type="vertical" className="h-14 bg-secondryD" />
@@ -569,7 +624,7 @@ const SoldOrderDetails = ({ user, users }) => {
                           {
                             status !== getStatus(1) || details.paymentSessionId !== "" ? <Col>
                               <Text className="block text-primaryC text-[13px] mb-2">
-                                STATUS
+                                Status
                               </Text>
                               {statusComponent(status)}
                             </Col> :
@@ -633,69 +688,52 @@ const SoldOrderDetails = ({ user, users }) => {
                           <Divider type="vertical" className="h-14 bg-secondryD" />
                           <div className="text-xs order_detail_date">
                             <Text className="block text-primaryC text-[13px]">
-                              ORDER CLOSE DATE
+                              Order Close Date
                             </Text>
                             <DatePicker
                               value={
                                 selectedDate
                               }
                               onChange={onDateChange}
-                              disabled={details.order.status === 3 || details.order.status === 4}
+                              disabled={status === getStatus(3) || status === getStatus(4)}
                             />
                           </div>
                         </Row>
-                        <Row className="my-2 md:hidden flex-col gap-2 justify-between p-4 pb-2 rounded">
+                        <Row className="my-2 md:hidden flex-col gap-[6px] justify-between p-4 rounded">
                           <div className="flex gap-4">
-                          <NewOrderData className="w-2/4" title="ORDER NUMBER" value={`#${details.order.orderId}`} />
-                          <NewOrderData className="w-2/4" title="BUYER" value={details.order.purchasersCommonName} />
+                          <NewOrderData className="w-2/4" title="Order Number" value={'#' + details.order.orderId} />
+                          <NewOrderData className="w-2/4" title="Buyer" value={details.order.purchasersCommonName} />
                           </div>
                           <div className="flex gap-4">
-                          <NewOrderData className="w-2/4" title="SELLER" value={details.order.sellersCommonName} />
-                          <NewOrderData className="w-2/4"title="TOTAL ($)" value={details.order.totalPrice} />
+                          <NewOrderData className="w-2/4" title="Seller" value={details.order.sellersCommonName} />
+                          <NewOrderData className="w-2/4"title="Total ($)" value={'$' + details.order.totalPrice} />
                           </div>
-                          <div className="flex justify-between">
-                            <NewOrderData className="w-2/4" title="DATE" value={getStringDate(details.order.createdDate, US_DATE_FORMAT)} />
-                              <NewOrderData className="w-2/4" title="ORDER CLOSE DATE" 
+                          <div className="flex justify-between mobile_order_detail_card">
+                            <NewOrderData className="w-2/4" title="Date" value={getStringDate(details.order.createdDate, US_DATE_FORMAT)} />
+                              <NewOrderData className="w-2/4" title="Order Close Date" 
                               value={
                               <DatePicker
                                 value={selectedDate}                                
                                 onChange={onDateChange}
-                                disabled={details.order.status === 3 || details.order.status === 4}
+                                disabled={status === getStatus(3) || status === getStatus(4)}
                               />}/>
                             </div>
                           <div className="flex justify-between">
-                            <NewOrderData className="w-2/4" title={"Invoice"} value={
-                              <div className="flex items-center">
-                                <EyeOutlined className="mr-1 -mt-3 hover:text-primaryHover cursor-pointer" />
-                                <p
-                                  // onClick={() => {
-                                  //   navigate(
-                                  //     `${routes.SoldOrderItemDetail.url.replace(":id", data?.address)}`,
-                                  //     { state: { orderId: orderDetails.orderId, address: Id } }
-                                  //   );
-                                  // }}
-                                  className="hover:text-primaryHover"
-                                >
-                                  View
-                                </p>
-                              </div>} />
-                            <NewOrderData className="w-2/4" title="STATUS" value={statusComponent(status)} />
-                          </div>
-                          <div className="flex justify-between">
-                            <NewOrderData className="w-2/4" title="PAYMENT STATUS" value={statusComponentForPayment(paid)} />
+                            <NewOrderData className="w-2/4" title="Status" value={statusComponent(status)} />
+                            <NewOrderData className="w-2/4" title="Payment Status" value={statusComponentForPayment(paid)} />
                           </div>
                         </Row>
                         <Row className="flex-nowrap items-center justify-between mb-2 md:mb-6 p-2">
                           <div className="w-full">
                             <Text className="block text-primaryC text-[13px] mb-2">
-                              COMMENTS
+                              Comments
                             </Text>
                             <TextArea
                               rows={2}
                               placeholder="Enter Comments"
                               value={decodeURIComponent(comment)}
                               disabled={
-                                details.order.status === 3 || details.order.status === 4
+                                status === getStatus(3) || status === getStatus(4)
                               }
                               onChange={(event) => {
                                 setcomment(encodeURIComponent(event.target.value));

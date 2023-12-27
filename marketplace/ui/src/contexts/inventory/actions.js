@@ -596,7 +596,6 @@ const actions = {
           type: actionDescriptors.fetchInventoryOwnershipHistoryFailed, 
           error: "Unauthorized while fetching ownership history" 
         });
-        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
