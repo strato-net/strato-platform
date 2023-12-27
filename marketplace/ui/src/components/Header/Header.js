@@ -11,7 +11,7 @@ import {
   Button,
   Typography
 } from "antd";
-import { ArrowLeftOutlined,  LogoutOutlined,  SearchOutlined, ShoppingCartOutlined } from "@ant-design/icons";
+import { ArrowLeftOutlined,  LogoutOutlined,  } from "@ant-design/icons";
 import { Images } from "../../images";
 import "./header.css";
 import { useNavigate } from "react-router-dom";
@@ -256,12 +256,12 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
             navigate("/checkout");
           }}
         >
-          <div className="lg:hidden">
+          <div className="md:hidden">
           <Avatar
             icon={<img src={Images.Responsive_cart} alt="" className="w-6 h-6" /> }
           />
           </div>
-          <div className="hidden lg:inline-block">
+          <div className="hidden md:inline-block">
           <Avatar
             icon={ <img src={Images.Header_cart} alt="" className="w-6 h-6" />}
           />
@@ -285,7 +285,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
           ) :
             <Dropdown menu={{ items }} placement="bottomRight" trigger={["click"]} overlayStyle={{ marginTop: "40px" }}>
               <a onClick={(e) => e.preventDefault()} className="hidden md:flex text-base text-white" id="user-dropdown">
-                <ProfileIcon className="profile_icon" />
+               <img src={Images.Setting_icon}  className="w-[30px] h-[30px] "/> 
               </a>
             </Dropdown>
         }
