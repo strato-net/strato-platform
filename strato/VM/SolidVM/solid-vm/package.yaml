@@ -2,9 +2,6 @@ name: solid-vm
 
 dependencies:
   - base
-  - blockapps-haskoin
-  - x509-certs
-  - monad-logger
 
 library:
   source-dirs: src/
@@ -18,10 +15,9 @@ library:
   dependencies:
   - aeson
   - base16-bytestring
-  - binary
-  - bloc2
   - blockapps-data
   - blockapps-datadefs
+  - blockapps-haskoin
   - blockapps-mpdbs
   - bytestring
   - common-log
@@ -37,7 +33,6 @@ library:
   - labeled-error
   - lens
   - lrucache
-  - memory
   - merkle-patricia-db
   - monad-alter
   - nibblestring
@@ -55,6 +50,7 @@ library:
   - utf8-string
   - vector
   - vm-tools
+  - x509-certs
 
 
 
@@ -71,7 +67,6 @@ executables:
       - solid-vm-parser
       - solid-vm-static-analysis
       - text
-      - deepseq
 
 tests:
   solid-vm-spec:
@@ -79,23 +74,17 @@ tests:
     main: Main.hs
     ghc-options: -dynamic
     dependencies:
-      - strato-init
+      - QuickCheck
       - aeson
-      - json-stream
-      - seqevents
-      - mtl
-      - crypto-api
-      - blockapps-data
-      - core-api2
-      - strato-genesis
       - async
-      - base16-bytestring
+      - blockapps-data
       - blockapps-datadefs
       - blockapps-mpdbs
       - bytestring
       - common-log
+      - composable-monads-base
       - containers
-      - deepseq
+      - crypto-api
       - ethereum-rlp
       - hflags
       - hspec
@@ -105,19 +94,21 @@ tests:
       - merkle-patricia-db
       - monad-alter
       - raw-strings-qq
+      - seqevents
       - solid-vm
       - solid-vm-model
+      - solid-vm-parser
       - solid-vm-static-analysis
       - source-tools
+      - strato-genesis
+      - strato-init
       - strato-model
       - text
       - time
-      - vm-tools
-      - utf8-string
-      - test-framework
-      - QuickCheck
-      - solid-vm-parser
       - transformers
+      - utf8-string
+      - vm-tools
+      - x509-certs
 
 benchmarks:
     codebench:

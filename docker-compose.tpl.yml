@@ -1,7 +1,9 @@
 #strato-version:<VERSION>
-#strato-getting-started-min-version:4.0
+#strato-getting-started-min-version:4.2.1
 version: "3"
 volumes:
+  marketplacedata:
+   driver: local
   pgdata:
     driver: local
   prometheusdata:
@@ -47,9 +49,65 @@ services:
     - PROMETHEUS_HOST=${PROMETHEUS_HOST}
     - STRATO_HOSTNAME=${STRATO_HOSTNAME}
     - STRATO_PORT_API=${STRATO_PORT_API}
-    - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY}
+    - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
     build: .
     image: ${APEX_IMAGE:-<REPO_URL>apex:<VERSION>}
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+  marketplace-backend:
+    depends_on:
+    - nginx
+    environment:
+    - MP_IS_BOOTNODE=${MP_IS_BOOTNODE:-false}
+    - MP_API_DEBUG=${MP_API_DEBUG:-false}
+    - MP_DELAY_DEPLOYMENT=${MP_DELAY_DEPLOYMENT}
+    - ORG_DEPLOY_FILE_NAME=${DEPLOY_FILE_NAME:-org.deploy.yaml}
+    - MP_SERVER_HOST=${NODE_HOST}
+    - MP_SERVER_SSL=${ssl}
+    - STRATO_NODE_PROTOCOL=${STRATO_NODE_PROTOCOL}
+    - STRATO_NODE_HOST=${STRATO_NODE_HOST}
+    - NODE_LABEL=${NODE_NAME} # TODO: obsolete? (label is not used from config.yaml)
+    - OAUTH_APP_TOKEN_COOKIE_NAME=${OAUTH_APP_TOKEN_COOKIE_NAME:-stratomp_session}
+    - OAUTH_OPENID_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
+    - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
+    - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+    - OAUTH_VAULT_PROXY_ALT_CLIENT_ID=${OAUTH_VAULT_PROXY_ALT_CLIENT_ID}
+    - OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET=${OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET}
+    - OAUTH_SCOPE=${OAUTH_SCOPE:-email openid} # TODO: to be removed after app oauth changes
+    - OAUTH_SERVICE_OAUTH_FLOW=client-credential
+    - OAUTH_TOKEN_FIELD=access_token
+    - OAUTH_TOKEN_USERNAME_PROPERTY=${OAUTH_TOKEN_USERNAME_PROPERTY:-email}
+    - OAUTH_TOKEN_USERNAME_PROPERTY_SERVICE_FLOW=${OAUTH_TOKEN_USERNAME_PROPERTY_SERVICE_FLOW:-sub}
+    - STRIPE_PAYMENT_SERVER_URL=${STRIPE_PAYMENT_SERVER_URL}
+    - GLOBAL_ADMIN_NAME=${GLOBAL_ADMIN_NAME}
+    - GLOBAL_ADMIN_PASSWORD=${GLOBAL_ADMIN_PASSWORD}
+    - ORG_NAME='BlockApps' # TODO: can be removed?
+    - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+    build: .
+    image: ${MARKETPLACEBACKEND_IMAGE:-<REPO_URL>marketplace-backend:<VERSION>}
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+    volumes:
+       - marketplacedata:/config:rw
+  marketplace-ui:
+    depends_on:
+      - marketplace-backend
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - ASSET_TABLE_NAME=${ASSET_TABLE_NAME}
+      - SALE_TABLE_NAME=${SALE_TABLE_NAME}
+      - SITE_ID=${SITE_ID:-038fe3fa}
+
+    build: .
+    image: ${MARKETPLACEUI_IMAGE:-<REPO_URL>marketplace-ui:<VERSION>}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -73,7 +131,9 @@ services:
     - postgres
     - redis
     environment:
+    - accountNonceLimit=${accountNonceLimit}
     - addBootnodes=${addBootnodes}
+    - API_DEBUG_LOG=${API_DEBUG_LOG:-false}
     - appFetchLimit=${appFetchLimit}
     - averageTxsPerBlock=${averageTxsPerBlock}
     - blockstanbul=${blockstanbul}
@@ -87,14 +147,17 @@ services:
     - connectionTimeout=${connectionTimeout}
     - debugFail=${debugFail}
     - debugPort=${debugPort}
+    - debugWSHost=${debugWSHost}
     - debugWSPort=${debugWSPort}
     - validatorBehavior=${validatorBehavior:-true}
     - evmDebugMode=${evmDebugMode}
-    - evmTraceMode=${evmTraceMode}
     - faucetEnabled=${faucetEnabled}
+    - FULL_DEBUG_LOG=${FULL_DEBUG_LOG:-false}
+    - gasLimit=${gasLimit}
     - gasOn=${gasOn:-false}
     - generateKey=${generateKey:-true}
     - genesis=${genesis}
+    - idServerUrl=${idServerUrl}
     - kafkaHost=kafka
     - kafkaPort=9092
     - lazyBlocks=${lazyBlocks}
@@ -102,10 +165,8 @@ services:
     - maxReturnedHeaders=${maxReturnedHeaders}
     - maxTxsPerBlock=${maxTxsPerBlock}
     - minBlockDifficulty=${minBlockDifficulty}
-    - mineBlocks=${mineBlocks:-true}
-    - miningAlgorithm=${miningAlgorithm}
     - miningThreads=${miningThreads}
-    - network=${network:-blockappsnet}
+    - network=${network}
     - networkID=${networkID}
     - numMinPeers=${numMinPeers}
     - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
@@ -119,35 +180,38 @@ services:
     - postgres_port=5432
     - postgres_slipstream_db=cirrus
     - postgres_user=postgres
-    - PROCESS_MONITORING=${PROCESS_MONITORING}
+    - PROCESS_MONITORING=${PROCESS_MONITORING:-true}
     - redisBDBNumber=${redisBDBNumber}
     - redisHost=redis
     - redisPort=6379
     - requireCerts=${requireCerts:-true}
-    - seqDebugMode=${seqDebugMode}
     - seqEventsBatchSize=${seqEventsBatchSize}
     - seqEventsCostHeuristic=${seqEventsCostHeuristic}
     - seqMaxEventsPerIter=${seqMaxEventsPerIter}
     - seqMaxUsPerIter=${seqMaxUsPerIter}
     - seqRTSOPTs=${seqRTSOPTs}
-    - SLIPSTREAM_DEBUG=${SLIPSTREAM_DEBUG}
+    - SEQUENCER_DEBUG_LOG=${SEQUENCER_DEBUG_LOG:-false}
+    - SLIPSTREAM_DEBUG_LOG=${SLIPSTREAM_DEBUG_LOG:-false}
     - SLIPSTREAM_OPTIONAL=${SLIPSTREAM_OPTIONAL}
     - splitinit=true
-    - START_EXPERIMENTAL_STRATO_API=${START_EXPERIMENTAL_STRATO_API}
     - stratoHost=strato:3000
     - svmTrace=${svmTrace}
     - sqlDiff=${sqlDiff}
     - svmDev=${svmDev}
+    - txSizeLimit=${txSizeLimit}
     - useSyncMode=${useSyncMode}
+    - userRegistryAddress=${userRegistryAddress}
+    - userRegistryCodeHash=${userRegistryCodeHash}
+    - useBuiltinUserRegistry=${useBuiltinUserRegistry}
+    - useWalletsByDefault=${useWalletsByDefault}
     - VAULT_URL=${VAULT_URL}
     - VAULT_PROXY_DEBUG=${VAULT_PROXY_DEBUG}
     - vmDebug=${vmDebug}
+    - VM_DEBUG_LOG=${VM_DEBUG_LOG:-false}
     - vmRunnerRTSOPTs=${vmRunnerRTSOPTs}
     - wireMessageCacheSize=${wireMessageCacheSize}
     - wsDebug=${wsDebug}
     - zkHost=zookeeper
-    - EVM_COMPATIBLE=${EVM_COMPATIBLE}
-    - indexEVM=${indexEVM:-false}
     build: .
     image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>}
     ports:
@@ -214,6 +278,8 @@ services:
     - debugPort=${debugPort}
     - debugWSPort=${debugWSPort}
     - DOCS_HOST=${DOCS_HOST}
+    - MARKETPLACE_BACKEND_HOST=${MARKETPLACE_BACKEND_HOST}
+    - MARKETPLACE_UI_HOST=${MARKETPLACE_UI_HOST}
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
     - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
@@ -226,14 +292,13 @@ services:
     - SMD_HOST=${SMD_HOST}
     - ssl=${ssl}
     - sslCertFileType=${sslCertFileType}
-    - START_EXPERIMENTAL_STRATO_API=${START_EXPERIMENTAL_STRATO_API}
     - STATS_ENABLED=${STATS_ENABLED}
     - STRATO_HOSTNAME=${STRATO_HOSTNAME}
     - STRATO_PORT_API=${STRATO_PORT_API}
     - STRATO_PORT_API2=${STRATO_PORT_API2}
     - STRATO_PORT_BLOCKSTANBUL_VOTE=${STRATO_PORT_BLOCKSTANBUL_VOTE}
     - STRATO_PORT_LOGS=${STRATO_PORT_LOGS}
-    - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY}
+    - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
     - vmDebug=${vmDebug}
     build: .
     image: ${NGINX_IMAGE:-<REPO_URL>nginx:<VERSION>}
@@ -278,7 +343,7 @@ services:
       KAFKA_ADVERTISED_PORT: 9092
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_DELETE_TOPIC_ENABLE: "true"
-      KAFKA_LOG_CLEANER_ENABLE: "false"
+      KAFKA_LOG_CLEANER_ENABLE: "true"
       KAFKA_LOG_DIRS: '/kafka/kafka-logs'
       KAFKA_LOG_RETENTION_HOURS: 2147483647
       KAFKA_OFFSET_METADATA_MAX_BYTES: 1048576

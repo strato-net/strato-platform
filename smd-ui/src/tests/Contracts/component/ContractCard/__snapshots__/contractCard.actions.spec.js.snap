@@ -31,6 +31,38 @@ Object {
 }
 `;
 
+exports[`ContractCard: action fetch contract info snapshots failure 1`] = `
+Object {
+  "error": Object {
+    "message": "some error",
+  },
+  "key": "data-card-1234567-",
+  "type": "FETCH_CONTRACT_INFO_FAILURE",
+}
+`;
+
+exports[`ContractCard: action fetch contract info snapshots request 1`] = `
+Object {
+  "chainId": "123456756789876789876543345678",
+  "contractAddress": "1234567",
+  "contractName": "Foo",
+  "key": "data-card-1234567-",
+  "type": "FETCH_CONTRACT_INFO_REQUEST",
+}
+`;
+
+exports[`ContractCard: action fetch contract info snapshots success 1`] = `
+Object {
+  "data": Object {
+    "address": "1234567",
+    "chainId": "123456756789876789876543345678",
+    "xabi": Object {},
+  },
+  "key": "data-card-1234567-",
+  "type": "FETCH_CONTRACT_INFO_SUCCESS",
+}
+`;
+
 exports[`ContractCard: action fetch instance failure 1`] = `
 Object {
   "error": "ERROR",

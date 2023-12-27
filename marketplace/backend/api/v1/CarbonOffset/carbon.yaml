@@ -1,0 +1,59 @@
+paths:
+  /carbon/:
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - Carbon
+      summary: Retrieve carbon
+      produces:
+        - application/json
+      responses:
+        200:
+          description: Array of carbons
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Carbon
+      summary: Create a carbon
+      produces:
+        - application/json
+      requestBody:
+        description: It enables user to create carbon
+        required: true
+        content:
+          'application/json':
+            schema:
+              $ref: '#/definitions/createCarbon'
+      responses:
+        200:
+          description: Object of create carbon
+
+definitions:
+  createCarbon:
+    type: object
+    properties:
+      machineArgs:
+        type: object
+        properties:
+          serialNumber:
+            type: string
+          name:
+            type: string
+          description:
+            type: string
+          projectType:
+            type: string
+          units:
+            type: number
+          images:
+            type: array
+            items:
+              type: string
+          price:
+            type: number
+          paymentTypes:
+            type: array
+            items:
+              type: number

@@ -12,7 +12,7 @@ import {
 } from './createContract.actions';
 import { fetchAccounts, fetchUserAddresses } from '../Accounts/accounts.actions';
 import { fetchContracts } from '../Contracts/contracts.actions';
-import { Button, Dialog } from '@blueprintjs/core';
+import { Button, Dialog, Popover, PopoverInteractionKind, Position, AnchorButton, Switch } from '@blueprintjs/core';
 import Dropzone from 'react-dropzone'
 import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
@@ -24,10 +24,18 @@ import { isOauthEnabled } from '../../lib/checkMode';
 import { fetchChainIds, getLabelIds } from '../Chains/chains.actions';
 import SampleContracts from './contracts/SampleContracts';
 import './createContract.css';
+import HexText from '../HexText';
+import { useEffect, useState } from 'react';
 
 // TODO: use solc instead of /contracts/xabi for compile
 
 class CreateContract extends Component {
+  constructor(props) {
+    super();
+    this.state = {
+      useWallet: false,
+    };
+  }
 
   componentWillReceiveProps(nextProps) {
     if (nextProps.isToasts) {
@@ -56,6 +64,10 @@ class CreateContract extends Component {
       </div>
     );
   };
+
+  toggleWalletUsage = (e) => {
+    this.setState({ useWallet : !this.state.useWallet }, () => {})
+  }
 
   handleUsernameChange = (e) => {
     this.props.usernameChange(e.target.value);
@@ -172,8 +184,9 @@ class CreateContract extends Component {
       solidvm: values.solidvm,
       fileText: fileText,
       arguments: args,
-      chainId: values.chainId,
-      metadata: metadata
+      chainId: this.props.selectedChain ? this.props.selectedChain : undefined,
+      metadata: metadata,
+      useWallet: this.state.useWallet
     };
 
     mixpanelWrapper.track('create_contract_submit_click_successful');
@@ -281,71 +294,6 @@ class CreateContract extends Component {
     }
   }
 
-  renderChainFields() {
-    const chainLabel = Object.getOwnPropertyNames(this.props.chainLabel);
-
-    if (chainLabel.length) {
-      return (
-        <div>
-          <div className="row">
-            <div className="col-sm-3 text-right">
-              <label className="pt-label smd-pad-4">
-                Chain
-              </label>
-            </div>
-            <div className="col-sm-9 smd-pad-4">
-              <div className="pt-select">
-                <Field
-                  className="pt-input chain-field"
-                  component="select"
-                  name="chainLabel"
-                  onChange={
-                    (e) => this.props.getLabelIds(e.target.value)
-                  }
-                >
-                  <option />
-                  {
-                    chainLabel.map((label, i) => {
-                      return (
-                        <option key={label + i} value={label}>{label}</option>
-                      )
-                    })
-                  }
-                </Field>
-              </div>
-            </div>
-          </div>
-
-          <div className="row">
-            <div className="col-sm-3 text-right">
-              <label className="pt-label smd-pad-4">
-                Chain IDs
-              </label>
-            </div>
-            <div className="col-sm-9 smd-pad-4">
-              <div className="pt-select smd-max-width">
-                <Field
-                  className="pt-input smd-max-width"
-                  component="select"
-                  name="chainId"
-                >
-                  <option />
-                  {
-                    this.props.chainLabelIds && Object.getOwnPropertyNames(this.props.chainLabelIds).map((id, i) => {
-                      return (
-                        <option key={id + i} value={id}>{id}</option>
-                      )
-                    })
-                  }
-                </Field>
-              </div>
-            </div>
-          </div>
-        </div>
-      )
-    }
-  }
-
   render() {
     const { handleSubmit, pristine, submitting, valid, toastsError } = this.props;
     const contracts = this.props.sourceFromEditor ? Object.keys(this.props.sourceFromEditor) : this.props.abi && this.props.abi.src && Object.keys(this.props.abi.src);
@@ -353,18 +301,30 @@ class CreateContract extends Component {
 
     return (
       <div className="smd-pad-16" style={{ display: 'inline-block' }}>
-        <Button onClick={() => {
+        <Popover 
+          isDisabled={!!this.props.userCertificate}
+          interactionKind={PopoverInteractionKind.HOVER}
+          position={Position.LEFT}
+          content={
+            <div className='pt-dark pt-callout pt-icon-info-sign pt-intent-warning'>
+              <h5 className="pt-callout-title">Verification Required</h5>
+                Your identity must be verified before you can do this action.
+            </div>
+          }
+        >
+
+        <AnchorButton onClick={() => {
           mixpanelWrapper.track("create_contract_open_click");
-          this.props.fetchChainIds();
           this.props.contractOpenModal();
           this.props.initialize(this.props.initialValues);
           this.props.getLabelIds(this.props.initialValues.chainLabel)
         }}
           id="tour-create-contract-button"
           className="pt-intent-primary pt-icon-add"
-          text="Create Contract"
-          disabled={(this.props.enableCreateContract !== undefined && !this.props.enableCreateContract) ? true : false}
+          text={"Create Contract"}
+          disabled={ (this.props.enableCreateContract !== undefined && !this.props.enableCreateContract) || !this.props.userCertificate}
         />
+        </Popover>
         <form>
           <Dialog
             iconName="inbox"
@@ -374,7 +334,16 @@ class CreateContract extends Component {
             className="pt-dark create-contract-dialog"
           >
             <div className="pt-dialog-body">
-              {this.renderChainFields()}
+              <div className='row'>
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Shard
+                  </label>
+                </div>
+                <div className="col-sm-9 smd-pad-4">
+                  {this.props.selectedChain ? <HexText value={this.props.selectedChain}/> : "Main Chain"}
+                </div>
+              </div>
               <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label smd-pad-4">
@@ -393,6 +362,19 @@ class CreateContract extends Component {
                 </div>
                 <div className="col-sm-9 smd-pad-4">
                   {this.renderAddress(isModeOauth)}
+                </div>
+              </div>
+              <div className="row">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Use Wallet
+                  </label>
+                </div>
+                <div className="col-sm-9 smd-pad-4">
+                  <Switch
+                    checked={this.state.useWallet}
+                    onChange={this.toggleWalletUsage}
+                  />
                 </div>
               </div>
               {!isModeOauth && <div className="row">
@@ -594,13 +576,15 @@ export function mapStateToProps(state) {
     usingSampleContract: state.createContract.usingSampleContract,
     codeType: state.codeEditor.codeType,
     initialValues: {
-      commonName: state.user.oauthUser ? state.user.oauthUser.commonName : 'Certification Pending',
-      address: state.user.oauthUser ? state.user.oauthUser.address : 'Certification Pending',
+      commonName: state.user.userCertificate ? state.user.userCertificate.commonName : 'Verification Pending',
+      address: state.user.userCertificate ? state.user.userCertificate.userAddress : 'Verification Pending',
       chainLabel: state.chains.selectedChain ? selectedChainData.label || '' : '',
       chainId: state.chains.selectedChain ? state.chains.selectedChain : ''
     },
     chainLabel: state.chains.listChain,
-    chainLabelIds: state.chains.listLabelIds
+    chainLabelIds: state.chains.listLabelIds,
+    selectedChain: state.chains.selectedChain,
+    userCertificate: state.user.userCertificate,
   };
 }
 

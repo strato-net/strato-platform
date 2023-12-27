@@ -1,11 +1,10 @@
-
-import           Text.Parsec
-
-import           SolidVM.Solidity.Parse.File
-import           SolidVM.Solidity.Parse.ParserTypes
 import qualified Data.Map as M
+import SolidVM.Solidity.Parse.File
+import SolidVM.Solidity.Parse.ParserTypes
+import Text.Parsec
+
 main :: IO ()
 main = do
   contents <- getContents
-  let maybeFile = runParser solidityFile (ParserState "qq" "" M.empty) "qq" contents
+  let maybeFile = runParser solidityFile (ParserState "qq" "" M.empty M.empty 0) "qq" contents
   putStrLn $ show maybeFile

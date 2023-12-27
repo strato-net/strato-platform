@@ -1,49 +1,34 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeOperators #-}
 
-module Blockchain.Verification (
-  transactionsVerificationValue,
-  ommersVerificationValue,
-  receiptsVerificationValue
-  ) where
+module Blockchain.Verification
+  ( transactionsVerificationValue,
+    ommersVerificationValue,
+    receiptsVerificationValue,
+  )
+where
 
-import           Prelude.Unicode
-
-
-import           Blockchain.Data.DataDefs
-import           Blockchain.Data.RLP
-import           Blockchain.Data.Transaction
-import qualified Blockchain.Database.MerklePatricia             as MP
-import           Blockchain.Database.MerklePatricia.InternalMem
-import           Blockchain.Database.MerklePatriciaMem
-import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Strato.Model.Util
-
-import           Data.Functor.Identity
+import Blockchain.Data.DataDefs
+import Blockchain.Data.RLP
+import Blockchain.Data.Transaction
+import qualified Blockchain.Database.MerklePatricia as MP
+import Blockchain.Strato.Model.Keccak256
+import Data.Functor.Identity
+import Prelude.Unicode
 
 {-
 transactionsVerificationValue::[Transaction]->MP.StateRoot
 transactionsVerificationValue = MP.sha2StateRoot . listToRLPVerificationValue
 -}
 
+transactionsVerificationValue :: [Transaction] -> MP.StateRoot
+transactionsVerificationValue theList = runIdentity . MP.runMP . MP.addAllKVs MP.emptyTriePtr $ zip [(0 :: Integer) ..] theList
 
-addAllKVsMem::RLPSerializable obj=>Monad m=>MPMem->[(Integer, obj)]->m MPMem
-addAllKVsMem x [] = return x
-addAllKVsMem mpdb (x:rest) = do
-  mpdb' <- unsafePutKeyValMem mpdb (byteString2NibbleString $ rlpSerialize $ rlpEncode $ fst x) (rlpEncode $ rlpSerialize $ rlpEncode $ snd x)
-  addAllKVsMem mpdb' rest
-
-blank :: MPMem
-blank = initializeBlankMem { mpStateRoot = MP.emptyTriePtr }
-
-transactionsVerificationValue::[Transaction]->MP.StateRoot
-transactionsVerificationValue theList = runIdentity $ do
-    mp <- addAllKVsMem blank $ zip [0..] $ theList
-    return (mpStateRoot mp)
-
-ommersVerificationValue::[BlockData]->Keccak256
+ommersVerificationValue :: [BlockData] -> Keccak256
 ommersVerificationValue = listToRLPVerificationValue
 
-receiptsVerificationValue::()->MP.StateRoot
+receiptsVerificationValue :: () -> MP.StateRoot
 receiptsVerificationValue _ = MP.emptyTriePtr
 
 listToRLPVerificationValue :: (RLPSerializable a) => [a] -> Keccak256

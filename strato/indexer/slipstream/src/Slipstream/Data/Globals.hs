@@ -2,26 +2,26 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Slipstream.Data.Globals (
-  Globals(..),
-  TableColumns,
-  TableName(..)
-  ) where
+module Slipstream.Data.Globals
+  ( CirrusHandle (..),
+    Globals (..),
+    TableColumns,
+    TableName (..),
+  )
+where
 
-import           Control.DeepSeq
-import           Data.Cache.LRU
-import qualified Data.HashMap.Strict as HM
-import qualified Data.Map.Strict     as M
-import qualified Data.Set            as S
-import           Data.Text
-import           GHC.Generics
-
-import           BlockApps.Solidity.Value
-import           Blockchain.Strato.Model.Account
-import           Blockchain.Strato.Model.CodePtr
-import           Blockchain.Strato.Model.Keccak256
-import           Slipstream.Data.GlobalsColdStorage (Handle)
-
+import BlockApps.Solidity.Value
+import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Keccak256
+import Control.DeepSeq
+import Data.Cache.LRU
+import qualified Data.Map.Strict as M
+import qualified Data.Set as S
+import qualified Data.Text as T
+import Database.PostgreSQL.Typed (PGConnection)
+import GHC.Generics
+import Slipstream.Data.GlobalsColdStorage (Handle)
+import SolidVM.Model.CodeCollection
 
 instance NFData (LRU key val) where
   rnf = (`seq` ()) -- LRU is already pretty strict
@@ -29,31 +29,51 @@ instance NFData (LRU key val) where
 instance NFData (TableName) where
   rnf = (`seq` ())
 
+instance NFData CirrusHandle where
+  rnf = const ()
 
-data Globals = Globals { createdTables :: M.Map TableName TableColumns
-                       , historyList :: M.Map TableName Bool
-                       , createdInstances :: S.Set CodePtr -- lets us avoid an extra bloc call
-                       , solidVMInfo :: HM.HashMap Keccak256 (M.Map Text CodePtr)
-                       , contractStates :: LRU Account [(Text, Value)]
-                       , csHandle :: Handle
-                       } deriving (Generic, NFData)
+data CirrusHandle
+  = CirrusHandle {cirrusConn :: PGConnection, queriedMaps :: S.Set (T.Text, T.Text, T.Text)}
+  | FakeCirrusHandle
 
-data TableName = 
-    IndexTableName
-      { itOrganization :: Text
-      , itApplication  :: Text
-      , itContractName :: Text
+data Globals = Globals
+  { createdTables :: M.Map TableName TableColumns,
+    contractStates :: LRU Account [(T.Text, Value)],
+    ccMap :: LRU Keccak256 CodeCollection,
+    delegateMap :: LRU Account [Account],
+    coldStorageHandle :: Handle,
+    cirrusHandle :: CirrusHandle
+  }
+  deriving (Generic, NFData)
+
+data TableName
+  = IndexTableName
+      { itOrganization :: T.Text,
+        itApplication :: T.Text,
+        itContractName :: T.Text
       }
   | HistoryTableName -- technically the same as index, but logically different
-      { htOrganization :: Text
-      , htApplication  :: Text
-      , htContractName :: Text
+      { htOrganization :: T.Text,
+        htApplication :: T.Text,
+        htContractName :: T.Text
       }
   | EventTableName
-      { etOrganization :: Text
-      , etApplication  :: Text
-      , etContractName :: Text
-      , etEventName    :: Text
-      } deriving (Show, Eq, Ord)
+      { etOrganization :: T.Text,
+        etApplication :: T.Text,
+        etContractName :: T.Text,
+        etEventName :: T.Text
+      }
+  | MappingTableName
+      { mtOrganization :: T.Text,
+        mtApplication :: T.Text,
+        mtContractName :: T.Text,
+        mtMappingName :: T.Text
+      }
+  | AbstractTableName
+      { atOrganization :: T.Text,
+        atApplication :: T.Text,
+        atContractName :: T.Text
+      }
+  deriving (Show, Eq, Ord)
 
-type TableColumns = [Text]
+type TableColumns = [T.Text]

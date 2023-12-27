@@ -5,13 +5,13 @@
 
 module BlockApps.Solidity.Type where
 
-import           Control.DeepSeq
-import           Data.Binary
-import           Data.ByteString (ByteString)
-import           Data.List
-import           Data.Text       (Text)
-import qualified Data.Text       as Text
-import           GHC.Generics
+import Control.DeepSeq
+import Data.Binary
+import Data.ByteString (ByteString)
+import Data.List
+import Data.Text (Text)
+import qualified Data.Text as Text
+import GHC.Generics
 
 typeUInt :: SimpleType
 typeUInt = TypeInt False Nothing
@@ -37,6 +37,7 @@ data Type
   | TypeStruct Text
   | TypeEnum Text
   | TypeContract Text
+  | TypeVariadic
   deriving (Eq, Show, Generic, NFData, Binary, Ord)
 
 data SimpleType
@@ -44,23 +45,26 @@ data SimpleType
   | TypeAddress
   | TypeAccount
   | TypeString
-  | TypeInt { intSigned :: Bool
-            , intSize   :: Maybe Integer
-            }
-  | TypeBytes { bytesSize :: Maybe Integer
-              }
+  | TypeInt
+      { intSigned :: Bool,
+        intSize :: Maybe Integer
+      }
+  | TypeBytes
+      { bytesSize :: Maybe Integer
+      }
   deriving (Eq, Show, Generic, NFData, Binary, Ord)
 
 getTypeByteLength :: Type -> Maybe Int
 getTypeByteLength = \case
-  SimpleType ty         -> getSimpleTypeByteLength ty
-  TypeArrayDynamic{}    -> Nothing
+  SimpleType ty -> getSimpleTypeByteLength ty
+  TypeArrayDynamic {} -> Nothing
   TypeArrayFixed len ty -> (fromIntegral len *) <$> getTypeByteLength ty
-  TypeMapping{}         -> Nothing
-  TypeFunction{}        -> Nothing
-  TypeStruct{}          -> Nothing
-  TypeEnum{}            -> Nothing
-  TypeContract{}        -> getSimpleTypeByteLength TypeAccount
+  TypeMapping {} -> Nothing
+  TypeFunction {} -> Nothing
+  TypeStruct {} -> Nothing
+  TypeEnum {} -> Nothing
+  TypeContract {} -> getSimpleTypeByteLength TypeAccount
+  TypeVariadic {} -> Nothing
 
 getSimpleTypeByteLength :: SimpleType -> Maybe Int
 getSimpleTypeByteLength = \case
@@ -68,7 +72,7 @@ getSimpleTypeByteLength = \case
   TypeBytes Nothing -> Nothing
   _ -> Just 32
 
-formatSimpleType::SimpleType->String
+formatSimpleType :: SimpleType -> String
 formatSimpleType (TypeInt True Nothing) = "int"
 formatSimpleType (TypeInt False Nothing) = "uint"
 formatSimpleType (TypeInt s (Just b)) = (if s then "" else "u") ++ "int" ++ (show $ 8 * b)
@@ -79,7 +83,7 @@ formatSimpleType TypeAddress = "address"
 formatSimpleType TypeAccount = "account"
 formatSimpleType TypeString = "string"
 
-formatType::Type->String
+formatType :: Type -> String
 formatType (SimpleType x) = formatSimpleType x
 --formatType x = show x
 formatType (TypeArrayDynamic t) = formatType t ++ "[] " --TODO- might need some parens
@@ -87,10 +91,11 @@ formatType (TypeArrayFixed len t) = formatType t ++ "[" ++ show len ++ "] " --TO
 formatType (TypeMapping key val) = "mapping (" ++ formatSimpleType key ++ " => " ++ formatType val ++ ")"
 formatType (TypeFunction _ paramTypes returnTypes) =
   "function ("
-  ++ intercalate "," (map (formatType . snd) paramTypes)
-  ++ ") returns ("
-  ++ intercalate "," (map (formatType . snd) returnTypes)
-  ++ ")"
+    ++ intercalate "," (map (formatType . snd) paramTypes)
+    ++ ") returns ("
+    ++ intercalate "," (map (formatType . snd) returnTypes)
+    ++ ")"
 formatType (TypeEnum name) = Text.unpack name
 formatType (TypeContract name) = Text.unpack name
 formatType (TypeStruct name) = Text.unpack name
+formatType (TypeVariadic) = "variadic"

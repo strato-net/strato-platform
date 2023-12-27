@@ -1,22 +1,23 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
-import qualified Network.Socket               as S
 
-import           BlockApps.Init
-import           BlockApps.Logging
-import           Blockchain.EthConf
-import           Blockchain.Strato.Discovery.ContextLite
-import           Blockchain.Strato.Discovery.Data.Peer
-import           Blockchain.Strato.Discovery.UDPServer
-import           Control.Monad.IO.Class
-import           Control.Monad.Reader
-import           Control.Monad.Trans.Resource
-import qualified Data.Text                    as T
-import           Executable.EthereumDiscovery
-import           Executable.Options
-import           HFlags
-import qualified Text.Colors                  as CL
-import           UnliftIO
+import BlockApps.Init
+import BlockApps.Logging
+import Blockchain.EthConf
+import Blockchain.Strato.Discovery.ContextLite
+import Blockchain.Strato.Discovery.Data.Peer
+import Blockchain.Strato.Discovery.Data.PeerIOWiring ()
+import Blockchain.Strato.Discovery.UDPServer
+import Control.Monad.IO.Class
+import Control.Monad.Reader
+import Control.Monad.Trans.Resource
+import qualified Data.Text as T
+import Executable.EthereumDiscovery
+import Executable.Options
+import HFlags
+import qualified Network.Socket as S
+import qualified Text.Colors as CL
+import UnliftIO
 
 main :: IO ()
 main = do
@@ -34,5 +35,5 @@ main = do
           bracket
             (connectMe udpPort)
             (liftIO . S.close)
-            (\s -> local (\c -> c{sock = s}) $ f minPeers)
+            (\s -> local (\c -> c {sock = s}) $ f minPeers)
   S.withSocketsDo . runLoggingT $ ethereumDiscovery runner

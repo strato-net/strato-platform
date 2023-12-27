@@ -92,7 +92,7 @@ exports[`OauthAccounts: index render with empty values 1`] = `
   <div className=\\"row\\">
     <div className=\\"col-sm-4 text-left\\">
       <h3>
-        Accounts
+        Users
       </h3>
     </div>
     <div className=\\"col-sm-8 text-right\\">
@@ -105,7 +105,7 @@ exports[`OauthAccounts: index render with empty values 1`] = `
     <div className=\\"col-sm-4\\">
       <div className=\\"pt-input-group pt-dark pt-large\\">
         <span className=\\"pt-icon pt-icon-search\\" />
-        <input className=\\"pt-input\\" type=\\"search\\" placeholder=\\"Search accounts\\" onChange={[Function: onChange]} dir=\\"auto\\" />
+        <input className=\\"pt-input\\" type=\\"search\\" placeholder=\\"Search users\\" onChange={[Function: onChange]} dir=\\"auto\\" />
       </div>
     </div>
   </div>
@@ -117,7 +117,7 @@ exports[`OauthAccounts: index render with empty values 1`] = `
             <tbody>
               <tr>
                 <td colSpan={3}>
-                  No Accounts
+                  No Users
                 </td>
               </tr>
             </tbody>
@@ -137,7 +137,7 @@ exports[`OauthAccounts: index render with mocked values 1`] = `
   <div className=\\"row\\">
     <div className=\\"col-sm-4 text-left\\">
       <h3>
-        Accounts
+        Users
       </h3>
     </div>
     <div className=\\"col-sm-8 text-right\\">
@@ -150,7 +150,7 @@ exports[`OauthAccounts: index render with mocked values 1`] = `
     <div className=\\"col-sm-4\\">
       <div className=\\"pt-input-group pt-dark pt-large\\">
         <span className=\\"pt-icon pt-icon-search\\" />
-        <input className=\\"pt-input\\" type=\\"search\\" placeholder=\\"Search accounts\\" onChange={[Function: onChange]} dir=\\"auto\\" />
+        <input className=\\"pt-input\\" type=\\"search\\" placeholder=\\"Search users\\" onChange={[Function: onChange]} dir=\\"auto\\" />
       </div>
     </div>
   </div>
@@ -162,6 +162,8 @@ exports[`OauthAccounts: index render with mocked values 1`] = `
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
                 clinicaladmin
+                 - 
+                BlockApps
               </div>
             </div>
           </div>
@@ -169,6 +171,8 @@ exports[`OauthAccounts: index render with mocked values 1`] = `
             <div className=\\"row\\">
               <div className=\\"pt-card pt-elevation-2 smd-pointer \\" onClick={[Function: onClick]}>
                 clinicalops
+                 - 
+                BlockApps
               </div>
             </div>
           </div>

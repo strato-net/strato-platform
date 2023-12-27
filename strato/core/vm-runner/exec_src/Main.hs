@@ -1,25 +1,28 @@
-{-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE DeriveAnyClass    #-}
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE TypeOperators     #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeOperators #-}
 
-import           Control.Monad
-import           Control.Concurrent.Async             as Async
-import           Debugger.Options() -- HFlags
-import           Network.Wai.Middleware.Prometheus
-import           Network.Wai.Handler.Warp
-import           HFlags
+-- HFlags
 
-import           BlockApps.Init
-import           BlockApps.Logging
-import           Blockchain.VMOptions() -- HFlags
-import           Executable.EthereumVM
-import           Executable.EVMFlags() -- HFlags
-import           SolidVM.Solidity.SourceTools
-
+import BlockApps.Init
+import BlockApps.Logging
+-- HFlags
+import Blockchain.Strato.Model.Options ()
+import Blockchain.VMOptions ()
+import Control.Concurrent.Async as Async
+import Control.Monad
+import Debugger.Options ()
+import Executable.EVMFlags ()
+import Executable.EthereumVM
+import HFlags
+import Network.Wai.Handler.Warp
+import Network.Wai.Middleware.Prometheus
+-- HFlags
+import SolidVM.Solidity.SourceTools
 
 main :: IO ()
 main = do

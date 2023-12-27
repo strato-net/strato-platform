@@ -3,31 +3,31 @@
 
 module BlockApps.Solidity.ArgValue where
 
-import           BlockApps.Solidity.Type
-import           BlockApps.Solidity.TypeDefs
-import           BlockApps.Solidity.Value
-import           Control.Lens                 ((&), (?~))
-import           Control.Monad
-import qualified Data.Aeson                   as A
-import qualified Data.Aeson.KeyMap            as KM
-import qualified Data.Aeson.Key               as DAK
-import qualified Data.Bimap                   as Bimap
-import qualified Data.Bifunctor               as BF
-import           Data.Either
-import           Data.ByteString              (ByteString)
-import qualified Data.ByteString              as ByteString
-import qualified Data.ByteString.Base16       as Base16
-import qualified Data.Map.Strict              as Map
+import BlockApps.Solidity.Type
+import BlockApps.Solidity.TypeDefs
+import BlockApps.Solidity.Value
 -- import qualified Data.HashMap.Strict          as HM
-import           Data.Swagger
-import           Data.Text                    (Text)
-import qualified Data.Text                    as Text
-import qualified Data.Text.Encoding           as Text
-import qualified Data.Vector                  as V
-import           Test.QuickCheck
-import           Text.Read                    (readMaybe)
 
-import           Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Address
+import Control.Lens ((&), (?~))
+import Control.Monad
+import qualified Data.Aeson as A
+import qualified Data.Aeson.Key as DAK
+import qualified Data.Aeson.KeyMap as KM
+import qualified Data.Bifunctor as BF
+import qualified Data.Bimap as Bimap
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as ByteString
+import qualified Data.ByteString.Base16 as Base16
+import Data.Either
+import qualified Data.Map.Strict as Map
+import Data.Swagger
+import Data.Text (Text)
+import qualified Data.Text as Text
+import qualified Data.Text.Encoding as Text
+import qualified Data.Vector as V
+import Test.QuickCheck
+import Text.Read (readMaybe)
 
 data ArgValue
   = ArgInt Integer
@@ -35,7 +35,7 @@ data ArgValue
   | ArgString Text
   | ArgArray (V.Vector ArgValue)
   | ArgObject (KM.KeyMap ArgValue)
-  deriving (Eq,Show)
+  deriving (Eq, Show)
 
 instance Arbitrary ArgValue where
   arbitrary = elements [ArgInt 5, ArgBool True, ArgBool False, ArgString "arggg"]
@@ -47,8 +47,9 @@ instance A.FromJSON ArgValue where
     A.String x -> return $ ArgString x
     A.Array xs -> ArgArray <$> traverse A.parseJSON xs
     A.Null -> fail "parsing JSON for ArgValue: encountered Null"
-    A.Object xo -> ArgObject <$> traverse A.parseJSON xo 
-    -- fmap A.parseJSON xo
+    A.Object xo -> ArgObject <$> traverse A.parseJSON xo
+
+-- fmap A.parseJSON xo
 
 instance A.ToJSON ArgValue where
   toJSON = \case
@@ -59,58 +60,66 @@ instance A.ToJSON ArgValue where
     ArgObject o -> A.Object (fmap A.toJSON o)
 
 instance ToSchema ArgValue where
-  declareNamedSchema = pure . pure $
-    NamedSchema (Just "Solidity Argument Value") $ mempty
-      & description ?~ "A Solidity argument value"
-      & example ?~ A.toJSON (ArgInt 5)
+  declareNamedSchema =
+    pure . pure $
+      NamedSchema (Just "Solidity Argument Value") $
+        mempty
+          & description ?~ "A Solidity argument value"
+          & example ?~ A.toJSON (ArgInt 5)
 
 --Used to coerce the solidity type from the argument values, without having the actual contract type info
 argValueToType :: ArgValue -> Type
-argValueToType (ArgInt _)       = SimpleType typeInt
-argValueToType (ArgBool _)      = SimpleType TypeBool
-argValueToType (ArgString _)    = SimpleType TypeString
-argValueToType (ArgArray v)     = TypeArrayDynamic $ argValueToType $ V.head v
-argValueToType (ArgObject _)    = TypeStruct ""
+argValueToType (ArgInt _) = SimpleType typeInt
+argValueToType (ArgBool _) = SimpleType TypeBool
+argValueToType (ArgString _) = SimpleType TypeString
+argValueToType (ArgArray v) = TypeArrayDynamic $ argValueToType $ V.head v
+argValueToType (ArgObject _) = TypeStruct ""
 
 isSimple :: Type -> Bool
 isSimple (SimpleType _) = True
-isSimple _              = False
+isSimple _ = False
 
 -- TODO: create valueToArgValue
 argValueToValue :: Maybe TypeDefs -> Type -> ArgValue -> Either Text Value
 argValueToValue defs theType argVal = case theType of
   SimpleType ty -> SimpleValue <$> argValueToSimpleValue ty argVal
   TypeArrayDynamic ty -> case argVal of
-    ArgArray xs -> ValueArrayDynamic . tosparse . V.toList <$>
-      traverse (argValueToValue defs ty) xs
+    ArgArray xs ->
+      ValueArrayDynamic . tosparse . V.toList
+        <$> traverse (argValueToValue defs ty) xs
     o -> Left . Text.pack $ "argValueToValue: Expected TypeArrayDynamic to be an array, but got: " ++ show o
   TypeArrayFixed len ty -> case argVal of
-    ArgArray xs -> if toInteger (V.length xs) == toInteger len
-      then ValueArrayFixed len . V.toList <$> traverse (argValueToValue defs ty) xs
-      else Left . Text.pack $ "argValueToValue: Expected length of TypeArrayFixed to match length of the array. Expected " ++ show len ++ ", but got " ++ show (length xs)
+    ArgArray xs ->
+      if toInteger (V.length xs) == toInteger len
+        then ValueArrayFixed len . V.toList <$> traverse (argValueToValue defs ty) xs
+        else Left . Text.pack $ "argValueToValue: Expected length of TypeArrayFixed to match length of the array. Expected " ++ show len ++ ", but got " ++ show (length xs)
     o -> Left . Text.pack $ "argValueToValue: Expected TypeArrayFixed to be an array, but got: " ++ show o
-  TypeMapping{}  -> do
+  TypeMapping {} -> do
     case argVal of
       ArgObject hm -> do
-        mp <- mapM (\v -> do
-          let inferredType = argValueToType v
-              value = argValueToValue defs inferredType v
-          return value
-          ) hm
+        mp <-
+          mapM
+            ( \v -> do
+                let inferredType = argValueToType v
+                    value = argValueToValue defs inferredType v
+                return value
+            )
+            hm
         let initialValueType = argValueToType $ snd . head $ KM.toList hm
             isUniform = foldl (\b av -> b && argValueToType av == initialValueType) True hm
         when (any isLeft mp) $ do
           Left "argValueToValue: Could not parse object into a Mapping"
         when (not isUniform) $ do
           Left "argValueToValue: Mapping object does not contain uniform values"
-          -- Use a struct because it is parsed in the VM as different types once it has the correct type info for args
+        -- Use a struct because it is parsed in the VM as different types once it has the correct type info for args
         Right $ ValueStruct $ Map.fromList $ [(k, v) | (k, Right v) <- BF.first DAK.toText <$> KM.toList mp]
-      a ->  Left $ Text.pack $ "argValueToValue: Expected TypeMapping to be a object, but got a" ++ show a
-  TypeFunction{} -> Left "argValueToValue TODO: TypeFunction not yet implemented"
-  TypeContract{} -> case argVal of
-    ArgString str -> ValueContract <$> case readMaybe (Text.unpack str) of
-      Nothing -> Left $ "argValueToValue: could not decode as contract address: " <> str
-      Just x -> return x
+      a -> Left $ Text.pack $ "argValueToValue: Expected TypeMapping to be a object, but got a" ++ show a
+  TypeFunction {} -> Left "argValueToValue TODO: TypeFunction not yet implemented"
+  TypeContract {} -> case argVal of
+    ArgString str ->
+      ValueContract <$> case readMaybe (Text.unpack str) of
+        Nothing -> Left $ "argValueToValue: could not decode as contract address: " <> str
+        Just x -> return x
     o -> Left . Text.pack $ "argValueToValue: Expected TypeContract to be a string, but got: " ++ show o
   TypeEnum enumName -> case defs of
     Nothing -> Left $ "argValueToValue: Enum values cannot be parsed without type definitions" -- TODO(dustin): Pass in TypeDefs
@@ -123,18 +132,36 @@ argValueToValue defs theType argVal = case theType of
                 Nothing -> Left $ "argValueToValue: Missing value '" <> str <> "' in enum definition for " <> enumName
                 Just i -> Right $ ValueEnum enumName str' $ fromIntegral i
         o -> Left . Text.pack $ "argValueToValue: Expected TypeEnum to be a string, but got: " ++ show o
-  TypeStruct _   -> do
+  TypeStruct _ -> do
     case argVal of
       ArgObject hm -> do
-        mp <- mapM (\v -> do
-          let inferredType = argValueToType v
-              value = argValueToValue defs inferredType v
-          return value
-          ) hm
+        mp <-
+          mapM
+            ( \v -> do
+                let inferredType = argValueToType v
+                    value = argValueToValue defs inferredType v
+                return value
+            )
+            hm
         when (any isLeft mp) $ do
           Left "argValueToValue: Could not parse object into a Struct"
         Right $ ValueStruct $ Map.fromList $ [(k, v) | (k, Right v) <- BF.first DAK.toText <$> KM.toList mp]
-      a ->  Left $ Text.pack $ "argValueToValue: Expected TypeStruct to be a object, but got a" ++ show a
+      a -> Left $ Text.pack $ "argValueToValue: Expected TypeStruct to be a object, but got a" ++ show a
+  TypeVariadic -> do
+    case argVal of
+      ArgArray xs -> do
+        listOfVals <-
+          mapM
+            ( \v -> do
+                let inferredType = argValueToType v
+                    value = argValueToValue defs inferredType v
+                case value of
+                  Right v' -> return v'
+                  _ -> Left $ "argValueToValue: Could not parse array into a Variadic"
+            )
+            $ V.toList xs
+        Right $ ValueVariadic listOfVals
+      o -> Left . Text.pack $ "argValueToValue: Expected TypeVariadic to be an array, but got: " ++ show o
 
 argValueToSimpleValue :: SimpleType -> ArgValue -> Either Text SimpleValue
 argValueToSimpleValue theType argVal = case theType of
@@ -146,14 +173,16 @@ argValueToSimpleValue theType argVal = case theType of
       _ -> Left $ "argValueToSimpleValue: Could not parse boolean value from string \"" <> str <> "\""
     o -> Left . Text.pack $ "argValueToSimpleValue: Expected TypeBool to be a boolean, but got " ++ show o
   TypeAddress -> case argVal of
-    ArgString str -> ValueAddress <$> case stringAddress (Text.unpack str) of
-      Nothing -> Left $ "argValueToSimpleValue: could not decode as address: " <> str
-      Just x -> return x
+    ArgString str ->
+      ValueAddress <$> case stringAddress (Text.unpack str) of
+        Nothing -> Left $ "argValueToSimpleValue: could not decode as address: " <> str
+        Just x -> return x
     o -> Left . Text.pack $ "argValueToSimpleValue: Expected TypeAddress to be a string, but got " ++ show o
   TypeAccount -> case argVal of
-    ArgString str -> ValueAccount <$> case readMaybe (Text.unpack str) of
-      Nothing -> Left $ "argValueToSimpleValue: could not decode as account: " <> str
-      Just x -> return x
+    ArgString str ->
+      ValueAccount <$> case readMaybe (Text.unpack str) of
+        Nothing -> Left $ "argValueToSimpleValue: could not decode as account: " <> str
+        Just x -> return x
     o -> Left . Text.pack $ "argValueToSimpleValue: Expected TypeAccount to be a string, but got " ++ show o
   TypeString -> case argVal of
     ArgString str -> return $ ValueString str

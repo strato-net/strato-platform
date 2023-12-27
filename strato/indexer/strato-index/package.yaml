@@ -8,7 +8,6 @@ ghc-options: -threaded -rtsopts -with-rtsopts=-N
 
 dependencies:
   - base
-  - milena-tools
 
 library:
   source-dirs: src/
@@ -20,19 +19,19 @@ library:
   - common-log
   - conduit
   - containers
-  - deepseq
   - extra
   - format
-  - hedis
+  - kafka-monad
   - milena
+  - milena-tools
   - monad-alter
-  - resourcet
+  - redis-monad
   - seqevents
+  - sql-monad
   - strato-conf
   - strato-model
   - strato-redis-blockdb
   - text
-  - transformers
   - x509-certs
 
 executables:
@@ -40,31 +39,69 @@ executables:
     main: ApiIndexerMain.hs
     source-dirs: exec_src
     dependencies:
+      - blockapps-data
+      - blockapps-datadefs
       - blockapps-init
       - common-log
+      - containers
+      - evm-solidity
       - hflags
+      - kafka-monad
+      - monad-alter
+      - redis-monad
+      - seqevents
+      - sql-monad
+      - strato-conf
       - strato-index
-    other-modules: []
+      - strato-model
+      - strato-redis-blockdb
+    other-modules:
+      - Wiring
 
   strato-p2p-indexer:
     main: P2PIndexerMain.hs
     source-dirs: exec_src
     dependencies:
+      - blockapps-data
+      - blockapps-datadefs
       - blockapps-init
       - common-log
+      - containers
+      - evm-solidity
       - hflags
+      - kafka-monad
+      - monad-alter
+      - redis-monad
+      - seqevents
+      - strato-conf
       - strato-index
-    other-modules: []
+      - strato-model
+      - strato-redis-blockdb
+    other-modules:
+      - Wiring
 
   strato-txr-indexer:
     main: TxrIndexerMain.hs
     source-dirs: exec_src/
     dependencies:
+      - blockapps-data
+      - blockapps-datadefs
       - blockapps-init
       - common-log
+      - containers
+      - evm-solidity
       - hflags
+      - kafka-monad
+      - monad-alter
+      - redis-monad
+      - seqevents
+      - sql-monad
+      - strato-conf
       - strato-index
-    other-modules: []
+      - strato-model
+      - strato-redis-blockdb
+    other-modules:
+      - Wiring
 
 tests:
   strato-index-test:
@@ -72,7 +109,6 @@ tests:
     main: Spec.hs
     ghc-options: -dynamic
     dependencies:
-    - blockapps-data
     - blockapps-datadefs
     - bytestring
     - hspec
@@ -80,5 +116,4 @@ tests:
     - x509-certs
     - strato-model
     - text
-    - containers
 

@@ -1,9 +1,9 @@
 {
-  "short_name": "BlockApps SMD",
-  "name": "BlockApps SMD UI panel",
+  "short_name": "STRATO Mercata Home",
+  "name": "STRATO Mercata Dashboard",
   "icons": [
     {
-      "src": "favicon.ico",
+      "src": "favicon_large.png",
       "sizes": "192x192",
       "type": "image/png"
     }

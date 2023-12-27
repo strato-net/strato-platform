@@ -18,14 +18,16 @@ import {
   FETCH_CHAINS_SUCCESS,
   FETCH_CHAIN_DETAIL_SUCCESS,
   FETCH_CHAIN_DETAIL_FAILURE,
-  FETCH_CHAINS_FAILURE
+  FETCH_CHAINS_FAILURE,
+  FETCH_SELECT_CHAIN_DETAIL_REQUEST
 } from '../../components/Chains/chains.actions';
 import watchFetchChains, {
   getChains,
   getChainDetail,
   getChainsIds,
   getChainsApi,
-  getChainDetailApi
+  getChainDetailApi,
+  getChainDetailSelect
 } from '../../components/Chains/chains.saga';
 import { chain, chains } from './chainsMock';
 
@@ -36,7 +38,8 @@ describe('Chains: saga', () => {
     const match = [
       takeLatest(FETCH_CHAINS_REQUEST, getChains),
       takeLatest(FETCH_CHAIN_IDS_REQUEST, getChainsIds),
-      takeEvery(FETCH_CHAIN_DETAIL_REQUEST, getChainDetail)
+      takeEvery(FETCH_CHAIN_DETAIL_REQUEST, getChainDetail),
+      takeEvery(FETCH_SELECT_CHAIN_DETAIL_REQUEST, getChainDetailSelect)
     ]
     expect(gen.next().value).toEqual(match);
     expect(gen.next().done).toBe(true);
@@ -47,7 +50,7 @@ describe('Chains: saga', () => {
 
     test('inspection', () => {
       const gen = getChains(payload);
-      expect(gen.next().value).toEqual(call(getChainsApi, 10, 0));
+      expect(gen.next().value).toEqual(call(getChainsApi, 10, 0, undefined));
       expect(gen.next(chain).value).toEqual(put(fetchChainsSuccess(chain)));
       expect(gen.throw('error').value).toEqual(put(fetchChainsFailure('error')));
       expect(gen.next().done).toBe(true);
@@ -76,8 +79,10 @@ describe('Chains: saga', () => {
   describe('getChainsIds generator', () => {
 
     test('inspection', () => {
-      const gen = getChainsIds();
-      expect(gen.next().value).toEqual(call(getChainsApi));
+      const payload = { limit: 10, offset: 0 };
+
+      const gen = getChainsIds(payload);
+      expect(gen.next().value).toEqual(call(getChainsApi, 10, 0));
       expect(gen.next(chain).value).toEqual(put(fetchChainIdsSuccess(chain)));
       expect(gen.throw('error').value).toEqual(put(fetchChainIdsFailure('error')));
       expect(gen.next().done).toBe(true);

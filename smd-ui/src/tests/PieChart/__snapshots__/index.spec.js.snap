@@ -21,7 +21,7 @@ initialize {
                 "attribs": Object {},
                 "children": Array [
                   Object {
-                    "data": "Transaction Type",
+                    "data": "Last 15 Transactions by Type",
                     "next": null,
                     "parent": [Circular],
                     "prev": null,
@@ -187,7 +187,7 @@ initialize {
                   "attribs": Object {},
                   "children": Array [
                     Object {
-                      "data": "Transaction Type",
+                      "data": "Last 15 Transactions by Type",
                       "next": null,
                       "parent": [Circular],
                       "prev": null,

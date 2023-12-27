@@ -11,44 +11,42 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
-
-{-# OPTIONS_GHC -fno-warn-orphans        #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
-
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Slipstream.GlobalsColdStorage
-  ( initStorage
-  , readStorage
-  , asyncWriteToStorage
-  , syncStorage
-  , Handle
-  , fakeHandle
-  ) where
-
-import Control.Lens ((^.))
-import ClassyPrelude hiding (Handle)
-import Data.Binary hiding (get)
-import Database.Persist
-import Database.Persist.Sql
-import Database.Persist.TH
-import qualified Prelude as P ()
-import System.IO.Unsafe
-import UnliftIO.Concurrent
-import UnliftIO.Resource
+  ( initStorage,
+    readStorage,
+    asyncWriteToStorage,
+    syncStorage,
+    Handle,
+    fakeHandle,
+  )
+where
 
 import BlockApps.Solidity.Value
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
-
-import qualified Slipstream.DelayedBloomFilter as DBF
-import Slipstream.Metrics
+import ClassyPrelude hiding (Handle)
+import Control.Lens ((^.))
+import Data.Binary hiding (get)
+import Database.Persist
+import Database.Persist.Sql
+import Database.Persist.TH
 import Slipstream.Data.GlobalsColdStorage
+import Slipstream.Metrics
+import UnliftIO.Concurrent
+import UnliftIO.Resource
+import qualified Prelude as P ()
 
 -- Data definitions --
 
-share [mkPersist sqlSettings{mpsEntityJSON=Nothing}, mkMigrate "migrateStore"] [persistLowerCase|
+share
+  [mkPersist sqlSettings {mpsEntityJSON = Nothing}, mkMigrate "migrateStore"]
+  [persistLowerCase|
 ColdStorage
   address Address
   chainId MChainId
@@ -57,42 +55,12 @@ ColdStorage
   deriving Eq Show
 |]
 
--- Filter Management --
--- The importance of a shared filter between all worker threads is
--- to prevent a scenario where different cold storage handles have
--- different opinions about the contents of the database.
-type AcctFilter = DBF.DelayedBloomFilter Account
-
-{-# NOINLINE globalBloomFilter #-}
-globalBloomFilter :: TMVar AcctFilter
-globalBloomFilter = unsafePerformIO newEmptyTMVarIO
-
-readFilter :: STM AcctFilter
-readFilter = readTMVar globalBloomFilter
-
-setFilter :: AcctFilter -> STM ()
-setFilter = void . swapTMVar globalBloomFilter
-
-initFilter :: MonadIO m => Int -> m Bool
-initFilter = atomically . tryPutTMVar globalBloomFilter . DBF.newFilter
-
 -- SQL writer daemon --
 
 storageWorker :: MonadUnliftIO m => TQueue QueueElem -> ReaderT SqlBackend m ()
 storageWorker q = forever $ do
   datum <- atomically $ readTQueue q
-  recordKeys datum
   traverse (uncurry repsert) . serialize $ datum
-
-recordKeys :: MonadIO m => QueueElem -> m ()
-recordKeys SyncFlush = return ()
-recordKeys (PreStorageEntry a _) = do
-  depth <- atomically $ do
-    f <- readFilter
-    setFilter $ DBF.insert a f
-    return $! DBF.stackDepth f
-  incNumBloomWrites
-  recordStackDepth depth
 
 -- Data translation --
 
@@ -100,7 +68,7 @@ serialize :: QueueElem -> Maybe (Key ColdStorage, ColdStorage)
 serialize SyncFlush = Nothing
 serialize (PreStorageEntry (Account a mc) vs) =
   let mci = MChainId $ ChainId <$> mc
-  in Just (ColdStorageKey a mci, ColdStorage a mci . toStrict . encode $ vs)
+   in Just (ColdStorageKey a mci, ColdStorage a mci . toStrict . encode $ vs)
 
 deserialize :: Maybe ColdStorage -> Either Text [(Text, Value)]
 deserialize Nothing = Left "storage not found"
@@ -112,30 +80,31 @@ deserialize (Just (ColdStorage _ _ bvs)) =
 -- API --
 
 -- | Migrates tables, and starts a background thread for writing cache entries to the database
-initStorage :: (MonadUnliftIO m, MonadResource m)
-            => Int -> ReaderT SqlBackend m (Bool, Handle)
-initStorage cacheSize = do
+initStorage ::
+  (MonadUnliftIO m, MonadResource m) =>
+  ReaderT SqlBackend m Handle
+initStorage = do
   void $ runMigrationSilent migrateStore
   queue <- atomically newTQueue
-  ourBloom <- initFilter $ cacheSize `div` 2
   tid <- forkIO $ storageWorker queue
   void . register . liftIO . killThread $ tid
   sql <- ask
-  return $! (ourBloom, Handle queue sql)
+  return $! Handle queue sql
 
 -- | Check postgres for an entry about this account's values
-readStorage :: MonadUnliftIO m
-            => Handle -> Account -> m (Either Text [(Text, Value)])
+readStorage ::
+  MonadUnliftIO m =>
+  Handle ->
+  Account ->
+  m (Either Text [(Text, Value)])
 readStorage FakeHandle _ = recordStorageResult $! Left "fake handle"
-readStorage (Handle _ sql) acct = recordStorageResult =<< do
-  seen <- DBF.elem acct <$> atomically readFilter
-  if not seen
-    then return . Left $ "unseen by bloom filter"
-    else flip runReaderT sql
-       . fmap deserialize
-       . get
-       . ColdStorageKey (acct ^. accountAddress)
-       $ MChainId (fmap ChainId $ acct ^. accountChainId)
+readStorage (Handle _ sql) acct =
+  recordStorageResult =<< do
+    flip runReaderT sql
+      . fmap deserialize
+      . get
+      . ColdStorageKey (acct ^. accountAddress)
+      $ MChainId (fmap ChainId $ acct ^. accountChainId)
 
 recordStorageResult :: (MonadIO m) => Either Text a -> m (Either Text a)
 recordStorageResult v = do

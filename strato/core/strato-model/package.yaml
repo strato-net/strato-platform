@@ -46,6 +46,7 @@ library:
     - generic-arbitrary
     - generic-deriving
     - hashable
+    - hflags
     - http-api-data
     - integer-gmp
     - labeled-error
@@ -56,7 +57,7 @@ library:
     - path-pieces
     - persistent
     - primitive
-    - relapse           # remove this
+    - raw-strings-qq
     - secp256k1-haskell
     - servant
     - servant-docs
@@ -77,15 +78,11 @@ tests:
     dependencies:
       - aeson
       - aeson-qq
-      - base16-bytestring
       - binary
-      - cryptonite
       - ethereum-rlp
-      - integer-gmp
       - labeled-error
       - persistent
       - Ranged-sets
-      - secp256k1-haskell
       - strato-model
       - text
       - hspec

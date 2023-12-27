@@ -1,15 +1,17 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module StateMachineSpec where
 
-import           Test.Hspec
+import Test.Hspec
 
 spec :: Spec
 spec = pure ()
+
 {- TODO: fix
 import Test.Hspec (Spec, describe, it, parallel)
 import Test.Hspec.Expectations.Lifted
@@ -45,14 +47,11 @@ import Blockchain.Strato.Model.Secp256k1
 
 import qualified LabeledError
 
-
 myPriv :: PrivateKey
 myPriv = fromMaybe (error "could not import private key") (importPrivateKey (LabeledError.b16Decode "myPriv" $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"))
 
-
 testContext :: BlockstanbulContext
-testContext = newContext (Checkpoint (View 20 18) M.empty [] []) (fromPrivateKey myPriv)
-
+testContext = newContext (Checkpoint (View 20 18) M.empty [] []) (fromPrivateKey myPriv) True
 
 runTest :: StateT BlockstanbulContext (LoggingT IO) () -> IO ()
 runTest = runAuthTest . (disableAuth >>)
@@ -65,7 +64,7 @@ instance (Monad m) => HasBlockstanbulContext (StateT BlockstanbulContext m) wher
   getBlockstanbulContext = Just <$> get
 
 instance (Monad m) => HasVault (StateT BlockstanbulContext m) where
-  sign bs = return $ signMsg myPriv bs 
+  sign bs = return $ signMsg myPriv bs
   getPub = error "called getPub, but this should never happen"
   getShared _ = error "called getShared, but this should never happen"
 
@@ -264,7 +263,6 @@ spec = parallel $ do
             other = got \\ omsgs
         map (_round . roundchangeView . oMessage) omsgs `shouldBe` [21]
         other `shouldMatchList` [LeadFound 18 2 (sender auth)]
-
 
   describe "A prepare message" $ do
     it "sets the prepared state of a validator" $ property $ \auth blk ->
@@ -584,7 +582,7 @@ spec = parallel $ do
     it "accepts a block if the signer is the original sender" $ property $ \blk ->
       runAuthTest $ do
         v <- use view
-        (lockBlk, omsgs) <- resendLock blk myPriv 
+        (lockBlk, omsgs) <- resendLock blk myPriv
         let ps = [(k, l) | Prepare k l <- map oMessage omsgs]
         ps `shouldBe` [(v, blockHash lockBlk)]
 

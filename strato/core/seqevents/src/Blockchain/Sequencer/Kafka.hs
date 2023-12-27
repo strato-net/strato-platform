@@ -1,7 +1,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeOperators #-}
-module Blockchain.Sequencer.Kafka (
-    assertTopicCreation,
+
+module Blockchain.Sequencer.Kafka
+  ( assertTopicCreation,
     unseqEventsTopicName,
     seqVmEventsTopicName,
     seqP2pEventsTopicName,
@@ -14,32 +15,33 @@ module Blockchain.Sequencer.Kafka (
     writeUnseqEvents,
     writeSeqVmEvents,
     writeSeqP2pEvents,
+    writeUnseqEventsWithLimits,
     emitKafkaTransactions,
     emitKafkaBlock,
     emitKafkaChainDetails,
-    emitBlockstanbulMsg
-) where
-
-import           Conduit
-import           Control.Monad.Change.Modify (Outputs(..))
-import           Data.Binary                (Binary, decode, encode)
+    emitBlockstanbulMsg,
+  )
+where
 
 import qualified Blockchain.Blockstanbul as PBFT
-import           Blockchain.Data.Block
-import           Blockchain.Data.ChainInfo
-import           Blockchain.Data.Transaction
-import qualified Blockchain.Data.TXOrigin              as Origin
-import           Blockchain.KafkaTopics     (lookupTopic)
-import           Blockchain.Sequencer.Event
-import           Blockchain.Sequencer.Kafka.Metrics
-import           Blockchain.Strato.Model.ExtendedWord  (Word256)
-import           Blockchain.Strato.Model.MicroTime
-import           Blockchain.Stream.Raw
-
-import qualified Data.ByteString.Lazy       as BL
-import qualified Network.Kafka              as K
-import qualified Network.Kafka.Producer     as KW
-import qualified Network.Kafka.Protocol     as KP
+import Blockchain.Data.Block
+import Blockchain.Data.ChainInfo
+import qualified Blockchain.Data.TXOrigin as Origin
+import Blockchain.Data.Transaction
+import Blockchain.KafkaTopics (lookupTopic)
+import Blockchain.Sequencer.Event
+import Blockchain.Sequencer.Kafka.Metrics
+import Blockchain.Strato.Model.ExtendedWord (Word256)
+import Blockchain.Strato.Model.MicroTime
+import Blockchain.Stream.Raw
+import Conduit
+import Control.Monad.Change.Modify (Outputs (..))
+import Data.Binary (Binary, decode, encode)
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
+import qualified Network.Kafka as K
+import qualified Network.Kafka.Producer as KW
+import qualified Network.Kafka.Protocol as KP
 
 unseqEventsTopicName :: KP.TopicName
 unseqEventsTopicName = lookupTopic "unseqevents"
@@ -52,9 +54,9 @@ seqP2pEventsTopicName = lookupTopic "seq_p2p_events"
 
 assertTopicCreation :: K.Kafka k => k ()
 assertTopicCreation = do
-    K.updateMetadata unseqEventsTopicName
-    K.updateMetadata seqVmEventsTopicName
-    K.updateMetadata seqP2pEventsTopicName
+  K.updateMetadata unseqEventsTopicName
+  K.updateMetadata seqVmEventsTopicName
+  K.updateMetadata seqP2pEventsTopicName
 
 readUnseqEvents :: K.Kafka k => KP.Offset -> k [IngestEvent]
 readUnseqEvents off = do
@@ -88,47 +90,56 @@ readSeqP2pEventsFromTopic = readFromTopic'
 writeUnseqEvents :: K.Kafka k => [IngestEvent] -> k [KP.ProduceResponse]
 writeUnseqEvents events = do
   KW.produceMessagesAsSingletonSets $
-      (K.TopicAndMessage unseqEventsTopicName . KW.makeMessage . BL.toStrict . encode) <$> events
+    (K.TopicAndMessage unseqEventsTopicName . KW.makeMessage . BL.toStrict . encode) <$> events
 
 writeSeqVmEvents :: K.Kafka k => [VmEvent] -> k [KP.ProduceResponse]
 writeSeqVmEvents events = do
   recordEvents seqVMWrites events
   KW.produceMessagesAsSingletonSets $
-      (K.TopicAndMessage seqVmEventsTopicName . KW.makeMessage . BL.toStrict . encode) <$> events
+    (K.TopicAndMessage seqVmEventsTopicName . KW.makeMessage . BL.toStrict . encode) <$> events
 
 writeSeqP2pEvents :: K.Kafka k => [P2pEvent] -> k [KP.ProduceResponse]
 writeSeqP2pEvents events = do
   recordEvents seqP2PWrites events
   KW.produceMessagesAsSingletonSets $
-      (K.TopicAndMessage seqP2pEventsTopicName . KW.makeMessage . BL.toStrict . encode) <$> events
+    (K.TopicAndMessage seqP2pEventsTopicName . KW.makeMessage . BL.toStrict . encode) <$> events
+
+writeUnseqEventsWithLimits :: K.Kafka k => [B.ByteString] -> k [KP.ProduceResponse]
+writeUnseqEventsWithLimits events = do
+  KW.produceMessagesAsSingletonSets $
+    (K.TopicAndMessage unseqEventsTopicName . KW.makeMessage) <$> events
 
 readFromTopic' :: (Binary b, K.Kafka k) => KP.TopicName -> KP.Offset -> k [b]
 readFromTopic' topic offset = do
   _ <- setDefaultKafkaState
   bytes <- fetchBytes topic offset
   return $ map (decode . BL.fromStrict) bytes
-  --  map (decode . BL.fromStrict) <$> fetchBytes topic offset
+--  map (decode . BL.fromStrict) <$> fetchBytes topic offset
 {-# INLINE readFromTopic' #-}
 
-emitKafkaTransactions :: (MonadIO m, m `Outputs` [IngestEvent])
-                      => Origin.TXOrigin
-                      -> [Transaction]
-                      -> m ()
+emitKafkaTransactions ::
+  (MonadIO m, m `Outputs` [IngestEvent]) =>
+  Origin.TXOrigin ->
+  [Transaction] ->
+  m ()
 emitKafkaTransactions origin txs = do
-    ts <- liftIO getCurrentMicrotime
-    let ingestTxs = IETx ts . IngestTx origin <$> txs
-    output ingestTxs
+  ts <- liftIO getCurrentMicrotime
+  let ingestTxs = IETx ts . IngestTx origin <$> txs
+  output ingestTxs
 
-emitKafkaBlock :: (m `Outputs` [IngestEvent])
-               => Origin.TXOrigin -> Block -> m ()
+emitKafkaBlock ::
+  (m `Outputs` [IngestEvent]) =>
+  Origin.TXOrigin ->
+  Block ->
+  m ()
 emitKafkaBlock origin baseBlock = do
-    let ingestBlock = IEBlock $ blockToIngestBlock origin baseBlock
-    output [ingestBlock]
+  let ingestBlock = IEBlock $ blockToIngestBlock origin baseBlock
+  output [ingestBlock]
 
 emitKafkaChainDetails :: (m `Outputs` [IngestEvent]) => Origin.TXOrigin -> Word256 -> ChainInfo -> m ()
 emitKafkaChainDetails origin chainId details = do
-    let ingestGenesis = IEGenesis (IngestGenesis origin (chainId, details))
-    output [ingestGenesis]
+  let ingestGenesis = IEGenesis (IngestGenesis origin (chainId, details))
+  output [ingestGenesis]
 
 emitBlockstanbulMsg :: (m `Outputs` [IngestEvent]) => PBFT.WireMessage -> m ()
 emitBlockstanbulMsg wm = output [IEBlockstanbul wm]

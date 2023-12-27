@@ -10,6 +10,7 @@ description:
 
 dependencies:
   - base
+  - bytestring
   - ethereum-rlp
   - leveldb-haskell
   - monad-alter
@@ -24,11 +25,14 @@ library:
   - ansi-wl-pprint
   - base16-bytestring
   - binary
-  - bytestring
+  - conduit
   - containers
   - data-default
+  - data-fix
   - deepseq
   - format
+  - mtl
+  - Ranged-sets
 
 
 tests:
@@ -49,7 +53,6 @@ benchmarks:
     source-dirs: bench/
     ghc-options: -dynamic
     dependencies:
-      - bytestring
       - criterion
       - deepseq
       - directory

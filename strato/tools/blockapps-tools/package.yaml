@@ -44,14 +44,12 @@ library:
     - monad-alter
     - monad-loops
     - nibblestring
-    - persistent
     - persistent-postgresql
     - resourcet
     - seqevents
     - strato-conf
     - strato-index
     - strato-model
-    - strato-p2p
     - strato-redis-blockdb
     - strato-sequencer
     - strato-statediff
@@ -68,7 +66,6 @@ executables:
     main: Main.hs
     other-modules: []
     dependencies:
-      - base16-bytestring
       - blockapps-tools
       - bytestring
       - cmdargs
@@ -84,7 +81,6 @@ executables:
     main: B16Decode.hs
     dependencies:
       - base
-      - base16-bytestring
       - bytestring
       - labeled-error
     other-modules: []

@@ -1,12 +1,12 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module BlockApps.Init ( blockappsInit ) where
+module BlockApps.Init (blockappsInit) where
 
+import BlockApps.Crossmon
 import BlockApps.Logging (LoggingT)
-import Control.Monad
 import Control.Concurrent
-import Control.Monad.IO.Class (liftIO)
+import Control.Monad
 import Control.Monad.Trans.Resource (ResourceT)
 import Data.List (intercalate)
 import Data.Text hiding (intercalate)
@@ -17,10 +17,8 @@ import Prometheus
 import System.IO
 import System.Posix.Signals
 
-import Blockapps.Crossmon
-
-instance MonadMonitor (ResourceT (LoggingT IO)) where
-    doIO = liftIO
+instance (MonadMonitor m) => MonadMonitor (ResourceT m)
+instance (MonadMonitor m) => MonadMonitor (LoggingT m)
 
 foreign import ccall unsafe "execvp"
   c_execvp :: CString -> Ptr CString -> IO CInt
@@ -29,7 +27,7 @@ selfExec :: IO ()
 selfExec = do
   tid <- myThreadId
   putStrLn $ "attempting to self exec " ++ show tid
-  argv@(cmd:_) <- getFullArgs
+  argv@(cmd : _) <- getFullArgs
   putStrLn $ "caught sig-hup; self-reexec: " ++ intercalate " " argv
   hFlush stdout
   cmdC <- newCString cmd
@@ -41,10 +39,10 @@ selfExec = do
 blockappsInit :: Text -> IO ()
 blockappsInit self = do
   --Try and initialize a centralized location for all manager information
-  --Try and initialize a centralized location for all of the OAuth information (usually get from the getting-started script) 
-    --Try and initialize normal exchange token
-      --Try and initialize a normal refresh token 
-        --Refresh token doesn't exist if there hasn't been an update, initialize when it is first created
+  --Try and initialize a centralized location for all of the OAuth information (usually get from the getting-started script)
+  --Try and initialize normal exchange token
+  --Try and initialize a normal refresh token
+  --Refresh token doesn't exist if there hasn't been an update, initialize when it is first created
   --try to initialize the accessToken space
   -- accessToken <- case (tryReadTMVar accessToken) of
   --   Nothing -> newTMVar accessToken ()

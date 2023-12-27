@@ -6,13 +6,11 @@ synopsis: a microservice that handles peer to peer connections for strato
 
 dependencies:
   - base
-  - blockapps-data
   - common-log
-  - extra
   - vm-tools
-  - x509-certs
 
 ghc-options: -Wall -threaded
+
 
 executables:
   strato-p2p:
@@ -24,6 +22,7 @@ executables:
       - hflags
       - lifted-async
       - ordered-containers
+      - strato-model
       - strato-p2p
       - wai-middleware-prometheus
       - warp
@@ -37,11 +36,14 @@ library:
     - alarmclock
     - ansi-wl-pprint
     - base16-bytestring
+    - blockapps-data
     - blockapps-datadefs
     - blockapps-vault-wrapper-api
     - blockapps-vault-wrapper-client
     - blockstanbul
+    - broadcast-chan
     - bytestring
+    - composable-monads-base
     - conduit
     - conduit-extra
     - containers
@@ -69,6 +71,7 @@ library:
     - milena
     - milena-tools
     - monad-alter
+    - monad-logger
     - monadIO
     - mtl
     - network
@@ -88,14 +91,13 @@ library:
     - strato-redis-blockdb
     - text
     - these
+    - thread-hierarchy
     - time
     - transformers
     - unliftio-core
-    - unliftio
-    - vm-tools
+    - unliftio 
     - warp
     - x509-certs
-
 
 tests:
   strato-p2p-client-test:
@@ -103,8 +105,8 @@ tests:
     ghc-options: -Wall -Werror -dynamic
     main: Main.hs
     dependencies:
-      - QuickCheck
       - base16-bytestring
+      - blockapps-data
       - blockapps-datadefs
       - blockapps-mpdbs
       - blockapps-privacy
@@ -118,11 +120,9 @@ tests:
       - ethereum-encryption
       - ethereum-discovery
       - ethereum-rlp
+      - extra
       - hflags
       - hspec
-      - hspec-expectations-lifted
-      - hourglass
-      - labeled-error
       - lens
       - merkle-patricia-db
       - monad-alter
@@ -131,8 +131,6 @@ tests:
       - nibblestring
       - ordered-containers
       - Ranged-sets
-      - raw-strings-qq
-      - secp256k1-haskell
       - seqevents
       - stm-chans
       - stm-conduit
@@ -140,10 +138,11 @@ tests:
       - strato-model
       - strato-p2p
       - strato-sequencer
+      - strato-redis-blockdb
       - text
+      - thread-hierarchy
       - time
       - unliftio
       - vm-runner
       - vm-tools
       - x509-certs
-  

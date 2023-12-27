@@ -1,41 +1,33 @@
-module KV (
-  KV(..),
-  Value(..),
-  c2n,
-  formatKV
-  ) where
-
-
-import qualified Data.NibbleString as N
+module KV
+  ( KV (..),
+    Value (..),
+    c2n,
+    formatKV,
+  )
+where
 
 --import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia.NodeData as MP
+import qualified Data.NibbleString as N
 
-
-data NodePtr = NodePtr String deriving Show
+data NodePtr = NodePtr String deriving (Show)
 
 --data Node = KVNode String Value deriving Show
 
-data KV = KV {
-  theKey :: [N.Nibble],
-  theValue :: Either MP.NodeRef MP.Val
-  } deriving Show
+data KV = KV
+  { theKey :: [N.Nibble],
+    theValue :: Either MP.NodeRef MP.Val
+  }
+  deriving (Show)
 
-data Value = StringValue String | NodePtrValue MP.NodeRef deriving Show
-
-
-
+data Value = StringValue String | NodePtrValue MP.NodeRef deriving (Show)
 
 --------------------
 
-
-
 formatKV :: KV -> String
 formatKV (KV key (Right v)) = map n2c key ++ " " ++ show v
-formatKV (KV key (Left (MP.PtrRef np))) = map n2c key ++ " node:(" ++ show np ++ ")"
-formatKV (KV key (Left (MP.SmallRef np))) = map n2c key ++ " small:(" ++ show np ++ ")"
-
-
+formatKV (KV key (Left (Right np))) = map n2c key ++ " node:(" ++ show np ++ ")"
+formatKV (KV key (Left (Left np))) = map n2c key ++ " small:(" ++ show np ++ ")"
 
 c2n :: Char -> N.Nibble
 c2n '0' = 0

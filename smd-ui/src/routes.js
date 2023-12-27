@@ -13,6 +13,7 @@ import App from './App';
 import CodeEditor from './components/CodeEditor';
 import ExternalStorage from './components/ExternalStorage';
 import Chains from './components/Chains'
+import SearchResults from './components/SearchResults';
 
 export const routes =
   <Switch>
@@ -31,4 +32,5 @@ export const routes =
     <Route exact path="/contracts" component={Contracts} />
     <Route exact path="/contracts/:name/query" component={ContractQuery} />
     <Route exact path="/code_editor" component={CodeEditor} />
+    <Route exact path="/searchresults" component={SearchResults} />
   </Switch>

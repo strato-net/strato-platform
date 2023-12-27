@@ -57,7 +57,6 @@ AddressStateRef
     nonce Integer sqltype=numeric(1000,0)
     balance Integer sqltype=numeric(1000,0)
     contractRoot StateRoot
-    code BS.ByteString
     codeHash Keccak256 Maybe
     contractName String Maybe
     codePtrAddress Address Maybe
@@ -65,6 +64,12 @@ AddressStateRef
     chainId Word256 default='0000000000000000000000000000000000000000000000000000000000000000'
     latestBlockDataRefNumber Integer
     UniqueAddress address chainId
+    deriving Eq Read Show
+
+CodeRef
+    codeHash Keccak256
+    code BS.ByteString
+    UniqueCodeHash codeHash
     deriving Eq Read Show
 
 RawTransaction
@@ -122,30 +127,6 @@ UserN json
     numLogins Int
     verified Bool
     verkey BS.ByteString
-    deriving Eq Read Show
-
-UserData json
-    encryptedWallet String
-    address Address
-    userId UserNId
-    deriving Eq Read Show
-
-BlockApp json
-    name String
-    developerName String
-    developerEmail String
-    appUrl String
-    repoUrl String Maybe
-    loginPassHash BS.ByteString
-    verified Bool
-    verkey BS.ByteString
-    deriving Eq Read Show
-
-BlockAppLogin json
-    userId UserNId
-    blockAppId BlockAppId
-    timestamp UTCTime
-    ip String
     deriving Eq Read Show
 
 Extra
@@ -217,3 +198,4 @@ ChainMetadataRef
     key String
     value String
     deriving Eq Generic Show
+

@@ -1,35 +1,33 @@
-{-# LANGUAGE ConstraintKinds      #-}
-{-# LANGUAGE FlexibleContexts     #-}
-{-# LANGUAGE TypeApplications     #-}
-{-# LANGUAGE TypeOperators        #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeOperators #-}
 
-module Blockchain.DB.BlockSummaryDB (
-  BlockSummaryDB(..),
-  HasBlockSummaryDB,
-  genericLookupBlockSummaryDB,
-  genericInsertBlockSummaryDB,
-  genericDeleteBlockSummaryDB,
-  putBSum,
-  getBSum,
-  hasBSum
-  ) where
+module Blockchain.DB.BlockSummaryDB
+  ( BlockSummaryDB (..),
+    HasBlockSummaryDB,
+    genericLookupBlockSummaryDB,
+    genericInsertBlockSummaryDB,
+    genericDeleteBlockSummaryDB,
+    putBSum,
+    getBSum,
+    hasBSum,
+  )
+where
 
+import Blockchain.Data.BlockSummary
+import Blockchain.Data.RLP
+import Blockchain.Strato.Model.Keccak256
+import Control.DeepSeq
+import qualified Control.Monad.Change.Alter as A
+import Control.Monad.IO.Class
+import Data.Binary
+import qualified Data.ByteString.Lazy as BL
+import Data.Maybe
+import qualified Database.LevelDB as LDB
+import Text.Format
 
-import           Control.DeepSeq
-import qualified Control.Monad.Change.Alter   as A
-import           Control.Monad.IO.Class
-import           Data.Binary
-import qualified Data.ByteString.Lazy         as BL
-import           Data.Maybe
-import qualified Database.LevelDB             as LDB
-
-import           Blockchain.Data.BlockSummary
-import           Blockchain.Data.RLP
-import           Blockchain.Strato.Model.Keccak256
-
-import           Text.Format
-
-newtype BlockSummaryDB = BlockSummaryDB { unBlockSummaryDB :: LDB.DB }
+newtype BlockSummaryDB = BlockSummaryDB {unBlockSummaryDB :: LDB.DB}
 
 instance NFData BlockSummaryDB where
   rnf (BlockSummaryDB db) = db `seq` ()
@@ -53,8 +51,8 @@ genericDeleteBlockSummaryDB f blockHash = do
 
 getBSum :: HasBlockSummaryDB m => Keccak256 -> m BlockSummary
 getBSum blockHash =
-  fromMaybe (error $ "missing value in block summary DB: " ++ format blockHash) <$>
-    A.lookup (A.Proxy @BlockSummary) blockHash
+  fromMaybe (error $ "missing value in block summary DB: " ++ format blockHash)
+    <$> A.lookup (A.Proxy @BlockSummary) blockHash
 
 putBSum :: HasBlockSummaryDB m => Keccak256 -> BlockSummary -> m ()
 putBSum = A.insert (A.Proxy @BlockSummary)

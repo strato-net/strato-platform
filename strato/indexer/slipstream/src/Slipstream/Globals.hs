@@ -1,150 +1,216 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 
 module Slipstream.Globals
-  (
-    setTableCreated,
+  ( setTableCreated,
     getTableColumns,
+    getMappingTables,
     isTableCreated,
     setContractState,
-    xabiToText,
     flushPendingWrites,
     getContractState,
-    setHistoryTable,
-    historyStatusCreated,
-    setSolidVMInfo,
-    getSolidVMInfo,
+    getCCFromGlobals,
+    putCCIntoGlobals,
     forceGlobalEval,
     newGlobals,
-    isHistoric,
-    module Slipstream.Data.Globals
-  ) where
+    getDelegates,
+    addDelegate,
+    module Slipstream.Data.Globals,
+  )
+where
 
+import BlockApps.Solidity.Value
+import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Keccak256
+import Control.DeepSeq
+import Control.Monad
+import Control.Monad.IO.Class
+import qualified Data.Cache.LRU as LRU
+import Data.Either.Extra
+import qualified Data.Map.Strict as M
+import Data.Maybe (isJust, mapMaybe)
+import Data.Set as S (insert, member)
+import qualified Data.Text as T
+import Data.Text.Encoding (decodeUtf8, encodeUtf8)
+import Database.PostgreSQL.Typed (PGConnection, pgQuery)
+import Database.PostgreSQL.Typed.Types
+import Slipstream.Data.Globals
+import Slipstream.GlobalsColdStorage
+import Slipstream.Metrics
+import Slipstream.QueryFormatHelper
+import SolidVM.Model.CodeCollection
+import UnliftIO.IORef
 
-import           Control.DeepSeq
+{-# INLINE lru #-}
+lru :: Ord k => LRU.LRU k v
+lru = LRU.newLRU (Just 1024)
 
-import           Control.Monad
-import           Control.Monad.IO.Class
-import qualified Data.Aeson as JSON
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.Cache.LRU              as LRU
-import           Data.Either.Extra
-import qualified Data.HashMap.Strict         as HM
-import qualified Data.Map.Strict              as M
---import           Data.Set                    (Set)
-import qualified Data.Set                    as Set
-import           Data.Text                   (Text)
-import qualified Data.Text                   as T
-import           Data.Text.Encoding          (decodeUtf8)
-import           UnliftIO.IORef
-
-import           BlockApps.Logging
-import           BlockApps.Solidity.Value
-import           BlockApps.Solidity.Xabi     (Xabi(..))
-import           Blockchain.Strato.Model.Account
-import           Blockchain.Strato.Model.CodePtr
-
-import           Slipstream.Data.Globals
-import           Slipstream.GlobalsColdStorage
-import           Slipstream.Metrics
-
-newGlobals :: MonadIO m => Handle -> m (IORef Globals)
-newGlobals = newIORef . Globals M.empty M.empty Set.empty HM.empty (LRU.newLRU (Just 1024))
+newGlobals :: MonadIO m => Handle -> CirrusHandle -> m (IORef Globals)
+newGlobals h ch = newIORef $ Globals M.empty lru lru lru h ch
 
 updateGlobals :: MonadIO m => IORef Globals -> Globals -> m ()
 updateGlobals gref g = do
   recordGlobals g
   writeIORef gref g
 
-
-xabiToText :: Xabi -> Text
-xabiToText = T.replace "\'" "\'\'"
-           . decodeUtf8 . BL.toStrict
-           . JSON.encode
-
-setSolidVMInfo :: MonadIO m => IORef Globals -> CodePtr -> M.Map Text CodePtr -> m ()
-setSolidVMInfo gref (SolidVMCode _ !codeHash) infoMap = do 
-  globals@Globals{..} <- readIORef gref
-  updateGlobals gref globals{solidVMInfo=HM.insert codeHash infoMap solidVMInfo}
-setSolidVMInfo _ (EVMCode _) _ = error "Cannot use the SolidVMInfo cache for EVM contracts"
-setSolidVMInfo _ (CodeAtAccount _ _) _ = error "Cannot use the SolidVMInfo cache for CodeAtAccount contracts"
-
-getSolidVMInfo :: MonadIO m => IORef Globals -> CodePtr -> m (Maybe (M.Map Text CodePtr))
-getSolidVMInfo gref (SolidVMCode _ !codeHash) = do
-  info <- solidVMInfo <$> readIORef gref
-  return $ HM.lookup codeHash info
-getSolidVMInfo _ (EVMCode _) = error "Cannot use the SolidVMInfo cache for EVM contracts"
-getSolidVMInfo _ (CodeAtAccount _ _) = error "Cannot use the SolidVMInfo cache for CodeAtAccount contracts"
-
 setTableCreated :: MonadIO m => IORef Globals -> TableName -> TableColumns -> m ()
 setTableCreated globalsIORef tableName tableColumns = do
-  globals@Globals{..} <- readIORef globalsIORef
-  updateGlobals globalsIORef globals{createdTables=M.insert tableName tableColumns createdTables}
+  globals@Globals {..} <- readIORef globalsIORef
+  updateGlobals globalsIORef globals {createdTables = M.insert tableName tableColumns createdTables}
 
 isTableCreated :: MonadIO m => IORef Globals -> TableName -> m Bool
 isTableCreated globalsIORef tableName = do
-  Globals{..} <- readIORef globalsIORef
-  return $ tableName `M.member` createdTables
+  Globals {..} <- readIORef globalsIORef
+  if tableName `M.member` createdTables
+    then return True
+    else -- if table not in map, query cirrus to check if it's made
+    do
+      createdTables' <- scrapeFor globalsIORef tableName
+      return $ tableName `M.member` createdTables'
+
+getMappingTables :: MonadIO m => IORef Globals -> T.Text -> T.Text -> T.Text -> m [T.Text]
+getMappingTables globalsIORef org app contract = do
+  createdTables <- scrapeFor globalsIORef (MappingTableName org app contract "") -- empty map name to get all map tables
+  let mappingTables = M.filterWithKey isMappingTableName createdTables
+        where
+          isMappingTableName :: TableName -> TableColumns -> Bool
+          isMappingTableName (MappingTableName o a n _) _ =
+            o == org && a == app && n == contract
+          isMappingTableName _ _ = False
+  let mapNames = map mtMappingName (M.keys mappingTables)
+  return mapNames
 
 getTableColumns :: MonadIO m => IORef Globals -> TableName -> m (Maybe TableColumns)
 getTableColumns globalsIORef tableName = do
-  Globals{..} <- readIORef globalsIORef
-  return $ M.lookup tableName createdTables
-
-isHistoric :: (MonadLogger m, MonadIO m) => IORef Globals -> TableName -> m Bool
-isHistoric globalsIORef name = do
-  Globals{..} <- readIORef globalsIORef
-  let h = M.findWithDefault False name historyList
-  $logInfoS "isHistoric" $ T.pack $ show name ++ ": " ++ show h
-  return h
-
-setHistoryTable :: (MonadIO m, MonadLogger m) => IORef Globals -> TableName -> Bool -> m ()
-setHistoryTable g tableName b = do
-  globals@Globals{..} <- readIORef g
-  if tableName `M.notMember` historyList then do
-    $logInfoS "enableHistoryTable" . T.pack $ "Adding and setting history table: " ++ show tableName ++ "to: " ++ show b
-    updateGlobals g globals{historyList=M.insert tableName b historyList}
+  Globals {..} <- readIORef globalsIORef
+  let columns = M.lookup tableName createdTables
+  if isJust columns
+    then return columns
     else do
-      $logInfoS "enableHistoryTable" . T.pack $ "Cannot set history for contract after it has been set. " ++ show tableName
-      return ()
+      createdTables' <- scrapeFor globalsIORef tableName
+      return $ M.lookup tableName createdTables'
 
-historyStatusCreated :: (MonadIO m, MonadLogger m)=> IORef Globals -> TableName -> m Bool
-historyStatusCreated g tableName = do
-  Globals{..} <- readIORef g
-  let h = tableName `M.member` historyList
-  $logDebugS "historyStatusCreated" $ T.pack $ show h
-  return h
+-- scrape cirrus for a table and return the (potentially updated) createdTables map
+scrapeFor :: MonadIO m => IORef Globals -> TableName -> m (M.Map TableName TableColumns)
+scrapeFor globalsIORef tableName = do
+  Globals {..} <- readIORef globalsIORef
+  case cirrusHandle of
+    FakeCirrusHandle -> return createdTables
+    CirrusHandle {..} -> case tableName of
+      MappingTableName org app contract _ | (org, app, contract) `S.member` queriedMaps -> return createdTables
+      MappingTableName org app contract "" -> do
+        let theMapTablesQuery = queryForMatchingTables $ MappingTableName org app contract ""
+        results :: [PGValues] <- liftIO $ pgQuery cirrusConn theMapTablesQuery
+        forM_
+          results
+          ( \case
+              [PGTextValue tn] -> do
+                cols <- scrapeForCols (wrapSingleQuotes $ decodeUtf8 tn) cirrusConn
+                let mapName = last $ T.splitOn "." (decodeUtf8 tn)
+                setTableCreated globalsIORef (MappingTableName org app contract mapName) cols
+              _ -> return ()
+          )
+        g@Globals {createdTables = createdTables'} <- readIORef globalsIORef -- need to read again so have current ver of createdTables
+        updateGlobals globalsIORef g {cirrusHandle = cirrusHandle {queriedMaps = (org, app, contract) `S.insert` queriedMaps}}
+        return createdTables'
+      _ -> do
+        cols <- scrapeForCols (tableNameToSingleQuoteText tableName) cirrusConn
+        if null cols
+          then return createdTables
+          else do
+            setTableCreated globalsIORef tableName cols
+            Globals {createdTables = createdTables'} <- readIORef globalsIORef
+            return createdTables'
+  where
+    scrapeForCols :: MonadIO m => T.Text -> PGConnection -> m TableColumns
+    scrapeForCols tn cirrusConn = do
+      results :: [PGValues] <- liftIO $ pgQuery cirrusConn $ queryForCols tn
+      return $
+        mapMaybe
+          ( \case
+              [PGTextValue colName, PGTextValue colDataType] -> Just $ wrapDoubleQuotes (escapeQuotes $ decodeUtf8 colName) <> " " <> decodeUtf8 colDataType
+              _ -> Nothing
+          )
+          results
+    queryForCols t = encodeUtf8 $ "SELECT column_name, data_type FROM information_schema.columns WHERE table_name=" <> t <> ";"
+    queryForMatchingTables t =
+      let t' = wrapSingleQuotes . wrap1 "%" . escapeUnderscores . escapeQuotes $ tableNameToTextPostgres t
+       in encodeUtf8 $ "SELECT table_name from information_schema.tables WHERE table_name like " <> t' <> ";"
 
-getContractState :: MonadIO m => IORef Globals -> Account -> m (Maybe [(Text,Value)])
+getContractState :: MonadIO m => IORef Globals -> Account -> m (Maybe [(T.Text, Value)])
 getContractState globalsIORef account = do
-  g@Globals{..} <- readIORef globalsIORef
+  g@Globals {..} <- readIORef globalsIORef
   case LRU.lookup account contractStates of
-    (newCache, jv@Just{}) -> do
+    (newCache, jv@Just {}) -> do
       recordCacheHit
-      writeIORef globalsIORef g{contractStates = newCache }
+      writeIORef globalsIORef g {contractStates = newCache}
       return jv
     (newCache, Nothing) -> do
       recordCacheMiss
-      mvs <- eitherToMaybe <$> liftIO (readStorage csHandle account)
+      mvs <- eitherToMaybe <$> liftIO (readStorage coldStorageHandle account)
       forM_ mvs $ \vs ->
         let newCache' = LRU.insert account vs newCache
-        in writeIORef globalsIORef g{contractStates = newCache' }
+         in writeIORef globalsIORef g {contractStates = newCache'}
       return mvs
 
-setContractState :: MonadIO m => IORef Globals -> Account -> [(Text,Value)] -> m ()
+setContractState :: MonadIO m => IORef Globals -> Account -> [(T.Text, Value)] -> m ()
 setContractState gref account values = do
-  globals@Globals{..} <- readIORef gref
-  updateGlobals gref globals{contractStates = LRU.insert account values contractStates}
-  asyncWriteToStorage csHandle account values
+  globals@Globals {..} <- readIORef gref
+  updateGlobals gref globals {contractStates = LRU.insert account values contractStates}
+  asyncWriteToStorage coldStorageHandle account values
+
+getCCFromGlobals :: MonadIO m => IORef Globals -> Keccak256 -> m (Maybe CodeCollection)
+getCCFromGlobals globalsIORef codeHash = do
+  g@Globals {..} <- readIORef globalsIORef
+  case LRU.lookup codeHash ccMap of
+    (newCache, jv@Just {}) -> do
+      recordCacheHit
+      writeIORef globalsIORef g {ccMap = newCache}
+      return jv
+    (newCache, Nothing) -> do
+      recordCacheMiss
+      writeIORef globalsIORef g {ccMap = newCache}
+      return Nothing
+
+putCCIntoGlobals :: MonadIO m => IORef Globals -> Keccak256 -> CodeCollection -> m ()
+putCCIntoGlobals gref codeHash cc = do
+  globals@Globals {..} <- readIORef gref
+  updateGlobals gref globals {ccMap = LRU.insert codeHash cc ccMap}
+
+getDelegates :: MonadIO m => IORef Globals -> Account -> m [Account]
+getDelegates globalsIORef acct = do
+  g@Globals {..} <- readIORef globalsIORef
+  case LRU.lookup acct delegateMap of
+    (newCache, Just jv) -> do
+      recordCacheHit
+      writeIORef globalsIORef g {delegateMap = newCache}
+      return $ reverse jv
+    (newCache, Nothing) -> do
+      recordCacheMiss
+      writeIORef globalsIORef g {delegateMap = newCache}
+      return []
+
+addDelegate :: MonadIO m => IORef Globals -> Account -> Account -> m ()
+addDelegate gref acct delegate = do
+  g@Globals {..} <- readIORef gref
+  case LRU.lookup acct delegateMap of
+    (newCache, Just jv) -> do
+      recordCacheHit
+      writeIORef gref g {delegateMap = LRU.insert acct (delegate : jv) newCache}
+    (newCache, Nothing) -> do
+      recordCacheMiss
+      writeIORef gref g {delegateMap = LRU.insert acct [delegate] newCache}
 
 forceGlobalEval :: (MonadIO m) => IORef Globals -> m ()
 forceGlobalEval gref = liftIO $ modifyIORef' gref force
 
 flushPendingWrites :: MonadIO m => IORef Globals -> m ()
 flushPendingWrites gref = do
-  Globals{..} <- readIORef gref
-  syncStorage csHandle
+  Globals {..} <- readIORef gref
+  syncStorage coldStorageHandle

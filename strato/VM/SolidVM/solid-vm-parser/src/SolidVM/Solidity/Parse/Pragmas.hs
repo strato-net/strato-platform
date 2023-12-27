@@ -1,17 +1,18 @@
+{-# LANGUAGE RecordWildCards #-}
+{-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
+
 -- |
 -- Module: Pragmas
 -- Description: Parsers for Solidity pragmas
 -- Maintainer: Dustin Norwood <dustin@blockapps.net>
-{-# LANGUAGE RecordWildCards #-}
-{-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 module SolidVM.Solidity.Parse.Pragmas (solidityPragma) where
 
-import           Data.Source
-import           Text.Parsec
-
-import           SolidVM.Solidity.Parse.Declarations
-import           SolidVM.Solidity.Parse.Lexer
-import           SolidVM.Solidity.Parse.ParserTypes
+import Control.Monad (when)
+import Data.Source
+import SolidVM.Solidity.Parse.Declarations
+import SolidVM.Solidity.Parse.Lexer
+import SolidVM.Solidity.Parse.ParserTypes
+import Text.Parsec
 
 solidityPragma :: SolidityParser SourceUnit
 solidityPragma = do
@@ -20,9 +21,10 @@ solidityPragma = do
     -- this is the word immediately following the pragma keyword (typically it is 'solidvm')
     pragmaName <- identifier
     -- The follow is anything else after the pragmaName.
-    rest <- many1 (noneOf ";")
+    rest <- many (noneOf ";")
     -- Modify the state of the parser to change the pragma version if a new version is found
-    modifyState(\s -> s { pragmaVersion = rest })
+    when (pragmaName == "solidvm") $ modifyState (\s -> s {pragmaVersion = rest})
+    addPragma pragmaName rest
     semi
     pure (pragmaName, rest)
   return $ Pragma a pragmaName rest

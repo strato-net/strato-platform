@@ -10,6 +10,7 @@ dependencies:
   - crypto-pubkey-types
   - deepseq
   - ethereum-rlp
+  - evm-solidity
   - format
   - generic-arbitrary
   - generic-random

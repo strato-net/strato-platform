@@ -1,26 +1,15 @@
-FROM node:8.15-stretch-slim
-RUN apt-get update && \
-    mkdir -p /usr/share/man/man1 /usr/share/man/man7 && \
-    apt-get install -y git postgresql-client zip python build-essential && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
-    mkdir -p /usr/src/app
-
-# /usr/share/man/ required for postgres-client on debian slim
-# postgres-client is required for pgtools module; also used for container health check
-
-WORKDIR /usr/src/app
-
-EXPOSE 3009
-
-COPY package*.json  /usr/src/app/
-
-RUN npm install
-
-COPY . /usr/src/app
-
+FROM node:18.18-alpine3.18
 ARG STRATO_VERSION
-
 ENV STRATO_VERSION=${STRATO_VERSION}
-
-CMD [ "bash", "-c", "/usr/src/app/docker-run.sh" ]
+RUN apk add --no-cache postgresql-client curl lsof && \
+    mkdir -p /usr/src/app
+    # postgres-client is required for pgtools module
+WORKDIR /usr/src/app
+EXPOSE 3009
+HEALTHCHECK --interval=5s --timeout=2s --start-period=180s \
+  CMD lsof -i :3009 || \
+    exit 1
+COPY package*.json  /usr/src/app/
+RUN npm install
+COPY . /usr/src/app
+CMD [ "sh", "-c", "/usr/src/app/docker-run.sh" ]

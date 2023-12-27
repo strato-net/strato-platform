@@ -18,12 +18,23 @@ class Chain extends Component {
     if (chain && chain.info && chain.info.members && chain.info.members.length > 0) { 
       const members = chain.info.members;
       return members.map((member, index) => {
+        const { orgName, orgUnit, commonName, access } = member
+        if (orgName == "" && orgUnit == "" && commonName == "") {
           return (
             <tr key={index}>
-              <td>{member.orgName}</td>
-              <td>{member.orgUnit}</td>
-              <td>{member.commonName}</td>
-              <td>{member.access.toString()}</td>
+              <td>Everyone</td>
+              <td></td>
+              <td></td>
+              <td>{access.toString()}</td>
+            </tr>
+          )
+        }
+          return (
+            <tr key={index}>
+              <td>{orgName}</td>
+              <td>{orgUnit}</td>
+              <td>{commonName}</td>
+              <td>{access.toString()}</td>
             </tr>
           )
         })
@@ -44,18 +55,41 @@ class Chain extends Component {
       id,
       chain
     } = this.props;
-
-    
-
+    const testDapps = {
+      "BAB": "adksjfhalksjdfhlasdjkfalksdfaklsdjfhalksdjf"
+    }
     return (
       <div className="pt-card address-margin-bottom" key={label}>
         <div className="row smd-pad-2 smd-margin-4 smd-vertical-center">
           <div className="col-sm-10">
             <h5>
-              Chain Id: &nbsp;&nbsp; <HexText value={id} classes="smd-pad-2" />
+              Shard Id: &nbsp;&nbsp; <HexText value={id} classes="smd-pad-2" />
             </h5>
           </div>
         </div>
+        <div className="row smd-pad-2 smd-margin-4 smd-vertical-center">
+          <div className="col-sm-2">
+            <h5>
+              Dapp Integrations: 
+            </h5>
+          </div>
+          <div className="col-sm-6">
+            {
+              (this.props.chain && this.props.chain.info && Object.entries(this.props.chain.info.parentChains).length == 0) && 'None'
+            }
+          </div>
+          </div>
+          {
+            this.props.chain && this.props.chain.info && 
+            Object.entries(this.props.chain.info.parentChains).length > 0 && 
+            Object.entries(this.props.chain.info.parentChains).map(([label, chainId]) => {
+              return <div className="row smd-pad-2 smd-margin-4 smd-vertical-center">&nbsp; &nbsp;
+                      <strong className='col-sm-2 text-right '>{label}:</strong>
+                      <HexText value={chainId} className="col-sm-8"/>
+                    </div> 
+
+            })
+          }
 
         <div key ={chain}>
         <table className="pt-table pt-str chain-detail" >

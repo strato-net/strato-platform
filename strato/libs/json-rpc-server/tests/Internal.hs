@@ -1,31 +1,34 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Internal ( request
-                , errRsp
-                , rpcErr
-                , defaultIdErrRsp
-                , nullIdErrRsp
-                , array
-                , rspToIdString
-                , defaultRq
-                , defaultRsp
-                , method
-                , params
-                , id'
-                , version
-                , result) where
+module Internal
+  ( request,
+    errRsp,
+    rpcErr,
+    defaultIdErrRsp,
+    nullIdErrRsp,
+    array,
+    rspToIdString,
+    defaultRq,
+    defaultRsp,
+    method,
+    params,
+    id',
+    version,
+    result,
+  )
+where
 
-import qualified Data.Aeson as A
 import Data.Aeson ((.=))
+import qualified Data.Aeson as A
 #if MIN_VERSION_aeson(2,0,0)
 import qualified Data.Aeson.KeyMap as H
 #else
 import qualified Data.HashMap.Strict as H
 #endif
 import Data.Maybe (catMaybes)
-import qualified Data.Vector as V
 import Data.Text (Text)
+import qualified Data.Vector as V
 
 #if !MIN_VERSION_base(4,8,0)
 import Control.Applicative ((<$>))
@@ -39,14 +42,19 @@ rspToIdString (A.Object rsp) = show <$> H.lookup "id" rsp
 rspToIdString _ = Nothing
 
 request :: Maybe A.Value -> Text -> Maybe A.Value -> A.Value
-request i m args = A.object $ catMaybes [ Just $ "method" .= A.String m
-                                        , ("params" .=) <$> args
-                                        , ("id" .=) <$> i
-                                        , Just ("jsonrpc" .= A.String "2.0")]
+request i m args =
+  A.object $
+    catMaybes
+      [ Just $ "method" .= A.String m,
+        ("params" .=) <$> args,
+        ("id" .=) <$> i,
+        Just ("jsonrpc" .= A.String "2.0")
+      ]
 
 defaultRq :: A.Value
 defaultRq = request (Just defaultId) "subtract" args
-    where args = Just $ A.object ["x" .= A.Number 1, "y" .= A.Number 2]
+  where
+    args = Just $ A.object ["x" .= A.Number 1, "y" .= A.Number 2]
 
 response :: A.Value -> Key -> A.Value -> A.Value
 response i key res = A.object ["id" .= i, key .= res, "jsonrpc" .= A.String "2.0"]
@@ -64,8 +72,9 @@ errRsp :: A.Value -> Int -> A.Value
 errRsp i code = response i "error" $ rpcErr Nothing code ""
 
 rpcErr :: Maybe A.Value -> Int -> Text -> A.Value
-rpcErr d code msg = A.object $ ["code" .= code, "message" .= msg] ++ dataPair 
-    where dataPair = catMaybes [("data" .=) <$> d]
+rpcErr d code msg = A.object $ ["code" .= code, "message" .= msg] ++ dataPair
+  where
+    dataPair = catMaybes [("data" .=) <$> d]
 
 method :: A.Value -> Text -> A.Value
 method rq m = insert rq "method" $ Just $ A.String m

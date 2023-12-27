@@ -1,30 +1,25 @@
 {-# LANGUAGE FlexibleContexts #-}
+
 module Blockchain.Strato.Indexer.Kafka
-    ( indexEventsTopicName
-    , assertTopicCreation
-    , readIndexEvents
-    , readIndexEventsFromTopic
-    , writeIndexEvents
-    ) where
+  ( indexEventsTopicName,
+    readIndexEvents,
+    writeIndexEvents,
+  )
+where
 
-import           Control.Monad.IO.Class
-import           Data.Binary
-
-import qualified Data.ByteString.Lazy            as L
-import qualified Network.Kafka                   as K
-import qualified Network.Kafka.Producer          as KW
-import qualified Network.Kafka.Protocol          as KP
-
-import           Blockchain.KafkaTopics          (lookupTopic)
-import           Blockchain.Strato.Indexer.Model
-import           Blockchain.Stream.Raw           (fetchBytes, setDefaultKafkaState)
-import           Blockchain.MilenaTools
+import Blockchain.KafkaTopics (lookupTopic)
+import Blockchain.MilenaTools
+import Blockchain.Strato.Indexer.Model
+import Blockchain.Stream.Raw (fetchBytes, setDefaultKafkaState)
+import Control.Monad.IO.Class
+import Data.Binary
+import qualified Data.ByteString.Lazy as L
+import qualified Network.Kafka as K
+import qualified Network.Kafka.Producer as KW
+import qualified Network.Kafka.Protocol as KP
 
 indexEventsTopicName :: KP.TopicName
 indexEventsTopicName = lookupTopic "indexevents"
-
-assertTopicCreation :: K.Kafka k => k ()
-assertTopicCreation = K.updateMetadata indexEventsTopicName
 
 readIndexEvents :: K.Kafka k => KP.Offset -> k [IndexEvent]
 readIndexEvents = readIndexEventsFromTopic indexEventsTopicName
@@ -34,7 +29,8 @@ readIndexEventsFromTopic topic offset = setDefaultKafkaState >> map (decode . L.
 
 writeIndexEvents :: K.Kafka k => [IndexEvent] -> k [KP.ProduceResponse]
 writeIndexEvents events = do
-  results <- KW.produceMessagesAsSingletonSets $
-    (K.TopicAndMessage indexEventsTopicName . KW.makeMessage . L.toStrict . encode) <$> events
+  results <-
+    KW.produceMessagesAsSingletonSets $
+      (K.TopicAndMessage indexEventsTopicName . KW.makeMessage . L.toStrict . encode) <$> events
   liftIO $ mapM_ parseKafkaResponse results
   return results

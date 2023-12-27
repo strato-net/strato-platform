@@ -17,18 +17,18 @@ class SideBar extends Component {
     const navLinksData = (
       [
         //{path: '/nodes', label: 'Nodes', id: 'nodes', icon: "pt-icon-layout-auto"},
-        { path: '/home', label: 'Dashboard', id: 'dashboard', icon: "fa-rocket" },
-        { path: '/shards', label: 'Shards', id: 'shards', icon: "fa-user-secret" },
-        { path: '/blocks', label: 'Blocks', id: 'blocks', icon: "fa-link" },
+        { path: '/home', label: 'Network Stats', id: 'network_stats', icon: "fa-chart-simple" },
+        { path: '/accounts', label: 'Users', id: 'accounts', icon: "fa-users" },
         { path: '/transactions', label: 'Transactions', id: 'transactions', icon: "fa-exchange" },
-        { path: '/accounts', label: 'Accounts', id: 'accounts', icon: "fa-users" },
-        { path: '/contracts', label: 'Contracts', id: 'contracts', icon: "fa-gavel" },
-        { path: '/code_editor', label: 'Contract Editor', id: 'code_editor', icon: "fa-code" }
+        { path: '/shards', label: 'Private Shards', id: 'shards', icon: "fa-diagram-project" },
+        { path: '/contracts', label: 'Contracts', id: 'contracts', icon: "fa-file-contract" },
+        { path: '/blocks', label: 'Blocks', id: 'blocks', icon: "fa-cube" },
+        { path: '/code_editor', label: 'Contract Editor', id: 'code_editor', icon: "fa-code" },
       ]
     );
 
     return (
-      <aside>
+      <aside id="sidebar" className={this.props.isCollapsed ? '' : 'sidebar-expand'}>
         <div className="menu">
           {
             navLinksData.map(data =>
@@ -38,7 +38,7 @@ class SideBar extends Component {
                 to={data.path}
                 className="menu-item"
                 activeClassName="active-menu-item"
-                onClick={() => { mixpanelWrapper.track('nav_link_' + data.id + '_click') }}
+                onClick={this.props.toggleCollapse}
               >
                 <i className={'fa ' + data.icon}> </i>
                 <span className="menu-text"> {data.label}</span>

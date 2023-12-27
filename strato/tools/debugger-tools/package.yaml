@@ -1,0 +1,24 @@
+name: debugger-tools
+version: 0.0.1
+build-type: Simple
+author: jxuan101
+maintainer:   jin_huai_xuan@blockapps.net
+synopsis: A toolkit for debugging in STRATO
+category:      Debugging
+description:
+    A toolkit for debugging in STRATO
+
+dependencies:
+  - base
+  - ghc-debug-client
+  - ghc-debug-common
+  - containers
+  - language-dot
+  - mtl
+  - text
+
+executables:
+  ghc-debug:
+    source-dirs: exec_src/
+    main: ghc-debug.hs
+    other-modules: []

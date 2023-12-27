@@ -8,8 +8,10 @@ library:
   source-dirs: src
   dependencies: 
   - blockapps-data
+  - composable-monads-base
   - monad-logger
   - mtl
+  - persistent-postgresql
   - strato-conf
   - unliftio-core
   

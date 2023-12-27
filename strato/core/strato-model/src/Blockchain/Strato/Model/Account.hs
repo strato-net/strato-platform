@@ -1,68 +1,67 @@
-{-# LANGUAGE DataKinds                  #-}
-{-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE OverloadedLists       #-}
-{-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE QuasiQuotes                #-}
-{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 
 module Blockchain.Strato.Model.Account
-    ( Account(..)
-    , AccountPayable
-    , accountChainId
-    , accountAddress
-    , OnNamedChain(..)
-    , NamedAccount(..)
-    , namedAccountChainId
-    , namedAccountAddress
-    , namedAccountToAccount
-    , accountToNamedAccount
-    , accountToNamedAccount'
-    , accountOnUnspecifiedChain
-    , unspecifiedChain
-    , mainChain
-    , explicitChain
-    ) where
+  ( Account (..),
+    AccountPayable,
+    accountChainId,
+    accountAddress,
+    OnNamedChain (..),
+    NamedAccount (..),
+    namedAccountChainId,
+    namedAccountAddress,
+    namedAccountToAccount,
+    accountToNamedAccount,
+    accountToNamedAccount',
+    accountOnUnspecifiedChain,
+    unspecifiedChain,
+    mainChain,
+    explicitChain,
+  )
+where
 
-import           Control.DeepSeq
-import           Control.Lens
-import qualified Data.Aeson                           as AS
-import           Data.Aeson.Types
-import qualified Data.Aeson.Encoding                  as Enc
-import qualified Data.Aeson.Key                       as DAK 
-
-import           Data.Binary
-import           Data.Data
-import           Data.Hashable
-import           Data.Swagger                         hiding (Format, format, get, put)
-import qualified Data.Swagger                         as Sw
-import qualified Data.Text                            as T
-import           Database.Persist.TH
-import           GHC.Generics
-import           Servant.API
-import           Servant.Docs
-import qualified Text.PrettyPrint.ANSI.Leijen         as Lei
-import           Text.Printf
-import           Test.QuickCheck                      (Arbitrary(..), oneof)
-import           Web.FormUrlEncoded
-
-import           Blockchain.Data.RLP
-import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.ExtendedWord
-import qualified Data.RLP                             as RLP2
-import qualified Text.Colors       as CL
-import           Text.Format
-import           Text.Read (readMaybe)
-import           Text.ShortDescription
+import Blockchain.Data.RLP
+import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.ExtendedWord
+import Control.DeepSeq
+import Control.Lens
+import qualified Data.Aeson as AS
+import qualified Data.Aeson.Encoding as Enc
+import qualified Data.Aeson.Key as DAK
+import Data.Aeson.Types
+import Data.Binary
+import Data.Data
+import Data.Hashable
+import Data.Swagger hiding (Format, format, get, put)
+import qualified Data.Swagger as Sw
+import qualified Data.Text as T
+import Database.Persist.TH
+import GHC.Generics
+import Servant.API
+import Servant.Docs
+import Test.QuickCheck (Arbitrary (..), oneof)
+import qualified Text.Colors as CL
+import Text.Format
+import qualified Text.PrettyPrint.ANSI.Leijen as Lei
+import Text.Printf
+import Text.Read (readMaybe)
+import Text.ShortDescription
+import Web.FormUrlEncoded
 
 type AccountPayable = Account --type synonym, irrelevant at runtime, but matters for typechecking during complilation
 
 data Account = Account
-  { _accountAddress :: Address
-  , _accountChainId :: Maybe Word256
-  } deriving (Eq, Ord, Generic, Data, Hashable, Binary)
+  { _accountAddress :: Address,
+    _accountChainId :: Maybe Word256
+  }
+  deriving (Eq, Ord, Generic, Data, Hashable, Binary)
 
 makeLenses ''Account
 
@@ -81,7 +80,7 @@ instance Read Account where
     (mAddr, mRem) -> case stringAddress mAddr of
       Nothing -> []
       Just addr -> case mRem of
-        (':':rem') -> case splitAt 64 rem' of
+        (':' : rem') -> case splitAt 64 rem' of
           (mCid, mRem2) -> case fromInteger <$> readMaybe ("0x" ++ mCid) of
             Nothing -> [(Account addr Nothing, mRem)]
             Just cid -> [(Account addr (Just cid), mRem2)]
@@ -95,8 +94,9 @@ instance AS.ToJSON Account where
 
 instance AS.ToJSONKey Account where
   toJSONKey = ToJSONKeyText f (Enc.text . t)
-          where f = DAK.fromText . T.pack . show
-                t = T.pack . show
+    where
+      f = DAK.fromText . T.pack . show
+      t = T.pack . show
 
 instance AS.FromJSON Account where
   parseJSON (String s) = case readMaybe (T.unpack s) of
@@ -118,14 +118,14 @@ instance ShortDescription Account where
 
 fromJSONEither :: AS.FromJSON a => AS.Value -> Either T.Text a
 fromJSONEither v = case AS.fromJSON v of
-    AS.Error s -> Left (T.pack s)
-    AS.Success a -> Right a
+  AS.Error s -> Left (T.pack s)
+  AS.Success a -> Right a
 
 derivePersistField "Account"
 
 instance FromHttpApiData Account where
   parseQueryParam = fromJSONEither . String
-  
+
 instance ToForm Account where
   toForm account = [("account", toQueryParam account)]
 
@@ -140,27 +140,26 @@ instance ToCapture (Capture "account" Account) where
 instance ToCapture (Capture "contractAccount" Account) where
   toCapture _ = DocCapture "contractAccount" "a STRATO account"
 
-instance RLP2.RLPEncodable Account where
-  rlpEncode (Account a Nothing) = RLP2.rlpEncode a
-  rlpEncode (Account a (Just cid)) = RLP2.Array [RLP2.rlpEncode a, RLP2.rlpEncode cid]
-  rlpDecode (RLP2.Array [a, cid]) = Account <$> (RLP2.rlpDecode a) <*> (Just <$> RLP2.rlpDecode cid)
-  rlpDecode a = flip Account Nothing <$> RLP2.rlpDecode a
 
 instance ToCapture (Capture "userAccount" Account) where
   toCapture _ = DocCapture "userAccount" "a STRATO account"
 
 instance ToParamSchema Account where
-  toParamSchema _ = mempty
-    & type_ ?~ SwaggerString
-    & Sw.format ?~ "hex string"
+  toParamSchema _ =
+    mempty
+      & type_ ?~ SwaggerString
+      & Sw.format ?~ "hex string"
 
 instance ToSchema Account where
-  declareNamedSchema _ = return $
-    NamedSchema (Just "Account")
-      ( mempty
-        & type_ ?~ SwaggerString
-        & example ?~ "account=abcdef:deadbeef"
-        & description ?~ "STRATO Account, 32 byte hex encoded chain ID, followed by a 20 byte hex encoded address" )
+  declareNamedSchema _ =
+    return $
+      NamedSchema
+        (Just "Account")
+        ( mempty
+            & type_ ?~ SwaggerString
+            & example ?~ "account=abcdef:deadbeef"
+            & description ?~ "STRATO Account, 32 byte hex encoded chain ID, followed by a 20 byte hex encoded address"
+        )
 
 instance ToHttpApiData Account where
   toUrlPiece = T.pack . show
@@ -174,20 +173,22 @@ data OnNamedChain a = UnspecifiedChain | MainChain | ExplicitChain a
   deriving (Read, Eq, Ord, Generic, Data, Hashable, Binary)
 
 data NamedAccount = NamedAccount
-  { _namedAccountAddress :: Address
-  , _namedAccountChainId :: OnNamedChain Word256
-  } deriving (Eq, Ord, Generic, Data, Hashable, Binary)
+  { _namedAccountAddress :: Address,
+    _namedAccountChainId :: OnNamedChain Word256
+  }
+  deriving (Eq, Ord, Generic, Data, Hashable, Binary)
 
 makeLenses ''NamedAccount
 
 namedAccountToAccount :: Maybe Word256 -> NamedAccount -> Account
-namedAccountToAccount cid (NamedAccount a UnspecifiedChain)    = Account a cid
-namedAccountToAccount _   (NamedAccount a MainChain)           = Account a Nothing
-namedAccountToAccount _   (NamedAccount a (ExplicitChain cid)) = Account a (Just cid)
+namedAccountToAccount cid (NamedAccount a UnspecifiedChain) = Account a cid
+namedAccountToAccount _ (NamedAccount a MainChain) = Account a Nothing
+namedAccountToAccount _ (NamedAccount a (ExplicitChain cid)) = Account a (Just cid)
 
 accountToNamedAccount :: Maybe Word256 -> Account -> NamedAccount
-accountToNamedAccount c (Account a c') | c == c'   = NamedAccount a UnspecifiedChain
-                                       | otherwise = NamedAccount a (maybe MainChain ExplicitChain c')
+accountToNamedAccount c (Account a c')
+  | c == c' = NamedAccount a UnspecifiedChain
+  | otherwise = NamedAccount a (maybe MainChain ExplicitChain c')
 
 accountToNamedAccount' :: Account -> NamedAccount
 accountToNamedAccount' (Account a Nothing) = NamedAccount a MainChain
@@ -215,8 +216,8 @@ instance Read NamedAccount where
     (mAddr, mRem) -> case stringAddress mAddr of
       Nothing -> []
       Just addr -> case mRem of
-        (':':rem') -> case rem' of
-          ('m':'a':'i':'n':rem'') -> [(NamedAccount addr MainChain, rem'')]
+        (':' : rem') -> case rem' of
+          ('m' : 'a' : 'i' : 'n' : rem'') -> [(NamedAccount addr MainChain, rem'')]
           _ -> case splitAt 64 rem' of
             (mCid, mRem2) -> case fromInteger <$> readMaybe ("0x" ++ mCid) of
               Nothing -> [(NamedAccount addr UnspecifiedChain, mRem)]
@@ -239,8 +240,9 @@ instance AS.ToJSON NamedAccount where
 
 instance AS.ToJSONKey NamedAccount where
   toJSONKey = ToJSONKeyText f (Enc.text . t)
-          where f = DAK.fromText . T.pack . show
-                t = T.pack . show
+    where
+      f = DAK.fromText . T.pack . show
+      t = T.pack . show
 
 instance AS.FromJSON NamedAccount where
   parseJSON (String s) = case readMaybe (T.unpack s) of

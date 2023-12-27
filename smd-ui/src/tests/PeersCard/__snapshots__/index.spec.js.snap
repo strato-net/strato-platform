@@ -8,10 +8,17 @@ Object {
     },
     "name": "LOCALHOST",
     "peers": Object {
-      "192.168.10.33": "3005",
-      "192.168.10.36": "3004",
+      "192.168.10.33": Object {
+        "enode": "enode://687294782948972018571047ra9asd8f97381asdfasd",
+        "tcp_port": "30303",
+      },
+      "192.168.10.36": Object {
+        "enode": "enode://687294782948972018571047ra9asd8f97381asdfasd",
+        "tcp_port": "30303",
+      },
     },
   },
+  "peerIds": undefined,
 }
 `;
 
@@ -27,8 +34,14 @@ ShallowWrapper {
         },
         "name": "LOCALHOST",
         "peers": Object {
-          "192.168.10.33": "3005",
-          "192.168.10.36": "3004",
+          "192.168.10.33": Object {
+            "enode": "enode://687294782948972018571047ra9asd8f97381asdfasd",
+            "tcp_port": "30303",
+          },
+          "192.168.10.36": Object {
+            "enode": "enode://687294782948972018571047ra9asd8f97381asdfasd",
+            "tcp_port": "30303",
+          },
         },
       }
     }
@@ -46,114 +59,123 @@ ShallowWrapper {
     "nodeType": "host",
     "props": Object {
       "children": Array [
-        <h5>
-          Peers 
-          (2)
-        </h5>,
-        Array [
+        <div
+          className="row node-peers"
+        >
           <div
-            className="row node-peers"
+            className="col-xs-3"
           >
-            <div
-              className="col-xs-3"
-            >
-              <small>
-                IP:
-              </small>
-            </div>
-            <div
-              className="col-xs-9"
-            >
-              <Text
-                ellipsize={true}
-              >
-                <small>
-                  192.168.10.36
-                </small>
-              </Text>
-            </div>
-            <div
-              className="col-xs-3"
-            >
-              <small>
-                Port:
-              </small>
-            </div>
-            <div
-              className="col-xs-9"
-            >
-              <Text
-                ellipsize={true}
-              >
-                <small>
-                  3004
-                </small>
-              </Text>
-            </div>
-          </div>,
+            <small>
+              Public Key:
+            </small>
+          </div>
           <div
-            className="row node-peers"
+            className="col-xs-9"
           >
-            <div
-              className="col-xs-3"
+            <small>
+              <HexText
+                value="687294782948972018571047ra9asd8f97381asdfasd"
+              />
+            </small>
+          </div>
+          <div
+            className="col-xs-3"
+          >
+            <small>
+              IP:
+            </small>
+          </div>
+          <div
+            className="col-xs-9"
+          >
+            <Text
+              ellipsize={true}
             >
               <small>
-                IP:
+                192.168.10.36
               </small>
-            </div>
-            <div
-              className="col-xs-9"
-            >
-              <Text
-                ellipsize={true}
-              >
-                <small>
-                  192.168.10.33
-                </small>
-              </Text>
-            </div>
-            <div
-              className="col-xs-3"
+            </Text>
+          </div>
+          <div
+            className="col-xs-3"
+          >
+            <small>
+              Port:
+            </small>
+          </div>
+          <div
+            className="col-xs-9"
+          >
+            <Text
+              ellipsize={true}
             >
               <small>
-                Port:
+                30303
               </small>
-            </div>
-            <div
-              className="col-xs-9"
+            </Text>
+          </div>
+        </div>,
+        <div
+          className="row node-peers"
+        >
+          <div
+            className="col-xs-3"
+          >
+            <small>
+              Public Key:
+            </small>
+          </div>
+          <div
+            className="col-xs-9"
+          >
+            <small>
+              <HexText
+                value="687294782948972018571047ra9asd8f97381asdfasd"
+              />
+            </small>
+          </div>
+          <div
+            className="col-xs-3"
+          >
+            <small>
+              IP:
+            </small>
+          </div>
+          <div
+            className="col-xs-9"
+          >
+            <Text
+              ellipsize={true}
             >
-              <Text
-                ellipsize={true}
-              >
-                <small>
-                  3005
-                </small>
-              </Text>
-            </div>
-          </div>,
-        ],
+              <small>
+                192.168.10.33
+              </small>
+            </Text>
+          </div>
+          <div
+            className="col-xs-3"
+          >
+            <small>
+              Port:
+            </small>
+          </div>
+          <div
+            className="col-xs-9"
+          >
+            <Text
+              ellipsize={true}
+            >
+              <small>
+                30303
+              </small>
+            </Text>
+          </div>
+        </div>,
       ],
       "className": "pt-card pt-elevation-2",
     },
     "ref": null,
     "rendered": Array [
-      Object {
-        "instance": null,
-        "key": undefined,
-        "nodeType": "host",
-        "props": Object {
-          "children": Array [
-            "Peers ",
-            "(2)",
-          ],
-        },
-        "ref": null,
-        "rendered": Array [
-          "Peers ",
-          "(2)",
-        ],
-        "type": "h5",
-      },
       Object {
         "instance": null,
         "key": "0",
@@ -164,6 +186,22 @@ ShallowWrapper {
               className="col-xs-3"
             >
               <small>
+                Public Key:
+              </small>
+            </div>,
+            <div
+              className="col-xs-9"
+            >
+              <small>
+                <HexText
+                  value="687294782948972018571047ra9asd8f97381asdfasd"
+                />
+              </small>
+            </div>,
+            <div
+              className="col-xs-3"
+            >
+              <small>
                 IP:
               </small>
             </div>,
@@ -192,7 +230,7 @@ ShallowWrapper {
                 ellipsize={true}
               >
                 <small>
-                  3004
+                  30303
                 </small>
               </Text>
             </div>,
@@ -201,6 +239,68 @@ ShallowWrapper {
         },
         "ref": null,
         "rendered": Array [
+          Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "children": <small>
+                Public Key:
+              </small>,
+              "className": "col-xs-3",
+            },
+            "ref": null,
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": "Public Key:",
+              },
+              "ref": null,
+              "rendered": "Public Key:",
+              "type": "small",
+            },
+            "type": "div",
+          },
+          Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "children": <small>
+                <HexText
+                  value="687294782948972018571047ra9asd8f97381asdfasd"
+                />
+              </small>,
+              "className": "col-xs-9",
+            },
+            "ref": null,
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": <HexText
+                  value="687294782948972018571047ra9asd8f97381asdfasd"
+                />,
+              },
+              "ref": null,
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "class",
+                "props": Object {
+                  "value": "687294782948972018571047ra9asd8f97381asdfasd",
+                },
+                "ref": null,
+                "rendered": null,
+                "type": [Function],
+              },
+              "type": "small",
+            },
+            "type": "div",
+          },
           Object {
             "instance": null,
             "key": undefined,
@@ -299,7 +399,7 @@ ShallowWrapper {
                 ellipsize={true}
               >
                 <small>
-                  3004
+                  30303
                 </small>
               </Text>,
               "className": "col-xs-9",
@@ -311,7 +411,7 @@ ShallowWrapper {
               "nodeType": "class",
               "props": Object {
                 "children": <small>
-                  3004
+                  30303
                 </small>,
                 "ellipsize": true,
               },
@@ -321,10 +421,10 @@ ShallowWrapper {
                 "key": undefined,
                 "nodeType": "host",
                 "props": Object {
-                  "children": "3004",
+                  "children": "30303",
                 },
                 "ref": null,
-                "rendered": "3004",
+                "rendered": "30303",
                 "type": "small",
               },
               "type": [Function],
@@ -340,6 +440,22 @@ ShallowWrapper {
         "nodeType": "host",
         "props": Object {
           "children": Array [
+            <div
+              className="col-xs-3"
+            >
+              <small>
+                Public Key:
+              </small>
+            </div>,
+            <div
+              className="col-xs-9"
+            >
+              <small>
+                <HexText
+                  value="687294782948972018571047ra9asd8f97381asdfasd"
+                />
+              </small>
+            </div>,
             <div
               className="col-xs-3"
             >
@@ -372,7 +488,7 @@ ShallowWrapper {
                 ellipsize={true}
               >
                 <small>
-                  3005
+                  30303
                 </small>
               </Text>
             </div>,
@@ -381,6 +497,68 @@ ShallowWrapper {
         },
         "ref": null,
         "rendered": Array [
+          Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "children": <small>
+                Public Key:
+              </small>,
+              "className": "col-xs-3",
+            },
+            "ref": null,
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": "Public Key:",
+              },
+              "ref": null,
+              "rendered": "Public Key:",
+              "type": "small",
+            },
+            "type": "div",
+          },
+          Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "children": <small>
+                <HexText
+                  value="687294782948972018571047ra9asd8f97381asdfasd"
+                />
+              </small>,
+              "className": "col-xs-9",
+            },
+            "ref": null,
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": <HexText
+                  value="687294782948972018571047ra9asd8f97381asdfasd"
+                />,
+              },
+              "ref": null,
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "class",
+                "props": Object {
+                  "value": "687294782948972018571047ra9asd8f97381asdfasd",
+                },
+                "ref": null,
+                "rendered": null,
+                "type": [Function],
+              },
+              "type": "small",
+            },
+            "type": "div",
+          },
           Object {
             "instance": null,
             "key": undefined,
@@ -479,7 +657,7 @@ ShallowWrapper {
                 ellipsize={true}
               >
                 <small>
-                  3005
+                  30303
                 </small>
               </Text>,
               "className": "col-xs-9",
@@ -491,7 +669,7 @@ ShallowWrapper {
               "nodeType": "class",
               "props": Object {
                 "children": <small>
-                  3005
+                  30303
                 </small>,
                 "ellipsize": true,
               },
@@ -501,10 +679,10 @@ ShallowWrapper {
                 "key": undefined,
                 "nodeType": "host",
                 "props": Object {
-                  "children": "3005",
+                  "children": "30303",
                 },
                 "ref": null,
-                "rendered": "3005",
+                "rendered": "30303",
                 "type": "small",
               },
               "type": [Function],
@@ -524,114 +702,123 @@ ShallowWrapper {
       "nodeType": "host",
       "props": Object {
         "children": Array [
-          <h5>
-            Peers 
-            (2)
-          </h5>,
-          Array [
+          <div
+            className="row node-peers"
+          >
             <div
-              className="row node-peers"
+              className="col-xs-3"
             >
-              <div
-                className="col-xs-3"
-              >
-                <small>
-                  IP:
-                </small>
-              </div>
-              <div
-                className="col-xs-9"
-              >
-                <Text
-                  ellipsize={true}
-                >
-                  <small>
-                    192.168.10.36
-                  </small>
-                </Text>
-              </div>
-              <div
-                className="col-xs-3"
-              >
-                <small>
-                  Port:
-                </small>
-              </div>
-              <div
-                className="col-xs-9"
-              >
-                <Text
-                  ellipsize={true}
-                >
-                  <small>
-                    3004
-                  </small>
-                </Text>
-              </div>
-            </div>,
+              <small>
+                Public Key:
+              </small>
+            </div>
             <div
-              className="row node-peers"
+              className="col-xs-9"
             >
-              <div
-                className="col-xs-3"
+              <small>
+                <HexText
+                  value="687294782948972018571047ra9asd8f97381asdfasd"
+                />
+              </small>
+            </div>
+            <div
+              className="col-xs-3"
+            >
+              <small>
+                IP:
+              </small>
+            </div>
+            <div
+              className="col-xs-9"
+            >
+              <Text
+                ellipsize={true}
               >
                 <small>
-                  IP:
+                  192.168.10.36
                 </small>
-              </div>
-              <div
-                className="col-xs-9"
-              >
-                <Text
-                  ellipsize={true}
-                >
-                  <small>
-                    192.168.10.33
-                  </small>
-                </Text>
-              </div>
-              <div
-                className="col-xs-3"
+              </Text>
+            </div>
+            <div
+              className="col-xs-3"
+            >
+              <small>
+                Port:
+              </small>
+            </div>
+            <div
+              className="col-xs-9"
+            >
+              <Text
+                ellipsize={true}
               >
                 <small>
-                  Port:
+                  30303
                 </small>
-              </div>
-              <div
-                className="col-xs-9"
+              </Text>
+            </div>
+          </div>,
+          <div
+            className="row node-peers"
+          >
+            <div
+              className="col-xs-3"
+            >
+              <small>
+                Public Key:
+              </small>
+            </div>
+            <div
+              className="col-xs-9"
+            >
+              <small>
+                <HexText
+                  value="687294782948972018571047ra9asd8f97381asdfasd"
+                />
+              </small>
+            </div>
+            <div
+              className="col-xs-3"
+            >
+              <small>
+                IP:
+              </small>
+            </div>
+            <div
+              className="col-xs-9"
+            >
+              <Text
+                ellipsize={true}
               >
-                <Text
-                  ellipsize={true}
-                >
-                  <small>
-                    3005
-                  </small>
-                </Text>
-              </div>
-            </div>,
-          ],
+                <small>
+                  192.168.10.33
+                </small>
+              </Text>
+            </div>
+            <div
+              className="col-xs-3"
+            >
+              <small>
+                Port:
+              </small>
+            </div>
+            <div
+              className="col-xs-9"
+            >
+              <Text
+                ellipsize={true}
+              >
+                <small>
+                  30303
+                </small>
+              </Text>
+            </div>
+          </div>,
         ],
         "className": "pt-card pt-elevation-2",
       },
       "ref": null,
       "rendered": Array [
-        Object {
-          "instance": null,
-          "key": undefined,
-          "nodeType": "host",
-          "props": Object {
-            "children": Array [
-              "Peers ",
-              "(2)",
-            ],
-          },
-          "ref": null,
-          "rendered": Array [
-            "Peers ",
-            "(2)",
-          ],
-          "type": "h5",
-        },
         Object {
           "instance": null,
           "key": "0",
@@ -642,6 +829,22 @@ ShallowWrapper {
                 className="col-xs-3"
               >
                 <small>
+                  Public Key:
+                </small>
+              </div>,
+              <div
+                className="col-xs-9"
+              >
+                <small>
+                  <HexText
+                    value="687294782948972018571047ra9asd8f97381asdfasd"
+                  />
+                </small>
+              </div>,
+              <div
+                className="col-xs-3"
+              >
+                <small>
                   IP:
                 </small>
               </div>,
@@ -670,7 +873,7 @@ ShallowWrapper {
                   ellipsize={true}
                 >
                   <small>
-                    3004
+                    30303
                   </small>
                 </Text>
               </div>,
@@ -679,6 +882,68 @@ ShallowWrapper {
           },
           "ref": null,
           "rendered": Array [
+            Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": <small>
+                  Public Key:
+                </small>,
+                "className": "col-xs-3",
+              },
+              "ref": null,
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "host",
+                "props": Object {
+                  "children": "Public Key:",
+                },
+                "ref": null,
+                "rendered": "Public Key:",
+                "type": "small",
+              },
+              "type": "div",
+            },
+            Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": <small>
+                  <HexText
+                    value="687294782948972018571047ra9asd8f97381asdfasd"
+                  />
+                </small>,
+                "className": "col-xs-9",
+              },
+              "ref": null,
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "host",
+                "props": Object {
+                  "children": <HexText
+                    value="687294782948972018571047ra9asd8f97381asdfasd"
+                  />,
+                },
+                "ref": null,
+                "rendered": Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "class",
+                  "props": Object {
+                    "value": "687294782948972018571047ra9asd8f97381asdfasd",
+                  },
+                  "ref": null,
+                  "rendered": null,
+                  "type": [Function],
+                },
+                "type": "small",
+              },
+              "type": "div",
+            },
             Object {
               "instance": null,
               "key": undefined,
@@ -777,7 +1042,7 @@ ShallowWrapper {
                   ellipsize={true}
                 >
                   <small>
-                    3004
+                    30303
                   </small>
                 </Text>,
                 "className": "col-xs-9",
@@ -789,7 +1054,7 @@ ShallowWrapper {
                 "nodeType": "class",
                 "props": Object {
                   "children": <small>
-                    3004
+                    30303
                   </small>,
                   "ellipsize": true,
                 },
@@ -799,10 +1064,10 @@ ShallowWrapper {
                   "key": undefined,
                   "nodeType": "host",
                   "props": Object {
-                    "children": "3004",
+                    "children": "30303",
                   },
                   "ref": null,
-                  "rendered": "3004",
+                  "rendered": "30303",
                   "type": "small",
                 },
                 "type": [Function],
@@ -818,6 +1083,22 @@ ShallowWrapper {
           "nodeType": "host",
           "props": Object {
             "children": Array [
+              <div
+                className="col-xs-3"
+              >
+                <small>
+                  Public Key:
+                </small>
+              </div>,
+              <div
+                className="col-xs-9"
+              >
+                <small>
+                  <HexText
+                    value="687294782948972018571047ra9asd8f97381asdfasd"
+                  />
+                </small>
+              </div>,
               <div
                 className="col-xs-3"
               >
@@ -850,7 +1131,7 @@ ShallowWrapper {
                   ellipsize={true}
                 >
                   <small>
-                    3005
+                    30303
                   </small>
                 </Text>
               </div>,
@@ -859,6 +1140,68 @@ ShallowWrapper {
           },
           "ref": null,
           "rendered": Array [
+            Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": <small>
+                  Public Key:
+                </small>,
+                "className": "col-xs-3",
+              },
+              "ref": null,
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "host",
+                "props": Object {
+                  "children": "Public Key:",
+                },
+                "ref": null,
+                "rendered": "Public Key:",
+                "type": "small",
+              },
+              "type": "div",
+            },
+            Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": <small>
+                  <HexText
+                    value="687294782948972018571047ra9asd8f97381asdfasd"
+                  />
+                </small>,
+                "className": "col-xs-9",
+              },
+              "ref": null,
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "host",
+                "props": Object {
+                  "children": <HexText
+                    value="687294782948972018571047ra9asd8f97381asdfasd"
+                  />,
+                },
+                "ref": null,
+                "rendered": Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "class",
+                  "props": Object {
+                    "value": "687294782948972018571047ra9asd8f97381asdfasd",
+                  },
+                  "ref": null,
+                  "rendered": null,
+                  "type": [Function],
+                },
+                "type": "small",
+              },
+              "type": "div",
+            },
             Object {
               "instance": null,
               "key": undefined,
@@ -957,7 +1300,7 @@ ShallowWrapper {
                   ellipsize={true}
                 >
                   <small>
-                    3005
+                    30303
                   </small>
                 </Text>,
                 "className": "col-xs-9",
@@ -969,7 +1312,7 @@ ShallowWrapper {
                 "nodeType": "class",
                 "props": Object {
                   "children": <small>
-                    3005
+                    30303
                   </small>,
                   "ellipsize": true,
                 },
@@ -979,10 +1322,10 @@ ShallowWrapper {
                   "key": undefined,
                   "nodeType": "host",
                   "props": Object {
-                    "children": "3005",
+                    "children": "30303",
                   },
                   "ref": null,
-                  "rendered": "3005",
+                  "rendered": "30303",
                   "type": "small",
                 },
                 "type": [Function],
@@ -1025,41 +1368,59 @@ ShallowWrapper {
     "key": undefined,
     "nodeType": "host",
     "props": Object {
-      "children": Array [
-        <h5>
-          Peers 
-          (0)
-        </h5>,
-        <Text
+      "children": <Text
+        ellipsize={true}
+      >
+        <small>
+          No peers
+        </small>
+      </Text>,
+      "className": "pt-card pt-elevation-2",
+    },
+    "ref": null,
+    "rendered": Object {
+      "instance": null,
+      "key": undefined,
+      "nodeType": "class",
+      "props": Object {
+        "children": <small>
+          No peers
+        </small>,
+        "ellipsize": true,
+      },
+      "ref": null,
+      "rendered": Object {
+        "instance": null,
+        "key": undefined,
+        "nodeType": "host",
+        "props": Object {
+          "children": "No peers",
+        },
+        "ref": null,
+        "rendered": "No peers",
+        "type": "small",
+      },
+      "type": [Function],
+    },
+    "type": "div",
+  },
+  Symbol(enzyme.__nodes__): Array [
+    Object {
+      "instance": null,
+      "key": undefined,
+      "nodeType": "host",
+      "props": Object {
+        "children": <Text
           ellipsize={true}
         >
           <small>
             No peers
           </small>
         </Text>,
-      ],
-      "className": "pt-card pt-elevation-2",
-    },
-    "ref": null,
-    "rendered": Array [
-      Object {
-        "instance": null,
-        "key": undefined,
-        "nodeType": "host",
-        "props": Object {
-          "children": Array [
-            "Peers ",
-            "(0)",
-          ],
-        },
-        "ref": null,
-        "rendered": Array [
-          "Peers ",
-          "(0)",
-        ],
-        "type": "h5",
+        "className": "pt-card pt-elevation-2",
       },
-      Object {
+      "ref": null,
+      "rendered": Object {
         "instance": null,
         "key": undefined,
         "nodeType": "class",
@@ -1083,74 +1444,6 @@ ShallowWrapper {
         },
         "type": [Function],
       },
-    ],
-    "type": "div",
-  },
-  Symbol(enzyme.__nodes__): Array [
-    Object {
-      "instance": null,
-      "key": undefined,
-      "nodeType": "host",
-      "props": Object {
-        "children": Array [
-          <h5>
-            Peers 
-            (0)
-          </h5>,
-          <Text
-            ellipsize={true}
-          >
-            <small>
-              No peers
-            </small>
-          </Text>,
-        ],
-        "className": "pt-card pt-elevation-2",
-      },
-      "ref": null,
-      "rendered": Array [
-        Object {
-          "instance": null,
-          "key": undefined,
-          "nodeType": "host",
-          "props": Object {
-            "children": Array [
-              "Peers ",
-              "(0)",
-            ],
-          },
-          "ref": null,
-          "rendered": Array [
-            "Peers ",
-            "(0)",
-          ],
-          "type": "h5",
-        },
-        Object {
-          "instance": null,
-          "key": undefined,
-          "nodeType": "class",
-          "props": Object {
-            "children": <small>
-              No peers
-            </small>,
-            "ellipsize": true,
-          },
-          "ref": null,
-          "rendered": Object {
-            "instance": null,
-            "key": undefined,
-            "nodeType": "host",
-            "props": Object {
-              "children": "No peers",
-            },
-            "ref": null,
-            "rendered": "No peers",
-            "type": "small",
-          },
-          "type": [Function],
-        },
-      ],
       "type": "div",
     },
   ],

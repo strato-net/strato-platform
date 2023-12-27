@@ -1,8 +1,8 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 set -e
 set -x
 
-# TODO: Set POSTGRES vars defaults here, remove default from docker-compose, rename postgres vars using uppercase
+# TODO: Set POSTGRES vars defaults here, remove default from docker-compose.yml, rename postgres vars using uppercase
 PROMETHEUS_HOST=${PROMETHEUS_HOST:-'prometheus:9090'}
 STRATO_HOSTNAME=${STRATO_HOSTNAME:-strato}
 STRATO_PORT_API=${STRATO_PORT_API:-3000}

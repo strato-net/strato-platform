@@ -1,11 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-import qualified Data.Aeson      as Ae
-import           Test.Hspec
-import           Test.QuickCheck
-import           Data.Source
-import           Data.Text       (Text)
+import qualified Data.Aeson as Ae
+import Data.Source
+import Data.Text (Text)
+import Test.Hspec
+import Test.QuickCheck
 
 main :: IO ()
 main = hspec spec
@@ -16,11 +16,14 @@ jsonRT = Ae.eitherDecode . Ae.encode
 spec :: Spec
 spec = do
   describe "SourceAnnotation Text" $ do
-    it "round trips correctly" $ property $ \(src::(SourceAnnotation Text)) -> do
-      jsonRT src `shouldBe` Right src
+    it "round trips correctly" $
+      property $ \(src :: (SourceAnnotation Text)) -> do
+        jsonRT src `shouldBe` Right src
   describe "SourceMap" $ do
-    it "round trips correctly" $ property $ \(src::SourceMap) -> do
-      jsonRT src `shouldBe` Right src
+    it "round trips correctly" $
+      property $ \(src :: SourceMap) -> do
+        jsonRT src `shouldBe` Right src
   describe "SourcePosition" $ do
-    it "round trips correctly" $ property $ \(src::SourcePosition) -> do
-      jsonRT src `shouldBe` Right src
+    it "round trips correctly" $
+      property $ \(src :: SourcePosition) -> do
+        jsonRT src `shouldBe` Right src

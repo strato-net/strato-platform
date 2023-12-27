@@ -2,17 +2,18 @@
 
 --see http://stackoverflow.com/questions/35022378/how-do-i-change-runtcpclient-timeout-duration
 
-module Blockchain.TCPClientWithTimeout (
-  runTCPClientWithConnectTimeout,
-  TCPClientWithTimeoutException(..)
-  ) where
+module Blockchain.TCPClientWithTimeout
+  ( runTCPClientWithConnectTimeout,
+    TCPClientWithTimeoutException (..),
+  )
+where
 
-import           Control.Exception.Lifted (throw)
-import           Control.Monad.IO.Class
-import           Control.Monad.IO.Unlift
-import           Data.Conduit.Network
-import           UnliftIO.Concurrent
-import           UnliftIO.Exception
+import Control.Exception.Lifted (throw)
+import Control.Monad.IO.Class
+import Control.Monad.IO.Unlift
+import Data.Conduit.Network
+import UnliftIO.Concurrent
+import UnliftIO.Exception
 
 data TCPClientWithTimeoutException = TimeoutException deriving (Show)
 
@@ -22,22 +23,27 @@ threadDelaySeconds :: Double -> IO ()
 threadDelaySeconds secs =
   threadDelay (ceiling $ secs * 1e6)
 
-runTCPClientWithConnectTimeout::(MonadUnliftIO m)
-                              => ClientSettings->Double->(AppData->m ())->m ()
+runTCPClientWithConnectTimeout ::
+  (MonadUnliftIO m) =>
+  ClientSettings ->
+  Double ->
+  (AppData -> m ()) ->
+  m ()
 runTCPClientWithConnectTimeout settings secs cont = do
   race <- liftIO newChan
   resultMVar <- liftIO newEmptyMVar
 
-  timerThreadID <- forkIO $ liftIO $ do
-    threadDelaySeconds secs
-    writeChan race False
+  timerThreadID <- forkIO $
+    liftIO $ do
+      threadDelaySeconds secs
+      writeChan race False
 
   clientThreadID <- forkIO $ do
     result <-
       try $
-      runGeneralTCPClient settings $ \appData -> do
-        liftIO $ writeChan race True
-        cont appData
+        runGeneralTCPClient settings $ \appData -> do
+          liftIO $ writeChan race True
+          cont appData
     liftIO $ writeChan race True --second call needed because first call won't be hit in the case of an error caught by try
     liftIO $ putMVar resultMVar result
 
@@ -48,8 +54,8 @@ runTCPClientWithConnectTimeout settings secs cont = do
       liftIO $ killThread timerThreadID --don't want a buildup of timer threads....
       result' <- liftIO $ readMVar resultMVar
       case result' of
-       Left e  -> throw (e::SomeException)
-       Right x -> return x
+        Left e -> throw (e :: SomeException)
+        Right x -> return x
     else do
-      _ <- throwIO $ TimeoutException
       liftIO $ killThread clientThreadID
+      throwIO $ TimeoutException
