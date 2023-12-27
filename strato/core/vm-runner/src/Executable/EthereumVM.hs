@@ -106,8 +106,8 @@ ethereumVM d = runResourceT $ do
 
         baggerData <- uncurry EVMCheckpoint <$> Bagger.getCheckpointableState
         checkpointData <- baggerData <$> getContextBestBlockInfo
-        _ <- checkpointData . unBlockHashRoot <$> Mod.get Proxy
-        return ()
+        withChainroot <- checkpointData . unBlockHashRoot <$> Mod.get Proxy
+        setMetadata seqVmEventsTopicName withChainroot
 
 initializeCheckpointAndBlockSummary ::
   ( HasBlockSummaryDB m,
@@ -249,6 +249,20 @@ getCheckpoint = do
       let md' = fromKafkaMetadata md
       $logInfoS "getCheckpoint" . T.pack $ show ofs ++ " / " ++ format md'
       return (ofs, md')
+
+setMetadata :: (MonadLogger m, HasKafka m) => KP.TopicName -> EVMCheckpoint -> m ()
+setMetadata topic checkpoint = do
+  ofs <-
+    execKafka (K.fetchSingleOffset consumerGroup topic 0) >>= \case
+        Left KP.UnknownTopicOrPartition -> return 1
+        Left err -> error $ "Unexpected response when fetching checkpoint: " ++ show err
+        Right (ofs, _) -> return ofs
+
+  let kMetadata = toKafkaMetadata checkpoint
+
+  $logInfoS "setMetadata" . T.pack $ "Setting checkpoint to " ++ show ofs
+  ret <- execKafka $ K.commitSingleOffset consumerGroup seqVmEventsTopicName 0 ofs kMetadata
+  either (error . show) return ret
 
 setCheckpoint :: (MonadLogger m, HasKafka m) => KP.Offset -> EVMCheckpoint -> m ()
 setCheckpoint ofs checkpoint = do
