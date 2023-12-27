@@ -116,7 +116,7 @@ type HasPeerDB m = (
   Mod.Accessible AvailablePeers m,
   A.Replaceable (IPAsText, TCPPort) ActivityState m,
   Mod.Accessible ActivePeers m,
-  A.Replaceable (IPAsText, UDPPort) PeerBondingState m,
+  A.Replaceable Point PeerBondingState m,
   A.Replaceable (IPAsText, TCPPort) PeerBondingState m,
   A.Selectable (IPAsText, UDPPort) PeerBondingState m,
   Mod.Accessible BondedPeers m,
@@ -243,12 +243,11 @@ getActivePeers :: (MonadUnliftIO m, Mod.Accessible ActivePeers m) => m (Either S
 getActivePeers = try $ unActivePeers <$> Mod.access (Mod.Proxy @ActivePeers)
 
 setPeerBondingState ::
-  (MonadUnliftIO m, A.Replaceable (IPAsText, UDPPort) PeerBondingState m) =>
-  String ->
-  Int ->
+  (MonadUnliftIO m, A.Replaceable Point PeerBondingState m) =>
+  Point ->
   Int ->
   m (Either SomeException ())
-setPeerBondingState ip port state = try $ A.replace (A.Proxy @PeerBondingState) (IPAsText $ T.pack ip, UDPPort port) (PeerBondingState state)
+setPeerBondingState point state = try $ A.replace (A.Proxy @PeerBondingState) point (PeerBondingState state)
 
 getBondedPeers :: (MonadUnliftIO m, Mod.Accessible BondedPeers m) => m (Either SomeException [PPeer])
 getBondedPeers = try $ unBondedPeers <$> Mod.access (Mod.Proxy @BondedPeers)
