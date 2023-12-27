@@ -227,7 +227,7 @@ const ResponsiveCart = ({
             <Button
               type="primary"
               id="submit-order-button"
-              className=" w-full sm:w-44 h-9 bg-[#13188A]"
+              className=" w-full sm:w-44 h-9 !bg-[#13188A]"
               onClick={() => {
                 if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                   window.location.href = loginUrl;
