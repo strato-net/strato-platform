@@ -674,7 +674,7 @@ const CreateInventoryModal = ({
         break;
     }
   };
-  const disabled = isCreateInventorySubmitting || isUploadImageSubmitting;
+  const disabled = isCreateInventorySubmitting || isUploadImageSubmitting || !formik.values.subCategory;
 
   /*
               <div className="flex justify-between mt-4 ">
@@ -740,9 +740,10 @@ const CreateInventoryModal = ({
               key="submit"
               type="primary"
               onClick={formik.handleSubmit}
+              loading={isCreateInventorySubmitting || isUploadImageSubmitting}
               disabled={disabled}
             >
-              {disabled ? <Spin /> : "Create Inventory"}
+              Create Inventory
             </Button>
           </div>,
         ]}
