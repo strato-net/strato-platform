@@ -83,6 +83,7 @@ const SoldOrderDetails = ({ user, users }) => {
     issellerDetailsUpdating,
     success,
     isCreateOrderLineItem,
+    isCreateOrderSubmitting,
   } = useOrderState();
   const routeMatch = useMatch({
     path: routes.SoldOrderDetails.url,
@@ -581,7 +582,7 @@ const SoldOrderDetails = ({ user, users }) => {
                             id="save-button"
                             type="primary"
                             // Disable the button here if the serial numbers aren't uploaded. We don't want the user closing the order without providing the serial numbers.
-                            loading={issellerDetailsUpdating || isCreateOrderLineItem}
+                            loading={issellerDetailsUpdating || isCreateOrderLineItem || isCreateOrderSubmitting}
                             disabled={status === getStatus(3) || status === getStatus(4) || allSerialNumbersUploaded() === false }
                             onClick={() => {
                               handleUpdateComment()
