@@ -407,7 +407,7 @@ const Checkout = ({ user }) => {
             </Breadcrumb.Item>
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
               <p className="text-sm text-[#202020] font-medium">
-                Add to Cart
+                My Cart
               </p>
             </Breadcrumb.Item>
           </Breadcrumb>
