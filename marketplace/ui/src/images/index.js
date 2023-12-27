@@ -50,4 +50,5 @@ export const Images = {
   'menu_icon' : require("./resources/Ham_menu.png"),
   'Responsive_search' :  require("./resources/Responsive_Search.png"),
   'Responsive_cart'  : require("./resources/Responive_Cart.png"),
+  'Header_cart' :  require("./resources/Header_Cart.png"),
 };
