@@ -41,13 +41,10 @@ putS3File multipartdata =
                     uploadFileName = contentHash <> extension
                 --Set up AWS credentials and the default configuration.
                 $logInfoS "highway/putS3File" $ T.pack $ "Setting up AWS credentials and the default AWS configuration."
-                mgr     <- asks httpManager
-                awsakid <- asks awsaccesskeyid
-                awssak  <- asks awssecretaccesskey
-                awss3b  <- asks awss3bucket
+                mgr    <- asks httpManager
+                cr     <- asks awsCredentials
+                awss3b <- asks awss3bucket
                 hwUrl  <- asks highwayUrl
-                cr      <- liftIO $ Aws.makeCredentials awsakid
-                                                        awssak
                 let cfg = Aws.Configuration { Aws.timeInfo    = Aws.Timestamp
                                             , Aws.credentials = cr
                                             , Aws.logger      = Aws.defaultLog Aws.Warning

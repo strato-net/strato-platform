@@ -31,12 +31,9 @@ getS3File :: Text
 getS3File filename = do
   --Set up AWS credentials and the default configuration.
   $logInfoS "highway/getS3File" $ T.pack $ "Setting up AWS credentials and the default AWS configuration."
-  mgr     <- asks httpManager
-  awsakid <- asks awsaccesskeyid
-  awssak  <- asks awssecretaccesskey
-  awss3b  <- asks awss3bucket
-  cr      <- liftIO $ Aws.makeCredentials awsakid
-                                          awssak
+  mgr    <- asks httpManager
+  cr     <- asks awsCredentials
+  awss3b <- asks awss3bucket
   let cfg = Aws.Configuration { Aws.timeInfo    = Aws.Timestamp
                               , Aws.credentials = cr
                               , Aws.logger      = Aws.defaultLog Aws.Warning
@@ -45,7 +42,7 @@ getS3File filename = do
   let s3cfg = Aws.defServiceConfig :: S3.S3Configuration Aws.NormalQuery
   --Set up a ResourceT region with an available HTTP manager.
   $logInfoS "highway/getS3File" $ T.pack $ "Setting up a ResourceT region with an available HTTP manager."
-  st      <- askUnliftIO
+  st     <- askUnliftIO
   liftIO $ runResourceT $ do
     --Create a request object with S3.getObject and run the request with pureAws.
     liftIO $ unliftIO st $ $logInfoS "highway/getS3File" $ T.pack $ "Creating a request object with getObject and running the request via pureAws."
