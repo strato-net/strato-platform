@@ -260,7 +260,7 @@ setMetadata topic checkpoint = do
 
   let kMetadata = toKafkaMetadata checkpoint
 
-  $logInfoS "setMetadata" . T.pack $ "Setting checkpoint to " ++ show ofs
+  $logInfoS "setMetadata" . T.pack $ "Setting checkpoint/metadata to " ++ show ofs ++ "/" ++ show kMetadata
   ret <- execKafka $ K.commitSingleOffset consumerGroup seqVmEventsTopicName 0 ofs kMetadata
   either (error . show) return ret
 
