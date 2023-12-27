@@ -174,7 +174,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
 
   return (
     <>
-    <Header className={`fixed z-[100] !bg-[#ffffff] !pl-2 w-full !pr-4 md:px-12 flex md:!mb-10 shadow-header md:p-10 justify-between md:justify-start`}>
+    <Header className={`fixed z-[100] !bg-[#ffffff] !pl-2 w-full !pr-4 md:px-12 flex md:!mb-10 ${showMenu ? '' : 'shadow-header'} md:p-10 justify-between md:justify-start`}>
       <Space className="relative flex-grow-0 md:flex-1 ml-2 md:ml-5">
         <div
           className="mt-4 mr-5 md:mt-0 cursor-pointer flex-grow-0 w-max md:w-[170px] h-[44px]"
@@ -296,7 +296,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
     </Header>
     {showMenu &&
       <div>
-        <div className="bg-white border-t absolute w-full z-50 md:hidden top-16">
+        <div className="bg-white border-t border-[#E9E9E9] absolute w-full z-50 md:hidden top-16>
               {subMenuItems.map((item) => {
                 return (
                   <Typography onClick={()=>handleIntMenuTab(item)} className={`text-base py-3 px-4 cursor-pointer ${item ? '' : 'hidden'}`} >{item?.label}</Typography>
