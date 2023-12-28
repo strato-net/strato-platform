@@ -31,6 +31,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                 }
                 className='md:h-[200px] md:w-[40vw] h-[150px] rounded'
                 src={topSellingProduct.images ? topSellingProduct?.images[0] : images_placeholder}
+                alt={topSellingProduct?.name || "N/A"}
             />
             <div className='flex justify-between'>
                 <Typography
@@ -41,7 +42,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                 >
                     {topSellingProduct?.name || "N/A"}
                 </Typography>
-                <img className='w-4 h-4' src={Images.Verified} alt='' />
+                <img className='w-4 h-4' src={Images.Verified} alt='verified' />
             </div>
             <Typography className='font-normal text-black'>{'$' + topSellingProduct?.price || "N/A"}</Typography>
             <Typography className={`#989898 opacity-40 max-h-5 overflow-hidden ${parent == 'Marketplace' ? 'hidden md:flex' : ''}`}>{topSellingProduct?.description || "N/A"}</Typography>
