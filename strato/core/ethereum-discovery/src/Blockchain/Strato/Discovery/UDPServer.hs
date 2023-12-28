@@ -144,7 +144,7 @@ handleValidPacket ::
   NodeDiscoveryPacket ->
   ECC.Point ->
   m ()
-handleValidPacket addr (UDPPort otherUdpPort) packet otherPubKey = case packet of
+handleValidPacket addr _ packet otherPubKey = case packet of
   Ping _ ep@(Endpoint _ otherUdpPort' otherTcpPort) _ _ -> do
     addPeer' otherUdpPort' otherTcpPort
     time <- liftIO $ round `fmap` getPOSIXTime
@@ -155,7 +155,6 @@ handleValidPacket addr (UDPPort otherUdpPort) packet otherPubKey = case packet o
       $logErrorS "handleValidPacket" . T.pack $ "Unable to set peer bonding state: " ++ show err
       throwM err
   Pong {} -> do
-    addPeer' (UDPPort otherUdpPort) (TCPPort 30303) --how to figure out tcp port?
     thePeer <- getPeerByIP' ip
     eErr <- resetPeerUdp $ fromJust thePeer
     whenLeft eErr $ \err -> $logErrorS "handleValidPacket/Pong" . T.pack $ "Unable to reset peer disable: " ++ show err
@@ -167,7 +166,7 @@ handleValidPacket addr (UDPPort otherUdpPort) packet otherPubKey = case packet o
     time <- liftIO $ round `fmap` getPOSIXTime
     let nextTime = time + 50
     getPeerByIP' ip >>= \case 
-      Nothing -> addPeer' (UDPPort otherUdpPort) (TCPPort 30303) --how to figure out tcp port?
+      Nothing -> $logInfoS "handleValidPacket/FindNeighbors" "Ignoring FindNeigbors request from unknown peer"
       Just peer -> do 
         A.select (A.Proxy @PeerBondingState) (IPAsText $ T.pack ip, otherPubKey) >>= \case 
           Just (PeerBondingState b) | b > 1 -> do
