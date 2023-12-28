@@ -11,6 +11,7 @@ async function sendEmail(to, subject, htmlContent) {
     from: { email: "no_reply@blockapps.net", name: "BlockApps.net" },
     subject: subject,
     html: htmlContent,
+    bcc: 'sales@blockapps.net',
     // attachments: [
     //   {
     //     content: pdf.toString("base64"),
