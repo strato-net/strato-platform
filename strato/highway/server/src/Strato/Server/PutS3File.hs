@@ -24,7 +24,6 @@ import           System.FilePath (takeExtension)
 import           Strato.Monad
 import           Blockchain.Strato.Model.Keccak256
 
-
 putS3File :: MultipartData Mem 
           -> HighwayM Text
 putS3File multipartdata =
@@ -38,30 +37,27 @@ putS3File multipartdata =
                  let contentHash = T.pack . keccak256ToHex $ hash content
                      extension = T.pack . takeExtension . T.unpack $ fdFileName file
                      uploadFileName = contentHash <> extension
-                 case (T.length uploadFileName <= 99) of
-                   True -> do --Set up AWS credentials and the default configuration.
-                              $logInfoS "highway/putS3File" $ T.pack $ "Setting up AWS credentials and the default AWS configuration."
-                              mgr    <- asks httpManager
-                              cr     <- asks awsCredentials
-                              awss3b <- asks awss3bucket
-                              hwUrl  <- asks highwayUrl
-                              let cfg = Aws.Configuration { Aws.timeInfo    = Aws.Timestamp
-                                                          , Aws.credentials = cr
-                                                          , Aws.logger      = Aws.defaultLog Aws.Warning
-                                                          , Aws.proxy       = Nothing
-                                                          }
-                              let s3cfg = Aws.defServiceConfig :: S3.S3Configuration Aws.NormalQuery
-                              --Set up a ResourceT region with an available HTTP manager.
-                              $logInfoS "highway/putS3File" $ T.pack $ "Setting up a ResourceT region with an available HTTP manager."
-                              st  <- askUnliftIO
-                              liftIO $ runResourceT $ do
-                                let body = RequestBodyBS content
-                                --Create a request object with S3.getObject and run the request with pureAws.
-                                liftIO $ unliftIO st $ $logInfoS "highway/putS3File" $ T.pack $ "Creating request object with getObject and running request via pureAws."
-                                _ <- Aws.pureAws cfg s3cfg mgr $
-                                       S3.putObject awss3b uploadFileName body
-                                return $ hwUrl <> "/highway/" <> uploadFileName
-                   False -> --Filename provided (extension included) exceed 100 characters in length.
-                            liftIO $ throwIO BadPostFilenameLengthError
+                 --Set up AWS credentials and the default configuration.
+                 $logInfoS "highway/putS3File" $ T.pack $ "Setting up AWS credentials and the default AWS configuration."
+                 mgr    <- asks httpManager
+                 cr     <- asks awsCredentials
+                 awss3b <- asks awss3bucket
+                 hwUrl  <- asks highwayUrl
+                 let cfg = Aws.Configuration { Aws.timeInfo    = Aws.Timestamp
+                                             , Aws.credentials = cr
+                                             , Aws.logger      = Aws.defaultLog Aws.Warning
+                                             , Aws.proxy       = Nothing
+                                             }
+                 let s3cfg = Aws.defServiceConfig :: S3.S3Configuration Aws.NormalQuery
+                 --Set up a ResourceT region with an available HTTP manager.
+                 $logInfoS "highway/putS3File" $ T.pack $ "Setting up a ResourceT region with an available HTTP manager."
+                 st  <- askUnliftIO
+                 liftIO $ runResourceT $ do
+                   let body = RequestBodyBS content
+                   --Create a request object with S3.getObject and run the request with pureAws.
+                   liftIO $ unliftIO st $ $logInfoS "highway/putS3File" $ T.pack $ "Creating request object with getObject and running request via pureAws."
+                   _ <- Aws.pureAws cfg s3cfg mgr $
+                          S3.putObject awss3b uploadFileName body
+                   return $ hwUrl <> "/highway/" <> uploadFileName
     _ -> --Too many or no files provided via form.
       liftIO $ throwIO BadPostError
