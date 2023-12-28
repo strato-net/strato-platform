@@ -45,3 +45,20 @@ img.ant-image-preview-img {
     width: 10% !important;
   }
 }
+:where(.css-dev-only-do-not-override-9ntgx0).ant-checkbox-wrapper:not(.ant-checkbox-wrapper-disabled):hover .ant-checkbox-checked:not(.ant-checkbox-disabled) .ant-checkbox-inner{
+  background-color: #181eac;
+  border-color: #181eac;
+}
+
+:where(.css-dev-only-do-not-override-9ntgx0).ant-checkbox-checked .ant-checkbox-inner{
+  background-color: #181eac;
+  border-color: #181eac;
+}
+
+:where(.css-dev-only-do-not-override-9ntgx0).ant-checkbox-checked:after{
+  border: 2px solid #181eac;
+}
+
+:where(.css-dev-only-do-not-override-9ntgx0).ant-input-number .ant-input-number-input{
+  padding: 0;
+}

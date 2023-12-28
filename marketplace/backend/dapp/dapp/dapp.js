@@ -462,6 +462,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return saleOrderJs.cancelOrder(rawAdmin, contract, options, comments);
   }
 
+  contract.updateOrderStatus = async function (args, options = defaultOptions) {
+    const { saleOrderAddress, status, ...restArgs } = args;
+    const contract = { name: saleOrderJs.contractName, address: saleOrderAddress }
+    return saleOrderJs.updateOrderStatus(rawAdmin, contract, options, status);
+  }
+
   contract.getSaleOrders = async function (args, options = defaultOptions) {
     const getOptions = { ...options, app: contractName, };
     return saleOrderJs.getAll(rawAdmin, args, getOptions);
@@ -516,13 +522,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const getOptions = { ...options, app: contractName };
       let userStripeAccount, connectLink;
       // get user paymentProvider details from cirrus
-      const sellerStripeDetails = await paymentProviderJs.get(rawAdmin, { name: 'STRIPE', accountDeauthorized: false }, getOptions)
-
-      /*  check if an accountId already exists for the user org */
-      if (sellerStripeDetails.length > 0 && Object.keys(sellerStripeDetails[0]).length > 0) {
-        throw new rest.RestError(RestStatus.CONFLICT, "User has already connected their stripe account.")
-      }
-
+      const sellerStripeDetails = await paymentProviderJs.get(rawAdmin, { name: 'STRIPE', accountDeauthorized: false, ownerCommonName: userCert.commonName }, getOptions)
       if (sellerStripeDetails.length == 0 || Object.keys(sellerStripeDetails[0]).length == 0) {
         await axios.get(new URL('/stripe/onboard', STRIPE_PAYMENT_SERVER_URL).href)
           .then(async function (res) {
@@ -536,7 +536,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             }
           });
       } else {
-          await axios.get(new URL(`/stripe/onboard/${sellerStripeDetails.accountId}`, STRIPE_PAYMENT_SERVER_URL).href)
+          await axios.get(new URL(`/stripe/onboard/${sellerStripeDetails[0].accountId}`, STRIPE_PAYMENT_SERVER_URL).href)
             .then(function (res) {
               if (res.status === 200) {
                 connectLink = res.data.connectLink;
@@ -565,46 +565,53 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       }
 
       let returnedStripeAccountStatus = paymentProviders[0];
+      let paymentMethodsChecked = [];
       for (const paymentProvider of paymentProviders) {
-        const connectedStripeAccountStatus = { chargesEnabled: false, detailsSubmitted: false, payoutsEnabled: false, accountDeauthorized: false, eventTime: Date.now() }
-        const paymentProviderContract = { name: paymentProviderJs.contractName, address: paymentProvider.address }
-        try {
-          await axios.get(new URL(`/stripe/status/${paymentProvider.accountId}`, STRIPE_PAYMENT_SERVER_URL).href)
-            .then(function (res) {
-              if (res.status === 200) {
-                connectedStripeAccountStatus.chargesEnabled = res.data.chargesEnabled;
-                connectedStripeAccountStatus.detailsSubmitted = res.data.detailsSubmitted;
-                connectedStripeAccountStatus.payoutsEnabled = res.data.payoutsEnabled;
-              } else {
-                throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
-              }
-            }, (error) => {
-              console.log(error);
-            });
-        } catch (error) {
-          if (error.code == 'account_invalid') {
-            connectedStripeAccountStatus.accountDeauthorized = true
-          }
+        if (paymentProvider.name in paymentMethodsChecked) {
+          continue;
         }
-        const { detailsSubmitted, chargesEnabled, payoutsEnabled, accountDeauthorized } = connectedStripeAccountStatus;
-        if (paymentProvider.detailsSubmitted !== detailsSubmitted || paymentProvider.chargesEnabled !== chargesEnabled || paymentProvider.payoutsEnabled !== payoutsEnabled || paymentProvider.accountDeauthorized !== accountDeauthorized) {
-          await paymentProviderJs.updatePaymentProvider(rawAdmin, paymentProviderContract, connectedStripeAccountStatus, options);
-        }
-
-        if (connectedStripeAccountStatus.detailsSubmitted
-           && connectedStripeAccountStatus.chargesEnabled
-           && connectedStripeAccountStatus.payoutsEnabled
-           ) {
-            returnedStripeAccountStatus = { 
-              accountId: paymentProvider.accountId, 
-              paymentProviderAddress: paymentProvider.address, 
-              ...connectedStripeAccountStatus 
+        else {
+          const connectedStripeAccountStatus = { chargesEnabled: false, detailsSubmitted: false, payoutsEnabled: false, accountDeauthorized: false, eventTime: Date.now() }
+          const paymentProviderContract = { name: paymentProviderJs.contractName, address: paymentProvider.address }
+          try {
+            await axios.get(new URL(`/stripe/status/${paymentProvider.accountId}`, STRIPE_PAYMENT_SERVER_URL).href)
+              .then(function (res) {
+                if (res.status === 200) {
+                  connectedStripeAccountStatus.chargesEnabled = res.data.chargesEnabled;
+                  connectedStripeAccountStatus.detailsSubmitted = res.data.detailsSubmitted;
+                  connectedStripeAccountStatus.payoutsEnabled = res.data.payoutsEnabled;
+                } else {
+                  throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+                }
+              }, (error) => {
+                console.log(error);
+              });
+          } catch (error) {
+            if (error.code == 'account_invalid') {
+              connectedStripeAccountStatus.accountDeauthorized = true
             }
-           }
+          }
+          const { detailsSubmitted, chargesEnabled, payoutsEnabled, accountDeauthorized } = connectedStripeAccountStatus;
+          if (paymentProvider.detailsSubmitted !== detailsSubmitted || paymentProvider.chargesEnabled !== chargesEnabled || paymentProvider.payoutsEnabled !== payoutsEnabled || paymentProvider.accountDeauthorized !== accountDeauthorized) {
+            await paymentProviderJs.updatePaymentProvider(rawAdmin, paymentProviderContract, connectedStripeAccountStatus, options);
+          }
+
+          if (connectedStripeAccountStatus.detailsSubmitted
+            && connectedStripeAccountStatus.chargesEnabled
+            && connectedStripeAccountStatus.payoutsEnabled
+            ) {
+              returnedStripeAccountStatus = { 
+                accountId: paymentProvider.accountId, 
+                paymentProviderAddress: paymentProvider.address, 
+                ...connectedStripeAccountStatus 
+              }
+            }
+          
+          paymentMethodsChecked.push(paymentProvider.name);
+        }
+
+        return returnedStripeAccountStatus
       }
-
-      return returnedStripeAccountStatus
-
     } catch (error) {
       console.error(`${error}`)
       throw new rest.RestError(RestStatus.BAD_REQUEST, `${error.message}`)
@@ -695,10 +702,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         throw new rest.RestError(RestStatus.BAD_REQUEST, "Incorrect order value.");
       }
       let stripePaymentSession;
+      const {paymentList,...restArgs} = args;
       try {
         const checkoutBody = {
-          paymentTypes: ['card'],
-          cartData: args,
+          paymentTypes: paymentList,
+          cartData: restArgs,
           orderDetail: invoices,
           accountId: sellerStripeDetails[0].accountId,
         }
@@ -769,6 +777,29 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while fetching payment session", { message: "Error while fetching payment" })
     }
   };
+
+  contract.getPaymentIntent = async function (args, options = defaultOptions) {
+    try {
+      const { session_id, sellersCommonName } = args;
+      const paymentDetail = await paymentProviderJs.get(rawAdmin, 
+        { name: 'STRIPE', ownerCommonName: sellersCommonName, accountDeauthorized: false }, 
+        options);
+      if (paymentDetail.length === 0) {
+        throw new rest.RestError(RestStatus.CONFLICT, "Seller payment details cannot be found.");
+      }
+      const paymentIntent = await axios.get(new URL(`/stripe/intent/${session_id}/${paymentDetail[0].accountId}`, STRIPE_PAYMENT_SERVER_URL).href)
+        .then(function (res) {
+          if (res.status === 200) {
+            return res.data;
+          } else {
+            throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+          }
+        });
+      return { ...paymentIntent }
+    } catch (error) {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while fetching payment intent", { message: "Error while fetching payment intent" })
+    }
+  };  
 
   contract.createUserAddress = async function (args, options = defaultOptions) {
     try {

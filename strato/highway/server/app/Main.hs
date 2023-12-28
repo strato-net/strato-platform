@@ -15,6 +15,7 @@ import BlockApps.Init
 import BlockApps.Logging
 import Options
 
+import Aws as Aws (makeCredentials)
 import Control.Monad
 import Control.Monad.IO.Unlift
 import Data.ByteString.Char8 as DBC8
@@ -85,11 +86,12 @@ initHighway = do
                             False -> do $logInfoS "highway/initHighway" $ T.pack $ "Preparing environment for highway."
                                         mgr <- liftIO $ newManager tlsManagerSettings
                                         boundary <- liftIO genBoundary
+                                        cr       <- liftIO $ Aws.makeCredentials (DBC8.pack flags_awsaccesskeyid)
+                                                                                 (DBC8.pack flags_awssecretaccesskey)              
                                         let env = HighwayWrapperEnv
                                                     mgr
+                                                    cr
                                                     boundary
-                                                    (DBC8.pack flags_awsaccesskeyid)
-                                                    (DBC8.pack flags_awssecretaccesskey)
                                                     (T.pack flags_awss3bucket)
                                                     (T.pack flags_highwayUrl)
                                         $logInfoS "highway/initHighway" $ T.pack $ "Initialization successful!"

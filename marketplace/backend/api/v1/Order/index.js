@@ -27,6 +27,12 @@ router.post(
   OrderController.create
 );
 
+router.put(
+  Order.updateOrderStatus,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  OrderController.updateOrderStatus
+);
 
 router.put(
   Order.updateBuyerDetails,
@@ -54,6 +60,13 @@ router.get(
   authHandler.authorizeRequest(),
   loadDapp,
   OrderController.paymentSession
+)
+
+router.get(
+  Order.paymentIntent,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  OrderController.paymentIntent
 )
 
 router.post(

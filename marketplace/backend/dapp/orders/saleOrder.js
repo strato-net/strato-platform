@@ -202,7 +202,7 @@ async function cancelOrder(user, contract, options, comments = "") {
   const callArgs = {
     contract,
     method: "cancelOrder",
-    args: util.usc({}), // { comments: comments }),
+    args: util.usc({comments}),
   };
   const cancelStatus = await rest.call(user, callArgs, options);
 
@@ -215,6 +215,25 @@ async function cancelOrder(user, contract, options, comments = "") {
   }
 
   return cancelStatus;
+}
+
+async function updateOrderStatus(user, contract, options, status) {
+  const callArgs = {
+    contract,
+    method: "updateOrderStatus",
+    args: util.usc({status}), 
+  };
+  const updateOrderStatusResponse = await rest.call(user, callArgs, options);
+
+  if (parseInt(updateOrderStatusResponse, 10) !== RestStatus.OK) {
+    throw new rest.RestError(
+      updateOrderStatusResponse,
+      "Order Cannot Be Updated",
+      {}
+    );
+  }
+
+  return updateOrderStatusResponse;
 }
 
 /**
@@ -253,6 +272,7 @@ export default {
   get,
   getAll,
   cancelOrder,
+  updateOrderStatus,
   completeOrder,
   marshalIn,
   marshalOut,

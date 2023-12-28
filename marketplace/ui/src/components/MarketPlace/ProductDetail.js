@@ -504,7 +504,7 @@ const ProductDetails = ({ user, users }) => {
             </Text>
             </Space> */}
 
-            <Space className="flex justify-between py-[15px] px-[14px]  border border-[#E9E9E9] rounded-md">
+            <Space className="flex justify-between">
               <DescTitle text="Purity" />
               <Text className="text-[13px] text-[#202020] font-medium">{itemData?.purity}</Text>
             </Space>
@@ -615,7 +615,6 @@ const ProductDetails = ({ user, users }) => {
              <img  width={"100%"}  className="  rounded-md h-full " src={ image_placeholder} />
           </div></> }
               </Carousel>
-
             <div className=" w-full lg:w-1/2 ">
               <div className=" lg:border-b lg:border-[#E9E9E9] pb-[6px]">
                 <Text className="font-semibold text-base lg:text-3xl text-[#202020]">
@@ -690,7 +689,7 @@ const ProductDetails = ({ user, users }) => {
                 <div className="flex gap-4 justify-between lg:justify-start  pt-4 w-full">
                   <Button
                     type="primary"
-                    className="w-[90%] md:w-[365px] h-9  bg-primary !hover:bg-primaryHover"
+                    className="w-[90%] md:w-[365px] h-9  !bg-[#13188A] !hover:bg-primaryHover"
                     onClick={() => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                         setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
@@ -724,10 +723,10 @@ const ProductDetails = ({ user, users }) => {
                   </Button>
 
                   {ownerSameAsUser() ? <Button
-                    icon={<div className="">
-                    <img src={Images.Cart} alt="cart"   className="object-contain w-[18px] h-[18px]"></img>
-                    </div>}
-                    className=" w-9 h-9 border border-primary rounded-md"
+                    icon={
+                    <img src={Images.Cart} alt="cart"   className=" w-[18px] h-[18px]"></img>
+                    }
+                    className=" !w-9 h-9 border border-primary  !bg-[#13188A] rounded-md"
                     disabled={true}
                     id="addToCart"
                     onClick={() => {
@@ -759,9 +758,9 @@ const ProductDetails = ({ user, users }) => {
                   
                   </Button> : <Button
                   icon={<div className="flex justify-center items-center">
-                    <img src={Images.Cart} alt="cart"  width={14} height={14}></img>
+                    <img src={Images.Cart} alt="cart"  width={18} height={18} className="object-contain"/>
                     </div>}
-                    className="group w-9 h-9 border  bg-[#13188A] hover:bg-primary"
+                    className=" !w-9 h-9 rounded-md  !bg-[#13188A]"
                     onClick={() => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                         setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
@@ -795,7 +794,7 @@ const ProductDetails = ({ user, users }) => {
                 <div className="flex ">
                   <Button
                     type="primary"
-                    className="w-[80%] md:w-[365px] h-9 m-3 mt-10 bg-primary !hover:bg-primaryHover"
+                    className="w-[80%] md:w-[365px] h-9 m-3 mt-10 !bg-primary !hover:bg-primaryHover"
                     href={`mailto:sales@blockapps.net`}
                     onClick={() => {
                     

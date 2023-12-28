@@ -166,25 +166,6 @@ const ResponsiveAddAddress = ({ back }) => {
               </p>
             )}
           </Form.Item>
-          <Form.Item label="" name="country" className="">
-            <p className="text-[#202020]  text-sm font-medium text-left">
-              Country
-            </p>
-            <Input
-              label="state"
-              className="h-[42px] w-full  "
-              name="country"
-              placeholder="Enter Country"
-              value={formik.values.country}
-              onChange={formik.handleChange}
-            />
-            {formik.touched.country && formik.errors.country && (
-              <p className="text-error text-xs text-left">
-                {formik.errors.country}
-              </p>
-            )}
-          </Form.Item>
-
           <Form.Item label="" name="zipcode" className="">
             <p className="text-[#202020]  text-sm font-medium text-left">
               Zipcode
@@ -201,6 +182,24 @@ const ResponsiveAddAddress = ({ back }) => {
             {formik.touched.zipcode && formik.errors.zipcode && (
               <p className="text-error text-xs text-left">
                 {formik.errors.zipcode}
+              </p>
+            )}
+          </Form.Item>
+          <Form.Item label="" name="country" className="">
+            <p className="text-[#202020]  text-sm font-medium text-left">
+              Country
+            </p>
+            <Input
+              label="country"
+              className="h-[42px] w-full  "
+              name="country"
+              placeholder="Enter Country"
+              value={formik.values.country}
+              onChange={formik.handleChange}
+            />
+            {formik.touched.country && formik.errors.country && (
+              <p className="text-error text-xs text-left">
+                {formik.errors.country}
               </p>
             )}
           </Form.Item>
