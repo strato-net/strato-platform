@@ -45,7 +45,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
             </div>
             <Typography className='font-normal text-black'>{'$' + topSellingProduct?.price || "N/A"}</Typography>
             <Typography className={`#989898 opacity-40 max-h-5 overflow-hidden ${parent == 'Marketplace' ? 'hidden md:flex' : ''}`}>{topSellingProduct?.description || "N/A"}</Typography>
-            <div className='flex justify-between items-center bg-[#EEEFFA] p-2'>
+            <div className='flex justify-between items-center bg-[#EEEFFA] p-2 rounded-[4px]'>
                 <Typography>Quantity:</Typography>
                 <div className='flex gap-3 p-1 bg-white'>
                     <Typography className='px-2 bg-[#EEEFFA] cursor-pointer rounded-sm' onClick={() => {
