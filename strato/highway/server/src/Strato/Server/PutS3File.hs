@@ -64,4 +64,4 @@ putS3File multipartdata =
                    False -> --Filename provided (extension included) exceed 100 characters in length.
                             liftIO $ throwIO BadPostFilenameLengthError
     _ -> --Too many or no files provided via form.
-      liftIO $ throwIO BadPutError
+      liftIO $ throwIO BadPostError
