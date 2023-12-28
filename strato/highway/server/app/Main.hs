@@ -26,7 +26,9 @@ import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Cors
 import Network.Wai.Middleware.Prometheus
+import Network.Wai.Parse (defaultParseRequestBodyOptions,setMaxRequestKeyLength)
 import Servant
+import Servant.Multipart
 import Servant.Multipart.Client
 import Text.RawString.QQ as TRQQ
 import System.IO
@@ -106,11 +108,13 @@ appHighwayWrapper env =
       }
     . instrumentApp "highway"
     . cors (const $ Just policy)
-    . serve
-      ( Proxy
-          @( HighwayWrapperAPI
-           )
-      )
+    . serveWithContext
+        ( Proxy
+            @( HighwayWrapperAPI
+             )
+        ) ctx
     $ serveHighwayWrapper env
   where
+    --ctx :: Context '[MultipartOptions Mem]
+    ctx    = (MultipartOptions (setMaxRequestKeyLength 100 defaultParseRequestBodyOptions)) :. EmptyContext
     policy = simpleCorsResourcePolicy {corsRequestHeaders = ["Content-Type"]}
