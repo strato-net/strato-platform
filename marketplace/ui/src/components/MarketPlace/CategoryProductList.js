@@ -313,8 +313,8 @@ const CategoryProductList = ({ user }) => {
             <Input
               size="large"
               placeholder="Search Marketplace"
-              prefix={<SearchOutlined style={{ color: "#989898" }} />}
-              className="bg-[#F6F6F6] border-none rounded-2xl p-[10px] "
+              prefix={<img src={Images.Header_Search} alt="search" className="w-[18px] h-[18px]" />}
+              className="bg-[#F6F6F6] border-none rounded-3xl p-[10px]"
             />
           </div>
         </div>
