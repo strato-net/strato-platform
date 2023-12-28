@@ -12,7 +12,7 @@
 
 module Strato.Monad where
 
-import Data.ByteString as DB hiding (map)
+import Aws (Credentials(..))
 import Data.ByteString.Lazy as DBL hiding (map)
 import BlockApps.Logging
 import Control.Monad.Reader
@@ -54,9 +54,8 @@ highwayWrapperError err = do
 
 data HighwayWrapperEnv = HighwayWrapperEnv
   { httpManager        :: Manager
+  , awsCredentials     :: Credentials 
   , generatedBoundary  :: DBL.ByteString
-  , awsaccesskeyid     :: DB.ByteString
-  , awssecretaccesskey :: DB.ByteString
   , awss3bucket        :: Text
   , highwayUrl         :: Text
   }

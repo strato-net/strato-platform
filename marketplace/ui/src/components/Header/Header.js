@@ -11,7 +11,7 @@ import {
   Button,
   Typography
 } from "antd";
-import { ArrowLeftOutlined, LogoutOutlined, MenuOutlined, SearchOutlined, ShoppingCartOutlined } from "@ant-design/icons";
+import { ArrowLeftOutlined,  LogoutOutlined,  } from "@ant-design/icons";
 import { Images } from "../../images";
 import "./header.css";
 import { useNavigate } from "react-router-dom";
@@ -174,19 +174,19 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
 
   return (
     <>
-    <Header className={`fixed z-[100] !bg-[#ffffff] !pl-2 w-full !pr-4 md:px-12 flex md:!mb-10 shadow-header md:p-10 justify-between md:justify-start`}>
+    <Header className={`fixed z-[100] !bg-[#ffffff] !pl-2 w-full !pr-4 md:px-12 flex md:!mb-10 ${showMenu ? '' : 'shadow-header'} md:p-10 justify-between md:justify-start`}>
       <Space className="relative flex-grow-0 md:flex-1 ml-2 md:ml-5">
         <div
           className="mt-4 mr-5 md:mt-0 cursor-pointer flex-grow-0 w-max md:w-[170px] h-[44px]"
           onClick={() => { navigate(routes.Marketplace.url) }}
         >
-          <img src={Images.newLogo} className="h-[31px] w-[120px] md:w-[170px] md:h-[44px]" height={'full'} width={'full'} preview={false} />
+          <img src={Images.newLogo} className="h-[31px] w-[120px] md:w-[170px] md:h-[44px]"  preview={false} />
         </div>
         <div className={`lg:ml-28 md:ml-1 flex-1 ${showSearch ? '-mt-[6px] fixed top-[13px] left-0 flex w-[100vw] z-50 mb-4' : 'hidden md:flex mb-10'}`}>
           <Input
             size="large"
             placeholder="Search"
-            prefix={showSearch ? <ArrowLeftOutlined onClick={()=>handleSearchShow(false)} /> : <SearchOutlined style={{ color: "#989898" }} />}
+            prefix={showSearch ? <ArrowLeftOutlined onClick={()=>handleSearchShow(false)} /> : <img src={Images.Header_Search} className="w-[18px] h-[18px]" />}
             className="bg-[#F6F6F6] border-none rounded-2xl md:!w-[35%] lg:w-[40%] absolute p-[10px] "
           />
         </div>
@@ -242,7 +242,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
       />
       <Space size="large" className="!gap-0 md:!gap-4 mr-0 -ml-3">
         {<div className="flex md:hidden mx-2" onClick={()=>handleSearchShow(true)}>
-          <SearchOutlined />
+         <img src={Images.Responsive_search} className="w-6 h-6" /> 
         </div>}
         {roleIndex === undefined || roleIndex === 1 ? null : <Badge
           className="cursor-pointer"
@@ -256,9 +256,16 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
             navigate("/checkout");
           }}
         >
+          <div className="md:hidden">
           <Avatar
-            icon={<ShoppingCartOutlined />}
+            icon={<img src={Images.Responsive_cart} alt="" className="w-6 h-6" /> }
           />
+          </div>
+          <div className="hidden md:inline-block">
+          <Avatar
+            icon={ <img src={Images.Header_cart} alt="" className="w-6 h-6" />}
+          />
+          </div>
         </Badge>
         }
         {
@@ -278,18 +285,18 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
           ) :
             <Dropdown menu={{ items }} placement="bottomRight" trigger={["click"]} overlayStyle={{ marginTop: "40px" }}>
               <a onClick={(e) => e.preventDefault()} className="hidden md:flex text-base text-white" id="user-dropdown">
-                <ProfileIcon className="profile_icon" />
+               <img src={Images.Setting_icon}  className="w-[30px] h-[30px] "/> 
               </a>
             </Dropdown>
         }
         {<div className="block md:hidden px-1" onClick={handleSubMenu}>
-          <MenuOutlined className="menu_outlined" />
+          <img src={Images.menu_icon} alt="" className="w-6 h-6"/> 
           </div>}
       </Space>
     </Header>
     {showMenu &&
       <div>
-        <div className="bg-white border-t absolute w-full z-50 md:hidden top-16">
+        <div className="bg-white border-t border-[#E9E9E9] absolute w-full z-50 md:hidden top-16">
               {subMenuItems.map((item) => {
                 return (
                   <Typography onClick={()=>handleIntMenuTab(item)} className={`text-base py-3 px-4 cursor-pointer ${item ? '' : 'hidden'}`} >{item?.label}</Typography>

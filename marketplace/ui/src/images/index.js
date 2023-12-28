@@ -47,4 +47,11 @@ export const Images = {
   'art_card' : require("./resources/categories/art_card.png"),
   'carbon_card' : require("./resources/categories/carbon_card.png"),
   'membership_card' : require("./resources/categories/membership_card.jpg"),
+  'menu_icon' : require("./resources/Ham_menu.png"),
+  'Responsive_search' :  require("./resources/Responsive_Search.png"),
+  'Responsive_cart'  : require("./resources/Responive_Cart.png"),
+  'Header_cart' :  require("./resources/Header_Cart.png"),
+  'Header_Search' :  require("./resources/Search.png"),
+  'Setting_icon' :  require("./resources/Setting.png"),
+  'filter' : require('./resources/Filter.png'),
 };

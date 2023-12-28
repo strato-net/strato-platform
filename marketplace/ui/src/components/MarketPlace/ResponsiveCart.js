@@ -99,7 +99,7 @@ const ResponsiveCart = ({
                 </div>
               </div>
 
-              <div className="flex justify-between ml-[20%]  items-baseline pt-[6px]">
+              <div className="flex justify-between ml-[20%]  items-baseline">
                 <Typography className="font-semibold text-[#202020] text-sm">{`$${element?.unitPrice}`}</Typography>
                 <div>
                   <div className="flex items-center justify-center mt-2">
@@ -227,7 +227,7 @@ const ResponsiveCart = ({
             <Button
               type="primary"
               id="submit-order-button"
-              className=" w-full sm:w-44 h-9 bg-[#13188A]"
+              className=" w-full sm:w-44 h-9 !bg-[#13188A]"
               onClick={() => {
                 if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                   window.location.href = loginUrl;
