@@ -595,7 +595,7 @@ type MonadP2P m =
          '(PPeer, UdpEnableTime),
          '(PPeer, PeerDisable),
          '(PPeer, T.Text),
-         '((IPAsText, TCPPort), PeerBondingState)
+         '((IPAsText, Point), PeerBondingState)
        ]
       m,
     All2

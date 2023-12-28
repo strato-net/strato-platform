@@ -971,21 +971,13 @@ instance MonadIO m => A.Replaceable (IPAsText, Point) PeerBondingState (MonadTes
 instance (Monad m, A.Replaceable (IPAsText, Point) PeerBondingState m) => A.Replaceable (IPAsText, Point) PeerBondingState (MonadP2PTest m) where
   replace p k = lift . A.replace p k
 
-instance MonadIO m => A.Replaceable (IPAsText, TCPPort) PeerBondingState (MonadTest m) where
-  replace _ (IPAsText t, _) (PeerBondingState s) = do
-    let ip = T.unpack t
-    stringPPeerMap . at ip . _Just %= (\p -> p {pPeerBondState = s})
-
-instance (Monad m, A.Replaceable (IPAsText, TCPPort) PeerBondingState m) => A.Replaceable (IPAsText, TCPPort) PeerBondingState (MonadP2PTest m) where
-  replace p k = lift . A.replace p k
-
-instance MonadIO m => A.Selectable (IPAsText, UDPPort) PeerBondingState (MonadTest m) where
+instance MonadIO m => A.Selectable (IPAsText, Point) PeerBondingState (MonadTest m) where
   select _ (IPAsText t, _) = do
     let ip = T.unpack t
     map' <- use stringPPeerMap
     return $ PeerBondingState . pPeerBondState <$> map' M.!? ip
 
-instance (A.Selectable (IPAsText, UDPPort) PeerBondingState m) => A.Selectable (IPAsText, UDPPort) PeerBondingState (MonadP2PTest m) where
+instance (A.Selectable (IPAsText, Point) PeerBondingState m) => A.Selectable (IPAsText, Point) PeerBondingState (MonadP2PTest m) where
   select p = lift . A.select p
 
 instance Mod.Accessible BondedPeers m where

@@ -68,16 +68,11 @@ instance MonadIO m => (A.Replaceable (IPAsText, Point) PeerBondingState) m where
     flip runSqlPool sqldb $
       SQL.updateWhere [PPeerIp SQL.==. ip, PPeerPubkey SQL.==. Just point] [PPeerBondState SQL.=. state]
 
-instance MonadIO m => (A.Replaceable (IPAsText, TCPPort) PeerBondingState) m where
-  replace _ (IPAsText ip, TCPPort port) (PeerBondingState state) = liftIO $ withGlobalSQLPool $ \sqldb -> do
-    flip runSqlPool sqldb $
-      SQL.updateWhere [PPeerIp SQL.==. ip, PPeerTcpPort SQL.==. port] [PPeerBondState SQL.=. state]
-
-instance MonadIO m => (A.Selectable (IPAsText, UDPPort) PeerBondingState) m where
-  select _ (IPAsText ip, UDPPort port) = liftIO $ withGlobalSQLPool $ \sqldb -> do
+instance MonadIO m => (A.Selectable (IPAsText, Point) PeerBondingState) m where
+  select _ (IPAsText ip, point) = liftIO $ withGlobalSQLPool $ \sqldb -> do
     fmap (fmap $ PeerBondingState . pPeerBondState . SQL.entityVal) $
       flip runSqlPool sqldb $
-        SQL.selectFirst [PPeerIp SQL.==. ip, PPeerUdpPort SQL.==. port] []
+        SQL.selectFirst [PPeerIp SQL.==. ip, PPeerPubkey SQL.==. Just point] []
 
 instance MonadIO m => Mod.Accessible BondedPeers m where
   access _ = liftIO $ withGlobalSQLPool $ \sqldb -> do
