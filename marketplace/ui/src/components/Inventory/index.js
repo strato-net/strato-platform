@@ -177,41 +177,6 @@ const Inventory = ({ user }) => {
     setPage(1);
     return;
   };
-  
-  const allCategory = { name: "All" };
-
-  const tabItems = [allCategory, ...categorys].map((category, index) => {
-    return {
-      label: category.name,
-      key: category.name === "All" ? undefined : category.name,
-      children: (
-        <div className="my-2 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 inventoryCard sm:place-items-center md:place-items-start   max-w-full">
-          { !isInventoriesLoading ? (
-              inventories.map((inventory, index) => {
-                let category = categorys.find((c) => c.name === inventory.category);
-                return (
-                  <InventoryCard
-                    id={index}
-                    inventory={inventory}
-                    category={category}
-                    key={index}
-                    debouncedSearchTerm={debouncedSearchTerm}
-                    paymentProviderAddress={
-                      stripeStatus ? stripeStatus.paymentProviderAddress : undefined
-                    }
-                  />
-                );
-              })
-            ) : (
-              <div className="absolute left-[50%] md:top-4 ">
-                <Spin size="large" />
-              </div>
-            )
-        }
-        </div>
-      ),
-    };
-  });
   // ------------------ Tabs END------------------
 
   return (
@@ -283,12 +248,73 @@ const Inventory = ({ user }) => {
               </Tooltip>
             </div>
           </div>
-          <div className="pt-6 mx-4 md:mx-5 md:px-10 mb-5 ">
-            <Tabs defaultActiveKey={category ? category : "All"}
-              className="store"
-              onChange={(key) => handleTabSelect(key)}
-              items={tabItems}
-            />
+          <div className="pt-6 mx-6 md:mx-5 md:px-10 mb-5 ">
+          <Tabs
+            defaultActiveKey={category ? category : "All"}
+            className="store"
+            onChange={(key) => handleTabSelect(key)}
+            items={[
+              {
+                label: "All",
+                key: undefined,
+                children: (
+                  <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 inventoryCard max-w-full">
+                    {!isInventoriesLoading ? (
+                      inventories.map((inventory, index) => {
+                        const category = categorys.find((c) => c.name === inventory.category);
+                        return (
+                          <InventoryCard
+                            id={index}
+                            inventory={inventory}
+                            category={category}
+                            key={index}
+                            debouncedSearchTerm={debouncedSearchTerm}
+                            paymentProviderAddress={
+                              stripeStatus ? stripeStatus.paymentProviderAddress : undefined
+                            }
+                          />
+                        );
+                      })
+                    ) : (
+                      <div className="absolute left-[50%] md:top-4">
+                        <Spin size="large" />
+                      </div>
+                    )}
+                  </div>
+                ),
+              },
+              ...categorys.map((category, index) => ({
+                label: category.name,
+                key: category.name,
+                children: (
+                  <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 inventoryCard max-w-full">
+                    {!isInventoriesLoading ? (
+                      inventories.map((inventory, index) => {
+                        const category = categorys.find((c) => c.name === inventory.category);
+                        return (
+                          <InventoryCard
+                            id={index}
+                            inventory={inventory}
+                            category={category}
+                            key={index}
+                            debouncedSearchTerm={debouncedSearchTerm}
+                            paymentProviderAddress={
+                              stripeStatus ? stripeStatus.paymentProviderAddress : undefined
+                            }
+                          />
+                        );
+                      })
+                    ) : (
+                      <div className="absolute left-[50%] md:top-4">
+                        <Spin size="large" />
+                      </div>
+                    )}
+                  </div>
+                ),
+              })),
+            ]}
+          />
+
             <div className="flex justify-center pt-6">
               <Pagination
                 current={page}
