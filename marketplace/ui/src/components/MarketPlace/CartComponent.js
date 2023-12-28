@@ -58,9 +58,9 @@ const CartComponent = ({ columns, data }) => {
 
     return (
         <>
-            <div className="pt-10  ">
+            <div className="pt-2  ">
                 <div>
-                    <div className="mt-4  ">
+                    <div className=" cart">
                         <DataTableComponent
                             isLoading={false}
                             scrollX={"100%"}
@@ -69,7 +69,6 @@ const CartComponent = ({ columns, data }) => {
                             pagination={false}
                         />
                     </div>
-
                     <div className="bg-[#EEEFFA]  rounded-b-md flex justify-between border-b border-l border-r  border-[#E9E9E9] ">
                         <Row className=" py-[15px] pl-14 xl:pl-20 ">
                             <Col>
