@@ -63,6 +63,7 @@ data HighwayWrapperEnv = HighwayWrapperEnv
 data HighwayWrapperError
   = BadGetError 
   | BadPutError
+  | BadPutFilenameLengthError
   | UserError Text
   | RuntimeError SomeException
   deriving (Show, Exception)
@@ -94,6 +95,11 @@ handleHighwayError = \case
       "handleHighwayError/BadPutError"
       "Could not push file contents to S3."
     throwIO BadPutError
+  BadPutFilenameLengthError -> do
+    $logErrorS
+      "handleHighwayError/BadPutFilenameLengthError"
+      "Filename length limit of 100 characters exceeded."
+    throwIO BadPutFilenameLengthError
   e@(RuntimeError _) -> do
     $logErrorS "handleHighwayError/RuntimeError" . Text.pack $
       show e ++ "\n  callstack missing for runtime errors"
@@ -122,6 +128,15 @@ enterHighwayWrapper env x = Handler $ do
                     ]
             }
         BadPutError ->
+          err500
+            { errBody =
+                fromString $
+                  unlines
+                    [ "Bad PUT Error!",
+                      "Upload of file was unsuccessful."
+                    ]
+            }
+        BadPutFilenameLengthError ->
           err500
             { errBody =
                 fromString $
