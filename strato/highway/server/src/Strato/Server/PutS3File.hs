@@ -62,6 +62,6 @@ putS3File multipartdata =
                                        S3.putObject awss3b uploadFileName body
                                 return $ hwUrl <> "/highway/" <> uploadFileName
                    False -> --Filename provided (extension included) exceed 100 characters in length.
-                            liftIO $ throwIO BadPutFilenameLengthError
+                            liftIO $ throwIO BadPostFilenameLengthError
     _ -> --Too many or no files provided via form.
       liftIO $ throwIO BadPutError
