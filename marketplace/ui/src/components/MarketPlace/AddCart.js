@@ -289,7 +289,7 @@ const Checkout = ({ user }) => {
       title: <Text className="text-[#202020] text-base font-semibold">Unit Price($)</Text>,
       dataIndex: "unitPrice",
       align: "center",
-      render: (text) => <p className=" text-sm text-[#202020] font-medium font-sans">{text}</p>,
+      render: (text) => <p className=" text-sm text-[#202020] font-medium font-sans">{'$'+text}</p>,
     },
     {
       title: <Text className="text-[#202020] text-base font-semibold">Quantity</Text>,
@@ -330,19 +330,19 @@ const Checkout = ({ user }) => {
       ),
       dataIndex: "shippingCharges",
       align: "center",
-      render: (text) => <p className="text-sm font-medium text-[#202020] ">{text}</p>,
+      render: (text) => <p className="text-sm font-medium text-[#202020] ">{ '$'+text}</p>,
     },
     {
       title: <Text className="text-[#202020] text-base font-semibold">Tax($)</Text>,
       dataIndex: "tax",
       align: "center",
-      render: (text) => <p className="text-sm font-medium text-[#202020]">{text}</p>,
+      render: (text) => <p className="text-sm font-medium text-[#202020]">{'$'+text}</p>,
     },
     {
       title: <Text className="text-[#202020] text-base font-semibold">Amount($)</Text>,
       dataIndex: "amount",
       align: "center",
-      render: (text) => <p className="text-sm font-medium text-[#202020]">{text}</p>  
+      render: (text) => <p className="text-sm font-medium text-[#202020]">{'$'+text}</p>  
 ,
   
     },

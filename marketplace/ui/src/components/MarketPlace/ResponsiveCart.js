@@ -173,11 +173,11 @@ const ResponsiveCart = ({
                     </div>
                     <div className="flex justify-between">
                       <Typography className="text-sm text-[#202020] font-medium">Shipping Charges:</Typography>
-                      <Typography className="text-sm text-[#202020] font-semibold">{element?.shippingCharges}</Typography>
+                      <Typography className="text-sm text-[#202020] font-semibold">{ '$'+ element?.shippingCharges} </Typography>
                     </div>
                     <div className="flex justify-between">
                       <Typography  className="text-sm text-[#202020] font-medium">Tax($):</Typography>
-                      <Typography className="text-sm text-[#202020] font-semibold">{element?.tax}</Typography>
+                      <Typography className="text-sm text-[#202020] font-semibold">{'$'+element?.tax}</Typography>
                     </div>
                   </div>
                 </div>
@@ -188,7 +188,7 @@ const ResponsiveCart = ({
                   Amount($):
                 </Typography>
                 <Typography className="text-sm  font-semibold text-[#202020]">
-                  {element?.amount}
+                  {'$'+ element?.amount}
                 </Typography>
               </div>
             </div>
