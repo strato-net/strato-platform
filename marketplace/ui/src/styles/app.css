@@ -361,7 +361,7 @@ body::-webkit-scrollbar {
 }
 
 .head .ant-table-thead .ant-table-cell{
-  background: #EEEFFA !important;
+  background: white !important;
 }
 
 .ant-form-item .ant-form-item-label{
@@ -403,4 +403,15 @@ body::-webkit-scrollbar {
 .inventory_card .ant-input-number .ant-input-number-input{
   text-align: left;
   height: 42px;
+}
+
+
+
+.cart  .ant-table-container th{
+  background-color: white !important;
+}
+
+
+ .cart .ant-table-header {
+  height:100% !important
 }

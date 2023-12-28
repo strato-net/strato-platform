@@ -187,7 +187,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
             size="large"
             placeholder="Search"
             prefix={showSearch ? <ArrowLeftOutlined onClick={()=>handleSearchShow(false)} /> : <img src={Images.Header_Search} className="w-[18px] h-[18px]" />}
-            className="bg-[#F6F6F6] border-none rounded-2xl md:!w-[35%] lg:w-[40%] absolute p-[10px] "
+            className="bg-[#F6F6F6] border-none rounded-[100px] md:!w-[35%] lg:w-[40%] absolute p-[10px] "
           />
         </div>
         </Space>
