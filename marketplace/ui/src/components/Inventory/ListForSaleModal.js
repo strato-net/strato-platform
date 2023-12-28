@@ -1,4 +1,4 @@
-import { Button, Input, InputNumber, Modal, Select, Tag, Table } from "antd";
+import { Button, Input, InputNumber, Modal, Select, Tag, Table, Typography } from "antd";
 import { useEffect, useState } from "react";
 import { actions } from "../../contexts/inventory/actions";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
@@ -50,7 +50,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
         const paymentType = PAYMENT_TYPE.find(type => type.value === value);
       
         if (paymentType) {
-          if (paymentType.name === "Card") {
+          if (paymentType.name === "Credit Card / ACH") {
             return paymentType.options.map((IconComponent, index) => (
               <span key={index} className="ml-1">{IconComponent}</span>
             ));
@@ -140,6 +140,9 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
         return finalColumns;
     };
 
+
+
+    
     const getCategory = () => {
         const parts = inventory.contract_name.split('-');
         return parts[parts.length - 1];
@@ -178,17 +181,54 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
             title={`${inventory.saleAddress ? 'Update' : 'List'} - ${decodeURIComponent(inventory.name)}`}
             width={650}
             footer={[
+                <div className="flex justify-center md:block">
+
+              
                 <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canList || inventory.status === "1"} loading={isListing}>
                     {inventory.saleAddress ? 'Update' : 'List' }
                 </Button>
+                </div>
             ]}
         >
-              <div className="head">
+              <div className="head hidden md:block">
             <Table
                 columns={columns()}
                 dataSource={data}
                 pagination={false}
             />
+            </div>
+            <div className="flex gap-5 flex-col justify-center md:hidden mt-5">
+                <div className="w-full">
+                    <Typography className="text-[#202020] text-sm font-medium">Set Payment Types</Typography>
+                    <Select
+                    
+                        id="paymentTypes"
+                        mode="multiple"
+                        tagRender={tagRender}
+                        placeholder="Select Payment Types"
+                        name="paymentTypes"
+                        maxTagCount="responsive"
+                        value={paymentTypes}
+                        onChange={handleSelectAll}
+                        showSearch={false}
+                        className="w-full"
+                    >
+                        {PAYMENT_TYPE.map((e, index) => (
+                        <Option value={e.value} key={index}>
+                            {e.name}
+                        </Option>
+                        ))}
+                    </Select>
+                </div>
+                <div className="w-full">
+                    <Typography className="text-[#202020] text-sm font-medium">Quantity</Typography>
+                <InputNumber  className="w-full h-9" value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
+                </div>
+                <div>
+                    <Typography className="text-[#202020] text-sm font-medium">{getCategory() === "CarbonOffset" || getCategory() === "Metals" ? "Set Price Per Unit" : "Set Price"}</Typography>
+                <InputNumber className="w-full h-9" value={pricePerUnit} controls={false} min={1} onChange={(value) => setpricePerUnit(value)} />
+                </div>
+
             </div>
         </Modal>
     )

@@ -29,7 +29,7 @@ let server
     throw new Error(`Deploy file '${config.configDirPath}/${config.deployFilename}' not found`);
   }
 
-  const marketplaceUrl = constants.marketplaceSSL === 'true' ? `https://${constants.marketplaceHost}/marketplace` : `http://${constants.marketplaceHost}/marketplace`;
+  const marketplaceUrl = `${config.serverHost}/marketplace`
   axios.defaults.headers.common['Referer'] = marketplaceUrl;
 
   app.set(deployParamName, deploy);

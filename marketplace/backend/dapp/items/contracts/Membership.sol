@@ -1,7 +1,7 @@
 pragma es6;
 pragma strict;
 
-import <e5c8511b96a78f9ab8b67d233cc8fc831f6ece36>;
+import <d6cdd554a0503fb0e33cbaee329afeab5b0a26b2>;
 
 /// @title A representation of Membership assets
 contract Membership is SemiFungible {
