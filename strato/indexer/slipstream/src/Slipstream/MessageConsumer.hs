@@ -54,7 +54,7 @@ getAndProcessMessages ::
 getAndProcessMessages env conn = do
   _ <- execKafka assertTopicCreation
 
-  consume "getAndProcessMessages'" "slipstream" "vmevents" $ \messages -> do
+  consume "getAndProcessMessages'" "slipstream" "vmevents" $ \() messages -> do
     recordKafkaMessages messages
     cache <- access (Proxy @(IORef Globals))
     forceGlobalEval cache

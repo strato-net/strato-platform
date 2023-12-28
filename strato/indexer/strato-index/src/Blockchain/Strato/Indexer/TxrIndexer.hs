@@ -121,8 +121,9 @@ doValidatorRemoved bHash cm = do
 txrIndexerMainLoop :: (MonadLogger m, HasKafka m, HasRedis m, HasSQL m) =>
                       m ()
 txrIndexerMainLoop = forever $ do
-  consume "txrIndexer" (lookupConsumerGroup "strato-txr-indexer") targetTopicName $ \idxEvents ->
+  consume "txrIndexer" (lookupConsumerGroup "strato-txr-indexer") targetTopicName $ \() idxEvents -> do
     runConduit $ yieldMany idxEvents .| process .| output
+    return ()
   where
     process = awaitForever $ yieldMany . indexEventToTxrResults
     output = awaitForever $ lift . txrResultHandler

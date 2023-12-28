@@ -26,7 +26,9 @@ module Control.Monad.Composable.Kafka (
   Offset,
   Metadata(..),
   ConsumerGroup,
-  KafkaError(..)
+  KafkaError(..),
+  packMetadata,
+  unpackMetadata
   ) where
 
 import BlockApps.Logging
@@ -98,23 +100,35 @@ execKafka f = do
       return v
 
 
+unpackMetadata :: Binary a =>
+                  Metadata -> a
+unpackMetadata = decode . BL.fromStrict . _kString . _kMetadata
+
+packMetadata :: Binary a =>
+                a -> Metadata
+packMetadata = Metadata . KString . BL.toStrict . encode
+
 ----------------------
 --   Checkpoints    --
 ----------------------
 
 getKafkaCheckpoint :: (MonadLogger m, HasKafka m) =>
-                      ConsumerGroup -> TopicName -> m Offset
+                      ConsumerGroup -> TopicName -> m (Offset, Metadata)
 getKafkaCheckpoint consumerGroup topicName =
   execKafka (fetchSingleOffset consumerGroup topicName 0) >>= \case
-    Left UnknownTopicOrPartition -> setKafkaCheckpoint consumerGroup topicName 0 "" >> getKafkaCheckpoint consumerGroup topicName
+    Left UnknownTopicOrPartition -> do
+      let md' = ""
+          theOffset = 0
+      setKafkaCheckpoint consumerGroup topicName theOffset md'
+      return (theOffset, md')
     Left err -> error $ "Unexpected response when fetching offset for " ++ show consumerGroup ++ ": " ++ show err
-    Right r -> pure $ fst r
+    Right (o, md) -> return (o, md)
 
 setKafkaCheckpoint :: (MonadLogger m, HasKafka m) =>
                       ConsumerGroup -> TopicName -> Offset -> Metadata -> m ()
 setKafkaCheckpoint consumerGroup topicName ofs md = do
   $logInfoS "setKafkaCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs
-  op' <- execKafka (setKafkaCheckpoint' consumerGroup topicName ofs md)
+  op' <- execKafka $ setKafkaCheckpoint' consumerGroup topicName ofs md
   case op' of
     Left err -> error $ "Client error: " ++ show err
     Right _ -> return ()
@@ -141,17 +155,17 @@ produceItems topicName events = do
 --Consuming/Fetching--
 ----------------------
 
-consume :: (Binary a, MonadLogger m, HasKafka m) =>
-           Text -> ConsumerGroup -> TopicName -> ([a] -> m ()) -> m ()
+consume :: (Binary a, Binary md, MonadLogger m, HasKafka m) =>
+           Text -> ConsumerGroup -> TopicName -> (md -> [a] -> m md) -> m ()
 consume name consumerGroup topicName f = 
   forever $ do
     $logInfoS name "About to fetch blocks"
-    offset <- getKafkaCheckpoint consumerGroup topicName
-    idxEvents <- fetchItems topicName offset
-    $logInfoS name . T.pack $ "Fetched " ++ show (length idxEvents) ++ " events starting from " ++ show offset
-    f idxEvents
-    let nextOffset' = offset + fromIntegral (length idxEvents)
-    setKafkaCheckpoint consumerGroup topicName nextOffset' ""
+    (offset, md) <- getKafkaCheckpoint consumerGroup topicName
+    items <- fetchItems topicName offset
+    $logInfoS name . T.pack $ "Fetched " ++ show (length items) ++ " events starting from " ++ show offset
+    md' <- f (unpackMetadata md) items
+    let nextOffset' = offset + fromIntegral (length items)
+    setKafkaCheckpoint consumerGroup topicName nextOffset' $ packMetadata md'
 
 fetchItems :: (Binary a, HasKafka m) =>
               TopicName -> Offset -> m [a]

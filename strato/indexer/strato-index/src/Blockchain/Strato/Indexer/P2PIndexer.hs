@@ -43,8 +43,9 @@ p2pIndexerMainLoop ::
   ) =>
   m ()
 p2pIndexerMainLoop = forever $ do
-  consume "p2pIndexer" (lookupConsumerGroup "strato-p2p-indexer") targetTopicName $ \idxEvents ->
+  consume "p2pIndexer" (lookupConsumerGroup "strato-p2p-indexer") targetTopicName $ \() idxEvents -> do
     indexP2P idxEvents
+    return ()
 
 indexP2P ::
   ( MonadLogger m,
