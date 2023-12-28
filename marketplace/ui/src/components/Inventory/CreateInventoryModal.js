@@ -230,7 +230,7 @@ const CreateInventoryModal = ({
 
     if (isDone) {
       if (page === 1)
-        actions.fetchInventory(dispatch, 10, 0, debouncedSearchTerm, undefined);
+        await actions.fetchInventory(dispatch, 10, 0, debouncedSearchTerm, undefined);
       resetPage(1);
       handleCancel();
     }
