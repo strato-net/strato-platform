@@ -3,7 +3,8 @@ import React, { useState } from "react";
 import {
     Typography,
     Button,
-    notification
+    notification,
+    InputNumber
 } from "antd";
 import { useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
@@ -53,7 +54,25 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                     }}>
                         -
                     </Typography>
-                    <Typography>{quantity}</Typography>
+                    <InputNumber 
+                        className="w-10" 
+                        size="small" 
+                        bordered={false} 
+                        value={quantity} 
+                        max={topSellingProduct.saleQuantity}
+                        onChange={setQuantity}
+                        onPressEnter={(e) => {
+                            const newValue = parseInt(e.target.value, 10);
+                            if (newValue <= topSellingProduct.saleQuantity) {
+                                setQuantity(newValue);
+                            } else {
+                                api.error({
+                                    message: "Cannot add more than available quantity",
+                                    placement: "bottom",
+                                });
+                            }
+                        }}  
+                        controls={false}/>
                     <Typography className='px-2 bg-[#EEEFFA] cursor-pointer rounded-sm' onClick={() => {
                         if ((quantity + 1 <= topSellingProduct.saleQuantity) && (quantity + 1 <= topSellingProduct.quantity)) {
                             setQuantity(quantity + 1)

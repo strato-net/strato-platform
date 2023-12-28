@@ -62,7 +62,7 @@ const CreateInventoryModal = ({
     images: null,
     files: null,
     category: "Art",
-    subCategory: "",
+    subCategory: null,
     size: null,
     skuNumber: null,
     condition: null,
@@ -674,7 +674,7 @@ const CreateInventoryModal = ({
         break;
     }
   };
-  const disabled = isCreateInventorySubmitting || isUploadImageSubmitting || !formik.values.subCategory;
+  const disabled = isCreateInventorySubmitting || isUploadImageSubmitting
 
   /*
               <div className="flex justify-between mt-4 ">
@@ -740,10 +740,9 @@ const CreateInventoryModal = ({
               key="submit"
               type="primary"
               onClick={formik.handleSubmit}
-              loading={isCreateInventorySubmitting || isUploadImageSubmitting}
               disabled={disabled}
             >
-              Create Inventory
+            {disabled ? <Spin /> : "Create Inventory"}
             </Button>
           </div>,
         ]}
