@@ -212,14 +212,24 @@ export const setSearchQueryOptions = (args = {}, _queryOptionsArray) => {
 }
 
 export const setSearchQueryOptionsPrime = (args) => {
-  const nonQueryOptions = ['queryValue', 'queryFields', 'queryOptions', 'limit', 'offset', 'sort', 'range', , 'notEqualsField', 'notEqualsValue']
-  const queryArgs = setSearchQueryOptionsLike(args, Object.keys(args).reduce((result, key) => {
-    if (!nonQueryOptions.includes(key)) {
+  const nonQueryOptions = ['queryValue', 'queryFields', 'queryOptions', 'limit', 'offset', 'sort', 'range', 'notEqualsField', 'notEqualsValue']
+  const queryArgs = setSearchQueryOptions(args, Object.keys(args).reduce((result, key) => {
+    if (!nonQueryOptions.includes(key) && key != 'category' && key != 'subCategory') {
       if (Array.isArray(args[key])) {
         result.push(({ key, value: `(${args[key].join(',')})`, predicate: 'in' }))
       } else {
         result.push(({ key, value: args[key] }))
       }
+    }
+    
+    if (key === 'category' && Array.isArray(args[key])) {
+      const categories = args[key][0].split(',').map(category => '%-' + category + '%');
+      result.push({ key, value: categories, predicate: 'or', subPredicate: 'like'})
+    }
+
+    if (key === 'subCategory' && Array.isArray(args[key])) {
+      const subCategories = args[key][0].split(',').map(subCategory => '%-' + subCategory);
+      result.push({ key, value: subCategories, predicate: 'or', subPredicate: 'like'})
     }
 
     if (key === 'queryValue') {
