@@ -30,7 +30,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                 onClick={() =>
                     navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
                 }
-                className='md:h-[200px] md:w-[40vw] h-[150px]'
+                className='md:h-[200px] md:w-[40vw] h-[150px] object-contain'
                 src={topSellingProduct.images ? topSellingProduct?.images[0] : images_placeholder}
             />
             <div className='flex justify-between'>

@@ -611,10 +611,10 @@ const ProductDetails = ({ user, users }) => {
             } className="product_detail w-full  sm:w-[417px]   lg:h-[348px] md:w-[343px] lg:w-[417px]" showStatus={false} showArrows swipeable emulateTouch infiniteLoop >
              { details.images.length > 0  ? details.images.map((element,  index)=>{
                   return ( <><div key={index} className="sm:w-[343px ] h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
-                  <img  width={"100%"}  className="  rounded-md h-full " src={element ? element : image_placeholder} />
+                  <img  width={"100%"}  className="object-contain rounded-md h-full " src={element ? element : image_placeholder} />
                </div></>)
              })  : <><div  className="sm:w-[343px ] sm:h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
-             <img  width={"100%"}  className="  rounded-md h-full " src={ image_placeholder} />
+             <img  width={"100%"}  className="object-contain rounded-md h-full " src={ image_placeholder} />
           </div></> }
               </Carousel>
 
