@@ -28,12 +28,11 @@ const Order = ({ user }) => {
 
   return (
     <div>
-      <div className="px-4 md:px-20 py-2 md:py-10">
+      <div className="px-4 md:px-20 py-2 md:py-10 mt-2">
       <Breadcrumb>
         <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
           <ClickableCell href={routes.Marketplace.url}>
             <p className="text-sm text-[#13188A] font-semibold">
-
             Home
             </p>
           </ClickableCell>

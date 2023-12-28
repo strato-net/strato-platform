@@ -155,14 +155,15 @@ const TopSellingProductCard = () => {
               <Spin spinning={isTopSellingProductsLoading} size="large" />
             </div>
           ) : 
-        <div className="relative pl-[1px] md:pl-10">
+        <div className="relative md:pl-10">
           <div onClick={()=>scroll(-300)}  className={`${!prevVisible ? 'hidden' : 'md:flex hidden'} cursor-pointer absolute  justify-center items-center top-48 left-24 h-16 w-16 text-2xl bg-[#6A6A6A] rounded-full text-white`}>{"<"}</div>
-          <div ref={containerRef} className="overflow-x-auto gap-6 p-2 flex trending_cards">
+          <div ref={containerRef} className="overflow-x-auto gap-6 px-1 py-2 flex trending_cards">
             {topSellingProducts.map((topSellingProduct) => {
               return (
                 <NewTrendingCard
                 topSellingProduct={topSellingProduct}
                 addItemToCart={addItemToCart}
+                parent={"Marketplace"}
                 />)
               })}
           </div>

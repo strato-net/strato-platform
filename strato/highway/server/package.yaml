@@ -51,6 +51,7 @@ executables:
     main: Main.hs
     other-modules: [Options]
     dependencies:
+      - aws
       - blockapps-highway-api
       - blockapps-highway-server
       - blockapps-init
