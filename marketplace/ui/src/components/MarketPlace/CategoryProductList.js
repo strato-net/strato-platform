@@ -292,7 +292,7 @@ const CategoryProductList = ({ user }) => {
           </Breadcrumb.Item>
           <Breadcrumb.Item href="" onClick={e => setSelectedCategories([])}>
             <ClickableCell href={routes.MarketplaceProductList.url}>
-              <p href={routes.MarketplaceProductList.url} className={`${selectedCategories.length > 0 ? "text-[#13188A] font-semibold " :"text-[#202020] font-medium"} text-sm hover:bg-transparent`}>
+              <p href={routes.MarketplaceProductList.url} className={`${selectedCategories.length > 0 ? "text-[#13188A] font-semibold " : "text-[#202020] font-medium"} text-sm hover:bg-transparent`}>
                 Marketplace
               </p>
             </ClickableCell>
@@ -306,7 +306,7 @@ const CategoryProductList = ({ user }) => {
 
         <div className="flex items-center justify-center ml-4 md:ml-14 mr-14 mt-4 gap-4">
           <div className="border border-solid border-[#6A6A6A] rounded-md cursor-pointer p-1 md:p-2" onClick={handleFilterClick}>
-            <img src={Images.filter} alt="filter" className=" w-5 h-5 md:w-6 md:h-6"/>
+            <img src={Images.filter} alt="filter" className=" w-5 h-5 md:w-6 md:h-6" />
           </div>
 
           <div className={`flex-1 `}>
@@ -347,7 +347,7 @@ const CategoryProductList = ({ user }) => {
                     ghost="true"
                     reverse={false}
                     expandIcon={({ isActive }) =>
-                      isActive ? <img src={Images.Dropdown} alt="img" style={{width:"24px", height:"24px", transform:"rotate(180deg)"}} /> : <img src={Images.Dropdown} alt="img" style={{width:"24px", height:"24px"}}/>
+                      isActive ? <img src={Images.Dropdown} alt="img" style={{ width: "24px", height: "24px", transform: "rotate(180deg)" }} /> : <img src={Images.Dropdown} alt="img" style={{ width: "24px", height: "24px" }} />
                     }
                   >
                     <Panel header={<Text strong className="text-base">Categories</Text>} key="1">
@@ -379,7 +379,7 @@ const CategoryProductList = ({ user }) => {
                     ghost="true"
                     reverse={false}
                     expandIcon={({ isActive }) =>
-                      isActive ? <img src={Images.Dropdown} alt="img" style={{width:"24px", height:"24px", transform:"rotate(180deg)"}} /> : <img src={Images.Dropdown} alt="img" style={{width:"24px", height:"24px"}}/>
+                      isActive ? <img src={Images.Dropdown} alt="img" style={{ width: "24px", height: "24px", transform: "rotate(180deg)" }} /> : <img src={Images.Dropdown} alt="img" style={{ width: "24px", height: "24px" }} />
                     }
                   >
                     <Panel header={<Text strong className="text-base">Sub-Category</Text>} key="1">
@@ -410,8 +410,8 @@ const CategoryProductList = ({ user }) => {
                 ghost="true"
                 reverse={false}
                 expandIcon={({ isActive }) =>
-                      isActive ? <img src={Images.Dropdown} alt="img" style={{width:"24px", height:"24px", transform:"rotate(180deg)"}} /> : <img src={Images.Dropdown} alt="img" style={{width:"24px", height:"24px"}}/>
-                    }
+                  isActive ? <img src={Images.Dropdown} alt="img" style={{ width: "24px", height: "24px", transform: "rotate(180deg)" }} /> : <img src={Images.Dropdown} alt="img" style={{ width: "24px", height: "24px" }} />
+                }
               >
                 <Panel header={<Text strong className="text-base">Price ($)</Text>} key="1">
                   <Space>
@@ -437,7 +437,7 @@ const CategoryProductList = ({ user }) => {
                     ghost="true"
                     reverse={false}
                     expandIcon={({ isActive }) =>
-                      isActive ? <img src={Images.Dropdown} alt="img" style={{width:"24px", height:"24px", transform:"rotate(180deg)"}} /> : <img src={Images.Dropdown} alt="img" style={{width:"24px", height:"24px"}}/>
+                      isActive ? <img src={Images.Dropdown} alt="img" style={{ width: "24px", height: "24px", transform: "rotate(180deg)" }} /> : <img src={Images.Dropdown} alt="img" style={{ width: "24px", height: "24px" }} />
                     }
                   >
                     <Panel header={<Text strong className="text-base">Product</Text>} key="1">
@@ -458,57 +458,6 @@ const CategoryProductList = ({ user }) => {
                   <Divider className="m-auto w-[94%] min-w-[80%]" />
                 </>
               )}
-
-              {/* Panel - Quantity */}
-              <Collapse
-                bordered={false}
-                defaultActiveKey={1}
-                expandIconPosition="end"
-                ghost="true"
-                reverse={false}
-                expandIcon={({ isActive }) =>
-                      isActive ? <img src={Images.Dropdown} alt="img" style={{width:"24px", height:"24px", transform:"rotate(180deg)"}} /> : <img src={Images.Dropdown} alt="img" style={{width:"24px", height:"24px"}}/>
-                    }
-              >
-                <Panel header={<Text strong className="text-base">Quantity</Text>} key="1">
-                  <Space className="flex flex-col">
-                  <div className="flex flex-col">
-                    <Text>Min</Text>
-                    <InputNumber min={0} controls={false} prefix="$" 
-                    addonAfter={
-                    <div className="flex flex-row gap-[1px]">
-                      <Typography className='px-2 bg-[#EEEFFA] cursor-pointer text-xl flex items-center'>
-                        -
-                      </Typography> 
-                      <Typography className='px-2 bg-[#EEEFFA] cursor-pointer text-xl flex items-center'>
-                        +
-                      </Typography>
-                    </div>
-                    } 
-                    className="w-full"/>
-                  </div>
-                    
-                  <div className="flex flex-col gap-[1px]">
-                  <Text>Max</Text>
-                    <InputNumber min={minPrice} prefix="$" 
-                    controls={false}
-                    addonAfter={
-                    <div className="flex flex-row">
-                      <Typography className='px-2 bg-[#EEEFFA] cursor-pointer text-xl flex items-center'>
-                        -
-                      </Typography> 
-                      <Typography className='px-2 bg-[#EEEFFA] cursor-pointer text-xl flex items-center'>
-                        +
-                      </Typography>
-                    </div>
-                    } 
-                    className="w-full"/>
-                  </div>
-                  </Space>
-                </Panel>
-              </Collapse>
-              <Divider className="m-auto w-[94%] min-w-[80%]" />
-
               <div className="pb-2"></div>
             </div>
           </div>}
@@ -669,53 +618,6 @@ const CategoryProductList = ({ user }) => {
                   <Divider className="m-0" />
                 </>
               )}
-
-              {/* Panel - Quantity */}
-              <Collapse
-                bordered={false}
-                expandIconPosition="end"
-                ghost="true"
-                reverse={false}
-                className="pl-4 pr-4"
-              >
-                <Panel header={<Text>Quantity</Text>} key="1">
-                  <Space className="flex flex-row justify-center">
-                  <div className="flex flex-col">
-                    <Text>Min</Text>
-                    <InputNumber min={0} controls={false} prefix="$" 
-                    addonAfter={
-                    <div className="flex flex-row gap-[1px]">
-                      <Typography className='px-2 bg-[#EEEFFA] cursor-pointer text-xl flex items-center'>
-                        -
-                      </Typography> 
-                      <Typography className='px-2 bg-[#EEEFFA] cursor-pointer text-xl flex items-center'>
-                        +
-                      </Typography>
-                    </div>
-                    } className="w-full"/>
-                  </div>
-                    
-                  <div className="flex flex-col">
-                  <Text>Max</Text>
-                    <InputNumber min={minPrice} prefix="$" 
-                    controls={false}
-                    addonAfter={
-                    <div className="flex flex-row gap-[1px]">
-                      <Typography className='px-2 bg-[#EEEFFA] cursor-pointer text-xl flex items-center'>
-                        -
-                      </Typography> 
-                      <Typography className='px-2 bg-[#EEEFFA] cursor-pointer text-xl flex items-center'>
-                        +
-                      </Typography>
-                    </div>
-                    }
-                    className="w-full"/>
-                  </div>
-                  </Space>
-                </Panel>
-              </Collapse>
-              <Divider className="m-0" />
-
               <div className="pb-8"></div>
             </div>
           </div>
