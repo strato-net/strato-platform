@@ -29,7 +29,7 @@ const Order = ({ user }) => {
 
   return (
     <div>
-      <div className="px-4 md:px-20 py-2 md:py-10 mt-2">
+      <div className="px-4 md:px-20 py-2 md:py-10 mt-2 orders">
       <Breadcrumb>
         <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
           <ClickableCell href={routes.Marketplace.url}>
@@ -50,7 +50,7 @@ const Order = ({ user }) => {
         defaultActiveKey={state == null ? "Sold" : state.defaultKey}
         onChange={onChange}
         tabBarExtraContent={              
-          <div className="text-xs md:flex items-center hidden">
+          <div className="text-xs md:flex items-center hidden orders_page">
             <DatePicker
               value={
                 selectedDate

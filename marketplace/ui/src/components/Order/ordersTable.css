@@ -36,6 +36,14 @@
     padding: 0px !important;
 }
 
+.orders .ant-table-wrapper .ant-table-thead>tr>th{
+    font-size: 16px !important;
+}
+
+.orders_page .ant-picker{
+    margin-bottom: 12px;
+}
+
 @media (min-width: 768px) {
     .orders_searchbar input{
         background-color: #F6F6F6;
