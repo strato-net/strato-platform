@@ -169,7 +169,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
             isDone = await actions.listInventory(inventoryDispatch, body);
         }
         if (isDone) {
-            actions.fetchInventory(inventoryDispatch, 10, 0, "", undefined);
+            await actions.fetchInventory(inventoryDispatch, 10, 0, "", undefined);
             handleCancel();
         }
     }

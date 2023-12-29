@@ -22,6 +22,7 @@ const getSchema = () => {
     images: yup.mixed().required("Image is required"),
     files: yup.mixed().optional().nullable(),
     category: yup.string().required("Category is required"),
+    subCategory: yup.string().nullable().required("Sub-Category is required")
   });
 };
 

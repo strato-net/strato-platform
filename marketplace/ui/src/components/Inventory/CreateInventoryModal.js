@@ -62,7 +62,7 @@ const CreateInventoryModal = ({
     images: null,
     files: null,
     category: "Art",
-    subCategory: "",
+    subCategory: null,
     size: null,
     skuNumber: null,
     condition: null,
@@ -230,7 +230,7 @@ const CreateInventoryModal = ({
 
     if (isDone) {
       if (page === 1)
-        actions.fetchInventory(dispatch, 10, 0, debouncedSearchTerm, undefined);
+        await actions.fetchInventory(dispatch, 10, 0, debouncedSearchTerm, undefined);
       resetPage(1);
       handleCancel();
     }
@@ -674,7 +674,7 @@ const CreateInventoryModal = ({
         break;
     }
   };
-  const disabled = isCreateInventorySubmitting || isUploadImageSubmitting;
+  const disabled = isCreateInventorySubmitting || isUploadImageSubmitting
 
   /*
               <div className="flex justify-between mt-4 ">
@@ -742,7 +742,7 @@ const CreateInventoryModal = ({
               onClick={formik.handleSubmit}
               disabled={disabled}
             >
-              {disabled ? <Spin /> : "Create Inventory"}
+            {disabled ? <Spin /> : "Create Inventory"}
             </Button>
           </div>,
         ]}
