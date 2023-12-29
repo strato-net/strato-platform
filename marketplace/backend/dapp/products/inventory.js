@@ -1,7 +1,7 @@
 import { util, rest, importer } from '/blockapps-rest-plus';
 import config from '/load.config';
 import RestStatus from 'http-status-codes';
-import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs, setSearchQueryOptionsPrime } from '/helpers/utils';
+import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs, setSearchQueryOptionsPrime, waitForAddress } from '/helpers/utils';
 import dayjs from 'dayjs';
 import constants from '../../helpers/constants';
 import saleJs from "../orders/sale";
@@ -9,6 +9,7 @@ import saleJs from "../orders/sale";
 const contractName = constants.assetTableName;
 const contractFilename = `${util.cwd}/dapp/products/contracts/Inventory.sol`;
 const saleContractName = 'SimpleSale';
+const saleContract = constants.saleTableName;
 const saleContractFilename = `${util.cwd}/dapp/mercata-base-contracts/Templates/Sales/SimpleSale.sol`;
 
 /** 
@@ -64,8 +65,20 @@ async function uploadSaleContract(user, _constructorArgs, options) {
 
     const contract = await rest.createContract(user, contractArgs, copyOfOptions);
     contract.src = 'removed';
-
-    return contract;
+    
+    const searchOptions = {
+        ...options,
+        org: 'BlockApps',
+        query: {
+            address: `eq.${contract.address}`
+        }
+      }
+      
+    let isDone = await waitForAddress(user, {name: saleContract}, searchOptions);
+    
+    if (isDone) {
+        return contract;
+    }
 }
 
 /**
