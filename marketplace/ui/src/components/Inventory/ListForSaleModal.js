@@ -14,7 +14,8 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
     const inventoryDispatch = useInventoryDispatch();
     const [canList, setCanList] = useState(true);
     const {
-        isListing
+        isListing,
+        issaleUpdating
     } = useInventoryState();
 
     useEffect(() => {
@@ -162,13 +163,15 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
             ...body,
             quantity,
         }
-        let isDone
+        let isDone1
+        let isDone2
+        
         if (inventory.saleAddress) {
-            isDone = await actions.updateSale(inventoryDispatch, body);
+            isDone1 = await actions.updateSale(inventoryDispatch, body);
         } else {
-            isDone = await actions.listInventory(inventoryDispatch, body);
+            isDone2 = await actions.listInventory(inventoryDispatch, body);
         }
-        if (isDone) {
+        if ( (isDone1 && !issaleUpdating) || (isDone2 && !isListing)) {
             await actions.fetchInventory(inventoryDispatch, 10, 0, "", undefined);
             handleCancel();
         }
@@ -184,7 +187,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
                 <div className="flex justify-center md:block">
 
               
-                <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canList || inventory.status === "1"} loading={isListing}>
+                <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canList || inventory.status === "1"} loading={inventory.saleAddress ? issaleUpdating : isListing}>
                     {inventory.saleAddress ? 'Update' : 'List' }
                 </Button>
                 </div>

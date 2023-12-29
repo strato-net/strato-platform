@@ -228,7 +228,7 @@ const CreateInventoryModal = ({
       values.subCategory
     );
 
-    if (isDone) {
+    if (isDone && !isCreateInventorySubmitting) {
       if (page === 1)
         await actions.fetchInventory(dispatch, 10, 0, debouncedSearchTerm, undefined);
       resetPage(1);
