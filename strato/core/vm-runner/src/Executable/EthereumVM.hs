@@ -59,7 +59,6 @@ import Control.Monad.Composable.Base
 import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.SQL
 import Control.Monad.Reader (ask, runReaderT)
-import Data.Binary
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.DList as DL
 import Data.Foldable hiding (fold)
@@ -223,9 +222,6 @@ sendOutEvent (OutBlock o) = void . execKafka $ writeUnseqEvents [IEBlock $ block
 consumerGroup :: KP.ConsumerGroup
 consumerGroup = lookupConsumerGroup "ethereum-vm"
 
-metadataConsumerGroup :: KP.ConsumerGroup
-metadataConsumerGroup = lookupConsumerGroup "ethereum-vm-metadata"
-
 getFirstBlockFromSequencer :: (MonadLogger m, MonadFail m, HasKafka m) => m OutputBlock
 getFirstBlockFromSequencer = do
   (VmBlock block) <- head <$> getUnprocessedKafkaEvents (KP.Offset 0)
@@ -243,22 +239,21 @@ initializeCheckpointAndBlockSummaryKafka = do
 getCheckpoint :: (MonadLogger m, MonadFail m, HasKafka m, HasContext m) => m (KP.Offset, EVMCheckpoint)
 getCheckpoint = do
   let topic = seqVmEventsTopicName
-      topic' = show topic
-      cg' = show metadataConsumerGroup
-  $logInfoS "getCheckpoint" . T.pack $ "Getting checkpoint for " ++ topic' ++ "#0 for " ++ cg'
-  execKafka (K.fetchSingleOffset metadataConsumerGroup topic 0) >>= \case
+      cg = consumerGroup
+  $logInfoS "getCheckpoint" . T.pack $ "Getting checkpoint for " ++ show topic ++ "#0 for " ++ show cg
+  execKafka (K.fetchSingleOffset cg topic 0) >>= \case
     Left KP.UnknownTopicOrPartition -> initializeCheckpointAndBlockSummaryKafka >> getCheckpoint
     Left err -> error $ "Unexpected response when fetching checkpoint: " ++ show err
     Right (ofs, md) -> do
-      let md' = decode $ unpackMetadata md
-      $logInfoS "getCheckpoint" . T.pack $ show ofs ++ " / " ++ format md'
-      return (ofs, md')
+      let evmCheckpoint = unpackMetadata md
+      $logInfoS "getCheckpoint" . T.pack $ show ofs ++ " / " ++ format evmCheckpoint
+      return (ofs, evmCheckpoint)
 
 setCheckpoint :: (MonadLogger m, HasKafka m) => KP.Offset -> EVMCheckpoint -> m ()
 setCheckpoint ofs checkpoint = do
   $logInfoS "setCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs ++ " / " ++ format checkpoint
-  let kMetadata = packMetadata $ encode checkpoint
-  ret <- execKafka $ K.commitSingleOffset metadataConsumerGroup seqVmEventsTopicName 0 ofs kMetadata
+  let kMetadata = packMetadata checkpoint
+  ret <- execKafka $ K.commitSingleOffset consumerGroup seqVmEventsTopicName 0 ofs kMetadata
   either (error . show) return ret
 
 getUnprocessedKafkaEvents :: (MonadLogger m, HasKafka m) => KP.Offset -> m [VmEvent]

@@ -41,6 +41,7 @@ import Control.Monad.Trans.Except
 import Control.Monad.Trans.State
 import Data.Binary
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import Data.IORef
@@ -102,11 +103,11 @@ execKafka f = do
 
 unpackMetadata :: Binary a =>
                   Metadata -> a
-unpackMetadata = decode . BL.fromStrict . _kString . _kMetadata
+unpackMetadata = decode . BL.fromStrict . either (error "error in unpackMetadata, data is not valid base 16 encoded") id . B16.decode . _kString . _kMetadata
 
 packMetadata :: Binary a =>
                 a -> Metadata
-packMetadata = Metadata . KString . BL.toStrict . encode
+packMetadata = Metadata . KString . B16.encode . BL.toStrict . encode
 
 ----------------------
 --   Checkpoints    --
