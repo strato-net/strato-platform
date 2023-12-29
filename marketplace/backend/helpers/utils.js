@@ -97,8 +97,16 @@ export const search = async (contractName, args, options, user) => {
       ...queryOptions,
     },
   }
-
-  const results = await rest.search(user, tableArgs, searchOptions)
+  
+  function predicate(response) {
+    return (
+      response !== undefined
+      && response.length !== undefined
+      && response.length > 0
+    )
+  }
+  
+  const results = await rest.searchUntil(user, tableArgs, predicate, searchOptions)
   return results
 }
 

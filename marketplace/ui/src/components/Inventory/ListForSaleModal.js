@@ -163,15 +163,14 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
             ...body,
             quantity,
         }
-        let isDone1
-        let isDone2
+        let isDone
         
         if (inventory.saleAddress) {
-            isDone1 = await actions.updateSale(inventoryDispatch, body);
+            isDone = await actions.updateSale(inventoryDispatch, body);
         } else {
-            isDone2 = await actions.listInventory(inventoryDispatch, body);
+            isDone = await actions.listInventory(inventoryDispatch, body);
         }
-        if ( (isDone1 && !issaleUpdating) || (isDone2 && !isListing)) {
+        if ( isDone ) {
             await actions.fetchInventory(inventoryDispatch, 10, 0, "", undefined);
             handleCancel();
         }
