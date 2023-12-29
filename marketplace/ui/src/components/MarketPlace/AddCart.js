@@ -262,14 +262,14 @@ const Checkout = ({ user }) => {
     {
       title: (
         <Text className="text-[#202020] text-base font-semibold px-6">
-          Item
+          Items
         </Text>
       ),
       dataIndex: "item",
         width:"230px",
       render: (text) => {
         return (
-          <div className="flex gap-3 items-center">
+          <div className="flex gap-3 items-center ml-3">
             <img
               className=" w-10 h-10 md:w-[52px] md:h-[52px] lg:w-14 lg:h-14  object-contain rounded-[4px]"
               alt=""
