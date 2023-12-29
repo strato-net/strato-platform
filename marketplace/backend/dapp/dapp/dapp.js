@@ -221,8 +221,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.listItem = async function (args, options = defaultOptions) {
-    const getOptions = { ...options, org: 'BlockApps' };
-    return await inventoryJs.uploadSaleContract(rawAdmin, args, getOptions);
+    return await inventoryJs.uploadSaleContract(rawAdmin, args, options);
   }
 
   contract.unlistItem = async function (args, options = defaultOptions) {
