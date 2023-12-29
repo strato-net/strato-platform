@@ -65,8 +65,12 @@ async function uploadSaleContract(user, _constructorArgs, options) {
     const contract = await rest.createContract(user, contractArgs, copyOfOptions);
     contract.src = 'removed';
     
-    console.log("contract123123", contract)
-    console.log("options123", options) 
+    const searchOptions = {
+        ...options,
+        query: {
+            address: `eq.${contract.address}`
+        }
+      }
     
     function predicate(response) {
         return (
@@ -75,13 +79,8 @@ async function uploadSaleContract(user, _constructorArgs, options) {
             && response.length > 0
         )
     }
-
-    const searchOptions = {
-        address: `eq.${contract.address}`,
-        ...options
-    }
       
-    let isDone = await rest.searchUntil(user, { address: contract.address, name: `BlockApps-${contract.name}` }, predicate, searchOptions);
+    let isDone = await rest.searchUntil(user, {name:`BlockApps-Mercata-Sale`}, predicate, searchOptions);
     
     if (isDone) {
         return contract;
