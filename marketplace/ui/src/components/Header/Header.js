@@ -95,7 +95,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
     // } else 
     if (pathName.includes("/order") || pathName.includes("/orders") || pathName.includes('sold-orders') || pathName.includes('bought-orders')) {
       setSelectedTab("1");
-    } else if (pathName.includes("/inventories")) {
+    } else if (pathName.includes("/mystore")) {
       setSelectedTab("2");
     } else if (pathName.includes("/products")) {
       setSelectedTab("3");

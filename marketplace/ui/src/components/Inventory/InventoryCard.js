@@ -255,7 +255,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
         <div className=" pt-[5px]  flex">
           
           <div className="flex  items-center">
-          <Button type="link" className="text-[#13188A] font-semibold text-base h-6" onClick={callDetailPage}>Preview</Button>
+          <Button type="link" className="text-[#13188A] font-semibold text-base h-6 mb-2" onClick={callDetailPage}>Preview</Button>
           <Popover
             placement="bottomLeft"
             open={openPop}
