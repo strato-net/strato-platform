@@ -87,7 +87,11 @@ const CreateInventoryModal = ({
     if (!isLt1M) {
       setUploadErr("Cannot upload an image of size more than 1mb");
     }
-    return isJpgOrPng && isLt1M;
+    const isNameLengthValid = file.name.length <= 100;
+    if (!isNameLengthValid) {
+      setUploadErr("File name must be less than 100 characters");
+    }
+    return isJpgOrPng && isLt1M && isNameLengthValid;
   }
 
   function beforeFileUpload(file) {
@@ -99,7 +103,13 @@ const CreateInventoryModal = ({
     if (!isLt1M) {
       setUploadErr("Cannot upload a PDF of size more than 1mb");
     }
-    return isPdf && isLt1M;
+
+    const isNameLengthValid = file.name.length <= 100;
+    if (!isNameLengthValid) {
+      setUploadErr("File name must be less than 100 characters");
+    }
+
+    return isPdf && isLt1M && isNameLengthValid
   }
 
   const handleCreateFormSubmit = async (values) => {
@@ -890,10 +900,11 @@ const CreateInventoryModal = ({
                 <div className="p-4 border-secondryD border rounded flex flex-col justify-around">
                   <Upload
                     onChange={(es) => {
-                      if (es && es.fileList && es.fileList.length > 0) {
-                        setSelectedFiles(es.fileList);
-                        formik.setFieldValue("files", es.fileList.map((e) => e.originFileObj));
-                      }
+                      setSelectedFiles(es.fileList);
+                      formik.setFieldValue(
+                        "files",
+                        es.fileList.map((e) => e.originFileObj || null)
+                      );
                     }}
                     fileList={selectedFiles}
                     accept="application/pdf"
