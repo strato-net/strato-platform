@@ -205,7 +205,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getInventory = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName, };
-    return inventoryJs.get(rawAdmin, { ...args }, getOptions);
+    return await inventoryJs.get(rawAdmin, { ...args }, getOptions);
   };
 
   contract.getInventories = async function (args, options = optionsNoChainIds) {
@@ -217,41 +217,41 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getOwnershipHistory = async function (args, options = optionsNoChainIds) {
     console.log('#### GET OWNERSHIP HISTORY ARGS', JSON.stringify(args))
-    return inventoryJs.getOwnershipHistory(rawAdmin, args, options);
+    return await inventoryJs.getOwnershipHistory(rawAdmin, args, options);
   };
 
   contract.listItem = async function (args, options = defaultOptions) {
-    return inventoryJs.uploadSaleContract(rawAdmin, args, options);
+    return await inventoryJs.uploadSaleContract(rawAdmin, args, options);
   }
 
   contract.unlistItem = async function (args, options = defaultOptions) {
     const { saleAddress, ...restArgs } = args;
     const contract = { address: saleAddress };
-    return inventoryJs.unlistItem(rawAdmin, contract, restArgs, options);
+    return await inventoryJs.unlistItem(rawAdmin, contract, restArgs, options);
   }
 
   contract.resellItem = async function (args, options = defaultOptions) {
     const { assetAddress, ...restArgs } = args;
     const contract = { address: assetAddress };
-    return inventoryJs.resellItem(rawAdmin, contract, restArgs, options);
+    return await inventoryJs.resellItem(rawAdmin, contract, restArgs, options);
   }
 
   contract.transferItem = async function (args, options = defaultOptions) {
     const { assetAddress, ...restArgs } = args;
     const contract = { address: assetAddress };
-    return inventoryJs.transferItem(rawAdmin, contract, restArgs, options);
+    return await inventoryJs.transferItem(rawAdmin, contract, restArgs, options);
   }
 
   contract.updateSale = async function (args, options = defaultOptions) {
     const { saleAddress, ...restArgs } = args;
     const contract = { address: saleAddress };
-    return inventoryJs.updateSale(rawAdmin, contract, restArgs, options);
+    return await inventoryJs.updateSale(rawAdmin, contract, restArgs, options);
   }
 
   contract.updateInventory = async function (args, options = defaultOptions) {
     const { itemContract, itemAddress, ...restArgs } = args;
     const contract = { name: itemContract, address: itemAddress };
-    return inventoryJs.updateInventory(rawAdmin, contract, restArgs, options);
+    return await inventoryJs.updateInventory(rawAdmin, contract, restArgs, options);
   }
 
   // ------------------------------ INVENTORY ENDS--------------------------------
