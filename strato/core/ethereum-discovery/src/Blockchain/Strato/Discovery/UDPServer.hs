@@ -144,21 +144,22 @@ handleValidPacket ::
   NodeDiscoveryPacket ->
   ECC.Point ->
   m ()
-handleValidPacket addr _ packet otherPubKey = case packet of
+handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
   Ping _ ep@(Endpoint _ otherUdpPort' otherTcpPort) _ _ -> do
     addPeer' otherUdpPort' otherTcpPort
     time <- liftIO $ round `fmap` getPOSIXTime
     mPeer <- getPeerByIP' ip
     sendPacket (fromJust mPeer) $ Pong ep 4 (time + 50)
-    eErr' <- setPeerBondingState (sockAddrToIP addr) otherPubKey 2
+    eErr' <- setPeerBondingState ip otherPubKey 2
     whenLeft eErr' $ \err -> do
       $logErrorS "handleValidPacket" . T.pack $ "Unable to set peer bonding state: " ++ show err
       throwM err
   Pong {} -> do
+    addPeer' otherUdpPort (TCPPort 30303) -- to update pubkey if needed
     thePeer <- getPeerByIP' ip
     eErr <- resetPeerUdp $ fromJust thePeer
     whenLeft eErr $ \err -> $logErrorS "handleValidPacket/Pong" . T.pack $ "Unable to reset peer disable: " ++ show err
-    eErr' <- setPeerBondingState (sockAddrToIP addr) otherPubKey 2
+    eErr' <- setPeerBondingState ip otherPubKey 2
     whenLeft eErr' $ \err -> do
       $logErrorS "handleValidPacket" . T.pack $ "Unable to set peer bonding state: " ++ show err
       throwM err
