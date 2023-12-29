@@ -417,3 +417,14 @@ body::-webkit-scrollbar {
  .cart .ant-table-header {
   height:100% !important
 }
+
+.cart .ant-table-wrapper .ant-table.ant-table-middle {
+  border-radius :6px 6px 0px 0px !important;
+}
+.ant-menu-light {
+  color : white !important;
+}
+
+:where(.css-dev-only-do-not-override-9ntgx0).ant-menu-horizontal{
+  border-bottom: 0px;
+}

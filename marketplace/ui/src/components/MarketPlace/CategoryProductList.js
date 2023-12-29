@@ -282,7 +282,7 @@ const CategoryProductList = ({ user }) => {
   return (
     <div className={`${mobileOpenFilter ? 'overflow-y-hidden h-[100vh] w-[100vw] bg-[#00000020] relative mt-0 md:bg-white md:mt-[auto] md:overflow-scroll trending_cards' : ' '}`}>
       <div className="fixed bg-white w-full top-7 z-10 md:static">
-        <Breadcrumb className="text-xs ml-4 md:ml-14 mt-14">
+        <Breadcrumb className="text-xs ml-4 md:ml-14 mt-14 lg:mt-5">
           <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
             <ClickableCell href={routes.Marketplace.url}>
               <p href={routes.Marketplace.url} className="text-[#13188A] font-semibold hover:bg-transparent text-sm">
@@ -304,7 +304,7 @@ const CategoryProductList = ({ user }) => {
           ))}
         </Breadcrumb>
 
-        <div className="flex items-center justify-center ml-4 md:ml-14 mr-14 mt-4 gap-4">
+        <div className="flex items-center justify-center ml-4 md:ml-14 mr-14 mt-6 lg:mt-8 gap-4">
           <div className="border border-solid border-[#6A6A6A] rounded-md cursor-pointer p-1 md:p-2" onClick={handleFilterClick}>
             <img src={Images.filter} alt="filter" className=" w-5 h-5 md:w-6 md:h-6"/>
           </div>

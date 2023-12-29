@@ -428,7 +428,7 @@ const BoughtOrderDetails = ({ user, users }) => {
       </div>
     ) : (
         <div>
-          <Breadcrumb className="text-sm ml-4 md:ml-20 mt-4 md:mt-14 mb-2">
+          <Breadcrumb className="text-sm ml-4 md:ml-20 mt-4 md:mt-5 mb-2">
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
               <ClickableCell href={routes.Marketplace.url}>
                 <p className="text-sm text-[#13188A] font-semibold">
@@ -451,7 +451,7 @@ const BoughtOrderDetails = ({ user, users }) => {
           </Breadcrumb>
 
           <Tabs
-            className="mx-4 md:mx-20 mt-0"
+            className="mx-4 md:mx-20 mt-5"
             onChange={onChange}
             defaultActiveKey={state == null ? "Bought" : state.defaultKey}
             items={[
