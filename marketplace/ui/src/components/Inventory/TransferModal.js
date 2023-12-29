@@ -128,7 +128,7 @@ const TransferModal = ({ open, handleCancel, inventory }) => {
 
                     <p className="text-[#202020] font-medium text-sm">Set Quantity</p>
                     <div className="inventory_card">
-                        <InputNumber className="w-full pl-[1.4rem]" value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
+                        <InputNumber className="w-full pl-[9px]" value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
                     </div>
                 </div>
                 <div>
