@@ -23,7 +23,7 @@ import image_placeholder from "../../images/resources/image_placeholder.png";
 import { getUnitNameByIndex } from "../../helpers/constants";
 import "react-responsive-carousel/lib/styles/carousel.min.css";
 
-const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentProviderAddress }) => {
+const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentProviderAddress, categorys }) => {
   const [openPop, setOpenPop] = useState(false);
   const [open, setOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -109,7 +109,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
 
   const getCategory = () => {
     const parts = inventory.contract_name.split('-');
-    return parts[parts.length - 1];
+    const contractName = parts[parts.length - 1];
+    return categorys.subCategories.find(c => c.contract === contractName).name;
   };
 
   const categoricalProperties = () => {
