@@ -266,7 +266,7 @@ const Checkout = ({ user }) => {
         </Text>
       ),
       dataIndex: "item",
-
+        width:"230px",
       render: (text) => {
         return (
           <div className="flex gap-3 items-center">
@@ -388,7 +388,8 @@ const Checkout = ({ user }) => {
     {
       title: <Text className="text-[#202020] text-base font-semibold "></Text>,
       dataIndex: "action",
-      align: "center",
+      align: "",
+      width:"4%",
       render: (text) => {
         return (
           <Button
