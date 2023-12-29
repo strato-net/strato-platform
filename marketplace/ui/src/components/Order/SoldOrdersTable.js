@@ -18,6 +18,7 @@ import { ResponsiveOrderCard } from "./ResponsiveOrdersCard";
 import dayjs from "dayjs";
 import { ResponsiveSoldOrderCard } from "./ResponsiveSoldOrdersCard";
 import RestStatus from "http-status-codes";
+import { Images } from "../../images";
 
 
 const SoldOrdersTable = ({ user, selectedDate, onDateChange }) => {
@@ -277,6 +278,7 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange }) => {
                     }}
                     onChange={onDateChange}
                     disabled={false}
+                    suffixIcon={<img src={Images.calender} alt="calender" className="w-5 h-5" style={{ maxWidth:"none" }} />}
                   />
                 </div>
                 <div className="relative">

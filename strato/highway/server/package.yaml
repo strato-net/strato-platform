@@ -61,11 +61,13 @@ executables:
       - http-client
       - http-client-tls
       - raw-strings-qq
+      - servant-multipart
       - servant-multipart-client
       - servant-server
       - text
       - unliftio-core
       - wai-cors
+      - wai-extra
       - wai-middleware-prometheus
       - warp
     ghc-options: -threaded 

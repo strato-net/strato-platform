@@ -7,6 +7,7 @@ import TransfersTable from "./TransfersTable";
 import dayjs from "dayjs";
 import routes from "../../helpers/routes";
 import ClickableCell from "../ClickableCell";
+import { Images } from "../../images";
 
 const { Search } = Input;
 
@@ -28,7 +29,7 @@ const Order = ({ user }) => {
 
   return (
     <div>
-      <div className="px-4 md:px-20 py-2 md:py-10 mt-2">
+      <div className="px-4 md:px-20 lg:py-2 lg:mt-3 orders">
       <Breadcrumb>
         <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
           <ClickableCell href={routes.Marketplace.url}>
@@ -45,11 +46,11 @@ const Order = ({ user }) => {
       </Breadcrumb>
       </div>
       <Tabs
-        className="mx-4 md:mx-20 mt-0"
+        className="mx-4 md:mx-20 lg:mt-[10px]"
         defaultActiveKey={state == null ? "Sold" : state.defaultKey}
         onChange={onChange}
         tabBarExtraContent={              
-          <div className="text-xs md:flex items-center hidden">
+          <div className="text-xs md:flex items-center hidden orders_page">
             <DatePicker
               value={
                 selectedDate
@@ -62,6 +63,7 @@ const Order = ({ user }) => {
               }}
               onChange={onDateChange}
               disabled={false}
+              suffixIcon={<img src={Images.calender} alt="calender" className=" w-[18px] h-5" style={{maxWidth:"none"}} />}
             />
           </div>
         }

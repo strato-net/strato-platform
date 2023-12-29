@@ -798,10 +798,10 @@ const CreateInventoryModal = ({
 
 
 
-              <Form.Item label="Sub-Category" className="w-full sm:w-[200px] md:w-72">
+              <Form.Item label="Sub Category" className="w-full sm:w-[200px] md:w-72">
                 <Select
                   id="subCategory"
-                  placeholder="Select Sub-Category"
+                  placeholder="Select Sub Category"
                   allowClear
                   name="subCategory"
                   value={formik.values.subCategory}

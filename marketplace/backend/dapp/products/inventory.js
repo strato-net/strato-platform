@@ -397,8 +397,9 @@ async function getOwnershipHistory(user, args, options) {
 
 async function inventoryCount(admin, args = {}, defaultOptions) {
     const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
+    const { range, ...newArgs } = args;
     const queryArgs = setSearchQueryOptionsPrime({
-        ...args,
+        ...newArgs,
         limit: undefined,
         offset: 0,
         order: undefined,

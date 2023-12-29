@@ -1068,21 +1068,22 @@ instance A.Replaceable (IPAsText, TCPPort) ActivityState m where
 instance Mod.Accessible ActivePeers m where
   access = error "'Mod.Accessible ActivePeers m' not implemented"
   
-instance MonadIO m => A.Replaceable (IPAsText, UDPPort) PeerBondingState (MonadTest m) where
-  replace _ (IPAsText t, _) (PeerBondingState s) = do
-    let ip = T.unpack t
-    stringPPeerMap . at ip . _Just %= (\p -> p {pPeerBondState = s})
+instance MonadIO m => A.Replaceable (IPAsText, Point) PeerBondingState (MonadTest m) where
+  replace _ (IPAsText ip, point) (PeerBondingState s) = do
+    stringPPeerMap . at (T.unpack ip) . _Just %= (\p -> p {pPeerBondState = s})
+    pointPPeerMap . at point . _Just %= (\p -> p {pPeerBondState = s})
 
-instance (Monad m, A.Replaceable (IPAsText, UDPPort) PeerBondingState m) => A.Replaceable (IPAsText, UDPPort) PeerBondingState (MonadP2PTest m) where
+instance (Monad m, A.Replaceable (IPAsText, Point) PeerBondingState m) => A.Replaceable (IPAsText, Point) PeerBondingState (MonadP2PTest m) where
   replace p k = lift . A.replace p k
 
-instance MonadIO m => A.Replaceable (IPAsText, TCPPort) PeerBondingState (MonadTest m) where
-  replace _ (IPAsText t, _) (PeerBondingState s) = do
+instance MonadIO m => A.Selectable (IPAsText, Point) PeerBondingState (MonadTest m) where
+  select _ (IPAsText t, _) = do
     let ip = T.unpack t
-    stringPPeerMap . at ip . _Just %= (\p -> p {pPeerBondState = s})
+    map' <- use stringPPeerMap
+    return $ PeerBondingState . pPeerBondState <$> map' M.!? ip
 
-instance (Monad m, A.Replaceable (IPAsText, TCPPort) PeerBondingState m) => A.Replaceable (IPAsText, TCPPort) PeerBondingState (MonadP2PTest m) where
-  replace p k = lift . A.replace p k
+instance (A.Selectable (IPAsText, Point) PeerBondingState m) => A.Selectable (IPAsText, Point) PeerBondingState (MonadP2PTest m) where
+  select p = lift . A.select p
 
 instance MonadIO m => Mod.Accessible BondedPeers (MonadTest m) where
   access _ = do
@@ -1114,12 +1115,22 @@ instance MonadIO m => Mod.Accessible UnbondedPeers (MonadTest m) where
 instance (Monad m, Mod.Accessible UnbondedPeers m) => Mod.Accessible UnbondedPeers (MonadP2PTest m) where
   access = lift . Mod.access
 
-instance MonadIO m => A.Selectable IPAsText ClosestPeers (MonadTest m) where
-  select _ (IPAsText t) = Just . ClosestPeers . filter f . M.elems <$> use stringPPeerMap
-    where
-      f p = pPeerIp p /= t && pPeerPubkey p /= Nothing
+instance MonadIO m => Mod.Accessible ValidatorAddresses (MonadTest m) where
+  access _ = do
+    valCMPSs <- Set.toList <$> use p2pValidators
+    cmpsToX509 <- use parsedSetToX509Map
+    let valAdds = catMaybes $ (\valCMPS -> userAddress <$> cmpsToX509 M.!? valCMPS) <$> valCMPSs
+    return $ ValidatorAddresses valAdds
 
-instance A.Selectable IPAsText ClosestPeers m => A.Selectable IPAsText ClosestPeers (MonadP2PTest m) where
+instance (Monad m, Mod.Accessible ValidatorAddresses m) => Mod.Accessible ValidatorAddresses (MonadP2PTest m) where
+  access = lift . Mod.access
+
+instance MonadIO m => A.Selectable Point ClosestPeers (MonadTest m) where
+  select _ point = Just . ClosestPeers . filter f . M.elems <$> use pointPPeerMap
+    where
+      f p = pPeerPubkey p /= Just point && pPeerPubkey p /= Nothing
+
+instance A.Selectable Point ClosestPeers m => A.Selectable Point ClosestPeers (MonadP2PTest m) where
   select p = lift . A.select p
 
 instance MonadIO m => A.Replaceable PPeer UdpEnableTime (MonadTest m) where
