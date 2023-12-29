@@ -13,7 +13,7 @@ const UnlistModal = ({ open, handleCancel, inventory, saleAddress }) => {
             saleAddress
         };
         let isDone = await actions.unlistInventory(inventoryDispatch, body);
-        if (isDone && !isUnlisting) {
+        if (isDone) {
             await actions.fetchInventory(inventoryDispatch, 10, 0, "", undefined);
             handleCancel();
         }

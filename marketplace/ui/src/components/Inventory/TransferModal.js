@@ -88,7 +88,7 @@ const TransferModal = ({ open, handleCancel, inventory }) => {
 
         if (quantity > 0 && quantity <= inventory.quantity && userAddress) {
             let isDone = await actions.transferInventory(inventoryDispatch, body);
-            if (isDone && !isTransferring) {
+            if (isDone) {
                 await actions.fetchInventory(inventoryDispatch, 10, 0, "", undefined);
                 handleCancel();
             }

@@ -45,7 +45,7 @@ const ResellModal = ({ open, handleCancel, inventory }) => {
             quantity
         };
         let isDone = await actions.resellInventory(inventoryDispatch, body);
-        if (isDone && !isReselling) {
+        if (isDone) {
             await actions.fetchInventory(inventoryDispatch, 10, 0, "", undefined);
             handleCancel();
         }
