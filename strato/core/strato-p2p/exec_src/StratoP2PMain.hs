@@ -19,6 +19,7 @@ import           Blockchain.Strato.Model.Options()
 import           Blockchain.Participation (p2pApp, setParticipationMode)
 import           Blockchain.SeqEventNotify
 import           Blockchain.Strato.Discovery.Data.Peer (resetPeers)
+import           Blockchain.Strato.Discovery.Data.PeerIOWiring ()
 import           Executable.StratoP2P
 import           BlockApps.Init
 import           BlockApps.Logging as BL
@@ -36,11 +37,7 @@ initP2P = do
   setParticipationMode flags_participationMode
   wireMessagesRef <- liftIO $ newIORef empty
   cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
-  context <- liftIO $ readIORef $ configContext cfg
-  let contextkafkastate = contextKafkaState context
-  let contextkafkamiddlemanin = contextKafkaMiddlemanIn context
-  _ <- async $ runContextM cfg $ seqEventNotificationSourceChanFill contextkafkastate contextkafkamiddlemanin
-  let sSource = seqEventNotificationSourceChanPour contextkafkamiddlemanin
+  let sSource  = seqEventNotificationSource $ contextKafkaState initContext
       runner f = runContextM cfg $ f sSource
   liftIO $
     race_

@@ -19,7 +19,6 @@ library:
     - bytestring
     - containers
     - hedis
-    - hflags
     - milena
     - mtl
     - postgresql-simple

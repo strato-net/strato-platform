@@ -1,57 +1,68 @@
-import "/dapp/orders/contracts/Sales/MaterialsSale.sol";
-
 pragma es6;
 pragma strict;
-import <0b469dbb1f0207a49cb014192ab05a72f5b2fcf3>;
+
+import <d6cdd554a0503fb0e33cbaee329afeab5b0a26b2>;
+
+contract UnitOfMeasurement {
+enum UnitOfMeasurement {
+    NULL,
+    TON,
+    POUND,
+    OUNCE,
+    TONNE,
+    KG,
+    G   
+}
+}
 
 /// @title A representation of Metals assets
-contract Metals is ItemStatus, RestStatus, Asset {
-    string public serialNumber;
-    string public source;
+contract Metals is Mintable, UnitOfMeasurement{
 
-    event OwnershipUpdate(
-        string seller,
-        string newOwner,
-        uint ownershipStartDate,
-        address itemAddress
-    );
+    event OwnershipUpdate(string seller, string newOwner, uint ownershipStartDate, address itemAddress);
+
+    //categorical
+    UnitOfMeasurement public unitOfMeasurement;
+    uint public leastSellableUnits;
+    string public source; 
+    string purity;
 
     constructor(
-        string _serialNumber,
-        uint _createdDate,
-        address _owner,
         string _name,
         string _description,
         string[] _images,
-        uint _price,
+        string[] _files,
+        uint _createdDate,
+        uint _quantity,
+        UnitOfMeasurement _unitOfMeasurement,
+        uint _leastSellableUnits,
         string _source,
-        PaymentType[] _paymentTypes
-    ) public Asset(_name, _description, _images, _createdDate ){
-        owner = _owner;
-
-        serialNumber = _serialNumber;
+        string _purity
+    ) Mintable (
+        _name,
+        _description,
+        _images,
+        _files,
+        _createdDate,
+        _quantity) 
+    {
+        unitOfMeasurement = _unitOfMeasurement;
+        leastSellableUnits = _leastSellableUnits;
         source = _source;
-
-        mapping(string => string) ownerCert = getUserCert(owner);
-        ownerOrganization = ownerCert["organization"];
-        ownerCommonName = ownerCert["commonName"];
-
-        createSales(_paymentTypes, _price);
+        purity = _purity;
     }
 
-    function createSales(PaymentType[] _paymentTypes, uint _price) public requireOwner("create sales") returns (uint) {
-        for (uint i = 0; i < _paymentTypes.length; i++) {
-            whitelistSale(address(new MaterialsSale(address(this), _paymentTypes[i], _price)));
-        }
-        status = ItemStatus.PUBLISHED;
-        return RestStatus.OK;
-    }
-
-    function update(
-        ItemStatus _status,
-        uint _price
-    ) public requireOwner("update metals") returns (uint) {
-        updateAsset(name, description, images, _status, _price);
-        return RestStatus.OK;
-    }
+    function mint(uint splitQuantity) internal override returns (UTXO) {
+        Metals newAsset = new Metals(name,
+                              description, 
+                              images, 
+                              files, 
+                              createdDate, 
+                              splitQuantity,
+                              unitOfMeasurement,
+                              leastSellableUnits,
+                              source,
+                              purity
+                              );
+        return UTXO(address(newAsset)); 
+}
 }

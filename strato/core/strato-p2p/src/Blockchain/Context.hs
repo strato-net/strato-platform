@@ -72,12 +72,9 @@ module Blockchain.Context
     , toMaybe
     ) where
 
-
-import           BroadcastChan
 import           Conduit
 import           Control.Applicative
 import           Control.Concurrent
---import           Control.Concurrent.Chan.Unagi         as CCCU
 import           Control.Exception                     hiding (bracket)
 import           Control.Lens                          hiding (Context)
 import qualified Control.Monad.Change.Alter            as A
@@ -88,7 +85,6 @@ import qualified Data.ByteString                       as B
 import qualified Data.ByteString.Char8                 as BC
 import           Data.Conduit.Network
 import           Data.Default
-import           Data.Int                              (Int64)
 import qualified Data.Kind                             as DK
 import           Data.Foldable                         (toList)
 import qualified Data.Map.Strict                       as M
@@ -134,6 +130,7 @@ import           Blockchain.Stream.VMOutput            ( VMOutput(..)
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models (RedisBestBlock(..))
 import           Blockchain.TCPClientWithTimeout
+import           Control.Monad.Composable.Base
 import qualified Database.Persist.Sql                  as SQL
 import qualified Database.Redis                        as Redis
 import qualified Network.Kafka                         as K
@@ -205,7 +202,6 @@ withPeerAddress f = PeerAddress . f . unPeerAddress
 
 data Context = Context
   { contextKafkaState        :: K.KafkaState
-  , contextKafkaMiddlemanIn  :: BroadcastChan In (P2pEvent,Int64)
   , blockHeaders             :: ([BlockData], UTCTime) -- keep track when last updated global headers cache
   , remainingBlockHeaders    :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
   , actionTimestamp          :: ActionTimestamp
@@ -488,10 +484,8 @@ instance MonadIO m => Mod.Accessible RBDB.RedisConnection (ReaderT Config m) whe
 instance MonadIO m => Mod.Accessible SQLDB (ReaderT Config m) where
   access _ = asks configSQLDB
 
-instance MonadIO m => ((IPAsText, TCPPort) `A.Alters` ActivityState) (ReaderT Config m) where
-  lookup _ _ = error "lookup ActivityState undefined for ContextM"
-  insert _ (IPAsText i, TCPPort p) = void . liftIO . setPeerActiveState i p
-  delete _ _ = error "lookup ActivityState undefined for ContextM"
+instance {-# OVERLAPPING #-} MonadIO m => AccessibleEnv SQLDB (ReaderT Config m) where
+  accessEnv = asks configSQLDB
 
 instance (MonadIO m, MonadLogger m) => Stacks Block (ReaderT Config m) where
   takeStack _ n = do
@@ -506,12 +500,6 @@ instance MonadUnliftIO m => A.Selectable IPAsText PPeer (ReaderT Config m) where
       lst -> return . Just . SQL.entityVal $ head lst
     where
       actions = SQL.selectList [PPeerIp SQL.==. ip] []
-
-instance Ord Point where
-  (Point it it') `compare` (Point it2 it2') = case (it `compare` it2) of
-    EQ -> (it' `compare` it2')
-    x -> x
-  _ `compare` _ = GT
 
 instance MonadUnliftIO m => A.Selectable Point PPeer (ReaderT Config m) where
   select _ pk =
@@ -539,36 +527,6 @@ instance (MonadIO m, MonadLogger m) => HasVault (ReaderT Config m) where
 
 instance MonadIO m => A.Selectable (IPAsText, UDPPort, B.ByteString) Point (ReaderT Config m) where
   select p = liftIO . A.select p
-
-instance MonadIO m => Mod.Accessible AvailablePeers (ReaderT Config m) where
-  access = liftIO . Mod.access
-
-instance MonadIO m => Mod.Accessible BondedPeersForUDP (ReaderT Config m) where
-  access = liftIO . Mod.access
-
-instance MonadIO m => A.Replaceable PPeer UdpEnableTime (ReaderT Config m) where
-  replace p k = liftIO . A.replace p k
-
-instance MonadIO m => A.Replaceable PPeer TcpEnableTime (ReaderT Config m) where
-  replace p k = liftIO . A.replace p k
-
-instance MonadIO m => Mod.Accessible BondedPeers (ReaderT Config m) where
-  access = liftIO . Mod.access
-
-instance MonadIO m => Mod.Accessible UnbondedPeers (ReaderT Config m) where
-  access = liftIO . Mod.access
-
-instance MonadIO m => A.Replaceable (IPAsText, UDPPort) PeerBondingState (ReaderT Config m) where
-  replace p k = liftIO . A.replace p k
-
-instance MonadIO m => A.Replaceable (IPAsText, TCPPort) PeerBondingState (ReaderT Config m) where
-  replace p k = liftIO . A.replace p k
-
-instance MonadIO m => A.Replaceable PPeer PeerDisable (ReaderT Config m) where
-  replace p k = liftIO . A.replace p k
-
-instance MonadIO m => A.Replaceable PPeer T.Text (ReaderT Config m) where
-  replace p k = liftIO . A.replace p k
 
 waitOnVault :: (MonadLogger m, MonadIO m, Show a) => m (Either a b) -> m b
 waitOnVault action = do
@@ -637,7 +595,7 @@ type MonadP2P m =
          '(PPeer, UdpEnableTime),
          '(PPeer, PeerDisable),
          '(PPeer, T.Text),
-         '((IPAsText, TCPPort), PeerBondingState)
+         '((IPAsText, Point), PeerBondingState)
        ]
       m,
     All2
@@ -695,7 +653,7 @@ initConfig wireMessagesRef maxHeaders = do
     $logInfoS "HasVault" "Calling vault-wrapper to get the node's public key"
     fmap VC.unPubKey $ waitOnVault $ liftIO $ runClientM (VC.getKey Nothing Nothing) vaultClient
 
-  initState  <- liftIO $ initContext
+  let initState  = initContext
   initStateF <- newIORef initState
   return $ Config
     { configSQLDB = sqlDB' dbs
@@ -708,17 +666,15 @@ initConfig wireMessagesRef maxHeaders = do
     , configPubKey = nodePubKey
     }
 
-initContext :: IO Context
-initContext = do
-  initContextKafkaMiddlemanIn  <- newBroadcastChan :: IO (BroadcastChan In (P2pEvent,Int64))
-  return Context { actionTimestamp = emptyActionTimestamp
-                 , contextKafkaState = mkConfiguredKafkaState "strato-p2p"
-                 , contextKafkaMiddlemanIn = initContextKafkaMiddlemanIn
-                 , blockHeaders = ([], jamshidBirth)
-                 , remainingBlockHeaders = (RemainingBlockHeaders [], jamshidBirth)
-                 , _blockstanbulPeerAddr = PeerAddress Nothing
-                 , _outboundWireMessages = S.empty
-                 }
+initContext :: Context
+initContext =
+  Context { actionTimestamp = emptyActionTimestamp
+          , contextKafkaState = mkConfiguredKafkaState "strato-p2p"
+          , blockHeaders = ([], jamshidBirth)
+          , remainingBlockHeaders = (RemainingBlockHeaders [], jamshidBirth)
+          , _blockstanbulPeerAddr = PeerAddress Nothing
+          , _outboundWireMessages = S.empty
+          }
 
 getPeerByIP ::
   A.Selectable IPAsText PPeer m =>

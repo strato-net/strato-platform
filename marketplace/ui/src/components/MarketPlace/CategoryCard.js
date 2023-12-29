@@ -1,6 +1,4 @@
-import React from "react";
-import { Card, Typography, Image, Space } from "antd";
-import { LeftArrow, RightArrow } from "../../images/SVGComponents";
+import { Typography} from "antd";
 import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
 import { useCategoryState } from "../../contexts/category";
@@ -15,33 +13,27 @@ const CategoryCard = () => {
   const { categorys } = useCategoryState();
 
   const categoryImages = [
-    Images.art,
-    Images.carbon,
-    Images.metals,
-    Images.clothing,
-    Images.collectibles,
+    Images["Carbon-category"],
+    Images["Metal"],
+    Images["Clothing-category"],
+    Images["collectibles"],
+    Images["Art-category"],
+    Images["membership_card"],
   ];
+  
 
   return (
-    <Card className="w-full">
-      <div className="flex justify-between mb-5">
-        <Title level={3}>Categories</Title>
-        {/* <Space size="large">
-          <div className="cursor-pointer w-9 h-9 rounded-full shadow-[0px_0px_2px_0_rgba(0,0,0,0.3)] flex justify-center items-center">
-            <LeftArrow />
-          </div>
-          <div className="cursor-pointer w-9 h-9 rounded-full shadow-[0px_0px_2px_0_rgba(0,0,0,0.3)] flex justify-center items-center">
-            <RightArrow />
-          </div>
-        </Space> */}
-      </div>
-      <div className="flex justify-evenly px-2">
+    <>
+      <Title className="md:px-10 !text-xl md:!text-4xl !text-left py-2">
+        Shop by Category
+      </Title>
+      <div className="flex justify-start sm:justify-center md:justify-start gap-3 lg:gap-[15px] flex-wrap px-0 md:px-10 xl:grid xl:grid-cols-6">
         {categorys.map((category, index) => {
           return (
             <div
               id={category.name}
               key={index}
-              className="w-48 h-44 border border-tertiaryB rounded-md py-5 mx-3 cursor-pointer"
+              className=" w-[162px] md:w-[210px] 2xl:w-[248px] h-[160px] md:h-[180px] 2xl:h-[200px] border border-tertiaryB shadow-category rounded-lg cursor-pointer"
               onClick={() => {
                 navigate(`${naviroute.replace(":category", category.name)}`);
                 window.LOQ.push(['ready', async LO => {
@@ -57,22 +49,25 @@ const CategoryCard = () => {
                 }
               }
             >
-              <div className="flex flex-col items-center text-center">
-                <Image
+              <div className="flex flex-col">
+                <img
                   src={categoryImages[index]}
-                  height={108}
-                  width={150}
+                  className="rounded-t-lg px-[9px] py-[6px] lg:px-[0px] lg:py-[0px] h-[110px] md:h-[125px] 2xl:h-[140px]"
                   preview={false}
                 />
-                <Text type="secondary" className="mt-2 text-sm !text-primaryB">
+                <div className="py-2 xl:py-3 flex justify-center md:justify-start ">
+                <Text type="secondary" className="text-lg md:text-xl lg:text-2xl !text-primaryB font-semibold" >
+                  <span className="p-3 font-sans">
                   {category.name}
+                    </span>
                 </Text>
+                  </div>
               </div>
             </div>
           );
         })}
       </div>
-    </Card>
+    </>
   );
 };
 

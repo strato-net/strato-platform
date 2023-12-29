@@ -32,7 +32,6 @@ library:
       - split
       - strato-statediff
       - time
-      - unordered-containers
       - vector
       - vm-tools
       - aeson
@@ -75,7 +74,6 @@ tests:
     main: Main.hs
     dependencies:
       - aeson
-      - base16-bytestring
       - blockapps-data
       - bytestring
       - hspec

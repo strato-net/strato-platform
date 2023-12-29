@@ -85,10 +85,7 @@ test-suite spec
     , base >=4.8 && <5
     , base16-bytestring
     , bytestring
-    , cereal
-    , deepseq
     , entropy
-    , hashable
     , hspec
     , labeled-error
     , mtl

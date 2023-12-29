@@ -1,5 +1,5 @@
-url: http://localhost:8080
+url: http://localhost
 dapp:
   contract:
-    name: Dapp
-    address: 49a0834d3228008ab9ac5b2933e5bc5003538472
+    name: Mercata
+    address: eddd7c9aa884a3b1b8595f0897608c07a8e770b1

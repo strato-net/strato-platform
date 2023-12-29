@@ -6,13 +6,11 @@ synopsis: a microservice that handles peer to peer connections for strato
 
 dependencies:
   - base
-  - blockapps-data
   - common-log
-  - extra
   - vm-tools
-  - x509-certs
 
 ghc-options: -Wall -threaded
+
 
 executables:
   strato-p2p:
@@ -20,12 +18,10 @@ executables:
     main: StratoP2PMain.hs
     dependencies:
       - blockapps-init
-      - broadcast-chan
       - ethereum-discovery
       - hflags
       - lifted-async
       - ordered-containers
-      - resourcet
       - strato-model
       - strato-p2p
       - unliftio
@@ -38,24 +34,23 @@ library:
   dependencies:
     - SafeSemaphore
     - aeson
-    - async
     - alarmclock
     - ansi-wl-pprint
     - base16-bytestring
+    - blockapps-data
     - blockapps-datadefs
     - blockapps-vault-wrapper-api
     - blockapps-vault-wrapper-client
     - blockstanbul
     - broadcast-chan
     - bytestring
-    - concurrency
+    - composable-monads-base
     - conduit
     - conduit-extra
     - containers
     - cross-monitoring
     - crypto-pubkey-types
     - data-default
-    - deepseq
     - dlist
     - dns
     - either
@@ -78,7 +73,6 @@ library:
     - milena
     - milena-tools
     - monad-alter
-    - monad-control
     - monad-logger
     - monadIO
     - mtl
@@ -93,7 +87,6 @@ library:
     - servant-client
     - servant-server
     - split
-    - stm
     - stm-conduit
     - strato-conf
     - strato-model
@@ -114,8 +107,8 @@ tests:
     ghc-options: -Wall -Werror -dynamic
     main: Main.hs
     dependencies:
-      - QuickCheck
       - base16-bytestring
+      - blockapps-data
       - blockapps-datadefs
       - blockapps-mpdbs
       - blockapps-privacy
@@ -129,6 +122,7 @@ tests:
       - ethereum-encryption
       - ethereum-discovery
       - ethereum-rlp
+      - extra
       - hflags
       - hspec
       - hspec-expectations-lifted
@@ -143,8 +137,6 @@ tests:
       - nibblestring
       - ordered-containers
       - Ranged-sets
-      - raw-strings-qq
-      - secp256k1-haskell
       - seqevents
       - stm-chans
       - stm-conduit
@@ -158,4 +150,4 @@ tests:
       - unliftio
       - vm-runner
       - vm-tools
-      - x509-certs 
+      - x509-certs

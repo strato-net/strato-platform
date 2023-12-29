@@ -29,15 +29,18 @@ import BlockApps.Logging
 import Blockchain.DB.SQLDB
 import Blockchain.DBM
 import Blockchain.Data.PubKey (secPubKeyToPoint)
+import Blockchain.EthConf (lookupRedisBlockDBConfig)
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Discovery.UDP (processDataStream')
 import Blockchain.Strato.Model.Secp256k1
+import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import Control.Concurrent (threadDelay)
 import Control.Exception
 import Control.Monad.Catch hiding (bracket)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Change.Modify (Accessible (..))
 import qualified Control.Monad.Change.Modify as Mod
+import Control.Monad.Composable.Base
 import Control.Monad.IO.Class
 import Control.Monad.IO.Unlift
 import Control.Monad.Reader
@@ -46,6 +49,7 @@ import qualified Data.ByteString as B
 import Data.Maybe (listToMaybe)
 import qualified Data.Text as T
 import qualified Database.Persist.Postgresql as SQL
+import qualified Database.Redis as Redis
 import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Network.Socket
 import qualified Network.Socket.ByteString as NB
@@ -56,6 +60,7 @@ import System.Timeout
 
 data ContextLite = ContextLite
   { liteSQLDB :: SQLDB,
+    redisBlockDB :: RBDB.RedisConnection,
     vaultClient :: ClientEnv,
     sock :: Socket,
     myUdpPort :: UDPPort,
@@ -64,6 +69,9 @@ data ContextLite = ContextLite
 
 instance Monad m => Accessible SQLDB (ReaderT ContextLite m) where
   access _ = asks liteSQLDB
+
+instance {-# OVERLAPPING #-} Monad m => AccessibleEnv SQLDB (ReaderT ContextLite m) where
+  accessEnv = asks liteSQLDB
 
 instance Monad m => Accessible Socket (ReaderT ContextLite m) where
   access _ = asks sock
@@ -74,8 +82,11 @@ instance Monad m => Accessible UDPPort (ReaderT ContextLite m) where
 instance Monad m => Accessible TCPPort (ReaderT ContextLite m) where
   access _ = asks myTcpPort
 
-instance MonadIO m => A.Selectable IPAsText ClosestPeers (ReaderT ContextLite m) where
-  select p ip = liftIO $ A.select p ip
+instance Monad m => Accessible RBDB.RedisConnection (ReaderT ContextLite m) where
+  access _ = asks redisBlockDB
+  
+instance MonadIO m => Accessible ValidatorAddresses (ReaderT ContextLite m) where
+  access _ = RBDB.withRedisBlockDB $ ValidatorAddresses <$> RBDB.getValidatorAddresses
 
 instance MonadUnliftIO m => A.Replaceable IPAsText PPeer (ReaderT ContextLite m) where
   replace _ (IPAsText ip) peer = do
@@ -106,12 +117,6 @@ instance MonadUnliftIO m => A.Selectable String PPeer (ReaderT ContextLite m) wh
           lst -> return . Just . SQL.entityVal $ head lst
         where
           actions = SQL.selectList [PPeerIp SQL.==. T.pack ipStr] []
-
-instance MonadIO m => A.Replaceable T.Text PPeer (ReaderT ContextLite m) where
-  replace p k = liftIO . A.replace p k
-
-instance MonadIO m => A.Replaceable PPeer PeerUdpDisable (ReaderT ContextLite m) where
-  replace p k = liftIO . A.replace p k
 
 instance MonadIO m => A.Replaceable SockAddr B.ByteString (ReaderT ContextLite m) where
   replace _ addr packet = do
@@ -157,24 +162,6 @@ instance MonadIO m => A.Selectable () (B.ByteString, SockAddr) (ReaderT ContextL
     sock' <- asks sock
     liftIO . timeout 10000000 $ NB.recvFrom sock' 80000
 
-instance MonadIO m => Mod.Accessible AvailablePeers (ReaderT ContextLite m) where
-  access = liftIO . Mod.access
-
-instance MonadIO m => Mod.Accessible BondedPeersForUDP (ReaderT ContextLite m) where
-  access = liftIO . Mod.access
-
-instance MonadIO m => A.Replaceable PPeer UdpEnableTime (ReaderT ContextLite m) where
-  replace p k = liftIO . A.replace p k
-
-instance MonadIO m => A.Replaceable PPeer T.Text (ReaderT ContextLite m) where
-  replace p k = liftIO . A.replace p k
-
-instance MonadIO m => Mod.Accessible UnbondedPeers (ReaderT ContextLite m) where
-  access = liftIO . Mod.access
-
-instance MonadIO m => A.Replaceable (IPAsText, UDPPort) PeerBondingState (ReaderT ContextLite m) where
-  replace p k = liftIO . A.replace p k
-
 instance (Monad m, MonadIO m, MonadLogger m) => HasVault (ReaderT ContextLite m) where
   sign msg = do
     vc <- asks vaultClient
@@ -192,27 +179,20 @@ type DiscoveryRunner n m a = (Int -> n a) -> m a
 
 type MonadDiscovery m =
   ( HasVault m,
+    HasPeerDB m,
     MonadFail m,
     MonadCatch m,
     MonadThrow m,
     MonadLogger m,
     MonadUnliftIO m,
-    A.Selectable IPAsText ClosestPeers m,
     A.Selectable String PPeer m,
-    A.Replaceable PPeer PeerUdpDisable m,
-    A.Replaceable PPeer T.Text m,
-    A.Replaceable T.Text PPeer m,
     A.Selectable () (B.ByteString, SockAddr) m,
     A.Replaceable IPAsText PPeer m,
     A.Replaceable SockAddr B.ByteString m,
     Mod.Accessible UDPPort m,
     Mod.Accessible TCPPort m,
-    A.Selectable (Maybe IPAsText, UDPPort) SockAddr m,
-    Mod.Accessible AvailablePeers m,
-    Mod.Accessible BondedPeersForUDP m,
-    A.Replaceable PPeer UdpEnableTime m,
-    Mod.Accessible UnbondedPeers m,
-    A.Replaceable (IPAsText, UDPPort) PeerBondingState m
+    Mod.Accessible ValidatorAddresses m,
+    A.Selectable (Maybe IPAsText, UDPPort) SockAddr m
   )
 
 waitOnVault :: (MonadIO m, MonadLogger m, Show a) => m (Either a b) -> m b
@@ -228,11 +208,13 @@ waitOnVault action = do
 initContextLite :: MonadUnliftIO m => String -> UDPPort -> TCPPort -> m ContextLite
 initContextLite vaultUrl udpPort tcpPort = do
   dbs <- openDBs
+  redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
   mgr <- liftIO $ newManager defaultManagerSettings
   url <- liftIO $ parseBaseUrl vaultUrl
   return
     ContextLite
       { liteSQLDB = sqlDB' dbs,
+        redisBlockDB = RBDB.RedisConnection redisBDBPool,
         vaultClient = mkClientEnv mgr url,
         sock = error "initContextLite: Uninitialized socket",
         myUdpPort = udpPort,

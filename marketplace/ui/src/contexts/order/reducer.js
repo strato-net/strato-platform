@@ -31,6 +31,22 @@ const reducer = (state, action) => {
         error: action.error,
         isCreateOrderSubmitting: false,
       };
+    case actionDescriptors.cancelSale:
+      return {
+        ...state,
+        isorderDetailsLoading: true,
+      };
+    case actionDescriptors.cancelSaleSuccessful:
+      return {
+        ...state,
+        isorderDetailsLoading: false,
+      };
+    case actionDescriptors.cancelSaleFailed:
+      return {
+        ...state,
+        isorderDetailsLoading: false,
+        error: action.error,
+      };
     case actionDescriptors.createPayment:
       return {
         ...state,
@@ -82,6 +98,19 @@ const reducer = (state, action) => {
         ...state,
         error: action.error,
         isordersLoading: false,
+      };      
+    case actionDescriptors.updateOrderStatus:
+      return {
+        ...state,
+      };
+    case actionDescriptors.updateOrderStatusSuccessful:
+      return {
+        ...state,
+      };
+    case actionDescriptors.updateOrderStatusFailed:
+      return {
+        ...state,
+        error: action.error,
       };
     case actionDescriptors.fetchOrderSold:
       return {

@@ -1,9 +1,20 @@
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 
-module Blockchain.Init.Monad where
+{-# OPTIONS -fno-warn-orphans #-}
+
+-- There are instances in this file that won't compile unless I add a `Monad m` constraint, however
+-- after I add it, I get a "redundant-constraint" warning.  Is this actually a bug in GHC?
+-- Either way, the problem can be fixed by suppressing the warning, meh....
+{-# OPTIONS -fno-warn-redundant-constraints #-}
+
+module Blockchain.Init.Monad (
+  runSetupDBM
+  ) where
 
 import BlockApps.Logging
 import BlockApps.X509.Certificate
@@ -12,18 +23,15 @@ import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.RawStorageDB
-import Blockchain.DB.SQLDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import qualified Blockchain.Database.MerklePatricia as MP
-import Blockchain.EthConf (connStr, lookupRedisBlockDBConfig)
 import Blockchain.Init.Options (flags_vaultWrapperUrl)
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
-import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
@@ -36,7 +44,6 @@ import qualified Data.Map as M
 import qualified Data.NibbleString as N
 import qualified Data.Text as T
 import qualified Database.LevelDB as DB
-import qualified Database.Redis as Redis
 import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Servant.Client
 import qualified Strato.Strato23.API as VC
@@ -47,8 +54,6 @@ data SetupDBs = SetupDBs
     stateRoots :: IORef (M.Map (Maybe Word256) MP.StateRoot),
     hashDB :: HashDB,
     codeDB :: CodeDB,
-    sqlDB :: SQLDB,
-    redisDB :: RBDB.RedisConnection,
     vaultDB :: ClientEnv,
     localStorageTx :: IORef (M.Map (Account, B.ByteString) B.ByteString),
     localStorageBlock :: IORef (M.Map (Account, B.ByteString) B.ByteString),
@@ -57,6 +62,9 @@ data SetupDBs = SetupDBs
   }
 
 type SetupDBM = ReaderT SetupDBs (ResourceT (LoggingT IO))
+
+type HasDBs m = Mod.Accessible SetupDBs m
+
 
 runSetupDBM :: SetupDBM a -> ResourceT (LoggingT IO) a
 runSetupDBM mv = do
@@ -67,13 +75,11 @@ runSetupDBM mv = do
   cdb <- CodeDB <$> open codeDBPath
   [m1, m2] <- liftIO . replicateM 2 . newIORef $ M.empty
   [m3, m4] <- liftIO . replicateM 2 . newIORef $ M.empty
-  pool <- createPostgresqlPool connStr 20
-  redisConn <- RBDB.RedisConnection <$> liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
   vdb <- do
     mgr <- liftIO $ newManager defaultManagerSettings
     url <- liftIO $ parseBaseUrl flags_vaultWrapperUrl
     return $ mkClientEnv mgr url
-  runReaderT mv $ SetupDBs sdb srRef hdb cdb pool redisConn vdb m1 m2 m3 m4
+  runReaderT mv $ SetupDBs sdb srRef hdb cdb vdb m1 m2 m3 m4
 
 waitOnVault :: (MonadLogger m, MonadIO m, Show a) => m (Either a b) -> m b
 waitOnVault action = do
@@ -82,76 +88,75 @@ waitOnVault action = do
     Left _ -> waitOnVault action
     Right val -> return val
 
-instance HasVault SetupDBM where
+instance (Monad m, MonadIO m, MonadLogger m, HasDBs m) => HasVault m where
   getPub = do
-    vc <- asks vaultDB
-    fmap VC.unPubKey $ waitOnVault $ liftIO $ runClientM (VC.getKey Nothing Nothing) vc
+    env <- Mod.access Mod.Proxy
+    fmap VC.unPubKey $ waitOnVault $ liftIO $ runClientM (VC.getKey Nothing Nothing) $ vaultDB env
   sign bs = do
-    vc <- asks vaultDB
-    waitOnVault $ liftIO $ runClientM (VC.postSignature Nothing (VC.MsgHash bs)) vc
+    env <- Mod.access Mod.Proxy
+    waitOnVault $ liftIO $ runClientM (VC.postSignature Nothing (VC.MsgHash bs)) $ vaultDB env
   getShared _ = error "should not be calling getShared in strato-init"
 
-instance (Maybe Word256 `A.Alters` MP.StateRoot) SetupDBM where
-  lookup _ k = fmap (M.lookup k) $ liftIO . readIORef =<< asks stateRoots
-  insert _ k v = liftIO . flip modifyIORef (M.insert k v) =<< asks stateRoots
-  delete _ k = liftIO . flip modifyIORef (M.delete k) =<< asks stateRoots
+instance (MonadIO m, MonadLogger m, HasDBs m) => (Maybe Word256 `A.Alters` MP.StateRoot) m where
+  lookup _ k = fmap (M.lookup k) $ liftIO . readIORef =<< fmap stateRoots (Mod.access Mod.Proxy)
+  insert _ k v = liftIO . flip modifyIORef (M.insert k v) =<< fmap stateRoots (Mod.access Mod.Proxy)
+  delete _ k = liftIO . flip modifyIORef (M.delete k) =<< fmap stateRoots (Mod.access Mod.Proxy)
 
-instance (MP.StateRoot `A.Alters` MP.NodeData) SetupDBM where
-  lookup _ = MP.genericLookupDB $ asks stateDB
-  insert _ = MP.genericInsertDB $ asks stateDB
-  delete _ = MP.genericDeleteDB $ asks stateDB
+instance (MonadIO m, MonadLogger m, HasDBs m) => (MP.StateRoot `A.Alters` MP.NodeData) m where
+  lookup _ = MP.genericLookupDB $ fmap stateDB $ Mod.access Mod.Proxy
+  insert _ = MP.genericInsertDB $ fmap stateDB $ Mod.access Mod.Proxy
+  delete _ = MP.genericDeleteDB $ fmap stateDB $ Mod.access Mod.Proxy
 
-instance HasMemRawStorageDB SetupDBM where
-  getMemRawStorageTxDB = liftIO . readIORef . localStorageTx =<< ask
+instance (Monad m, MonadIO m, HasDBs m) => HasMemRawStorageDB m where
+  getMemRawStorageTxDB = liftIO . readIORef . localStorageTx =<<  Mod.access Mod.Proxy
   putMemRawStorageTxMap theMap = do
-    lstref <- asks localStorageTx
+    lstref <- fmap localStorageTx $ Mod.access Mod.Proxy
     liftIO $ atomicWriteIORef lstref theMap
-  getMemRawStorageBlockDB = liftIO . readIORef . localStorageBlock =<< ask
+  getMemRawStorageBlockDB = liftIO . readIORef . localStorageBlock =<< Mod.access Mod.Proxy
   putMemRawStorageBlockMap theMap = do
-    lsbref <- asks localStorageBlock
+    lsbref <- fmap localStorageBlock $ Mod.access Mod.Proxy
     liftIO $ atomicWriteIORef lsbref theMap
 
-instance (RawStorageKey `A.Alters` RawStorageValue) SetupDBM where
+instance (MonadIO m, MonadLogger m, HasDBs m) => (RawStorageKey `A.Alters` RawStorageValue) m where
   lookup _ = genericLookupRawStorageDB
   insert _ = genericInsertRawStorageDB
   delete _ = genericDeleteRawStorageDB
 
-instance HasMemAddressStateDB SetupDBM where
-  getAddressStateTxDBMap = liftIO . readIORef =<< asks localAddressStateTx
+instance (MonadIO m, HasDBs m) => HasMemAddressStateDB m where
+  getAddressStateTxDBMap = liftIO . readIORef =<< fmap localAddressStateTx (Mod.access Mod.Proxy)
   putAddressStateTxDBMap theMap = do
-    lastref <- asks localAddressStateTx
+    lastref <- fmap localAddressStateTx $ Mod.access Mod.Proxy
     liftIO $ atomicWriteIORef lastref theMap
-  getAddressStateBlockDBMap = liftIO . readIORef =<< asks localAddressStateBlock
+  getAddressStateBlockDBMap = liftIO . readIORef =<< fmap localAddressStateBlock (Mod.access Mod.Proxy)
   putAddressStateBlockDBMap theMap = do
-    lasbref <- asks localAddressStateBlock
+    lasbref <- fmap localAddressStateBlock $ Mod.access Mod.Proxy
     liftIO $ atomicWriteIORef lasbref theMap
 
-instance (Account `A.Alters` AddressState) SetupDBM where
+instance (MonadIO m, MonadLogger m, HasDBs m) => (Account `A.Alters` AddressState) m where
   lookup _ = getAddressStateMaybe
   insert _ = putAddressState
   delete _ = deleteAddressState
 
-instance (Account `A.Selectable` AddressState) SetupDBM where
+instance (MonadIO m, MonadLogger m, HasDBs m) => (Account `A.Selectable` AddressState) m where
   select _ = getAddressStateMaybe
 
-instance (Keccak256 `A.Alters` DBCode) SetupDBM where
-  lookup _ = genericLookupCodeDB $ asks codeDB
-  insert _ = genericInsertCodeDB $ asks codeDB
-  delete _ = genericDeleteCodeDB $ asks codeDB
+instance (MonadIO m, MonadLogger m, HasDBs m) => (Keccak256 `A.Alters` DBCode) m where
+  lookup _ = genericLookupCodeDB $ fmap codeDB $ Mod.access Mod.Proxy
+  insert _ = genericInsertCodeDB $ fmap codeDB $ Mod.access Mod.Proxy
+  delete _ = genericDeleteCodeDB $ fmap codeDB $ Mod.access Mod.Proxy
 
-instance (Address `A.Selectable` X509Certificate) SetupDBM where
+instance (MonadIO m, MonadLogger m, HasDBs m) => (Address `A.Selectable` X509Certificate) m where
   select _ = error "SetupDBM select @X509Certificate"
 
-instance ((Address, T.Text) `A.Selectable` X509CertificateField) SetupDBM where
+instance (MonadIO m, MonadLogger m, HasDBs m) => ((Address, T.Text) `A.Selectable` X509CertificateField) m where
   select _ = error "SetupDBM select @X509CertificateField"
 
-instance (N.NibbleString `A.Alters` N.NibbleString) SetupDBM where
-  lookup _ = genericLookupHashDB $ asks hashDB
-  insert _ = genericInsertHashDB $ asks hashDB
-  delete _ = genericDeleteHashDB $ asks hashDB
+instance (MonadIO m, MonadLogger m, HasDBs m) => (N.NibbleString `A.Alters` N.NibbleString) m where
+  lookup _ = genericLookupHashDB $ fmap hashDB $ Mod.access Mod.Proxy
+  insert _ = genericInsertHashDB $ fmap hashDB $ Mod.access Mod.Proxy
+  delete _ = genericDeleteHashDB $ fmap hashDB $ Mod.access Mod.Proxy
 
-instance Mod.Accessible SQLDB SetupDBM where
-  access _ = asks sqlDB
-
-instance Mod.Accessible RBDB.RedisConnection SetupDBM where
-  access _ = asks redisDB
+{-
+instance (Monad m, MonadIO m, MonadLogger m, HasDBs m) => Mod.Accessible SQLDB m where
+  access _ = fmap sqlDB $ Mod.access Mod.Proxy
+-}

@@ -2,20 +2,12 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS -fno-warn-orphans      #-}
-{-# OPTIONS_GHC -fno-warn-type-defaults #-}
-
-{-# OPTIONS -fno-warn-deprecations #-}
 
 module Blockchain.VMContext
   ( CurrentBlockHash (..),
@@ -34,7 +26,6 @@ module Blockchain.VMContext
     hashDB,
     codeDB,
     blockSummaryDB,
-    kafkaState,
     redisPool,
     sqldb,
     stateTxMap,
@@ -55,11 +46,6 @@ module Blockchain.VMContext
     dbs,
     state,
     stateDiffQueue,
-    contextGet,
-    contextGets,
-    contextPut,
-    contextModify,
-    contextModify',
     runTestContextM,
     initContext,
     runContextM,
@@ -75,7 +61,6 @@ module Blockchain.VMContext
     getContextBestBlockInfo,
     putContextBestBlockInfo,
     checkIfRunningTests,
-    compactContextM,
     lookupX509AddrFromCBHash,
     knownFailedTxs,
   )
@@ -101,7 +86,6 @@ import Blockchain.Data.BlockSummary
 import Blockchain.Data.ChainInfo
 import Blockchain.Data.DataDefs
 import Blockchain.Data.RLP
-import Blockchain.Data.TransactionResult
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.EthConf
 import Blockchain.Strato.Model.Account
@@ -111,7 +95,6 @@ import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
-import Blockchain.Strato.RedisBlockDB.Models
 import Blockchain.Strato.StateDiff (StateDiff)
 import Blockchain.Stream.VMEvent
 import qualified Blockchain.TxRunResultCache as TRC
@@ -127,27 +110,21 @@ import Control.Monad.Reader
 import Control.Monad.Trans.Resource
 import qualified Data.ByteString as B
 import Data.Default
-import Data.Either.Extra
 import qualified Data.Map as M
-import Data.Maybe (fromMaybe)
 import qualified Data.NibbleString as N
 import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as Text
-import Data.Traversable (for)
 import qualified Database.LevelDB as DB
 import qualified Database.Persist.Sqlite as Lite
 import qualified Database.Redis as Redis
 import Debugger
 import Executable.EVMFlags
 import GHC.Generics
-import qualified Network.Kafka as K
-import qualified Network.Kafka.Protocol as K
 import SolidVM.Model.Storable
 import SolidVM.Model.Value
 import System.Directory
 import Text.PrettyPrint.ANSI.Leijen hiding ((<$>), (</>))
-import Text.Read (readMaybe)
 import UnliftIO
 
 {-# NOINLINE knownFailedTxs #-}
@@ -155,7 +132,13 @@ knownFailedTxs :: S.Set Keccak256
 knownFailedTxs =
   S.fromList
     [ keccak256FromHex "d924cd206a64fe1a6acd77af0a25f2acc4acd23d5a169caf2e701cb9cfc3d7d8",
-      keccak256FromHex "3058b1027e6e69d6faa9e13fb897c10343ae8cd0d302404a70aee9d2bad316da"
+      keccak256FromHex "3058b1027e6e69d6faa9e13fb897c10343ae8cd0d302404a70aee9d2bad316da",
+      keccak256FromHex "283b2bb2fc3a9ad81fae7286ad89115979474ae953b55fef627f39aa409c2133",
+      keccak256FromHex "b9335249f18645559cc84493071c3d0641c35232cd7814f45eb04d990afae921",
+      keccak256FromHex "a257f8fa9ef7a7b4de81ddf518b3492e1716894879dec8c37be3ec6a4beef553",
+      keccak256FromHex "2f719b6227fa0316cb71c033183b2f282ed06ae42ca8f50e1c1cead57840134c",
+      keccak256FromHex "2637c3b60b6bd1d098adc109877ba1b1c40c59889f2e8ef6d03fb5657836f70f",
+      keccak256FromHex "5439d5802b32b50c29b4f26bb47a7cff3121229798dabed7e7ca7e6a5c0658f2"
     ]
 
 newtype CurrentBlockHash = CurrentBlockHash {unCurrentBlockHash :: Keccak256}
@@ -178,7 +161,6 @@ data ContextDBs = ContextDBs
     _hashDB :: HashDB,
     _codeDB :: CodeDB,
     _blockSummaryDB :: BlockSummaryDB,
-    _kafkaState :: IORef K.KafkaState,
     _redisPool :: RBDB.RedisConnection,
     _sqldb :: SQLDB
   }
@@ -311,202 +293,9 @@ withCurrentBlockHash bh f = do
   Mod.put (Mod.Proxy @CurrentBlockHash) cbh
   pure a
 
-getStateDB :: ContextM DB.DB
-getStateDB = fmap MP.unStateDB . view $ dbs . stateDB
-
-getHashDB :: ContextM HashDB
-getHashDB = view $ dbs . hashDB
-
-getCodeDB :: ContextM CodeDB
-getCodeDB = view $ dbs . codeDB
-
-getBlockSummaryDB :: ContextM BlockSummaryDB
-getBlockSummaryDB = view $ dbs . blockSummaryDB
-
-get :: ContextM ContextState
-get = readIORef =<< view state
-{-# INLINE get #-}
-
-gets :: (ContextState -> a) -> ContextM a
-gets f = f <$> get
-{-# INLINE gets #-}
-
-put :: ContextState -> ContextM ()
-put c = view state >>= \i -> atomicModifyIORef' i (const (c, ()))
-{-# INLINE put #-}
-
-modify :: (ContextState -> ContextState) -> ContextM ()
-modify f = view state >>= \i -> atomicModifyIORef' i (\a -> (f a, ()))
-{-# INLINE modify #-}
-
-modify' :: (ContextState -> ContextState) -> ContextM ()
-modify' f = view state >>= \i -> atomicModifyIORef' i (\a -> (f a, ()))
-{-# INLINE modify' #-}
-
-contextGet :: ContextM ContextState
-contextGet = get
-{-# INLINE contextGet #-}
-
-contextGets :: (ContextState -> a) -> ContextM a
-contextGets = gets
-{-# INLINE contextGets #-}
-
-contextPut :: ContextState -> ContextM ()
-contextPut = put
-{-# INLINE contextPut #-}
-
-contextModify :: (ContextState -> ContextState) -> ContextM ()
-contextModify = modify
-{-# INLINE contextModify #-}
-
-contextModify' :: (ContextState -> ContextState) -> ContextM ()
-contextModify' = modify'
-{-# INLINE contextModify' #-}
 
 instance Show Context where
   show = const "<context>"
-
-instance Mod.Modifiable ContextState ContextM where
-  get _ = get
-  put _ = put
-
-instance Mod.Accessible Context ContextM where
-  access _ = ask
-
-instance Mod.Modifiable (Maybe DebugSettings) ContextM where
-  get _ = gets $ view debugSettings
-  put _ ds = modify $ debugSettings .~ ds
-
-instance Mod.Accessible ContextState ContextM where
-  access _ = get
-
-instance Mod.Accessible MemDBs ContextM where
-  access _ = gets $ view memDBs
-
-instance Mod.Modifiable MemDBs ContextM where
-  get _ = gets $ view memDBs
-  put _ md = modify $ memDBs .~ md
-
-instance Mod.Accessible IsBlockstanbul ContextM where
-  access _ = IsBlockstanbul <$> contextGets _hasBlockstanbul
-
-instance Mod.Modifiable BaggerState ContextM where
-  get _ = contextGets _baggerState
-  put _ s = contextModify $ baggerState .~ s
-
-instance Mod.Accessible TRC.Cache ContextM where
-  access _ = contextGets _txRunResultsCache
-
-instance ContextM `Mod.Yields` TransactionResult where
-  yield = void . putTransactionResult
-
-vmBlockHashRootKey :: B.ByteString
-vmBlockHashRootKey = "block_hash_root"
-
-vmGenesisRootKey :: B.ByteString
-vmGenesisRootKey = "genesis_root"
-
-vmBestBlockRootKey :: B.ByteString
-vmBestBlockRootKey = "best_block_root"
-
-instance Mod.Modifiable BlockHashRoot ContextM where
-  get _ = do
-    db <- getStateDB
-    BlockHashRoot . maybe MP.emptyTriePtr MP.StateRoot <$> DB.get db def vmBlockHashRootKey
-  put _ (BlockHashRoot (MP.StateRoot sr)) = do
-    db <- getStateDB
-    DB.put db def vmBlockHashRootKey sr
-
-instance Mod.Modifiable GenesisRoot ContextM where
-  get _ = do
-    db <- getStateDB
-    GenesisRoot . maybe MP.emptyTriePtr MP.StateRoot <$> DB.get db def vmGenesisRootKey
-  put _ (GenesisRoot (MP.StateRoot sr)) = do
-    db <- getStateDB
-    DB.put db def vmGenesisRootKey sr
-
-instance Mod.Modifiable BestBlockRoot ContextM where
-  get _ = do
-    db <- getStateDB
-    BestBlockRoot . maybe MP.emptyTriePtr MP.StateRoot <$> DB.get db def vmBestBlockRootKey
-  put _ (BestBlockRoot (MP.StateRoot sr)) = do
-    db <- getStateDB
-    DB.put db def vmBestBlockRootKey sr
-
-instance Mod.Modifiable K.KafkaState ContextM where
-  get _ = readIORef =<< view (dbs . kafkaState)
-  put _ ks = view (dbs . kafkaState) >>= flip writeIORef ks
-
-instance Mod.Modifiable CurrentBlockHash ContextM where
-  get _ = fmap (fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0)) . gets $ view $ memDBs . currentBlock
-  put _ bh = modify $ memDBs . currentBlock ?~ bh
-
-instance HasMemAddressStateDB ContextM where
-  getAddressStateTxDBMap = gets $ view $ memDBs . stateTxMap
-  putAddressStateTxDBMap theMap = modify $ memDBs . stateTxMap .~ theMap
-  getAddressStateBlockDBMap = gets $ view $ memDBs . stateBlockMap
-  putAddressStateBlockDBMap theMap = modify $ memDBs . stateBlockMap .~ theMap
-
-instance (MP.StateRoot `A.Alters` MP.NodeData) ContextM where
-  lookup _ = MP.genericLookupDB $ getStateDB
-  insert _ = MP.genericInsertDB $ getStateDB
-  delete _ = MP.genericDeleteDB $ getStateDB
-
-instance (Account `A.Alters` AddressState) ContextM where
-  lookup _ = getAddressStateMaybe
-  insert _ = putAddressState
-  delete _ = deleteAddressState
-
-instance A.Selectable Account AddressState ContextM where
-  select _ = getAddressStateMaybe
-
-instance (Maybe Word256 `A.Alters` MP.StateRoot) ContextM where
-  lookup _ chainId = do
-    mBH <- gets $ view $ memDBs . currentBlock
-    fmap join . for mBH $ \(CurrentBlockHash bh) -> do
-      mSR <- gets $ view $ memDBs . stateRoots . at (bh, chainId)
-      case mSR of
-        Just sr -> pure $ Just sr
-        Nothing -> getChainStateRoot chainId bh
-  insert _ chainId sr = do
-    mBH <- gets $ view $ memDBs . currentBlock
-    case mBH of
-      Nothing -> pure ()
-      Just (CurrentBlockHash bh) -> do
-        modify $ memDBs . stateRoots %~ M.insert (bh, chainId) sr
-        putChainStateRoot chainId bh sr
-  delete _ chainId = do
-    mBH <- gets $ view $ memDBs . currentBlock
-    case mBH of
-      Nothing -> pure ()
-      Just (CurrentBlockHash bh) -> do
-        modify $ memDBs . stateRoots %~ M.delete (bh, chainId)
-        deleteChainStateRoot chainId bh
-
-instance A.Selectable Word256 ParentChainIds ContextM where
-  select _ chainId = fmap (\(_, _, p) -> ParentChainIds p) <$> getChainGenesisInfo (Just chainId)
-
-instance (Keccak256 `A.Alters` DBCode) ContextM where
-  lookup _ = genericLookupCodeDB $ getCodeDB
-  insert _ = genericInsertCodeDB $ getCodeDB
-  delete _ = genericDeleteCodeDB $ getCodeDB
-
-instance ((Address, T.Text) `A.Selectable` X509CertificateField) ContextM where
-  select _ (k, t) = do
-    let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8
-    mCertAddress <- lookupX509AddrFromCBHash k
-    fmap join . for mCertAddress $ \certAddress -> do
-      maybe Nothing (readMaybe . T.unpack . Text.decodeUtf8) <$> A.lookup (A.Proxy) (certKey certAddress t)
-
-instance (Address `A.Selectable` X509Certificate) ContextM where
-  select _ k = do
-    let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8
-    mCertAddress <- lookupX509AddrFromCBHash k
-    fmap join . for mCertAddress $ \certAddress -> do
-      mBString <- fmap (rlpDecode . rlpDeserialize) <$> A.lookup (A.Proxy) (certKey certAddress ".certificateString")
-      case mBString of
-        Just (BString bs) -> pure . eitherToMaybe $ bsToCert bs
-        _ -> pure Nothing
 
 lookupX509AddrFromCBHash ::
   ( MonadLogger m,
@@ -522,47 +311,6 @@ lookupX509AddrFromCBHash k = do
   case mAccount of
     Just (BAccount a) -> pure . Just $ a ^. namedAccountAddress
     _ -> pure Nothing
-
-instance (N.NibbleString `A.Alters` N.NibbleString) ContextM where
-  lookup _ = genericLookupHashDB $ getHashDB
-  insert _ = genericInsertHashDB $ getHashDB
-  delete _ = genericDeleteHashDB $ getHashDB
-
-instance HasMemRawStorageDB ContextM where
-  getMemRawStorageTxDB = gets $ view $ memDBs . storageTxMap
-  putMemRawStorageTxMap theMap = modify $ memDBs . storageTxMap .~ theMap
-  getMemRawStorageBlockDB = gets $ view $ memDBs . storageBlockMap
-  putMemRawStorageBlockMap theMap = modify $ memDBs . storageBlockMap .~ theMap
-
-instance (RawStorageKey `A.Alters` RawStorageValue) ContextM where
-  lookup _ = genericLookupRawStorageDB
-  insert _ = genericInsertRawStorageDB
-  delete _ = genericDeleteRawStorageDB
-  lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
-
-instance (Keccak256 `A.Alters` BlockSummary) ContextM where
-  lookup _ = genericLookupBlockSummaryDB $ getBlockSummaryDB
-  insert _ = genericInsertBlockSummaryDB $ getBlockSummaryDB
-  delete _ = genericDeleteBlockSummaryDB $ getBlockSummaryDB
-
-instance MonadReader Context m => Mod.Accessible SQLDB m where
-  access _ = view $ dbs . sqldb
-
-instance Mod.Accessible RBDB.RedisConnection ContextM where
-  access _ = view $ dbs . redisPool
-
-instance Mod.Accessible (Maybe WorldBestBlock) ContextM where
-  access _ = do
-    mRBB <- RBDB.withRedisBlockDB RBDB.getWorldBestBlockInfo
-    for mRBB $ \(RedisBestBlock sha num diff) ->
-      return . WorldBestBlock $ BestBlock sha num diff
-
-instance Mod.Modifiable GasCap ContextM where
-  get _ = contextGets (GasCap . _vmGasCap)
-
-  put _ (GasCap g) = do
-    contextModify (vmGasCap .~ g)
-    $logDebugS "#### Mod.put @vmGasCap" . T.pack $ "VM Gas Cap updated to: " ++ show g
 
 runTestContextM ::
   ( MonadUnliftIO m,
@@ -592,11 +340,6 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
               Redis.connectPort = Redis.PortNumber 2023,
               Redis.connectDatabase = 0
             }
-      initialKafkaState <-
-        newIORef $
-          K.mkKafkaState
-            (K.KString "fake_client")
-            (K.Host (K.KString "localhost"), K.Port 1234132)
       cache <- liftIO $ TRC.new 64
 
       let cdbs =
@@ -605,7 +348,6 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
                 _hashDB = HashDB hdb,
                 _codeDB = CodeDB cdb,
                 _blockSummaryDB = BlockSummaryDB blksumdb,
-                _kafkaState = initialKafkaState,
                 _redisPool = RBDB.RedisConnection rPool,
                 _sqldb = SQLDB conn
               }
@@ -665,7 +407,6 @@ initContext dSettings = do
   cdb <- DB.open (dbDir "h" ++ codeDBPath) ldbOptions
   blksumdb <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath) ldbOptions
   rPool <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
-  kafkaStateRef <- newIORef $ mkConfiguredKafkaState "ethereum-vm"
   cache <- liftIO $ TRC.new 64
 
   let cdbs =
@@ -674,7 +415,6 @@ initContext dSettings = do
             _hashDB = HashDB hdb,
             _codeDB = CodeDB cdb,
             _blockSummaryDB = BlockSummaryDB blksumdb,
-            _kafkaState = kafkaStateRef,
             _redisPool = RBDB.RedisConnection rPool,
             _sqldb = conn
           }
@@ -784,5 +524,3 @@ putContextBestBlockInfo new = Mod.modifyStatefully_ Mod.Proxy $ assign bestBlock
 checkIfRunningTests :: (Functor m, Mod.Accessible ContextState m) => m Bool
 checkIfRunningTests = _runningTests <$> Mod.access Mod.Proxy
 
-compactContextM :: ContextM ()
-compactContextM = modify' force

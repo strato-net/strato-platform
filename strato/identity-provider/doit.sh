@@ -34,6 +34,12 @@ function runIdentityServer {
   if [ -n "${SENDGRID_APIKEY}" ]; then
       sgFlag="--SENDGRID_APIKEY=${SENDGRID_APIKEY}"
   fi  
+  if [ -n "${userRegistryAddress}" ]; then
+      urFlag="--userRegistryAddress=${userRegistryAddress}"
+  fi  
+  if [ -n "${userTableName}" ]; then
+      utFlag="--userTableName=${userTableName}"
+  fi  
   RED='\033[0;31m'
   NC='\033[0m' # No Color
   OAUTH_DISCOVERY_URL=$(yq '.[0].discoveryUrl // "" ' /identity-provider/idconf.yaml )
@@ -69,7 +75,7 @@ function runIdentityServer {
   echo "Running identity-provider-server..."
   runBackgroundProcess identity-provider-server \
     --minLogLevel=${minLogLevel} --port="${identityProviderPort}" \
-    "${vpFlag}" "${sgFlag}" &>> logs/identity-provider-server
+    "${vpFlag}" "${sgFlag}" "${urFlag}" "${utFlag}" &>> logs/identity-provider-server
   
   echo "Configuring log rotation..."
   runBackgroundProcess logRotation

@@ -24,6 +24,7 @@ import Control.Arrow ((&&&))
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
+import Control.Monad.Composable.Kafka
 import qualified Data.Map.Strict as M
 import Data.Maybe (fromJust)
 import qualified Data.Text as T
@@ -31,8 +32,17 @@ import Network.Kafka
 import Network.Kafka.Protocol
 import Text.Format
 
-p2pIndexer :: LoggingT IO ()
-p2pIndexer = runIContextM "strato-p2p-indexer" . forever $ do
+p2pIndexerMainLoop ::
+  ( MonadLogger m,
+    HasKafka m,
+    (Keccak256 `A.Alters` P2P (Private (Word256, OutputTx))) m,
+    (Keccak256 `A.Alters` P2P OutputBlock) m,
+    Mod.Modifiable (P2P BestBlock) m,
+    (Word256 `A.Alters` P2P ChainInfo) m,
+    (Word256 `A.Alters` P2P ChainMembers) m
+  ) =>
+  m ()
+p2pIndexerMainLoop = forever $ do
   $logInfoS "p2pIndexer" "About to fetch IndexEvents"
   (offset, idxEvents) <- getUnprocessedIndexEvents
   $logInfoS "p2pIndexer" . T.pack $ "Fetched " ++ show (length idxEvents) ++ " events starting from " ++ show offset
@@ -75,22 +85,25 @@ indexP2P idxEvents = do
 kafkaClientIds :: (KafkaClientId, ConsumerGroup)
 kafkaClientIds = ("strato-p2p-indexer", lookupConsumerGroup "strato-p2p-indexer")
 
-getKafkaCheckpoint :: IContextM Offset
+getKafkaCheckpoint :: (MonadLogger m, HasKafka m) =>
+                      m Offset
 getKafkaCheckpoint =
-  withKafkaRetry1s (fetchSingleOffset (snd kafkaClientIds) targetTopicName 0) >>= \case
+  execKafka (fetchSingleOffset (snd kafkaClientIds) targetTopicName 0) >>= \case
     Left UnknownTopicOrPartition -> setKafkaCheckpoint 0 >> getKafkaCheckpoint
     Left err -> error $ "Unexpected response when fetching offset for " ++ show targetTopicName ++ ": " ++ show err
     Right (ofs, _) -> return ofs
 
-setKafkaCheckpoint :: Offset -> IContextM ()
+setKafkaCheckpoint :: (MonadLogger m, HasKafka m) =>
+                      Offset -> m ()
 setKafkaCheckpoint ofs = do
   $logInfoS "setKafkaCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs
-  withKafkaRetry1s (commitSingleOffset (snd kafkaClientIds) targetTopicName 0 ofs "") >>= \case
+  execKafka (commitSingleOffset (snd kafkaClientIds) targetTopicName 0 ofs "") >>= \case
     Left err -> error $ "Unexpected response when setting checkpoint to " ++ show ofs ++ ": " ++ show err
     Right () -> return ()
 
-getUnprocessedIndexEvents :: IContextM (Offset, [IndexEvent])
+getUnprocessedIndexEvents :: (MonadLogger m, HasKafka m) =>
+                             m (Offset, [IndexEvent])
 getUnprocessedIndexEvents = do
   ofs <- getKafkaCheckpoint
-  evs <- withKafkaRetry1s (readIndexEvents ofs)
+  evs <- execKafka (readIndexEvents ofs)
   return (ofs, evs)

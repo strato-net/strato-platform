@@ -160,6 +160,13 @@ export const setSearchQueryOptions = (args = {}, _queryOptionsArray) => {
         ['or']: `(${categoryQueries.join(',')})`
       }
     }
+    if (key === 'subcategory' || key === 'subCategory') {
+      const subcategoryQueries = value.map(subcategory => 'contract_name.like.' + subcategory);
+      return {
+        ...agg,
+        ['or']: `(${subcategoryQueries.join(',')})`
+      }
+    }
     if (!value && typeof value != 'boolean') {
       return agg
     }
@@ -205,14 +212,24 @@ export const setSearchQueryOptions = (args = {}, _queryOptionsArray) => {
 }
 
 export const setSearchQueryOptionsPrime = (args) => {
-  const nonQueryOptions = ['queryValue', 'queryFields', 'queryOptions', 'limit', 'offset', 'sort', 'range', , 'notEqualsField', 'notEqualsValue']
-  const queryArgs = setSearchQueryOptionsLike(args, Object.keys(args).reduce((result, key) => {
-    if (!nonQueryOptions.includes(key)) {
+  const nonQueryOptions = ['queryValue', 'queryFields', 'queryOptions', 'limit', 'offset', 'sort', 'range', 'notEqualsField', 'notEqualsValue']
+  const queryArgs = setSearchQueryOptions(args, Object.keys(args).reduce((result, key) => {
+    if (!nonQueryOptions.includes(key) && key != 'category' && key != 'subCategory') {
       if (Array.isArray(args[key])) {
         result.push(({ key, value: `(${args[key].join(',')})`, predicate: 'in' }))
       } else {
         result.push(({ key, value: args[key] }))
       }
+    }
+    
+    if (key === 'category' && Array.isArray(args[key])) {
+      const categories = args[key][0].split(',').map(category => '%-' + category + '%');
+      result.push({ key, value: categories, predicate: 'or', subPredicate: 'like'})
+    }
+
+    if (key === 'subCategory' && Array.isArray(args[key])) {
+      const subCategories = args[key][0].split(',').map(subCategory => '%-' + subCategory);
+      result.push({ key, value: subCategories, predicate: 'or', subPredicate: 'like'})
     }
 
     if (key === 'queryValue') {
@@ -248,7 +265,13 @@ export const setSearchQueryOptionsPrime = (args) => {
     
     if (key === 'notEqualsValue') {
       const { notEqualsField, notEqualsValue } = args
-      result.push({ key: notEqualsField, value: notEqualsValue, predicate: 'neq' })
+      if (Array.isArray(args[key])) {
+        notEqualsField.map((field, i) => {
+          result.push({ key: field, value: notEqualsValue[i], predicate: 'neq' })
+        })
+      } else {
+        result.push({ key: notEqualsField, value: notEqualsValue, predicate: 'neq' })
+      }
     }
 
     return result
@@ -319,9 +342,9 @@ export const setSearchQueryOptionsLike = (args = {}, _queryOptionsArray) => {
 }
 
 export const searchAllWithQueryArgs = async (contractName, args, options, user) => {
-  const nonQueryOptions = ['queryValue', 'queryFields', 'queryOptions', 'limit', 'offset', 'sort', 'range', 'gteField', 'gteValue', 'notEqualsField', 'notEqualsValue']
+  const nonQueryOptions = ['queryValue', 'queryFields', 'queryOptions', 'limit', 'offset', 'sort', 'range', 'gteField', 'gteValue', 'lteField', 'lteValue', 'notEqualsField', 'notEqualsValue']
   const queryArgs = setSearchQueryOptions(args, Object.keys(args).reduce((result, key) => {
-    if (!nonQueryOptions.includes(key) && key != 'category') {
+    if (!nonQueryOptions.includes(key) && key != 'category' && key != 'subCategory') {
       if (Array.isArray(args[key])) {
         result.push(({ key, value: `(${args[key].join(',')})`, predicate: 'in' }))
       } else {
@@ -330,8 +353,13 @@ export const searchAllWithQueryArgs = async (contractName, args, options, user) 
     }
 
     if (key === 'category' && Array.isArray(args[key])) {
-      const categories = args[key][0].split(',').map(category => '%-' + category);
+      const categories = args[key][0].split(',').map(category => '%-' + category + '%');
       result.push({ key, value: categories, predicate: 'or', subPredicate: 'like'})
+    }
+
+    if (key === 'subCategory' && Array.isArray(args[key])) {
+      const subCategories = args[key][0].split(',').map(subCategory => '%-' + subCategory);
+      result.push({ key, value: subCategories, predicate: 'or', subPredicate: 'like'})
     }
 
     if (key === 'queryValue') {
@@ -351,9 +379,20 @@ export const searchAllWithQueryArgs = async (contractName, args, options, user) 
       result.push({ key: gteField, value: gteValue, predicate: 'gte' })
     }
 
+    if (key === 'lteValue') {
+      const { lteField, lteValue } = args
+      result.push({ key: lteField, value: lteValue, predicate: 'lte' })
+    }
+
     if (key === 'notEqualsValue') {
       const { notEqualsField, notEqualsValue } = args
-      result.push({ key: notEqualsField, value: notEqualsValue, predicate: 'neq' })
+      if (Array.isArray(args[key])) {
+        notEqualsField.map((field, i) => {
+          result.push({ key: field, value: notEqualsValue[i], predicate: 'neq' })
+        })
+      } else {
+        result.push({ key: notEqualsField, value: notEqualsValue, predicate: 'neq' })
+      }
     }
 
     if (key === 'sort') {
@@ -379,6 +418,7 @@ export const searchAllWithQueryArgs = async (contractName, args, options, user) 
   }, []))
 
   const { category, ...restQueryArgs } = queryArgs;
+  console.log('#### REST QUERY ARGS', JSON.stringify(restQueryArgs))
   const results = await searchAll(contractName, restQueryArgs, options, user)
 
   return results

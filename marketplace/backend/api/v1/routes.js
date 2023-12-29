@@ -9,16 +9,18 @@ import product from './Product'
 import inventory from './Inventory'
 import item from './Item'
 import art from './Art'
-import carbon from './Carbon'
+import carbonOffset from './CarbonOffset'
 import metals from './Metals'
 import clothing from './Clothing'
+import membership from './Membership'
+import carbonDAO from './CarbonDAO'
+import collectibles from './Collectibles'
 import order from './Order'
 import orderLineItem from './OrderLineItem'
 import eventType from './EventType'
 import event from './Event'
 import authentication from './authentication'
 import users from './users'
-import image from './Image'
 import marketplace from './Marketplace'
 import paymentService from './PaymentService'
 import orderLine from "./OrderLine"
@@ -32,14 +34,16 @@ import {
   Inventory,
   Item,
   Art,
-  Carbon,
+  CarbonOffset,
   Metals,
   Clothing,
+  Membership,
+  CarbonDAO,
+  Collectibles,
   Order,
   OrderLineItem,
   EventType,
   Event,
-  Image,
   Marketplace,
   OrderLine,
   PaymentService,
@@ -56,14 +60,16 @@ router.use(Product.prefix, product)
 router.use(Inventory.prefix, inventory)
 router.use(Item.prefix, item)
 router.use(Art.prefix, art)
-router.use(Carbon.prefix, carbon)
+router.use(CarbonOffset.prefix, carbonOffset)
 router.use(Clothing.prefix, clothing)
+router.use(Membership.prefix, membership)
+router.use(CarbonDAO.prefix, carbonDAO)
+router.use(Collectibles.prefix, collectibles)
 router.use(Metals.prefix, metals)
 router.use(Order.prefix, order)
 router.use(OrderLineItem.prefix, orderLineItem)
 router.use(EventType.prefix, eventType)
 router.use(Event.prefix, event)
-router.use(Image.prefix, image)
 router.use(Marketplace.prefix, marketplace)
 router.use(OrderLine.prefix, orderLine)
 router.use(PaymentService.prefix, paymentService)

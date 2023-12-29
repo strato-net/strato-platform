@@ -1,4 +1,4 @@
-name:                blockapps-highway-wrapper-api
+name:                blockapps-highway-api
 version:             0.1.0.0
 github:              "githubuser/API"
 author:              "Author name here"
@@ -24,19 +24,9 @@ dependencies:
 library:
   source-dirs: src
   dependencies:
-  - aeson
-  - aeson-casing
-  - base16-bytestring
   - bytestring
-  - cryptonite
   - http-media
-  - labeled-error
-  - lens
-  - saltine
   - servant
   - servant-multipart
-  - servant-multipart-client
   - servant-server
-  - strato-model
-  - swagger2
   - text

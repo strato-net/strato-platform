@@ -15,27 +15,7 @@ import swaggerUi from "swagger-ui-express";
 import swaggerSpecs from "./swaggerspecs";
 import dotenv from "dotenv";
 import websocket from "./websocket";
-
-if (
-  !process.env.EXT_STORAGE_S3_ACCESS_KEY_ID ||
-  !process.env.EXT_STORAGE_S3_BUCKET ||
-  !process.env.EXT_STORAGE_S3_SECRET_ACCESS_KEY
-) {
-  dotenv.config();
-}
-
-assert.isDefined(
-  process.env.EXT_STORAGE_S3_ACCESS_KEY_ID,
-  "Missing external storage params"
-);
-assert.isDefined(
-  process.env.EXT_STORAGE_S3_BUCKET,
-  "Missing external storage params"
-);
-assert.isDefined(
-  process.env.EXT_STORAGE_S3_SECRET_ACCESS_KEY,
-  "Missing external storage params"
-);
+import axios from "axios";
 
 let server
 (async () => {
@@ -48,7 +28,10 @@ let server
   if (!deploy) {
     throw new Error(`Deploy file '${config.configDirPath}/${config.deployFilename}' not found`);
   }
-  
+
+  const marketplaceUrl = `${config.serverHost}/marketplace`
+  axios.defaults.headers.common['Referer'] = marketplaceUrl;
+
   app.set(deployParamName, deploy);
   
   // Setup middleware
@@ -72,14 +55,6 @@ let server
     console.error('Error initializing the oauthHandler', e)
     throw e
   }
-  
-  app.set(constants.s3ParamName, {
-    bucket: {
-      Bucket: process.env.EXT_STORAGE_S3_BUCKET
-    },
-    accessKeyId: process.env.EXT_STORAGE_S3_ACCESS_KEY_ID,
-    secretAccessKey: process.env.EXT_STORAGE_S3_SECRET_ACCESS_KEY
-  });
   // Setup routes
   app.use(`${baseUrl}`, routes);
   

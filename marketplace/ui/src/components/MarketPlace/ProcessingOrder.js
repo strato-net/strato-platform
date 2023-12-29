@@ -1,7 +1,7 @@
 import { Spin, notification } from "antd";
 import React, { useEffect, useState, useMemo } from "react";
 import RestStatus from "http-status-codes";
-import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
+import { apiUrl, HTTP_METHODS, ORDER_STATUS } from "../../helpers/constants";
 import { useNavigate, useMatch, useLocation } from "react-router-dom";
 import routes from "../../helpers/routes";
 import {generateHtmlContent, generateHtmlContentNickel} from "../../helpers/emailTemplate";
@@ -65,14 +65,16 @@ const ProcessingOrder = () => {
 
   const getCartData = async () => {
     try {
+      const sellersCommonName = storedConfirmList[0].sellersCommonName;
       const response = await fetch(
-        `${apiUrl}/order/payment/session/${sessionId}`,
+        `${apiUrl}/order/payment/session/${sessionId}/${sellersCommonName}`,
         {
           method: HTTP_METHODS.GET,
         }
       );
 
       const body = await response.json();
+      console.log(body);
       if (response.status === RestStatus.OK) {
         try {
           const cartObject = JSON.parse(body.data.metadata.cart);
@@ -80,7 +82,13 @@ const ProcessingOrder = () => {
             if (body.data["payment_status"] === "paid") {
               const customerEmail = body.data["customer_details"]["email"];
               const cart = JSON.parse(body.data.metadata.cart);
-              let object = { paymentSessionId: sessionId, paymentMethod: body.data.payment_method, ...cart };
+              let object = { paymentSessionId: sessionId, status:ORDER_STATUS.AWAITING_FULFILLMENT, paymentMethod: body.data.payment_method, ...cart };
+              handleOrderConfirm(object, customerEmail);
+            }
+            else if (body.data["payment_method_options"].hasOwnProperty("us_bank_account")) {
+              const customerEmail = body.data["customer_details"]["email"];
+              const cart = JSON.parse(body.data.metadata.cart);
+              let object = { paymentSessionId: sessionId, status:ORDER_STATUS.PAYMENT_PENDING, paymentMethod: body.data.payment_method, ...cart };
               handleOrderConfirm(object, customerEmail);
             }
           }
@@ -160,14 +168,13 @@ const ProcessingOrder = () => {
     let assetAddresses = [];
     const orderList = storedConfirmList.map(o => {
       assetAddresses.push(o.key);
-      return { assetAddress: o.key, quantity: o.qty, category: o.category };
+      return { saleAddress: o.saleAddress, quantity: o.qty };
     });
     
     const body = {
-      orderList: orderList,
-      paymentMethod: cartData.paymentMethod,
-      totalPrice: cartData.orderTotal,
-      shippingAddress: cartData.shippingAddress,
+      status: cartData.status,
+      items: orderList,
+      shippingAddressId: cartData.shippingAddressId,
       paymentSessionId: cartData.paymentSessionId,
       to: customerEmail,
       subject: "Your Order Confirmation",

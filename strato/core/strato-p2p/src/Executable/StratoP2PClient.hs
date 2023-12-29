@@ -179,7 +179,9 @@ stratoP2PClient runner = runner $ \sSource -> do
               $logErrorLS "stratoP2PClient/handleRunPeerResult" theUDPErr
             disErr <- storeDisableException thePeer (T.pack "WrongGenesisBlock")
             whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
-            A.replace (A.Proxy @PeerBondingState) (IPAsText $ pPeerIp thePeer, TCPPort $ pPeerTcpPort thePeer) (PeerBondingState 3) -- 3 indicates wrong genesis block/networkID
+            case pPeerPubkey thePeer of 
+              Just pubkey -> A.replace (A.Proxy @PeerBondingState) (IPAsText $ pPeerIp thePeer, pubkey) (PeerBondingState 3) -- 3 indicates wrong genesis block/networkID
+              Nothing -> return ()
             lengthenPeerDisable thePeer
           e' | Just HeadMacIncorrect <- fromException e' -> do
             disErr <- storeDisableException thePeer (T.pack "HeadMacIncorrect")
@@ -191,7 +193,9 @@ stratoP2PClient runner = runner $ \sSource -> do
               $logErrorLS "stratoP2PClient/handleRunPeerResult" theUDPErr
             disErr <- storeDisableException thePeer (T.pack "NetworkIDMismatch")
             whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
-            A.replace (A.Proxy @PeerBondingState) (IPAsText $ pPeerIp thePeer, TCPPort $ pPeerTcpPort thePeer) (PeerBondingState 3) -- 3 indicates wrong genesis block/networkID
+            case pPeerPubkey thePeer of 
+              Just pubkey -> A.replace (A.Proxy @PeerBondingState) (IPAsText $ pPeerIp thePeer, pubkey) (PeerBondingState 3) -- 3 indicates wrong genesis block/networkID
+              Nothing -> return ()
             lengthenPeerDisable thePeer
           e' | Just PeerDisconnected <- fromException e' -> do
             disErr <- storeDisableException thePeer (T.pack "PeerDisconnected")

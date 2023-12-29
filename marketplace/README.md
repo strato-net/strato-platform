@@ -38,14 +38,9 @@ cd backend
 GLOBAL_ADMIN_NAME=<globalAdminUsername>
 GLOBAL_ADMIN_PASSWORD=<globalAdminPassword>
 
-EXT_STORAGE_S3_ACCESS_KEY_ID=<s3Key>
-EXT_STORAGE_S3_SECRET_ACCESS_KEY=<s3AccessKey>
-EXT_STORAGE_S3_BUCKET=<s3Bucket>
-
 SENDGRID_API_KEY=<sendgridApiKey>
 
-STRIPE_PUBLISHABLE_KEY=<stripePublishableKey>
-STRIPE_SECRET_KEY=<stripeSecretKey>
+STRIPE_PAYMENT_SERVER_URL=<stripePaymentServerURL>
 
 ### VARS USED IN BACKEND TESTS ONLY: ###
 #  accounts for testing user roles:
@@ -202,7 +197,6 @@ Some docker-compose vars are optional with default values and some are required 
 MP_IS_BOOTNODE              - (default: 'false') if false - .deploy.yaml is expected in docker volume
 MP_API_DEBUG                - (default: 'false') show additional logs of STRATO API calls in backend container log
 CONFIG_DIR_PATH             - (default: '/config') directory inside of container to keep the config and deploy yaml files. Not recommended to change unless you know what you are doing.
-MP_DAPP_ADDRESS             - (required for MP_IS_BOOTNODE=false) the address of the pre-existing Marketplace Dapp contract (for MP_IS_BOOTNODE=false mode only)
 ORG_DEPLOY_FILE_NAME        - (default: 'org.deploy.yaml') filename of the targeted org deploy file. Not recommended to change unless you know what you are doing.
 APPLICATION_USER_NAME       - (default: 'APP_USER') the username of service user
 MP_SERVER_HOST              - (required) App server host (hostname or hostname:port, e.g. example.com) of the application server

@@ -31,9 +31,12 @@ const actionDescriptors = {
   updateSellerDetailsFailed: "update_seller_details_failed",
   resetMessage: "reset_message",
   setMessage: "set_message",
+  updateOrderStatus: "update_order_status",
+  updateOrderStatusSuccessful: "update_order_status_successful",
+  updateOrderStatusFailed: "update_order_status_failed",
   createSaleOrder: "create_sale",
   createSaleOrderSuccessful: "create_sale_successful",
-  createSaleOrderFailed: "create_sale_failed",
+  createSaleOrderFailed: "create_sale_failed",  
   cancelSale: "cancel_sale",
   cancelSaleSuccessful: "cancel_sale_successful",
   cancelSaleFailed: "cancel_sale_failed",
@@ -277,9 +280,10 @@ const actions = {
       query = filter !== 0 ? query.concat(`&status=${filter}`) : query;
     }
 
+    const encodedCommonName = encodeURIComponent(commonName);
     try {
       const response = await fetch(
-        `${apiUrl}/order?limit=${limit}&offset=${offset}&order=${order}&purchasersCommonName=${commonName}${query}`,
+        `${apiUrl}/order?limit=${limit}&offset=${offset}&order=${order}&purchasersCommonName=${encodedCommonName}${query}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -308,7 +312,7 @@ const actions = {
 
   fetchOrderSold: async (dispatch, limit, offset, commonName, selectedDate, filter, order) => {
     dispatch({ type: actionDescriptors.fetchOrderSold });
-
+    const encodedCommonName = encodeURIComponent(commonName);
     let query = "";
     if (selectedDate) {
       let end = selectedDate + 86400;
@@ -320,7 +324,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/order?&limit=${limit}&offset=${offset}&order=${order}&sellersCommonName=${commonName}${query}`,
+        `${apiUrl}/order?&limit=${limit}&offset=${offset}&order=${order}&sellersCommonName=${encodedCommonName}${query}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -563,6 +567,46 @@ const actions = {
         error: "Error while creating Sale",
       });
       actions.setMessage(dispatch, "Error while creating sale");
+    }
+  },
+
+  updateOrderStatus: async (dispatch, payload) => {
+    dispatch ({ type: actionDescriptors.createSaleOrder });
+    
+    try {
+      const response = await fetch(`${apiUrl}/order/update/`, {
+        method: HTTP_METHODS.PUT,
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.updateOrderStatusSuccessful,
+          payload: body.data,
+        });
+        actions.setMessage(dispatch, "Order Updated Successfully", true);
+        return body.data;
+      }
+
+      dispatch({
+        type: actionDescriptors.updateOrderStatusFailed,
+        error: "Error Updating Order Status",
+      });
+      actions.setMessage(dispatch, "Error While Updating Order Status");
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.updateOrderStatusFailed,
+        error:"Error While Updating Order Status",
+      });
+      actions.setMessage(dispatch, "Error While Updating Order Status");
     }
   },
 };

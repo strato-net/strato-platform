@@ -22,6 +22,8 @@ import Blockchain.KafkaTopics
 import qualified Blockchain.Network as Net
 import Control.Concurrent
 import Control.Monad
+import Control.Monad.Composable.Redis
+import Control.Monad.Composable.SQL
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Resource
@@ -35,6 +37,7 @@ import Database.Persist.Postgresql hiding (get)
 import qualified Executable.EthDiscoverySetup as EthDiscovery
 import Network.Kafka
 import Network.Kafka.Protocol
+import SelectAccessible ()
 import System.Directory
 import System.Exit
 import System.FilePath
@@ -176,7 +179,7 @@ oneTimeSetup genesisBlockName = do
             liftIO $ putStrLn $ CL.yellow ">>>> Inserting bootnodes"
             EthDiscovery.setup bootnodes
 
-      void . runLoggingT . runResourceT . runSetupDBM $ do
+      void . runLoggingT . runResourceT . runSetupDBM . runRedisM lookupRedisBlockDBConfig . runSQLM $ do
         liftIO $ putStrLn $ CL.yellow ">>>> Setting UP DB handles"
         void $ addCode EVM B.empty --blank code is the default for Accounts, but gets added nowhere else.
         liftIO $ putStrLn $ CL.yellow ">>>> Initializing Genesis Block"

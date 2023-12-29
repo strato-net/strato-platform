@@ -1,32 +1,33 @@
 import { rest, util, importer } from "blockapps-rest";
 const { createContract } = rest;
-import constants, { CHARGES, ITEM_STATUS, ORDER_STATUS, SERVICE_PROVIDERS, PAYMENT_TYPES } from "/helpers/constants";
+import { SERVICE_PROVIDERS, STRIPE_PAYMENT_SERVER_URL } from "/helpers/constants";
 import { yamlWrite, yamlSafeDumpSync, getYamlFile } from "/helpers/config";
 import { pollingHelper } from "/helpers/utils";
 
-import StripeService from "/payment-service/stripe.service";
+import axios from 'axios';
 import dayjs from 'dayjs';
 import RestStatus from 'http-status-codes';
 import certificateJs from "/dapp/certificates/certificate";
 
 import artJs from "/dapp/items/art";
-import carbonJs from "/dapp/items/carbon";
+import carbonOffsetJs from "/dapp/items/carbonOffset";
 import metalsJs from "/dapp/items/metals";
 import clothingJs from "/dapp/items/clothing";
+import membershipJs from "/dapp/items/membership";
+import carbonDAOJs from "/dapp/items/carbonDAO";
+import collectibleJs from "dapp/items/collectibles";
 
 import saleJs from "/dapp/orders/sale";
 import saleOrderJs from "/dapp/orders/saleOrder";
 
 import inventoryJs from "/dapp/products/inventory";
 import marketplaceJs from "/dapp/marketplace/marketplace.js";
-import userAddressJs from "/dapp/addresses/userAddress.js";
-import paymentManagerJs from "/dapp/payments/paymentManager";
 import paymentProviderJs from '/dapp/payments/paymentProvider';
 
 const allAssetNames = [];
 
-const contractName = "Dapp";
-const contractFileName = `dapp/dapp/contracts/Dapp.sol`;
+const contractName = "Mercata";
+const contractFileName = `dapp/mercata-base-contracts/BaseCodeCollection.sol`;
 
 const balance = 100000000000000000000;
 let userCert = null;
@@ -108,15 +109,6 @@ async function uploadContract(token, options) {
   return await bind(token, contract, options);
 }
 
-async function getManagersAndCirrusInfo(admin, contract, options) {
-  const state = await rest.getState(admin, contract, options);
-  const paymentManager = await paymentManagerJs.bindAddress(admin, state.paymentManager, options);
-
-  const cirrusOrg = state.bootUserOrganization !== "" ? state.bootUserOrganization : undefined;
-
-  return { cirrusOrg, paymentManager };
-}
-
 async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   const contract = _contract;
   console.debug(contract)
@@ -130,16 +122,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     //We are not guaranteed the user will have a certificate
     //99% chance they do, but if this this their first login
     //the node might not have a certificate in time
-    if (!(userCertificate === null || userCertificate === undefined || userCertificate.organization === null || userCertificate.organization === undefined)) {
+    if (!(userCertificate === null || userCertificate === undefined || userCertificate.commonName === null || userCertificate.commonName === undefined)) {
       contract.userOrganization = userCertificate.organization
       userOrganization = userCertificate.organization
       userCommonName = userCertificate.commonName
       userCert = userCertificate;//Attaching user cert to dapp to save from needing make another call to get it
-      console.log('dapp - userCertificate.organization', userCertificate.organization)
     }
   }
 
-  const managers = await getManagersAndCirrusInfo(rawAdmin, contract, _defaultOptions)
   // includes the org+app for cirrus namespacing (helpers/utils.js will prepend to cirrus queries)
   const defaultOptions = { ..._defaultOptions, app: contractName, chainIds: [], };
   // for querying data not on the dapp shard
@@ -148,13 +138,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     chainIds: [],
   };
 
-  const dappAddress = contract.address;
-  const admin = { dappAddress, ...rawAdmin };
-
-  contract.managers = managers;
-  contract.chainId = defaultOptions.chainIds
-    ? defaultOptions.chainIds[0]
-    : undefined;
+  const admin = { ...rawAdmin };
 
   // --------------------------- DAPP MANAGEMENT --------------------------------
   // governance - single add
@@ -218,7 +202,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   // -------------------------- INVENTORY --------------------------------
-  
+
   contract.getInventory = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName, };
     return inventoryJs.get(rawAdmin, { ...args }, getOptions);
@@ -227,18 +211,45 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getInventories = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
     const inventories = await inventoryJs.getAll(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
-    const inventoryCount = await inventoryJs.inventoryCount(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate', status: [1,2] }, getOptions);
-    return {inventories: inventories, inventoryCount: inventoryCount}
+    const inventoryCount = await inventoryJs.inventoryCount(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
+    return { inventories: inventories, inventoryCount: inventoryCount }
   };
 
+  contract.getOwnershipHistory = async function (args, options = optionsNoChainIds) {
+    console.log('#### GET OWNERSHIP HISTORY ARGS', JSON.stringify(args))
+    return inventoryJs.getOwnershipHistory(rawAdmin, args, options);
+  };
+
+  contract.listItem = async function (args, options = defaultOptions) {
+    return inventoryJs.uploadSaleContract(rawAdmin, args, options);
+  }
+
+  contract.unlistItem = async function (args, options = defaultOptions) {
+    const { saleAddress, ...restArgs } = args;
+    const contract = { address: saleAddress };
+    return inventoryJs.unlistItem(rawAdmin, contract, restArgs, options);
+  }
+
   contract.resellItem = async function (args, options = defaultOptions) {
-    const { itemContract, itemAddress, ...restArgs } = args;
-    const contract = { name: itemContract, address: itemAddress };
+    const { assetAddress, ...restArgs } = args;
+    const contract = { address: assetAddress };
     return inventoryJs.resellItem(rawAdmin, contract, restArgs, options);
   }
 
+  contract.transferItem = async function (args, options = defaultOptions) {
+    const { assetAddress, ...restArgs } = args;
+    const contract = { address: assetAddress };
+    return inventoryJs.transferItem(rawAdmin, contract, restArgs, options);
+  }
+
+  contract.updateSale = async function (args, options = defaultOptions) {
+    const { saleAddress, ...restArgs } = args;
+    const contract = { address: saleAddress };
+    return inventoryJs.updateSale(rawAdmin, contract, restArgs, options);
+  }
+
   contract.updateInventory = async function (args, options = defaultOptions) {
-    const { itemContract, itemAddress, ...restArgs} = args;
+    const { itemContract, itemAddress, ...restArgs } = args;
     const contract = { name: itemContract, address: itemAddress };
     return inventoryJs.updateInventory(rawAdmin, contract, restArgs, options);
   }
@@ -247,22 +258,28 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
-    return marketplaceJs.getAll(rawAdmin, { ...args }, getOptions);
+    const newArgs = { ...args, notEqualsField: 'sale', notEqualsValue: '0000000000000000000000000000000000000000' }
+    return marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
   };
 
   contract.getMarketplaceInventoriesLoggedIn = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
-    return marketplaceJs.getAll(rawAdmin, { ...args, notEqualsField: 'ownerCommonName', notEqualsValue: userCommonName }, getOptions);
+    const newArgs = { ...args, notEqualsField: ['sale', 'ownerCommonName'],
+                      notEqualsValue: ['0000000000000000000000000000000000000000', userCommonName] }
+    return marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
   };
 
   contract.getTopSellingProducts = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName }
-    return marketplaceJs.getTopSellingProducts(rawAdmin, { ...args }, getOptions)
+    const newArgs = { ...args, notEqualsField: 'sale', notEqualsValue: '0000000000000000000000000000000000000000' }
+    return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions)
   }
 
   contract.getTopSellingProductsLoggedIn = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName }
-    return marketplaceJs.getTopSellingProducts(rawAdmin, { ...args, notEqualsField: 'ownerCommonName', notEqualsValue: userCommonName }, getOptions)
+    const newArgs = { ...args, notEqualsField: ['sale', 'ownerCommonName'],
+                      notEqualsValue: ['0000000000000000000000000000000000000000', userCommonName] }
+    return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions)
   }
 
   // ------------------------------ ART STARTS ------------------------------
@@ -282,40 +299,25 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return artJs.getAll(rawAdmin, args, getOptions);
   };
 
-  // contract.transferOwnershipArt = async function (args, options = defaultOptions) {
-  //   const { address, chainId, newOwner } = args;
-  //   const contract = { name: artJs.contractName, address: address, };
-  //   const chainOptions = { chainIds: [chainId], ...options };
-  //   return artJs.transferOwnership(rawAdmin, contract, chainOptions, newOwner);
-  // };
-
-  // contract.updateArt = async function (args, options = defaultOptions) {
-  //   const { address, chainId, updates } = args;
-  //   const contract = { name: artJs.contractName, address: address, };
-  //   const chainOptions = { chainIds: [chainId], ...options };
-  //   return artJs.update(rawAdmin, contract, updates, chainOptions);
-  // };
   // ------------------------------ ART ENDS --------------------------------
 
-  // ------------------------------ CARBON STARTS------------------------------
+  // ------------------------------ CARBONOFFSET STARTS------------------------------
 
-  contract.createCarbon = async function (args, options = defaultOptions) {
+  contract.createCarbonOffset = async function (args, options = defaultOptions) {
     const createdDate = Math.floor(Date.now() / 1000);
     const newArgs = {
       ...args.itemArgs,
       createdDate,
-      owner: rawAdmin.address,
-      status: 1,
     };
-    return carbonJs.uploadContract(rawAdmin, newArgs, options);
+    return carbonOffsetJs.uploadContract(rawAdmin, newArgs, options);
   };
 
-  contract.getCarbons = async function (args = {}, options = optionsNoChainIds) {
+  contract.getCarbonOffsets = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName, };
-    return carbonJs.getAll(rawAdmin, args, getOptions);
+    return carbonOffsetJs.getAll(rawAdmin, args, getOptions);
   };
 
-  // ------------------------------ CARBON ENDS--------------------------------
+  // ------------------------------ CARBONOFFSET ENDS--------------------------------
 
   // ------------------------------ METALS STARTS------------------------------
 
@@ -343,7 +345,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const newArgs = {
       ...args.itemArgs,
       createdDate,
-      owner: rawAdmin.address,
     };
     return clothingJs.uploadContract(rawAdmin, newArgs, options);
   };
@@ -355,14 +356,76 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   // ------------------------------ CLOTHING ENDS--------------------------------
 
+  // ------------------------------ MEMBERSHIP STARTS------------------------------
+
+  contract.createMembership = async function (args, options = defaultOptions) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const newArgs = {
+      ...args.itemArgs,
+      createdDate,
+      owner: rawAdmin.address,
+      status: 1,
+    };
+    console.log("newArgs", newArgs);
+    return membershipJs.uploadContract(rawAdmin, newArgs, options);
+  };
+
+  contract.getMemberships = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName, };
+    return membershipJs.getAll(rawAdmin, args, getOptions);
+  };
+
+  // ------------------------------ MEMBERSHIP ENDS--------------------------------
+
+  // ------------------------------ CARBONDAO STARTS------------------------------
+
+  contract.createCarbonDAO = async function (args, options = defaultOptions) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const newArgs = {
+      ...args.itemArgs,
+      createdDate
+    };
+    console.log("newArgs", newArgs);
+    return carbonDAOJs.uploadContract(rawAdmin, newArgs, options);
+  };
+
+  contract.getCarbonDAOs = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName, };
+    return carbonDAOJs.getAll(rawAdmin, args, getOptions);
+  };
+
+  // ------------------------------ CARBONDAO ENDS--------------------------------
+
+  // ------------------------------ COLLECTIBLES STARTS------------------------------
+
+  contract.createCollectible = async function (args, options = defaultOptions) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const newArgs = {
+      ...args.itemArgs,
+      createdDate,
+    };
+    return collectibleJs.uploadContract(rawAdmin, newArgs, options);
+  };
+
+  contract.getCollectibles = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName, };
+    return collectibleJs.getAll(rawAdmin, args, getOptions);
+  };
+
+  // ------------------------------ COLLECTIBLES ENDS--------------------------------
+
   // ------------------------------ SALE TEST STARTS ------------------------------
 
   contract.createSaleOrder = async function (args, options = defaultOptions) {
     const createdDate = Math.floor(Date.now() / 1000);
-    const { orderList, paymentMethod, ...restArgs } = args;
-    const assetAddresses = orderList.map(asset => {
-      return asset.assetAddress;
+    const { items, ...restArgs } = args;
+    const saleAddresses = items.map(item => {
+      return item.saleAddress;
     })
+    const quantities = items.map(item => {
+      return item.quantity;
+    })
+    /*
     const sales = await saleJs.getAll(rawAdmin, { assetAddresses, paymentMethod }, options);
     const sellersAddress = sales[0].sellersAddress;
     const sellersCommonName = sales[0].sellersCommonName;
@@ -371,9 +434,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const saleData = JSON.parse(sale.data);
       if (saleData.units && orderForSale.quantity < saleData.units) {
         const contract = { name: orderForSale.category, address: orderForSale.assetAddress }
-        const splitSaleAddress = await saleJs.createSplitSale(rawAdmin, { 
-          paymentType: parseInt(PAYMENT_TYPES[paymentMethod]), 
-          price: sale.price, 
+        const splitSaleAddress = await saleJs.createSplitSale(rawAdmin, {
+          paymentType: parseInt(PAYMENT_TYPES[paymentMethod]),
+          price: sale.price,
           units: orderForSale.quantity,
         }, options, contract);
         return splitSaleAddress;
@@ -382,13 +445,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         return sale.address;
       }
     }));
+    */
     const newArgs = {
       ...restArgs,
       saleAddresses,
-      sellersCommonName,
-      sellersAddress,
-      purchasersCommonName: userCert.commonName,
-      purchasersAddress: rawAdmin.address,
+      quantities,
       orderId: util.uid(),
       createdDate: createdDate,
     }
@@ -401,6 +462,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return saleOrderJs.cancelOrder(rawAdmin, contract, options, comments);
   }
 
+  contract.updateOrderStatus = async function (args, options = defaultOptions) {
+    const { saleOrderAddress, status, ...restArgs } = args;
+    const contract = { name: saleOrderJs.contractName, address: saleOrderAddress }
+    return saleOrderJs.updateOrderStatus(rawAdmin, contract, options, status);
+  }
+
   contract.getSaleOrders = async function (args, options = defaultOptions) {
     const getOptions = { ...options, app: contractName, };
     return saleOrderJs.getAll(rawAdmin, args, getOptions);
@@ -409,9 +476,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getOrder = async function (args, options = defaultOptions) {
     try {
       const order = await saleOrderJs.get(rawAdmin, args, options);
-      const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
-      const userContactAddress = await userAddressJs.get(rawAdmin, { address: order.shippingAddress }, getOptions);
-      const sales = await saleJs.getAll(rawAdmin, { saleAddresses: order.saleAddresses, state: [1,2] }, options);
+      const sales = await saleJs.getAll(rawAdmin, { saleAddresses: order.saleAddresses }, options);
       const assetAddresses = sales.map(sale => {
         return sale.assetToBeSold;
       })
@@ -419,16 +484,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const assetsWithoutQuantity = await inventoryJs.getAll(rawAdmin, { assetAddresses: assetAddresses }, options);
       assetsWithoutQuantity.map(asset => {
         const saleForAsset = sales.find(sale => sale.assetToBeSold === asset.address);
-        const saleData = JSON.parse(saleForAsset.data);
-        const quantity = saleData.units ? saleData.units : 1;
         assets.push({
           ...asset,
           price: saleForAsset.price,
-          quantity: quantity,
-          amount: quantity * saleForAsset.price,
+          saleQuantity: saleForAsset.quantity,
+          saleAddress: saleForAsset.address,
+          amount: saleForAsset.quantity * saleForAsset.price,
         })
       })
-      const result = { userContactAddress, order, assets };
+      const result = { userContactAddress: order.shippingAddress, order, assets };
 
       return result;
     } catch (error) {
@@ -445,10 +509,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return saleOrderJs.cancelOrder(rawAdmin, contract, options, comments);
   }
 
-  contract.saleOrderTransferOwnership = async function (args, options = defaultOptions) {
-    const { saleOrderAddress, fulfillmentDate, comments, ...restArgs } = args;
-    const contract = { name: saleOrderJs.contractName, address: saleOrderAddress }
-    return saleOrderJs.transferOwnership(rawAdmin, contract, options, fulfillmentDate, comments);
+  contract.completeOrder = async function (args, options = defaultOptions) {
+    return saleOrderJs.completeOrder(rawAdmin, args, options);
   };
 
   // ------------------------------ SALE TEST ENDS ------------------------------
@@ -457,29 +519,32 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   /* ------------------------ Stripe account connect starts here ------------------------ */
   contract.stripeOnboarding = async function (args, options = defaultOptions) {
     try {
-      const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
-      let userStripeAccount, generatedAccountLink;
+      const getOptions = { ...options, app: contractName };
+      let userStripeAccount, connectLink;
       // get user paymentProvider details from cirrus
-      const sellerStripeDetails = await paymentProviderJs.get(rawAdmin, { name: SERVICE_PROVIDERS.STRIPE, ownerOrganization: userOrganization, accountDeauthorized: false }, getOptions)
-
-      /*  check if an accountId already exists for the user org */
-      if (Object.keys(sellerStripeDetails).length > 0 && sellerStripeDetails.accountLinked) {
-        throw new rest.RestError(RestStatus.CONFLICT, "User has already connected their stripe account.")
-      }
-
-      if (Object.keys(sellerStripeDetails).length == 0) {
-        userStripeAccount = await StripeService.generateStripeAccountId();
-        // save generated account id
-        const accountDetails = {
-          name: SERVICE_PROVIDERS.STRIPE,
-          accountId: userStripeAccount.id, status: "", createdDate: dayjs().unix(),
-        }
-        userStripeAccount = userStripeAccount.id
-        await managers.paymentManager.createPaymentProvider(accountDetails)
+      const sellerStripeDetails = await paymentProviderJs.get(rawAdmin, { name: 'STRIPE', accountDeauthorized: false, ownerCommonName: userCert.commonName }, getOptions)
+      if (sellerStripeDetails.length == 0 || Object.keys(sellerStripeDetails[0]).length == 0) {
+        await axios.get(new URL('/stripe/onboard', STRIPE_PAYMENT_SERVER_URL).href)
+          .then(async function (res) {
+            if (res.status === 200) {
+              const { accountDetails } = res.data;
+              userStripeAccount = accountDetails.accountId;
+              await paymentProviderJs.uploadContract(rawAdmin, accountDetails, options);
+              connectLink = res.data.connectLink;
+            } else {
+              throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+            }
+          });
       } else {
-        userStripeAccount = sellerStripeDetails.accountId
+          await axios.get(new URL(`/stripe/onboard/${sellerStripeDetails[0].accountId}`, STRIPE_PAYMENT_SERVER_URL).href)
+            .then(function (res) {
+              if (res.status === 200) {
+                connectLink = res.data.connectLink;
+              } else {
+                throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+              }
+            });
       }
-      const connectLink = StripeService.generateStripeAccountConnectLink(userStripeAccount);
       return connectLink
     } catch (error) {
       console.error(`${error}`)
@@ -489,36 +554,64 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getStripeOnboardingStatus = async function (args, options = defaultOptions) {
     try {
-      const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
+      const getOptions = { ...options, app: contractName };
 
       // get user paymentProvider details from cirrus
-      const paymentProvider = await paymentProviderJs.get(rawAdmin, { name: SERVICE_PROVIDERS.STRIPE, accountDeauthorized: false, ...args }, getOptions);
-
+      const paymentProviders = await paymentProviderJs.get(rawAdmin, { name: 'STRIPE', accountDeauthorized: false, ...args }, getOptions);
       /* TODO check if the provider contract exists on then initiate a update */
-      if (Object.keys(paymentProvider).length == 0) {
+      if (paymentProviders.length == 0 || Object.keys(paymentProviders[0]).length == 0) {
         // throw new rest.RestError(RestStatus.NOT_FOUND, "User hasn't started their stripe setup.")
         return {}
       }
-      const connectedStripeAccountStatus = { accountId: paymentProvider.accountId, paymentProviderAddress: paymentProvider.address, chargesEnabled: false, detailsSubmitted: false, payoutsEnabled: false, accountDeauthorized: false, eventTime: Date.now() }
 
-      try {
-        const userStripeAccount = await StripeService.getStripeConnectAccountDetail(paymentProvider.accountId);
-        connectedStripeAccountStatus.chargesEnabled = userStripeAccount.charges_enabled
-        connectedStripeAccountStatus.detailsSubmitted = userStripeAccount.details_submitted
-        connectedStripeAccountStatus.payoutsEnabled = userStripeAccount.payouts_enabled
-
-      } catch (error) {
-        if (error.code == 'account_invalid') {
-          connectedStripeAccountStatus.accountDeauthorized = true
+      let returnedStripeAccountStatus = paymentProviders[0];
+      let paymentMethodsChecked = [];
+      for (const paymentProvider of paymentProviders) {
+        if (paymentProvider.name in paymentMethodsChecked) {
+          continue;
         }
-      }
-      const { detailsSubmitted, chargesEnabled, payoutsEnabled, accountDeauthorized } = connectedStripeAccountStatus
-      if (paymentProvider.detailsSubmitted !== detailsSubmitted || paymentProvider.chargesEnabled !== chargesEnabled || paymentProvider.payoutsEnabled !== payoutsEnabled || paymentProvider.accountDeauthorized !== accountDeauthorized) {
-        await managers.paymentManager.updatePaymentProvider(connectedStripeAccountStatus, options)
-      }
+        else {
+          const connectedStripeAccountStatus = { chargesEnabled: false, detailsSubmitted: false, payoutsEnabled: false, accountDeauthorized: false, eventTime: Date.now() }
+          const paymentProviderContract = { name: paymentProviderJs.contractName, address: paymentProvider.address }
+          try {
+            await axios.get(new URL(`/stripe/status/${paymentProvider.accountId}`, STRIPE_PAYMENT_SERVER_URL).href)
+              .then(function (res) {
+                if (res.status === 200) {
+                  connectedStripeAccountStatus.chargesEnabled = res.data.chargesEnabled;
+                  connectedStripeAccountStatus.detailsSubmitted = res.data.detailsSubmitted;
+                  connectedStripeAccountStatus.payoutsEnabled = res.data.payoutsEnabled;
+                } else {
+                  throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+                }
+              }, (error) => {
+                console.log(error);
+              });
+          } catch (error) {
+            if (error.code == 'account_invalid') {
+              connectedStripeAccountStatus.accountDeauthorized = true
+            }
+          }
+          const { detailsSubmitted, chargesEnabled, payoutsEnabled, accountDeauthorized } = connectedStripeAccountStatus;
+          if (paymentProvider.detailsSubmitted !== detailsSubmitted || paymentProvider.chargesEnabled !== chargesEnabled || paymentProvider.payoutsEnabled !== payoutsEnabled || paymentProvider.accountDeauthorized !== accountDeauthorized) {
+            await paymentProviderJs.updatePaymentProvider(rawAdmin, paymentProviderContract, connectedStripeAccountStatus, options);
+          }
 
-      return connectedStripeAccountStatus
+          if (connectedStripeAccountStatus.detailsSubmitted
+            && connectedStripeAccountStatus.chargesEnabled
+            && connectedStripeAccountStatus.payoutsEnabled
+            ) {
+              returnedStripeAccountStatus = { 
+                accountId: paymentProvider.accountId, 
+                paymentProviderAddress: paymentProvider.address, 
+                ...connectedStripeAccountStatus 
+              }
+            }
+          
+          paymentMethodsChecked.push(paymentProvider.name);
+        }
 
+        return returnedStripeAccountStatus
+      }
     } catch (error) {
       console.error(`${error}`)
       throw new rest.RestError(RestStatus.BAD_REQUEST, `${error.message}`)
@@ -528,12 +621,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.updateStripeOnboardingStatus = async function (args, options = defaultOptions) {
     try {
       // get user paymentProvider details from cirrus
-      const { accountId, chargesEnabled, detailsSubmitted, payoutsEnabled, accountDeauthorized, eventTime } = args
+      const { accountId, ...restArgs } = args
 
-      const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
+      const getOptions = { ...options, app: contractName };
       const chainOptions = { ...options, chainIds: [contract.chainId] };
 
-      const paymentProvider = await paymentProviderJs.get(rawAdmin, { name: SERVICE_PROVIDERS.STRIPE, accountId }, getOptions);
+      const paymentProvider = await paymentProviderJs.get(rawAdmin, { name: 'STRIPE', accountId }, getOptions);
 
       /* TODO check if the provider contract exists on then initiate a update */
       if (!paymentProvider) {
@@ -541,11 +634,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         return false
       }
 
-      if (paymentProvider.eventTime > eventTime) {
+      if (paymentProvider[0].eventTime > eventTime) {
         return true;
       }
 
-      await managers.paymentManager.updatePaymentProvider({ paymentProviderAddress: paymentProvider.address, chargesEnabled, detailsSubmitted, payoutsEnabled, accountDeauthorized, eventTime }, chainOptions)
+      const paymentProviderContract = { name: paymentProviderJs.contractName, address: paymentProvider.address }
+      await paymentProviderJs.updatePaymentProvider(rawAdmin, paymentProviderContract, restArgs, chainOptions);
 
     } catch (error) {
       console.error(error);
@@ -559,17 +653,16 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       const { orderList, orderTotal: recievedOrderTotal } = args;
 
-      const newOptions = { ...options, org: managers.cirrusOrg, app: contractName }
-
       const assetAddresses = orderList.map(o => o.assetAddress);
-      
-      const assets = await inventoryJs.getAll(rawAdmin, { assetAddresses: assetAddresses, status: 1 }, options);
+
+      const assets = await inventoryJs.getAll(rawAdmin, { assetAddresses: assetAddresses }, options);
+
+      const saleAddresses = assets.map(a => a.saleAddress);
 
       if (assets.length == 0 || assets.length != orderList.length) {
         throw new rest.RestError(RestStatus.NOT_FOUND, "Inventory not found")
       }
 
-      const inventoryOrganization = assets[0].ownerOrganization;
       const sellerName = assets[0].ownerCommonName;
       for (const currInventory of assets) {
 
@@ -585,47 +678,61 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       // const chainOptions = { ...options, chainIds: [contract.chainId] };
       const sellerStripeDetails = await paymentProviderJs.get(rawAdmin,
         {
-          name: SERVICE_PROVIDERS.STRIPE, ownerOrganization: inventoryOrganization,
+          name: 'STRIPE', ownerCommonName: sellerName,
           accountDeauthorized: false
         },
-        newOptions)
+        options)
 
       /*  check if an accountId already exists for the user org */
-      if (Object.keys(sellerStripeDetails).length == 0 || !sellerStripeDetails.chargesEnabled || !sellerStripeDetails.detailsSubmitted || !sellerStripeDetails.payoutsEnabled) {
-        throw new rest.RestError(RestStatus.CONFLICT, "Seller hasn't activated this payment method")
+      if (sellerStripeDetails.length === 0 || !sellerStripeDetails[0].chargesEnabled || !sellerStripeDetails[0].detailsSubmitted || !sellerStripeDetails[0].payoutsEnabled) {
+        throw new rest.RestError(RestStatus.CONFLICT, "Seller hasn't activated this payment method");
       }
 
-      const invoices = []; let calculatedOrderTotal = 0
+      const invoices = []; 
+      let calculatedOrderTotal = 0;
 
       orderList.forEach(item => {
         const inventoryItem = assets.find(asset => asset.address == item.assetAddress);
-        invoices.push({ productName: decodeURIComponent(inventoryItem.name), unitPrice: inventoryItem.price, quantity: item.quantity })
+        invoices.push({ productName: decodeURIComponent(inventoryItem.name), unitPrice: inventoryItem.price, quantity: item.quantity });
 
-        calculatedOrderTotal += (inventoryItem.price * item.quantity)
+        calculatedOrderTotal += (inventoryItem.price * item.quantity);
       })
 
       if (calculatedOrderTotal != recievedOrderTotal) {
-        throw new rest.RestError(RestStatus.BAD_REQUEST, "Incorrect order value.")
+        throw new rest.RestError(RestStatus.BAD_REQUEST, "Incorrect order value.");
       }
       let stripePaymentSession;
+      const {paymentList,...restArgs} = args;
       try {
-
-        stripePaymentSession = await StripeService.initiatePayment(args, invoices, sellerStripeDetails.accountId);
+        const checkoutBody = {
+          paymentTypes: paymentList,
+          cartData: restArgs,
+          orderDetail: invoices,
+          accountId: sellerStripeDetails[0].accountId,
+        }
+        stripePaymentSession = await axios.post(new URL('/stripe/checkout', STRIPE_PAYMENT_SERVER_URL).href, checkoutBody)
+          .then(function (res) {
+            if (res.status === 200) {
+              return res.data;
+            } else {
+              throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+            }
+          });
       } catch (err) {
-        throw new rest.RestError(err.statusCode, err.message)
+        throw new rest.RestError(err.statusCode, err.message);
       }
       const paymentParameters = {
+        address: sellerStripeDetails[0].address,
+        saleAddresses,
         paymentSessionId: stripePaymentSession.id,
-        paymentProvider: "stripe",
         paymentStatus: stripePaymentSession.payment_status,
         sessionStatus: stripePaymentSession.status,
         amount: stripePaymentSession.amount_total.toString(),
         expiresAt: stripePaymentSession.expires_at,
         createdDate: stripePaymentSession.created,
-        sellerAccountId: sellerStripeDetails.accountId
       }
-      const paymentContract = await managers.paymentManager.createPayment(paymentParameters)
-      return stripePaymentSession
+      await paymentProviderJs.createPayment(rawAdmin, paymentParameters, options);
+      return stripePaymentSession;
 
     } catch (error) {
       console.log(error);
@@ -636,52 +743,118 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     }
   };
 
+  // Stripe Webhook TODO
+
   contract.updatePayment = async function (args, options = defaultOptions, token) {
     try {
-      const chainOptions = { ...options, chainIds: [contract.chainId] };
-      return managers.paymentManager.updatePayment(args, chainOptions)
+      return paymentProviderJs.finalizePayment(args, options)
     } catch (error) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while updating payment status", { message: "Error while updating payment status" })
     }
   };
 
-  contract.getPayment = async function (args, options = defaultOptions) {
-    try {
-      return managers.paymentManager.get(args, { ...options, org: managers.cirrusOrg, app: contractName });
-    } catch (error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while fetching payment", { message: "Error while fetching payment" })
-    }
-  };
+  // Stripe Webhook End
 
   contract.getPaymentSession = async function (args, options = defaultOptions) {
     try {
-      const newOptions = { ...options, org: managers.cirrusOrg, app: contractName }
-      const { session_id } = args
-      const paymentDetail = await managers.paymentManager.get({ paymentSessionId: session_id }, newOptions);
-      const paymentSession = await StripeService.getPaymentSession(session_id, paymentDetail.sellerAccountId);
-      const paymentIntent = await StripeService.getPaymentIntent(paymentSession.payment_intent, paymentDetail.sellerAccountId);
-      const paymentMethod = await StripeService.getPaymentMethod(paymentIntent.payment_method, paymentDetail.sellerAccountId);
-      return { ...paymentSession, payment_method: paymentMethod.card.brand }
+      const { session_id, sellersCommonName } = args;
+      const paymentDetail = await paymentProviderJs.get(rawAdmin, 
+        { name: 'STRIPE', ownerCommonName: sellersCommonName, accountDeauthorized: false }, 
+        options);
+      if (paymentDetail.length === 0) {
+        throw new rest.RestError(RestStatus.CONFLICT, "Seller payment details cannot be found.");
+      }
+      const paymentSession = await axios.get(new URL(`/stripe/session/${session_id}/${paymentDetail[0].accountId}`, STRIPE_PAYMENT_SERVER_URL).href)
+        .then(function (res) {
+          if (res.status === 200) {
+            return res.data;
+          } else {
+            throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+          }
+        });
+      return { ...paymentSession }
     } catch (error) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while fetching payment session", { message: "Error while fetching payment" })
     }
   };
 
+  contract.getPaymentIntent = async function (args, options = defaultOptions) {
+    try {
+      const { session_id, sellersCommonName } = args;
+      const paymentDetail = await paymentProviderJs.get(rawAdmin, 
+        { name: 'STRIPE', ownerCommonName: sellersCommonName, accountDeauthorized: false }, 
+        options);
+      if (paymentDetail.length === 0) {
+        throw new rest.RestError(RestStatus.CONFLICT, "Seller payment details cannot be found.");
+      }
+      const paymentIntent = await axios.get(new URL(`/stripe/intent/${session_id}/${paymentDetail[0].accountId}`, STRIPE_PAYMENT_SERVER_URL).href)
+        .then(function (res) {
+          if (res.status === 200) {
+            return res.data;
+          } else {
+            throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+          }
+        });
+      return { ...paymentIntent }
+    } catch (error) {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while fetching payment intent", { message: "Error while fetching payment intent" })
+    }
+  };  
+
   contract.createUserAddress = async function (args, options = defaultOptions) {
     try {
-      const createdDate = Math.floor(Date.now() / 1000);
-      return managers.paymentManager.createUserAddress({ ...args, createdDate: createdDate, });
-    } catch (err) {
+      await axios.post(new URL(`/customer/address`, STRIPE_PAYMENT_SERVER_URL).href, { commonName: userCert.commonName, ...args })
+        .then(function (res) {
+          if (res.status === 200) {
+            console.log(res.data);
+          } else {
+            throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+          }
+        });
+      return {}
+    } catch (error) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
       }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while adding address: ${JSON.stringify(err)} `);
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while adding address: ${JSON.stringify(error)} `);
     }
   };
 
   contract.getAllUserAddress = async function (args, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName }
-    return userAddressJs.getAll(rawAdmin, { ownerOrganization: userOrganization, ...args }, getOptions);
+    try {
+      const userAddresses = await axios.get(new URL(`/customer/address/${userCert.commonName}`, STRIPE_PAYMENT_SERVER_URL).href).then(function (res) {
+        if (res.status === 200) {
+          return res.data.data;
+        } else {
+          throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+        }
+      });
+      return userAddresses;
+    } catch (error) {
+      if (error.response) {
+        throw new rest.RestError(error.response.status, error.response.statusText);
+      }
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching addresses: ${JSON.stringify(err)} `);
+    }
+  };
+
+  contract.getAddressFromId = async function (args, options = defaultOptions) {
+    try {
+      const { id } = args;
+      const userAddress = await axios.get(new URL(`/customer/address/id/${id}`, STRIPE_PAYMENT_SERVER_URL).href).then(function (res) {
+        if (res.status === 200) {
+          return res.data.data;
+        } else {
+          throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+        }
+      });
+      return userAddress;
+    }catch (error) {
+      if (error.response) {
+        throw new rest.RestError(error.response.status, error.response.statusText);
+      }
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching address: ${JSON.stringify(err)} `);
+    }
   };
 
   return contract;

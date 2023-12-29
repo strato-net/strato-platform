@@ -2,8 +2,6 @@ import { rest } from 'blockapps-rest'
 import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
-import { getSignedUrlFromS3 } from '../../../helpers/s3'
-import constants from '../../../helpers/constants'
 
 const options = { config, cacheNonce: true }
 
@@ -22,13 +20,8 @@ class InventoryController {
         chainOptions = { ...options }
       }
 
-      let result;
       const inventory = await dapp.getInventory(args, chainOptions)
-      inventory.images && inventory.images.length > 0 ?
-        result = { ...inventory, images: inventory.images.map(image => (getSignedUrlFromS3(image, req.app.get(constants.s3ParamName))))}
-        :
-        result = inventory
-      rest.response.status200(res, result)
+      rest.response.status200(res, inventory)
 
       return next()
     } catch (e) {
@@ -41,16 +34,7 @@ class InventoryController {
       const { dapp, query } = req
 
       const inventories = await dapp.getInventories({ ...query })
-      const inventoriesWithImageUrl = inventories?.inventories.map(inventory => (
-        inventory.images && inventory.images.length > 0 ?
-        {
-          ...inventory,
-          images: inventory.images.map(image => (getSignedUrlFromS3(image, req.app.get(constants.s3ParamName)))
-          )
-        }
-        :
-        inventory
-      ))
+      const inventoriesWithImageUrl = inventories?.inventories
       rest.response.status200(res, {inventoriesWithImageUrl:inventoriesWithImageUrl, count: inventories.inventoryCount})
 
       return next()
@@ -90,6 +74,36 @@ class InventoryController {
     }
   }
 
+  static async list(req, res, next) {
+    try {
+      const { dapp, body } = req
+
+      InventoryController.validateListItemArgs(body)
+
+      const result = await dapp.listItem(body)
+      rest.response.status200(res, result)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
+  static async unlist(req, res, next) {
+    try {
+      const { dapp, body } = req
+
+      InventoryController.validateUnlistItemArgs(body)
+
+      const result = await dapp.unlistItem(body)
+      rest.response.status200(res, result)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
   static async resell(req, res, next) {
     try {
       const { dapp, body } = req
@@ -98,6 +112,50 @@ class InventoryController {
 
       const result = await dapp.resellItem(body)
       rest.response.status200(res, result)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
+  static async transfer(req, res, next) {
+    try {
+      const { dapp, body } = req
+
+      InventoryController.validateTransferItemArgs(body)
+
+      const result = await dapp.transferItem(body)
+      rest.response.status200(res, result)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
+  static async updateSale(req, res, next) {
+    try {
+      const { dapp, body } = req
+
+      InventoryController.validateUpdateSaleArgs(body)
+
+      const result = await dapp.updateSale(body, options)
+      rest.response.status200(res, result)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
+  static async getOwnershipHistory(req, res, next) {
+    try {
+      const { dapp, query } = req
+      InventoryController.validateGetOwnershipHistoryArgs(query)
+
+      const items = await dapp.getOwnershipHistory(query)
+      rest.response.status200(res, items)
 
       return next()
     } catch (e) {
@@ -116,19 +174,6 @@ class InventoryController {
   //     return next(e)
   //   }
   // }
-
-  // static async transferOwnership(req, res, next) {
-  //   try {
-  //     const { dapp, body } = req
-
-  //     InventoryController.validateTransferOwnershipArgs(body)
-  //     const result = await dapp.transferOwnershipInventory(body, options)
-  //     rest.response.status200(res, result)
-  //   } catch (e) {
-  //     return next(e)
-  //   }
-  // }
-
 
   // ----------------------- ARG VALIDATION ------------------------
 
@@ -183,15 +228,45 @@ class InventoryController {
     }
   }
 
-  static validateResellItemArgs(args) {
-    const resellItemSchema = Joi.object({
-      itemContract: Joi.string().required(),
-      itemAddress: Joi.string().required(),
-      paymentTypes: Joi.array().min(1).items(
-        Joi.number().integer().min(0).max(5).required(),
+  static validateListItemArgs(args) {
+    const listItemSchema = Joi.object({
+      assetToBeSold: Joi.string().required(),
+      paymentProviders: Joi.array().min(1).items(
+        Joi.string().min(0).required(),
       ).required(),
       price: Joi.number().integer().greater(0).required(),
-      units: Joi.number().integer().greater(0).optional(),
+      quantity: Joi.number().integer().greater(0).optional(),
+    });
+
+    const validation = listItemSchema.validate(args);
+
+    if (validation.error) {
+      console.log('validation error: ', validation.error)
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'List Item Argument Validation Error', {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      })
+    }
+  }
+
+  static validateUnlistItemArgs(args) {
+    const unlistItemSchema = Joi.object({
+      saleAddress: Joi.string().required(),
+    });
+
+    const validation = unlistItemSchema.validate(args);
+
+    if (validation.error) {
+      console.log('validation error: ', validation.error)
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Unlist Item Argument Validation Error', {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      })
+    }
+  }
+
+  static validateResellItemArgs(args) {
+    const resellItemSchema = Joi.object({
+      assetAddress: Joi.string().required(),
+      quantity: Joi.number().integer().greater(0).required(),
     });
 
     const validation = resellItemSchema.validate(args);
@@ -199,6 +274,43 @@ class InventoryController {
     if (validation.error) {
       console.log('validation error: ', validation.error)
       throw new rest.RestError(RestStatus.BAD_REQUEST, validation.error.message, {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      })
+    }
+  }
+
+  static validateTransferItemArgs(args) {
+    const transferItemSchema = Joi.object({
+      assetAddress: Joi.string().required(),
+      newOwner: Joi.string().required(),
+      quantity: Joi.number().integer().greater(0).required(),
+    });
+
+    const validation = transferItemSchema.validate(args);
+
+    if (validation.error) {
+      console.log('validation error: ', validation.error)
+      throw new rest.RestError(RestStatus.BAD_REQUEST, validation.error.message, {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      })
+    }
+  }
+
+  static validateUpdateSaleArgs(args) {
+    const updateSaleItemSchema = Joi.object({
+      saleAddress: Joi.string().required(),
+      paymentProviders: Joi.array().min(1).items(
+        Joi.string().min(0).required(),
+      ).optional(),
+      price: Joi.number().integer().greater(0).optional(),
+      quantity: Joi.number().integer().greater(0).optional(),
+    });
+
+    const validation = updateSaleItemSchema.validate(args);
+
+    if (validation.error) {
+      console.log('validation error: ', validation.error)
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Update Sale Item Argument Validation Error', {
         message: `Missing args or bad format: ${validation.error.message}`,
       })
     }
@@ -215,6 +327,22 @@ class InventoryController {
 
     if (validation.error) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, 'Transfer Ownership Inventory Argument Validation Error', {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      })
+    }
+  }
+
+  static validateGetOwnershipHistoryArgs(args) {
+    const getOwnershipHistorySchema = Joi.object({
+      originAddress: Joi.string().required(),
+      minItemNumber: Joi.number().min(0).required(),
+      maxItemNumber: Joi.number().min(0).required(),
+    });
+
+    const validation = getOwnershipHistorySchema.validate(args);
+
+    if (validation.error) {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Get Ownership History Argument Validation Error', {
         message: `Missing args or bad format: ${validation.error.message}`,
       })
     }

@@ -12,14 +12,10 @@ dependencies:
   - base
   - ghc-debug-client
   - ghc-debug-common
-  - ghc-heap
   - containers
-  - extra
-  - process
   - language-dot
   - mtl
   - text
-  - bytestring
 
 executables:
   ghc-debug:
