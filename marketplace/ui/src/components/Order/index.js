@@ -7,6 +7,7 @@ import TransfersTable from "./TransfersTable";
 import dayjs from "dayjs";
 import routes from "../../helpers/routes";
 import ClickableCell from "../ClickableCell";
+import { Images } from "../../images";
 
 const { Search } = Input;
 
@@ -62,6 +63,7 @@ const Order = ({ user }) => {
               }}
               onChange={onDateChange}
               disabled={false}
+              suffixIcon={<img src={Images.calender} alt="calender" className=" w-[18px] h-5" style={{maxWidth:"none"}} />}
             />
           </div>
         }
