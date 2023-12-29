@@ -501,12 +501,6 @@ instance MonadUnliftIO m => A.Selectable IPAsText PPeer (ReaderT Config m) where
     where
       actions = SQL.selectList [PPeerIp SQL.==. ip] []
 
-instance Ord Point where
-  (Point it it') `compare` (Point it2 it2') = case (it `compare` it2) of
-    EQ -> (it' `compare` it2')
-    x -> x
-  _ `compare` _ = GT
-
 instance MonadUnliftIO m => A.Selectable Point PPeer (ReaderT Config m) where
   select _ pk =
     sqlQuery actions >>= \case
@@ -601,7 +595,7 @@ type MonadP2P m =
          '(PPeer, UdpEnableTime),
          '(PPeer, PeerDisable),
          '(PPeer, T.Text),
-         '((IPAsText, TCPPort), PeerBondingState)
+         '((IPAsText, Point), PeerBondingState)
        ]
       m,
     All2

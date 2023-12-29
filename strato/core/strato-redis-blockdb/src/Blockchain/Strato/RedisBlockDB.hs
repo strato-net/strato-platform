@@ -23,6 +23,7 @@ module Blockchain.Strato.RedisBlockDB
     isValidator,
     addValidators,
     removeValidators,
+    getValidatorAddresses,
     getChainMembers,
     putChainMembers,
     addChainMember,
@@ -158,25 +159,28 @@ inNamespace ::
   S8.ByteString
 inNamespace ns k = ns' `S8.append` toKey k
   where
-    ns' = case ns of
-      Headers -> "h:"
-      Transactions -> "t:"
-      Numbers -> "n:"
-      Uncles -> "u:"
-      Parent -> "p:"
-      Children -> "c:"
-      Canonical -> "q:"
-      PrivateChainInfo -> "x:"
-      PrivateChainMembers -> "m:"
-      PrivateTransactions -> "pt:"
-      PrivateTxsInBlocks -> "pb:"
-      PrivateOrgNameChains -> "pnc:"
-      Validators -> "v:"
-      PrivateTrueOrgNameChains -> "pnct:"
-      PrivateFalseOrgNameChains -> "pncf:"
-      X509Certificates -> "x509:"
-      ParsedSetWhitePage -> "potu:"
-      ParsedSetToX509 -> "psx509:"
+    ns' = namespaceToKeyPrefix ns
+
+namespaceToKeyPrefix :: BlockDBNamespace -> S8.ByteString 
+namespaceToKeyPrefix ns = case ns of 
+  Headers -> "h:"
+  Transactions -> "t:"
+  Numbers -> "n:"
+  Uncles -> "u:"
+  Parent -> "p:"
+  Children -> "c:"
+  Canonical -> "q:"
+  PrivateChainInfo -> "x:"
+  PrivateChainMembers -> "m:"
+  PrivateTransactions -> "pt:"
+  PrivateTxsInBlocks -> "pb:"
+  PrivateOrgNameChains -> "pnc:"
+  Validators -> "validators"
+  PrivateTrueOrgNameChains -> "pnct:"
+  PrivateFalseOrgNameChains -> "pncf:"
+  X509Certificates -> "x509:"
+  ParsedSetWhitePage -> "potu:"
+  ParsedSetToX509 -> "psx509:"
 
 findNamespace :: S8.ByteString -> BlockDBNamespace
 findNamespace key = case S8.takeWhile (/= ':') key of
@@ -187,7 +191,7 @@ findNamespace key = case S8.takeWhile (/= ':') key of
   "p" -> Parent
   "c" -> Children
   "q" -> Canonical
-  "v" -> Validators
+  "validators" -> Validators
   "x" -> PrivateChainInfo
   "m" -> PrivateChainMembers
   "pt" -> PrivateTransactions
@@ -195,8 +199,8 @@ findNamespace key = case S8.takeWhile (/= ':') key of
   "pnct" -> PrivateTrueOrgNameChains
   "pncf" -> PrivateFalseOrgNameChains
   "x509" -> X509Certificates
-  "potu:" -> ParsedSetWhitePage
-  "psx509:" -> ParsedSetToX509
+  "potu" -> ParsedSetWhitePage
+  "psx509" -> ParsedSetToX509
   wut -> error $ "unknown namespace: " ++ show wut
 
 getChainInfo ::
@@ -227,31 +231,33 @@ isValidator ::
   CM.ChainMemberParsedSet ->
   Redis Bool
 isValidator val =
-  getInNamespace Validators val >>= \case
-    Right (Just v) -> pure $ fromValue v
+  sismember (namespaceToKeyPrefix Validators) (toValue val) >>= \case
+    Right b -> pure b
     _ -> pure False
+
+getValidatorAddresses :: Redis [Address]
+getValidatorAddresses = do 
+  smembers (namespaceToKeyPrefix Validators) >>= \case 
+    Left _ -> pure []
+    Right keysBS -> (fmap userAddress . catMaybes) <$> (sequence $ (getCertFromParsedSet . fromValue) <$> keysBS)
 
 addValidators ::
   [CM.ChainMemberParsedSet] ->
   Redis (Either Reply Status)
 addValidators [] = pure $ Right Ok
-addValidators vals = do
-  res <- multiExec . mset $ (\val -> (inNamespace Validators val, toValue True)) <$> vals
-  case res of
-    TxSuccess _ -> pure $ Right Ok
-    TxAborted -> pure . Left $ SingleLine (S8.pack $ "addValidators - Aborted")
-    TxError e -> pure . Left $ SingleLine (S8.pack $ "addValidators - Error" ++ e)
+addValidators vals =
+  sadd (namespaceToKeyPrefix Validators) (toValue <$> vals) >>= \case
+    Right _ -> pure $ Right Ok
+    Left reply -> pure $ Left reply
 
 removeValidators ::
   [CM.ChainMemberParsedSet] ->
   Redis (Either Reply Status)
 removeValidators [] = pure $ Right Ok
-removeValidators vals = do
-  res <- multiExec . del $ inNamespace Validators <$> vals
-  case res of
-    TxSuccess _ -> pure $ Right Ok
-    TxAborted -> pure . Left $ SingleLine (S8.pack $ "removeValidators - Aborted")
-    TxError e -> pure . Left $ SingleLine (S8.pack $ "removeValidators - Error" ++ e)
+removeValidators vals =
+  srem (namespaceToKeyPrefix Validators) (toValue <$> vals) >>= \case
+    Right _ -> pure $ Right Ok
+    Left reply -> pure $ Left reply
 
 getChainMembers ::
   Word256 ->
