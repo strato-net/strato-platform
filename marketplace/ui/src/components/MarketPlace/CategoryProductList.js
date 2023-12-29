@@ -220,7 +220,7 @@ const CategoryProductList = ({ user }) => {
     setMobileOpenFilter(!mobileOpenFilter);
   };
 
-  const addItemToCart = (product) => {
+  const addItemToCart = (product, quantity) => {
     if (product.ownerCommonName === user?.commonName) {
       openToast("bottom", true, "Cannot buy your own item")
       return false;
@@ -234,7 +234,7 @@ const CategoryProductList = ({ user }) => {
     }
     let items = [];
     if (!found) {
-      items = [...cartList, { product, qty: 1 }];
+      items = [...cartList, { product, qty: quantity }];
       actions.addItemToCart(marketplaceDispatch, items);
 
       openToast("bottom", false, "Item added to cart");

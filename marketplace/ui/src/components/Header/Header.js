@@ -66,7 +66,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
   ];
 
   const navUrls = [
-    routes.MarketplaceProductList.url,
+    routes.Marketplace.url,
     routes.Orders.url,
     routes.MyStore.url,
     routes.Products.url,

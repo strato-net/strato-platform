@@ -56,7 +56,7 @@ const TopSellingProductCard = () => {
     }
   };
 
-  const addItemToCart = (product) => {
+  const addItemToCart = (product, quantity) => {
     if (product.ownerCommonName === user?.commonName) {
       openToast("bottom", true, "Cannot buy your own item")
       return false;
@@ -70,7 +70,7 @@ const TopSellingProductCard = () => {
     }
     let items = [];
     if (!found) {
-      items = [...cartList, { product, qty: 1 }];
+      items = [...cartList, { product, qty: quantity }];
       actions.addItemToCart(marketplaceDispatch, items);
 
       openToast("bottom", false, "Item added to cart");
@@ -137,14 +137,14 @@ const TopSellingProductCard = () => {
         </Title>
         <Button 
           size="large" 
-          onClick={()=>navigate('/category/:category')}
+          onClick={()=>navigate(routes.MarketplaceProductList.url)}
           className="text-black hover:!text-black border-grayDark hidden md:flex"
         >
             View All
         </Button>
         <Button 
           size="small" 
-          onClick={()=>navigate('/category/:category')}
+          onClick={()=>navigate(routes.MarketplaceProductList.url)}
           className="text-black hover:!text-black border-grayDark flex md:hidden"
         >
             View All
