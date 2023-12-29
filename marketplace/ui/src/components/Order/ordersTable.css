@@ -36,6 +36,14 @@
     padding: 0px !important;
 }
 
+.orders .ant-table-wrapper .ant-table-thead>tr>th{
+    font-size: 16px !important;
+}
+
+.orders_page .ant-picker{
+    margin-bottom: 12px;
+}
+
 @media (min-width: 768px) {
     .orders_searchbar input{
         background-color: #F6F6F6;
@@ -68,4 +76,10 @@
     background-color: #EEEFFA;
     color: #13188A;
     font-weight: 600;
+}
+:where(.css-dev-only-do-not-override-9ntgx0).ant-picker .ant-picker-input >input:placeholder-shown{
+    display:none;
+}
+:where(.css-dev-only-do-not-override-9ntgx0).ant-picker{
+    height: 31px;
 }

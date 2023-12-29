@@ -280,7 +280,7 @@ const CategoryProductList = ({ user }) => {
   };
 
   return (
-    <div className={`${mobileOpenFilter ? 'overflow-y-hidden h-[67.5vh] md:h-[100vh] w-[100vw] bg-[#00000020] relative mt-24 md:bg-white md:mt-[auto] md:overflow-scroll trending_cards' : ' '}`}>
+    <div className={`${mobileOpenFilter ? 'overflow-y-hidden h-[100vh] w-[100vw] bg-[#00000020] relative mt-0 md:bg-white md:mt-[auto] md:overflow-scroll trending_cards' : ' '}`}>
       <div className="fixed bg-white w-full top-7 z-10 md:static">
         <Breadcrumb className="text-xs ml-4 md:ml-14 mt-14">
           <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
@@ -382,7 +382,7 @@ const CategoryProductList = ({ user }) => {
                       isActive ? <img src={Images.Dropdown} alt="img" style={{width:"24px", height:"24px", transform:"rotate(180deg)"}} /> : <img src={Images.Dropdown} alt="img" style={{width:"24px", height:"24px"}}/>
                     }
                   >
-                    <Panel header={<Text strong className="text-base">Sub-Category</Text>} key="1">
+                    <Panel header={<Text strong className="text-base">Sub Categories</Text>} key="1">
                       <Checkbox.Group
                         // onChange={onChangeSubCategory}
                         value={selectedSubCategories}
