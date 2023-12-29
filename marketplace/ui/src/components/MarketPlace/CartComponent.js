@@ -77,18 +77,18 @@ const CartComponent = ({ columns, data }) => {
                                     <p className="text-[18px]  text-[#202020] ml-2 w-20 text-right">${total}</p>
                                 </Row>
                                 <Row className="justify-end mt-2">
-                                    <p className="text-base font-medium w-36 text-[#6A6A6A]">Tax</p>
+                                    <p className="text-base font-medium w-36 text-[#6A6A6A]">Tax:</p>
                                     <p className="text-[18px]  text-[#202020] ml-2 w-20 text-right">${tax}</p>
                                 </Row>
                                 <Row className="justify-end mt-2">
-                                    <p className="text-base font-medium w-36 text-[#6A6A6A]">Shipping Charges</p>
+                                    <p className="text-base font-medium w-[150px]  text-[#6A6A6A]">Shipping Charges:</p>
                                     <p className="text-[18px]  text-[#202020] ml-2 w-20 text-right">${shipping}</p>
                                 </Row>
                             </Col>
                         </Row>
                         {/* //As per the  design we have two display two time 'total value' */}
                         <Row className="flex   justify-evenly items-center pr-[51px] py-[18px]">
-                            <div className="w-[1px] h-[100%] bg-[#202020] mx-5 "></div>
+                            <div className="w-[1px] h-full bg-[#20202030] mx-5 "></div>
                             <div className="flex gap-5">
                                 <p className="text-base font-semibold  w-36 text-[#6A6A6A] ">Total:</p>
                                 <p className="text-lg font-semibold w-36  text-[#202020]">${total + tax + shipping}</p>
