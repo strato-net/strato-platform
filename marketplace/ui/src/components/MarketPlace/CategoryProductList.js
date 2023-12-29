@@ -382,7 +382,7 @@ const CategoryProductList = ({ user }) => {
                       isActive ? <img src={Images.Dropdown} alt="img" style={{width:"24px", height:"24px", transform:"rotate(180deg)"}} /> : <img src={Images.Dropdown} alt="img" style={{width:"24px", height:"24px"}}/>
                     }
                   >
-                    <Panel header={<Text strong className="text-base">Sub-Category</Text>} key="1">
+                    <Panel header={<Text strong className="text-base">Sub Categories</Text>} key="1">
                       <Checkbox.Group
                         // onChange={onChangeSubCategory}
                         value={selectedSubCategories}
