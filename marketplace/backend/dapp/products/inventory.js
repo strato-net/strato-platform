@@ -184,6 +184,7 @@ async function unlistItem(user, _contract, args, options) {
         method: "closeSale",
         args: util.usc({ ...args }),
     };
+    console.log("callArgs123: ", callArgs)
     const unlistStatus = await rest.call(user, callArgs, options);
 
     if (parseInt(unlistStatus, 10) !== RestStatus.OK) {
@@ -193,8 +194,21 @@ async function unlistItem(user, _contract, args, options) {
             { callArgs }
         );
     }
-
-    return unlistStatus;
+    
+    const searchOptions = {
+        ...options,
+        org: 'BlockApps',
+        query: {
+            address: `eq.${callArgs.contract.address}`,
+            isOpen: `eq.false`
+        }
+      }
+      
+    let isDone = await waitForAddress(user, {name: saleContract}, searchOptions);
+    
+    if (isDone) {
+        return unlistStatus;
+    }
 }
 
 async function resellItem(user, contract, args, options) {
