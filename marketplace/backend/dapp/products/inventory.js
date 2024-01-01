@@ -217,7 +217,20 @@ async function resellItem(user, contract, args, options) {
         method: "mintNewUnits",
         args: util.usc({ ...args }),
     };
+    
+    const searchOptions = {
+        ...options,
+        org: 'BlockApps',
+        query: {
+            address: `eq.${callArgs.contract.address}`
+        }
+      }
+      
+    let isDone1 = await waitForAddress(user, {name: contractName}, searchOptions);
+
     const resellStatus = await rest.call(user, callArgs, options);
+    
+    let isDone2 = await waitForAddress(user, {name: contractName}, searchOptions);
 
     if (parseInt(resellStatus, 10) !== RestStatus.OK) {
         throw new rest.RestError(
@@ -226,8 +239,9 @@ async function resellItem(user, contract, args, options) {
             { callArgs }
         );
     }
-
-    return resellStatus;
+    if (isDone1.quantity !== isDone2.quantity) {
+        return resellStatus;
+    }
 }
 
 async function transferItem(user, contract, args, options) {
