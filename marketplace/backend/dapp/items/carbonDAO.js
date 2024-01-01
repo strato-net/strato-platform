@@ -1,11 +1,12 @@
 import { util, rest, importer } from '/blockapps-rest-plus';
 import config from '/load.config';
 import RestStatus from 'http-status-codes';
-import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } from '/helpers/utils';
+import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs, waitForAddress } from '/helpers/utils';
 import dayjs from 'dayjs';
 import constants from '../../helpers/constants';
 
 
+const contractAssetName = constants.assetTableName;
 const contractName = "CarbonDAO";
 const contractFilename = `${util.cwd}/dapp/items/contracts/CarbonDAO.sol`;
 const contractEvents = { OWNERSHIP_UPDATE: "OwnershipUpdate" }
@@ -39,8 +40,20 @@ async function uploadContract(user, _constructorArgs, options) {
 
     const contract = await rest.createContract(user, contractArgs, copyOfOptions);
     contract.src = 'removed';
-
-    return bind(user, contract, copyOfOptions);
+    
+    const searchOptions = {
+        ...options,
+        org: 'BlockApps',
+        query: {
+            address: `eq.${contract.address}`
+        }
+      }
+      
+    let isDone = await waitForAddress(user, {name: contractAssetName}, searchOptions);
+    
+    if (isDone) {
+        return bind(user, contract, copyOfOptions);
+    }
 }
 
 /**
