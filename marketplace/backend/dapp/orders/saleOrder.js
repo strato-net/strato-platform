@@ -4,10 +4,12 @@ import RestStatus from "http-status-codes";
 import {
   setSearchQueryOptions,
   searchOne,
-  searchAllWithQueryArgs,
+  searchAllWithQueryArgs, 
+  waitForAddress
 } from "/helpers/utils";
 import constants from "../../helpers/constants";
 
+const contractBaseName = constants.orderTableName;
 const contractName = "SimpleOrder";
 const contractFilename = `${util.cwd}/dapp/mercata-base-contracts/Templates/Orders/SimpleOrder.sol`;
 
@@ -41,7 +43,19 @@ async function uploadContract(user, _constructorArgs, options) {
   const contract = await rest.createContract(user, contractArgs, copyOfOptions);
   contract.src = "removed";
 
-  return bind(user, contract, copyOfOptions);
+  const searchOptions = {
+    ...options,
+    org: 'BlockApps',
+    query: {
+        address: `eq.${contract.address}`
+    }
+  }
+  
+  let isDone = await waitForAddress(user, {name: contractBaseName}, searchOptions);
+
+  if (isDone) {
+    return bind(user, contract, copyOfOptions);
+  }
 }
 
 /**
