@@ -22,7 +22,6 @@ dependencies:
 library:
   source-dirs: src
   dependencies:
-  - ansi-wl-pprint
   - base16-bytestring
   - binary
   - conduit

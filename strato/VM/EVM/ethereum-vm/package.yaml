@@ -10,7 +10,6 @@ description:
 
 dependencies:
   - base
-  - ansi-wl-pprint
   - base16-bytestring
   - binary
   - blockapps-data

@@ -49,7 +49,6 @@ import Servant.Docs
 import Test.QuickCheck (Arbitrary (..), oneof)
 import qualified Text.Colors as CL
 import Text.Format
-import qualified Text.PrettyPrint.ANSI.Leijen as Lei
 import Text.Printf
 import Text.Read (readMaybe)
 import Text.ShortDescription
@@ -106,9 +105,6 @@ instance AS.FromJSON Account where
 
 instance FromJSONKey Account where
   fromJSONKey = FromJSONKeyTextParser (parseJSON . String)
-
-instance Lei.Pretty Account where
-  pretty = Lei.text . CL.yellow . show
 
 instance Format Account where
   format = CL.yellow . show
@@ -252,9 +248,6 @@ instance AS.FromJSON NamedAccount where
 
 instance FromJSONKey NamedAccount where
   fromJSONKey = FromJSONKeyTextParser (parseJSON . String)
-
-instance Lei.Pretty NamedAccount where
-  pretty = Lei.text . CL.yellow . show
 
 instance Format NamedAccount where
   format = CL.yellow . show

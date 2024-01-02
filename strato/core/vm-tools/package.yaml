@@ -35,7 +35,6 @@ library:
   ghc-options: -Wall -O2
   dependencies:
     - aeson
-    - ansi-wl-pprint
     - binary
     - blockapps-data
     - blockapps-datadefs

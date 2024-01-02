@@ -83,7 +83,7 @@ postUserKeyQuery userName KeyStore {..} conn = do
     Just _ -> return False
     Nothing -> do
       void $
-        runInsert_
+        runInsert
           conn
           Insert
             { iTable = usersTable,
@@ -112,7 +112,7 @@ postUserKeyQuery' userName oauthProvider KeyStore {..} conn = do
     Just _ -> return False
     Nothing -> do
       void $
-        runInsert_
+        runInsert
           conn
           Insert
             { iTable = usersTable,
@@ -155,7 +155,7 @@ postMessageQuery salt nonce message conn = do
     (_ : _) -> return False
     [] ->
       True
-        <$ runInsert_
+        <$ runInsert
           conn
           Insert
             { iTable = messageTable,

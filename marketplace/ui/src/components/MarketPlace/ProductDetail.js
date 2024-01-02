@@ -569,7 +569,7 @@ const ProductDetails = ({ user, users }) => {
       ) : (
         <div>
           <Row>
-            <Breadcrumb className="text-xs  mt-4 mb-4 md:mt-6 lg:mt-[42px] md:mb-6 lg:mb-[44px] ml-4 lg:ml-16">
+            <Breadcrumb className="text-xs   mb-4 md:mt-5  md:mb-6 lg:mb-[44px] ml-4 lg:ml-16">
               <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
                 <ClickableCell href={routes.Marketplace.url}>
                   <p
@@ -660,7 +660,7 @@ const ProductDetails = ({ user, users }) => {
                        -
                         </p> 
                     </div>
-                    <InputNumber className="w-full md:w-[295px] h-9 md:h-10 lg:h-[46px] border text-[#6A6A6A] border-[#00000029] text-center flex flex-col justify-center font-semibold" min={1} max={availableQuantity} value={`${qty}`} defaultValue={`${qty}`} controls={false}
+                    <InputNumber className="w-full md:w-[280px] h-9 md:h-10 lg:h-[46px] border text-[#6A6A6A] border-[#00000029] text-center flex flex-col justify-center font-semibold !rounded-lg" min={1} max={availableQuantity} value={`${qty}`} defaultValue={`${qty}`} controls={false}
                       onChange={e => {
                         if (e < availableQuantity) {
                           setQty(e)
@@ -829,19 +829,13 @@ const ProductDetails = ({ user, users }) => {
           className="product_detail"
                 defaultActiveKey="1"
                 onChange={onTabChange}
-                items={!user ?
+                items={
                   [{
                     label: <span className="text-sm md:text-base">Description</span>,
                     key: "1",
                     children: <DescriptionComponent />,
-                  }]
-                  :
-                  [{
-                    label: <span className="text-sm md:text-base">Description</span>,
-                    key: "1",
-                    children: <DescriptionComponent />,
-                  },
-                  {
+                  },                  
+                  user && { //if user is logged in then display Ownership History
                     label: <span className="text-sm md:text-base">Ownership History</span>,
                     key: "3",
                     children: (
@@ -878,8 +872,8 @@ const ProductDetails = ({ user, users }) => {
                         />
                       </div>
                     )
-                  }
-                  ]}
+                  },
+                  ]}                  
               />
           </div>
           </div>

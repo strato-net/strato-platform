@@ -36,6 +36,7 @@ import Blockchain.Strato.Model.Secp256k1
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import Control.Concurrent (threadDelay)
 import Control.Exception
+import Control.Monad (void)
 import Control.Monad.Catch hiding (bracket)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Change.Modify (Accessible (..))

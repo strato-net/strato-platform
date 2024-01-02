@@ -14,8 +14,9 @@ module Tests (tests) where
 -- import qualified Data.Vector as V
 
 import Control.Applicative (empty, (<|>))
+import Control.Monad (when)
 import Control.Monad.Except (runExceptT, throwError)
-import Control.Monad.State (State, modify, runState, when)
+import Control.Monad.State (State, modify, runState)
 import Data.Aeson ((.=))
 import qualified Data.Aeson as A
 import qualified Data.ByteString.Lazy as B

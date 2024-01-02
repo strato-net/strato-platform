@@ -99,7 +99,6 @@ import Data.Time.Clock
 import Prometheus as P
 import qualified Text.Colors as CL
 import Text.Format
-import Text.PrettyPrint.ANSI.Leijen (pretty)
 import Text.Printf
 import Text.ShortDescription
 import Text.Tools
@@ -404,7 +403,7 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
           when flags_debug $ $logDebugS "addTx" . T.pack . CL.red $ show e
           lift $ P.incCounter vmTxsUnsuccessful
         Nothing -> do
-          when flags_debug $ $logDebugS "addTx" . T.pack $ "Removing accounts in suicideList: " ++ intercalate ", " (show . pretty <$> S.toList (erSuicideList execResults))
+          when flags_debug $ $logDebugS "addTx" . T.pack $ "Removing accounts in suicideList: " ++ intercalate ", " (format <$> S.toList (erSuicideList execResults))
           forM_ (S.toList $ erSuicideList execResults) $ \address' -> do
             lift $ purgeStorageMap address'
             lift $ A.delete (Proxy @AddressState) address'

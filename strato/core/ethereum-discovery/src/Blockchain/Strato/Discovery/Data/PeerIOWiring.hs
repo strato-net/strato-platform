@@ -24,6 +24,7 @@ import Blockchain.DB.SQLDB (runSqlPool, withGlobalSQLPool)
 import Blockchain.Data.PersistTypes ()
 import Blockchain.MiscJSON ()
 import Blockchain.Strato.Discovery.Data.Peer
+import Control.Monad (void)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Reader

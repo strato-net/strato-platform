@@ -36,9 +36,9 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import Blockchain.Strato.Model.Account
 import Control.Arrow ((***))
+import Control.Monad (forM_, join)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Loops
-import Control.Monad.State
 import Data.ByteString (ByteString)
 import Data.Default
 import Data.Foldable (for_)

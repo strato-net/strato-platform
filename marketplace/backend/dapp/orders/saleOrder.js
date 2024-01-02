@@ -4,7 +4,8 @@ import RestStatus from "http-status-codes";
 import {
   setSearchQueryOptions,
   searchOne,
-  searchAllWithQueryArgs,
+  searchAllWithQueryArgs, 
+  waitForAddress
 } from "/helpers/utils";
 import constants from "../../helpers/constants";
 
@@ -40,6 +41,16 @@ async function uploadContract(user, _constructorArgs, options) {
 
   const contract = await rest.createContract(user, contractArgs, copyOfOptions);
   contract.src = "removed";
+
+  const searchOptions = {
+    ...options,
+    org: constants.blockAppsOrg.blockAppsOrg,
+    query: {
+        address: `eq.${contract.address}`
+    }
+  }
+  
+  await waitForAddress(user, {name: constants.orderTableName}, searchOptions);
 
   return bind(user, contract, copyOfOptions);
 }

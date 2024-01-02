@@ -29,7 +29,6 @@ import Data.List
 import Data.Word
 import qualified Text.Colors as CL
 import Text.Format
-import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 import Text.Tools
 
 data Capability
@@ -54,7 +53,7 @@ instance RLPSerializable Capability where
   rlpEncode (UNKNOWNCAP name ver) = RLPArray [rlpEncode name, rlpEncode ver]
 
   rlpDecode (RLPArray [name, ver]) = name2Cap (rlpDecode ver) $ rlpDecode name
-  rlpDecode x = error $ "wrong format given to rlpDecode for Capability: " ++ show (pretty x)
+  rlpDecode x = error $ "wrong format given to rlpDecode for Capability: " ++ format x
 
 data TerminationReason
   = DisconnectRequested
@@ -312,7 +311,7 @@ obj2WireMessage 0x1d (RLPArray chDetPairs) =
   ChainDetails $ rlpDecode <$> chDetPairs
 obj2WireMessage 0x1e (RLPArray trHashes) =
   GetTransactions $ rlpDecode <$> trHashes
-obj2WireMessage x y = error ("Missing case in obj2WireMessage: " ++ show x ++ ", " ++ show (pretty y))
+obj2WireMessage x y = error ("Missing case in obj2WireMessage: " ++ show x ++ ", " ++ format y)
 
 -- Convert Message into RLPObject and corresponding message code
 wireMessage2Obj :: Message -> (Word8, RLPObject)

@@ -32,8 +32,10 @@ import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
 import Control.Applicative ((<|>))
 import Control.Lens as L
+import Control.Monad (liftM2, liftM3, unless)
 import qualified Control.Monad.Change.Alter as A
-import Control.Monad.Except hiding (sequence)
+import Control.Monad.Except
+import Control.Monad.Trans.Class (lift)
 import Data.Binary
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
