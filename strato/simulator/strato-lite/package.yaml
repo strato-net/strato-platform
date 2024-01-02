@@ -58,6 +58,10 @@ library:
   - ethereum-encryption
   - ethereum-rlp
   - hflags
+  - hspec
+  - hspec-expectations-lifted
+  - ki-unlifted
+  - labeled-error
   - lens
   - merkle-patricia-db
   - monad-alter
@@ -76,7 +80,6 @@ library:
   - strato-p2p
   - strato-sequencer
   - text
-  - thread-hierarchy
   - time
   - transformers
   - unliftio
@@ -101,6 +104,8 @@ tests:
       - containers
       - ethereum-encryption
       - hflags
+      - ki-unlifted
+      - labeled-error
       - hspec
       - lens
       - monad-alter
@@ -117,4 +122,3 @@ tests:
       - unliftio
       - vm-tools
       - x509-certs
-

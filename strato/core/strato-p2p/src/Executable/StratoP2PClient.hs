@@ -33,7 +33,6 @@ import           Blockchain.Strato.Discovery.UDP
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.TCPClientWithTimeout
 import           Control.Concurrent hiding (yield)
-import           Control.Concurrent.Hierarchy
 import           Control.Concurrent.SSem (SSem)
 import qualified Control.Concurrent.SSem as SSem
 import           Control.Exception.Base (ErrorCall (..))
@@ -49,6 +48,7 @@ import           Data.Either.Combinators
 import           Data.Maybe
 import qualified Data.Text as T
 import           GHC.IO.Exception
+import           Ki.Unlifted as KIU
 import qualified Text.Colors as C
 import           Text.Format
 import           UnliftIO
@@ -57,9 +57,8 @@ runPeer ::
   (RunsClient m, MonadP2P m) =>
   PPeer ->
   ConduitM () P2pEvent m () ->
-  ThreadMap ->
   m ()
-runPeer peer sSource tm = do
+runPeer peer sSource = do
   ender <- toIO . $logInfoS "runPeer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
   void $ register ender
   myPublic <- getPub
@@ -81,21 +80,22 @@ runPeer peer sSource tm = do
   $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "Attempting to connect to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
   $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "my pubkey is: " ++ format myPublic
   $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "server pubkey is: " ++ format otherPubKey 
-  runClientConnection (IPAsText $ pPeerIp peer) (TCPPort . fromIntegral $ pPeerTcpPort peer) sSource $ \c -> do
-    let pStr = pPeerString peer -- display string will show up as dns name
-    attempt :: (Maybe SomeException) <- 
-      withCertifiedPeer peer . withActivePeer peer $
-        runEthClientConduit
-          peer {pPeerPubkey = Just otherPubKey}
-          (c ^. peerSource)
-          (c ^. peerSink)
-          (c ^. seqSource)
-          pStr
-          tm
-    case attempt of
-      Nothing  -> $logDebugS "runPeer" "Peer ran successfully!"
-      Just err -> do $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err
-                     throwIO err
+  runClientConnection (IPAsText $ pPeerIp peer) (TCPPort . fromIntegral $ pPeerTcpPort peer) sSource $ \c ->
+    scoped $ \scope -> do
+      let pStr = pPeerString peer -- display string will show up as dns name
+      attempt :: (Maybe SomeException) <- 
+        withCertifiedPeer peer . withActivePeer peer $
+          runEthClientConduit
+            peer {pPeerPubkey = Just otherPubKey}
+            (c ^. peerSource)
+            (c ^. peerSink)
+            (c ^. seqSource)
+            pStr
+            scope
+      case attempt of
+        Nothing  -> $logDebugS "runPeer" "Peer ran successfully!"
+        Just err -> do $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err
+                       throwIO err
 
 runEthClientConduit ::
   MonadP2P m =>
@@ -104,9 +104,9 @@ runEthClientConduit ::
   ConduitM B.ByteString Void m () ->
   ConduitM () P2pEvent m () ->
   String ->
-  ThreadMap ->
+  Scope ->
   m (Maybe SomeException)
-runEthClientConduit peer pSource pSink seqSrc peerStr tm = do
+runEthClientConduit peer pSource pSink seqSrc peerStr scp = do
   myPublic' <- getPub
   let myPublic = secPubKeyToPoint myPublic'
       otherPubKey = fromMaybe (error "programmer error: runEthClientConduit was called without a pubkey") $ pPeerPubkey peer
@@ -114,7 +114,7 @@ runEthClientConduit peer pSource pSink seqSrc peerStr tm = do
   case mConnectionResult of
     Nothing                   -> pure $ Just $ toException $ HandshakeException "handshake timed out"
     Just (_, (outCtx, inCtx)) -> do
-      !eventSource <- mkEthP2PEventSource pSource seqSrc peerStr inCtx tm
+      !eventSource <- mkEthP2PEventSource pSource seqSrc peerStr inCtx scp
       !eventSink   <- mkEthP2PEventConduit peerStr outCtx
       fmap (either Just (const Nothing)) . try . runConduit $
         eventSource
@@ -128,15 +128,14 @@ runPeerInList ::
   ) =>
   PPeer ->
   ConduitM () P2pEvent m () ->
-  ThreadMap ->
   m (Either SomeException ())
-runPeerInList thePeer sSource tm = do
+runPeerInList thePeer sSource = do 
   eErr <- nonviolentDisable thePeer --don't connect to a peer too frequently, out of politeness
   whenLeft eErr $ \err -> do
     $logErrorS "runPeerInList" . T.pack $ "Unable to disable peer:" ++ show err
     $logErrorS "runPeerInList" "Simulating disable..."
     liftIO $ threadDelay $ 10 * 1000 * 1000
-  withAsync (runPeer thePeer sSource tm) $ \res -> waitCatch res
+  withAsync (runPeer thePeer sSource) $ \res -> waitCatch res
 
 stratoP2PClient :: (MonadP2P m, RunsClient m) => PeerRunner m (LoggingT IO) () -> LoggingT IO ()
 stratoP2PClient runner = runner $ \sSource -> do
@@ -164,12 +163,9 @@ stratoP2PClient runner = runner $ \sSource -> do
         (liftIO (SSem.tryWait sem)) >>= \case
           Nothing -> return ()
           Just _ -> do
-            tmm    <- liftIO newThreadMap
-            _      <- void $ liftIO $ newChild tmm $ \_ -> return ()
-            result <- runPeerInList p sSource tmm
-            _      <- liftIO $ killThreadHierarchy tmm
-            handleRunPeerResult p result
-            liftIO (SSem.signal sem)
+            result <- runPeerInList p sSource
+            _ <- handleRunPeerResult p result
+            liftIO $ SSem.signal sem
     handleRunPeerResult :: MonadP2P m => PPeer -> Either SomeException () -> m ()
     handleRunPeerResult thePeer = \case
       Left e | Just (ErrorCall x) <- fromException e -> error x
