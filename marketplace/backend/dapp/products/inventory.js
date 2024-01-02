@@ -11,6 +11,7 @@ const contractFilename = `${util.cwd}/dapp/products/contracts/Inventory.sol`;
 const saleContractName = 'SimpleSale';
 const saleContract = constants.saleTableName;
 const saleContractFilename = `${util.cwd}/dapp/mercata-base-contracts/Templates/Sales/SimpleSale.sol`;
+const contractEvents = { ITEM_TRANSFER: "ItemTransfers" }
 
 /** 
  * Upload a new Inventory 
@@ -332,6 +333,7 @@ async function getAll(admin, args = {}, defaultOptions) {
     let inventories;
     let sales;
     let finalInventory = [];
+    console.log("GetALL call")
     const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
 
     if (ownerCommonName) {
@@ -377,6 +379,13 @@ async function getAll(admin, args = {}, defaultOptions) {
     }
 
     return finalInventory ? finalInventory.map((inventory) => marshalOut(inventory)) : undefined;
+}
+
+async function getAllItemTransferEvents(admin, args = {}, defaultOptions) {
+    const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
+    const itemTransferEvents = await searchAllWithQueryArgs(`${contractName}.${contractEvents.ITEM_TRANSFER}`, args, options, admin);
+    const total  = await searchAllWithQueryArgs( `${contractName}.${contractEvents.ITEM_TRANSFER}`, { ...args, limit: undefined, offset: 0, order: undefined, queryOptions: { select: "count", } }, options, admin );
+    return { transfers: itemTransferEvents.map((item) => marshalOut(item)), total: total[0].count };
 }
 
 async function getOwnershipHistory(user, args, options) {
@@ -445,6 +454,7 @@ export default {
     get,
     getAll,
     getOwnershipHistory,
+    getAllItemTransferEvents,
     inventoryCount,
     marshalIn,
     marshalOut,

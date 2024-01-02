@@ -270,7 +270,9 @@ const AuthenticatedRoutes = ({ user, users }) => {
           <UsersProvider>
             <OrdersProvider>
               <ItemsProvider>
+                <InventoriesProvider>
                 <Order user={user} users={users} />
+                </InventoriesProvider>
               </ItemsProvider>
             </OrdersProvider>
           </UsersProvider>
