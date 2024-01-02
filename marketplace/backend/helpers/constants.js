@@ -26,6 +26,7 @@ export default {
   assetTableName: "Asset",
   saleTableName: "Sale",
   orderTableName: "Order",
+  blockAppsOrg: "BlockApps",
 };
 
 export const STRIPE_PAYMENT_SERVER_URL = getEnvVariable('STRIPE_PAYMENT_SERVER_URL');
