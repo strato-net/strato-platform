@@ -34,7 +34,6 @@ library:
   - merkle-patricia-db
   - monad-alter
   - monad-loops
-  - mtl
   - nibblestring
   - solid-vm-model
   - strato-model

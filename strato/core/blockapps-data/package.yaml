@@ -43,7 +43,6 @@ library:
   - milena
   - monad-alter
   - monad-logger
-  - mtl
   - network
   - persistent
   - persistent-postgresql
