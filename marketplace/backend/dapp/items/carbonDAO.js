@@ -6,7 +6,6 @@ import dayjs from 'dayjs';
 import constants from '../../helpers/constants';
 
 
-const contractAssetName = constants.assetTableName;
 const contractName = "CarbonDAO";
 const contractFilename = `${util.cwd}/dapp/items/contracts/CarbonDAO.sol`;
 const contractEvents = { OWNERSHIP_UPDATE: "OwnershipUpdate" }
@@ -43,13 +42,13 @@ async function uploadContract(user, _constructorArgs, options) {
     
     const searchOptions = {
         ...options,
-        org: 'BlockApps',
+        org: constants.blockAppsOrg,
         query: {
             address: `eq.${contract.address}`
         }
       }
       
-    let isDone = await waitForAddress(user, {name: contractAssetName}, searchOptions);
+    let isDone = await waitForAddress(user, {name: constants.assetTableName}, searchOptions);
     
     if (isDone) {
         return bind(user, contract, copyOfOptions);

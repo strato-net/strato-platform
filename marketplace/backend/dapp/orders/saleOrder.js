@@ -9,7 +9,6 @@ import {
 } from "/helpers/utils";
 import constants from "../../helpers/constants";
 
-const contractBaseName = constants.orderTableName;
 const contractName = "SimpleOrder";
 const contractFilename = `${util.cwd}/dapp/mercata-base-contracts/Templates/Orders/SimpleOrder.sol`;
 
@@ -45,13 +44,13 @@ async function uploadContract(user, _constructorArgs, options) {
 
   const searchOptions = {
     ...options,
-    org: 'BlockApps',
+    org: constants.blockAppsOrg.blockAppsOrg,
     query: {
         address: `eq.${contract.address}`
     }
   }
   
-  let isDone = await waitForAddress(user, {name: contractBaseName}, searchOptions);
+  let isDone = await waitForAddress(user, {name: constants.orderTableName}, searchOptions);
 
   if (isDone) {
     return bind(user, contract, copyOfOptions);

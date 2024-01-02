@@ -68,7 +68,7 @@ async function uploadSaleContract(user, _constructorArgs, options) {
     
     const searchOptions = {
         ...options,
-        org: 'BlockApps',
+        org: constants.blockAppsOrg,
         query: {
             address: `eq.${contract.address}`
         }
@@ -197,7 +197,7 @@ async function unlistItem(user, _contract, args, options) {
     
     const searchOptions = {
         ...options,
-        org: 'BlockApps',
+        org: constants.blockAppsOrg,
         query: {
             address: `eq.${callArgs.contract.address}`,
             isOpen: `eq.false`
@@ -220,7 +220,7 @@ async function resellItem(user, contract, args, options) {
     
     const searchOptions = {
         ...options,
-        org: 'BlockApps',
+        org: constants.blockAppsOrg,
         query: {
             address: `eq.${callArgs.contract.address}`
         }
