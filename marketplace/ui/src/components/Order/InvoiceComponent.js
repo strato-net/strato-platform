@@ -197,19 +197,19 @@ const InvoiceComponent = ({ invoice, userAddress }) => {
             <Text style={[styles.label, styles.tableHeaderColumn]}>Tax($)</Text>
             <Text style={[styles.label, styles.tableHeaderColumn]}>Amount($)</Text>
           </View>
-          {invoice.assets.map(asset => (
+          {invoice.assets.map((asset, index) => (
             <View style={styles.tableRow} key={asset.address}>
               <Text style={[styles.value, styles.tableRowColumn]}>{decodeURIComponent(asset.name)}</Text>
               {/* <View style={styles.separator} /> */}
               <Text style={[styles.value, styles.tableRowColumn]}>${asset.price}</Text>
               {/* <View style={styles.separator} /> */}
-              <Text style={[styles.value, styles.tableRowColumn]}>{asset.quantity}</Text>
+              <Text style={[styles.value, styles.tableRowColumn]}>{invoice.order.quantities[index]}</Text>
               {/* <View style={styles.separator} /> */}
               <Text style={[styles.value, styles.tableRowColumn]}>${asset.shippingCharges ? asset.shippingCharges : 0}</Text>
               {/* <View style={styles.separator} /> */}
               <Text style={[styles.value, styles.tableRowColumn]}>${asset.tax ? asset.tax : 0}</Text>
               {/* <View style={styles.separator} /> */}
-              <Text style={[styles.value, styles.tableRowColumn]}>${asset.amount}</Text>
+              <Text style={[styles.value, styles.tableRowColumn]}>${asset.price * invoice.order.quantities[index]}</Text>
             </View>
           ))}
           {/* <View style={styles.tableRow} >
