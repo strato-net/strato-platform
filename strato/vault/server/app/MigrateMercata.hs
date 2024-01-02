@@ -92,7 +92,7 @@ main = do
     return . sum
       =<< mapM
         ( \(newKey, rowId) ->
-            runUpdate_ conn $
+            runUpdate conn $
               Update
                 { uTable = usersTable,
                   uUpdateWith = updateEasy (set _6 (toFields newKey)),

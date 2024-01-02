@@ -51,6 +51,7 @@ import qualified Blockchain.VMContext as VMC
 import Conduit
 import Control.Concurrent.STM.TMChan
 import Control.Lens hiding (Context, view)
+import Control.Monad (void)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Reader
 import qualified Data.ByteString.Char8 as BC

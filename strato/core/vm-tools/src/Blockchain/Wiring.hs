@@ -51,12 +51,12 @@ import qualified Blockchain.TxRunResultCache as TRC
 import Blockchain.VMContext
 import Control.DeepSeq
 import Control.Lens hiding (Context (..))
+import Control.Monad (join, void)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Base
 import Control.Monad.Composable.SQL
 import Control.Monad.IO.Class
-import Control.Monad.Reader
 import qualified Data.ByteString as B
 import Data.Default
 import Data.Either.Extra

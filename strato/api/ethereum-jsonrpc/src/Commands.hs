@@ -15,6 +15,7 @@ import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 import Blockchain.Stream.Raw
+import Control.Monad.IO.Class
 import Control.Monad.Except
 import qualified Data.Aeson as JSON
 import qualified Data.Aeson.KeyMap as KM

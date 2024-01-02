@@ -37,10 +37,10 @@ import           Control.Concurrent.SSem (SSem)
 import qualified Control.Concurrent.SSem as SSem
 import           Control.Exception.Base (ErrorCall (..))
 import           Control.Lens ((^.))
+import           Control.Monad (forever, unless, void)
 import qualified Control.Monad.Change.Alter as A
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
-import           Control.Monad.Reader
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString as B
 import           Data.Conduit

@@ -48,6 +48,7 @@ import Blockchain.Watchdog
 import BroadcastChan
 import Conduit
 import Control.Concurrent (ThreadId)
+import Control.Monad (forever, void, when)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.IO.Unlift

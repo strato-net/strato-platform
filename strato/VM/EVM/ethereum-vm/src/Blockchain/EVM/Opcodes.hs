@@ -22,7 +22,8 @@ import GHC.Word
 import Network.Haskoin.Crypto.BigWord (BigWord (..))
 import System.Endian
 import System.IO.Unsafe
-import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
+import Text.Format
+
 import Prelude hiding (EQ, GT, LT)
 
 type CodePointer = Int
@@ -144,10 +145,10 @@ data Operation
   | MalformedOpcode Word8
   deriving (Show, Eq, Ord, Typeable, Data)
 
-instance Pretty Operation where
-  pretty x@JUMPDEST = text $ "------" ++ show x
-  pretty (PUSH v) = text $ "PUSH " ++ show v
-  pretty x = text $ show x
+instance Format Operation where
+  format x@JUMPDEST = "------" ++ show x
+  format (PUSH v) = "PUSH " ++ show v
+  format x = show x
 
 data OPData = OPData Word8 Operation Int Int String
 

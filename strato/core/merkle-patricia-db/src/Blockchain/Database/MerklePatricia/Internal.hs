@@ -38,9 +38,9 @@ import Blockchain.Database.MerklePatricia.MPDB
 import Blockchain.Database.MerklePatricia.NodeData
 import Blockchain.Database.MerklePatricia.StateRoot
 import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
+import Control.Monad ((<=<))
 import Control.Monad.Change.Alter (Alters)
 import qualified Control.Monad.Change.Alter as A
-import Control.Monad.State
 import qualified Data.ByteString as B
 import Data.Function
 import Data.List
