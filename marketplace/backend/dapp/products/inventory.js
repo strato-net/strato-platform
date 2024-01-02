@@ -74,11 +74,9 @@ async function uploadSaleContract(user, _constructorArgs, options) {
         }
       }
       
-    let isDone = await waitForAddress(user, {name: saleContract}, searchOptions);
+    await waitForAddress(user, {name: saleContract}, searchOptions);
     
-    if (isDone) {
-        return contract;
-    }
+    return contract;
 }
 
 /**
@@ -204,11 +202,9 @@ async function unlistItem(user, _contract, args, options) {
         }
       }
       
-    let isDone = await waitForAddress(user, {name: saleContract}, searchOptions);
+    await waitForAddress(user, {name: saleContract}, searchOptions);
     
-    if (isDone) {
-        return unlistStatus;
-    }
+    return unlistStatus;
 }
 
 async function resellItem(user, contract, args, options) {
@@ -218,19 +214,7 @@ async function resellItem(user, contract, args, options) {
         args: util.usc({ ...args }),
     };
     
-    const searchOptions = {
-        ...options,
-        org: constants.blockAppsOrg,
-        query: {
-            address: `eq.${callArgs.contract.address}`
-        }
-      }
-      
-    let isDone1 = await waitForAddress(user, {name: contractName}, searchOptions);
-
     const resellStatus = await rest.call(user, callArgs, options);
-    
-    let isDone2 = await waitForAddress(user, {name: contractName}, searchOptions);
 
     if (parseInt(resellStatus, 10) !== RestStatus.OK) {
         throw new rest.RestError(
@@ -239,9 +223,8 @@ async function resellItem(user, contract, args, options) {
             { callArgs }
         );
     }
-    if (isDone1.quantity !== isDone2.quantity) {
-        return resellStatus;
-    }
+    
+    return resellStatus;
 }
 
 async function transferItem(user, contract, args, options) {

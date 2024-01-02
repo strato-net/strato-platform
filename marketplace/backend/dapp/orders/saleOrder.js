@@ -50,11 +50,9 @@ async function uploadContract(user, _constructorArgs, options) {
     }
   }
   
-  let isDone = await waitForAddress(user, {name: constants.orderTableName}, searchOptions);
+  await waitForAddress(user, {name: constants.orderTableName}, searchOptions);
 
-  if (isDone) {
-    return bind(user, contract, copyOfOptions);
-  }
+  return bind(user, contract, copyOfOptions);
 }
 
 /**
