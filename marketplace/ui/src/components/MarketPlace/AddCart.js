@@ -429,7 +429,7 @@ const Checkout = ({ user }) => {
   };
 
   return (
-    <div className="h-screen  mx-4 my-4 lg:mx-8 xl:mx-14   ">
+    <div className="h-screen  mx-4 my-2 lg:mx-8 xl:mx-14   ">
       {contextHolder}
       {isCreateOrderSubmitting ? (
         <div className="h-screen flex justify-center items-center">
