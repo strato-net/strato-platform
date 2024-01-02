@@ -35,7 +35,6 @@ library:
     - SafeSemaphore
     - aeson
     - alarmclock
-    - ansi-wl-pprint
     - base16-bytestring
     - blockapps-data
     - blockapps-datadefs
