@@ -56,7 +56,7 @@ import Control.Lens hiding (from, ix)
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Composable.SQL
-import Control.Monad.Except
+import Control.Monad.Trans.Class
 import Control.Monad.Trans.State.Lazy
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString

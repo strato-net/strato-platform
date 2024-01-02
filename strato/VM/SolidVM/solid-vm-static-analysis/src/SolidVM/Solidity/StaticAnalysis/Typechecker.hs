@@ -13,6 +13,7 @@ where
 import Control.Applicative ((<|>))
 import Control.Arrow ((&&&))
 import Control.Lens hiding (enum)
+import Control.Monad (forM, msum)
 import Control.Monad.Reader
 import Control.Monad.Trans.State
 import Data.Bool (bool)

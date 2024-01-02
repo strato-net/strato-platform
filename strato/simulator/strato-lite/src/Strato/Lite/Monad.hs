@@ -80,6 +80,7 @@ import Control.Applicative (liftA2)
 import Control.Concurrent.STM.TMChan
 import Control.Lens hiding (Context, view)
 import qualified Control.Lens as Lens
+import Control.Monad (forever, join, void, when)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Reader

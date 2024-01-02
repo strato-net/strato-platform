@@ -8,4 +8,5 @@ library:
     - ansi-wl-pprint
     - base16-bytestring
     - bytestring
+    - format
     - Ranged-sets
