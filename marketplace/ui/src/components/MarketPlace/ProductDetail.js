@@ -829,19 +829,13 @@ const ProductDetails = ({ user, users }) => {
           className="product_detail"
                 defaultActiveKey="1"
                 onChange={onTabChange}
-                items={!user ?
+                items={
                   [{
                     label: <span className="text-sm md:text-base">Description</span>,
                     key: "1",
                     children: <DescriptionComponent />,
-                  }]
-                  :
-                  [{
-                    label: <span className="text-sm md:text-base">Description</span>,
-                    key: "1",
-                    children: <DescriptionComponent />,
-                  },
-                  {
+                  },                  
+                  user && { //if user is logged in then display Ownership History
                     label: <span className="text-sm md:text-base">Ownership History</span>,
                     key: "3",
                     children: (
@@ -878,8 +872,8 @@ const ProductDetails = ({ user, users }) => {
                         />
                       </div>
                     )
-                  }
-                  ]}
+                  },
+                  ]}                  
               />
           </div>
           </div>

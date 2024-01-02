@@ -169,6 +169,18 @@ const Inventory = ({ user }) => {
   const onboardSeller = async () => {
     navigate(routes.OnboardingSellerToStripe.url)
   }
+
+const getAllSubcategories = (categories) => {
+  let subcategories = [];
+  categories.forEach(category => {
+      if (category.subCategories && category.subCategories.length > 0) {
+          subcategories = subcategories.concat(category.subCategories);
+      }
+  });
+  return subcategories;
+}
+
+const allSubcategories = getAllSubcategories(categorys);
   
   // ------------------ Tabs Start------------------
   const handleTabSelect = (key) => {
@@ -272,6 +284,7 @@ const Inventory = ({ user }) => {
                             paymentProviderAddress={
                               stripeStatus ? stripeStatus.paymentProviderAddress : undefined
                             }
+                            allSubcategories={allSubcategories}
                           />
                         );
                       })
@@ -301,6 +314,7 @@ const Inventory = ({ user }) => {
                             paymentProviderAddress={
                               stripeStatus ? stripeStatus.paymentProviderAddress : undefined
                             }
+                            allSubcategories={allSubcategories}
                           />
                         );
                       })
