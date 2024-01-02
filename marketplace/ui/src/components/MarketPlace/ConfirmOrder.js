@@ -272,7 +272,7 @@ const ConfirmOrder = () => {
       dataIndex: "sellersCommonName",
       align: "center",
       render: (text) => (
-        <p className="text-center">{text}</p>
+        <p className="text-center font-semibold">{text}</p>
       ),
       // width: "12%"
     },
@@ -280,13 +280,13 @@ const ConfirmOrder = () => {
       title: <Text className="text-[#202020] text-base font-semibold">Unit Price($)</Text>,
       dataIndex: "unitPrice",
       align: "center",
-      render: (text) => <p className=" text-sm text-[#202020] font-medium font-sans">{text}</p>,
+      render: (text) => <p className=" text-sm text-[#202020]  font-sans font-semibold">{text}</p>,
     },
     {
       title: <Text className="text-[#202020] text-base font-semibold">Quantity</Text>,
       dataIndex: "qty",
       align: "center",
-      render: (text) => <p className="text-sm text-[#202020] font-medium font-sans">{text}</p>,
+      render: (text) => <p className="text-sm text-[#202020]  font-sans font-semibold">{text}</p>,
     },
     {
       title: (
@@ -294,19 +294,19 @@ const ConfirmOrder = () => {
       ),
       dataIndex: "shippingCharges",
       align: "center",
-      render: (text) => <p className="text-sm font-medium text-[#202020] ">{text}</p>,
+      render: (text) => <p className="text-sm  text-[#202020] font-semibold ">{text}</p>,
     },
     {
       title: <Text className="text-[#202020] text-base font-semibold">Tax($)</Text>,
       dataIndex: "tax",
       align: "center",
-      render: (text) => <p className="text-sm font-medium text-[#202020]">{text}</p>,
+      render: (text) => <p className="text-sm  text-[#202020] font-semibold">{text}</p>,
     },
     {
       title: <Text className="text-[#202020] text-base font-semibold">Amount($)</Text>,
       dataIndex: "amount",
       align: "center",
-      render: (text) => <p className="text-sm font-medium text-[#202020]">{text}</p>
+      render: (text) => <p className="text-sm font-semibold text-[#202020]">{text}</p>
       ,
 
     },
@@ -365,7 +365,7 @@ const ConfirmOrder = () => {
   return (
     <>
       {responsiveAddress ? <ResponsiveAddAddress back={closeResponsiveAddress} /> :
-        <div className="h-screen md:mx-10 md:mt-10 mt-5 mx-5 lg:mx-14   lg:mt-14">
+        <div className="h-screen md:mx-10 md:mt-5  mx-5 lg:mx-14   ">
           {contextHolder}
           {isCreateOrderSubmitting || isCreatePaymentSubmitting ? (
             <div className="h-screen flex justify-center items-center">
@@ -409,7 +409,7 @@ const ConfirmOrder = () => {
                   Review and Submit
                 </button>}
               </div>
-              <div className="pt-4 hidden lg:block border-top">
+              <div className="pt-4 hidden lg:block border-top cart">
                 <DataTableComponent
                   isLoading={false}
                   scrollX="100%"
@@ -462,9 +462,7 @@ const ConfirmOrder = () => {
                     /></div>
                     <div className="  md:hidden"><Button type="link" icon={<img src={Images.AddBlack} className=" w-4 h-4 lg:w-6 lg:h-6 " alt="add" />}
                       onClick={() => {
-                        setshowAddress(true);
                         setResponsiveAddress(true);
-
                       }}
                     /></div>
                   </>
