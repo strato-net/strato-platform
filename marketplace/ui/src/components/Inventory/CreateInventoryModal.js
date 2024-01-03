@@ -78,39 +78,54 @@ const CreateInventoryModal = ({
     enableReinitialize: true,
   });
 
-  function beforeImageUpload(file) {
+  const beforeImageUpload = (file) => {
     const isJpgOrPng = file.type === "image/jpeg" || file.type === "image/png";
     if (!isJpgOrPng) {
       setUploadErr("Image must be of jpeg or png format");
+      return Upload.LIST_IGNORE;
     }
     const isLt1M = file.size / 1024 / 1024 < 1;
     if (!isLt1M) {
       setUploadErr("Cannot upload an image of size more than 1mb");
+      return Upload.LIST_IGNORE;
     }
     const isNameLengthValid = file.name.length <= 100;
     if (!isNameLengthValid) {
       setUploadErr("File name must be less than 100 characters");
+      return Upload.LIST_IGNORE;
     }
-    return isJpgOrPng && isLt1M && isNameLengthValid;
-  }
+    setUploadErr("");
+    return false
+  };
 
-  function beforeFileUpload(file) {
+  const handleImageChange = (info) => {
+    setSelectedImages(info.fileList);
+  };
+
+  const beforeFileUpload = (file) => {
     const isPdf = file.type === "application/pdf";
     if (!isPdf) {
       setUploadErr("File must be PDF format");
+      return Upload.LIST_IGNORE;
     }
     const isLt1M = file.size / 1024 / 1024 < 1;
     if (!isLt1M) {
       setUploadErr("Cannot upload a PDF of size more than 1mb");
+      return Upload.LIST_IGNORE;
     }
-
     const isNameLengthValid = file.name.length <= 100;
     if (!isNameLengthValid) {
       setUploadErr("File name must be less than 100 characters");
+      return Upload.LIST_IGNORE;
     }
+    setUploadErr("");
+    return false;
+  };
 
-    return isPdf && isLt1M && isNameLengthValid
-  }
+  const handleFileChange = (info) => {
+    setSelectedFiles(info.fileList);
+  };
+  
 
   const handleCreateFormSubmit = async (values) => {
     let imageKeys = []
@@ -862,15 +877,7 @@ const CreateInventoryModal = ({
               <Form.Item label="Upload Images" className="w-full sm:w-[200px] md:w-72">
                 <div className="p-4 border-secondryD border rounded flex flex-col justify-around">
                   <Upload
-                    onChange={(es) => {
-                      // TODO: these files need to be sent to the file server to be uploaded correctly. 
-                      // We should be checking the response and updating the file status accordingly. 
-                      setSelectedImages(es.fileList);
-                      formik.setFieldValue(
-                        "images",
-                        es.fileList.map((e) => e.originFileObj || null)
-                      );
-                    }}
+                    onChange={handleImageChange}
                     fileList={selectedImages}
                     accept="image/png, image/jpeg"
                     multiple={true}
@@ -899,13 +906,7 @@ const CreateInventoryModal = ({
               <Form.Item label="Upload Files" className="w-full sm:w-[200px] md:w-72">
                 <div className="p-4 border-secondryD border rounded flex flex-col justify-around">
                   <Upload
-                    onChange={(es) => {
-                      setSelectedFiles(es.fileList);
-                      formik.setFieldValue(
-                        "files",
-                        es.fileList.map((e) => e.originFileObj || null)
-                      );
-                    }}
+                    onChange={handleFileChange}
                     fileList={selectedFiles}
                     accept="application/pdf"
                     multiple={true}
