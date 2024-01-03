@@ -154,9 +154,6 @@ const Checkout = ({ user }) => {
         if (items[index].qty - 1 <= availableQuantity) {
           items[index].qty -= 1;
           actions.addItemToCart(marketplaceDispatch, items);
-        } else {
-          openToast("bottom", true, "Cannot add more than available quantity");
-          return;
         }
       }
     });
@@ -170,9 +167,6 @@ const Checkout = ({ user }) => {
         if (items[index].qty + 1 <= availableQuantity) {
           items[index].qty += 1;
           actions.addItemToCart(marketplaceDispatch, items);
-        } else {
-          openToast("bottom", true, "Cannot add more than available quantity");
-          return;
         }
       }
     });
@@ -217,28 +211,28 @@ const Checkout = ({ user }) => {
           items[index].qty = e;
           actions.addItemToCart(marketplaceDispatch, items);
         } else {
-          openToast("bottom", true, "Cannot add more than available quantity");
           items[index].qty = availableQuantity;
           actions.addItemToCart(marketplaceDispatch, items);
         }
       }
     });
   };
-  const openToast = (placement, isError, msg) => {
-    if (isError) {
-      api.error({
-        message: msg,
-        placement,
-        key: 1,
-      });
-    } else {
-      api.success({
-        message: msg,
-        placement,
-        key: 1,
-      });
-    }
-  };
+  
+  // const openToast = (placement, isError, msg) => {
+  //   if (isError) {
+  //     api.error({
+  //       message: msg,
+  //       placement,
+  //       key: 1,
+  //     });
+  //   } else {
+  //     api.success({
+  //       message: msg,
+  //       placement,
+  //       key: 1,
+  //     });
+  //   }
+  // };
 
   const openToastOrder = (placement) => {
     if (success) {
@@ -322,7 +316,7 @@ const Checkout = ({ user }) => {
               onClick={() => {
                 MinusQty(qty, product);
               }}
-              className="  w-6 h-6  text-[17px] text-[#202020]   bg-[#E9E9E9] flex justify-center items-center cursor-pointer rounded-full"
+              className={`w-6 h-6 text-[17px] text-[#202020] bg-[#E9E9E9] flex justify-center items-center rounded-full ${qty === 1 ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
             >
               -
             </div>
@@ -334,14 +328,14 @@ const Checkout = ({ user }) => {
               defaultValue={qty}
               controls={false}
               onChange={(e) => {
-                ValueQty(product);
+                ValueQty(product, e);
               }}
             />
             <div
               onClick={() => {
                 AddQty(product);
               }}
-              className="  w-6 h-6  text-[17px] text-[#202020] bg-[#E9E9E9] flex justify-center items-center cursor-pointer rounded-full"
+              className={`w-6 h-6 text-[17px] text-[#202020] bg-[#E9E9E9] flex justify-center items-center rounded-full ${qty >= product.quantity ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
             >
               +
             </div>

@@ -50,7 +50,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
             <div className='flex justify-between items-center bg-[#EEEFFA] p-2 rounded-[4px]'>
                 <Typography>Quantity:</Typography>
                 <div className='flex gap-3 p-1 bg-white'>
-                    <Typography className='px-2 bg-[#EEEFFA] cursor-pointer rounded-sm' onClick={() => {
+                    <Typography className={`px-2 bg-[#EEEFFA] rounded-sm ${quantity === 1 ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`} onClick={() => {
                         setQuantity(quantity == 1 ? quantity : quantity - 1)
                     }}>
                         -
@@ -61,6 +61,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                         bordered={false} 
                         value={quantity} 
                         max={topSellingProduct.saleQuantity}
+                        min={1}
                         onChange={setQuantity}
                         onPressEnter={(e) => {
                             const newValue = parseInt(e.target.value, 10);
@@ -74,15 +75,9 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                             }
                         }}  
                         controls={false}/>
-                    <Typography className='px-2 bg-[#EEEFFA] cursor-pointer rounded-sm' onClick={() => {
+                    <Typography className={`px-2 bg-[#EEEFFA] rounded-sm ${quantity >= Math.min(topSellingProduct.saleQuantity, topSellingProduct.quantity) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`} onClick={() => {
                         if ((quantity + 1 <= topSellingProduct.saleQuantity) && (quantity + 1 <= topSellingProduct.quantity)) {
                             setQuantity(quantity + 1)
-                        }
-                        else {
-                            api.error({
-                                message: "Cannot add more than available quantity",
-                                placement: "bottom",
-                            });
                         }
                     }}>
                         +
