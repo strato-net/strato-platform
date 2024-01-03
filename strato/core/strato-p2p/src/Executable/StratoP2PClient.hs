@@ -81,17 +81,15 @@ runPeer peer sSource = do
   $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "my pubkey is: " ++ format myPublic
   $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "server pubkey is: " ++ format otherPubKey 
   runClientConnection (IPAsText $ pPeerIp peer) (TCPPort . fromIntegral $ pPeerTcpPort peer) sSource $ \c ->
-    scoped $ \scope -> do
       let pStr = pPeerString peer -- display string will show up as dns name
       attempt :: (Maybe SomeException) <- 
-        withCertifiedPeer peer . withActivePeer peer $
+        withCertifiedPeer peer . withActivePeer peer . scoped $
           runEthClientConduit
             peer {pPeerPubkey = Just otherPubKey}
             (c ^. peerSource)
             (c ^. peerSink)
             (c ^. seqSource)
             pStr
-            scope
       case attempt of
         Nothing  -> $logDebugS "runPeer" "Peer ran successfully!"
         Just err -> do $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err
