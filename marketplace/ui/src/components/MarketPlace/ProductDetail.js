@@ -383,7 +383,7 @@ const ProductDetails = ({ user, users }) => {
                   <div className="flex gap-4 justify-between lg:justify-start  pt-4 w-full">
                     <Button
                       type="primary"
-                      className="w-[90%] md:w-[365px] h-9  !bg-[#13188A] !hover:bg-primaryHover"
+                      className="w-[90%] md:w-[365px] h-9  !bg-[#13188A] !hover:bg-primaryHover !text-white"
                       onClick={() => {
                         if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                           setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
@@ -416,73 +416,74 @@ const ProductDetails = ({ user, users }) => {
                       Buy Now
                     </Button>
 
-                    {ownerSameAsUser() ? <Button
-                      icon={
-                        <img src={Images.Cart} alt="cart" className=" w-[18px] h-[18px]"></img>
-                      }
-                      className=" !w-9 h-9 border border-primary  !bg-[#13188A] rounded-md"
-                      disabled={true}
-                      id="addToCart"
-                      onClick={() => {
-                        if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                          setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
-                          window.location.href = loginUrl;
-                        } else {
-                          window.LOQ.push(['ready', async LO => {
-                            // Track an event
-                            await LO.$internal.ready('events')
-                            LO.events.track('Add to Cart (from Product Details)', {
-                              product: details.name,
-                              category: details.category,
-                              productId: details.productId
-                            })
-                          }])
-                          TagManager.dataLayer({
-                            dataLayer: {
-                              event: 'add_to_cart_from_product_details',
-                              product_name: details?.name,
-                              category: details?.category,
-                              productId: details?.productId
-                            },
-                          });
-                          addItemToCart();
-                        }
-                      }}
-                    >
+                    {ownerSameAsUser() ?
+                      <Button
+                        icon={<div className="flex justify-center items-center">
+                          <img src={Images.Cart} alt="cart" width={18} height={18} className="object-contain" />
+                        </div>}
+                        className=" !w-9 h-9 border border-primary  !bg-[#13188A] rounded-md"
+                        disabled={true}
+                        id="addToCart"
+                        onClick={() => {
+                          if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                            setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
+                            window.location.href = loginUrl;
+                          } else {
+                            window.LOQ.push(['ready', async LO => {
+                              // Track an event
+                              await LO.$internal.ready('events')
+                              LO.events.track('Add to Cart (from Product Details)', {
+                                product: details.name,
+                                category: details.category,
+                                productId: details.productId
+                              })
+                            }])
+                            TagManager.dataLayer({
+                              dataLayer: {
+                                event: 'add_to_cart_from_product_details',
+                                product_name: details?.name,
+                                category: details?.category,
+                                productId: details?.productId
+                              },
+                            });
+                            addItemToCart();
+                          }
+                        }}
+                      />
+                      :
+                      <Button
+                        icon={<div className="flex justify-center items-center">
+                          <img src={Images.Cart} alt="cart" width={18} height={18} className="object-contain" />
+                        </div>}
+                        className=" !w-9 h-9 rounded-md  !bg-[#13188A]"
+                        onClick={() => {
+                          if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                            setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
+                            window.location.href = loginUrl;
+                          } else {
+                            window.LOQ.push(['ready', async LO => {
+                              // Track an event
+                              await LO.$internal.ready('events')
+                              LO.events.track('Add to Cart (from Product Details)', {
+                                product: details?.name,
+                                category: details?.category,
+                                productId: details?.productId
+                              })
+                            }])
+                            TagManager.dataLayer({
+                              dataLayer: {
+                                event: 'add_to_cart_from_product_details',
+                                product_name: details?.name,
+                                category: details?.category,
+                                productId: details?.productId
+                              },
+                            });
+                            addItemToCart();
+                          }
+                        }}
+                      />
 
-                    </Button> : <Button
-                      icon={<div className="flex justify-center items-center">
-                        <img src={Images.Cart} alt="cart" width={18} height={18} className="object-contain" />
-                      </div>}
-                      className=" !w-9 h-9 rounded-md  !bg-[#13188A]"
-                      onClick={() => {
-                        if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                          setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
-                          window.location.href = loginUrl;
-                        } else {
-                          window.LOQ.push(['ready', async LO => {
-                            // Track an event
-                            await LO.$internal.ready('events')
-                            LO.events.track('Add to Cart (from Product Details)', {
-                              product: details?.name,
-                              category: details?.category,
-                              productId: details?.productId
-                            })
-                          }])
-                          TagManager.dataLayer({
-                            dataLayer: {
-                              event: 'add_to_cart_from_product_details',
-                              product_name: details?.name,
-                              category: details?.category,
-                              productId: details?.productId
-                            },
-                          });
-                          addItemToCart();
-                        }
-                      }}
-                    >
-
-                    </Button>}
+                    }
                   </div>
                   :
                   <div className="flex ">

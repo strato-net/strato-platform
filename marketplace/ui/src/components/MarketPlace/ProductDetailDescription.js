@@ -1,8 +1,6 @@
 import { Space, Typography } from "antd";
 
 const ProductDetailDescription = ({ categoryName, itemData }) => {
-    console.log(itemData)
-
     const { Text } = Typography;
     const DescTitle = ({ text }) => {
         return <Text className="text-primaryC text-[13px] whitespace-pre">{text}</Text>;
