@@ -59,8 +59,8 @@ const CreateInventoryModal = ({
     quantity: 1,
     expirationPeriodInMonths: 1,
     clothingType: null,
-    images: null,
-    files: null,
+    images: [],
+    files: [],
     category: "Art",
     subCategory: null,
     size: null,
@@ -100,6 +100,7 @@ const CreateInventoryModal = ({
 
   const handleImageChange = (info) => {
     setSelectedImages(info.fileList);
+    formik.setFieldValue("images", info.fileList)
   };
 
   const beforeFileUpload = (file) => {
@@ -124,9 +125,9 @@ const CreateInventoryModal = ({
 
   const handleFileChange = (info) => {
     setSelectedFiles(info.fileList);
+    formik.setFieldValue("files", info.fileList)
   };
   
-
   const handleCreateFormSubmit = async (values) => {
     let imageKeys = []
     if (values.images && values.images.length > 0) {
