@@ -243,6 +243,16 @@ async function transferItem(user, contract, args, options) {
             { callArgs }
         );
     }
+    
+    const searchOptions = {
+        ...options,
+        org: constants.blockAppsOrg,
+        query: {
+            address: `eq.${callArgs.contract.address}`
+        }
+      }
+      
+    await waitForAddress(user, {name: `Asset.ItemTransfers`}, searchOptions);
 
     return transferStatus;
 }
