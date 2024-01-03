@@ -5,11 +5,6 @@ const ProductItemDetails = ({ categoryName, itemData }) => {
     const DescTitle = ({ text }) => {
         return <Text className="text-primaryC text-[13px] whitespace-pre">{text}</Text>;
     };
-    const toPascalCase = (s) => {
-        if (s) {
-            return s[0].toUpperCase() + s.slice(1, s.length)
-        }
-    }
 
     switch (categoryName) {
         case "Art":
@@ -25,7 +20,7 @@ const ProductItemDetails = ({ categoryName, itemData }) => {
                 <Space direction="vertical" className="py-[15px] px-[14px] w-full sm:w-[388px] md:w-[417px] border border-[#E9E9E9] rounded-md">
                     <Space className="flex justify-between">
                         <DescTitle text="Type" />
-                        <Text className="text-[13px] text-[#202020] font-medium">{toPascalCase(itemData?.clothingType)}</Text>
+                        <Text className="text-[13px] text-[#202020] font-medium">{itemData?.clothingType}</Text>
                     </Space>
                     <Space className="flex justify-between">
                         <DescTitle text="Brand" />
@@ -37,7 +32,7 @@ const ProductItemDetails = ({ categoryName, itemData }) => {
                     </Space>
                     <Space className="flex justify-between">
                         <DescTitle text="Condition" />
-                        <Text className="text-[13px] text-[#202020] font-medium">{toPascalCase(itemData?.condition)}</Text>
+                        <Text className="text-[13px] text-[#202020] font-medium">{itemData?.condition}</Text>
                     </Space>
                     <Space className="flex justify-between">
                         <DescTitle text="SKU" />
@@ -49,7 +44,7 @@ const ProductItemDetails = ({ categoryName, itemData }) => {
                 <Space direction="vertical" className="py-[15px] px-[14px] w-full sm:w-[388px] md:w-[417px] border border-[#E9E9E9] rounded-md">
                     <Space className="flex justify-between">
                         <DescTitle text="Condition" />
-                        <Text className="text-[13px] text-[#202020] font-medium">{toPascalCase(itemData?.condition)}</Text>
+                        <Text className="text-[13px] text-[#202020] font-medium">{itemData?.condition}</Text>
                     </Space>
                 </Space>)
         case "Metals":
