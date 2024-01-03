@@ -44,7 +44,7 @@ async function uploadContract(user, _constructorArgs, options) {
 
   const searchOptions = {
     ...options,
-    org: constants.blockAppsOrg.blockAppsOrg,
+    org: constants.blockAppsOrg,
     query: {
         address: `eq.${contract.address}`
     }
