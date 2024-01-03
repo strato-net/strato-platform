@@ -134,6 +134,19 @@ class InventoryController {
     }
   }
 
+  static async getAllItemTransferEvents(req, res, next) {
+    try {
+      const { dapp, query } = req
+      const itemTransfers = await dapp.getAllItemTransferEvents(query)
+
+      rest.response.status200(res, itemTransfers)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
   static async updateSale(req, res, next) {
     try {
       const { dapp, body } = req

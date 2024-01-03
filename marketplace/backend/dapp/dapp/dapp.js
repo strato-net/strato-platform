@@ -238,9 +238,16 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.transferItem = async function (args, options = defaultOptions) {
     const { assetAddress, ...restArgs } = args;
+    const transferNumber = parseInt(util.uid())
+    const finalArgs = {transferNumber:transferNumber, ...restArgs};
     const contract = { address: assetAddress };
-    return await inventoryJs.transferItem(rawAdmin, contract, restArgs, options);
+    return inventoryJs.transferItem(rawAdmin, contract, finalArgs, options);
   }
+
+  contract.getAllItemTransferEvents = function (args, options = defaultOptions) {
+    const getOptions = { ...options, app: contractName, };
+    return inventoryJs.getAllItemTransferEvents(rawAdmin, args, getOptions);
+  };
 
   contract.updateSale = async function (args, options = defaultOptions) {
     const { saleAddress, ...restArgs } = args;
