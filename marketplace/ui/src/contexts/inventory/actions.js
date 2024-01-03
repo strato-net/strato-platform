@@ -167,13 +167,13 @@ const actions = {
     const query = queryValue ? `&productId=${queryValue}` : "";
     
     let temp = [category]
-    const categoryQuery = category ? `&category[]=${temp}` : "";
+    const categoryQuery = category ? `category[]=${temp}` : "";
 
     dispatch({ type: actionDescriptors.fetchInventory });
 
     try {
       const response = await fetch(
-        `${apiUrl}/inventory?limit=${limit}&offset=${offset}${query}${categoryQuery}`,
+        `${apiUrl}/inventory?${categoryQuery}&limit=${limit}&offset=${offset}${query}&isMint=true`,
         {
           method: HTTP_METHODS.GET,
         }

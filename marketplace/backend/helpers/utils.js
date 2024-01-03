@@ -173,8 +173,17 @@ export const setSearchQueryOptions = (args = {}, _queryOptionsArray) => {
         ['or']: `(${subcategoryQueries.join(',')})`
       }
     }
+
+    
+
     if (!value && typeof value != 'boolean') {
       return agg
+    }
+    if (key === 'isMint'){
+      return {
+        ...agg,
+        ['or']: `(and(data->>isMint.eq.True,quantity.eq.0),quantity.gt.0)`
+      }
     }
     let option = {}
     if (predicate === 'or') {
@@ -238,6 +247,8 @@ export const setSearchQueryOptionsPrime = (args) => {
       result.push({ key, value: subCategories, predicate: 'or', subPredicate: 'like'})
     }
 
+    
+
     if (key === 'queryValue') {
       const { queryValue, queryFields } = args
       if (queryFields) {
@@ -278,6 +289,10 @@ export const setSearchQueryOptionsPrime = (args) => {
       } else {
         result.push({ key: notEqualsField, value: notEqualsValue, predicate: 'neq' })
       }
+    }
+
+    if (key === 'isMint'){
+      result.push({ key, value:`(and(data->>isMint.eq.True,quantity.eq.0),quantity.gt.0)`, predicate: 'or'})      
     }
 
     return result
@@ -350,7 +365,7 @@ export const setSearchQueryOptionsLike = (args = {}, _queryOptionsArray) => {
 export const searchAllWithQueryArgs = async (contractName, args, options, user) => {
   const nonQueryOptions = ['queryValue', 'queryFields', 'queryOptions', 'limit', 'offset', 'sort', 'range', 'gteField', 'gteValue', 'lteField', 'lteValue', 'notEqualsField', 'notEqualsValue']
   const queryArgs = setSearchQueryOptions(args, Object.keys(args).reduce((result, key) => {
-    if (!nonQueryOptions.includes(key) && key != 'category' && key != 'subCategory') {
+    if (!nonQueryOptions.includes(key) && key != 'category' && key != 'subCategory' && key != 'isMint') {
       if (Array.isArray(args[key])) {
         result.push(({ key, value: `(${args[key].join(',')})`, predicate: 'in' }))
       } else {
@@ -366,6 +381,10 @@ export const searchAllWithQueryArgs = async (contractName, args, options, user) 
     if (key === 'subCategory' && Array.isArray(args[key])) {
       const subCategories = args[key][0].split(',').map(subCategory => '%-' + subCategory);
       result.push({ key, value: subCategories, predicate: 'or', subPredicate: 'like'})
+    }
+
+    if (key === 'isMint'){
+      result.push({ key, value:`(and(data->>isMint.eq.True,quantity.eq.0),quantity.gt.0)`, predicate: 'or'})      
     }
 
     if (key === 'queryValue') {
@@ -404,7 +423,8 @@ export const searchAllWithQueryArgs = async (contractName, args, options, user) 
     if (key === 'sort') {
       result.push(args[key])
     }
-
+    
+    
     if (key == 'range') {
       if (Array.isArray(args[key])) {
         const queryArray = args[key].reduce((agg, cum) => {
