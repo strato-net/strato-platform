@@ -38,7 +38,7 @@ import image_placeholder from "../../images/resources/image_placeholder.png";
 import "react-responsive-carousel/lib/styles/carousel.min.css"; // requires a loader
 import { Carousel } from "react-responsive-carousel"
 import { Images } from "../../images";
-import ProductDetailDescription from "./ProductDetailDescription";
+import ProductItemDetails from "./ProductItemDetails";
 
 const ProductDetails = ({ user, users }) => {
   const { state, pathname } = useLocation();
@@ -523,11 +523,11 @@ const ProductDetails = ({ user, users }) => {
                 defaultActiveKey="1"
                 items={
                   [{
-                    label: <span className="text-sm md:text-base">Description</span>,
+                    label: <span className="text-sm md:text-base">Item Details</span>,
                     key: "1",
                     children: (
                       <div>
-                        <ProductDetailDescription
+                        <ProductItemDetails
                           categoryName={getCategory(details)}
                           itemData={itemData}
                         />
