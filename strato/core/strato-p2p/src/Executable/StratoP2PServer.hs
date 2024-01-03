@@ -68,7 +68,7 @@ ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
       case pPeerPubkey p of
         Nothing -> do
           $logErrorS "runEthServer" . T.pack $ "Didn't get pubkey during discovery for peer " ++ peerStr ++ ". rejecting violently."
-        Just pubkey ->
+        Just pubkey -> do
             attempt <- withCertifiedPeer p . withActivePeer p . scoped $
                          runEthServerConduit p pSource pSink seqSrc peerStr
             case attempt of
