@@ -95,7 +95,7 @@ const CreateInventoryModal = ({
       return Upload.LIST_IGNORE;
     }
     setUploadErr("");
-    return false
+    return true
   };
 
   const handleImageChange = (info) => {
@@ -884,7 +884,16 @@ const CreateInventoryModal = ({
               <Form.Item label="Upload Images" className="w-full sm:w-[200px] md:w-72">
                 <div className="p-4 border-secondryD border rounded flex flex-col justify-around">
                   <Upload
-                    onChange={handleImageChange}
+                    // onChange={handleImageChange}
+                    onChange={(es) => {
+                      // TODO: these files need to be sent to the file server to be uploaded correctly. 
+                      // We should be checking the response and updating the file status accordingly. 
+                      setSelectedImages(es.fileList);
+                      formik.setFieldValue(
+                        "images",
+                        es.fileList.map((e) => e.originFileObj || null)
+                      );
+                    }}
                     fileList={selectedImages}
                     accept="image/png, image/jpeg"
                     multiple={true}
