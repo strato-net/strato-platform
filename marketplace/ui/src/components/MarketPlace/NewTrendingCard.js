@@ -3,7 +3,8 @@ import React, { useState } from "react";
 import {
     Typography,
     Button,
-    notification
+    notification,
+    InputNumber
 } from "antd";
 import { useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
@@ -29,11 +30,11 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                 onClick={() =>
                     navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
                 }
-                className='md:h-[200px] md:w-[40vw] h-[150px] rounded'
+                className='md:h-[200px] md:w-[40vw] h-[150px] object-contain rounded-md'
                 src={topSellingProduct.images ? topSellingProduct?.images[0] : images_placeholder}
                 alt={topSellingProduct?.name || "N/A"}
             />
-            <div className='flex justify-between'>
+            <div className='flex justify-between items-center'>
                 <Typography
                     onClick={() =>
                         navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
@@ -49,28 +50,41 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
             <div className='flex justify-between items-center bg-[#EEEFFA] p-2 rounded-[4px]'>
                 <Typography>Quantity:</Typography>
                 <div className='flex gap-3 p-1 bg-white'>
-                    <Typography className='px-2 bg-[#EEEFFA] cursor-pointer rounded-sm' onClick={() => {
+                    <Typography className={`px-2 bg-[#EEEFFA] rounded-sm ${quantity === 1 ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`} onClick={() => {
                         setQuantity(quantity == 1 ? quantity : quantity - 1)
                     }}>
                         -
                     </Typography>
-                    <Typography>{quantity}</Typography>
-                    <Typography className='px-2 bg-[#EEEFFA] cursor-pointer rounded-sm' onClick={() => {
+                    <InputNumber 
+                        className="w-10" 
+                        size="small" 
+                        bordered={false} 
+                        value={quantity} 
+                        max={topSellingProduct.saleQuantity}
+                        min={1}
+                        onChange={setQuantity}
+                        onPressEnter={(e) => {
+                            const newValue = parseInt(e.target.value, 10);
+                            if (newValue <= topSellingProduct.saleQuantity) {
+                                setQuantity(newValue);
+                            } else {
+                                api.error({
+                                    message: "Cannot add more than available quantity",
+                                    placement: "bottom",
+                                });
+                            }
+                        }}  
+                        controls={false}/>
+                    <Typography className={`px-2 bg-[#EEEFFA] rounded-sm ${quantity >= Math.min(topSellingProduct.saleQuantity, topSellingProduct.quantity) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`} onClick={() => {
                         if ((quantity + 1 <= topSellingProduct.saleQuantity) && (quantity + 1 <= topSellingProduct.quantity)) {
                             setQuantity(quantity + 1)
-                        }
-                        else {
-                            api.error({
-                                message: "Cannot add more than available quantity",
-                                placement: "bottom",
-                            });
                         }
                     }}>
                         +
                     </Typography>
                 </div>
             </div>
-            <div className='flex gap-4'>
+            <div className='flex gap-4 mt-1'>
                 <Button
                     id={`${topSellingProduct.name.replace(/ /g, "_")}-buy-now`}
                     type='primary'
@@ -96,7 +110,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                                     productId: topSellingProduct.productId
                                 },
                             });
-                            if (addItemToCart(topSellingProduct)) {
+                            if (addItemToCart(topSellingProduct, quantity)) {
                                 navigate("/checkout")
                             }
                         }
@@ -127,7 +141,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                                     productId: topSellingProduct.productId
                                 },
                             });
-                            addItemToCart(topSellingProduct);
+                            addItemToCart(topSellingProduct, quantity);
                         }
                     }}
                     type='primary'

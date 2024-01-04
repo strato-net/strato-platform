@@ -25,7 +25,6 @@ module Blockchain.TypeLits
   )
 where
 
-import Control.Applicative (liftA2)
 import Control.Comonad
 import Data.Aeson
 import qualified Data.Aeson.Key as DAK

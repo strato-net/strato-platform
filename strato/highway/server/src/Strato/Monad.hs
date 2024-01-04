@@ -62,7 +62,7 @@ data HighwayWrapperEnv = HighwayWrapperEnv
 
 data HighwayWrapperError
   = BadGetError 
-  | BadPutError
+  | BadPostError
   | UserError Text
   | RuntimeError SomeException
   deriving (Show, Exception)
@@ -89,11 +89,11 @@ handleHighwayError = \case
       "handleHighwayError/BadGetError"
       "Could not retrieve file from S3."
     throwIO BadGetError
-  BadPutError -> do
+  BadPostError -> do
     $logErrorS
-      "handleHighwayError/BadPutError"
+      "handleHighwayError/BadPostError"
       "Could not push file contents to S3."
-    throwIO BadPutError
+    throwIO BadPostError
   e@(RuntimeError _) -> do
     $logErrorS "handleHighwayError/RuntimeError" . Text.pack $
       show e ++ "\n  callstack missing for runtime errors"
@@ -121,12 +121,12 @@ enterHighwayWrapper env x = Handler $ do
                       "Could not find file."
                     ]
             }
-        BadPutError ->
+        BadPostError ->
           err500
             { errBody =
                 fromString $
                   unlines
-                    [ "Bad PUT Error!",
+                    [ "Bad POST Error!",
                       "Upload of file was unsuccessful."
                     ]
             }

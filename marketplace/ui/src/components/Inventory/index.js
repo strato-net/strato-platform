@@ -169,6 +169,18 @@ const Inventory = ({ user }) => {
   const onboardSeller = async () => {
     navigate(routes.OnboardingSellerToStripe.url)
   }
+
+const getAllSubcategories = (categories) => {
+  let subcategories = [];
+  categories.forEach(category => {
+      if (category.subCategories && category.subCategories.length > 0) {
+          subcategories = subcategories.concat(category.subCategories);
+      }
+  });
+  return subcategories;
+}
+
+const allSubcategories = getAllSubcategories(categorys);
   
   // ------------------ Tabs Start------------------
   const handleTabSelect = (key) => {
@@ -188,7 +200,7 @@ const Inventory = ({ user }) => {
         </div>
       ) : (
         <>
-          <Breadcrumb className="mx-5 md:mx-14 mt-4">
+          <Breadcrumb className="mx-5 md:mx-14 mt-2 lg:mt-4">
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
               <ClickableCell href={routes.Marketplace.url}>
                 <p className="text-sm text-[#13188A] font-semibold">
@@ -202,13 +214,13 @@ const Inventory = ({ user }) => {
               </p>
             </Breadcrumb.Item>
           </Breadcrumb>
-          <div className="w-full h-[116px] py-4 px-4 md:h-[96px] bg-[#F6F6F6] flex flex-col md:flex-row md:px-14  justify-between items-center mt-6 lg:mt-11">
+          <div className="w-full h-[116px] py-4 px-4 md:h-[96px] bg-[#F6F6F6] flex flex-col md:flex-row md:px-14  justify-between items-center mt-6 lg:mt-8">
             <div className="flex justify-between w-full">
-              <Button className="!px-1 md:!px-0 flex items-center flex-row-reverse gap-[6px] text-lg md:text-2xl font-semibold text-[#13188A]" type="link" icon={<img src={Images.ForwardIcon} alt="inventory" className="hidden md:block w-6 h-6" />}> Inventory
+              <Button className="!px-1 md:!px-0 flex items-center flex-row-reverse gap-[6px] text-lg md:text-2xl font-semibold !text-[#13188A] " type="link" icon={<img src={Images.ForwardIcon} alt="inventory" className="hidden md:block w-6 h-6" />}> Inventory
               </Button>
             </div>
-            <div className="flex">
-              <Button type="primary" className="w-40 mr-3"
+            <div className="flex gap-3">
+              <Button type="primary" className="w-40 h-9 "
                 onClick={() => {
                   if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                     window.location.href = loginUrl;
@@ -272,6 +284,7 @@ const Inventory = ({ user }) => {
                             paymentProviderAddress={
                               stripeStatus ? stripeStatus.paymentProviderAddress : undefined
                             }
+                            allSubcategories={allSubcategories}
                           />
                         );
                       })
@@ -301,6 +314,7 @@ const Inventory = ({ user }) => {
                             paymentProviderAddress={
                               stripeStatus ? stripeStatus.paymentProviderAddress : undefined
                             }
+                            allSubcategories={allSubcategories}
                           />
                         );
                       })

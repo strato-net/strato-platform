@@ -102,6 +102,7 @@ import Blockchain.VM.SolidException
 import Blockchain.VMOptions
 import Control.DeepSeq
 import Control.Lens hiding (Context (..))
+import Control.Monad (when)
 import Control.Monad.Catch (MonadCatch)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
@@ -124,7 +125,7 @@ import GHC.Generics
 import SolidVM.Model.Storable
 import SolidVM.Model.Value
 import System.Directory
-import Text.PrettyPrint.ANSI.Leijen hiding ((<$>), (</>))
+import Text.Format
 import UnliftIO
 
 {-# NOINLINE knownFailedTxs #-}
@@ -489,7 +490,7 @@ incrementNonce account = A.adjustWithDefault_ Mod.Proxy account $ \addressState 
 getNewAddress :: (MonadIO m, (Account `A.Alters` AddressState) m) => Account -> m Account
 getNewAddress account = do
   nonce <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy account
-  when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ show (pretty account) ++ ", nonce=" ++ show nonce
+  when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ format account ++ ", nonce=" ++ show nonce
   let newAddress = getNewAddress_unsafe (account ^. accountAddress) nonce
   incrementNonce account
   return $ (accountAddress .~ newAddress) account
@@ -497,7 +498,7 @@ getNewAddress account = do
 getNewAddressWithSalt :: (MonadIO m, MonadLogger m, (Account `A.Alters` AddressState) m) => Account -> Value -> Keccak256 -> String -> m Account
 getNewAddressWithSalt account salt hsh args = do
   nonce <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy account
-  when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ show (pretty account) ++ ", nonce=" ++ show nonce
+  when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ format account ++ ", nonce=" ++ show nonce
   let saltAsString = case salt of
         (SString s) -> s
         _ -> invalidArguments "big major bad" salt

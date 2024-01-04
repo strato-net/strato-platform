@@ -62,6 +62,13 @@ router.post(
   InventoryController.transfer
 );
 
+router.get(
+  Inventory.transferredItems,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  InventoryController.getAllItemTransferEvents
+);
+
 router.put(
   Inventory.update,
   authHandler.authorizeRequest(),

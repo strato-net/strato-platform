@@ -30,6 +30,20 @@ abstract contract Asset is Utils {
         uint maxItemNumber
     );
 
+    event ItemTransfers(
+        address indexed assetAddress,
+        address indexed oldOwner,
+        string oldOwnerCommonName,
+        address indexed newOwner,
+        string newOwnerCommonName,
+        string assetName,
+        uint minItemNumber,
+        uint maxItemNumber,
+        uint quantity,
+        uint transferNumber,
+        uint transferDate
+    );
+
     constructor(
         string _name,
         string _description,
@@ -112,8 +126,27 @@ abstract contract Asset is Utils {
         sale = address(0);
     }
 
-    function _transfer(address _newOwner, uint _quantity) internal virtual {
+    function _transfer(address _newOwner, uint _quantity, bool _isUserTransfer, uint _transferNumber) internal virtual {
         string newOwnerCommonName = getCommonName(_newOwner);
+
+        if(_isUserTransfer && _transferNumber>0){
+
+            emit ItemTransfers(
+                originAddress,
+                owner,
+                ownerCommonName,
+                _newOwner,
+                newOwnerCommonName,
+                name,
+                itemNumber,
+                itemNumber + _quantity - 1,
+                _quantity,
+                _transferNumber,
+                block.timestamp
+                );
+
+            }
+
         emit OwnershipTransfer(
             originAddress,
             owner,
@@ -130,13 +163,13 @@ abstract contract Asset is Utils {
     
     function transferOwnership(address _newOwner, uint _quantity) public fromSale("transfer ownership") {
         require(_quantity <= quantity, "Cannot transfer more than available quantity.");
-        _transfer(_newOwner, _quantity);
+        _transfer(_newOwner, _quantity, false, 0);
     }
 
-    function automaticTransfer(address _newOwner, uint _quantity) public requireOwner("automatic transfer") returns (uint) {
+    function automaticTransfer(address _newOwner, uint _quantity, uint _transferNumber) public requireOwner("automatic transfer") returns (uint) {
         require(_quantity <= quantity, "Cannot transfer more than available quantity.");
         if (sale == address(0)) {
-            _transfer(_newOwner, _quantity);
+            _transfer(_newOwner, _quantity, true, _transferNumber);
             return RestStatus.OK;
         } else {
             return Sale(sale).automaticTransfer(_newOwner, _quantity);

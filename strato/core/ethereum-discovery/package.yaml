@@ -31,6 +31,7 @@ library:
     - blockapps-vault-wrapper-client
     - bytestring
     - common-log
+    - containers
     - composable-monads-base
     - cpu
     - crypto-pubkey-types
@@ -41,6 +42,7 @@ library:
     - ethereum-rlp
     - exceptions
     - format
+    - hedis
     - hflags
     - http-client
     - labeled-error
@@ -55,6 +57,7 @@ library:
     - split
     - strato-conf
     - strato-model
+    - strato-redis-blockdb
     - text
     - time
     - unliftio

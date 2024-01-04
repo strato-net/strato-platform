@@ -110,7 +110,7 @@ const SoldOrderDetails = ({ user, users }) => {
           productImage: prod.images && prod.images.length > 0 ? prod.images[0] : image_placeholder,
           productName: prod,
           name: prod.name,
-          unitPrice: '$' + prod.price,
+          unitPrice:  prod.price,
           quantity: parseInt(orderDetails.order.quantities[index]),
           shippingCharges: prod.shippingCharges ? prod.shippingCharges : 0,
           amount: prod.price * parseInt(orderDetails.order.quantities[index]),
@@ -541,7 +541,7 @@ const SoldOrderDetails = ({ user, users }) => {
         </div>
       ) : (
         <div>
-          <Breadcrumb className="text-sm ml-4 md:ml-20 mt-4 md:mt-14 mb-2">
+          <Breadcrumb className="text-sm ml-4 md:ml-20  mt-0 md:mt-5 mb-2">
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
               <ClickableCell href={routes.Marketplace.url}>
                 <p className="text-sm text-primary font-semibold">Home</p>
@@ -558,7 +558,7 @@ const SoldOrderDetails = ({ user, users }) => {
           </Breadcrumb>
 
             <Tabs
-              className="mx-4 md:mx-20 mt-0"
+              className="mx-4 md:mx-20 mt-0 md:mt-5"
               defaultActiveKey={state == null ? "Sold" : state.defaultKey}
               onChange={onChange}
               items={[
@@ -614,7 +614,7 @@ const SoldOrderDetails = ({ user, users }) => {
                             value={details.order.sellersCommonName}
                           />
                           <Divider type="vertical" className="h-14 bg-secondryD" />
-                          <OrderData title="Total ($)" value={details.order.totalPrice} />
+                          <OrderData title="Total($)" value={details.order.totalPrice} />
                           <Divider type="vertical" className="h-14 bg-secondryD" />
                           <OrderData
                             title="Date"
@@ -707,7 +707,7 @@ const SoldOrderDetails = ({ user, users }) => {
                           </div>
                           <div className="flex gap-4">
                           <NewOrderData className="w-2/4" title="Seller" value={details.order.sellersCommonName} />
-                          <NewOrderData className="w-2/4"title="Total ($)" value={'$' + details.order.totalPrice} />
+                          <NewOrderData className="w-2/4"title="Total($)" value={'$' + details.order.totalPrice} />
                           </div>
                           <div className="flex justify-between mobile_order_detail_card">
                             <NewOrderData className="w-2/4" title="Date" value={getStringDate(details.order.createdDate, US_DATE_FORMAT)} />

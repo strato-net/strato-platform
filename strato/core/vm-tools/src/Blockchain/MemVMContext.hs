@@ -72,6 +72,7 @@ import Blockchain.VMContext
   )
 import Control.DeepSeq
 import Control.Lens
+import Control.Monad (join)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.IO.Class

@@ -45,6 +45,7 @@ import Control.Concurrent hiding (yield)
 import Control.Concurrent.STM.TBQueue
 import Control.Concurrent.STM.TQueue
 import Control.Lens
+import Control.Monad (forM, join, unless, when)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Reader

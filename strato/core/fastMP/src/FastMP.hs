@@ -27,8 +27,8 @@ import qualified Database.LevelDB as LDB
 import KV
 import LevelDBTools
 import ReverseOrderedKVs
+import Text.Colors
 import Text.Format
-import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
 debug :: Bool
 debug = False
@@ -135,9 +135,9 @@ processNext (input, ((prefix, partialNode) : partialrest)) = do
     $logDebugS "processNext" . T.pack $
       concat
         [ "#### Flush Partial(",
-          show (green . text $ either (BC.unpack . B16.encode) format nodePtr),
+          green (either (BC.unpack . B16.encode) format nodePtr),
           "):\n",
-          show (pretty node)
+          format node
         ]
 
   return ((KV prefix (Left nodePtr)) : input, partialrest)
@@ -186,9 +186,9 @@ addToPartial partialNode (KV x@(_ : rest) val) = do
     $logDebugS "addToPartial" . T.pack $
       concat
         [ "####addToPartial (",
-          show (green . text $ either (BC.unpack . B16.encode) format nodePtr),
+          green (either (BC.unpack . B16.encode) format nodePtr),
           "):\n",
-          show (pretty node)
+          format node
         ]
 
   return $ partialNode {branches = (head x, nodePtr) : branches partialNode}

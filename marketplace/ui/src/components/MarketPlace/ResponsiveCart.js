@@ -107,12 +107,12 @@ const ResponsiveCart = ({
                       onClick={() => {
                         MinusQty(qty, product);
                       }}
-                      className="  w-6 h-6    bg-[#E9E9E9] flex justify-center items-center cursor-pointer rounded-full"
+                      className={`w-6 h-6 bg-[#E9E9E9] flex justify-center items-center rounded-full ${qty === 1 ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
                     >
                       <p className="text-lg text-[#202020] font-medium">-</p>
                     </div>
                     <InputNumber
-                      className=" w-8 border-none text-[#202020] font-medium bg-[transparent]  rounded-none outline-none  text-sm text-center flex flex-col justify-center"
+                      className=" w-[3rem] border-none text-[#202020] font-medium bg-[transparent]  rounded-none outline-none  text-sm text-center flex flex-col justify-center"
                       min={1}
                       value={qty}
                       defaultValue={qty}
@@ -122,10 +122,10 @@ const ResponsiveCart = ({
                       }}
                     />
                     <div
-                      onClick={() => {
+                      onClick={() => { 
                         AddQty(product);
                       }}
-                      className="  w-6 h-6    bg-[#E9E9E9] flex justify-center items-center cursor-pointer rounded-full"
+                      className={`w-6 h-6 bg-[#E9E9E9] flex justify-center items-center rounded-full ${qty >= product.quantity ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
                     >
                      <p className="text-lg text-[#202020] font-medium">+</p>
                     </div>

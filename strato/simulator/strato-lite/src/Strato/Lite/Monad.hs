@@ -76,11 +76,10 @@ import Blockchain.Strato.Model.Wei
 import qualified Blockchain.TxRunResultCache as TRC
 import Blockchain.VMContext (ContextBestBlockInfo (..), GasCap (..), IsBlockstanbul (..), baggerState, lookupX509AddrFromCBHash, putContextBestBlockInfo, vmGasCap)
 import Conduit
-import Control.Applicative (liftA2)
-import Control.Concurrent.Hierarchy
 import Control.Concurrent.STM.TMChan
 import Control.Lens hiding (Context, view)
 import qualified Control.Lens as Lens
+import Control.Monad (forever, join, void, when)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Reader
@@ -118,6 +117,7 @@ import Executable.EthereumVM2
 import Executable.StratoP2P
 import Executable.StratoP2PClient 
 import Executable.StratoP2PServer (runEthServerConduit)
+import Ki.Unlifted as KIU
 import Network.Socket
 import Text.Read (readMaybe)
 import UnliftIO
@@ -1068,21 +1068,22 @@ instance A.Replaceable (IPAsText, TCPPort) ActivityState m where
 instance Mod.Accessible ActivePeers m where
   access = error "'Mod.Accessible ActivePeers m' not implemented"
   
-instance MonadIO m => A.Replaceable (IPAsText, UDPPort) PeerBondingState (MonadTest m) where
-  replace _ (IPAsText t, _) (PeerBondingState s) = do
-    let ip = T.unpack t
-    stringPPeerMap . at ip . _Just %= (\p -> p {pPeerBondState = s})
+instance MonadIO m => A.Replaceable (IPAsText, Point) PeerBondingState (MonadTest m) where
+  replace _ (IPAsText ip, point) (PeerBondingState s) = do
+    stringPPeerMap . at (T.unpack ip) . _Just %= (\p -> p {pPeerBondState = s})
+    pointPPeerMap . at point . _Just %= (\p -> p {pPeerBondState = s})
 
-instance (Monad m, A.Replaceable (IPAsText, UDPPort) PeerBondingState m) => A.Replaceable (IPAsText, UDPPort) PeerBondingState (MonadP2PTest m) where
+instance (Monad m, A.Replaceable (IPAsText, Point) PeerBondingState m) => A.Replaceable (IPAsText, Point) PeerBondingState (MonadP2PTest m) where
   replace p k = lift . A.replace p k
 
-instance MonadIO m => A.Replaceable (IPAsText, TCPPort) PeerBondingState (MonadTest m) where
-  replace _ (IPAsText t, _) (PeerBondingState s) = do
+instance MonadIO m => A.Selectable (IPAsText, Point) PeerBondingState (MonadTest m) where
+  select _ (IPAsText t, _) = do
     let ip = T.unpack t
-    stringPPeerMap . at ip . _Just %= (\p -> p {pPeerBondState = s})
+    map' <- use stringPPeerMap
+    return $ PeerBondingState . pPeerBondState <$> map' M.!? ip
 
-instance (Monad m, A.Replaceable (IPAsText, TCPPort) PeerBondingState m) => A.Replaceable (IPAsText, TCPPort) PeerBondingState (MonadP2PTest m) where
-  replace p k = lift . A.replace p k
+instance (A.Selectable (IPAsText, Point) PeerBondingState m) => A.Selectable (IPAsText, Point) PeerBondingState (MonadP2PTest m) where
+  select p = lift . A.select p
 
 instance MonadIO m => Mod.Accessible BondedPeers (MonadTest m) where
   access _ = do
@@ -1114,12 +1115,22 @@ instance MonadIO m => Mod.Accessible UnbondedPeers (MonadTest m) where
 instance (Monad m, Mod.Accessible UnbondedPeers m) => Mod.Accessible UnbondedPeers (MonadP2PTest m) where
   access = lift . Mod.access
 
-instance MonadIO m => A.Selectable IPAsText ClosestPeers (MonadTest m) where
-  select _ (IPAsText t) = Just . ClosestPeers . filter f . M.elems <$> use stringPPeerMap
-    where
-      f p = pPeerIp p /= t && pPeerPubkey p /= Nothing
+instance MonadIO m => Mod.Accessible ValidatorAddresses (MonadTest m) where
+  access _ = do
+    valCMPSs <- Set.toList <$> use p2pValidators
+    cmpsToX509 <- use parsedSetToX509Map
+    let valAdds = catMaybes $ (\valCMPS -> userAddress <$> cmpsToX509 M.!? valCMPS) <$> valCMPSs
+    return $ ValidatorAddresses valAdds
 
-instance A.Selectable IPAsText ClosestPeers m => A.Selectable IPAsText ClosestPeers (MonadP2PTest m) where
+instance (Monad m, Mod.Accessible ValidatorAddresses m) => Mod.Accessible ValidatorAddresses (MonadP2PTest m) where
+  access = lift . Mod.access
+
+instance MonadIO m => A.Selectable Point ClosestPeers (MonadTest m) where
+  select _ point = Just . ClosestPeers . filter f . M.elems <$> use pointPPeerMap
+    where
+      f p = pPeerPubkey p /= Just point && pPeerPubkey p /= Nothing
+
+instance A.Selectable Point ClosestPeers m => A.Selectable Point ClosestPeers (MonadP2PTest m) where
   select p = lift . A.select p
 
 instance MonadIO m => A.Replaceable PPeer UdpEnableTime (MonadTest m) where
@@ -1676,8 +1687,9 @@ makeLenses ''P2PConnection
 createConnection ::
   P2PPeer ->
   P2PPeer ->
+  Scope ->
   IO P2PConnection
-createConnection server' client' = do
+createConnection server' client' scp = do
   serverToClientTQueue <- newTQueueIO
   clientToServerTQueue <- newTQueueIO
   serverSeqSource <- atomically . dupTMChan $ _p2pPeerSeqP2pSource server'
@@ -1686,26 +1698,20 @@ createConnection server' client' = do
   clientCtx <- newIORef $ def & unseqSink .~ _p2pPeerUnseqSource client'
   serverExceptionTVar <- newTVarIO Nothing
   clientExceptionTVar <- newTVarIO Nothing
-  let rServer :: MonadP2PTest TestContextM (Maybe SomeException)
-      rServer = do
-        tm <- liftIO newThreadMap
-        runEthServerConduit
-          (_p2pPeerPPeer client')
-          (sourceTQueue clientToServerTQueue)
-          (sinkTQueue serverToClientTQueue)
-          (sourceTMChan serverSeqSource .| (awaitForever $ either (const $ pure ()) yield))
-          ("Me: " ++ _p2pPeerName server' ++ ", Them: " ++ _p2pPeerName client')
-          tm
-      rClient :: MonadP2PTest TestContextM (Maybe SomeException)
-      rClient = do
-        tm <- liftIO newThreadMap
-        runEthClientConduit
-          (_p2pPeerPPeer server')
-          (sourceTQueue serverToClientTQueue)
-          (sinkTQueue clientToServerTQueue)
-          (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
-          ("Me: " ++ _p2pPeerName client' ++ ", Them: " ++ _p2pPeerName server')
-          tm
+  let rServer = runEthServerConduit
+                  (_p2pPeerPPeer client')             
+                  (sourceTQueue clientToServerTQueue) 
+                  (sinkTQueue serverToClientTQueue)   
+                  (sourceTMChan serverSeqSource .| (awaitForever $ either (const $ pure ()) yield))
+                  ("Me: " ++ _p2pPeerName server' ++ ", Them: " ++ _p2pPeerName client')
+                  scp
+  let rClient = runEthClientConduit         
+                  (_p2pPeerPPeer server')   
+                  (sourceTQueue serverToClientTQueue)
+                  (sinkTQueue clientToServerTQueue)
+                  (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
+                  ("Me: " ++ _p2pPeerName client' ++ ", Them: " ++ _p2pPeerName server')
+                  scp
   pure $
     P2PConnection
       serverToClientTQueue
@@ -1720,8 +1726,9 @@ createConnection server' client' = do
 createGermophobicConnection ::
   P2PPeer ->
   P2PPeer ->
+  Scope ->
   IO P2PConnection
-createGermophobicConnection server' client' = do
+createGermophobicConnection server' client' scp = do
   serverToClientTQueue <- newTQueueIO
   clientToServerTQueue <- newTQueueIO
   clientSeqSource <- atomically . dupTMChan $ _p2pPeerSeqP2pSource client'
@@ -1729,18 +1736,14 @@ createGermophobicConnection server' client' = do
   clientCtx <- newIORef $ def & unseqSink .~ _p2pPeerUnseqSource client'
   serverExceptionTVar <- newTVarIO Nothing
   clientExceptionTVar <- newTVarIO Nothing
-  tm                  <- newThreadMap
-  let rServer :: MonadP2PTest TestContextM (Maybe SomeException)
-      rServer = pure Nothing -- server is germophobic; will not conduct handshake
-      rClient :: MonadP2PTest TestContextM (Maybe SomeException)
-      rClient =
-        runEthClientConduit
-          (_p2pPeerPPeer server')
-          (sourceTQueue serverToClientTQueue)
-          (sinkTQueue clientToServerTQueue)
-          (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
-          ("Me: " ++ _p2pPeerName client' ++ ", Them: " ++ _p2pPeerName server')
-          tm
+  let rServer = pure Nothing -- server is germophobic; will not conduct handshake
+  let rClient = runEthClientConduit         
+                  (_p2pPeerPPeer server')   
+                  (sourceTQueue serverToClientTQueue)
+                  (sinkTQueue clientToServerTQueue)
+                  (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
+                  ("Me: " ++ _p2pPeerName client' ++ ", Them: " ++ _p2pPeerName server')
+                  scp
   pure $
     P2PConnection
       serverToClientTQueue
@@ -1886,11 +1889,13 @@ addConnection serverLabel clientLabel = do
       _ -> pure Nothing
   case mPeers of
     Nothing -> pure False
-    Just (server', client') -> liftIO $ do
-      connection <- createConnection server' client'
-      a <- async $ runConnection connection
-      atomically $ modifyTVar (mgr ^. threads) $ connectionThreads . at (serverLabel, clientLabel) ?~ a
-      pure True
+    Just (server', client') ->
+      liftIO $ do
+        connection <- scoped $ \scope ->
+                        createConnection server' client' scope
+        a <- async $ runConnection connection
+        atomically $ modifyTVar (mgr ^. threads) $ connectionThreads . at (serverLabel, clientLabel) ?~ a
+        pure True
 
 removeConnection :: Text -> Text -> ReaderT NetworkManager IO Bool
 removeConnection serverLabel clientLabel = do
@@ -1943,7 +1948,8 @@ runNetworkWithStaticConnections nodesList connectionsList validatorsFilter = do
   eConnections <- runExceptT . for connectionsList $ \(server', client') -> do
     serverPeer <- maybeToExceptT ("Couldn't find server " <> server') . MaybeT . pure $ M.lookup server' nodesMap
     clientPeer <- maybeToExceptT ("Couldn't find client " <> client') . MaybeT . pure $ M.lookup client' nodesMap
-    liftIO $ createConnection serverPeer clientPeer
+    liftIO $ scoped $ \scope  ->
+      createConnection serverPeer clientPeer scope
   for eConnections $ \connections' -> do
     let connectionsMap = M.fromList $ zip connectionsList connections'
         network' = Network nodesMap connectionsMap inet

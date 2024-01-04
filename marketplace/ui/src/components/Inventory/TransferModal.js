@@ -89,7 +89,7 @@ const TransferModal = ({ open, handleCancel, inventory }) => {
         if (quantity > 0 && quantity <= inventory.quantity && userAddress) {
             let isDone = await actions.transferInventory(inventoryDispatch, body);
             if (isDone) {
-                actions.fetchInventory(inventoryDispatch, 10, 0, "", undefined);
+                await actions.fetchInventory(inventoryDispatch, 10, 0, "", undefined);
                 handleCancel();
             }
         }
@@ -128,7 +128,7 @@ const TransferModal = ({ open, handleCancel, inventory }) => {
 
                     <p className="text-[#202020] font-medium text-sm">Set Quantity</p>
                     <div className="inventory_card">
-                        <InputNumber className="w-full pl-[1.4rem]" value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
+                        <InputNumber className="w-full pl-5" value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
                     </div>
                 </div>
                 <div>

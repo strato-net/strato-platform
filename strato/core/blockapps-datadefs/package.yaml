@@ -2,7 +2,6 @@ name: blockapps-datadefs
 
 dependencies:
   - aeson
-  - ansi-wl-pprint
   - base
   - base16-bytestring
   - binary

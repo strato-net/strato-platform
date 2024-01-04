@@ -29,11 +29,14 @@ import BlockApps.Logging
 import Blockchain.DB.SQLDB
 import Blockchain.DBM
 import Blockchain.Data.PubKey (secPubKeyToPoint)
+import Blockchain.EthConf (lookupRedisBlockDBConfig)
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Discovery.UDP (processDataStream')
 import Blockchain.Strato.Model.Secp256k1
+import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import Control.Concurrent (threadDelay)
 import Control.Exception
+import Control.Monad (void)
 import Control.Monad.Catch hiding (bracket)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Change.Modify (Accessible (..))
@@ -47,6 +50,7 @@ import qualified Data.ByteString as B
 import Data.Maybe (listToMaybe)
 import qualified Data.Text as T
 import qualified Database.Persist.Postgresql as SQL
+import qualified Database.Redis as Redis
 import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Network.Socket
 import qualified Network.Socket.ByteString as NB
@@ -57,6 +61,7 @@ import System.Timeout
 
 data ContextLite = ContextLite
   { liteSQLDB :: SQLDB,
+    redisBlockDB :: RBDB.RedisConnection,
     vaultClient :: ClientEnv,
     sock :: Socket,
     myUdpPort :: UDPPort,
@@ -77,6 +82,12 @@ instance Monad m => Accessible UDPPort (ReaderT ContextLite m) where
 
 instance Monad m => Accessible TCPPort (ReaderT ContextLite m) where
   access _ = asks myTcpPort
+
+instance Monad m => Accessible RBDB.RedisConnection (ReaderT ContextLite m) where
+  access _ = asks redisBlockDB
+  
+instance MonadIO m => Accessible ValidatorAddresses (ReaderT ContextLite m) where
+  access _ = RBDB.withRedisBlockDB $ ValidatorAddresses <$> RBDB.getValidatorAddresses
 
 instance MonadUnliftIO m => A.Replaceable IPAsText PPeer (ReaderT ContextLite m) where
   replace _ (IPAsText ip) peer = do
@@ -181,6 +192,7 @@ type MonadDiscovery m =
     A.Replaceable SockAddr B.ByteString m,
     Mod.Accessible UDPPort m,
     Mod.Accessible TCPPort m,
+    Mod.Accessible ValidatorAddresses m,
     A.Selectable (Maybe IPAsText, UDPPort) SockAddr m
   )
 
@@ -197,11 +209,13 @@ waitOnVault action = do
 initContextLite :: MonadUnliftIO m => String -> UDPPort -> TCPPort -> m ContextLite
 initContextLite vaultUrl udpPort tcpPort = do
   dbs <- openDBs
+  redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
   mgr <- liftIO $ newManager defaultManagerSettings
   url <- liftIO $ parseBaseUrl vaultUrl
   return
     ContextLite
       { liteSQLDB = sqlDB' dbs,
+        redisBlockDB = RBDB.RedisConnection redisBDBPool,
         vaultClient = mkClientEnv mgr url,
         sock = error "initContextLite: Uninitialized socket",
         myUdpPort = udpPort,

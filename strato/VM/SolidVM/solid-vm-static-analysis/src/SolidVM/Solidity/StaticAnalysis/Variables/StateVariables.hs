@@ -9,6 +9,7 @@ module SolidVM.Solidity.StaticAnalysis.Variables.StateVariables
 where
 
 import Control.Lens
+import Control.Monad (unless)
 import Control.Monad.State
 import Data.Foldable (traverse_)
 import qualified Data.Map.Strict as M

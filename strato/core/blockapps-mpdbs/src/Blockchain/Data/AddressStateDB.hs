@@ -52,7 +52,6 @@ import GHC.Generics
 import Numeric
 import qualified Text.Colors as CL
 import Text.Format
-import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 import Text.Tools
 import Prelude hiding (lookup)
 
@@ -142,7 +141,7 @@ instance RLPSerializable AddressState where
         addressStateCodeHash = rlpDecode ch,
         addressStateChainId = Nothing
       }
-  rlpDecode x = error $ "Missing case in rlpDecode for AddressState: " ++ show (pretty x)
+  rlpDecode x = error $ "Missing case in rlpDecode for AddressState: " ++ format x
 
 {-- TODO:
     resolveCodePtr fails when there is a circular reference of code pointers on the same chain

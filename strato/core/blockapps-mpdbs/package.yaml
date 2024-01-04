@@ -18,7 +18,6 @@ library:
   source-dirs: src/
   default-extensions: TemplateHaskell
   dependencies:
-  - ansi-wl-pprint
   - base16-bytestring
   - binary
   - blockapps-data
@@ -35,7 +34,6 @@ library:
   - merkle-patricia-db
   - monad-alter
   - monad-loops
-  - mtl
   - nibblestring
   - solid-vm-model
   - strato-model
