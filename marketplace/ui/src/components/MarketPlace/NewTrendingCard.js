@@ -30,11 +30,11 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                 onClick={() =>
                     navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
                 }
-                className='md:h-[200px] md:w-[40vw] h-[150px] object-contain'
+                className='md:h-[200px] md:w-[40vw] h-[150px] object-contain rounded-md'
                 src={topSellingProduct.images ? topSellingProduct?.images[0] : images_placeholder}
                 alt={topSellingProduct?.name || "N/A"}
             />
-            <div className='flex justify-between'>
+            <div className='flex justify-between items-center'>
                 <Typography
                     onClick={() =>
                         navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
@@ -89,7 +89,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                     </Typography>
                 </div>
             </div>
-            <div className='flex gap-4'>
+            <div className='flex gap-4 mt-1'>
                 <Button
                     id={`${topSellingProduct.name.replace(/ /g, "_")}-buy-now`}
                     type='primary'
