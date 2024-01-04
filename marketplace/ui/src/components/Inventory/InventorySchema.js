@@ -19,9 +19,10 @@ const getSchema = () => {
     // brand: yup.string().nullable().required("A brand is required"),
     quantity: yup.number().positive("Quantity must be a positive number").required("Quantity is required"),
     expirationPeriodInMonths: yup.number().positive("Expiration period must be a positive number").required("Expiration period is required"),
-    images: yup.array().of(yup.mixed())
-      .required("Image is required")
-      .test('is-non-empty', "Image is required", array => array.length > 0),
+    images: yup.mixed().required("Image is required"),
+    // images: yup.array().of(yup.mixed())
+    //   .required("Image is required")
+    //   .test('is-non-empty', "Image is required", array => array.length > 0),
     files: yup.mixed().optional().nullable(),
     category: yup.string().required("Category is required"),
     subCategory: yup.string().nullable().required("Sub-Category is required")
