@@ -6,7 +6,7 @@ import { useInventoryDispatch, useInventoryState } from "../../contexts/inventor
 import { useUsersDispatch, useUsersState } from "../../contexts/users";
 import { useAuthenticateState } from "../../contexts/authentication";
 
-const TransferModal = ({ open, handleCancel, inventory }) => {
+const TransferModal = ({ open, handleCancel, inventory, categoryName }) => {
     const [data, setData] = useState([inventory]);
     const [quantity, setQuantity] = useState(1);
     const [userAddress, setUserAddress] = useState("");
@@ -89,7 +89,7 @@ const TransferModal = ({ open, handleCancel, inventory }) => {
         if (quantity > 0 && quantity <= inventory.quantity && userAddress) {
             let isDone = await actions.transferInventory(inventoryDispatch, body);
             if (isDone) {
-                await actions.fetchInventory(inventoryDispatch, 10, 0, "", undefined);
+                await actions.fetchInventory(inventoryDispatch, 10, 0, "", categoryName);
                 handleCancel();
             }
         }

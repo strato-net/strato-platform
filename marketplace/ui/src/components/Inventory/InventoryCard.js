@@ -538,6 +538,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
             inventory: inventory,
             category: category,
           }}
+          categoryName={category}
         />
       )}
       {listModalOpen && (
@@ -546,6 +547,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
           handleCancel={handleListModalClose}
           inventory={inventory}
           paymentProviderAddress={paymentProviderAddress}
+          categoryName={category}
         />
       )}
       {unlistModalOpen && (
@@ -554,6 +556,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
           handleCancel={handleUnlistModalClose}
           inventory={inventory}
           saleAddress={inventory.saleAddress}
+          categoryName={category}
         />
       )}
       {resellModalOpen && (
@@ -561,6 +564,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
           open={resellModalOpen}
           handleCancel={handleResellModalClose}
           inventory={inventory}
+          categoryName={category}
+          
         />
       )}
       {transferModalOpen && (
@@ -568,6 +573,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
           open={transferModalOpen}
           handleCancel={handleTransferModalClose}
           inventory={inventory}
+          categoryName={category}
         />
       )}
     </div>

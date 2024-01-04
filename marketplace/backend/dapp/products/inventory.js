@@ -7,6 +7,7 @@ import constants from '../../helpers/constants';
 import saleJs from "../orders/sale";
 
 const contractName = constants.assetTableName;
+const transferContractName = `${contractName}.ItemTransfers`;
 const contractFilename = `${util.cwd}/dapp/products/contracts/Inventory.sol`;
 const saleContractName = 'SimpleSale';
 const saleContract = constants.saleTableName;
@@ -252,7 +253,7 @@ async function transferItem(user, contract, args, options) {
         }
       }
       
-    await waitForAddress(user, {name: `Asset.ItemTransfers`}, searchOptions);
+    await waitForAddress(user, {name: transferContractName}, searchOptions);
 
     return transferStatus;
 }
