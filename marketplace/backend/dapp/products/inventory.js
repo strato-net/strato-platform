@@ -183,7 +183,6 @@ async function unlistItem(user, _contract, args, options) {
         method: "closeSale",
         args: util.usc({ ...args }),
     };
-    console.log("callArgs123: ", callArgs)
     const unlistStatus = await rest.call(user, callArgs, options);
 
     if (parseInt(unlistStatus, 10) !== RestStatus.OK) {
@@ -354,7 +353,6 @@ async function getAll(admin, args = {}, defaultOptions) {
     let inventories;
     let sales;
     let finalInventory = [];
-    console.log("GetALL call")
     const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
 
     if (ownerCommonName) {

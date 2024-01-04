@@ -62,7 +62,8 @@ abstract contract Mintable is UTXO {
     
     function _callMint(address _newOwner, uint _quantity) internal virtual override{
         UTXO newAsset = mint(_quantity);
-        Asset(newAsset).transferOwnership(_newOwner, _quantity);
+        // regular transfer - isUserTransfer: false, transferNumber: 0
+        Asset(newAsset).transferOwnership(_newOwner, _quantity, false, 0);
     }
     
     function checkCondition() internal virtual override returns (bool){

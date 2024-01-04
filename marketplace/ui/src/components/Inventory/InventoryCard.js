@@ -295,13 +295,19 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
                   <PieChartOutlined />
                   <p className="ml-3">Mint</p>
                 </div>) : (<div></div>)}
-                <div
-                  className="flex items-center mt-2 cursor-pointer"
-                  onClick={showTransferModal}
-                >
-                  <SwapOutlined />
-                  <p className="ml-3">Transfer</p>
-                </div>
+
+                {inventory.quantity && parseInt(inventory.quantity) > 0 && (!inventory.saleAddress || (inventory.saleAddress && parseInt(inventory.saleQuantity) > 0)) ? (
+                  <div
+                      className="flex items-center mt-2 cursor-pointer"
+                      onClick={showTransferModal}
+                  >
+                      <SwapOutlined />
+                      <p className="ml-3">Transfer</p>
+                  </div>
+                ) : (
+                  <div></div>
+              )}
+
               </div>
             }
             trigger="click"
