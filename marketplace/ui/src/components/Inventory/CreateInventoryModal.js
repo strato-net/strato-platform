@@ -135,9 +135,11 @@ const CreateInventoryModal = ({
         const formData = new FormData();
         formData.append(img.name, img);
         const imageData = await actions.uploadImage(dispatch, formData);
-        // Sometimes the image fits the criteria and the upload fails. 
-        // These should be checked before submitting the form
-        if (imageData) imageKeys.push(imageData);
+        if (imageData) {
+          imageKeys.push(imageData);
+        } else {
+          throw new Error("Image upload failed");
+        }
       }
     }
 
@@ -147,7 +149,11 @@ const CreateInventoryModal = ({
         const formData = new FormData();
         formData.append(file.name, file);
         const fileData = await actions.uploadImage(dispatch, formData);
-        if (fileData) fileKeys.push(fileData);
+        if (fileData) {
+          fileKeys.push(fileData);
+        } else {
+          throw new Error("File upload failed");
+        }
       }
     }
 
