@@ -19,7 +19,7 @@ export const ResponsiveSoldOrderCard = ({ data, isLoading }) => {
                 classes = "text-[#FF8C00]"
                 break;
             case 'Canceled':
-                classes = "text-[#FF0000]]"
+                classes = "text-[#FF0000]"
                 break;
             case 'Awaiting Shipment':
                 classes = "text-[#13188A]"
