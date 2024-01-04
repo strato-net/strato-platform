@@ -403,11 +403,11 @@ const CreateInventoryModal = ({
                 placeholder="Select Type of Clothing"
                 onChange={handleClothingTypeChange}
               >
-                <Option value="shirt">Shirt</Option>
-                <Option value="jacket">Jacket</Option>
-                <Option value="pants">Pants</Option>
-                <Option value="shoes">Shoes</Option>
-                <Option value="accessories">Accessories</Option>
+                <Option value="Shirt">Shirt</Option>
+                <Option value="Jacket">Jacket</Option>
+                <Option value="Pants">Pants</Option>
+                <Option value="Shoes">Shoes</Option>
+                <Option value="Accessories">Accessories</Option>
               </Select>
               {formik.touched.clothingType && formik.errors.clothingType && (
                 <span className="text-error text-xs">
@@ -458,9 +458,9 @@ const CreateInventoryModal = ({
                 onChange={(value) => formik.setFieldValue("condition", value)}
                 onBlur={formik.handleBlur}
               >
-                <Option value="new">New</Option>
-                <Option value="conditional">Conditional</Option>
-                <Option value="used">Used</Option>
+                <Option value="New">New</Option>
+                <Option value="Conditional">Conditional</Option>
+                <Option value="Used">Used</Option>
               </Select>
               {formik.touched.condition && formik.errors.condition && (
                 <span className="text-error text-xs">
@@ -510,9 +510,9 @@ const CreateInventoryModal = ({
                 onChange={(value) => formik.setFieldValue("condition", value)}
                 onBlur={formik.handleBlur}
               >
-                <Option value="new">New</Option>
-                <Option value="conditional">Conditional</Option>
-                <Option value="used">Used</Option>
+                <Option value="New">New</Option>
+                <Option value="Conditional">Conditional</Option>
+                <Option value="Used">Used</Option>
               </Select>
               {formik.touched.condition && formik.errors.condition && (
                 <span className="text-error text-xs">

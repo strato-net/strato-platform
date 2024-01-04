@@ -112,7 +112,7 @@ const ResponsiveCart = ({
                       <p className="text-lg text-[#202020] font-medium">-</p>
                     </div>
                     <InputNumber
-                      className=" w-8 border-none text-[#202020] font-medium bg-[transparent]  rounded-none outline-none  text-sm text-center flex flex-col justify-center"
+                      className=" w-[3rem] border-none text-[#202020] font-medium bg-[transparent]  rounded-none outline-none  text-sm text-center flex flex-col justify-center"
                       min={1}
                       value={qty}
                       defaultValue={qty}

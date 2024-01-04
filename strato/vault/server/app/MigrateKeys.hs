@@ -78,7 +78,7 @@ main = do
                 nonce
                 oldkey
                 addr
-          void . runUpdate_ conn $
+          void . runUpdate conn $
             Update
               { uTable = TS.usersTable,
                 -- Note: These lenses are 1-indexed. Its not a huge problem to set enc_key again,

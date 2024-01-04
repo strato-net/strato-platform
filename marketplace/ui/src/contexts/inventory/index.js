@@ -30,6 +30,10 @@ const InventoriesProvider = ({ children }) => {
     isLoadingStripeStatus: false,
     uploadedImg : null,
     isUploadImageSubmitting: false,
+    isTransferringItems: false,
+    itemTransfers: [],
+    totalItemsTransfered: 0,
+    isFetchingItemTransfers: false    
   };
 
   const [state, dispatch] = useReducer(reducer, initialState);

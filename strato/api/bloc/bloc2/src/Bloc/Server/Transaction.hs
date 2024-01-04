@@ -64,7 +64,7 @@ import Blockchain.Strato.Model.Secp256k1 hiding (HasVault)
 import Blockchain.Strato.Model.Wei
 import Blockchain.Strato.RedisBlockDB (getBestBlockInfo, getSyncStatus, getWorldBestBlockInfo, runStratoRedisIO)
 import Blockchain.Strato.RedisBlockDB.Models (RedisBestBlock (..))
-import Control.Applicative (liftA2, (<|>))
+import Control.Applicative ((<|>))
 import Control.Arrow
 import Control.Lens hiding (from, ix)
 import Control.Monad

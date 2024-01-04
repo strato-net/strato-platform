@@ -38,6 +38,9 @@ img.ant-image-preview-img {
 .trending_cards::-webkit-scrollbar {
   display: none;
 }
+.trending_cards{
+  scrollbar-width: none; 
+}
 
 @media (max-width: 525px) {
   .control-dots .dot {

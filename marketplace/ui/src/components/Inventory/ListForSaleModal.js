@@ -41,9 +41,10 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
                 onClose={onClose}
                 className="flex items-center mr-1"
             >
-                {renderIcon(value)}
+                {PAYMENT_TYPE[0].name}
+                {/* {renderIcon(value)} */}
                 {/* (...) Indicates More options in addition to available icons */}
-                <p className="ml-1">...</p>
+                {/* <p className="ml-1">...</p> */}
             </Tag>
         );
     };

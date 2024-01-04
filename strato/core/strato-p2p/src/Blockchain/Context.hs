@@ -130,6 +130,7 @@ import           Blockchain.Stream.VMOutput            ( VMOutput(..)
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models (RedisBestBlock(..))
 import           Blockchain.TCPClientWithTimeout
+import           Control.Monad                         (void, when)
 import           Control.Monad.Composable.Base
 import qualified Database.Persist.Sql                  as SQL
 import qualified Database.Redis                        as Redis

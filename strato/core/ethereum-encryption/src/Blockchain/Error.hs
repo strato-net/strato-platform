@@ -9,5 +9,5 @@ import System.Posix.Process
 error' :: String -> a
 error' x = unsafePerformIO $ do
   hPutStrLn stderr x
-  exitImmediately $ ExitFailure (-1)
+  _ <- exitImmediately $ ExitFailure (-1)
   return undefined

@@ -9,6 +9,7 @@ where
 
 import Control.Applicative ((<|>))
 import Control.Lens
+import Control.Monad (join)
 import Control.Monad.Reader
 import Control.Monad.Trans.State
 import Data.Functor.Compose

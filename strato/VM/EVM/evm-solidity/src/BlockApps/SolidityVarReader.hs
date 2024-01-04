@@ -37,6 +37,7 @@ import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
+import Control.Monad (join)
 import Control.Exception
 import Control.Monad.Except
 import Data.Bifunctor (bimap)
