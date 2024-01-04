@@ -389,6 +389,7 @@ async function getAll(admin, args = {}, defaultOptions) {
                     price: itemSale?.price,
                     saleAddress: itemSale?.address,
                     saleQuantity: itemSale?.quantity,
+                    saleDate: itemSale?.block_timestamp
                 })
             }
             else if (isMarketplaceSearch) {
