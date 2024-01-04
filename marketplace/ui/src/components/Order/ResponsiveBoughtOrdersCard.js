@@ -39,34 +39,38 @@ export const ResponsiveBoughtOrderCard = ({ data, isLoading }) => {
                             <Typography>Order Number</Typography>
                             <Typography
                                 onClick={() => { navigate(routes.BoughtOrderDetails.url.replace(":id", item.address)); }}
-                                className={`text-[#13188A] cursor-pointer`}
+                                className={`text-[#13188A] font-semibold cursor-pointer`}
                             >
                                 {'#' + item?.orderNumber?.orderId || 'N/A'}
                             </Typography>
                         </div>
-                        <div className={`p-2 px-4 w-full flex justify-between`}>
+                        <div className={` px-4 w-full flex justify-between`}>
                             <Typography>Buyer</Typography>
-                            <Typography>{item?.sellersCommonName || 'N/A'}</Typography>
+                            <Typography className="text-[#202020] font-semibold">{item?.sellersCommonName || 'N/A'}</Typography>
                         </div>
-                        <div className={`p-2 px-4 w-full flex justify-between`}>
+                        <div className={` px-4 w-full flex justify-between`}>
                             <Typography>Order Total($)</Typography>
-                            <Typography className={`text-[#202020]`}>{'$' + item?.orderTotal || 'N/A'}</Typography>
+                            <Typography className={`text-[#202020] font-semibold`}>{'$' + item?.orderTotal || 'N/A'}</Typography>
                         </div>
-                        <div className={`p-2 px-4 w-full flex justify-between`}>
+                        <div className={` px-4 w-full flex justify-between`}>
                             <Typography>Date</Typography>
-                            <Typography className={`text-[#202020]`}>{item?.date || 'N/A'}</Typography>
+                            <Typography className={`text-[#202020] font-semibold`}>{item?.date || 'N/A'}</Typography>
                         </div>
-                        <div className={`p-2 px-4 w-full flex justify-between`}>
+                        <div className={` px-4 w-full flex justify-between`}>
                             <Typography>Status</Typography>
-                            <Typography className={statusComponent(item?.status)}>{item?.status || 'N/A'}</Typography>
+                            <Typography className={`font-semibold ${statusComponent(item?.status)}`}>{item?.status || 'N/A'}</Typography>
                         </div>
+                    
+
+                       
                         <Button
                             onClick={() => { navigate(routes.BoughtOrderDetails.url.replace(":id", item.address)) }}
-                            className="w-1/3 text-blue border-blue cursor-pointer"
+                            className="w-1/3 mt-1 text-blue border-blue cursor-pointer font-semibold"
                             size="middle"
                         >
                             More
                         </Button>
+                      
                     </div>
                 )
             }) : <Typography className="text-center text-lg m-6 font-semibold">No data</Typography>}

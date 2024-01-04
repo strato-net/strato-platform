@@ -81,5 +81,11 @@
     display:none;
 }
 :where(.css-dev-only-do-not-override-9ntgx0).ant-picker{
-    height: 36px;
+    height: 32px;
+}
+@media (min-width : 770px) {
+    :where(.css-dev-only-do-not-override-9ntgx0).ant-picker{
+        height: 36px;
+    }
+    
 }
