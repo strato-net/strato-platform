@@ -340,17 +340,17 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
         <div className="flex flex-col gap-4 px-[18px] py-4 border border-[#E9E9E9] rounded-md w-full ">
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Sub Category</p>
-            <p className="text-[#202020] font-medium">{getCategory() || "N/A"}</p>
+            <p className="text-[#202020] font-semibold">{getCategory() || "N/A"}</p>
           </div> <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity Owned</p>
-            <p className="text-[#202020] font-medium">{inventory.quantity || "N/A"}</p>
+            <p className="text-[#202020] font-semibold">{inventory.quantity || "N/A"}</p>
           </div> <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity for Sale </p>
-            <p className="text-[#202020] font-medium">{inventory.saleQuantity || "N/A"}</p>
+            <p className="text-[#202020] font-semibold">{inventory.saleQuantity || "N/A"}</p>
           </div>
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Price</p>
-            <p className="text-[#202020] font-medium">{inventory?.price || "N/A"}</p>
+            <p className="text-[#202020] font-semibold">{inventory?.price || "N/A"}</p>
           </div>
 
         </div>
