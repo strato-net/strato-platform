@@ -3022,15 +3022,22 @@ runTheConstructors from to hsh cc contractName' argExps = do
         SVMType.Array _ _ -> return ()
         t -> do
           defVal <- createDefaultValue cc contract' t
-          for_ (toBasic defVal) $ markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n])
-    -- SVMType.Bool -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) $ MS.BBool False
+          for_ (toBasic defVal) $ markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n])    
+
+    let getParents p = fromMaybe [] . fmap CC._parents $ M.lookup p (cc ^. CC.contracts)
+        familyTree :: [SolidString] -> [SolidString]
+        familyTree [] = []
+        familyTree xs = foldl' (\(acc :: [SolidString]) (p' :: SolidString) -> acc ++ [p'] ++ familyTree (getParents p')) [] xs
 
     forM_ (reverse $ contract' ^. CC.parents) $ \parent -> do
-      let args =
-            CC.OrderedArgs
-              . fromMaybe []
-              $ M.lookup parent =<< (fmap CC._funcConstructorCalls $ contract' ^. CC.constructor)
-      runTheConstructors from to hsh cc parent args
+      let lookupConstructor = fmap CC._funcConstructorCalls $ contract' ^. CC.constructor
+          ft = familyTree [parent]
+      onTraced $ liftIO $ putStrLn $ "family tree: " ++ show ft
+      for_ ft (\c' -> do 
+          case M.lookup c' =<< lookupConstructor of
+            Nothing -> return () -- runTheConstructors from to hsh cc parent (CC.OrderedArgs [])
+            Just args -> runTheConstructors from to hsh cc c' (CC.OrderedArgs args)
+        )
 
     case contract' ^. CC.constructor of
       Just theFunction -> do
@@ -3041,12 +3048,11 @@ runTheConstructors from to hsh cc contractName' argExps = do
               --args' <- argsToVals contract' theModifier argExps
               return $ Just theModifier
             Nothing -> do
-              if name `elem` contract' ^. CC.parents then return Nothing else missingField "modifier not found" name
+              if name `elem` familyTree (contract' ^. CC.parents) then return Nothing else missingField "modifier not found" name
         let theModifiers = catMaybes theModifiers'
         !commands <- case CC._funcContents theFunction of
           Nothing -> missingField "contract constructor has been declared but not defined" contractName'
           Just cms -> pure cms
-        -- let modifierArgs = map CC.modifierArgs theModifiers
         let !modContentsList = map (\m -> fromMaybe (missingField "Function call: Modifier has been declared but not defined" m) (CC._modifierContents m)) theModifiers
         let isNotModExec = \case
               CC.ModifierExecutor _ -> False

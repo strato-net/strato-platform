@@ -8522,3 +8522,12 @@ contract qq {
   }
 }
 |]) `shouldThrow` anyTypeError
+
+  it "can access constructor of grandparent contracts" $ runTest ( do
+      runArgs "(1, 2)" [r|
+
+contract qq is B { constructor(uint f, uint g) C(f, g) {} }
+abstract contract B is C {}
+abstract contract C { constructor(uint x, uint y) {} }
+
+|]) `shouldReturn` ()
