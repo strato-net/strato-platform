@@ -573,7 +573,7 @@ const SoldOrderDetails = ({ user, users }) => {
                           type="primary"
                           // Disable the button here if the serial numbers aren't uploaded. We don't want the user closing the order without providing the serial numbers.
                           loading={issellerDetailsUpdating || isCreateOrderLineItem || isCreateOrderSubmitting}
-                          disabled={status === getStatus(3) || status === getStatus(4) || allSerialNumbersUploaded() === false}
+                          disabled={status === getStatus(3) || status === getStatus(4) || allSerialNumbersUploaded() === false || !selectedDate}
                           onClick={() => {
                             handleUpdateComment()
                             window.LOQ.push(['ready', async LO => {
