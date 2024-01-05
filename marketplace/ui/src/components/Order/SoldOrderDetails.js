@@ -131,26 +131,14 @@ const SoldOrderDetails = ({ user, users }) => {
     if (Id !== undefined) {
       getData();
     }
-  }, [Id, dispatch]);
+  }, [Id, dispatch, status]);
 
   const getData = async () => {
     const data = await actions.fetchOrderDetails(dispatch, Id);
     if (data != null) {
-      setShouldCheckPaymentStatus(true);
+      getPaymentStatus(data.order.paymentSessionId, data.order.sellersCommonName);
     }
   };
-
-  useEffect(() => {
-    actions.fetchOrderDetails(dispatch, Id);
-  }, [status])
-
-  useEffect(() => {
-    if (shouldCheckPaymentStatus && orderDetails) {
-      getPaymentStatus(orderDetails.order.paymentSessionId, orderDetails.order.sellersCommonName);
-      setShouldCheckPaymentStatus(false);
-    }
-  }, [shouldCheckPaymentStatus, orderDetails]);
-
 
   const validatePayment = async (paymentSessionId) => {
     if (!paymentSessionId || !orderDetails) return;
