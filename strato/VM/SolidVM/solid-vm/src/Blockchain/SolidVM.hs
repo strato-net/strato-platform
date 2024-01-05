@@ -3012,6 +3012,9 @@ runTheConstructors from to hsh cc contractName' argExps = do
 
   void . withCallInfo to contract' (stringToLabel $ labelToString contractName' ++ " constructor") hsh cc (M.fromList zipped) False False $ do
 
+    ci <- getCurrentCallInfo
+    onTraced $ liftIO $ putStrLn $ show ci
+
     forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, e) -> do
       v <- expToVar e
       setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
@@ -3028,16 +3031,13 @@ runTheConstructors from to hsh cc contractName' argExps = do
         familyTree :: [SolidString] -> [SolidString]
         familyTree [] = []
         familyTree xs = foldl' (\(acc :: [SolidString]) (p' :: SolidString) -> acc ++ [p'] ++ familyTree (getParents p')) [] xs
+        lookupConstructor = fmap CC._funcConstructorCalls $ contract' ^. CC.constructor
 
-    forM_ (reverse $ contract' ^. CC.parents) $ \parent -> do
-      let lookupConstructor = fmap CC._funcConstructorCalls $ contract' ^. CC.constructor
-          ft = familyTree [parent]
-      onTraced $ liftIO $ putStrLn $ "family tree: " ++ show ft
-      for_ ft (\c' -> do 
-          case M.lookup c' =<< lookupConstructor of
-            Nothing -> return () -- runTheConstructors from to hsh cc parent (CC.OrderedArgs [])
-            Just args -> runTheConstructors from to hsh cc c' (CC.OrderedArgs args)
-        )
+    for_ (familyTree $ contract' ^. CC.parents) (\c' -> do 
+        case M.lookup c' =<< lookupConstructor of
+          Nothing -> return () 
+          Just args -> runTheConstructors from to hsh cc c' (CC.OrderedArgs args)
+      )
 
     case contract' ^. CC.constructor of
       Just theFunction -> do
