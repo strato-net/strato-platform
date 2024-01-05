@@ -39,7 +39,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                     onClick={() =>
                         navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
                     }
-                    className='font-semibold overflow-hidden cursor-pointer'
+                    className='font-semibold overflow-hidden cursor-pointer w-[180px] md:w-[220px] whitespace-nowrap text-ellipsis'
                 >
                     {topSellingProduct?.name || "N/A"}
                 </Typography>
