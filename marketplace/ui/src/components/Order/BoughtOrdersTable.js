@@ -33,6 +33,7 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
   const [dropdownVisible, setDropdownVisible] = useState(false);
   const [mDropdownVisible, setMDropdownVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false); 
+  const [shouldRefetch, setShouldRefetch] = useState(true);
 
 
   const { orders, isordersLoading, orderBoughtTotal} = useOrderState();
@@ -47,7 +48,25 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
       filter,
       order
     );
-  }, [dispatch, limit, offset, debouncedSearchTerm, user, order, selectedDate, filter]);
+  }, [dispatch, limit, offset, debouncedSearchTerm, user, order, selectedDate, filter, shouldRefetch]);
+  
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      orders.map(async (order) => {
+        if (order.paymentSessionId !== "" && getStatus(parseInt(order.status)) === getStatusByName("Payment Pending")) {
+          try {
+            setIsLoading(true);
+            await validatePayment(order);          
+          } catch (err) {
+            console.error(err);
+          }
+        }
+        setIsLoading(false);
+      })
+    }, 10000); // Poll every 30 seconds, adjust as needed
+
+    return () => clearInterval(intervalId); // Clear interval on component unmount
+  }, [orders]); // Dependency array
   
   useEffect(() => {
     setPage(1);
@@ -78,6 +97,10 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
           saleOrderAddress: order.address,
           status: 1,
         });
+
+        if (isDone.includes('200')){
+          setShouldRefetch(!shouldRefetch);
+        }
       }
     }
   } 
