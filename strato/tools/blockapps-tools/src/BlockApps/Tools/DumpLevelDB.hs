@@ -10,18 +10,15 @@ import Control.Monad (when)
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Resource
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import Data.Default
 import qualified Database.LevelDB as DB
 import qualified LabeledError
 import System.FilePath
-import Text.PrettyPrint.ANSI.Leijen hiding ((<$>), (</>))
+import Text.Colors
+import Text.Format
 
 --import Debug.Trace
-
-instance Pretty B.ByteString where
-  pretty = blue . text . BC.unpack . B16.encode
 
 showAllKeyVal :: DB.DB -> (B.ByteString -> String) -> ResourceT IO ()
 showAllKeyVal db f = do
@@ -37,8 +34,8 @@ showAllKeyVal db f = do
       Just key <- DB.iterKey i
       Just val <- DB.iterValue i
       if B.null val
-        then liftIO $ putStrLn $ "----------\n" ++ show (pretty key) ++ ": <BLANK>"
-        else liftIO $ putStrLn $ "----------\n" ++ show (pretty key) ++ ": " ++ f val
+        then liftIO $ putStrLn $ "----------\n" ++ blue (format key) ++ ": <BLANK>"
+        else liftIO $ putStrLn $ "----------\n" ++ blue (format key) ++ ": " ++ f val
       DB.iterNext i
       v <- DB.iterValid i
       when v $ showAllKeyVal' db' i

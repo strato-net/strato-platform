@@ -13,6 +13,7 @@
 module Main where
 
 import Control.Concurrent
+import Control.Monad (zipWithM_)
 import Control.Monad.Identity
 import Control.Monad.RWS
 import Control.Monad.State

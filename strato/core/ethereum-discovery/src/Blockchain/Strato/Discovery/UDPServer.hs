@@ -25,11 +25,11 @@ import Blockchain.Strato.Discovery.UDP
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
+import Control.Monad (forM_, when)
 import Control.Monad.Catch
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.IO.Class
-import Control.Monad.Reader
 import qualified Crypto.Types.PubKey.ECC as ECC
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16

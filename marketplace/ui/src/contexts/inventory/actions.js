@@ -35,6 +35,9 @@ const actionDescriptors = {
   transferInventory: "transfer_inventory",
   transferInventorySuccessful: "transfer_inventory_successful",
   transferInventoryFailed: "transfer_inventory_failed",
+  fetchItemTransfers: "fetch_item_transfers",
+  fetchItemTransfersSuccessful: "fetch_item_transfers_successful",
+  fetchItemTransfersFailed: "fetch_item_transfers_failed",
   resetMessage: "reset_message",
   setMessage: "set_message",
   onboardSellerToStripe: "onboard_seller_to_stripe",
@@ -529,6 +532,54 @@ const actions = {
       actions.setMessage(dispatch, "Error while transferring Item");
     }
   },
+
+
+ 
+  fetchItemTransfers: async (dispatch, limit, offset, ownerCommonName, order, date) => {
+    dispatch({ type: actionDescriptors.fetchItemTransfers });
+
+    let range;
+    const end = date + 86400; // This is the end of the same day, needed for the range filter. 
+    if (date) {
+      range = `&range[]=transferDate,${date},${end}`
+    }
+    
+    try {
+      const response = await fetch(`${apiUrl}/inventory/transfers/items?limit=${limit}&order=transferDate.${order}&offset=${offset}&or=(oldOwnerCommonName.eq.${ownerCommonName},newOwnerCommonName.eq.${ownerCommonName})${range}`, {
+        method: HTTP_METHODS.GET,
+
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchItemTransfersSuccessful,
+          payload: body.data,
+        });
+
+        return true;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.fetchItemTransfersFailed, 
+          error: "Unauthorized while fetching item transfers" 
+        });
+        window.location.href = body.error.loginUrl;
+      }
+
+      dispatch({
+        type: actionDescriptors.fetchItemTransfersFailed,
+        error: "Error while fetching item transfers",
+      });
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.fetchItemTransfersFailed,
+        error: "Error while fetching item transfers",
+      });
+      return false;
+    }
+  }, 
 
   fetchInventoryDetail: async (dispatch, address) => {
     dispatch({ type: actionDescriptors.fetchInventoryDetail });

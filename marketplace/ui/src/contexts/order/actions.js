@@ -471,22 +471,22 @@ const actions = {
           type: actionDescriptors.executeSaleSuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, "Sale executed successfully", true);
+        actions.setMessage(dispatch, "Order fulfilled successfully", true);
         return body.data;
       }
 
       dispatch({
         type: actionDescriptors.executeSaleFailed,
-        error: "Error while executing sale",
+        error: "Error while fulfilling order",
       });
-      actions.setMessage(dispatch, "Error while executing sale");
+      actions.setMessage(dispatch, "Error while fulfilling order");
       return false;
     } catch (err) {
       dispatch({
         type: actionDescriptors.executeSaleFailed,
-        error: "Error while executing Sale",
+        error: "Error while fulfilling order",
       });
-      actions.setMessage(dispatch, "Error while executing sale");
+      actions.setMessage(dispatch, "Error while fulfilling order");
     }
   },
 

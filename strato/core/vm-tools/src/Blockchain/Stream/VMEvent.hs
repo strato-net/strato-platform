@@ -33,8 +33,8 @@ import Blockchain.Stream.Action (Action, Delegatecall)
 import Blockchain.Stream.Raw
 import Conduit
 import Control.Exception
+import Control.Monad (forM, when)
 import Control.Monad.Change.Modify (Modifiable)
-import Control.Monad.State
 import qualified Data.Aeson as JSON
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL

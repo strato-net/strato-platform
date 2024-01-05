@@ -37,7 +37,8 @@ abstract contract SemiFungible is Mintable {
     function _callMint(address _newOwner, uint _quantity) internal override{
         for (uint i = 0; i < _quantity; i++) {
             UTXO newAsset = mint(1);
-            Asset(newAsset).transferOwnership(_newOwner, 1);
+            // regular transfer - isUserTransfer: false, transferNumber: 0
+            Asset(newAsset).transferOwnership(_newOwner, 1, false, 0);
         }
         
     }

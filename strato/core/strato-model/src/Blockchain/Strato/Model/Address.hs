@@ -61,7 +61,6 @@ import Servant.Docs
 import Test.QuickCheck (Arbitrary (..))
 import qualified Text.Colors as CL
 import Text.Format
-import qualified Text.PrettyPrint.ANSI.Leijen as Lei
 import Text.Printf
 import Text.Read (readMaybe)
 import Text.ShortDescription
@@ -126,9 +125,6 @@ instance AS.FromJSON Address where
 
 instance FromJSONKey Address where
   fromJSONKey = FromJSONKeyTextParser (parseJSON . String)
-
-instance Lei.Pretty Address where
-  pretty = Lei.text . CL.yellow . formatAddressWithoutColor
 
 instance Format Address where
   format = CL.yellow . formatAddressWithoutColor

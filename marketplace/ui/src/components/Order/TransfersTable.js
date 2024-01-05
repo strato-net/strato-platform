@@ -1,27 +1,27 @@
 import React, { useEffect, useState } from "react";
 import DataTableComponent from "../DataTableComponent";
 import { getStringDate } from "../../helpers/utils";
-import { actions } from "../../contexts/item/actions";
-import { useItemDispatch, useItemState } from "../../contexts/item";
+import { actions } from "../../contexts/inventory/actions";
 import { US_DATE_FORMAT } from "../../helpers/constants";
 import { Input, Pagination } from "antd";
 import "./ordersTable.css"
 import { DownOutlined, SearchOutlined, UpOutlined } from "@ant-design/icons";
 import { ResponsiveOrderCard } from "./ResponsiveOrdersCard";
 import { ResponsiveTransferOrderCard } from "./ResponsiveTransferOrdersCard";
+import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 
 
 const TransfersTable = ({ user, selectedDate }) => {
-  const dispatch = useItemDispatch();
+  const dispatch = useInventoryDispatch();
   const limit = 10;
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState(1);
-  const { itemTransfers, totalItemsTransfered, isFetchingItemTransfers } = useItemState();
+  const { itemTransfers, totalItemsTransfered, isFetchingItemTransfers } = useInventoryState();
   const [order, setOrder] = useState("desc")
 
   console.log("selectedDate", selectedDate)
   useEffect(() => {
-    actions.fetchItemTransfers(dispatch, limit, offset, user.organization, order, selectedDate);
+    actions.fetchItemTransfers(dispatch, limit, offset, user.commonName, order, selectedDate);
   }, [dispatch, limit, offset, user, order, selectedDate]);
 
   useEffect(() => {
@@ -32,25 +32,27 @@ const TransfersTable = ({ user, selectedDate }) => {
   const [data, setdata] = useState([]);
   useEffect(() => {
     let items = [];
+    if(itemTransfers)
+    {
     itemTransfers.forEach((transfer) => {
       items.push({
         address: transfer.address,
         key: transfer.address,
-        inventoryId: transfer.inventoryId,
-        productName: decodeURIComponent(transfer.productName),
+        assetAddress: transfer.assetAddress,
+        assetName: decodeURIComponent(transfer.assetName),
         newOwner: transfer.newOwner,
         newOwnerCommonName: transfer.newOwnerCommonName,
-        newOwnerOrganization: transfer.newOwnerOrganization,
         oldOwner: transfer.oldOwner,
         oldOwnerCommonName: transfer.oldOwnerCommonName,
-        oldOwnerOrganization: transfer.oldOwnerOrganization,
         quantity: transfer.quantity,
         transferDate: getStringDate(transfer.transferDate, US_DATE_FORMAT),
         transferNumber: transfer.transferNumber,
       });
     });
+  }
     setdata(items);
   }, [itemTransfers]);
+
   
   const column = [
     {
@@ -62,12 +64,12 @@ const TransfersTable = ({ user, selectedDate }) => {
     {
       title: "From",
       key: "oldOwnerCommonName",
-      render: (text, record) => <p>{record.oldOwnerOrganization.startsWith("Mercata Account") ? record.oldOwnerCommonName : record.oldOwnerOrganization}</p>,
+      render: (text, record) => <p>{record.oldOwnerCommonName}</p>,
     },
     {
       title: "To",
       key: "newOwnerCommonName",
-      render: (text, record) => <p>{record.newOwnerOrganization.startsWith("Mercata Account") ? record.newOwnerCommonName : record.newOwnerOrganization}</p>,
+      render: (text, record) => <p>{record.newOwnerCommonName}</p>,
     },
     {
       dataIndex: "transferDate",
@@ -87,9 +89,9 @@ const TransfersTable = ({ user, selectedDate }) => {
       ),
     },
     {
-      title: "Product Name",
-      dataIndex: "productName",
-      key: "productName",
+      title: "Asset Name",
+      dataIndex: "assetName",
+      key: "assetName",
       render: (text) => <p>{text}</p>,
     },
     {

@@ -12,7 +12,6 @@ library:
   - -rtsopts
   - -with-rtsopts=-N
   dependencies:
-    - ansi-wl-pprint
     - base16-bytestring
     - common-log
     - conduit

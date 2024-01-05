@@ -1,17 +1,17 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PackageImports #-}
-{-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE Rank2Types #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE FlexibleContexts          #-}
+{-# LANGUAGE FlexibleInstances         #-}
+{-# LANGUAGE LambdaCase                #-}
+{-# LANGUAGE MultiParamTypeClasses     #-}
+{-# LANGUAGE OverloadedStrings         #-}
+{-# LANGUAGE PackageImports            #-}
+{-# LANGUAGE QuasiQuotes               #-}
+{-# LANGUAGE Rank2Types                #-}
+{-# LANGUAGE RecordWildCards           #-}
+{-# LANGUAGE ScopedTypeVariables       #-}
+{-# LANGUAGE TemplateHaskell           #-}
+{-# LANGUAGE TupleSections             #-}
+{-# LANGUAGE TypeApplications          #-}
+{-# LANGUAGE TypeOperators             #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -76,11 +76,10 @@ import Blockchain.Strato.RedisBlockDB (RedisConnection)
 import qualified Blockchain.TxRunResultCache as TRC
 import Blockchain.VMContext (ContextBestBlockInfo (..), GasCap (..), IsBlockstanbul (..), baggerState, lookupX509AddrFromCBHash, putContextBestBlockInfo, vmGasCap)
 import Conduit
-import Control.Applicative (liftA2)
-import Control.Concurrent.Hierarchy
 import Control.Concurrent.STM.TMChan
 import Control.Lens hiding (Context, view)
 import qualified Control.Lens as Lens
+import Control.Monad (forever, join, void)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Reader
@@ -114,6 +113,7 @@ import Executable.EthereumVM2
 import Executable.StratoP2P
 import Executable.StratoP2PClient
 import Executable.StratoP2PServer
+import Ki.Unlifted as KIU
 import Network.Socket
 import Test.Hspec
 import Text.Read (readMaybe)
@@ -1566,8 +1566,9 @@ makeLenses ''P2PConnection
 createConnection ::
   P2PPeer ->
   P2PPeer ->
+  Scope ->
   IO P2PConnection
-createConnection server' client' = do
+createConnection server' client' scp = do
   serverToClientTQueue <- newTQueueIO
   clientToServerTQueue <- newTQueueIO
   serverSeqSource <- atomically . dupTMChan $ _p2pPeerSeqP2pSource server'
@@ -1576,25 +1577,20 @@ createConnection server' client' = do
   clientCtx <- newIORef $ def & unseqSink .~ _p2pPeerUnseqSource client'
   serverExceptionTVar <- newTVarIO Nothing
   clientExceptionTVar <- newTVarIO Nothing
-  tm                  <- newThreadMap
-  let rServer :: MonadP2PTest TestContextM (Maybe SomeException)
-      rServer =
-        Executable.StratoP2PServer.runEthServerConduit
-          (_p2pPeerPPeer client')
-          (sourceTQueue clientToServerTQueue)
-          (sinkTQueue serverToClientTQueue)
-          (sourceTMChan serverSeqSource .| (awaitForever $ either (const $ pure ()) yield))
-          ("Me: " ++ _p2pPeerName server' ++ ", Them: " ++ _p2pPeerName client')
-          tm
-      rClient :: MonadP2PTest TestContextM (Maybe SomeException)
-      rClient =
-        runEthClientConduit
-          (_p2pPeerPPeer server')
-          (sourceTQueue serverToClientTQueue)
-          (sinkTQueue clientToServerTQueue)
-          (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
-          ("Me: " ++ _p2pPeerName client' ++ ", Them: " ++ _p2pPeerName server')
-          tm
+  let rServer = Executable.StratoP2PServer.runEthServerConduit
+                  (_p2pPeerPPeer client')             
+                  (sourceTQueue clientToServerTQueue) 
+                  (sinkTQueue serverToClientTQueue)   
+                  (sourceTMChan serverSeqSource .| (awaitForever $ either (const $ pure ()) yield))
+                  ("Me: " ++ _p2pPeerName server' ++ ", Them: " ++ _p2pPeerName client')
+                  scp
+  let rClient = runEthClientConduit         
+                  (_p2pPeerPPeer server')
+                  (sourceTQueue serverToClientTQueue)
+                  (sinkTQueue clientToServerTQueue)
+                  (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
+                  ("Me: " ++ _p2pPeerName client' ++ ", Them: " ++ _p2pPeerName server')
+                  scp
   pure $
     P2PConnection
       serverToClientTQueue

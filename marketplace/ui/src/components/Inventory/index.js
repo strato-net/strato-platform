@@ -169,6 +169,18 @@ const Inventory = ({ user }) => {
   const onboardSeller = async () => {
     navigate(routes.OnboardingSellerToStripe.url)
   }
+
+const getAllSubcategories = (categories) => {
+  let subcategories = [];
+  categories.forEach(category => {
+      if (category.subCategories && category.subCategories.length > 0) {
+          subcategories = subcategories.concat(category.subCategories);
+      }
+  });
+  return subcategories;
+}
+
+const allSubcategories = getAllSubcategories(categorys);
   
   // ------------------ Tabs Start------------------
   const handleTabSelect = (key) => {
@@ -207,8 +219,8 @@ const Inventory = ({ user }) => {
               <Button className="!px-1 md:!px-0 flex items-center flex-row-reverse gap-[6px] text-lg md:text-2xl font-semibold !text-[#13188A] " type="link" icon={<img src={Images.ForwardIcon} alt="inventory" className="hidden md:block w-6 h-6" />}> Inventory
               </Button>
             </div>
-            <div className="flex">
-              <Button type="primary" className="w-40 mr-3"
+            <div className="flex gap-3">
+              <Button type="primary" className="w-40 h-9 "
                 onClick={() => {
                   if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                     window.location.href = loginUrl;
@@ -272,6 +284,7 @@ const Inventory = ({ user }) => {
                             paymentProviderAddress={
                               stripeStatus ? stripeStatus.paymentProviderAddress : undefined
                             }
+                            allSubcategories={allSubcategories}
                           />
                         );
                       })
@@ -301,6 +314,7 @@ const Inventory = ({ user }) => {
                             paymentProviderAddress={
                               stripeStatus ? stripeStatus.paymentProviderAddress : undefined
                             }
+                            allSubcategories={allSubcategories}
                           />
                         );
                       })
