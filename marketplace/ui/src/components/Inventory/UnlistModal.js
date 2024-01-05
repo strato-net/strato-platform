@@ -2,7 +2,7 @@ import { Button, Modal } from "antd";
 import { actions } from "../../contexts/inventory/actions";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 
-const UnlistModal = ({ open, handleCancel, inventory, saleAddress }) => {
+const UnlistModal = ({ open, handleCancel, inventory, saleAddress, categoryName }) => {
     const inventoryDispatch = useInventoryDispatch();
     const {
         isUnlisting
@@ -14,7 +14,7 @@ const UnlistModal = ({ open, handleCancel, inventory, saleAddress }) => {
         };
         let isDone = await actions.unlistInventory(inventoryDispatch, body);
         if (isDone) {
-            await actions.fetchInventory(inventoryDispatch, 10, 0, "", undefined);
+            await actions.fetchInventory(inventoryDispatch, 10, 0, "", categoryName);
             handleCancel();
         }
     }

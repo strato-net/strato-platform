@@ -6,7 +6,7 @@ import { PAYMENT_TYPE } from "../../helpers/constants";
 
 const { Option } = Select;
 
-const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddress }) => {
+const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddress, categoryName }) => {
     const [data, setData] = useState([inventory]);
     const [quantity, setQuantity] = useState(inventory.quantity);
     const [paymentTypes, setPaymentTypes] = useState([PAYMENT_TYPE[0].value]);
@@ -171,7 +171,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
             isDone = await actions.listInventory(inventoryDispatch, body);
         }
         if ( isDone ) {
-            await actions.fetchInventory(inventoryDispatch, 10, 0, "", undefined);
+            await actions.fetchInventory(inventoryDispatch, 10, 0, "", categoryName);
             handleCancel();
         }
     }
