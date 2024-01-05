@@ -70,7 +70,7 @@ const UpdateInventoryModal = ({
 
   useEffect(() => {
     if (inventoryToUpdate) {
-      const data = inventoryToUpdate.inventory.data ? JSON.parse(inventoryToUpdate.inventory.data) : {};
+      const data = inventoryToUpdate.inventory.data ? inventoryToUpdate.inventory.data : {};
       let nextState = {
         category: {
           name: getCategory(),
