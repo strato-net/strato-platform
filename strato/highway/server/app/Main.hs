@@ -115,6 +115,6 @@ appHighwayWrapper env =
         ) ctx
     $ serveHighwayWrapper env
   where
-    --ctx :: Context '[MultipartOptions Mem]
-    ctx    = (MultipartOptions (setMaxRequestKeyLength 100 defaultParseRequestBodyOptions)) :. EmptyContext
+    ctx :: Context '[MultipartOptions Mem]
+    ctx    = (MultipartOptions (setMaxRequestKeyLength 100 defaultParseRequestBodyOptions) ()) :. EmptyContext
     policy = simpleCorsResourcePolicy {corsRequestHeaders = ["Content-Type"]}
