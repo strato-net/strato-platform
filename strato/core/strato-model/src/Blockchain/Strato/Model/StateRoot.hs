@@ -28,7 +28,6 @@ import Data.String
 import GHC.Generics
 import qualified Text.Colors as CL
 import Text.Format
-import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
 -- | Internal nodes are indexed in the underlying database by their keccak256-bit hash.
 -- This types represents said hash.
@@ -43,9 +42,6 @@ newtype StateRoot = StateRoot B.ByteString
 instance Format StateRoot where
   format x | x == emptyTriePtr = CL.yellow "<empty>"
   format (StateRoot x) = CL.yellow $ BC.unpack $ B16.encode x
-
-instance Pretty StateRoot where
-  pretty (StateRoot sr) = green . text . BC.unpack $ B16.encode sr
 
 instance NFData StateRoot
 

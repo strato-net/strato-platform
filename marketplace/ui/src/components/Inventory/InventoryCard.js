@@ -23,7 +23,7 @@ import image_placeholder from "../../images/resources/image_placeholder.png";
 import { getUnitNameByIndex } from "../../helpers/constants";
 import "react-responsive-carousel/lib/styles/carousel.min.css";
 
-const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentProviderAddress }) => {
+const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentProviderAddress, allSubcategories }) => {
   const [openPop, setOpenPop] = useState(false);
   const [open, setOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -34,7 +34,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
   const [transferModalOpen, setTransferModalOpen] = useState(false);
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
-
+  
   const itemData = JSON.parse(inventory.data);
   const showModalEdit = () => {
     hide();
@@ -109,7 +109,9 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
 
   const getCategory = () => {
     const parts = inventory.contract_name.split('-');
-    return parts[parts.length - 1];
+    const contractName = parts[parts.length - 1];
+   
+    return allSubcategories?.find(c => c.contract === contractName)?.name
   };
 
   const categoricalProperties = () => {
@@ -255,7 +257,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
         <div className=" pt-[5px]  flex">
           
           <div className="flex  items-center">
-          <Button type="link" className="text-[#13188A] font-semibold text-base h-6" onClick={callDetailPage}>Preview</Button>
+          <Button type="link" className="text-[#13188A] font-semibold text-base h-6 mb-2" onClick={callDetailPage}>Preview</Button>
           <Popover
             placement="bottomLeft"
             open={openPop}
@@ -293,13 +295,19 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
                   <PieChartOutlined />
                   <p className="ml-3">Mint</p>
                 </div>) : (<div></div>)}
-                <div
-                  className="flex items-center mt-2 cursor-pointer"
-                  onClick={showTransferModal}
-                >
-                  <SwapOutlined />
-                  <p className="ml-3">Transfer</p>
-                </div>
+
+                {inventory.quantity && parseInt(inventory.quantity) > 0 && (!inventory.saleAddress || (inventory.saleAddress && parseInt(inventory.saleQuantity) > 0)) ? (
+                  <div
+                      className="flex items-center mt-2 cursor-pointer"
+                      onClick={showTransferModal}
+                  >
+                      <SwapOutlined />
+                      <p className="ml-3">Transfer</p>
+                  </div>
+                ) : (
+                  <div></div>
+              )}
+
               </div>
             }
             trigger="click"
@@ -338,17 +346,17 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
         <div className="flex flex-col gap-4 px-[18px] py-4 border border-[#E9E9E9] rounded-md w-full ">
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Sub Category</p>
-            <p className="text-[#202020] font-medium">{getCategory() || "N/A"}</p>
+            <p className="text-[#202020] font-semibold">{getCategory() || "N/A"}</p>
           </div> <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity Owned</p>
-            <p className="text-[#202020] font-medium">{inventory.quantity || "N/A"}</p>
+            <p className="text-[#202020] font-semibold">{inventory.quantity || "N/A"}</p>
           </div> <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity for Sale </p>
-            <p className="text-[#202020] font-medium">{inventory.saleQuantity || "N/A"}</p>
+            <p className="text-[#202020] font-semibold">{inventory.saleQuantity || "N/A"}</p>
           </div>
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Price</p>
-            <p className="text-[#202020] font-medium">{inventory?.price || "N/A"}</p>
+            <p className="text-[#202020] font-semibold">{inventory?.price || "N/A"}</p>
           </div>
 
         </div>
@@ -536,6 +544,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
             inventory: inventory,
             category: category,
           }}
+          categoryName={category}
         />
       )}
       {listModalOpen && (
@@ -544,6 +553,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
           handleCancel={handleListModalClose}
           inventory={inventory}
           paymentProviderAddress={paymentProviderAddress}
+          categoryName={category}
         />
       )}
       {unlistModalOpen && (
@@ -552,6 +562,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
           handleCancel={handleUnlistModalClose}
           inventory={inventory}
           saleAddress={inventory.saleAddress}
+          categoryName={category}
         />
       )}
       {resellModalOpen && (
@@ -559,6 +570,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
           open={resellModalOpen}
           handleCancel={handleResellModalClose}
           inventory={inventory}
+          categoryName={category}
+          
         />
       )}
       {transferModalOpen && (
@@ -566,6 +579,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
           open={transferModalOpen}
           handleCancel={handleTransferModalClose}
           inventory={inventory}
+          categoryName={category}
         />
       )}
     </div>

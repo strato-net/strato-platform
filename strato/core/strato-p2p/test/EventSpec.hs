@@ -1,17 +1,17 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PackageImports #-}
-{-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE Rank2Types #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE FlexibleContexts          #-}
+{-# LANGUAGE FlexibleInstances         #-}
+{-# LANGUAGE LambdaCase                #-}
+{-# LANGUAGE MultiParamTypeClasses     #-}
+{-# LANGUAGE OverloadedStrings         #-}
+{-# LANGUAGE PackageImports            #-}
+{-# LANGUAGE QuasiQuotes               #-}
+{-# LANGUAGE Rank2Types                #-}
+{-# LANGUAGE RecordWildCards           #-}
+{-# LANGUAGE ScopedTypeVariables       #-}
+{-# LANGUAGE TemplateHaskell           #-}
+{-# LANGUAGE TupleSections             #-}
+{-# LANGUAGE TypeApplications          #-}
+{-# LANGUAGE TypeOperators             #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -77,11 +77,10 @@ import Blockchain.Strato.RedisBlockDB (RedisConnection)
 import qualified Blockchain.TxRunResultCache as TRC
 import Blockchain.VMContext (ContextBestBlockInfo (..), GasCap (..), IsBlockstanbul (..), baggerState, lookupX509AddrFromCBHash, putContextBestBlockInfo, vmGasCap)
 import Conduit
-import Control.Applicative (liftA2)
-import Control.Concurrent.Hierarchy
 import Control.Concurrent.STM.TMChan
 import Control.Lens hiding (Context, view)
 import qualified Control.Lens as Lens
+import Control.Monad (forever, join, void)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Base
@@ -115,6 +114,7 @@ import Executable.EthereumVM2
 import Executable.StratoP2P
 import Executable.StratoP2PClient
 import Executable.StratoP2PServer
+import Ki.Unlifted as KIU
 import Network.Socket
 import Test.Hspec
 import Text.Read (readMaybe)
@@ -857,15 +857,6 @@ instance (HasMemPeerDB m, (String `A.Alters` PPeer) m, State.MonadState TestCont
   insert _ (IPAsText ip) p = A.insert (A.Proxy @PPeer) (T.unpack ip) p
   delete _ (IPAsText ip) = A.delete (A.Proxy @PPeer) $ T.unpack ip
 
-toActivityState :: Int -> ActivityState
-toActivityState 1 = Active
-toActivityState _ = Inactive
-
-fromActivityState :: ActivityState -> Int
-fromActivityState Active = 1
-fromActivityState Inactive = 0
-
-
 instance (MonadIO m, MonadLogger m, MonadReader P2PPeer m) => RunsClient (MonadP2PTest m) where
   runClientConnection ipAsText@(IPAsText ip) tcpPort@(TCPPort p) sSource f = do
     inet <- lift $ asks _p2pPeerInternet
@@ -936,6 +927,47 @@ instance MonadReader P2PPeer m => A.Selectable (Maybe IPAsText, UDPPort) SockAdd
   select _ (Nothing, udpPort) = do
     myIP <- lift $ asks _p2pMyIPAddress
     pure $ ipAndPortToSockAddr myIP udpPort
+
+------------------------- Extra stuff for HasPeerDB??
+
+instance (MonadIO m, HasMemPeerDB m) => A.Replaceable (IPAsText, Point) PeerBondingState (MonadTest m) where
+  replace _ (IPAsText ip, point) (PeerBondingState s) = do
+    lift $ A.replace Mod.Proxy (IPAsText ip, undefined :: TCPPort) (PeerBondingState s)  -- the instances for TCPPort and UDPPort just ignore the parameter and do the same thing
+    pointPPeerMap . at point . _Just %= (\p -> p {pPeerBondState = s})
+
+instance (Monad m, A.Replaceable (IPAsText, Point) PeerBondingState m) => A.Replaceable (IPAsText, Point) PeerBondingState (MonadP2PTest m) where
+  replace p k = lift . A.replace p k
+
+instance (MonadIO m, HasMemPeerDB m) => A.Selectable (IPAsText, Point) PeerBondingState (MonadTest m) where
+  select _ (IPAsText t, _) = do
+    let ip = T.unpack t
+    map' <- readIORef =<< fmap stringPPeerMap accessEnv
+    return $ PeerBondingState . pPeerBondState <$> map' M.!? ip
+
+instance (A.Selectable (IPAsText, Point) PeerBondingState m) => A.Selectable (IPAsText, Point) PeerBondingState (MonadP2PTest m) where
+  select p = lift . A.select p
+
+instance MonadIO m => Mod.Accessible ValidatorAddresses (MonadTest m) where
+  access _ = do
+    seqCtxt <- use sequencerContext
+    let mBlockstanbulCtxt = seqCtxt  ^. blockstanbulContext
+        valCMPSs = maybe [] (Set.toList . unChainMembers ._validators) mBlockstanbulCtxt
+    cmpsToX509 <- use parsedSetToX509Map
+    let valAdds = catMaybes $ (\valCMPS -> userAddress <$> cmpsToX509 M.!? valCMPS) <$> valCMPSs
+    return $ ValidatorAddresses valAdds
+
+instance (Monad m, Mod.Accessible ValidatorAddresses m) => Mod.Accessible ValidatorAddresses (MonadP2PTest m) where
+  access = lift . Mod.access
+
+instance MonadIO m => A.Selectable Point ClosestPeers (MonadTest m) where
+  select _ point = Just . ClosestPeers . filter f . M.elems <$> use pointPPeerMap
+    where
+      f p = pPeerPubkey p /= Just point && pPeerPubkey p /= Nothing
+
+instance A.Selectable Point ClosestPeers m => A.Selectable Point ClosestPeers (MonadP2PTest m) where
+  select p = lift . A.select p
+
+-------- END extra stuff for HasPeerDB??
 
 instance
   ( MonadIO m,
@@ -1420,8 +1452,9 @@ makeLenses ''P2PConnection
 createConnection ::
   P2PPeer ->
   P2PPeer ->
+  Scope ->
   IO P2PConnection
-createConnection server' client' = do
+createConnection server' client' scp = do
   serverToClientTQueue <- newTQueueIO
   clientToServerTQueue <- newTQueueIO
   serverSeqSource <- atomically . dupTMChan $ _p2pPeerSeqP2pSource server'
@@ -1430,25 +1463,20 @@ createConnection server' client' = do
   clientCtx <- newIORef $ def & unseqSink .~ _p2pPeerUnseqSource client'
   serverExceptionTVar <- newTVarIO Nothing
   clientExceptionTVar <- newTVarIO Nothing
-  tm                  <- newThreadMap
-  let rServer :: MonadP2PTest TestContextM (Maybe SomeException)
-      rServer =
-        Executable.StratoP2PServer.runEthServerConduit
-          (_p2pPeerPPeer client')
-          (sourceTQueue clientToServerTQueue)
-          (sinkTQueue serverToClientTQueue)
-          (sourceTMChan serverSeqSource .| (awaitForever $ either (const $ pure ()) yield))
-          ("Me: " ++ _p2pPeerName server' ++ ", Them: " ++ _p2pPeerName client')
-          tm
-      rClient :: MonadP2PTest TestContextM (Maybe SomeException)
-      rClient =
-        runEthClientConduit
-          (_p2pPeerPPeer server')
-          (sourceTQueue serverToClientTQueue)
-          (sinkTQueue clientToServerTQueue)
-          (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
-          ("Me: " ++ _p2pPeerName client' ++ ", Them: " ++ _p2pPeerName server')
-          tm
+  let rServer = Executable.StratoP2PServer.runEthServerConduit
+                  (_p2pPeerPPeer client')             
+                  (sourceTQueue clientToServerTQueue) 
+                  (sinkTQueue serverToClientTQueue)   
+                  (sourceTMChan serverSeqSource .| (awaitForever $ either (const $ pure ()) yield))
+                  ("Me: " ++ _p2pPeerName server' ++ ", Them: " ++ _p2pPeerName client')
+                  scp
+  let rClient = runEthClientConduit         
+                  (_p2pPeerPPeer server')
+                  (sourceTQueue serverToClientTQueue)
+                  (sinkTQueue clientToServerTQueue)
+                  (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
+                  ("Me: " ++ _p2pPeerName client' ++ ", Them: " ++ _p2pPeerName server')
+                  scp
   pure $
     P2PConnection
       serverToClientTQueue

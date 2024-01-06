@@ -34,6 +34,7 @@ module Control.Monad.Composable.Kafka (
 import BlockApps.Logging
 import Blockchain.MilenaTools
 import Control.Lens
+import Control.Monad (forever)
 import Control.Monad.Composable.Base
 import Control.Monad.IO.Unlift
 import Control.Monad.Reader

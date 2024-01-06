@@ -1,15 +1,18 @@
 import { util, rest, importer } from '/blockapps-rest-plus';
 import config from '/load.config';
 import RestStatus from 'http-status-codes';
-import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs, setSearchQueryOptionsPrime } from '/helpers/utils';
+import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs, setSearchQueryOptionsPrime, waitForAddress } from '/helpers/utils';
 import dayjs from 'dayjs';
 import constants from '../../helpers/constants';
 import saleJs from "../orders/sale";
 
 const contractName = constants.assetTableName;
+const transferContractName = `${contractName}.ItemTransfers`;
 const contractFilename = `${util.cwd}/dapp/products/contracts/Inventory.sol`;
 const saleContractName = 'SimpleSale';
+const saleContract = constants.saleTableName;
 const saleContractFilename = `${util.cwd}/dapp/mercata-base-contracts/Templates/Sales/SimpleSale.sol`;
+const contractEvents = { ITEM_TRANSFER: "ItemTransfers" }
 
 /** 
  * Upload a new Inventory 
@@ -64,7 +67,17 @@ async function uploadSaleContract(user, _constructorArgs, options) {
 
     const contract = await rest.createContract(user, contractArgs, copyOfOptions);
     contract.src = 'removed';
-
+    
+    const searchOptions = {
+        ...options,
+        org: constants.blockAppsOrg,
+        query: {
+            address: `eq.${contract.address}`
+        }
+      }
+      
+    await waitForAddress(user, {name: saleContract}, searchOptions);
+    
     return contract;
 }
 
@@ -180,7 +193,18 @@ async function unlistItem(user, _contract, args, options) {
             { callArgs }
         );
     }
-
+    
+    const searchOptions = {
+        ...options,
+        org: constants.blockAppsOrg,
+        query: {
+            address: `eq.${callArgs.contract.address}`,
+            isOpen: `eq.false`
+        }
+      }
+      
+    await waitForAddress(user, {name: saleContract}, searchOptions);
+    
     return unlistStatus;
 }
 
@@ -190,6 +214,7 @@ async function resellItem(user, contract, args, options) {
         method: "mintNewUnits",
         args: util.usc({ ...args }),
     };
+    
     const resellStatus = await rest.call(user, callArgs, options);
 
     if (parseInt(resellStatus, 10) !== RestStatus.OK) {
@@ -199,7 +224,7 @@ async function resellItem(user, contract, args, options) {
             { callArgs }
         );
     }
-
+    
     return resellStatus;
 }
 
@@ -218,6 +243,16 @@ async function transferItem(user, contract, args, options) {
             { callArgs }
         );
     }
+    
+    const searchOptions = {
+        ...options,
+        org: constants.blockAppsOrg,
+        query: {
+            address: `eq.${callArgs.contract.address}`
+        }
+      }
+      
+    await waitForAddress(user, {name: transferContractName}, searchOptions);
 
     return transferStatus;
 }
@@ -353,6 +388,7 @@ async function getAll(admin, args = {}, defaultOptions) {
                     price: itemSale?.price,
                     saleAddress: itemSale?.address,
                     saleQuantity: itemSale?.quantity,
+                    saleDate: itemSale?.block_timestamp
                 })
             }
             else if (isMarketplaceSearch) {
@@ -364,6 +400,13 @@ async function getAll(admin, args = {}, defaultOptions) {
     }
 
     return finalInventory ? finalInventory.map((inventory) => marshalOut(inventory)) : undefined;
+}
+
+async function getAllItemTransferEvents(admin, args = {}, defaultOptions) {
+    const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
+    const itemTransferEvents = await searchAllWithQueryArgs(`${contractName}.${contractEvents.ITEM_TRANSFER}`, args, options, admin);
+    const total  = await searchAllWithQueryArgs( `${contractName}.${contractEvents.ITEM_TRANSFER}`, { ...args, limit: undefined, offset: 0, order: undefined, queryOptions: { select: "count", } }, options, admin );
+    return { transfers: itemTransferEvents.map((item) => marshalOut(item)), total: total[0].count };
 }
 
 async function getOwnershipHistory(user, args, options) {
@@ -384,8 +427,9 @@ async function getOwnershipHistory(user, args, options) {
 
 async function inventoryCount(admin, args = {}, defaultOptions) {
     const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
+    const { range, ...newArgs } = args;
     const queryArgs = setSearchQueryOptionsPrime({
-        ...args,
+        ...newArgs,
         limit: undefined,
         offset: 0,
         order: undefined,
@@ -431,6 +475,7 @@ export default {
     get,
     getAll,
     getOwnershipHistory,
+    getAllItemTransferEvents,
     inventoryCount,
     marshalIn,
     marshalOut,

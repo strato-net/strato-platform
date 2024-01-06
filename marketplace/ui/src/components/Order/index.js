@@ -7,6 +7,7 @@ import TransfersTable from "./TransfersTable";
 import dayjs from "dayjs";
 import routes from "../../helpers/routes";
 import ClickableCell from "../ClickableCell";
+import { Images } from "../../images";
 
 const { Search } = Input;
 
@@ -18,7 +19,7 @@ const Order = ({ user }) => {
   const onChange = (key) => {
     setActiveTab(key)
   };
-  
+
   const [selectedDate, setSelectedDate] = useState("");
   const { Text } = Typography;
 
@@ -28,29 +29,30 @@ const Order = ({ user }) => {
 
   return (
     <div>
-      <div className="px-4 md:px-20 py-2 md:py-10 mt-2">
-      <Breadcrumb>
-        <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-          <ClickableCell href={routes.Marketplace.url}>
-            <p className="text-sm text-[#13188A] font-semibold">
-            Home
+      <div className="px-4 md:px-20 lg:py-2 lg:mt-3 orders">
+        <Breadcrumb>
+          <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+            <ClickableCell href={routes.Marketplace.url}>
+              <p className="text-sm text-[#13188A] font-semibold">
+                Home
+              </p>
+            </ClickableCell>
+          </Breadcrumb.Item>
+          <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+            <p className=" text-sm text-[#202020] font-medium">
+              {'Orders (' + activeTab + ')'}
             </p>
-          </ClickableCell>
-        </Breadcrumb.Item>
-        <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-          <p className=" text-sm text-[#202020] font-medium">
-            {'Orders (' + activeTab + ')'}
-          </p>
-        </Breadcrumb.Item>
-      </Breadcrumb>
+          </Breadcrumb.Item>
+        </Breadcrumb>
       </div>
       <Tabs
-        className="mx-4 md:mx-20 mt-0"
+        className="mx-4 md:mx-20 lg:mt-[10px]"
         defaultActiveKey={state == null ? "Sold" : state.defaultKey}
         onChange={onChange}
-        tabBarExtraContent={              
-          <div className="text-xs md:flex items-center hidden">
+        tabBarExtraContent={
+          <div className="text-xs md:flex items-center hidden orders_page">
             <DatePicker
+              style={{ backgroundColor: "#F6F6F6" }}
               value={
                 selectedDate
               }
@@ -62,6 +64,7 @@ const Order = ({ user }) => {
               }}
               onChange={onDateChange}
               disabled={false}
+              suffixIcon={<img src={Images.calender} alt="calender" className=" w-[18px] h-5" style={{ maxWidth: "none" }} />}
             />
           </div>
         }
@@ -69,17 +72,17 @@ const Order = ({ user }) => {
           {
             label: <p id="sold-tab" className="font-semibold text-sm md:text-base">Orders (Sold)</p>,
             key: "Sold",
-            children: <SoldOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} onDateChange={onDateChange}/>
+            children: <SoldOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} onDateChange={onDateChange} />
           },
           {
             label: <p id="bought-tab" className="font-semibold text-sm md:text-base">Orders (Bought)</p>,
             key: "Bought",
-            children: <BoughtOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} onDateChange={onDateChange}/>
+            children: <BoughtOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} onDateChange={onDateChange} />
           },
           {
             label: <p id="transfers-tab" className="font-semibold text-sm md:text-base">Transfers</p>,
             key: "Transfers",
-            children: <TransfersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()}/>
+            children: <TransfersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
           }
         ]}
       />

@@ -43,8 +43,6 @@ import Control.Lens
 import Control.Monad.Trans.Class (lift)
 import qualified Data.Binary as BIN
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Char8 as BC
 import Data.Data
 import Data.Swagger hiding (Format, format)
 import Data.Text (Text)
@@ -56,8 +54,8 @@ import Database.Persist.Sql
 import Database.Persist.TH
 import GHC.Generics
 import Numeric
+import Text.Colors
 import Text.Format
-import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
 share
   [mkPersist sqlSettings, mkMigrate "migrateAuto"] -- annoying: postgres doesn't like tables called user
@@ -139,9 +137,6 @@ instance BIN.Binary LogDB
 
 instance BIN.Binary EventDB
 
-instance Pretty BS.ByteString where
-  pretty = blue . text . BC.unpack . B16.encode
-
 instance RLPSerializable BlockData where
   rlpDecode (RLPArray [v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15]) =
     BlockData
@@ -161,7 +156,7 @@ instance RLPSerializable BlockData where
         blockDataMixHash = rlpDecode v14,
         blockDataNonce = bytesToWord64 $ BS.unpack $ rlpDecode v15
       }
-  rlpDecode (RLPArray arr) = error ("Error in rlpDecode for Block: wrong number of items, expected 15, got " ++ show (length arr) ++ ", arr = " ++ show (pretty arr))
+  rlpDecode (RLPArray arr) = error ("Error in rlpDecode for Block: wrong number of items, expected 15, got " ++ show (length arr) ++ ", arr = " ++ format arr)
   rlpDecode x = error ("rlp2BlockData called on non block object: " ++ show x)
 
   rlpEncode bd =
@@ -214,7 +209,7 @@ instance Format BlockData where
       ++ show (blockDataTimestamp b)
       ++ "\n"
       ++ "extraData: "
-      ++ show (pretty $ blockDataExtraData b)
+      ++ blue (format $ blockDataExtraData b)
       ++ "\n"
       ++ "nonce: "
       ++ showHex (blockDataNonce b) ""

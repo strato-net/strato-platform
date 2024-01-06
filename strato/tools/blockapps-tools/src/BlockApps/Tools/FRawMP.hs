@@ -13,12 +13,13 @@ import Control.Monad (void)
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
 import qualified Database.LevelDB as DB
-import Text.PrettyPrint.ANSI.Leijen hiding ((<$>), (</>))
+import Text.Format
 
 doit :: String -> MP.StateRoot -> IO ()
 doit filename sr = void . DB.runResourceT $ do
   sdb <- DB.open filename DB.defaultOptions {DB.cacheSize = 1024}
   runReaderT (MP.map f sr) sdb
   where
-    f k v = liftIO $ putStrLn $ displayS (renderPretty 1.0 200 $ formatKV k v) ""
-    formatKV key val = pretty key <> text ": " <> pretty (rlpDeserialize $ rlpDecode val)
+    --f k v = liftIO $ putStrLn $ displayS (renderPretty 1.0 200 $ formatKV k v) ""
+    f k v = liftIO $ putStrLn $ formatKV k v
+    formatKV key val = format key ++ ": " ++ format (rlpDeserialize $ rlpDecode val)

@@ -8,7 +8,6 @@
 -- given type to an 'RLPObject', full serialization will be specified.  The 'RLPSerializable' class provides functions to do this conversion.
 module Blockchain.Data.RLP
   ( RLPObject (..),
-    formatRLPObject,
     RLPSerializable (..),
     RLPSerializable1 (..),
     rlpDecode1,
@@ -34,13 +33,14 @@ import Data.ByteString.Internal
 import Data.Fix
 import Data.Functor.Compose
 import Data.Functor.Identity
+import Data.List
 import qualified Data.Map as M
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Data.Word
 import GHC.Generics
 import Numeric
-import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
+import Text.Format
 
 -- | An internal representation of generic data, with no type information.
 --
@@ -66,14 +66,11 @@ rlpDecode1 = liftRlpDecode rlpDecode
 rlpEncode1 :: (RLPSerializable1 f, RLPSerializable a) => f a -> RLPObject
 rlpEncode1 = liftRlpEncode rlpEncode
 
-instance Pretty RLPObject where
-  pretty (RLPArray objects) =
-    encloseSep (text "[") (text "]") (text ", ") $ pretty <$> objects
-  pretty (RLPScalar n) = text $ "0x" ++ showHex n ""
-  pretty (RLPString s) = text $ "0x" ++ BC.unpack (B16.encode s)
-
-formatRLPObject :: RLPObject -> String
-formatRLPObject = show . pretty
+instance Format RLPObject where
+  format (RLPArray objects) =
+    "[" ++ (intercalate ", " $ map format objects) ++ "]"
+  format (RLPScalar n) = "0x" ++ showHex n ""
+  format (RLPString s) = "0x" ++ BC.unpack (B16.encode s)
 
 splitAtEither :: Int -> B.ByteString -> Either String (B.ByteString, B.ByteString)
 splitAtEither i s | i > B.length s = Left "splitAtEither called with n > length arr"

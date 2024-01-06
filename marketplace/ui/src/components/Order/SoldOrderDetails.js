@@ -110,7 +110,7 @@ const SoldOrderDetails = ({ user, users }) => {
           productImage: prod.images && prod.images.length > 0 ? prod.images[0] : image_placeholder,
           productName: prod,
           name: prod.name,
-          unitPrice: '$' + prod.price,
+          unitPrice: prod.price,
           quantity: parseInt(orderDetails.order.quantities[index]),
           shippingCharges: prod.shippingCharges ? prod.shippingCharges : 0,
           amount: prod.price * parseInt(orderDetails.order.quantities[index]),
@@ -131,22 +131,14 @@ const SoldOrderDetails = ({ user, users }) => {
     if (Id !== undefined) {
       getData();
     }
-  }, [Id, dispatch]);
+  }, [Id, dispatch, status]);
 
   const getData = async () => {
     const data = await actions.fetchOrderDetails(dispatch, Id);
     if (data != null) {
-      setShouldCheckPaymentStatus(true);
+      getPaymentStatus(data.order.paymentSessionId, data.order.sellersCommonName);
     }
   };
-  
-  useEffect(() => {
-    if (shouldCheckPaymentStatus && orderDetails) {
-      getPaymentStatus(orderDetails.order.paymentSessionId, orderDetails.order.sellersCommonName);
-      setShouldCheckPaymentStatus(false);
-    }
-  }, [shouldCheckPaymentStatus, orderDetails]);
-
 
   const validatePayment = async (paymentSessionId) => {
     if (!paymentSessionId || !orderDetails) return;
@@ -169,8 +161,7 @@ const SoldOrderDetails = ({ user, users }) => {
           setPaid("Payment Failed");
           setcomment(encodeURIComponent('Stripe: ' + intentBody.data.last_payment_error.message))
         }
-        else if(paymentErrorAndRequiresMethod && !isCanceled)
-        {
+        else if (paymentErrorAndRequiresMethod && !isCanceled) {
           setisLoadingPaymentStatus(true)
           const body = {
             saleOrderAddress: orderDetails.order.address,
@@ -184,9 +175,9 @@ const SoldOrderDetails = ({ user, users }) => {
             setPaid("Payment Failed");
             await actions.fetchOrderDetails(dispatch, Id);
             setisLoadingPaymentStatus(false);
-            }
+          }
         }
-        
+
       } catch (err) {
         console.error(`Error: ${err}`);
       }
@@ -281,7 +272,7 @@ const SoldOrderDetails = ({ user, users }) => {
 
   const handleUpdateComment = async () => {
     let body = {};
-    let isDone=false;
+    let isDone = false;
 
     body = {
       orderAddress: details.order.address,
@@ -292,7 +283,6 @@ const SoldOrderDetails = ({ user, users }) => {
     isDone = await actions.executeSale(dispatch, body);
     if (isDone) {
       setStatus(getStatus(3));
-      await actions.fetchOrderDetails(dispatch, Id);
     }
   };
 
@@ -334,9 +324,9 @@ const SoldOrderDetails = ({ user, users }) => {
     let textClass = "bg-[#FFF6EC]";
     if (status === "Awaiting Shipment") {
       textClass = "bg-[#EBF7FF]";
-    } else if (status === "Awaiting Fulfillment"){
+    } else if (status === "Awaiting Fulfillment") {
       textClass = "bg-[#FF8C0033]"
-    } else if (status === "Payment Pending"){
+    } else if (status === "Payment Pending") {
       textClass = "bg-[#FF8C0033]"
     } else if (status === "Closed") {
       textClass = "bg-[#119B2D33]";
@@ -346,9 +336,9 @@ const SoldOrderDetails = ({ user, users }) => {
     let bgClass = "bg-[#119B2D]";
     if (status === "Awaiting Shipment") {
       bgClass = "bg-[#13188A]";
-    } else if (status === "Payment Pending"){
+    } else if (status === "Payment Pending") {
       bgClass = "bg-[#FF8C00]"
-    } else if (status === "Awaiting Fulfillment"){
+    } else if (status === "Awaiting Fulfillment") {
       bgClass = "bg-[#FF8C00]"
     } else if (status === "Closed") {
       bgClass = "bg-[#119B2D]";
@@ -365,7 +355,7 @@ const SoldOrderDetails = ({ user, users }) => {
 
   const statusComponentForPayment = (status) => {
     let textClass = "bg-[#FFF6EC]";
-    if (status === "Processing"){
+    if (status === "Processing") {
       textClass = "bg-[#FF8C0033]"
     } else if (status === "Paid") {
       textClass = "bg-[#119B2D33]";
@@ -373,21 +363,21 @@ const SoldOrderDetails = ({ user, users }) => {
       textClass = "bg-[#FFF0F0]";
     }
     let bgClass = "bg-[#119B2D]";
-    if (status === "Processing"){
+    if (status === "Processing") {
       bgClass = "bg-[#FF8C00]"
     } else if (status === "Paid") {
       bgClass = "bg-[#119B2D]";
     } else if (status === "Payment Failed") {
       bgClass = "bg-[#FF0000]";
     }
-      
-  return (
-    <div className={classNames(textClass, "status_contain w-max h-max text-center py-1 px-2 rounded-md md:rounded-xl flex justify-start items-center gap-1 p-1")}>
-      <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
-      <p className="!mb-0 text-[11px] md:text-sm">{status}</p>
-    </div>
-  );
-};
+
+    return (
+      <div className={classNames(textClass, "status_contain w-max h-max text-center py-1 px-2 rounded-md md:rounded-xl flex justify-start items-center gap-1 p-1")}>
+        <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
+        <p className="!mb-0 text-[11px] md:text-sm">{status}</p>
+      </div>
+    );
+  };
 
 
   const onChange = (key) => {
@@ -411,7 +401,7 @@ const SoldOrderDetails = ({ user, users }) => {
         <p
           // href={routes.BoughtOrderDetails.url}
           className="text-primary text-[17px] cursor-pointer"
-          onClick={() => {navigate(`${routes.MarketplaceProductDetail.url.replace(":address", text.address)}`) }}
+          onClick={() => { navigate(`${routes.MarketplaceProductDetail.url.replace(":address", text.address)}`) }}
         >
           {decodeURIComponent(text.name)}
         </p>
@@ -541,7 +531,7 @@ const SoldOrderDetails = ({ user, users }) => {
         </div>
       ) : (
         <div>
-          <Breadcrumb className="text-sm ml-4 md:ml-20 mt-4 md:mt-14 mb-2">
+          <Breadcrumb className="text-sm ml-4 md:ml-20  mt-0 md:mt-5 mb-2">
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
               <ClickableCell href={routes.Marketplace.url}>
                 <p className="text-sm text-primary font-semibold">Home</p>
@@ -557,218 +547,218 @@ const SoldOrderDetails = ({ user, users }) => {
             </Breadcrumb.Item>
           </Breadcrumb>
 
-            <Tabs
-              className="mx-4 md:mx-20 mt-0"
-              defaultActiveKey={state == null ? "Sold" : state.defaultKey}
-              onChange={onChange}
-              items={[
-                {
-                  label: <p id="sold-tab" className="font-semibold text-sm md:text-base">Orders (Sold)</p>,
-                  key: "Sold",
-                  children:
-                    <div className="mb-10">
-                      <Button type="ghost" onClick={()=>onChange('Sold')} className="cursor-pointer px-2 flex md:hidden items-center gap-2 text-xs font-semibold"><LeftArrow /> Back</Button>
-                      <Card className="md:p-2 mb-4 md:mb-14 md:shadow-card_shadow order_detail_card">
-                        <div className="flex flex-col md:flex-row md:justify-between">
-                          <div className="flex flex-col">
-                            <div className="flex">
-                              <Text className="bg-[#E9E9E9] md:bg-white py-2 px-3 md:w-2/5 w-full md:bg-none font-semibold text-sm md:text-lg text-primaryB flex gap-4 items-center">Order Details</Text>
-                              <Text className="hidden md:flex mt-2">{statusComponentForPayment(paid) }</Text>
-                            </div>
-                            <Text className="text-[#6A6A6A] md:text-black px-3 my-2 text-xs md:text-sm md:font-semibold">Please enter the fulfillment date to close the order</Text>
-                            
+          <Tabs
+            className="mx-4 md:mx-20 mt-0 md:mt-5"
+            defaultActiveKey={state == null ? "Sold" : state.defaultKey}
+            onChange={onChange}
+            items={[
+              {
+                label: <p id="sold-tab" className="font-semibold text-sm md:text-base">Orders (Sold)</p>,
+                key: "Sold",
+                children:
+                  <div className="mb-10">
+                    <Button type="ghost" onClick={() => onChange('Sold')} className="cursor-pointer px-2 flex md:hidden items-center gap-2 text-xs font-semibold"><LeftArrow /> Back</Button>
+                    <Card className="md:p-2 mb-4 md:mb-14 md:shadow-card_shadow order_detail_card">
+                      <div className="flex flex-col md:flex-row md:justify-between">
+                        <div className="flex flex-col">
+                          <div className="flex">
+                            <Text className="bg-[#E9E9E9] md:bg-white py-2 px-3 md:w-2/5 w-full md:bg-none font-semibold text-sm md:text-lg text-primaryB flex gap-4 items-center">Order Details</Text>
+                            <Text className="hidden md:flex mt-2">{statusComponentForPayment(paid)}</Text>
                           </div>
-                          <Button
-                            id="save-button"
-                            type="primary"
-                            // Disable the button here if the serial numbers aren't uploaded. We don't want the user closing the order without providing the serial numbers.
-                            loading={issellerDetailsUpdating || isCreateOrderLineItem || isCreateOrderSubmitting}
-                            disabled={status === getStatus(3) || status === getStatus(4) || allSerialNumbersUploaded() === false }
-                            onClick={() => {
-                              handleUpdateComment()
-                              window.LOQ.push(['ready', async LO => {
-                                await LO.$internal.ready('events')
-                                LO.events.track('Order Details: Save Button')
-                              }])
-                              TagManager.dataLayer({
-                                dataLayer: {
-                                  event: 'orderDetails_sold_save_click',
-                                },
-                              });
-                            }}
-                            className="min-w-max w-max h-9 px-[3%] ml-2 bg-primary !hover:bg-primaryHover"
-                          >
-                            Save
-                          </Button>
-                        </div>
-                        <Row className="hidden md:flex my-6 justify-between bg-[#F6F6F6] p-4 pb-2 rounded">
-                          <OrderData title="Order Number" value={`#${details.order.orderId}`} />
-                          <Divider type="vertical" className="h-14 bg-secondryD" />
-                          <OrderData
-                            title="Buyer"
-                            value={details.order.purchasersCommonName}
-                          />
-                          <Divider type="vertical" className="h-14 bg-secondryD" />
-                          <OrderData
-                            title="Seller"
-                            value={details.order.sellersCommonName}
-                          />
-                          <Divider type="vertical" className="h-14 bg-secondryD" />
-                          <OrderData title="Total ($)" value={details.order.totalPrice} />
-                          <Divider type="vertical" className="h-14 bg-secondryD" />
-                          <OrderData
-                            title="Date"
-                            value={getStringDate(details.order.createdDate, US_DATE_FORMAT)}
-                          />
-                          <Divider type="vertical" className="h-14 bg-secondryD" />
+                          <Text className="text-[#6A6A6A] md:text-black px-3 my-2 text-xs md:text-sm md:font-semibold">Please enter the fulfillment date to close the order</Text>
 
-                          {
-                            status !== getStatus(1) || details.paymentSessionId !== "" ? <Col>
-                              <Text className="block text-primaryC text-[13px] mb-2">
-                                Status
-                              </Text>
-                              {statusComponent(status)}
-                            </Col> :
-                              <div>
-                                <Row className="items-center mb-2 gap-1">
-                                  <Select
-                                    bordered={false}
-                                    defaultValue=""
-                                    value="STATUS"
-                                    size="small"
-                                    className="text-primaryC text-[13px]"
-                                    style={{
-                                      width: 120,
-                                      color: "#4E4D4B",
-                                    }}
-                                    onChange={(value) => {
-                                      if (value === getStatus(2)) {
-                                        return;
-                                      }
-                                      setSelectedStatus(value);
-                                      toggleConfirmStatusModal(true);
-                                    }}
-                                    options={
-                                      status === getStatus(1)
+                        </div>
+                        <Button
+                          id="save-button"
+                          type="primary"
+                          // Disable the button here if the serial numbers aren't uploaded. We don't want the user closing the order without providing the serial numbers.
+                          loading={issellerDetailsUpdating || isCreateOrderLineItem || isCreateOrderSubmitting}
+                          disabled={status === getStatus(3) || status === getStatus(4) || allSerialNumbersUploaded() === false}
+                          onClick={() => {
+                            handleUpdateComment()
+                            window.LOQ.push(['ready', async LO => {
+                              await LO.$internal.ready('events')
+                              LO.events.track('Order Details: Save Button')
+                            }])
+                            TagManager.dataLayer({
+                              dataLayer: {
+                                event: 'orderDetails_sold_save_click',
+                              },
+                            });
+                          }}
+                          className="min-w-max w-max h-9 px-[3%] ml-2 bg-primary !hover:bg-primaryHover"
+                        >
+                          Save
+                        </Button>
+                      </div>
+                      <Row className="hidden md:flex my-6 justify-between bg-[#F6F6F6] p-4 pb-2 rounded">
+                        <OrderData title="Order Number" value={`#${details.order.orderId}`} />
+                        <Divider type="vertical" className="h-14 bg-secondryD" />
+                        <OrderData
+                          title="Buyer"
+                          value={details.order.purchasersCommonName}
+                        />
+                        <Divider type="vertical" className="h-14 bg-secondryD" />
+                        <OrderData
+                          title="Seller"
+                          value={details.order.sellersCommonName}
+                        />
+                        <Divider type="vertical" className="h-14 bg-secondryD" />
+                        <OrderData title="Total($)" value={details.order.totalPrice} />
+                        <Divider type="vertical" className="h-14 bg-secondryD" />
+                        <OrderData
+                          title="Date"
+                          value={getStringDate(details.order.createdDate, US_DATE_FORMAT)}
+                        />
+                        <Divider type="vertical" className="h-14 bg-secondryD" />
+
+                        {
+                          status !== getStatus(1) || details.paymentSessionId !== "" ? <Col>
+                            <Text className="block text-primaryC text-[13px] mb-2">
+                              Status
+                            </Text>
+                            {statusComponent(status)}
+                          </Col> :
+                            <div>
+                              <Row className="items-center mb-2 gap-1">
+                                <Select
+                                  bordered={false}
+                                  defaultValue=""
+                                  value="STATUS"
+                                  size="small"
+                                  className="text-primaryC text-[13px]"
+                                  style={{
+                                    width: 120,
+                                    color: "#4E4D4B",
+                                  }}
+                                  onChange={(value) => {
+                                    if (value === getStatus(2)) {
+                                      return;
+                                    }
+                                    setSelectedStatus(value);
+                                    toggleConfirmStatusModal(true);
+                                  }}
+                                  options={
+                                    status === getStatus(1)
+                                      ? [
+                                        {
+                                          text: getStatus(1),
+                                          value: getStatus(1),
+                                        },
+                                        {
+                                          text: getStatus(4),
+                                          value: getStatus(4),
+                                        },
+                                      ]
+                                      : status === getStatus(2)
                                         ? [
                                           {
-                                            text: getStatus(1),
-                                            value: getStatus(1),
-                                          },
-                                          {
-                                            text: getStatus(4),
-                                            value: getStatus(4),
+                                            text: getStatus(2),
+                                            value: getStatus(2),
                                           },
                                         ]
-                                        : status === getStatus(2)
+                                        : status === getStatus(4)
                                           ? [
                                             {
-                                              text: getStatus(2),
-                                              value: getStatus(2),
+                                              text: getStatus(4),
+                                              value: getStatus(4),
                                             },
                                           ]
-                                          : status === getStatus(4)
-                                            ? [
-                                              {
-                                                text: getStatus(4),
-                                                value: getStatus(4),
-                                              },
-                                            ]
-                                            : [
-                                              {
-                                                text: getStatus(3),
-                                                value: getStatus(3),
-                                              },
-                                            ]
-                                    }
-                                  />
-                                </Row>
-                                {statusComponent(status)}
-                              </div>
-                          }
-                          <Divider type="vertical" className="h-14 bg-secondryD" />
-                          <div className="text-xs order_detail_date">
-                            <Text className="block text-primaryC text-[13px]">
-                              Order Close Date
-                            </Text>
-                            <DatePicker
-                              value={
-                                selectedDate
-                              }
-                              onChange={onDateChange}
-                              disabled={status === getStatus(3) || status === getStatus(4)}
-                            />
-                          </div>
-                        </Row>
-                        <Row className="my-2 md:hidden flex-col gap-[6px] justify-between p-4 rounded">
-                          <div className="flex gap-4">
-                          <NewOrderData className="w-2/4" title="Order Number" value={'#' + details.order.orderId} />
-                          <NewOrderData className="w-2/4" title="Buyer" value={details.order.purchasersCommonName} />
-                          </div>
-                          <div className="flex gap-4">
-                          <NewOrderData className="w-2/4" title="Seller" value={details.order.sellersCommonName} />
-                          <NewOrderData className="w-2/4"title="Total ($)" value={'$' + details.order.totalPrice} />
-                          </div>
-                          <div className="flex justify-between mobile_order_detail_card">
-                            <NewOrderData className="w-2/4" title="Date" value={getStringDate(details.order.createdDate, US_DATE_FORMAT)} />
-                              <NewOrderData className="w-2/4" title="Order Close Date" 
-                              value={
-                              <DatePicker
-                                value={selectedDate}                                
-                                onChange={onDateChange}
-                                disabled={status === getStatus(3) || status === getStatus(4)}
-                              />}/>
+                                          : [
+                                            {
+                                              text: getStatus(3),
+                                              value: getStatus(3),
+                                            },
+                                          ]
+                                  }
+                                />
+                              </Row>
+                              {statusComponent(status)}
                             </div>
-                          <div className="flex justify-between">
-                            <NewOrderData className="w-2/4" title="Status" value={statusComponent(status)} />
-                            <NewOrderData className="w-2/4" title="Payment Status" value={statusComponentForPayment(paid)} />
-                          </div>
-                        </Row>
-                        <Row className="flex-nowrap items-center justify-between mb-2 md:mb-6 p-2">
-                          <div className="w-full">
-                            <Text className="block text-primaryC text-[13px] mb-2">
-                              Comments
-                            </Text>
-                            <TextArea
-                              rows={2}
-                              placeholder="Enter Comments"
-                              value={decodeURIComponent(comment)}
-                              disabled={
-                                status === getStatus(3) || status === getStatus(4)
-                              }
-                              onChange={(event) => {
-                                setcomment(encodeURIComponent(event.target.value));
-                              }}
-                            />
-                          </div>
-                        </Row>
-                        <div className="md:block hidden">
-                          <DataTableComponent
-                            columns={column}
-                            data={data}
-                            scrollX="100%"
-                            isLoading={false}
+                        }
+                        <Divider type="vertical" className="h-14 bg-secondryD" />
+                        <div className="text-xs order_detail_date">
+                          <Text className="block text-primaryC text-[13px]">
+                            Order Close Date
+                          </Text>
+                          <DatePicker
+                            value={
+                              selectedDate
+                            }
+                            onChange={onDateChange}
+                            disabled={status === getStatus(3) || status === getStatus(4)}
                           />
                         </div>
-                      </Card>
-                      {data?.length > 0 && data?.map((item) => {
-                        return (
-                          <ResponsiveOrderDetailCard data={item} />)
-                      })}
-                    </div>
-                },
-                {
-                  label: <p id="bought-tab" className="font-semibold text-sm md:text-base">Orders (Bought)</p>,
-                  key: "Bought",
-                  children: <BoughtOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
-                },
-                {
-                  label: <p id="transfers-tab" className="font-semibold text-sm md:text-base">Transfers</p>,
-                  key: "Transfers",
-                  children: <TransfersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
-                }
-              ]}
-            />
+                      </Row>
+                      <Row className="my-2 md:hidden flex-col gap-[6px] justify-between p-4 rounded">
+                        <div className="flex gap-4">
+                          <NewOrderData className="w-2/4" title="Order Number" value={'#' + details.order.orderId} />
+                          <NewOrderData className="w-2/4" title="Buyer" value={details.order.purchasersCommonName} />
+                        </div>
+                        <div className="flex gap-4">
+                          <NewOrderData className="w-2/4" title="Seller" value={details.order.sellersCommonName} />
+                          <NewOrderData className="w-2/4" title="Total($)" value={'$' + details.order.totalPrice} />
+                        </div>
+                        <div className="flex justify-between mobile_order_detail_card">
+                          <NewOrderData className="w-2/4" title="Date" value={getStringDate(details.order.createdDate, US_DATE_FORMAT)} />
+                          <NewOrderData className="w-2/4" title="Order Close Date"
+                            value={
+                              <DatePicker
+                                value={selectedDate}
+                                onChange={onDateChange}
+                                disabled={status === getStatus(3) || status === getStatus(4)}
+                              />} />
+                        </div>
+                        <div className="flex justify-between">
+                          <NewOrderData className="w-2/4" title="Status" value={statusComponent(status)} />
+                          <NewOrderData className="w-2/4" title="Payment Status" value={statusComponentForPayment(paid)} />
+                        </div>
+                      </Row>
+                      <Row className="flex-nowrap items-center justify-between mb-2 md:mb-6 p-2">
+                        <div className="w-full">
+                          <Text className="block text-primaryC text-[13px] mb-2">
+                            Comments
+                          </Text>
+                          <TextArea
+                            rows={2}
+                            placeholder="Enter Comments"
+                            value={decodeURIComponent(comment)}
+                            disabled={
+                              status === getStatus(3) || status === getStatus(4)
+                            }
+                            onChange={(event) => {
+                              setcomment(encodeURIComponent(event.target.value));
+                            }}
+                          />
+                        </div>
+                      </Row>
+                      <div className="md:block hidden">
+                        <DataTableComponent
+                          columns={column}
+                          data={data}
+                          scrollX="100%"
+                          isLoading={false}
+                        />
+                      </div>
+                    </Card>
+                    {data?.length > 0 && data?.map((item) => {
+                      return (
+                        <ResponsiveOrderDetailCard data={item} />)
+                    })}
+                  </div>
+              },
+              {
+                label: <p id="bought-tab" className="font-semibold text-sm md:text-base">Orders (Bought)</p>,
+                key: "Bought",
+                children: <BoughtOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
+              },
+              {
+                label: <p id="transfers-tab" className="font-semibold text-sm md:text-base">Transfers</p>,
+                key: "Transfers",
+                children: <TransfersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
+              }
+            ]}
+          />
 
         </div>
       )}

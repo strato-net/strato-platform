@@ -6,5 +6,5 @@ import Text.Format
 
 doit :: String -> IO ()
 doit filename = ldbForEach filename $ \key val -> do
-  putStrLn $ format key ++ ":" ++ tab ("\n" ++ formatRLPObject (rlpDeserialize val))
+  putStrLn $ format key ++ ":" ++ tab ("\n" ++ format (rlpDeserialize val))
   putStrLn "--------------------"

@@ -8,7 +8,6 @@ import qualified Data.ByteString as B
 import qualified Data.IntSet as I
 import Numeric
 import Text.Format
-import Text.PrettyPrint.ANSI.Leijen
 
 getOperationAt :: Code -> CodePointer -> (Operation, CodePointer)
 getOperationAt (Code bytes) p = opCode2Op bytes p
@@ -20,7 +19,7 @@ safeIntDrop i s = B.drop i s
 
 showCode :: CodePointer -> Code -> String
 showCode _ (Code bytes) | B.null bytes = ""
-showCode lineNumber c@(Code rom) = showHex lineNumber "" ++ " " ++ format (B.pack $ op2OpCode op) ++ " " ++ show (pretty op) ++ "\n" ++ showCode (lineNumber + nextP) (Code (safeIntDrop nextP rom))
+showCode lineNumber c@(Code rom) = showHex lineNumber "" ++ " " ++ format (B.pack $ op2OpCode op) ++ " " ++ format op ++ "\n" ++ showCode (lineNumber + nextP) (Code (safeIntDrop nextP rom))
   where
     (op, nextP) = getOperationAt c 0
 showCode _ (PtrToCode _) = error "showCode: called with PtrToCode"

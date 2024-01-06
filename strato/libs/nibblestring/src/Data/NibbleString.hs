@@ -40,7 +40,8 @@ import Data.Ranged.Boundaries
 import Data.String
 import Data.Word
 import Numeric
-import Text.PrettyPrint.ANSI.Leijen hiding (empty, (<$>))
+import Text.Colors
+import Text.Format
 import Prelude hiding (drop, head, length, null, tail, take)
 import qualified Prelude
 
@@ -61,10 +62,9 @@ instance DiscreteOrdered NibbleString where
   adjacent _ _ = False
   adjacentBelow _ = Nothing
 
-instance Pretty NibbleString where
-  pretty (EvenNibbleString s) = blue $ text $ BC.unpack (B16.encode s)
-  pretty (OddNibbleString c s) =
-    blue $ text $ showHex c "" ++ BC.unpack (B16.encode s)
+instance Format NibbleString where
+  format (EvenNibbleString s) = blue $ BC.unpack (B16.encode s)
+  format (OddNibbleString c s) = blue $ showHex c "" ++ BC.unpack (B16.encode s)
 
 instance IsString NibbleString where
   fromString "" = EvenNibbleString B.empty

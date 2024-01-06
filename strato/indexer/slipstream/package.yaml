@@ -44,7 +44,6 @@ library:
     - milena
     - milena-tools
     - monad-alter
-    - mtl
     - persistent
     - postgresql-typed
     - prometheus-client

@@ -31,6 +31,7 @@ const CreateInventoryModal = ({
   debouncedSearchTerm,
   resetPage,
   page,
+  categoryName,
 }) => {
 
   const schema = getSchema();
@@ -59,10 +60,10 @@ const CreateInventoryModal = ({
     quantity: 1,
     expirationPeriodInMonths: 1,
     clothingType: null,
-    images: null,
-    files: null,
+    images: [],
+    files: [],
     category: "Art",
-    subCategory: "",
+    subCategory: null,
     size: null,
     skuNumber: null,
     condition: null,
@@ -78,30 +79,56 @@ const CreateInventoryModal = ({
     enableReinitialize: true,
   });
 
-  function beforeImageUpload(file) {
+  const beforeImageUpload = (file) => {
     const isJpgOrPng = file.type === "image/jpeg" || file.type === "image/png";
     if (!isJpgOrPng) {
       setUploadErr("Image must be of jpeg or png format");
+      return Upload.LIST_IGNORE;
     }
     const isLt1M = file.size / 1024 / 1024 < 1;
     if (!isLt1M) {
       setUploadErr("Cannot upload an image of size more than 1mb");
+      return Upload.LIST_IGNORE;
     }
-    return isJpgOrPng && isLt1M;
-  }
+    const isNameLengthValid = file.name.length <= 100;
+    if (!isNameLengthValid) {
+      setUploadErr("File name must be less than 100 characters");
+      return Upload.LIST_IGNORE;
+    }
+    setUploadErr("");
+    return false
+  };
 
-  function beforeFileUpload(file) {
+  const handleImageChange = (info) => {
+    setSelectedImages(info.fileList);
+    formik.setFieldValue("images", info.fileList.map((e) => e.originFileObj))
+  };
+
+  const beforeFileUpload = (file) => {
     const isPdf = file.type === "application/pdf";
     if (!isPdf) {
       setUploadErr("File must be PDF format");
+      return Upload.LIST_IGNORE;
     }
     const isLt1M = file.size / 1024 / 1024 < 1;
     if (!isLt1M) {
       setUploadErr("Cannot upload a PDF of size more than 1mb");
+      return Upload.LIST_IGNORE;
     }
-    return isPdf && isLt1M;
-  }
+    const isNameLengthValid = file.name.length <= 100;
+    if (!isNameLengthValid) {
+      setUploadErr("File name must be less than 100 characters");
+      return Upload.LIST_IGNORE;
+    }
+    setUploadErr("");
+    return false;
+  };
 
+  const handleFileChange = (info) => {
+    setSelectedFiles(info.fileList);
+    formik.setFieldValue("files", info.fileList.map((e) => e.originFileObj))
+  };
+  
   const handleCreateFormSubmit = async (values) => {
     let imageKeys = []
     if (values.images && values.images.length > 0) {
@@ -109,9 +136,11 @@ const CreateInventoryModal = ({
         const formData = new FormData();
         formData.append(img.name, img);
         const imageData = await actions.uploadImage(dispatch, formData);
-        // Sometimes the image fits the criteria and the upload fails. 
-        // These should be checked before submitting the form
-        if (imageData) imageKeys.push(imageData);
+        if (imageData) {
+          imageKeys.push(imageData);
+        } else {
+          throw new Error("Image upload failed");
+        }
       }
     }
 
@@ -121,7 +150,11 @@ const CreateInventoryModal = ({
         const formData = new FormData();
         formData.append(file.name, file);
         const fileData = await actions.uploadImage(dispatch, formData);
-        if (fileData) fileKeys.push(fileData);
+        if (fileData) {
+          fileKeys.push(fileData);
+        } else {
+          throw new Error("File upload failed");
+        }
       }
     }
 
@@ -230,7 +263,7 @@ const CreateInventoryModal = ({
 
     if (isDone) {
       if (page === 1)
-        actions.fetchInventory(dispatch, 10, 0, debouncedSearchTerm, undefined);
+        await actions.fetchInventory(dispatch, 10, 0, debouncedSearchTerm, categoryName);
       resetPage(1);
       handleCancel();
     }
@@ -371,11 +404,11 @@ const CreateInventoryModal = ({
                 placeholder="Select Type of Clothing"
                 onChange={handleClothingTypeChange}
               >
-                <Option value="shirt">Shirt</Option>
-                <Option value="jacket">Jacket</Option>
-                <Option value="pants">Pants</Option>
-                <Option value="shoes">Shoes</Option>
-                <Option value="accessories">Accessories</Option>
+                <Option value="Shirt">Shirt</Option>
+                <Option value="Jacket">Jacket</Option>
+                <Option value="Pants">Pants</Option>
+                <Option value="Shoes">Shoes</Option>
+                <Option value="Accessories">Accessories</Option>
               </Select>
               {formik.touched.clothingType && formik.errors.clothingType && (
                 <span className="text-error text-xs">
@@ -426,9 +459,9 @@ const CreateInventoryModal = ({
                 onChange={(value) => formik.setFieldValue("condition", value)}
                 onBlur={formik.handleBlur}
               >
-                <Option value="new">New</Option>
-                <Option value="conditional">Conditional</Option>
-                <Option value="used">Used</Option>
+                <Option value="New">New</Option>
+                <Option value="Conditional">Conditional</Option>
+                <Option value="Used">Used</Option>
               </Select>
               {formik.touched.condition && formik.errors.condition && (
                 <span className="text-error text-xs">
@@ -478,9 +511,9 @@ const CreateInventoryModal = ({
                 onChange={(value) => formik.setFieldValue("condition", value)}
                 onBlur={formik.handleBlur}
               >
-                <Option value="new">New</Option>
-                <Option value="conditional">Conditional</Option>
-                <Option value="used">Used</Option>
+                <Option value="New">New</Option>
+                <Option value="Conditional">Conditional</Option>
+                <Option value="Used">Used</Option>
               </Select>
               {formik.touched.condition && formik.errors.condition && (
                 <span className="text-error text-xs">
@@ -674,7 +707,7 @@ const CreateInventoryModal = ({
         break;
     }
   };
-  const disabled = isCreateInventorySubmitting || isUploadImageSubmitting;
+  const disabled = isCreateInventorySubmitting || isUploadImageSubmitting
 
   /*
               <div className="flex justify-between mt-4 ">
@@ -742,7 +775,7 @@ const CreateInventoryModal = ({
               onClick={formik.handleSubmit}
               disabled={disabled}
             >
-              {disabled ? <Spin /> : "Create Inventory"}
+            {disabled ? <Spin /> : "Create Inventory"}
             </Button>
           </div>,
         ]}
@@ -798,10 +831,10 @@ const CreateInventoryModal = ({
 
 
 
-              <Form.Item label="Sub-Category" className="w-full sm:w-[200px] md:w-72">
+              <Form.Item label="Sub Category" className="w-full sm:w-[200px] md:w-72">
                 <Select
                   id="subCategory"
-                  placeholder="Select Sub-Category"
+                  placeholder="Select Sub Category"
                   allowClear
                   name="subCategory"
                   value={formik.values.subCategory}
@@ -852,15 +885,7 @@ const CreateInventoryModal = ({
               <Form.Item label="Upload Images" className="w-full sm:w-[200px] md:w-72">
                 <div className="p-4 border-secondryD border rounded flex flex-col justify-around">
                   <Upload
-                    onChange={(es) => {
-                      // TODO: these files need to be sent to the file server to be uploaded correctly. 
-                      // We should be checking the response and updating the file status accordingly. 
-                      setSelectedImages(es.fileList);
-                      formik.setFieldValue(
-                        "images",
-                        es.fileList.map((e) => e.originFileObj || null)
-                      );
-                    }}
+                    onChange={handleImageChange}
                     fileList={selectedImages}
                     accept="image/png, image/jpeg"
                     multiple={true}
@@ -889,12 +914,7 @@ const CreateInventoryModal = ({
               <Form.Item label="Upload Files" className="w-full sm:w-[200px] md:w-72">
                 <div className="p-4 border-secondryD border rounded flex flex-col justify-around">
                   <Upload
-                    onChange={(es) => {
-                      if (es && es.fileList && es.fileList.length > 0) {
-                        setSelectedFiles(es.fileList);
-                        formik.setFieldValue("files", es.fileList.map((e) => e.originFileObj));
-                      }
-                    }}
+                    onChange={handleFileChange}
                     fileList={selectedFiles}
                     accept="application/pdf"
                     multiple={true}

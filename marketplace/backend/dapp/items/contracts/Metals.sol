@@ -1,7 +1,7 @@
 pragma es6;
 pragma strict;
 
-import <d6cdd554a0503fb0e33cbaee329afeab5b0a26b2>;
+import <5a4f9eace9d21c1aae3f8e9c21198649b7b9ab63>;
 
 contract UnitOfMeasurement {
 enum UnitOfMeasurement {

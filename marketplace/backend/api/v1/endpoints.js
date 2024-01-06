@@ -43,6 +43,7 @@ export const Product = {
 
 export const Inventory = {
   prefix: '/inventory',
+  transferredItems: '/transfers/items/',
   getOwnershipHistory: '/ownership/history',
   get: '/:address',
   getAll: '/',
