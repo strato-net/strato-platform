@@ -78,16 +78,16 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
 
 
   const validatePayment = async (order) =>{
-    const response = await fetch(
+    const response1 = await fetch(
       `${apiUrl}/order/payment/session/${order.paymentSessionId}/${order.sellersCommonName}`,
       {
         method: HTTP_METHODS.GET,
       }
     );
 
-    const body = await response.json();
+    const body = await response1.json();
     
-    if (response.status === RestStatus.OK) {
+    if (response1.status === RestStatus.OK) {
       if (
         body.data["payment_status"] === "paid" &&
         getStatus(parseInt(order.status)) === getStatusByName("Payment Pending")
@@ -100,6 +100,28 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
 
         if (isDone.includes('200')){
           setShouldRefetch(!shouldRefetch);
+        }
+      }
+      else{ 
+        const response2 = await fetch(
+          `${apiUrl}/order/payment/intent/${order.paymentSessionId}/${order.sellersCommonName}`,
+          { method: HTTP_METHODS.GET }
+        );
+        const intentBody = await response2.json();
+        const paymentErrorAndRequiresMethod = intentBody.data.last_payment_error?.message && intentBody.data.status === 'requires_payment_method';
+        console.log("paymentErrorAndRequiresMethod", paymentErrorAndRequiresMethod);
+        if (paymentErrorAndRequiresMethod){
+          // Update order status
+          const body = {
+            saleOrderAddress: order.address,
+            comments: encodeURIComponent('Stripe: ' + intentBody.data.last_payment_error.message),
+          };
+          //Update Order Details and change the Order Status to 'Canceled' from 'Payment Pending'
+          let isDone = await actions.cancelSale(dispatch, body);
+          console.log("isDone", isDone);
+          if (isDone) {
+            setShouldRefetch(!shouldRefetch);
+          }
         }
       }
     }
