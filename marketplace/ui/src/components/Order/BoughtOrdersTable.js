@@ -109,7 +109,7 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
         );
         const intentBody = await response2.json();
         const paymentErrorAndRequiresMethod = intentBody.data.last_payment_error?.message && intentBody.data.status === 'requires_payment_method';
-        console.log("paymentErrorAndRequiresMethod", paymentErrorAndRequiresMethod);
+
         if (paymentErrorAndRequiresMethod){
           // Update order status
           const body = {
@@ -118,7 +118,7 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
           };
           //Update Order Details and change the Order Status to 'Canceled' from 'Payment Pending'
           let isDone = await actions.cancelSale(dispatch, body);
-          console.log("isDone", isDone);
+
           if (isDone) {
             setShouldRefetch(!shouldRefetch);
           }
