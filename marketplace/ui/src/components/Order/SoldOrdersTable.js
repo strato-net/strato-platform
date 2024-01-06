@@ -101,6 +101,28 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange }) => {
           setShouldRefetch(!shouldRefetch);
         }
       }
+      else{ 
+        const response2 = await fetch(
+          `${apiUrl}/order/payment/intent/${order.paymentSessionId}/${order.sellersCommonName}`,
+          { method: HTTP_METHODS.GET }
+        );
+        const intentBody = await response2.json();
+        const paymentErrorAndRequiresMethod = intentBody.data.last_payment_error?.message && intentBody.data.status === 'requires_payment_method';
+
+        if (paymentErrorAndRequiresMethod){
+          // Update order status
+          const body = {
+            saleOrderAddress: order.address,
+            comments: encodeURIComponent('Stripe: ' + intentBody.data.last_payment_error.message),
+          };
+          //Update Order Details and change the Order Status to 'Canceled' from 'Payment Pending'
+          let isDone = await actions.cancelSale(dispatch, body);
+
+          if (isDone) {
+            setShouldRefetch(!shouldRefetch);
+          }
+        }
+      }
     }
   } 
 
