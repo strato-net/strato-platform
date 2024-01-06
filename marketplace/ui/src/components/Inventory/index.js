@@ -273,7 +273,6 @@ const allSubcategories = getAllSubcategories(categorys);
                   <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 sm:place-items-center md:place-items-start  inventoryCard max-w-full">
                     {!isInventoriesLoading ? (
                       inventories.map((inventory, index) => {
-                        const category = categorys.find((c) => c.name === inventory.category);
                         return (
                           <InventoryCard
                             id={index}
@@ -296,14 +295,13 @@ const allSubcategories = getAllSubcategories(categorys);
                   </div>
                 ),
               },
-              ...categorys.map((category, index) => ({
-                label: category.name,
-                key: category.name,
+              ...categorys.map((categoryObject, index) => ({
+                label: categoryObject.name,
+                key: categoryObject.name,
                 children: (
                   <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 inventoryCard max-w-full">
                     {!isInventoriesLoading ? (
                       inventories.map((inventory, index) => {
-                        const category = categorys.find((c) => c.name === inventory.category);
                         return (
                           <InventoryCard
                             id={index}
@@ -350,6 +348,7 @@ const allSubcategories = getAllSubcategories(categorys);
             debouncedSearchTerm={debouncedSearchTerm}
             resetPage={onPageChange}
             page={page}
+            categoryName={category}
           />
         )
       }
