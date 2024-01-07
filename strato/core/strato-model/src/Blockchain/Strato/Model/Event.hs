@@ -15,6 +15,7 @@ import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq
 import Data.Aeson
+import Data.Binary
 import GHC.Generics
 import Test.QuickCheck
 import Test.QuickCheck.Arbitrary.Generic
@@ -53,6 +54,8 @@ instance Format Event where
       ++ "evArgs: "
       ++ show evArgs
       ++ "\n"
+
+instance Binary Event
 
 instance ToJSON Event where
   toJSON Event {..} =

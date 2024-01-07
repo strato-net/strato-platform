@@ -50,6 +50,7 @@ library:
   - blockstanbul
   - bytestring
   - common-log
+  - composable-monads-base
   - conduit
   - containers
   - data-default
@@ -58,10 +59,7 @@ library:
   - ethereum-encryption
   - ethereum-rlp
   - hflags
-  - hspec
-  - hspec-expectations-lifted
   - ki-unlifted
-  - labeled-error
   - lens
   - merkle-patricia-db
   - monad-alter
