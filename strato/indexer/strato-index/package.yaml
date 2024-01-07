@@ -45,7 +45,6 @@ executables:
       - containers
       - evm-solidity
       - hflags
-      - kafka-monad
       - monad-alter
       - redis-monad
       - seqevents
@@ -68,7 +67,6 @@ executables:
       - containers
       - evm-solidity
       - hflags
-      - kafka-monad
       - monad-alter
       - redis-monad
       - seqevents
@@ -90,7 +88,6 @@ executables:
       - containers
       - evm-solidity
       - hflags
-      - kafka-monad
       - monad-alter
       - redis-monad
       - seqevents

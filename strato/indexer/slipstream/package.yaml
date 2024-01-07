@@ -42,7 +42,6 @@ library:
     - lrucache
     - kafka-monad
     - milena
-    - milena-tools
     - monad-alter
     - persistent
     - postgresql-typed

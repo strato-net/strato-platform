@@ -24,7 +24,6 @@ executables:
       - ordered-containers
       - strato-model
       - strato-p2p
-      - unliftio
       - wai-middleware-prometheus
       - warp
       
@@ -92,7 +91,6 @@ library:
     - strato-redis-blockdb
     - text
     - these
-    - thread-hierarchy
     - time
     - transformers
     - unliftio-core
