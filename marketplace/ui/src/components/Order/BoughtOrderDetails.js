@@ -124,7 +124,7 @@ const BoughtOrderDetails = ({ user, users }) => {
 
     if (isCanceled){
       setPaid("Payment Failed");
-      setcomment(encodeURIComponent(orderDetails.order.comments))
+      setcomment(orderDetails.order.comments);
     }
     
     if (isPending) {
