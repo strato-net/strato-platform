@@ -358,13 +358,13 @@ async function getAll(admin, args = {}, defaultOptions) {
 
     if (isTrendingSearch) {
         // If it's a trending search, first search the sales
-        sales = await saleJs.getAll(admin, { range, isOpen: true }, options);
+        // Order them by creation date and set limit here
+        sales = await saleJs.getAll(admin, { range, isOpen: true, order: 'block_timestamp.desc', limit: '25', offset: '0' }, options);
         const trendingAssetAddresses = sales.map(sale => sale.assetToBeSold);
 
         // Match the inventory with the sales
         inventories = await searchAllWithQueryArgs(contractName,
             {
-                ...restArgs,
                 address: trendingAssetAddresses,
             }, options, admin);
     } else {
