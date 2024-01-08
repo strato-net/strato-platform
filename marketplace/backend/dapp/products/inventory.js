@@ -403,6 +403,8 @@ async function getAll(admin, args = {}, defaultOptions) {
                 });
             } else if (!isMarketplaceSearch) {
                 finalInventory.push(inventory);
+            } else {
+                // skip
             }
         });
     }
