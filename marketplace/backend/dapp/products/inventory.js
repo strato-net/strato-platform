@@ -354,30 +354,43 @@ async function getAll(admin, args = {}, defaultOptions) {
     let inventories;
     let sales;
     let finalInventory = [];
-    const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
+    const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' };
 
-    // Fetch sales first bc all sales have inventory
+    // Fetch sales first
     sales = await saleJs.getAll(admin, { range, isOpen: true }, options);
 
-    if (sales && sales.length > 0) {
-        const assetAddressesFromSales = sales.map((sale) => sale.assetToBeSold);
-
-        // Now, fetch inventories based on the asset addresses from the sales
+    if (isMarketplaceSearch && sales.length > 0) {
+        // For marketplace search, fetch only inventories that are in the sales
+        const assetAddressesFromSales = sales.map(sale => sale.assetToBeSold);
+        inventories = await searchAllWithQueryArgs(contractName,
+            {
+                ...restArgs,
+                address: assetAddressesFromSales,
+            }, options, admin);
+    } else {
+        // For non-marketplace search we fetch all inventories
         if (ownerCommonName) {
             inventories = await searchAllWithQueryArgs(contractName,
                 {
                     ...restArgs,
                     ownerCommonName: ownerCommonName,
-                    address: assetAddressesFromSales,
+                }, options, admin);
+        } else if (assetAddresses) {
+            inventories = await searchAllWithQueryArgs(contractName,
+                {
+                    ...restArgs,
+                    address: assetAddresses,
                 }, options, admin);
         } else {
             inventories = await searchAllWithQueryArgs(contractName,
                 {
                     ...restArgs,
-                    address: assetAddressesFromSales,
                 }, options, admin);
         }
+    }
 
+    // Process inventories
+    if (inventories) {
         inventories.forEach(inventory => {
             const itemSale = sales.find(sale => sale.assetToBeSold === inventory.address && sale.isOpen);
             if (itemSale) {
@@ -388,16 +401,15 @@ async function getAll(admin, args = {}, defaultOptions) {
                     saleQuantity: itemSale?.quantity,
                     saleDate: itemSale?.block_timestamp
                 });
-            } else if (isMarketplaceSearch) {
-                // Skip 
-            } else {
+            } else if (!isMarketplaceSearch) {
                 finalInventory.push(inventory);
             }
         });
     }
 
-    return finalInventory ? finalInventory.map((inventory) => marshalOut(inventory)) : undefined;
+    return finalInventory.map(inventory => marshalOut(inventory));
 }
+
 
 async function getAllItemTransferEvents(admin, args = {}, defaultOptions) {
     const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
