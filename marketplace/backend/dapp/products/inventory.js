@@ -356,32 +356,30 @@ async function getAll(admin, args = {}, defaultOptions) {
     let finalInventory = [];
     const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
 
-    if (ownerCommonName) {
-        inventories = await searchAllWithQueryArgs(contractName,
-            {
-                ...restArgs,
-                ownerCommonName: ownerCommonName,
-            }, options, admin);
-    }
-    else if (assetAddresses) {
-        inventories = await searchAllWithQueryArgs(contractName,
-            {
-                ...restArgs,
-                address: assetAddresses,
-            }, options, admin);
-    }
-    else {
-        inventories = await searchAllWithQueryArgs(contractName,
-            {
-                ...restArgs,
-            }, options, admin);
-    }
+    // Fetch sales first bc all sales have inventory
+    sales = await saleJs.getAll(admin, { range, isOpen: true }, options);
 
-    if (inventories) {
-        const assetAddresses = inventories.map((inventory) => inventory.address);
-        sales = await saleJs.getAll(admin, { assetAddresses, range, isOpen: true }, options);
+    if (sales && sales.length > 0) {
+        const assetAddressesFromSales = sales.map((sale) => sale.assetToBeSold);
+
+        // Now, fetch inventories based on the asset addresses from the sales
+        if (ownerCommonName) {
+            inventories = await searchAllWithQueryArgs(contractName,
+                {
+                    ...restArgs,
+                    ownerCommonName: ownerCommonName,
+                    address: assetAddressesFromSales,
+                }, options, admin);
+        } else {
+            inventories = await searchAllWithQueryArgs(contractName,
+                {
+                    ...restArgs,
+                    address: assetAddressesFromSales,
+                }, options, admin);
+        }
+
         inventories.forEach(inventory => {
-            const itemSale = sales.find(sale => sale.assetToBeSold == inventory.address && sale.isOpen);
+            const itemSale = sales.find(sale => sale.assetToBeSold === inventory.address && sale.isOpen);
             if (itemSale) {
                 finalInventory.push({
                     ...inventory,
@@ -389,10 +387,9 @@ async function getAll(admin, args = {}, defaultOptions) {
                     saleAddress: itemSale?.address,
                     saleQuantity: itemSale?.quantity,
                     saleDate: itemSale?.block_timestamp
-                })
-            }
-            else if (isMarketplaceSearch) {
-                //skip
+                });
+            } else if (isMarketplaceSearch) {
+                // Skip 
             } else {
                 finalInventory.push(inventory);
             }
