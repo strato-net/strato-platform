@@ -35,7 +35,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
   
-  const itemData = JSON.parse(inventory.data);
+  const itemData = inventory.data;
   const showModalEdit = () => {
     hide();
     setOpenEdit(true);

@@ -438,7 +438,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const sellersCommonName = sales[0].sellersCommonName;
     const saleAddresses = await Promise.all(sales.map(async (sale) => {
       const orderForSale = orderList.find(order => order.assetAddress === sale.assetToBeSold);
-      const saleData = JSON.parse(sale.data);
+      const saleData = sale.data;
       if (saleData.units && orderForSale.quantity < saleData.units) {
         const contract = { name: orderForSale.category, address: orderForSale.assetAddress }
         const splitSaleAddress = await saleJs.createSplitSale(rawAdmin, {
