@@ -283,7 +283,7 @@ data Action = Action
     _transactionChainId :: Maybe Word256,
     _transactionSender :: Account,
     _actionData :: Map Account ActionData,
-    _metadata :: Maybe (Map Text Text),
+    _metadata :: !(Maybe (Map Text Text)),
     _events :: S.Seq Event,
     _delegatecalls :: S.Seq Delegatecall
   }
