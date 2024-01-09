@@ -98,7 +98,7 @@ const reducer = (state, action) => {
         ...state,
         error: action.error,
         isordersLoading: false,
-      };      
+      };
     case actionDescriptors.updateOrderStatus:
       return {
         ...state,
@@ -213,6 +213,22 @@ const reducer = (state, action) => {
         ...state,
         error: action.error,
         isCreateOrderSubmitting: false,
+      }
+    case actionDescriptors.updateOrderComment:
+      return {
+        ...state,
+        isUpdatingOrderComment: true,
+      }
+    case actionDescriptors.updateOrderCommentSuccessful:
+      return {
+        ...state,
+        isUpdatingOrderComment: false,
+      }
+    case actionDescriptors.updateOrderCommentFailed:
+      return {
+        ...state,
+        error: action.error,
+        isUpdatingOrderComment: false,
       }
     case actionDescriptors.createSaleOrder:
       return {

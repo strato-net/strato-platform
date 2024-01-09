@@ -89,6 +89,13 @@ abstract contract Order is Utils {
         return RestStatus.OK;
     }
 
+    function updateComment(string _comments) external returns (uint) {
+        require(status != OrderStatus.CLOSED && status != OrderStatus.CANCELED, "Order already closed.");
+        comments = _comments;
+
+        return RestStatus.OK;
+    }
+
     function unlockSales() internal {
         for (uint i = 0; i < saleAddresses.length; i++) {
             Sale s = Sale(saleAddresses[i]);
@@ -99,7 +106,6 @@ abstract contract Order is Utils {
             }
         }
     }
-
 
     function updateOrderStatus(OrderStatus _status) external returns (uint) {
         require((tx.origin == purchasersAddress || getCommonName(tx.origin) == sellersCommonName), "Only the purchaser/seller can update the order status");
