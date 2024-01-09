@@ -164,10 +164,11 @@ const actions = {
   },
 
   fetchInventory: async (dispatch, limit, offset, queryValue, category) => {
-    const query = queryValue ? `&productId=${queryValue}` : "";
-    
-    let temp = [category]
-    const categoryQuery = category ? `category[]=${temp}` : "";
+      // let temp = [category]
+      const query = queryValue ? `&productId=${queryValue}` : ``;
+      // const categoryQuery = category ? `category[]=${temp}` : "";
+  
+      const categoryQuery = category ? `&queryValue=${category}&queryFields=contract_name` : "";
 
     dispatch({ type: actionDescriptors.fetchInventory });
 
