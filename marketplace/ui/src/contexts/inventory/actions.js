@@ -167,7 +167,8 @@ const actions = {
       // let temp = [category]
       const query = queryValue ? `&productId=${queryValue}` : ``;
       // const categoryQuery = category ? `category[]=${temp}` : "";
-  
+      
+      // Added query to filter based on the field "contract_name"
       const categoryQuery = category ? `&queryValue=${category}&queryFields=contract_name` : "";
 
     dispatch({ type: actionDescriptors.fetchInventory });

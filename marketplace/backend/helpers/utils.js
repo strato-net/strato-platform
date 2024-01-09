@@ -147,7 +147,7 @@ export const setSearchQueryOptions = (args = {}, _queryOptionsArray) => {
   const queryOptionsArray = Array.isArray(_queryOptionsArray) ? _queryOptionsArray : [_queryOptionsArray]
   const queryOptions = queryOptionsArray.reduce((agg, cur) => {
     const { key, value, predicate = 'eq' } = cur
-    if (key === 'order'){
+    if (key === 'order') {
       return {
         ...agg,
         order: value,
@@ -174,12 +174,13 @@ export const setSearchQueryOptions = (args = {}, _queryOptionsArray) => {
       }
     }
 
-    
+
 
     if (!value && typeof value != 'boolean') {
       return agg
     }
-    if (key === 'isMint'){
+    // Added the value in the arguments that we are getting where key is 'isMint'
+    if (key === 'isMint') {
       return {
         ...agg,
         ['or']: `(and(data->>isMint.eq.True,quantity.eq.0),quantity.gt.0)`
@@ -236,18 +237,18 @@ export const setSearchQueryOptionsPrime = (args) => {
         result.push(({ key, value: args[key] }))
       }
     }
-    
+
     if (key === 'category' && Array.isArray(args[key])) {
       const categories = args[key][0].split(',').map(category => '%-' + category + '%');
-      result.push({ key, value: categories, predicate: 'or', subPredicate: 'like'})
+      result.push({ key, value: categories, predicate: 'or', subPredicate: 'like' })
     }
 
     if (key === 'subCategory' && Array.isArray(args[key])) {
       const subCategories = args[key][0].split(',').map(subCategory => '%-' + subCategory);
-      result.push({ key, value: subCategories, predicate: 'or', subPredicate: 'like'})
+      result.push({ key, value: subCategories, predicate: 'or', subPredicate: 'like' })
     }
 
-    
+
 
     if (key === 'queryValue') {
       const { queryValue, queryFields } = args
@@ -263,7 +264,7 @@ export const setSearchQueryOptionsPrime = (args) => {
     if (key === 'sort') {
       result.push(args[key])
     }
-    
+
     if (key == 'range') {
       if (Array.isArray(args[key])) {
         const queryArray = args[key].reduce((agg, cum) => {
@@ -279,7 +280,7 @@ export const setSearchQueryOptionsPrime = (args) => {
         }
       }
     }
-    
+
     if (key === 'notEqualsValue') {
       const { notEqualsField, notEqualsValue } = args
       if (Array.isArray(args[key])) {
@@ -290,9 +291,9 @@ export const setSearchQueryOptionsPrime = (args) => {
         result.push({ key: notEqualsField, value: notEqualsValue, predicate: 'neq' })
       }
     }
-
-    if (key === 'isMint'){
-      result.push({ key, value:`(and(data->>isMint.eq.True,quantity.eq.0),quantity.gt.0)`, predicate: 'or'})      
+    // Added to remove the unusable inventories when (isMint==true && quantity==0) OR  (quantity>0)
+    if (key === 'isMint') {
+      result.push({ key, value: `(and(data->>isMint.eq.True,quantity.eq.0),quantity.gt.0)`, predicate: 'or' })
     }
 
     return result
@@ -331,8 +332,8 @@ export const setSearchQueryOptionsLike = (args = {}, _queryOptionsArray) => {
       }, [])
       option = {
         [predicate]: `(${valueArray.join(',')})`,
-      } 
-      
+      }
+
     } else if (value === "true" || value === "false" || typeof value == 'boolean') {
       option = {
         [key]: `eq.${value}`,
@@ -375,16 +376,17 @@ export const searchAllWithQueryArgs = async (contractName, args, options, user) 
 
     if (key === 'category' && Array.isArray(args[key])) {
       const categories = args[key][0].split(',').map(category => '%-' + category + '%');
-      result.push({ key, value: categories, predicate: 'or', subPredicate: 'like'})
+      result.push({ key, value: categories, predicate: 'or', subPredicate: 'like' })
     }
 
     if (key === 'subCategory' && Array.isArray(args[key])) {
       const subCategories = args[key][0].split(',').map(subCategory => '%-' + subCategory);
-      result.push({ key, value: subCategories, predicate: 'or', subPredicate: 'like'})
+      result.push({ key, value: subCategories, predicate: 'or', subPredicate: 'like' })
     }
 
-    if (key === 'isMint'){
-      result.push({ key, value:`(and(data->>isMint.eq.True,quantity.eq.0),quantity.gt.0)`, predicate: 'or'})      
+    // Added to remove the unusable inventories when (isMint==true && quantity==0) OR  (quantity>0)
+    if (key === 'isMint') {
+      result.push({ key, value: `(and(data->>isMint.eq.True,quantity.eq.0),quantity.gt.0)`, predicate: 'or' })
     }
 
     if (key === 'queryValue') {
@@ -423,8 +425,8 @@ export const searchAllWithQueryArgs = async (contractName, args, options, user) 
     if (key === 'sort') {
       result.push(args[key])
     }
-    
-    
+
+
     if (key == 'range') {
       if (Array.isArray(args[key])) {
         const queryArray = args[key].reduce((agg, cum) => {
@@ -473,10 +475,10 @@ export function getEnvVariable(name) {
   return value
 }
 
-export const  pollingHelper = async ( func, argsToFunc, attemptNumber=0, attemptsAllowed=8, milliseconds=1000  )  => {
- if (attemptsAllowed  < attemptNumber) return null;
- let result = await func(...argsToFunc);
- if (!(result === null || result === undefined)) return result;
- await new Promise(resolve => setTimeout(resolve, milliseconds));
- return pollingHelper(func, argsToFunc, attemptNumber+1, attemptsAllowed, milliseconds  );
+export const pollingHelper = async (func, argsToFunc, attemptNumber = 0, attemptsAllowed = 8, milliseconds = 1000) => {
+  if (attemptsAllowed < attemptNumber) return null;
+  let result = await func(...argsToFunc);
+  if (!(result === null || result === undefined)) return result;
+  await new Promise(resolve => setTimeout(resolve, milliseconds));
+  return pollingHelper(func, argsToFunc, attemptNumber + 1, attemptsAllowed, milliseconds);
 }
