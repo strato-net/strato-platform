@@ -286,8 +286,6 @@ async function updateOrderComment(user, contract, options, comments) {
   };
   const updateOrderCommentResponse = await rest.call(user, callArgs, options);
 
-  console.log(updateOrderCommentResponse, "ajkdnasjkndkjasnkjdasnkndajsknd")
-
   if (parseInt(updateOrderCommentResponse, 10) !== RestStatus.OK) {
     throw new rest.RestError(
       updateOrderCommentResponse,
