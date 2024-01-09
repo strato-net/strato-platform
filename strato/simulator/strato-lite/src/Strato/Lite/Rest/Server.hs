@@ -13,6 +13,7 @@ module Strato.Lite.Rest.Server where
 
 import qualified Blockchain.Data.TXOrigin as Origin
 import Blockchain.Sequencer.Event
+import Blockchain.Strato.Discovery.Data.MemPeerDB
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Model.MicroTime
 import qualified Control.Concurrent.STM.MonadIO as CCS
@@ -57,9 +58,12 @@ getChainInfo mgr nodeLabel = liftIO . atomically $ do
 getPeers :: NetworkManager -> T.Text -> Handler [T.Text]
 getPeers mgr label = do
   mPeer <- liftIO $ fmap (M.lookup label . _nodes) . readTVarIO $ mgr ^. network
-  mCtx <- liftIO $ traverse (readTVarIO . _p2pTestContext) mPeer
-  let peers = maybe [] (map T.pack . M.keys . _stringPPeerMap) mCtx
-  pure peers
+  case mPeer of
+    Nothing -> return []
+    Just peer -> do
+      peerMap <- liftIO $ readIORef. stringPPeerMap . _p2pPeerDB $ peer
+      let peers = map T.pack . M.keys $ peerMap
+      pure peers
 
 postAddNode :: NetworkManager -> T.Text -> AddNodeParams -> Handler Bool
 postAddNode mgr label (AddNodeParams ip identity bootNodes) =

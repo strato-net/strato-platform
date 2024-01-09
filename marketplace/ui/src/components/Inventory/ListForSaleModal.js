@@ -6,7 +6,7 @@ import { PAYMENT_TYPE } from "../../helpers/constants";
 
 const { Option } = Select;
 
-const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddress }) => {
+const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddress, categoryName }) => {
     const [data, setData] = useState([inventory]);
     const [quantity, setQuantity] = useState(inventory.quantity);
     const [paymentTypes, setPaymentTypes] = useState([PAYMENT_TYPE[0].value]);
@@ -41,9 +41,10 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
                 onClose={onClose}
                 className="flex items-center mr-1"
             >
-                {renderIcon(value)}
+                {PAYMENT_TYPE[0].name}
+                {/* {renderIcon(value)} */}
                 {/* (...) Indicates More options in addition to available icons */}
-                <p className="ml-1">...</p>
+                {/* <p className="ml-1">...</p> */}
             </Tag>
         );
     };
@@ -170,7 +171,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
             isDone = await actions.listInventory(inventoryDispatch, body);
         }
         if ( isDone ) {
-            await actions.fetchInventory(inventoryDispatch, 10, 0, "", undefined);
+            await actions.fetchInventory(inventoryDispatch, 10, 0, "", categoryName);
             handleCancel();
         }
     }

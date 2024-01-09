@@ -119,11 +119,15 @@ const BoughtOrderDetails = ({ user, users }) => {
     if (!paymentSessionId || !orderDetails) return;
 
     const currentStatus = getStatus(parseInt(orderDetails.order.status));
-    const isPendingOrCanceled = currentStatus === getStatusByName("Payment Pending") || currentStatus === getStatusByName("Canceled");
+    const isPending = currentStatus === getStatusByName("Payment Pending");
     const isCanceled = currentStatus === getStatusByName("Canceled");
 
-
-    if (isPendingOrCanceled) {
+    if (isCanceled){
+      setPaid("Payment Failed");
+      setcomment(orderDetails.order.comments);
+    }
+    
+    if (isPending) {
       try {
         const response = await fetch(
           `${apiUrl}/order/payment/intent/${paymentSessionId}/${orderDetails.order.sellersCommonName}`,
@@ -132,11 +136,7 @@ const BoughtOrderDetails = ({ user, users }) => {
         const intentBody = await response.json();
         const paymentErrorAndRequiresMethod = intentBody.data.last_payment_error?.message && intentBody.data.status === 'requires_payment_method';
 
-        if (paymentErrorAndRequiresMethod && isCanceled) {
-          setPaid("Payment Failed");
-          setcomment(encodeURIComponent('Stripe: ' + intentBody.data.last_payment_error.message))
-        }
-        else if(paymentErrorAndRequiresMethod && !isCanceled)
+        if(paymentErrorAndRequiresMethod && !isCanceled)
         {
           setisLoadingPaymentStatus(true)
           const body = {
@@ -201,7 +201,7 @@ const BoughtOrderDetails = ({ user, users }) => {
           productImage: prod.images && prod.images.length > 0 ? prod.images[0] : image_placeholder,
           productName: prod,
           name: prod.name,
-          unitPrice: '$' + prod.price,
+          unitPrice:  prod.price,
           quantity: parseInt(orderDetails.order.quantities[index]),
           shippingCharges: prod.shippingCharges ? prod.shippingCharges : 0,
           amount: prod.price * parseInt(orderDetails.order.quantities[index]),
@@ -510,7 +510,7 @@ const BoughtOrderDetails = ({ user, users }) => {
                           value={details.order.sellersCommonName}
                         />
                         <Divider type="vertical" className="h-14 bg-secondryD" />
-                        <OrderData title="Total ($)" value={details.order.totalPrice} />
+                        <OrderData title="Total($)" value={details.order.totalPrice} />
                         <Divider type="vertical" className="h-14 bg-secondryD" />
                         <OrderData
                           title="Date"
@@ -531,7 +531,7 @@ const BoughtOrderDetails = ({ user, users }) => {
                         </div>
                         <div className="flex gap-4">
                           <NewOrderData className="w-2/4" title="Seller" value={details.order.sellersCommonName} />
-                          <NewOrderData className="w-2/4" title="Total ($)" value={'$' + details.order.totalPrice} />
+                          <NewOrderData className="w-2/4" title="Total($)" value={'$' + details.order.totalPrice} />
                         </div>
                         <div className="flex justify-between">
                           <NewOrderData className="w-2/4" title="Status" value={statusComponent(status)} />

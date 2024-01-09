@@ -33,6 +33,7 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange }) => {
   const [dropdownVisible, setDropdownVisible] = useState(false);
   const [mDropdownVisible, setMDropdownVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false); 
+  const [shouldRefetch, setShouldRefetch] = useState(true);
 
   const { ordersSold, isordersSoldLoading, orderSoldTotal } = useOrderState();
 
@@ -47,7 +48,25 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange }) => {
       order
     );
 
-  }, [dispatch, limit, offset, debouncedSearchTerm, user, order, selectedDate, filter]);
+  }, [dispatch, limit, offset, debouncedSearchTerm, user, order, selectedDate, filter, shouldRefetch]);
+  
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      ordersSold.map(async (order) => {
+        if (order.paymentSessionId !== "" && getStatus(parseInt(order.status)) === getStatusByName("Payment Pending")) {
+          try {
+            setIsLoading(true);
+            await validatePayment(order);          
+          } catch (err) {
+            console.error(err);
+          }
+        }
+        setIsLoading(false);
+      })
+    }, 10000); // Poll every 30 seconds, adjust as needed
+
+    return () => clearInterval(intervalId); // Clear interval on component unmount
+  }, [ordersSold]); // Dependency array
 
   useEffect(() => {
     setPage(1);
@@ -77,6 +96,32 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange }) => {
           saleOrderAddress: order.address,
           status: 1,
         });
+        
+        if (isDone.includes('200')){
+          setShouldRefetch(!shouldRefetch);
+        }
+      }
+      else{ 
+        const response2 = await fetch(
+          `${apiUrl}/order/payment/intent/${order.paymentSessionId}/${order.sellersCommonName}`,
+          { method: HTTP_METHODS.GET }
+        );
+        const intentBody = await response2.json();
+        const paymentErrorAndRequiresMethod = intentBody.data.last_payment_error?.message && intentBody.data.status === 'requires_payment_method';
+
+        if (paymentErrorAndRequiresMethod){
+          // Update order status
+          const body = {
+            saleOrderAddress: order.address,
+            comments: encodeURIComponent('Stripe: ' + intentBody.data.last_payment_error.message),
+          };
+          //Update Order Details and change the Order Status to 'Canceled' from 'Payment Pending'
+          let isDone = await actions.cancelSale(dispatch, body);
+
+          if (isDone) {
+            setShouldRefetch(!shouldRefetch);
+          }
+        }
       }
     }
   } 

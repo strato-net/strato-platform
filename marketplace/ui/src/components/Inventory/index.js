@@ -219,8 +219,8 @@ const allSubcategories = getAllSubcategories(categorys);
               <Button className="!px-1 md:!px-0 flex items-center flex-row-reverse gap-[6px] text-lg md:text-2xl font-semibold !text-[#13188A] " type="link" icon={<img src={Images.ForwardIcon} alt="inventory" className="hidden md:block w-6 h-6" />}> Inventory
               </Button>
             </div>
-            <div className="flex">
-              <Button type="primary" className="w-40 mr-3"
+            <div className="flex gap-3">
+              <Button type="primary" className="w-40 h-9 "
                 onClick={() => {
                   if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                     window.location.href = loginUrl;
@@ -273,7 +273,6 @@ const allSubcategories = getAllSubcategories(categorys);
                   <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 sm:place-items-center md:place-items-start  inventoryCard max-w-full">
                     {!isInventoriesLoading ? (
                       inventories.map((inventory, index) => {
-                        const category = categorys.find((c) => c.name === inventory.category);
                         return (
                           <InventoryCard
                             id={index}
@@ -296,14 +295,13 @@ const allSubcategories = getAllSubcategories(categorys);
                   </div>
                 ),
               },
-              ...categorys.map((category, index) => ({
-                label: category.name,
-                key: category.name,
+              ...categorys.map((categoryObject, index) => ({
+                label: categoryObject.name,
+                key: categoryObject.name,
                 children: (
                   <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 inventoryCard max-w-full">
                     {!isInventoriesLoading ? (
                       inventories.map((inventory, index) => {
-                        const category = categorys.find((c) => c.name === inventory.category);
                         return (
                           <InventoryCard
                             id={index}
@@ -350,6 +348,7 @@ const allSubcategories = getAllSubcategories(categorys);
             debouncedSearchTerm={debouncedSearchTerm}
             resetPage={onPageChange}
             page={page}
+            categoryName={category}
           />
         )
       }

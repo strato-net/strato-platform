@@ -22,10 +22,10 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import ClassyPrelude (atomically, fromMaybe, newTMChan)
 import qualified Control.Monad.Change.Alter as A
+import Control.Monad.Composable.Kafka
 import qualified Data.ByteString.Char8 as C8
 import Data.Foldable (for_)
 import Network.HTTP.Client (defaultManagerSettings, newManager)
-import qualified Network.Kafka.Protocol as KP
 import Servant.Client
 
 -- bootstrap genesis block into leveldb if needed
@@ -94,7 +94,7 @@ bootstrapSequencer
           flushLdbBatchOps
       initKafka :: CablePackage -> IO ()
       initKafka pkg = do
-        let clientId = KP.KString $ C8.pack defaultKafkaClientId'
+        let clientId = KString $ C8.pack defaultKafkaClientId'
             dummyGregorCfg =
               GregorConfig
                 { kafkaAddress = Nothing,

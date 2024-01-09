@@ -24,6 +24,9 @@ body {
 body::-webkit-scrollbar {
   display: none;
 }
+body{
+  scrollbar-width: none; 
+}
 
 .ant-table .ant-table-container .ant-table-content table thead.ant-table-thead .ant-table-cell {
   background-color: rgba(24, 30, 172, 0.1);
@@ -223,6 +226,9 @@ body::-webkit-scrollbar {
   display: none;
 }
 
+.ant-table-body {
+  scrollbar-width: none; 
+}
 
 .ant-table-tbody {
   border-bottom: none;
@@ -322,6 +328,9 @@ body::-webkit-scrollbar {
 .hide-Scroll::-webkit-scrollbar {
   display: none;
   scroll-behavior: smooth;
+}
+.hide-Scroll{
+  scrollbar-width: none; 
 }
 
 .orders_responsive_cards {
@@ -424,7 +433,6 @@ body::-webkit-scrollbar {
 .ant-menu-light {
   color : white !important;
 }
-
-:where(.css-dev-only-do-not-override-9ntgx0).ant-menu-horizontal{
+:where(.css-9ntgx0).ant-menu-horizontal{
   border-bottom: 0px;
 }

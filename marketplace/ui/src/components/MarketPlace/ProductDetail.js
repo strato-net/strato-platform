@@ -130,7 +130,7 @@ const ProductDetails = ({ user, users }) => {
         (c) => c.name === details.category
       );
       setCategoryName(prodCategory?.name);
-      const detailsData = JSON.parse(details.data);
+      const detailsData = details.data;
       setItemData(detailsData);
       if (details.saleQuantity) {
         setAvailableQuantity(details.saleQuantity || 1);
@@ -150,7 +150,6 @@ const ProductDetails = ({ user, users }) => {
       let value = qty + 1;
       setQty(value);
     } else {
-      openToast("bottom", true, "Cannot add more than available quantity");
     }
   };
 
@@ -204,11 +203,6 @@ const ProductDetails = ({ user, users }) => {
             setQty(1);
             openToast("bottom", false, "Item updated in cart");
           } else {
-            openToast(
-              "bottom",
-              true,
-              "Cannot add more than available quantity"
-            );
             return;
           }
         }
@@ -347,30 +341,21 @@ const ProductDetails = ({ user, users }) => {
                   <div className="flex justify-between lg:justify-start  w-full gap-3 lg:gap-[15px]" id="quantity">
                     <div
                       onClick={subtract}
-                      className="h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer" style={{ borderColor: qty > 1 ? '#1777FF' : '#E3E3E3' }}>
-                      <p className=" text-2xl md:text-3xl lg:text-4xl font-semibold lg:text-[#202020] text-[#989898]">
-                        -
-                      </p>
+                      className={`h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer ${qty > 1 ? '' : 'cursor-not-allowed opacity-50'}`}>
+                      <p className=" text-2xl md:text-3xl lg:text-4xl font-semibold lg:text-[#202020] text-[#989898]">-</p> 
                     </div>
                     <InputNumber className="w-full md:w-[280px] h-9 md:h-10 lg:h-[46px] border text-[#6A6A6A] border-[#00000029] text-center flex flex-col justify-center font-semibold !rounded-lg" min={1} max={availableQuantity} value={`${qty}`} defaultValue={`${qty}`} controls={false}
                       onChange={e => {
                         if (e < availableQuantity) {
                           setQty(e)
                         } else {
-                          openToast(
-                            "bottom",
-                            true,
-                            "Cannot add more than available quantity"
-                          );
                           setQty(availableQuantity)
                         }
                       }} />
                     <div
                       onClick={add}
-                      className="ml-0.5 h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg  flex justify-center items-center border border-[#00000029] text-center cursor-pointer" style={{ borderColor: availableQuantity > qty ? '#1777FF' : '#E3E3E3' }}>
-                      <p className="text-2xl md:text-3xl lg:text-4xl font-semibold lg:text-[#202020] text-[#989898]">
-                        +
-                      </p>
+                      className={`h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer ${qty < availableQuantity ? '' : 'cursor-not-allowed opacity-50'}`}>
+                       <p className="text-2xl md:text-3xl lg:text-4xl font-semibold lg:text-[#202020] text-[#989898]">+</p> 
                     </div>
                   </div>
 
