@@ -239,7 +239,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.transferItem = async function (args, options = defaultOptions) {
     const { assetAddress, ...restArgs } = args;
     const transferNumber = parseInt(util.uid())
-    const finalArgs = {transferNumber:transferNumber, ...restArgs};
+    const finalArgs = { transferNumber: transferNumber, ...restArgs };
     const contract = { address: assetAddress };
     return inventoryJs.transferItem(rawAdmin, contract, finalArgs, options);
   }
@@ -271,8 +271,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getMarketplaceInventoriesLoggedIn = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
-    const newArgs = { ...args, notEqualsField: ['sale', 'ownerCommonName'],
-                      notEqualsValue: ['0000000000000000000000000000000000000000', userCommonName] }
+    const newArgs = {
+      ...args, notEqualsField: ['sale', 'ownerCommonName'],
+      notEqualsValue: ['0000000000000000000000000000000000000000', userCommonName]
+    }
     return marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
   };
 
@@ -284,8 +286,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getTopSellingProductsLoggedIn = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName }
-    const newArgs = { ...args, notEqualsField: ['sale', 'ownerCommonName'],
-                      notEqualsValue: ['0000000000000000000000000000000000000000', userCommonName] }
+    const newArgs = {
+      ...args, notEqualsField: ['sale', 'ownerCommonName'],
+      notEqualsValue: ['0000000000000000000000000000000000000000', userCommonName]
+    }
     return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions)
   }
 
@@ -520,6 +524,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return saleOrderJs.completeOrder(rawAdmin, args, options);
   };
 
+  contract.updateOrderComment = async function (args, options = defaultOptions) {
+    const { saleOrderAddress, comments, ...restArgs } = args;
+    const contract = { name: saleOrderJs.contractName, address: saleOrderAddress }
+    return saleOrderJs.updateOrderComment(rawAdmin, contract, options, comments);
+  };
+
   // ------------------------------ SALE TEST ENDS ------------------------------
 
 
@@ -543,14 +553,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             }
           });
       } else {
-          await axios.get(new URL(`/stripe/onboard/${sellerStripeDetails[0].accountId}`, STRIPE_PAYMENT_SERVER_URL).href)
-            .then(function (res) {
-              if (res.status === 200) {
-                connectLink = res.data.connectLink;
-              } else {
-                throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
-              }
-            });
+        await axios.get(new URL(`/stripe/onboard/${sellerStripeDetails[0].accountId}`, STRIPE_PAYMENT_SERVER_URL).href)
+          .then(function (res) {
+            if (res.status === 200) {
+              connectLink = res.data.connectLink;
+            } else {
+              throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+            }
+          });
       }
       return connectLink
     } catch (error) {
@@ -606,14 +616,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           if (connectedStripeAccountStatus.detailsSubmitted
             && connectedStripeAccountStatus.chargesEnabled
             && connectedStripeAccountStatus.payoutsEnabled
-            ) {
-              returnedStripeAccountStatus = { 
-                accountId: paymentProvider.accountId, 
-                paymentProviderAddress: paymentProvider.address, 
-                ...connectedStripeAccountStatus 
-              }
+          ) {
+            returnedStripeAccountStatus = {
+              accountId: paymentProvider.accountId,
+              paymentProviderAddress: paymentProvider.address,
+              ...connectedStripeAccountStatus
             }
-          
+          }
+
           paymentMethodsChecked.push(paymentProvider.name);
         }
 
@@ -695,7 +705,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         throw new rest.RestError(RestStatus.CONFLICT, "Seller hasn't activated this payment method");
       }
 
-      const invoices = []; 
+      const invoices = [];
       let calculatedOrderTotal = 0;
 
       orderList.forEach(item => {
@@ -709,7 +719,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         throw new rest.RestError(RestStatus.BAD_REQUEST, "Incorrect order value.");
       }
       let stripePaymentSession;
-      const {paymentList,...restArgs} = args;
+      const { paymentList, ...restArgs } = args;
       try {
         const checkoutBody = {
           paymentTypes: paymentList,
@@ -765,8 +775,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getPaymentSession = async function (args, options = defaultOptions) {
     try {
       const { session_id, sellersCommonName } = args;
-      const paymentDetail = await paymentProviderJs.get(rawAdmin, 
-        { name: 'STRIPE', ownerCommonName: sellersCommonName, accountDeauthorized: false }, 
+      const paymentDetail = await paymentProviderJs.get(rawAdmin,
+        { name: 'STRIPE', ownerCommonName: sellersCommonName, accountDeauthorized: false },
         options);
       if (paymentDetail.length === 0) {
         throw new rest.RestError(RestStatus.CONFLICT, "Seller payment details cannot be found.");
@@ -788,8 +798,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getPaymentIntent = async function (args, options = defaultOptions) {
     try {
       const { session_id, sellersCommonName } = args;
-      const paymentDetail = await paymentProviderJs.get(rawAdmin, 
-        { name: 'STRIPE', ownerCommonName: sellersCommonName, accountDeauthorized: false }, 
+      const paymentDetail = await paymentProviderJs.get(rawAdmin,
+        { name: 'STRIPE', ownerCommonName: sellersCommonName, accountDeauthorized: false },
         options);
       if (paymentDetail.length === 0) {
         throw new rest.RestError(RestStatus.CONFLICT, "Seller payment details cannot be found.");
@@ -806,7 +816,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     } catch (error) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while fetching payment intent", { message: "Error while fetching payment intent" })
     }
-  };  
+  };
 
   contract.createUserAddress = async function (args, options = defaultOptions) {
     try {
@@ -856,7 +866,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         }
       });
       return userAddress;
-    }catch (error) {
+    } catch (error) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
       }

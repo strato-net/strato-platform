@@ -12,7 +12,6 @@ import {
   Button,
   Spin,
   notification,
-  Image,
   Tabs,
 } from "antd";
 import { useLocation, useMatch } from "react-router-dom";
@@ -20,14 +19,11 @@ import { actions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import routes from "../../helpers/routes";
 import classNames from "classnames";
-import { EyeOutlined } from "@ant-design/icons";
 import { getStringDate } from "../../helpers/utils";
 import { useNavigate } from "react-router-dom";
-import UploadSerialNumberModal from "./UploadSerialNumber";
 import DataTableComponent from "../DataTableComponent";
-import { getStatus, getStatusByValue, getStatusByName } from "./constant";
+import { getStatus, getStatusByName } from "./constant";
 import dayjs from "dayjs";
-import ConfirmStatusModal from "./ConfirmStatusModal";
 import { US_DATE_FORMAT } from "../../helpers/constants";
 import ClickableCell from "../ClickableCell";
 import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
@@ -46,44 +42,21 @@ const SoldOrderDetails = ({ user, users }) => {
   const { Text } = Typography;
   const [selectedDate, setSelectedDate] = useState("");
   const [status, setStatus] = useState(getStatus(1));
-  const [selectedStatus, setSelectedStatus] = useState(null);
   const [paid, setPaid] = useState("Processing");
   const [isLoadingPaymentStatus, setisLoadingPaymentStatus] = useState(false)
-  const [comment, setcomment] = useState("");
+  const [comment, setComment] = useState("");
   const { TextArea } = Input;
   const [api, contextHolder] = notification.useNotification();
-  const [isUploadSerialNumberModalOpen, setisUploadSerialNumberModalOpen] =
-    useState(false);
-  const [isConfirmStatusModalOpen, toggleConfirmStatusModal] = useState(false);
-  const [selectedProd, setselectedProd] = useState(null);
-  const [shouldCheckPaymentStatus, setShouldCheckPaymentStatus] = useState(false);
   const state = useLocation()
-
-  const openToast = (placement, isError, msg) => {
-    if (isError) {
-      api.error({
-        message: msg,
-        placement,
-        key: 1,
-      });
-    } else {
-      api.success({
-        message: msg,
-        placement,
-        key: 1,
-      });
-    }
-  };
 
   const {
     orderDetails,
     isorderDetailsLoading,
     ordersAudit,
     message,
-    issellerDetailsUpdating,
     success,
-    isCreateOrderLineItem,
     isCreateOrderSubmitting,
+    isUpdatingOrderComment
   } = useOrderState();
   const routeMatch = useMatch({
     path: routes.SoldOrderDetails.url,
@@ -93,7 +66,7 @@ const SoldOrderDetails = ({ user, users }) => {
   useEffect(() => {
     if (orderDetails) {
       setStatus(getStatus(parseInt(orderDetails.order.status)));
-      setcomment(orderDetails.order.comments);
+      setComment(orderDetails.order.comments);
       // Fulfillment date is sometimes coming in as 0. a unix of 0 sets the date to 1969. So we need to check for 0 and null, I added undefined just in case too. 
       if (orderDetails.order.fulfillmentDate === 0 || orderDetails.order.fulfillmentDate === null || orderDetails.order.fulfillmentDate === undefined) {
         setSelectedDate(null);
@@ -124,7 +97,6 @@ const SoldOrderDetails = ({ user, users }) => {
 
   useEffect(() => {
     setId(routeMatch?.params?.id);
-
   }, [routeMatch]);
 
   useEffect(() => {
@@ -149,7 +121,7 @@ const SoldOrderDetails = ({ user, users }) => {
 
     if (isCanceled) {
       setPaid("Payment Failed");
-      setcomment(orderDetails.order.comments);
+      setComment(orderDetails.order.comments);
     }
     if (isPending) {
       try {
@@ -168,7 +140,7 @@ const SoldOrderDetails = ({ user, users }) => {
           };
           //Update Order Details and change the Order Status to 'Canceled' from 'Payment Pending'
           let isDone = await actions.cancelSale(dispatch, body);
-          setcomment(`Stripe: ${orderDetails.order.comments}`);
+          setComment(`Stripe: ${orderDetails.order.comments}`);
           if (isDone) {
             setStatus("Canceled");
             setPaid("Payment Failed");
@@ -248,28 +220,10 @@ const SoldOrderDetails = ({ user, users }) => {
   };
 
   const onDateChange = (date) => {
-    console.log("date", date)
     setSelectedDate(date);
   };
 
-  // This is checking if we need to upload serial numbers. 
-  // Used to disable the sae button if the serial numbers aren't uploaded.
-  const allSerialNumbersUploaded = () => {
-    let serialsUploaded = true;
-    if (orderDetails === null) {
-      return serialsUploaded;
-    }
-    // for (const orderLine of orderDetails.orderLines) {
-    //   if (orderLine.containsSerialNumber === true) {
-    //     if (orderLine.isSerialUploaded === false) {
-    //       serialsUploaded = false;
-    //     }
-    //   }
-    // }
-    return serialsUploaded;
-  };
-
-  const handleUpdateComment = async () => {
+  const handleCloseOrder = async () => {
     let body = {};
     let isDone = false;
 
@@ -285,39 +239,14 @@ const SoldOrderDetails = ({ user, users }) => {
     }
   };
 
-  const handleChange = async () => {
-    handleCancel();
-    let body = {};
-    if (selectedStatus === getStatus(4)) {
-      if (comment === "") {
-        openToast("bottom", true, "Comment is mandatory to cancel order");
-        return;
-      }
-      body = {
-        address: Id,
-
-        updates: {
-          status: parseInt(getStatusByValue(selectedStatus)),
-          sellerComments: comment,
-          // fulfillmentDate: dayjs(selectedDate).unix(),
-        },
-      };
-    } else {
-      body = {
-        address: Id,
-
-        updates: {
-          status: parseInt(getStatusByValue(selectedStatus)),
-        },
-      };
+  const handleUpdateComment = async () => {
+    let body = {
+      saleOrderAddress: orderDetails.order.address,
+      comments: comment
     }
 
-    const isDone = await actions.updateSellerDetails(dispatch, body);
-    if (isDone) {
-      setStatus(selectedStatus);
-      await actions.fetchOrderDetails(dispatch, Id);
-    }
-  };
+    await actions.updateOrderComment(dispatch, body)
+  }
 
   const statusComponent = (status) => {
     let textClass = "bg-[#FFF6EC]";
@@ -407,53 +336,6 @@ const SoldOrderDetails = ({ user, users }) => {
       ),
     },
     {
-      title: <Text className="text-primaryC text-[13px]">Serial Number</Text>,
-      dataIndex: "serialNumber",
-      key: "serialNumber",
-      align: "center",
-      // width: "192px",
-
-      // This is checking the serial number. If a serial number was uploaded at inventory creation we need to provide one here
-      // If the serial number is necessary provide the upload button / view button
-      // If it is not necessary provide N/A. 
-
-      render: (text) => {
-        if (text.isSerialUploaded === true) {
-          return (
-            <div className="flex items-center justify-center">
-              <EyeOutlined className="mr-2 hover:text-primaryHover cursor-pointer" />
-              <p
-                onClick={() => {
-                  navigate(
-                    `${routes.SoldOrderItemDetail.url.replace(":id", text.address)}`,
-                    { state: { orderId: orderDetails.orderId, address: Id } }
-                  );
-                }}
-                className="hover:text-primaryHover cursor-pointer"
-              >
-                View
-              </p>
-            </div>
-          );
-        } else {
-          return (
-            <Button
-              id="upload-button"
-              className="text-primary text-[17px]"
-              type="link"
-              disabled={orderDetails.status === 4}
-              onClick={() => {
-                setselectedProd(text);
-                setisUploadSerialNumberModalOpen(true);
-              }}
-            >
-              Upload
-            </Button>
-          );
-        }
-      }
-    },
-    {
       title: <Text className="text-primaryC text-[13px]">Unit Price($)</Text>,
       dataIndex: "unitPrice",
       key: "unitPrice",
@@ -492,10 +374,6 @@ const SoldOrderDetails = ({ user, users }) => {
     },
   ];
 
-  if (data[0] && !data[0].serialNumber.containsSerialNumber) {
-    column = column.filter(col => col.dataIndex !== "serialNumber")
-  }
-
   const openToastOrder = (placement) => {
     if (success) {
       api.success({
@@ -514,17 +392,13 @@ const SoldOrderDetails = ({ user, users }) => {
     }
   };
 
-  const handleCancel = () => {
-    toggleConfirmStatusModal(false);
-  };
-
   return (
     <div>
       {contextHolder}
-      {details === null || isorderDetailsLoading || issellerDetailsUpdating || isLoadingPaymentStatus ? (
+      {details === null || isorderDetailsLoading || isLoadingPaymentStatus ? (
         <div className="h-screen flex justify-center items-center">
           <Spin
-            spinning={isorderDetailsLoading || issellerDetailsUpdating || isLoadingPaymentStatus}
+            spinning={isorderDetailsLoading || isLoadingPaymentStatus}
             size="large"
           />
         </div>
@@ -570,11 +444,15 @@ const SoldOrderDetails = ({ user, users }) => {
                         <Button
                           id="save-button"
                           type="primary"
-                          // Disable the button here if the serial numbers aren't uploaded. We don't want the user closing the order without providing the serial numbers.
-                          loading={issellerDetailsUpdating || isCreateOrderLineItem || isCreateOrderSubmitting}
-                          disabled={status === getStatus(3) || status === getStatus(4) || allSerialNumbersUploaded() === false}
+                          loading={isCreateOrderSubmitting || isUpdatingOrderComment}
+                          disabled={status === getStatus(3) || status === getStatus(4) || (!comment && !selectedDate)}
                           onClick={() => {
-                            handleUpdateComment()
+                            if (!selectedDate && comment) {
+                              handleUpdateComment();
+                            }
+                            else if (selectedDate) {
+                              handleCloseOrder()
+                            }
                             window.LOQ.push(['ready', async LO => {
                               await LO.$internal.ready('events')
                               LO.events.track('Order Details: Save Button')
@@ -629,13 +507,6 @@ const SoldOrderDetails = ({ user, users }) => {
                                   style={{
                                     width: 120,
                                     color: "#4E4D4B",
-                                  }}
-                                  onChange={(value) => {
-                                    if (value === getStatus(2)) {
-                                      return;
-                                    }
-                                    setSelectedStatus(value);
-                                    toggleConfirmStatusModal(true);
                                   }}
                                   options={
                                     status === getStatus(1)
@@ -726,7 +597,7 @@ const SoldOrderDetails = ({ user, users }) => {
                               status === getStatus(3) || status === getStatus(4)
                             }
                             onChange={(event) => {
-                              setcomment(encodeURIComponent(event.target.value));
+                              setComment(encodeURIComponent(event.target.value));
                             }}
                           />
                         </div>
@@ -760,26 +631,6 @@ const SoldOrderDetails = ({ user, users }) => {
           />
 
         </div>
-      )}
-      {isUploadSerialNumberModalOpen && (
-        <UploadSerialNumberModal
-          isUploadSerialNumberModalOpen={isUploadSerialNumberModalOpen}
-          toggleUploadSerialNumberModal={setisUploadSerialNumberModalOpen}
-          product={selectedProd}
-          orderId={details.orderId}
-          orderAddress={details.address}
-          dispatch={dispatch}
-          actions={actions}
-          isLoading={isCreateOrderLineItem}
-          Id={Id}
-        />
-      )}
-      {isConfirmStatusModalOpen && (
-        <ConfirmStatusModal
-          isConfirmStatusModalOpen={isConfirmStatusModalOpen}
-          handleCancel={handleCancel}
-          handleYes={handleChange}
-        />
       )}
       {message && openToastOrder("bottom")}
     </div>
