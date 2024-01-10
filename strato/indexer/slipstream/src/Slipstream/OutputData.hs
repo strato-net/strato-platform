@@ -1357,7 +1357,10 @@ valueToSQLText (SimpleValue (ValueBool x)) = Just $ wrapSingleQuotes $ tshow x
 valueToSQLText (SimpleValue (ValueInt _ _ v)) = Just $ wrapSingleQuotes $ tshow v
 valueToSQLText (SimpleValue (ValueString s)) = Just $ wrapSingleQuotes $ escapeQuotes s
 valueToSQLText (SimpleValue (ValueAddress (Address 0))) = Just "NULL"
-valueToSQLText (SimpleValue (ValueAddress (Address addr))) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ printf "%040x" (fromIntegral addr :: Integer)
+valueToSQLText (SimpleValue (ValueAddress (Address addr))) =
+  if fromIntegral addr == (0 :: Integer)
+  then Just "NULL"
+  else Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ printf "%040x" (fromIntegral addr :: Integer)
 valueToSQLText (SimpleValue (ValueAccount acct)) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show acct
 valueToSQLText (SimpleValue (ValueBytes _ bytes)) = Just $
   wrapSingleQuotes $
