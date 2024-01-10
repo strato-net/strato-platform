@@ -131,7 +131,21 @@ data CallInfo = CallInfo
     currentSourcePos :: Maybe SourcePosition,
     isFreeFunction :: Bool
   }
-  deriving (Show)
+
+instance Show CallInfo where
+  show CallInfo {..} =
+    CL.underline "CallInfo" 
+      ++ CL.green "\nCallInfo.currentFunctionName\t" ++ show currentFunctionName
+      ++ CL.green "\nCallInfo.currentAccount\t" ++ show currentAccount
+      ++ CL.green "\nCallInfo.currentContract\t" ++ show currentContract
+      ++ CL.green "\nCallInfo.codeCollection\t" ++ show codeCollection
+      ++ CL.green "\nCallInfo.collectionHash\t" ++ format collectionHash
+      ++ CL.green "\nCallInfo.localVariables\t" ++ show localVariables
+      ++ CL.green "\nCallInfo.variableStack\t" ++ show variableStack
+      ++ CL.green "\nCallInfo.readOnly\t" ++ show readOnly
+      ++ CL.green "\nCallInfo.isUncheckedSection\t" ++ show isUncheckedSection
+      ++ CL.green "\nCallInfo.currentSourcePos\t" ++ show currentSourcePos
+      ++ CL.green "\nCallInfo.isFreeFunction\t" ++ show isFreeFunction
 
 {-
 BlockData

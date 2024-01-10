@@ -3012,8 +3012,8 @@ runTheConstructors from to hsh cc contractName' argExps = do
 
   void . withCallInfo to contract' (stringToLabel $ labelToString contractName' ++ " constructor") hsh cc (M.fromList zipped) False False $ do
 
-    ci <- getCurrentCallInfo
-    onTraced $ liftIO $ putStrLn $ show ci
+    -- ci <- getCurrentCallInfo
+    -- onTraced $ liftIO $ putStrLn $ show ci
 
     forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, e) -> do
       v <- expToVar e

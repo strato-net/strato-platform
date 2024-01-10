@@ -79,7 +79,7 @@ import qualified LabeledError
 import qualified Numeric (readHex, showHex)
 import SolidVM.Model.SolidString
 import SolidVM.Model.Storable as MS
-import Test.Hspec (Selector, Spec, anyException, it, pendingWith, shouldThrow, xdescribe, xit)
+import Test.Hspec (Selector, Spec, anyException, it, pendingWith, shouldThrow, xdescribe, xit, fit)
 import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
@@ -8531,3 +8531,18 @@ abstract contract B is C {}
 abstract contract C { constructor(uint x, uint y) {} }
 
 |]) `shouldReturn` ()
+  
+  fit "access structs in mappings" $ runTest ( do
+      runBS [r|
+contract qq {
+  struct MyStruct {
+    mapping(string => bool) structMap;
+  }
+  
+  mapping(string => MyStruct) myMap;
+  
+  constructor() returns (bool) { 
+    bool b = myMap["hello"].structMap["world"];
+  } 
+
+}|]) `shouldReturn` ()
