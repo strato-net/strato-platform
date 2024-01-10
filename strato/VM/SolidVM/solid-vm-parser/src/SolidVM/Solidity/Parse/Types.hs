@@ -53,11 +53,14 @@ simpleType =
     unknownLabelParser = try $ do
       name <- identifier
       isUserDefined <- isInUserDefinedTypes name
+      isStruct <- isInStructs name
       if isUserDefined
         then do
           typ <- getUserDefinedType name
           return $ (SVMType.UserDefined name (userTypeHelper' typ))
-        else return $ (SVMType.UnknownLabel name Nothing)
+      else if isStruct then return $ (SVMType.Struct Nothing name)
+      else return $ (SVMType.UnknownLabel name Nothing)
+
     unknownLabelMemberParser = try $ do
       name <- concat <$> sequence [identifier, dot, identifier]
       return $ SVMType.UnknownLabel name Nothing

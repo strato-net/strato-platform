@@ -8539,10 +8539,9 @@ contract qq {
     mapping(string => bool) structMap;
   }
   
-  mapping(string => MyStruct) myMap;
+  mapping(string => MyStruct) localMap;
   
-  constructor() returns (bool) { 
-    bool b = myMap["hello"].structMap["world"];
-  } 
-
+  constructor() {
+    bool b = localMap["hello"].structMap["world"];
+  }
 }|]) `shouldReturn` ()

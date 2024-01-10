@@ -184,6 +184,7 @@ structDeclaration = do
         (fieldName, VariableDeclaration (SolidVM.VariableDecl decl _ _ _ _ _)) <- simpleVariableDeclaration
         return (fieldName, decl)
     pure (structName, structFields)
+  addStruct structName structFields
   return
     ( structName,
       StructDeclaration
