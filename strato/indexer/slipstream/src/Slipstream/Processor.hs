@@ -445,7 +445,8 @@ processTheMessages env conn messages = do
 
             deferredForeignKeys <- case (_contractType c) of
               AbstractType -> do
-                outputData conn $ createExpandAbstractTable g c nameParts cc
+                _ <- outputData conn $ createExpandAbstractTable g c nameParts cc
+                return []
               _ -> do
                 outputData conn $ createExpandIndexTable g c nameParts
 
