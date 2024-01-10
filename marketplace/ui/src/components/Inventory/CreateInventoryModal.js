@@ -121,7 +121,7 @@ const CreateInventoryModal = ({
       }
     }
 
-    const { category, subCategory, ...body } = values;
+    const { category, subCategory, images, files, ...body } = values;
     const newBody = {
       itemArgs: {
         images: imageKeys || [],
