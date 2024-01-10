@@ -39,7 +39,7 @@ const CreateInventoryModal = ({
   const [selectedFiles, setSelectedFiles] = useState(null);
   const [clothingType, setClothingType] = useState(null);
   const [sizeOptions, setSizeOptions] = useState([]);
-  const [categoryValue, setCategoryValue] = useState(form.getFieldValue("category"));
+  const [categoryValue, setCategoryValue] = useState("Art");
   const [subCategoryValue, setSubCategoryValue] = useState(form.getFieldValue("subCategory"));
 
   const beforeImageUpload = (file) => {
@@ -308,7 +308,7 @@ const CreateInventoryModal = ({
                   }}
                 >
                   {categorys.map((category) =>
-                    category.name === form.getFieldValue("category") ? category.subCategories.map((e, index) => (
+                    category.name === categoryValue ? category.subCategories.map((e, index) => (
                       <Option value={e.contract} key={index}>
                         {e.name}
                       </Option>
