@@ -13,6 +13,8 @@ module Blockchain.ExtMergeSources
   )
 where
 
+import           BlockApps.Logging
+import           Blockchain.Metrics
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
@@ -22,6 +24,7 @@ import           Data.Conduit                 as DC
 import           Data.Conduit.TMChan          hiding (mergeSources)
 import qualified Data.Conduit.List            as CL
 import           Data.Kind
+import           Data.String
 import           Ki.Unlifted as KIU
 import           UnliftIO.Exception
 import           UnliftIO.STM
@@ -76,22 +79,39 @@ chanSink :: MonadIO m
 chanSink ch writer = CL.mapM_ $ liftIO . atomically . writer ch
 {-# INLINE chanSink #-}
 
-mergeSourcesByForce :: (MonadResource mi, Monad mo, MonadUnliftIO mi)
-                    => [ConduitM () a mi ()]
+--mergeSourcesByForce :: (MonadResource mi, Monad mo, MonadUnliftIO mi)
+--                    => [(a1,ConduitM () a mi ())]
+--                    -> Int
+--                    -> Scope
+--                    -> mo (ConduitM () a mi ())
+mergeSourcesByForce :: ( MonadResource m1
+                       , Monad m2
+                       , MonadUnliftIO m1
+                       , Eq a1
+                       , Data.String.IsString a1
+                       , MonadLogger m1
+                       )
+                    => [(a1,ConduitT () a2 m1 ())]
                     -> Int
                     -> Scope
-                    -> mo (ConduitM () a mi ())
+                    -> m2 (ConduitT z a2 m1 ())
 mergeSourcesByForce sx bound scp =
   return $ do
     (chkey,c) <- allocate (liftSTM $ newTBMChan bound)
                           (liftSTM . closeTBMChan)
     refcount <- liftSTM . newTVar $ length sx
     st <- lift $ askUnliftIO
-    _  <- forM sx $ \s ->
+    _  <- forM sx $ \(tag,s) ->
             liftIO $ fork scp 
                  ( (unliftIO st $
                       runConduit $ s .| chanSink c writeTBMChan)
-                        `finally` (liftSTM $ decRefcount refcount c)
+                        `finally` ( case tag of
+                                      "canarySource" -> do
+                                        _ <- unliftIO st $ $logInfoS "canary/exit" "" >> killCanary
+                                        liftSTM $ decRefcount refcount c
+                                      _              ->
+                                        liftSTM $ decRefcount refcount c
+                                  )
                  )
     chanSource c readTBMChan
     release chkey
