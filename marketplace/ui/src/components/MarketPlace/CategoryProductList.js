@@ -302,7 +302,7 @@ const CategoryProductList = ({ user }) => {
     setSearch(e.target.value)
   }
 
-  const isLoading = isMarketplaceLoading || issubCategorysLoading;
+  const isLoading = isMarketplaceLoading;
 
   return (
     <div className={`${mobileOpenFilter ? 'overflow-y-hidden h-[100vh] w-[100vw] bg-[#00000020] relative mt-0 md:bg-white md:mt-[auto] md:overflow-scroll trending_cards' : ' '}`}>
@@ -410,15 +410,20 @@ const CategoryProductList = ({ user }) => {
                   >
                     <Panel header={<Text strong className="text-base">Sub Categories</Text>} key="1">
                       <Checkbox.Group
-                        // onChange={onChangeSubCategory}
                         value={selectedSubCategories}
                       >
                         <div className="flex flex-col gap-3">
-                          {subCategories.map((subcategory, index) => (
-                            <Checkbox value={subcategory.contract} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
-                              {subcategory.name}
-                            </Checkbox>
-                          ))}
+                          {issubCategorysLoading ? (
+                            <div className="text-center py-4">
+                              <Spin size="small" />    Loading Sub-Categories...
+                            </div>
+                          ) : (
+                            subCategories.map((subcategory, index) => (
+                              <Checkbox value={subcategory.contract} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
+                                {subcategory.name}
+                              </Checkbox>
+                            ))
+                          )}
                         </div>
                       </Checkbox.Group>
                     </Panel>
