@@ -56,14 +56,17 @@ const CategoryProductList = ({ user }) => {
   const [uniqueProductNames, setUniqueProductNames] = useState([]);
   const [desktopOpenFilter, setDesktopOpenFilter] = useState(true);
   const [mobileOpenFilter, setMobileOpenFilter] = useState(false);
+  const [search, setSearch] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState(search)
   //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
-  const { categorys } = useCategoryState();
+  const { categorys, iscategorysLoading } = useCategoryState();
   const { cartList } = useMarketplaceState();
   const [api] = notification.useNotification();
   let currentCategory;
 
   let { hasChecked, isAuthenticated } = useAuthenticateState();
+
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
@@ -93,7 +96,7 @@ const CategoryProductList = ({ user }) => {
   //=========================Sub-categories===============================//
 
   const subCategoryDispatch = useSubCategoryDispatch();
-  const { subCategorys } = useSubCategoryState();
+  const { subCategorys, issubCategorysLoading } = useSubCategoryState();
 
   useEffect(() => {
     setSubCategories(subCategorys);
@@ -123,51 +126,62 @@ const CategoryProductList = ({ user }) => {
   useEffect(() => {
     let subCategoriesOfSelectedCategories = "";
     subCategorys.map((sub) => subCategoriesOfSelectedCategories += sub.contract + ",");
+    const debounceTimer = setTimeout(() => {
 
-    if (category !== "" && hasChecked && !isAuthenticated &&
-      ((selectedSubCategories.length === 0 && selectedCategories.length === 0)
+      if (category !== "" && hasChecked && !isAuthenticated &&
+        ((selectedSubCategories.length === 0 && selectedCategories.length === 0)
+          || (selectedSubCategories.length !== 0 && selectedCategories.length !== 0))) {
+        actions.fetchMarketplace(
+          marketplaceDispatch,
+          arrayToStr(selectedCategories),
+          arrayToStr(selectedSubCategories),
+          arrayToStr(selectedProducts),
+          arrayToStr(selectedBrands),
+          minPrice,
+          maxPrice,
+          debouncedSearch
+        );
+      } else if (category !== "" && ((selectedSubCategories.length === 0 && selectedCategories.length === 0)
         || (selectedSubCategories.length !== 0 && selectedCategories.length !== 0))) {
-      actions.fetchMarketplace(
-        marketplaceDispatch,
-        arrayToStr(selectedCategories),
-        arrayToStr(selectedSubCategories),
-        arrayToStr(selectedProducts),
-        arrayToStr(selectedBrands),
-        minPrice,
-        maxPrice
-      );
-    } else if (category !== "" && ((selectedSubCategories.length === 0 && selectedCategories.length === 0)
-      || (selectedSubCategories.length !== 0 && selectedCategories.length !== 0))) {
-      actions.fetchMarketplaceLoggedIn(
-        marketplaceDispatch,
-        arrayToStr(selectedCategories),
-        arrayToStr(selectedSubCategories),
-        arrayToStr(selectedProducts),
-        arrayToStr(selectedBrands),
-        minPrice,
-        maxPrice
-      );
-    } else if (selectedSubCategories.length === 0 && selectedCategories.length > 0 && hasChecked && !isAuthenticated) {
-      actions.fetchMarketplace(
-        marketplaceDispatch,
-        arrayToStr(selectedCategories),
-        subCategoriesOfSelectedCategories,
-        arrayToStr(selectedProducts),
-        arrayToStr(selectedBrands),
-        minPrice,
-        maxPrice
-      );
-    } else if (selectedSubCategories.length === 0 && selectedCategories.length > 0) {
-      actions.fetchMarketplaceLoggedIn(
-        marketplaceDispatch,
-        arrayToStr(selectedCategories),
-        subCategoriesOfSelectedCategories,
-        arrayToStr(selectedProducts),
-        arrayToStr(selectedBrands),
-        minPrice,
-        maxPrice
-      );
-    }
+        actions.fetchMarketplaceLoggedIn(
+          marketplaceDispatch,
+          arrayToStr(selectedCategories),
+          arrayToStr(selectedSubCategories),
+          arrayToStr(selectedProducts),
+          arrayToStr(selectedBrands),
+          minPrice,
+          maxPrice,
+          debouncedSearch
+        );
+      } else if (selectedSubCategories.length === 0 && selectedCategories.length > 0 && hasChecked && !isAuthenticated) {
+        actions.fetchMarketplace(
+          marketplaceDispatch,
+          arrayToStr(selectedCategories),
+          subCategoriesOfSelectedCategories,
+          arrayToStr(selectedProducts),
+          arrayToStr(selectedBrands),
+          minPrice,
+          maxPrice,
+          debouncedSearch
+        );
+      } else if (selectedSubCategories.length === 0 && selectedCategories.length > 0) {
+        actions.fetchMarketplaceLoggedIn(
+          marketplaceDispatch,
+          arrayToStr(selectedCategories),
+          subCategoriesOfSelectedCategories,
+          arrayToStr(selectedProducts),
+          arrayToStr(selectedBrands),
+          minPrice,
+          maxPrice,
+          debouncedSearch
+        );
+      }
+    }, 1000);
+
+    return () => {
+      clearTimeout(debounceTimer);
+    };
+
   }, [
     marketplaceDispatch,
     selectedSubCategories,
@@ -179,7 +193,12 @@ const CategoryProductList = ({ user }) => {
     category,
     hasChecked,
     isAuthenticated,
+    debouncedSearch,
   ]);
+
+  useEffect(() => {
+    setDebouncedSearch(search);
+  }, [search]);
 
   useEffect(() => {
     if (marketplaceList?.length > 0) {
@@ -279,6 +298,12 @@ const CategoryProductList = ({ user }) => {
     }
   };
 
+  const handleSearch = (e) => {
+    setSearch(e.target.value)
+  }
+
+  const isLoading = isMarketplaceLoading || issubCategorysLoading;
+
   return (
     <div className={`${mobileOpenFilter ? 'overflow-y-hidden h-[100vh] w-[100vw] bg-[#00000020] relative mt-0 md:bg-white md:mt-[auto] md:overflow-scroll trending_cards' : ' '}`}>
       <div className="fixed bg-white w-full top-7 z-10 md:static">
@@ -312,6 +337,7 @@ const CategoryProductList = ({ user }) => {
           <div className={`flex-1 `}>
             <Input
               size="large"
+              onChange={(e) => { handleSearch(e) }}
               placeholder="Search Marketplace"
               prefix={<img src={Images.Header_Search} alt="search" className="w-[18px] h-[18px]" />}
               className="bg-[#F6F6F6] border-none rounded-3xl p-[10px]"
@@ -464,9 +490,9 @@ const CategoryProductList = ({ user }) => {
 
         {/* Product list section */}
 
-        {isMarketplaceLoading ? (
+        {isLoading ? (
           <div className="h-96 w-full flex justify-center items-center">
-            <Spin spinning={isMarketplaceLoading} size="large" />
+            <Spin spinning={isLoading} size="large" />
           </div>
         ) : (
           <div className=" mb-12 w-full">
