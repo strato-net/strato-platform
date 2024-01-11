@@ -15,7 +15,7 @@ import CategoryProductCard from "./CategoryProductCard";
 //categories
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 //sub-categories
 import { actions as subCategoryActions } from "../../contexts/subCategory/actions";
 import {
@@ -58,6 +58,7 @@ const CategoryProductList = ({ user }) => {
   const [mobileOpenFilter, setMobileOpenFilter] = useState(false);
   const [search, setSearch] = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState(search)
+  const previousDebouncedSearchRef = useRef();
   //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
   const { categorys, iscategorysLoading } = useCategoryState();
@@ -126,8 +127,8 @@ const CategoryProductList = ({ user }) => {
   useEffect(() => {
     let subCategoriesOfSelectedCategories = "";
     subCategorys.map((sub) => subCategoriesOfSelectedCategories += sub.contract + ",");
-    const debounceTimer = setTimeout(() => {
 
+    const callAPI = () => {
       if (category !== "" && hasChecked && !isAuthenticated &&
         ((selectedSubCategories.length === 0 && selectedCategories.length === 0)
           || (selectedSubCategories.length !== 0 && selectedCategories.length !== 0))) {
@@ -176,67 +177,19 @@ const CategoryProductList = ({ user }) => {
           debouncedSearch
         );
       }
-    }, 1000);
-
-    return () => {
-      clearTimeout(debounceTimer);
     };
-
-  }, [
-    debouncedSearch,
-  ]);
+    
+    if (debouncedSearch !== previousDebouncedSearchRef.current && debouncedSearch !== "") {
+      const debounceTimer = setTimeout(() => {
+        callAPI();
+      }, 1000);
   
-  useEffect(() => {
-    let subCategoriesOfSelectedCategories = "";
-    subCategorys.map((sub) => subCategoriesOfSelectedCategories += sub.contract + ",");
-
-    if (category !== "" && hasChecked && !isAuthenticated &&
-      ((selectedSubCategories.length === 0 && selectedCategories.length === 0)
-        || (selectedSubCategories.length !== 0 && selectedCategories.length !== 0))) {
-      actions.fetchMarketplace(
-        marketplaceDispatch,
-        arrayToStr(selectedCategories),
-        arrayToStr(selectedSubCategories),
-        arrayToStr(selectedProducts),
-        arrayToStr(selectedBrands),
-        minPrice,
-        maxPrice,
-        debouncedSearch
-      );
-    } else if (category !== "" && ((selectedSubCategories.length === 0 && selectedCategories.length === 0)
-      || (selectedSubCategories.length !== 0 && selectedCategories.length !== 0))) {
-      actions.fetchMarketplaceLoggedIn(
-        marketplaceDispatch,
-        arrayToStr(selectedCategories),
-        arrayToStr(selectedSubCategories),
-        arrayToStr(selectedProducts),
-        arrayToStr(selectedBrands),
-        minPrice,
-        maxPrice,
-        debouncedSearch
-      );
-    } else if (selectedSubCategories.length === 0 && selectedCategories.length > 0 && hasChecked && !isAuthenticated) {
-      actions.fetchMarketplace(
-        marketplaceDispatch,
-        arrayToStr(selectedCategories),
-        subCategoriesOfSelectedCategories,
-        arrayToStr(selectedProducts),
-        arrayToStr(selectedBrands),
-        minPrice,
-        maxPrice,
-        debouncedSearch
-      );
-    } else if (selectedSubCategories.length === 0 && selectedCategories.length > 0) {
-      actions.fetchMarketplaceLoggedIn(
-        marketplaceDispatch,
-        arrayToStr(selectedCategories),
-        subCategoriesOfSelectedCategories,
-        arrayToStr(selectedProducts),
-        arrayToStr(selectedBrands),
-        minPrice,
-        maxPrice,
-        debouncedSearch
-      );
+      return () => {
+        previousDebouncedSearchRef.current = debouncedSearch;
+        clearTimeout(debounceTimer);
+      };
+    } else {
+      callAPI();
     }
 
   }, [
@@ -249,7 +202,8 @@ const CategoryProductList = ({ user }) => {
     maxPrice,
     category,
     hasChecked,
-    isAuthenticated
+    isAuthenticated,
+    debouncedSearch
   ]);
 
   useEffect(() => {
