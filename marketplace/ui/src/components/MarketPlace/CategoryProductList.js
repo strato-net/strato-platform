@@ -11,7 +11,6 @@ import {
   Input,
   notification,
 } from "antd";
-import CategoryProductCard from "./CategoryProductCard";
 //categories
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
@@ -30,14 +29,12 @@ import {
 } from "../../contexts/marketplace";
 import { arrayToStr } from "../../helpers/utils";
 import routes from "../../helpers/routes";
-import useDebounce from "../UseDebounce";
 import { useMatch } from "react-router-dom";
-import { MAX_QUANTITY, MAX_PRICE } from "../../helpers/constants";
+import { MAX_PRICE } from "../../helpers/constants";
 import ClickableCell from "../ClickableCell";
 import { useAuthenticateState } from "../../contexts/authentication";
-import { SearchOutlined, CloseOutlined } from "@ant-design/icons";
+import { CloseOutlined } from "@ant-design/icons";
 import NewTrendingCard from "./NewTrendingCard";
-import { FilterIcon } from "../../images/SVGComponents";
 import { Images } from "../../images";
 import './index.css'
 
@@ -62,7 +59,7 @@ const CategoryProductList = ({ user }) => {
   const previousDebouncedSearchRef = useRef();
   //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
-  const { categorys, iscategorysLoading } = useCategoryState();
+  const { categorys } = useCategoryState();
   const { cartList } = useMarketplaceState();
   const [api] = notification.useNotification();
   let currentCategory;
@@ -124,53 +121,27 @@ const CategoryProductList = ({ user }) => {
 
   //============================Marketplace================================//
   const marketplaceDispatch = useMarketplaceDispatch();
-  const { marketplaceList, isMarketplaceLoading, marketplaceListCount } = useMarketplaceState();
+  const { marketplaceList, isMarketplaceLoading } = useMarketplaceState();
   useEffect(() => {
-    let subCategoriesOfSelectedCategories = "";
-    subCategorys.map((sub) => subCategoriesOfSelectedCategories += sub.contract + ",");
+    let subCategoriesOfSelectedCategories = subCategorys.map(sub => sub.contract).join(',');
 
     const callAPI = () => {
-      if (category !== "" && hasChecked && !isAuthenticated &&
-        ((selectedSubCategories.length === 0 && selectedCategories.length === 0)
-          || (selectedSubCategories.length !== 0 && selectedCategories.length !== 0))) {
+      if (hasChecked && !isAuthenticated) {
         actions.fetchMarketplace(
           marketplaceDispatch,
           arrayToStr(selectedCategories),
-          arrayToStr(selectedSubCategories),
+          selectedCategories.length > 0 && selectedSubCategories.length === 0 ? subCategoriesOfSelectedCategories : arrayToStr(selectedSubCategories),
           arrayToStr(selectedProducts),
           arrayToStr(selectedBrands),
           minPrice,
           maxPrice,
           debouncedSearch
         );
-      } else if (category !== "" && ((selectedSubCategories.length === 0 && selectedCategories.length === 0)
-        || (selectedSubCategories.length !== 0 && selectedCategories.length !== 0))) {
+      } else {
         actions.fetchMarketplaceLoggedIn(
           marketplaceDispatch,
           arrayToStr(selectedCategories),
-          arrayToStr(selectedSubCategories),
-          arrayToStr(selectedProducts),
-          arrayToStr(selectedBrands),
-          minPrice,
-          maxPrice,
-          debouncedSearch
-        );
-      } else if (selectedSubCategories.length === 0 && selectedCategories.length > 0 && hasChecked && !isAuthenticated) {
-        actions.fetchMarketplace(
-          marketplaceDispatch,
-          arrayToStr(selectedCategories),
-          subCategoriesOfSelectedCategories,
-          arrayToStr(selectedProducts),
-          arrayToStr(selectedBrands),
-          minPrice,
-          maxPrice,
-          debouncedSearch
-        );
-      } else if (selectedSubCategories.length === 0 && selectedCategories.length > 0) {
-        actions.fetchMarketplaceLoggedIn(
-          marketplaceDispatch,
-          arrayToStr(selectedCategories),
-          subCategoriesOfSelectedCategories,
+          selectedCategories.length > 0 && selectedSubCategories.length === 0 ? subCategoriesOfSelectedCategories : arrayToStr(selectedSubCategories),
           arrayToStr(selectedProducts),
           arrayToStr(selectedBrands),
           minPrice,
@@ -179,13 +150,13 @@ const CategoryProductList = ({ user }) => {
         );
       }
     };
-    
+
     // Check if the current search term has changed from the previous search term and if it is not an empty string
     if (debouncedSearch !== previousDebouncedSearchRef.current && debouncedSearch !== "") {
       const debounceTimer = setTimeout(() => {
         callAPI();
       }, 1000);
-  
+
       return () => {
         // set previousDebouncedSearchRef to store the debounced search current term
         previousDebouncedSearchRef.current = debouncedSearch;
@@ -596,7 +567,6 @@ const CategoryProductList = ({ user }) => {
                   >
                     <Panel header={<Text>Sub-Category</Text>} key="1">
                       <Checkbox.Group
-                        // onChange={onChangeSubCategory}
                         value={selectedSubCategories}
                       >
                         <div className="flex flex-col gap-3">
@@ -646,7 +616,6 @@ const CategoryProductList = ({ user }) => {
                   >
                     <Panel header={<Text>Product</Text>} key="1">
                       <Checkbox.Group
-                        // onChange={onChangeProduct}
                         value={selectedProducts}
                       >
                         <div className="flex flex-col gap-3">
