@@ -79,11 +79,7 @@ chanSink :: MonadIO m
 chanSink ch writer = CL.mapM_ $ liftIO . atomically . writer ch
 {-# INLINE chanSink #-}
 
---mergeSourcesByForce :: (MonadResource mi, Monad mo, MonadUnliftIO mi)
---                    => [(a1,ConduitM () a mi ())]
---                    -> Int
---                    -> Scope
---                    -> mo (ConduitM () a mi ())
+-- | Custom mergeSourcesByForce function.
 mergeSourcesByForce :: ( MonadResource m1
                        , Monad m2
                        , MonadUnliftIO m1

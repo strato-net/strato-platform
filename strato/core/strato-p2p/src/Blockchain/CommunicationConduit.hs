@@ -126,11 +126,11 @@ mkEthP2PEventSource peerSourceConduit seqEventSource peerStr inCtx scp = do
     merged
       .| CL.iterM recordEvent
 
---mkCanarySource :: (MonadLogger m, MonadUnliftIO m, MonadResource m) => m (ConduitM () Void m ())
-mkCanarySource :: (MonadLogger m, MonadUnliftIO m) => m (ConduitM () Void m ())
+mkCanarySource :: ( MonadLogger m
+                  , MonadUnliftIO m
+                  )
+               => m (ConduitM () Void m ())
 mkCanarySource = do
-  --ender <- toIO $ $logInfoS "canary/exit" "" >> killCanary
-  --void . register $ ender
   q <- atomically newTQueue
   $logInfoS "canary/enter" ""
   addCanary
