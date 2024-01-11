@@ -183,6 +183,63 @@ const CategoryProductList = ({ user }) => {
     };
 
   }, [
+    debouncedSearch,
+  ]);
+  
+  useEffect(() => {
+    let subCategoriesOfSelectedCategories = "";
+    subCategorys.map((sub) => subCategoriesOfSelectedCategories += sub.contract + ",");
+
+    if (category !== "" && hasChecked && !isAuthenticated &&
+      ((selectedSubCategories.length === 0 && selectedCategories.length === 0)
+        || (selectedSubCategories.length !== 0 && selectedCategories.length !== 0))) {
+      actions.fetchMarketplace(
+        marketplaceDispatch,
+        arrayToStr(selectedCategories),
+        arrayToStr(selectedSubCategories),
+        arrayToStr(selectedProducts),
+        arrayToStr(selectedBrands),
+        minPrice,
+        maxPrice,
+        debouncedSearch
+      );
+    } else if (category !== "" && ((selectedSubCategories.length === 0 && selectedCategories.length === 0)
+      || (selectedSubCategories.length !== 0 && selectedCategories.length !== 0))) {
+      actions.fetchMarketplaceLoggedIn(
+        marketplaceDispatch,
+        arrayToStr(selectedCategories),
+        arrayToStr(selectedSubCategories),
+        arrayToStr(selectedProducts),
+        arrayToStr(selectedBrands),
+        minPrice,
+        maxPrice,
+        debouncedSearch
+      );
+    } else if (selectedSubCategories.length === 0 && selectedCategories.length > 0 && hasChecked && !isAuthenticated) {
+      actions.fetchMarketplace(
+        marketplaceDispatch,
+        arrayToStr(selectedCategories),
+        subCategoriesOfSelectedCategories,
+        arrayToStr(selectedProducts),
+        arrayToStr(selectedBrands),
+        minPrice,
+        maxPrice,
+        debouncedSearch
+      );
+    } else if (selectedSubCategories.length === 0 && selectedCategories.length > 0) {
+      actions.fetchMarketplaceLoggedIn(
+        marketplaceDispatch,
+        arrayToStr(selectedCategories),
+        subCategoriesOfSelectedCategories,
+        arrayToStr(selectedProducts),
+        arrayToStr(selectedBrands),
+        minPrice,
+        maxPrice,
+        debouncedSearch
+      );
+    }
+
+  }, [
     marketplaceDispatch,
     selectedSubCategories,
     subCategorys,
@@ -192,8 +249,7 @@ const CategoryProductList = ({ user }) => {
     maxPrice,
     category,
     hasChecked,
-    isAuthenticated,
-    debouncedSearch,
+    isAuthenticated
   ]);
 
   useEffect(() => {
