@@ -58,6 +58,7 @@ const CategoryProductList = ({ user }) => {
   const [mobileOpenFilter, setMobileOpenFilter] = useState(false);
   const [search, setSearch] = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState(search)
+  // useRef() to keep track of the previous value of the debounced search term
   const previousDebouncedSearchRef = useRef();
   //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
@@ -179,12 +180,14 @@ const CategoryProductList = ({ user }) => {
       }
     };
     
+    // Check if the current search term has changed from the previous search term and if it is not an empty string
     if (debouncedSearch !== previousDebouncedSearchRef.current && debouncedSearch !== "") {
       const debounceTimer = setTimeout(() => {
         callAPI();
       }, 1000);
   
       return () => {
+        // set previousDebouncedSearchRef to store the debounced search current term
         previousDebouncedSearchRef.current = debouncedSearch;
         clearTimeout(debounceTimer);
       };
