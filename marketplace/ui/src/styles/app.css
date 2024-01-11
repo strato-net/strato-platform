@@ -384,6 +384,7 @@ body{
 }
 .ant-select-selector{
   height: 42px !important; 
+  align-items: center;
 }
 
 
