@@ -392,7 +392,8 @@ createForeignIndexesForJoins foreignKey = do
       <> wrapDoubleQuotes (columnName foreignKey)
       <> ") REFERENCES "
       <> tableNameToDoubleQuoteText (foreignTableName foreignKey)
-      <> " (address);"
+      <> " (address)"
+      <> "DEFERRABLE INITIALLY IMMEDIATE;"
 
 notifyPostgREST ::
   OutputM m =>
@@ -1361,18 +1362,23 @@ valueToSQLText (SimpleValue (ValueAddress (Address addr))) =
   if fromIntegral addr == (0 :: Integer)
   then Just "NULL"
   else Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ printf "%040x" (fromIntegral addr :: Integer)
-valueToSQLText (SimpleValue (ValueAccount acct)) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show acct
+valueToSQLText (SimpleValue (ValueAccount acct@(NamedAccount (Address addr) _))) = 
+  if fromIntegral addr == (0 :: Integer)
+  then Just "NULL"
+  else Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show acct
 valueToSQLText (SimpleValue (ValueBytes _ bytes)) = Just $
   wrapSingleQuotes $
     escapeQuotes $ case decodeUtf8' bytes of
       Left _ -> decodeUtf8 $ Base16.encode bytes
       Right x -> x
 valueToSQLText (ValueEnum _ _ index) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show index
-valueToSQLText (ValueContract acct) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show acct
+valueToSQLText (ValueContract acct@(NamedAccount (Address addr) _)) = 
+  if fromIntegral addr == (0 :: Integer)
+  then Just "NULL"
+  else Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show acct
 valueToSQLText (ValueFunction _ _ _) = Nothing
 valueToSQLText (ValueMapping _) = Nothing
 valueToSQLText arr@(ValueArrayFixed _ _) = Just . wrapSingleQuotes . solidityValueToText . valueToSolidityValue $ arr
 valueToSQLText arr@(ValueArrayDynamic _) = Just . wrapSingleQuotes . solidityValueToText . valueToSolidityValue $ arr
 valueToSQLText struct@(ValueStruct _) = Just . wrapSingleQuotes . solidityValueToText . valueToSolidityValue $ struct
-
 valueToSQLText x = Just . wrapSingleQuotes . solidityValueToText . valueToSolidityValue $ x
