@@ -15,7 +15,7 @@ import CategoryProductCard from "./CategoryProductCard";
 //categories
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 //sub-categories
 import { actions as subCategoryActions } from "../../contexts/subCategory/actions";
 import {
@@ -56,14 +56,19 @@ const CategoryProductList = ({ user }) => {
   const [uniqueProductNames, setUniqueProductNames] = useState([]);
   const [desktopOpenFilter, setDesktopOpenFilter] = useState(true);
   const [mobileOpenFilter, setMobileOpenFilter] = useState(false);
+  const [search, setSearch] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState(search)
+  // useRef() to keep track of the previous value of the debounced search term
+  const previousDebouncedSearchRef = useRef();
   //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
-  const { categorys } = useCategoryState();
+  const { categorys, iscategorysLoading } = useCategoryState();
   const { cartList } = useMarketplaceState();
   const [api] = notification.useNotification();
   let currentCategory;
 
   let { hasChecked, isAuthenticated } = useAuthenticateState();
+
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
@@ -93,7 +98,7 @@ const CategoryProductList = ({ user }) => {
   //=========================Sub-categories===============================//
 
   const subCategoryDispatch = useSubCategoryDispatch();
-  const { subCategorys } = useSubCategoryState();
+  const { subCategorys, issubCategorysLoading } = useSubCategoryState();
 
   useEffect(() => {
     setSubCategories(subCategorys);
@@ -124,50 +129,72 @@ const CategoryProductList = ({ user }) => {
     let subCategoriesOfSelectedCategories = "";
     subCategorys.map((sub) => subCategoriesOfSelectedCategories += sub.contract + ",");
 
-    if (category !== "" && hasChecked && !isAuthenticated &&
-      ((selectedSubCategories.length === 0 && selectedCategories.length === 0)
+    const callAPI = () => {
+      if (category !== "" && hasChecked && !isAuthenticated &&
+        ((selectedSubCategories.length === 0 && selectedCategories.length === 0)
+          || (selectedSubCategories.length !== 0 && selectedCategories.length !== 0))) {
+        actions.fetchMarketplace(
+          marketplaceDispatch,
+          arrayToStr(selectedCategories),
+          arrayToStr(selectedSubCategories),
+          arrayToStr(selectedProducts),
+          arrayToStr(selectedBrands),
+          minPrice,
+          maxPrice,
+          debouncedSearch
+        );
+      } else if (category !== "" && ((selectedSubCategories.length === 0 && selectedCategories.length === 0)
         || (selectedSubCategories.length !== 0 && selectedCategories.length !== 0))) {
-      actions.fetchMarketplace(
-        marketplaceDispatch,
-        arrayToStr(selectedCategories),
-        arrayToStr(selectedSubCategories),
-        arrayToStr(selectedProducts),
-        arrayToStr(selectedBrands),
-        minPrice,
-        maxPrice
-      );
-    } else if (category !== "" && ((selectedSubCategories.length === 0 && selectedCategories.length === 0)
-      || (selectedSubCategories.length !== 0 && selectedCategories.length !== 0))) {
-      actions.fetchMarketplaceLoggedIn(
-        marketplaceDispatch,
-        arrayToStr(selectedCategories),
-        arrayToStr(selectedSubCategories),
-        arrayToStr(selectedProducts),
-        arrayToStr(selectedBrands),
-        minPrice,
-        maxPrice
-      );
-    } else if (selectedSubCategories.length === 0 && selectedCategories.length > 0 && hasChecked && !isAuthenticated) {
-      actions.fetchMarketplace(
-        marketplaceDispatch,
-        arrayToStr(selectedCategories),
-        subCategoriesOfSelectedCategories,
-        arrayToStr(selectedProducts),
-        arrayToStr(selectedBrands),
-        minPrice,
-        maxPrice
-      );
-    } else if (selectedSubCategories.length === 0 && selectedCategories.length > 0) {
-      actions.fetchMarketplaceLoggedIn(
-        marketplaceDispatch,
-        arrayToStr(selectedCategories),
-        subCategoriesOfSelectedCategories,
-        arrayToStr(selectedProducts),
-        arrayToStr(selectedBrands),
-        minPrice,
-        maxPrice
-      );
+        actions.fetchMarketplaceLoggedIn(
+          marketplaceDispatch,
+          arrayToStr(selectedCategories),
+          arrayToStr(selectedSubCategories),
+          arrayToStr(selectedProducts),
+          arrayToStr(selectedBrands),
+          minPrice,
+          maxPrice,
+          debouncedSearch
+        );
+      } else if (selectedSubCategories.length === 0 && selectedCategories.length > 0 && hasChecked && !isAuthenticated) {
+        actions.fetchMarketplace(
+          marketplaceDispatch,
+          arrayToStr(selectedCategories),
+          subCategoriesOfSelectedCategories,
+          arrayToStr(selectedProducts),
+          arrayToStr(selectedBrands),
+          minPrice,
+          maxPrice,
+          debouncedSearch
+        );
+      } else if (selectedSubCategories.length === 0 && selectedCategories.length > 0) {
+        actions.fetchMarketplaceLoggedIn(
+          marketplaceDispatch,
+          arrayToStr(selectedCategories),
+          subCategoriesOfSelectedCategories,
+          arrayToStr(selectedProducts),
+          arrayToStr(selectedBrands),
+          minPrice,
+          maxPrice,
+          debouncedSearch
+        );
+      }
+    };
+    
+    // Check if the current search term has changed from the previous search term and if it is not an empty string
+    if (debouncedSearch !== previousDebouncedSearchRef.current && debouncedSearch !== "") {
+      const debounceTimer = setTimeout(() => {
+        callAPI();
+      }, 1000);
+  
+      return () => {
+        // set previousDebouncedSearchRef to store the debounced search current term
+        previousDebouncedSearchRef.current = debouncedSearch;
+        clearTimeout(debounceTimer);
+      };
+    } else {
+      callAPI();
     }
+
   }, [
     marketplaceDispatch,
     selectedSubCategories,
@@ -179,7 +206,12 @@ const CategoryProductList = ({ user }) => {
     category,
     hasChecked,
     isAuthenticated,
+    debouncedSearch
   ]);
+
+  useEffect(() => {
+    setDebouncedSearch(search);
+  }, [search]);
 
   useEffect(() => {
     if (marketplaceList?.length > 0) {
@@ -279,6 +311,12 @@ const CategoryProductList = ({ user }) => {
     }
   };
 
+  const handleSearch = (e) => {
+    setSearch(e.target.value)
+  }
+
+  const isLoading = isMarketplaceLoading;
+
   return (
     <div className={`${mobileOpenFilter ? 'overflow-y-hidden h-[100vh] w-[100vw] bg-[#00000020] relative mt-0 md:bg-white md:mt-[auto] md:overflow-scroll trending_cards' : ' '}`}>
       <div className="fixed bg-white w-full top-7 z-10 md:static">
@@ -312,6 +350,7 @@ const CategoryProductList = ({ user }) => {
           <div className={`flex-1 `}>
             <Input
               size="large"
+              onChange={(e) => { handleSearch(e) }}
               placeholder="Search Marketplace"
               prefix={<img src={Images.Header_Search} alt="search" className="w-[18px] h-[18px]" />}
               className="bg-[#F6F6F6] border-none rounded-3xl p-[10px]"
@@ -384,15 +423,20 @@ const CategoryProductList = ({ user }) => {
                   >
                     <Panel header={<Text strong className="text-base">Sub Categories</Text>} key="1">
                       <Checkbox.Group
-                        // onChange={onChangeSubCategory}
                         value={selectedSubCategories}
                       >
                         <div className="flex flex-col gap-3">
-                          {subCategories.map((subcategory, index) => (
-                            <Checkbox value={subcategory.contract} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
-                              {subcategory.name}
-                            </Checkbox>
-                          ))}
+                          {issubCategorysLoading ? (
+                            <div className="text-center py-4">
+                              <Spin size="small" />    Loading Sub-Categories...
+                            </div>
+                          ) : (
+                            subCategories.map((subcategory, index) => (
+                              <Checkbox value={subcategory.contract} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
+                                {subcategory.name}
+                              </Checkbox>
+                            ))
+                          )}
                         </div>
                       </Checkbox.Group>
                     </Panel>
@@ -464,9 +508,9 @@ const CategoryProductList = ({ user }) => {
 
         {/* Product list section */}
 
-        {isMarketplaceLoading ? (
+        {isLoading ? (
           <div className="h-96 w-full flex justify-center items-center">
-            <Spin spinning={isMarketplaceLoading} size="large" />
+            <Spin spinning={isLoading} size="large" />
           </div>
         ) : (
           <div className=" mb-12 w-full">
