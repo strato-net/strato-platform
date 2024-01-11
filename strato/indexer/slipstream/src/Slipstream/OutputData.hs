@@ -393,7 +393,7 @@ createForeignIndexesForJoins foreignKey = do
       <> ") REFERENCES "
       <> tableNameToDoubleQuoteText (foreignTableName foreignKey)
       <> " (address)"
-      <> "DEFERRABLE INITIALLY IMMEDIATE;"
+      <> "DEFERRABLE INITIALLY DEFERRED;"
 
 notifyPostgREST ::
   OutputM m =>
