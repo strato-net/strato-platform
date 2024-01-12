@@ -14,7 +14,7 @@ import {
 } from "antd";
 // import CategoryProductCard from "./CategoryProductCard";
 import { useMatch } from "react-router-dom";
-import { SearchOutlined, CloseOutlined } from "@ant-design/icons";
+import { CloseOutlined } from "@ant-design/icons";
 // Actions
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { actions as subCategoryActions } from "../../contexts/subCategory/actions";
@@ -28,7 +28,7 @@ import { useAuthenticateState } from "../../contexts/authentication";
 import { arrayToStr } from "../../helpers/utils";
 import routes from "../../helpers/routes";
 // import useDebounce from "../UseDebounce";
-import { MAX_QUANTITY, MAX_PRICE } from "../../helpers/constants";
+import { MAX_PRICE } from "../../helpers/constants";
 import ClickableCell from "../ClickableCell";
 import NewTrendingCard from "./NewTrendingCard";
 // import { FilterIcon } from "../../images/SVGComponents";
@@ -61,10 +61,10 @@ const CategoryProductList = ({ user }) => {
   const subCategoryDispatch = useSubCategoryDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
   // states
-  const { marketplaceList, isMarketplaceLoading, marketplaceListCount } = useMarketplaceState();
-  const { categorys, iscategorysLoading } = useCategoryState();
+  const { marketplaceList, isMarketplaceLoading } = useMarketplaceState();
+  const { categorys } = useCategoryState();
   let { hasChecked, isAuthenticated } = useAuthenticateState();
-  const { subCategorys, issubCategorysLoading } = useSubCategoryState();
+  const { subCategorys } = useSubCategoryState();
   const { cartList } = useMarketplaceState();
   let currentCategory;
 
@@ -122,51 +122,25 @@ const CategoryProductList = ({ user }) => {
   };
 
   useEffect(() => {
-    let subCategoriesOfSelectedCategories = "";
-    subCategorys.map((sub) => subCategoriesOfSelectedCategories += sub.contract + ",");
+    let subCategoriesOfSelectedCategories = subCategorys.map(sub => sub.contract).join(',');
 
     const callAPI = () => {
-      if (category !== "" && hasChecked && !isAuthenticated &&
-        ((selectedSubCategories.length === 0 && selectedCategories.length === 0)
-          || (selectedSubCategories.length !== 0 && selectedCategories.length !== 0))) {
+      if (hasChecked && !isAuthenticated) {
         marketplaceActions.fetchMarketplace(
           marketplaceDispatch,
           arrayToStr(selectedCategories),
-          arrayToStr(selectedSubCategories),
+          selectedCategories.length > 0 && selectedSubCategories.length === 0 ? subCategoriesOfSelectedCategories : arrayToStr(selectedSubCategories),
           arrayToStr(selectedProducts),
           arrayToStr(selectedBrands),
           minPrice,
           maxPrice,
           debouncedSearch
         );
-      } else if (category !== "" && ((selectedSubCategories.length === 0 && selectedCategories.length === 0)
-        || (selectedSubCategories.length !== 0 && selectedCategories.length !== 0))) {
+      } else {
         marketplaceActions.fetchMarketplaceLoggedIn(
           marketplaceDispatch,
           arrayToStr(selectedCategories),
-          arrayToStr(selectedSubCategories),
-          arrayToStr(selectedProducts),
-          arrayToStr(selectedBrands),
-          minPrice,
-          maxPrice,
-          debouncedSearch
-        );
-      } else if (selectedSubCategories.length === 0 && selectedCategories.length > 0 && hasChecked && !isAuthenticated) {
-        marketplaceActions.fetchMarketplace(
-          marketplaceDispatch,
-          arrayToStr(selectedCategories),
-          subCategoriesOfSelectedCategories,
-          arrayToStr(selectedProducts),
-          arrayToStr(selectedBrands),
-          minPrice,
-          maxPrice,
-          debouncedSearch
-        );
-      } else if (selectedSubCategories.length === 0 && selectedCategories.length > 0) {
-        marketplaceActions.fetchMarketplaceLoggedIn(
-          marketplaceDispatch,
-          arrayToStr(selectedCategories),
-          subCategoriesOfSelectedCategories,
+          selectedCategories.length > 0 && selectedSubCategories.length === 0 ? subCategoriesOfSelectedCategories : arrayToStr(selectedSubCategories),
           arrayToStr(selectedProducts),
           arrayToStr(selectedBrands),
           minPrice,
