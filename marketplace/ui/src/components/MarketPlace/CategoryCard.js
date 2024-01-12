@@ -35,7 +35,7 @@ const CategoryCard = () => {
               key={index}
               className=" w-[162px] md:w-[210px] 2xl:w-[248px] h-[160px] md:h-[180px] 2xl:h-[200px] border border-tertiaryB shadow-category rounded-lg cursor-pointer"
               onClick={() => {
-                navigate(`${naviroute.replace(":category", category.name)}`);
+                navigate(`${naviroute}?category=${category.name}`);
                 window.LOQ.push(['ready', async LO => {
                   // Track an event
                   await LO.$internal.ready('events')

@@ -31,7 +31,7 @@ import {
 import { arrayToStr } from "../../helpers/utils";
 import routes from "../../helpers/routes";
 import useDebounce from "../UseDebounce";
-import { useMatch } from "react-router-dom";
+import { useLocation, useMatch, useNavigate } from "react-router-dom";
 import { MAX_QUANTITY, MAX_PRICE } from "../../helpers/constants";
 import ClickableCell from "../ClickableCell";
 import { useAuthenticateState } from "../../contexts/authentication";
@@ -45,8 +45,17 @@ const { Panel } = Collapse;
 const { Text } = Typography;
 
 const CategoryProductList = ({ user }) => {
+
+  const location = useLocation();
+  const navigate = useNavigate();
+  const queryParams = new URLSearchParams(location.search);
+
+  const SearchQueryValue = queryParams.get('search');
+  const categoryQueryValue = queryParams.get('category');
+  const categoryQueryValueArr = categoryQueryValue ? categoryQueryValue.split(',') : []
+
   const [category, setCategory] = useState("");
-  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [selectedCategories, setSelectedCategories] = useState(categoryQueryValueArr);
   const [selectedSubCategories, setSelectedSubCategories] = useState([]);
   const [selectedProducts, setSelectedProducts] = useState([]);
   const [selectedBrands, setSelectedBrands] = useState([]);
@@ -57,7 +66,7 @@ const CategoryProductList = ({ user }) => {
   const [desktopOpenFilter, setDesktopOpenFilter] = useState(true);
   const [mobileOpenFilter, setMobileOpenFilter] = useState(false);
   const [search, setSearch] = useState("")
-  const [debouncedSearch, setDebouncedSearch] = useState(search)
+  const [debouncedSearch, setDebouncedSearch] = useState(SearchQueryValue)
   // useRef() to keep track of the previous value of the debounced search term
   const previousDebouncedSearchRef = useRef();
   //=========================Categories===============================//
@@ -80,18 +89,30 @@ const CategoryProductList = ({ user }) => {
   });
 
   const onChangeCategory = (checkedValues) => {
+    const categoryStr = checkedValues.join(",")
+    let url;
+    if (checkedValues.length == 0 && SearchQueryValue) {
+      url = `/category?search=${SearchQueryValue}`
+    }
+    if (checkedValues.length > 0 && SearchQueryValue) {
+      url = `/category?category=${categoryStr}&search=${SearchQueryValue}`
+    }
+    if (checkedValues.length > 0 && !SearchQueryValue) {
+      url = `/category?category=${categoryStr}`
+    }
+    navigate(url)
     setSelectedCategories(checkedValues);
     currentCategory = categorys.find((c) => c.name === checkedValues);
     if (checkedValues.length === 0) clearSelection();
   };
 
-  useEffect(() => {
-    let param = routeMatch?.params?.category;
-    let newCategory = [];
-    if (param !== ":category") newCategory.push(param);
-    setCategory(param);
-    setSelectedCategories(newCategory);
-  }, []);
+  // useEffect(() => {
+  //   let param = routeMatch?.params?.category;
+  //   let newCategory = [];
+  //   if (param !== ":category") newCategory.push(param);
+  //   setCategory(param);
+  //   setSelectedCategories(newCategory);
+  // }, []);
 
   currentCategory = categorys.find((c) => c.name === category);
   currentCategory ?? (currentCategory = " ");
@@ -141,7 +162,7 @@ const CategoryProductList = ({ user }) => {
           arrayToStr(selectedBrands),
           minPrice,
           maxPrice,
-          debouncedSearch
+          SearchQueryValue
         );
       } else if (category !== "" && ((selectedSubCategories.length === 0 && selectedCategories.length === 0)
         || (selectedSubCategories.length !== 0 && selectedCategories.length !== 0))) {
@@ -153,7 +174,7 @@ const CategoryProductList = ({ user }) => {
           arrayToStr(selectedBrands),
           minPrice,
           maxPrice,
-          debouncedSearch
+          SearchQueryValue
         );
       } else if (selectedSubCategories.length === 0 && selectedCategories.length > 0 && hasChecked && !isAuthenticated) {
         actions.fetchMarketplace(
@@ -164,7 +185,7 @@ const CategoryProductList = ({ user }) => {
           arrayToStr(selectedBrands),
           minPrice,
           maxPrice,
-          debouncedSearch
+          SearchQueryValue
         );
       } else if (selectedSubCategories.length === 0 && selectedCategories.length > 0) {
         actions.fetchMarketplaceLoggedIn(
@@ -175,17 +196,39 @@ const CategoryProductList = ({ user }) => {
           arrayToStr(selectedBrands),
           minPrice,
           maxPrice,
-          debouncedSearch
+          SearchQueryValue
+        );
+      } else if (hasChecked && !isAuthenticated) {
+        actions.fetchMarketplace(
+          marketplaceDispatch,
+          arrayToStr(selectedCategories),
+          arrayToStr(selectedSubCategories),
+          arrayToStr(selectedProducts),
+          arrayToStr(selectedBrands),
+          minPrice,
+          maxPrice,
+          SearchQueryValue
+        );
+      } else {
+        actions.fetchMarketplaceLoggedIn(
+          marketplaceDispatch,
+          arrayToStr(selectedCategories),
+          arrayToStr(selectedSubCategories),
+          arrayToStr(selectedProducts),
+          arrayToStr(selectedBrands),
+          minPrice,
+          maxPrice,
+          SearchQueryValue
         );
       }
     };
-    
+
     // Check if the current search term has changed from the previous search term and if it is not an empty string
     if (debouncedSearch !== previousDebouncedSearchRef.current && debouncedSearch !== "") {
       const debounceTimer = setTimeout(() => {
         callAPI();
       }, 1000);
-  
+
       return () => {
         // set previousDebouncedSearchRef to store the debounced search current term
         previousDebouncedSearchRef.current = debouncedSearch;
@@ -206,7 +249,8 @@ const CategoryProductList = ({ user }) => {
     category,
     hasChecked,
     isAuthenticated,
-    debouncedSearch
+    debouncedSearch,
+    SearchQueryValue
   ]);
 
   useEffect(() => {
@@ -312,7 +356,18 @@ const CategoryProductList = ({ user }) => {
   };
 
   const handleSearch = (e) => {
-    setSearch(e.target.value)
+    const value = e.target.value;
+    // setSearch(value)
+    let url = '/category';
+    if (categoryQueryValue) {
+      url += `?category=${categoryQueryValue}`;
+    }
+    if (value.length > 0) {
+      url += categoryQueryValue
+        ? `&search=${value}`
+        : `?search=${value}`;
+    }
+    navigate(url, { replace: true });
   }
 
   const isLoading = isMarketplaceLoading;
@@ -350,8 +405,10 @@ const CategoryProductList = ({ user }) => {
           <div className={`flex-1 `}>
             <Input
               size="large"
-              onChange={(e) => { handleSearch(e) }}
+              // onChange={(e) => { handleSearch(e) }}
+              onPressEnter={(e) => { handleSearch(e) }}
               placeholder="Search Marketplace"
+              defaultValue={SearchQueryValue}
               prefix={<img src={Images.Header_Search} alt="search" className="w-[18px] h-[18px]" />}
               className="bg-[#F6F6F6] border-none rounded-3xl p-[10px]"
             />
