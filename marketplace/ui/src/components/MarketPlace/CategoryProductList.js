@@ -79,6 +79,11 @@ const CategoryProductList = ({ user }) => {
     strict: true,
   });
 
+  const categoryRouteMatch = useMatch({
+    path: routes.MarketplaceCategoryProductList.url,
+    strict: true,
+  });
+
   const onChangeCategory = (checkedValues) => {
     setSelectedCategories(checkedValues);
     currentCategory = categorys.find((c) => c.name === checkedValues);
@@ -86,7 +91,7 @@ const CategoryProductList = ({ user }) => {
   };
 
   useEffect(() => {
-    let param = routeMatch?.pathname;
+    let param = routeMatch ? routeMatch?.pathname : categoryRouteMatch.params?.category;
     let newCategory = [];
     if (param !== "/category") newCategory.push(param);
     setCategory(param);
