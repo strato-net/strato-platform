@@ -86,9 +86,9 @@ const CategoryProductList = ({ user }) => {
   };
 
   useEffect(() => {
-    let param = routeMatch?.params?.category;
+    let param = routeMatch?.pathname;
     let newCategory = [];
-    if (param !== ":category") newCategory.push(param);
+    if (param !== "/category") newCategory.push(param);
     setCategory(param);
     setSelectedCategories(newCategory);
   }, []);
@@ -179,13 +179,13 @@ const CategoryProductList = ({ user }) => {
         );
       }
     };
-    
+
     // Check if the current search term has changed from the previous search term and if it is not an empty string
     if (debouncedSearch !== previousDebouncedSearchRef.current && debouncedSearch !== "") {
       const debounceTimer = setTimeout(() => {
         callAPI();
       }, 1000);
-  
+
       return () => {
         // set previousDebouncedSearchRef to store the debounced search current term
         previousDebouncedSearchRef.current = debouncedSearch;
