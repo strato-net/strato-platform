@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   Breadcrumb,
   Collapse,
@@ -54,7 +54,9 @@ const CategoryProductList = ({ user }) => {
   const [mobileOpenFilter, setMobileOpenFilter] = useState(false);
   const [search, setSearch] = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState(search)
-  // Dispatch
+  // useRef() to keep track of the previous value of the debounced search term
+  const previousDebouncedSearchRef = useRef();
+  //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
   const subCategoryDispatch = useSubCategoryDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
@@ -117,8 +119,8 @@ const CategoryProductList = ({ user }) => {
   useEffect(() => {
     let subCategoriesOfSelectedCategories = "";
     subCategorys.map((sub) => subCategoriesOfSelectedCategories += sub.contract + ",");
-    const debounceTimer = setTimeout(() => {
 
+    const callAPI = () => {
       if (category !== "" && hasChecked && !isAuthenticated &&
         ((selectedSubCategories.length === 0 && selectedCategories.length === 0)
           || (selectedSubCategories.length !== 0 && selectedCategories.length !== 0))) {
@@ -167,11 +169,22 @@ const CategoryProductList = ({ user }) => {
           debouncedSearch
         );
       }
-    }, 1000);
-
-    return () => {
-      clearTimeout(debounceTimer);
     };
+    
+    // Check if the current search term has changed from the previous search term and if it is not an empty string
+    if (debouncedSearch !== previousDebouncedSearchRef.current && debouncedSearch !== "") {
+      const debounceTimer = setTimeout(() => {
+        callAPI();
+      }, 1000);
+  
+      return () => {
+        // set previousDebouncedSearchRef to store the debounced search current term
+        previousDebouncedSearchRef.current = debouncedSearch;
+        clearTimeout(debounceTimer);
+      };
+    } else {
+      callAPI();
+    }
 
   }, [
     marketplaceDispatch,
@@ -184,7 +197,7 @@ const CategoryProductList = ({ user }) => {
     category,
     hasChecked,
     isAuthenticated,
-    debouncedSearch,
+    debouncedSearch
   ]);
 
   useEffect(() => {
@@ -284,7 +297,7 @@ const CategoryProductList = ({ user }) => {
     setSearch(e.target.value)
   }
 
-  const isLoading = isMarketplaceLoading || issubCategorysLoading;
+  const isLoading = isMarketplaceLoading;
 
   const BreadCrumbCompnent = () =>
     <Breadcrumb className="text-xs ml-4 md:ml-14 mt-14 lg:mt-5">
