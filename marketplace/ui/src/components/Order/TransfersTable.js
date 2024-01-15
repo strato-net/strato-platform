@@ -120,7 +120,7 @@ const TransfersTable = ({ user, selectedDate }) => {
 
   return (
     <div>
-      <Input className="text-base orders_searchbar mb-5 rounded-full bg-[#F6F6F6]" prefix={<SearchOutlined />} placeholder="Search Markeplace" />
+      <Input className="text-base orders_searchbar mb-5 rounded-full bg-[#F6F6F6]" prefix={<SearchOutlined />} placeholder="Search Transfers" />
       <div className="flex md:hidden order_responsive">
         <ResponsiveTransferOrderCard
           data={data}

@@ -312,7 +312,7 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange }) => {
   return (
     <div>
       <div className="flex gap-2 items-center mb-5">
-                <Input className="text-base orders_searchbar md:p-3 rounded-full bg-[#F6F6F6]" prefix={<SearchOutlined />} placeholder="Search Markeplace" />
+                <Input className="text-base orders_searchbar md:p-3 rounded-full bg-[#F6F6F6]" prefix={<SearchOutlined />} placeholder="Search Sold Orders" />
                 <div className="text-xs flex items-center md:hidden">
                   <DatePicker
                     disabledDate={(current) => {
