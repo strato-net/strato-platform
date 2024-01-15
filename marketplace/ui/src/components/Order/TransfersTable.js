@@ -9,9 +9,17 @@ import { DownOutlined, SearchOutlined, UpOutlined } from "@ant-design/icons";
 import { ResponsiveOrderCard } from "./ResponsiveOrdersCard";
 import { ResponsiveTransferOrderCard } from "./ResponsiveTransferOrdersCard";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 
 const TransfersTable = ({ user, selectedDate }) => {
+  const navigate = useNavigate();
+  const params = useParams();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const searchVal = searchParams.get('search');
+  const { type } = params;
+
   const dispatch = useInventoryDispatch();
   const limit = 10;
   const [offset, setOffset] = useState(0);
@@ -19,10 +27,11 @@ const TransfersTable = ({ user, selectedDate }) => {
   const { itemTransfers, totalItemsTransfered, isFetchingItemTransfers } = useInventoryState();
   const [order, setOrder] = useState("desc")
 
-  console.log("selectedDate", selectedDate)
   useEffect(() => {
-    actions.fetchItemTransfers(dispatch, limit, offset, user.commonName, order, selectedDate);
-  }, [dispatch, limit, offset, user, order, selectedDate]);
+    if (user?.commonName) {
+      actions.fetchItemTransfers(dispatch, limit, offset, user?.commonName, order, selectedDate, searchVal);
+    }
+  }, [dispatch, limit, offset, user, order, selectedDate, searchVal]);
 
   useEffect(() => {
     setPage(1);
@@ -32,28 +41,27 @@ const TransfersTable = ({ user, selectedDate }) => {
   const [data, setdata] = useState([]);
   useEffect(() => {
     let items = [];
-    if(itemTransfers)
-    {
-    itemTransfers.forEach((transfer) => {
-      items.push({
-        address: transfer.address,
-        key: transfer.address,
-        assetAddress: transfer.assetAddress,
-        assetName: decodeURIComponent(transfer.assetName),
-        newOwner: transfer.newOwner,
-        newOwnerCommonName: transfer.newOwnerCommonName,
-        oldOwner: transfer.oldOwner,
-        oldOwnerCommonName: transfer.oldOwnerCommonName,
-        quantity: transfer.quantity,
-        transferDate: getStringDate(transfer.transferDate, US_DATE_FORMAT),
-        transferNumber: transfer.transferNumber,
+    if (itemTransfers) {
+      itemTransfers.forEach((transfer) => {
+        items.push({
+          address: transfer.address,
+          key: transfer.address,
+          assetAddress: transfer.assetAddress,
+          assetName: decodeURIComponent(transfer.assetName),
+          newOwner: transfer.newOwner,
+          newOwnerCommonName: transfer.newOwnerCommonName,
+          oldOwner: transfer.oldOwner,
+          oldOwnerCommonName: transfer.oldOwnerCommonName,
+          quantity: transfer.quantity,
+          transferDate: getStringDate(transfer.transferDate, US_DATE_FORMAT),
+          transferNumber: transfer.transferNumber,
+        });
       });
-    });
-  }
+    }
     setdata(items);
   }, [itemTransfers]);
 
-  
+
   const column = [
     {
       title: "Transfer Number",
@@ -110,7 +118,6 @@ const TransfersTable = ({ user, selectedDate }) => {
   };
 
   const onChange = (pagination, filters, sorter) => {
-    console.log(sorter);
     if (order === "desc") {
       setOrder("asc")
     } else {
@@ -118,16 +125,36 @@ const TransfersTable = ({ user, selectedDate }) => {
     }
   };
 
+  const handleEnterSearch = (e) => {
+    const value = e.target.value;
+    if (value.length === 0) {
+      navigate(`/order/${type}`)
+    } else {
+      navigate(`/order/${type}?search=${value}`)
+    }
+  }
+
+  const handleChangeSearch = (e) => {
+    const value = e.target.value;
+    if (value.length === 0) {
+      navigate(`/order/${type}`)
+    }
+  }
+
   return (
     <div>
-      <Input className="text-base orders_searchbar mb-5 rounded-full bg-[#F6F6F6]" prefix={<SearchOutlined />} placeholder="Search Transfers" />
+      <Input className="text-base orders_searchbar md:p-3 rounded-full bg-[#F6F6F6]"
+        onChange={(e) => { handleChangeSearch(e) }}
+        onPressEnter={(e) => { handleEnterSearch(e) }}
+        prefix={<SearchOutlined />}
+        placeholder="Search Transfers" />
       <div className="flex md:hidden order_responsive">
         <ResponsiveTransferOrderCard
           data={data}
           isLoading={isFetchingItemTransfers}
         />
       </div>
-      <div className="hidden md:block">
+      <div className="hidden md:block mt-5">
         <DataTableComponent
           columns={column}
           data={data}
