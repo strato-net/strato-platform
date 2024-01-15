@@ -569,10 +569,10 @@ const CategoryProductList = ({ user }) => {
           <div className={`flex-1 `}>
             <Input
               size="large"
-              // onChange={(e) => { handleSearch(e) }}
+              onChange={(e) => { handleSearch(e) }}
               onPressEnter={(e) => { handleSearch(e) }}
               placeholder="Search Marketplace"
-              defaultValue={searchQueryValue}
+              // defaultValue={searchQueryValue}
               prefix={<img src={Images.Header_Search} alt="search" className="w-[18px] h-[18px]" />}
               className="bg-[#F6F6F6] border-none rounded-3xl p-[10px]"
             />
