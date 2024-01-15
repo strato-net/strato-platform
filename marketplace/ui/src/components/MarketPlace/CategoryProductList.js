@@ -1,3 +1,4 @@
+import { useEffect, useState, useRef } from "react";
 import {
   Breadcrumb,
   Collapse,
@@ -11,33 +12,27 @@ import {
   Input,
   notification,
 } from "antd";
-import CategoryProductCard from "./CategoryProductCard";
-//categories
+// import CategoryProductCard from "./CategoryProductCard";
+// import { useMatch } from "react-router-dom";
+import { SearchOutlined, CloseOutlined } from "@ant-design/icons";
+// Actions
 import { actions as categoryActions } from "../../contexts/category/actions";
-import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
-import { useEffect, useState, useRef } from "react";
-//sub-categories
 import { actions as subCategoryActions } from "../../contexts/subCategory/actions";
-import {
-  useSubCategoryDispatch,
-  useSubCategoryState,
-} from "../../contexts/subCategory";
-//Marketplace
-import { actions } from "../../contexts/marketplace/actions";
-import {
-  useMarketplaceDispatch,
-  useMarketplaceState,
-} from "../../contexts/marketplace";
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
+// Dispatch and states
+import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
+import { useSubCategoryDispatch, useSubCategoryState } from "../../contexts/subCategory";
+import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/marketplace";
+import { useAuthenticateState } from "../../contexts/authentication";
+// other
 import { arrayToStr } from "../../helpers/utils";
 import routes from "../../helpers/routes";
 import useDebounce from "../UseDebounce";
 import { useLocation, useMatch, useNavigate } from "react-router-dom";
 import { MAX_QUANTITY, MAX_PRICE } from "../../helpers/constants";
 import ClickableCell from "../ClickableCell";
-import { useAuthenticateState } from "../../contexts/authentication";
-import { SearchOutlined, CloseOutlined } from "@ant-design/icons";
 import NewTrendingCard from "./NewTrendingCard";
-import { FilterIcon } from "../../images/SVGComponents";
+// import { FilterIcon } from "../../images/SVGComponents";
 import { Images } from "../../images";
 import './index.css'
 
@@ -54,6 +49,8 @@ const CategoryProductList = ({ user }) => {
   const categoryQueryValue = queryParams.get('category');
   const categoryQueryValueArr = categoryQueryValue ? categoryQueryValue.split(',') : []
 
+  const [api] = notification.useNotification();
+  // States
   const [category, setCategory] = useState("");
   const [selectedCategories, setSelectedCategories] = useState(categoryQueryValueArr);
   const [selectedSubCategories, setSelectedSubCategories] = useState([]);
@@ -71,13 +68,15 @@ const CategoryProductList = ({ user }) => {
   const previousDebouncedSearchRef = useRef();
   //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
+  const subCategoryDispatch = useSubCategoryDispatch();
+  const marketplaceDispatch = useMarketplaceDispatch();
+  // states
+  const { marketplaceList, isMarketplaceLoading, marketplaceListCount } = useMarketplaceState();
   const { categorys, iscategorysLoading } = useCategoryState();
-  const { cartList } = useMarketplaceState();
-  const [api] = notification.useNotification();
-  let currentCategory;
-
   let { hasChecked, isAuthenticated } = useAuthenticateState();
-
+  const { subCategorys, issubCategorysLoading } = useSubCategoryState();
+  const { cartList } = useMarketplaceState();
+  let currentCategory;
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
@@ -85,6 +84,11 @@ const CategoryProductList = ({ user }) => {
 
   const routeMatch = useMatch({
     path: routes.MarketplaceProductList.url,
+    strict: true,
+  });
+
+  const categoryRouteMatch = useMatch({
+    path: routes.MarketplaceCategoryProductList.url,
     strict: true,
   });
 
@@ -107,7 +111,7 @@ const CategoryProductList = ({ user }) => {
   };
 
   // useEffect(() => {
-  //   let param = routeMatch?.params?.category;
+  //   let param = routeMatch ? routeMatch?.pathname : categoryRouteMatch.params?.category;
   //   let newCategory = [];
   //   if (param !== ":category") newCategory.push(param);
   //   setCategory(param);
@@ -116,10 +120,6 @@ const CategoryProductList = ({ user }) => {
 
   currentCategory = categorys.find((c) => c.name === category);
   currentCategory ?? (currentCategory = " ");
-  //=========================Sub-categories===============================//
-
-  const subCategoryDispatch = useSubCategoryDispatch();
-  const { subCategorys, issubCategorysLoading } = useSubCategoryState();
 
   useEffect(() => {
     setSubCategories(subCategorys);
@@ -143,9 +143,6 @@ const CategoryProductList = ({ user }) => {
     setSelectedProducts(valuesChecked);
   };
 
-  //============================Marketplace================================//
-  const marketplaceDispatch = useMarketplaceDispatch();
-  const { marketplaceList, isMarketplaceLoading, marketplaceListCount } = useMarketplaceState();
   useEffect(() => {
     let subCategoriesOfSelectedCategories = "";
     subCategorys.map((sub) => subCategoriesOfSelectedCategories += sub.contract + ",");
@@ -154,7 +151,7 @@ const CategoryProductList = ({ user }) => {
       if (category !== "" && hasChecked && !isAuthenticated &&
         ((selectedSubCategories.length === 0 && selectedCategories.length === 0)
           || (selectedSubCategories.length !== 0 && selectedCategories.length !== 0))) {
-        actions.fetchMarketplace(
+        marketplaceActions.fetchMarketplace(
           marketplaceDispatch,
           arrayToStr(selectedCategories),
           arrayToStr(selectedSubCategories),
@@ -166,7 +163,7 @@ const CategoryProductList = ({ user }) => {
         );
       } else if (category !== "" && ((selectedSubCategories.length === 0 && selectedCategories.length === 0)
         || (selectedSubCategories.length !== 0 && selectedCategories.length !== 0))) {
-        actions.fetchMarketplaceLoggedIn(
+        marketplaceActions.fetchMarketplaceLoggedIn(
           marketplaceDispatch,
           arrayToStr(selectedCategories),
           arrayToStr(selectedSubCategories),
@@ -177,7 +174,7 @@ const CategoryProductList = ({ user }) => {
           searchQueryValue
         );
       } else if (selectedSubCategories.length === 0 && selectedCategories.length > 0 && hasChecked && !isAuthenticated) {
-        actions.fetchMarketplace(
+        marketplaceActions.fetchMarketplace(
           marketplaceDispatch,
           arrayToStr(selectedCategories),
           subCategoriesOfSelectedCategories,
@@ -188,7 +185,7 @@ const CategoryProductList = ({ user }) => {
           searchQueryValue
         );
       } else if (selectedSubCategories.length === 0 && selectedCategories.length > 0) {
-        actions.fetchMarketplaceLoggedIn(
+        marketplaceActions.fetchMarketplaceLoggedIn(
           marketplaceDispatch,
           arrayToStr(selectedCategories),
           subCategoriesOfSelectedCategories,
@@ -199,7 +196,7 @@ const CategoryProductList = ({ user }) => {
           searchQueryValue
         );
       } else if (hasChecked && !isAuthenticated) {
-        actions.fetchMarketplace(
+        marketplaceActions.fetchMarketplace(
           marketplaceDispatch,
           arrayToStr(selectedCategories),
           arrayToStr(selectedSubCategories),
@@ -210,7 +207,7 @@ const CategoryProductList = ({ user }) => {
           searchQueryValue
         );
       } else {
-        actions.fetchMarketplaceLoggedIn(
+        marketplaceActions.fetchMarketplaceLoggedIn(
           marketplaceDispatch,
           arrayToStr(selectedCategories),
           arrayToStr(selectedSubCategories),
@@ -276,7 +273,6 @@ const CategoryProductList = ({ user }) => {
     setSubCategories([]);
   };
 
-  //=============================================================================//
   const checkValues = (e, arr) => {
     let tempValues = [...arr];
     const existingIndex = tempValues.indexOf(e.target.value);
@@ -289,7 +285,6 @@ const CategoryProductList = ({ user }) => {
     }
     return tempValues;
   }
-  //============================================================================//
 
   const handleFilterClick = () => {
     setDesktopOpenFilter(!desktopOpenFilter);
@@ -311,7 +306,7 @@ const CategoryProductList = ({ user }) => {
     let items = [];
     if (!found) {
       items = [...cartList, { product, qty: quantity }];
-      actions.addItemToCart(marketplaceDispatch, items);
+      marketplaceActions.addItemToCart(marketplaceDispatch, items);
 
       openToast("bottom", false, "Item added to cart");
       return true;
@@ -322,7 +317,7 @@ const CategoryProductList = ({ user }) => {
           const availableQuantity = product.saleQuantity ? product.saleQuantity : 1;
           if (items[index].qty + 1 <= availableQuantity) {
             items[index].qty += 1;
-            actions.addItemToCart(marketplaceDispatch, items);
+            marketplaceActions.addItemToCart(marketplaceDispatch, items);
 
             openToast("bottom", false, "Item updated in cart");
             return true;
@@ -340,19 +335,12 @@ const CategoryProductList = ({ user }) => {
   };
 
   const openToast = (placement, isError, msg) => {
-    if (isError) {
-      api.error({
-        message: msg,
-        placement,
-        key: 1,
-      });
-    } else {
-      api.success({
-        message: msg,
-        placement,
-        key: 1,
-      });
+    let msgObj = {
+      message: msg,
+      placement,
+      key: 1,
     }
+    isError ? api.error(msgObj) : api.success(msgObj)
   };
 
   const handleSearch = (e) => {
@@ -372,30 +360,248 @@ const CategoryProductList = ({ user }) => {
 
   const isLoading = isMarketplaceLoading;
 
+  const BreadCrumbCompnent = () =>
+    <Breadcrumb className="text-xs ml-4 md:ml-14 mt-14 lg:mt-5">
+      <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+        <ClickableCell href={routes.Marketplace.url}>
+          <p href={routes.Marketplace.url} className="text-[#13188A] font-semibold hover:bg-transparent text-sm">
+            Home
+          </p>
+        </ClickableCell>
+      </Breadcrumb.Item>
+      <Breadcrumb.Item href="" onClick={e => setSelectedCategories([])}>
+        <ClickableCell href={routes.MarketplaceProductList.url}>
+          <p href={routes.MarketplaceProductList.url} className={`${selectedCategories.length > 0 ? "text-[#13188A] font-semibold " : "text-[#202020] font-medium"} text-sm hover:bg-transparent`}>
+            Marketplace
+          </p>
+        </ClickableCell>
+      </Breadcrumb.Item>
+      {selectedCategories?.map((category, index) => (
+        <Breadcrumb.Item key={index} className="text-[#202020] font-medium text-sm">
+          {category ? category : ""}
+        </Breadcrumb.Item>
+      ))}
+    </Breadcrumb>
+
+  const MobileCollapseComponent = (children) => {
+    return <Collapse
+      bordered={false}
+      expandIconPosition="end"
+      ghost="true"
+      reverse={false}
+      className="pl-4 pr-4"
+    >
+      {children}
+    </Collapse>
+  }
+
+  const DesktopCollapseComponent = (children) => {
+    return <Collapse
+      bordered={false}
+      defaultActiveKey={1}
+      expandIconPosition="end"
+      ghost="true"
+      reverse={false}
+      expandIcon={({ isActive }) =>
+        isActive ? <img src={Images.Dropdown} alt="img" style={{ width: "24px", height: "24px", transform: "rotate(180deg)" }} /> : <img src={Images.Dropdown} alt="img" style={{ width: "24px", height: "24px" }} />
+      }
+    >
+      {children}
+    </Collapse>
+  }
+
+  const DesktopFilterComponent = () => <div className="mr-6 w-1/3 hidden md:flex md:flex-col">
+    <div className="flex items-center">
+      <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
+      <Text className="text-xl font-semibold pr-7 ml-1">Filters</Text>
+    </div>
+    <div className="bg-white border border-solid border-[#E9E9E9] my-6 mb-24">
+
+      {categorys.length > 0 && (
+        <>
+          {DesktopCollapseComponent(<Panel header={<Text strong className="text-base">Categories</Text>} key="1">
+            <Checkbox.Group
+              onChange={onChangeCategory}
+              value={selectedCategories}
+            >
+              <div className="flex flex-col gap-3">
+                {categorys.map((category, index) => (
+                  <Checkbox value={category.name} key={index} className="m-0">
+                    {category.name}
+                  </Checkbox>
+                ))}
+              </div>
+            </Checkbox.Group>
+          </Panel>)}
+
+          <Divider className="m-auto w-[94%] min-w-[80%]" />
+        </>
+      )}
+
+      {subCategories.length > 0 && (
+        <>
+          {DesktopCollapseComponent(
+            <Panel header={<Text strong className="text-base">Sub Categories</Text>} key="1">
+              <Checkbox.Group
+                // onChange={onChangeSubCategory}
+                value={selectedSubCategories}
+              >
+                <div className="flex flex-col gap-3">
+                  {subCategories.map((subcategory, index) => (
+                    <Checkbox value={subcategory.contract} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
+                      {subcategory.name}
+                    </Checkbox>
+                  ))}
+                </div>
+              </Checkbox.Group>
+            </Panel>
+          )}
+          <Divider className="m-auto w-[94%] min-w-[80%]" />
+        </>
+      )}
+      <Divider className="m-auto w-[94%] min-w-[80%]" />
+
+      {DesktopCollapseComponent(
+        <Panel header={<Text strong className="text-base">Price ($)</Text>} key="1">
+          <Space>
+            <InputNumber min={0} prefix='$' placeholder="min" onChange={(e) => {
+              e === null ? setMinPrice(0) : setMinPrice(e)
+            }} />
+            -
+            <InputNumber min={minPrice} prefix='$' placeholder="max" onChange={(e) => {
+              e === null ? setMaxPrice(MAX_PRICE) : setMaxPrice(e)
+            }} />
+          </Space>
+        </Panel>
+      )}
+      <Divider className="m-auto w-[94%] min-w-[80%]" />
+
+      {marketplaceList?.length > 0 && (
+        <>
+          {DesktopCollapseComponent(
+            <Panel header={<Text strong className="text-base">Product</Text>} key="1">
+              <Checkbox.Group
+                // onChange={onChangeProduct}
+                value={selectedProducts}
+              >
+                <div className="flex flex-col gap-3">
+                  {uniqueProductNames.map((product, index) => (
+                    <Checkbox value={product} key={index} className="m-0" onChange={onChangeProduct}>
+                      {decodeURIComponent(product)}
+                    </Checkbox>
+                  ))}
+                </div>
+              </Checkbox.Group>
+            </Panel>
+          )}
+          <Divider className="m-auto w-[94%] min-w-[80%]" />
+        </>
+      )}
+      <div className="pb-2"></div>
+    </div>
+  </div>
+
+  const MobileFilterComponent = () => <div>
+    <div className="mr-6 fixed w-full h-full z-50 top-16 overflow-scroll md:hidden">
+      <div className="bg-white shadow-[2px_-2px_4px_0_rgba(0,0,0,0.05)] mb-24">
+        <div className="flex items-center justify-between pt-5">
+          <Text className="text-base font-semibold pr-7 pl-7 ml-1">Select</Text>
+          <Avatar icon={<CloseOutlined />} style={{ color: "#202020" }} className="flex items-center pr-12" onClick={handleFilterClick} />
+        </div>
+        <Divider className="m-0 mt-3" />
+
+        {/* Panel - Category */}
+        {categorys.length > 0 && (
+          <>
+            {MobileCollapseComponent(
+              <Panel header={<Text>Categories</Text>} key="1">
+                <Checkbox.Group
+                  onChange={onChangeCategory}
+                  value={selectedCategories}
+                >
+                  <div className="flex flex-col gap-3">
+                    {categorys.map((category, index) => (
+                      <Checkbox value={category.name} key={index} className="m-0">
+                        {category.name}
+                      </Checkbox>
+                    ))}
+                  </div>
+                </Checkbox.Group>
+              </Panel>
+            )}
+            <Divider className="m-0" />
+          </>
+        )}
+        {/* Panel - Sub Category */}
+        {currentCategory && (
+          <>
+            {MobileCollapseComponent(
+              <Panel header={<Text>Sub-Category</Text>} key="1">
+                <Checkbox.Group
+                  // onChange={onChangeSubCategory}
+                  value={selectedSubCategories}
+                >
+                  <div className="flex flex-col gap-3">
+                    {subCategories.map((subcategory, index) => (
+                      <Checkbox value={subcategory.contract} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
+                        {subcategory.name}
+                      </Checkbox>
+                    ))}
+                  </div>
+                </Checkbox.Group>
+              </Panel>
+            )}
+            <Divider className="m-0" />
+          </>
+        )}
+        {/* Panel - Price */}
+        {MobileCollapseComponent(
+          <Panel header={<Text>Price ($)</Text>} key="1">
+            <Space>
+              <InputNumber min={0} prefix='$' placeholder="min" onChange={(e) => {
+                e === null ? setMinPrice(0) : setMinPrice(e)
+              }} />
+              -
+              <InputNumber min={minPrice} prefix='$' placeholder="max" onChange={(e) => {
+                e === null ? setMaxPrice(MAX_PRICE) : setMaxPrice(e)
+              }} />
+            </Space>
+          </Panel>
+        )}
+        <Divider className="m-0" />
+
+        {/* Panel - Product */}
+        {marketplaceList?.length > 0 && (
+          <>
+            {MobileCollapseComponent(
+              <Panel header={<Text>Product</Text>} key="1">
+                <Checkbox.Group
+                  // onChange={onChangeProduct}
+                  value={selectedProducts}
+                >
+                  <div className="flex flex-col gap-3">
+                    {uniqueProductNames.map((product, index) => (
+                      <Checkbox value={product} key={index} className="m-0" onChange={onChangeProduct}>
+                        {decodeURIComponent(product)}
+                      </Checkbox>
+                    ))}
+                  </div>
+                </Checkbox.Group>
+              </Panel>
+            )}
+            <Divider className="m-0" />
+          </>
+        )}
+        <div className="pb-8"></div>
+      </div>
+    </div>
+    <div className="h-full w-full bg-[#00000020] absolute top-0 md:hidden"></div>
+  </div>
+
   return (
     <div className={`${mobileOpenFilter ? 'overflow-y-hidden h-[100vh] w-[100vw] bg-[#00000020] relative mt-0 md:bg-white md:mt-[auto] md:overflow-scroll trending_cards' : ' '}`}>
       <div className="fixed bg-white w-full top-7 z-10 md:static">
-        <Breadcrumb className="text-xs ml-4 md:ml-14 mt-14 lg:mt-5">
-          <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-            <ClickableCell href={routes.Marketplace.url}>
-              <p href={routes.Marketplace.url} className="text-[#13188A] font-semibold hover:bg-transparent text-sm">
-                Home
-              </p>
-            </ClickableCell>
-          </Breadcrumb.Item>
-          <Breadcrumb.Item href="" onClick={e => setSelectedCategories([])}>
-            <ClickableCell href={routes.MarketplaceProductList.url}>
-              <p href={routes.MarketplaceProductList.url} className={`${selectedCategories.length > 0 ? "text-[#13188A] font-semibold " : "text-[#202020] font-medium"} text-sm hover:bg-transparent`}>
-                Marketplace
-              </p>
-            </ClickableCell>
-          </Breadcrumb.Item>
-          {selectedCategories?.map((category, index) => (
-            <Breadcrumb.Item key={index} className="text-[#202020] font-medium text-sm">
-              {category ? category : ""}
-            </Breadcrumb.Item>
-          ))}
-        </Breadcrumb>
+        {BreadCrumbCompnent()}
 
         <div className="flex items-center justify-center ml-4 md:ml-14 mr-14 mt-6 lg:mt-8 gap-4">
           <div className="border border-solid border-[#6A6A6A] rounded-md cursor-pointer p-1 md:p-2" onClick={handleFilterClick}>
@@ -425,146 +631,9 @@ const CategoryProductList = ({ user }) => {
 
       <div className="flex pt-4 mx-14 mt-[60px] md:mt-4 ">
         {/* Filter section */}
-        {desktopOpenFilter &&
-          <div className="mr-6 w-1/3 hidden md:flex md:flex-col">
-            <div className="flex items-center">
-              <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
-              <Text className="text-xl font-semibold pr-7 ml-1">Filters</Text>
-            </div>
-            <div className="bg-white border border-solid border-[#E9E9E9] my-6 mb-24">
-
-              {/* Panel - Category */}
-              {categorys.length > 0 && (
-                <>
-                  <Collapse
-                    bordered={false}
-                    defaultActiveKey={1}
-                    expandIconPosition="end"
-                    ghost="true"
-                    reverse={false}
-                    expandIcon={({ isActive }) =>
-                      isActive ? <img src={Images.Dropdown} alt="img" style={{ width: "24px", height: "24px", transform: "rotate(180deg)" }} /> : <img src={Images.Dropdown} alt="img" style={{ width: "24px", height: "24px" }} />
-                    }
-                  >
-                    <Panel header={<Text strong className="text-base">Categories</Text>} key="1">
-                      <Checkbox.Group
-                        onChange={onChangeCategory}
-                        value={selectedCategories}
-                      >
-                        <div className="flex flex-col gap-3">
-                          {categorys.map((category, index) => (
-                            <Checkbox value={category.name} key={index} className="m-0">
-                              {category.name}
-                            </Checkbox>
-                          ))}
-                        </div>
-                      </Checkbox.Group>
-                    </Panel>
-                  </Collapse>
-                  <Divider className="m-auto w-[94%] min-w-[80%]" />
-                </>
-              )}
-
-              {/* Panel - SubCategory */}
-              {subCategories.length > 0 && (
-                <>
-                  <Collapse
-                    bordered={false}
-                    defaultActiveKey={1}
-                    expandIconPosition="end"
-                    ghost="true"
-                    reverse={false}
-                    expandIcon={({ isActive }) =>
-                      isActive ? <img src={Images.Dropdown} alt="img" style={{ width: "24px", height: "24px", transform: "rotate(180deg)" }} /> : <img src={Images.Dropdown} alt="img" style={{ width: "24px", height: "24px" }} />
-                    }
-                  >
-                    <Panel header={<Text strong className="text-base">Sub Categories</Text>} key="1">
-                      <Checkbox.Group
-                        value={selectedSubCategories}
-                      >
-                        <div className="flex flex-col gap-3">
-                          {issubCategorysLoading ? (
-                            <div className="text-center py-4">
-                              <Spin size="small" />    Loading Sub-Categories...
-                            </div>
-                          ) : (
-                            subCategories.map((subcategory, index) => (
-                              <Checkbox value={subcategory.contract} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
-                                {subcategory.name}
-                              </Checkbox>
-                            ))
-                          )}
-                        </div>
-                      </Checkbox.Group>
-                    </Panel>
-                  </Collapse>
-                  <Divider className="m-auto w-[94%] min-w-[80%]" />
-                </>
-              )}
-              <Divider className="m-auto w-[94%] min-w-[80%]" />
-
-              {/* Panel - Price */}
-              <Collapse
-                bordered={false}
-                defaultActiveKey={1}
-                expandIconPosition="end"
-                ghost="true"
-                reverse={false}
-                expandIcon={({ isActive }) =>
-                  isActive ? <img src={Images.Dropdown} alt="img" style={{ width: "24px", height: "24px", transform: "rotate(180deg)" }} /> : <img src={Images.Dropdown} alt="img" style={{ width: "24px", height: "24px" }} />
-                }
-              >
-                <Panel header={<Text strong className="text-base">Price ($)</Text>} key="1">
-                  <Space>
-                    <InputNumber min={0} prefix='$' placeholder="min" onChange={(e) => {
-                      e === null ? setMinPrice(0) : setMinPrice(e)
-                    }} />
-                    -
-                    <InputNumber min={minPrice} prefix='$' placeholder="max" onChange={(e) => {
-                      e === null ? setMaxPrice(MAX_PRICE) : setMaxPrice(e)
-                    }} />
-                  </Space>
-                </Panel>
-              </Collapse>
-              <Divider className="m-auto w-[94%] min-w-[80%]" />
-
-              {/* Panel - Product */}
-              {marketplaceList?.length > 0 && (
-                <>
-                  <Collapse
-                    bordered={false}
-                    defaultActiveKey={1}
-                    expandIconPosition="end"
-                    ghost="true"
-                    reverse={false}
-                    expandIcon={({ isActive }) =>
-                      isActive ? <img src={Images.Dropdown} alt="img" style={{ width: "24px", height: "24px", transform: "rotate(180deg)" }} /> : <img src={Images.Dropdown} alt="img" style={{ width: "24px", height: "24px" }} />
-                    }
-                  >
-                    <Panel header={<Text strong className="text-base">Product</Text>} key="1">
-                      <Checkbox.Group
-                        // onChange={onChangeProduct}
-                        value={selectedProducts}
-                      >
-                        <div className="flex flex-col gap-3">
-                          {uniqueProductNames.map((product, index) => (
-                            <Checkbox value={product} key={index} className="m-0" onChange={onChangeProduct}>
-                              {decodeURIComponent(product)}
-                            </Checkbox>
-                          ))}
-                        </div>
-                      </Checkbox.Group>
-                    </Panel>
-                  </Collapse>
-                  <Divider className="m-auto w-[94%] min-w-[80%]" />
-                </>
-              )}
-              <div className="pb-2"></div>
-            </div>
-          </div>}
+        {desktopOpenFilter && DesktopFilterComponent()}
 
         {/* Product list section */}
-
         {isLoading ? (
           <div className="h-96 w-full flex justify-center items-center">
             <Spin spinning={isLoading} size="large" />
@@ -602,129 +671,7 @@ const CategoryProductList = ({ user }) => {
         )}
       </div>
 
-      {
-        mobileOpenFilter &&
-        <div>
-          <div className="mr-6 fixed w-full h-full z-50 top-16 overflow-scroll md:hidden">
-            <div className="bg-white shadow-[2px_-2px_4px_0_rgba(0,0,0,0.05)] mb-24">
-              <div className="flex items-center justify-between pt-5">
-                <Text className="text-base font-semibold pr-7 pl-7 ml-1">Select</Text>
-                <Avatar icon={<CloseOutlined />} style={{ color: "#202020" }} className="flex items-center pr-12" onClick={handleFilterClick} />
-              </div>
-              <Divider className="m-0 mt-3" />
-
-              {/* Panel - Category */}
-              {categorys.length > 0 && (
-                <>
-                  <Collapse
-                    bordered={false}
-                    expandIconPosition="end"
-                    ghost="true"
-                    reverse={false}
-                    className="pl-4 pr-4"
-                  >
-                    <Panel header={<Text>Categories</Text>} key="1">
-                      <Checkbox.Group
-                        onChange={onChangeCategory}
-                        value={selectedCategories}
-                      >
-                        <div className="flex flex-col gap-3">
-                          {categorys.map((category, index) => (
-                            <Checkbox value={category.name} key={index} className="m-0">
-                              {category.name}
-                            </Checkbox>
-                          ))}
-                        </div>
-                      </Checkbox.Group>
-                    </Panel>
-                  </Collapse>
-                  <Divider className="m-0" />
-                </>
-              )}
-              {/* Panel - Sub Category */}
-              {currentCategory && (
-                <>
-                  <Collapse
-                    bordered={false}
-                    expandIconPosition="end"
-                    ghost="true"
-                    reverse={false}
-                    className="pl-4 pr-4"
-                  >
-                    <Panel header={<Text>Sub-Category</Text>} key="1">
-                      <Checkbox.Group
-                        // onChange={onChangeSubCategory}
-                        value={selectedSubCategories}
-                      >
-                        <div className="flex flex-col gap-3">
-                          {subCategories.map((subcategory, index) => (
-                            <Checkbox value={subcategory.contract} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
-                              {subcategory.name}
-                            </Checkbox>
-                          ))}
-                        </div>
-                      </Checkbox.Group>
-                    </Panel>
-                  </Collapse>
-                  <Divider className="m-0" />
-                </>
-              )}
-              {/* Panel - Price */}
-              <Collapse
-                bordered={false}
-                expandIconPosition="end"
-                ghost="true"
-                reverse={false}
-                className="pl-4 pr-4"
-              >
-                <Panel header={<Text>Price ($)</Text>} key="1">
-                  <Space>
-                    <InputNumber min={0} prefix='$' placeholder="min" onChange={(e) => {
-                      e === null ? setMinPrice(0) : setMinPrice(e)
-                    }} />
-                    -
-                    <InputNumber min={minPrice} prefix='$' placeholder="max" onChange={(e) => {
-                      e === null ? setMaxPrice(MAX_PRICE) : setMaxPrice(e)
-                    }} />
-                  </Space>
-                </Panel>
-              </Collapse>
-              <Divider className="m-0" />
-
-              {/* Panel - Product */}
-              {marketplaceList?.length > 0 && (
-                <>
-                  <Collapse
-                    bordered={false}
-                    expandIconPosition="end"
-                    ghost="true"
-                    reverse={false}
-                    className="pl-4 pr-4"
-                  >
-                    <Panel header={<Text>Product</Text>} key="1">
-                      <Checkbox.Group
-                        // onChange={onChangeProduct}
-                        value={selectedProducts}
-                      >
-                        <div className="flex flex-col gap-3">
-                          {uniqueProductNames.map((product, index) => (
-                            <Checkbox value={product} key={index} className="m-0" onChange={onChangeProduct}>
-                              {decodeURIComponent(product)}
-                            </Checkbox>
-                          ))}
-                        </div>
-                      </Checkbox.Group>
-                    </Panel>
-                  </Collapse>
-                  <Divider className="m-0" />
-                </>
-              )}
-              <div className="pb-8"></div>
-            </div>
-          </div>
-          <div className="h-full w-full bg-[#00000020] absolute top-0 md:hidden"></div>
-        </div>
-      }
+      {mobileOpenFilter && MobileFilterComponent()}
     </div >
   );
 };

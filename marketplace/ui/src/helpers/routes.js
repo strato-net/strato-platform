@@ -8,6 +8,10 @@ export default {
     label: "Marketplace Product List",
     url: "/category",
   },
+  MarketplaceCategoryProductList: {
+    label: "Marketplace Product List",
+    url: "/category/:category",
+  },
   MarketplaceProductDetail: {
     label: "Marketplace Product Detail",
     url: "/productList/:address",
