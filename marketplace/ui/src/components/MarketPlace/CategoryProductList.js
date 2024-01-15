@@ -128,78 +128,56 @@ const CategoryProductList = ({ user }) => {
   useEffect(() => {
     let subCategoriesOfSelectedCategories = "";
     subCategorys.map((sub) => subCategoriesOfSelectedCategories += sub.contract + ",");
-
     // const callAPI = () => {
-      if (category !== "" && hasChecked && !isAuthenticated &&
-        ((selectedSubCategories.length === 0 && selectedCategories.length === 0)
-          || (selectedSubCategories.length !== 0 && selectedCategories.length !== 0))) {
-        marketplaceActions.fetchMarketplace(
-          marketplaceDispatch,
-          arrayToStr(selectedCategories),
-          arrayToStr(selectedSubCategories),
-          arrayToStr(selectedProducts),
-          arrayToStr(selectedBrands),
-          minPrice,
-          maxPrice,
-          searchQueryValue
-        );
-      } else if (category !== "" && ((selectedSubCategories.length === 0 && selectedCategories.length === 0)
+    if (hasChecked && !isAuthenticated &&
+      ((selectedSubCategories.length === 0 && selectedCategories.length === 0)
         || (selectedSubCategories.length !== 0 && selectedCategories.length !== 0))) {
-        marketplaceActions.fetchMarketplaceLoggedIn(
-          marketplaceDispatch,
-          arrayToStr(selectedCategories),
-          arrayToStr(selectedSubCategories),
-          arrayToStr(selectedProducts),
-          arrayToStr(selectedBrands),
-          minPrice,
-          maxPrice,
-          searchQueryValue
-        );
-      } else if (selectedSubCategories.length === 0 && selectedCategories.length > 0 && hasChecked && !isAuthenticated) {
-        marketplaceActions.fetchMarketplace(
-          marketplaceDispatch,
-          arrayToStr(selectedCategories),
-          subCategoriesOfSelectedCategories,
-          arrayToStr(selectedProducts),
-          arrayToStr(selectedBrands),
-          minPrice,
-          maxPrice,
-          searchQueryValue
-        );
-      } else if (selectedSubCategories.length === 0 && selectedCategories.length > 0) {
-        marketplaceActions.fetchMarketplaceLoggedIn(
-          marketplaceDispatch,
-          arrayToStr(selectedCategories),
-          subCategoriesOfSelectedCategories,
-          arrayToStr(selectedProducts),
-          arrayToStr(selectedBrands),
-          minPrice,
-          maxPrice,
-          searchQueryValue
-        );
-      } else if (hasChecked && !isAuthenticated) {
-        marketplaceActions.fetchMarketplace(
-          marketplaceDispatch,
-          arrayToStr(selectedCategories),
-          arrayToStr(selectedSubCategories),
-          arrayToStr(selectedProducts),
-          arrayToStr(selectedBrands),
-          minPrice,
-          maxPrice,
-          searchQueryValue
-        );
-      } else {
-        marketplaceActions.fetchMarketplaceLoggedIn(
-          marketplaceDispatch,
-          arrayToStr(selectedCategories),
-          arrayToStr(selectedSubCategories),
-          arrayToStr(selectedProducts),
-          arrayToStr(selectedBrands),
-          minPrice,
-          maxPrice,
-          searchQueryValue
-        );
-      }
+      marketplaceActions.fetchMarketplace(
+        marketplaceDispatch,
+        arrayToStr(selectedCategories),
+        arrayToStr(selectedSubCategories),
+        arrayToStr(selectedProducts),
+        arrayToStr(selectedBrands),
+        minPrice,
+        maxPrice,
+        searchQueryValue
+      );
+    } else if (((selectedSubCategories.length === 0 && selectedCategories.length === 0)
+      || (selectedSubCategories.length !== 0 && selectedCategories.length !== 0))) {
+      marketplaceActions.fetchMarketplaceLoggedIn(
+        marketplaceDispatch,
+        arrayToStr(selectedCategories),
+        arrayToStr(selectedSubCategories),
+        arrayToStr(selectedProducts),
+        arrayToStr(selectedBrands),
+        minPrice,
+        maxPrice,
+        searchQueryValue
+      );
+    } else if (selectedSubCategories.length === 0 && selectedCategories.length > 0 && hasChecked && !isAuthenticated) {
+      marketplaceActions.fetchMarketplace(
+        marketplaceDispatch,
+        arrayToStr(selectedCategories),
+        subCategoriesOfSelectedCategories,
+        arrayToStr(selectedProducts),
+        arrayToStr(selectedBrands),
+        minPrice,
+        maxPrice,
+        searchQueryValue
+      );
+    } else if (selectedSubCategories.length === 0 && selectedCategories.length > 0 && subCategorys.length > 0) {
+      marketplaceActions.fetchMarketplaceLoggedIn(
+        marketplaceDispatch,
+        arrayToStr(selectedCategories),
+        subCategoriesOfSelectedCategories,
+        arrayToStr(selectedProducts),
+        arrayToStr(selectedBrands),
+        minPrice,
+        maxPrice,
+        searchQueryValue
+      );
+    }
+
     // };
 
     // Check if the current search term has changed from the previous search term and if it is not an empty string
