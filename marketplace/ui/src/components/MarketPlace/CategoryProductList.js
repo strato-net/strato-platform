@@ -80,17 +80,7 @@ const CategoryProductList = ({ user }) => {
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
-  }, [categoryDispatch]);
-
-  const routeMatch = useMatch({
-    path: routes.MarketplaceProductList.url,
-    strict: true,
-  });
-
-  const categoryRouteMatch = useMatch({
-    path: routes.MarketplaceCategoryProductList.url,
-    strict: true,
-  });
+  }, []);
 
   const onChangeCategory = (checkedValues) => {
     const categoryStr = checkedValues.join(",")
@@ -109,14 +99,6 @@ const CategoryProductList = ({ user }) => {
     currentCategory = categorys.find((c) => c.name === checkedValues);
     if (checkedValues.length === 0) clearSelection();
   };
-
-  // useEffect(() => {
-  //   let param = routeMatch ? routeMatch?.pathname : categoryRouteMatch.params?.category;
-  //   let newCategory = [];
-  //   if (param !== ":category") newCategory.push(param);
-  //   setCategory(param);
-  //   setSelectedCategories(newCategory);
-  // }, []);
 
   currentCategory = categorys.find((c) => c.name === category);
   currentCategory ?? (currentCategory = " ");
@@ -147,7 +129,7 @@ const CategoryProductList = ({ user }) => {
     let subCategoriesOfSelectedCategories = "";
     subCategorys.map((sub) => subCategoriesOfSelectedCategories += sub.contract + ",");
 
-    const callAPI = () => {
+    // const callAPI = () => {
       if (category !== "" && hasChecked && !isAuthenticated &&
         ((selectedSubCategories.length === 0 && selectedCategories.length === 0)
           || (selectedSubCategories.length !== 0 && selectedCategories.length !== 0))) {
@@ -218,25 +200,24 @@ const CategoryProductList = ({ user }) => {
           searchQueryValue
         );
       }
-    };
+    // };
 
     // Check if the current search term has changed from the previous search term and if it is not an empty string
-    if (debouncedSearch !== previousDebouncedSearchRef.current && debouncedSearch !== "") {
-      const debounceTimer = setTimeout(() => {
-        callAPI();
-      }, 1000);
+    // if (debouncedSearch !== previousDebouncedSearchRef.current && debouncedSearch !== "") {
+    //   const debounceTimer = setTimeout(() => {
+    //     callAPI();
+    //   }, 1000);
 
-      return () => {
-        // set previousDebouncedSearchRef to store the debounced search current term
-        previousDebouncedSearchRef.current = debouncedSearch;
-        clearTimeout(debounceTimer);
-      };
-    } else {
-      callAPI();
-    }
+    //   return () => {
+    //     // set previousDebouncedSearchRef to store the debounced search current term
+    //     previousDebouncedSearchRef.current = debouncedSearch;
+    //     clearTimeout(debounceTimer);
+    //   };
+    // } else {
+    //   callAPI();
+    // }
 
   }, [
-    marketplaceDispatch,
     selectedSubCategories,
     subCategorys,
     selectedProducts,
@@ -246,13 +227,12 @@ const CategoryProductList = ({ user }) => {
     category,
     hasChecked,
     isAuthenticated,
-    debouncedSearch,
     searchQueryValue
   ]);
 
-  useEffect(() => {
-    setDebouncedSearch(search);
-  }, [search]);
+  // useEffect(() => {
+  //   setDebouncedSearch(search);
+  // }, [search]);
 
   useEffect(() => {
     if (marketplaceList?.length > 0) {
