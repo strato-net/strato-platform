@@ -9,7 +9,7 @@ const { Title, Text } = Typography;
 
 const CategoryCard = () => {
   const navigate = useNavigate();
-  const naviroute = routes.MarketplaceCategoryProductList.url;
+  const naviroute = routes.MarketplaceProductList.url;
   const { categorys } = useCategoryState();
 
   const categoryImages = [
