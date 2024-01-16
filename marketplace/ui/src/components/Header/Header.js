@@ -33,6 +33,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
   const navigate = useNavigate();
   const queryParams = new URLSearchParams(location.search);
   const categoryQueryValue = queryParams.get('category');
+  const searchQueryValue = queryParams.get('search');
 
   const marketplaceDispatch = useMarketplaceDispatch();
   const userDispatch = useAuthenticateDispatch();
@@ -218,8 +219,10 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
           </div>
           <div className={`lg:ml-28 md:ml-1 flex-1 ${showSearch ? '-mt-[6px] fixed top-[13px] left-0 flex w-[100vw] z-50 mb-4' : 'hidden md:flex mb-10'}`}>
             <Input
+              key={searchQueryValue}
               size="large"
               placeholder="Search"
+              // defaultValue={searchQueryValue}
               onChange={(e) => { handleChangeSearch(e) }}
               onPressEnter={(e) => { handleEnterSearch(e) }}
               prefix={showSearch ? <ArrowLeftOutlined onClick={() => handleSearchShow(false)} /> : <img src={Images.Header_Search} className="w-[18px] h-[18px]" />}

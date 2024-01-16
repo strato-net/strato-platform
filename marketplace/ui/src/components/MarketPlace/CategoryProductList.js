@@ -307,14 +307,13 @@ const CategoryProductList = ({ user }) => {
     if (categoryQueryValue) {
       url += `?category=${categoryQueryValue}`;
     }
-    if(value.length === 0){
+    if (value.length === 0) {
       navigate(url, { replace: true });
     }
   }
 
   const handleEnterSearch = (e) => {
     const value = e.target.value;
-    // setSearch(value)
     let url = '/category';
     if (categoryQueryValue) {
       url += `?category=${categoryQueryValue}`;
@@ -577,13 +576,14 @@ const CategoryProductList = ({ user }) => {
             <img src={Images.filter} alt="filter" className=" w-5 h-5 md:w-6 md:h-6" />
           </div>
 
-          <div className={`flex-1 `}>
+          <div className={`flex-1`}>
             <Input
+              key={searchQueryValue}
               size="large"
               onChange={(e) => { handleChangeSearch(e) }}
               onPressEnter={(e) => { handleEnterSearch(e) }}
               placeholder="Search Marketplace"
-              // defaultValue={searchQueryValue}
+              defaultValue={searchQueryValue}
               prefix={<img src={Images.Header_Search} alt="search" className="w-[18px] h-[18px]" />}
               className="bg-[#F6F6F6] border-none rounded-3xl p-[10px]"
             />
