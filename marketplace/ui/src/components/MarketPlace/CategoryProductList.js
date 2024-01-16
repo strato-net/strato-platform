@@ -12,7 +12,6 @@ import {
   Input,
   notification,
 } from "antd";
-// import CategoryProductCard from "./CategoryProductCard";
 import { useMatch } from "react-router-dom";
 import { CloseOutlined } from "@ant-design/icons";
 // Actions
@@ -27,11 +26,9 @@ import { useAuthenticateState } from "../../contexts/authentication";
 // other
 import { arrayToStr } from "../../helpers/utils";
 import routes from "../../helpers/routes";
-// import useDebounce from "../UseDebounce";
 import { MAX_PRICE } from "../../helpers/constants";
 import ClickableCell from "../ClickableCell";
 import NewTrendingCard from "./NewTrendingCard";
-// import { FilterIcon } from "../../images/SVGComponents";
 import { Images } from "../../images";
 import './index.css'
 
@@ -54,6 +51,7 @@ const CategoryProductList = ({ user }) => {
   const [mobileOpenFilter, setMobileOpenFilter] = useState(false);
   const [search, setSearch] = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState(search)
+  const [isDoneRendering, setIsDoneRendering] = useState(false);
   // useRef() to keep track of the previous value of the debounced search term
   const previousDebouncedSearchRef = useRef();
   //=========================Categories===============================//
@@ -91,9 +89,12 @@ const CategoryProductList = ({ user }) => {
   useEffect(() => {
     let param = routeMatch ? routeMatch?.pathname : categoryRouteMatch.params?.category;
     let newCategory = [];
-    if (param !== "/category") newCategory.push(param);
+    if (param !== "/category") {
+      newCategory.push(param);
+      setSelectedCategories(newCategory);
+    };
     setCategory(param);
-    setSelectedCategories(newCategory);
+    setIsDoneRendering(true);
   }, []);
 
   currentCategory = categorys.find((c) => c.name === category);
@@ -151,18 +152,20 @@ const CategoryProductList = ({ user }) => {
     };
 
     // Check if the current search term has changed from the previous search term and if it is not an empty string
-    if (debouncedSearch !== previousDebouncedSearchRef.current && debouncedSearch !== "") {
-      const debounceTimer = setTimeout(() => {
-        callAPI();
-      }, 1000);
+    if (isDoneRendering) {
+      if (debouncedSearch !== previousDebouncedSearchRef.current && debouncedSearch !== "") {
+        const debounceTimer = setTimeout(() => {
+          callAPI();
+        }, 1000);
 
-      return () => {
-        // set previousDebouncedSearchRef to store the debounced search current term
-        previousDebouncedSearchRef.current = debouncedSearch;
-        clearTimeout(debounceTimer);
-      };
-    } else {
-      callAPI();
+        return () => {
+          // set previousDebouncedSearchRef to store the debounced search current term
+          previousDebouncedSearchRef.current = debouncedSearch;
+          clearTimeout(debounceTimer);
+        };
+      } else {
+        callAPI();
+      }
     }
 
   }, [
@@ -173,10 +176,10 @@ const CategoryProductList = ({ user }) => {
     selectedBrands,
     minPrice,
     maxPrice,
-    category,
     hasChecked,
     isAuthenticated,
-    debouncedSearch
+    debouncedSearch,
+    isDoneRendering
   ]);
 
   useEffect(() => {
@@ -588,7 +591,7 @@ const CategoryProductList = ({ user }) => {
       </div>
 
       {mobileOpenFilter && MobileFilterComponent()}
-    </div >
+    </div>
   );
 };
 
