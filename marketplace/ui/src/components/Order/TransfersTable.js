@@ -152,7 +152,7 @@ const TransfersTable = ({ user, selectedDate }) => {
         onChange={(e) => { handleChangeSearch(e) }}
         defaultValue={searchVal}
         prefix={<SearchOutlined />}
-        placeholder="Search Transfers" />
+        placeholder="Search Transfers Number / Asset Name" />
       <div className="flex md:hidden order_responsive">
         <ResponsiveTransferOrderCard
           data={data}
