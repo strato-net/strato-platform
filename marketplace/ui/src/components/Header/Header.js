@@ -179,7 +179,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
 
   const handleChangeSearch = (e) => {
     const value = e.target.value;
-    if (value.length === 0) {
+    if (value.length === 0 && searchQueryValue) {
       let url = '/category';
       if (categoryQueryValue) {
         url += `?category=${categoryQueryValue}`;
