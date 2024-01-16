@@ -271,7 +271,7 @@ const actions = {
     }
   },
 
-  fetchOrder: async (dispatch, limit, offset, commonName, selectedDate, filter, order) => {
+  fetchOrder: async (dispatch, limit, offset, commonName, selectedDate, filter, order, search) => {
     dispatch({ type: actionDescriptors.fetchOrder });
 
     let query = "";
@@ -281,6 +281,14 @@ const actions = {
     }
     if (filter) {
       query = filter !== 0 ? query.concat(`&status=${filter}`) : query;
+    }
+    if (search) {
+      const searchValue = isNaN(search) ? search : parseInt(search);
+      if (!isNaN(searchValue)) {
+        query = search ? query.concat(`&orderId=${searchValue}`) : query;
+      } else {
+        query = search ? query.concat(`&queryValue=${searchValue}&queryFields=sellersCommonName`) : query;
+      }
     }
 
     const encodedCommonName = encodeURIComponent(commonName);
@@ -313,7 +321,7 @@ const actions = {
     }
   },
 
-  fetchOrderSold: async (dispatch, limit, offset, commonName, selectedDate, filter, order) => {
+  fetchOrderSold: async (dispatch, limit, offset, commonName, selectedDate, filter, order, search) => {
     dispatch({ type: actionDescriptors.fetchOrderSold });
     const encodedCommonName = encodeURIComponent(commonName);
     let query = "";
@@ -323,6 +331,15 @@ const actions = {
     }
     if (filter) {
       query = filter !== 0 ? query.concat(`&status=${filter}`) : query;
+    }
+
+    if (search) {
+      const searchValue = isNaN(search) ? search : parseInt(search);
+      if (!isNaN(searchValue)) {
+        query = search ? query.concat(`&orderId=${searchValue}`) : query;
+      } else {
+        query = search ? query.concat(`&queryValue=${searchValue}&queryFields=purchasersCommonName`) : query;
+      }
     }
 
     try {

@@ -25,7 +25,7 @@ export default {
   InventoryDetail: { label: "Inventory Detail", url: "/inventories/:id" },
   InventoryEventSerialNumberList: { label: "Inventory Event Serial Numbers", url: "/inventories/events/serialNumbers" },
   Items: { label: "Item", url: "/items" },
-  Orders: { label: "Order", url: "/orders" },
+  Orders: { label: "Order", url: "/order/:type", soldUrl: "/order/sold" },
   SoldOrderDetails: { label: "Sold Order Detail", url: "/sold-orders/:id" },
   BoughtOrderDetails: {
     label: "Bought Order Detail",
