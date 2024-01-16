@@ -62,7 +62,7 @@ const CategoryProductList = ({ user }) => {
   const [uniqueProductNames, setUniqueProductNames] = useState([]);
   const [desktopOpenFilter, setDesktopOpenFilter] = useState(true);
   const [mobileOpenFilter, setMobileOpenFilter] = useState(false);
-  const [search, setSearch] = useState("")
+  const [search, setSearch] = useState(searchQueryValue)
   const [debouncedSearch, setDebouncedSearch] = useState(searchQueryValue)
   // useRef() to keep track of the previous value of the debounced search term
   const previousDebouncedSearchRef = useRef();
@@ -222,6 +222,28 @@ const CategoryProductList = ({ user }) => {
     }
   }, [marketplaceList]);
 
+  useEffect(() => {
+
+    const timeOut = setTimeout(() => {
+      console.log("test");
+      let url = '/category';
+      if (categoryQueryValue) {
+        url += `?category=${categoryQueryValue}`;
+      }
+      if (search.length > 0) {
+        url += categoryQueryValue
+          ? `&search=${search}`
+          : `?search=${search}`;
+      }
+
+      navigate(url, { replace: true });
+    }, 1000);
+
+    return () => {
+      clearTimeout(timeOut)
+    }
+  }, [search])
+
   //=========================Other functions===============================//
 
   const clearSelection = () => {
@@ -303,27 +325,7 @@ const CategoryProductList = ({ user }) => {
 
   const handleChangeSearch = (e) => {
     const value = e.target.value;
-    let url = '/category';
-    if (categoryQueryValue) {
-      url += `?category=${categoryQueryValue}`;
-    }
-    if (value.length === 0) {
-      navigate(url, { replace: true });
-    }
-  }
-
-  const handleEnterSearch = (e) => {
-    const value = e.target.value;
-    let url = '/category';
-    if (categoryQueryValue) {
-      url += `?category=${categoryQueryValue}`;
-    }
-    if (value.length > 0) {
-      url += categoryQueryValue
-        ? `&search=${value}`
-        : `?search=${value}`;
-    }
-    navigate(url, { replace: true });
+    setSearch(value)
   }
 
   const isLoading = isMarketplaceLoading;
@@ -581,7 +583,6 @@ const CategoryProductList = ({ user }) => {
               key={searchQueryValue}
               size="large"
               onChange={(e) => { handleChangeSearch(e) }}
-              onPressEnter={(e) => { handleEnterSearch(e) }}
               placeholder="Search Marketplace"
               defaultValue={searchQueryValue}
               prefix={<img src={Images.Header_Search} alt="search" className="w-[18px] h-[18px]" />}

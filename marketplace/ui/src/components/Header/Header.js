@@ -219,7 +219,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
           </div>
           <div className={`lg:ml-28 md:ml-1 flex-1 ${showSearch ? '-mt-[6px] fixed top-[13px] left-0 flex w-[100vw] z-50 mb-4' : 'hidden md:flex mb-10'}`}>
             <Input
-              key={searchQueryValue}
+              // key={searchQueryValue}
               size="large"
               placeholder="Search"
               // defaultValue={searchQueryValue}
