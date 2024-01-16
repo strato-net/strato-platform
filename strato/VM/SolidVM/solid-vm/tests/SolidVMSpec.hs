@@ -8532,16 +8532,37 @@ abstract contract C { constructor(uint x, uint y) {} }
 
 |]) `shouldReturn` ()
   
-  fit "access structs in mappings" $ runTest ( do
+  fit "can access structs in mappings" $ runTest ( do
       runBS [r|
 contract qq {
   struct MyStruct {
-    mapping(string => bool) structMap;
+    mapping(string => uint) structMap;
   }
   
   mapping(string => MyStruct) localMap;
   
   constructor() {
-    bool b = localMap["hello"].structMap["world"];
+    localMap["hello"].structMap["world"] = 69;
+    uint b = localMap["hello"].structMap["world"];
+    require(b == 69, "lesgooo");
+
+    uint c = localMap["dustin"].structMap["norwood"];
+    require(c == 0, "lesgeddit");
   }
 }|]) `shouldReturn` ()
+  
+--   fit "can access global structs in mappings" $ runTest ( do
+--       runBS [r|
+-- struct MyStruct {
+--   mapping(string => bool) structMap;
+-- }
+
+-- contract qq {
+--   mapping(string => MyStruct) localMap;
+  
+--   constructor() {
+--     localMap["hello"].structMap["world"] = true;
+--     bool b = localMap["hello"].structMap["world"];
+--     require(b == true, "lessgeddit");
+--   }
+-- }|]) `shouldReturn` ()

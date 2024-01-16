@@ -17,9 +17,6 @@ module Blockchain.SolidVM.SetGet
     getBool,
     getAccount,
     getString,
-    {-
-      getSolid,
-    -}
     deleteVar,
     toBasic,
     fromBasic,
@@ -47,25 +44,6 @@ import SolidVM.Model.Value
 import Text.Format
 import Text.Printf
 import UnliftIO
-
---import Debug.Trace
-
-{-
-{-# INLINE putSolid #-}
-putSolid :: Either LocalVar Address -> MS.StoragePath -> MS.BasicValue -> SM ()
-putSolid loc key val = case loc of
-                          Left LocalVar -> setLocal key val
-                          Right addr -> do
-                            markDiffForAction addr key val
-                            putSolidStorageKeyVal' addr key val
-
-{-# INLINE getSolid #-}
-getSolid :: Either LocalVar Address -> MS.StoragePath -> SM MS.BasicValue
-getSolid loc key = case loc of
-                      Left LocalVar -> getLocal key
-                      Right addr -> getSolidStorageKeyVal' addr key
-
--}
 
 fromBasic :: MS.BasicValue -> Value
 fromBasic = \case
@@ -165,40 +143,17 @@ setVal (SInteger dst) (SInteger _) = immutableError "Cannot assign immutable or 
 setVal (SNULL) _ = return ()
 setVal dst src = typeError "unknown case called in setVal (Probably tried to change the value of a constant):" ("src = " ++ show src ++ ", dst = " ++ show dst)
 
-{-
-
-getInt :: Variable -> SM Integer
-getInt p = do
-  v <- getVar' (Just TInteger) p
-  case v of
-    SInteger s -> return s
-    _ -> typeError "getInt" (p, v)
-
-getBool :: Variable -> SM Bool
-getBool p = do
-  v <- getVar' (Just TBool) p
-  case v of
-    SBool b -> return b
-    _ -> typeError "getBool" (p, v)
--}
-
 getAccount :: MonadSM m => Variable -> m Value
 getAccount = getVar
 
 getString :: MonadSM m => Variable -> m Value
 getString = getVar
 
-{-
-getContract :: String -> Variable -> SM Value
-getContract contractName = getVar' (Just $ TContract contractName)
--}
-
 weakGetVar :: MonadIO m => Variable -> m Value
 weakGetVar (Constant c) = return c
 weakGetVar (Variable v) = liftIO $ readIORef v
 
 getVar :: MonadSM m => Variable -> m Value
---getVar x | trace ("getVar called: " ++ show x) $  False = undefined
 getVar (Constant (SReference addressedPath@(AccountPath addr key))) = do
   theValue <- getSolidStorageKeyVal' addr key
   case theValue of

@@ -814,6 +814,9 @@ getCurrentCodeCollection = do
     (currentCallInfo : _) -> return (collectionHash currentCallInfo, codeCollection currentCallInfo)
     _ -> internalError "getCurrentContract called with an empty stack" ()
 
+upgrade :: MonadSM m => (SolidString, CC.FieldType) -> m (B.ByteString, BasicType)
+upgrade = mapM (hintFromType . CC.fieldTypeType) . first (encodeUtf8 . labelToText)
+
 hintFromType :: MonadSM m => SVMType.Type -> m BasicType
 hintFromType = \case
   SVMType.Address _ -> return TAccount
@@ -824,15 +827,17 @@ hintFromType = \case
   SVMType.String {} -> return TString
   (SVMType.UserDefined _ SVMType.Bool {}) -> return TBool
   (SVMType.UserDefined _ SVMType.Int {}) -> return TString
+  SVMType.Struct _ def -> do
+    t' <- getTypeOfName def
+    case t' of
+      StructTypo fs -> TStruct def <$> mapM upgrade fs 
+      _ -> todo "hintFromType" t'
   SVMType.UnknownLabel s _ -> do
     t' <- getTypeOfName s
     case t' of
       ContractTypo {} -> return $ TContract s
       EnumTypo {} -> return $ TEnumVal s
-      StructTypo fs -> do
-        let upgrade :: MonadSM m => (SolidString, CC.FieldType) -> m (B.ByteString, BasicType)
-            upgrade = mapM (hintFromType . CC.fieldTypeType) . first (encodeUtf8 . labelToText)
-        TStruct s <$> mapM upgrade fs
+      StructTypo fs -> TStruct s <$> mapM upgrade fs
   SVMType.Array {} -> return TComplex
   SVMType.Mapping {} -> return TComplex
   tt'' -> todo "hintFromType" tt''
@@ -851,42 +856,44 @@ getXabiType acct field = do
 
 getXabiValueType :: MonadSM m => AccountPath -> m SVMType.Type
 getXabiValueType (AccountPath loc path) = do
-  ccs' <- codeCollection <$> getCurrentCallInfo
+  (ccs', c') <- getCurrentCallInfo >>= \ci -> return (codeCollection ci, currentContract ci)
   let field = MS.getField path
+      loop :: (CC.CodeCollection, CC.Contract) -> [MS.StoragePathPiece] -> SVMType.Type -> SVMType.Type
+      loop _ [] = id
+      loop (ccs, _) [x] = \case
+        SVMType.Mapping {SVMType.value = v} -> case x of
+          MS.MapIndex {} -> v
+          _ -> typeError "non map index attribute of mapping" x
+        SVMType.Array {SVMType.entry = v} -> case x of
+          MS.Field "length" -> SVMType.Int {signed = Just True, bytes = Nothing}
+          MS.ArrayIndex {} -> v
+          _ -> typeError "non-length or array index attribute of array" x
+        SVMType.String {} -> case x of
+          MS.Field "length" -> SVMType.Int {signed = Just True, bytes = Nothing}
+          _ -> force (typeError "non-length attribute of string" x)
+        SVMType.UnknownLabel s _ ->
+          let t' = getTypeOfName' s ccs
+          in case (x, t') of
+                (MS.Field n, StructTypo fs) ->
+                  let mt'' = lookup (textToLabel $ decodeUtf8 n) fs
+                  in case mt'' of
+                        Just t'' -> CC.fieldTypeType t''
+                        Nothing -> missingField "field not present in struct definition" $ show (n, fs)
+                (_, StructTypo {}) -> typeError "non field access to struct" x
+                (_, ContractTypo {}) -> todo "getValueType/contract access" t'
+                (_, EnumTypo {}) -> todo "getValueType/enum acess" t'
+        t'' -> t''
+      loop (ccs, ct) (_ : rs) = \case
+        SVMType.Mapping {SVMType.value = t'} -> loop (ccs, ct) rs t'
+        SVMType.Array {SVMType.entry = t'} -> loop (ccs, ct) rs t'
+        SVMType.Struct a b -> loop (ccs, ct) rs (SVMType.Struct a b)
+        t -> todo "getXabiValueType/loopnext unsupported type" t
   mType <- getXabiType loc field
+  liftIO $ putStrLn $ ">>>>>>>>>> getXabiValueType: " ++ show (field, mType) -- DEBUG
   case mType of
     Nothing -> todo "getXabiValueType/unknown storage reference" field
-    Just v -> return $!! loop ccs' (tail $ MS.toList path) v
+    Just v -> return $!! loop (ccs', c') (tail $ MS.toList path) v
   where
-    loop :: CC.CodeCollection -> [MS.StoragePathPiece] -> SVMType.Type -> SVMType.Type
-    loop _ [] = id
-    loop ccs [x] = \case
-      SVMType.Mapping {SVMType.value = v} -> case x of
-        MS.MapIndex {} -> v
-        _ -> typeError "non map index attribute of mapping" x
-      SVMType.Array {SVMType.entry = v} -> case x of
-        MS.Field "length" -> SVMType.Int {signed = Just True, bytes = Nothing}
-        MS.ArrayIndex {} -> v
-        _ -> typeError "non-length or array index attribute of array" x
-      SVMType.String {} -> case x of
-        MS.Field "length" -> SVMType.Int {signed = Just True, bytes = Nothing}
-        _ -> force (typeError "non-length attribute of string" x)
-      SVMType.UnknownLabel s _ ->
-        let t' = getTypeOfName' s ccs
-         in case (x, t') of
-              (MS.Field n, StructTypo fs) ->
-                let mt'' = lookup (textToLabel $ decodeUtf8 n) fs
-                 in case mt'' of
-                      Just t'' -> CC.fieldTypeType t''
-                      Nothing -> missingField "field not present in struct definition" $ show (n, fs)
-              (_, StructTypo {}) -> typeError "non field access to struct" x
-              (_, ContractTypo {}) -> todo "getValueType/contract access" t'
-              (_, EnumTypo {}) -> todo "getValueType/enum acess" t'
-      t'' -> t''
-    loop ccs (_ : rs) = \case
-      SVMType.Mapping {SVMType.value = t'} -> loop ccs rs t'
-      SVMType.Array {SVMType.entry = t'} -> loop ccs rs t'
-      t -> todo "getXabiValueType/loopnext unsupported type" t
 
 getValueType :: MonadSM m => AccountPath -> m BasicType
 getValueType p = hintFromType =<< getXabiValueType p

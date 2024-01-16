@@ -1189,8 +1189,6 @@ runStatement s@(CC.SimpleStatement (CC.VariableDefinition entries maybeExpressio
   return Nothing
 runStatement (CC.SolidityTryCatchStatement tryExpression returnsDecl statementsForSuccess catchBlockMap pos) = do
   solidVMBreakpoint pos
-  -- currentCallInfo <- getCurrentCallInfo
-
   mRes <- EUnsafe.try $ do
     expResultVal <- getVar =<< expToVar tryExpression
     return expResultVal
@@ -1411,30 +1409,48 @@ doWhile condition code = do
     Just SContinue -> doWhile condition code
     _ -> return result
 
+-- HELPME: how can we simplify this function? It is only used once in the code base
 getIndexType :: MonadSM m => AccountPath -> m IndexType
 getIndexType (AccountPath addr p) = do
   let field = MS.getField p
   mType <- getXabiType addr field
-  let n = MS.size p - 1
+  
+  -- DEBUG
+  onTraced $ liftIO $ putStrLn $ "\tgetIndexType p: " ++ show p
+  onTraced $ liftIO $ putStrLn $ "\tgetIndexType field: " ++ show field
+  onTraced $ liftIO $ putStrLn $ "\tmType: " ++ show mType
+  -- END DEBUG
+
+  let n' = MS.size p - 1
+      loop :: MonadSM m => Int -> SVMType.Type -> m IndexType
+      loop 0 t = case t of
+        SVMType.Mapping {SVMType.key = SVMType.Int {}} -> return MapIntIndex
+        SVMType.Mapping {SVMType.key = SVMType.String {}} -> return MapStringIndex
+        SVMType.Mapping {SVMType.key = SVMType.Bytes {}} -> return MapStringIndex
+        SVMType.Mapping {SVMType.key = SVMType.Address {}} -> return MapAccountIndex
+        SVMType.Mapping {SVMType.key = SVMType.Account {}} -> return MapAccountIndex
+        SVMType.Mapping {SVMType.key = SVMType.Bool {}} -> return MapBoolIndex
+        SVMType.Array {} -> return ArrayIndex
+        _ -> typeError "unanticipated index type" t
+      loop n t = case t of
+        SVMType.Mapping {SVMType.value = t'} -> loop (n - 1) t'
+        SVMType.Array {SVMType.entry = t'} -> loop (n - 1) t'
+        SVMType.Struct _ k -> do
+          c' <- getCurrentContract
+          -- TODO should also look up global structs 
+          case (k `M.lookup` CC._structs c') of
+            Nothing -> typeError "unknown struct" k
+            Just s -> do
+              let structMems = M.fromList $ map (\(a, b, _) -> (a, b)) s
+                  field' = UTF8.toString . MS.getField . MS.fromList $ [MS.last p]
+              case field' `M.lookup` structMems of
+                Nothing -> typeError "unknown field" field'
+                Just tt -> loop 0 (CC.fieldTypeType tt)
+        _ -> typeError "indexing type in var dec" t
   case mType of
     Nothing -> todo "getIndexType/unknown storage reference" field
-    Just v -> return $! loop n v
-  where
-    loop :: Int -> SVMType.Type -> IndexType
-    loop 0 t = case t of
-      SVMType.Mapping {SVMType.key = SVMType.Int {}} -> MapIntIndex
-      SVMType.Mapping {SVMType.key = SVMType.String {}} -> MapStringIndex
-      SVMType.Mapping {SVMType.key = SVMType.Bytes {}} -> MapStringIndex
-      SVMType.Mapping {SVMType.key = SVMType.Address {}} -> MapAccountIndex
-      SVMType.Mapping {SVMType.key = SVMType.Account {}} -> MapAccountIndex
-      SVMType.Mapping {SVMType.key = SVMType.Bool {}} -> MapBoolIndex
-      SVMType.Array {} -> ArrayIndex
-      _ -> typeError "unanticipated index type" t
-    loop n t = case t of
-      SVMType.Mapping {SVMType.value = t'} -> loop (n - 1) t'
-      SVMType.Array {SVMType.entry = t'} -> loop (n - 1) t'
-      _ -> typeError "indexing type in var dec" t
-
+    Just v -> loop n' v
+  
 expToPath :: MonadSM m => CC.Expression -> m AccountPath
 expToPath (CC.Variable _ x) = do
   callInfo <- getCurrentCallInfo
@@ -1452,9 +1468,11 @@ expToPath x@(CC.IndexAccess _ parent mIndex) = do
     case parvar of
       Constant (SReference apt) -> return apt
       _ -> expToPath parent
-
   idxType <- getIndexType parPath
   idxVar <- maybe (typeError "empty index is only valid at type level" x) expToVar mIndex
+  onTraced $ liftIO $ putStrLn $ "  parPath: " ++ show parPath -- DEBUG
+  onTraced $ liftIO $ putStrLn $ "  idxType: " ++ show idxType -- DEBUG
+  onTraced $ liftIO $ putStrLn $ "  idxVar: " ++ show idxVar   -- DEBUG
   apSnoc parPath <$> case idxType of
     MapAccountIndex -> do
       idx <- getAccount idxVar
@@ -2334,10 +2352,6 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
 
             _ -> typeError "cannot call non-function" var
 
-{-
-SimpleStatement (ExpressionStatement (Binary "=" (Variable "tickets") (FunctionCall (NewExpression (SolidString "Hashmap")) [])))
--}
-
 expToVar' ep@(CC.Binary _ "=" dst@(CC.IndexAccess _ parent (Just indExp)) src) = do
   !srcVar <- expToVar src
   !srcVal <- getVar srcVar
@@ -2464,10 +2478,8 @@ evaluateAccountMember a _ "chainIdString" = do
         Just cid -> return $ Constant $ SString $ format cid
     MainChain -> return $ Constant $ SString $ replicate 64 '0'
     ExplicitChain cid -> return $ Constant $ SString $ format cid
--- evaluateAccountMember a _ "call" =
 evaluateAccountMember a True funcName = return $ Constant $ SContractFunction Nothing a funcName
 evaluateAccountMember a False itemName = do
-  --return $ Constant $ SContractItem addr itemName
   from <- getCurrentAccount
   let address = namedAccountToAccount (from ^. accountChainId) a
   result <- callWithResult from address CC.DefaultCall Nothing itemName False (CC.OrderedArgs [])
@@ -3012,9 +3024,6 @@ runTheConstructors from to hsh cc contractName' argExps = do
 
   void . withCallInfo to contract' (stringToLabel $ labelToString contractName' ++ " constructor") hsh cc (M.fromList zipped) False False $ do
 
-    -- ci <- getCurrentCallInfo
-    -- onTraced $ liftIO $ putStrLn $ show ci
-
     forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, e) -> do
       v <- expToVar e
       setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
@@ -3280,8 +3289,6 @@ encodeForReturn' (STuple items) = do
 
   return $ "(" ++ (intercalate "," encodedItems) ++ ")"
 encodeForReturn' x = todo "Cannot encode this return type: " x
-
---formatAddressWithoutColor : padded the address with 40 bytes
 
 {- BEN WILL REFACTOR THIS SOMEDAY -}
 solidityExceptionHandler :: MonadSM m => (M.Map String (Maybe (String, SVMType.Type), [CC.Statement])) -> SolidException -> m (Maybe Value)
@@ -3700,66 +3707,3 @@ specialUsingChecker (CC.FunctionCall _ (CC.MemberAccess _ (CC.Variable firstPos 
       removeFunctionFromCurrentContractInCurrentCallInfo usingFuncName
       return $ Just theResult
 specialUsingChecker _ = return $ Nothing
-
--- --If given a list, apply a given function to only the first element of the list.
--- mapOnFirst :: (a -> a) -> [a] -> [a]
--- mapOnFirst _ [] = []
--- mapOnFirst f (x:xs) = f x : xs
-
--- --If given a list, apply a given function to only the last item in the list
--- mapOnLast :: forall a. (a -> a) -> [a] -> [a]
--- mapOnLast f = foldr step []
---   where step :: a -> [a] -> [a]
---         step x [] = [f x]
---         step x xs = x : xs
-
--- --If given a SourceAnnotation get the position of (startLine, startColumn, endLine, endColumn)
--- getPositionFromSourceAnnotation :: SourceAnnotation a -> (Int, Int, Int, Int)
--- getPositionFromSourceAnnotation sa = (sa ^. sourceAnnotationStart ^. sourcePositionLine,
---                                       sa ^. sourceAnnotationStart ^. sourcePositionColumn,
---                                       sa ^. sourceAnnotationEnd ^. sourcePositionLine,
---                                       sa ^. sourceAnnotationEnd ^. sourcePositionColumn)
-
--- --If given a string and a SourceAnnotation, trim the string to be within the SourceAnnotation
--- trimCodeCollection :: String -> (Int, Int, Int, Int) -> String
--- trimCodeCollection cc sa = final
---   where (startLine, startColumn, endLine, endColumn) = sa
---         bandwidth = drop (startLine - 1) (take endLine (lines cc))
---         trimBack = mapOnLast (take endColumn) bandwidth
---         trimmedUp = mapOnFirst (drop $ startColumn - 1) trimBack
---         body = unlines trimmedUp
---         numOpen = countElem '{' body
---         numClosed = countElem '}' body
---         enclosed = if (numOpen > numClosed) then
---           body ++ replicate (numOpen - numClosed) '}'
---           else body
---         final = if (numOpen == 0) then
---           enclosed
---           else
---             finalCut
---             where
---               goodCut = fst $ splitLast '}' enclosed
---               numClosedFinal = countElem '}' goodCut
---               finalCut = if (numClosedFinal == numOpen) then
---                 goodCut ++ "\n"
---                 else
---                   goodCut ++ replicate (numOpen - numClosedFinal) '}' ++ "\n"
-
--- splitLast :: Char -> String -> (String, String)
--- splitLast char str = let n = findIndex (==char) (reverse str) in
---                 case n of
---                   Nothing -> (str, [])
---                   Just m  -> splitAt (length str - m -1) str
-
--- countElem :: Eq a => a -> [a] -> Int
--- countElem i = length . filter (i==)
-
--- makeSourceAnnotation :: (Int, Int, Int, Int) -> SourceAnnotation a
--- makeSourceAnnotation (startLine, startColumn, endLine, endColumn) =
---   let start = SourcePosition startLine startColumn
---       end = SourcePosition endLine endColumn
---   in SourceAnnotation
---     {
---       start,
---       end
---     }
