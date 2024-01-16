@@ -349,7 +349,7 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
           onChange={(e) => { handleChangeSearch(e) }}
           defaultValue={searchVal}
           prefix={<SearchOutlined />}
-          placeholder="Search Bought Order / Seller" />
+          placeholder="Search Bought Orders by Seller or Order #" />
         <div className="text-xs flex items-center md:hidden">
           <DatePicker
             disabledDate={(current) => {
