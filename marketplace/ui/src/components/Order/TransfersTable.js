@@ -144,6 +144,7 @@ const TransfersTable = ({ user, selectedDate }) => {
   return (
     <div>
       <Input className="text-base orders_searchbar md:p-3 rounded-full bg-[#F6F6F6]"
+        key={searchVal}
         onChange={(e) => { handleChangeSearch(e) }}
         onPressEnter={(e) => { handleEnterSearch(e) }}
         defaultValue={searchVal}

@@ -316,7 +316,7 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
     if (searchVal) {
       url += `?search=${searchVal}`
     }
-    url += `${searchVal?'&':'?'}page=${page}`
+    url += `${searchVal ? '&' : '?'}page=${page}`
     navigate(url, { new: true })
   };
 
@@ -341,6 +341,7 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
     <div>
       <div className="flex gap-2 items-center mb-5">
         <Input className="text-base orders_searchbar md:p-3 rounded-full bg-[#F6F6F6]"
+          key={searchVal}
           onChange={(e) => { handleChangeSearch(e) }}
           onPressEnter={(e) => { handleEnterSearch(e) }}
           defaultValue={searchVal}

@@ -32,7 +32,7 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange }) => {
   const { type } = params;
   const dispatch = useOrderDispatch();
   const debouncedSearchTerm = useDebounce("", 1000);
-  const limit = 10; 
+  const limit = 10;
   const offset = ((pageNo - 1) * limit)
   const [order, setOrder] = useState("createdDate.desc");
   const [filter, setFilter] = useState(0)
@@ -336,6 +336,7 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange }) => {
     <div>
       <div className="flex gap-2 items-center mb-5">
         <Input className="text-base orders_searchbar md:p-3 rounded-full bg-[#F6F6F6]"
+          key={searchVal}
           onChange={(e) => { handleChangeSearch(e) }}
           onPressEnter={(e) => { handleEnterSearch(e) }}
           defaultValue={searchVal}
