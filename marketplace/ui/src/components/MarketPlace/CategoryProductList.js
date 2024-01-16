@@ -301,7 +301,18 @@ const CategoryProductList = ({ user }) => {
     isError ? api.error(msgObj) : api.success(msgObj)
   };
 
-  const handleSearch = (e) => {
+  const handleChangeSearch = (e) => {
+    const value = e.target.value;
+    let url = '/category';
+    if (categoryQueryValue) {
+      url += `?category=${categoryQueryValue}`;
+    }
+    if(value.length === 0){
+      navigate(url, { replace: true });
+    }
+  }
+
+  const handleEnterSearch = (e) => {
     const value = e.target.value;
     // setSearch(value)
     let url = '/category';
@@ -569,8 +580,8 @@ const CategoryProductList = ({ user }) => {
           <div className={`flex-1 `}>
             <Input
               size="large"
-              onChange={(e) => { handleSearch(e) }}
-              onPressEnter={(e) => { handleSearch(e) }}
+              onChange={(e) => { handleChangeSearch(e) }}
+              onPressEnter={(e) => { handleEnterSearch(e) }}
               placeholder="Search Marketplace"
               // defaultValue={searchQueryValue}
               prefix={<img src={Images.Header_Search} alt="search" className="w-[18px] h-[18px]" />}
