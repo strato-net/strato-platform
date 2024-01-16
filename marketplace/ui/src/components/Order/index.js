@@ -49,6 +49,7 @@ const Order = ({ user }) => {
       </div>
       <Tabs
         className="mx-4 md:mx-20 lg:mt-[10px]"
+        key={type}
         defaultActiveKey={type}
         onChange={onChange}
         tabBarExtraContent={

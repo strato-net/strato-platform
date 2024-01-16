@@ -554,8 +554,7 @@ const actions = {
           searchQuery = search ? `&queryValue=${searchValue}&queryFields=assetName` : '';
         }
       }
-      let url = `${apiUrl}/inventory/transfers/items?limit=${limit}&order=transferDate.${order}&offset=${offset}
-      &oldOwnerCommonName.eq.${ownerCommonName}${search ? searchQuery : ''}${date ? range : ''}`
+      let url = `${apiUrl}/inventory/transfers/items?limit=${limit}&order=transferDate.${order}&offset=${offset}&oldOwnerCommonName.eq.${ownerCommonName}${search ? searchQuery : ''}${date ? range : ''}`
 
       const response = await fetch(url, {
         method: HTTP_METHODS.GET,
