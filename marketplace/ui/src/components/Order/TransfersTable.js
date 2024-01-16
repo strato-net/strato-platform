@@ -29,7 +29,7 @@ const TransfersTable = ({ user, selectedDate }) => {
   const [order, setOrder] = useState("desc")
 
   useEffect(() => {
-    if (user?.commonName) {
+    if (user?.commonName && type==='transfers') {
       actions.fetchItemTransfers(dispatch, limit, offset, user?.commonName, order, selectedDate, searchVal);
     }
   }, [dispatch, limit, offset, user, order, selectedDate, searchVal]);

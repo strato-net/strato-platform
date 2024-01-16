@@ -45,7 +45,7 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange }) => {
   const { ordersSold, isordersSoldLoading, orderSoldTotal } = useOrderState();
 
   useEffect(() => {
-    if (user?.commonName) {
+    if (user?.commonName && type==='sold') {
       actions.fetchOrderSold(
         dispatch,
         limit,
@@ -341,7 +341,7 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange }) => {
           onPressEnter={(e) => { handleEnterSearch(e) }}
           defaultValue={searchVal}
           prefix={<SearchOutlined />}
-          placeholder="Search Sold Orders" />
+          placeholder="Search Order" />
         <div className="text-xs flex items-center md:hidden">
           <DatePicker
             disabledDate={(current) => {
