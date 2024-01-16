@@ -551,7 +551,7 @@ const actions = {
         if (!isNaN(searchValue)) {
           searchQuery = search ? `&transferNumber=${searchValue}` : '';
         } else {
-          searchQuery = search ? `&queryValue=${searchValue}&queryFields=sellersCommonName` : '';
+          searchQuery = search ? `&queryValue=${searchValue}&queryFields=newOwnerCommonName` : '';
         }
       }
       let url = `${apiUrl}/inventory/transfers/items?limit=${limit}&order=transferDate.${order}&offset=${offset}

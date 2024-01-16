@@ -27,13 +27,14 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const searchVal = searchParams.get('search');
+  const pageVal = searchParams.get('page');
+  const pageNo = pageVal ? parseInt(pageVal) : 1;
   const { type } = params;
 
   const dispatch = useOrderDispatch();
   const debouncedSearchTerm = useDebounce("", 1000);
   const limit = 10;
-  const [offset, setOffset] = useState(0);
-  const [page, setPage] = useState(1);
+  const offset = ((pageNo - 1) * limit);
   const [order, setOrder] = useState("createdDate.desc");
   const [filter, setFilter] = useState(0)
   const [selectedValue, setSelectedValue] = useState(null);
@@ -77,11 +78,6 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
 
     return () => clearInterval(intervalId); // Clear interval on component unmount
   }, [orders]); // Dependency array
-
-  useEffect(() => {
-    setPage(1);
-    setOffset(0);
-  }, [orderBoughtTotal]);
 
   const [data, setdata] = useState([]);
 
@@ -316,11 +312,12 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
   };
 
   const onPageChange = (page) => {
-    setOffset((page - 1) * limit);
-    setPage(page);
-
     let url = `/order/${type}`;
-    navigate(url);
+    if (searchVal) {
+      url += `?search=${searchVal}`
+    }
+    url += `${searchVal?'&':'?'}page=${page}`
+    navigate(url, { new: true })
   };
 
 
@@ -346,6 +343,7 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
         <Input className="text-base orders_searchbar md:p-3 rounded-full bg-[#F6F6F6]"
           onChange={(e) => { handleChangeSearch(e) }}
           onPressEnter={(e) => { handleEnterSearch(e) }}
+          defaultValue={searchVal}
           prefix={<SearchOutlined />}
           placeholder="Search Bought Orders" />
         <div className="text-xs flex items-center md:hidden">
@@ -384,7 +382,7 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
         />
       </div>
       <Pagination
-        current={page}
+        current={pageNo}
         onChange={onPageChange}
         total={orderBoughtTotal}
         showSizeChanger={false}

@@ -18,12 +18,13 @@ const TransfersTable = ({ user, selectedDate }) => {
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const searchVal = searchParams.get('search');
+  const pageVal = searchParams.get('page');
+  const pageNo = pageVal ? parseInt(pageVal) : 1;
   const { type } = params;
 
   const dispatch = useInventoryDispatch();
   const limit = 10;
-  const [offset, setOffset] = useState(0);
-  const [page, setPage] = useState(1);
+  const offset = ((pageNo - 1) * limit);
   const { itemTransfers, totalItemsTransfered, isFetchingItemTransfers } = useInventoryState();
   const [order, setOrder] = useState("desc")
 
@@ -32,11 +33,6 @@ const TransfersTable = ({ user, selectedDate }) => {
       actions.fetchItemTransfers(dispatch, limit, offset, user?.commonName, order, selectedDate, searchVal);
     }
   }, [dispatch, limit, offset, user, order, selectedDate, searchVal]);
-
-  useEffect(() => {
-    setPage(1);
-    setOffset(0);
-  }, [totalItemsTransfered]);
 
   const [data, setdata] = useState([]);
   useEffect(() => {
@@ -113,8 +109,12 @@ const TransfersTable = ({ user, selectedDate }) => {
 
 
   const onPageChange = (page) => {
-    setOffset((page - 1) * limit);
-    setPage(page);
+    let url = `/order/${type}`;
+    if (searchVal) {
+      url += `?search=${searchVal}`
+    }
+    url += `${searchVal ? '&' : '?'}page=${page}`
+    navigate(url, { new: true })
   };
 
   const onChange = (pagination, filters, sorter) => {
@@ -146,6 +146,7 @@ const TransfersTable = ({ user, selectedDate }) => {
       <Input className="text-base orders_searchbar md:p-3 rounded-full bg-[#F6F6F6]"
         onChange={(e) => { handleChangeSearch(e) }}
         onPressEnter={(e) => { handleEnterSearch(e) }}
+        defaultValue={searchVal}
         prefix={<SearchOutlined />}
         placeholder="Search Transfers" />
       <div className="flex md:hidden order_responsive">
@@ -166,7 +167,7 @@ const TransfersTable = ({ user, selectedDate }) => {
         />
       </div>
       <Pagination
-        current={page}
+        current={pageNo}
         onChange={onPageChange}
         total={totalItemsTransfered}
         showSizeChanger={false}
