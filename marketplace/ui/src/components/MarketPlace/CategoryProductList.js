@@ -225,7 +225,6 @@ const CategoryProductList = ({ user }) => {
   useEffect(() => {
 
     const timeOut = setTimeout(() => {
-      console.log("test");
       let url = '/category';
       if (categoryQueryValue) {
         url += `?category=${categoryQueryValue}`;
