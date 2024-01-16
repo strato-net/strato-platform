@@ -26,13 +26,27 @@ const TransfersTable = ({ user, selectedDate }) => {
   const limit = 10;
   const offset = ((pageNo - 1) * limit);
   const { itemTransfers, totalItemsTransfered, isFetchingItemTransfers } = useInventoryState();
-  const [order, setOrder] = useState("desc")
+  const [order, setOrder] = useState("desc");
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
-    if (user?.commonName && type==='transfers') {
+    if (user?.commonName && type === 'transfers') {
       actions.fetchItemTransfers(dispatch, limit, offset, user?.commonName, order, selectedDate, searchVal);
     }
   }, [dispatch, limit, offset, user, order, selectedDate, searchVal]);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (search.length === 0) {
+        navigate(`/order/${type}`)
+      } else {
+        navigate(`/order/${type}?search=${search}`)
+      }
+    }, 1000)
+    return () => {
+      clearTimeout(timeout)
+    }
+  }, [search])
 
   const [data, setdata] = useState([]);
   useEffect(() => {
@@ -125,20 +139,10 @@ const TransfersTable = ({ user, selectedDate }) => {
     }
   };
 
-  const handleEnterSearch = (e) => {
-    const value = e.target.value;
-    if (value.length === 0) {
-      navigate(`/order/${type}`)
-    } else {
-      navigate(`/order/${type}?search=${value}`)
-    }
-  }
 
   const handleChangeSearch = (e) => {
     const value = e.target.value;
-    if (value.length === 0) {
-      navigate(`/order/${type}`)
-    }
+    setSearch(value)
   }
 
   return (
@@ -146,7 +150,6 @@ const TransfersTable = ({ user, selectedDate }) => {
       <Input className="text-base orders_searchbar md:p-3 rounded-full bg-[#F6F6F6]"
         key={searchVal}
         onChange={(e) => { handleChangeSearch(e) }}
-        onPressEnter={(e) => { handleEnterSearch(e) }}
         defaultValue={searchVal}
         prefix={<SearchOutlined />}
         placeholder="Search Transfers" />

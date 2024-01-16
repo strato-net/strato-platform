@@ -38,6 +38,8 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
   const [order, setOrder] = useState("createdDate.desc");
   const [filter, setFilter] = useState(0)
   const [selectedValue, setSelectedValue] = useState(null);
+  const [search, setSearch] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
   const [dropdownVisible, setDropdownVisible] = useState(false);
   const [mDropdownVisible, setMDropdownVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -60,6 +62,20 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
       );
     }
   }, [dispatch, limit, offset, debouncedSearchTerm, user, order, selectedDate, filter, shouldRefetch, searchVal]);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+    if (search.length === 0) {
+      navigate(`/order/${type}`)
+    } else {
+      navigate(`/order/${type}?search=${search}`)
+    }
+
+    }, 1000)
+    return () => {
+      clearTimeout(timeout)
+    }
+  }, [search])
 
   useEffect(() => {
     const intervalId = setInterval(() => {
@@ -320,21 +336,9 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
     navigate(url, { new: true })
   };
 
-
-  const handleEnterSearch = (e) => {
-    const value = e.target.value;
-    if (value.length === 0) {
-      navigate(`/order/${type}`)
-    } else {
-      navigate(`/order/${type}?search=${value}`)
-    }
-  }
-
   const handleChangeSearch = (e) => {
     const value = e.target.value;
-    if (value.length === 0) {
-      navigate(`/order/${type}`)
-    }
+    setSearch(value)
   }
 
   return (
@@ -343,7 +347,6 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
         <Input className="text-base orders_searchbar md:p-3 rounded-full bg-[#F6F6F6]"
           key={searchVal}
           onChange={(e) => { handleChangeSearch(e) }}
-          onPressEnter={(e) => { handleEnterSearch(e) }}
           defaultValue={searchVal}
           prefix={<SearchOutlined />}
           placeholder="Search Bought Order" />
