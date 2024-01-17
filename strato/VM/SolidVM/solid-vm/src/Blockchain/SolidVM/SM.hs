@@ -885,13 +885,13 @@ initializeAction acct name appName hsh = do
     Action.actionData %= M.insertWith Action.mergeActionData acct newData
 
 markDiffForAction :: Mod.Modifiable Action m => Account -> MS.StoragePath -> MS.BasicValue -> m ()
-markDiffForAction owner key' val' = do
+markDiffForAction owner !key' !val' = do
   let key = MS.unparsePath key'
       val = rlpSerialize $ rlpEncode val'
       ins = \case
         Action.SolidVMDiff m -> Action.SolidVMDiff $ M.insert key val m
         e -> internalError "SolidVM Diff executing in EVM" $ show e
-  Mod.modifyStatefully_ (Mod.Proxy @Action) $
+  key `seq` val `seq` Mod.modifyStatefully_ (Mod.Proxy @Action) $!
     Action.actionData . at owner . mapped . Action.actionDataStorageDiffs %= ins
 
 addEvent :: Mod.Modifiable (Q.Seq Event) m => Event -> m ()
