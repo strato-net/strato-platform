@@ -540,12 +540,18 @@ const actions = {
     dispatch({ type: actionDescriptors.fetchItemTransfers });
 
     try {
-      let range = '';
       let searchQuery = '';
       const end = date + 86400;
+      const baseUrl = new URL(`${apiUrl}/inventory/transfers/items`);
+      baseUrl.searchParams.set('limit', limit);
+      baseUrl.searchParams.set('order', `transferDate.${order}`);
+      baseUrl.searchParams.set('offset', offset);
+      baseUrl.searchParams.set('or', `(oldOwnerCommonName.eq.${ownerCommonName},newOwnerCommonName.eq.${ownerCommonName})`);
+
       if (date) {
-        range = `&range[]=transferDate,${date},${end}`
+        baseUrl.searchParams.set('range[]', `transferDate,${date},${end}`);
       }
+      let url = baseUrl.toString();
       if (search) {
         const searchValue = isNaN(search) ? search : parseInt(search);
         if (!isNaN(searchValue)) {
@@ -554,8 +560,8 @@ const actions = {
           searchQuery = search ? `&queryValue=${searchValue}&queryFields=assetName` : '';
         }
       }
-      let url = `${apiUrl}/inventory/transfers/items?limit=${limit}&order=transferDate.${order}&offset=${offset}&or=(oldOwnerCommonName.eq.${ownerCommonName},newOwnerCommonName.eq.${ownerCommonName})${searchQuery}${range}`
-
+      url += searchQuery;
+     
       const response = await fetch(url, {
         method: HTTP_METHODS.GET,
 
