@@ -82,21 +82,27 @@ const CategoryProductList = ({ user }) => {
   }, []);
 
   const onChangeCategory = (checkedValues) => {
-    const categoryStr = checkedValues.join(",")
-    let url;
-    if (checkedValues.length == 0 && searchQueryValue) {
-      url = `/category?search=${searchQueryValue}`
+    const categoryStr = checkedValues.join(",");
+    const baseUrl = new URL('/category', window.location.origin);
+  
+    if (checkedValues.length === 0 && searchQueryValue) {
+      baseUrl.searchParams.set('search', searchQueryValue);
     }
-    if (checkedValues.length > 0 && searchQueryValue) {
-      url = `/category?category=${categoryStr}&search=${searchQueryValue}`
+    if (checkedValues.length > 0) {
+      baseUrl.searchParams.set('category', categoryStr);
     }
-    if (checkedValues.length > 0 && !searchQueryValue) {
-      url = `/category?category=${categoryStr}`
+    if (searchQueryValue) {
+      baseUrl.searchParams.set('search', searchQueryValue);
     }
-    navigate(url)
+  
+    const url = baseUrl.pathname + baseUrl.search; 
+    navigate(url);
     setSelectedCategories(checkedValues);
     currentCategory = categorys.find((c) => c.name === checkedValues);
-    if (checkedValues.length === 0) clearSelection();
+  
+    if (checkedValues.length === 0) {
+      clearSelection();
+    }
   };
 
   currentCategory = categorys.find((c) => c.name === category);
@@ -198,25 +204,24 @@ const CategoryProductList = ({ user }) => {
   }, [marketplaceList]);
 
   useEffect(() => {
-
     const timeOut = setTimeout(() => {
-      let url = '/category';
+      const baseUrl = new URL('/category', window.location.origin);
+  
       if (categoryQueryValue) {
-        url += `?category=${categoryQueryValue}`;
+        baseUrl.searchParams.set('category', categoryQueryValue);
       }
       if (search.length > 0) {
-        url += categoryQueryValue
-          ? `&search=${search}`
-          : `?search=${search}`;
+        baseUrl.searchParams.set('search', search);
       }
-
+  
+      const url = baseUrl.pathname + baseUrl.search;
       navigate(url, { replace: true });
     }, 1000);
-
+  
     return () => {
-      clearTimeout(timeOut)
-    }
-  }, [search])
+      clearTimeout(timeOut);
+    };
+  }, [search]);
 
   //=========================Other functions===============================//
 
