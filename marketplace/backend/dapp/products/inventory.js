@@ -408,9 +408,7 @@ async function getAll(admin, args = {}, defaultOptions) {
                     saleDate: itemSale?.block_timestamp
                 });
             }
-            else if (isMarketplaceSearch) {
-                //skip
-            } else {
+            else {
                 finalInventory.push(inventory);
             }
         });

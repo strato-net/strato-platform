@@ -337,7 +337,7 @@ const ProductDetails = ({ user, users }) => {
                   </Paragraph>
                 </div>
 
-                {availableQuantity !== 0 ?
+                {availableQuantity !== 0  && details?.price ?
                   <div className="flex justify-between lg:justify-start  w-full gap-3 lg:gap-[15px]" id="quantity">
                     <div
                       onClick={subtract}
@@ -364,7 +364,7 @@ const ProductDetails = ({ user, users }) => {
                     If you are interested in purchasing this item, please contact our sales team at sales@blockapps.net
                   </Paragraph>
                 }
-                {availableQuantity !== 0 ?
+                {availableQuantity !== 0 && details?.price ?
                   <div className="flex gap-4 justify-between lg:justify-start  pt-4 w-full">
                     <Button
                       type="primary"

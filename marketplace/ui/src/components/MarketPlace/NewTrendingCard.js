@@ -45,113 +45,118 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                 </Typography>
                 <img className='w-4 h-4' src={Images.Verified} alt='verified' />
             </div>
-            <Typography className='font-normal text-black'>{'$' + topSellingProduct?.price || "N/A"}</Typography>
+            <Typography className='font-normal text-black'>{'$' + (topSellingProduct?.price !== null ? topSellingProduct?.price : "N/A")}</Typography>
             <Typography className={`#989898 opacity-40 max-h-5 overflow-hidden ${parent == 'Marketplace' ? 'hidden md:flex' : ''}`}>{topSellingProduct?.description || "N/A"}</Typography>
-            <div className='flex justify-between items-center bg-[#EEEFFA] p-2 rounded-[4px]'>
-                <Typography>Quantity:</Typography>
-                <div className='flex gap-3 p-1 bg-white'>
-                    <Typography className={`px-2 bg-[#EEEFFA] rounded-sm ${quantity === 1 ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`} onClick={() => {
-                        setQuantity(quantity == 1 ? quantity : quantity - 1)
-                    }}>
-                        -
-                    </Typography>
-                    <InputNumber 
-                        className="w-10" 
-                        size="small" 
-                        bordered={false} 
-                        value={quantity} 
-                        max={topSellingProduct.saleQuantity}
-                        min={1}
-                        onChange={setQuantity}
-                        onPressEnter={(e) => {
-                            const newValue = parseInt(e.target.value, 10);
-                            if (newValue <= topSellingProduct.saleQuantity) {
-                                setQuantity(newValue);
-                            } else {
-                                api.error({
-                                    message: "Cannot add more than available quantity",
-                                    placement: "bottom",
-                                });
+            { topSellingProduct?.price ? 
+                <>
+                <div className='flex justify-between items-center bg-[#EEEFFA] p-2 rounded-[4px]'>
+                    <Typography>Quantity:</Typography>
+                    <div className='flex gap-3 p-1 bg-white'>
+                        <Typography className={`px-2 bg-[#EEEFFA] rounded-sm ${quantity === 1 ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`} onClick={() => {
+                            setQuantity(quantity == 1 ? quantity : quantity - 1)
+                        }}>
+                            -
+                        </Typography>
+                        <InputNumber 
+                            className="w-10" 
+                            size="small" 
+                            bordered={false} 
+                            value={quantity} 
+                            max={topSellingProduct.saleQuantity}
+                            min={1}
+                            onChange={setQuantity}
+                            onPressEnter={(e) => {
+                                const newValue = parseInt(e.target.value, 10);
+                                if (newValue <= topSellingProduct.saleQuantity) {
+                                    setQuantity(newValue);
+                                } else {
+                                    api.error({
+                                        message: "Cannot add more than available quantity",
+                                        placement: "bottom",
+                                    });
+                                }
+                            }}  
+                            controls={false}/>
+                        <Typography className={`px-2 bg-[#EEEFFA] rounded-sm ${quantity >= Math.min(topSellingProduct.saleQuantity, topSellingProduct.quantity) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`} onClick={() => {
+                            if ((quantity + 1 <= topSellingProduct.saleQuantity) && (quantity + 1 <= topSellingProduct.quantity)) {
+                                setQuantity(quantity + 1)
                             }
-                        }}  
-                        controls={false}/>
-                    <Typography className={`px-2 bg-[#EEEFFA] rounded-sm ${quantity >= Math.min(topSellingProduct.saleQuantity, topSellingProduct.quantity) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`} onClick={() => {
-                        if ((quantity + 1 <= topSellingProduct.saleQuantity) && (quantity + 1 <= topSellingProduct.quantity)) {
-                            setQuantity(quantity + 1)
-                        }
-                    }}>
-                        +
-                    </Typography>
+                        }}>
+                            +
+                        </Typography>
+                    </div>
                 </div>
-            </div>
-            <div className='flex gap-4 mt-1'>
-                <Button
-                    id={`${topSellingProduct.name.replace(/ /g, "_")}-buy-now`}
-                    type='primary'
-                    className='flex-1 h-9 !bg-[#13188A] !text-white'
-                    onClick={() => {
-                        if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                            setCookie("returnUrl", `/marketplace/productList/${topSellingProduct.address}`, 10);
-                            window.location.href = loginUrl;
-                        } else {
-                            window.LOQ.push(['ready', async LO => {
-                                await LO.$internal.ready('events')
-                                LO.events.track('Buy Now (from Top Selling Product)', {
-                                    product: topSellingProduct.name,
-                                    category: topSellingProduct.category,
-                                    productId: topSellingProduct.productId
-                                })
-                            }])
-                            TagManager.dataLayer({
-                                dataLayer: {
-                                    event: 'buy_now_from_top_selling_product',
-                                    product_name: topSellingProduct.name,
-                                    category: topSellingProduct.category,
-                                    productId: topSellingProduct.productId
-                                },
-                            });
-                            if (addItemToCart(topSellingProduct, quantity)) {
-                                navigate("/checkout")
+                <div className='flex gap-4 mt-1'>
+                    <Button
+                        id={`${topSellingProduct.name.replace(/ /g, "_")}-buy-now`}
+                        type='primary'
+                        className='flex-1 h-9 !bg-[#13188A] !text-white'
+                        onClick={() => {
+                            if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                                setCookie("returnUrl", `/marketplace/productList/${topSellingProduct.address}`, 10);
+                                window.location.href = loginUrl;
+                            } else {
+                                window.LOQ.push(['ready', async LO => {
+                                    await LO.$internal.ready('events')
+                                    LO.events.track('Buy Now (from Top Selling Product)', {
+                                        product: topSellingProduct.name,
+                                        category: topSellingProduct.category,
+                                        productId: topSellingProduct.productId
+                                    })
+                                }])
+                                TagManager.dataLayer({
+                                    dataLayer: {
+                                        event: 'buy_now_from_top_selling_product',
+                                        product_name: topSellingProduct.name,
+                                        category: topSellingProduct.category,
+                                        productId: topSellingProduct.productId
+                                    },
+                                });
+                                if (addItemToCart(topSellingProduct, quantity)) {
+                                    navigate("/checkout")
+                                }
                             }
-                        }
-                    }}
-                >
-                    Buy Now
-                </Button>
-                <Button
-                className='h-9 w-9 flex items-center justify-center !bg-[#13188A] '
-                    onClick={() => {
-                        if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                            setCookie("returnUrl", `/marketplace/productList/${topSellingProduct.address}`, 10);
-                            window.location.href = loginUrl;
-                        } else {
-                            window.LOQ.push(['ready', async LO => {
-                                await LO.$internal.ready('events')
-                                LO.events.track('Add To Cart (from Top Selling Product)', {
-                                    product: topSellingProduct.name,
-                                    category: topSellingProduct.category,
-                                    productId: topSellingProduct.productId
-                                })
-                            }])
-                            TagManager.dataLayer({
-                                dataLayer: {
-                                    event: 'add_to_cart_from_top_selling_product',
-                                    product_name: topSellingProduct.name,
-                                    category: topSellingProduct.category,
-                                    productId: topSellingProduct.productId
-                                },
-                            });
-                            addItemToCart(topSellingProduct, quantity);
-                        }
-                    }}
-                    type='primary'
-                >
-                   
-                    <img src={Images.Cart} alt='Cart' width={18} height={18} className='max-w-[18px]'/>
+                        }}
+                    >
+                        Buy Now
+                    </Button>
+                    <Button
+                    className='h-9 w-9 flex items-center justify-center !bg-[#13188A] '
+                        onClick={() => {
+                            if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                                setCookie("returnUrl", `/marketplace/productList/${topSellingProduct.address}`, 10);
+                                window.location.href = loginUrl;
+                            } else {
+                                window.LOQ.push(['ready', async LO => {
+                                    await LO.$internal.ready('events')
+                                    LO.events.track('Add To Cart (from Top Selling Product)', {
+                                        product: topSellingProduct.name,
+                                        category: topSellingProduct.category,
+                                        productId: topSellingProduct.productId
+                                    })
+                                }])
+                                TagManager.dataLayer({
+                                    dataLayer: {
+                                        event: 'add_to_cart_from_top_selling_product',
+                                        product_name: topSellingProduct.name,
+                                        category: topSellingProduct.category,
+                                        productId: topSellingProduct.productId
+                                    },
+                                });
+                                addItemToCart(topSellingProduct, quantity);
+                            }
+                        }}
+                        type='primary'
+                    >
                     
-                    {/* <ShoppingCartOutlined style={{ color: '#EEEFFA' , width:'18px' ,  height:'18px' }} /> */}
-                </Button>
-            </div>
+                        <img src={Images.Cart} alt='Cart' width={18} height={18} className='max-w-[18px]'/>
+                        
+                        {/* <ShoppingCartOutlined style={{ color: '#EEEFFA' , width:'18px' ,  height:'18px' }} /> */}
+                    </Button>
+                </div>
+                </>
+                : null
+            }
         </div>
     )
 }
