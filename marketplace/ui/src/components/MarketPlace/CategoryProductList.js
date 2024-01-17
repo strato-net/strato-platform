@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import {
   Breadcrumb,
   Collapse,
@@ -12,9 +12,7 @@ import {
   Input,
   notification,
 } from "antd";
-// import CategoryProductCard from "./CategoryProductCard";
-// import { useMatch } from "react-router-dom";
-import { SearchOutlined, CloseOutlined } from "@ant-design/icons";
+import { CloseOutlined } from "@ant-design/icons";
 // Actions
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { actions as subCategoryActions } from "../../contexts/subCategory/actions";
@@ -27,9 +25,8 @@ import { useAuthenticateState } from "../../contexts/authentication";
 // other
 import { arrayToStr } from "../../helpers/utils";
 import routes from "../../helpers/routes";
-import useDebounce from "../UseDebounce";
-import { useLocation, useMatch, useNavigate } from "react-router-dom";
-import { MAX_QUANTITY, MAX_PRICE } from "../../helpers/constants";
+import { useLocation, useNavigate } from "react-router-dom";
+import { MAX_PRICE } from "../../helpers/constants";
 import ClickableCell from "../ClickableCell";
 import NewTrendingCard from "./NewTrendingCard";
 import { Images } from "../../images";
@@ -50,7 +47,6 @@ const CategoryProductList = ({ user }) => {
 
   const [api] = notification.useNotification();
   // States
-  const [category, setCategory] = useState("");
   const [selectedCategories, setSelectedCategories] = useState(categoryQueryValueArr);
   const [selectedSubCategories, setSelectedSubCategories] = useState([]);
   const [selectedProducts, setSelectedProducts] = useState([]);
@@ -62,9 +58,6 @@ const CategoryProductList = ({ user }) => {
   const [desktopOpenFilter, setDesktopOpenFilter] = useState(true);
   const [mobileOpenFilter, setMobileOpenFilter] = useState(false);
   const [search, setSearch] = useState(searchQueryValue)
-  const [debouncedSearch, setDebouncedSearch] = useState(searchQueryValue)
-  // useRef() to keep track of the previous value of the debounced search term
-  const previousDebouncedSearchRef = useRef();
   //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
   const subCategoryDispatch = useSubCategoryDispatch();
@@ -75,7 +68,6 @@ const CategoryProductList = ({ user }) => {
   let { hasChecked, isAuthenticated } = useAuthenticateState();
   const { subCategorys } = useSubCategoryState();
   const { cartList } = useMarketplaceState();
-  let currentCategory;
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
@@ -84,7 +76,7 @@ const CategoryProductList = ({ user }) => {
   const onChangeCategory = (checkedValues) => {
     const categoryStr = checkedValues.join(",");
     const baseUrl = new URL('/category', window.location.origin);
-  
+
     if (checkedValues.length === 0 && searchQueryValue) {
       baseUrl.searchParams.set('search', searchQueryValue);
     }
@@ -94,19 +86,15 @@ const CategoryProductList = ({ user }) => {
     if (searchQueryValue) {
       baseUrl.searchParams.set('search', searchQueryValue);
     }
-  
-    const url = baseUrl.pathname + baseUrl.search; 
+
+    const url = baseUrl.pathname + baseUrl.search;
     navigate(url);
     setSelectedCategories(checkedValues);
-    currentCategory = categorys.find((c) => c.name === checkedValues);
-  
+
     if (checkedValues.length === 0) {
       clearSelection();
     }
   };
-
-  currentCategory = categorys.find((c) => c.name === category);
-  currentCategory ?? (currentCategory = " ");
 
   useEffect(() => {
     setSubCategories(subCategorys);
@@ -131,55 +119,32 @@ const CategoryProductList = ({ user }) => {
   };
 
   useEffect(() => {
-
-    let subCategoriesOfSelectedCategories = subCategorys.map(sub => sub.contract).join(',');
-
-    // const callAPI = () => {
-      if (hasChecked && !isAuthenticated) {
-        marketplaceActions.fetchMarketplace(
-          marketplaceDispatch,
-          arrayToStr(selectedCategories),
-          selectedCategories.length > 0 && selectedSubCategories.length === 0 ? subCategoriesOfSelectedCategories : arrayToStr(selectedSubCategories),
-          arrayToStr(selectedProducts),
-          arrayToStr(selectedBrands),
-          minPrice,
-          maxPrice,
-          searchQueryValue
-        );
-      } else {
-        marketplaceActions.fetchMarketplaceLoggedIn(
-          marketplaceDispatch,
-          arrayToStr(selectedCategories),
-          selectedCategories.length > 0 && selectedSubCategories.length === 0 ? subCategoriesOfSelectedCategories : arrayToStr(selectedSubCategories),
-          arrayToStr(selectedProducts),
-          arrayToStr(selectedBrands),
-          minPrice,
-          maxPrice,
-          searchQueryValue
-        );
-      }
-    // };
-
-    // };
-
-    // Check if the current search term has changed from the previous search term and if it is not an empty string
-    // if (debouncedSearch !== previousDebouncedSearchRef.current && debouncedSearch !== "") {
-    //   const debounceTimer = setTimeout(() => {
-    //     callAPI();
-    //   }, 1000);
-
-    //   return () => {
-    //     // set previousDebouncedSearchRef to store the debounced search current term
-    //     previousDebouncedSearchRef.current = debouncedSearch;
-    //     clearTimeout(debounceTimer);
-    //   };
-    // } else {
-    //   callAPI();
-    // }
-
+    if (hasChecked && !isAuthenticated) {
+      marketplaceActions.fetchMarketplace(
+        marketplaceDispatch,
+        arrayToStr(selectedCategories),
+        arrayToStr(selectedSubCategories),
+        arrayToStr(selectedProducts),
+        arrayToStr(selectedBrands),
+        minPrice,
+        maxPrice,
+        searchQueryValue
+      );
+    } else {
+      marketplaceActions.fetchMarketplaceLoggedIn(
+        marketplaceDispatch,
+        arrayToStr(selectedCategories),
+        arrayToStr(selectedSubCategories),
+        arrayToStr(selectedProducts),
+        arrayToStr(selectedBrands),
+        minPrice,
+        maxPrice,
+        searchQueryValue
+      );
+    }
   }, [
+    selectedCategories,
     selectedSubCategories,
-    subCategorys,
     selectedProducts,
     selectedBrands,
     minPrice,
@@ -188,10 +153,6 @@ const CategoryProductList = ({ user }) => {
     isAuthenticated,
     searchQueryValue
   ]);
-
-  // useEffect(() => {
-  //   setDebouncedSearch(search);
-  // }, [search]);
 
   useEffect(() => {
     if (marketplaceList?.length > 0) {
@@ -206,18 +167,18 @@ const CategoryProductList = ({ user }) => {
   useEffect(() => {
     const timeOut = setTimeout(() => {
       const baseUrl = new URL('/category', window.location.origin);
-  
+
       if (categoryQueryValue) {
         baseUrl.searchParams.set('category', categoryQueryValue);
       }
       if (search.length > 0) {
         baseUrl.searchParams.set('search', search);
       }
-  
+
       const url = baseUrl.pathname + baseUrl.search;
       navigate(url, { replace: true });
     }, 1000);
-  
+
     return () => {
       clearTimeout(timeOut);
     };
@@ -309,7 +270,7 @@ const CategoryProductList = ({ user }) => {
 
   const isLoading = isMarketplaceLoading;
 
-  const BreadCrumbCompnent = () =>
+  const BreadCrumbComponent = () =>
     <Breadcrumb className="text-xs ml-4 md:ml-14 mt-14 lg:mt-5">
       <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
         <ClickableCell href={routes.Marketplace.url}>
@@ -392,7 +353,6 @@ const CategoryProductList = ({ user }) => {
           {DesktopCollapseComponent(
             <Panel header={<Text strong className="text-base">Sub Categories</Text>} key="1">
               <Checkbox.Group
-                // onChange={onChangeSubCategory}
                 value={selectedSubCategories}
               >
                 <div className="flex flex-col gap-3">
@@ -430,7 +390,6 @@ const CategoryProductList = ({ user }) => {
           {DesktopCollapseComponent(
             <Panel header={<Text strong className="text-base">Product</Text>} key="1">
               <Checkbox.Group
-                // onChange={onChangeProduct}
                 value={selectedProducts}
               >
                 <div className="flex flex-col gap-3">
@@ -482,27 +441,24 @@ const CategoryProductList = ({ user }) => {
           </>
         )}
         {/* Panel - Sub Category */}
-        {currentCategory && (
-          <>
-            {MobileCollapseComponent(
-              <Panel header={<Text>Sub-Category</Text>} key="1">
-                <Checkbox.Group
-                  // onChange={onChangeSubCategory}
-                  value={selectedSubCategories}
-                >
-                  <div className="flex flex-col gap-3">
-                    {subCategories.map((subcategory, index) => (
-                      <Checkbox value={subcategory.contract} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
-                        {subcategory.name}
-                      </Checkbox>
-                    ))}
-                  </div>
-                </Checkbox.Group>
-              </Panel>
-            )}
-            <Divider className="m-0" />
-          </>
-        )}
+        <>
+          {MobileCollapseComponent(
+            <Panel header={<Text>Sub-Category</Text>} key="1">
+              <Checkbox.Group
+                value={selectedSubCategories}
+              >
+                <div className="flex flex-col gap-3">
+                  {subCategories.map((subcategory, index) => (
+                    <Checkbox value={subcategory.contract} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
+                      {subcategory.name}
+                    </Checkbox>
+                  ))}
+                </div>
+              </Checkbox.Group>
+            </Panel>
+          )}
+          <Divider className="m-0" />
+        </>
         {/* Panel - Price */}
         {MobileCollapseComponent(
           <Panel header={<Text>Price ($)</Text>} key="1">
@@ -525,7 +481,6 @@ const CategoryProductList = ({ user }) => {
             {MobileCollapseComponent(
               <Panel header={<Text>Product</Text>} key="1">
                 <Checkbox.Group
-                  // onChange={onChangeProduct}
                   value={selectedProducts}
                 >
                   <div className="flex flex-col gap-3">
@@ -550,7 +505,7 @@ const CategoryProductList = ({ user }) => {
   return (
     <div className={`${mobileOpenFilter ? 'overflow-y-hidden h-[100vh] w-[100vw] bg-[#00000020] relative mt-0 md:bg-white md:mt-[auto] md:overflow-scroll trending_cards' : ' '}`}>
       <div className="fixed bg-white w-full top-7 z-10 md:static">
-        {BreadCrumbCompnent()}
+        {BreadCrumbComponent()}
 
         <div className="flex items-center justify-center ml-4 md:ml-14 mr-14 mt-6 lg:mt-8 gap-4">
           <div className="border border-solid border-[#6A6A6A] rounded-md cursor-pointer p-1 md:p-2" onClick={handleFilterClick}>
@@ -559,11 +514,9 @@ const CategoryProductList = ({ user }) => {
 
           <div className={`flex-1`}>
             <Input
-              // key={searchQueryValue}
               size="large"
               onChange={(e) => { handleChangeSearch(e) }}
               placeholder="Search Marketplace"
-              // defaultValue={searchQueryValue}
               prefix={<img src={Images.Header_Search} alt="search" className="w-[18px] h-[18px]" />}
               className="bg-[#F6F6F6] border-none rounded-3xl p-[10px]"
             />
@@ -583,41 +536,40 @@ const CategoryProductList = ({ user }) => {
         {desktopOpenFilter && DesktopFilterComponent()}
 
         {/* Product list section */}
-        {isLoading ? (
-          <div className="h-96 w-full flex justify-center items-center">
-            <Spin spinning={isLoading} size="large" />
+        <div className="mb-12 w-full">
+          <div className="hidden md:flex items-center">
+            <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
+            <Text className="text-gray-800 ml-1 text-xl font-semibold">
+              {marketplaceList?.length} Results
+            </Text>
           </div>
-        ) : (
-          <div className=" mb-12 w-full">
-            <div className="hidden md:flex items-center">
-              <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
-              <Text className="text-gray-800 ml-1 text-xl font-semibold">
-                {marketplaceList?.length} Results
-              </Text>
+          {isLoading ?
+            <div className="h-96 w-full flex justify-center items-center">
+              <Spin spinning={isLoading} size="large" />
             </div>
-            {marketplaceList?.length > 0 ? (
-              <div className={`mt-[61px] md:mt-4 mb-8 flex w-full md:grid flex-col items-center ${desktopOpenFilter ? "grid-cols-1 gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 lg:gap-14 " : " sm:grid-cols-1 gap-4 md:grid-cols-2 md:gap-14 lg:grid-cols-3 lg:gap-16 xl:grid-cols-4"}`} id="product-list">
-                {marketplaceList.map((product, index) => {
-                  const prodCategory = categorys.find(
-                    (c) => c.name === product.category
-                  );
-                  return (
-                    <NewTrendingCard
-                      topSellingProduct={product}
-                      key={index}
-                      addItemToCart={addItemToCart}
-                      parent={"Marketplace"}
-                    />
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="h-96 flex justify-center items-center" id="product-list">
-                No data found
-              </div>
-            )}
-          </div>
-        )}
+            :
+            <div>
+              {marketplaceList?.length > 0 ? (
+                <div className={`mt-[61px] md:mt-4 mb-8 flex w-full md:grid flex-col items-center ${desktopOpenFilter ? "grid-cols-1 gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 lg:gap-14 " : " sm:grid-cols-1 gap-4 md:grid-cols-2 md:gap-14 lg:grid-cols-3 lg:gap-16 xl:grid-cols-4"}`} id="product-list">
+                  {marketplaceList.map((product, index) => {
+                    return (
+                      <NewTrendingCard
+                        topSellingProduct={product}
+                        key={index}
+                        addItemToCart={addItemToCart}
+                        parent={"Marketplace"}
+                      />
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="h-96 flex justify-center items-center" id="product-list">
+                  No data found
+                </div>
+              )}
+            </div>
+          }
+        </div>
       </div>
 
       {mobileOpenFilter && MobileFilterComponent()}
