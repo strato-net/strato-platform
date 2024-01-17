@@ -540,7 +540,6 @@ const actions = {
     dispatch({ type: actionDescriptors.fetchItemTransfers });
 
     try {
-      let searchQuery = '';
       const end = date + 86400;
       const baseUrl = new URL(`${apiUrl}/inventory/transfers/items`);
       baseUrl.searchParams.set('limit', limit);
@@ -551,16 +550,17 @@ const actions = {
       if (date) {
         baseUrl.searchParams.set('range[]', `transferDate,${date},${end}`);
       }
-      let url = baseUrl.toString();
+      
       if (search) {
         const searchValue = isNaN(search) ? search : parseInt(search);
         if (!isNaN(searchValue)) {
-          searchQuery = search ? `&transferNumber=${searchValue}` : '';
+          baseUrl.searchParams.set('transferNumber', searchValue);
         } else {
-          searchQuery = search ? `&queryValue=${searchValue}&queryFields=assetName` : '';
+          baseUrl.searchParams.set('queryValue', searchValue);
+          baseUrl.searchParams.set('queryFields', 'assetName');
         }
       }
-      url += searchQuery;
+      const url = baseUrl.toString();
      
       const response = await fetch(url, {
         method: HTTP_METHODS.GET,
