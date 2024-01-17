@@ -12,8 +12,9 @@ import {
   Input,
   notification,
 } from "antd";
-import { useMatch } from "react-router-dom";
-import { CloseOutlined } from "@ant-design/icons";
+// import CategoryProductCard from "./CategoryProductCard";
+// import { useMatch } from "react-router-dom";
+import { SearchOutlined, CloseOutlined } from "@ant-design/icons";
 // Actions
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { actions as subCategoryActions } from "../../contexts/subCategory/actions";
@@ -26,7 +27,9 @@ import { useAuthenticateState } from "../../contexts/authentication";
 // other
 import { arrayToStr } from "../../helpers/utils";
 import routes from "../../helpers/routes";
-import { MAX_PRICE } from "../../helpers/constants";
+import useDebounce from "../UseDebounce";
+import { useLocation, useMatch, useNavigate } from "react-router-dom";
+import { MAX_QUANTITY, MAX_PRICE } from "../../helpers/constants";
 import ClickableCell from "../ClickableCell";
 import NewTrendingCard from "./NewTrendingCard";
 import { Images } from "../../images";
@@ -36,10 +39,19 @@ const { Panel } = Collapse;
 const { Text } = Typography;
 
 const CategoryProductList = ({ user }) => {
+
+  const location = useLocation();
+  const navigate = useNavigate();
+  const queryParams = new URLSearchParams(location.search);
+
+  const searchQueryValue = queryParams.get('search');
+  const categoryQueryValue = queryParams.get('category');
+  const categoryQueryValueArr = categoryQueryValue ? categoryQueryValue.split(',') : []
+
   const [api] = notification.useNotification();
   // States
   const [category, setCategory] = useState("");
-  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [selectedCategories, setSelectedCategories] = useState(categoryQueryValueArr);
   const [selectedSubCategories, setSelectedSubCategories] = useState([]);
   const [selectedProducts, setSelectedProducts] = useState([]);
   const [selectedBrands, setSelectedBrands] = useState([]);
@@ -49,9 +61,8 @@ const CategoryProductList = ({ user }) => {
   const [uniqueProductNames, setUniqueProductNames] = useState([]);
   const [desktopOpenFilter, setDesktopOpenFilter] = useState(true);
   const [mobileOpenFilter, setMobileOpenFilter] = useState(false);
-  const [search, setSearch] = useState("")
-  const [debouncedSearch, setDebouncedSearch] = useState(search)
-  const [isDoneRendering, setIsDoneRendering] = useState(false);
+  const [search, setSearch] = useState(searchQueryValue)
+  const [debouncedSearch, setDebouncedSearch] = useState(searchQueryValue)
   // useRef() to keep track of the previous value of the debounced search term
   const previousDebouncedSearchRef = useRef();
   //=========================Categories===============================//
@@ -68,34 +79,25 @@ const CategoryProductList = ({ user }) => {
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
-  }, [categoryDispatch]);
-
-  const routeMatch = useMatch({
-    path: routes.MarketplaceProductList.url,
-    strict: true,
-  });
-
-  const categoryRouteMatch = useMatch({
-    path: routes.MarketplaceCategoryProductList.url,
-    strict: true,
-  });
+  }, []);
 
   const onChangeCategory = (checkedValues) => {
+    const categoryStr = checkedValues.join(",")
+    let url;
+    if (checkedValues.length == 0 && searchQueryValue) {
+      url = `/category?search=${searchQueryValue}`
+    }
+    if (checkedValues.length > 0 && searchQueryValue) {
+      url = `/category?category=${categoryStr}&search=${searchQueryValue}`
+    }
+    if (checkedValues.length > 0 && !searchQueryValue) {
+      url = `/category?category=${categoryStr}`
+    }
+    navigate(url)
     setSelectedCategories(checkedValues);
     currentCategory = categorys.find((c) => c.name === checkedValues);
     if (checkedValues.length === 0) clearSelection();
   };
-
-  useEffect(() => {
-    let param = routeMatch ? routeMatch?.pathname : categoryRouteMatch.params?.category;
-    let newCategory = [];
-    if (param !== "/category") {
-      newCategory.push(param);
-      setSelectedCategories(newCategory);
-    };
-    setCategory(param);
-    setIsDoneRendering(true);
-  }, []);
 
   currentCategory = categorys.find((c) => c.name === category);
   currentCategory ?? (currentCategory = " ");
@@ -123,9 +125,10 @@ const CategoryProductList = ({ user }) => {
   };
 
   useEffect(() => {
+
     let subCategoriesOfSelectedCategories = subCategorys.map(sub => sub.contract).join(',');
 
-    const callAPI = () => {
+    // const callAPI = () => {
       if (hasChecked && !isAuthenticated) {
         marketplaceActions.fetchMarketplace(
           marketplaceDispatch,
@@ -135,7 +138,7 @@ const CategoryProductList = ({ user }) => {
           arrayToStr(selectedBrands),
           minPrice,
           maxPrice,
-          debouncedSearch
+          searchQueryValue
         );
       } else {
         marketplaceActions.fetchMarketplaceLoggedIn(
@@ -146,30 +149,29 @@ const CategoryProductList = ({ user }) => {
           arrayToStr(selectedBrands),
           minPrice,
           maxPrice,
-          debouncedSearch
+          searchQueryValue
         );
       }
-    };
+    // };
+
+    // };
 
     // Check if the current search term has changed from the previous search term and if it is not an empty string
-    if (isDoneRendering) {
-      if (debouncedSearch !== previousDebouncedSearchRef.current && debouncedSearch !== "") {
-        const debounceTimer = setTimeout(() => {
-          callAPI();
-        }, 1000);
+    // if (debouncedSearch !== previousDebouncedSearchRef.current && debouncedSearch !== "") {
+    //   const debounceTimer = setTimeout(() => {
+    //     callAPI();
+    //   }, 1000);
 
-        return () => {
-          // set previousDebouncedSearchRef to store the debounced search current term
-          previousDebouncedSearchRef.current = debouncedSearch;
-          clearTimeout(debounceTimer);
-        };
-      } else {
-        callAPI();
-      }
-    }
+    //   return () => {
+    //     // set previousDebouncedSearchRef to store the debounced search current term
+    //     previousDebouncedSearchRef.current = debouncedSearch;
+    //     clearTimeout(debounceTimer);
+    //   };
+    // } else {
+    //   callAPI();
+    // }
 
   }, [
-    marketplaceDispatch,
     selectedSubCategories,
     subCategorys,
     selectedProducts,
@@ -178,13 +180,12 @@ const CategoryProductList = ({ user }) => {
     maxPrice,
     hasChecked,
     isAuthenticated,
-    debouncedSearch,
-    isDoneRendering
+    searchQueryValue
   ]);
 
-  useEffect(() => {
-    setDebouncedSearch(search);
-  }, [search]);
+  // useEffect(() => {
+  //   setDebouncedSearch(search);
+  // }, [search]);
 
   useEffect(() => {
     if (marketplaceList?.length > 0) {
@@ -195,6 +196,27 @@ const CategoryProductList = ({ user }) => {
       setUniqueProductNames(uniqueNames);
     }
   }, [marketplaceList]);
+
+  useEffect(() => {
+
+    const timeOut = setTimeout(() => {
+      let url = '/category';
+      if (categoryQueryValue) {
+        url += `?category=${categoryQueryValue}`;
+      }
+      if (search.length > 0) {
+        url += categoryQueryValue
+          ? `&search=${search}`
+          : `?search=${search}`;
+      }
+
+      navigate(url, { replace: true });
+    }, 1000);
+
+    return () => {
+      clearTimeout(timeOut)
+    }
+  }, [search])
 
   //=========================Other functions===============================//
 
@@ -275,8 +297,9 @@ const CategoryProductList = ({ user }) => {
     isError ? api.error(msgObj) : api.success(msgObj)
   };
 
-  const handleSearch = (e) => {
-    setSearch(e.target.value)
+  const handleChangeSearch = (e) => {
+    const value = e.target.value;
+    setSearch(value)
   }
 
   const isLoading = isMarketplaceLoading;
@@ -529,11 +552,13 @@ const CategoryProductList = ({ user }) => {
             <img src={Images.filter} alt="filter" className=" w-5 h-5 md:w-6 md:h-6" />
           </div>
 
-          <div className={`flex-1 `}>
+          <div className={`flex-1`}>
             <Input
+              // key={searchQueryValue}
               size="large"
-              onChange={(e) => { handleSearch(e) }}
+              onChange={(e) => { handleChangeSearch(e) }}
               placeholder="Search Marketplace"
+              // defaultValue={searchQueryValue}
               prefix={<img src={Images.Header_Search} alt="search" className="w-[18px] h-[18px]" />}
               className="bg-[#F6F6F6] border-none rounded-3xl p-[10px]"
             />
