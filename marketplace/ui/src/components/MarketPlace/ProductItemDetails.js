@@ -1,4 +1,5 @@
 import { Space, Typography } from "antd";
+import { getUnitNameByIndex } from "../../helpers/constants";
 
 const ProductItemDetails = ({ categoryName, itemData }) => {
     const { Text } = Typography;
@@ -60,7 +61,7 @@ const ProductItemDetails = ({ categoryName, itemData }) => {
                     </Space>
                     <Space className="flex justify-between">
                         <DescTitle text="Unit of Measurement" />
-                        <Text className="text-[13px] text-[#202020] font-medium">{itemData?.unitOfMeasurement}</Text>
+                        <Text className="text-[13px] text-[#202020] font-medium">{getUnitNameByIndex(itemData?.unitOfMeasurement)}</Text>
                     </Space>
                     <Space className="flex justify-between">
                         <DescTitle text="Least Sellable Unit" />

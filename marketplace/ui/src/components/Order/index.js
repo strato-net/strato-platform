@@ -1,6 +1,6 @@
 import { Input, Tabs, Typography, DatePicker, Breadcrumb } from "antd";
 import React, { useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import SoldOrdersTable from "./SoldOrdersTable";
 import BoughtOrdersTable from "./BoughtOrdersTable";
 import TransfersTable from "./TransfersTable";
@@ -13,11 +13,13 @@ const { Search } = Input;
 
 const Order = ({ user }) => {
   // const naviroute = routes.OrderDetail.url;
+  const navigate = useNavigate();
+  const params = useParams();
+  const { type } = params;
   const { state } = useLocation();
-  const [activeTab, setActiveTab] = useState(state?.defaultKey || 'Sold')
 
   const onChange = (key) => {
-    setActiveTab(key)
+    navigate(`/order/${key}`)
   };
 
   const [selectedDate, setSelectedDate] = useState("");
@@ -40,14 +42,15 @@ const Order = ({ user }) => {
           </Breadcrumb.Item>
           <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
             <p className=" text-sm text-[#202020] font-medium">
-              {'Orders (' + activeTab + ')'}
+              {'Orders (' + type + ')'}
             </p>
           </Breadcrumb.Item>
         </Breadcrumb>
       </div>
       <Tabs
         className="mx-4 md:mx-20 lg:mt-[10px]"
-        defaultActiveKey={state == null ? "Sold" : state.defaultKey}
+        key={type}
+        defaultActiveKey={type}
         onChange={onChange}
         tabBarExtraContent={
           <div className="text-xs md:flex items-center hidden orders_page">
@@ -71,17 +74,17 @@ const Order = ({ user }) => {
         items={[
           {
             label: <p id="sold-tab" className="font-semibold text-sm md:text-base">Orders (Sold)</p>,
-            key: "Sold",
+            key: "sold",
             children: <SoldOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} onDateChange={onDateChange} />
           },
           {
             label: <p id="bought-tab" className="font-semibold text-sm md:text-base">Orders (Bought)</p>,
-            key: "Bought",
+            key: "bought",
             children: <BoughtOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} onDateChange={onDateChange} />
           },
           {
             label: <p id="transfers-tab" className="font-semibold text-sm md:text-base">Transfers</p>,
-            key: "Transfers",
+            key: "transfers",
             children: <TransfersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
           }
         ]}

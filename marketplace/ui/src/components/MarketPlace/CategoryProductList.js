@@ -32,7 +32,6 @@ import { useLocation, useMatch, useNavigate } from "react-router-dom";
 import { MAX_QUANTITY, MAX_PRICE } from "../../helpers/constants";
 import ClickableCell from "../ClickableCell";
 import NewTrendingCard from "./NewTrendingCard";
-// import { FilterIcon } from "../../images/SVGComponents";
 import { Images } from "../../images";
 import './index.css'
 
@@ -71,10 +70,10 @@ const CategoryProductList = ({ user }) => {
   const subCategoryDispatch = useSubCategoryDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
   // states
-  const { marketplaceList, isMarketplaceLoading, marketplaceListCount } = useMarketplaceState();
-  const { categorys, iscategorysLoading } = useCategoryState();
+  const { marketplaceList, isMarketplaceLoading } = useMarketplaceState();
+  const { categorys } = useCategoryState();
   let { hasChecked, isAuthenticated } = useAuthenticateState();
-  const { subCategorys, issubCategorysLoading } = useSubCategoryState();
+  const { subCategorys } = useSubCategoryState();
   const { cartList } = useMarketplaceState();
   let currentCategory;
 
@@ -126,57 +125,34 @@ const CategoryProductList = ({ user }) => {
   };
 
   useEffect(() => {
-    let subCategoriesOfSelectedCategories = "";
-    subCategorys.map((sub) => subCategoriesOfSelectedCategories += sub.contract + ",");
+
+    let subCategoriesOfSelectedCategories = subCategorys.map(sub => sub.contract).join(',');
+
     // const callAPI = () => {
-    if (hasChecked && !isAuthenticated &&
-      ((selectedSubCategories.length === 0 && selectedCategories.length === 0)
-        || (selectedSubCategories.length !== 0 && selectedCategories.length !== 0))) {
-      marketplaceActions.fetchMarketplace(
-        marketplaceDispatch,
-        arrayToStr(selectedCategories),
-        arrayToStr(selectedSubCategories),
-        arrayToStr(selectedProducts),
-        arrayToStr(selectedBrands),
-        minPrice,
-        maxPrice,
-        searchQueryValue
-      );
-    } else if (((selectedSubCategories.length === 0 && selectedCategories.length === 0)
-      || (selectedSubCategories.length !== 0 && selectedCategories.length !== 0))) {
-      marketplaceActions.fetchMarketplaceLoggedIn(
-        marketplaceDispatch,
-        arrayToStr(selectedCategories),
-        arrayToStr(selectedSubCategories),
-        arrayToStr(selectedProducts),
-        arrayToStr(selectedBrands),
-        minPrice,
-        maxPrice,
-        searchQueryValue
-      );
-    } else if (selectedSubCategories.length === 0 && selectedCategories.length > 0 && hasChecked && !isAuthenticated) {
-      marketplaceActions.fetchMarketplace(
-        marketplaceDispatch,
-        arrayToStr(selectedCategories),
-        subCategoriesOfSelectedCategories,
-        arrayToStr(selectedProducts),
-        arrayToStr(selectedBrands),
-        minPrice,
-        maxPrice,
-        searchQueryValue
-      );
-    } else if (selectedSubCategories.length === 0 && selectedCategories.length > 0 && subCategorys.length > 0) {
-      marketplaceActions.fetchMarketplaceLoggedIn(
-        marketplaceDispatch,
-        arrayToStr(selectedCategories),
-        subCategoriesOfSelectedCategories,
-        arrayToStr(selectedProducts),
-        arrayToStr(selectedBrands),
-        minPrice,
-        maxPrice,
-        searchQueryValue
-      );
-    }
+      if (hasChecked && !isAuthenticated) {
+        marketplaceActions.fetchMarketplace(
+          marketplaceDispatch,
+          arrayToStr(selectedCategories),
+          selectedCategories.length > 0 && selectedSubCategories.length === 0 ? subCategoriesOfSelectedCategories : arrayToStr(selectedSubCategories),
+          arrayToStr(selectedProducts),
+          arrayToStr(selectedBrands),
+          minPrice,
+          maxPrice,
+          searchQueryValue
+        );
+      } else {
+        marketplaceActions.fetchMarketplaceLoggedIn(
+          marketplaceDispatch,
+          arrayToStr(selectedCategories),
+          selectedCategories.length > 0 && selectedSubCategories.length === 0 ? subCategoriesOfSelectedCategories : arrayToStr(selectedSubCategories),
+          arrayToStr(selectedProducts),
+          arrayToStr(selectedBrands),
+          minPrice,
+          maxPrice,
+          searchQueryValue
+        );
+      }
+    // };
 
     // };
 
@@ -202,7 +178,6 @@ const CategoryProductList = ({ user }) => {
     selectedBrands,
     minPrice,
     maxPrice,
-    category,
     hasChecked,
     isAuthenticated,
     searchQueryValue
@@ -641,7 +616,7 @@ const CategoryProductList = ({ user }) => {
       </div>
 
       {mobileOpenFilter && MobileFilterComponent()}
-    </div >
+    </div>
   );
 };
 
