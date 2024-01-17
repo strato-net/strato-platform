@@ -540,8 +540,8 @@ const actions = {
     dispatch({ type: actionDescriptors.fetchItemTransfers });
 
     try {
-      let range;
-      let searchQuery;
+      let range = '';
+      let searchQuery = '';
       const end = date + 86400;
       if (date) {
         range = `&range[]=transferDate,${date},${end}`
@@ -554,7 +554,7 @@ const actions = {
           searchQuery = search ? `&queryValue=${searchValue}&queryFields=assetName` : '';
         }
       }
-      let url = `${apiUrl}/inventory/transfers/items?limit=${limit}&order=transferDate.${order}&offset=${offset}&or=(oldOwnerCommonName.eq.${ownerCommonName},newOwnerCommonName.eq.${ownerCommonName})${search ? searchQuery : ''}${date ? range : ''}`
+      let url = `${apiUrl}/inventory/transfers/items?limit=${limit}&order=transferDate.${order}&offset=${offset}&or=(oldOwnerCommonName.eq.${ownerCommonName},newOwnerCommonName.eq.${ownerCommonName})${searchQuery}${range}`
 
       const response = await fetch(url, {
         method: HTTP_METHODS.GET,
