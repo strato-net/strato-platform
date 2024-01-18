@@ -273,7 +273,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const newArgs = {
       ...args, notEqualsField: 'ownerCommonName', notEqualsValue: userCommonName
     }
-    console.log("newArgs1", newArgs);
+
     return marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
   };
 

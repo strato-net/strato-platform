@@ -407,11 +407,10 @@ async function getAll(admin, args = {}, defaultOptions) {
                     saleQuantity: itemSale?.quantity,
                     saleDate: itemSale?.block_timestamp
                 });
-            }
-            else if (inventory.address !== inventory.originAddress && isMarketplaceSearch) {
-                finalInventory.push(inventory);
-            } else if (!isMarketplaceSearch) {
-                finalInventory.push(inventory);
+            } else {
+                if (inventory.address !== inventory.originAddress){
+                    finalInventory.push(inventory);
+                }
             }
         });
     }
