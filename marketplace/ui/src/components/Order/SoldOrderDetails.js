@@ -309,7 +309,7 @@ const SoldOrderDetails = ({ user, users }) => {
 
 
   const onChange = (key) => {
-    navigate(routes.Orders.url, { state: { defaultKey: key } })
+    navigate(routes.Orders.url.replace(':type', 'sold'))
   };
 
   const navigate = useNavigate();
@@ -411,8 +411,8 @@ const SoldOrderDetails = ({ user, users }) => {
               </ClickableCell>
             </Breadcrumb.Item>
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-              <div onClick={() => { navigate(routes.Orders.url, { state: { defaultKey: "Sold" } }); }}>
-                <p className="text-sm text-primary font-semibold">Orders (Sold)</p>
+              <div onClick={() => { navigate(routes.Orders.url.replace(':type', 'sold')); }}>
+                <p className="text-sm text-primary font-semibold">Orders (sold)</p>
               </div>
             </Breadcrumb.Item>
             <Breadcrumb.Item className="text-sm text-[#202020] font-medium">
