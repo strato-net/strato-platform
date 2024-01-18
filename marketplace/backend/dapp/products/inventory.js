@@ -390,10 +390,30 @@ async function getAll(admin, args = {}, defaultOptions) {
                 }, options, admin);
         }
 
+        // if (inventories) {
+        //     const assetAddresses = inventories.map((inventory) => inventory.address);
+        //     sales = await saleJs.getAll(admin, { assetAddresses, range, isOpen: true }, options);
+        // }
         if (inventories) {
+            sales = [];
             const assetAddresses = inventories.map((inventory) => inventory.address);
-            sales = await saleJs.getAll(admin, { assetAddresses, range, isOpen: true }, options);
+            const batchSize = 100; // Define the batch size, you can adjust this as needed
+
+            for (let i = 0; i < assetAddresses.length; i += batchSize) {
+                const batchAddresses = assetAddresses.slice(i, i + batchSize);
+        
+                const batchSales = await saleJs.getAll(admin, {
+                    assetAddresses: batchAddresses,
+                    range,
+                    isOpen: true
+                }, options);
+
+                if (batchSales) {
+                    sales.push(...batchSales);
+                }
+            }
         }
+        
     }
 
     if (inventories) {
@@ -407,10 +427,13 @@ async function getAll(admin, args = {}, defaultOptions) {
                     saleQuantity: itemSale?.quantity,
                     saleDate: itemSale?.block_timestamp
                 });
-            } else {
+            } 
+            else if (isMarketplaceSearch) {	
                 if (inventory.address !== inventory.originAddress){
                     finalInventory.push(inventory);
-                }
+                }	
+            } else {
+                finalInventory.push(inventory);
             }
         });
     }
