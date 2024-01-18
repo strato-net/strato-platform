@@ -126,7 +126,9 @@ abstract contract Asset is Utils {
 
     function close() internal {
         sale = address(0);
-        invalid = true;
+        if (address(this) != originAddress){
+            invalid = true;
+        }
     }
 
     function _transfer(address _newOwner, uint _quantity, bool _isUserTransfer, uint _transferNumber) internal virtual {

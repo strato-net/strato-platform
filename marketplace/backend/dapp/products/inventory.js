@@ -430,7 +430,7 @@ async function getAll(admin, args = {}, defaultOptions) {
                 });
             } else if (isMarketplaceSearch && inventory.address !== inventory.originAddress && !inventory.invalid) {
                 finalInventory.push(inventory);
-            } else if (inventory.invalid === false) {
+            } else if (!inventory.invalid && !isMarketplaceSearch) {
                 finalInventory.push(inventory);
             }
         });
