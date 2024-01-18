@@ -408,7 +408,7 @@ async function getAll(admin, args = {}, defaultOptions) {
                     saleDate: itemSale?.block_timestamp
                 });
             }
-            else if (inventory.address !== inventory.originAddress) {
+            else if (inventory.address !== inventory.originAddress && isMarketplaceSearch) {
                 finalInventory.push(inventory);
             }
         });
