@@ -160,12 +160,6 @@ getVar (Constant (SReference addressedPath@(AccountPath addr key))) = do
     MS.BDefault -> do
       typeHint <- getValueType addressedPath
       case typeHint of
-        {-
-        TStruct name fieldHints -> SStruct name . M.fromList <$> do
-          forM fieldHints $ \(l, _) -> do
-            fieldValue <- getVar . Constant . SReference $ addressedPath `apSnoc` MS.Field l
-            return (BC.unpack l, Constant fieldValue)
-        -}
         TStruct _ _ -> return $ SReference addressedPath
         TComplex -> return $ SReference addressedPath
         _ -> return $ findDefault typeHint

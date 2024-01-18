@@ -882,18 +882,23 @@ getXabiValueType (AccountPath loc path) = do
                 (_, StructTypo {}) -> typeError "non field access to struct" x
                 (_, ContractTypo {}) -> todo "getValueType/contract access" t'
                 (_, EnumTypo {}) -> todo "getValueType/enum acess" t'
+        SVMType.Struct {} -> case x of
+          MS.MapIndex it -> case it of
+            MS.IBool _ -> SVMType.Bool
+            MS.IAccount _ -> SVMType.Account {isPayable = False}
+            MS.INum _ -> SVMType.Int {signed = Just True, bytes = Nothing}
+            MS.IText _ -> SVMType.String {dynamic = Nothing}
+          _ -> typeError "accessing unknown field in struct" x
         t'' -> t''
       loop (ccs, ct) (_ : rs) = \case
         SVMType.Mapping {SVMType.value = t'} -> loop (ccs, ct) rs t'
         SVMType.Array {SVMType.entry = t'} -> loop (ccs, ct) rs t'
-        SVMType.Struct a b -> loop (ccs, ct) rs (SVMType.Struct a b)
+        ss@(SVMType.Struct {}) -> loop (ccs, ct) rs ss
         t -> todo "getXabiValueType/loopnext unsupported type" t
   mType <- getXabiType loc field
-  liftIO $ putStrLn $ ">>>>>>>>>> getXabiValueType: " ++ show (field, mType) -- DEBUG
   case mType of
     Nothing -> todo "getXabiValueType/unknown storage reference" field
     Just v -> return $!! loop (ccs', c') (tail $ MS.toList path) v
-  where
 
 getValueType :: MonadSM m => AccountPath -> m BasicType
 getValueType p = hintFromType =<< getXabiValueType p
