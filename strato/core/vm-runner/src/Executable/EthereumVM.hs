@@ -318,19 +318,21 @@ getUnprocessedKafkaEvents offset = do
 
 -- This function lives on its own thread
 checkQueueAndCommitsSqlDiffsForever :: (MonadLogger m, HasSQL m, HasContext m) => DL.DList VMEvent -> m ()
-checkQueueAndCommitsSqlDiffsForever vmEvents = do
-  context' <- accessEnv
-  let que = _stateDiffQueue context'
-  msg <- liftIO . atomically $ readTQueue que
-  case msg of
-    TXR !txResult -> checkQueueAndCommitsSqlDiffsForever $ vmEvents `DL.snoc` NewTransactionResult txResult
-    SD !stateDiff' -> do
-      commitSqlDiffs stateDiff'
-      checkQueueAndCommitsSqlDiffsForever vmEvents
-    VME !vmes -> checkQueueAndCommitsSqlDiffsForever $ vmEvents `DL.append` DL.fromList vmes
-    Flush -> do
-      void . produceVMEvents $ toList vmEvents
-      checkQueueAndCommitsSqlDiffsForever DL.empty
+checkQueueAndCommitsSqlDiffsForever vmEvents = loop vmEvents
+  where
+    loop acc = do
+      context' <- accessEnv
+      let que = _stateDiffQueue context'
+      msg <- liftIO . atomically $ readTQueue que
+      case msg of
+        TXR !txResult -> loop $ acc `DL.snoc` NewTransactionResult txResult
+        SD !stateDiff' -> do
+          commitSqlDiffs stateDiff'
+          loop acc
+        VME !vmes -> loop $ acc `DL.append` DL.fromList vmes
+        Flush -> do
+          void . produceVMEvents $ toList acc
+          loop DL.empty
 
 deployCommitsSqlDiffs :: Context -> ResourceT (LoggingT IO) ()
 deployCommitsSqlDiffs context' = runSQLM $ runReaderT (checkQueueAndCommitsSqlDiffsForever DL.empty) context'
