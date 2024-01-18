@@ -77,9 +77,6 @@ import qualified Network.Kafka.Protocol as KP
 import Text.Format (format)
 import UnliftIO (race_)
 
--- newtype CertRoot = CertRoot { unCertRoot :: MP.StateRoot }
---   deriving (Eq, Ord, Show)
-
 ethereumVM :: Maybe DebugSettings -> LoggingT IO ()
 ethereumVM d = runResourceT $ do
   ctx <- initContext d
@@ -117,7 +114,6 @@ ethereumVM d = runResourceT $ do
         baggerData <- uncurry EVMCheckpoint <$> Bagger.getCheckpointableState
         checkpointData <- baggerData <$> getContextBestBlockInfo
         withChainroot <- checkpointData . unBlockHashRoot <$> Mod.get Proxy
-        -- withCertroot <- withChainroot . unCertRoot <$> Mod.get Proxy
         setCheckpoint newOffset withChainroot
 
 initializeCheckpointAndBlockSummary ::

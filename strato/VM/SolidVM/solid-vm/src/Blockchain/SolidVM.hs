@@ -1415,12 +1415,6 @@ getIndexType (AccountPath addr p) = do
   let field = MS.getField p
   mType <- getXabiType addr field
   
-  -- DEBUG
-  onTraced $ liftIO $ putStrLn $ "\tgetIndexType p: " ++ show p
-  onTraced $ liftIO $ putStrLn $ "\tgetIndexType field: " ++ show field
-  onTraced $ liftIO $ putStrLn $ "\tmType: " ++ show mType
-  -- END DEBUG
-
   let n' = MS.size p - 1
       loop :: MonadSM m => Int -> SVMType.Type -> m IndexType
       loop 0 t = case t of
@@ -1470,9 +1464,6 @@ expToPath x@(CC.IndexAccess _ parent mIndex) = do
       _ -> expToPath parent
   idxType <- getIndexType parPath
   idxVar <- maybe (typeError "empty index is only valid at type level" x) expToVar mIndex
-  onTraced $ liftIO $ putStrLn $ "  parPath: " ++ show parPath -- DEBUG
-  onTraced $ liftIO $ putStrLn $ "  idxType: " ++ show idxType -- DEBUG
-  onTraced $ liftIO $ putStrLn $ "  idxVar: " ++ show idxVar   -- DEBUG
   apSnoc parPath <$> case idxType of
     MapAccountIndex -> do
       idx <- getAccount idxVar
@@ -2032,7 +2023,6 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
               let toAddress = namedAccountToAccount (fromAddress ^. accountChainId) addr
               res <- callWithResult fromAddress toAddress CC.RawCall Nothing funcName False args'
               case res of
-                -- TODO: call() should return (bool, variadic)... (Constant BBool , Constant a)
                 Just a -> return $ Constant a
                 Nothing -> return $ Constant SNULL
             (SAccount addr _, itemName) -> regularFunctionCall $ Just (return $ Constant $ SContractItem addr itemName)
