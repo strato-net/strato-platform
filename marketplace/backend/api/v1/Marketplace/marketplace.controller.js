@@ -12,7 +12,16 @@ class MarketplaceController {
       const inventories = await dapp.getMarketplaceInventories({ ...query })
 
       const productsWithImageUrl = inventories?.inventoryResults.sort((a, b) => {
-        return b.saleDate.localeCompare(a.saleDate);
+        if (a.saleDate && b.saleDate) {
+          return b.saleDate.localeCompare(a.saleDate); // Sort by saleDate if both exist.
+        } else if (a.saleDate) {
+          return -1; // a has saleDate but b doesn't, so a comes first.
+        } else if (b.saleDate) {
+          return 1; // b has saleDate but a doesn't, so b comes first.
+        } else {
+          // Both a and b don't have saleDate, use block_timestamp.
+          return b.block_timestamp.localeCompare(a.block_timestamp);
+        }
       });
       rest.response.status200(res, {productsWithImageUrl: productsWithImageUrl, inventoryCount: inventories?.inventoryCount})
 
