@@ -129,6 +129,7 @@ export const Order = {
   createSaleOrder: '/sale',
   cancelSaleOrder: '/sale/cancel',
   executeSale: '/closeSale',
+  updateOrderComment: '/updateComment'
 }
 
 export const OrderLine = {

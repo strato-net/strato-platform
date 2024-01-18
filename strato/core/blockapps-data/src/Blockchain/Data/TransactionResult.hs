@@ -20,6 +20,7 @@ import Blockchain.SolidVM.Model
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq
+import Data.Binary
 import Data.Swagger hiding (Format, format)
 import qualified Database.Persist.Postgresql as SQL
 import qualified Generic.Random as GR
@@ -76,6 +77,8 @@ instance Format TransactionResult where
       ++ show transactionResultKind
 
 instance NFData TransactionResult
+
+instance Binary TransactionResult
 
 instance Arbitrary TransactionResult where
   arbitrary = GR.genericArbitrary GR.uniform

@@ -2,7 +2,8 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 module Control.Monad.Composable.Base (
-  AccessibleEnv(..)
+  AccessibleEnv(..),
+  accessEnvVar
   ) where
 
 import Control.Monad.Reader (MonadTrans, lift)
@@ -17,3 +18,9 @@ instance {-# OVERLAPPING #-} (Monad m) => AccessibleEnv a (ReaderT a m) where
 
 instance (Monad m, AccessibleEnv a m, MonadTrans t) => AccessibleEnv a (t m) where
   accessEnv = lift accessEnv
+
+accessEnvVar :: (Monad m, AccessibleEnv a m) =>
+                (a -> b) -> m b
+accessEnvVar f = do
+  env <- accessEnv
+  return $ f env

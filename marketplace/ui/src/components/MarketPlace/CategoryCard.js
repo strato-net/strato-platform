@@ -1,4 +1,4 @@
-import { Typography} from "antd";
+import { Typography } from "antd";
 import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
 import { useCategoryState } from "../../contexts/category";
@@ -20,7 +20,7 @@ const CategoryCard = () => {
     Images["Art-category"],
     Images["membership_card"],
   ];
-  
+
 
   return (
     <>
@@ -35,7 +35,7 @@ const CategoryCard = () => {
               key={index}
               className=" w-[162px] md:w-[210px] 2xl:w-[248px] h-[160px] md:h-[180px] 2xl:h-[200px] border border-tertiaryB shadow-category rounded-lg cursor-pointer"
               onClick={() => {
-                navigate(`${naviroute.replace(":category", category.name)}`);
+                navigate(`${naviroute}?category=${category.name}`);
                 window.LOQ.push(['ready', async LO => {
                   // Track an event
                   await LO.$internal.ready('events')
@@ -46,7 +46,7 @@ const CategoryCard = () => {
                     event: `${category.name}_filter_homepage`
                   },
                 });
-                }
+              }
               }
             >
               <div className="flex flex-col">
@@ -56,12 +56,12 @@ const CategoryCard = () => {
                   preview={false}
                 />
                 <div className="py-2 xl:py-3 flex justify-center md:justify-start ">
-                <Text type="secondary" className="text-lg md:text-xl lg:text-2xl !text-primaryB font-semibold" >
-                  <span className="p-3 font-sans">
-                  {category.name}
+                  <Text type="secondary" className="text-lg md:text-xl lg:text-2xl !text-primaryB font-semibold" >
+                    <span className="p-3 font-sans">
+                      {category.name}
                     </span>
-                </Text>
-                  </div>
+                  </Text>
+                </div>
               </div>
             </div>
           );

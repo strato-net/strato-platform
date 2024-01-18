@@ -23,6 +23,7 @@ const UpdateInventoryModal = ({
   handleCancel,
   debouncedSearchTerm,
   inventoryToUpdate,
+  categoryName
 }) => {
   const schema = getSchema();
   const [formState, setFormState] = useState(null);
@@ -70,7 +71,7 @@ const UpdateInventoryModal = ({
 
   useEffect(() => {
     if (inventoryToUpdate) {
-      const data = inventoryToUpdate.inventory.data ? JSON.parse(inventoryToUpdate.inventory.data) : {};
+      const data = inventoryToUpdate.inventory.data ? inventoryToUpdate.inventory.data : {};
       let nextState = {
         category: {
           name: getCategory(),
@@ -110,7 +111,7 @@ const UpdateInventoryModal = ({
     let isDone = await actions.updateInventory(dispatch, body);
 
     if (isDone) {
-      await actions.fetchInventory(dispatch, 10, 0, debouncedSearchTerm, undefined);
+      await actions.fetchInventory(dispatch, 10, 0, debouncedSearchTerm, categoryName);
       handleCancel();
     }
   };

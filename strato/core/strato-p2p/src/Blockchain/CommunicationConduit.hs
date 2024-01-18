@@ -83,9 +83,9 @@ blockstanbulVersion :: Int
 blockstanbulVersion = 1
 
 mkEthP2PEventSource ::
-  ( MonadResource m,
-    MonadLogger m,
-    MonadUnliftIO m
+  ( MonadResource m
+  ,  MonadLogger m
+  ,  MonadUnliftIO m
   ) =>
   ConduitM () B.ByteString m () ->
   ConduitM () P2pEvent m () ->
@@ -98,17 +98,26 @@ mkEthP2PEventSource peerSourceConduit seqEventSource peerStr inCtx scp = do
   eventsourcethreadid <- myThreadId
   recvWatchdog <- mkWatchdog eventsourcethreadid $ fromIntegral flags_connectionTimeout
   merged <- mergeSourcesByForce
-              ( [ peerSourceConduit
+              ( [ ( ("peerSourceConduit" :: String)
+                  , peerSourceConduit
                     .| ethDecrypt inCtx
                     .| CL.iterM (recordTraffic Inbound)
                     .| bytesToMessages
                     .| CL.iterM (displayMessage Inbound peerStr)
                     .| CL.map MsgEvt
-                    .| CL.iterM (const $ petWatchdog recvWatchdog),
-                  seqEventSource
-                    .| CL.map NewSeqEvent,
-                  canarySource .| CL.map absurd,
-                  timerSource
+                    .| CL.iterM (const $ petWatchdog recvWatchdog)
+                  )
+                , ( ("seqEventSource" :: String)
+                  , seqEventSource
+                    .| CL.map NewSeqEvent
+                  )
+                , ( ("canarySource" :: String)
+                  , canarySource
+                    .| CL.map absurd
+                  )
+                , ( ("timerSource" :: String)
+                  , timerSource
+                  )
                 ]
               )
               4096 -- 🙏
@@ -117,10 +126,11 @@ mkEthP2PEventSource peerSourceConduit seqEventSource peerStr inCtx scp = do
     merged
       .| CL.iterM recordEvent
 
-mkCanarySource :: (MonadLogger m, MonadUnliftIO m, MonadResource m) => m (ConduitM () Void m ())
+mkCanarySource :: ( MonadLogger m
+                  , MonadUnliftIO m
+                  )
+               => m (ConduitM () Void m ())
 mkCanarySource = do
-  ender <- toIO $ $logInfoS "canary/exit" "" >> killCanary
-  void . register $ ender
   q <- atomically newTQueue
   $logInfoS "canary/enter" ""
   addCanary

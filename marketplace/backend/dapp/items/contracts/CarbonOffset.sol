@@ -1,7 +1,7 @@
 pragma es6;
 pragma strict;
 
-import <9cd03ab3290710caa85563a82a1c745772901650>;
+import <8f8d4cef7232db7001bae657db85eb4325ee2f3d>;
 
 /// @title A representation of CarbonOffset assets
 contract CarbonOffset is Mintable {

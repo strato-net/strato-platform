@@ -127,7 +127,7 @@ const ProcessingOrder = () => {
     let orderTotal = 0; 
     for (let i = 0; i < storedConfirmList.length; i++) {
       let orderItem = storedConfirmList[i];
-      let itemName = orderItem.item.name.replace(/%20/g, ' '); 
+      let itemName = decodeURIComponent(orderItem.item.name);
       let itemPrice = parseFloat(orderItem.unitPrice).toFixed(2); 
       let itemQty = orderItem.qty;
       let itemTotal = (itemPrice * itemQty).toFixed(2); 

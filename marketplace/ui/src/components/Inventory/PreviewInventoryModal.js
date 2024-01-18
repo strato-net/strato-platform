@@ -29,7 +29,7 @@ const PreviewInventoryModal = ({ open, handleCancel, inventory, category }) => {
   };
 
   const Description = ({ item }) => {
-    const itemData = JSON.parse(item.data);
+    const itemData = item.data;
 
     switch (getCategory()) {
       case "Art":

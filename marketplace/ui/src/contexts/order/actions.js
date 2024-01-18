@@ -36,13 +36,16 @@ const actionDescriptors = {
   updateOrderStatusFailed: "update_order_status_failed",
   createSaleOrder: "create_sale",
   createSaleOrderSuccessful: "create_sale_successful",
-  createSaleOrderFailed: "create_sale_failed",  
+  createSaleOrderFailed: "create_sale_failed",
   cancelSale: "cancel_sale",
   cancelSaleSuccessful: "cancel_sale_successful",
   cancelSaleFailed: "cancel_sale_failed",
   executeSale: "execute_sale",
   executeSaleSuccessful: "execute_sale_successful",
   executeSaleFailed: "execute_sale_failed",
+  updateOrderComment: "update_order_comment",
+  updateOrderCommentSuccessful: "update_order_comment_successful",
+  updateOrderCommentFailed: "update_order_comment_failed",
 };
 
 const actions = {
@@ -77,10 +80,10 @@ const actions = {
         });
         actions.setMessage(dispatch, "Order created successfully", true);
         return true;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.createOrderFailed, 
-          error: "Unauthorized while creating Order" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.createOrderFailed,
+          error: "Unauthorized while creating Order"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -123,10 +126,10 @@ const actions = {
         });
         actions.setMessage(dispatch, "Payment created successfully", true);
         return body.data;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.createPaymentFailed, 
-          error: "Unauthorized while creating Order" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.createPaymentFailed,
+          error: "Unauthorized while creating Order"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -169,10 +172,10 @@ const actions = {
         });
         actions.setMessage(dispatch, "Item created successfully", true);
         return true;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.createOrderLineItemFailed, 
-          error: "Unauthorized while creating Item" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.createOrderLineItemFailed,
+          error: "Unauthorized while creating Item"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -209,17 +212,17 @@ const actions = {
         });
 
         return body.data;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchOrderDetailsFailed, 
-          error: "Unauthorized while fetching Order" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchOrderDetailsFailed,
+          error: "Unauthorized while fetching Order"
         });
         window.location.href = body.error.loginUrl;
       }
 
       dispatch({
         type: actionDescriptors.fetchOrderDetailsFailed,
-        error:body.error,
+        error: body.error,
       });
       return null;
     } catch (err) {
@@ -247,10 +250,10 @@ const actions = {
         });
 
         return true;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchOrderLineItemDetailsFailed, 
-          error: "Unauthorized while fetching Item" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchOrderLineItemDetailsFailed,
+          error: "Unauthorized while fetching Item"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -268,7 +271,7 @@ const actions = {
     }
   },
 
-  fetchOrder: async (dispatch, limit, offset, commonName, selectedDate, filter, order) => {
+  fetchOrder: async (dispatch, limit, offset, commonName, selectedDate, filter, order, search) => {
     dispatch({ type: actionDescriptors.fetchOrder });
 
     let query = "";
@@ -278,6 +281,14 @@ const actions = {
     }
     if (filter) {
       query = filter !== 0 ? query.concat(`&status=${filter}`) : query;
+    }
+    if (search) {
+      const searchValue = isNaN(search) ? search : parseInt(search);
+      if (!isNaN(searchValue)) {
+        query = search ? query.concat(`&orderId=${searchValue}`) : query;
+      } else {
+        query = search ? query.concat(`&queryValue=${searchValue}&queryFields=sellersCommonName`) : query;
+      }
     }
 
     const encodedCommonName = encodeURIComponent(commonName);
@@ -297,10 +308,10 @@ const actions = {
           payload: body.data,
         });
         return;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchOrderFailed, 
-          error: "Unauthorized while fetching order" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchOrderFailed,
+          error: "Unauthorized while fetching order"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -310,7 +321,7 @@ const actions = {
     }
   },
 
-  fetchOrderSold: async (dispatch, limit, offset, commonName, selectedDate, filter, order) => {
+  fetchOrderSold: async (dispatch, limit, offset, commonName, selectedDate, filter, order, search) => {
     dispatch({ type: actionDescriptors.fetchOrderSold });
     const encodedCommonName = encodeURIComponent(commonName);
     let query = "";
@@ -320,6 +331,15 @@ const actions = {
     }
     if (filter) {
       query = filter !== 0 ? query.concat(`&status=${filter}`) : query;
+    }
+
+    if (search) {
+      const searchValue = isNaN(search) ? search : parseInt(search);
+      if (!isNaN(searchValue)) {
+        query = search ? query.concat(`&orderId=${searchValue}`) : query;
+      } else {
+        query = search ? query.concat(`&queryValue=${searchValue}&queryFields=purchasersCommonName`) : query;
+      }
     }
 
     try {
@@ -339,10 +359,10 @@ const actions = {
         });
         return;
       }
-      else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchOrderSoldFailed, 
-          error: "Unauthorized while fetching order sold" 
+      else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchOrderSoldFailed,
+          error: "Unauthorized while fetching order sold"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -381,10 +401,10 @@ const actions = {
         });
         actions.setMessage(dispatch, "Order has been updated", true);
         return true;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.updateBuyerDetailsFailed, 
-          error: "Unauthorized while updating Order" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.updateBuyerDetailsFailed,
+          error: "Unauthorized while updating Order"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -427,10 +447,10 @@ const actions = {
         });
         actions.setMessage(dispatch, "Order has been updated", true);
         return true;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.updateSellerDetailsFailed, 
-          error: "Unauthorized while updating Order" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.updateSellerDetailsFailed,
+          error: "Unauthorized while updating Order"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -439,7 +459,7 @@ const actions = {
         type: actionDescriptors.updateSellerDetailsFailed,
         error: body.error,
       });
-      actions.setMessage(dispatch,body.error);
+      actions.setMessage(dispatch, body.error);
       return false;
     } catch (err) {
       dispatch({
@@ -451,8 +471,8 @@ const actions = {
   },
 
   executeSale: async (dispatch, payload) => {
-    dispatch ({ type: actionDescriptors.executeSale });
-    
+    dispatch({ type: actionDescriptors.executeSale });
+
     try {
       const response = await fetch(`${apiUrl}/order/closeSale`, {
         method: HTTP_METHODS.POST,
@@ -471,28 +491,68 @@ const actions = {
           type: actionDescriptors.executeSaleSuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, "Sale executed successfully", true);
+        actions.setMessage(dispatch, "Order fulfilled successfully", true);
         return body.data;
       }
 
       dispatch({
         type: actionDescriptors.executeSaleFailed,
-        error: "Error while executing sale",
+        error: "Error while fulfilling order",
       });
-      actions.setMessage(dispatch, "Error while executing sale");
+      actions.setMessage(dispatch, "Error while fulfilling order");
       return false;
     } catch (err) {
       dispatch({
         type: actionDescriptors.executeSaleFailed,
-        error: "Error while executing Sale",
+        error: "Error while fulfilling order",
       });
-      actions.setMessage(dispatch, "Error while executing sale");
+      actions.setMessage(dispatch, "Error while fulfilling order");
+    }
+  },
+
+  updateOrderComment: async (dispatch, payload) => {
+    dispatch({ type: actionDescriptors.updateOrderComment });
+
+    try {
+      const response = await fetch(`${apiUrl}/order/updateComment`, {
+        method: HTTP_METHODS.PUT,
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.updateOrderCommentSuccessful,
+          payload: body.data,
+        });
+        actions.setMessage(dispatch, "Comment updated successfully", true);
+        return body.data;
+      }
+
+      dispatch({
+        type: actionDescriptors.updateOrderCommentFailed,
+        error: "Error while updating comment",
+      });
+      actions.setMessage(dispatch, "Error while updating comment");
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.updateOrderCommentFailed,
+        error: "Error while updating comment",
+      });
+      actions.setMessage(dispatch, "Error while updating comment");
     }
   },
 
   cancelSale: async (dispatch, payload) => {
-    dispatch ({ type: actionDescriptors.cancelSale });
-    
+    dispatch({ type: actionDescriptors.cancelSale });
+
     try {
       const response = await fetch(`${apiUrl}/order/sale/cancel`, {
         method: HTTP_METHODS.POST,
@@ -531,8 +591,8 @@ const actions = {
   },
 
   createSaleOrder: async (dispatch, payload) => {
-    dispatch ({ type: actionDescriptors.createSaleOrder });
-    
+    dispatch({ type: actionDescriptors.createSaleOrder });
+
     try {
       const response = await fetch(`${apiUrl}/order/sale`, {
         method: HTTP_METHODS.POST,
@@ -571,8 +631,8 @@ const actions = {
   },
 
   updateOrderStatus: async (dispatch, payload) => {
-    dispatch ({ type: actionDescriptors.createSaleOrder });
-    
+    dispatch({ type: actionDescriptors.createSaleOrder });
+
     try {
       const response = await fetch(`${apiUrl}/order/update/`, {
         method: HTTP_METHODS.PUT,
@@ -604,7 +664,7 @@ const actions = {
     } catch (err) {
       dispatch({
         type: actionDescriptors.updateOrderStatusFailed,
-        error:"Error While Updating Order Status",
+        error: "Error While Updating Order Status",
       });
       actions.setMessage(dispatch, "Error While Updating Order Status");
     }

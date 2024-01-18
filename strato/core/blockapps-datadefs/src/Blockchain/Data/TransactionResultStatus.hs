@@ -8,6 +8,7 @@ module Blockchain.Data.TransactionResultStatus where
 
 import Control.DeepSeq
 import Data.Aeson hiding (Success)
+import Data.Binary
 import Database.Persist.TH
 import GHC.Generics
 import qualified Generic.Random as GR
@@ -46,6 +47,8 @@ derivePersistField "TransactionFailureType"
 instance Arbitrary TransactionResultStatus where
   arbitrary = GR.genericArbitrary GR.uniform
 
+instance Binary TransactionResultStatus
+
 instance FromJSON TransactionResultStatus where
   parseJSON (String "success") = pure Success
   parseJSON x = flip (withObject "Failure") x $ \v ->
@@ -68,6 +71,8 @@ instance ToJSON TransactionResultStatus where
         ++ maybe [] (pure . ("expectation" .=)) trfExpectation
         ++ maybe [] (pure . ("reality" .=)) trfReality
         ++ maybe [] (pure . ("details" .=)) trfDetails
+
+instance Binary TransactionFailureType
 
 instance FromJSON TransactionFailureType
 
