@@ -155,7 +155,37 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                     </Button>
                 </div>
                 </>
-                : null
+                : 
+            <>
+                <div className='flex gap-4 mt-1'>
+                    <Button
+                        id={`${topSellingProduct.name.replace(/ /g, "_")}-contact-now`}
+                        type='primary'
+                        href={`mailto:sales@blockapps.net`}
+                        className='flex-1 h-9 !bg-[#13188A] !text-white'
+                        onClick={() => {
+                            window.LOQ.push(['ready', async LO => {
+                                await LO.$internal.ready('events')
+                                LO.events.track('Contact Sales (from Product Details)', {
+                                  product: topSellingProduct?.name,
+                                  category: topSellingProduct?.category,
+                                  productId: topSellingProduct?.productId
+                                })
+                              }])
+                              TagManager.dataLayer({
+                                dataLayer: {
+                                  event: 'contact_sales_from_product_details',
+                                  product_name: topSellingProduct?.name,
+                                  category: topSellingProduct?.category,
+                                  productId: topSellingProduct?.productId
+                                },
+                              });
+                        }}
+                    >
+                        Contact To Buy
+                    </Button>
+                </div>
+                </>
             }
         </div>
     )
