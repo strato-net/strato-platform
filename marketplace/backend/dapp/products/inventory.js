@@ -410,6 +410,8 @@ async function getAll(admin, args = {}, defaultOptions) {
             }
             else if (inventory.address !== inventory.originAddress && isMarketplaceSearch) {
                 finalInventory.push(inventory);
+            } else if (!isMarketplaceSearch) {
+                finalInventory.push(inventory);
             }
         });
     }
