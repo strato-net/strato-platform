@@ -141,9 +141,13 @@ async function get(user, args, options) {
         return undefined;
     }
 
+    let updatedSale = ({
+        ...sale,
+        price: parseFloat(sale.price / 100).toFixed(2)
+    })
 
     return marshalOut({
-        ...sale,
+        ...updatedSale,
     });
 }
 
@@ -162,7 +166,15 @@ async function getAll(admin, args = {}, defaultOptions) {
         sales = await searchAllWithQueryArgs(contractName, { address: saleAddresses, isOpen: isOpen, ...restArgs }, options, admin);
     }
 
-    return sales ? sales.map((sale) => marshalOut(sale)) : undefined;
+    let updatedSales;
+    if (sales) {
+        updatedSales = sales.map((sale) => ({
+            ...sale,
+            price: parseFloat(sale.price / 100).toFixed(2)
+        }))
+    }
+
+    return updatedSales ? updatedSales.map((sale) => marshalOut(sale)) : undefined;
 }
 
 /**

@@ -35,7 +35,7 @@ class InventoryController {
 
       const inventories = await dapp.getInventories({ ...query })
       const inventoriesWithImageUrl = inventories?.inventories
-      rest.response.status200(res, {inventoriesWithImageUrl:inventoriesWithImageUrl, count: inventories.inventoryCount})
+      rest.response.status200(res, { inventoriesWithImageUrl: inventoriesWithImageUrl, count: inventories.inventoryCount })
 
       return next()
     } catch (e) {
@@ -247,7 +247,7 @@ class InventoryController {
       paymentProviders: Joi.array().min(1).items(
         Joi.string().min(0).required(),
       ).required(),
-      price: Joi.number().integer().greater(0).required(),
+      price: Joi.number().greater(0).required(),
       quantity: Joi.number().integer().greater(0).optional(),
     });
 
@@ -315,7 +315,7 @@ class InventoryController {
       paymentProviders: Joi.array().min(1).items(
         Joi.string().min(0).required(),
       ).optional(),
-      price: Joi.number().integer().greater(0).optional(),
+      price: Joi.number().greater(0).optional(),
       quantity: Joi.number().integer().greater(0).optional(),
     });
 

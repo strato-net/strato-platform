@@ -34,7 +34,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
   const [transferModalOpen, setTransferModalOpen] = useState(false);
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
-  
+
   const itemData = inventory.data;
   const showModalEdit = () => {
     hide();
@@ -110,7 +110,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
   const getCategory = () => {
     const parts = inventory.contract_name.split('-');
     const contractName = parts[parts.length - 1];
-   
+
     return allSubcategories?.find(c => c.contract === contractName)?.name
   };
 
@@ -251,73 +251,73 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
     <div className=" p-3 md:p-[18px] border border-[#BABABA] md:border-[#E9E9E9] rounded-lg sm:w-[343px] md:w-full  ">
       <div className="bg-[#F2F2F9] rounded-md px-[14px] flex justify-between items-center pb-[13px] pt-2 w-full">
         <div>
-        <p className="text-lg lg:text-xl font-semibold text-[#202020] cursor-default" onClick={callDetailPage}>{inventory?.name || "N/A"}</p>
-        <Typography className="pt-1">{`(${getCategory()})`}</Typography>
+          <p className="text-lg lg:text-xl font-semibold text-[#202020] cursor-default" onClick={callDetailPage}>{inventory?.name || "N/A"}</p>
+          <Typography className="pt-1">{`(${getCategory()})`}</Typography>
         </div>
         <div className=" pt-[5px]  flex">
-          
+
           <div className="flex  items-center">
-          <Button type="link" className="text-[#13188A] font-semibold text-base h-6 mb-2" onClick={callDetailPage}>Preview</Button>
+            <Button type="link" className="text-[#13188A] font-semibold text-base h-6 mb-2" onClick={callDetailPage}>Preview</Button>
 
-          {((itemData.isMint === "True" && inventory.quantity === 0) || inventory.quantity > 0) &&
-          
-            <Popover
-            placement="bottomLeft"
-            open={openPop}
-            className=""
-            id="sideMenu"
-            onOpenChange={handleOpenChange}
-            title={
-              <div className="font-medium">
-                {inventory.price ? (<div>
-                  <div
-                    className="flex items-center mt-2 cursor-pointer"
-                    onClick={showListModal}
-                  >
-                    <EditOutlined />
-                    <p className="ml-3">Edit Listing</p>
-                  </div>
-                  <div
-                    className="flex items-center mt-2 cursor-pointer"
-                    onClick={showUnlistModal}
-                  >
-                    <StopOutlined />
-                    <p className="ml-3">Unlist</p>
-                  </div>
-                </div>) : paymentProviderAddress ? (<div
-                  className="flex items-center mt-2 cursor-pointer"
-                  onClick={showListModal}
-                >
-                  <DollarOutlined />
-                  <p className="ml-3">List for Sale</p>
-                </div>) : (<div></div>)}
-                {itemData.isMint && itemData.isMint == "True" ? (<div
-                  className="flex items-center mt-2 cursor-pointer"
-                  onClick={showResellModal}
-                >
-                  <PieChartOutlined />
-                  <p className="ml-3">Mint</p>
-                </div>) : (<div></div>)}
+            {((itemData.isMint === "True" && inventory.quantity === 0) || inventory.quantity > 0) &&
 
-                {inventory.quantity && parseInt(inventory.quantity) > 0 && (!inventory.saleAddress || (inventory.saleAddress && parseInt(inventory.saleQuantity) > 0)) ? (
-                  <div
+              <Popover
+                placement="bottomLeft"
+                open={openPop}
+                className=""
+                id="sideMenu"
+                onOpenChange={handleOpenChange}
+                title={
+                  <div className="font-medium">
+                    {inventory.price ? (<div>
+                      <div
+                        className="flex items-center mt-2 cursor-pointer"
+                        onClick={showListModal}
+                      >
+                        <EditOutlined />
+                        <p className="ml-3">Edit Listing</p>
+                      </div>
+                      <div
+                        className="flex items-center mt-2 cursor-pointer"
+                        onClick={showUnlistModal}
+                      >
+                        <StopOutlined />
+                        <p className="ml-3">Unlist</p>
+                      </div>
+                    </div>) : paymentProviderAddress ? (<div
                       className="flex items-center mt-2 cursor-pointer"
-                      onClick={showTransferModal}
-                  >
-                      <SwapOutlined />
-                      <p className="ml-3">Transfer</p>
-                  </div>
-                ) : (
-                  <div></div>
-              )}
+                      onClick={showListModal}
+                    >
+                      <DollarOutlined />
+                      <p className="ml-3">List for Sale</p>
+                    </div>) : (<div></div>)}
+                    {itemData.isMint && itemData.isMint == "True" ? (<div
+                      className="flex items-center mt-2 cursor-pointer"
+                      onClick={showResellModal}
+                    >
+                      <PieChartOutlined />
+                      <p className="ml-3">Mint</p>
+                    </div>) : (<div></div>)}
 
-              </div>
+                    {inventory.quantity && parseInt(inventory.quantity) > 0 && (!inventory.saleAddress || (inventory.saleAddress && parseInt(inventory.saleQuantity) > 0)) ? (
+                      <div
+                        className="flex items-center mt-2 cursor-pointer"
+                        onClick={showTransferModal}
+                      >
+                        <SwapOutlined />
+                        <p className="ml-3">Transfer</p>
+                      </div>
+                    ) : (
+                      <div></div>
+                    )}
+
+                  </div>
+                }
+                trigger="click"
+              >
+                <MoreOutlined />
+              </Popover>
             }
-            trigger="click"
-          >
-            <MoreOutlined />
-          </Popover>
-          }
           </div>
         </div>
       </div>
@@ -330,33 +330,33 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
               inventory.images && inventory.images.length > 0
                 ? inventory.images[0]
                 : image_placeholder}
-                
+
           />
         </div>
 
 
         <div className="pt-[7px] lg:hidden flex items-center gap-[5px]">
-        {inventory.price ?
-          <div className="flex items-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
-            <div className="w-[7px] h-[7px] rounded-full bg-[#119B2D]"></div>
-            <p className="text-[#4D4D4D] text-[8px]">Published</p>
-          </div>
-          :
-          (inventory.data.isMint && inventory.data.isMint === "False" && inventory.quantity === 0) || (!inventory.data.isMint && inventory.quantity === 0)?
-          <div className="flex items-center gap-2 bg-[#FFA50029] p-[6px] rounded-md">
-            <div className="w-[7px] h-[7px] rounded-full bg-[#FFA500]"></div>
-            <p className="text-[#4D4D4D] text-[8px]">Sold Out</p>
-          </div>
-            :  
+          {inventory.price ?
             <div className="flex items-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
-              <div className="w-[7px] h-[7px] rounded-full bg-[#ff4d4f]"></div>
-              <p className="text-[#4D4D4D] text-[8px]">Unpublished</p>
+              <div className="w-[7px] h-[7px] rounded-full bg-[#119B2D]"></div>
+              <p className="text-[#4D4D4D] text-[8px]">Published</p>
             </div>
+            :
+            (inventory.data.isMint && inventory.data.isMint === "False" && inventory.quantity === 0) || (!inventory.data.isMint && inventory.quantity === 0) ?
+              <div className="flex items-center gap-2 bg-[#FFA50029] p-[6px] rounded-md">
+                <div className="w-[7px] h-[7px] rounded-full bg-[#FFA500]"></div>
+                <p className="text-[#4D4D4D] text-[8px]">Sold Out</p>
+              </div>
+              :
+              <div className="flex items-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
+                <div className="w-[7px] h-[7px] rounded-full bg-[#ff4d4f]"></div>
+                <p className="text-[#4D4D4D] text-[8px]">Unpublished</p>
+              </div>
           }
         </div>
 
 
-       
+
         <div className="flex flex-col gap-4 px-[18px] py-4 border border-[#E9E9E9] rounded-md w-full ">
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Sub Category</p>
@@ -370,7 +370,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
           </div>
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Price</p>
-            <p className="text-[#202020] font-semibold">{inventory?.price || "N/A"}</p>
+            <p className="text-[#202020] font-semibold">{inventory.price ? `$ ${inventory?.price}` : "N/A"}</p>
           </div>
 
         </div>
@@ -383,11 +383,11 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
             <p className="text-[#4D4D4D] text-xs"> Published </p>
           </div>
           :
-          (inventory.data.isMint && inventory.data.isMint === "False" && inventory.quantity === 0) || (!inventory.data.isMint && inventory.quantity === 0)?
-          <div className="pt-[7px] hidden lg:flex items-center gap-[5px] bg-[#FFA50029] p-[6px] rounded-md">
-            <div className="w-[10px] h-[10px] rounded-full bg-[#FFA500]"></div>
-            <p className="text-[#4D4D4D] text-xs"> Sold Out </p>
-          </div>
+          (inventory.data.isMint && inventory.data.isMint === "False" && inventory.quantity === 0) || (!inventory.data.isMint && inventory.quantity === 0) ?
+            <div className="pt-[7px] hidden lg:flex items-center gap-[5px] bg-[#FFA50029] p-[6px] rounded-md">
+              <div className="w-[10px] h-[10px] rounded-full bg-[#FFA500]"></div>
+              <p className="text-[#4D4D4D] text-xs"> Sold Out </p>
+            </div>
             :
             <div className="pt-[7px] hidden lg:flex items-center gap-[5px] bg-[#1548C329] p-[6px] rounded-md">
               <div className="w-[10px] h-[10px] rounded-full bg-[#ff4d4f]"></div>
@@ -395,7 +395,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
             </div>
         }
 
-       
+
       </div>
 
       {/* <div className="flex" id={id}>
@@ -592,7 +592,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
           handleCancel={handleResellModalClose}
           inventory={inventory}
           categoryName={category}
-          
+
         />
       )}
       {transferModalOpen && (

@@ -172,8 +172,13 @@ async function get(user, args, options) {
     return undefined;
   }
 
-  return marshalOut({
+  let updatedOrder = ({
     ...order,
+    totalPrice: parseFloat(order.totalPrice / 100).toFixed(2)
+  })
+
+  return marshalOut({
+    ...updatedOrder,
   });
 }
 
@@ -197,7 +202,15 @@ async function getAll(admin, args = {}, options) {
     admin
   );
 
-  return saleOrders ? { orders: saleOrders.map((order) => marshalOut(order)), total: count[0].count } : undefined;
+  let updatedSaleOrders;
+  if (saleOrders) {
+    updatedSaleOrders = saleOrders.map((order) => ({
+        ...order,
+        totalPrice: parseFloat(order.totalPrice / 100).toFixed(2)
+    }))
+}
+
+  return updatedSaleOrders ? { orders: updatedSaleOrders.map((order) => marshalOut(order)), total: count[0].count } : undefined;
 }
 
 /**
