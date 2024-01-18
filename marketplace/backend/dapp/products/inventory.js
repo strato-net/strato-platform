@@ -418,7 +418,8 @@ async function getAll(admin, args = {}, defaultOptions) {
 
     if (inventories) {
         inventories.forEach(inventory => {
-            const itemSale = sales.find(sale => sale.assetToBeSold == inventory.address && sale.isOpen);
+            const itemSale = sales.find(sale => sale.assetToBeSold === inventory.address && sale.isOpen);
+    
             if (itemSale) {
                 finalInventory.push({
                     ...inventory,
@@ -427,12 +428,9 @@ async function getAll(admin, args = {}, defaultOptions) {
                     saleQuantity: itemSale?.quantity,
                     saleDate: itemSale?.block_timestamp
                 });
-            } 
-            else if (isMarketplaceSearch) {	
-                if (inventory.address !== inventory.originAddress){
-                    finalInventory.push(inventory);
-                }	
-            } else {
+            } else if (isMarketplaceSearch && inventory.address !== inventory.originAddress && !inventory.invalid) {
+                finalInventory.push(inventory);
+            } else if (inventory.invalid === false) {
                 finalInventory.push(inventory);
             }
         });

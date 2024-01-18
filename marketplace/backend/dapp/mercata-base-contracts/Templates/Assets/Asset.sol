@@ -17,7 +17,8 @@ abstract contract Asset is Utils {
     uint public createdDate;
     uint public quantity;
     uint public itemNumber;
-
+    bool public invalid;
+    
     address public sale;
 
     event OwnershipTransfer(
@@ -61,6 +62,7 @@ abstract contract Asset is Utils {
         files = _files;
         createdDate = _createdDate;
         quantity = _quantity;
+        invalid = false;
         try {
             assert(Asset(msg.sender).assetMagicNumber() == assetMagicNumber);
             originAddress = Asset(msg.sender).originAddress();
@@ -124,6 +126,7 @@ abstract contract Asset is Utils {
 
     function close() internal {
         sale = address(0);
+        invalid = true;
     }
 
     function _transfer(address _newOwner, uint _quantity, bool _isUserTransfer, uint _transferNumber) internal virtual {
