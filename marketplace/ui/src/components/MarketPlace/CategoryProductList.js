@@ -130,7 +130,7 @@ const CategoryProductList = ({ user }) => {
         maxPrice,
         searchQueryValue
       );
-    } else {
+    } else if (hasChecked && isAuthenticated) {
       marketplaceActions.fetchMarketplaceLoggedIn(
         marketplaceDispatch,
         arrayToStr(selectedCategories),
