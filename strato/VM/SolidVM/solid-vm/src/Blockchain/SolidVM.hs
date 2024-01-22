@@ -839,6 +839,15 @@ argsToValsModifiers ctract md args =
                 let tp = expressionType v
                 v' <- eval32 tp v
                 return $ (k, Constant v')
+          SVMType.Struct _ def -> do
+            let ls = M.toList mp :: [(SolidString, CC.Expression)]
+            m <- mapM go ls
+            return $ SStruct def (M.fromList m)
+            where
+              go (k, v) = do
+                let tp = expressionType v
+                v' <- eval32 tp v
+                return $ (k, Constant v')
           (SVMType.Mapping _ keyType valueType) -> do
             m <- mapM go $ M.toList mp
             return $ SMap valueType $ M.fromList m
@@ -905,6 +914,15 @@ argsToVals ctract fn args = case args of
             let ls = M.toList mp :: [(SolidString, CC.Expression)]
             m <- mapM go ls
             return $ SStruct l $ M.fromList m
+            where
+              go (k, v) = do
+                let tp = expressionType v
+                v' <- eval32 tp v
+                return $ (k, Constant v')
+          SVMType.Struct _ def -> do
+            let ls = M.toList mp :: [(SolidString, CC.Expression)]
+            m <- mapM go ls
+            return $ SStruct def (M.fromList m)
             where
               go (k, v) = do
                 let tp = expressionType v
