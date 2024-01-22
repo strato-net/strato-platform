@@ -17,7 +17,21 @@ so that they could be properly moved to their respective version's subsection.
 ## [Unreleased]
 
 ### Added
-- Debug log flags: API_DEBUG_LOG, SLIPSTREAM_DEBUG_LOG, VM_DEBUG_LOG, API_DEBUG_LOG, FULL_DEBUG_LOG
+- Custom `Show` instances for `CodeCollection`, `Function`, `Contract` data types
+
+### Changed 
+- When a transaction fails, the `<failed>` message blinks :^)
+
+### Fixed
+- Mappings within a struct within a `(type => Struct)` mapping can be accessed
+- Constructor arguments are correctly passed to grandparent+ constructors from a base contract
+
+### Removed
+
+## [11.0.0] - 1/22/2024
+
+### Added
+- Debug log flags: `API_DEBUG_LOG`, `SLIPSTREAM_DEBUG_LOG`, `VM_DEBUG_LOG`, `API_DEBUG_LOG`, `FULL_DEBUG_LOG`
 - Improved Slipstream logging
 
 ### Changed
