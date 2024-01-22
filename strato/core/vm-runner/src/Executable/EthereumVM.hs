@@ -259,7 +259,7 @@ setCheckpoint ofs checkpoint = do
 getUnprocessedKafkaEvents :: (MonadLogger m, HasKafka m) => KP.Offset -> m [VmEvent]
 getUnprocessedKafkaEvents offset = do
   $logInfoS "getUnprocessedKafkaEvents" . T.pack $ "Fetching sequenced blockchain events with offset " ++ show offset
-  ret <- execKafka (readSeqVmEvents offset)
+  ret <- readSeqVmEvents offset
   let countLimit =
         if flags_seqEventsBatchSize > 0
           then take flags_seqEventsBatchSize

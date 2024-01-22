@@ -5,8 +5,8 @@ module BlockApps.Tools.DumpKafkaSequencer where
 
 import Blockchain.EthConf
 import Blockchain.Sequencer.Kafka
+import Control.Monad.Composable.Kafka
 import Control.Monad.IO.Class
-import Network.Kafka.Protocol
 
 dumpKafkaSequencer :: Offset -> IO ()
 dumpKafkaSequencer ofs = do
@@ -22,10 +22,7 @@ dumpKafkaSequencer ofs = do
 
 dumpKafkaSequencerVM :: Offset -> IO ()
 dumpKafkaSequencerVM startingBlock = do
-  ret <- runKafkaConfigured "queryStrato" $ doConsume' startingBlock
-  case ret of
-    Left e -> error $ show e
-    Right _ -> return ()
+  runKafkaMConfigured "queryStrato" $ doConsume' startingBlock
   where
     doConsume' offset = do
       seqEvents <- readSeqVmEvents offset

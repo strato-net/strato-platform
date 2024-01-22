@@ -19,6 +19,7 @@ library:
     - ethereum-rlp
     - format
     - generic-arbitrary
+    - kafka-monad
     - lens
     - milena
     - monad-alter
