@@ -390,10 +390,6 @@ async function getAll(admin, args = {}, defaultOptions) {
                 }, options, admin);
         }
 
-        // if (inventories) {
-        //     const assetAddresses = inventories.map((inventory) => inventory.address);
-        //     sales = await saleJs.getAll(admin, { assetAddresses, range, isOpen: true }, options);
-        // }
         if (inventories) {
             sales = [];
             const assetAddresses = inventories.map((inventory) => inventory.address);
