@@ -111,7 +111,7 @@ readUnseqEvents' :: (MonadLogger m, P.MonadMonitor m, HasKafka m, HasGregorConte
 readUnseqEvents' = do
   offset <- getNextIngestedOffset
   $logInfoS "readUnseqEvents'" . T.pack $ "Fetching unseqevents from " ++ show offset
-  ret <- execKafka $ SK.readUnseqEvents offset
+  ret <- SK.readUnseqEvents offset
   let count = length ret
   P.unsafeAddCounter gregorUnseqRead $ fromIntegral count
   return (offset + fromIntegral count, ret)

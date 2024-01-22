@@ -46,13 +46,13 @@ assertTopicCreation = do
   K.updateMetadata seqVmEventsTopicName
   K.updateMetadata seqP2pEventsTopicName
 
-readUnseqEvents :: K.Kafka k => KP.Offset -> k [IngestEvent]
+readUnseqEvents :: HasKafka k => KP.Offset -> k [IngestEvent]
 readUnseqEvents off = do
   events <- readUnseqEventsFromTopic unseqEventsTopicName off
   return events
 
-readUnseqEventsFromTopic :: K.Kafka k => KP.TopicName -> KP.Offset -> k [IngestEvent]
-readUnseqEventsFromTopic = readFromTopicOld'
+readUnseqEventsFromTopic :: HasKafka k => KP.TopicName -> KP.Offset -> k [IngestEvent]
+readUnseqEventsFromTopic = readFromTopic'
 {-# INLINE readUnseqEventsFromTopic #-}
 
 readSeqVmEvents :: HasKafka k => KP.Offset -> k [VmEvent]
