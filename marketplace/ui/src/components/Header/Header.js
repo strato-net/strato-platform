@@ -72,7 +72,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
 
   const navUrls = [
     routes.Marketplace.url,
-    routes.Orders.url.replace(':type','sold'),
+    routes.Orders.url.replace(':type', 'sold'),
     routes.MyStore.url,
     routes.Products.url,
     routes.Events.url,
@@ -162,14 +162,14 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
   }, [user])
 
   const subMenuItems = [
-    {value: "marketplace", path: routes.MarketplaceProductList.url, label: "Marketplace"},
-    {value: "orders", path: routes.Orders.url.replace(':type','sold'), label: "Orders"},
-    {value: "mystore", path: "/mystore", label: "My Store"},
-    user ? {value: "logout", path: "/logout", label: <div><p className="!mb-0">Logout</p><p className="text-xs text-gray">{user?.preferred_username}</p></div>} : null,
+    { value: "marketplace", path: routes.MarketplaceProductList.url, label: "Marketplace" },
+    { value: "orders", path: routes.Orders.url.replace(':type', 'sold'), label: "Orders" },
+    { value: "mystore", path: "/mystore", label: "My Store" },
+    user ? { value: "logout", path: "/logout", label: <div><p className="!mb-0">Logout</p><p className="text-xs text-gray">{user?.preferred_username}</p></div> } : null,
   ]
 
   const handleIntMenuTab = (data) => {
-    data.value == 'logout' ? logout() : data.value == 'orders' ? navigate(routes.Orders.url.replace(':type','sold'), { state: { defaultKey: "Sold" } }) : navigate( data.path)
+    data.value == 'logout' ? logout() : data.value == 'orders' ? navigate(routes.Orders.url.replace(':type', 'sold'), { state: { defaultKey: "Sold" } }) : navigate(data.path)
     handleMenuTab(data)
   }
 
@@ -177,35 +177,31 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
     setShowSearch(status)
   }
 
+  const navigateSearch = (value) => {
+    const baseUrl = new URL('/category', window.location.origin);
+
+    if (categoryQueryValue) {
+      baseUrl.searchParams.set('category', categoryQueryValue);
+    }
+    if (value.length > 0) {
+      baseUrl.searchParams.set('search', value);
+    }
+
+    const url = baseUrl.pathname + baseUrl.search;
+    navigate(url, { replace: true });
+  }
+
   const handleChangeSearch = (e) => {
     const value = e.target.value;
     if (value.length === 0 && searchQueryValue) {
-      let url = '/category';
-      if (categoryQueryValue) {
-        url += `?category=${categoryQueryValue}`;
-      }
-      if (value.length > 0) {
-        url += categoryQueryValue
-          ? `&search=${value}`
-          : `?search=${value}`;
-      }
-      navigate(url, { replace: true });
+      navigateSearch(value)
     }
   }
 
   const handleEnterSearch = (e) => {
     const value = e.target.value;
-    let url = '/category';
-    if (categoryQueryValue) {
-      url += `?category=${categoryQueryValue}`;
-    }
-    if (value.length > 0) {
-      url += categoryQueryValue
-        ? `&search=${value}`
-        : `?search=${value}`;
-    }
-    navigate(url, { replace: true });
-  }
+    navigateSearch(value)
+  };
 
   return (
     <>
