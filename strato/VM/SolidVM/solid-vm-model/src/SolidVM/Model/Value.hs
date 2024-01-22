@@ -254,6 +254,7 @@ createDefaultValue _ _ (SVMType.Address _) = return $ (SAccount $ unspecifiedCha
 createDefaultValue _ _ (SVMType.Account _) = return $ (SAccount $ unspecifiedChain (Address 0)) False
 createDefaultValue _ _ (SVMType.String _) = return $ SString ""
 createDefaultValue _ _ (SVMType.Bytes _ _) = return $ SString ""
+createDefaultValue cc c (SVMType.Struct _ def) = createDefaultValue cc c (SVMType.UnknownLabel def Nothing)
 createDefaultValue cc ctract (SVMType.UnknownLabel name _) =
   case (M.lookup name $ CC._enums ctract, M.lookup name $ CC._structs ctract) of
     (Just ((val : _), _), _) -> return $ SEnumVal name val 0x0

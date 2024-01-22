@@ -45,9 +45,9 @@ module Blockchain.SolidVM.SM
     getXabiType,
     getXabiValueType,
     getValueType,
+    getIndexType,
     pushSender,
     initializeAction,
-    -- lookupX509AddrFromCBHash,
     markDiffForAction,
     getBlockHashWithNumber,
     getBSum,
@@ -85,7 +85,6 @@ import qualified Blockchain.Stream.Action as Action
 import Blockchain.VMContext
 import Blockchain.VMOptions
 import Control.Applicative ((<|>))
-import Control.DeepSeq (force, ($!!))
 import Control.Lens hiding (Context)
 import Control.Monad
 import Control.Monad.Catch (MonadCatch)
@@ -858,51 +857,55 @@ getXabiValueType :: MonadSM m => AccountPath -> m SVMType.Type
 getXabiValueType (AccountPath loc path) = do
   (ccs', c') <- getCurrentCallInfo >>= \ci -> return (codeCollection ci, currentContract ci)
   let field = MS.getField path
-      loop :: (CC.CodeCollection, CC.Contract) -> [MS.StoragePathPiece] -> SVMType.Type -> SVMType.Type
-      loop _ [] = id
+      loop :: MonadSM m => (CC.CodeCollection, CC.Contract) -> [MS.StoragePathPiece] -> SVMType.Type -> m SVMType.Type
+      loop _ [] = return . id
       loop (ccs, _) [x] = \case
         SVMType.Mapping {SVMType.value = v} -> case x of
-          MS.MapIndex {} -> v
+          MS.MapIndex {} -> return v
           _ -> typeError "non map index attribute of mapping" x
         SVMType.Array {SVMType.entry = v} -> case x of
-          MS.Field "length" -> SVMType.Int {signed = Just True, bytes = Nothing}
-          MS.ArrayIndex {} -> v
+          MS.Field "length" -> return SVMType.Int {signed = Just True, bytes = Nothing}
+          MS.ArrayIndex {} -> return v
           _ -> typeError "non-length or array index attribute of array" x
         SVMType.String {} -> case x of
-          MS.Field "length" -> SVMType.Int {signed = Just True, bytes = Nothing}
-          _ -> force (typeError "non-length attribute of string" x)
+          MS.Field "length" -> return SVMType.Int {signed = Just True, bytes = Nothing}
+          _ -> typeError "non-length attribute of string" x
         SVMType.UnknownLabel s _ ->
           let t' = getTypeOfName' s ccs
           in case (x, t') of
                 (MS.Field n, StructTypo fs) ->
                   let mt'' = lookup (textToLabel $ decodeUtf8 n) fs
                   in case mt'' of
-                        Just t'' -> CC.fieldTypeType t''
+                        Just t'' -> return (CC.fieldTypeType t'')
                         Nothing -> missingField "field not present in struct definition" $ show (n, fs)
                 (_, StructTypo {}) -> typeError "non field access to struct" x
                 (_, ContractTypo {}) -> todo "getValueType/contract access" t'
-                (_, EnumTypo {}) -> todo "getValueType/enum acess" t'
-        SVMType.Struct {} -> case x of
-          MS.MapIndex it -> case it of
-            MS.IBool _ -> SVMType.Bool
-            MS.IAccount _ -> SVMType.Account {isPayable = False}
-            MS.INum _ -> SVMType.Int {signed = Just True, bytes = Nothing}
-            MS.IText _ -> SVMType.String {dynamic = Nothing}
-          _ -> typeError "accessing unknown field in struct" x
-        t'' -> t''
-      loop (ccs, ct) (_ : rs) = \case
+                (_, EnumTypo {}) -> todo "getValueType/enum access" t'
+        t'' -> return t''
+      loop (ccs, ct) (r : rs) = \case
         SVMType.Mapping {SVMType.value = t'} -> loop (ccs, ct) rs t'
         SVMType.Array {SVMType.entry = t'} -> loop (ccs, ct) rs t'
-        ss@(SVMType.Struct {}) -> loop (ccs, ct) rs ss
+        ss@(SVMType.Struct _ def) -> 
+          case r of 
+            MS.Field n -> do
+              t' <- getTypeOfName def
+              case t' of
+                StructTypo fs -> 
+                  let mt'' = lookup (textToLabel $ decodeUtf8 n) fs
+                  in case mt'' of
+                        Just t'' -> loop (ccs, ct) rs (CC.fieldTypeType t'')
+                        Nothing -> missingField "field not present in struct definition" $ show (n, fs)
+                _ -> todo "getXabiValueType/struct field access" t' 
+            _ -> todo "getXabiValueType/struct field access" ss
         t -> todo "getXabiValueType/loopnext unsupported type" t
   mType <- getXabiType loc field
   case mType of
     Nothing -> todo "getXabiValueType/unknown storage reference" field
-    Just v -> return $!! loop (ccs', c') (tail $ MS.toList path) v
+    Just v -> loop (ccs', c') (tail $ MS.toList path) v
 
 getValueType :: MonadSM m => AccountPath -> m BasicType
-getValueType p = hintFromType =<< getXabiValueType p
-
+getValueType p = hintFromType =<< getXabiValueType p 
+  
 initializeAction :: MonadSM m => Account -> String -> String -> Keccak256 -> m ()
 initializeAction acct name appName hsh = do
   -- org name to be set later, b/c the lookup is complex
@@ -970,3 +973,44 @@ getCodeAndCollection address' = do
       let !contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc ^. CC.contracts
 
       return (contract', ch, cc)
+
+-- HELPME: how can we simplify this function? It is only used once in the code base
+getIndexType :: MonadSM m => AccountPath -> m IndexType
+getIndexType (AccountPath addr p) = do
+  let field = MS.getField p
+  mType <- getXabiType addr field
+  
+  let n' = MS.size p - 1
+      loop :: MonadSM m => Int -> SVMType.Type -> m IndexType
+      loop 0 t = case t of
+        SVMType.Mapping {SVMType.key = SVMType.Int {}} -> return MapIntIndex
+        SVMType.Mapping {SVMType.key = SVMType.String {}} -> return MapStringIndex
+        SVMType.Mapping {SVMType.key = SVMType.Bytes {}} -> return MapStringIndex
+        SVMType.Mapping {SVMType.key = SVMType.Address {}} -> return MapAccountIndex
+        SVMType.Mapping {SVMType.key = SVMType.Account {}} -> return MapAccountIndex
+        SVMType.Mapping {SVMType.key = SVMType.Bool {}} -> return MapBoolIndex
+        SVMType.Array {} -> return ArrayIndex
+        _ -> typeError "unanticipated index type" t
+      loop n t = case t of
+        SVMType.Mapping {SVMType.value = t'} -> loop (n - 1) t'
+        SVMType.Array {SVMType.entry = t'} -> loop (n - 1) t'
+        -- TODO lookup struct typos, this seems to be the case when there is a global struct reference
+        -- SVMType.UnknownLabel def _ -> do
+        --   t' <- getTypeOfName def
+        --   case t' of
+        --     StructTypo fs -> fs `M.lookup` field >>= loop (n - 1) 
+        --     _ -> todo "hintFromType" t'
+        SVMType.Struct _ k -> do
+          (cc, c') <- getCurrentCallInfo >>= \ci -> return (codeCollection ci, currentContract ci)
+          case (k `M.lookup` M.union (CC._structs c') (CC._flStructs cc)) of
+            Nothing -> typeError "unknown struct" k
+            Just s -> do
+              let structMems = M.fromList $ map (\(a, b, _) -> (a, b)) s
+                  field' = UTF8.toString . MS.getField . MS.fromList $ [MS.last p]
+              case field' `M.lookup` structMems of
+                Nothing -> typeError "unknown field" field'
+                Just tt -> loop (n-1) (CC.fieldTypeType tt)
+        _ -> typeError "indexing type in var dec" t
+  case mType of
+    Nothing -> todo "getIndexType/unknown storage reference" field
+    Just v -> loop n' v

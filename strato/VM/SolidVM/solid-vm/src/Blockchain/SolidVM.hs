@@ -1408,42 +1408,6 @@ doWhile condition code = do
     Just SBreak -> return Nothing
     Just SContinue -> doWhile condition code
     _ -> return result
-
--- HELPME: how can we simplify this function? It is only used once in the code base
-getIndexType :: MonadSM m => AccountPath -> m IndexType
-getIndexType (AccountPath addr p) = do
-  let field = MS.getField p
-  mType <- getXabiType addr field
-  
-  let n' = MS.size p - 1
-      loop :: MonadSM m => Int -> SVMType.Type -> m IndexType
-      loop 0 t = case t of
-        SVMType.Mapping {SVMType.key = SVMType.Int {}} -> return MapIntIndex
-        SVMType.Mapping {SVMType.key = SVMType.String {}} -> return MapStringIndex
-        SVMType.Mapping {SVMType.key = SVMType.Bytes {}} -> return MapStringIndex
-        SVMType.Mapping {SVMType.key = SVMType.Address {}} -> return MapAccountIndex
-        SVMType.Mapping {SVMType.key = SVMType.Account {}} -> return MapAccountIndex
-        SVMType.Mapping {SVMType.key = SVMType.Bool {}} -> return MapBoolIndex
-        SVMType.Array {} -> return ArrayIndex
-        _ -> typeError "unanticipated index type" t
-      loop n t = case t of
-        SVMType.Mapping {SVMType.value = t'} -> loop (n - 1) t'
-        SVMType.Array {SVMType.entry = t'} -> loop (n - 1) t'
-        SVMType.Struct _ k -> do
-          c' <- getCurrentContract
-          -- TODO should also look up global structs 
-          case (k `M.lookup` CC._structs c') of
-            Nothing -> typeError "unknown struct" k
-            Just s -> do
-              let structMems = M.fromList $ map (\(a, b, _) -> (a, b)) s
-                  field' = UTF8.toString . MS.getField . MS.fromList $ [MS.last p]
-              case field' `M.lookup` structMems of
-                Nothing -> typeError "unknown field" field'
-                Just tt -> loop 0 (CC.fieldTypeType tt)
-        _ -> typeError "indexing type in var dec" t
-  case mType of
-    Nothing -> todo "getIndexType/unknown storage reference" field
-    Just v -> loop n' v
   
 expToPath :: MonadSM m => CC.Expression -> m AccountPath
 expToPath (CC.Variable _ x) = do

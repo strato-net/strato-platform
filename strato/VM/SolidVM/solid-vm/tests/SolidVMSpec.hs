@@ -79,7 +79,7 @@ import qualified LabeledError
 import qualified Numeric (readHex, showHex)
 import SolidVM.Model.SolidString
 import SolidVM.Model.Storable as MS
-import Test.Hspec (Selector, Spec, anyException, it, pendingWith, shouldThrow, xdescribe, xit, fit)
+import Test.Hspec (Selector, Spec, anyException, it, pendingWith, shouldThrow, xdescribe, xit)
 import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
@@ -8532,22 +8532,33 @@ abstract contract C { constructor(uint x, uint y) {} }
 
 |]) `shouldReturn` ()
   
-  fit "can access structs in mappings" $ runTest ( do
+  it "can access structs in mappings" $ runTest ( do
       runBS [r|
 contract qq {
   struct MyStruct {
-    mapping(string => uint) structMap;
+    mapping(uint => bool) structMapBool;
+    mapping(string => uint) structMapUint;
+    mapping(string => string) structMapString;
+    mapping(string => address) structMapAddress;
   }
   
   mapping(string => MyStruct) localMap;
   
   constructor() {
-    localMap["hello"].structMap["world"] = 69;
-    uint b = localMap["hello"].structMap["world"];
-    require(b == 69, "lesgooo");
+    // compare default values
+    bool bcd = localMap["david"].structMapBool[33];
+    require(bcd == false, "lesgeddit");
 
-    uint c = localMap["dustin"].structMap["norwood"];
-    require(c == 0, "lesgeddit");
+    // handle all types
+    bool x = localMap["hello"].structMapBool[1] = true;
+    uint y = localMap["hello"].structMapUint["world"] = 69;
+    string z = localMap["hello"].structMapString["world"] = "hello";
+    address zz = localMap["hello"].structMapAddress["world"] = address("deadbeef"); 
+
+    require(x == true, "hell yea brother");
+    require(y == 69, "lets get this money");
+    require(z == "hello", "world");
+    require(zz == address("deadbeef"), "medium rare deadbeef");
   }
 }|]) `shouldReturn` ()
   
