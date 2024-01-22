@@ -3016,7 +3016,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
 
     for_ (familyTree $ contract' ^. CC.parents) (\c' -> do 
         case M.lookup c' =<< lookupConstructor of
-          Nothing -> return () 
+          Nothing -> runTheConstructors from to hsh cc c' (CC.OrderedArgs [])
           Just args -> runTheConstructors from to hsh cc c' (CC.OrderedArgs args)
       )
 
