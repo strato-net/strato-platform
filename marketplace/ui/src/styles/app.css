@@ -384,6 +384,7 @@ body{
 }
 .ant-select-selector{
   height: 42px !important; 
+  align-items: center;
 }
 
 
@@ -433,7 +434,6 @@ body{
 .ant-menu-light {
   color : white !important;
 }
-
-:where(.css-dev-only-do-not-override-9ntgx0).ant-menu-horizontal{
+:where(.css-9ntgx0).ant-menu-horizontal{
   border-bottom: 0px;
 }

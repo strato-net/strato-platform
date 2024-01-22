@@ -47,16 +47,31 @@ export const INVENTORY_STATUS = {
 
 export const getUnitNameByIndex = (index) => {
   const unit = unitOfMeasures.find((measure) => measure.value === parseInt(index));
-  return unit ? unit.name : null;
+
+  if (unit) {
+    if (unit.name.length > 20) {
+      // Extract abbreviation from inside brackets
+      const matches = unit.name.match(/\((.*?)\)/);
+      if (matches && matches.length > 1) {
+        return matches[1];
+      }
+    }
+    
+    return unit.name;
+  }
+  
+  return null;
 };
 
 export const unitOfMeasures = [
-  { name: "TON", value: 1 },
-  { name: "POUND", value: 2 },
-  { name: "OUNCE", value: 3 },
-  { name: "TONNE", value: 4 },
-  { name: "KG", value: 5 },
-  { name: "G", value: 6 }
+  { name: "Gram (G)", value: 1 },
+  { name: "Kilogram (KG)", value: 2 },
+  { name: "Troy Ounce (t oz)", value: 3 },
+  { name: "Troy Pound (t lb)", value: 4 },
+  { name: "Avoirdupois Ounce (AVDP Oz)", value: 5 },
+  { name: "Avoirdupois Pound (AVDP Lb)", value: 6 },
+  { name: "Metric Ton (TON)", value: 7 },
+  { name: "Imperial Ton (TONNE)", value: 8 }
 ];
 
 export const CHARGES = {

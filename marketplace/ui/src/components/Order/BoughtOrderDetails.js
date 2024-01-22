@@ -119,11 +119,15 @@ const BoughtOrderDetails = ({ user, users }) => {
     if (!paymentSessionId || !orderDetails) return;
 
     const currentStatus = getStatus(parseInt(orderDetails.order.status));
-    const isPendingOrCanceled = currentStatus === getStatusByName("Payment Pending") || currentStatus === getStatusByName("Canceled");
+    const isPending = currentStatus === getStatusByName("Payment Pending");
     const isCanceled = currentStatus === getStatusByName("Canceled");
 
-
-    if (isPendingOrCanceled) {
+    if (isCanceled){
+      setPaid("Payment Failed");
+      setcomment(orderDetails.order.comments);
+    }
+    
+    if (isPending) {
       try {
         const response = await fetch(
           `${apiUrl}/order/payment/intent/${paymentSessionId}/${orderDetails.order.sellersCommonName}`,
@@ -132,11 +136,7 @@ const BoughtOrderDetails = ({ user, users }) => {
         const intentBody = await response.json();
         const paymentErrorAndRequiresMethod = intentBody.data.last_payment_error?.message && intentBody.data.status === 'requires_payment_method';
 
-        if (paymentErrorAndRequiresMethod && isCanceled) {
-          setPaid("Payment Failed");
-          setcomment(encodeURIComponent('Stripe: ' + intentBody.data.last_payment_error.message))
-        }
-        else if(paymentErrorAndRequiresMethod && !isCanceled)
+        if(paymentErrorAndRequiresMethod && !isCanceled)
         {
           setisLoadingPaymentStatus(true)
           const body = {
@@ -305,7 +305,7 @@ const BoughtOrderDetails = ({ user, users }) => {
   };
 
   const onChange = (key) => {
-    navigate(routes.Orders.url, { state: { defaultKey: key } })
+    navigate(routes.Orders.url.replace(':type', 'bought'))
   };
 
   const NewOrderData = ({ title, value, className }) => {
@@ -438,10 +438,10 @@ const BoughtOrderDetails = ({ user, users }) => {
               </ClickableCell>
             </Breadcrumb.Item>
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-              <div onClick={() => { navigate(routes.Orders.url, { state: { defaultKey: "Bought" } }); }}>
+              <div onClick={() => { navigate(routes.Orders.url.replace(':type', 'bought')); }}>
                 <p className="text-sm text-[#13188A] font-semibold">
 
-                Orders (Bought)
+                Orders (bought)
                 </p>
               </div>
             </Breadcrumb.Item>

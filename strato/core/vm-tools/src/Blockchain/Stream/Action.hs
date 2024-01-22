@@ -25,6 +25,7 @@ import Data.Aeson
 import qualified Data.Aeson.Key as DAK
 import qualified Data.Aeson.KeyMap as KM
 import Data.Aeson.Types
+import Data.Binary
 import qualified Data.Bifunctor as BF
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -48,7 +49,11 @@ import qualified Text.Colors as CL
 import Text.Format
 import Text.Tools
 
+import Data.Binary.Instances.Time ()
+
 data CallType = Create | Delete | Update deriving (Eq, Show, Generic, NFData)
+
+instance Binary CallType
 
 instance ToJSON CallType
 
@@ -137,6 +142,8 @@ instance Format DataDiff where
         formatVal (Right v) = format v
      in "SolidVMDiff [" ++ intercalate ", " (map (\(k, v) -> "(" ++ BC.unpack k ++ ", " ++ v ++ ")") (M.toList $ fmap (formatVal . hexStorageToBasic . HexStorage) vals)) ++ "]"
 
+instance Binary DataDiff
+
 instance ToJSON DataDiff where
   toJSON (EVMDiff m) = toJSON m
   toJSON (SolidVMDiff m) = toJSON m
@@ -198,6 +205,8 @@ instance Format ActionData where
       ++ "actionDataCallTypes:\n"
       ++ tab (show _actionDataCallTypes)
 
+instance Binary ActionData
+
 mergeActionData :: ActionData -> ActionData -> ActionData
 mergeActionData newData oldData =
   let diffs = case (_actionDataStorageDiffs newData, _actionDataStorageDiffs oldData) of
@@ -256,6 +265,8 @@ instance Format Delegatecall where
       ++ "\n"
       ++ "delegatecallApplication: "
       ++ T.unpack _delegatecallApplication
+
+instance Binary Delegatecall
 
 instance ToJSON Delegatecall where
   toJSON Delegatecall {..} =
@@ -321,6 +332,8 @@ instance Format Action where
       ++ "actionDelegatecalls: "
       ++ unlines (map show $ toList _delegatecalls)
       ++ "\n"
+
+instance Binary Action
 
 instance ToJSON Action where
   toJSON Action {..} =

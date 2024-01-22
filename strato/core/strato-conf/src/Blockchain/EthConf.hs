@@ -8,7 +8,9 @@ module Blockchain.EthConf
 where
 
 import Blockchain.EthConf.Model
+import Control.Monad.Composable.Kafka
 import Control.Monad.Except (ExceptT (..))
+import Control.Monad.IO.Class
 import Control.Monad.Trans.State
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
@@ -39,6 +41,12 @@ cirrusConnStr = postgreSQLConnectionString . cirrusConfig $ ethConf
 
 runKafkaConfigured :: KafkaClientId -> StateT KafkaState (ExceptT KafkaClientError IO) a -> IO (Either KafkaClientError a)
 runKafkaConfigured name = runKafka (mkConfiguredKafkaState name)
+
+runKafkaMConfigured :: MonadIO m =>
+                       KafkaClientId -> KafkaM m a -> m a
+runKafkaMConfigured name =
+  let k = kafkaConfig ethConf
+  in runKafkaM name (fromString $ kafkaHost k, fromIntegral $ kafkaPort k)
 
 mkConfiguredKafkaState :: KafkaClientId -> KafkaState
 mkConfiguredKafkaState cid = (mkKafkaState cid (kh, kp)) {_stateRequiredAcks = -1, _stateWaitSize = 1, _stateWaitTime = 100000}

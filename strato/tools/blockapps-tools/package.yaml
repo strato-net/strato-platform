@@ -33,6 +33,7 @@ library:
     - format
     - hedis
     - hflags
+    - kafka-monad
     - labeled-error
     - lens
     - leveldb-haskell

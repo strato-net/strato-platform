@@ -4,7 +4,7 @@ import RestStatus from "http-status-codes";
 import {
   setSearchQueryOptions,
   searchOne,
-  searchAllWithQueryArgs, 
+  searchAllWithQueryArgs,
   waitForAddress
 } from "/helpers/utils";
 import constants from "../../helpers/constants";
@@ -46,11 +46,11 @@ async function uploadContract(user, _constructorArgs, options) {
     ...options,
     org: constants.blockAppsOrg,
     query: {
-        address: `eq.${contract.address}`
+      address: `eq.${contract.address}`
     }
   }
-  
-  await waitForAddress(user, {name: constants.orderTableName}, searchOptions);
+
+  await waitForAddress(user, { name: constants.orderTableName }, searchOptions);
 
   return bind(user, contract, copyOfOptions);
 }
@@ -185,12 +185,12 @@ async function getAll(admin, args = {}, options) {
   const count = await searchAllWithQueryArgs(
     constants.orderTableName,
     {
-    ...args,
-    limit: undefined,
-    offset: 0,
-    order: undefined,
-    queryOptions: {
-      select: "count",
+      ...args,
+      limit: undefined,
+      offset: 0,
+      order: undefined,
+      queryOptions: {
+        select: "count",
       }
     },
     newOptions,
@@ -213,7 +213,7 @@ async function cancelOrder(user, contract, options, comments = "") {
   const callArgs = {
     contract,
     method: "cancelOrder",
-    args: util.usc({comments}),
+    args: util.usc({ comments }),
   };
   const cancelStatus = await rest.call(user, callArgs, options);
 
@@ -232,7 +232,7 @@ async function updateOrderStatus(user, contract, options, status) {
   const callArgs = {
     contract,
     method: "updateOrderStatus",
-    args: util.usc({status}), 
+    args: util.usc({ status }),
   };
   const updateOrderStatusResponse = await rest.call(user, callArgs, options);
 
@@ -275,6 +275,28 @@ async function completeOrder(user, args, options) {
   return completionStatus;
 }
 
+/**
+ * Update an Order Comment
+ */
+async function updateOrderComment(user, contract, options, comments) {
+  const callArgs = {
+    contract,
+    method: "updateComment",
+    args: util.usc({ comments }),
+  };
+  const updateOrderCommentResponse = await rest.call(user, callArgs, options);
+
+  if (parseInt(updateOrderCommentResponse, 10) !== RestStatus.OK) {
+    throw new rest.RestError(
+      updateOrderCommentResponse,
+      "Order Cannot Be Updated",
+      {}
+    );
+  }
+
+  return updateOrderCommentResponse;
+}
+
 export default {
   uploadContract,
   contractName,
@@ -285,6 +307,7 @@ export default {
   cancelOrder,
   updateOrderStatus,
   completeOrder,
+  updateOrderComment,
   marshalIn,
   marshalOut,
   getHistory,

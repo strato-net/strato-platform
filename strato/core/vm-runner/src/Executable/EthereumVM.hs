@@ -37,7 +37,7 @@ import Blockchain.JsonRpcCommand
 import qualified Blockchain.MilenaTools as K
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
-import Blockchain.Strato.Indexer.Kafka (writeIndexEvents)
+import Blockchain.Strato.Indexer.Kafka (produceIndexEvents)
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import qualified Blockchain.Strato.Model.Keccak256 as Keccak256
 import Blockchain.Strato.StateDiff.Database (commitSqlDiffs)
@@ -59,7 +59,6 @@ import Control.Monad.Composable.Base
 import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.SQL
 import Control.Monad.Reader (ask, runReaderT)
-import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.DList as DL
 import Data.Foldable hiding (fold)
@@ -67,7 +66,6 @@ import Data.List
 import qualified Data.Map as M
 import Data.Maybe
 import Data.Proxy
-import Data.String
 import qualified Data.Text as T
 import Debugger
 import Executable.EthereumVM2
@@ -80,24 +78,17 @@ import UnliftIO (race_)
 ethereumVM :: Maybe DebugSettings -> LoggingT IO ()
 ethereumVM d = runResourceT $ do
   ctx <- initContext d
-  let k = kafkaConfig ethConf
-  race_ (deployCommitsSqlDiffs ctx) . runSQLM . runKafkaM "ethereum-vm" (fromString $ kafkaHost k, fromIntegral $ kafkaPort k) . execContextM' ctx $ do
+  race_ (deployCommitsSqlDiffs ctx) . runSQLM . runKafkaMConfigured "ethereum-vm" . execContextM' ctx $ do
     Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
-    (cpOffsetStart, EVMCheckpoint cpHash cpHead cpBBI cpSR) <- getCheckpoint
+    (_, EVMCheckpoint cpHash cpHead cpBBI cpSR) <- getCheckpoint
     $logInfoLS "ethereumVM/getCheckpoint" (cpHash, cpBBI, cpSR)
 
     putContextBestBlockInfo cpBBI
     Mod.put Proxy $ BlockHashRoot cpSR
 
     Bagger.processNewBestBlock cpHash cpHead [] -- bootstrap Bagger with genesis block
-    $logInfoS "evm/preLoop" $ T.pack $ "cpOffset = " ++ show cpOffsetStart
-    forever $
-      loopTimeit "one full loop" $ do
-        recordBaggerMetrics =<< contextGets _baggerState
-        cpOffset <- getCheckpointNoMetadata
-        $logInfoS "evm/loop" "Getting Blocks/Txs"
-        seqEvents <- loopTimeit "======>>>> waiting for new events <<<<======" $ getUnprocessedKafkaEvents cpOffset
 
+    consume "evm/loop" consumerGroup seqVmEventsTopicName $ \_ seqEvents -> do
         logEventSummaries seqEvents
 
         let !vmInEventBatch = foldr insertInBatch newInBatch seqEvents
@@ -110,11 +101,10 @@ ethereumVM d = runResourceT $ do
 
         loopTimeit "compactContextM" $ compactContextM
 
-        let newOffset = cpOffset + fromIntegral (length seqEvents)
         baggerData <- uncurry EVMCheckpoint <$> Bagger.getCheckpointableState
         checkpointData <- baggerData <$> getContextBestBlockInfo
         withChainroot <- checkpointData . unBlockHashRoot <$> Mod.get Proxy
-        setCheckpoint newOffset withChainroot
+        return withChainroot
 
 initializeCheckpointAndBlockSummary ::
   ( HasBlockSummaryDB m,
@@ -204,13 +194,13 @@ sendOutEvent (OutAction act) = do
       vmes = ccEvents ++ dcEvents ++ actionEvents
   contx <- accessEnv
   void . liftIO $ enqueue (_stateDiffQueue contx) (VME vmes)
-sendOutEvent (OutIndexEvent e) = void . execKafka $ writeIndexEvents [e]
+sendOutEvent (OutIndexEvent e) = void $ produceIndexEvents [e]
 sendOutEvent (OutToStateDiff cId cInfo bHash org app) = withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo org app
 sendOutEvent (OutStateDiff diff) = do
   contx <- accessEnv
   void . liftIO $ enqueue (_stateDiffQueue contx) (SD diff)
-sendOutEvent (OutLog l) = loopTimeit "flushLogEntries" $ void . execKafka $ writeIndexEvents [LogDBEntry l]
-sendOutEvent (OutEvent e) = loopTimeit "flushEventEntries" $ void . execKafka $ writeIndexEvents [EventDBEntry e]
+sendOutEvent (OutLog l) = loopTimeit "flushLogEntries" $ void $ produceIndexEvents [LogDBEntry l]
+sendOutEvent (OutEvent e) = loopTimeit "flushEventEntries" $ void $ produceIndexEvents [EventDBEntry e]
 sendOutEvent (OutTXR tr) = do
   contx <- accessEnv
   void . liftIO $ enqueue (_stateDiffQueue contx) (TXR tr)
@@ -246,41 +236,21 @@ initializeCheckpointAndBlockSummaryKafka = do
 getCheckpoint :: (MonadLogger m, MonadFail m, HasKafka m, HasContext m) => m (KP.Offset, EVMCheckpoint)
 getCheckpoint = do
   let topic = seqVmEventsTopicName
-      topic' = show topic
-      cg' = show consumerGroup
-  $logInfoS "getCheckpoint" . T.pack $ "Getting checkpoint for " ++ topic' ++ "#0 for " ++ cg'
-  execKafka (K.fetchSingleOffset consumerGroup topic 0) >>= \case
+      cg = consumerGroup
+  $logInfoS "getCheckpoint" . T.pack $ "Getting checkpoint for " ++ show topic ++ "#0 for " ++ show cg
+  execKafka (K.fetchSingleOffset cg topic 0) >>= \case
     Left KP.UnknownTopicOrPartition -> initializeCheckpointAndBlockSummaryKafka >> getCheckpoint
     Left err -> error $ "Unexpected response when fetching checkpoint: " ++ show err
     Right (ofs, md) -> do
-      let md' = fromKafkaMetadata md
-      $logInfoS "getCheckpoint" . T.pack $ show ofs ++ " / " ++ format md'
-      return (ofs, md')
-
-getCheckpointNoMetadata :: (MonadLogger m, HasKafka m) => m KP.Offset
-getCheckpointNoMetadata = do
-  let topic = seqVmEventsTopicName
-      topic' = show topic
-      cg' = show consumerGroup
-  $logInfoS "getCheckpointNoMetadata" . T.pack $ "Getting checkpoint for " ++ topic' ++ "#0 for " ++ cg'
-  execKafka (K.fetchSingleOffset consumerGroup topic 0) >>= \case
-    Left KP.UnknownTopicOrPartition -> setCheckpointNoMetadata 1 >> getCheckpointNoMetadata
-    Left err -> error $ "Unexpected response when fetching checkpoint: " ++ show err
-    Right (ofs, _) -> do
-      return ofs
+      let evmCheckpoint = unpackMetadata md
+      $logInfoS "getCheckpoint" . T.pack $ show ofs ++ " / " ++ format evmCheckpoint
+      return (ofs, evmCheckpoint)
 
 setCheckpoint :: (MonadLogger m, HasKafka m) => KP.Offset -> EVMCheckpoint -> m ()
 setCheckpoint ofs checkpoint = do
   $logInfoS "setCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs ++ " / " ++ format checkpoint
-  let kMetadata = toKafkaMetadata checkpoint
+  let kMetadata = packMetadata checkpoint
   ret <- execKafka $ K.commitSingleOffset consumerGroup seqVmEventsTopicName 0 ofs kMetadata
-  either (error . show) return ret
-
-setCheckpointNoMetadata :: (MonadLogger m, HasKafka m) => KP.Offset -> m ()
-setCheckpointNoMetadata ofs = do
-  $logInfoS "setCheckpointNoMetadata" . T.pack $ "Setting checkpoint to " ++ show ofs
-  let emptyMetadata = KP.Metadata $ KP.KString BS.empty
-  ret <- execKafka $ K.commitSingleOffset consumerGroup seqVmEventsTopicName 0 ofs emptyMetadata
   either (error . show) return ret
 
 getUnprocessedKafkaEvents :: (MonadLogger m, HasKafka m) => KP.Offset -> m [VmEvent]

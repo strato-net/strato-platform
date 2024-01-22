@@ -40,7 +40,6 @@ library:
     - lens
     - leveldb-haskell
     - lifted-async
-    - milena
     - monad-alter
     - prometheus-client
     - seqevents
@@ -54,7 +53,6 @@ library:
     - transformers
     - classy-prelude
     - containers
-    - milena-tools
     - mtl
     - partitioner
     - resourcet

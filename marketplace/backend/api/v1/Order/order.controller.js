@@ -46,13 +46,13 @@ class OrderController {
   static async create(req, res, next) {
     try {
       const { dapp, body } = req
-      
+
       const { to, subject, htmlContents } = body;
 
       OrderController.validateCreateOrderArgs(body)
 
       const result = await dapp.createOrder(body)
-      
+
       rest.response.status200(res, result)
 
       // Only send email if order is created successfully
@@ -259,6 +259,21 @@ class OrderController {
     }
   }
 
+  static async updateOrderComment(req, res, next) {
+    try {
+      const { dapp, body } = req
+
+      OrderController.validateUpdateOrderCommentArgs(body)
+
+      const result = await dapp.updateOrderComment(body)
+      rest.response.status200(res, result)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
 
   // ----------------------- ARG VALIDATION ------------------------
 
@@ -292,9 +307,9 @@ class OrderController {
       paymentList: Joi.array().items(Joi.string()).required(),
       buyerOrganization: Joi.string().required(),
       orderList: Joi.array().min(1).items(Joi.object({
-            quantity: Joi.number().required(),
-            assetAddress: Joi.string().required(),
-          })).required(),
+        quantity: Joi.number().required(),
+        assetAddress: Joi.string().required(),
+      })).required(),
       orderTotal: Joi.number().required(),
       shippingAddressId: Joi.number().min(1).required(),
       tax: Joi.number().required(),
@@ -432,7 +447,7 @@ class OrderController {
         message: `Missing args or bad format: ${validation.error.message}`,
       })
     }
-  }  
+  }
 
   static validateCancelSaleOrderArgs(args) {
     const cancelSaleOrderSchema = Joi.object({
@@ -444,6 +459,21 @@ class OrderController {
 
     if (validation.error) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, 'Cancel Sale Order Argument Validation Error', {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      })
+    }
+  }
+
+  static validateUpdateOrderCommentArgs(args) {
+    const updateOrderCommentSchema = Joi.object({
+      saleOrderAddress: Joi.string().required(),
+      comments: Joi.string().required(),
+    }).required();
+
+    const validation = updateOrderCommentSchema.validate(args);
+
+    if (validation.error) {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Update Order Comment Argument Validation Error', {
         message: `Missing args or bad format: ${validation.error.message}`,
       })
     }

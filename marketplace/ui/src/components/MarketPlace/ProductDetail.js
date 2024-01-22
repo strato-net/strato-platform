@@ -130,7 +130,7 @@ const ProductDetails = ({ user, users }) => {
         (c) => c.name === details.category
       );
       setCategoryName(prodCategory?.name);
-      const detailsData = JSON.parse(details.data);
+      const detailsData = details.data;
       setItemData(detailsData);
       if (details.saleQuantity) {
         setAvailableQuantity(details.saleQuantity || 1);

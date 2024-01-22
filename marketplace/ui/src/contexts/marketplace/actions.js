@@ -140,7 +140,8 @@ const actions = {
     products,
     manufacturers,
     minPrice,
-    maxPrice
+    maxPrice,
+    search
   ) => {
     dispatch({ type: actionDescriptors.fetchMarketplace });
 
@@ -155,12 +156,15 @@ const actions = {
       : "";
 
     const productIdQuery = products ? `&name[]=${products}` : "";
+    const searchQuery = search
+      ? `&queryValue=${search}&queryFields=name`
+      : "";
     const priceQuery = `&range[]=price,${minPrice},${maxPrice}`;
     // const sortLatest = "&order=createdDate.desc"
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace?${priceQuery}${categoryQuery}${subCategoryQuery}${productIdQuery}${manufacturerQuery}`,
+        `${apiUrl}/marketplace?${priceQuery}${categoryQuery}${subCategoryQuery}${productIdQuery}${manufacturerQuery}${searchQuery}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -206,7 +210,8 @@ const actions = {
     products,
     manufacturers,
     minPrice,
-    maxPrice
+    maxPrice,
+    search
   ) => {
     dispatch({ type: actionDescriptors.fetchMarketplaceLoggedIn });
 
@@ -223,10 +228,13 @@ const actions = {
     const productIdQuery = products ? `&name[]=${products}` : "";
     const priceQuery = `&range[]=price,${minPrice},${maxPrice}`;
     // const sortLatest = "&order=createdDate.desc"
+    const searchQuery = search
+    ? `&queryValue=${search}&queryFields=name`
+    : "";
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace/all?${priceQuery}${categoryQuery}${subCategoryQuery}${productIdQuery}${manufacturerQuery}`,
+        `${apiUrl}/marketplace/all?${priceQuery}${categoryQuery}${subCategoryQuery}${productIdQuery}${manufacturerQuery}${searchQuery}`,
         {
           method: HTTP_METHODS.GET,
         }

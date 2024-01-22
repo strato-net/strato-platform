@@ -94,10 +94,10 @@ const actions = {
         dispatch({ type: actionDescriptors.createInventoryFailed, error: "Error while creating Inventory" });
         actions.setMessage(dispatch, "Error while creating Inventory")
         return false;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.createInventoryFailed, 
-          error: "Unauthorized while creating Inventory" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.createInventoryFailed,
+          error: "Unauthorized while creating Inventory"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -119,8 +119,8 @@ const actions = {
 
   fetchInventorySearch: async (dispatch, limit, offset, queryValue) => {
     const query = queryValue
-    ? `&queryValue=${queryValue}&queryFields=name`
-    : "";
+      ? `&queryValue=${queryValue}&queryFields=name`
+      : "";
 
     dispatch({ type: actionDescriptors.fetchInventorySearch });
 
@@ -136,7 +136,7 @@ const actions = {
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchInventorySearchSuccessful,
-          payload: {data: body.data.inventoriesWithImageUrl, count: body.data.count}
+          payload: { data: body.data.inventoriesWithImageUrl, count: body.data.count }
         });
         return;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
@@ -144,10 +144,10 @@ const actions = {
           type: actionDescriptors.fetchInventorySearchFailed,
           error: "Error while fetching Inventory",
         });
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchInventorySearchFailed, 
-          error: "Unauthorized while fetching Inventory" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchInventorySearchFailed,
+          error: "Unauthorized while fetching Inventory"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -164,16 +164,18 @@ const actions = {
   },
 
   fetchInventory: async (dispatch, limit, offset, queryValue, category) => {
-    const query = queryValue ? `&productId=${queryValue}` : "";
-    
-    let temp = [category]
-    const categoryQuery = category ? `&category[]=${temp}` : "";
+    // let temp = [category]
+    const query = queryValue ? `&productId=${queryValue}` : ``;
+    // const categoryQuery = category ? `category[]=${temp}` : "";
+
+    // Added query to filter based on the field "contract_name"
+    const categoryQuery = category ? `&queryValue=${category}&queryFields=contract_name` : "";
 
     dispatch({ type: actionDescriptors.fetchInventory });
 
     try {
       const response = await fetch(
-        `${apiUrl}/inventory?limit=${limit}&offset=${offset}${query}${categoryQuery}`,
+        `${apiUrl}/inventory?${categoryQuery}&limit=${limit}&offset=${offset}${query}&isMint=true`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -184,7 +186,7 @@ const actions = {
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchInventorySuccessful,
-          payload: {data: body.data.inventoriesWithImageUrl, count: body.data.count},
+          payload: { data: body.data.inventoriesWithImageUrl, count: body.data.count },
         });
         return;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
@@ -192,10 +194,10 @@ const actions = {
           type: actionDescriptors.fetchInventoryFailed,
           error: "Error while fetching Inventory",
         });
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchInventoryFailed, 
-          error: "Unauthorized while fetching Inventory" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchInventoryFailed,
+          error: "Unauthorized while fetching Inventory"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -241,10 +243,10 @@ const actions = {
         });
         actions.setMessage(dispatch, "Error while updating Inventory");
         return false;;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.updateInventoryFailed, 
-          error: "Unauthorized while updating Inventory" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.updateInventoryFailed,
+          error: "Unauthorized while updating Inventory"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -294,10 +296,10 @@ const actions = {
         });
         actions.setMessage(dispatch, "Error while updating Sale");
         return false;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.updateSaleFailed, 
-          error: "Unauthorized while updating Sale" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.updateSaleFailed,
+          error: "Unauthorized while updating Sale"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -348,10 +350,10 @@ const actions = {
         dispatch({ type: actionDescriptors.listInventoryFailed, error: "Error while listing Item" });
         actions.setMessage(dispatch, "Error while listing Item")
         return false;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.listInventoryFailed, 
-          error: "Unauthorized while listing Inventory" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.listInventoryFailed,
+          error: "Unauthorized while listing Inventory"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -402,10 +404,10 @@ const actions = {
         dispatch({ type: actionDescriptors.unlistInventoryFailed, error: "Error while unlisting Item" });
         actions.setMessage(dispatch, "Error while unlisting Item")
         return false;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.unlistInventoryFailed, 
-          error: "Unauthorized while unlisting Inventory" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.unlistInventoryFailed,
+          error: "Unauthorized while unlisting Inventory"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -456,10 +458,10 @@ const actions = {
         dispatch({ type: actionDescriptors.resellInventoryFailed, error: "Error while publishing Item" });
         actions.setMessage(dispatch, "Error while publishing Item")
         return false;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.resellInventoryFailed, 
-          error: "Unauthorized while publishing Inventory" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.resellInventoryFailed,
+          error: "Unauthorized while publishing Inventory"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -510,10 +512,10 @@ const actions = {
         dispatch({ type: actionDescriptors.transferInventoryFailed, error: "Error while transferring Item" });
         actions.setMessage(dispatch, "Error while transferring Item")
         return false;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.transferInventoryFailed, 
-          error: "Unauthorized while transferring Inventory" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.transferInventoryFailed,
+          error: "Unauthorized while transferring Inventory"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -534,18 +536,27 @@ const actions = {
   },
 
 
- 
-  fetchItemTransfers: async (dispatch, limit, offset, ownerCommonName, order, date) => {
+  fetchItemTransfers: async (dispatch, limit, offset, ownerCommonName, order, date, search) => {
     dispatch({ type: actionDescriptors.fetchItemTransfers });
 
-    let range;
-    const end = date + 86400; // This is the end of the same day, needed for the range filter. 
-    if (date) {
-      range = `&range[]=transferDate,${date},${end}`
-    }
-    
     try {
-      const response = await fetch(`${apiUrl}/inventory/transfers/items?limit=${limit}&order=transferDate.${order}&offset=${offset}&or=(oldOwnerCommonName.eq.${ownerCommonName},newOwnerCommonName.eq.${ownerCommonName})${range}`, {
+      let range;
+      let searchQuery;
+      const end = date + 86400;
+      if (date) {
+        range = `&range[]=transferDate,${date},${end}`
+      }
+      if (search) {
+        const searchValue = isNaN(search) ? search : parseInt(search);
+        if (!isNaN(searchValue)) {
+          searchQuery = search ? `&transferNumber=${searchValue}` : '';
+        } else {
+          searchQuery = search ? `&queryValue=${searchValue}&queryFields=assetName` : '';
+        }
+      }
+      let url = `${apiUrl}/inventory/transfers/items?limit=${limit}&order=transferDate.${order}&offset=${offset}&or=(oldOwnerCommonName.eq.${ownerCommonName},newOwnerCommonName.eq.${ownerCommonName})${search ? searchQuery : ''}${date ? range : ''}`
+
+      const response = await fetch(url, {
         method: HTTP_METHODS.GET,
 
       });
@@ -559,10 +570,10 @@ const actions = {
         });
 
         return true;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchItemTransfersFailed, 
-          error: "Unauthorized while fetching item transfers" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchItemTransfersFailed,
+          error: "Unauthorized while fetching item transfers"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -579,7 +590,7 @@ const actions = {
       });
       return false;
     }
-  }, 
+  },
 
   fetchInventoryDetail: async (dispatch, address) => {
     dispatch({ type: actionDescriptors.fetchInventoryDetail });
@@ -598,10 +609,10 @@ const actions = {
         });
 
         return true;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchInventoryDetailFailed, 
-          error: "Unauthorized while fetching Inventory" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchInventoryDetailFailed,
+          error: "Unauthorized while fetching Inventory"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -642,10 +653,10 @@ const actions = {
         });
 
         return true;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchInventoryOwnershipHistoryFailed, 
-          error: "Unauthorized while fetching ownership history" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchInventoryOwnershipHistoryFailed,
+          error: "Unauthorized while fetching ownership history"
         });
       }
 
@@ -687,10 +698,10 @@ const actions = {
         });
         actions.setMessage(dispatch, "Error while trying to onboard to Stripe");
         return null;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.onboardSellerToStripeFailed, 
-          error: "Unauthorized while trying to onboard to Stripe" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.onboardSellerToStripeFailed,
+          error: "Unauthorized while trying to onboard to Stripe"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -725,10 +736,10 @@ const actions = {
           payload: body.data,
         });
         return body.data;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.sellerStripeStatusFailed, 
-          error: "Unauthorized while trying to get Stripe status" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.sellerStripeStatusFailed,
+          error: "Unauthorized while trying to get Stripe status"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -756,7 +767,7 @@ const actions = {
           method: HTTP_METHODS.POST,
           body: payload,
         });
-      } catch(e) {
+      } catch (e) {
         console.log(JSON.stringify(e))
       }
 

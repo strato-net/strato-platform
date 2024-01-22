@@ -1,17 +1,20 @@
 pragma es6;
 pragma strict;
 
-import <5a4f9eace9d21c1aae3f8e9c21198649b7b9ab63>;
+import <8f8d4cef7232db7001bae657db85eb4325ee2f3d>;
 
 contract UnitOfMeasurement {
 enum UnitOfMeasurement {
     NULL,
-    TON,
-    POUND,
-    OUNCE,
-    TONNE,
-    KG,
-    G   
+    G,              // Gram
+    KG,             // Kilogram
+    TROY_OUNCE,     // Troy Ounce
+    TROY_POUND,     // Troy Pound
+    AVDP_POUND,     // Avoirdupois Pound
+    AVDP_OUNCE,     // Avoirdupois Ounce
+    TON,            // Metric Ton
+    TONNE           // Imperial Ton
+
 }
 }
 

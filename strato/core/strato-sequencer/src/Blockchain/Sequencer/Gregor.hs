@@ -31,7 +31,6 @@ where
 import BlockApps.Logging
 import Blockchain.Blockstanbul (Checkpoint (..), decodeCheckpoint, encodeCheckpoint)
 import qualified Blockchain.EthConf as EC
-import qualified Blockchain.MilenaTools as K
 import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.Event
 import qualified Blockchain.Sequencer.Kafka as SK
@@ -43,7 +42,8 @@ import Control.Concurrent.STM (flushTQueue)
 import Control.Lens hiding (op)
 import Control.Monad
 import Control.Monad.Composable.Base
-import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Kafka (KafkaM, HasKafka, KafkaEnv(..), runKafkaM, runKafkaMUsingEnv, KafkaClientId, KafkaAddress, execKafka)
+import qualified Control.Monad.Composable.Kafka as Kafka
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Resource
@@ -53,22 +53,20 @@ import Data.List.Extra (chunksOf)
 import Data.Maybe
 import Data.String
 import qualified Data.Text as T
-import qualified Network.Kafka as K
-import qualified Network.Kafka.Protocol as KP
 import qualified Prometheus as P
 import System.IO.Unsafe
 import Text.Format
 import UnliftIO.STM
 
 data GregorConfig = GregorConfig
-  { kafkaAddress :: Maybe K.KafkaAddress,
-    kafkaClientId :: K.KafkaClientId,
-    kafkaConsumerGroup :: KP.ConsumerGroup,
+  { kafkaAddress :: Maybe KafkaAddress,
+    kafkaClientId :: KafkaClientId,
+    kafkaConsumerGroup :: Kafka.ConsumerGroup,
     cablePackage :: CablePackage
   }
 
 data GregorContext = GregorContext
-  { _gregorConsumerGroup :: KP.ConsumerGroup,
+  { _gregorConsumerGroup :: Kafka.ConsumerGroup,
     _gregorUnseq :: TBQueue IngestEvent,
     _gregorUnseqCheckpoints :: TQueue Checkpoint,
     _gregorSeqP2P :: TQueue P2pEvent,
@@ -105,11 +103,11 @@ runGregorM cfg = do
 
 
 getKafkaConsumerGroup :: (Functor m, HasGregorContext m) =>
-                         m KP.ConsumerGroup
+                         m Kafka.ConsumerGroup
 getKafkaConsumerGroup = fmap _gregorConsumerGroup accessEnv
 
 readUnseqEvents' :: (MonadLogger m, P.MonadMonitor m, HasKafka m, HasGregorContext m) =>
-                    m (KP.Offset, [IngestEvent])
+                    m (Kafka.Offset, [IngestEvent])
 readUnseqEvents' = do
   offset <- getNextIngestedOffset
   $logInfoS "readUnseqEvents'" . T.pack $ "Fetching unseqevents from " ++ show offset
@@ -132,32 +130,32 @@ assertTopicCreation :: HasKafka m => m ()
 assertTopicCreation = void $ execKafka SK.assertTopicCreation
 
 getNextIngestedOffset :: (MonadLogger m, HasKafka m, HasGregorContext m) =>
-                         m KP.Offset
+                         m Kafka.Offset
 getNextIngestedOffset = do
   group <- getKafkaConsumerGroup
   fst <$> getNextOffsetAndMetadata group
 
-encodeMeta :: Checkpoint -> KP.Metadata
-encodeMeta = KP.Metadata . KP.KString . encodeCheckpoint
+encodeMeta :: Checkpoint -> Kafka.Metadata
+encodeMeta = Kafka.Metadata . Kafka.KString . encodeCheckpoint
 
-decodeMeta :: KP.Metadata -> Either String Checkpoint
-decodeMeta (KP.Metadata (KP.KString bs)) = decodeCheckpoint bs
+decodeMeta :: Kafka.Metadata -> Either String Checkpoint
+decodeMeta (Kafka.Metadata (Kafka.KString bs)) = decodeCheckpoint bs
 
 getNextOffsetAndMetadata :: HasKafka m =>
-                            KP.ConsumerGroup -> m (KP.Offset, KP.Metadata)
+                            Kafka.ConsumerGroup -> m (Kafka.Offset, Kafka.Metadata)
 getNextOffsetAndMetadata group = do
   ret <-
-    execKafka (K.fetchSingleOffset group SK.unseqEventsTopicName 0) >>= \case
-      Left KP.UnknownTopicOrPartition ->
+    execKafka (Kafka.fetchSingleOffset group SK.unseqEventsTopicName 0) >>= \case
+      Left Kafka.UnknownTopicOrPartition ->
         -- we've never committed an Offset
         setNextOffsetAndMetadata group 0 (encodeMeta def) >> getNextOffsetAndMetadata group
       Left err -> error $ "Unexpected response when fetching offset for " ++ show SK.unseqEventsTopicName ++ ": " ++ show err
       Right om -> return om
   return ret
 
-setNextOffsetAndMetadata :: HasKafka m => KP.ConsumerGroup -> KP.Offset -> KP.Metadata -> m ()
+setNextOffsetAndMetadata :: HasKafka m => Kafka.ConsumerGroup -> Kafka.Offset -> Kafka.Metadata -> m ()
 setNextOffsetAndMetadata group newOffset newMeta = do
-  op <- execKafka $ K.commitSingleOffset group SK.unseqEventsTopicName 0 newOffset newMeta
+  op <- execKafka $ Kafka.commitSingleOffset group SK.unseqEventsTopicName 0 newOffset newMeta
   op & \case
     Left err ->
       error $ "Unexpected response when setting the offset to " ++ show newOffset ++ ": " ++ show err
@@ -254,7 +252,7 @@ unseqEventsLock :: Lock
 unseqEventsLock = unsafePerformIO newLock
 
 updateOffset_locked :: (MonadLogger m, HasKafka m, HasGregorContext m) =>
-                       KP.Offset -> m ()
+                       Kafka.Offset -> m ()
 updateOffset_locked off = do
   ctx <- accessEnv
 
@@ -267,7 +265,7 @@ updateOffset_locked off = do
     setNextOffsetAndMetadata group off meta
 
 updateMetadata_locked :: (MonadLogger m, HasKafka m, HasGregorContext m) =>
-                         KP.Metadata -> m ()
+                         Kafka.Metadata -> m ()
 updateMetadata_locked meta = do
   ctx <- accessEnv
 

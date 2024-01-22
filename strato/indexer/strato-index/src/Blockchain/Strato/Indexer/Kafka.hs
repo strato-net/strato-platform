@@ -1,36 +1,23 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Blockchain.Strato.Indexer.Kafka
   ( indexEventsTopicName,
-    readIndexEvents,
-    writeIndexEvents,
+    produceIndexEvents,
+    consume
   )
 where
 
 import Blockchain.KafkaTopics (lookupTopic)
-import Blockchain.MilenaTools
-import Blockchain.Strato.Indexer.Model
-import Blockchain.Stream.Raw (fetchBytes, setDefaultKafkaState)
-import Control.Monad.IO.Class
+import Control.Monad.Composable.Kafka
 import Data.Binary
-import qualified Data.ByteString.Lazy as L
-import qualified Network.Kafka as K
-import qualified Network.Kafka.Producer as KW
 import qualified Network.Kafka.Protocol as KP
 
 indexEventsTopicName :: KP.TopicName
 indexEventsTopicName = lookupTopic "indexevents"
 
-readIndexEvents :: K.Kafka k => KP.Offset -> k [IndexEvent]
-readIndexEvents = readIndexEventsFromTopic indexEventsTopicName
-
-readIndexEventsFromTopic :: K.Kafka k => KP.TopicName -> KP.Offset -> k [IndexEvent]
-readIndexEventsFromTopic topic offset = setDefaultKafkaState >> map (decode . L.fromStrict) <$> fetchBytes topic offset
-
-writeIndexEvents :: K.Kafka k => [IndexEvent] -> k [KP.ProduceResponse]
-writeIndexEvents events = do
-  results <-
-    KW.produceMessagesAsSingletonSets $
-      (K.TopicAndMessage indexEventsTopicName . KW.makeMessage . L.toStrict . encode) <$> events
-  liftIO $ mapM_ parseKafkaResponse results
-  return results
+produceIndexEvents :: (Binary a, HasKafka m) =>
+                      [a] -> m [KP.ProduceResponse]
+produceIndexEvents = produceItems indexEventsTopicName

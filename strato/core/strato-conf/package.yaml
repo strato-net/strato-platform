@@ -19,6 +19,7 @@ library:
     - bytestring
     - containers
     - hedis
+    - kafka-monad
     - milena
     - mtl
     - postgresql-simple

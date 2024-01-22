@@ -109,6 +109,7 @@ import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.IO.Class
 import Control.Monad.Reader
 import Control.Monad.Trans.Resource
+import Data.Binary
 import qualified Data.ByteString as B
 import Data.Default
 import qualified Data.Map as M
@@ -156,6 +157,8 @@ instance NFData RBDB.RedisConnection where
 
 data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo !Keccak256 !BlockData !Integer !Int !Int
   deriving (Eq, Read, Show, Generic, NFData)
+
+instance Binary ContextBestBlockInfo
 
 data ContextDBs = ContextDBs
   { _stateDB :: MP.StateDB,

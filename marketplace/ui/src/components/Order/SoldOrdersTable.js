@@ -1,16 +1,16 @@
 import React, { useEffect, useState } from "react";
 import classNames from "classnames";
-import { EyeOutlined, DownOutlined, UpOutlined, FilterFilled, SearchOutlined} from "@ant-design/icons";
+import { EyeOutlined, DownOutlined, UpOutlined, FilterFilled, SearchOutlined } from "@ant-design/icons";
 import routes from "../../helpers/routes";
 import DataTableComponent from "../DataTableComponent";
 import { getStatus, getStatusByName } from "./constant";
 import { getStringDate } from "../../helpers/utils";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useParams, useLocation } from "react-router-dom";
 import { actions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import useDebounce from "../UseDebounce";
 import { apiUrl, HTTP_METHODS, US_DATE_FORMAT } from "../../helpers/constants";
-import { Pagination, Button, Radio, Space, Typography, DatePicker, Input} from "antd";
+import { Pagination, Button, Radio, Space, Typography, DatePicker, Input } from "antd";
 import TagManager from "react-gtm-module";
 import "./ordersTable.css"
 import { FilterIcon } from "../../images/SVGComponents";
@@ -22,42 +22,78 @@ import { Images } from "../../images";
 
 
 const SoldOrdersTable = ({ user, selectedDate, onDateChange }) => {
+  const navigate = useNavigate();
+  const params = useParams();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const searchVal = searchParams.get('search');
+  const pageVal = searchParams.get('page');
+  const pageNo = pageVal ? parseInt(pageVal) : 1;
+  const { type } = params;
   const dispatch = useOrderDispatch();
   const debouncedSearchTerm = useDebounce("", 1000);
   const limit = 10;
-  const [offset, setOffset] = useState(0);
-  const [page, setPage] = useState(1);
+  const offset = ((pageNo - 1) * limit)
   const [order, setOrder] = useState("createdDate.desc");
   const [filter, setFilter] = useState(0)
   const [selectedValue, setSelectedValue] = useState(null);
+  const [search, setSearch] = useState("")
   const [dropdownVisible, setDropdownVisible] = useState(false);
   const [mDropdownVisible, setMDropdownVisible] = useState(false);
-  const [isLoading, setIsLoading] = useState(false); 
+  const [isLoading, setIsLoading] = useState(false);
+  const [shouldRefetch, setShouldRefetch] = useState(true);
 
   const { ordersSold, isordersSoldLoading, orderSoldTotal } = useOrderState();
 
   useEffect(() => {
-    actions.fetchOrderSold(
-      dispatch,
-      limit,
-      offset,
-      user?.commonName,
-      selectedDate,
-      filter,
-      order
-    );
-
-  }, [dispatch, limit, offset, debouncedSearchTerm, user, order, selectedDate, filter]);
+    if (user?.commonName && type === 'sold') {
+      actions.fetchOrderSold(
+        dispatch,
+        limit,
+        offset,
+        user?.commonName,
+        selectedDate,
+        filter,
+        order,
+        searchVal
+      );
+    }
+  }, [dispatch, limit, offset, debouncedSearchTerm, user, order, selectedDate, filter, shouldRefetch, searchVal]);
 
   useEffect(() => {
-    setPage(1);
-    setOffset(0);
-  }, [orderSoldTotal]);
+    const timeout = setTimeout(() => {
+      if (search.length === 0) {
+        navigate(`/order/${type}`)
+      } else {
+        navigate(`/order/${type}?search=${search}`)
+      }
+    }, 1000)
+    return () => {
+      clearTimeout(timeout)
+    }
+  }, [search])
 
-  const navigate = useNavigate();
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      ordersSold.map(async (order) => {
+        if (order.paymentSessionId !== "" && getStatus(parseInt(order.status)) === getStatusByName("Payment Pending")) {
+          try {
+            setIsLoading(true);
+            await validatePayment(order);
+          } catch (err) {
+            console.error(err);
+          }
+        }
+        setIsLoading(false);
+      })
+    }, 10000); // Poll every 30 seconds, adjust as needed
+
+    return () => clearInterval(intervalId); // Clear interval on component unmount
+  }, [ordersSold]); // Dependency array
+
   const [data, setdata] = useState([]);
 
-  const validatePayment = async (order) =>{
+  const validatePayment = async (order) => {
     const response = await fetch(
       `${apiUrl}/order/payment/session/${order.paymentSessionId}/${order.sellersCommonName}`,
       {
@@ -66,7 +102,7 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange }) => {
     );
 
     const body = await response.json();
-    
+
     if (response.status === RestStatus.OK) {
       if (
         body.data["payment_status"] === "paid" &&
@@ -77,9 +113,35 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange }) => {
           saleOrderAddress: order.address,
           status: 1,
         });
+
+        if (isDone.includes('200')) {
+          setShouldRefetch(!shouldRefetch);
+        }
+      }
+      else {
+        const response2 = await fetch(
+          `${apiUrl}/order/payment/intent/${order.paymentSessionId}/${order.sellersCommonName}`,
+          { method: HTTP_METHODS.GET }
+        );
+        const intentBody = await response2.json();
+        const paymentErrorAndRequiresMethod = intentBody.data.last_payment_error?.message && intentBody.data.status === 'requires_payment_method';
+
+        if (paymentErrorAndRequiresMethod) {
+          // Update order status
+          const body = {
+            saleOrderAddress: order.address,
+            comments: encodeURIComponent('Stripe: ' + intentBody.data.last_payment_error.message),
+          };
+          //Update Order Details and change the Order Status to 'Canceled' from 'Payment Pending'
+          let isDone = await actions.cancelSale(dispatch, body);
+
+          if (isDone) {
+            setShouldRefetch(!shouldRefetch);
+          }
+        }
       }
     }
-  } 
+  }
 
   useEffect(() => {
     const fetchData = async () => {
@@ -109,9 +171,9 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange }) => {
       setIsLoading(false);
       setdata(updatedData);
     };
-  
+
     fetchData();
-  }, [ordersSold]);  
+  }, [ordersSold]);
 
   const handleSort = (data) => {
     setSelectedValue(data)
@@ -216,9 +278,9 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange }) => {
       dataIndex: "status",
       key: "status",
       render: (text) => statusComponent(text),
-      filterDropdown: ({confirm}) => dropdownVisible && <Sorting className="hidden md:flex flex-col gap-1 sort_conatiner py-1" />,
+      filterDropdown: ({ confirm }) => dropdownVisible && <Sorting className="hidden md:flex flex-col gap-1 sort_conatiner py-1" />,
       filterIcon: () => (<FilterIcon />),
-      onFilterDropdownOpenChange: (visible) => {setDropdownVisible(visible)},
+      onFilterDropdownOpenChange: (visible) => { setDropdownVisible(visible) },
       filterSearch: true,
       filterMultiple: false,
       filterResetToDefaultFilteredValue: true,
@@ -230,9 +292,9 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange }) => {
     let textClass = "bg-[#FFF6EC]";
     if (status === "Awaiting Shipment") {
       textClass = "bg-[#EBF7FF]";
-    } else if (status === "Awaiting Fulfillment"){
+    } else if (status === "Awaiting Fulfillment") {
       textClass = "bg-[#FF8C0033]"
-    } else if (status === "Payment Pending"){
+    } else if (status === "Payment Pending") {
       textClass = "bg-[#FF8C0033]"
     } else if (status === "Closed") {
       textClass = "bg-[#119B2D33]";
@@ -242,9 +304,9 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange }) => {
     let bgClass = "bg-[#119B2D]";
     if (status === "Awaiting Shipment") {
       bgClass = "bg-[#13188A]";
-    } else if (status === "Payment Pending"){
+    } else if (status === "Payment Pending") {
       bgClass = "bg-[#FF8C00]"
-    } else if (status === "Awaiting Fulfillment"){
+    } else if (status === "Awaiting Fulfillment") {
       bgClass = "bg-[#FF8C00]"
     } else if (status === "Closed") {
       bgClass = "bg-[#119B2D]";
@@ -260,37 +322,51 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange }) => {
   };
 
   const onPageChange = (page) => {
-    setOffset((page - 1) * limit);
-    setPage(page);
+    let url = `/order/${type}`;
+    if (searchVal) {
+      url += `?search=${searchVal}`
+    }
+    url += `${searchVal ? '&' : '?'}page=${page}`
+    navigate(url, { new: true })
   };
+
+  const handleChangeSearch = (e) => {
+    const value = e.target.value;
+    setSearch(value)
+  }
 
   return (
     <div>
       <div className="flex gap-2 items-center mb-5">
-                <Input className="text-base orders_searchbar md:p-3 rounded-full bg-[#F6F6F6]" prefix={<SearchOutlined />} placeholder="Search Markeplace" />
-                <div className="text-xs flex items-center md:hidden">
-                  <DatePicker
-                    disabledDate={(current) => {
-                      const currentDate = dayjs().startOf('day'); // Get the start of today
-                      const selectedDate = dayjs(current).startOf('day');
+        <Input className="text-base orders_searchbar md:p-3 rounded-full bg-[#F6F6F6]"
+          key={searchVal}
+          onChange={(e) => { handleChangeSearch(e) }}
+          defaultValue={searchVal}
+          prefix={<SearchOutlined />}
+          placeholder="Search Sold Orders by Buyer or Order #" />
+        <div className="text-xs flex items-center md:hidden">
+          <DatePicker
+            disabledDate={(current) => {
+              const currentDate = dayjs().startOf('day'); // Get the start of today
+              const selectedDate = dayjs(current).startOf('day');
 
-                      return selectedDate.isAfter(currentDate);
-                    }}
-                    onChange={onDateChange}
-                    disabled={false}
-                    suffixIcon={<img src={Images.calender} alt="calender" className="w-5 h-5" style={{ maxWidth:"none" }} />}
-                  />
-                </div>
-                <div className="relative">
-                  <div onClick={()=>setMDropdownVisible(!mDropdownVisible)} className="h-[30px] w-8 rounded-md border border-[#6A6A6A] flex md:hidden justify-center items-center">
-                    <FilterIcon />
-                  </div>
-                  {mDropdownVisible && <Sorting className="md:hidden flex flex-col gap-1 absolute right-0 top-10 w-max shadow-card_shadow z-[99999] bg-white sort_conatiner py-1" />}
-                      </div>
-                </div>
+              return selectedDate.isAfter(currentDate);
+            }}
+            onChange={onDateChange}
+            disabled={false}
+            suffixIcon={<img src={Images.calender} alt="calender" className="w-5 h-5" style={{ maxWidth: "none" }} />}
+          />
+        </div>
+        <div className="relative">
+          <div onClick={() => setMDropdownVisible(!mDropdownVisible)} className="h-[30px] w-8 rounded-md border border-[#6A6A6A] flex md:hidden justify-center items-center">
+            <FilterIcon />
+          </div>
+          {mDropdownVisible && <Sorting className="md:hidden flex flex-col gap-1 absolute right-0 top-10 w-max shadow-card_shadow z-[99999] bg-white sort_conatiner py-1" />}
+        </div>
+      </div>
       <div className="flex md:hidden order_responsive">
-        <ResponsiveSoldOrderCard 
-          data={data} 
+        <ResponsiveSoldOrderCard
+          data={data}
           isLoading={isordersSoldLoading || isLoading}
         />
       </div>
@@ -304,11 +380,11 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange }) => {
         />
       </div>
       <Pagination
-        current={page}
+        current={pageNo}
         onChange={onPageChange}
         total={orderSoldTotal}
         showSizeChanger={false}
-        className="flex justify-center my-5 "
+        className="flex justify-center my-5"
       />
     </div>
   );
