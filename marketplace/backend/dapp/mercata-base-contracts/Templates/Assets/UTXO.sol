@@ -65,6 +65,9 @@ abstract contract UTXO is Asset {
             _callMint(_newOwner, _quantity);
             quantity -= _quantity;
             itemNumber += _quantity;
+            if (sale == address(1)){
+                close();
+            }
         }
     }
 

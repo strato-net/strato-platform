@@ -171,7 +171,7 @@ abstract contract Asset is Utils {
 
     function automaticTransfer(address _newOwner, uint _quantity, uint _transferNumber) public requireOwner("automatic transfer") returns (uint) {
         require(_quantity <= quantity, "Cannot transfer more than available quantity.");
-        if (sale == address(0)) {
+        if (sale == address(0) || sale == address(1)) {
             // transfer feature - isUserTransfer: true, transferNumber: >0
             _transfer(_newOwner, _quantity, true, _transferNumber);
             return RestStatus.OK;
