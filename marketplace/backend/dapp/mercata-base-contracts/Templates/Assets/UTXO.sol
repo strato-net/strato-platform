@@ -33,6 +33,7 @@ abstract contract UTXO is Asset {
             assert(UTXO(owner).utxoMagicNumber() == utxoMagicNumber);
             owner = _newOwner;
             ownerCommonName = getCommonName(_newOwner);
+            sale = address(1);
         } catch {
             
             if(_isUserTransfer && _transferNumber>0){

@@ -178,13 +178,27 @@ function bindAddress(user, address, options) {
 }
 
 async function unlistItem(user, _contract, args, options) {
-    const contract = { name: saleContractName, ..._contract }
-    const callArgs = {
-        contract,
-        method: "closeSale",
-        args: util.usc({ ...args }),
-    };
-    const unlistStatus = await rest.call(user, callArgs, options);
+    let contract = { name: saleContractName, ..._contract }
+    let unlistStatus;
+    let callArgs;
+
+    const isAllZerosWithLastOne = str => /^0*1$/.test(str);
+    if (isAllZerosWithLastOne(contract.address)) {
+        contract = { name: contractName, address: args.inventoryAddress }
+        callArgs = {
+            contract,
+            method: "close",
+            args: util.usc({ }),
+        };
+        unlistStatus = await rest.call(user, callArgs, options);
+    } else {
+        callArgs = {
+            contract,
+            method: "closeSale",
+            args: util.usc({ ...args }),
+        };
+        unlistStatus = await rest.call(user, callArgs, options);
+    }
 
     if (parseInt(unlistStatus, 10) !== RestStatus.OK) {
         throw new rest.RestError(
@@ -198,12 +212,12 @@ async function unlistItem(user, _contract, args, options) {
         ...options,
         org: constants.blockAppsOrg,
         query: {
-            address: `eq.${callArgs.contract.address}`,
-            isOpen: `eq.false`
+            address: `eq.${args.inventoryAddress}`,
+            sale: `eq.0000000000000000000000000000000000000000`
         }
       }
       
-    await waitForAddress(user, {name: saleContract}, searchOptions);
+    await waitForAddress(user, {name: contractName}, searchOptions);
     
     return unlistStatus;
 }

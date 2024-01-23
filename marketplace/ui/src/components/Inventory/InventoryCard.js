@@ -114,6 +114,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
     return allSubcategories?.find(c => c.contract === contractName)?.name
   };
 
+  const isAllZeros = str => /^0*$/.test(str);
+
   const categoricalProperties = () => {
     switch (getCategory()) {
       case "Art":
@@ -269,7 +271,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
             onOpenChange={handleOpenChange}
             title={
               <div className="font-medium">
-                {inventory.price ? (<div>
+                {!isAllZeros(inventory.sale) ? (<div>
                   <div
                     className="flex items-center mt-2 cursor-pointer"
                     onClick={showListModal}
@@ -336,7 +338,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
 
 
         <div className="pt-[7px] lg:hidden flex items-center gap-[5px]">
-        {inventory.price ?
+        {!isAllZeros(inventory.sale) ?
           <div className="flex items-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
             <div className="w-[7px] h-[7px] rounded-full bg-[#119B2D]"></div>
             <p className="text-[#4D4D4D] text-[8px]">Published</p>
@@ -377,8 +379,9 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
 
       </div>
       <div className="flex justify-between">
-        {inventory.price ?
+        {!isAllZeros(inventory.sale) ?
           <div className="pt-[7px] hidden lg:flex items-center gap-[5px] bg-[#1548C329] p-[6px] rounded-md">
+            {console.log(inventory)}
             <div className="w-[10px] h-[10px] rounded-full bg-[#119B2D]"></div>
             <p className="text-[#4D4D4D] text-xs"> Published </p>
           </div>
@@ -582,7 +585,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
           open={unlistModalOpen}
           handleCancel={handleUnlistModalClose}
           inventory={inventory}
-          saleAddress={inventory.saleAddress}
+          saleAddress={inventory.sale}
           categoryName={category}
         />
       )}

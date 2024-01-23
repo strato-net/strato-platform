@@ -1,6 +1,6 @@
 pragma es6;
 pragma strict;
-import <d1cf1a8c249cdc9db6b9e0a337e708d9c4aacf11>;
+import <b63644c5e28bb14f2c6f420c8adf318272a419cd>;
 
 /// @title A representation of asset sale contract
 contract SimpleSale is Sale {

@@ -10,7 +10,8 @@ const UnlistModal = ({ open, handleCancel, inventory, saleAddress, categoryName 
 
     const handleSubmit = async () => {
         let body = {
-            saleAddress
+            saleAddress,
+            inventoryAddress: inventory.address,
         };
         let isDone = await actions.unlistInventory(inventoryDispatch, body);
         if (isDone) {

@@ -264,6 +264,7 @@ class InventoryController {
   static validateUnlistItemArgs(args) {
     const unlistItemSchema = Joi.object({
       saleAddress: Joi.string().required(),
+      inventoryAddress: Joi.string().required()
     });
 
     const validation = unlistItemSchema.validate(args);

@@ -265,13 +265,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
-    return marketplaceJs.getAll(rawAdmin, args, getOptions);
+    const newArgs = { ...args, notEqualsField: 'sale', notEqualsValue: '0000000000000000000000000000000000000000' }
+    return marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
   };
 
   contract.getMarketplaceInventoriesLoggedIn = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
     const newArgs = {
-      ...args, notEqualsField: 'ownerCommonName', notEqualsValue: userCommonName
+      ...args, notEqualsField: ['sale', 'ownerCommonName'],
+      notEqualsValue: ['0000000000000000000000000000000000000000', userCommonName]
     }
 
     return marketplaceJs.getAll(rawAdmin, newArgs, getOptions);

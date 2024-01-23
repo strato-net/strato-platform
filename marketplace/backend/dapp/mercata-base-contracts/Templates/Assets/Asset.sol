@@ -124,8 +124,9 @@ abstract contract Asset is Utils {
         close();
     }
 
-    function close() internal {
+    function close() public requireOwnerOrigin("set sale to 0") internal returns (uint){
         sale = address(0);
+        return RestStatus.OK;
     }
 
     function _transfer(address _newOwner, uint _quantity, bool _isUserTransfer, uint _transferNumber) internal virtual {
