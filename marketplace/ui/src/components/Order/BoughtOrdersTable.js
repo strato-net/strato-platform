@@ -328,12 +328,14 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
   };
 
   const onPageChange = (page) => {
-    let url = `/order/${type}`;
+    const baseUrl = new URL(`/order/${type}`, window.location.origin);
     if (searchVal) {
-      url += `?search=${searchVal}`
+      baseUrl.searchParams.set("search", searchVal);
     }
-    url += `${searchVal ? '&' : '?'}page=${page}`
-    navigate(url, { new: true })
+  
+    baseUrl.searchParams.set("page", page);
+    const url = baseUrl.pathname + baseUrl.search;
+    navigate(url, { new: true });
   };
 
   const handleChangeSearch = (e) => {
