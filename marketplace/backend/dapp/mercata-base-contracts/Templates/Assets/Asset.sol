@@ -17,7 +17,6 @@ abstract contract Asset is Utils {
     uint public createdDate;
     uint public quantity;
     uint public itemNumber;
-    bool public invalid;
     
     address public sale;
 
@@ -62,7 +61,6 @@ abstract contract Asset is Utils {
         files = _files;
         createdDate = _createdDate;
         quantity = _quantity;
-        invalid = false;
         try {
             assert(Asset(msg.sender).assetMagicNumber() == assetMagicNumber);
             originAddress = Asset(msg.sender).originAddress();
@@ -115,7 +113,7 @@ abstract contract Asset is Utils {
 
     // Updated function to add a sale to the whitelist
     function attachSale() public requireOwnerOrigin("attach sale") {
-        require(sale == address(0), "Sale is already assigned for this asset");
+        require(sale == address(0) || sale == address(1), "Sale is already assigned for this asset");
         sale = msg.sender;
     }
 

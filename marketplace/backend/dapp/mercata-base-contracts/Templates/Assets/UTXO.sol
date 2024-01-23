@@ -65,13 +65,6 @@ abstract contract UTXO is Asset {
             _callMint(_newOwner, _quantity);
             quantity -= _quantity;
             itemNumber += _quantity;
-            markInvalid();
-        }
-    }
-    
-    function markInvalid() internal {
-        if (address(this) != originAddress && quantity == 0) {
-            invalid = true;
         }
     }
 

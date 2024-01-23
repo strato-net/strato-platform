@@ -425,7 +425,7 @@ async function getAll(admin, args = {}, defaultOptions) {
         }
         
     }
-
+    const isAllZeros = str => /^0*$/.test(str);
     if (inventories) {
         inventories.forEach(inventory => {
             const itemSale = sales.find(sale => sale.assetToBeSold === inventory.address && sale.isOpen);
@@ -438,9 +438,11 @@ async function getAll(admin, args = {}, defaultOptions) {
                     saleQuantity: itemSale?.quantity,
                     saleDate: itemSale?.block_timestamp
                 });
-            } else if (isMarketplaceSearch && inventory.address !== inventory.originAddress && !inventory.invalid) {
-                finalInventory.push(inventory);
-            } else if (!inventory.invalid && !isMarketplaceSearch) {
+            } else if (isMarketplaceSearch) {
+                if (!isAllZeros(inventory.sale)){
+                    finalInventory.push(inventory);
+                }
+            } else {
                 finalInventory.push(inventory);
             }
         });

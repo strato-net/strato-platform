@@ -275,7 +275,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       ...args, notEqualsField: ['sale', 'ownerCommonName'],
       notEqualsValue: ['0000000000000000000000000000000000000000', userCommonName]
     }
-
     return marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
   };
 
