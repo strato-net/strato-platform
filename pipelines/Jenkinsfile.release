@@ -50,7 +50,6 @@ pipeline {
           sh "echo ${env.RELEASE_VERSION} > VERSION"
           sh 'rm -rf .docker-work'
           sh 'REPO=public make all'
-          sh 'rm -rf .docker-work'
           dir ('blockapps-rest') {
             sh 'yarn install --pure-lockfile'
             sh 'yarn build'
@@ -94,6 +93,7 @@ pipeline {
               usernamePassword(credentialsId: 'marketplace-global-admin', passwordVariable: 'GLOBAL_ADMIN_PASSWORD', usernameVariable: 'GLOBAL_ADMIN_NAME'),
               usernamePassword(credentialsId: 'marketplace-dev-aws-iam-user', passwordVariable: 'AWS_IAM_USER_ACCESS_KEY', usernameVariable: 'AWS_IAM_USER_KEY_ID'),
           ]) {
+            // TODO: run the temporary stripe payment server instead
             writeFile file: "run.sh", text: """#!/bin/bash
               sudo \\
                 NODE_HOST=\$(</host) \\
@@ -105,8 +105,6 @@ pipeline {
                 VAULT_PROXY_DEBUG=true \\
                 certInfo='{"orgName":"BlockApps","orgUnit":"Engineering","commonName":"Test"}' \\
                 STRIPE_PAYMENT_SERVER_URL='http://payments.mercata-testnet2.blockapps.net' \\
-                STRIPE_PUBLISHABLE_KEY='${STRIPE_PUBLISHABLE_KEY}' \\
-                STRIPE_SECRET_KEY='${STRIPE_SECRET_KEY}' \\
                 GLOBAL_ADMIN_NAME='${GLOBAL_ADMIN_NAME}' \\
                 GLOBAL_ADMIN_PASSWORD='${GLOBAL_ADMIN_PASSWORD}' \\
                 MP_IS_BOOTNODE='true' \\
