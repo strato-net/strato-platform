@@ -3,7 +3,6 @@ import {
   Layout,
   Input,
   Menu,
-  Image,
   Space,
   Badge,
   Avatar,
@@ -11,7 +10,7 @@ import {
   Button,
   Typography
 } from "antd";
-import { ArrowLeftOutlined, LogoutOutlined, } from "@ant-design/icons";
+import { ArrowLeftOutlined, LogoutOutlined } from "@ant-design/icons";
 import { Images } from "../../images";
 import "./header.css";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -24,11 +23,10 @@ import { actions } from "../../contexts/marketplace/actions";
 import { actions as userActions } from "../../contexts/authentication/actions";
 import { useAuthenticateDispatch } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
-import { ProfileIcon } from "../../images/SVGComponents";
 
 const { Header } = Layout;
 
-const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, handleMenuTab }) => {
+const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTab }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const queryParams = new URLSearchParams(location.search);
@@ -122,6 +120,9 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
           </p>
           <p className="text-xs">
             {user == null ? "" : user.preferred_username}
+          </p>
+          <p className="text-xs mt-3">
+            {user == null ? "" : 'STRATS: ' + user.stratsBalance}
           </p>
         </div>
       ),

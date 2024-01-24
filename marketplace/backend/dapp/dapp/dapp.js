@@ -24,6 +24,8 @@ import inventoryJs from "/dapp/products/inventory";
 import marketplaceJs from "/dapp/marketplace/marketplace.js";
 import paymentProviderJs from '/dapp/payments/paymentProvider';
 
+import strats from "../strats/strats";
+
 const allAssetNames = [];
 
 const contractName = "Mercata";
@@ -873,6 +875,18 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching address: ${JSON.stringify(err)} `);
     }
   };
+
+  contract.getStratsBalance = async function (args, options = defaultOptions) {
+    const { userAddress } = args;
+    const yaml = getYamlFile('./config/localhost.deploy.yaml');
+    const getOptions = { ...options, org: 'BlockApps', app: '' };
+    const args2 = {
+      address: yaml.strats.contract.address,
+      key: userAddress
+    }
+    const balance = await strats.getStratsBalance(rawAdmin, args2, getOptions);
+    return balance;
+  }
 
   return contract;
 };
