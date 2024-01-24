@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveFunctor #-}
@@ -375,7 +376,7 @@ instance MonadIO m => (Keccak256 `A.Alters` (Proxy (Inbound WireMessage))) (Read
         ( \wms ->
             let s = S.size wms
                 wms' = if s >= flags_wireMessageCacheSize then S.delete (head $ toList wms) wms else wms
-                wms'' = wms' S.>| k
+                !wms'' = wms' S.>| k
              in (wms'', ())
         )
   delete _ k =
@@ -383,7 +384,7 @@ instance MonadIO m => (Keccak256 `A.Alters` (Proxy (Inbound WireMessage))) (Read
       >>= flip
         atomicModifyIORef'
         ( \wms ->
-            let wms' = S.delete k wms
+            let !wms' = S.delete k wms
              in (wms', ())
         )
 
@@ -396,7 +397,7 @@ instance MonadIO m => ((T.Text, Keccak256) `A.Alters` (Proxy (Outbound WireMessa
     wms <- use outboundWireMessages
     let s = S.size wms
         wms' = if s >= flags_wireMessageCacheSize then S.delete (head $ toList wms) wms else wms
-        wms'' = wms' S.>| k
+        !wms'' = wms' S.>| k
     assign outboundWireMessages wms''
   delete _ k =
     Mod.modifyStatefully_ (Mod.Proxy @Context) $
