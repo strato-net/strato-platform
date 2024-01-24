@@ -13,16 +13,16 @@ module Slipstream.OutputData (
   outputData,
   outputData',
   OutputM,
-  ProcessedMappingRow(..),
+  ProcessedCollectionRow(..),
   insertEventTables,
   insertIndexTable,
   insertForeignKeys,
-  insertMappingTable,
-  insertMappingTableQuery,
+  insertCollectionTable,
+  insertCollectionTableQuery,
   insertAbstractTable,
   insertAbstractTableQuery,
   createIndexTable,
-  createMappingTable,
+  createCollectionTable,
   createHistoryTable,
   createAbstractTable,
   insertHistoryTable,
@@ -103,20 +103,20 @@ instance Functor (First b) where
   fmap f (First (a, b)) = First (f a, b)
 
 
-data ProcessedMappingRow = ProcessedMappingRow
+data ProcessedCollectionRow = ProcessedCollectionRow
   { address :: Address,
     codehash :: CodePtr,
     organization :: Text,
     application :: Text,
     contractname :: Text,
-    mapname :: Text,
+    collectionname :: Text,
     blockHash :: Keccak256,
     blockTimestamp :: UTCTime,
     blockNumber :: Integer,
     transactionHash :: Keccak256,
     transactionSender :: Address,
-    mapDataKey :: V.Value,
-    mapDataValue :: V.Value
+    collectionDataKey :: V.Value,
+    collectionDataValue :: V.Value
   }
   deriving (Show)
 
@@ -235,7 +235,7 @@ baseMappingColumns =
     "transaction_hash",
     "transaction_sender",
     "contract_name",
-    "mapname"
+    "collectionname"
   ]
 
 baseAbstractColumns :: TableColumns
@@ -278,10 +278,10 @@ indexTableName o a n = uncurry3 IndexTableName $ constructTableNameParameters o 
 abstractTableName :: Text -> Text -> Text -> TableName
 abstractTableName o a n = uncurry3 AbstractTableName $ constructTableNameParameters o a n
 
-mappingTableName :: Text -> Text -> Text -> Text -> TableName
-mappingTableName o a n m =
+collectionTableName :: Text -> Text -> Text -> Text -> TableName
+collectionTableName o a n m =
   let (o', a', n') = constructTableNameParameters o a n
-   in MappingTableName o' a' n' m
+   in CollectionTableName o' a' n' m
 
 getContractsForParents :: [SolidString] -> Map.Map SolidString (ContractF a) -> [ContractF a]
 getContractsForParents parents' cc =
@@ -449,7 +449,7 @@ getDeferredForeignKeysForMapping tableName o a =
         foreignTableName =
           indexTableName o a $
             ( \case
-                MappingTableName _ _ n' _ -> n'
+                CollectionTableName _ _ n' _ -> n'
                 _ -> ""
             )
               tableName
@@ -500,22 +500,22 @@ createAbstractTable globalsIORef contract (o, a, n) cc = do
       lift $ getDeferredForeignKeysAbstract tableName contract o a cc
 
 -- if flag from solidvm that it is a record, vmevent
-createMappingTable ::
+createCollectionTable ::
   OutputM m =>
   IORef Globals ->
   (Text, Text, Text) ->
   Text ->
   ConduitM () Text m [ForeignKeyInfo]
-createMappingTable globalsIORef (o, a, n) m = do
-  let tableName = mappingTableName o a n m
+createCollectionTable globalsIORef (o, a, n) m = do
+  let tableName = collectionTableName o a n m
   tableExists <- isTableCreated globalsIORef tableName
 
-  $logDebugLS "createMappingTable/tableExists" ("Table Name: " ++ show tableName ++ ", table exists: " ++ formatBool tableExists)
+  $logDebugLS "createCollectionTable/tableExists" ("Table Name: " ++ show tableName ++ ", table exists: " ++ formatBool tableExists)
   if tableExists
     then return []
     else do
       incNumMappingTables
-      yield $ (createMappingTableQuery (o, a, n, m))
+      yield $ (createCollectionTableQuery (o, a, n, m))
       let list = ["key", "value"]
       setTableCreated globalsIORef tableName list
       return $ getDeferredForeignKeysForMapping tableName o a
@@ -755,16 +755,16 @@ insertIndexTable [] = error "insertIndexTable: unhandled empty list"
 insertIndexTable contracts = do
   yieldMany $ insertIndexTableQuery contracts 
 
-insertMappingTable ::
+insertCollectionTable ::
   OutputM m =>
-  [ProcessedMappingRow] ->
+  [ProcessedCollectionRow] ->
   ConduitM () Text m ()
-insertMappingTable [] = error "insertMappingTable: unhandled empty list"
-insertMappingTable maps = do
-  let newMaps = nubBy ((==) `on` mapDataKey) maps
-  multilineLog "insertMappingTable" $ boringBox $ map show newMaps
-  let grouped = (groupBy ((==) `on` mapname) newMaps)
-      results = concat $ map insertMappingTableQuery grouped
+insertCollectionTable [] = error "insertCollectionTable: unhandled empty list"
+insertCollectionTable maps = do
+  let newMaps = nubBy ((==) `on` collectionDataKey) maps
+  multilineLog "insertCollectionTable" $ boringBox $ map show newMaps
+  let grouped = (groupBy ((==) `on` collectionname) newMaps)
+      results = concat $ map insertCollectionTableQuery grouped
   yieldMany $ results
 
 insertForeignKeys ::
@@ -851,9 +851,9 @@ createIndexTableQuery contract (o, a, n) =
           ",\n  PRIMARY KEY (address) );"
         ]
 
-createMappingTableQuery :: (Text, Text, Text, Text) -> Text
-createMappingTableQuery (o, a, n, m) =
-  let tableName = mappingTableName o a n m
+createCollectionTableQuery :: (Text, Text, Text, Text) -> Text
+createCollectionTableQuery (o, a, n, m) =
+  let tableName = collectionTableName o a n m
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS ",
           tableNameToDoubleQuoteText tableName,
@@ -866,7 +866,7 @@ createMappingTableQuery (o, a, n, m) =
               "transaction_hash text",
               "transaction_sender text",
               "contract_name text",
-              "mapname text",
+              "collectionname text",
               "key text",
               "value text"
             ],
@@ -979,20 +979,20 @@ insertIndexTableQuery cs =
                       ";"
                     ]
 
-insertMappingTableQuery :: [ProcessedMappingRow] -> [Text]
-insertMappingTableQuery [] = error "insertMappingTableQuery: unhandled empty list"
-insertMappingTableQuery ms =
+insertCollectionTableQuery :: [ProcessedCollectionRow] -> [Text]
+insertCollectionTableQuery [] = error "insertCollectionTableQuery: unhandled empty list"
+insertCollectionTableQuery ms =
   concat $
-    let ms' = (\m -> (m, Map.toList $ Map.mapMaybe valueToSQLText $ Map.fromList [("key", mapDataKey m), ("value", mapDataValue m)])) <$> ms
+    let ms' = (\m -> (m, Map.toList $ Map.mapMaybe valueToSQLText $ Map.fromList [("key", collectionDataKey m), ("value", collectionDataValue m)])) <$> ms
      in flip map (map snd $ partitionWith (length . snd) ms') $ \case
           [] -> []
           mappings@((x, list) : _) ->
             let tableName =
-                  mappingTableName
+                  collectionTableName
                     (organization x)
                     (application x)
                     (contractname x)
-                    (mapname x)
+                    (collectionname x)
                 keySt = wrapAndEscapeDouble . map escapeQuotes $ baseMappingTableColumns ++ map fst (fillFirstEmptyEntries list)
                 baseVals =
                   [ tshow . address,
@@ -1002,7 +1002,7 @@ insertMappingTableQuery ms =
                     T.pack . keccak256ToHex . transactionHash,
                     tshow . transactionSender,
                     contractname,
-                    mapname
+                    collectionname
                   ]
                 vals = flip map mappings $ \(row, rowList) ->
                   wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
@@ -1024,7 +1024,7 @@ insertMappingTableQuery ms =
     transaction_hash = excluded.transaction_hash,
     transaction_sender = excluded.transaction_sender,
     contract_name = excluded.contract_name,
-    mapname = excluded.mapname,
+    collectionname = excluded.collectionname,
     value = excluded.value|],
                       ";"
                     ]
