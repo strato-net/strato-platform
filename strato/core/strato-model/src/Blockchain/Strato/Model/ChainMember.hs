@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -563,7 +564,9 @@ instance D.Default FalseOrgNameChains where def = FalseOrgNameChains S.empty
 
 instance DPS.PersistField ChainMemberParsedSet where
   toPersistValue = DPS.PersistText . T.pack . show
-  fromPersistValue (DPS.PersistText t) = Right . LabeledError.read "PersistField/ChainMemberParsedSet" . T.unpack $ t
+  fromPersistValue (DPS.PersistText t) =
+    let !cmps = Right . LabeledError.read "PersistField/ChainMemberParsedSet" . T.unpack $ t
+     in cmps
   fromPersistValue x = Left . T.pack $ "PersistField ChainMemberParsedSet: expected string: " ++ show x
 
 instance DPS.PersistFieldSql ChainMemberParsedSet where

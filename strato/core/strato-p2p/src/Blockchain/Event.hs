@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -406,7 +407,7 @@ handleEvents peer = awaitForever $ \case
           then
             $logInfoS "handleEvents/P2pTx" $
               T.pack $
-                printf "peer %s is not authorized for chainID %s" (maybe "<nokey>" showEnode $ pPeerEnode peer) (formatChainId mCid)
+                printf "peer is not authorized for chainID %s" (formatChainId mCid)
           else do
             $logInfoS "handleEvents/P2pTx" $ T.pack $ "sending Transaction " ++ format (otHash tx) ++ " for chainID " ++ formatChainId mCid
             $logDebugS "handleEvents/P2pTx" . T.pack $ "the transaction was: " ++ format tx
@@ -423,7 +424,7 @@ handleEvents peer = awaitForever $ \case
           else do
             $logInfoS "handleEvents/P2pGenesis" $
               T.pack $
-                printf "peer %s is not authorized for received chainID %s" (maybe "<nokey>" showEnode $ pPeerEnode peer) (formatChainId $ Just cId)
+                printf "peer is not authorized for received chainID %s" (formatChainId $ Just cId)
             $logDebugLS "handleEvents/P2pGenesis/members" $ (unChainMembers (members uci))
     P2pGetChain chainIds -> yieldR $ GetChainDetails chainIds
     P2pGetTx shas -> yieldR $ GetTransactions shas
@@ -462,7 +463,7 @@ handleEvents peer = awaitForever $ \case
             True -> do
               let outbound = Blockstanbul msg
               $logDebugS "handleEvents/P2pBlockstanbul" . T.pack $ "Outgoing mesage: " ++ show outbound
-              let msgHash = rlpHash msg
+              let !msgHash = rlpHash msg
               lift $ insert (Proxy @(Proxy (Inbound WireMessage))) msgHash Proxy
               msgExists <- lift $ exists (Proxy @(Proxy (Outbound WireMessage))) (pPeerIp peer, msgHash)
               if msgExists
@@ -482,7 +483,8 @@ handleEvents peer = awaitForever $ \case
                         ". Forwarding to peer ",
                         pPeerIp peer
                       ]
-                  lift $ insert (Proxy @(Proxy (Outbound WireMessage))) (pPeerIp peer, msgHash) Proxy
+                  let !ip = pPeerIp peer
+                  lift $ insert (Proxy @(Proxy (Outbound WireMessage))) (ip, msgHash) Proxy
                   yieldR outbound
     P2pAskForBlocks start _ _ -> do
       $logDebugS "handleEvents/P2pAskForBlocks" . T.pack $ "syncFetch: " ++ show start
