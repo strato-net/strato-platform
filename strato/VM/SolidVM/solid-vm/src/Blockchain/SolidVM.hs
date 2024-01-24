@@ -2982,18 +2982,18 @@ runTheConstructors from to hsh cc baseContract argExps = do
         zippy' <- zipNamesToVariables ctrct argVals'
 
         void . withCallInfo to ctrct (c' ++ " constructor") hsh cc (M.fromList zippy') False False $ do 
-          runTheConstructors' from to hsh cc ctrct args'
+          runTheConstructors' from to cc ctrct
       )
 
     -- run the base constructor
     onTraced . liftIO . putStrLn $
         box ["running base constructor: " ++ baseContract ++ "(" ++ intercalate ", " (map (labelToString . snd) (extractConstructorArgs baseContract')) ++ ")"]
 
-    runTheConstructors' from to hsh cc baseContract' argExps
+    runTheConstructors' from to cc baseContract' 
 
 -- | Internal function that actually executes the constructors
-runTheConstructors' :: MonadSM m => Account -> Account -> Keccak256 -> CC.CodeCollection -> CC.Contract -> CC.ArgList -> m ()
-runTheConstructors' from to _ cc contract _ = do
+runTheConstructors' :: MonadSM m => Account -> Account -> CC.CodeCollection -> CC.Contract -> m ()
+runTheConstructors' from to cc contract = do
   -- set the storage paths for the contract variables using the initial values
   forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _ _) <- M.toList $ contract ^. CC.storageDefs] $ \(n, e) -> do
     v <- expToVar e
