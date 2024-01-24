@@ -2895,7 +2895,6 @@ certificateMap maybeCert _ =
           SVMType.value = SVMType.String Nothing
         }
 
--- TODO change [SolidString] to SolidString and just grab the shits from the contract - maybe even make it a set?
 -- | Do a depth-first traversal of the contract inheritance tree (or graph, if you insist)
 familyTree :: CC.CodeCollection -> [SolidString] -> [SolidString]
 familyTree _ [] = []
