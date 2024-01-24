@@ -550,7 +550,7 @@ const CategoryProductList = ({ user }) => {
         <div className="flex items-center ml-4 mt-2 md:ml-14 md:hidden">
           <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
           <Text className="text-gray-800 ml-1 text-sm font-normal">
-            {isLoading ? <Spin spinning={isLoading} size="small" /> : marketplaceList?.length} Results
+            {isLoading ? <Spin spinning={isLoading} size="small" /> : marketplaceListCount} Results
           </Text>
         </div>
       </div>
@@ -564,7 +564,7 @@ const CategoryProductList = ({ user }) => {
           <div className="hidden md:flex items-center">
             <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
             <Text className="text-gray-800 ml-1 text-xl font-semibold">
-            {isLoading ? <Spin spinning={isLoading} size="small" /> : marketplaceList?.length} Results
+            {isLoading ? <Spin spinning={isLoading} size="small" /> : marketplaceListCount} Results
             </Text>
           </div>
           {isLoading ?
