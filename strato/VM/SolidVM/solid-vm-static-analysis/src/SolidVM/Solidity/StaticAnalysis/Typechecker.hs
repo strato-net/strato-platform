@@ -863,7 +863,8 @@ contractHelper ::
   Type'
 contractHelper cc c =
   let constr = maybe M.empty (M.singleton "constructor") $ _constructor c
-      funcsAndConstr = constr <> _functions c
+      unravelOverloads f = f : concatMap unravelOverloads (_funcOverload f)
+      funcsAndConstr = constr <> concatMap unravelOverloads (_functions c)
       varTypes' = reduceType' (_contractContext c) $ varDeclHelper cc c <$> M.elems (_storageDefs c)
       constTypes' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_constants c)
       constTypes'' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_flConstants cc)
