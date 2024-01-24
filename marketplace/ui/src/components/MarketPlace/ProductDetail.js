@@ -327,7 +327,7 @@ const ProductDetails = ({ user, users }) => {
                   <Paragraph
                     className="text-[#202020] text-sm  h-[60px] overflow-auto"
                   >
-                    {decodeURIComponent(details.description).split('\n').map((line, index) => (
+                    {details?.description?.split('\n').map((line, index) => (
                       <React.Fragment key={index}>
                         {line}
                         <br />
