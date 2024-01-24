@@ -569,20 +569,6 @@ getVariableOfName name = do
       maybeThis :: Maybe Variable
       maybeThis = toMaybe (name == "this") . t "this" . Constant . (flip (SAccount . accountOnUnspecifiedChain) False) $ currentAccount currentCallInfo
 
-  --        M.lookup (currentAddress currentCallInfo) (accounts sstate) >>= M.lookup name . storage
-
-  --TODO- Add the constant lookup properly
-  {-
-    maybeConstantValue <- do
-  --    M.lookup (currentAddress currentCallInfo) (accounts sstate) >>= M.lookup name . constants
-      liftIO $ putStrLn $ " @@@@@@@@@@@@@@@@@@@ available constants: " ++ show (M.keys $ currentContract currentCallInfo^.constants)
-      case M.lookup name $ currentContract currentCallInfo^.constants of
-        Nothing -> return Nothing
-        Just (CC.ConstantDecl _ _ e) -> do
-          let val = constExpToVar e
-          return $ Just $ Constant $ val
-  -}
-
   return . fromMaybe (unknownVariable "getVariableOfName" name) . foldr1 (<|>) $
     [ maybeLocalValue,
       maybeStorageItem,

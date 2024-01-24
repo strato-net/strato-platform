@@ -8526,9 +8526,10 @@ contract qq {
   it "can access constructor of grandparent contracts" $ runTest ( do
       runArgs "(1, 2)" [r|
 
-contract qq is B { constructor(uint f, uint g) C(f, g) {} }
+contract qq is B, D { constructor(uint f, uint g) C(f, g) D() {} }
 abstract contract B is C {}
 abstract contract C { constructor(uint x, uint y) {} }
+abstract contract D { constructor() {} }
 
 |]) `shouldReturn` ()
   

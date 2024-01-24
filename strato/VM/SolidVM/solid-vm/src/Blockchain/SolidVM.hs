@@ -2895,156 +2895,146 @@ certificateMap maybeCert _ =
           SVMType.value = SVMType.String Nothing
         }
 
-{-
-data Func = Func
-  { funcArgs :: Map Text CC.IndexedType
-  , funcVals :: Map Text CC.IndexedType
-  , funcStateMutability :: Maybe StateMutability
+-- TODO change [SolidString] to SolidString and just grab the shits from the contract - maybe even make it a set?
+-- | Do a depth-first traversal of the contract inheritance tree (or graph, if you insist)
+familyTree :: CC.CodeCollection -> [SolidString] -> [SolidString]
+familyTree _ [] = []
+familyTree cc xs = foldl' (\(acc :: [SolidString]) (p' :: SolidString) -> acc ++ [p'] ++ familyTree cc (getParents p')) [] xs
+                where getParents p = fromMaybe [] . fmap CC._parents $ M.lookup p (cc ^. CC.contracts)
 
-  -- These Values are only used for parsing and unparsing solidity.
-  -- This data will not be stored in the db and will have no
-  -- relevance when constructing from the db.
-  , funcContents :: Maybe [Statement]
-  , funcVisibility :: Maybe Visibility
-  , funcModifiers :: [(SolidString, [(ExpressionF a)])]
-  } deriving (Eq,Show,Generic)
 
--}
+extractConstructorArgs :: CC.Contract -> [(SVMType.Type, SolidString)]
+extractConstructorArgs ct = 
+  map fst $ sortWith snd $ 
+        [ ((t, fromMaybe "" n), i) | (n, CC.IndexedType {CC.indexedTypeType = t, CC.indexedTypeIndex = i}) <- constructorArgs ]
+  where constructorArgs = fromMaybe [] . fmap CC._funcArgs $ ct ^. CC.constructor
 
-{-
-initializeContract :: Address -> Contract -> SM ()
-initializeContract address contract' = do
-  undefined address contract'
--}
 
-{-
-getContractAddress :: Address -> SM Address
-getContractAddress (Address v) = do
-  nonce' <- getNonce $ Address v
-  setNonce (Address v) $ nonce'+1
-  return $ Address $ fromIntegral $ bytesToInteger $ B.unpack $ B.drop 12 $ keccak256 $ BC.pack $ show v ++ show nonce'
--}
+zipNamesToVariables :: MonadSM m => CC.Contract -> ValList -> m [(SolidString, (SVMType.Type, Variable))]
+zipNamesToVariables ct (OrderedVals vl) = do 
+  forM (zip (extractConstructorArgs ct) vl) $ \((t, n), v) -> do
+    let correctedVal = coerceType ct t v
+    var <- createVar correctedVal
+    return (n, (t, var))
+zipNamesToVariables ct (NamedVals ns) = do 
+  let argTypes =
+        M.fromList $
+          map (\(k, v) -> (fromMaybe "" $ k, v)) $
+            maybe einval CC._funcArgs $ ct ^. CC.constructor
+      typeAndVal =
+        M.merge
+          (M.mapMissing (curry $ invalidArguments "missing argument"))
+          (M.mapMissing (curry $ invalidArguments "extra argument"))
+          (M.zipWithMatched $ \_k t v -> (t, v))
+          argTypes
+          (M.fromList ns)
+      einval = invalidArguments "named arguments to contract without constructor" (ct, ns)
+  forM (M.toList typeAndVal) $ \(n, (CC.IndexedType _ t, v)) -> do
+    let correctedVal = coerceType ct t v
+    var <- createVar correctedVal
+    return (n, (t, var))
 
---keccak256 :: BC.ByteString -> BC.ByteString
---keccak256 bs = convert (hash bs :: Digest Keccak_256)
 
-{-
-bytesToInteger :: [Word8] -> Integer
-bytesToInteger bytes =
-  sum $ map (\(shiftBits, byte) -> fromIntegral byte `shiftL` shiftBits) $ zip [0, 8..] $ reverse bytes
--}
+matchArgumentsToValues :: MonadSM m => CC.Contract -> CC.ArgList -> m ValList
+matchArgumentsToValues contract args = do
+  let argPairs ct' = fromMaybe [] (fmap CC._funcArgs $ ct' ^. CC.constructor)
+      argCount = length . argPairs
+      constructorOf ct' =
+        fromMaybe 
+          (invalidArguments ("arguments provided for missing constructor in contract " ++ (contract ^. CC.contractName)) (argPairs contract))
+          (CC._constructor ct')
 
-runTheConstructors :: MonadSM m => Account -> Account -> Keccak256 -> CC.CodeCollection -> SolidString -> CC.ArgList -> m ()
-runTheConstructors from to hsh cc contractName' argExps = do
-  let !contract' =
-        fromMaybe (missingType "contract inherits from nonexistent parent" contractName') $
-          cc ^. CC.contracts . at contractName'
-      argPairs = fromMaybe [] . fmap CC._funcArgs $ contract' ^. CC.constructor
-      argCount = length argPairs
-      argTypeNames =
-        map fst $
-          sortWith snd $
-            [ ((t, fromMaybe "" n), i)
-              | (n, CC.IndexedType {CC.indexedTypeType = t, CC.indexedTypeIndex = i}) <- argPairs
-            ]
-  onTraced $
-    liftIO $
-      putStrLn $
-        box
-          ["running constructor: " ++ labelToString contractName' ++ "(" ++ intercalate ", " (map (labelToString . snd) argTypeNames) ++ ")"]
-
-  argVals <- case argExps of
+  case args of
     (CC.OrderedArgs []) -> do
-      when (argCount > 0) $ invalidArguments "not enough arguments provided" argPairs
-      return $ OrderedVals []
+      if (argCount contract > 0)
+      then invalidArguments "not enough arguments provided" (argPairs contract)
+      else return (OrderedVals [])
     (CC.NamedArgs []) -> do
-      when (argCount > 0) $ invalidArguments "not enough arguments provided" argPairs
-      return $ NamedVals []
-    _ ->
-      argsToVals
-        contract'
-        ( fromMaybe (invalidArguments ("arguments provided for missing constructor in contract " ++ labelToString contractName') argPairs) $
-            CC._constructor contract'
-        )
-        argExps
-  let einval = invalidArguments "named arguments to contract without constructor" (contractName', argVals)
-  zipped <-
-    case argVals of
-      OrderedVals vals ->
-        forM (zip argTypeNames vals) $ \((t, n), v) -> do
-          let correctedVal = coerceType contract' t v
-          var <- createVar correctedVal
-          return (n, (t, var))
-      NamedVals ns -> do
-        let argTypes =
-              M.fromList $
-                map (\(k, v) -> (fromMaybe "" $ k, v)) $
-                  maybe einval CC._funcArgs $ contract' ^. CC.constructor
+      if (argCount contract > 0) 
+      then invalidArguments "not enough arguments provided" (argPairs contract)
+      else return (NamedVals [])
+    _ -> argsToVals contract (constructorOf contract) args
 
-            typeAndVal =
-              M.merge
-                (M.mapMissing (curry $ invalidArguments "missing argument"))
-                (M.mapMissing (curry $ invalidArguments "extra argument"))
-                (M.zipWithMatched $ \_k t v -> (t, v))
-                argTypes
-                (M.fromList ns)
 
-        forM (M.toList typeAndVal) $ \(n, (CC.IndexedType _ t, v)) -> do
-          let correctedVal = coerceType contract' t v
-          var <- createVar correctedVal
-          return (n, (t, var))
+-- | Entry point to running the constructors
+runTheConstructors :: MonadSM m => Account -> Account -> Keccak256 -> CC.CodeCollection -> SolidString -> CC.ArgList -> m ()
+runTheConstructors from to hsh cc baseContract argExps = do
+  let getContract ct' = fromMaybe (missingType "contract inherits from nonexistent parent" baseContract) (cc ^. CC.contracts . at ct')
+      lookupConstructor ct' = fmap CC._funcConstructorCalls $ ct' ^. CC.constructor
+      baseContract' = getContract baseContract
+  
+  argVals <- matchArgumentsToValues baseContract' argExps
+  zippy <- zipNamesToVariables baseContract' argVals
 
-  void . withCallInfo to contract' (stringToLabel $ labelToString contractName' ++ " constructor") hsh cc (M.fromList zipped) False False $ do
+  void . withCallInfo to baseContract' (baseContract ++ " constructor") hsh cc (M.fromList zippy) False False $ do
+    -- run all the constructors in the inheritance tree before the base
+    -- so as to initialize all the storage defs before the base may use them
+    for_ (familyTree cc $ baseContract' ^. CC.parents) (\c' -> do 
+        let ctrct = getContract c'
+            args' = CC.OrderedArgs $ fromMaybe [] (M.lookup c' =<< lookupConstructor baseContract')
+            -- TODO this does not handle a case where if a non-base contract calls 
+            --      a constructor in another parent contract the code collection 
+            --      then this lookup will fail. Should also check c' as well as base
 
-    forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, e) -> do
-      v <- expToVar e
-      setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
+        onTraced . liftIO . putStrLn $
+              box ["running constructor: " ++ c' ++ "(" ++ intercalate ", " (map (labelToString . snd) (extractConstructorArgs ctrct)) ++ ")"]
 
-    forM_ [(n, theType) | (n, CC.VariableDecl theType _ Nothing _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, theType) -> do
-      case theType of
-        SVMType.Mapping _ _ _ -> return ()
-        SVMType.Array _ _ -> return ()
-        t -> do
-          defVal <- createDefaultValue cc contract' t
-          for_ (toBasic defVal) $ markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n])    
+        argVals' <- matchArgumentsToValues ctrct args'
+        zippy' <- zipNamesToVariables ctrct argVals'
 
-    let getParents p = fromMaybe [] . fmap CC._parents $ M.lookup p (cc ^. CC.contracts)
-        familyTree :: [SolidString] -> [SolidString]
-        familyTree [] = []
-        familyTree xs = foldl' (\(acc :: [SolidString]) (p' :: SolidString) -> acc ++ [p'] ++ familyTree (getParents p')) [] xs
-        lookupConstructor = fmap CC._funcConstructorCalls $ contract' ^. CC.constructor
-
-    for_ (familyTree $ contract' ^. CC.parents) (\c' -> do 
-        case M.lookup c' =<< lookupConstructor of
-          Nothing -> runTheConstructors from to hsh cc c' (CC.OrderedArgs [])
-          Just args -> runTheConstructors from to hsh cc c' (CC.OrderedArgs args)
+        void . withCallInfo to ctrct (c' ++ " constructor") hsh cc (M.fromList zippy') False False $ do 
+          runTheConstructors' from to hsh cc ctrct args'
       )
 
-    case contract' ^. CC.constructor of
-      Just theFunction -> do
-        let theModifierNames = map fst $ (CC._funcModifiers theFunction)
-        !theModifiers' <- forM theModifierNames $ \name -> do
-          case M.lookup name (contract' ^. CC.modifiers) of
-            Just theModifier -> do
-              --args' <- argsToVals contract' theModifier argExps
-              return $ Just theModifier
-            Nothing -> do
-              if name `elem` familyTree (contract' ^. CC.parents) then return Nothing else missingField "modifier not found" name
-        let theModifiers = catMaybes theModifiers'
-        !commands <- case CC._funcContents theFunction of
-          Nothing -> missingField "contract constructor has been declared but not defined" contractName'
-          Just cms -> pure cms
-        let !modContentsList = map (\m -> fromMaybe (missingField "Function call: Modifier has been declared but not defined" m) (CC._modifierContents m)) theModifiers
-        let isNotModExec = \case
-              CC.ModifierExecutor _ -> False
-              _ -> True
-        let (lhs, rhs) = foldr (\(a, b) (c, d) -> (a ++ c, b ++ d)) ([], []) (map (span isNotModExec) modContentsList)
-        logVals lhs rhs
-        _ <- runStatementBlock' lhs
-        _ <- pushSender from $ runStatementBlock commands
-        _ <- runStatementBlock' rhs
-        pure ()
-      Nothing -> return ()
+    -- run the base constructor
+    onTraced . liftIO . putStrLn $
+        box ["running base constructor: " ++ baseContract ++ "(" ++ intercalate ", " (map (labelToString . snd) (extractConstructorArgs baseContract')) ++ ")"]
+
+    runTheConstructors' from to hsh cc baseContract' argExps
+
+-- | Internal function that actually executes the constructors
+runTheConstructors' :: MonadSM m => Account -> Account -> Keccak256 -> CC.CodeCollection -> CC.Contract -> CC.ArgList -> m ()
+runTheConstructors' from to _ cc contract _ = do
+  -- set the storage paths for the contract variables using the initial values
+  forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _ _) <- M.toList $ contract ^. CC.storageDefs] $ \(n, e) -> do
+    v <- expToVar e
+    setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
+
+  -- set default values for uninitialized storage defs
+  forM_ [(n, theType) | (n, CC.VariableDecl theType _ Nothing _ _ _) <- M.toList $ contract ^. CC.storageDefs] $ \(n, theType) -> do
+    case theType of
+      SVMType.Mapping _ _ _ -> return ()
+      SVMType.Array _ _ -> return ()
+      t -> do
+        defVal <- createDefaultValue cc contract t
+        for_ (toBasic defVal) $ markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n])    
+
+  -- run dat shit
+  case contract ^. CC.constructor of
+    Just theFunction -> do
+      let theModifierNames = map fst $ (CC._funcModifiers theFunction)
+      !theModifiers' <- forM theModifierNames $ \name -> do
+        case M.lookup name (contract ^. CC.modifiers) of
+          Just theModifier -> return (Just theModifier)
+          Nothing -> do
+            if name `elem` familyTree cc (contract ^. CC.parents) 
+            then return Nothing 
+            else missingField "modifier not found" name
+      let theModifiers = catMaybes theModifiers'
+      !commands <- case CC._funcContents theFunction of
+        Nothing -> missingField "contract constructor has been declared but not defined" (contract ^. CC.contractName)
+        Just cms -> pure cms
+      let !modContentsList = map (\m -> fromMaybe (missingField "Function call: Modifier has been declared but not defined" m) (CC._modifierContents m)) theModifiers
+      let isNotModExec = \case
+            CC.ModifierExecutor _ -> False
+            _ -> True
+      let (lhs, rhs) = foldr (\(a, b) (c, d) -> (a ++ c, b ++ d)) ([], []) (map (span isNotModExec) modContentsList)
+      logVals lhs rhs
+      _ <- runStatementBlock' lhs
+      _ <- pushSender from $ runStatementBlock commands
+      _ <- runStatementBlock' rhs
+      pure ()
+    Nothing -> return ()
 
   return ()
 
