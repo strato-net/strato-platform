@@ -45,7 +45,7 @@ const CategoryProductList = ({ user }) => {
 
   const searchQueryValue = queryParams.get('search');
   const categoryQueryValue = queryParams.get('category');
-  const limit = 10;
+  const limit = 9;
   const categoryQueryValueArr = categoryQueryValue ? categoryQueryValue.split(',') : []
   const pageVal = queryParams.get('page');
   const pageNo = pageVal ? parseInt(pageVal) : 1;
@@ -550,7 +550,7 @@ const CategoryProductList = ({ user }) => {
         <div className="flex items-center ml-4 mt-2 md:ml-14 md:hidden">
           <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
           <Text className="text-gray-800 ml-1 text-sm font-normal">
-            {marketplaceList?.length} Results
+            {isLoading ? <Spin spinning={isLoading} size="small" /> : marketplaceList?.length} Results
           </Text>
         </div>
       </div>
@@ -564,7 +564,7 @@ const CategoryProductList = ({ user }) => {
           <div className="hidden md:flex items-center">
             <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
             <Text className="text-gray-800 ml-1 text-xl font-semibold">
-              {marketplaceList?.length} Results
+            {isLoading ? <Spin spinning={isLoading} size="small" /> : marketplaceList?.length} Results
             </Text>
           </div>
           {isLoading ?
@@ -589,6 +589,7 @@ const CategoryProductList = ({ user }) => {
                   </div>
                   <Pagination
                     current={pageNo}
+                    pageSize={limit}
                     onChange={onPageChange}
                     total={marketplaceListCount}
                     showSizeChanger={false}

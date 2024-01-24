@@ -351,6 +351,7 @@ async function get(user, args, options) {
 
 async function getAll(admin, args = {}, defaultOptions) {
     const { range, ownerCommonName, assetAddresses, status, isMarketplaceSearch, isTrendingSearch, ...restArgs } = args;
+    const { limit, offset, ...rest1 } = restArgs;
     let inventories;
     let sales;
     let finalInventory = [];
@@ -366,6 +367,11 @@ async function getAll(admin, args = {}, defaultOptions) {
         inventories = await searchAllWithQueryArgs(contractName,
             {
                 address: trendingAssetAddresses,
+            }, options, admin);
+    } else if (isMarketplaceSearch) {
+        inventories = await searchAllWithQueryArgs(contractName,
+            {
+                ...rest1,
             }, options, admin);
     } else {
         // Original logic
@@ -389,11 +395,11 @@ async function getAll(admin, args = {}, defaultOptions) {
                     ...restArgs,
                 }, options, admin);
         }
-
-        if (inventories) {
-            const assetAddresses = inventories.map((inventory) => inventory.address);
-            sales = await saleJs.getAll(admin, { assetAddresses, range, isOpen: true }, options);
         }
+
+    if (inventories) {
+        const assetAddresses = inventories.map((inventory) => inventory.address);
+        sales = await saleJs.getAll(admin, { assetAddresses, range, isOpen: true }, options);
     }
 
     if (inventories) {
@@ -416,7 +422,15 @@ async function getAll(admin, args = {}, defaultOptions) {
         });
     }
 
-    return finalInventory ? finalInventory.map((inventory) => marshalOut(inventory)) : undefined;
+    if (isMarketplaceSearch) {
+        const totalInventoryCount = finalInventory.length;
+        finalInventory = finalInventory.splice(offset, limit)
+        return finalInventory
+            ? { inventory: finalInventory.map((inventory) => marshalOut(inventory)), inventoryCount: totalInventoryCount }
+            : undefined;
+    } else {
+        return finalInventory ? finalInventory.map((inventory) => marshalOut(inventory)) : undefined;
+    }
 }
 
 
