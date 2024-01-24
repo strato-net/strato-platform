@@ -75,15 +75,15 @@ int = V.SimpleValue . V.valueInt
 --     insertIndexTable $ map fst contracts
 --     insertHistoryTable $ map fst contracts
 
-createInsertsMapping :: OutputM m
+createInsertsCollection :: OutputM m
               => IORef Globals
-              -> [ProcessedMappingRow]
+              -> [ProcessedCollectionRow]
               -> ConduitM () T.Text m ()
-createInsertsMapping globalsIORef mappings = do
-  unless (null mappings) $ do
-    let mapping = head mappings
-    _ <- createMappingTable globalsIORef (organization mapping, application mapping, contractname mapping) (mapname mapping)
-    insertMappingTable mappings
+createInsertsCollection globalsIORef collections = do
+  unless (null collections) $ do
+    let collection = head collections
+    _ <- createCollectionTable globalsIORef (organization collection, application collection, contractname collection) (collectionname collection)
+    insertCollectionTable collections
 
 -- createInsertsAbstract :: (OutputM m,
 --     Selectable Account AddressState m,
@@ -734,25 +734,25 @@ spec = do
 
   it "can create and insert into mapping tables" $ do
     let testAdd = Address 0x98eaddede
-        input = [ProcessedMappingRow {
+        input = [ProcessedCollectionRow {
           address = testAdd,
           codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- $ hash "<CODEHASH>",
           organization = "",
           application = "",
           contractname = "SwissArmy",
-          mapname = "SwissArmyMapping",
+          collectionname = "SwissArmyMapping",
           blockHash = hash "<BLOCKHASH>",
           blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
           blockNumber = 123,
           transactionHash = hash "<TRANSACTIONHASH>",
           transactionSender = testAdd,
-          mapDataKey = V.SimpleValue $ V.ValueString "hi-key",
-          mapDataValue = V.SimpleValue $ V.ValueString "hi-value"
+          collectionDataKey = V.SimpleValue $ V.ValueString "hi-key",
+          collectionDataValue = V.SimpleValue $ V.ValueString "hi-value"
           }     ]
 
     g <- newGlobals fakeHandle fakeCirrusHandle
     [swissArmyMappingCreate, swissArmyMappingRowInsert] <-
-        runLoggingT . runConduit $ createInsertsMapping g input .| sinkList
+        runLoggingT . runConduit $ createInsertsCollection g input .| sinkList
 
     swissArmyMappingCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy.SwissArmyMapping" (address text,
     block_hash text,
@@ -761,7 +761,7 @@ spec = do
     transaction_hash text,
     transaction_sender text,
     contract_name text,
-    mapname text,
+    collectionname text,
     key text,
     value text,
   PRIMARY KEY (address, key));|]
@@ -773,7 +773,7 @@ spec = do
     "transaction_hash",
     "transaction_sender",
     "contract_name",
-    "mapname",
+    "collectionname",
     "key",
     "value")
   VALUES ('000000000000000000000000000000098eaddede',
@@ -794,7 +794,7 @@ spec = do
     transaction_hash = excluded.transaction_hash,
     transaction_sender = excluded.transaction_sender,
     contract_name = excluded.contract_name,
-    mapname = excluded.mapname,
+    collectionname = excluded.collectionname,
     value = excluded.value;|]
 
   -- it "can create and insert into abstract tables" $ do
