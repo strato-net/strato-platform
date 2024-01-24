@@ -11,6 +11,7 @@ import {
   Avatar,
   Input,
   notification,
+  Pagination,
 } from "antd";
 import { CloseOutlined } from "@ant-design/icons";
 // Actions
@@ -35,6 +36,7 @@ import './index.css'
 const { Panel } = Collapse;
 const { Text } = Typography;
 
+
 const CategoryProductList = ({ user }) => {
 
   const location = useLocation();
@@ -43,8 +45,11 @@ const CategoryProductList = ({ user }) => {
 
   const searchQueryValue = queryParams.get('search');
   const categoryQueryValue = queryParams.get('category');
+  const limit = 10;
   const categoryQueryValueArr = categoryQueryValue ? categoryQueryValue.split(',') : []
-
+  const pageVal = queryParams.get('page');
+  const pageNo = pageVal ? parseInt(pageVal) : 1;
+  const offset = ((pageNo - 1) * limit)
   const [api] = notification.useNotification();
   // States
   const [selectedCategories, setSelectedCategories] = useState(categoryQueryValueArr);
@@ -57,13 +62,14 @@ const CategoryProductList = ({ user }) => {
   const [uniqueProductNames, setUniqueProductNames] = useState([]);
   const [desktopOpenFilter, setDesktopOpenFilter] = useState(true);
   const [mobileOpenFilter, setMobileOpenFilter] = useState(false);
-  const [search, setSearch] = useState(searchQueryValue)
+  const [search, setSearch] = useState(searchQueryValue);
+
   //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
   const subCategoryDispatch = useSubCategoryDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
   // states
-  const { marketplaceList, isMarketplaceLoading } = useMarketplaceState();
+  const { marketplaceList, isMarketplaceLoading, marketplaceListCount } = useMarketplaceState();
   const { categorys } = useCategoryState();
   let { hasChecked, isAuthenticated } = useAuthenticateState();
   const { subCategorys } = useSubCategoryState();
@@ -128,7 +134,9 @@ const CategoryProductList = ({ user }) => {
         arrayToStr(selectedBrands),
         minPrice,
         maxPrice,
-        searchQueryValue
+        searchQueryValue,
+        limit,
+        offset
       );
     } else {
       marketplaceActions.fetchMarketplaceLoggedIn(
@@ -139,7 +147,9 @@ const CategoryProductList = ({ user }) => {
         arrayToStr(selectedBrands),
         minPrice,
         maxPrice,
-        searchQueryValue
+        searchQueryValue,
+        limit,
+        offset
       );
     }
   }, [
@@ -151,7 +161,8 @@ const CategoryProductList = ({ user }) => {
     maxPrice,
     hasChecked,
     isAuthenticated,
-    searchQueryValue
+    searchQueryValue,
+    offset
   ]);
 
   useEffect(() => {
@@ -269,6 +280,19 @@ const CategoryProductList = ({ user }) => {
   }
 
   const isLoading = isMarketplaceLoading;
+
+  const onPageChange = (page) => {
+    const baseUrl = new URL('/category', window.location.origin);
+    if (categoryQueryValue) {
+      baseUrl.searchParams.set('category', categoryQueryValue);
+    }
+    if (searchQueryValue) {
+      baseUrl.searchParams.set('search', searchQueryValue);
+    }
+    baseUrl.searchParams.set('page', page);
+    const url = baseUrl.pathname + baseUrl.search;
+    navigate(url);
+  };
 
   const BreadCrumbComponent = () =>
     <Breadcrumb className="text-xs ml-4 md:ml-14 mt-14 lg:mt-5">
@@ -550,18 +574,27 @@ const CategoryProductList = ({ user }) => {
             :
             <div>
               {marketplaceList?.length > 0 ? (
-                <div className={`mt-[61px] md:mt-4 mb-8 flex w-full md:grid flex-col items-center ${desktopOpenFilter ? "grid-cols-1 gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 lg:gap-14 " : " sm:grid-cols-1 gap-4 md:grid-cols-2 md:gap-14 lg:grid-cols-3 lg:gap-16 xl:grid-cols-4"}`} id="product-list">
-                  {marketplaceList.map((product, index) => {
-                    return (
-                      <NewTrendingCard
-                        topSellingProduct={product}
-                        key={index}
-                        addItemToCart={addItemToCart}
-                        parent={"Marketplace"}
-                      />
-                    );
-                  })}
-                </div>
+                <>
+                  <div className={`mt-[61px] md:mt-4 mb-8 flex w-full md:grid flex-col items-center ${desktopOpenFilter ? "grid-cols-1 gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 lg:gap-14 " : " sm:grid-cols-1 gap-4 md:grid-cols-2 md:gap-14 lg:grid-cols-3 lg:gap-16 xl:grid-cols-4"}`} id="product-list">
+                    {marketplaceList.map((product, index) => {
+                      return (
+                        <NewTrendingCard
+                          topSellingProduct={product}
+                          key={index}
+                          addItemToCart={addItemToCart}
+                          parent={"Marketplace"}
+                        />
+                      );
+                    })}
+                  </div>
+                  <Pagination
+                    current={pageNo}
+                    onChange={onPageChange}
+                    total={marketplaceListCount}
+                    showSizeChanger={false}
+                    className="flex justify-center my-5"
+                  />
+                </>
               ) : (
                 <div className="h-96 flex justify-center items-center" id="product-list">
                   No data found
