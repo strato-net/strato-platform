@@ -25,7 +25,6 @@ module Blockchain.Strato.Discovery.Data.Peer
 where
 
 import Blockchain.DB.SQLDB (runSqlPool, withGlobalSQLPool)
-import Blockchain.Data.Enode
 import Blockchain.Data.PersistTypes ()
 import Blockchain.Data.PubKey
 import Blockchain.Data.RLP
@@ -80,7 +79,6 @@ PPeer
     nextDisableWindowSeconds Int default=5
     nextUdpDisableWindowSeconds Int default=5
     disableExpiration UTCTime default=now()
-    ~enode Enode Maybe
     deriving Show Read Eq
 |]
 
@@ -196,8 +194,7 @@ buildPeerPoint (pubkeyMaybe, ip, p) =
             pPeerDisableException = T.pack "None",
             pPeerNextDisableWindowSeconds = 5,
             pPeerNextUdpDisableWindowSeconds = 5,
-            pPeerDisableExpiration = jamshidBirth,
-            pPeerEnode = peerToEnode peer
+            pPeerDisableExpiration = jamshidBirth
           }
    in peer
 
@@ -331,18 +328,6 @@ storeDisableException ::
   T.Text ->
   m (Either SomeException ())
 storeDisableException peer' e = try $ A.replace (A.Proxy) peer' e
-
--- TODO: Allow an empty public key in the Enode type
-peerToEnode :: PPeer -> Maybe Enode
-peerToEnode peer =
-  ( \pk ->
-      Enode
-        (OrgId $ pointToBytes pk)
-        (readIP . T.unpack $ pPeerIp peer)
-        (pPeerTcpPort peer)
-        (Just $ pPeerUdpPort peer)
-  )
-    <$> pPeerPubkey peer
 
 getNumAvailablePeers :: (MonadUnliftIO m, Mod.Accessible AvailablePeers m) => m Int
 getNumAvailablePeers = length . unAvailablePeers <$> Mod.access (Mod.Proxy @AvailablePeers) -- lolololol ever heard of SELECT COUNT

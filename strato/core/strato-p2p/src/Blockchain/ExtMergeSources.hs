@@ -93,8 +93,7 @@ mergeSourcesByForce :: ( MonadResource m1
                     -> m2 (ConduitT z a2 m1 ())
 mergeSourcesByForce sx bound scp =
   return $ do
-    (chkey,c) <- allocate (liftSTM $ newTBMChan bound)
-                          (liftSTM . closeTBMChan)
+    c <- liftSTM $ newTBMChan bound
     refcount <- liftSTM . newTVar $ length sx
     st <- lift $ askUnliftIO
     _  <- forM sx $ \(tag,s) ->
@@ -110,4 +109,3 @@ mergeSourcesByForce sx bound scp =
                                   )
                  )
     chanSource c readTBMChan
-    release chkey

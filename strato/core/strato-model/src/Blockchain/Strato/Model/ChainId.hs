@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -49,10 +50,11 @@ instance ToJSONKey ChainId where
 instance PersistField ChainId where
   toPersistValue = PersistText . Text.pack . chainIdString
   fromPersistValue (PersistText t) =
-    maybeToEither "could not decode chainid"
-      . stringChainId
-      . Text.unpack
-      $ t
+    let !eCid = maybeToEither "could not decode chainid"
+              . stringChainId
+              . Text.unpack
+              $ t
+     in eCid
   fromPersistValue x =
     Left . Text.pack $
       "PersistField ChainId: expected PersistText: " ++ show x
