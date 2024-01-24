@@ -18,7 +18,7 @@ defineFlag "connectionTimeout" (30 :: Int) "Number of seconds to tolerate a usel
 defineFlag "maxReturnedHeaders" (500 :: Int) "Number of headers to return from a GetBlockHeaders request"
 defineFlag "maxHeadersTxsLens" (2500 :: Int) "Number of txs size to return from a BlockHeader request"
 defineFlag "averageTxsPerBlock" (40 :: Int) "Average number of txs per block"
-defineFlag "wireMessageCacheSize" (10 :: Int) "Number of wire messages to cache for network performance"
+defineFlag "wireMessageCacheSize" (2000 :: Int) "Number of wire messages to cache for network performance"
 defineFlag "vaultWrapperUrl" ("http://localhost:8013/strato/v2.3" :: String) "The Vault-Wrapper URL"
 defineFlag
   "txGossipFanout"
