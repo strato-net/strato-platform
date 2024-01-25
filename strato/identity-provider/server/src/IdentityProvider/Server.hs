@@ -335,7 +335,7 @@ certInCirrus token realm a = do
   where
     cirrusSearchPath :: Address -> String
     cirrusSearchPath address =
-      "/cirrus/search/Certificate?userAddress.eq." <> show address <> "&order=block_timestamp.desc&limit=1"
+      "/cirrus/search/Certificate?userAddress=eq." <> show address <> "&order=block_timestamp.desc&limit=1"
 
     callCirrus :: MonadIO m => BaseUrl -> m (HTTP.Response BL.ByteString)
     callCirrus nurl = do
