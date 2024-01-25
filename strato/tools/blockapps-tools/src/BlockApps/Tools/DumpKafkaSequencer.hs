@@ -31,10 +31,7 @@ dumpKafkaSequencerVM startingBlock = do
 
 dumpKafkaSequencerP2P :: Offset -> IO ()
 dumpKafkaSequencerP2P startingBlock = do
-  ret <- runKafkaConfigured "queryStrato" $ doConsume' startingBlock
-  case ret of
-    Left e -> error $ show e
-    Right _ -> return ()
+  runKafkaMConfigured "queryStrato" $ doConsume' startingBlock
   where
     doConsume' offset = do
       seqEvents <- readSeqP2pEvents offset

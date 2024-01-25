@@ -14,7 +14,6 @@ library:
     - aeson
     - blockstanbul
     - bytestring
-    - conduit
     - deepseq
     - ethereum-rlp
     - format

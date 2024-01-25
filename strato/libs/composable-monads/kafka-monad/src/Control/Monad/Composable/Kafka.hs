@@ -6,12 +6,11 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 
-{-# OPTIONS -fno-warn-unused-top-binds #-}
-
 module Control.Monad.Composable.Kafka (
   KafkaM,
   HasKafka,
   KafkaEnv(..),
+  kafkaStateToKafkaEnv,
   runKafkaM,
   runKafkaMUsingEnv,
   execKafka,
@@ -28,15 +27,18 @@ module Control.Monad.Composable.Kafka (
   ConsumerGroup,
   KafkaError(..),
   packMetadata,
-  unpackMetadata
+  unpackMetadata,
+  conduitSource,
+  conduitSourceUsingEnv
   ) where
 
 import BlockApps.Logging
 import Blockchain.MilenaTools
+import Conduit
 import Control.Lens
-import Control.Monad (forever)
+import Control.Monad (forever, forM_)
 import Control.Monad.Composable.Base
-import Control.Monad.IO.Unlift
+import Control.Monad.Loops
 import Control.Monad.Reader
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.State
@@ -66,7 +68,7 @@ data KafkaEnv = KafkaEnv
 
 createKafkaEnv ::
   MonadIO m =>
-  KafkaString ->
+  KafkaClientId ->
   KafkaAddress ->
   m KafkaEnv
 createKafkaEnv x y = do
@@ -77,6 +79,11 @@ createKafkaEnv x y = do
             _stateWaitTime = 100000 -- 100s
           }
 
+  kafkaStateToKafkaEnv kafkaState
+
+kafkaStateToKafkaEnv :: MonadIO m =>
+                        KafkaState -> m KafkaEnv
+kafkaStateToKafkaEnv kafkaState = do
   ksIORef <- liftIO $ newIORef kafkaState
   return $ KafkaEnv ksIORef
 
@@ -187,3 +194,21 @@ fetchBytes topic offset = do
 
   return $ fetchResponseToPayload [offset] fetched
 
+conduitSource :: (MonadLogger m, MonadIO m, Binary a) =>
+                 LogSource -> KafkaClientId -> KafkaAddress -> TopicName -> ConduitT i a m b
+conduitSource name clientId kafkaAddress topicName = do
+  env <- createKafkaEnv clientId kafkaAddress
+
+  conduitSourceUsingEnv name env topicName
+
+conduitSourceUsingEnv :: (MonadLogger m, MonadIO m, Binary a) =>
+                         LogSource -> KafkaEnv -> TopicName -> ConduitT i a m b
+conduitSourceUsingEnv name env topicName = do
+  startingOffset <- runKafkaMUsingEnv env $ execKafka $ getLastOffset LatestTime 0 topicName
+
+  flip iterateM_ startingOffset $ \offset -> do
+      $logInfoS name "About to fetch blocks"
+      items <- runKafkaMUsingEnv env $ fetchItems topicName offset
+      $logInfoS name . T.pack $ "Fetched " ++ show (length items) ++ " events starting from " ++ show offset
+      forM_ items yield
+      return $ offset + fromIntegral (length items)

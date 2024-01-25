@@ -64,6 +64,7 @@ library:
     # - json-rpc
     - json-rpc-server
     - json-rpc-client
+    - kafka-monad
     - ki-unlifted
     - lens
     - lifted-async

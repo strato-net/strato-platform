@@ -21,10 +21,9 @@ import qualified Blockchain.Blockstanbul as PBFT
 import Blockchain.KafkaTopics (lookupTopic)
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka.Metrics
-import Blockchain.Stream.Raw
 import Control.Monad.Change.Modify (Outputs (..))
 import Control.Monad.Composable.Kafka
-import Data.Binary (Binary, decode, encode)
+import Data.Binary (Binary, encode)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Network.Kafka as K
@@ -65,14 +64,14 @@ readSeqVmEventsFromTopic :: HasKafka k => KP.TopicName -> KP.Offset -> k [VmEven
 readSeqVmEventsFromTopic = readFromTopic'
 {-# INLINE readSeqVmEventsFromTopic #-}
 
-readSeqP2pEvents :: K.Kafka k => KP.Offset -> k [P2pEvent]
+readSeqP2pEvents :: HasKafka m => KP.Offset -> m [P2pEvent]
 readSeqP2pEvents off = do
   events <- readSeqP2pEventsFromTopic seqP2pEventsTopicName off
   recordEvents seqP2PReads events
   return events
 
-readSeqP2pEventsFromTopic :: K.Kafka k => KP.TopicName -> KP.Offset -> k [P2pEvent]
-readSeqP2pEventsFromTopic = readFromTopicOld'
+readSeqP2pEventsFromTopic :: HasKafka m => KP.TopicName -> KP.Offset -> m [P2pEvent]
+readSeqP2pEventsFromTopic = readFromTopic'
 {-# INLINE readSeqP2pEventsFromTopic #-}
 
 writeUnseqEvents :: K.Kafka k => [IngestEvent] -> k [KP.ProduceResponse]
@@ -99,14 +98,6 @@ writeUnseqEventsWithLimits events = do
 
 readFromTopic' :: (Binary b, HasKafka k) => KP.TopicName -> KP.Offset -> k [b]
 readFromTopic' = fetchItems
-
-readFromTopicOld' :: (Binary b, K.Kafka k) => KP.TopicName -> KP.Offset -> k [b]
-readFromTopicOld' topic offset = do 
-  _ <- setDefaultKafkaState
-  bytes <- fetchBytes topic offset
-  return $ map (decode . BL.fromStrict) bytes
---  map (decode . BL.fromStrict) <$> fetchBytes topic offset
-{-# INLINE readFromTopic' #-}
 
 emitBlockstanbulMsg :: (m `Outputs` [IngestEvent]) => PBFT.WireMessage -> m ()
 emitBlockstanbulMsg wm = output [IEBlockstanbul wm]
