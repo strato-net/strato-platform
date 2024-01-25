@@ -52,9 +52,6 @@ const Order = ({ user }) => {
     const wb = XLSX.utils.book_new();
   
     // Convert each data array to a worksheet
-    console.log("isordersLoading: ", isordersLoading)
-    console.log("isFetchingItemTransfers: ", isFetchingItemTransfers)
-    console.log("isordersSoldLoading: ", isordersSoldLoading)
     while (isFetchingItemTransfers || isordersLoading || isordersSoldLoading) {
       console.log("Waiting for data to load...");
       await new Promise(resolve => setTimeout(resolve, 100)); // Wait for half a second
