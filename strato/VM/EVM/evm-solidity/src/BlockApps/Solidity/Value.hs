@@ -257,8 +257,8 @@ valueToText = \case
     "[" <> Text.intercalate "," (map valueToText vals) <> "]"
 
 escapeStringValue :: Text -> Text
-escapeStringValue tx = Text.replace "\"" "\\\""
-                     . Text.replace "\\" "\\\\"
+escapeStringValue = Text.replace "\"" "\\\""
+                  . Text.replace "\\" "\\\\"
 
 simpleValueToText :: SimpleValue -> Text
 simpleValueToText sv = case sv of
