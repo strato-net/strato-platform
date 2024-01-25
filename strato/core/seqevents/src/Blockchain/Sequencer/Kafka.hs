@@ -30,13 +30,13 @@ import qualified Network.Kafka as K
 import qualified Network.Kafka.Producer as KW
 import qualified Network.Kafka.Protocol as KP
 
-unseqEventsTopicName :: KP.TopicName
+unseqEventsTopicName :: TopicName
 unseqEventsTopicName = lookupTopic "unseqevents"
 
-seqVmEventsTopicName :: KP.TopicName
+seqVmEventsTopicName :: TopicName
 seqVmEventsTopicName = lookupTopic "seq_vm_events"
 
-seqP2pEventsTopicName :: KP.TopicName
+seqP2pEventsTopicName :: TopicName
 seqP2pEventsTopicName = lookupTopic "seq_p2p_events"
 
 assertTopicCreation :: K.Kafka k => k ()
@@ -50,7 +50,7 @@ readUnseqEvents off = do
   events <- readUnseqEventsFromTopic unseqEventsTopicName off
   return events
 
-readUnseqEventsFromTopic :: HasKafka k => KP.TopicName -> KP.Offset -> k [IngestEvent]
+readUnseqEventsFromTopic :: HasKafka k => TopicName -> KP.Offset -> k [IngestEvent]
 readUnseqEventsFromTopic = readFromTopic'
 {-# INLINE readUnseqEventsFromTopic #-}
 
@@ -60,7 +60,7 @@ readSeqVmEvents off = do
   recordEvents seqVMReads events
   return events
 
-readSeqVmEventsFromTopic :: HasKafka k => KP.TopicName -> KP.Offset -> k [VmEvent]
+readSeqVmEventsFromTopic :: HasKafka k => TopicName -> KP.Offset -> k [VmEvent]
 readSeqVmEventsFromTopic = readFromTopic'
 {-# INLINE readSeqVmEventsFromTopic #-}
 
@@ -70,7 +70,7 @@ readSeqP2pEvents off = do
   recordEvents seqP2PReads events
   return events
 
-readSeqP2pEventsFromTopic :: HasKafka m => KP.TopicName -> KP.Offset -> m [P2pEvent]
+readSeqP2pEventsFromTopic :: HasKafka m => TopicName -> KP.Offset -> m [P2pEvent]
 readSeqP2pEventsFromTopic = readFromTopic'
 {-# INLINE readSeqP2pEventsFromTopic #-}
 
@@ -96,7 +96,7 @@ writeUnseqEventsWithLimits events = do
   KW.produceMessagesAsSingletonSets $
     (K.TopicAndMessage unseqEventsTopicName . KW.makeMessage) <$> events
 
-readFromTopic' :: (Binary b, HasKafka k) => KP.TopicName -> KP.Offset -> k [b]
+readFromTopic' :: (Binary b, HasKafka k) => TopicName -> KP.Offset -> k [b]
 readFromTopic' = fetchItems
 
 emitBlockstanbulMsg :: (m `Outputs` [IngestEvent]) => PBFT.WireMessage -> m ()

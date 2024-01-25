@@ -10,6 +10,7 @@ module Control.Monad.Composable.Kafka (
   KafkaM,
   HasKafka,
   KafkaEnv(..),
+  TopicName,
   kafkaStateToKafkaEnv,
   runKafkaM,
   runKafkaMUsingEnv,
