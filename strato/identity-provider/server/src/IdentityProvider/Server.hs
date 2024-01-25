@@ -200,16 +200,14 @@ putIdentity ::
   m Address
 putIdentity accessToken uuid idProv name mEmail mCo = do
   time' <- liftIO getCurrentTime
-  $logInfoS "putIdentity" $ "User " <> uuid <> " called PUT /identity with name " <> name <> " and company " <> T.pack (show mCo)
+  $logInfoS "putIdentity" $ "User " <> uuid <> " called PUT /identity with username " <> name <> " and company " <> T.pack (show mCo)
   -- check if a user exists in vault
   let realm = extractRealmName $ T.unpack idProv
       name' = T.unpack name
       uuid' = T.unpack uuid
-      orgNew = getDefaultEmptyOrg name' uuid'
-      orgOld = getDefaultEmptyOrgOld name' uuid'
-      (hasOrgName, org) = case mCo of
-        Just o | o /= "" -> (True, T.unpack o)
-        _ -> (False, orgNew)
+      org = case mCo of
+        Just o | o /= "" -> T.unpack o
+        _ -> getDefaultEmptyOrg name' uuid'
       csvLogMsg = T.intercalate ","
            [ T.pack $ show time'
            , T.pack realm
@@ -221,15 +219,7 @@ putIdentity accessToken uuid idProv name mEmail mCo = do
   getVaultKey accessToken >>= \case
     Just (AddressAndKey a k) -> do
       -- has vault key, confirm also has cert
-      userCerts <- do
-        certs <- certInCirrus accessToken realm a org
-        -- We don't want to check for a cert using the default
-        -- org name if the provided org name is different
-        if hasOrgName
-          then pure certs
-          else if null certs
-            then certInCirrus accessToken realm a orgOld
-            else pure certs
+      userCerts <- certInCirrus accessToken realm a
 
       getAccessTokenForRealm realm >>= \case
         Nothing -> do
@@ -322,9 +312,8 @@ certInCirrus ::
   Text ->
   String ->
   Address ->
-  String ->
   m [CertificateInCirrus]
-certInCirrus token realm a co = do
+certInCirrus token realm a = do
   rd <- access (Proxy @RealmData)
   case M.lookup realm rd of
     Nothing -> do
@@ -344,14 +333,13 @@ certInCirrus token realm a co = do
           $logErrorS "certInCirrus" "Unexpected response from cirrus query. This should never happen"
           throwIO $ IdentityError "Unable to decode cirrus query for user's cert. Something went very wrong"
   where
-    cirrusSearchPath :: Address -> String -> String
-    cirrusSearchPath address org =
-      let orgParam = ",organization.eq." <> org
-       in "/cirrus/search/Certificate?and=(userAddress.eq." <> show address <> orgParam <> ")&order=block_timestamp.desc&limit=1"
+    cirrusSearchPath :: Address -> String
+    cirrusSearchPath address =
+      "/cirrus/search/Certificate?userAddress.eq." <> show address <> "&order=block_timestamp.desc&limit=1"
 
     callCirrus :: MonadIO m => BaseUrl -> m (HTTP.Response BL.ByteString)
     callCirrus nurl = do
-      let cirrusEndpoint = cirrusSearchPath a co
+      let cirrusEndpoint = cirrusSearchPath a
           url = showBaseUrl nurl {baseUrlPath = baseUrlPath nurl <> cirrusEndpoint}
       mgr <- liftIO $ case baseUrlScheme nurl of
         Http -> newManager defaultManagerSettings
