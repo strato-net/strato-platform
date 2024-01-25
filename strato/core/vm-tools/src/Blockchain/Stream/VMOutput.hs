@@ -31,8 +31,8 @@ import Blockchain.KafkaTopics
 import Blockchain.MilenaTools
 import Blockchain.Stream.Raw
 import Conduit
+import Control.Monad (when)
 import Control.Monad.Change.Modify (Modifiable)
-import Control.Monad.State
 import qualified Data.Binary as Binary
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL

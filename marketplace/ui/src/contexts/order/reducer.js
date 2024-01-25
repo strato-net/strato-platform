@@ -31,17 +31,20 @@ const reducer = (state, action) => {
         error: action.error,
         isCreateOrderSubmitting: false,
       };
-    case actionDescriptors.cancelOrder:
+    case actionDescriptors.cancelSale:
       return {
         ...state,
+        isorderDetailsLoading: true,
       };
-    case actionDescriptors.cancelOrderSuccessful:
+    case actionDescriptors.cancelSaleSuccessful:
       return {
         ...state,
+        isorderDetailsLoading: false,
       };
-    case actionDescriptors.cancelOrderFailed:
+    case actionDescriptors.cancelSaleFailed:
       return {
         ...state,
+        isorderDetailsLoading: false,
         error: action.error,
       };
     case actionDescriptors.createPayment:
@@ -95,6 +98,19 @@ const reducer = (state, action) => {
         ...state,
         error: action.error,
         isordersLoading: false,
+      };
+    case actionDescriptors.updateOrderStatus:
+      return {
+        ...state,
+      };
+    case actionDescriptors.updateOrderStatusSuccessful:
+      return {
+        ...state,
+      };
+    case actionDescriptors.updateOrderStatusFailed:
+      return {
+        ...state,
+        error: action.error,
       };
     case actionDescriptors.fetchOrderSold:
       return {
@@ -197,6 +213,22 @@ const reducer = (state, action) => {
         ...state,
         error: action.error,
         isCreateOrderSubmitting: false,
+      }
+    case actionDescriptors.updateOrderComment:
+      return {
+        ...state,
+        isUpdatingOrderComment: true,
+      }
+    case actionDescriptors.updateOrderCommentSuccessful:
+      return {
+        ...state,
+        isUpdatingOrderComment: false,
+      }
+    case actionDescriptors.updateOrderCommentFailed:
+      return {
+        ...state,
+        error: action.error,
+        isUpdatingOrderComment: false,
       }
     case actionDescriptors.createSaleOrder:
       return {

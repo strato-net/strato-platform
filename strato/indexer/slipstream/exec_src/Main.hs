@@ -24,7 +24,6 @@ import Data.String
 import Database.Persist.Postgresql
 import Database.PostgreSQL.Typed
 import HFlags
-import Network.Kafka hiding (runKafka)
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Prometheus
 -- import Slipstream.Processor

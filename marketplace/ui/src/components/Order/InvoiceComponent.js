@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
 
 });
 
-const InvoiceComponent = ({ invoice }) => {
+const InvoiceComponent = ({ invoice, userAddress }) => {
   const [subtotal, setSubtotal] = useState(0);
   const [totalTax, settotalTax] = useState(0);
   const [totalShipping, settotalShipping] = useState(0);
@@ -161,28 +161,28 @@ const InvoiceComponent = ({ invoice }) => {
               <Text style={styles.addressTitle}>Address: </Text>
               <View style={styles.addressTextSection}>
                 <Text style={styles.bottomLabelAddress}>Name: </Text>
-                <Text style={styles.bottomLabelValue}>{decodeURIComponent(invoice.userContactAddress.shippingName)}</Text>
+                <Text style={styles.bottomLabelValue}>{decodeURIComponent(userAddress.name)}</Text>
               </View>
               <View style={styles.addressTextSection}>
                 <Text style={styles.bottomLabelAddress}>Address: </Text>
                 <Text style={styles.bottomLabelValue}>
-                  { invoice.userContactAddress.shippingAddressLine2 ?
-                    decodeURIComponent(invoice.userContactAddress.shippingAddressLine1)+", "+decodeURIComponent(invoice.userContactAddress.shippingAddressLine2) 
-                    : decodeURIComponent(invoice.userContactAddress.shippingAddressLine1)
+                  { userAddress.addressLine2 ?
+                    decodeURIComponent(userAddress.addressLine1)+", "+decodeURIComponent(userAddress.addressLine2) 
+                    : decodeURIComponent(userAddress.addressLine1)
                   }
                 </Text>
               </View>
               <View style={styles.addressTextSection}>
                 <Text style={styles.bottomLabelAddress}>City: </Text>
-                <Text style={styles.bottomLabelValue}>{decodeURIComponent(invoice.userContactAddress.shippingCity)}</Text>
+                <Text style={styles.bottomLabelValue}>{decodeURIComponent(userAddress.city)}</Text>
               </View>
               <View style={styles.addressTextSection}>
                 <Text style={styles.bottomLabelAddress}>State: </Text>
-                <Text style={styles.bottomLabelValue}>{decodeURIComponent(invoice.userContactAddress.shippingState)}</Text>
+                <Text style={styles.bottomLabelValue}>{decodeURIComponent(userAddress.state)}</Text>
               </View>
               <View style={styles.addressTextSection}>
                 <Text style={styles.bottomLabelAddress}>Zip code: </Text>
-                <Text style={styles.bottomLabelValue}>{decodeURIComponent(invoice.userContactAddress.shippingZipcode)}</Text>
+                <Text style={styles.bottomLabelValue}>{decodeURIComponent(userAddress.zipcode)}</Text>
               </View>
             </View>
           </View>
@@ -197,19 +197,19 @@ const InvoiceComponent = ({ invoice }) => {
             <Text style={[styles.label, styles.tableHeaderColumn]}>Tax($)</Text>
             <Text style={[styles.label, styles.tableHeaderColumn]}>Amount($)</Text>
           </View>
-          {invoice.assets.map(asset => (
+          {invoice.assets.map((asset, index) => (
             <View style={styles.tableRow} key={asset.address}>
               <Text style={[styles.value, styles.tableRowColumn]}>{decodeURIComponent(asset.name)}</Text>
               {/* <View style={styles.separator} /> */}
               <Text style={[styles.value, styles.tableRowColumn]}>${asset.price}</Text>
               {/* <View style={styles.separator} /> */}
-              <Text style={[styles.value, styles.tableRowColumn]}>{asset.quantity}</Text>
+              <Text style={[styles.value, styles.tableRowColumn]}>{invoice.order.quantities[index]}</Text>
               {/* <View style={styles.separator} /> */}
               <Text style={[styles.value, styles.tableRowColumn]}>${asset.shippingCharges ? asset.shippingCharges : 0}</Text>
               {/* <View style={styles.separator} /> */}
               <Text style={[styles.value, styles.tableRowColumn]}>${asset.tax ? asset.tax : 0}</Text>
               {/* <View style={styles.separator} /> */}
-              <Text style={[styles.value, styles.tableRowColumn]}>${asset.amount}</Text>
+              <Text style={[styles.value, styles.tableRowColumn]}>${asset.price * invoice.order.quantities[index]}</Text>
             </View>
           ))}
           {/* <View style={styles.tableRow} >

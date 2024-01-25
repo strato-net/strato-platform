@@ -1,28 +1,68 @@
 {
     "categories": [
         {
-            "name": "Art",
-            "imageKey": ""
-        },
-        {
             "name": "Carbon",
-            "imageKey": ""
+            "imageKey": "",
+            "subCategories": [
+                {
+                    "name": "Carbon Offset",
+                    "contract": "CarbonOffset"
+                },
+                {
+                    "name": "Carbon DAO",
+                    "contract": "CarbonDAO"
+                }
+            ]
         },
         {
             "name": "Metals",
-            "imageKey": ""
+            "imageKey": "",
+            "subCategories": [
+                {
+                    "name": "Metals",
+                    "contract": "Metals"
+                }
+            ]
         },
         {
             "name": "Clothing",
-            "imageKey": ""
-        },
-        {
-            "name": "Membership",
-            "imageKey": ""
+            "imageKey": "",
+            "subCategories": [
+                {
+                    "name": "Clothing",
+                    "contract": "Clothing"
+                }
+            ]
         },
         {
             "name": "Collectibles",
-            "imageKey": ""
+            "imageKey": "",
+            "subCategories": [
+                {
+                    "name": "Collectibles",
+                    "contract": "Collectibles"
+                }
+            ]           
+        },
+        {
+            "name": "Art",
+            "imageKey": "",
+            "subCategories": [
+                {
+                    "name": "Art",
+                    "contract": "Art"
+                }
+            ]
+        },
+        {
+            "name": "Membership",
+            "imageKey": "",
+            "subCategories": [
+                {
+                    "name": "Membership",
+                    "contract": "Membership"
+                }
+            ]            
         }
     ]
 }

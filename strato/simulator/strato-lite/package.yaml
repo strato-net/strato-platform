@@ -50,6 +50,7 @@ library:
   - blockstanbul
   - bytestring
   - common-log
+  - composable-monads-base
   - conduit
   - containers
   - data-default
@@ -58,6 +59,7 @@ library:
   - ethereum-encryption
   - ethereum-rlp
   - hflags
+  - ki-unlifted
   - lens
   - merkle-patricia-db
   - monad-alter
@@ -76,7 +78,6 @@ library:
   - strato-p2p
   - strato-sequencer
   - text
-  - thread-hierarchy
   - time
   - transformers
   - unliftio
@@ -101,6 +102,8 @@ tests:
       - containers
       - ethereum-encryption
       - hflags
+      - ki-unlifted
+      - labeled-error
       - hspec
       - lens
       - monad-alter
@@ -117,4 +120,3 @@ tests:
       - unliftio
       - vm-tools
       - x509-certs
-

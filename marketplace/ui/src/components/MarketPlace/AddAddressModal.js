@@ -13,7 +13,7 @@ import {
 
 
 
-const AddAddressModel = ({open , close }) => {
+const AddAddressModal = ({open , close }) => {
     const [showAddress, setshowAddress] = useState(false);
     const marketplaceDispatch = useMarketplaceDispatch();
     const ShippingDetailsSchema = () => {
@@ -25,6 +25,7 @@ const AddAddressModel = ({open , close }) => {
         addressLine2: yup.string().notRequired(),
         city: yup.string().required("City is required"),
         state: yup.string().required("State is required"),
+        country: yup.string().required("Country is required"),
         sameAddress: yup.boolean(),
         name_b: yup.string().when("sameAddress", {
           is: false,
@@ -47,6 +48,10 @@ const AddAddressModel = ({open , close }) => {
           is: false,
           then: yup.string().required("State is required"),
         }),
+        country_b: yup.string().when("sameAddress", { 
+          is: false,
+          then: yup.string().required("Country is required"),
+        })
       });
     };
     
@@ -60,7 +65,8 @@ const AddAddressModel = ({open , close }) => {
           billingState: encodeURIComponent(values.state),
           billingCity: encodeURIComponent(values.city),
           billingAddressLine1: encodeURIComponent(values.addressLine1),
-          billingAddressLine2: encodeURIComponent(values.addressLine2)
+          billingAddressLine2: encodeURIComponent(values.addressLine2),
+          billingCountry: encodeURIComponent(values.country),
         }
       } else {
         billingAddr = {
@@ -69,21 +75,21 @@ const AddAddressModel = ({open , close }) => {
           billingState: encodeURIComponent(values.state_b),
           billingCity: encodeURIComponent(values.city_b),
           billingAddressLine1: encodeURIComponent(values.addressLine1_b),
-          billingAddressLine2: encodeURIComponent(values.addressLine2_b)
+          billingAddressLine2: encodeURIComponent(values.addressLine2_b),
+          billingCountry: encodeURIComponent(values.country_b),
         }
       }
     
       const body = {
         //shipping address
-        shippingName: encodeURIComponent(values.name),
-        shippingZipcode: values.zipcode,
-        shippingState: encodeURIComponent(values.state),
-        shippingCity: encodeURIComponent(values.city),
-        shippingAddressLine1: encodeURIComponent(values.addressLine1),
-        shippingAddressLine2: encodeURIComponent(values.addressLine2),
-    
-        //billing address
-        ...billingAddr
+        name: encodeURIComponent(values.name),
+        zipcode: values.zipcode,
+        state: encodeURIComponent(values.state),
+        city: encodeURIComponent(values.city),
+        addressLine1: encodeURIComponent(values.addressLine1),
+        addressLine2: encodeURIComponent(values.addressLine2),
+        country: encodeURIComponent(values.country),
+        // billing address
       };
     
       window.LOQ.push(['ready', async LO => {
@@ -111,12 +117,14 @@ const AddAddressModel = ({open , close }) => {
           addressLine1: "",
           addressLine2: "",
           city: "",
+          country: "",
           state_b: "",
           name_b: "",
           zipcode_b: "",
           addressLine1_b: "",
           addressLine2_b: "",
           city_b: "",
+          country_b: "",
         },
         validationSchema: ShippingDetailsSchema,
         onSubmit: function (values) {
@@ -133,8 +141,8 @@ const AddAddressModel = ({open , close }) => {
     open={open}
     onCancel={close}
     title={
-      <div className="px-[30px] flex justify-between border-b border-[#BABABA]">
-        <Typography className="text-xl text-[#202020] font-semibold">Add new address</Typography>
+      <div className="flex justify-between border-b border-[#BABABA]">
+        <Typography className="text-xl text-[#202020] font-semibold">Add New Address</Typography>
 
       </div>
     }
@@ -188,7 +196,7 @@ const AddAddressModel = ({open , close }) => {
             name=""
             className=""
           >
-            <p className="text-left text-[#202020] font-medium">addressLine2</p>
+            <p className="text-left text-[#202020] font-medium">Address Line 2</p>
             <Input
               className="h-[42px] w-[330px] lg:w-[354px] "
               name="addressLine2"
@@ -258,11 +266,30 @@ const AddAddressModel = ({open , close }) => {
           </Form.Item>
         </div>
 
+        <div className="flex justify-between items-start pb-6">
+        <Form.Item label="" name="country" className="">
+        <p className="text-[#202020] font-medium text-left">Country</p>
+            <Input
+              label="state"
+              className="h-[42px] w-[330px] lg:w-[354px] "
+              name="country"
+              placeholder="Enter Country"
+              value={formik.values.country}
+              onChange={formik.handleChange}
+            />
+            {formik.touched.country && formik.errors.country && (
+             <p className="text-error text-xs text-left">
+                {formik.errors.country}
+             </p>
+            )}
+          </Form.Item>        
+          
+        </div>
       </div>
       <div className="flex justify-center pt-6" id="add-address-button">
         <div className="cursor-pointer justify-center flex items-center w-40 h-9  border border-primary rounded bg-primary hover:bg-primaryHover text-white"
           onClick={formik.handleSubmit}>
-          Add address
+          Add Address
         </div>
       </div>
     </Form>
@@ -272,4 +299,4 @@ const AddAddressModel = ({open , close }) => {
   )
 }
 
-export default AddAddressModel
+export default AddAddressModal

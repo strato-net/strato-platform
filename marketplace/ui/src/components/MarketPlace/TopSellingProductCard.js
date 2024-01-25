@@ -20,6 +20,7 @@ const { Title } = Typography;
 const TopSellingProductCard = () => {
   const containerRef = useRef(null)
   const [offset, setOffset] = useState(0);
+  const limit = 25;
 
   const marketplaceDispatch = useMarketplaceDispatch();
   const { topSellingProducts, isTopSellingProductsLoading, cartList } = useMarketplaceState();
@@ -28,15 +29,14 @@ const TopSellingProductCard = () => {
 
   useEffect(() => {
     if (!isAuthenticated) {
-      actions.fetchTopSellingProducts(marketplaceDispatch, offset);
+      actions.fetchTopSellingProducts(marketplaceDispatch, offset, limit);
     } else {
-      actions.fetchTopSellingProductsLoggedIn(marketplaceDispatch, offset);
+      actions.fetchTopSellingProductsLoggedIn(marketplaceDispatch, offset, limit);
     }
   }, [marketplaceDispatch, offset, hasChecked, isAuthenticated, loginUrl]);
 
   const naviroute = routes.MarketplaceProductDetail.url;
 
-  const limit = 3;
 
   const navigate = useNavigate();
 
@@ -56,7 +56,7 @@ const TopSellingProductCard = () => {
     }
   };
 
-  const addItemToCart = (product) => {
+  const addItemToCart = (product, quantity) => {
     if (product.ownerCommonName === user?.commonName) {
       openToast("bottom", true, "Cannot buy your own item")
       return false;
@@ -70,7 +70,7 @@ const TopSellingProductCard = () => {
     }
     let items = [];
     if (!found) {
-      items = [...cartList, { product, qty: 1 }];
+      items = [...cartList, { product, qty: quantity }];
       actions.addItemToCart(marketplaceDispatch, items);
 
       openToast("bottom", false, "Item added to cart");
@@ -137,14 +137,14 @@ const TopSellingProductCard = () => {
         </Title>
         <Button 
           size="large" 
-          onClick={()=>navigate('/category/:category')}
+          onClick={()=>navigate(routes.MarketplaceProductList.url)}
           className="text-black hover:!text-black border-grayDark hidden md:flex"
         >
             View All
         </Button>
         <Button 
           size="small" 
-          onClick={()=>navigate('/category/:category')}
+          onClick={()=>navigate(routes.MarketplaceProductList.url)}
           className="text-black hover:!text-black border-grayDark flex md:hidden"
         >
             View All
@@ -155,14 +155,15 @@ const TopSellingProductCard = () => {
               <Spin spinning={isTopSellingProductsLoading} size="large" />
             </div>
           ) : 
-        <div className="relative pl-[1px] md:pl-10">
+        <div className="relative md:pl-10">
           <div onClick={()=>scroll(-300)}  className={`${!prevVisible ? 'hidden' : 'md:flex hidden'} cursor-pointer absolute  justify-center items-center top-48 left-24 h-16 w-16 text-2xl bg-[#6A6A6A] rounded-full text-white`}>{"<"}</div>
-          <div ref={containerRef} className="overflow-x-auto gap-6 p-2 flex trending_cards">
+          <div ref={containerRef} className="overflow-x-auto gap-6 px-1 py-2 flex trending_cards">
             {topSellingProducts.map((topSellingProduct) => {
               return (
                 <NewTrendingCard
                 topSellingProduct={topSellingProduct}
                 addItemToCart={addItemToCart}
+                parent={"Marketplace"}
                 />)
               })}
           </div>

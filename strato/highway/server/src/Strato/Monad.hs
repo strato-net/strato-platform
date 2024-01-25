@@ -12,7 +12,7 @@
 
 module Strato.Monad where
 
-import Data.ByteString as DB hiding (map)
+import Aws (Credentials(..))
 import Data.ByteString.Lazy as DBL hiding (map)
 import BlockApps.Logging
 import Control.Monad.Reader
@@ -54,16 +54,15 @@ highwayWrapperError err = do
 
 data HighwayWrapperEnv = HighwayWrapperEnv
   { httpManager        :: Manager
+  , awsCredentials     :: Credentials 
   , generatedBoundary  :: DBL.ByteString
-  , awsaccesskeyid     :: DB.ByteString
-  , awssecretaccesskey :: DB.ByteString
   , awss3bucket        :: Text
   , highwayUrl         :: Text
   }
 
 data HighwayWrapperError
   = BadGetError 
-  | BadPutError
+  | BadPostError
   | UserError Text
   | RuntimeError SomeException
   deriving (Show, Exception)
@@ -90,11 +89,11 @@ handleHighwayError = \case
       "handleHighwayError/BadGetError"
       "Could not retrieve file from S3."
     throwIO BadGetError
-  BadPutError -> do
+  BadPostError -> do
     $logErrorS
-      "handleHighwayError/BadPutError"
+      "handleHighwayError/BadPostError"
       "Could not push file contents to S3."
-    throwIO BadPutError
+    throwIO BadPostError
   e@(RuntimeError _) -> do
     $logErrorS "handleHighwayError/RuntimeError" . Text.pack $
       show e ++ "\n  callstack missing for runtime errors"
@@ -122,12 +121,12 @@ enterHighwayWrapper env x = Handler $ do
                       "Could not find file."
                     ]
             }
-        BadPutError ->
+        BadPostError ->
           err500
             { errBody =
                 fromString $
                   unlines
-                    [ "Bad PUT Error!",
+                    [ "Bad POST Error!",
                       "Upload of file was unsuccessful."
                     ]
             }

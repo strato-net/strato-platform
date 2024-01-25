@@ -43,6 +43,7 @@ export const Product = {
 
 export const Inventory = {
   prefix: '/inventory',
+  transferredItems: '/transfers/items/',
   getOwnershipHistory: '/ownership/history',
   get: '/:address',
   getAll: '/',
@@ -75,8 +76,8 @@ export const Art = {
   create: '/'
 }
 
-export const Carbon = {
-  prefix: '/carbon',
+export const CarbonOffset = {
+  prefix: '/carbonOffset',
   getAll: '/',
   create: '/'
 }
@@ -116,16 +117,19 @@ export const Order = {
   get: '/:address',
   getAll: '/',
   create: '/',
-  update: '/update',
+  updateOrderStatus: '/update',
   updateBuyerDetails: '/updateBuyerDetails',
   updateSellerDetails: '/updateSellerDetails',
   payment: '/payment',
-  paymentSession: '/payment/session/:session_id',
+  paymentSession: '/payment/session/:session_id/:sellersCommonName',
+  paymentIntent: '/payment/intent/:session_id/:sellersCommonName',
   userAddress: '/userAddress',
   getAllUserAddress: '/userAddresses/user',
+  getAddressFromId: '/userAddress/:id',
   createSaleOrder: '/sale',
   cancelSaleOrder: '/sale/cancel',
   executeSale: '/closeSale',
+  updateOrderComment: '/updateComment'
 }
 
 export const OrderLine = {

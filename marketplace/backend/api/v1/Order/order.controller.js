@@ -46,13 +46,13 @@ class OrderController {
   static async create(req, res, next) {
     try {
       const { dapp, body } = req
-      
+
       const { to, subject, htmlContents } = body;
 
       OrderController.validateCreateOrderArgs(body)
 
       const result = await dapp.createOrder(body)
-      
+
       rest.response.status200(res, result)
 
       // Only send email if order is created successfully
@@ -137,7 +137,22 @@ class OrderController {
 
       OrderController.validatePaymentSessionArgs(params)
 
-      const result = await dapp.getPaymentSession({ session_id: params.session_id })
+      const result = await dapp.getPaymentSession(params)
+      rest.response.status200(res, result)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
+  static async paymentIntent(req, res, next) {
+    try {
+      const { dapp, params } = req
+
+      OrderController.validatePaymentIntentArgs(params)
+
+      const result = await dapp.getPaymentIntent(params)
       rest.response.status200(res, result)
 
       return next()
@@ -151,6 +166,19 @@ class OrderController {
       const { dapp, query } = req
 
       const orders = await dapp.getAllUserAddress({ ...query })
+      rest.response.status200(res, orders)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
+  static async getAddressFromId(req, res, next) {
+    try {
+      const { dapp, params } = req
+
+      const orders = await dapp.getAddressFromId(params)
       rest.response.status200(res, orders)
 
       return next()
@@ -201,6 +229,21 @@ class OrderController {
     }
   }
 
+  static async updateOrderStatus(req, res, next) {
+    try {
+      const { dapp, body } = req
+
+      OrderController.validateUpdateOrderStatusArgs(body)
+
+      const result = await dapp.updateOrderStatus(body)
+      rest.response.status200(res, result)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
   static async executeSale(req, res, next) {
     try {
       const { dapp, body } = req
@@ -208,6 +251,21 @@ class OrderController {
       OrderController.validateExecuteSaleArgs(body)
 
       const result = await dapp.completeOrder(body)
+      rest.response.status200(res, result)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
+  static async updateOrderComment(req, res, next) {
+    try {
+      const { dapp, body } = req
+
+      OrderController.validateUpdateOrderCommentArgs(body)
+
+      const result = await dapp.updateOrderComment(body)
       rest.response.status200(res, result)
 
       return next()
@@ -246,13 +304,14 @@ class OrderController {
 
   static validatePaymentArgs(args) {
     const paymentSchema = Joi.object({
+      paymentList: Joi.array().items(Joi.string()).required(),
       buyerOrganization: Joi.string().required(),
       orderList: Joi.array().min(1).items(Joi.object({
-            quantity: Joi.number().required(),
-            assetAddress: Joi.string().required(),
-          })).required(),
+        quantity: Joi.number().required(),
+        assetAddress: Joi.string().required(),
+      })).required(),
       orderTotal: Joi.number().required(),
-      shippingAddress: Joi.string().required().allow(''),
+      shippingAddressId: Joi.number().min(1).required(),
       tax: Joi.number().required(),
       user: Joi.string().required(),
       email: Joi.string().required(),
@@ -270,13 +329,29 @@ class OrderController {
 
   static validatePaymentSessionArgs(args) {
     const paymentSchema = Joi.object({
-      session_id: Joi.string().required()
+      session_id: Joi.string().required(),
+      sellersCommonName: Joi.string().required(),
     }).required();
 
     const validation = paymentSchema.validate(args);
 
     if (validation.error) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, 'Payment session Argument Validation Error', {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      })
+    }
+  }
+
+  static validatePaymentIntentArgs(args) {
+    const paymentSchema = Joi.object({
+      session_id: Joi.string().required(),
+      sellersCommonName: Joi.string().required(),
+    }).required();
+
+    const validation = paymentSchema.validate(args);
+
+    if (validation.error) {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Payment Intent Argument Validation Error', {
         message: `Missing args or bad format: ${validation.error.message}`,
       })
     }
@@ -320,18 +395,13 @@ class OrderController {
 
   static validateCreateUserAddressArgs(args) {
     const createUserAddressSchema = Joi.object({
-      shippingName: Joi.string().required(),
-      shippingZipcode: Joi.string().required(),
-      shippingState: Joi.string().required(),
-      shippingCity: Joi.string().required(),
-      shippingAddressLine1: Joi.string().required(),
-      shippingAddressLine2: Joi.string().allow(""),
-      billingName: Joi.string().required(),
-      billingZipcode: Joi.string().required(),
-      billingState: Joi.string().required(),
-      billingCity: Joi.string().required(),
-      billingAddressLine1: Joi.string().required(),
-      billingAddressLine2: Joi.string().allow("")
+      name: Joi.string().required(),
+      zipcode: Joi.string().required(),
+      state: Joi.string().required(),
+      city: Joi.string().required(),
+      addressLine1: Joi.string().required(),
+      addressLine2: Joi.string().allow(""),
+      country: Joi.string().required(),
     }).required();
 
     const validation = createUserAddressSchema.validate(args);
@@ -345,11 +415,13 @@ class OrderController {
 
   static validateCreateSaleOrderArgs(args) {
     const createSaleOrderSchema = Joi.object({
+      status: Joi.number().min(1).required(),
       items: Joi.array().min(1).items(Joi.object({
         quantity: Joi.number().required(),
         saleAddress: Joi.string().required(),
       })).required(),
-      shippingAddress: Joi.string().required().allow(''),
+      shippingAddressId: Joi.number().min(1).required(),
+      paymentSessionId: Joi.string().required(),
     }).required();
 
     const validation = createSaleOrderSchema.validate(args);
@@ -357,6 +429,21 @@ class OrderController {
     if (validation.error) {
       console.log(validation.error);
       throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Sale Order Argument Validation Error', {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      })
+    }
+  }
+
+  static validateUpdateOrderStatusArgs(args) {
+    const updateOrderStatusSchema = Joi.object({
+      saleOrderAddress: Joi.string().required(),
+      status: Joi.number().min(1).required()
+    }).required();
+
+    const validation = updateOrderStatusSchema.validate(args);
+
+    if (validation.error) {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Update Order Status Argument Validation Error', {
         message: `Missing args or bad format: ${validation.error.message}`,
       })
     }
@@ -372,6 +459,21 @@ class OrderController {
 
     if (validation.error) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, 'Cancel Sale Order Argument Validation Error', {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      })
+    }
+  }
+
+  static validateUpdateOrderCommentArgs(args) {
+    const updateOrderCommentSchema = Joi.object({
+      saleOrderAddress: Joi.string().required(),
+      comments: Joi.string().required(),
+    }).required();
+
+    const validation = updateOrderCommentSchema.validate(args);
+
+    if (validation.error) {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Update Order Comment Argument Validation Error', {
         message: `Missing args or bad format: ${validation.error.message}`,
       })
     }

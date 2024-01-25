@@ -16,7 +16,6 @@ library:
   source-dirs: src/
   dependencies:
     - aeson
-    - ansi-wl-pprint
     - base16-bytestring
     - binary
     - blockapps-data
@@ -34,6 +33,7 @@ library:
     - format
     - hedis
     - hflags
+    - kafka-monad
     - labeled-error
     - lens
     - leveldb-haskell

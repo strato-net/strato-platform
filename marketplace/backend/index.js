@@ -15,6 +15,7 @@ import swaggerUi from "swagger-ui-express";
 import swaggerSpecs from "./swaggerspecs";
 import dotenv from "dotenv";
 import websocket from "./websocket";
+import axios from "axios";
 
 let server
 (async () => {
@@ -27,7 +28,10 @@ let server
   if (!deploy) {
     throw new Error(`Deploy file '${config.configDirPath}/${config.deployFilename}' not found`);
   }
-  
+
+  const marketplaceUrl = `${config.serverHost}/marketplace`
+  axios.defaults.headers.common['Referer'] = marketplaceUrl;
+
   app.set(deployParamName, deploy);
   
   // Setup middleware

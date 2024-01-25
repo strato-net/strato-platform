@@ -51,11 +51,11 @@ library:
   source-dirs: library/
   exposed-modules: Blockchain.Data.RLP
   dependencies:
-  - ansi-wl-pprint
   - base16-bytestring
   - containers
   - data-fix
   - deepseq
+  - format
   - text
 
 tests:

@@ -5,7 +5,7 @@ import { actions as itemActions } from "../../contexts/item/actions";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import { useItemDispatch } from "../../contexts/item";
 
-const ResellModal = ({ open, handleCancel, inventory }) => {
+const ResellModal = ({ open, handleCancel, inventory, categoryName }) => {
     const [quantity, setQuantity] = useState(1);
     const inventoryDispatch = useInventoryDispatch();
     const itemDispatch = useItemDispatch();
@@ -46,7 +46,7 @@ const ResellModal = ({ open, handleCancel, inventory }) => {
         };
         let isDone = await actions.resellInventory(inventoryDispatch, body);
         if (isDone) {
-            actions.fetchInventory(inventoryDispatch, 10, 0, "");
+            await actions.fetchInventory(inventoryDispatch, 10, 0, "", categoryName);
             handleCancel();
         }
     }
@@ -63,11 +63,15 @@ const ResellModal = ({ open, handleCancel, inventory }) => {
                 </Button>
             ]}
         >
+            <div className="head">
+
             <Table
+            
                 columns={columns()}
                 dataSource={[inventory]}
                 pagination={false}
             />
+            </div>
         </Modal>
     )
 }

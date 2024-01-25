@@ -6,7 +6,6 @@
 module Strato.TypesSpec where
 
 import Bloc.API.TypeWrappers
-import Control.Applicative
 import Data.Aeson
 import Test.Hspec
 import Test.Hspec.QuickCheck

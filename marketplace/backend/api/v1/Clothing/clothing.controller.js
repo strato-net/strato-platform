@@ -39,7 +39,6 @@ class ClothingController {
   static validateCreateClothingArgs(args) {
     const createClothingSchema = Joi.object({
       itemArgs: Joi.object({
-        serialNumber: Joi.string().allow("").optional(),
         name: Joi.string().required(),
         description: Joi.string().required(),
         clothingType: Joi.string().required(),
@@ -47,8 +46,8 @@ class ClothingController {
         skuNumber: Joi.string().required(),
         condition: Joi.string().required(),
         brand: Joi.string().required(),
-        images: Joi.array().items(Joi.string().optional()).required(),
-        files: Joi.array().items(Joi.string().optional()).required(),
+        images: Joi.array().items(Joi.string().allow(null)).required(),
+        files: Joi.array().items(Joi.string().allow(null)).required(),
         quantity: Joi.number().positive().required(),
       }).required()
     });

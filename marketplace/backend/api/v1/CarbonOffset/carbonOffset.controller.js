@@ -5,13 +5,13 @@ import config from '../../../load.config'
 
 const options = { config, cacheNonce: true }
 
-class CarbonController {
+class CarbonOffsetController {
   static async getAll(req, res, next) {
     try {
       const { dapp, query } = req
 
-      const carbons = await dapp.getCarbons({ ...query })
-      rest.response.status200(res, carbons)
+      const carbonOffsets = await dapp.getCarbonOffsets({ ...query })
+      rest.response.status200(res, carbonOffsets)
 
       return next()
     } catch (e) {
@@ -23,9 +23,9 @@ class CarbonController {
     try {
       const { dapp, body } = req
 
-      CarbonController.validateCreateCarbonArgs(body)
+      CarbonOffsetController.validateCreateCarbonOffsetArgs(body)
 
-      const result = await dapp.createCarbon(body)
+      const result = await dapp.createCarbonOffset(body)
       rest.response.status200(res, result)
 
       return next()
@@ -36,26 +36,26 @@ class CarbonController {
 
   // ----------------------- ARG VALIDATION ------------------------
 
-  static validateCreateCarbonArgs(args) {
-    const createCarbonSchema = Joi.object({
+  static validateCreateCarbonOffsetArgs(args) {
+    const createCarbonOffsetSchema = Joi.object({
       itemArgs: Joi.object({
         name: Joi.string().required(),
         description: Joi.string().required(),
         quantity: Joi.number().integer().min(1).required(),
-        images: Joi.array().items(Joi.string().optional()).required(),
-        files: Joi.array().items(Joi.string().optional()).required(),
+        images: Joi.array().items(Joi.string().allow(null)).required(),
+        files: Joi.array().items(Joi.string().allow(null)).required(),
       }).required()
     });
 
-    const validation = createCarbonSchema.validate(args);
+    const validation = createCarbonOffsetSchema.validate(args);
 
     if (validation.error) {
       console.log(validation.error.message);
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Carbon Argument Validation Error', {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create CarbonOffset Argument Validation Error', {
         message: `Missing args or bad format: ${validation.error.message}`,
       })
     }
   }
 }
 
-export default CarbonController;
+export default CarbonOffsetController;

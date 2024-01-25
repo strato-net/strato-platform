@@ -27,12 +27,11 @@ import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
 import Conduit
-import Control.Applicative (liftA2)
 import Control.Lens hiding (view)
 import Control.Monad hiding (sequence)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Extra (whenM)
-import Control.Monad.State.Strict hiding (sequence)
+import Control.Monad.State.Strict
 import Control.Monad.Trans.Except
 import Crypto.Random.Entropy (getEntropy)
 import qualified Data.Map.Strict as M

@@ -109,25 +109,25 @@ function newnode {
   slipMinLogLevel=LevelInfo
   vmMinLogLevel=LevelInfo
 
-  if (( "${API_DEBUG_LOG:-false}" || "${FULL_DEBUG_LOG:-false}" )); then 
-    apiDebugMode=LevelDebug
-  fi
-  
-  if (( "${SEQUENCER_DEBUG_LOG:-false}" || "${FULL_DEBUG_LOG:-false}" )); then 
-    seqMinLogLevel=LevelDebug
+  if ${API_DEBUG_LOG:-false} || ${FULL_DEBUG_LOG:-false}; 
+  then apiDebugMode=LevelDebug
   fi
 
-  if (( "${SLIPSTREAM_DEBUG_LOG:-false}" || "${FULL_DEBUG_LOG:-false}" )); then 
-    slipMinLogLevel=LevelDebug
-  fi  
-  
-  if (( "${VM_DEBUG_LOG:-false}" || "${FULL_DEBUG_LOG:-false}" )); then 
-    vmMinLogLevel=LevelDebug
+  if ${SEQUENCER_DEBUG_LOG:-false} || ${FULL_DEBUG_LOG:-false}; 
+  then seqMinLogLevel=LevelDebug
+  fi
+
+  if ${SLIPSTREAM_DEBUG_LOG:-false} || ${FULL_DEBUG_LOG:-false}; 
+  then slipMinLogLevel=LevelDebug
+  fi
+
+  if ${VM_DEBUG_LOG:-false} || ${FULL_DEBUG_LOG:-false}; 
+  then vmMinLogLevel=LevelDebug
   fi
 
   echo "Starting ethereum-discover"
   runBackgroundProcess ethereum-discover  &>> logs/ethereum-discover
-  
+
   echo "Starting strato-p2p"
   runBackgroundProcess strato-p2p \
      --averageTxsPerBlock=${averageTxsPerBlock:-40} \

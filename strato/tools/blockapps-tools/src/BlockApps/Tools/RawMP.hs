@@ -9,18 +9,19 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
 import qualified Data.NibbleString as N
 import qualified Database.LevelDB as DB
-import Text.PrettyPrint.ANSI.Leijen hiding ((<$>), (</>))
+import Text.Format
 
-formatKV :: (N.NibbleString, RLPObject) -> Doc
+formatKV :: (N.NibbleString, RLPObject) -> String
 formatKV (key, val) =
-  pretty key <> text ": " <> pretty (rlpDeserialize $ rlpDecode val)
+  format key ++ ": " ++ format (rlpDeserialize $ rlpDecode val)
 
 showVals :: MonadIO m => DB.DB -> MP.StateRoot -> m ()
 showVals sdb sr = do
   kvs <- runReaderT (MP.unsafeGetKeyVals sr "") sdb
   liftIO . print $ length kvs
   --liftIO . putStrLn $ displayS (renderPretty 1.0 200 $ vsep $ formatKV <$> kvs) ""
-  liftIO . putStrLn $ displayS (renderPretty 1.0 200 $ vsep $ formatKV <$> kvs) ""
+  liftIO . putStrLn $ unlines $ formatKV <$> kvs
+
 
 doit :: String -> MP.StateRoot -> IO ()
 doit filename sr = DB.runResourceT $ do

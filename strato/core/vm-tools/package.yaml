@@ -35,8 +35,8 @@ library:
   ghc-options: -Wall -O2
   dependencies:
     - aeson
-    - ansi-wl-pprint
     - binary
+    - binary-instances
     - blockapps-data
     - blockapps-datadefs
     - blockapps-init
@@ -58,6 +58,7 @@ library:
     - format
     - generic-arbitrary
     - hedis
+    - kafka-monad
     - lens
     - leveldb-haskell
     - lrucache

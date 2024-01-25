@@ -43,11 +43,11 @@ class MetalsController {
         description: Joi.string().required(),
         source: Joi.string().required(),
         quantity: Joi.number().integer().min(1).required(),
-        unitOfMeasurement: Joi.number().integer().min(0).max(6).required(),
+        unitOfMeasurement: Joi.number().integer().min(0).max(8).required(),
         leastSellableUnits: Joi.number().integer().min(1).required(),
         purity: Joi.string().required(),
-        images: Joi.array().items(Joi.string().optional()).required(),
-        files: Joi.array().items(Joi.string().optional()).required(),
+        images: Joi.array().items(Joi.string().allow(null)).required(),
+        files: Joi.array().items(Joi.string().allow(null)).required(),
       }).required()
     });
 

@@ -38,6 +38,7 @@ library:
   - hflags
   - http-client
   - http-types
+  - kafka-monad
   - lens
   - leveldb-haskell
   - merkle-patricia-db

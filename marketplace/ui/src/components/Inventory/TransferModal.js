@@ -5,8 +5,9 @@ import { actions as userActions } from "../../contexts/users/actions";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import { useUsersDispatch, useUsersState } from "../../contexts/users";
 import { useAuthenticateState } from "../../contexts/authentication";
+import { SearchOutlined } from '@ant-design/icons';
 
-const TransferModal = ({ open, handleCancel, inventory }) => {
+const TransferModal = ({ open, handleCancel, inventory, categoryName }) => {
     const [data, setData] = useState([inventory]);
     const [quantity, setQuantity] = useState(1);
     const [userAddress, setUserAddress] = useState("");
@@ -25,6 +26,14 @@ const TransferModal = ({ open, handleCancel, inventory }) => {
 
     const filterDuplicateUserAddresses = (arr) => {
         return [...new Map(arr.map((u) => [u.value, u])).values()];
+    };
+    
+    const [searchInput, setSearchInput] = useState('');
+    const [dropdownOpen, setDropdownOpen] = useState(false);
+
+    const handleSearchChange = (value) => {
+        setSearchInput(value);
+        setDropdownOpen(!!value);
     };
 
     const usersList = users.map((record) => (user.commonName !== record.commonName ? { label: `${record.commonName} - ${record.organization}`, value: record.userAddress } : {}));
@@ -46,6 +55,13 @@ const TransferModal = ({ open, handleCancel, inventory }) => {
             setCanTransfer(true);
         };
     }, [quantity, userAddress])
+    
+    const filteredOptions = searchInput
+    ? filteredUsersList.filter(option =>
+        option.label && option.label.toLowerCase().includes(searchInput.toLowerCase())
+      )
+    : [];
+
 
     const columns = [
         {
@@ -68,11 +84,16 @@ const TransferModal = ({ open, handleCancel, inventory }) => {
                     className="w-64"
                     showSearch
                     onSelect={handleSelect}
-                    options={filteredUsersList}
+                    onSearch={handleSearchChange}
+                    options={filteredOptions}
                     optionFilterProp="value"
                     filterOption={(input, option) =>
                         (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
                     }
+                    open={dropdownOpen}
+                    suffixIcon={<SearchOutlined />}
+                    onFocus={() => setDropdownOpen(!!searchInput)} // Open dropdown on focus if there is any input
+                    onBlur={() => setDropdownOpen(false)} // Close dropdown on blur
                 />
             )
         }
@@ -89,7 +110,7 @@ const TransferModal = ({ open, handleCancel, inventory }) => {
         if (quantity > 0 && quantity <= inventory.quantity && userAddress) {
             let isDone = await actions.transferInventory(inventoryDispatch, body);
             if (isDone) {
-                actions.fetchInventory(inventoryDispatch, 10, 0, "");
+                await actions.fetchInventory(inventoryDispatch, 10, 0, "", categoryName);
                 handleCancel();
             }
         }
@@ -102,16 +123,55 @@ const TransferModal = ({ open, handleCancel, inventory }) => {
             title={`Transfer - ${decodeURIComponent(inventory.name)}`}
             width={650}
             footer={[
-                <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canTransfer} loading={isTransferring}>
-                    Transfer
-                </Button>
+                <div className="flex justify-center md:block">
+                    <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canTransfer} loading={isTransferring}>
+                        Transfer
+                    </Button>
+                </div>
             ]}
         >
-            <Table
-                columns={columns}
-                dataSource={data}
-                pagination={false}
-            />
+            <div className="head hidden md:block">
+
+                <Table
+                    columns={columns}
+                    dataSource={data}
+                    pagination={false}
+                />
+            </div>
+            <div className="flex flex-col gap-[18px] md:hidden mt-5">
+                <div> <p className="text-[#202020] font-medium text-sm">Quantity Available</p>
+                    <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center ">
+
+                        <p className="px-5 "> {inventory?.quantity}</p>
+                    </div>
+                </div>
+                <div>
+
+                    <p className="text-[#202020] font-medium text-sm">Set Quantity</p>
+                    <div className="inventory_card">
+                        <InputNumber className="w-full pl-5" value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
+                    </div>
+                </div>
+                <div>
+                    <p className="text-[#202020] font-medium text-sm">Select recipient</p>
+                    <Select
+                        className="w-full"
+                        showSearch
+                        onSelect={handleSelect}
+                        onSearch={handleSearchChange}
+                        options={filteredOptions}
+                        optionFilterProp="value"
+                        filterOption={(input, option) =>
+                            (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                        }
+                        open={dropdownOpen}
+                        suffixIcon={<SearchOutlined />}
+                        onFocus={() => setDropdownOpen(!!searchInput)} // Open dropdown on focus if there is any input
+                        onBlur={() => setDropdownOpen(false)} // Close dropdown on blur
+                    />
+                </div>
+
+            </div>
         </Modal>
     )
 }

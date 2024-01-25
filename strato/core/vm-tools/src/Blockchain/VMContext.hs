@@ -102,12 +102,14 @@ import Blockchain.VM.SolidException
 import Blockchain.VMOptions
 import Control.DeepSeq
 import Control.Lens hiding (Context (..))
+import Control.Monad (when)
 import Control.Monad.Catch (MonadCatch)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.IO.Class
 import Control.Monad.Reader
 import Control.Monad.Trans.Resource
+import Data.Binary
 import qualified Data.ByteString as B
 import Data.Default
 import qualified Data.Map as M
@@ -124,7 +126,7 @@ import GHC.Generics
 import SolidVM.Model.Storable
 import SolidVM.Model.Value
 import System.Directory
-import Text.PrettyPrint.ANSI.Leijen hiding ((<$>), (</>))
+import Text.Format
 import UnliftIO
 
 {-# NOINLINE knownFailedTxs #-}
@@ -132,7 +134,13 @@ knownFailedTxs :: S.Set Keccak256
 knownFailedTxs =
   S.fromList
     [ keccak256FromHex "d924cd206a64fe1a6acd77af0a25f2acc4acd23d5a169caf2e701cb9cfc3d7d8",
-      keccak256FromHex "3058b1027e6e69d6faa9e13fb897c10343ae8cd0d302404a70aee9d2bad316da"
+      keccak256FromHex "3058b1027e6e69d6faa9e13fb897c10343ae8cd0d302404a70aee9d2bad316da",
+      keccak256FromHex "283b2bb2fc3a9ad81fae7286ad89115979474ae953b55fef627f39aa409c2133",
+      keccak256FromHex "b9335249f18645559cc84493071c3d0641c35232cd7814f45eb04d990afae921",
+      keccak256FromHex "a257f8fa9ef7a7b4de81ddf518b3492e1716894879dec8c37be3ec6a4beef553",
+      keccak256FromHex "2f719b6227fa0316cb71c033183b2f282ed06ae42ca8f50e1c1cead57840134c",
+      keccak256FromHex "2637c3b60b6bd1d098adc109877ba1b1c40c59889f2e8ef6d03fb5657836f70f",
+      keccak256FromHex "5439d5802b32b50c29b4f26bb47a7cff3121229798dabed7e7ca7e6a5c0658f2"
     ]
 
 newtype CurrentBlockHash = CurrentBlockHash {unCurrentBlockHash :: Keccak256}
@@ -149,6 +157,8 @@ instance NFData RBDB.RedisConnection where
 
 data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo !Keccak256 !BlockData !Integer !Int !Int
   deriving (Eq, Read, Show, Generic, NFData)
+
+instance Binary ContextBestBlockInfo
 
 data ContextDBs = ContextDBs
   { _stateDB :: MP.StateDB,
@@ -483,7 +493,7 @@ incrementNonce account = A.adjustWithDefault_ Mod.Proxy account $ \addressState 
 getNewAddress :: (MonadIO m, (Account `A.Alters` AddressState) m) => Account -> m Account
 getNewAddress account = do
   nonce <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy account
-  when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ show (pretty account) ++ ", nonce=" ++ show nonce
+  when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ format account ++ ", nonce=" ++ show nonce
   let newAddress = getNewAddress_unsafe (account ^. accountAddress) nonce
   incrementNonce account
   return $ (accountAddress .~ newAddress) account
@@ -491,7 +501,7 @@ getNewAddress account = do
 getNewAddressWithSalt :: (MonadIO m, MonadLogger m, (Account `A.Alters` AddressState) m) => Account -> Value -> Keccak256 -> String -> m Account
 getNewAddressWithSalt account salt hsh args = do
   nonce <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy account
-  when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ show (pretty account) ++ ", nonce=" ++ show nonce
+  when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ format account ++ ", nonce=" ++ show nonce
   let saltAsString = case salt of
         (SString s) -> s
         _ -> invalidArguments "big major bad" salt

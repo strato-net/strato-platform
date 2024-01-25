@@ -1,71 +1,93 @@
 import React, { useEffect, useState } from "react";
 import DataTableComponent from "../DataTableComponent";
 import { getStringDate } from "../../helpers/utils";
-import { actions } from "../../contexts/item/actions";
-import { useItemDispatch, useItemState } from "../../contexts/item";
+import { actions } from "../../contexts/inventory/actions";
 import { US_DATE_FORMAT } from "../../helpers/constants";
-import { Pagination } from "antd";
+import { Input, Pagination } from "antd";
 import "./ordersTable.css"
-import { DownOutlined, UpOutlined } from "@ant-design/icons";
+import { DownOutlined, SearchOutlined, UpOutlined } from "@ant-design/icons";
+import { ResponsiveOrderCard } from "./ResponsiveOrdersCard";
+import { ResponsiveTransferOrderCard } from "./ResponsiveTransferOrdersCard";
+import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 
 const TransfersTable = ({ user, selectedDate }) => {
-  const dispatch = useItemDispatch();
+  const navigate = useNavigate();
+  const params = useParams();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const searchVal = searchParams.get('search');
+  const pageVal = searchParams.get('page');
+  const pageNo = pageVal ? parseInt(pageVal) : 1;
+  const { type } = params;
+
+  const dispatch = useInventoryDispatch();
   const limit = 10;
-  const [offset, setOffset] = useState(0);
-  const [page, setPage] = useState(1);
-  const { itemTransfers, totalItemsTransfered, isFetchingItemTransfers } = useItemState();
-  const [order, setOrder] = useState("desc")
-
-  console.log("selectedDate", selectedDate)
-  useEffect(() => {
-    actions.fetchItemTransfers(dispatch, limit, offset, user.organization, order, selectedDate);
-  }, [dispatch, limit, offset, user, order, selectedDate]);
+  const offset = ((pageNo - 1) * limit);
+  const { itemTransfers, totalItemsTransfered, isFetchingItemTransfers } = useInventoryState();
+  const [order, setOrder] = useState("desc");
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
-    setPage(1);
-    setOffset(0);
-  }, [totalItemsTransfered]);
+    if (user?.commonName && type === 'transfers') {
+      actions.fetchItemTransfers(dispatch, limit, offset, user?.commonName, order, selectedDate, searchVal);
+    }
+  }, [dispatch, limit, offset, user, order, selectedDate, searchVal]);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (search.length === 0) {
+        navigate(`/order/${type}`)
+      } else {
+        navigate(`/order/${type}?search=${search}`)
+      }
+    }, 1000)
+    return () => {
+      clearTimeout(timeout)
+    }
+  }, [search])
 
   const [data, setdata] = useState([]);
   useEffect(() => {
     let items = [];
-    itemTransfers.forEach((transfer) => {
-      items.push({
-        address: transfer.address,
-        key: transfer.address,
-        inventoryId: transfer.inventoryId,
-        productName: decodeURIComponent(transfer.productName),
-        newOwner: transfer.newOwner,
-        newOwnerCommonName: transfer.newOwnerCommonName,
-        newOwnerOrganization: transfer.newOwnerOrganization,
-        oldOwner: transfer.oldOwner,
-        oldOwnerCommonName: transfer.oldOwnerCommonName,
-        oldOwnerOrganization: transfer.oldOwnerOrganization,
-        quantity: transfer.quantity,
-        transferDate: getStringDate(transfer.transferDate, US_DATE_FORMAT),
-        transferNumber: transfer.transferNumber,
+    if (itemTransfers) {
+      itemTransfers.forEach((transfer) => {
+        items.push({
+          address: transfer.address,
+          key: transfer.address,
+          assetAddress: transfer.assetAddress,
+          assetName: decodeURIComponent(transfer.assetName),
+          newOwner: transfer.newOwner,
+          newOwnerCommonName: transfer.newOwnerCommonName,
+          oldOwner: transfer.oldOwner,
+          oldOwnerCommonName: transfer.oldOwnerCommonName,
+          quantity: transfer.quantity,
+          transferDate: getStringDate(transfer.transferDate, US_DATE_FORMAT),
+          transferNumber: transfer.transferNumber,
+        });
       });
-    });
+    }
     setdata(items);
   }, [itemTransfers]);
-  
+
+
   const column = [
     {
-      title: "TRANSFER NUMBER",
+      title: "Transfer Number",
       dataIndex: "transferNumber",
       key: "transferNumber",
       render: (text) => <p>{text}</p>,
     },
     {
-      title: "FROM",
+      title: "From",
       key: "oldOwnerCommonName",
-      render: (text, record) => <p>{record.oldOwnerOrganization.startsWith("Mercata Account") ? record.oldOwnerCommonName : record.oldOwnerOrganization}</p>,
+      render: (text, record) => <p>{record.oldOwnerCommonName}</p>,
     },
     {
-      title: "TO",
+      title: "To",
       key: "newOwnerCommonName",
-      render: (text, record) => <p>{record.newOwnerOrganization.startsWith("Mercata Account") ? record.newOwnerCommonName : record.newOwnerOrganization}</p>,
+      render: (text, record) => <p>{record.newOwnerCommonName}</p>,
     },
     {
       dataIndex: "transferDate",
@@ -73,7 +95,7 @@ const TransfersTable = ({ user, selectedDate }) => {
       render: (text) => <p>{text}</p>,
       title: (
         <div style={{ display: "flex" }}>
-          <div className="mt-1.5">{"Date".toUpperCase()}</div>
+          <div className="mt-1.5">{"Date"}</div>
           <div>
             {order === "desc" ? (
               <UpOutlined className="icon-container icon-hover" onClick={() => setOrder("asc")} />
@@ -85,13 +107,13 @@ const TransfersTable = ({ user, selectedDate }) => {
       ),
     },
     {
-      title: "PRODUCT NAME",
-      dataIndex: "productName",
-      key: "productName",
+      title: "Asset Name",
+      dataIndex: "assetName",
+      key: "assetName",
       render: (text) => <p>{text}</p>,
     },
     {
-      title: "QUANTITY",
+      title: "Quantity",
       dataIndex: "quantity",
       key: "quantity",
       render: (text) => <p>{text}</p>,
@@ -101,12 +123,17 @@ const TransfersTable = ({ user, selectedDate }) => {
 
 
   const onPageChange = (page) => {
-    setOffset((page - 1) * limit);
-    setPage(page);
+    const baseUrl = new URL(`/order/${type}`, window.location.origin);
+    if (searchVal) {
+      baseUrl.searchParams.set("search", searchVal);
+    }
+  
+    baseUrl.searchParams.set("page", page);
+    const url = baseUrl.pathname + baseUrl.search;
+    navigate(url, { new: true });
   };
 
   const onChange = (pagination, filters, sorter) => {
-    console.log(sorter);
     if (order === "desc") {
       setOrder("asc")
     } else {
@@ -114,19 +141,39 @@ const TransfersTable = ({ user, selectedDate }) => {
     }
   };
 
+
+  const handleChangeSearch = (e) => {
+    const value = e.target.value;
+    setSearch(value)
+  }
+
   return (
     <div>
-      <DataTableComponent
-        columns={column}
-        data={data}
-        isLoading={isFetchingItemTransfers}
-        pagination={false}
-        scrollX="100%"
-        rowKey={record => record.transferNumber}
-        onChange={onChange}
-      />
+      <Input className="text-base orders_searchbar md:p-3 rounded-full bg-[#F6F6F6]"
+        key={searchVal}
+        onChange={(e) => { handleChangeSearch(e) }}
+        defaultValue={searchVal}
+        prefix={<SearchOutlined />}
+        placeholder="Search Transfers by Buyer or Transfer #" />
+      <div className="flex md:hidden order_responsive">
+        <ResponsiveTransferOrderCard
+          data={data}
+          isLoading={isFetchingItemTransfers}
+        />
+      </div>
+      <div className="hidden md:block mt-5">
+        <DataTableComponent
+          columns={column}
+          data={data}
+          isLoading={isFetchingItemTransfers}
+          pagination={false}
+          scrollX="100%"
+          rowKey={record => record.transferNumber}
+          onChange={onChange}
+        />
+      </div>
       <Pagination
-        current={page}
+        current={pageNo}
         onChange={onPageChange}
         total={totalItemsTransfered}
         showSizeChanger={false}

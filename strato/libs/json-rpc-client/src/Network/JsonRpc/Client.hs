@@ -48,8 +48,9 @@ where
 
 import Control.Applicative (Alternative (..), (<|>))
 import Control.Arrow ((&&&))
-import Control.Monad (liftM)
-import Control.Monad.Except (ExceptT (..), lift, throwError, (<=<))
+import Control.Monad (liftM, (<=<))
+import Control.Monad.Except (ExceptT (..), throwError)
+import Control.Monad.Trans.Class (lift)
 import Data.Aeson ((.:), (.=))
 import qualified Data.Aeson as A
 import qualified Data.Aeson.Key as DAK

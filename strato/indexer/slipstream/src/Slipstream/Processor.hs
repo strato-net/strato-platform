@@ -20,7 +20,7 @@
 module Slipstream.Processor
   ( processTheMessages,
     parseActions,
-  )
+    )
 where
 
 import Bloc.Database.Queries
@@ -47,11 +47,12 @@ import qualified Blockchain.Stream.Action as Action
 import Blockchain.Stream.VMEvent
 import Control.Arrow ((&&&))
 import Control.Lens (at, (.~), (?~), (^.))
+import Control.Monad (forM, forM_, unless, when)
 import Control.Monad.Change.Alter
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.SQL
-import Control.Monad.Except
 import Control.Monad.IO.Unlift
+import Control.Monad.Trans.Class
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict hiding (state)
@@ -83,7 +84,6 @@ import Slipstream.QueryFormatHelper
 import SolidVM.CodeCollectionTools
 import SolidVM.Model.CodeCollection hiding (contractName)
 import qualified SolidVM.Model.CodeCollection as CC (contractName)
-import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType
 import Text.Format
 import Text.Tools (boringBox, multilineLog)
@@ -369,11 +369,6 @@ getCodeCollection g cp ccString = do
     EVMCode _ -> return $ Left "EVM contracts are not indexed by Slipstream"
     CodeAtAccount _ _ -> return $ Left "Cannot compile or parse code at account"
 
-getContractsForParents :: [SolidString] -> Map.Map SolidString (ContractF a) -> [ContractF a]
-getContractsForParents parents' cc =
-  let getContractForParent parent = Map.lookup parent cc
-   in mapMaybe getContractForParent parents'
-
 getMapNamesFromContract :: Contract -> [Text]
 getMapNamesFromContract c =
   let storageDefs' = c ^. storageDefs
@@ -381,16 +376,6 @@ getMapNamesFromContract c =
       listOfMappings = filter (\(_, vd) -> case (_varType vd) of SVMType.Mapping _ _ _ -> True; _ -> False) storageDefsList
       listOfMappingsWithRecords = filter (\(_, vd) -> _isRecord vd) listOfMappings
    in T.pack . fst <$> listOfMappingsWithRecords
-
-getAbstractParentsFromContract :: Contract -> CodeCollection -> [Contract]
-getAbstractParentsFromContract c cc =
-  -- recursively obtain parent + grandparent contracts
-  -- ex. B is A, C is B, then C should also be A
-  let go [] = []
-      go xs = xs ++ (go $ getContractsForParents (concatMap (^. parents) xs) ccc)
-      ccc = cc ^. contracts
-      parents' = c ^. parents
-   in filter ((== AbstractType) . _contractType) (go $ getContractsForParents parents' ccc)
 
 processTheMessages ::
   ( MonadLogger m,

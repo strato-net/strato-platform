@@ -11,8 +11,10 @@ class MarketplaceController {
       }
       const inventories = await dapp.getMarketplaceInventories({ ...query })
 
-      const productsWithImageUrl = inventories
-      rest.response.status200(res, productsWithImageUrl)
+      const productsWithImageUrl = inventories?.inventoryResults.sort((a, b) => {
+        return b.saleDate.localeCompare(a.saleDate);
+      });
+      rest.response.status200(res, {productsWithImageUrl: productsWithImageUrl, inventoryCount: inventories?.inventoryCount})
 
       return next()
     } catch (e) {
@@ -30,8 +32,10 @@ class MarketplaceController {
       }
       const inventories = await dapp.getMarketplaceInventoriesLoggedIn({ ...query })
 
-      const productsWithImageUrl = inventories
-      rest.response.status200(res, productsWithImageUrl)
+      const productsWithImageUrl = inventories?.inventoryResults.sort((a, b) => {
+        return b.saleDate.localeCompare(a.saleDate);
+      });
+      rest.response.status200(res, {productsWithImageUrl: productsWithImageUrl, inventoryCount: inventories?.inventoryCount})
 
       return next()
     } catch (e) {
@@ -43,7 +47,10 @@ class MarketplaceController {
     try {
       const { dapp, query } = req
       const inventories = await dapp.getTopSellingProducts({ ...query })
-      const productsWithImageUrl = inventories
+      const productsWithImageUrl = inventories.sort((a, b) => {
+        return b.saleDate.localeCompare(a.saleDate);
+      });
+
       rest.response.status200(res, productsWithImageUrl)
 
       return next()
@@ -56,7 +63,10 @@ class MarketplaceController {
     try {
       const { dapp, query } = req
       const inventories = await dapp.getTopSellingProductsLoggedIn({ ...query })
-      const productsWithImageUrl = inventories
+      const productsWithImageUrl = inventories.sort((a, b) => {
+        return b.saleDate.localeCompare(a.saleDate);
+      });
+
       rest.response.status200(res, productsWithImageUrl)
 
       return next()

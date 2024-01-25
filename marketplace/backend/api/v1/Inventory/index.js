@@ -22,7 +22,7 @@ router.get(
 
 router.get(
   Inventory.getOwnershipHistory,
-  authHandler.authorizeRequest(),
+  authHandler.authorizeRequest(true),
   loadDapp,
   InventoryController.getOwnershipHistory
 );
@@ -60,6 +60,13 @@ router.post(
   authHandler.authorizeRequest(),
   loadDapp,
   InventoryController.transfer
+);
+
+router.get(
+  Inventory.transferredItems,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  InventoryController.getAllItemTransferEvents
 );
 
 router.put(

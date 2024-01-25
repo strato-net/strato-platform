@@ -42,9 +42,7 @@ library:
     - lrucache
     - kafka-monad
     - milena
-    - milena-tools
     - monad-alter
-    - mtl
     - persistent
     - postgresql-typed
     - prometheus-client
@@ -71,7 +69,6 @@ executables:
       - blockapps-init
       - hflags
       - kafka-monad
-      - milena
       - persistent-postgresql
       - postgresql-typed
       - slipstream

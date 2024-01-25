@@ -134,6 +134,19 @@ class InventoryController {
     }
   }
 
+  static async getAllItemTransferEvents(req, res, next) {
+    try {
+      const { dapp, query } = req
+      const itemTransfers = await dapp.getAllItemTransferEvents(query)
+
+      rest.response.status200(res, itemTransfers)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
   static async updateSale(req, res, next) {
     try {
       const { dapp, body } = req
@@ -334,7 +347,6 @@ class InventoryController {
 
   static validateGetOwnershipHistoryArgs(args) {
     const getOwnershipHistorySchema = Joi.object({
-      contract_name: Joi.string().required(),
       originAddress: Joi.string().required(),
       minItemNumber: Joi.number().min(0).required(),
       maxItemNumber: Joi.number().min(0).required(),

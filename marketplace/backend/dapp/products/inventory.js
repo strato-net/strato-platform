@@ -1,15 +1,18 @@
 import { util, rest, importer } from '/blockapps-rest-plus';
 import config from '/load.config';
 import RestStatus from 'http-status-codes';
-import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs, setSearchQueryOptionsPrime } from '/helpers/utils';
+import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs, setSearchQueryOptionsPrime, waitForAddress } from '/helpers/utils';
 import dayjs from 'dayjs';
 import constants from '../../helpers/constants';
 import saleJs from "../orders/sale";
 
 const contractName = constants.assetTableName;
+const transferContractName = `${contractName}.ItemTransfers`;
 const contractFilename = `${util.cwd}/dapp/products/contracts/Inventory.sol`;
 const saleContractName = 'SimpleSale';
+const saleContract = constants.saleTableName;
 const saleContractFilename = `${util.cwd}/dapp/mercata-base-contracts/Templates/Sales/SimpleSale.sol`;
+const contractEvents = { ITEM_TRANSFER: "ItemTransfers" }
 
 /** 
  * Upload a new Inventory 
@@ -64,7 +67,17 @@ async function uploadSaleContract(user, _constructorArgs, options) {
 
     const contract = await rest.createContract(user, contractArgs, copyOfOptions);
     contract.src = 'removed';
-
+    
+    const searchOptions = {
+        ...options,
+        org: constants.blockAppsOrg,
+        query: {
+            address: `eq.${contract.address}`
+        }
+      }
+      
+    await waitForAddress(user, {name: saleContract}, searchOptions);
+    
     return contract;
 }
 
@@ -167,20 +180,31 @@ function bindAddress(user, address, options) {
 async function unlistItem(user, _contract, args, options) {
     const contract = { name: saleContractName, ..._contract }
     const callArgs = {
-      contract,
-      method: "closeSale",
-      args: util.usc({ ...args }),
+        contract,
+        method: "closeSale",
+        args: util.usc({ ...args }),
     };
     const unlistStatus = await rest.call(user, callArgs, options);
-  
+
     if (parseInt(unlistStatus, 10) !== RestStatus.OK) {
-      throw new rest.RestError(
-        unlistStatus,
-        "You cannot unlist the item because it's already published",
-        { callArgs }
-      );
+        throw new rest.RestError(
+            unlistStatus,
+            "You cannot unlist the item because it's already published",
+            { callArgs }
+        );
     }
-  
+    
+    const searchOptions = {
+        ...options,
+        org: constants.blockAppsOrg,
+        query: {
+            address: `eq.${callArgs.contract.address}`,
+            isOpen: `eq.false`
+        }
+      }
+      
+    await waitForAddress(user, {name: saleContract}, searchOptions);
+    
     return unlistStatus;
 }
 
@@ -190,6 +214,7 @@ async function resellItem(user, contract, args, options) {
         method: "mintNewUnits",
         args: util.usc({ ...args }),
     };
+    
     const resellStatus = await rest.call(user, callArgs, options);
 
     if (parseInt(resellStatus, 10) !== RestStatus.OK) {
@@ -199,7 +224,7 @@ async function resellItem(user, contract, args, options) {
             { callArgs }
         );
     }
-
+    
     return resellStatus;
 }
 
@@ -218,6 +243,16 @@ async function transferItem(user, contract, args, options) {
             { callArgs }
         );
     }
+    
+    const searchOptions = {
+        ...options,
+        org: constants.blockAppsOrg,
+        query: {
+            address: `eq.${callArgs.contract.address}`
+        }
+      }
+      
+    await waitForAddress(user, {name: transferContractName}, searchOptions);
 
     return transferStatus;
 }
@@ -243,38 +278,38 @@ async function updateInventory(user, contract, args, options) {
 }
 
 async function updateSale(admin, contract, _args, options) {
-  // const args = paymentJs.marshalIn(_args)
-  const args = { ..._args }
-  const scheme = Object.keys(_args).reduce((agg, key) => {
-    const base = 1
-    switch (key) {
-      case 'quantity':
-        return agg | (base << 0)
-      case 'price':
-        return agg | (base << 1)
-      case 'paymentProviders':
-        return agg | (base << 2)
-      default:
-        return agg
+    // const args = paymentJs.marshalIn(_args)
+    const args = { ..._args }
+    const scheme = Object.keys(_args).reduce((agg, key) => {
+        const base = 1
+        switch (key) {
+            case 'quantity':
+                return agg | (base << 0)
+            case 'price':
+                return agg | (base << 1)
+            case 'paymentProviders':
+                return agg | (base << 2)
+            default:
+                return agg
+        }
+    }, 0)
+
+    const callArgs = {
+        contract,
+        method: 'update',
+        args: util.usc({
+            scheme,
+            ...args
+        }),
     }
-  }, 0)
 
-  const callArgs = {
-    contract,
-    method: 'update',
-    args: util.usc({
-      scheme,
-      ...args
-    }),
-  }
+    const restStatus = await rest.call(admin, callArgs, options)
 
-  const restStatus = await rest.call(admin, callArgs, options)
+    if (parseInt(restStatus, 10) !== RestStatus.OK) {
+        throw new rest.RestError(restStatus, 0, { callArgs })
+    }
 
-  if (parseInt(restStatus, 10) !== RestStatus.OK) {
-    throw new rest.RestError(restStatus, 0, { callArgs })
-  }
-
-  return restStatus;
+    return restStatus;
 }
 
 /**
@@ -315,36 +350,53 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, defaultOptions) {
-    const { range, ownerCommonName, assetAddresses, status, ...restArgs } = args;
+    const { range, ownerCommonName, assetAddresses, status, isMarketplaceSearch, isTrendingSearch, ...restArgs } = args;
     let inventories;
     let sales;
     let finalInventory = [];
-    const options = {...defaultOptions, org: 'BlockApps', app: 'Mercata'}
+    const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' };
 
-    if (ownerCommonName) {
+    if (isTrendingSearch) {
+        // If it's a trending search, first search the sales
+        // Order them by creation date and set limit here
+        sales = await saleJs.getAll(admin, { range, isOpen: true, order: 'block_timestamp.desc', limit: '25', offset: '0' }, options);
+        const trendingAssetAddresses = sales.map(sale => sale.assetToBeSold);
+
+        // Match the inventory with the sales
         inventories = await searchAllWithQueryArgs(contractName,
             {
-                ...restArgs,
-                ownerCommonName: ownerCommonName, 
+                address: trendingAssetAddresses,
             }, options, admin);
-    }
-    else if (assetAddresses) {
-        inventories = await searchAllWithQueryArgs(contractName,
-            {
-                ...restArgs,
-                address: assetAddresses, 
-            }, options, admin);
-    }
-    else {
-        inventories = await searchAllWithQueryArgs(contractName, 
-            { 
-                ...restArgs, 
-            }, options, admin);
+    } else {
+        // Original logic
+        if (ownerCommonName) {
+            inventories = await searchAllWithQueryArgs(contractName,
+                {
+                    ...restArgs,
+                    ownerCommonName: ownerCommonName,
+                }, options, admin);
+        }
+        else if (assetAddresses) {
+            inventories = await searchAllWithQueryArgs(contractName,
+                {
+                    ...restArgs,
+                    address: assetAddresses,
+                }, options, admin);
+        }
+        else {
+            inventories = await searchAllWithQueryArgs(contractName,
+                {
+                    ...restArgs,
+                }, options, admin);
+        }
+
+        if (inventories) {
+            const assetAddresses = inventories.map((inventory) => inventory.address);
+            sales = await saleJs.getAll(admin, { assetAddresses, range, isOpen: true }, options);
+        }
     }
 
     if (inventories) {
-        const assetAddresses = inventories.map((inventory) => inventory.address);
-        sales = await saleJs.getAll(admin, { assetAddresses }, options);
         inventories.forEach(inventory => {
             const itemSale = sales.find(sale => sale.assetToBeSold == inventory.address && sale.isOpen);
             if (itemSale) {
@@ -353,7 +405,11 @@ async function getAll(admin, args = {}, defaultOptions) {
                     price: itemSale?.price,
                     saleAddress: itemSale?.address,
                     saleQuantity: itemSale?.quantity,
-                })
+                    saleDate: itemSale?.block_timestamp
+                });
+            }
+            else if (isMarketplaceSearch) {
+                //skip
             } else {
                 finalInventory.push(inventory);
             }
@@ -363,9 +419,17 @@ async function getAll(admin, args = {}, defaultOptions) {
     return finalInventory ? finalInventory.map((inventory) => marshalOut(inventory)) : undefined;
 }
 
+
+async function getAllItemTransferEvents(admin, args = {}, defaultOptions) {
+    const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
+    const itemTransferEvents = await searchAllWithQueryArgs(`${contractName}.${contractEvents.ITEM_TRANSFER}`, args, options, admin);
+    const total  = await searchAllWithQueryArgs( `${contractName}.${contractEvents.ITEM_TRANSFER}`, { ...args, limit: undefined, offset: 0, order: undefined, queryOptions: { select: "count", } }, options, admin );
+    return { transfers: itemTransferEvents.map((item) => marshalOut(item)), total: total[0].count };
+}
+
 async function getOwnershipHistory(user, args, options) {
-    const { contract_name , originAddress, minItemNumber, maxItemNumber } = args;
-    const newOptions = { ...options, org: undefined, app: undefined }
+    const { originAddress, minItemNumber, maxItemNumber } = args;
+    const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
     const searchArgs = {
         originAddress,
         gteField: 'maxItemNumber',
@@ -375,14 +439,15 @@ async function getOwnershipHistory(user, args, options) {
         sort: '+block_timestamp'
     };
 
-    const history = await searchAllWithQueryArgs(`${contract_name}.OwnershipTransfer`, searchArgs, newOptions, user);
+    const history = await searchAllWithQueryArgs(`${contractName}.OwnershipTransfer`, searchArgs, newOptions, user);
     return history;
 }
 
 async function inventoryCount(admin, args = {}, defaultOptions) {
-    const options = {...defaultOptions, org: 'BlockApps', app: 'Mercata'}
+    const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
+    const { range, ...newArgs } = args;
     const queryArgs = setSearchQueryOptionsPrime({
-        ...args,
+        ...newArgs,
         limit: undefined,
         offset: 0,
         order: undefined,
@@ -428,6 +493,7 @@ export default {
     get,
     getAll,
     getOwnershipHistory,
+    getAllItemTransferEvents,
     inventoryCount,
     marshalIn,
     marshalOut,

@@ -1,6 +1,6 @@
 pragma es6;
 pragma strict;
-import <a3d9911aeffee71e0c6cd37946d80f3864b49d45>;
+import <8f8d4cef7232db7001bae657db85eb4325ee2f3d>;
 
 contract SimpleOrder is Order {
     constructor(
@@ -8,13 +8,22 @@ contract SimpleOrder is Order {
         address[] _saleAddresses, 
         uint[] _quantities,
         uint _createdDate,
-        string _shippingAddress
+        uint _shippingAddressId,
+        string _paymentSessionId,
+        OrderStatus _status
     ) Order (
         _orderId,
         _saleAddresses,
         _quantities,
         _createdDate,
-        _shippingAddress
+        _shippingAddressId,
+        _paymentSessionId,
+        _status
     ) {
     }
+    function onCancel(string _comments) internal override {
+        comments= _comments;
+    }
+
+        
 }

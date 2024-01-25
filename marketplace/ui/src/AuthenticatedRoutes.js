@@ -141,6 +141,21 @@ const AuthenticatedRoutes = ({ user, users }) => {
       />
       <Route
         exact
+        path={routes.MarketplaceCategoryProductList.url}
+        element={
+          <UsersProvider>
+            <CategorysProvider>
+              <SubCategorysProvider>
+                <ProductsProvider>
+                  <CategoryProductList user={user} users={users} />
+                </ProductsProvider>
+              </SubCategorysProvider>
+            </CategorysProvider>
+          </UsersProvider>
+        }
+      />
+      <Route
+        exact
         path={routes.MarketplaceProductDetail.url}
         element={
           <UsersProvider>
@@ -175,7 +190,7 @@ const AuthenticatedRoutes = ({ user, users }) => {
       />
       <Route
         exact
-        path={routes.Inventories.url}
+        path={routes.MyStore.url}
         element={
           <UsersProvider>
             <CertifiersProvider>
@@ -270,7 +285,9 @@ const AuthenticatedRoutes = ({ user, users }) => {
           <UsersProvider>
             <OrdersProvider>
               <ItemsProvider>
-                <Order user={user} users={users} />
+                <InventoriesProvider>
+                  <Order user={user} users={users} />
+                </InventoriesProvider>
               </ItemsProvider>
             </OrdersProvider>
           </UsersProvider>

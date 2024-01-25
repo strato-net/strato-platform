@@ -11,8 +11,10 @@ import {
   Button,
   Spin,
   Image,
+  Tabs,
+  DatePicker,
 } from "antd";
-import { useMatch } from "react-router-dom";
+import { useLocation, useMatch } from "react-router-dom";
 import { actions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import routes from "../../helpers/routes";
@@ -20,7 +22,7 @@ import classNames from "classnames";
 import { EyeOutlined } from "@ant-design/icons";
 import DataTableComponent from "../DataTableComponent";
 import { getStringDate } from "../../helpers/utils";
-import { getStatus } from "./constant";
+import { getStatus, getStatusByName } from "./constant";
 import { useNavigate } from "react-router-dom";
 import { US_DATE_FORMAT } from "../../helpers/constants";
 import ClickableCell from "../ClickableCell";
@@ -28,6 +30,12 @@ import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
 import RestStatus from "http-status-codes";
 import TagManager from "react-gtm-module";
 import image_placeholder from "../../images/resources/image_placeholder.png";
+import dayjs from "dayjs";
+import TransfersTable from "./TransfersTable";
+import SoldOrdersTable from "./SoldOrdersTable";
+import { ResponsiveOrderDetailCard } from "./ResponsiveOrderDetailCard";
+import { LeftArrow } from "../../images/SVGComponents";
+
 
 const BoughtOrderDetails = ({ user, users }) => {
   const [comment, setcomment] = useState("");
@@ -38,8 +46,11 @@ const BoughtOrderDetails = ({ user, users }) => {
   const [api, contextHolder] = notification.useNotification();
   const [status, setStatus] = useState(getStatus(0));
   const { TextArea } = Input;
-  const [paid, setPaid] = useState(false)
+  const [paid, setPaid] = useState("Processing");
   const [isLoadingPaymentStatus, setisLoadingPaymentStatus] = useState(false);
+  const [selectedDate, setSelectedDate] = useState("");
+  const [shouldCheckPaymentStatus, setShouldCheckPaymentStatus] = useState(false);
+  const { state } = useLocation()
 
   const navigate = useNavigate();
 
@@ -88,40 +99,91 @@ const BoughtOrderDetails = ({ user, users }) => {
       getData();
     }
   }, [Id, dispatch]);
-
+  
   const getData = async () => {
     const data = await actions.fetchOrderDetails(dispatch, Id);
     if (data != null) {
-      getPaymentStatus(data.order.paymentSessionId);
+      setShouldCheckPaymentStatus(true);
     }
-  }
+  };
+  
+  useEffect(() => {
+    if (shouldCheckPaymentStatus && orderDetails) {
+      getPaymentStatus(orderDetails.order.paymentSessionId, orderDetails.order.sellersCommonName);
+      setShouldCheckPaymentStatus(false);
+    }
+  }, [shouldCheckPaymentStatus, orderDetails]);
 
-  const getPaymentStatus = async (paymentSessionId) => {
-    if (paymentSessionId !== "") {
+
+  const validatePayment = async (paymentSessionId) => {
+    if (!paymentSessionId || !orderDetails) return;
+
+    const currentStatus = getStatus(parseInt(orderDetails.order.status));
+    const isPending = currentStatus === getStatusByName("Payment Pending");
+    const isCanceled = currentStatus === getStatusByName("Canceled");
+
+    if (isCanceled){
+      setPaid("Payment Failed");
+      setcomment(orderDetails.order.comments);
+    }
+    
+    if (isPending) {
       try {
-        setisLoadingPaymentStatus(true);
         const response = await fetch(
-          `${apiUrl}/order/payment/session/${paymentSessionId}`,
-          {
-            method: HTTP_METHODS.GET,
-          }
+          `${apiUrl}/order/payment/intent/${paymentSessionId}/${orderDetails.order.sellersCommonName}`,
+          { method: HTTP_METHODS.GET }
         );
+        const intentBody = await response.json();
+        const paymentErrorAndRequiresMethod = intentBody.data.last_payment_error?.message && intentBody.data.status === 'requires_payment_method';
 
-        const body = await response.json();
-        setisLoadingPaymentStatus(false);
-        if (response.status === RestStatus.OK) {
-
-          if (body.data["payment_status"] === "paid") {
-            setPaid(true);
-          }
-
+        if(paymentErrorAndRequiresMethod && !isCanceled)
+        {
+          setisLoadingPaymentStatus(true)
+          const body = {
+            saleOrderAddress: orderDetails.order.address,
+            comments: encodeURIComponent('Stripe: ' + intentBody.data.last_payment_error.message),
+          };
+          //Update Order Details and change the Order Status to 'Canceled' from 'Payment Pending'
+          let isDone = await actions.cancelSale(dispatch, body);
+          setcomment(`Stripe: ${orderDetails.order.comments}`);
+          if (isDone) {
+            setStatus("Canceled");
+            setPaid("Payment Failed");
+            await actions.fetchOrderDetails(dispatch, Id);
+            setisLoadingPaymentStatus(false);
+            }
         }
-
+        
       } catch (err) {
+        console.error(`Error: ${err}`);
       }
     }
+  };
 
-  }
+  const getPaymentStatus = async (paymentSessionId, sellersCommonName) => {
+    if (!paymentSessionId) return;
+
+    setisLoadingPaymentStatus(true);
+    try {
+      const response = await fetch(
+        `${apiUrl}/order/payment/session/${paymentSessionId}/${sellersCommonName}`,
+        { method: HTTP_METHODS.GET }
+      );
+
+      const body = await response.json();
+      if (response.status === RestStatus.OK) {
+        if (body.data["payment_status"] === "paid") {
+          setPaid("Paid");
+        } else {
+          await validatePayment(paymentSessionId);
+        }
+      }
+    } catch (err) {
+      console.error(`Error: ${err}`);
+    } finally {
+      setisLoadingPaymentStatus(false);
+    }
+  };
 
 
 
@@ -131,17 +193,18 @@ const BoughtOrderDetails = ({ user, users }) => {
       setcomment(orderDetails.order.comments);
 
       let items = [];
-      orderDetails.assets.forEach((prod) => {
+      orderDetails.assets.forEach((prod, index) => {
         items.push({
           address: prod.address,
           chainId: prod.chainId,
           key: prod.address,
           productImage: prod.images && prod.images.length > 0 ? prod.images[0] : image_placeholder,
           productName: prod,
-          unitPrice: prod.price,
-          quantity: prod.quantity,
+          name: prod.name,
+          unitPrice:  prod.price,
+          quantity: parseInt(orderDetails.order.quantities[index]),
           shippingCharges: prod.shippingCharges ? prod.shippingCharges : 0,
-          amount: prod.amount,
+          amount: prod.price * parseInt(orderDetails.order.quantities[index]),
           serialNumber: prod,
           tax: prod.tax ? prod.tax : 0,
         });
@@ -172,25 +235,84 @@ const BoughtOrderDetails = ({ user, users }) => {
   const OrderData = ({ title, value }) => {
     return (
       <Col>
-        <Text className="block text-primaryC text-[13px] mb-2">{title}</Text>
-        <Text className="block text-primaryC text-[17px]">{value}</Text>
+        <Text className="block text-[#6A6A6A] text-[13px] mb-2">{title}</Text>
+        <Text className="block text-[#202020] text-[17px] font-semibold">{value}</Text>
       </Col>
     );
   };
 
-  const statusComponent = (status) => {
-    let textClass = "text-orange bg-[#FFF6EC]";
-    if (status === getStatus(2)) {
-      textClass = "text-blue  bg-[#EBF7FF]";
-    } else if (status === getStatus(3)) {
-      textClass = "text-success  bg-[#EAFFEE]";
-    } else if (status === getStatus(4)) {
-      textClass = "text-error  bg-[#FFF0F0]";
-    }
+  const onDateChange = (date) => {
+    setSelectedDate(date);
+  };
 
+  const statusComponent = (status) => {
+    let textClass = "bg-[#FFF6EC]";
+    if (status === "Awaiting Shipment") {
+      textClass = "bg-[#EBF7FF]";
+    } else if (status === "Awaiting Fulfillment"){
+      textClass = "bg-[#FF8C0033]"
+    } else if (status === "Payment Pending"){
+      textClass = "bg-[#FF8C0033]"
+    } else if (status === "Closed") {
+      textClass = "bg-[#119B2D33]";
+    } else if (status === "Canceled") {
+      textClass = "bg-[#FFF0F0]";
+    }
+    let bgClass = "bg-[#119B2D]";
+    if (status === "Awaiting Shipment") {
+      bgClass = "bg-[#13188A]";
+    } else if (status === "Payment Pending"){
+      bgClass = "bg-[#FF8C00]"
+    } else if (status === "Awaiting Fulfillment"){
+      bgClass = "bg-[#FF8C00]"
+    } else if (status === "Closed") {
+      bgClass = "bg-[#119B2D]";
+    } else if (status === "Canceled") {
+      bgClass = "bg-[#FF0000]";
+    }
     return (
-      <div className={classNames(textClass, "text-center text-xs p-1 rounded")}>
-        <p>{status}</p>
+      <div className={classNames(textClass, "status_contain w-max h-max text-center py-1 px-3 rounded-md md:rounded-xl flex justify-start items-center gap-1 p-1")}>
+        <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
+        <p className="!mb-0 text-[11px] md:text-sm">{status}</p>
+      </div>
+    );
+  };
+
+    const statusComponentForPayment = (status) => {
+      let textClass = "bg-[#FFF6EC]";
+      if (status === "Processing"){
+        textClass = "bg-[#FF8C0033]"
+      } else if (status === "Paid") {
+        textClass = "bg-[#119B2D33]";
+      } else if (status === "Payment Failed") {
+        textClass = "bg-[#FFF0F0]";
+      }
+      let bgClass = "bg-[#119B2D]";
+      if (status === "Processing"){
+        bgClass = "bg-[#FF8C00]"
+      } else if (status === "Paid") {
+        bgClass = "bg-[#119B2D]";
+      } else if (status === "Payment Failed") {
+        bgClass = "bg-[#FF0000]";
+      }
+        
+    return (
+      <div className={classNames(textClass, "status_contain w-max h-max text-center py-1 px-3 rounded-md md:rounded-xl flex justify-start items-center gap-1 p-1")}>
+        <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
+        <p className="!mb-0 text-xs md:text-sm">{status}</p>
+      </div>
+    );
+  };
+
+  const onChange = (key) => {
+    navigate(routes.Orders.url.replace(':type', 'bought'))
+  };
+
+  const NewOrderData = ({ title, value, className }) => {
+    return (
+      <div className={className}>
+        <Text className="block text-[#6A6A6A] text-[12px] mb-1">{title}</Text>
+        <Text className="block text-[#202020] text-[13px] font-semibold">{value}</Text>
       </div>
     );
   };
@@ -203,7 +325,7 @@ const BoughtOrderDetails = ({ user, users }) => {
       render: (text) => <img className="w-[75px] h-[60px] object-contain" alt="" src={text} />,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">PRODUCT NAME</Text>,
+      title: <Text className="text-primaryC text-[13px]">Product Name</Text>,
       dataIndex: "productName",
       key: "productName",
       render: (text) => (
@@ -217,7 +339,7 @@ const BoughtOrderDetails = ({ user, users }) => {
       ),
     },
     {
-      title: <Text className="text-primaryC text-[13px]">SERIAL NUMBER</Text>,
+      title: <Text className="text-primaryC text-[13px]">Serial Number</Text>,
       dataIndex: "serialNumber",
       key: "serialNumber",
       align: "center",
@@ -241,14 +363,14 @@ const BoughtOrderDetails = ({ user, users }) => {
       ),
     },
     {
-      title: <Text className="text-primaryC text-[13px]">UNIT PRICE($)</Text>,
+      title: <Text className="text-primaryC text-[13px]">Unit Price($)</Text>,
       dataIndex: "unitPrice",
       key: "unitPrice",
       align: "center",
       render: (text) => <p>{text}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">QUANTITY</Text>,
+      title: <Text className="text-primaryC text-[13px]">Quantity</Text>,
       dataIndex: "quantity",
       key: "quantity",
       align: "center",
@@ -256,7 +378,7 @@ const BoughtOrderDetails = ({ user, users }) => {
     },
     {
       title: (
-        <Text className="text-primaryC text-[13px]">SHIPPING CHARGES($)</Text>
+        <Text className="text-primaryC text-[13px]">Shipping Charges($)</Text>
       ),
       dataIndex: "shippingCharges",
       key: "shippingCharges",
@@ -264,14 +386,14 @@ const BoughtOrderDetails = ({ user, users }) => {
       render: (text) => <p>{text}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">TAX($)</Text>,
+      title: <Text className="text-primaryC text-[13px]">Tax($)</Text>,
       dataIndex: "tax",
       key: "tax",
       align: "center",
       render: (text) => <p>{text}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">AMOUNT($)</Text>,
+      title: <Text className="text-primaryC text-[13px]">Amount($)</Text>,
       dataIndex: "amount",
       key: "amount",
       align: "center",
@@ -298,111 +420,162 @@ const BoughtOrderDetails = ({ user, users }) => {
     <div>
       {contextHolder}
       {details === null || isorderDetailsLoading || isbuyerDetailsUpdating || isLoadingPaymentStatus ? (
-        <div className="h-screen flex justify-center items-center">
-          <Spin
-            spinning={isorderDetailsLoading || isbuyerDetailsUpdating || isLoadingPaymentStatus}
-            size="large"
-          />
-        </div>
-      ) : (
+      <div className="h-screen flex justify-center items-center">
+        <Spin
+          spinning={isorderDetailsLoading || isbuyerDetailsUpdating || isLoadingPaymentStatus}
+          size="large"
+        />
+      </div>
+    ) : (
         <div>
-          <Breadcrumb className="text-xs ml-14 mt-14 mb-8">
+          <Breadcrumb className="text-sm ml-4 md:ml-20 mt-4 md:mt-5 mb-2">
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
               <ClickableCell href={routes.Marketplace.url}>
+                <p className="text-sm text-[#13188A] font-semibold">
+
                 Home
+                </p>
               </ClickableCell>
             </Breadcrumb.Item>
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-              <div onClick={() => { navigate(routes.Orders.url, { state: { defaultKey: "Bought" } }); }}>
-                Orders (Bought)
+              <div onClick={() => { navigate(routes.Orders.url.replace(':type', 'bought')); }}>
+                <p className="text-sm text-[#13188A] font-semibold">
+
+                Orders (bought)
+                </p>
               </div>
             </Breadcrumb.Item>
-            <Breadcrumb.Item className="text-primary">
+            <Breadcrumb.Item className="text-sm font-medium text-[#202020]">
               {details.order.orderId}
             </Breadcrumb.Item>
           </Breadcrumb>
 
-          <Card className="mx-12 mb-14">
-            <div className="flex">
-              <Text className="font-semibold text-primaryB">Order Details</Text>
+          <Tabs
+            className="mx-4 md:mx-20 mt-5"
+            onChange={onChange}
+            defaultActiveKey={state == null ? "Bought" : state.defaultKey}
+            items={[
               {
-                !paid ? <div /> : <div className={classNames("text-success  bg-[#EAFFEE]", "ml-4 w-20 text-center text-xs p-1 rounded")}>
-                  <p>Paid</p>
-                </div>
+                label: <p id="sold-tab" className="font-semibold text-sm md:text-base">Orders (Sold)</p>,
+                key: "Sold",
+                children: <SoldOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
+
+              },
+              {
+                label: <p id="bought-tab" className="font-semibold text-sm md:text-base">Orders (Bought)</p>,
+                key: "Bought",
+                children:
+                  <div className="mb-10">
+                    <Button type="ghost" onClick={()=>onChange('Bought')} className="cursor-pointer mb-1 px-2 flex md:hidden items-center gap-2 text-sm font-semibold"><LeftArrow /> Back</Button>
+                    <Card className="md:p-2 mb-4 md:mb-14 md:shadow-card_shadow order_detail_card">
+                      <div className="flex flex-col md:flex-row md:justify-between">
+                        <div className="flex flex-col">
+                          <div className="flex">
+                            <Text className="bg-[#E9E9E9] md:bg-white py-2 px-3 w-full md:w-2/5 md:bg-none font-semibold text-sm md:text-lg text-primaryB flex gap-4 items-center">Order Details</Text>
+                            <Text className="hidden md:flex mt-2">{statusComponentForPayment(paid)}</Text>
+                          </div>
+                          <Text className="text-[#6A6A6A] md:text-black px-3 my-2 text-xs md:text-sm md:font-semibold">Please enter the fulfillment date to close the order</Text>
+                        </div>
+                        <Button
+                        id="cancel-order-button"
+                        type="primary"
+                        className="min-w-max w-max h-9 px-[2%] ml-2 bg-primary !hover:bg-primaryHover"
+                        disabled={status !== getStatus(1) || comment === "" || details.order.paymentSessionId !== ""}
+                        onClick={() => {
+                          handleCancelOrder()
+                          window.LOQ.push(['ready', async LO => {
+                            await LO.$internal.ready('events')
+                            LO.events.track('Order Details: Cancel Order')
+                          }])
+                          TagManager.dataLayer({
+                            dataLayer: {
+                              event: 'orderDetails_bought_cancel_click',
+                            },
+                          });
+                        }}
+                      >
+                        Cancel Order
+                      </Button>
+                      </div>
+                      <Row className="hidden md:flex my-6 justify-between bg-[#F6F6F6] p-4 pb-2 rounded">
+                        <OrderData title="Order Number" value={`#${details.order.orderId}`} />
+                        <Divider type="vertical" className="h-14 bg-secondryD" />
+                        <OrderData
+                          title="Buyer"
+                          value={details.order.purchasersCommonName}
+                        />
+                        <Divider type="vertical" className="h-14 bg-secondryD" />
+                        <OrderData
+                          title="Seller"
+                          value={details.order.sellersCommonName}
+                        />
+                        <Divider type="vertical" className="h-14 bg-secondryD" />
+                        <OrderData title="Total($)" value={details.order.totalPrice} />
+                        <Divider type="vertical" className="h-14 bg-secondryD" />
+                        <OrderData
+                          title="Date"
+                          value={getStringDate(details.order.createdDate, US_DATE_FORMAT)}
+                        />
+                        <Divider type="vertical" className="h-14 bg-secondryD" />
+                        <Col>
+                          <Text className="block text-primaryC text-[13px] mb-2">
+                            Status
+                          </Text>
+                          {statusComponent(status)}
+                        </Col>
+                      </Row>
+                      <Row className="my-2 md:hidden flex-col gap-[6px] justify-between p-4 pb-0 rounded">
+                        <div className="flex gap-4">
+                          <NewOrderData className="w-2/4" title="Order Number" value={'#' + details.order.orderId} />
+                          <NewOrderData className="w-2/4" title="Buyer" value={details.order.purchasersCommonName} />
+                        </div>
+                        <div className="flex gap-4">
+                          <NewOrderData className="w-2/4" title="Seller" value={details.order.sellersCommonName} />
+                          <NewOrderData className="w-2/4" title="Total($)" value={'$' + details.order.totalPrice} />
+                        </div>
+                        <div className="flex justify-between">
+                          <NewOrderData className="w-2/4" title="Status" value={statusComponent(status)} />
+                          <NewOrderData className="w-2/4" title="Payment Status" value={statusComponentForPayment(paid)} />
+                        </div>
+                      </Row>
+                      <Row className="flex-nowrap items-center justify-between mb-2 md:mb-6 p-2">
+                        <div className="w-full">
+                          <Text className="block text-primaryC text-[13px] mb-2">
+                            Comments
+                          </Text>
+                          <TextArea
+                            rows={2}
+                            placeholder="Enter Comments"
+                            value={decodeURIComponent(comment)}
+                            disabled={status !== getStatus(1) || details.order.paymentSessionId !== ""}
+                            onChange={(event) => {
+                              setcomment(event.target.value);
+                            }}
+                          />
+                        </div>
+                      </Row>
+
+                      <div className="hidden md:block">
+                        <DataTableComponent
+                          columns={column}
+                          data={data}
+                          isLoading={false}
+                          scrollX="100%"
+                        /></div>
+                    </Card>
+                    {data?.length > 0 && data?.map((item) => {
+                      return (
+                        <ResponsiveOrderDetailCard data={item} />)
+                    })}
+                  </div>
+              },
+              {
+                label: <p id="transfers-tab" className="font-semibold text-sm md:text-base">Transfers</p>,
+                key: "Transfers",
+                children: <TransfersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
               }
-            </div>
-            <Row className="my-6 justify-between">
-              <OrderData title="NUMBER" value={`#${details.order.orderId}`} />
-              <Divider type="vertical" className="h-14 bg-secondryD" />
-              <OrderData
-                title="BUYER"
-                value={details.order.purchasersCommonName}
-              />
-              <Divider type="vertical" className="h-14 bg-secondryD" />
-              <OrderData
-                title="SELLER"
-                value={details.order.sellersCommonName}
-              />
-              <Divider type="vertical" className="h-14 bg-secondryD" />
-              <OrderData title="TOTAL ($)" value={details.order.totalPrice} />
-              <Divider type="vertical" className="h-14 bg-secondryD" />
-              <OrderData
-                title="DATE"
-                value={getStringDate(details.order.createdDate, US_DATE_FORMAT)}
-              />
-              <Divider type="vertical" className="h-14 bg-secondryD" />
-              <Col>
-                <Text className="block text-primaryC text-[13px] mb-2">
-                  STATUS
-                </Text>
-                {statusComponent(status)}
-              </Col>
-            </Row>
-
-            <Row className="flex-nowrap items-center justify-between mb-6">
-              <div className="w-full">
-                <Text className="block text-primaryC text-[13px] mb-2">
-                  COMMENTS
-                </Text>
-                <TextArea
-                  rows={2}
-                  placeholder="Enter Comments"
-                  value={decodeURIComponent(comment)}
-                  disabled={status !== getStatus(1) || details.order.paymentSessionId !== ""}
-                  onChange={(event) => {
-                    setcomment(event.target.value);
-                  }}
-                />
-              </div>
-              <Button
-                id="cancel-order-button"
-                type="primary"
-                className="w-48 h-9 ml-6 mt-3 bg-primary !hover:bg-primaryHover"
-                disabled={status !== getStatus(1) || comment === "" || details.order.paymentSessionId !== ""}
-                onClick={() => {
-                  handleCancelOrder()
-                  window.LOQ.push(['ready', async LO => {
-                    await LO.$internal.ready('events')
-                    LO.events.track('Order Details: Cancel Order')
-                  }])
-                  TagManager.dataLayer({
-                    dataLayer: {
-                      event: 'orderDetails_bought_cancel_click',
-                    },
-                  });
-                }}
-              >
-                Cancel Order
-              </Button>
-            </Row>
-
-            <DataTableComponent
-              columns={column}
-              data={data}
-              isLoading={false}
-              scrollX="100%"
-            />
-          </Card>
+            ]}
+          />
         </div>
       )}
 

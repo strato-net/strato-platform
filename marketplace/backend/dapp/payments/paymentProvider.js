@@ -1,11 +1,12 @@
 import { util, rest, importer } from '/blockapps-rest-plus';
 // import config from '/load.config';
 import RestStatus from 'http-status-codes';
-import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } from '/helpers/utils';
+import { setSearchQueryOptions, search, searchOne, searchAll, searchAllWithQueryArgs } from '/helpers/utils';
 // import dayjs from 'dayjs';
 
 
-const contractName = 'StripePaymentProvider';
+const contractName = 'BasePaymentProvider';
+const stripeContractName = 'StripePaymentProvider';
 const paymentContractName = 'StripePaymentProvider.StripePaymentInitialized';
 const contractFilename = `${util.cwd}/dapp/mercata-base-contracts/Templates/Payments/StripePaymentProvider.sol`;
 
@@ -20,7 +21,7 @@ async function uploadContract(user, _constructorArgs, options) {
     const constructorArgs = marshalIn(_constructorArgs);
 
     const contractArgs = {
-        name: contractName,
+        name: stripeContractName,
         source: await importer.combine(contractFilename),
         args: util.usc(constructorArgs),
     };
@@ -151,30 +152,33 @@ function bindAddress(user, address, options) {
 
 
 async function get(user, args, defaultOptions) {
-    const { ownerCommonName, name, address, accountId, accountDeauthorized, ...restArgs } = args;
-    const options = { ...defaultOptions, org: 'BlockApps', app: contractName }
+    const { ownerCommonName, name, address, accountId, accountDeauthorized, transaction_sender, ...restArgs } = args;
+    const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
     let paymentProvider;
 
     if (address) {
-        const searchArgs = setSearchQueryOptions(restArgs, [{ key: 'address', value: address }, {key: 'chargesEnabled', value: true}]);
-        paymentProvider = await searchOne(contractName, searchArgs, options, user);
+        const searchArgs = setSearchQueryOptions(restArgs, [{ key: 'address', value: address }, {key: 'order', value: 'chargesEnabled.desc,block_timestamp.desc'}]);
+        paymentProvider = await search(contractName, searchArgs, options, user);
     } else if (ownerCommonName) {
-        let searchValues = [{ key: 'ownerCommonName', value: ownerCommonName }, { key: 'name', value: name }, {key: 'chargesEnabled', value: true}];
+        let searchValues = [{ key: 'ownerCommonName', value: ownerCommonName }, { key: 'name', value: name }, {key: 'order', value: 'chargesEnabled.desc,block_timestamp.desc'}];
         if (accountDeauthorized != undefined) {
             searchValues.push({ key: 'accountDeauthorized', value: accountDeauthorized })
         }
         const searchArgs = setSearchQueryOptions(restArgs, searchValues);
-        paymentProvider = await searchOne(contractName, searchArgs, options, user);
+        paymentProvider = await search(contractName, searchArgs, options, user);
     } else if (accountId) {
 
-        const searchArgs = setSearchQueryOptions(restArgs, [{ key: 'accountId', value: accountId }, { key: 'name', value: name }, {key: 'chargesEnabled', value: true}]);
-        paymentProvider = await searchOne(contractName, searchArgs, options, user);
+        const searchArgs = setSearchQueryOptions(restArgs, [{ key: 'accountId', value: accountId }, { key: 'name', value: name }, {key: 'order', value: 'chargesEnabled.desc,block_timestamp.desc'}]);
+        paymentProvider = await search(contractName, searchArgs, options, user);
+    } else if (transaction_sender) {
+        const searchArgs = setSearchQueryOptions(restArgs, [{ key: 'transaction_sender', value: transaction_sender }, { key: 'name', value: name }, {key: 'order', value: 'chargesEnabled.desc,block_timestamp.desc'}]);
+        paymentProvider = await search(contractName, searchArgs, options, user);
     }
     if (!paymentProvider) {
-        return {};
+        return [];
     }
 
-    return marshalOut({ ...paymentProvider, });
+    return paymentProvider.map((p) => marshalOut({ ...p, }));
 }
 
 async function getAll(admin, args = {}, options) {
@@ -192,8 +196,9 @@ async function getState(user, contract, options) {
 }
 
 async function getPaymentSession(user, args, defaultOptions) {
-    const { paymentSessionId, ...restArgs } = args;
-    const options = { ...defaultOptions, org: 'BlockApps', app: undefined }
+    const { paymentSessionId, contractName, ...restArgs } = args;
+    const {app, ...defaultOptions1} = defaultOptions
+    const options = { ...defaultOptions1, org: contractName}
     const searchArgs = setSearchQueryOptions(restArgs, { key: 'paymentSessionId', value: paymentSessionId });
     const paymentProvider = await searchOne(paymentContractName, searchArgs, options, user);
 
@@ -203,7 +208,7 @@ async function getPaymentSession(user, args, defaultOptions) {
 
 async function createPayment(user, args, options) {
     const { address, ...restArgs } = args;
-    const contract = { name: contractName, address }
+    const contract = { name: stripeContractName, address }
     const callArgs = {
       contract,
       method: "initializePayment",
@@ -224,7 +229,7 @@ async function createPayment(user, args, options) {
 
 async function finalizePayment(user, args, options) {
     const { address, ...restArgs } = args;
-    const contract = { name: contractName, ..._contract }
+    const contract = { name: stripeContractName, ..._contract }
     const callArgs = {
       contract,
       method: "finalizePayment",
@@ -243,18 +248,66 @@ async function finalizePayment(user, args, options) {
     return finalizeStatus;
 }
 
+async function updatePaymentProvider(admin, contract, _args, baseOptions) {
+    const args = { ..._args }
+  
+    const scheme = Object.keys(_args).reduce((agg, key) => {
+      const base = 1;
+      switch (key) {
+        case "chargesEnabled":
+          return agg | (base << 0);
+        case "detailsSubmitted":
+          return agg | (base << 1);
+        case "payoutsEnabled":
+          return agg | (base << 2);
+        case "eventTime":
+          return agg | (base << 3);
+        case "accountDeauthorized":
+          return agg | (base << 4);
+        default:
+          return agg;
+      }
+    }, 0);
+    
+    const callArgs = {
+      contract,
+      method: "update",
+      args: util.usc({
+        scheme,
+        ...args,
+      }),
+    };
+  
+    const options = {
+      ...baseOptions,
+      history: [contractName],
+    };
+  
+    const [restStatus, paymentProviderAddress] = await rest.call(
+      admin,
+      callArgs,
+      options
+    );
+  
+    if (parseInt(restStatus, 10) !== RestStatus.OK)
+      throw new rest.RestError(restStatus, 0, { callArgs });
+  
+    return [restStatus, paymentProviderAddress];
+  }
+
 export default {
     uploadContract,
     contractName,
+    stripeContractName,
     contractFilename,
     bindAddress,
     get,
     getAll,
-    getState,
     marshalIn,
     marshalOut,
     getHistory,
     getPaymentSession,
     createPayment,
-    finalizePayment
+    finalizePayment,
+    updatePaymentProvider,
 }

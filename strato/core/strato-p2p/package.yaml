@@ -34,7 +34,6 @@ library:
     - SafeSemaphore
     - aeson
     - alarmclock
-    - ansi-wl-pprint
     - base16-bytestring
     - blockapps-data
     - blockapps-datadefs
@@ -65,6 +64,7 @@ library:
     # - json-rpc
     - json-rpc-server
     - json-rpc-client
+    - ki-unlifted
     - lens
     - lifted-async
     - lifted-base
@@ -91,7 +91,6 @@ library:
     - strato-redis-blockdb
     - text
     - these
-    - thread-hierarchy
     - time
     - transformers
     - unliftio-core
@@ -112,6 +111,7 @@ tests:
       - blockapps-privacy
       - blockstanbul
       - bytestring
+      - composable-monads-base
       - conduit
       - containers
       - crypto-pubkey-types
@@ -123,6 +123,10 @@ tests:
       - extra
       - hflags
       - hspec
+      - hspec-expectations-lifted
+      - hourglass
+      - ki-unlifted
+      - labeled-error
       - lens
       - merkle-patricia-db
       - monad-alter
@@ -140,7 +144,6 @@ tests:
       - strato-sequencer
       - strato-redis-blockdb
       - text
-      - thread-hierarchy
       - time
       - unliftio
       - vm-runner
