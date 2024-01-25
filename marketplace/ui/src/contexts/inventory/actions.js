@@ -555,7 +555,7 @@ const actions = {
         }
       }
       let url = `${apiUrl}/inventory/transfers/items?limit=${limit}&order=transferDate.${order}&offset=${offset}&or=(oldOwnerCommonName.eq.${ownerCommonName},newOwnerCommonName.eq.${ownerCommonName})${search ? searchQuery : ''}${date ? range : ''}`
-
+     
       const response = await fetch(url, {
         method: HTTP_METHODS.GET,
 
