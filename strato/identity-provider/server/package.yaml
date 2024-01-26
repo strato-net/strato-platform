@@ -43,6 +43,7 @@ library:
   - mtl
   - servant-client
   - servant-server
+  - solid-vm-model
   - split
   - strato-model
   - text

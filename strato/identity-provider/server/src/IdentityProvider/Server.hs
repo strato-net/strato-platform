@@ -27,7 +27,7 @@ import Bloc.Client
 import BlockApps.Logging
 import BlockApps.Solidity.ArgValue
 import BlockApps.X509 hiding (isValid)
-import Blockchain.Strato.Model.Address (stringAddress)
+import Blockchain.Strato.Model.Address (stringAddress, deriveAddressWithSalt)
 import Blockchain.Strato.Model.Secp256k1 hiding (HasVault)
 import Control.Monad (unless)
 import Control.Monad.Change.Modify
@@ -54,6 +54,7 @@ import Network.HTTP.Types.Header (hAuthorization, hContentType)
 import Network.HTTP.Types.Status
 import Servant
 import Servant.Client hiding (manager, responseBody)
+import SolidVM.Model.Value (Value(..), ValList(..))
 import Strato.Strato23.API
 import Strato.Strato23.Client
 import UnliftIO hiding (Handler)
@@ -351,18 +352,20 @@ certInCirrus token (RealmDetails _ _ _ nurl1 nurl2) a = do
 walletInCirrus ::
   ( MonadIO m
   , MonadLogger m
-  , Accessible String m) =>
+  , Accessible String m
+  , Accessible Address m) =>
   Text ->
   RealmDetails ->
   String ->
   m Bool
 walletInCirrus token (RealmDetails _ _ _ nurl1 nurl2) commonName = do
   userTableName <- access (Proxy @String)
-  response1 <- callCirrus nurl1 userTableName
+  userRegistryAddress <- access (Proxy @Address)
+  response1 <- callCirrus userRegistryAddress nurl1 userTableName
   mWallet :: Maybe [WalletInCirrus] <-
     if statusCode (responseStatus response1) == 200
       then return . decode $ responseBody response1
-      else callCirrus nurl2 userTableName >>= return . decode . responseBody
+      else callCirrus userRegistryAddress nurl2 userTableName >>= return . decode . responseBody
   case mWallet of
     Just wallet -> do
       $logInfoS "walletInCirrus" $ T.pack $ "Checked for user's wallet in Cirrus; response was: " <> show wallet
@@ -371,12 +374,14 @@ walletInCirrus token (RealmDetails _ _ _ nurl1 nurl2) commonName = do
       $logErrorS "walletInCirrus" "Unexpected response from cirrus query. This should never happen"
       throwIO $ IdentityError "Unable to decode cirrus query for user's wallet. Something went very wrong"
   where
-    cirrusSearchPath :: String -> String
-    cirrusSearchPath userTableName = "/cirrus/search/" <> userTableName <> "?commonName=eq." <> commonName
+    cirrusSearchPath :: Address -> String -> String
+    cirrusSearchPath userRegAddr userTableName =
+      let derivedAddr = deriveAddressWithSalt (Just userRegAddr) commonName Nothing (Just . show $ OrderedVals [SString $ commonName])
+      in "/cirrus/search/" <> userTableName <> "?address=eq." <> show derivedAddr
 
-    callCirrus :: MonadIO m => BaseUrl -> String -> m (HTTP.Response BL.ByteString)
-    callCirrus nurl userTableName = do
-      let cirrusEndpoint = cirrusSearchPath userTableName
+    callCirrus :: MonadIO m => Address -> BaseUrl -> String -> m (HTTP.Response BL.ByteString)
+    callCirrus userRegAddr nurl userTableName = do
+      let cirrusEndpoint = cirrusSearchPath userRegAddr userTableName
           url = showBaseUrl nurl {baseUrlPath = baseUrlPath nurl <> cirrusEndpoint}
       mgr <- liftIO $ case baseUrlScheme nurl of
         Http -> newManager defaultManagerSettings
