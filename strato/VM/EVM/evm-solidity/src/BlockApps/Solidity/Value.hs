@@ -300,6 +300,10 @@ textToValue defs str = \case
   TypeStruct {} -> Left "textToValue TODO: TypeStruct not yet implemented"
   TypeVariadic {} -> Left "textToValue TODO: TypeVariadic not yet implemented"
 
+unEscapeStringValue :: Text -> Text
+unEscapeStringValue = Text.replace "\\\"" "\""
+                    . Text.replace "\\\\" "\\"  
+  
 textToSimpleValue :: Text -> SimpleType -> Either Text SimpleValue
 textToSimpleValue str = \case
   TypeBool -> case Text.toLower str of
@@ -314,7 +318,7 @@ textToSimpleValue str = \case
     ValueAccount <$> case readMaybe (Text.unpack str) of
       Nothing -> Left $ "textToSimpleValue: could not decode as account: " <> str
       Just x -> return x
-  TypeString -> return $ ValueString str
+  TypeString -> return $ ValueString $ unEscapeStringValue str
   TypeInt s b -> ValueInt s b <$> readNum
   TypeBytes (Just n) -> ValueBytes (Just n) <$> readBytes n
   TypeBytes Nothing -> ValueBytes Nothing <$> readBytesDyn
