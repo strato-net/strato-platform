@@ -1,5 +1,5 @@
 import { Input, Tabs, Typography, DatePicker, Breadcrumb, Button } from "antd";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import SoldOrdersTable from "./SoldOrdersTable";
 import BoughtOrdersTable from "./BoughtOrdersTable";
@@ -26,10 +26,9 @@ const Order = ({ user }) => {
   const { type } = params;
   const { state } = useLocation();
   const dispatch = useOrderDispatch();
-  const inventoryDispatch = useInventoryDispatch(); 
-  
-  const { itemTransfers, totalItemsTransfered, isFetchingItemTransfers } = useInventoryState();
-  const { orders, isordersLoading, orderBoughtTotal, ordersSold, orderSoldTotal, isordersSoldLoading } = useOrderState();
+  const inventoryDispatch = useInventoryDispatch();
+  const [call, setCall] = useState(false);
+  const { allOrders, isAllOrdersLoading } = useOrderState();
 
   const onChange = (key) => {
     navigate(`/order/${key}`)
@@ -42,58 +41,17 @@ const Order = ({ user }) => {
     setSelectedDate(date);
   };
   
-  const downloadExcel = async () => {
-    // Fetch the data for each table
-    if (user?.commonName) {
-      console.log("Fetching data...");
-      await actions.fetchOrderSold(
-        dispatch,
-        2000,
-        0,
-        user?.commonName,
-        selectedDate,
-        0,
-        "createdDate.desc",
-        null
-      );
-      
-      await actions.fetchOrder(
-        dispatch,
-        2000,
-        0,
-        user?.commonName,
-        selectedDate,
-        0,
-        "createdDate.desc",
-        null
-      );
-      await inventoryActions.fetchItemTransfers(
-        inventoryDispatch,
-        2000,
-        0,
-        user?.commonName,
-        "desc",
-        null,
-        null
-      );
-    }
-    
-    
-  
-    // Convert each data array to a worksheet
-    console.log("isordersLoading: ", isordersLoading)
-    console.log("isFetchingItemTransfers: ", isFetchingItemTransfers)
-    console.log("isordersSoldLoading: ", isordersSoldLoading)
-    if (!isFetchingItemTransfers && !isordersLoading && !isordersSoldLoading) {
-      // Create a new workbook
+  useEffect(() => {
+    console.log("isAllOrdersLoading: ", isAllOrdersLoading);
+    console.log("call: ", call);
+    console.log("allOrders1: ", allOrders);
+    if (allOrders && call && !isAllOrdersLoading) {
       const wb = XLSX.utils.book_new();
       console.log("Waiting for data to load...");
-      console.log("orders: ", orders);
-      console.log("ordersSold: ", ordersSold);
-      console.log("itemTransfers: ", itemTransfers);
-      const wsSold = XLSX.utils.json_to_sheet(ordersSold);
-      const wsBought = XLSX.utils.json_to_sheet(orders);
-      const wsTransferred = XLSX.utils.json_to_sheet(itemTransfers);
+      console.log("allOrders2: ", allOrders);
+      const wsSold = XLSX.utils.json_to_sheet(allOrders.bodySold);
+      const wsBought = XLSX.utils.json_to_sheet(allOrders.bodyBought);
+      const wsTransferred = XLSX.utils.json_to_sheet(allOrders.bodyTransfers);
     
       // Append each worksheet to the workbook
       XLSX.utils.book_append_sheet(wb, wsSold, 'Sold Orders');
@@ -106,6 +64,19 @@ const Order = ({ user }) => {
       // Convert the binary string to a Blob and save it
       const blob = new Blob([s2ab(wbout)], {type: 'application/octet-stream'});
       saveAs(blob, 'mercata-orders.xlsx');
+      setCall(false);
+    }
+  }, [allOrders, call, isAllOrdersLoading]);
+  
+  const downloadExcel = async () => {
+    // Fetch the data for each table
+    if (user?.commonName) {
+      console.log("Fetching data...");
+      await actions.fetchAllOrders(
+        dispatch,
+        user?.commonName
+      );
+      setCall(true);
     }
   };
   
@@ -115,51 +86,6 @@ const Order = ({ user }) => {
     const view = new Uint8Array(buf);
     for (let i=0; i<s.length; i++) view[i] = s.charCodeAt(i) & 0xFF;
     return buf;
-  }
-  
-  // Placeholder functions for fetching data
-  async function fetchSoldData() {
-    if (user?.commonName) {
-      await actions.fetchOrderSold(
-        dispatch,
-        2000,
-        0,
-        user?.commonName,
-        selectedDate,
-        0,
-        "createdDate.desc",
-        null
-      );
-    }
-  }
-  
-  async function fetchBoughtData() {
-    if (user?.commonName) {
-      await actions.fetchOrder(
-        dispatch,
-        2000,
-        0,
-        user?.commonName,
-        selectedDate,
-        0,
-        "createdDate.desc",
-        null
-      );
-    }
-  }
-  
-  async function fetchTransferredData() {
-    if (user?.commonName) {
-      await inventoryActions.fetchItemTransfers(
-        inventoryDispatch,
-        2000,
-        0,
-        user?.commonName,
-        "desc",
-        null,
-        null
-      );
-    }
   }
 
   return (
