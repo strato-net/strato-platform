@@ -44,34 +44,69 @@ const Order = ({ user }) => {
   
   const downloadExcel = async () => {
     // Fetch the data for each table
-    await fetchSoldData();
-    await fetchBoughtData();
-    await fetchTransferredData();
-    
-    // Create a new workbook
-    const wb = XLSX.utils.book_new();
-  
-    // Convert each data array to a worksheet
-    while (isFetchingItemTransfers || isordersLoading || isordersSoldLoading) {
-      console.log("Waiting for data to load...");
-      await new Promise(resolve => setTimeout(resolve, 100)); // Wait for half a second
+    if (user?.commonName) {
+      console.log("Fetching data...");
+      await actions.fetchOrderSold(
+        dispatch,
+        2000,
+        0,
+        user?.commonName,
+        selectedDate,
+        0,
+        "createdDate.desc",
+        null
+      );
+      
+      await actions.fetchOrder(
+        dispatch,
+        2000,
+        0,
+        user?.commonName,
+        selectedDate,
+        0,
+        "createdDate.desc",
+        null
+      );
+      await inventoryActions.fetchItemTransfers(
+        inventoryDispatch,
+        2000,
+        0,
+        user?.commonName,
+        "desc",
+        null,
+        null
+      );
     }
     
-    const wsSold = XLSX.utils.json_to_sheet(ordersSold);
-    const wsBought = XLSX.utils.json_to_sheet(orders);
-    const wsTransferred = XLSX.utils.json_to_sheet(itemTransfers);
+    
   
-    // Append each worksheet to the workbook
-    XLSX.utils.book_append_sheet(wb, wsSold, 'Sold Orders');
-    XLSX.utils.book_append_sheet(wb, wsBought, 'Bought Orders');
-    XLSX.utils.book_append_sheet(wb, wsTransferred, 'Transfers');
-  
-    // Write the workbook to a binary string
-    const wbout = XLSX.write(wb, {bookType: 'xlsx', type: 'binary'});
-  
-    // Convert the binary string to a Blob and save it
-    const blob = new Blob([s2ab(wbout)], {type: 'application/octet-stream'});
-    saveAs(blob, 'mercata-orders.xlsx');
+    // Convert each data array to a worksheet
+    console.log("isordersLoading: ", isordersLoading)
+    console.log("isFetchingItemTransfers: ", isFetchingItemTransfers)
+    console.log("isordersSoldLoading: ", isordersSoldLoading)
+    if (!isFetchingItemTransfers && !isordersLoading && !isordersSoldLoading) {
+      // Create a new workbook
+      const wb = XLSX.utils.book_new();
+      console.log("Waiting for data to load...");
+      console.log("orders: ", orders);
+      console.log("ordersSold: ", ordersSold);
+      console.log("itemTransfers: ", itemTransfers);
+      const wsSold = XLSX.utils.json_to_sheet(ordersSold);
+      const wsBought = XLSX.utils.json_to_sheet(orders);
+      const wsTransferred = XLSX.utils.json_to_sheet(itemTransfers);
+    
+      // Append each worksheet to the workbook
+      XLSX.utils.book_append_sheet(wb, wsSold, 'Sold Orders');
+      XLSX.utils.book_append_sheet(wb, wsBought, 'Bought Orders');
+      XLSX.utils.book_append_sheet(wb, wsTransferred, 'Transfers');
+    
+      // Write the workbook to a binary string
+      const wbout = XLSX.write(wb, {bookType: 'xlsx', type: 'binary'});
+    
+      // Convert the binary string to a Blob and save it
+      const blob = new Blob([s2ab(wbout)], {type: 'application/octet-stream'});
+      saveAs(blob, 'mercata-orders.xlsx');
+    }
   };
   
   // Utility function to convert a binary string to an ArrayBuffer
