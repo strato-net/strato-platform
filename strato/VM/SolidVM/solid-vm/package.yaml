@@ -36,6 +36,7 @@ library:
   - merkle-patricia-db
   - monad-alter
   - nibblestring
+  - ordered-containers
   - parsec
   - prometheus-client
   - solid-vm-model

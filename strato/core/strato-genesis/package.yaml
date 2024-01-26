@@ -41,6 +41,7 @@ library:
       - text
       - raw-strings-qq
       - solid-vm-model
+      - solid-vm
       - ethereum-rlp
       - x509-certs
       - lens

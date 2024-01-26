@@ -115,27 +115,6 @@ solidityContract = do
             then invalidArguments ("Function is already defined with similar params.") $ SolidVM._funcArgs new
             else old {SolidVM._funcOverload = SolidVM._funcOverload old ++ [new]}
 
---  where -- constants = byMutability True (repeat 0)
-
---        variables = byMutability False [0,32..]
-
---        byMutability :: Bool -> [Int] -> [(String, Declaration)] -> [((Text, SVMType.Type), Bool, Bool, Maybe Expression)]
---        byMutability isConst ns = Map.fromList . flip (zipWith mapVarTypes) ns . varTypesOf isConst
-
---        mapVarTypes (v, isPub, isConst, val) i =
---          fmap (SVMType.VarType i (visibility isPub) (Just isConst) val) v
-
---        varTypesOf :: Bool
---                   -> [(String, Declaration)]
---                   -> [((Text, SVMType.Type), Bool, Bool, Maybe Expression)]
---        varTypesOf isConstant = map (\(n, VariableDeclaration v isPub isConst val) ->
---                                   ((Text.pack n, v), isPub, isConst, val))
---                           . filter (\(_, decl) -> case decl of
---                                        (VariableDeclaration _ _ c _) -> isConstant == c
---                                        _ -> False)
-
---        visibility isPub = if isPub then Just True else Nothing
-
 -- | Parses a free function
 solidityFreeFunction :: SolidityParser SourceUnit
 solidityFreeFunction = do

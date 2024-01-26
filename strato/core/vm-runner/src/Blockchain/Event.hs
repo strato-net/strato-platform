@@ -65,7 +65,7 @@ data VmOutEvent
   | OutToStateDiff Word256 ChainInfo Keccak256 Text Text
   | OutStateDiff StateDiff
   | OutLog LogDB
-  | OutEvent EventDB
+  | OutEvent [EventDB]
   | OutTXR TransactionResult
   | OutASM (Map Account AddressStateModification)
   | OutJSONRPC String B.ByteString
@@ -107,7 +107,7 @@ insertOutBatch e b = case e of
   OutToStateDiff v w x y z -> b {outToStateDiffs = outToStateDiffs b `DL.snoc` (v, w, x, y, z)}
   OutStateDiff a -> b {outStateDiffs = outStateDiffs b `DL.snoc` a}
   OutLog a -> b {outLogs = outLogs b `DL.snoc` a}
-  OutEvent a -> b {outEvents = outEvents b `DL.snoc` a}
+  OutEvent a -> b {outEvents = outEvents b `DL.append` DL.fromList a}
   OutTXR a -> b {outTXRs = outTXRs b `DL.snoc` a}
   OutASM a -> b {outASMs = outASMs b `DL.snoc` a}
   OutJSONRPC x y -> b {outJSONRPCs = outJSONRPCs b `DL.snoc` (x, y)}
