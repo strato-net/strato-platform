@@ -1,4 +1,4 @@
-url: https://art.mercata-testnet2.blockapps.net/
+url: http://localhost
 dapp:
   contract:
     name: Mercata
