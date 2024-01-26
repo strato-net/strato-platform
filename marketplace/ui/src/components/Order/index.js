@@ -26,8 +26,8 @@ const Order = ({ user }) => {
   const { type } = params;
   const { state } = useLocation();
   const dispatch = useOrderDispatch();
-  const inventoryDispatch = useInventoryDispatch();
-  const [call, setCall] = useState(false);
+  const [callExcel, setCallExcel] = useState(false);
+  const [callCSV, setCallCSV] = useState(false);
   const { allOrders, isAllOrdersLoading } = useOrderState();
 
   const onChange = (key) => {
@@ -42,13 +42,8 @@ const Order = ({ user }) => {
   };
   
   useEffect(() => {
-    console.log("isAllOrdersLoading: ", isAllOrdersLoading);
-    console.log("call: ", call);
-    console.log("allOrders1: ", allOrders);
-    if (allOrders && call && !isAllOrdersLoading) {
+    if (allOrders && callExcel && !isAllOrdersLoading) {
       const wb = XLSX.utils.book_new();
-      console.log("Waiting for data to load...");
-      console.log("allOrders2: ", allOrders);
       const wsSold = XLSX.utils.json_to_sheet(allOrders.bodySold);
       const wsBought = XLSX.utils.json_to_sheet(allOrders.bodyBought);
       const wsTransferred = XLSX.utils.json_to_sheet(allOrders.bodyTransfers);
@@ -64,19 +59,45 @@ const Order = ({ user }) => {
       // Convert the binary string to a Blob and save it
       const blob = new Blob([s2ab(wbout)], {type: 'application/octet-stream'});
       saveAs(blob, 'mercata-orders.xlsx');
-      setCall(false);
+      setCallExcel(false);
+      setCallCSV(false);
     }
-  }, [allOrders, call, isAllOrdersLoading]);
+    if (allOrders && callCSV && !isAllOrdersLoading) {
+      // Adding an extra column to distinguish data
+      const addTypeColumn = (data, type) => data.map(row => ({ ...row, Type: type }));
+
+      const soldData = addTypeColumn(allOrders.bodySold, 'Sold');
+      const boughtData = addTypeColumn(allOrders.bodyBought, 'Bought');
+      const transferredData = addTypeColumn(allOrders.bodyTransfers, 'Transferred');
+
+      const combinedData = [...soldData, ...boughtData, ...transferredData];
+      const ws = XLSX.utils.json_to_sheet(combinedData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Orders');
+
+      const wbout = XLSX.write(wb, {bookType: 'csv', type: 'binary'});
+      const blob = new Blob([s2ab(wbout)], {type: 'text/csv'});
+      saveAs(blob, 'mercata-orders.csv');
+      setCallCSV(false);
+      setCallExcel(false);
+    }
+  }, [allOrders, callExcel, callCSV, isAllOrdersLoading]);
   
-  const downloadExcel = async () => {
-    // Fetch the data for each table
+  const download = async (format) => {
     if (user?.commonName) {
-      console.log("Fetching data...");
       await actions.fetchAllOrders(
         dispatch,
         user?.commonName
       );
-      setCall(true);
+      if (format === 'xlsx'){
+        setCallExcel(true);
+        setCallCSV(false);
+      } 
+      else if (format === 'csv'){
+        setCallCSV(true);
+        setCallExcel(false);
+      }
+      
     }
   };
   
@@ -113,7 +134,10 @@ const Order = ({ user }) => {
         onChange={onChange}
         tabBarExtraContent={
           <div className="text-xs md:flex items-center hidden orders_page">
-            <Button style={{ backgroundColor: "#F6F6F6" }} onClick={downloadExcel}>Export tables to Excel</Button>
+            <Button style={{ backgroundColor: "#F6F6F6" }} onClick={() => download('xlsx')}>Export to Excel</Button>
+            <Button style={{ backgroundColor: "#F6F6F6" }} onClick={() => download('csv')}>Export to CSV</Button>
+
+
             <DatePicker
               style={{ backgroundColor: "#F6F6F6" }}
               value={
