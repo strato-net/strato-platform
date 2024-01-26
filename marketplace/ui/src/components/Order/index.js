@@ -1,6 +1,6 @@
-import { Input, Tabs, Typography, DatePicker, Breadcrumb, Button } from "antd";
+import { Tabs, DatePicker, Breadcrumb, Button } from "antd";
 import React, { useEffect, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import SoldOrdersTable from "./SoldOrdersTable";
 import BoughtOrdersTable from "./BoughtOrdersTable";
 import TransfersTable from "./TransfersTable";
@@ -11,20 +11,14 @@ import { Images } from "../../images";
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
 import { actions } from "../../contexts/order/actions";
-import { actions as inventoryActions } from "../../contexts/inventory/actions";
 import { useOrderDispatch } from "../../contexts/order";
-import { useInventoryDispatch } from "../../contexts/inventory";
-import { useInventoryState } from "../../contexts/inventory";
 import { useOrderState } from "../../contexts/order";
 
-const { Search } = Input;
-
 const Order = ({ user }) => {
-  // const naviroute = routes.OrderDetail.url;
+
   const navigate = useNavigate();
   const params = useParams();
   const { type } = params;
-  const { state } = useLocation();
   const dispatch = useOrderDispatch();
   const [callExcel, setCallExcel] = useState(false);
   const [callCSV, setCallCSV] = useState(false);
@@ -35,7 +29,7 @@ const Order = ({ user }) => {
   };
 
   const [selectedDate, setSelectedDate] = useState("");
-  const { Text } = Typography;
+
 
   const onDateChange = (date) => {
     setSelectedDate(date);
