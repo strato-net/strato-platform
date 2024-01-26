@@ -1342,8 +1342,8 @@ solidityTypeToSQLType SVMType.Variadic = Nothing
 ------------------
 
 unEscapeStringValue :: Text -> Text
-unEscapeStringValue = Text.replace "\\\"" "\""
-                    . Text.replace "\\\\" "\\"  
+unEscapeStringValue = T.replace "\\\"" "\""
+                    . T.replace "\\\\" "\\"  
 
 solidityValueToText :: SolidityValue -> Text
 solidityValueToText (SolidityValueAsString x) = escapeQuotes $ unEscapeStringValue x
