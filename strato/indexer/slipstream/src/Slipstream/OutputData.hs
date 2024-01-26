@@ -1341,12 +1341,8 @@ solidityTypeToSQLType SVMType.Variadic = Nothing
 
 ------------------
 
-unEscapeStringValue :: Text -> Text
-unEscapeStringValue = T.replace "\\\"" "\""
-                    . T.replace "\\\\" "\\"  
-
 solidityValueToText :: SolidityValue -> Text
-solidityValueToText (SolidityValueAsString x) = escapeQuotes $ unEscapeStringValue x
+solidityValueToText (SolidityValueAsString x) = escapeQuotes $ V.unEscapeStringValue x
 solidityValueToText (SolidityBool x) = tshow x
 solidityValueToText (SolidityNum x) = tshow x
 solidityValueToText (SolidityBytes x) = escapeQuotes $ tshow x
@@ -1359,7 +1355,7 @@ valueToSQLTextFilterContract x = valueToSQLText x
 valueToSQLText :: Value -> Maybe Text
 valueToSQLText (SimpleValue (ValueBool x)) = Just $ wrapSingleQuotes $ tshow x
 valueToSQLText (SimpleValue (ValueInt _ _ v)) = Just $ wrapSingleQuotes $ tshow v
-valueToSQLText (SimpleValue (ValueString s)) = Just $ wrapSingleQuotes $ escapeQuotes $ unEscapeStringValue s
+valueToSQLText (SimpleValue (ValueString s)) = Just $ wrapSingleQuotes $ escapeQuotes $ V.unEscapeStringValue s
 valueToSQLText (SimpleValue (ValueAddress (Address 0))) = Just "NULL"
 valueToSQLText (SimpleValue (ValueAddress (Address addr))) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ printf "%040x" (fromIntegral addr :: Integer)
 valueToSQLText (SimpleValue (ValueAccount acct)) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show acct
