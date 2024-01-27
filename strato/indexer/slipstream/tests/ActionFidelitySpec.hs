@@ -70,6 +70,16 @@ spec = describe "Action conversions" $ do
          "chainId": null,
          "data": {
            "2f6ff9d4a35c07f7b630fe1ce039bc45559b5fb6": {
+             "codeCollection": {
+               "_contracts": {},
+               "_flFuncs": {},
+               "_flConstants": {},
+               "_flEnums": {},
+               "_flStructs": {},
+               "_flErrors": {},
+               "_pragmas": [],
+               "_imports": []
+             },
              "diff": {
                "0000000000000000000000000000000000000000000000000000000000000000":
                  "000000000000000000000000000000000000000000000000000000005c703a07",
@@ -87,7 +97,10 @@ spec = describe "Action conversions" $ do
              "types": ["Create"],
              "codeHash": "86bc2e2a375e6ea377ae90026248f472fbeaa1354ef4424f568d01f3a48ab5b9",
              "organization": "BlockApps1",
-             "application": "LogisticsEngine1"
+             "application": "LogisticsEngine1",
+             "abstracts": [],
+             "mappings": [],
+             "arrays": []
            }
          },
          "sender": "c2191df3032cb8ee72e37ab6bbc4e83f92b9911c",

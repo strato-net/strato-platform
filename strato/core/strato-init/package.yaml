@@ -51,6 +51,7 @@ library:
   - resourcet
   - seqevents
   - servant-client
+  - solid-vm-compiler
   - solid-vm-model
   - solid-vm
   - sql-monad
