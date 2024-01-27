@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -101,15 +102,16 @@ instance PersistField CodePtr where
   toPersistValue (CodeAtAccount acct name) = PersistText . T.pack $ name ++ "@" ++ show acct
   fromPersistValue (PersistText t) =
     let s = T.unpack t
-     in case readEither s of
-          Right r -> Right r
-          Left _ -> case span (/= '@') s of
-            (name, '@' : acct) -> first T.pack $ flip CodeAtAccount name <$> readEither acct
-            (_, _) ->
-              bimap
-                T.pack
-                (EVMCode . unsafeCreateKeccak256FromWord256)
-                $ readEither ("0x" ++ s) -- the node has been upgraded and contains legacy code hashes
+        !cp = case readEither s of
+                Right r -> Right r
+                Left _ -> case span (/= '@') s of
+                  (name, '@' : acct) -> first T.pack $ flip CodeAtAccount name <$> readEither acct
+                  (_, _) ->
+                    bimap
+                      T.pack
+                      (EVMCode . unsafeCreateKeccak256FromWord256)
+                      $ readEither ("0x" ++ s) -- the node has been upgraded and contains legacy code hashes
+     in cp
   fromPersistValue x = Left $ T.pack $ "PersistField CodePtr: expected text: " ++ (show x)
 
 instance PersistFieldSql CodePtr where
