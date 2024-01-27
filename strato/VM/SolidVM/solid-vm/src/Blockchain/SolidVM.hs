@@ -2895,12 +2895,6 @@ certificateMap maybeCert _ =
           SVMType.value = SVMType.String Nothing
         }
 
--- | Do a depth-first traversal of the contract inheritance tree (or graph, if you insist)
-familyTree :: CC.CodeCollection -> [SolidString] -> [SolidString]
-familyTree _ [] = []
-familyTree cc xs = foldl' (\(acc :: [SolidString]) (p' :: SolidString) -> acc ++ [p'] ++ familyTree cc (getParents p')) [] xs
-                where getParents p = fromMaybe [] . fmap CC._parents $ M.lookup p (cc ^. CC.contracts)
-
 
 extractConstructorArgs :: CC.Contract -> [(SVMType.Type, SolidString)]
 extractConstructorArgs ct = 
@@ -2938,6 +2932,7 @@ matchArgumentsToValues :: MonadSM m => CC.Contract -> CC.ArgList -> m ValList
 matchArgumentsToValues contract args = do
   let argPairs ct' = fromMaybe [] (fmap CC._funcArgs $ ct' ^. CC.constructor)
       argCount = length . argPairs
+      formattedConstructorArgs = "(" ++ intercalate ", " (map (labelToString . snd) (extractConstructorArgs contract)) ++ ")"
       constructorOf ct' =
         fromMaybe 
           (invalidArguments ("arguments provided for missing constructor in contract " ++ (contract ^. CC.contractName)) (argPairs contract))
@@ -2946,20 +2941,29 @@ matchArgumentsToValues contract args = do
   case args of
     (CC.OrderedArgs []) -> do
       if (argCount contract > 0)
-      then invalidArguments "not enough arguments provided" (argPairs contract)
+      then invalidArguments "not enough arguments provided" formattedConstructorArgs
       else return (OrderedVals [])
     (CC.NamedArgs []) -> do
       if (argCount contract > 0) 
-      then invalidArguments "not enough arguments provided" (argPairs contract)
+      then invalidArguments "not enough arguments provided" formattedConstructorArgs
       else return (NamedVals [])
     _ -> argsToVals contract (constructorOf contract) args
 
 
+-- TODO should use C3 linearization like Solidity (https://en.wikipedia.org/wiki/C3_linearization)
+-- | Do a depth-first traversal of the contract inheritance tree (or graph, if you insist)
+familyTree :: CC.CodeCollection -> [SolidString] -> [SolidString]
+familyTree _ [] = []
+familyTree cc xs = foldl' (\(acc :: [SolidString]) (p' :: SolidString) -> acc ++ familyTree cc (getParents p') ++ [p']) [] xs
+                where getParents p = fromMaybe [] . fmap CC._parents $ M.lookup p (cc ^. CC.contracts)
+                
+
 -- | Entry point to running the constructors
 runTheConstructors :: MonadSM m => Account -> Account -> Keccak256 -> CC.CodeCollection -> SolidString -> CC.ArgList -> m ()
 runTheConstructors from to hsh cc baseContract argExps = do
-  let getContract ct' = fromMaybe (missingType "contract inherits from nonexistent parent" baseContract) (cc ^. CC.contracts . at ct')
-      lookupConstructor ct' = fmap CC._funcConstructorCalls $ ct' ^. CC.constructor
+  let getContract ct' = fromMaybe (missingType "contract inherits from nonexistent parent" ct') (cc ^. CC.contracts . at ct')
+      constructorCallsOf ct' = CC._funcConstructorCalls <$> ct' ^. CC.constructor
+      formattedConstructorArgs ct' = "(" ++ intercalate ", " (map (labelToString . snd) (extractConstructorArgs ct')) ++ ")"
       baseContract' = getContract baseContract
   
   argVals <- matchArgumentsToValues baseContract' argExps
@@ -2970,13 +2974,24 @@ runTheConstructors from to hsh cc baseContract argExps = do
     -- so as to initialize all the storage defs before the base may use them
     for_ (familyTree cc $ baseContract' ^. CC.parents) (\c' -> do 
         let ctrct = getContract c'
-            args' = CC.OrderedArgs $ fromMaybe [] (M.lookup c' =<< lookupConstructor baseContract')
-            -- TODO this does not handle a case where if a non-base contract calls 
-            --      a constructor in another parent contract the code collection 
-            --      then this lookup will fail. Should also check c' as well as base
+            finder [] = Nothing
+            finder (r:rs) = 
+              case M.member c' <$> constructorCallsOf r of
+                Just True -> Just r
+                _ -> finder rs
+            args' =
+              -- if the base contract isn't explicitly calling a constructor, 
+              -- it can also be happening somewhere else in the code collection
+              case M.lookup c' =<< constructorCallsOf baseContract' of
+                Just a -> CC.OrderedArgs a
+                Nothing -> 
+                  case finder ((map snd .  M.toList) $ CC._contracts cc) of
+                    Just m' -> CC.OrderedArgs $ fromMaybe [] (M.lookup c' =<< constructorCallsOf m')
+                    Nothing -> CC.OrderedArgs [] 
 
         onTraced . liftIO . putStrLn $
-              box ["running constructor: " ++ c' ++ "(" ++ intercalate ", " (map (labelToString . snd) (extractConstructorArgs ctrct)) ++ ")"]
+              box ["running constructor: " ++ c' ++ formattedConstructorArgs ctrct]
+        
 
         argVals' <- matchArgumentsToValues ctrct args'
         zippy' <- zipNamesToVariables ctrct argVals'
@@ -2987,7 +3002,7 @@ runTheConstructors from to hsh cc baseContract argExps = do
 
     -- run the base constructor
     onTraced . liftIO . putStrLn $
-        box ["running base constructor: " ++ baseContract ++ "(" ++ intercalate ", " (map (labelToString . snd) (extractConstructorArgs baseContract')) ++ ")"]
+        box ["running base constructor: " ++ baseContract ++ formattedConstructorArgs baseContract']
 
     runTheConstructors' from to cc baseContract' 
 
