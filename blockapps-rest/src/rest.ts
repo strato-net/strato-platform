@@ -841,25 +841,7 @@ async function getContractsContract(user:OAuthUser, name, address, chainId, opti
  * @returns {Object} Returns an object with all accessible functions and state variables in this smart contract
  */
 async function getState(user:OAuthUser, contract:Contract, options:Options) {
-  const state = await util.until(
-    (res) => {
-      if (res) {
-        return true;
-      } else {
-        return false;
-      }
-    },
-    async (opts) => {
-      try {
-        const res = await api.getState(user, contract, opts);
-        return res;
-      } catch(e) {
-        return undefined;
-      }
-    },
-    options
-  );
-  return state;
+  return api.getState(user, contract, options);
 }
 
 /**
@@ -1747,6 +1729,28 @@ async function waitForAddress(user, contract, _options:Options) {
   return results[0];
 }
 
+async function waitForAddressState(admin, contract, options:Options) {
+  const state = await util.until(
+    (res) => {
+      if (res) {
+        return true;
+      } else {
+        return false;
+      }
+    },
+    async (opts) => {
+      try {
+        const res = await getState(admin, contract, opts);
+        return res;
+      } catch(e) {
+        return undefined;
+      }
+    },
+    options
+  );
+  return state;
+}
+
 export default {
   fill,
   getAccounts,
@@ -1819,5 +1823,6 @@ export default {
   RestError,
   response,
   //
-  waitForAddress
+  waitForAddress,
+  waitForAddressState
 };
