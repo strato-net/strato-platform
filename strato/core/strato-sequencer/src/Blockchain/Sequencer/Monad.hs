@@ -69,6 +69,7 @@ import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul
 import Blockchain.Constants
 import Blockchain.Data.ChainInfo
+import Blockchain.EthConf
 import Blockchain.Privacy
 import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.DB.DependentBlockDB
@@ -90,6 +91,7 @@ import Control.Lens
 import Control.Monad (join, unless, void)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
+import Control.Monad.Composable.Kafka
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.Binary
@@ -167,10 +169,11 @@ data SequencerConfig = SequencerConfig
     cablePackage :: CablePackage,
     maxEventsPerIter :: Int,
     maxUsPerIter :: Int,
-    vaultClient :: Maybe ClientEnv -- Nothing in tests
+    vaultClient :: Maybe ClientEnv, -- Nothing in tests
+    kafkaClientId :: KafkaClientId
   }
 
-type SequencerM = StateT SequencerContext (ReaderT SequencerConfig (ResourceT (LoggingT IO)))
+type SequencerM = StateT SequencerContext (ReaderT SequencerConfig (KafkaM (ResourceT (LoggingT IO))))
 
 instance HasDependentBlockDB SequencerM where
   getDependentBlockDB = use dependentBlockDB
@@ -476,34 +479,35 @@ prunePrivacyDBs = do
 runSequencerM :: SequencerConfig -> Maybe BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
 runSequencerM c mbc m = do
   liftIO $ createDirectoryIfMissing False $ dbDir "h"
-  a <- runResourceT . flip runReaderT c $ do
+  a <- runResourceT . runKafkaMConfigured (kafkaClientId c) . flip runReaderT c $ do
     dbCS <- asks depBlockDBCacheSize
     dbPath <- asks depBlockDBPath
     stxSize <- asks seenTransactionDBSize
     depBlock <- LDB.open dbPath LDB.defaultOptions {LDB.createIfMissing = True, LDB.cacheSize = dbCS}
     loopCh <- atomically newTMChan
     latestRound <- liftIO $ newIORef 0
-    runStateT
-      m
-      SequencerContext
-        { _dependentBlockDB = depBlock,
-          _seenTransactionDB = mkSeenTxDB stxSize,
-          _dbeRegistry = M.empty,
-          _blockHashRegistry = M.empty,
-          _emittedBlockRegistry = initialEmittedBlockCache,
-          _txHashRegistry = M.empty,
-          _chainHashRegistry = M.empty,
-          _chainIdRegistry = M.empty,
-          _chainInfoRegistry = M.empty,
-          _x509certRegistry = M.empty,
-          _x509certInfoState = M.empty,
-          _getChainsDB = emptyGetChainsDB,
-          _getTransactionsDB = emptyGetTransactionsDB,
-          _ldbBatchOps = Q.empty,
-          _blockstanbulContext = mbc,
-          _loopTimeout = loopCh,
-          _latestRoundNumber = latestRound
-        }
+    let sequencerContext =
+          SequencerContext
+          { _dependentBlockDB = depBlock,
+            _seenTransactionDB = mkSeenTxDB stxSize,
+            _dbeRegistry = M.empty,
+            _blockHashRegistry = M.empty,
+            _emittedBlockRegistry = initialEmittedBlockCache,
+            _txHashRegistry = M.empty,
+            _chainHashRegistry = M.empty,
+            _chainIdRegistry = M.empty,
+            _chainInfoRegistry = M.empty,
+            _x509certRegistry = M.empty,
+            _x509certInfoState = M.empty,
+            _getChainsDB = emptyGetChainsDB,
+            _getTransactionsDB = emptyGetTransactionsDB,
+            _ldbBatchOps = Q.empty,
+            _blockstanbulContext = mbc,
+            _loopTimeout = loopCh,
+            _latestRoundNumber = latestRound
+          }
+    runStateT m sequencerContext
+
   return $ fst a
 
 pairToVmTx :: (Timestamp, OutputTx) -> VmEvent

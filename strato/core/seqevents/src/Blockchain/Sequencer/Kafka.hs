@@ -79,16 +79,16 @@ writeUnseqEvents events = do
   KW.produceMessagesAsSingletonSets $
     (K.TopicAndMessage unseqEventsTopicName . KW.makeMessage . BL.toStrict . encode) <$> events
 
-writeSeqVmEvents :: K.Kafka k => [VmEvent] -> k [KP.ProduceResponse]
+writeSeqVmEvents :: HasKafka k => [VmEvent] -> k [KP.ProduceResponse]
 writeSeqVmEvents events = do
   recordEvents seqVMWrites events
-  KW.produceMessagesAsSingletonSets $
+  execKafka $ KW.produceMessagesAsSingletonSets $
     (K.TopicAndMessage seqVmEventsTopicName . KW.makeMessage . BL.toStrict . encode) <$> events
 
-writeSeqP2pEvents :: K.Kafka k => [P2pEvent] -> k [KP.ProduceResponse]
+writeSeqP2pEvents :: HasKafka k => [P2pEvent] -> k [KP.ProduceResponse]
 writeSeqP2pEvents events = do
   recordEvents seqP2PWrites events
-  KW.produceMessagesAsSingletonSets $
+  execKafka $ KW.produceMessagesAsSingletonSets $
     (K.TopicAndMessage seqP2pEventsTopicName . KW.makeMessage . BL.toStrict . encode) <$> events
 
 writeUnseqEventsWithLimits :: K.Kafka k => [B.ByteString] -> k [KP.ProduceResponse]

@@ -5,12 +5,13 @@ module BlockApps.Tools.InsertP2P where
 import Blockchain.EthConf
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
+import Control.Monad.Composable.Kafka
 import Text.Printf
 
 insertP2P :: P2pEvent -> IO ()
 insertP2P oev = do
   printf "Inserting %s into seq_p2p_events...\n" $ show oev
-  resps <- runKafkaConfigured "queryStrato" $ do
-    assertTopicCreation
+  resps <- runKafkaMConfigured "queryStrato" $ do
+    execKafka assertTopicCreation
     writeSeqP2pEvents [oev]
   mapM_ print resps

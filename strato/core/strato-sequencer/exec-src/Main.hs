@@ -121,7 +121,8 @@ main = do
             cablePackage = pkg,
             maxEventsPerIter = flags_seq_max_events_per_iter,
             maxUsPerIter = flags_seq_max_us_per_iter,
-            vaultClient = Just clientEnv
+            vaultClient = Just clientEnv,
+            kafkaClientId = kafkaClientId'
           }
   race_ (runTheGregor gregorCfg)
     . race_ (runLoggingT (runSequencerM seqCfg mCtx sequencer))
