@@ -26,6 +26,7 @@ where
 import Control.DeepSeq
 import Control.Lens hiding ((.=))
 import Data.Aeson as Aeson
+import Data.Binary
 import Data.Data
 import Data.Default
 import qualified Data.Map as M
@@ -47,6 +48,8 @@ data SourceAnnotation a = SourceAnnotation
   deriving (Eq, Ord, Generic, Functor, Data, NFData)
 
 makeLenses ''SourceAnnotation
+
+instance Binary a => Binary (SourceAnnotation a)
 
 instance ToJSON a => ToJSON (SourceAnnotation a) where
   toJSON ann =

@@ -9,8 +9,6 @@ library:
     - Blockchain.SolidVM
     - Blockchain.SolidVM.Simple
     - Blockchain.SolidVM.SM
-    - Blockchain.SolidVM.CodeCollectionDB
-    - SolidVM.CodeCollectionTools
   ghc-options: -Wall -O2
   dependencies:
   - aeson
@@ -36,8 +34,10 @@ library:
   - merkle-patricia-db
   - monad-alter
   - nibblestring
+  - ordered-containers
   - parsec
   - prometheus-client
+  - solid-vm-compiler
   - solid-vm-model
   - solid-vm-parser
   - solid-vm-static-analysis
@@ -63,6 +63,7 @@ executables:
       - containers
       - parsec
       - solid-vm
+      - solid-vm-compiler
       - solid-vm-model
       - solid-vm-parser
       - solid-vm-static-analysis
@@ -96,6 +97,7 @@ tests:
       - raw-strings-qq
       - seqevents
       - solid-vm
+      - solid-vm-compiler
       - solid-vm-model
       - solid-vm-parser
       - solid-vm-static-analysis
@@ -127,6 +129,7 @@ benchmarks:
         - text
         - parsec
         - strato-model
+        - solid-vm-compiler
         - solid-vm-parser
         - solid-vm-static-analysis
         - solid-vm-model

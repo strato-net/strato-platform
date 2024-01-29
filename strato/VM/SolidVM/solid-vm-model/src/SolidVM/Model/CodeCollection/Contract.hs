@@ -35,6 +35,7 @@ import Control.Applicative ((<|>))
 import Control.DeepSeq
 import Control.Lens
 import Data.Aeson as A
+import Data.Binary
 import Data.Default
 import Data.Map (Map, empty, fromList)
 import Data.Source
@@ -50,6 +51,8 @@ import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 
 data ContractType = ContractType | LibraryType | AbstractType | InterfaceType deriving (Show, Generic, NFData, Eq, ToJSON, FromJSON)
+
+instance Binary ContractType
 
 -- Changes to this structure should also have changes in the Unparser :)
 data ContractF a = Contract
@@ -70,7 +73,7 @@ data ContractF a = Contract
     _importedFrom :: Maybe Account,
     _contractContext :: a
   }
-  deriving (Show, Generic, NFData, Functor, Foldable, Traversable)
+  deriving (Eq, Show, Generic, NFData, Functor, Foldable, Traversable)
 
 instance Semigroup (ContractF a) where
   c1 <> c2 =
@@ -95,6 +98,8 @@ instance Semigroup (ContractF a) where
 
 instance Default a => Monoid (ContractF a) where
   mempty = def
+
+instance Binary a => Binary (ContractF a)
 
 instance ToJSON a => ToJSON (ContractF a)
 

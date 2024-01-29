@@ -24,6 +24,7 @@ where
 import Control.DeepSeq
 import Control.Lens
 import Data.Aeson
+import Data.Binary
 import Data.Source
 import GHC.Generics
 import SolidVM.Model.CodeCollection.Statement
@@ -43,6 +44,8 @@ data VariableDeclF a = VariableDecl
   deriving (Show, Eq, Generic, Functor, NFData, Foldable, Traversable)
 
 makeLenses ''VariableDeclF
+
+instance Binary a => Binary (VariableDeclF a)
 
 instance ToJSON a => ToJSON (VariableDeclF a)
 

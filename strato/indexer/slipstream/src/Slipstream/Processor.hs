@@ -23,7 +23,6 @@ module Slipstream.Processor
     )
 where
 
-import Bloc.Database.Queries
 import Bloc.Monad
 import Bloc.Server.Utils
 import BlockApps.Logging
@@ -31,48 +30,36 @@ import qualified BlockApps.SolidVMStorageDecoder as SolidVM
 import qualified BlockApps.Solidity.Contract as OLD
 import BlockApps.Solidity.Value
 import qualified BlockApps.SolidityVarReader as SVR
-import Blockchain.DB.CodeDB
 import Blockchain.Data.AddressStateDB
-import Blockchain.Data.AddressStateRef
-import Blockchain.Data.ChainInfo
-import Blockchain.Data.DataDefs
-import Blockchain.Data.Json
 import Blockchain.Data.TransactionResult
-import Blockchain.SolidVM.CodeCollectionDB
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.ChainId
-import Blockchain.Strato.Model.ExtendedWord
+import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Stream.Action as Action
 import Blockchain.Stream.VMEvent
 import Control.Arrow ((&&&))
-import Control.Lens (at, (.~), (?~), (^.))
+import Control.Lens ((^.))
 import Control.Monad (forM, forM_, unless, when)
-import Control.Monad.Change.Alter
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.SQL
 import Control.Monad.IO.Unlift
-import Control.Monad.Trans.Class
-import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict hiding (state)
-import qualified Data.Aeson as Aeson
 import Data.Either (lefts, rights)
-import Data.Foldable (fold, for_, toList)
+import Data.Foldable (toList)
 import Data.Function
 import Data.IORef
+import qualified Data.IntMap as I
 import Data.List (foldl', sortOn)
 import qualified Data.Map as Map
 import Data.Maybe
 import Data.Ord (Down (..))
 import qualified Data.Set as S
-import Data.Source.Map
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Text.Encoding
 import Data.Traversable (for)
 import Database.PostgreSQL.Typed (PGConnection)
-import qualified Handlers.AccountInfo as Account
 import SelectAccessible ()
 import Slipstream.Data.Action
 import Slipstream.Events
@@ -81,93 +68,11 @@ import Slipstream.Globals
 import Slipstream.Metrics
 import Slipstream.OutputData
 import Slipstream.QueryFormatHelper
-import SolidVM.CodeCollectionTools
 import SolidVM.Model.CodeCollection hiding (contractName)
-import qualified SolidVM.Model.CodeCollection as CC (contractName)
 import qualified SolidVM.Model.Type as SVMType
 import Text.Format
 import Text.Tools (boringBox, multilineLog)
 import Prelude hiding (lookup)
-
-instance MonadUnliftIO m => Selectable Account Contract (SQLM m) where
-  select _ a = runMaybeT $ do
-    (AddressStateRef' r _) <-
-      MaybeT
-        . fmap listToMaybe
-        . Account.getAccount'
-        $ Account.accountsFilterParams
-          & Account.qaAddress ?~ (a ^. accountAddress)
-          & Account.qaChainId .~ (fmap ChainId . maybeToList $ a ^. accountChainId)
-    codePtr <- MaybeT . pure $ addressStateRefCodePtr r
-    MaybeT $ either (const Nothing) (Just . snd) <$> getContractDetailsByCodeHash codePtr
-
-instance (MonadUnliftIO m, Mod.Accessible (IORef Globals) m) => Selectable Account CodeCollection (SQLM m) where
-  select _ acct = do
-    g <- lift $ Mod.access (Mod.Proxy @(IORef Globals))
-    let getCCForAccount a = do
-          mASR <-
-            fmap listToMaybe
-              . Account.getAccount'
-              $ Account.accountsFilterParams
-                & Account.qaAddress ?~ (a ^. accountAddress)
-                & Account.qaChainId .~ (fmap ChainId . maybeToList $ a ^. accountChainId)
-          let codePtr =
-                fromMaybe (EVMCode emptyHash) $
-                  (\(AddressStateRef' r _) -> addressStateRefCodePtr r) =<< mASR
-              getContract n cc = (,cc) <$> Map.lookup n (cc ^. contracts)
-          unsafeResolveCodePtr codePtr >>= \case
-            Just (SolidVMCode n ch) ->
-              getCCFromGlobals g ch >>= \case
-                Just cc -> pure $ getContract n cc
-                Nothing -> do
-                  mCC <- either (const Nothing) Just <$> getCodeCollectionByCodePtr codePtr
-                  for_ mCC $ putCCIntoGlobals g ch
-                  pure $ mCC >>= getContract n
-            _ -> pure Nothing
-    getCCForAccount acct >>= \case
-      mCC@(Just _) -> do
-        ds <- getDelegates g acct
-        (c, cc) <- fold . catMaybes . (mCC :) <$> traverse getCCForAccount ds
-        pure . Just $ (contracts . at (c ^. CC.contractName) ?~ c) cc
-      _ -> pure Nothing
-
-instance Monad m => Selectable Word256 ParentChainIds (SQLM m) where
-  select _ _ = pure Nothing
-
-instance Selectable Account Contract m => Selectable Account Contract (ReaderT BlocEnv m) where
-  select p = lift . select p
-
-instance MonadUnliftIO m => (Keccak256 `Selectable` SourceMap) (SQLM m) where
-  select _ = Account.getCodeFromPostgres
-
-instance MonadUnliftIO m => (Keccak256 `Alters` DBCode) (SQLM m) where
-  lookup _ k = fmap (SolidVM,) <$> Account.getCodeByteStringFromPostgres k
-  insert _ _ _ = error "Slipstream: Keccak256 `Alters` DBCode insert"
-  delete _ _ = error "Slipstream: Keccak256 `Alters` DBCode delete"
-
-instance (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceMap) (ReaderT BlocEnv m) where
-  select p = lift . select p
-
-instance MonadUnliftIO m => Selectable Account AddressState (SQLM m) where
-  select _ a = runMaybeT $ do
-    (AddressStateRef' r _) <-
-      MaybeT
-        . fmap listToMaybe
-        . Account.getAccount'
-        $ Account.accountsFilterParams
-          & Account.qaAddress ?~ (a ^. accountAddress)
-          & Account.qaChainId .~ (fmap ChainId . maybeToList $ a ^. accountChainId)
-    codePtr <- MaybeT . pure $ addressStateRefCodePtr r
-    pure $
-      AddressState
-        (addressStateRefNonce r)
-        (addressStateRefBalance r)
-        (addressStateRefContractRoot r)
-        codePtr
-        (toMaybe 0 $ addressStateRefChainId r)
-
-instance Selectable Account AddressState m => Selectable Account AddressState (ReaderT BlocEnv m) where
-  select p = lift . select p
 
 diffNull :: Action.DataDiff -> Bool
 diffNull (Action.EVMDiff m) = Map.null m
@@ -182,7 +87,7 @@ data BatchedInserts = BatchedInserts
   { indexInsert :: ProcessedContract,
     abstractInsert :: [(ProcessedContract, T.Text, TableColumns)],
     historyInserts :: [ProcessedContract],
-    mappingInserts :: [ProcessedMappingRow]
+    mappingInserts :: [ProcessedCollectionRow]
   }
   deriving (Show)
 
@@ -257,23 +162,40 @@ rowToInsert gref abiid row cont oldState = do
   setContractState gref (actionAccount row) newState
   return $ processedContract abiid (Map.fromList $ newState) row
 
-rowToMappings :: MonadIO m => AggregateAction -> m (Map.Map Text Value)
-rowToMappings row = do
+rowToCollections :: MonadIO m => AggregateAction -> m (Map.Map Text Value)
+rowToCollections row = do
   let newState = case actionStorage row of
-        Action.SolidVMDiff mp -> SolidVM.decodeCacheValuesForMapping mp
+        Action.SolidVMDiff mp -> SolidVM.decodeCacheValuesForCollections mp
         _ -> []
   return $ (Map.fromList $ newState)
 
-processedContractToProcessedMappingRows :: MonadIO m => Map.Map Text Value -> [Text] -> AggregateAction -> ABIID -> m [ProcessedMappingRow]
-processedContractToProcessedMappingRows state mapNames row abiid = do
-  let valueMappingsMap = Map.filter (\value -> case value of ValueMapping _ -> True; _ -> False) (state)
-      onlyRecord = Map.toList (Map.restrictKeys valueMappingsMap (S.fromList mapNames))
-      recordVMs = fmap (\(a, value) -> case value of ValueMapping b -> (a, b); _ -> undefined) onlyRecord
-  if null valueMappingsMap
+processedContractToProcessedCollectionRows :: MonadIO m => Map.Map Text Value -> [Text] -> AggregateAction -> ABIID -> m [ProcessedCollectionRow]
+processedContractToProcessedCollectionRows state mapAndArrayNames row abiid = do
+  let valueMappingsAndArrayMap = Map.filter (\value -> case value of 
+                                                      ValueMapping _ -> True 
+                                                      ValueArrayFixed _ _ -> True 
+                                                      ValueArrayDynamic _ -> True 
+                                                      _ -> False) state
+      onlyRecord = Map.toList (Map.restrictKeys valueMappingsAndArrayMap (S.fromList mapAndArrayNames))
+      recordVMs = fmap (\(a, value) -> case value of 
+                                    ValueMapping b -> (a, Left b) 
+                                    ValueArrayFixed _ b -> (a, Right (Left b)) 
+                                    ValueArrayDynamic b -> (a, Right (Right b)) 
+                                    _ -> undefined) onlyRecord
+  if null valueMappingsAndArrayMap  
     then return $ []
     else do
-      let result = concatMap (\(mName, theMap) -> map (\(k, v) -> processedMappingRow mName row abiid (SimpleValue k) v) (Map.toList theMap)) (recordVMs)
-      return $ result
+      let result = concatMap processRecord recordVMs
+          processRecord :: (Text, Either (Map.Map SimpleValue Value) (Either [Value] (I.IntMap Value))) -> [ProcessedCollectionRow]
+          processRecord (mName, value) = 
+            case value of
+              Left theMap -> 
+                map (\(k, v) -> processedCollectionRow mName row abiid (SimpleValue k) v) (Map.toList theMap)
+              Right (Left arrayValues) -> 
+                map (processArrayFixed mName row abiid) (zip [0..] arrayValues)
+              Right (Right intMapValues) -> 
+                map (processArrayDynamic mName row abiid) (I.toList intMapValues)
+      return result
 
 rowToHistories ::
   (MonadIO m) =>
@@ -291,23 +213,31 @@ rowToHistories _ abiId actions cont oldState = do
     newMap <- gets Map.fromList
     return $ processedContract abiId newMap hRow
 
-processedMappingRow :: Text -> AggregateAction -> ABIID -> Value -> Value -> ProcessedMappingRow
-processedMappingRow mapping AggregateAction {..} ABIID {..} k v =
-  ProcessedMappingRow
+processedCollectionRow :: Text -> AggregateAction -> ABIID -> Value -> Value -> ProcessedCollectionRow
+processedCollectionRow collection AggregateAction {..} ABIID {..} k v =
+  ProcessedCollectionRow
     { address = actionAccount ^. accountAddress,
       codehash = actionCodeHash,
       organization = actionOrganization,
       application = actionApplication,
       contractname = aiName,
-      mapname = mapping,
+      collectionname = collection,
       blockHash = actionBlockHash,
       blockTimestamp = actionBlockTimestamp,
       blockNumber = actionBlockNumber,
       transactionHash = actionTxHash,
       transactionSender = actionTxSender ^. accountAddress,
-      mapDataKey = k,
-      mapDataValue = v
+      collectionDataKey = k,
+      collectionDataValue = v
     }
+
+processArrayFixed :: Text -> AggregateAction -> ABIID -> (Int, Value) -> ProcessedCollectionRow
+processArrayFixed mName row abiid (index, value) =
+  processedCollectionRow mName row abiid (SimpleValue (ValueInt False Nothing (fromIntegral index))) value
+
+processArrayDynamic :: Text -> AggregateAction -> ABIID -> (Int, Value) -> ProcessedCollectionRow
+processArrayDynamic mName row abiid (index, value) =
+  processedCollectionRow mName row abiid (SimpleValue (ValueInt False Nothing (fromIntegral index))) value
 
 -- Prioritizing with-source actions prevents the issue where updates to contracts
 -- at different addresses are lost because the schema has not been seen yet.
@@ -334,57 +264,21 @@ parseEvents = concatMap parseEvent
           eventBlockNumber = Action._blockNumber a,
           eventTxHash = Action._transactionHash a,
           eventTxSender = Action._transactionSender a,
+          eventAbstracts = maybe Map.empty Action._actionDataAbstracts . Map.lookup (evContractAccount e) $ Action._actionData a,
           eventEvent = e
         }
 
-getCodeCollection ::
-  ( MonadIO m,
-    HasCodeDB m,
-    Selectable Account AddressState m
-  ) =>
-  IORef Globals ->
-  CodePtr ->
-  Text ->
-  m (Either String CodeCollection)
-getCodeCollection g cp ccString = do
-  let initList =
-        case Aeson.decodeStrict $ encodeUtf8 ccString of
-          Just l -> l
-          Nothing -> case Aeson.decodeStrict $ encodeUtf8 ccString of
-            Just m -> Map.toList m
-            Nothing -> [(T.empty, ccString)] -- for backwards compatibility
-            --We shouldn't crash if the source can't be parsed (a bad validator could brind the network down)
-            --For now I'm going to keep the crash in, since it will be a warning to us that we let a
-            --bad contract into the blockchain (the API shouldn't allow this)
-  case cp of
-    SolidVMCode _ ch ->
-      getCCFromGlobals g ch >>= \case
-        Just cc -> pure $ Right cc
-        Nothing ->
-          (fmap resolveLabels <$> compileSource False (Map.fromList initList)) >>= \case
-            Left e -> return $ Left $ "failed parse: " ++ show e --- return $ CodeCollection Map.empty
-            Right v -> do
-              putCCIntoGlobals g ch v
-              return $ Right v
-    EVMCode _ -> return $ Left "EVM contracts are not indexed by Slipstream"
-    CodeAtAccount _ _ -> return $ Left "Cannot compile or parse code at account"
-
-getMapNamesFromContract :: Contract -> [Text]
-getMapNamesFromContract c =
+getCollectionNamesFromContract :: ContractF () -> [Text]
+getCollectionNamesFromContract c =
   let storageDefs' = c ^. storageDefs
       storageDefsList = Map.toList storageDefs'
-      listOfMappings = filter (\(_, vd) -> case (_varType vd) of SVMType.Mapping _ _ _ -> True; _ -> False) storageDefsList
-      listOfMappingsWithRecords = filter (\(_, vd) -> _isRecord vd) listOfMappings
-   in T.pack . fst <$> listOfMappingsWithRecords
+      listOfCollections = filter (\(_, vd) -> case (_varType vd) of SVMType.Mapping _ _ _ -> True; SVMType.Array _ _-> True; _ -> False) storageDefsList
+      listOfCollectionsWithRecords = filter (\(_, vd) -> _isRecord vd) listOfCollections
+   in T.pack . fst <$> listOfCollectionsWithRecords
 
 processTheMessages ::
   ( MonadLogger m,
     HasSQL m,
-    Selectable Account AddressState m,
-    Selectable Account CodeCollection m,
-    Selectable Account Contract m,
-    Selectable Word256 ParentChainIds m,
-    HasCodeDB m,
     Mod.Accessible (IORef Globals) m
   ) =>
   BlocEnv ->
@@ -402,16 +296,11 @@ processTheMessages env conn messages = do
   let changes = parseActions messages
       events' = parseEvents messages
       -- TODO (Dan) : would be nice if we didn't just rip events out at the top level like this
-      creates = [(c, cp, o, a, hl, rm) | CodeCollectionAdded c cp o a hl rm <- messages]
-      delegates = [d | DelegatecallMade d <- messages]
+      creates = [(cc, cp, o, a, hl, abs', rm) | CodeCollectionAdded cc cp o a hl abs' rm <- messages]
+      -- delegates = [d | DelegatecallMade d <- messages]
       transactionResults = [tr | NewTransactionResult tr <- messages]
-      -- Use different functions based on flag value, this way it is only computed once, saving cpu cycles with if statements
-      getCC = getCodeCollection
 
-  fkeys' <- forM creates $ \(ccString, cp, o, a, hl, _) -> do
-    cc' <- getCC g cp ccString
-    case cc' of
-      Right cc -> do
+  fkeys' <- forM creates $ \(cc, cp, o, a, hl, abstracts', _) -> do
         $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (format cp) 
         multilineLog "processTheMessages/contracts" $ boringBox $ map show (Map.keys $ cc ^. contracts)
 
@@ -427,25 +316,23 @@ processTheMessages env conn messages = do
             -- Here we will get the storageDefs attribute of the contract (c) and iterate through the Map of (Text, VariableDecl) and look for VariableDecls that have the last attribute (isRecord) true and thetype are mappings
             -- We will then create a table for each of these mappings and add a foreign key to the main table
 
-            let mapNames = getMapNamesFromContract c
-
+            let collectionNames = getCollectionNamesFromContract c              
             let historyTableNames = map (historyTableName o a') hl
             $logDebugS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames
 
-            nameParts@(o'', a'', n'') <- resolveNameParts o a' c
+            let nameParts@(o'', a'', n'') = (o, a', T.pack $ _contractName c)
             $logInfoS "processTheMessages/Contract Added" $ "org=" <> o'' <> ", app=" <> a'' <> ", name=" <> n''
             multilineLog "processTheMessages/fields" $ boringBox $ map (show) $ Map.toList $ fmap _varType $ c ^. storageDefs
 
             --Create mapping tables
-            deferredForeignKeysForMappings <- fmap concat $
-              forM mapNames $ \m -> do
-                outputData conn $ createMappingTable g nameParts m --Tables are created
-
+            deferredForeignKeysForCollections <- fmap concat $
+              forM collectionNames $ \m -> do
+                outputData conn $ createCollectionTable g nameParts m --Tables are created
             -- mark
 
             deferredForeignKeys <- case (_contractType c) of
               AbstractType -> do
-                _ <- outputData conn $ createExpandAbstractTable g c nameParts cc
+                _ <- outputData conn $ createExpandAbstractTable g c nameParts abstracts' cc
                 return []
               _ -> do
                 outputData conn $ createExpandIndexTable g c nameParts
@@ -454,43 +341,41 @@ processTheMessages env conn messages = do
 
             outputData conn $ createExpandEventTables g c nameParts
 
-            return $ deferredForeignKeys ++ deferredForeignKeysForMappings
+            return $ deferredForeignKeys ++ deferredForeignKeysForCollections
 
         forM_ deferredForeignKeys $ \deferredForeignKey -> do
           outputData conn $ createForeignIndexesForJoins deferredForeignKey
         pure $ Right deferredForeignKeys
-      Left cc -> do
-        $logInfoS "processTheMessages" $ T.pack cc
-        pure $ Left cc -- Either String String
-  dfkeys' <- forM delegates $ \d@(Action.Delegatecall s c' o a) -> do
-    dels <- getDelegates g s
-    $logInfoS "processTheMessages" $ "Got delegates for " <> T.pack (format s) <> ": " <> T.pack (show dels)
-    if c' `elem` dels
-      then do
-        $logInfoS "processTheMessages" $ T.pack (format c') <> " was already seen as a delegate of " <> T.pack (format s)
-        pure $ Right []
-      else do
-        $logInfoS "processTheMessages" $ T.pack (format c') <> " was not a delegate of " <> T.pack (format s)
-        $logInfoS "processTheMessages" $ "Delegatecall made: " <> T.pack (format d)
-        mStorageContract <- select (Proxy @Contract) s
-        mCodeContract <- select (Proxy @Contract) c'
-        mCodeCollection <- select (Proxy @CodeCollection) c' 
-        deferredForeignKeys <- case (,,) <$> mStorageContract <*> mCodeContract <*> mCodeCollection of
-          Nothing -> pure []
-          Just (sc, cc, _') -> do
-            let c = cc {_contractName = _contractName sc}
-                mapNames = getMapNamesFromContract c
-            nameParts <- resolveNameParts o a c
-            forM_ mapNames $ outputData conn . createMappingTable g nameParts
-            deferredForeignKeys <- outputData conn $ createExpandIndexTable g c nameParts
-            outputData' conn $ createExpandHistoryTable g c nameParts
-            outputData conn $ createExpandEventTables g c nameParts
-            pure deferredForeignKeys
-        forM_ deferredForeignKeys $ outputData conn . createForeignIndexesForJoins
-        addDelegate g s c'
-        pure $ Right deferredForeignKeys
+  -- TODO: Add delegatecall indexing back in
+  -- dfkeys' <- forM delegates $ \d@(Action.Delegatecall s c' o a) -> do
+  --   dels <- getDelegates g s
+  --   $logInfoS "processTheMessages" $ "Got delegates for " <> T.pack (format s) <> ": " <> T.pack (show dels)
+  --   if c' `elem` dels
+  --     then do
+  --       $logInfoS "processTheMessages" $ T.pack (format c') <> " was already seen as a delegate of " <> T.pack (format s)
+  --       pure $ Right []
+  --     else do
+  --       $logInfoS "processTheMessages" $ T.pack (format c') <> " was not a delegate of " <> T.pack (format s)
+  --       $logInfoS "processTheMessages" $ "Delegatecall made: " <> T.pack (format d)
+  --       mStorageContract <- select (Proxy @Contract) s
+  --       mCodeContract <- select (Proxy @Contract) c'
+  --       mCodeCollection <- select (Proxy @CodeCollection) c' 
+  --       deferredForeignKeys <- case (,,) <$> mStorageContract <*> mCodeContract <*> mCodeCollection of
+  --         Nothing -> pure []
+  --         Just (sc, cc, _') -> do
+  --           let c = cc {_contractName = _contractName sc}
+  --               mapNames = getMapNamesFromContract c
+  --           nameParts <- resolveNameParts o a c
+  --           forM_ mapNames $ outputData conn . createMappingTable g nameParts
+  --           deferredForeignKeys <- outputData conn $ createExpandIndexTable g c nameParts
+  --           outputData' conn $ createExpandHistoryTable g c nameParts
+  --           outputData conn $ createExpandEventTables g c nameParts
+  --           pure deferredForeignKeys
+  --       forM_ deferredForeignKeys $ outputData conn . createForeignIndexesForJoins
+  --       addDelegate g s c'
+  --       pure $ Right deferredForeignKeys
 
-  let fkeys = rights $ fkeys' ++ dfkeys'
+  let fkeys = rights $ fkeys' -- ++ dfkeys'
 
   inserts <- enterBloc2 env $ do
     forM changes $ \(acct, actions) -> do
@@ -517,33 +402,21 @@ processTheMessages env conn messages = do
           oldState <- readPreviousSolidVMState g acct
           indexContract <- rowToInsert g abiid row cont oldState
           hs <- rowToHistories g abiid actions cont oldState
-          let cName = T.unpack $ SE.contractName indexContract
-          mCC <- lift $ select (Proxy @CodeCollection) (actionAccount row)
-          case (,) <$> mCC <*> (Map.lookup cName . _contracts =<< mCC) of
-            Nothing -> do
-              $logInfoS "processTheMessages" . T.pack $ "ERROR: Contract not in Code Collection "
-              pure . Right $ BatchedInserts indexContract [] hs []
-            Just (cc, c) -> do
-              let mapNames = getMapNamesFromContract c
-                  abstracts = getAbstractParentsFromContract c cc
-                  appName =
-                    if T.null $ SE.application indexContract
-                      then SE.contractName indexContract
-                      else SE.application indexContract
-              --get columns for abstract table
-              $logDebugLS "abstractColumns" $ T.pack $ "Getting abstract columns from " ++ (show abstracts)
-              abstractColumns <- fmap catMaybes . for abstracts $ \ab -> do
-                (o', a', n') <- lift $ resolveNameParts (SE.organization indexContract) appName ab
-                let tableName = AbstractTableName o' a' n'
-                    tableNameText = tableNameToDoubleQuoteText tableName
-                $logInfoS "Row will be inserted into abstract table: " tableNameText
-                mCols <- getTableColumns g tableName
-                pure $ (indexContract,tableNameText,) . map extractTextInsideQuotes <$> mCols
-              $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
-              $logDebugLS "History inserts are: " $ show hs
-              stateDiff <- rowToMappings row
-              pMappings <- processedContractToProcessedMappingRows stateDiff (mapNames) row abiid --get all mapping rows to insert
-              pure . Right $ BatchedInserts indexContract abstractColumns hs pMappings
+          let mapNames = actionMappings row
+              abstracts = actionAbstracts row
+          --get columns for abstract table
+          $logDebugLS "abstractColumns" $ T.pack $ "Getting abstract columns from " ++ (show abstracts)
+          abstractColumns <- fmap catMaybes . for (Map.toList abstracts) $ \((_, n'), (o', a')) -> do
+            let tableName = AbstractTableName o' a' n'
+                tableNameText = tableNameToDoubleQuoteText tableName
+            $logInfoS "Row will be inserted into abstract table: " tableNameText
+            mCols <- getTableColumns g tableName
+            pure $ (indexContract,tableNameText,) . map extractTextInsideQuotes <$> mCols
+          $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
+          $logDebugLS "History inserts are: " $ show hs
+          stateDiff <- rowToCollections row
+          pMappings <- processedContractToProcessedCollectionRows stateDiff (mapNames) row abiid --get all mapping rows to insert
+          pure . Right $ BatchedInserts indexContract abstractColumns hs pMappings
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
 
@@ -558,7 +431,7 @@ processTheMessages env conn messages = do
   forM_ insertsByCodeHash $ \ins -> do
     unless (null ins) $ outputData conn . insertIndexTable $ map indexInsert ins
     outputData conn . insertHistoryTable $ concatMap historyInserts ins
-    unless ((length (concatMap mappingInserts ins) < 1)) $ outputData conn . insertMappingTable $ concatMap mappingInserts ins
+    unless ((length (concatMap mappingInserts ins) < 1)) $ outputData conn . insertCollectionTable $ concatMap mappingInserts ins
     unless (null ins) $ outputData conn . insertAbstractTable $ concatMap abstractInsert ins
 
   forM_ insertsByCodeHash $ \ins -> do
