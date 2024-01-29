@@ -99,8 +99,7 @@ instance MonadUnliftIO m => A.Replaceable IPAsText PPeer (ReaderT ContextLite m)
         Just peer' -> do
           SQL.update
             (SQL.entityKey peer')
-            [ PPeerPubkey SQL.=. pPeerPubkey peer,
-              PPeerEnode SQL.=. pPeerEnode peer
+            [ PPeerPubkey SQL.=. pPeerPubkey peer
             ]
           return (SQL.entityKey peer')
       getPeerByIP :: HasSQLDB m => String -> m (Maybe (SQL.Entity PPeer))

@@ -219,8 +219,7 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
                     pPeerDisableException = T.pack "None",
                     pPeerNextDisableWindowSeconds = 5,
                     pPeerNextUdpDisableWindowSeconds = 5,
-                    pPeerDisableExpiration = posixSecondsToUTCTime 0,
-                    pPeerEnode = peerToEnode peer
+                    pPeerDisableExpiration = posixSecondsToUTCTime 0
                   }
           addPeer peer
         eErr <- resetPeerUdp $ fromJust thePeer
@@ -248,8 +247,7 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
                 pPeerDisableException = T.pack "None",
                 pPeerNextDisableWindowSeconds = 5,
                 pPeerNextUdpDisableWindowSeconds = 5,
-                pPeerDisableExpiration = posixSecondsToUTCTime 0,
-                pPeerEnode = peerToEnode peer
+                pPeerDisableExpiration = posixSecondsToUTCTime 0
               }
       addPeer peer
 

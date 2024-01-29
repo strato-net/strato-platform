@@ -1,7 +1,7 @@
 pragma es6;
 pragma strict;
 
-import <8f8d4cef7232db7001bae657db85eb4325ee2f3d>;
+import <e07b6c0fdf12618126f087043b15b15605871de1>;
 
 /// @title A representation of Clothing assets
 contract Clothing is Mintable {
