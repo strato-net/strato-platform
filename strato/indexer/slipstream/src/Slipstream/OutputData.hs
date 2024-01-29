@@ -1245,8 +1245,8 @@ valueToSQLText (ValueEnum _ _ index) = Just $ wrapSingleQuotes $ escapeQuotes $ 
 valueToSQLText (ValueContract acct) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show acct
 valueToSQLText (ValueFunction _ _ _) = Nothing
 valueToSQLText (ValueMapping _) = Nothing
-valueToSQLText arr@(ValueArrayFixed _ _) = Nothing
-valueToSQLText arr@(ValueArrayDynamic _) = Nothing
+valueToSQLText (ValueArrayFixed _ _) = Nothing
+valueToSQLText (ValueArrayDynamic _) = Nothing
 valueToSQLText struct@(ValueStruct _) = Just . wrapSingleQuotes . solidityValueToText . valueToSolidityValue $ struct
 
 valueToSQLText x = Just . wrapSingleQuotes . solidityValueToText . valueToSolidityValue $ x
