@@ -35,12 +35,48 @@ const Order = ({ user }) => {
     setSelectedDate(date);
   };
   
+  function mapOrderData(orders) {
+    return orders.map(order => ({
+      address: order.address,
+      transaction_hash: order.transaction_hash,
+      transaction_sender: order.transaction_sender,
+      createdDate: order.createdDate,
+      orderId: order.orderId,
+      purchasersAddress: order.purchasersAddress,
+      purchasersCommonName: order.purchasersCommonName,
+      status: order.status,
+      totalPrice: order.totalPrice,
+      comments: order.comments,
+      fulfillmentDate: order.fulfillmentDate,
+      sellersCommonName: order.sellersCommonName,
+      quantities: order.quantities.join(", ")
+    }));
+  }
+  
+  function mapTransfersData(transfers) {
+    return transfers.map(order => ({
+      id: order.id,
+      address: order.address,
+      transaction_hash: order.transaction_hash,
+      transaction_sender: order.transaction_sender,
+      assetAddress: order.assetAddress,
+      assetName: order.assetName,
+      oldOwner: order.oldOwner,
+      oldOwnerCommonName: order.oldOwnerCommonName,
+      newOwner: order.newOwner,
+      newOwnerCommonName: order.newOwnerCommonName,
+      quantity: order.quantity,
+      transferDate: order.transferDate
+    }));
+  }
+
+  
   useEffect(() => {
     if (allOrders && callExcel && !isAllOrdersLoading) {
       const wb = XLSX.utils.book_new();
-      const wsSold = XLSX.utils.json_to_sheet(allOrders.bodySold);
-      const wsBought = XLSX.utils.json_to_sheet(allOrders.bodyBought);
-      const wsTransferred = XLSX.utils.json_to_sheet(allOrders.bodyTransfers);
+      const wsSold = XLSX.utils.json_to_sheet(mapOrderData(allOrders.bodySold));
+      const wsBought = XLSX.utils.json_to_sheet(mapOrderData(allOrders.bodyBought));
+      const wsTransferred = XLSX.utils.json_to_sheet(mapTransfersData(allOrders.bodyTransfers));
     
       // Append each worksheet to the workbook
       XLSX.utils.book_append_sheet(wb, wsSold, 'Sold Orders');
@@ -60,9 +96,9 @@ const Order = ({ user }) => {
       // Adding an extra column to distinguish data
       const addTypeColumn = (data, type) => data.map(row => ({ ...row, Type: type }));
 
-      const soldData = addTypeColumn(allOrders.bodySold, 'Sold');
-      const boughtData = addTypeColumn(allOrders.bodyBought, 'Bought');
-      const transferredData = addTypeColumn(allOrders.bodyTransfers, 'Transferred');
+      const soldData = addTypeColumn(mapOrderData(allOrders.bodySold), 'Sold');
+      const boughtData = addTypeColumn(mapOrderData(allOrders.bodyBought), 'Bought');
+      const transferredData = addTypeColumn(mapTransfersData(allOrders.bodyTransfers), 'Transferred');
 
       const combinedData = [...soldData, ...boughtData, ...transferredData];
       const ws = XLSX.utils.json_to_sheet(combinedData);
