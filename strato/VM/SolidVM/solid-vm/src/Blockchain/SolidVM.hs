@@ -2990,7 +2990,7 @@ runTheConstructors from to hsh cc contract argExps = do
 
         zippy' <- zipValuesToVariables (getContract parent) =<< matchArgumentsToValues (getContract parent) argExp''
 
-        withCallInfo to (getContract parent) (parent ++ " constructor") hsh cc (M.fromList zippy') False False $ do
+        withCallInfo to (getContract parent) (parent ++ " constructor") hsh cc (M.union (M.fromList zippy) (M.fromList zippy')) False False $ do
           runTheConstructors'
             from 
             to 
