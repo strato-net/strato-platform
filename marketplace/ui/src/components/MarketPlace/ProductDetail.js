@@ -498,7 +498,7 @@ const ProductDetails = ({ user, users }) => {
                     children: (
                       <div>
                         <Paragraph
-                          className="text-[#202020] text-sm  h-[80px] overflow-auto"
+                          className="text-[#202020] text-sm"
                         >
                           {details?.description?.split('\n').map((line, index) => (
                             <React.Fragment key={index}>
