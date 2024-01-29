@@ -58,7 +58,7 @@ import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Base
 import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.SQL
-import Control.Monad.Reader (runReaderT)
+import Control.Monad.Reader (ask, runReaderT)
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.DList as DL
 import Data.Foldable hiding (fold)
@@ -99,6 +99,8 @@ ethereumVM d = runResourceT $ do
           yield vmInEventBatch
             .| handleVmEvents flags_useSyncMode
             .| mapM_C sendOutEvent
+        contx <- ask
+        void . liftIO $ enqueue (_stateDiffQueue contx) Flush
 
         loopTimeit "compactContextM" $ compactContextM
 
@@ -205,7 +207,9 @@ sendOutEvent (OutStateDiff diff) = do
   void . liftIO $ enqueue (_stateDiffQueue contx) (SD diff)
 sendOutEvent (OutLog l) = loopTimeit "flushLogEntries" $ void $ produceIndexEvents [LogDBEntry l]
 sendOutEvent (OutEvent e) = loopTimeit "flushEventEntries" $ void $ produceIndexEvents (EventDBEntry <$> e)
-sendOutEvent (OutTXR tr) = loopTimeit "flushEventEntries" $ void $ produceVMEvents [NewTransactionResult tr]
+sendOutEvent (OutTXR tr) = do
+  contx <- accessEnv
+  void . liftIO $ enqueue (_stateDiffQueue contx) (TXR tr)
 sendOutEvent (OutASM asm) =
   when (not flags_sqlDiff) $
     timeit "updateSQLBalanceAndNonce" (Just vmBlockInsertionMined) $
@@ -291,9 +295,13 @@ checkQueueAndCommitsSqlDiffsForever vmEvents = do
   let que = _stateDiffQueue context'
   msg <- liftIO . atomically $ readTQueue que
   case msg of
+    TXR !txResult -> checkQueueAndCommitsSqlDiffsForever $ vmEvents `DL.snoc` NewTransactionResult txResult
     SD !stateDiff' -> do
       commitSqlDiffs stateDiff'
       checkQueueAndCommitsSqlDiffsForever vmEvents
+    Flush -> do
+      void . produceVMEvents $ toList vmEvents
+      checkQueueAndCommitsSqlDiffsForever DL.empty
 
 deployCommitsSqlDiffs :: Context -> ResourceT (LoggingT IO) ()
 deployCommitsSqlDiffs context' = runSQLM $ runReaderT (checkQueueAndCommitsSqlDiffsForever DL.empty) context'

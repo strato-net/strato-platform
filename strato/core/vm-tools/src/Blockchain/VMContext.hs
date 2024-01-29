@@ -225,7 +225,9 @@ instance Default ContextState where
       }
 
 data QueueEvent
-  = SD StateDiff
+  = TXR TransactionResult
+  | SD StateDiff
+  | Flush
 
 data Context = Context
   { _dbs :: ContextDBs,
