@@ -42,8 +42,9 @@
     font-size: 16px !important;
 }
 
-.orders_page .ant-picker {
+.orders_page {
     margin-bottom: 12px;
+    gap: 8px;
 }
 
 @media (min-width: 768px) {

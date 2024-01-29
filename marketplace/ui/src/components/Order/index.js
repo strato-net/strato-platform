@@ -163,12 +163,16 @@ const Order = ({ user }) => {
         defaultActiveKey={type}
         onChange={onChange}
         tabBarExtraContent={
-          <div className="text-xs md:flex items-center hidden orders_page">
-            <Button style={{ backgroundColor: "#F6F6F6" }} onClick={() => download('xlsx')}>Export to Excel</Button>
-            <Button style={{ backgroundColor: "#F6F6F6" }} onClick={() => download('csv')}>Export to CSV</Button>
+          <div className="text-xs md:flex items-center orders_page">
+            <Button className="md:hidden" onClick={() => download('xlsx')}>Excel</Button>
+            <Button className="md:hidden" onClick={() => download('csv')}>CSV</Button>
+
+            <Button className="hidden md:block" onClick={() => download('xlsx')}>Export to Excel</Button>
+            <Button className="hidden md:block" onClick={() => download('csv')}>Export to CSV</Button>
 
 
             <DatePicker
+              className="md:flex hidden"
               style={{ backgroundColor: "#F6F6F6" }}
               value={
                 selectedDate
