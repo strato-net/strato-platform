@@ -12,11 +12,6 @@ where
 
 import Bloc.Monad (BlocEnv)
 import BlockApps.Logging
-import Blockchain.DB.CodeDB
-import Blockchain.Data.AddressStateDB
-import Blockchain.Data.ChainInfo
-import Blockchain.Strato.Model.Account
-import Blockchain.Strato.Model.ExtendedWord
 import Control.Monad
 import Control.Monad.Change.Alter
 import Control.Monad.Change.Modify
@@ -34,19 +29,13 @@ import Slipstream.Data.Action (AggregateEvent)
 import Slipstream.Globals
 import Slipstream.Metrics
 import Slipstream.Processor
-import SolidVM.Model.CodeCollection
 import Prelude hiding (lookup)
 
 getAndProcessMessages ::
   ( MonadLogger m,
     HasKafka m,
     HasSQL m,
-    Accessible (IORef Globals) m,
-    Selectable Account AddressState m,
-    Selectable Account CodeCollection m,
-    Selectable Account Contract m,
-    Selectable Word256 ParentChainIds m,
-    HasCodeDB m
+    Accessible (IORef Globals) m
   ) =>
   BlocEnv ->
   PGConnection ->

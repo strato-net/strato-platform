@@ -338,10 +338,10 @@ instance (HasMemPeerDB m, State.MonadState TestContext m) => (String `A.Alters` 
           Nothing -> pure $ ()
           Just k -> pointPPeerMap . at k ?= p
       Just oldPeer -> do
-        modifyIORef peerMapIORef $ at ip ?~ oldPeer {pPeerPubkey = pPeerPubkey p, pPeerEnode = pPeerEnode p}
+        modifyIORef peerMapIORef $ at ip ?~ oldPeer {pPeerPubkey = pPeerPubkey p}
         case pPeerPubkey p of
           Nothing -> pure $ ()
-          Just k -> pointPPeerMap . at k ?= oldPeer {pPeerPubkey = pPeerPubkey p, pPeerEnode = pPeerEnode p}
+          Just k -> pointPPeerMap . at k ?= oldPeer {pPeerPubkey = pPeerPubkey p}
   delete _ ip = do
     peerMap <- fmap stringPPeerMap accessEnv
     modifyIORef peerMap $ M.delete ip

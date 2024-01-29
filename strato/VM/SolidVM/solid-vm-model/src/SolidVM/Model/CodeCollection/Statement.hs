@@ -34,6 +34,7 @@ import Blockchain.Strato.Model.Account
 
 import Control.DeepSeq
 import Data.Aeson
+import Data.Binary
 import qualified Data.Map.Strict as Map
 import Data.Source
 import qualified Data.Text as T
@@ -65,6 +66,8 @@ data StatementF a
   | TryCatchStatement [StatementF a] (Map.Map String (Maybe [String], [StatementF a])) a
   deriving (Show, Eq, Generic, Functor, NFData, ToJSON, FromJSON, Foldable, Traversable)
 
+instance Binary a => Binary (StatementF a)
+
 extractStatement :: StatementF a -> a
 extractStatement (IfStatement _ _ _ a) = a
 extractStatement (WhileStatement _ _ a) = a
@@ -88,6 +91,8 @@ type Statement = Positioned StatementF
 
 data Location = Memory | Storage | Calldata deriving (Show, Eq, Generic, NFData)
 
+instance Binary Location
+
 instance ToJSON Location
 
 instance FromJSON Location
@@ -106,6 +111,8 @@ data VarDefEntryF a
   deriving (Show, Eq, Generic, Functor, NFData, Foldable, Traversable)
 
 type VarDefEntry = Positioned VarDefEntryF
+
+instance Binary a => Binary (VarDefEntryF a)
 
 instance ToJSON a => ToJSON (VarDefEntryF a)
 
@@ -130,6 +137,8 @@ data SimpleStatementF a
 
 type SimpleStatement = Positioned SimpleStatementF
 
+instance Binary a => Binary (SimpleStatementF a)
+
 instance ToJSON a => ToJSON (SimpleStatementF a)
 
 instance FromJSON a => FromJSON (SimpleStatementF a)
@@ -140,6 +149,8 @@ instance FromJSON a => FromJSON (SimpleStatementF a)
 -- }
 -- Anything else is a parse error.
 data InlineAssembly = MloadAdd32 T.Text T.Text deriving (Show, Eq, Generic, NFData)
+
+instance Binary InlineAssembly
 
 instance ToJSON InlineAssembly
 
@@ -191,6 +202,8 @@ extractExpression (ObjectLiteral a _) = a
 
 type Expression = Positioned ExpressionF
 
+instance Binary a => Binary (ExpressionF a)
+
 instance ToJSON a => ToJSON (ExpressionF a)
 
 instance FromJSON a => FromJSON (ExpressionF a)
@@ -226,6 +239,8 @@ instance Arbitrary a => Arbitrary (ArgListF a) where
 
 type ArgList = Positioned ArgListF
 
+instance Binary a => Binary (ArgListF a)
+
 instance ToJSON a => ToJSON (ArgListF a)
 
 instance FromJSON a => FromJSON (ArgListF a)
@@ -234,6 +249,8 @@ data NumberUnit = Wei | Szabo | Finney | Ether deriving (Show, Eq, Generic, NFDa
 
 instance Arbitrary NumberUnit where
   arbitrary = GR.genericArbitrary GR.uniform
+
+instance Binary NumberUnit
 
 instance ToJSON NumberUnit
 

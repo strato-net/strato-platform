@@ -18,6 +18,7 @@ import Control.DeepSeq
 import Control.Lens hiding ((.=))
 import Data.Aeson
 import Data.Aeson.Types
+import Data.Binary
 import Data.Source
 import Data.Text (Text)
 import GHC.Generics
@@ -37,6 +38,8 @@ data EventF a = Event
 makeLenses ''EventF
 
 type Event = Positioned EventF
+
+instance Binary a => Binary (EventF a)
 
 instance ToJSON a => ToJSON (EventF a) where
   toJSON e =

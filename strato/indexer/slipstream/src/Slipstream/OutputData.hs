@@ -36,18 +36,15 @@ module Slipstream.OutputData (
   createExpandHistoryTable,
   cirrusInfo,
   historyTableName,
-  tableColumns,
-  resolveNameParts,
-  getAbstractParentsFromContract
+  tableColumns
   ) where
 
 
 import           BlockApps.Solidity.Value as V
 import           Conduit
 import           Control.Arrow                   ((***))
-import           Control.Lens ((^.))
+import           Control.Lens ((^.), (<&>))
 import           Control.Monad
-import           Control.Monad.Change.Alter
 import qualified Data.Aeson                      as Aeson
 import qualified Data.ByteString.Base16         as Base16
 import qualified Data.ByteString.Char8           as BC
@@ -57,7 +54,7 @@ import qualified Data.Map.Strict                 as Map
 import           Data.Maybe                      (catMaybes, listToMaybe, mapMaybe)
 import           Data.Text                       (Text)
 import qualified Data.Text                       as T
-import           Data.Traversable                (for)
+-- import           Data.Traversable                (for)
 import           Bloc.Server.Utils               (partitionWith)
 import           BlockApps.Logging
 import           Blockchain.Strato.Model.Account
@@ -88,14 +85,6 @@ import           Text.RawString.QQ
 import           Text.Tools                      
 import           UnliftIO.Exception              (SomeException, catch, handle)
 import           UnliftIO.IORef
-import           Blockchain.Data.ChainInfo (ParentChainIds)
-import           Blockchain.Data.AddressStateDB
-import qualified Handlers.Storage as HS
-import           Blockchain.Strato.Model.ExtendedWord
-import qualified SolidVM.Model.Storable as MS
-import           MaybeNamed
-import           Blockchain.Strato.Model.ChainId
-import           Blockchain.Data.RLP
 
 newtype First b a = First {unFirst :: (a, b)}
 
@@ -283,73 +272,10 @@ collectionTableName o a n m =
   let (o', a', n') = constructTableNameParameters o a n
    in CollectionTableName o' a' n' m
 
-getContractsForParents :: [SolidString] -> Map.Map SolidString (ContractF a) -> [ContractF a]
-getContractsForParents parents' cc =
-  let getContractForParent parent = Map.lookup parent cc
-   in mapMaybe getContractForParent parents'
-   
-getAbstractParentsFromContract :: Contract -> CodeCollection -> [Contract]
-getAbstractParentsFromContract c cc =
-  -- recursively obtain parent + grandparent contracts
-  -- ex. B is A, C is B, then C should also be A
-  let go [] = []
-      go xs = xs ++ (go $ getContractsForParents (concatMap (_parents) xs) ccc)
-      ccc = _contracts cc
-      parents' = _parents c
-   in filter ((== AbstractType) . _contractType) (go $ getContractsForParents parents' ccc)
-
-resolveNameParts ::
-  ( MonadLogger m,
-    Selectable Account AddressState m,
-    Selectable Word256 ParentChainIds m,
-    Selectable HS.StorageFilterParams [HS.StorageAddress] m
-  ) =>
-  Text ->
-  Text ->
-  Contract ->
-  m (Text, Text, Text)
-resolveNameParts o a c = do
-  let tName = T.pack . _contractName
-  case c ^. importedFrom of
-    Nothing -> pure (o, a, tName c)
-    Just acct ->
-      select (Proxy @AddressState) acct >>= \case
-        Nothing -> do
-          $logWarnS "processTheMessages/resolveNameParts" . T.pack $
-            "Could not find address state for account " ++ show acct
-          pure (o, a, tName c)
-        Just s ->
-          resolveCodePtr (acct ^. accountChainId) (addressStateCodeHash s) >>= \case
-            Just (SolidVMCode appName _) -> do
-              let qs =
-                    HS.storageFilterParams
-                      { HS.qsKey = Just $ HS.HexStorage ".:creator",
-                        HS.qsAddress = Just $ acct ^. accountAddress,
-                        HS.qsChainId = Unnamed . ChainId <$> acct ^. accountChainId
-                      }
-              select (Proxy @[HS.StorageAddress]) qs >>= \case
-                Just (sa : _) -> case HS.value sa of
-                  HS.HexStorage orgHex -> case rlpDecode <$> rlpDeserializeMaybe orgHex of
-                    Just (MS.BString orgBS) -> case decodeUtf8' orgBS of
-                      Right o' -> pure (o', T.pack appName, tName c)
-                      Left _ -> do
-                        $logWarnS "resolveNameParts" . T.pack $
-                          ":creator field is not valid UTF8 for account " ++ show acct ++ ": " ++ show orgBS
-                        pure (o, T.pack appName, tName c)
-                    _ -> do
-                      $logWarnS "resolveNameParts" . T.pack $
-                        "Could not RLP decode :creator field for account " ++ show acct ++ ": " ++ show orgHex
-                      pure (o, T.pack appName, tName c)
-                _ -> pure ("", T.pack appName, tName c)
-            _ -> do
-              $logWarnS "resolveNameParts" . T.pack $
-                "Could not resolve code for account " ++ show acct
-              pure (o, a, tName c)
-
 createExpandIndexTable ::
   OutputM m =>
   IORef Globals ->
-  Contract ->
+  ContractF () ->
   (Text, Text, Text) ->
   ConduitM () Text m [ForeignKeyInfo]
 createExpandIndexTable g c nameParts = do
@@ -358,18 +284,15 @@ createExpandIndexTable g c nameParts = do
   return $ creationForeignKeys ++ expansionForeignKeys
 
 createExpandAbstractTable ::
-  ( OutputM m,
-    Selectable Account AddressState m,
-    Selectable Word256 ParentChainIds m,
-    Selectable HS.StorageFilterParams [HS.StorageAddress] m
-  ) =>
+  OutputM m =>
   IORef Globals ->
-  Contract ->
+  ContractF () ->
   (Text, Text, Text) ->
-  CodeCollection ->
+  Map.Map (Account, Text) (Text, Text) ->
+  CodeCollectionF () ->
   ConduitM () Text m [ForeignKeyInfo]
-createExpandAbstractTable g c nameParts cc = do
-  creationForeignKeys <- createAbstractTable g c nameParts cc
+createExpandAbstractTable g c nameParts abstracts cc = do
+  creationForeignKeys <- createAbstractTable g c nameParts abstracts cc
   expansionForeignKeys <- expandAbstractTable g c nameParts
   return $ creationForeignKeys ++ expansionForeignKeys
 
@@ -404,18 +327,15 @@ notifyPostgREST conn = do
 createExpandHistoryTable ::
   OutputM m =>
   IORef Globals ->
-  Contract ->
+  ContractF () ->
   (Text, Text, Text) ->
   ConduitM () (Text, Maybe (IORef Globals, TableName, TableColumns)) m ()
 createExpandHistoryTable g c nameParts = do
   createHistoryTable' g c nameParts
   expandHistoryTable g c nameParts
 
-getDeferredForeignKeys :: TableName -> Contract -> Text -> Text -> [ForeignKeyInfo]
+getDeferredForeignKeys :: TableName -> ContractF () -> Text -> Text -> [ForeignKeyInfo]
 getDeferredForeignKeys tableName c o a =
-  --    deferredForeignKeys' <- fmap concat $
-  --      forM (Map.toList $ cc^.contracts) $ \(nameString, c) ->
-
   flip map [(theName, x) | (theName, VariableDecl {_varType = SVMType.Contract x}) <- (Map.toList $ c ^. storageDefs)] $ \(theName, x) ->
     ForeignKeyInfo
       { tableName = tableName,
@@ -423,23 +343,21 @@ getDeferredForeignKeys tableName c o a =
         foreignTableName = indexTableName o a $ labelToText x
       }
 
-getDeferredForeignKeysAbstract ::   ( MonadLogger m,
-    Selectable Account AddressState m,
-    Selectable Word256 ParentChainIds m,
-    Selectable HS.StorageFilterParams [HS.StorageAddress] m
-  ) => TableName -> Contract -> Text -> Text -> CodeCollection -> m[ForeignKeyInfo]
-getDeferredForeignKeysAbstract tableName c o a cc =
-  fmap catMaybes . for [(theName, x) | (theName, VariableDecl {_varType = SVMType.Contract x}) <- Map.toList (c ^. storageDefs)] $ \(theName, x) -> do
-      let contract = getContractsBySolidString x cc
-      case contract of
-        Just c' -> do
-          (o',a',n') <- resolveNameParts o a c'
-          pure $ Just $ ForeignKeyInfo
-                          { tableName = tableName,
-                            columnName = labelToText theName,
-                            foreignTableName = abstractTableName o' a' n'
-                          }
-        Nothing -> return Nothing
+getDeferredForeignKeysAbstract ::
+  TableName -> ContractF () -> Text -> Text -> Map.Map (Account, Text) (Text, Text) -> CodeCollectionF () -> [ForeignKeyInfo]
+getDeferredForeignKeysAbstract tableName c o a abstracts' cc =
+  catMaybes . flip map [(theName, x) | (theName, VariableDecl {_varType = SVMType.Contract x}) <- Map.toList (c ^. storageDefs)] $ \(theName, x) -> do
+      getContractsBySolidString x cc <&> \c' ->
+          let (o',a',n') = case _importedFrom c' of
+                Nothing -> (o, a, _contractName c')
+                Just acct -> case Map.lookup (acct, T.pack $ _contractName c') abstracts' of
+                  Nothing -> (o, a, _contractName c')
+                  Just (o'', a'') -> (o'', a'', _contractName c')
+           in ForeignKeyInfo
+                { tableName = tableName,
+                  columnName = labelToText theName,
+                  foreignTableName = abstractTableName o' a' $ T.pack n'
+                }
 
 getDeferredForeignKeysForMapping :: TableName -> Text -> Text -> [ForeignKeyInfo]
 getDeferredForeignKeysForMapping tableName o a =
@@ -459,7 +377,7 @@ getDeferredForeignKeysForMapping tableName o a =
 createIndexTable ::
   OutputM m=>
   IORef Globals ->
-  Contract ->
+  ContractF () ->
   (Text, Text, Text) ->
   ConduitM () Text m [ForeignKeyInfo]
 createIndexTable globalsIORef contract (o, a, n) = do
@@ -478,17 +396,14 @@ createIndexTable globalsIORef contract (o, a, n) = do
       return $ getDeferredForeignKeys tableName contract o a
 
 createAbstractTable ::
-  ( OutputM m,
-    Selectable Account AddressState m,
-    Selectable Word256 ParentChainIds m,
-    Selectable HS.StorageFilterParams [HS.StorageAddress] m
-  ) =>
+  OutputM m =>
   IORef Globals ->
-  Contract ->
+  ContractF () ->
   (Text, Text, Text) ->
-  CodeCollection ->
+  Map.Map (Account, Text) (Text, Text) ->
+  CodeCollectionF () ->
   ConduitM () Text m [ForeignKeyInfo]
-createAbstractTable globalsIORef contract (o, a, n) cc = do
+createAbstractTable globalsIORef contract (o, a, n) abstracts' cc = do
   let tableName = abstractTableName o a n
   tableExists <- isTableCreated globalsIORef tableName
   if tableExists
@@ -497,7 +412,7 @@ createAbstractTable globalsIORef contract (o, a, n) cc = do
       let list = tableColumns $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
       yield $ createAbstractTableQuery contract (o, a, n)
       setTableCreated globalsIORef tableName (list ++ ["\"data\" jsonb"])
-      lift $ getDeferredForeignKeysAbstract tableName contract o a cc
+      pure $ getDeferredForeignKeysAbstract tableName contract o a abstracts' cc
 
 -- if flag from solidvm that it is a record, vmevent
 createCollectionTable ::
@@ -523,7 +438,7 @@ createCollectionTable globalsIORef (o, a, n) m = do
 createHistoryTable' ::
   OutputM m =>
   IORef Globals ->
-  Contract ->
+  ContractF () ->
   (Text, Text, Text) ->
   ConduitM () (Text, Maybe (IORef Globals, TableName, TableColumns)) m ()
 createHistoryTable' globalsIORef contract (o, a, n) = do
@@ -542,7 +457,7 @@ createHistoryTable' globalsIORef contract (o, a, n) = do
 createHistoryTable ::
   OutputM m =>
   IORef Globals ->
-  Contract ->
+  ContractF () ->
   (Text, Text, Text) ->
   ConduitM () Text m ()
 createHistoryTable globalsIORef contract (o, a, n) = do
@@ -562,7 +477,7 @@ createHistoryTable globalsIORef contract (o, a, n) = do
 expandIndexTable ::
   OutputM m =>
   IORef Globals ->
-  Contract ->
+  ContractF () ->
   (Text, Text, Text) ->
   ConduitM () Text m [ForeignKeyInfo]
 expandIndexTable globalsIORef contract (o, a, n) = do
@@ -572,7 +487,7 @@ expandIndexTable globalsIORef contract (o, a, n) = do
 expandAbstractTable ::
   OutputM m =>
   IORef Globals ->
-  Contract ->
+  ContractF () ->
   (Text, Text, Text) ->
   ConduitM () Text m [ForeignKeyInfo]
 expandAbstractTable globalsIORef contract (o, a, n) = do
@@ -582,7 +497,7 @@ expandAbstractTable globalsIORef contract (o, a, n) = do
 expandHistoryTable ::
   OutputM m =>
   IORef Globals ->
-  Contract ->
+  ContractF () ->
   (Text, Text, Text) ->
   ConduitM () (Text, Maybe (IORef Globals, TableName, TableColumns)) m ()
 expandHistoryTable globalsIORef contract (o, a, n) = do
@@ -593,7 +508,7 @@ expandHistoryTable globalsIORef contract (o, a, n) = do
 expandContractTable' ::
   OutputM m =>
   IORef Globals ->
-  Contract ->
+  ContractF () ->
   TableName ->
   ConduitM () (Text, Maybe (IORef Globals, TableName, TableColumns)) m [ForeignKeyInfo]
 expandContractTable' globalsIORef contract tableName = do
@@ -642,7 +557,7 @@ expandContractTable' globalsIORef contract tableName = do
 expandContractTable ::
   OutputM m =>
   IORef Globals ->
-  Contract ->
+  ContractF () ->
   TableName ->
   ConduitM () Text m [ForeignKeyInfo]
 expandContractTable globalsIORef contract tableName = do
@@ -691,7 +606,7 @@ expandContractTable globalsIORef contract tableName = do
 expandAbstractContractTable ::
   OutputM m =>
   IORef Globals ->
-  Contract ->
+  ContractF () ->
   TableName ->
   ConduitM () Text m [ForeignKeyInfo]
 expandAbstractContractTable globalsIORef contract tableName = do
@@ -831,7 +746,7 @@ insertAbstractTable cs@((_, abTableName, _) : _) = do
   multilineLog "insertAbstractTable/processedContract" $ show cs
   yieldMany $ insertAbstractTableQuery cs
 
-createIndexTableQuery :: Contract -> (Text, Text, Text) -> Text
+createIndexTableQuery :: ContractF () -> (Text, Text, Text) -> Text
 createIndexTableQuery contract (o, a, n) =
   let tableName = indexTableName o a n
       list = Map.toList $ contract ^. storageDefs
@@ -873,7 +788,7 @@ createCollectionTableQuery (o, a, n, m) =
           ",\n  PRIMARY KEY (address, key));"
         ]
 
-createAbstractTableQuery :: Contract -> (Text, Text, Text) -> Text
+createAbstractTableQuery :: ContractF () -> (Text, Text, Text) -> Text
 createAbstractTableQuery contract (o, a, n) =
   let tableName = abstractTableName o a n
       list = Map.toList $ contract ^. storageDefs
@@ -895,7 +810,7 @@ createAbstractTableQuery contract (o, a, n) =
           ",\n  PRIMARY KEY (address));"
         ]
 
-createHistoryTableQuery :: Contract -> (Text, Text, Text) -> Text
+createHistoryTableQuery :: ContractF () -> (Text, Text, Text) -> Text
 createHistoryTableQuery contract (o, a, n) =
   let tableName = historyTableName o a n
       list = Map.toList $ contract ^. storageDefs
@@ -1117,7 +1032,7 @@ insertHistoryTableQuery cs =
 createExpandEventTables ::
   OutputM m =>
   IORef Globals ->
-  Contract ->
+  ContractF () ->
   (Text, Text, Text) ->
   ConduitM () Text m ()
 createExpandEventTables globalsIORef c nameParts = mapM_ go . Map.toList $ c ^. events
@@ -1131,7 +1046,7 @@ createEventTable ::
   IORef Globals ->
   (Text, Text, Text) ->
   SolidString ->
-  Event ->
+  EventF () ->
   ConduitM () Text m ()
 createEventTable globalsIORef (o, a, n) evName ev = do
   let (org, app, cname) = constructTableNameParameters o a n
@@ -1142,7 +1057,7 @@ createEventTable globalsIORef (o, a, n) evName ev = do
     setTableCreated globalsIORef eventTable $ tableColumns [(x, indexedTypeType y) | (x, y) <- fillFirstEmptyEntries $ ev ^. eventLogs]
     yield $ createEventTableQuery eventTable ev
 
-createEventTableQuery :: TableName -> Event -> Text
+createEventTableQuery :: TableName -> EventF () -> Text
 createEventTableQuery tableName ev =
   let cols = ev ^. eventLogs
    in T.concat
@@ -1167,7 +1082,7 @@ expandEventTable ::
   IORef Globals ->
   (Text, Text, Text) ->
   SolidString ->
-  Event ->
+  EventF () ->
   ConduitM () Text m ()
 expandEventTable globalsIORef (o, a, n) evName ev = do
   let (org, app, cname) = constructTableNameParameters o a n
@@ -1199,72 +1114,34 @@ expandEventTable globalsIORef (o, a, n) evName ev = do
         yield $ expandTableQuery tableName extrasWithType
 
 insertEventTables :: 
-  ( OutputM m,
-    Selectable Account CodeCollection m,
-    Selectable Account Contract m,
-    Selectable Account AddressState m,
-    Selectable Word256 ParentChainIds m,
-    Selectable HS.StorageFilterParams [HS.StorageAddress] m
-  ) =>
+  OutputM m =>
   IORef Globals ->
   [AggregateEvent] ->
   ConduitM () Text m ()
 insertEventTables globalsIORef evs = do
-  processedEvents <- concat <$> mapM (lift . getAllEvents) evs
+  let processedEvents = concatMap getAllEvents evs
   yieldMany . catMaybes =<< lift (mapM (insertEventTable globalsIORef) processedEvents)
   where
     getAllEvents :: 
-      ( OutputM m, 
-        Selectable Account CodeCollection m, 
-        Selectable Account Contract m,
-        Selectable Account AddressState m,
-        Selectable Word256 ParentChainIds m,
-        Selectable HS.StorageFilterParams [HS.StorageAddress] m
-      ) => 
       AggregateEvent -> 
-      m [AggregateEvent]
+      [AggregateEvent]
     getAllEvents aggEvent = do
-      let event = eventEvent aggEvent
-          account = Action.evContractAccount $ event
-          org = Action.evContractOrganization $ event
-          app = Action.evContractApplication $ event
-          appName =
-              if T.null $ T.pack app
-                then Action.evContractName $ event
-                else app
-      maybeContract <- select (Proxy @Contract) account
-      maybeCodeCollection <- select (Proxy @CodeCollection) account
-      case (maybeContract, maybeCodeCollection) of
-        (Just contract, Just codeCollection) -> do
-          let parents = getAbstractParentsFromContract contract codeCollection
-          newEvents <-  processParents (T.pack org) (T.pack appName) parents aggEvent
-          -- Return the complete list of events (original event + new events)
-          return (aggEvent : newEvents)
-        _ -> return [aggEvent]
+      let newEvents = processParents aggEvent
+       in aggEvent : newEvents
 
     processParents :: 
-      ( OutputM m,
-        Selectable Account AddressState m,
-        Selectable Word256 ParentChainIds m,
-        Selectable HS.StorageFilterParams [HS.StorageAddress] m
-      ) => Text -> Text -> [Contract] -> AggregateEvent -> m [AggregateEvent]
-    processParents org app parents ae = mapM createNewEvent parents
+      AggregateEvent -> [AggregateEvent]
+    processParents ae = createNewEvent <$> Map.toList (eventAbstracts ae)
       where
         createNewEvent :: 
-          ( OutputM m, 
-            Selectable Account AddressState m,
-            Selectable Word256 ParentChainIds m,
-            Selectable HS.StorageFilterParams [HS.StorageAddress] m
-          ) => Contract -> m AggregateEvent
-        createNewEvent parentName = do
-          (o', a', n') <- resolveNameParts org app parentName
-          return $ ae {
-              eventEvent = (eventEvent ae) {
-                Action.evContractOrganization = T.unpack o',
-                Action.evContractApplication = T.unpack a',
-                Action.evContractName = T.unpack n'
-                  }
+          ((Account, Text), (Text, Text)) -> AggregateEvent
+        createNewEvent ((_, n'), (o', a')) =
+          ae { eventEvent = (eventEvent ae) {
+            Action.evContractOrganization = T.unpack o',
+            Action.evContractApplication = T.unpack a',
+            Action.evContractName = T.unpack n'
               }
+          }
 
 insertEventTable ::
   OutputM m =>

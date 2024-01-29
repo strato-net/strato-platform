@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -145,10 +146,11 @@ maybeToEither err m = maybe (Left err) Right m
 instance PersistField Address where
   toPersistValue = PersistText . T.pack . formatAddressWithoutColor
   fromPersistValue (PersistText t) =
-    maybeToEither "could not decode address"
-      . stringAddress
-      . T.unpack
-      $ t
+    let !eAddr = maybeToEither "could not decode address"
+               . stringAddress
+               . T.unpack
+               $ t
+     in eAddr
   fromPersistValue x = Left . T.pack $ "PersistField Address: expected PersistText: " ++ show x
 
 instance PersistFieldSql Address where
