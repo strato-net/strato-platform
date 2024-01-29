@@ -186,6 +186,19 @@ const CreateInventoryModal = ({
     }
   };
 
+  const handleCategory = (value) => {
+    form.setFieldValue("category", value);
+    setCategoryValue(value);
+    if (value === 'Carbon') {
+      form.setFieldValue("subCategory", null);
+      setSubCategoryValue(null);
+    } else {
+      const subCat = categorys.find(item => item.name === value).subCategories[0].name
+      form.setFieldValue("subCategory", subCat);
+      setSubCategoryValue(subCat);
+    }
+  }
+
   return (
     <>
       {contextHolder}
@@ -272,10 +285,7 @@ const CreateInventoryModal = ({
                   allowClear
                   value={categoryValue}
                   onChange={(value) => {
-                    form.setFieldValue("category", value);
-                    setCategoryValue(value);
-                    form.setFieldValue("subCategory", null);
-                    setSubCategoryValue(null);
+                    handleCategory(value)
                   }}
                 >
                   {categorys.map((e, index) => (
