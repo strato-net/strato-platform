@@ -987,7 +987,7 @@ insertAbstractTableQuery cs =
     transaction_sender = excluded.transaction_sender,
     contract_name = excluded.contract_name,
     data = excluded.data|],
-                      if null list then "" else ",\n    ",
+                      if null list' then "" else ",\n    ",
                       tableUpsert $ list',
                       ";"
                     ]
@@ -1245,8 +1245,8 @@ valueToSQLText (ValueEnum _ _ index) = Just $ wrapSingleQuotes $ escapeQuotes $ 
 valueToSQLText (ValueContract acct) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show acct
 valueToSQLText (ValueFunction _ _ _) = Nothing
 valueToSQLText (ValueMapping _) = Nothing
-valueToSQLText arr@(ValueArrayFixed _ _) = Just . wrapSingleQuotes . solidityValueToText . valueToSolidityValue $ arr
-valueToSQLText arr@(ValueArrayDynamic _) = Just . wrapSingleQuotes . solidityValueToText . valueToSolidityValue $ arr
+valueToSQLText arr@(ValueArrayFixed _ _) = Nothing
+valueToSQLText arr@(ValueArrayDynamic _) = Nothing
 valueToSQLText struct@(ValueStruct _) = Just . wrapSingleQuotes . solidityValueToText . valueToSolidityValue $ struct
 
 valueToSQLText x = Just . wrapSingleQuotes . solidityValueToText . valueToSolidityValue $ x

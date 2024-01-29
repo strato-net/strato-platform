@@ -268,7 +268,7 @@ parseEvents = concatMap parseEvent
           eventEvent = e
         }
 
-getCollectionNamesFromContract :: Contract -> [Text]
+getCollectionNamesFromContract :: ContractF () -> [Text]
 getCollectionNamesFromContract c =
   let storageDefs' = c ^. storageDefs
       storageDefsList = Map.toList storageDefs'
@@ -414,8 +414,8 @@ processTheMessages env conn messages = do
             pure $ (indexContract,tableNameText,) . map extractTextInsideQuotes <$> mCols
           $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
           $logDebugLS "History inserts are: " $ show hs
-          stateDiff <- rowToMappings row
-          pMappings <- processedContractToProcessedMappingRows stateDiff (mapNames) row abiid --get all mapping rows to insert
+          stateDiff <- rowToCollections row
+          pMappings <- processedContractToProcessedCollectionRows stateDiff (mapNames) row abiid --get all mapping rows to insert
           pure . Right $ BatchedInserts indexContract abstractColumns hs pMappings
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
