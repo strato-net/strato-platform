@@ -1504,9 +1504,10 @@ expToVar x = do
   return v
 
 decrementGas :: MonadSM m => Gas -> m ()
-decrementGas gas = do
+decrementGas !gas = do
   gasInfo' <- Mod.modifyStatefully (Mod.Proxy @GasInfo) $ gasLeft -= gas
-  Mod.modifyStatefully_ (Mod.Proxy @GasInfo) $ gasUsed += gas
+  let !gasUsed' = gas + gasInfo' ^. gasUsed
+  Mod.modifyStatefully_ (Mod.Proxy @GasInfo) $ gasUsed .= gasUsed'
   let !gasLeft' = gasInfo' ^. gasLeft
   if (gasLeft') < (Gas 0)
     then do

@@ -103,7 +103,6 @@ import Data.Bifunctor (first)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.UTF8 as UTF8
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe
@@ -163,7 +162,7 @@ data SState = SState
   { env :: Env.Environment,
     callStack :: [CallInfo],
     _ssMemDBs :: MemDBs,
-    _action :: Action,
+    _action :: !Action,
     _gasInfo :: GasInfo
   }
 
@@ -405,23 +404,24 @@ pushSender newSender mv = do
   return $ ret
 
 startingAction :: Maybe ByteString -> Env.Environment -> Maybe Word256 -> Action
-startingAction maybeCode env' chainId' =
-  Action.Action
-    { _blockHash = blockHeaderHash $ Env.blockHeader env',
-      _blockTimestamp = blockHeaderTimestamp $ Env.blockHeader env',
-      _blockNumber = blockHeaderBlockNumber $ Env.blockHeader env',
-      _transactionHash = Env.txHash env',
-      _transactionChainId = chainId',
-      _transactionSender = Env.sender env',
-      _actionData = M.empty,
-      _metadata =
-        case maybeCode of
-          Just theCode ->
-            Just $ M.insert "src" (T.pack $ UTF8.toString theCode) $ fromMaybe M.empty $ Env.metadata env'
-          Nothing -> Env.metadata env',
-      _events = Q.empty,
-      _delegatecalls = Q.empty
-    }
+startingAction !maybeCode env' chainId' =
+  let !codeSrc = case maybeCode of
+        Just theCode -> decodeUtf8 $! theCode
+        Nothing -> T.empty
+      !metadata = fromMaybe M.empty $! Env.metadata env'
+      !metadata' = if T.null codeSrc then Just $! M.insert "src" codeSrc metadata else Just metadata
+  in Action.Action
+      { _blockHash = blockHeaderHash $ Env.blockHeader env',
+        _blockTimestamp = blockHeaderTimestamp $ Env.blockHeader env',
+        _blockNumber = blockHeaderBlockNumber $ Env.blockHeader env',
+        _transactionHash = Env.txHash env',
+        _transactionChainId = chainId',
+        _transactionSender = Env.sender env',
+        _actionData = M.empty,
+        _metadata = metadata',
+        _events = Q.empty,
+        _delegatecalls = Q.empty
+      }
 
 getGasInfo :: MonadSM m => m GasInfo
 getGasInfo = Mod.get (Mod.Proxy @GasInfo)
@@ -900,13 +900,13 @@ initializeAction acct name appName hsh cc ab maps arrs = do
     Action.actionData %= M.insertWith Action.mergeActionData acct newData
 
 markDiffForAction :: Mod.Modifiable Action m => Account -> MS.StoragePath -> MS.BasicValue -> m ()
-markDiffForAction owner key' val' = do
+markDiffForAction owner !key' !val' = do
   let key = MS.unparsePath key'
       val = rlpSerialize $ rlpEncode val'
       ins = \case
         Action.SolidVMDiff m -> Action.SolidVMDiff $ M.insert key val m
         e -> internalError "SolidVM Diff executing in EVM" $ show e
-  Mod.modifyStatefully_ (Mod.Proxy @Action) $
+  key `seq` val `seq` Mod.modifyStatefully_ (Mod.Proxy @Action) $!
     Action.actionData . at owner . mapped . Action.actionDataStorageDiffs %= ins
 
 addEvent :: Mod.Modifiable (Q.Seq Event) m => Event -> m ()
