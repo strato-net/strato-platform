@@ -26,6 +26,7 @@ module Blockchain.SolidVM.SM
     withCallInfo,
     withTempCallInfo,
     withUncheckedCallInfo,
+    addLocalVariable,
     pushLocalVars,
     popLocalVars,
     getLocal,
@@ -666,6 +667,23 @@ popCallInfo :: MonadSM m => m ()
 popCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
   [] -> internalError "popCallInfo was called on an already empty stack" ()
   (_ : rest) -> pure rest
+
+-- Note: this is intentionally nonstrict in `theType`
+addLocalVariable :: MonadSM m => SVMType.Type -> SolidString -> Value -> m ()
+addLocalVariable theType name value = do
+  --  initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack name) value
+  newVariable <- liftIO $ fmap Variable $ newIORef value
+  cs <- Mod.get (Mod.Proxy @[CallInfo])
+  case cs of
+    [] -> internalError "addLocalVariable called with an empty stack" (name, value)
+    (currentSlice : rest) ->
+      Mod.put (Mod.Proxy @[CallInfo]) $
+        currentSlice
+          { localVariables =
+              M.insert name (theType, newVariable) $
+                localVariables currentSlice
+          } :
+        rest
 
 pushLocalVars :: MonadSM m => m ()
 pushLocalVars = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
