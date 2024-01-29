@@ -44,7 +44,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                 >
                     <Tooltip title={topSellingProduct?.name.length > 20 ? topSellingProduct?.name : null}>
               <span className=" whitespace-nowrap max-w-[160px] inline-block">
-                {topSellingProduct?.name.length > 20 ? `${topSellingProduct?.name.slice(0, 20)} ...` : `${topSellingProduct?.name}`}
+                {topSellingProduct?.name.length > 20 ? `${topSellingProduct?.name.slice(0, 20)}...` : `${topSellingProduct?.name}`}
               </span>
             </Tooltip>
                     {/* {topSellingProduct?.name || "N/A"} */}

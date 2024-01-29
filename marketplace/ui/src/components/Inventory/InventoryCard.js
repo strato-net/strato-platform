@@ -255,7 +255,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
             {/* {inventory?.name || "N/A"} */}
             <Tooltip title={inventory?.name.length > 20 ? inventory?.name : null}>
               <span className=" whitespace-nowrap max-w-[160px] inline-block">
-                {inventory?.name.length > 20 ? `${inventory?.name.slice(0, 20)} ...` : `${inventory?.name}`}
+                {inventory?.name.length > 20 ? `${inventory?.name.slice(0, 20)}...` : `${inventory?.name}`}
               </span>
             </Tooltip>
           </p>
