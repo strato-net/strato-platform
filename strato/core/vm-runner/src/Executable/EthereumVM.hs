@@ -295,7 +295,9 @@ checkQueueAndCommitsSqlDiffsForever vmEvents = do
   let que = _stateDiffQueue context'
   msg <- liftIO . atomically $ readTQueue que
   case msg of
-    TXR !txResult -> checkQueueAndCommitsSqlDiffsForever $ vmEvents `DL.snoc` NewTransactionResult txResult
+    TXR !txResult -> do
+      void . produceVMEvents $ [NewTransactionResult txResult]
+      checkQueueAndCommitsSqlDiffsForever DL.empty
     SD !stateDiff' -> do
       commitSqlDiffs stateDiff'
       checkQueueAndCommitsSqlDiffsForever vmEvents
