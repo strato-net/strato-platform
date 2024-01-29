@@ -4,7 +4,8 @@ import {
     Typography,
     Button,
     notification,
-    InputNumber
+    InputNumber,
+    Tooltip
 } from "antd";
 import { useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
@@ -41,7 +42,12 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                     }
                     className='font-semibold overflow-hidden cursor-pointer w-[180px] md:w-[220px] whitespace-nowrap text-ellipsis'
                 >
-                    {topSellingProduct?.name || "N/A"}
+                    <Tooltip title={topSellingProduct?.name.length > 20 ? topSellingProduct?.name : null}>
+              <span className=" whitespace-nowrap max-w-[160px] inline-block">
+                {topSellingProduct?.name.length > 20 ? `${topSellingProduct?.name.slice(0, 20)} ...` : `${topSellingProduct?.name}`}
+              </span>
+            </Tooltip>
+                    {/* {topSellingProduct?.name || "N/A"} */}
                 </Typography>
                 <img className='w-4 h-4' src={Images.Verified} alt='verified' />
             </div>
