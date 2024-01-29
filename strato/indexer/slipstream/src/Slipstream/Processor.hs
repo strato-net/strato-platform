@@ -87,7 +87,7 @@ data BatchedInserts = BatchedInserts
   { indexInsert :: ProcessedContract,
     abstractInsert :: [(ProcessedContract, T.Text, TableColumns)],
     historyInserts :: [ProcessedContract],
-    mappingInserts :: [ProcessedCollectionRow]
+    collectionInserts :: [ProcessedCollectionRow]
   }
   deriving (Show)
 
@@ -171,18 +171,18 @@ rowToCollections row = do
 
 processedContractToProcessedCollectionRows :: MonadIO m => Map.Map Text Value -> [Text] -> AggregateAction -> ABIID -> m [ProcessedCollectionRow]
 processedContractToProcessedCollectionRows state mapAndArrayNames row abiid = do
-  let valueMappingsAndArrayMap = Map.filter (\value -> case value of 
+  let valueCollectionsMap = Map.filter (\value -> case value of 
                                                       ValueMapping _ -> True 
                                                       ValueArrayFixed _ _ -> True 
                                                       ValueArrayDynamic _ -> True 
                                                       _ -> False) state
-      onlyRecord = Map.toList (Map.restrictKeys valueMappingsAndArrayMap (S.fromList mapAndArrayNames))
+      onlyRecord = Map.toList (Map.restrictKeys valueCollectionsMap (S.fromList mapAndArrayNames))
       recordVMs = fmap (\(a, value) -> case value of 
                                     ValueMapping b -> (a, Left b) 
                                     ValueArrayFixed _ b -> (a, Right (Left b)) 
                                     ValueArrayDynamic b -> (a, Right (Right b)) 
                                     _ -> undefined) onlyRecord
-  if null valueMappingsAndArrayMap  
+  if null valueCollectionsMap  
     then return $ []
     else do
       let result = concatMap processRecord recordVMs
@@ -314,7 +314,7 @@ processTheMessages env conn messages = do
                       _ -> a
 
             -- Here we will get the storageDefs attribute of the contract (c) and iterate through the Map of (Text, VariableDecl) and look for VariableDecls that have the last attribute (isRecord) true and thetype are mappings
-            -- We will then create a table for each of these mappings and add a foreign key to the main table
+            -- We will then create a table for each of these collections and add a foreign key to the main table
 
             let collectionNames = getCollectionNamesFromContract c              
             let historyTableNames = map (historyTableName o a') hl
@@ -324,7 +324,7 @@ processTheMessages env conn messages = do
             $logInfoS "processTheMessages/Contract Added" $ "org=" <> o'' <> ", app=" <> a'' <> ", name=" <> n''
             multilineLog "processTheMessages/fields" $ boringBox $ map (show) $ Map.toList $ fmap _varType $ c ^. storageDefs
 
-            --Create mapping tables
+            --Create collection tables
             deferredForeignKeysForCollections <- fmap concat $
               forM collectionNames $ \m -> do
                 outputData conn $ createCollectionTable g nameParts m --Tables are created
@@ -366,7 +366,7 @@ processTheMessages env conn messages = do
   --           let c = cc {_contractName = _contractName sc}
   --               mapNames = getMapNamesFromContract c
   --           nameParts <- resolveNameParts o a c
-  --           forM_ mapNames $ outputData conn . createMappingTable g nameParts
+  --           forM_ mapNames $ outputData conn . createCollectionTable g nameParts
   --           deferredForeignKeys <- outputData conn $ createExpandIndexTable g c nameParts
   --           outputData' conn $ createExpandHistoryTable g c nameParts
   --           outputData conn $ createExpandEventTables g c nameParts
@@ -401,8 +401,11 @@ processTheMessages env conn messages = do
           $logDebugLS "Contract name is: " $ show name
           oldState <- readPreviousSolidVMState g acct
           indexContract <- rowToInsert g abiid row cont oldState
+          $logInfoLS "DAVIDindexContract" $ T.pack $ "Bring it: " ++ (show indexContract)
           hs <- rowToHistories g abiid actions cont oldState
           let mapNames = actionMappings row
+              arrNames = actionArrays row
+              collectionNames = mapNames ++ arrNames
               abstracts = actionAbstracts row
           --get columns for abstract table
           $logDebugLS "abstractColumns" $ T.pack $ "Getting abstract columns from " ++ (show abstracts)
@@ -413,10 +416,11 @@ processTheMessages env conn messages = do
             mCols <- getTableColumns g tableName
             pure $ (indexContract,tableNameText,) . map extractTextInsideQuotes <$> mCols
           $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
+          $logDebugLS "Globals: Recorded Array names are: " . T.pack $ show arrNames ++ " contract: " ++ show (contractName indexContract)
           $logDebugLS "History inserts are: " $ show hs
           stateDiff <- rowToCollections row
-          pMappings <- processedContractToProcessedCollectionRows stateDiff (mapNames) row abiid --get all mapping rows to insert
-          pure . Right $ BatchedInserts indexContract abstractColumns hs pMappings
+          pCollections <- processedContractToProcessedCollectionRows stateDiff (collectionNames) row abiid --get all collection rows to insert
+          pure . Right $ BatchedInserts indexContract abstractColumns hs pCollections
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
 
@@ -431,7 +435,7 @@ processTheMessages env conn messages = do
   forM_ insertsByCodeHash $ \ins -> do
     unless (null ins) $ outputData conn . insertIndexTable $ map indexInsert ins
     outputData conn . insertHistoryTable $ concatMap historyInserts ins
-    unless ((length (concatMap mappingInserts ins) < 1)) $ outputData conn . insertCollectionTable $ concatMap mappingInserts ins
+    unless ((length (concatMap collectionInserts ins) < 1)) $ outputData conn . insertCollectionTable $ concatMap collectionInserts ins
     unless (null ins) $ outputData conn . insertAbstractTable $ concatMap abstractInsert ins
 
   forM_ insertsByCodeHash $ \ins -> do
