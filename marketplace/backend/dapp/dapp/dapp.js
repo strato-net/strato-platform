@@ -436,27 +436,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const quantities = items.map(item => {
       return item.quantity;
     })
-    /*
-    const sales = await saleJs.getAll(rawAdmin, { assetAddresses, paymentMethod }, options);
-    const sellersAddress = sales[0].sellersAddress;
-    const sellersCommonName = sales[0].sellersCommonName;
-    const saleAddresses = await Promise.all(sales.map(async (sale) => {
-      const orderForSale = orderList.find(order => order.assetAddress === sale.assetToBeSold);
-      const saleData = sale.data;
-      if (saleData.units && orderForSale.quantity < saleData.units) {
-        const contract = { name: orderForSale.category, address: orderForSale.assetAddress }
-        const splitSaleAddress = await saleJs.createSplitSale(rawAdmin, {
-          paymentType: parseInt(PAYMENT_TYPES[paymentMethod]),
-          price: sale.price,
-          units: orderForSale.quantity,
-        }, options, contract);
-        return splitSaleAddress;
-      }
-      else {
-        return sale.address;
-      }
-    }));
-    */
+
     const newArgs = {
       ...restArgs,
       saleAddresses,

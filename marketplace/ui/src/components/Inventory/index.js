@@ -7,12 +7,12 @@ import {
   notification,
   Spin,
   Typography,
-  Image,
-  Tooltip, 
+  Tooltip,
   Tabs
 } from "antd";
 import InventoryCard from "./InventoryCard";
 import CreateInventoryModal from "./CreateInventoryModal";
+import CreateBundleModal from "./CreateBundleModal";
 //categories
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
@@ -30,7 +30,6 @@ import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
 import { useAuthenticateState } from "../../contexts/authentication";
-import CategoryCard from "../MarketPlace/CategoryCard";
 
 const { Search } = Input;
 
@@ -38,6 +37,7 @@ const { Title, Text } = Typography;
 
 const Inventory = ({ user }) => {
   const [open, setOpen] = useState(false);
+  const [openBundleModal, setOpenBundleModal] = useState(false);
   const [queryValue, setQueryValue] = useState("");
   const debouncedSearchTerm = useDebounce(queryValue, 1000);
   const limit = 10;
@@ -111,6 +111,14 @@ const Inventory = ({ user }) => {
     setOpen(false);
   };
 
+  const showBundleModal = () => {
+    setOpenBundleModal(true);
+  };
+
+  const handleCancelBundleModal = () => {
+    setOpenBundleModal(false);
+  };
+
 
   const openToast = (placement) => {
     if (success) {
@@ -170,18 +178,18 @@ const Inventory = ({ user }) => {
     navigate(routes.OnboardingSellerToStripe.url)
   }
 
-const getAllSubcategories = (categories) => {
-  let subcategories = [];
-  categories.forEach(category => {
+  const getAllSubcategories = (categories) => {
+    let subcategories = [];
+    categories.forEach(category => {
       if (category.subCategories && category.subCategories.length > 0) {
-          subcategories = subcategories.concat(category.subCategories);
+        subcategories = subcategories.concat(category.subCategories);
       }
-  });
-  return subcategories;
-}
+    });
+    return subcategories;
+  }
 
-const allSubcategories = getAllSubcategories(categorys);
-  
+  const allSubcategories = getAllSubcategories(categorys);
+
   // ------------------ Tabs Start------------------
   const handleTabSelect = (key) => {
     setCategory(key);
@@ -232,6 +240,23 @@ const allSubcategories = getAllSubcategories(categorys);
               >
                 {"Connect Stripe"}
               </Button>
+              <Button
+                type="primary"
+                className="w-40 h-9 flex items-center justify-center gap-[6px]"
+                onClick={() => {
+                  if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                    window.location.href = loginUrl;
+                  } else {
+                    showBundleModal()
+                  }
+                }}
+                disabled={!stripeStatus.chargesEnabled || !stripeStatus.detailsSubmitted || !stripeStatus.payoutsEnabled}
+              >
+                <div className="flex items-center justify-center gap-[6px]">
+                  <img src={Images.CreateInventory} alt="Inventory" className="w-[18px] h-[18px]" />
+                  Create Bundle
+                </div>
+              </Button>
               <Tooltip
                 title={
                   stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled
@@ -261,71 +286,71 @@ const allSubcategories = getAllSubcategories(categorys);
             </div>
           </div>
           <div className="pt-6 mx-6 md:mx-5 md:px-10 mb-5 ">
-          <Tabs
-            defaultActiveKey={category ? category : "All"}
-            className="store"
-            onChange={(key) => handleTabSelect(key)}
-            items={[
-              {
-                label: "All",
-                key: undefined,
-                children: (
-                  <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 sm:place-items-center md:place-items-start  inventoryCard max-w-full">
-                    {!isInventoriesLoading ? (
-                      inventories.map((inventory, index) => {
-                        return (
-                          <InventoryCard
-                            id={index}
-                            inventory={inventory}
-                            category={category}
-                            key={index}
-                            debouncedSearchTerm={debouncedSearchTerm}
-                            paymentProviderAddress={
-                              stripeStatus ? stripeStatus.paymentProviderAddress : undefined
-                            }
-                            allSubcategories={allSubcategories}
-                          />
-                        );
-                      })
-                    ) : (
-                      <div className="absolute left-[50%] md:top-4">
-                        <Spin size="large" />
-                      </div>
-                    )}
-                  </div>
-                ),
-              },
-              ...categorys.map((categoryObject, index) => ({
-                label: categoryObject.name,
-                key: categoryObject.name,
-                children: (
-                  <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 inventoryCard max-w-full">
-                    {!isInventoriesLoading ? (
-                      inventories.map((inventory, index) => {
-                        return (
-                          <InventoryCard
-                            id={index}
-                            inventory={inventory}
-                            category={category}
-                            key={index}
-                            debouncedSearchTerm={debouncedSearchTerm}
-                            paymentProviderAddress={
-                              stripeStatus ? stripeStatus.paymentProviderAddress : undefined
-                            }
-                            allSubcategories={allSubcategories}
-                          />
-                        );
-                      })
-                    ) : (
-                      <div className="absolute left-[50%] md:top-4">
-                        <Spin size="large" />
-                      </div>
-                    )}
-                  </div>
-                ),
-              })),
-            ]}
-          />
+            <Tabs
+              defaultActiveKey={category ? category : "All"}
+              className="store"
+              onChange={(key) => handleTabSelect(key)}
+              items={[
+                {
+                  label: "All",
+                  key: undefined,
+                  children: (
+                    <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 sm:place-items-center md:place-items-start  inventoryCard max-w-full">
+                      {!isInventoriesLoading ? (
+                        inventories.map((inventory, index) => {
+                          return (
+                            <InventoryCard
+                              id={index}
+                              inventory={inventory}
+                              category={category}
+                              key={index}
+                              debouncedSearchTerm={debouncedSearchTerm}
+                              paymentProviderAddress={
+                                stripeStatus ? stripeStatus.paymentProviderAddress : undefined
+                              }
+                              allSubcategories={allSubcategories}
+                            />
+                          );
+                        })
+                      ) : (
+                        <div className="absolute left-[50%] md:top-4">
+                          <Spin size="large" />
+                        </div>
+                      )}
+                    </div>
+                  ),
+                },
+                ...categorys.map((categoryObject, index) => ({
+                  label: categoryObject.name,
+                  key: categoryObject.name,
+                  children: (
+                    <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 inventoryCard max-w-full">
+                      {!isInventoriesLoading ? (
+                        inventories.map((inventory, index) => {
+                          return (
+                            <InventoryCard
+                              id={index}
+                              inventory={inventory}
+                              category={category}
+                              key={index}
+                              debouncedSearchTerm={debouncedSearchTerm}
+                              paymentProviderAddress={
+                                stripeStatus ? stripeStatus.paymentProviderAddress : undefined
+                              }
+                              allSubcategories={allSubcategories}
+                            />
+                          );
+                        })
+                      ) : (
+                        <div className="absolute left-[50%] md:top-4">
+                          <Spin size="large" />
+                        </div>
+                      )}
+                    </div>
+                  ),
+                })),
+              ]}
+            />
 
             <div className="flex justify-center pt-6">
               <Pagination
@@ -349,6 +374,14 @@ const allSubcategories = getAllSubcategories(categorys);
             resetPage={onPageChange}
             page={page}
             categoryName={category}
+          />
+        )
+      }
+      {
+        openBundleModal && (
+          <CreateBundleModal
+            open={openBundleModal}
+            handleCancel={handleCancelBundleModal}
           />
         )
       }
