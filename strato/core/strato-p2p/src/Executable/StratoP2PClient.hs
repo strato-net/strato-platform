@@ -80,18 +80,16 @@ runPeer peer sSource = do
   $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "Attempting to connect to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
   $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "my pubkey is: " ++ format myPublic
   $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "server pubkey is: " ++ format otherPubKey 
-  runClientConnection (IPAsText $ pPeerIp peer) (TCPPort . fromIntegral $ pPeerTcpPort peer) sSource $ \c ->
-    scoped $ \scope -> do
+  runClientConnection (IPAsText $ pPeerIp peer) (TCPPort . fromIntegral $ pPeerTcpPort peer) sSource $ \c -> do
       let pStr = pPeerString peer -- display string will show up as dns name
       attempt :: (Maybe SomeException) <- 
-        withCertifiedPeer peer . withActivePeer peer $
+        withCertifiedPeer peer . withActivePeer peer . scoped $
           runEthClientConduit
             peer {pPeerPubkey = Just otherPubKey}
             (c ^. peerSource)
             (c ^. peerSink)
             (c ^. seqSource)
             pStr
-            scope
       case attempt of
         Nothing  -> $logDebugS "runPeer" "Peer ran successfully!"
         Just err -> do $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err
@@ -131,11 +129,13 @@ runPeerInList ::
   m (Either SomeException ())
 runPeerInList thePeer sSource = do 
   eErr <- nonviolentDisable thePeer --don't connect to a peer too frequently, out of politeness
-  whenLeft eErr $ \err -> do
-    $logErrorS "runPeerInList" . T.pack $ "Unable to disable peer:" ++ show err
-    $logErrorS "runPeerInList" "Simulating disable..."
-    liftIO $ threadDelay $ 10 * 1000 * 1000
-  withAsync (runPeer thePeer sSource) $ \res -> waitCatch res
+  case eErr of
+    Left err -> do
+      $logErrorS "runPeerInList" . T.pack $ "Unable to disable peer:" ++ show err
+      $logErrorS "runPeerInList" "Simulating disable..."
+      liftIO $ threadDelay $ 10 * 1000 * 1000
+    Right () -> pure ()
+  try $ runPeer thePeer sSource
 
 stratoP2PClient :: (MonadP2P m, RunsClient m) => PeerRunner m (LoggingT IO) () -> LoggingT IO ()
 stratoP2PClient runner = runner $ \sSource -> do
@@ -157,10 +157,10 @@ stratoP2PClient runner = runner $ \sSource -> do
     multiThreadedClient [] _ _ = do
       $logInfoS "stratoP2PClient/multiThreadedClient" "No available peers, will try again in 10 seconds"
       liftIO $ threadDelay 10000000
-    multiThreadedClient peers sem sSource = void . forConcurrently peers $ \p -> do
-      let isRunning = pPeerActiveState p == 1
-      unless isRunning $ do
-        (liftIO (SSem.tryWait sem)) >>= \case
+    multiThreadedClient peers sem sSource = do
+      let notRunningPeers = filter ((== 0) . pPeerActiveState) peers
+      unless (null notRunningPeers) . void . forConcurrently notRunningPeers $ \p -> do
+        liftIO (SSem.tryWait sem) >>= \case
           Nothing -> return ()
           Just _ -> do
             result <- runPeerInList p sSource

@@ -128,7 +128,7 @@ class CustomerAddressController {
     const addAddressSchema = Joi.object({
       commonName: Joi.string().required(),
       name: Joi.string().required(),
-      zipcode: Joi.number().positive().required(),
+      zipcode: Joi.string().required(),
       state: Joi.string().required(),
       city: Joi.string().required(),
       addressLine1: Joi.string().required(),
