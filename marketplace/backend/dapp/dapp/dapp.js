@@ -42,7 +42,7 @@ let userCert = null;
 // }
 
 function deploy(contract, args, options) {
-  console.log(options);
+  console.log(contract)
   // author the deployment
   const { deployFilePath } = args;
 
@@ -54,6 +54,13 @@ function deploy(contract, args, options) {
         address: contract.address
       },
     },
+    strats: {
+      contract: {
+        org: process.env.STRATS_ORG,
+        name: process.env.STRATS_CONTRACT_NAME,
+        address: process.env.STRATS_ADDRESS
+      }
+    }
   };
 
   if (options.config.apiDebug) {
@@ -879,11 +886,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getStratsBalance = async function (args, options = defaultOptions) {
     const { userAddress } = args;
     const yaml = getYamlFile('./config/localhost.deploy.yaml');
-    const getOptions = { ...options, org: 'BlockApps', app: '' };
+    const getOptions = { ...options, org: yaml.strats.contract.org, app: '' };
     const args2 = {
       address: yaml.strats.contract.address,
       key: userAddress
     }
+    
     const balance = await strats.getStratsBalance(rawAdmin, args2, getOptions);
     return balance;
   }
