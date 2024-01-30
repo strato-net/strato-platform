@@ -486,6 +486,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getOrder = async function (args, options = defaultOptions) {
     try {
+      // here
       const order = await saleOrderJs.get(rawAdmin, args, options);
       const sales = await saleJs.getAll(rawAdmin, { saleAddresses: order.saleAddresses }, options);
       const assetAddresses = sales.map(sale => {
@@ -529,6 +530,34 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const contract = { name: saleOrderJs.contractName, address: saleOrderAddress }
     return saleOrderJs.updateOrderComment(rawAdmin, contract, options, comments);
   };
+  
+  contract.export = async function (args, options = defaultOptions) {
+    const getOptions = { ...options, app: contractName, };
+    const { commonName } = args;
+    let newArgs = { limit: 2000, offset: 0, order: 'createdDate.desc', sellersCommonName: commonName }
+    const soldOrders = await saleOrderJs.getAll(rawAdmin, newArgs, getOptions);
+    console.log("soldOrders123: ", soldOrders)
+    // for every sold order, do  const sales = await saleJs.getAll(rawAdmin, { saleAddresses: order.saleAddresses }, options);
+    for (const order of soldOrders.orders) {
+      const sales = await saleJs.getAll(rawAdmin, { saleAddresses: order.saleAddresses }, options);
+      // get assetToBeSold from sales
+      const assetAddresses = sales.map(sale => {
+        return sale.assetToBeSold;
+      })
+      // get assets from inventory
+      const assets = await inventoryJs.getAll(rawAdmin, { assetAddresses: assetAddresses }, options);
+      
+      
+      // add another field in the order object with the assetsArray but from the assets only include the contract_name and assetname inside an object
+      order.assets = assets.map(asset => {
+        return { contract_name: asset.contract_name, name: asset.name }
+      })
+    }
+    // let saleAddresses = soldOrders.map((order) => order.saleAddresses);
+    // const sales = await saleJs.getAll(rawAdmin, { saleAddresses: saleAddresses }, options);
+    console.log("soldOrders123[0]: ", soldOrders.orders[0])
+    return  null
+  }
 
   // ------------------------------ SALE TEST ENDS ------------------------------
 

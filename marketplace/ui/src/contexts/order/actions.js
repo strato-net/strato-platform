@@ -384,49 +384,48 @@ const actions = {
   fetchAllOrders: async (dispatch, commonName) => {
     dispatch({ type: actionDescriptors.fetchAllOrders });
     const encodedCommonName = encodeURIComponent(commonName);
-
+    console.log("here")
     try {
       const ordersSold = await fetch(
-        `${apiUrl}/order?&limit=2000&offset=0&order=createdDate.desc&sellersCommonName=${encodedCommonName}`,
+        `${apiUrl}/order/exportOrders?commonName=${encodedCommonName}`,
         {
           method: HTTP_METHODS.GET,
         }
       );
-      const ordersBought = await fetch(
-        `${apiUrl}/order?limit=2000&offset=0&order=createdDate.desc&purchasersCommonName=${encodedCommonName}`,
-        {
-          method: HTTP_METHODS.GET,
-        }
-      );
+      console.log("ordersSold: ", ordersSold)
+      // const ordersBought = await fetch(
+      //   `${apiUrl}/order?limit=2000&offset=0&order=createdDate.desc&purchasersCommonName=${encodedCommonName}`,
+      //   {
+      //     method: HTTP_METHODS.GET,
+      //   }
+      // );
       
-      let url = `${apiUrl}/inventory/transfers/items?limit=2000&order=transferDate.desc&offset=0&or=(oldOwnerCommonName.eq.${encodedCommonName},newOwnerCommonName.eq.${encodedCommonName})`
+      // let url = `${apiUrl}/inventory/transfers/items?limit=2000&order=transferDate.desc&offset=0&or=(oldOwnerCommonName.eq.${encodedCommonName},newOwnerCommonName.eq.${encodedCommonName})`
      
-      const transfers = await fetch(url, {
-        method: HTTP_METHODS.GET,
+      // const transfers = await fetch(url, {
+      //   method: HTTP_METHODS.GET,
 
-      });
+      // });
 
       const bodysold = await ordersSold.json();
-      const bodybought = await ordersBought.json();
-      const bodytransfers = await transfers.json();
-
-      if (ordersSold.status === RestStatus.OK && ordersBought.status === RestStatus.OK && transfers.status === RestStatus.OK) {
+      console.log("bodysold: ", bodysold)
+      if (ordersSold.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchAllOrdersSuccessful,
-          payload: {bodySold: bodysold.data.orders, bodyBought: bodybought.data.orders, bodyTransfers: bodytransfers.data.transfers},
+          payload: {bodySold: bodysold.data.orders, bodyBought: [], bodyTransfers: []},
         });
         return;
       }
-      else if (bodybought.status === RestStatus.UNAUTHORIZED || bodysold.status === RestStatus.UNAUTHORIZED || bodytransfers.status === RestStatus.UNAUTHORIZED) {
+      else if (bodysold.status === RestStatus.UNAUTHORIZED) {
         dispatch({
           type: actionDescriptors.fetchAllOrdersFailed,
           error: "Unauthorized while fetching all orders"
         });
-        window.location.href = bodysold.error ? bodysold.error.loginUrl : bodybought.error ? bodybought.error.loginUrl : bodytransfers.error.loginUrl
+        window.location.href = bodysold.error.loginUrl
       }
       dispatch({
         type: actionDescriptors.fetchAllOrdersFailed,
-        error: bodysold.error ? bodysold.error : bodybought.error ? bodybought.error : bodytransfers.error,
+        error: bodysold.error,
       });
     } catch (err) {
       dispatch({

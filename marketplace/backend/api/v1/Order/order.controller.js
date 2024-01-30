@@ -115,6 +115,20 @@ class OrderController {
       return next(e)
     }
   }
+  
+  static async export(req, res, next) {
+    try {
+      console.log("req123: ", req)
+      const { dapp, query } = req
+      // TODO: add commonname validation
+      const orders = await dapp.export({ ...query })
+      rest.response.status200(res, orders)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
 
   static async createUserAddress(req, res, next) {
     try {
