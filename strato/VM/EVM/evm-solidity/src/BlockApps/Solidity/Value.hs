@@ -256,12 +256,16 @@ valueToText = \case
   ValueVariadic vals ->
     "[" <> Text.intercalate "," (map valueToText vals) <> "]"
 
+escapeStringValue :: Text -> Text
+escapeStringValue = Text.replace "\"" "\\\""
+                  . Text.replace "\\" "\\\\"
+
 simpleValueToText :: SimpleValue -> Text
 simpleValueToText sv = case sv of
   ValueBool tf -> if tf then "true" else "false"
   ValueAddress addr -> Text.pack $ "0x" ++ formatAddressWithoutColor addr
   ValueAccount acct -> Text.pack $ "0x" ++ show acct
-  ValueString tx -> '"' `Text.cons` tx `Text.snoc` '"'
+  ValueString tx -> '"' `Text.cons` escapeStringValue tx `Text.snoc` '"'
   ValueInt _ _ v -> Text.pack $ show v
   ValueBytes _ b -> Text.pack $ show . Base16.encode $ b
 
@@ -296,6 +300,10 @@ textToValue defs str = \case
   TypeStruct {} -> Left "textToValue TODO: TypeStruct not yet implemented"
   TypeVariadic {} -> Left "textToValue TODO: TypeVariadic not yet implemented"
 
+unEscapeStringValue :: Text -> Text
+unEscapeStringValue = Text.replace "\\\"" "\""
+                    . Text.replace "\\\\" "\\"  
+  
 textToSimpleValue :: Text -> SimpleType -> Either Text SimpleValue
 textToSimpleValue str = \case
   TypeBool -> case Text.toLower str of
@@ -310,7 +318,7 @@ textToSimpleValue str = \case
     ValueAccount <$> case readMaybe (Text.unpack str) of
       Nothing -> Left $ "textToSimpleValue: could not decode as account: " <> str
       Just x -> return x
-  TypeString -> return $ ValueString str
+  TypeString -> return $ ValueString $ unEscapeStringValue str
   TypeInt s b -> ValueInt s b <$> readNum
   TypeBytes (Just n) -> ValueBytes (Just n) <$> readBytes n
   TypeBytes Nothing -> ValueBytes Nothing <$> readBytesDyn
