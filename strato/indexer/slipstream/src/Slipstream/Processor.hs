@@ -401,7 +401,6 @@ processTheMessages env conn messages = do
           $logDebugLS "Contract name is: " $ show name
           oldState <- readPreviousSolidVMState g acct
           indexContract <- rowToInsert g abiid row cont oldState
-          $logInfoLS "DAVIDindexContract" $ T.pack $ "Bring it: " ++ (show indexContract)
           hs <- rowToHistories g abiid actions cont oldState
           let mapNames = actionMappings row
               arrNames = actionArrays row
