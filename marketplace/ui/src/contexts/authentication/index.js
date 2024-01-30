@@ -11,6 +11,7 @@ const AuthenticationProvider = ({ children }) => {
     error: undefined,
     hasChecked: false,
     isCheckingAuthentication: false,
+    isInitialCheckingAuthentication: true,
     user: undefined,
     users: [],
     isUsersLoading: false,

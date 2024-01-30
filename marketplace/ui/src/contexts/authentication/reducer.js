@@ -6,6 +6,7 @@ const reducer = (state, action) => {
       return {
         ...state,
         isCheckingAuthentication: true,
+        isInitialCheckingAuthentication: true,
       };
     case actionDescriptors.checkFailed:
       return {
@@ -13,6 +14,7 @@ const reducer = (state, action) => {
         user: undefined,
         isAuthenticated: false,
         isCheckingAuthentication: false,
+        isInitialCheckingAuthentication: false,
         hasChecked: true,
         loginUrl: action.payload,
       };
@@ -22,6 +24,7 @@ const reducer = (state, action) => {
         user: action.payload,
         isAuthenticated: true,
         isCheckingAuthentication: false,
+        isInitialCheckingAuthentication: false,
         hasChecked: true
       };
     case actionDescriptors.fetchUsers:

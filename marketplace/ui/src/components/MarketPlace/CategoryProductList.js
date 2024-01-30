@@ -74,7 +74,7 @@ const CategoryProductList = ({ user }) => {
   // states
   const { marketplaceList, isMarketplaceLoading, marketplaceListCount } = useMarketplaceState();
   const { categorys } = useCategoryState();
-  let { hasChecked, isAuthenticated } = useAuthenticateState();
+  let { hasChecked, isAuthenticated, isInitialCheckingAuthentication } = useAuthenticateState();
   const { subCategorys } = useSubCategoryState();
   const { cartList } = useMarketplaceState();
 
@@ -128,7 +128,7 @@ const CategoryProductList = ({ user }) => {
   };
 
   useEffect(() => {
-    if (hasChecked && !isAuthenticated) {
+    if (hasChecked && !isAuthenticated && !isInitialCheckingAuthentication) {
       marketplaceActions.fetchMarketplace(
         marketplaceDispatch,
         arrayToStr(selectedCategories),
@@ -141,7 +141,7 @@ const CategoryProductList = ({ user }) => {
         limit,
         offset
       );
-    } else {
+    } else if (hasChecked && !isInitialCheckingAuthentication && isAuthenticated) {
       marketplaceActions.fetchMarketplaceLoggedIn(
         marketplaceDispatch,
         arrayToStr(selectedCategories),
@@ -297,10 +297,10 @@ const CategoryProductList = ({ user }) => {
     if (searchQueryValue) {
       baseUrl.searchParams.set('search', searchQueryValue);
     }
-    if(minPriceQueryValue){
+    if (minPriceQueryValue) {
       baseUrl.searchParams.set('minPrice', minPriceQueryValue);
     }
-    if(maxPriceQueryValue){
+    if (maxPriceQueryValue) {
       baseUrl.searchParams.set('maxPrice', maxPriceQueryValue);
     }
     baseUrl.searchParams.set('page', page);
