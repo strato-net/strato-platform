@@ -140,7 +140,12 @@ knownFailedTxs =
       keccak256FromHex "a257f8fa9ef7a7b4de81ddf518b3492e1716894879dec8c37be3ec6a4beef553",
       keccak256FromHex "2f719b6227fa0316cb71c033183b2f282ed06ae42ca8f50e1c1cead57840134c",
       keccak256FromHex "2637c3b60b6bd1d098adc109877ba1b1c40c59889f2e8ef6d03fb5657836f70f",
-      keccak256FromHex "5439d5802b32b50c29b4f26bb47a7cff3121229798dabed7e7ca7e6a5c0658f2"
+      keccak256FromHex "5439d5802b32b50c29b4f26bb47a7cff3121229798dabed7e7ca7e6a5c0658f2",
+      keccak256FromHex "f59c29a962da7bf265b9c0ff2b200ff4fa5f17896c790092d236e42d8e80c884",
+      keccak256FromHex "33582d3e3859c4047193c49965167e73b83575d61848b9bbc537f34126d7c0d9",
+      keccak256FromHex "718aee65da51f83ef0e31ee77fcf02c58dc4339b853d49f39fbe98476192738e",
+      keccak256FromHex "7d6ebd0c64f1404a6eb9153dff9d204f8b2fdc258dc50d48d6bc2b7c078f3aa4",
+      keccak256FromHex "5906242be98d41bf5ec6f21f94b7e93c9830f43ca13c37666a290065347b50f3"
     ]
 
 newtype CurrentBlockHash = CurrentBlockHash {unCurrentBlockHash :: Keccak256}
