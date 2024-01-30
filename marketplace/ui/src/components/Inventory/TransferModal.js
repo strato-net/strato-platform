@@ -83,7 +83,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName }) => {
             align: "center",
             render: () => (
                 <Select
-                    className="w-[460px]"
+                    className="w-[440px]"
                     showSearch
                     onSelect={handleSelect}
                     onSearch={handleSearchChange}
