@@ -45,7 +45,10 @@ const CategoryProductList = ({ user }) => {
 
   const searchQueryValue = queryParams.get('search');
   const categoryQueryValue = queryParams.get('category');
+  const maxPriceQueryValue = queryParams.get('maxPrice');
+  const minPriceQueryValue = queryParams.get('minPrice');
   const limit = 9;
+
   const categoryQueryValueArr = categoryQueryValue ? categoryQueryValue.split(',') : []
   const pageVal = queryParams.get('page');
   const pageNo = pageVal ? parseInt(pageVal) : 1;
@@ -157,8 +160,8 @@ const CategoryProductList = ({ user }) => {
     selectedSubCategories,
     selectedProducts,
     selectedBrands,
-    minPrice,
-    maxPrice,
+    minPriceQueryValue,
+    maxPriceQueryValue,
     hasChecked,
     isAuthenticated,
     searchQueryValue,
@@ -182,10 +185,15 @@ const CategoryProductList = ({ user }) => {
       if (categoryQueryValue) {
         baseUrl.searchParams.set('category', categoryQueryValue);
       }
-      if (search.length > 0) {
+      if (search?.length > 0) {
         baseUrl.searchParams.set('search', search);
       }
-
+      if (minPrice != null) {
+        baseUrl.searchParams.set('minPrice', minPrice);
+      }
+      if (maxPrice != null) {
+        baseUrl.searchParams.set('maxPrice', maxPrice);
+      }
       const url = baseUrl.pathname + baseUrl.search;
       navigate(url, { replace: true });
     }, 1000);
@@ -193,7 +201,7 @@ const CategoryProductList = ({ user }) => {
     return () => {
       clearTimeout(timeOut);
     };
-  }, [search]);
+  }, [search, maxPrice, minPrice]);
 
   //=========================Other functions===============================//
 
@@ -289,6 +297,12 @@ const CategoryProductList = ({ user }) => {
     if (searchQueryValue) {
       baseUrl.searchParams.set('search', searchQueryValue);
     }
+    if(minPriceQueryValue){
+      baseUrl.searchParams.set('minPrice', minPriceQueryValue);
+    }
+    if(maxPriceQueryValue){
+      baseUrl.searchParams.set('maxPrice', maxPriceQueryValue);
+    }
     baseUrl.searchParams.set('page', page);
     const url = baseUrl.pathname + baseUrl.search;
     navigate(url);
@@ -344,6 +358,35 @@ const CategoryProductList = ({ user }) => {
     </Collapse>
   }
 
+
+  const handlePriceChange = (value, isMin) => {
+    if (value === null) {
+      isMin ? setMinPrice(0) : setMaxPrice(MAX_PRICE);
+    } else {
+      isMin ? setMinPrice(value) : setMaxPrice(value);
+    }
+  };
+
+  const priceFilterComponent = () => {
+    return <Space>
+      <InputNumber
+        min={0}
+        defaultValue={minPriceQueryValue}
+        prefix="$"
+        placeholder="Min"
+        onChange={(e) => handlePriceChange(e, true)}
+      />
+      -
+      <InputNumber
+        min={minPrice}
+        defaultValue={maxPriceQueryValue}
+        prefix="$"
+        placeholder="Max"
+        onChange={(e) => handlePriceChange(e, false)}
+      />
+    </Space>
+  }
+
   const DesktopFilterComponent = () => <div className="mr-6 w-1/3 hidden md:flex md:flex-col">
     <div className="flex items-center">
       <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
@@ -396,15 +439,7 @@ const CategoryProductList = ({ user }) => {
 
       {DesktopCollapseComponent(
         <Panel header={<Text strong className="text-base">Price ($)</Text>} key="1">
-          <Space>
-            <InputNumber min={0} prefix='$' placeholder="min" onChange={(e) => {
-              e === null ? setMinPrice(0) : setMinPrice(e)
-            }} />
-            -
-            <InputNumber min={minPrice} prefix='$' placeholder="max" onChange={(e) => {
-              e === null ? setMaxPrice(MAX_PRICE) : setMaxPrice(e)
-            }} />
-          </Space>
+          {priceFilterComponent()}
         </Panel>
       )}
       <Divider className="m-auto w-[94%] min-w-[80%]" />
@@ -486,15 +521,7 @@ const CategoryProductList = ({ user }) => {
         {/* Panel - Price */}
         {MobileCollapseComponent(
           <Panel header={<Text>Price ($)</Text>} key="1">
-            <Space>
-              <InputNumber min={0} prefix='$' placeholder="min" onChange={(e) => {
-                e === null ? setMinPrice(0) : setMinPrice(e)
-              }} />
-              -
-              <InputNumber min={minPrice} prefix='$' placeholder="max" onChange={(e) => {
-                e === null ? setMaxPrice(MAX_PRICE) : setMaxPrice(e)
-              }} />
-            </Space>
+            {priceFilterComponent()}
           </Panel>
         )}
         <Divider className="m-0" />
@@ -564,7 +591,7 @@ const CategoryProductList = ({ user }) => {
           <div className="hidden md:flex items-center">
             <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
             <Text className="text-gray-800 ml-1 text-xl font-semibold">
-            {isLoading ? <Spin spinning={isLoading} size="small" /> : marketplaceListCount} Results
+              {isLoading ? <Spin spinning={isLoading} size="small" /> : marketplaceListCount} Results
             </Text>
           </div>
           {isLoading ?
