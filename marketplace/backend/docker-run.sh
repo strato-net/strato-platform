@@ -5,6 +5,7 @@ export CONFIG_DIR_PATH=/config
 export DEPLOY_FILE_NAME=marketplace.deploy.yaml
 export STRATO_NODE_PROTOCOL=${STRATO_NODE_PROTOCOL:-http}
 export STRATO_NODE_HOST=${STRATO_NODE_HOST:-nginx}
+export BASE_CODE_COLLECTION=${BASE_CODE_COLLECTION:-8f8d4cef7232db7001bae657db85eb4325ee2f3d} # Current deployment address on testnet2
 
 echo "Waiting for STRATO to become available at ${STRATO_NODE_PROTOCOL}://${STRATO_NODE_HOST}/health ..."
 until curl --silent --output /dev/null --fail --location ${STRATO_NODE_PROTOCOL}://${STRATO_NODE_HOST}/health ; do sleep 0.5 ; done
@@ -119,6 +120,7 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
   sed -i 's*<orgName_value>*'"${ORG_NAME}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<adminName_value>*'"${ADMIN_NAME}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<adminPassword_value>*'"${ADMIN_PASSWORD}"'*g' /tmp/tmp.config.yaml
+  find . -type f -name '*.sol' -exec sed -i 's*BASE_CODE_COLLECTION*'"${BASE_CODE_COLLECTION}"'*g' {} +
 
   mv /tmp/tmp.config.yaml ./config/generated.config.yaml
   

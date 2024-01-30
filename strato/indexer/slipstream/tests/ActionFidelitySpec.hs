@@ -24,10 +24,10 @@ convert :: Action -> Either String Action -- 🤔
 convert = eitherDecode . encode
 
 emptyEVMData :: Action.ActionData
-emptyEVMData = Action.ActionData (EVMCode $ unsafeCreateKeccak256FromWord256 0) "LambdaCorp1" "Clozure1" EVM (Action.EVMDiff M.empty) []
+emptyEVMData = Action.ActionData (EVMCode $ unsafeCreateKeccak256FromWord256 0) mempty "LambdaCorp1" "Clozure1" EVM (Action.EVMDiff M.empty) M.empty [] [] []
 
 emptySolidVMData :: Action.ActionData
-emptySolidVMData = Action.ActionData (SolidVMCode "ContractName" $ unsafeCreateKeccak256FromWord256 0) "LambdaCorp2" "Clozure2" SolidVM (Action.SolidVMDiff M.empty) []
+emptySolidVMData = Action.ActionData (SolidVMCode "ContractName" $ unsafeCreateKeccak256FromWord256 0) mempty "LambdaCorp2" "Clozure2" SolidVM (Action.SolidVMDiff M.empty) M.empty [] [] []
 
 emptyAction :: Action
 emptyAction = Action.Action (unsafeCreateKeccak256FromWord256 0) (posixSecondsToUTCTime 0) 0 (unsafeCreateKeccak256FromWord256 0) Nothing (Account 0x0 Nothing) M.empty Nothing S.empty S.empty
@@ -70,6 +70,16 @@ spec = describe "Action conversions" $ do
          "chainId": null,
          "data": {
            "2f6ff9d4a35c07f7b630fe1ce039bc45559b5fb6": {
+             "codeCollection": {
+               "_contracts": {},
+               "_flFuncs": {},
+               "_flConstants": {},
+               "_flEnums": {},
+               "_flStructs": {},
+               "_flErrors": {},
+               "_pragmas": [],
+               "_imports": []
+             },
              "diff": {
                "0000000000000000000000000000000000000000000000000000000000000000":
                  "000000000000000000000000000000000000000000000000000000005c703a07",
@@ -87,7 +97,10 @@ spec = describe "Action conversions" $ do
              "types": ["Create"],
              "codeHash": "86bc2e2a375e6ea377ae90026248f472fbeaa1354ef4424f568d01f3a48ab5b9",
              "organization": "BlockApps1",
-             "application": "LogisticsEngine1"
+             "application": "LogisticsEngine1",
+             "abstracts": [],
+             "mappings": [],
+             "arrays": []
            }
          },
          "sender": "c2191df3032cb8ee72e37ab6bbc4e83f92b9911c",
@@ -132,10 +145,14 @@ spec = describe "Action conversions" $ do
                             (4, 0x73325f305f30000000000000000000000000000000000000000000000000000c),
                             (5, 0x73335f305f30000000000000000000000000000000000000000000000000000c)
                           ],
+                      Action._actionDataCodeCollection = mempty,
                       Action._actionDataCodeHash = EVMCode $ forceHash "86bc2e2a375e6ea377ae90026248f472fbeaa1354ef4424f568d01f3a48ab5b9",
                       Action._actionDataOrganization = "BlockApps1",
                       Action._actionDataApplication = "LogisticsEngine1",
                       Action._actionDataCodeKind = EVM,
+                      Action._actionDataAbstracts = M.empty,
+                      Action._actionDataMappings = [],
+                      Action._actionDataArrays = [],
                       Action._actionDataCallTypes = [Action.Create]
                     },
               Action._metadata = Just . M.fromList $ [("name", "Vehicle"), ("src", "contract Vehicle {}")],

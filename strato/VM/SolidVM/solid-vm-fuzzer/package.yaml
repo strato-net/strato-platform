@@ -20,6 +20,7 @@ library:
   - QuickCheck
   - servant-server
   - solid-vm
+  - solid-vm-compiler
   - solid-vm-model
   - solid-vm-static-analysis
   - source-tools

@@ -21,6 +21,7 @@ where
 import Control.DeepSeq (NFData)
 import Control.Lens hiding ((.=))
 import Data.Aeson
+import Data.Binary
 import Data.Data
 import Data.Default
 import GHC.Generics
@@ -36,6 +37,8 @@ data SourcePosition = SourcePosition
   deriving (Show, Eq, Ord, Generic, Data, NFData)
 
 makeLenses ''SourcePosition
+
+instance Binary SourcePosition
 
 instance ToJSON SourcePosition where
   toJSON pos =
