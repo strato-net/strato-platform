@@ -121,7 +121,7 @@ describe("state", function() {
       constructorArgs
     );
     const contract = await rest.createContract(admin, contractArgs, options);
-    const state = await rest.getState(admin, contract as Contract, options);
+    const state = await rest.waitForAddressState(admin, contract as Contract, options);
     assert.equal(state.var_uint, constructorArgs.arg_uint);
   });
 
@@ -150,19 +150,19 @@ describe("state", function() {
     const contract = await rest.createContract(admin, contractArgs, options);
     {
       options.stateQuery = { name };
-      const state = await rest.getState(admin, contract as Contract, options);
+      const state = await rest.waitForAddressState(admin, contract as Contract, options);
       assert.isDefined(state[options.stateQuery.name]);
       assert.equal(state.array.length, MAX_SEGMENT_SIZE);
     }
     {
       options.stateQuery = { name, length: true };
-      const state = await rest.getState(admin, contract as Contract, options);
+      const state = await rest.waitForAddressState(admin, contract as Contract, options);
       assert.isDefined(state[options.stateQuery.name]);
       assert.equal(state.array, SIZE, "array size");
     }
     {
       options.stateQuery = { name, length: true };
-      const state = await rest.getState(admin, contract as Contract, options);
+      const state = await rest.waitForAddressState(admin, contract as Contract, options);
       const length = state[options.stateQuery.name];
       const all = [];
       for (let segment = 0; segment < length / MAX_SEGMENT_SIZE; segment++) {
@@ -171,7 +171,7 @@ describe("state", function() {
           offset: segment * MAX_SEGMENT_SIZE,
           count: MAX_SEGMENT_SIZE
         };
-        const state = await rest.getState(admin, contract as Contract, options);
+        const state = await rest.waitForAddressState(admin, contract as Contract, options);
         all.push(...state[options.stateQuery.name]);
       }
       assert.equal(all.length, length, "array size");

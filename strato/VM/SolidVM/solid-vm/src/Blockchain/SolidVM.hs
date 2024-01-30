@@ -308,9 +308,21 @@ create' creator newAccount ch cc contractName' argExps createBuiltinCall = do
                   _ -> pure ""
               )
 
-  initializeAction newAccount (labelToString contractName') parentName ch
-
   let !contract' = fromMaybe (missingType "create'/contract" contractName') (cc ^. CC.contracts . at contractName')
+      !abstracts' = getAbstractParentsFromContract contract' cc
+      !mappings = getMapNamesFromContract contract'
+      !arrays = getArrayNamesFromContract contract'
+
+  env' <- getEnv
+  let origin' = Env.origin env'
+      metadata = Env.metadata env'
+      maybeUseWallet = M.lookup "useWallet" =<< metadata
+      !useWallet = maybe False (const True) maybeUseWallet
+
+  org <- bool (getOrg creator) (getOrg origin') useWallet
+  !abstracts <- M.fromList <$> traverse (resolveNameParts newAccount (T.pack org) (T.pack parentName)) abstracts'
+
+  initializeAction newAccount (labelToString contractName') parentName ch cc abstracts mappings arrays
 
   A.adjustWithDefault_ (A.Proxy @AddressState) newAccount $ \newAddressState ->
     pure
@@ -345,14 +357,8 @@ create' creator newAccount ch cc contractName' argExps createBuiltinCall = do
     -- set creator again, in case the caller's cert changed during constructor execution
     (\env -> setCreator (Env.origin env) newAccount contract' (blockDataNumber $ Env.blockHeader env)) =<< getEnv
 
-  env <- getEnv
-  let origin' = Env.origin env
-      metadata = Env.metadata env
-      maybeUseWallet = M.lookup "useWallet" =<< metadata
-      !useWallet = maybe False (const True) maybeUseWallet
-      parentName' = bool parentName "" (useWallet && parentName == "User")
+  let parentName' = bool parentName "" (useWallet && parentName == "User")
   
-  org <- bool (getOrg creator) (getOrg origin') useWallet
 
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) newAccount
@@ -518,7 +524,9 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
   let contract = fromMaybe contract' $ mContract >>= \c -> M.lookup c $ CC._contracts cc
       parentName' = if parentName == (CC._contractName contract) then "" else parentName
 
-  initializeAction to (labelToString $ CC._contractName contract) (labelToString parentName') hsh
+  let !abstracts' = getAbstractParentsFromContract contract cc
+      !mappings = getMapNamesFromContract contract
+      !arrays = getArrayNamesFromContract contract
 
   -- grab the org from the senders account and set it to the codeAddress
   orgAccount <-
@@ -529,6 +537,10 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
           _ -> pure from
       else pure to
   org <- getOrg orgAccount
+  !abstracts <- M.fromList <$> traverse (resolveNameParts to' (T.pack org) (T.pack parentName')) abstracts'
+
+  initializeAction to (labelToString $ CC._contractName contract) (labelToString parentName') hsh cc abstracts mappings arrays
+
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) to
   when (isRCC) $
@@ -2801,7 +2813,7 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
     Just nca -> do
       when (not isRunningTests) $ 
         void $ VME.produceVMEvents [ VME.CodeCollectionAdded 
-                                     (T.pack contractSrc) 
+                                     (const () <$> cc)
                                      (SolidVMCode contractName' hsh) 
                                      (T.pack org) 
                                      (bool (T.pack $ CC._contractName currentContract) (T.pack contractName') useWallet) 
@@ -2809,6 +2821,7 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
                                          Nothing -> []
                                          Just v -> (T.splitOn "," v)
                                      )
+                                     M.empty
                                      []
                                    ]
       pure $ ((flip SAccount) False) $ accountOnUnspecifiedChain nca
@@ -2846,7 +2859,7 @@ callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SS
     Just nca -> do
       when (not isRunningTests) $ 
         void $ VME.produceVMEvents [ VME.CodeCollectionAdded 
-                                      (T.pack contractSrc) 
+                                      (const () <$> cc)
                                       (SolidVMCode contractName' hsh) 
                                       (T.pack org) 
                                       (bool (T.pack $ CC._contractName currentContract) (T.pack contractName') useWallet) 
@@ -2854,6 +2867,7 @@ callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SS
                                           Nothing -> []
                                           Just v -> (T.splitOn "," v)
                                       )
+                                      M.empty
                                       []
                                    ]
       pure $ ((flip SAccount) False) $ accountOnUnspecifiedChain nca
