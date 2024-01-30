@@ -38,6 +38,7 @@ import Blockchain.SolidVM.Exception
 import Control.DeepSeq
 import Control.Lens
 import Data.Aeson as A
+import Data.Binary
 import Data.Default
 import Data.List (find)
 import Data.Map (Map)
@@ -70,7 +71,9 @@ data CodeCollectionF a = CodeCollection
     _pragmas :: [(String, String)],
     _imports :: [FileImportF a]
   }
-  deriving (Show, Generic, NFData, Functor)
+  deriving (Eq, Show, Generic, NFData, Functor)
+
+instance Binary a => Binary (CodeCollectionF a)
 
 instance ToJSON a => ToJSON (CodeCollectionF a)
 

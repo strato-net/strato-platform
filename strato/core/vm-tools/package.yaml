@@ -68,6 +68,7 @@ library:
     - monad-alter
     - mtl
     - nibblestring
+    - ordered-containers
     - persistent-sqlite
     - prometheus-client
     - QuickCheck

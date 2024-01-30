@@ -1,0 +1,52 @@
+name: solid-vm-compiler
+
+dependencies:
+  - base
+
+library:
+  source-dirs: src/
+  exposed-modules:
+    - Blockchain.SolidVM.CodeCollectionDB
+    - Blockchain.SolidVM.Metrics
+    - SolidVM.CodeCollectionTools
+  ghc-options: -Wall -O2
+  dependencies:
+  - aeson
+  - base16-bytestring
+  - blockapps-data
+  - blockapps-datadefs
+  - blockapps-haskoin
+  - blockapps-mpdbs
+  - bytestring
+  - common-log
+  - containers
+  - cryptohash
+  - data-default
+  - debugger
+  - deepseq
+  - ethereum-rlp
+  - exceptions
+  - extra
+  - format
+  - labeled-error
+  - lens
+  - lrucache
+  - merkle-patricia-db
+  - monad-alter
+  - nibblestring
+  - ordered-containers
+  - parsec
+  - prometheus-client
+  - solid-vm-model
+  - solid-vm-parser
+  - solid-vm-static-analysis
+  - source-tools
+  - strato-model
+  - text
+  - time
+  - transformers
+  - unliftio
+  - utf8-string
+  - vector
+  - vm-tools
+  - x509-certs

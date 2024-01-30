@@ -11,6 +11,7 @@ module SolidVM.Model.CodeCollection.Def where
 import Control.DeepSeq
 import Control.Lens (mapped, (&), (?~))
 import Data.Aeson
+import Data.Binary
 import Data.Source
 import Data.Swagger
 import GHC.Generics
@@ -31,6 +32,8 @@ data DefF a
   deriving (Eq, Show, Generic, NFData, Functor)
 
 type Def = Positioned DefF
+
+instance Binary a => Binary (DefF a)
 
 instance Arbitrary a => Arbitrary (DefF a) where arbitrary = GR.genericArbitrary GR.uniform
 

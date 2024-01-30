@@ -13,7 +13,6 @@ function getPeers() {
         'ip',
         'tcp_port',
         'pubkey',
-        'enode',
       ],
       where: {
         active_state: 1
