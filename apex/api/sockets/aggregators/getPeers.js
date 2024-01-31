@@ -12,6 +12,7 @@ function getPeers() {
       attributes: [
         'ip',
         'tcp_port',
+        'udp_port',
         'pubkey',
       ],
       where: {
@@ -20,7 +21,8 @@ function getPeers() {
     })
     .then((newPeers)=> {
       currentPeers = newPeers.reduce((obj, peer, i)=> {
-        obj[peer.ip] = peer
+        const enode = `enode://${peer.pubkey}@${peer.ip}:${peer.tcp_port}?discport=${peer.udp_port}`;
+        obj[peer.ip] =  { ...peer, enode }
         return obj;
       }, {})
 
