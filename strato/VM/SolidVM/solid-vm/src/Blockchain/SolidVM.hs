@@ -3064,17 +3064,13 @@ runTheConstructors from to hsh cc contractName' argExps = do
     let isStrict = isJust $ find ((== "strict") . fst) $ CC._pragmas cc
     forM_ (reverse $ contract' ^. CC.parents) $ \parent -> do
       if isStrict
-        then do
-          $logInfoS "runTheConstructors/constructorCalls/parent" . T.pack $ show parent
-          for_ (M.lookup parent . CC._funcConstructorCalls =<< contract' ^. CC.constructor) $ \args'' -> do
-            $logInfoS "runTheConstructors/constructorCalls/args''" . T.pack $ show args''
-            args' <- traverse (getVar <=< expToVar) args''
-            $logInfoS "runTheConstructors/constructorCalls/args'" . T.pack $ show args'
-            let argExprs = map (valueToExpression $ contract' ^. CC.contractContext) args'
-                mArgs = sequence $ uncurry (<|>) <$> zip argExprs (Just <$> args'')
-            case mArgs of
-              Just args -> runTheConstructors from to hsh cc parent $ CC.OrderedArgs args
-              Nothing -> typeError "Could not determine values for constructor arguments" args'
+        then for_ (M.lookup parent . CC._funcConstructorCalls =<< contract' ^. CC.constructor) $ \args'' -> do
+          args' <- traverse (getVar <=< expToVar) args''
+          let argExprs = map (valueToExpression $ contract' ^. CC.contractContext) args'
+              mArgs = sequence $ uncurry (<|>) <$> zip argExprs (Just <$> args'')
+          case mArgs of
+            Just args -> runTheConstructors from to hsh cc parent $ CC.OrderedArgs args
+            Nothing -> typeError "Could not determine values for constructor arguments" args'
         else do
           let args =
                 CC.OrderedArgs
