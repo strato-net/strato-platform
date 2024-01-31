@@ -47,6 +47,10 @@
     gap: 8px;
 }
 
+.customButton:hover {
+    color: black !important;
+  }
+
 @media (min-width: 768px) {
     .orders_searchbar input {
         background-color: #F6F6F6;

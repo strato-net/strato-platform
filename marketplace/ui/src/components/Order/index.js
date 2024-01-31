@@ -1,4 +1,4 @@
-import { Tabs, DatePicker, Breadcrumb, Button, Spin } from "antd";
+import { Tabs, DatePicker, Breadcrumb, Button } from "antd";
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import SoldOrdersTable from "./SoldOrdersTable";
@@ -42,6 +42,7 @@ const Order = ({ user }) => {
     setSelectedDate(date);
   };
   
+  // --------------------- EXPORT TO EXCEL AND CSV START ---------------------
   function getCategoryAndSubcategory(contractName) {
     for (const category of categorys) {
       for (const subCategory of category.subCategories) {
@@ -61,14 +62,39 @@ const Order = ({ user }) => {
     "CLOSED",
     "CANCELED",
     "PAYMENT_PENDING"
-];
-
+  ];
+  
+  function formatDate(epochTime) {
+    return new Date(epochTime * 1000).toLocaleDateString("en-US"); // Adjust date format as needed
+  }
+  
+  function camelCaseToTitleCase(camelCase) {
+    return camelCase
+      // Insert a space before all caps
+      .replace(/([A-Z])/g, ' $1')
+      // Uppercase the first character
+      .replace(/^./, str => str.toUpperCase());
+  }
+  
+  function formatDataObject(dataObject) {
+    let formattedObject = {};
+    Object.keys(dataObject).forEach(key => {
+      let value = dataObject[key];
+      if (key.endsWith('Date')) {
+        value = formatDate(value); // Assuming formatDate converts epoch to readable date
+      } else if (key === 'comments') {
+        value = decodeURIComponent(value);
+      }
+      formattedObject[camelCaseToTitleCase(key)] = value;
+    });
+    return formattedObject;
+  }
   
   function mapOrderData(orders) {
     return orders.flatMap(order => 
       order.assets.map((asset, index) => {
         const { category, subCategory } = getCategoryAndSubcategory(asset.contract_name);
-        return {
+        return formatDataObject({
           address: order.address,
           category,
           subCategory,
@@ -85,7 +111,7 @@ const Order = ({ user }) => {
           comments: order.comments,
           fulfillmentDate: order.fulfillmentDate,
           sellersCommonName: order.sellersCommonName,
-        };
+        });
       })
     );
   }
@@ -93,7 +119,7 @@ const Order = ({ user }) => {
   function mapTransfersData(transfers) {
     return transfers.map(order => {
       const { category, subCategory } = getCategoryAndSubcategory(order.contract_name);
-      return {
+      return formatDataObject({
         address: order.address,
         category,
         subCategory,
@@ -107,7 +133,7 @@ const Order = ({ user }) => {
         oldOwnerCommonName: order.oldOwnerCommonName,
         newOwner: order.newOwner,
         newOwnerCommonName: order.newOwnerCommonName
-      };
+      });
     });
   }
 
@@ -179,6 +205,7 @@ const Order = ({ user }) => {
     for (let i=0; i<s.length; i++) view[i] = s.charCodeAt(i) & 0xFF;
     return buf;
   }
+  // --------------------- EXPORT TO EXCEL AND CSV END ---------------------
 
   return (
     <div>
@@ -205,11 +232,11 @@ const Order = ({ user }) => {
         onChange={onChange}
         tabBarExtraContent={
           <div className="text-xs md:flex items-center orders_page">
-            <Button className="md:hidden" onClick={() => download('xlsx')} disabled={isAllOrdersLoading} loading={isAllOrdersLoading}>Excel</Button>
-            <Button className="md:hidden" onClick={() => download('csv')} disabled={isAllOrdersLoading} loading={isAllOrdersLoading}>CSV</Button>
+            <Button className="md:hidden customButton" onClick={() => download('xlsx')} disabled={isAllOrdersLoading} loading={isAllOrdersLoading}>Excel</Button>
+            <Button className="md:hidden customButton" onClick={() => download('csv')} disabled={isAllOrdersLoading} loading={isAllOrdersLoading}>CSV</Button>
 
-            <Button className="hidden md:block" onClick={() => download('xlsx')} disabled={isAllOrdersLoading} loading={isAllOrdersLoading}>Export to Excel</Button>
-            <Button className="hidden md:block" onClick={() => download('csv')} disabled={isAllOrdersLoading} loading={isAllOrdersLoading}>Export to CSV</Button>
+            <Button className="hidden md:block customButton" onClick={() => download('xlsx')} disabled={isAllOrdersLoading} loading={isAllOrdersLoading}>Export to Excel</Button>
+            <Button className="hidden md:block customButton" onClick={() => download('csv')} disabled={isAllOrdersLoading} loading={isAllOrdersLoading}>Export to CSV</Button>
 
 
             <DatePicker

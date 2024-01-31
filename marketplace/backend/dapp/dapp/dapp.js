@@ -245,7 +245,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   contract.getAllItemTransferEvents = function (args, options = defaultOptions) {
-    console.log("args123", args)
     const getOptions = { ...options, app: contractName, };
     return inventoryJs.getAllItemTransferEvents(rawAdmin, args, getOptions);
   };
@@ -467,7 +466,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getOrder = async function (args, options = defaultOptions) {
     try {
-      // here
       const order = await saleOrderJs.get(rawAdmin, args, options);
       const sales = await saleJs.getAll(rawAdmin, { saleAddresses: order.saleAddresses }, options);
       const assetAddresses = sales.map(sale => {
