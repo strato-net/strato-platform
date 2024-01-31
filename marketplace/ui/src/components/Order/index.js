@@ -1,4 +1,4 @@
-import { Tabs, DatePicker, Breadcrumb, Button } from "antd";
+import { Tabs, DatePicker, Breadcrumb, Button, Spin } from "antd";
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import SoldOrdersTable from "./SoldOrdersTable";
@@ -164,11 +164,11 @@ const Order = ({ user }) => {
         onChange={onChange}
         tabBarExtraContent={
           <div className="text-xs md:flex items-center orders_page">
-            <Button className="md:hidden" onClick={() => download('xlsx')}>Excel</Button>
-            <Button className="md:hidden" onClick={() => download('csv')}>CSV</Button>
+            <Button className="md:hidden" onClick={() => download('xlsx')} disabled={isAllOrdersLoading}>{isAllOrdersLoading ? <Spin /> : 'Excel'}</Button>
+            <Button className="md:hidden" onClick={() => download('csv')} disabled={isAllOrdersLoading}>{isAllOrdersLoading ? <Spin /> : 'CSV'}</Button>
 
-            <Button className="hidden md:block" onClick={() => download('xlsx')}>Export to Excel</Button>
-            <Button className="hidden md:block" onClick={() => download('csv')}>Export to CSV</Button>
+            <Button className="hidden md:block" onClick={() => download('xlsx')} disabled={isAllOrdersLoading}>{isAllOrdersLoading ? <Spin /> : 'Export to Excel'}</Button>
+            <Button className="hidden md:block" onClick={() => download('csv')} disabled={isAllOrdersLoading}>{isAllOrdersLoading ? <Spin /> : 'Export to CSV'}</Button>
 
 
             <DatePicker

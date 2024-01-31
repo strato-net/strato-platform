@@ -384,7 +384,7 @@ const actions = {
   fetchAllOrders: async (dispatch, commonName) => {
     dispatch({ type: actionDescriptors.fetchAllOrders });
     const encodedCommonName = encodeURIComponent(commonName);
-    console.log("here")
+    
     try {
       const ordersSold = await fetch(
         `${apiUrl}/order/exportOrders?commonName=${encodedCommonName}`,
@@ -392,27 +392,13 @@ const actions = {
           method: HTTP_METHODS.GET,
         }
       );
-      console.log("ordersSold: ", ordersSold)
-      // const ordersBought = await fetch(
-      //   `${apiUrl}/order?limit=2000&offset=0&order=createdDate.desc&purchasersCommonName=${encodedCommonName}`,
-      //   {
-      //     method: HTTP_METHODS.GET,
-      //   }
-      // );
       
-      // let url = `${apiUrl}/inventory/transfers/items?limit=2000&order=transferDate.desc&offset=0&or=(oldOwnerCommonName.eq.${encodedCommonName},newOwnerCommonName.eq.${encodedCommonName})`
-     
-      // const transfers = await fetch(url, {
-      //   method: HTTP_METHODS.GET,
-
-      // });
-
       const bodysold = await ordersSold.json();
-      console.log("bodysold: ", bodysold)
+      
       if (ordersSold.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchAllOrdersSuccessful,
-          payload: {bodySold: bodysold.data.orders, bodyBought: [], bodyTransfers: []},
+          payload: {bodySold: bodysold.data.soldOrders, bodyBought: bodysold.data.boughtOrders, bodyTransfers: bodysold.data.transfers},
         });
         return;
       }
