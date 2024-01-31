@@ -23,6 +23,7 @@ where
 import Control.DeepSeq
 import Control.Lens
 import Data.Aeson
+import Data.Binary
 import Data.Source
 import GHC.Generics
 import qualified Generic.Random as GR
@@ -41,6 +42,8 @@ data ConstantDeclF a = ConstantDecl
   deriving (Show, Eq, Generic, NFData, Functor, Foldable, Traversable)
 
 makeLenses ''ConstantDeclF
+
+instance Binary a => Binary (ConstantDeclF a)
 
 instance ToJSON a => ToJSON (ConstantDeclF a)
 

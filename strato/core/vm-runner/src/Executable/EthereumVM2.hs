@@ -206,7 +206,7 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis {..} -> do
         case catMaybes $ erException <$> mExecResults of
           [] -> do
             yieldMany . concat $! map (OutLog . mkLogEntry bHash tHash (Just cId)) . erLogs <$> mExecResults
-            yieldMany . concat $! map (OutEvent . mkEventEntry (Just cId)) . erEvents <$> mExecResults
+            yield . OutEvent . concat $! map (mkEventEntry (Just cId)) . erEvents <$> mExecResults
             let (orgName, appName) = case mExecResults of
                   [] -> ("", "")
                   x : _ -> (erOrgName x, erAppName x)
@@ -278,7 +278,7 @@ outputNewChains = traverse_ $ \(cId, cInfo, bHash, execr) -> do
         pure $ d ^. _2 . Action.actionDataApplication
   yield $ OutToStateDiff cId cInfo bHash org app
   for_ (catMaybes $ erAction <$> execr) $ yield . OutAction
-  for_ (concatMap erEvents execr) $ yield . OutEvent . mkEventEntry (Just cId)
+  yield . OutEvent $ flip map (concatMap erEvents execr) $ mkEventEntry (Just cId)
 
 processBlocks ::
   (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) =>

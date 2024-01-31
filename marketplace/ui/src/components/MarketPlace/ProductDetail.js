@@ -320,25 +320,9 @@ const ProductDetails = ({ user, users }) => {
                     {details?.price ? <>${details?.price}</> : "No Price Available"}
                   </Text>
                 </div>
-                <div className=" pt-6 lg:pt-[18px] lg:block hidden">
-                  <Typography className="text-xl font-semibold text-[#202020]">Description</Typography>
-                </div>
-                <div className="pt-[7px]">
-                  <Paragraph
-                    className="text-[#202020] text-sm  h-[60px] overflow-auto"
-                  >
-                    {decodeURIComponent(details.description).split('\n').map((line, index) => (
-                      <React.Fragment key={index}>
-                        {line}
-                        <br />
-                      </React.Fragment>
-                    ))}
-
-                  </Paragraph>
-                </div>
 
                 {availableQuantity !== 0 ?
-                  <div className="flex justify-between lg:justify-start  w-full gap-3 lg:gap-[15px]" id="quantity">
+                  <div className="flex justify-between lg:justify-start  w-full gap-3 lg:gap-[15px] pt-6 lg:pt-[18px]" id="quantity" >
                     <div
                       onClick={subtract}
                       className={`h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer ${qty > 1 ? '' : 'cursor-not-allowed opacity-50'}`}>
@@ -505,10 +489,29 @@ const ProductDetails = ({ user, users }) => {
             <div className=" mt-9 lg:mt-10 w-full md:w-[750px] sm:px-[10%] md:px-[15%] lg:px-0 pb-5 lg:w-[835px]  ">
               <Tabs
                 className="product_detail"
-                defaultActiveKey="1"
+                defaultActiveKey="0"
                 items={
-                  [{
-                    label: <span className="text-sm md:text-base">Item Details</span>,
+                  [
+                  {
+                    label: <span className="text-sm md:text-base">Description</span>,
+                    key: "0",
+                    children: (
+                      <div>
+                        <Paragraph
+                          className="text-[#202020] text-sm"
+                        >
+                          {details?.description?.split('\n').map((line, index) => (
+                            <React.Fragment key={index}>
+                              {line}
+                              <br />
+                            </React.Fragment>
+                          ))}
+                        </Paragraph>
+                      </div>
+                    ),
+                  }
+                  ,{
+                    label: <span className="text-sm md:text-base">Details</span>,
                     key: "1",
                     children: (
                       <div>

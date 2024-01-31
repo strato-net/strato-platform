@@ -27,6 +27,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time
 import GHC.Generics
+import SolidVM.Model.CodeCollection hiding (Event)
 
 data AggregateAction = AggregateAction
   { actionBlockHash :: Keccak256,
@@ -38,7 +39,11 @@ data AggregateAction = AggregateAction
     actionApplication :: Text,
     actionAccount :: Account,
     actionCodeHash :: CodePtr,
+    actionCodeCollection :: CodeCollection,
     actionStorage :: Action.DataDiff,
+    actionAbstracts :: Map (Account, Text) (Text, Text),
+    actionMappings :: [Text],
+    actionArrays :: [Text],
     actionType :: Action.CallType,
     actionMetadata :: Map Text Text
   }
@@ -50,6 +55,7 @@ data AggregateEvent = AggregateEvent
     eventBlockNumber :: Integer,
     eventTxHash :: Keccak256,
     eventTxSender :: Account,
+    eventAbstracts :: Map (Account, Text) (Text, Text),
     eventEvent :: Event
   }
   deriving (Show, Generic, NFData, ToJSON, FromJSON)
@@ -69,7 +75,11 @@ flatten Action.Action {..} = flip map (M.toList _actionData) $
             actionApplication = _actionDataApplication,
             actionAccount = account,
             actionCodeHash = _actionDataCodeHash,
+            actionCodeCollection = _actionDataCodeCollection,
             actionStorage = _actionDataStorageDiffs,
+            actionAbstracts = _actionDataAbstracts,
+            actionMappings = _actionDataMappings,
+            actionArrays = _actionDataArrays,
             actionType = t,
             actionMetadata = fromMaybe M.empty _metadata
           }
