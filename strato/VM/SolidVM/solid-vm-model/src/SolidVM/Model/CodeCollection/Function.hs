@@ -49,6 +49,7 @@ import Control.Lens (makeLenses, mapped, (&), (?~))
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.Casing.Internal (dropFPrefix)
+import Data.Binary
 import Data.Map.Strict (Map)
 import Data.Source
 import Data.Swagger
@@ -89,6 +90,8 @@ tRead "view" = Just View
 tRead "payable" = Just Payable
 tRead _ = Nothing
 
+instance Binary StateMutability
+
 instance ToJSON StateMutability where
   toJSON = String . tShow
 
@@ -120,6 +123,8 @@ tShowVisibility Private = "private"
 tShowVisibility Public = "public"
 tShowVisibility Internal = "internal"
 tShowVisibility External = "external"
+
+instance Binary Visibility
 
 instance ToJSON Visibility where
   toJSON = String . tShowVisibility
@@ -160,6 +165,8 @@ data FuncF a = Func
 
 makeLenses ''FuncF
 
+instance Binary a => Binary (FuncF a)
+
 instance ToJSON a => ToJSON (FuncF a)
 
 instance FromJSON a => FromJSON (FuncF a)
@@ -177,6 +184,8 @@ data ModifierF a = Modifier
 makeLenses ''ModifierF
 
 type Modifier = Positioned ModifierF
+
+instance Binary a => Binary (ModifierF a)
 
 instance ToJSON a => ToJSON (ModifierF a) where
   toJSON = genericToJSON (aesonPrefix camelCase)
@@ -197,6 +206,8 @@ data UsingF a = Using
 makeLenses ''UsingF
 
 type Using = Positioned UsingF
+
+instance Binary a => Binary (UsingF a)
 
 instance ToJSON a => ToJSON (UsingF a) where
   toJSON (Using dec typ ctx) =

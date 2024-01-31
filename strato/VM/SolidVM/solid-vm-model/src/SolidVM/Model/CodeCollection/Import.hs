@@ -22,6 +22,7 @@ import Control.Lens (makeLenses, mapped, (&), (?~))
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.Casing.Internal (dropFPrefix)
+import Data.Binary
 import Data.Source
 import Data.Swagger
 import Data.Text (Text)
@@ -51,6 +52,8 @@ data ItemImportF a
 
 makeLenses ''ItemImportF
 
+instance Binary a => Binary (ItemImportF a)
+
 instance ToJSON a => ToJSON (ItemImportF a)
 
 instance FromJSON a => FromJSON (ItemImportF a)
@@ -78,6 +81,8 @@ data FileImportF a
   deriving (Eq, Show, Generic, Functor, NFData, Foldable, Traversable)
 
 makeLenses ''FileImportF
+
+instance Binary a => Binary (FileImportF a)
 
 instance ToJSON a => ToJSON (FileImportF a)
 

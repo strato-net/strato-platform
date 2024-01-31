@@ -178,9 +178,11 @@ sendOutEvent (OutAction act) = do
                   if _actionDataCodeHash == cp
                     then Just _actionDataOrganization
                     else Nothing
+                cc = foldr (\ad b -> Action._actionDataCodeCollection ad <> b) mempty $ snd <$> actionDatas
+                abstracts' = foldr (\ad b -> Action._actionDataAbstracts ad <> b) mempty $ snd <$> actionDatas
              in Just $
                   CodeCollectionAdded
-                    { ccString = c,
+                    { codeCollection = const () <$> cc,
                       codePtr = cp,
                       organization = org,
                       application = n,
@@ -188,22 +190,23 @@ sendOutEvent (OutAction act) = do
                         case join $ fmap (M.lookup "history") (a ^. Action.metadata) of
                           Nothing -> []
                           Just v -> T.splitOn "," v,
+                      abstracts = abstracts',
                       recordMappings = []
                     }
           _ -> Nothing
       ccEvents = maybeToList $ extractCodeCollectionAddedMessages act
       dcEvents = DelegatecallMade <$> toList (act ^. Action.delegatecalls)
-      actionEvents = [NewAction act]
+      act' = act { Action._actionData = M.map (Action.actionDataCodeCollection .~ mempty) (Action._actionData act) }
+      actionEvents = [NewAction act']
       vmes = ccEvents ++ dcEvents ++ actionEvents
-  contx <- accessEnv
-  void . liftIO $ enqueue (_stateDiffQueue contx) (VME vmes)
+  void . produceVMEvents $ toList vmes
 sendOutEvent (OutIndexEvent e) = void $ produceIndexEvents [e]
 sendOutEvent (OutToStateDiff cId cInfo bHash org app) = withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo org app
 sendOutEvent (OutStateDiff diff) = do
   contx <- accessEnv
   void . liftIO $ enqueue (_stateDiffQueue contx) (SD diff)
 sendOutEvent (OutLog l) = loopTimeit "flushLogEntries" $ void $ produceIndexEvents [LogDBEntry l]
-sendOutEvent (OutEvent e) = loopTimeit "flushEventEntries" $ void $ produceIndexEvents [EventDBEntry e]
+sendOutEvent (OutEvent e) = loopTimeit "flushEventEntries" $ void $ produceIndexEvents (EventDBEntry <$> e)
 sendOutEvent (OutTXR tr) = do
   contx <- accessEnv
   void . liftIO $ enqueue (_stateDiffQueue contx) (TXR tr)
@@ -296,7 +299,6 @@ checkQueueAndCommitsSqlDiffsForever vmEvents = do
     SD !stateDiff' -> do
       commitSqlDiffs stateDiff'
       checkQueueAndCommitsSqlDiffsForever vmEvents
-    VME !vmes -> checkQueueAndCommitsSqlDiffsForever $ vmEvents `DL.append` DL.fromList vmes
     Flush -> do
       void . produceVMEvents $ toList vmEvents
       checkQueueAndCommitsSqlDiffsForever DL.empty

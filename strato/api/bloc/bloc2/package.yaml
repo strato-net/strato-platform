@@ -49,6 +49,7 @@ library:
     - servant-server
     - servant-swagger
     - solid-vm
+    - solid-vm-compiler
     - solid-vm-model
     - solid-vm-parser
     - source-tools
