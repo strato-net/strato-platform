@@ -80,13 +80,13 @@ const ProcessingOrder = ({user}) => {
           const cartObject = JSON.parse(body.data.metadata.cart);
           if (Object.keys(cartObject).length !== 0) {
             if (body.data["payment_status"] === "paid") {
-              const customerEmail = user.preferred_username;
+              const customerEmail = user.email;
               const cart = JSON.parse(body.data.metadata.cart);
               let object = { paymentSessionId: sessionId, status:ORDER_STATUS.AWAITING_FULFILLMENT, paymentMethod: body.data.payment_method, ...cart };
               handleOrderConfirm(object, customerEmail);
             }
             else if (body.data["payment_method_options"].hasOwnProperty("us_bank_account")) {
-              const customerEmail = user.preferred_username;
+              const customerEmail = user.email;
               const cart = JSON.parse(body.data.metadata.cart);
               let object = { paymentSessionId: sessionId, status:ORDER_STATUS.PAYMENT_PENDING, paymentMethod: body.data.payment_method, ...cart };
               handleOrderConfirm(object, customerEmail);
