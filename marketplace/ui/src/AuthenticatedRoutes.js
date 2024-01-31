@@ -283,13 +283,15 @@ const AuthenticatedRoutes = ({ user, users }) => {
         path={routes.Orders.url}
         element={
           <UsersProvider>
-            <OrdersProvider>
-              <ItemsProvider>
-                <InventoriesProvider>
-                  <Order user={user} users={users} />
-                </InventoriesProvider>
-              </ItemsProvider>
-            </OrdersProvider>
+            <CategorysProvider>
+              <OrdersProvider>
+                <ItemsProvider>
+                  <InventoriesProvider>
+                    <Order user={user} users={users} />
+                  </InventoriesProvider>
+                </ItemsProvider>
+              </OrdersProvider>
+            </CategorysProvider>
           </UsersProvider>
         }
       />

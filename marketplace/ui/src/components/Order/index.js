@@ -11,8 +11,9 @@ import { Images } from "../../images";
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
 import { actions } from "../../contexts/order/actions";
-import { useOrderDispatch } from "../../contexts/order";
-import { useOrderState } from "../../contexts/order";
+import { useOrderDispatch, useOrderState } from "../../contexts/order";
+import { actions as categoryActions } from "../../contexts/category/actions";
+import { useCategoryState, useCategoryDispatch } from "../../contexts/category";
 
 const Order = ({ user }) => {
 
@@ -20,9 +21,15 @@ const Order = ({ user }) => {
   const params = useParams();
   const { type } = params;
   const dispatch = useOrderDispatch();
+  const categoryDispatch = useCategoryDispatch();
   const [callExcel, setCallExcel] = useState(false);
   const [callCSV, setCallCSV] = useState(false);
   const { allOrders, isAllOrdersLoading } = useOrderState();
+  const { categorys } = useCategoryState();
+  
+  useEffect(() => {
+    categoryActions.fetchCategories(categoryDispatch);
+  }, [categoryDispatch]);
 
   const onChange = (key) => {
     navigate(`/order/${key}`)
@@ -35,44 +42,62 @@ const Order = ({ user }) => {
     setSelectedDate(date);
   };
   
+  function getCategoryAndSubcategory(contractName) {
+    for (const category of categorys) {
+      for (const subCategory of category.subCategories) {
+        // endsWith is used to match the contract name with the subcategory contract
+        if (contractName.endsWith(subCategory.contract)) {
+          return { category: category.name, subCategory: subCategory.name };
+        }
+      }
+    }
+    return { category: 'Unknown', subCategory: 'Unknown' };
+  }
+  
   function mapOrderData(orders) {
     return orders.flatMap(order => 
-      order.assets.map((asset, index) => ({
-        address: order.address,
-        transaction_hash: order.transaction_hash,
-        transaction_sender: order.transaction_sender,
-        createdDate: order.createdDate,
-        orderId: order.orderId,
-        purchasersAddress: order.purchasersAddress,
-        purchasersCommonName: order.purchasersCommonName,
-        status: order.status,
-        totalPrice: order.totalPrice,
-        comments: order.comments,
-        fulfillmentDate: order.fulfillmentDate,
-        sellersCommonName: order.sellersCommonName,
-        quantities: order.quantities[index],
-        assetName: asset.name,
-        contractName: asset.contract_name
-      }))
+      order.assets.map((asset, index) => {
+        const { category, subCategory } = getCategoryAndSubcategory(asset.contract_name);
+        return {
+          address: order.address,
+          category,
+          subCategory,
+          assetName: asset.name,
+          quantity: order.quantities[index],
+          createdDate: order.createdDate,
+          orderId: order.orderId,
+          purchasersAddress: order.purchasersAddress,
+          purchasersCommonName: order.purchasersCommonName,
+          status: order.status,
+          totalPrice: order.totalPrice,
+          comments: order.comments,
+          fulfillmentDate: order.fulfillmentDate,
+          sellersCommonName: order.sellersCommonName,
+        };
+      })
     );
   }
   
   function mapTransfersData(transfers) {
-    return transfers.map(order => ({
-      id: order.id,
-      address: order.address,
-      transaction_hash: order.transaction_hash,
-      transaction_sender: order.transaction_sender,
-      assetAddress: order.assetAddress,
-      assetName: order.assetName,
-      oldOwner: order.oldOwner,
-      oldOwnerCommonName: order.oldOwnerCommonName,
-      newOwner: order.newOwner,
-      newOwnerCommonName: order.newOwnerCommonName,
-      quantity: order.quantity,
-      transferDate: order.transferDate,
-      contractName: order.contract_name
-    }));
+    return transfers.map(order => {
+      const { category, subCategory } = getCategoryAndSubcategory(order.contract_name);
+      return {
+        address: order.address,
+        category,
+        subCategory,
+        assetName: order.assetName,
+        quantity: order.quantity,
+        createdDate: order.transferDate,
+        orderId: order.id,
+        address: order.address,
+        assetAddress: order.assetAddress,
+        oldOwner: order.oldOwner,
+        oldOwnerCommonName: order.oldOwnerCommonName,
+        newOwner: order.newOwner,
+        newOwnerCommonName: order.newOwnerCommonName,
+        
+      };
+    });
   }
 
   
@@ -169,11 +194,11 @@ const Order = ({ user }) => {
         onChange={onChange}
         tabBarExtraContent={
           <div className="text-xs md:flex items-center orders_page">
-            <Button className="md:hidden" onClick={() => download('xlsx')} disabled={isAllOrdersLoading}>{isAllOrdersLoading ? <Spin /> : 'Excel'}</Button>
-            <Button className="md:hidden" onClick={() => download('csv')} disabled={isAllOrdersLoading}>{isAllOrdersLoading ? <Spin /> : 'CSV'}</Button>
+            <Button className="md:hidden" onClick={() => download('xlsx')} disabled={isAllOrdersLoading} loading={isAllOrdersLoading}>Excel</Button>
+            <Button className="md:hidden" onClick={() => download('csv')} disabled={isAllOrdersLoading} loading={isAllOrdersLoading}>CSV</Button>
 
-            <Button className="hidden md:block" onClick={() => download('xlsx')} disabled={isAllOrdersLoading}>{isAllOrdersLoading ? <Spin /> : 'Export to Excel'}</Button>
-            <Button className="hidden md:block" onClick={() => download('csv')} disabled={isAllOrdersLoading}>{isAllOrdersLoading ? <Spin /> : 'Export to CSV'}</Button>
+            <Button className="hidden md:block" onClick={() => download('xlsx')} disabled={isAllOrdersLoading} loading={isAllOrdersLoading}>Export to Excel</Button>
+            <Button className="hidden md:block" onClick={() => download('csv')} disabled={isAllOrdersLoading} loading={isAllOrdersLoading}>Export to CSV</Button>
 
 
             <DatePicker
