@@ -73,6 +73,10 @@ body{
   font-size: 13px;
 }
 
+.custom-select-dropdown .ant-select-item-option-content {
+  white-space: normal; /* Allow text wrapping */
+}
+
 .ant-select .ant-select-arrow {
   color: #4e4d4b;
 }
@@ -387,6 +391,10 @@ body{
   align-items: center;
 }
 
+.ant-select-selection-search{
+  display: flex;
+  align-items: center;
+}
 
 @media screen and (max-width :  780px){
   .store .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
