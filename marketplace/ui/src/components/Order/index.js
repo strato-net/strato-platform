@@ -36,21 +36,25 @@ const Order = ({ user }) => {
   };
   
   function mapOrderData(orders) {
-    return orders.map(order => ({
-      address: order.address,
-      transaction_hash: order.transaction_hash,
-      transaction_sender: order.transaction_sender,
-      createdDate: order.createdDate,
-      orderId: order.orderId,
-      purchasersAddress: order.purchasersAddress,
-      purchasersCommonName: order.purchasersCommonName,
-      status: order.status,
-      totalPrice: order.totalPrice,
-      comments: order.comments,
-      fulfillmentDate: order.fulfillmentDate,
-      sellersCommonName: order.sellersCommonName,
-      quantities: order.quantities.join(", ")
-    }));
+    return orders.flatMap(order => 
+      order.assets.map((asset, index) => ({
+        address: order.address,
+        transaction_hash: order.transaction_hash,
+        transaction_sender: order.transaction_sender,
+        createdDate: order.createdDate,
+        orderId: order.orderId,
+        purchasersAddress: order.purchasersAddress,
+        purchasersCommonName: order.purchasersCommonName,
+        status: order.status,
+        totalPrice: order.totalPrice,
+        comments: order.comments,
+        fulfillmentDate: order.fulfillmentDate,
+        sellersCommonName: order.sellersCommonName,
+        quantities: order.quantities[index],
+        assetName: asset.name,
+        contractName: asset.contract_name
+      }))
+    );
   }
   
   function mapTransfersData(transfers) {
@@ -66,7 +70,8 @@ const Order = ({ user }) => {
       newOwner: order.newOwner,
       newOwnerCommonName: order.newOwnerCommonName,
       quantity: order.quantity,
-      transferDate: order.transferDate
+      transferDate: order.transferDate,
+      contractName: order.contract_name
     }));
   }
 
