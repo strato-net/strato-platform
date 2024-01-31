@@ -54,6 +54,16 @@ const Order = ({ user }) => {
     return { category: 'Unknown', subCategory: 'Unknown' };
   }
   
+  const OrderStatus = [
+    "NULL",
+    "AWAITING_FULFILLMENT",
+    "AWAITING_SHIPMENT",
+    "CLOSED",
+    "CANCELED",
+    "PAYMENT_PENDING"
+];
+
+  
   function mapOrderData(orders) {
     return orders.flatMap(order => 
       order.assets.map((asset, index) => {
@@ -64,12 +74,13 @@ const Order = ({ user }) => {
           subCategory,
           assetName: asset.name,
           quantity: order.quantities[index],
+          salePrice: asset.salePrice * order.quantities[index],
+          totalPrice: order.totalPrice,
           createdDate: order.createdDate,
           orderId: order.orderId,
           purchasersAddress: order.purchasersAddress,
           purchasersCommonName: order.purchasersCommonName,
-          status: order.status,
-          totalPrice: order.totalPrice,
+          status: OrderStatus[order.status] || "Unknown",
           comments: order.comments,
           fulfillmentDate: order.fulfillmentDate,
           sellersCommonName: order.sellersCommonName,
@@ -94,8 +105,7 @@ const Order = ({ user }) => {
         oldOwner: order.oldOwner,
         oldOwnerCommonName: order.oldOwnerCommonName,
         newOwner: order.newOwner,
-        newOwnerCommonName: order.newOwnerCommonName,
-        
+        newOwnerCommonName: order.newOwnerCommonName
       };
     });
   }

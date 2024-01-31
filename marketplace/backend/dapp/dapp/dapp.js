@@ -525,7 +525,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       
       const assets = await inventoryJs.getAll(rawAdmin, { assetAddresses: [...uniqueAssetAddresses] }, options);
       
-      const assetLookup = new Map(assets.map(asset => [asset.address, { contract_name: asset.contract_name, name: asset.name }]));
+      const assetDetailsMap = new Map(assets.map(asset => [asset.address, asset]));
+      const assetLookup = new Map(sales.map(sale => [
+        sale.assetToBeSold, 
+        { 
+          ...assetDetailsMap.get(sale.assetToBeSold),
+          salePrice: sale.price
+        }
+      ]));
       
       orders.orders.forEach(order => {
         order.assets = order.saleAddresses.map(saleAddress => {
