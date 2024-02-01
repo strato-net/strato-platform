@@ -168,7 +168,7 @@ const TransfersTable = ({ user, selectedDate, download, isAllOrdersLoading }) =>
           prefix={<SearchOutlined />}
           placeholder="Search Transfers by Buyer or Transfer #" />
         <Dropdown
-          className="md:hidden"
+          className="md:hidden customButton"
           menu={{ items: menuItems, onClick: (e) => download(e.key) }}
           disabled={isAllOrdersLoading}
           trigger={['click']}

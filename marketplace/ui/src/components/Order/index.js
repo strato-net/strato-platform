@@ -67,7 +67,7 @@ const Order = ({ user }) => {
   ];
   
   function formatDate(epochTime) {
-    return new Date(epochTime * 1000).toLocaleDateString("en-US"); // Adjust date format as needed
+    return new Date(epochTime * 1000).toLocaleDateString("en-US");
   }
   
   function formatDataObject(dataObject) {
@@ -75,11 +75,16 @@ const Order = ({ user }) => {
     Object.keys(dataObject).forEach(key => {
       let value = dataObject[key];
       if (key.endsWith('Date')) {
-        value = formatDate(value); // Assuming formatDate converts epoch to readable date
+        value = formatDate(value);
       } else if (key === 'comments') {
         value = decodeURIComponent(value);
       }
-      formattedObject[startCase(key)] = value;
+      
+      if (key === 'assetPrice') {
+        formattedObject['Asset Price (Unit)'] = value;
+      } else {
+        formattedObject[startCase(key)] = value;
+      }
     });
     return formattedObject;
   }
@@ -90,6 +95,7 @@ const Order = ({ user }) => {
         const { category, subCategory } = getCategoryAndSubcategory(asset.contract_name);
         return formatDataObject({
           orderNumber: order.orderId,
+          purchaserName: order.purchasersCommonName,
           category,
           subCategory,
           assetName: asset.name,
@@ -97,11 +103,10 @@ const Order = ({ user }) => {
           quantity: order.quantities[index],
           totalOrderAmount: order.totalPrice,
           orderDate: order.createdDate,
-          purchaserName: order.purchasersCommonName,
-          status: OrderStatus[order.status] || "Unknown",
-          comments: order.comments,
           orderFulfillmentDate: order.fulfillmentDate,
-          address: order.address
+          orderStatus: OrderStatus[order.status] || "Unknown",
+          comments: order.comments,
+          blockchainAddress: order.address
         });
       })
     );
@@ -111,15 +116,15 @@ const Order = ({ user }) => {
     return transfers.map(order => {
       const { category, subCategory } = getCategoryAndSubcategory(order.contract_name);
       return formatDataObject({
-        orderNumber: order.id,
+        transferNumber: order.id,
+        transferDate: order.transferDate,
         category,
         subCategory,
         assetName: order.assetName,
         quantity: order.quantity,
-        transferDate: order.transferDate,
-        oldOwnerCommonName: order.oldOwnerCommonName,
-        newOwnerCommonName: order.newOwnerCommonName,
-        address: order.address
+        sender: order.oldOwnerCommonName,
+        recipient: order.newOwnerCommonName,
+        blockchainAddress: order.address
       });
     });
   }
@@ -233,7 +238,7 @@ const Order = ({ user }) => {
         tabBarExtraContent={
           <div className="text-xs md:flex items-center orders_page">
             <Dropdown
-              className="md:flex hidden"
+              className="md:flex hidden customButton"
               menu={{ items: menuItems, onClick: (e) => download(e.key) }}
               disabled={isAllOrdersLoading}
               trigger={['click']}

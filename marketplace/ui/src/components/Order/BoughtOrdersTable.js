@@ -364,7 +364,7 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOr
           prefix={<SearchOutlined />}
           placeholder="Search Bought Orders by Seller or Order #" />
         <Dropdown
-          className="md:hidden"
+          className="md:hidden customButton"
           menu={{ items: menuItems, onClick: (e) => download(e.key) }}
           disabled={isAllOrdersLoading}
           trigger={['click']}
