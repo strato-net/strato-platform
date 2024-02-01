@@ -38,6 +38,7 @@ import Blockchain.ExtMergeSources
 import Blockchain.Frame
 import Blockchain.Metrics
 import Blockchain.Options
+import Blockchain.P2PUtil
 import Blockchain.Participation
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Discovery.Data.Peer
@@ -100,7 +101,8 @@ mkEthP2PEventSource peerSourceConduit seqEventSource peerStr inCtx scp = do
   recvWatchdog <- mkWatchdog eventsourcethreadid $ fromIntegral flags_connectionTimeout
   merged <- mergeSourcesByForce
               ( [ ( ("peerSourceConduit" :: String)
-                  , peerSourceConduit
+                  , labelTheThread ("peerSourceConduit: " ++ peerStr) $
+                    peerSourceConduit
                     .| ethDecrypt inCtx
                     .| CL.iterM (recordTraffic Inbound)
                     .| bytesToMessages
@@ -109,15 +111,18 @@ mkEthP2PEventSource peerSourceConduit seqEventSource peerStr inCtx scp = do
                     .| CL.iterM (const $ petWatchdog recvWatchdog)
                   )
                 , ( ("seqEventSource" :: String)
-                  , seqEventSource
+                  , labelTheThread ("seqEventSource: " ++ peerStr) $
+                    seqEventSource
                     .| CL.map NewSeqEvent
                   )
                 , ( ("canarySource" :: String)
-                  , canarySource
+                  , labelTheThread ("canarySource: " ++ peerStr) $
+                    canarySource
                     .| CL.map absurd
                   )
                 , ( ("timerSource" :: String)
-                  , timerSource
+                  , labelTheThread ("timerSource: " ++ peerStr) $
+                    timerSource
                   )
                 ]
               )
@@ -156,7 +161,7 @@ mkEthP2PEventConduit str outCtx = do
       .| ethEncrypt outCtx
 
 debounceTxSendsAndUnseq :: (MonadIO m, m `Mod.Outputs` [IngestEvent]) => ConduitT (Either P2PCNC Message) Message m ()
-debounceTxSendsAndUnseq = do
+debounceTxSendsAndUnseq = labelTheThread "debounceTxSendsAndUnseq" $ do
   txq <- atomically newTQueue
   awaitForever $ \case
     Right (W.Transactions txs) -> do

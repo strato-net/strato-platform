@@ -26,6 +26,7 @@ import           Blockchain.EthEncryptionException
 import           Blockchain.EventException
 import           Blockchain.Metrics
 import           Blockchain.Options
+import           Blockchain.P2PUtil
 import           Blockchain.RLPx
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
@@ -138,7 +139,7 @@ runPeerInList thePeer sSource = do
   try $ runPeer thePeer sSource
 
 stratoP2PClient :: (MonadP2P m, RunsClient m) => PeerRunner m (LoggingT IO) () -> LoggingT IO ()
-stratoP2PClient runner = runner $ \sSource -> do
+stratoP2PClient runner = runner $ \sSource -> labelTheThread "strato P2P Client main loop" $ do
   $logInfoS "stratoP2PClient" $ T.pack $ "maxConn: " ++ show flags_maxConn
   activePeersSem <- liftIO (SSem.new flags_maxConn)
   forever $ do

@@ -3,7 +3,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module Blockchain.P2PUtil
-  ( sockAddrToIP,
+  ( labelTheThread,
+    sockAddrToIP,
     resolveIPOrHost,
   )
 where
@@ -13,12 +14,19 @@ import Control.Arrow ((>>>))
 import Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as BC
 import Data.IP (IPv4)
+import qualified GHC.Conc as CONC
 import Network.DNS.Lookup
 import Network.DNS.Resolver
 import Network.DNS.Types (DNSError)
 import Network.DNS.Utils (normalize)
 import qualified Network.Socket as S
 import qualified System.IO.Unsafe as I_AM_A_VILE_EXCUSE_FOR_A_HUMAN_BEING
+
+labelTheThread :: MonadIO m => String -> m b -> m b
+labelTheThread theLabel doit = do
+  threadId <- liftIO $ CONC.myThreadId
+  liftIO $ CONC.labelThread threadId theLabel
+  doit
 
 sockAddrToIP :: S.SockAddr -> String
 sockAddrToIP (S.SockAddrInet6 _ _ host _) = show host
