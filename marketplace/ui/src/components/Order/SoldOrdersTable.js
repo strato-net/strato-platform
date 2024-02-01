@@ -369,7 +369,7 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrde
             </Space>
           </Button>
         </Dropdown>
-        <div className="text-xs flex items-center md:hidden">
+        <div className="text-xs flex items-center md:hidden h-[32px] w-[33px]">
           <DatePicker
             disabledDate={(current) => {
               const currentDate = dayjs().startOf('day'); // Get the start of today
