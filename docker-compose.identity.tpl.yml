@@ -16,6 +16,7 @@ services:
     - SENDGRID_APIKEY=${SENDGRID_APIKEY}
     - userRegistryAddress=${userRegistryAddress}
     - userTableName=${userTableName}
+    - cacheSize=${cacheSize}
     build: .
     image: ${IDENTTIYPROVIDER_IMAGE:-<REPO_URL>identity-provider:<VERSION>}
     restart: unless-stopped

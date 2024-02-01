@@ -39,6 +39,7 @@ library:
   - http-client
   - http-client-tls
   - http-types
+  - lrucache
   - monad-alter
   - mtl
   - servant-client

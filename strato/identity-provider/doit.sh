@@ -39,6 +39,9 @@ function runIdentityServer {
   fi  
   if [ -n "${userTableName}" ]; then
       utFlag="--userTableName=${userTableName}"
+  fi
+  if [ -n "${cacheSize}" ]; then
+      csFlag="--cacheSize=${cacheSize}"
   fi  
   RED='\033[0;31m'
   NC='\033[0m' # No Color
@@ -75,7 +78,7 @@ function runIdentityServer {
   echo "Running identity-provider-server..."
   runBackgroundProcess identity-provider-server \
     --minLogLevel=${minLogLevel} --port="${identityProviderPort}" \
-    "${vpFlag}" "${sgFlag}" "${urFlag}" "${utFlag}" &>> logs/identity-provider-server
+    "${vpFlag}" "${sgFlag}" "${urFlag}" "${utFlag}" "${csFlag}" &>> logs/identity-provider-server
   
   echo "Configuring log rotation..."
   runBackgroundProcess logRotation

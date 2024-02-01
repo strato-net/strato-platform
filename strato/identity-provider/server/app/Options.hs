@@ -6,7 +6,8 @@ module Options
     flags_vaultProxyUrl,
     flags_SENDGRID_APIKEY,
     flags_userRegistryAddress,
-    flags_userTableName
+    flags_userTableName,
+    flags_cacheSize
   )
 where
 
@@ -17,3 +18,4 @@ defineFlag "vaultProxyUrl" ("http://localhost:8013/strato/v2.3" :: String) "URL 
 defineFlag "SENDGRID_APIKEY" ("" :: String) "The api key for sendgrid to automatically send the welcome email"
 defineFlag "userRegistryAddress" ("4ff4fd7c213761718a86d4a2cb3cc334e3f60f31" :: String) "Address of the User Registry contract"
 defineFlag "userTableName" ("BlockApps-UserRegistry-User" :: String) "Name of the User table"
+defineFlag "cacheSize" (200 :: Int) "default size for each network's cache"

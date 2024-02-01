@@ -5,14 +5,18 @@
 -- all OAuth-related data types and functions go here
 module IdentityProvider.OAuth where
 
+import Blockchain.Strato.Model.Address (Address)
 import Control.Monad.IO.Class
 import Data.Aeson
 import Data.ByteString.Base64
 import qualified Data.ByteString.UTF8 as B (fromString)
+import Data.Cache.LRU hiding (fromList)
+import Data.IORef
 import Data.List (isSuffixOf)
 import Data.List.Split (splitOn)
 import Data.Map (Map, fromList)
 import Data.Text (Text)
+import Data.Time.Clock (UTCTime, getCurrentTime)
 import GHC.Generics
 import Network.HTTP.Client
 import Network.HTTP.Client.TLS
@@ -40,14 +44,15 @@ data RealmDetails = RealmDetails
     realmClientId :: String,
     realmClientSecret :: String,
     associatedNodeUrl :: BaseUrl,
-    associatedFallback :: BaseUrl
+    associatedFallback :: BaseUrl,
+    cacheRef :: IORef (LRU String Address), -- commonName -> userAddress
+    accessTokenRef :: IORef (Maybe AccessToken, UTCTime)
   }
-  deriving (Show)
 
-type RealmData = Map String RealmDetails -- realm name -> realm data
+type RealmMap = Map String RealmDetails -- realm name -> realm dets
 
-getRealmData :: MonadIO m => [ProvidedRealmInfo] -> m RealmData
-getRealmData realmInfos = fromList <$> mapM parseRealmMinInfo realmInfos
+getRealmMap :: MonadIO m => [ProvidedRealmInfo] -> Int -> m RealmMap
+getRealmMap realmInfos cacheSize = fromList <$> mapM parseRealmMinInfo realmInfos
   where
     parseRealmMinInfo :: MonadIO m => ProvidedRealmInfo -> m (String, RealmDetails)
     parseRealmMinInfo realmInfo = do
@@ -61,6 +66,9 @@ getRealmData realmInfos = fromList <$> mapM parseRealmMinInfo realmInfos
         parseBaseUrl $ case fallbackNodeUrl realmInfo of
           Just url -> url
           Nothing -> "https://node1." <> realmName <> ".blockapps.net" -- node1 usually gets more traffic, so preference for node2
+      cRef <- liftIO $ newIORef $ newLRU (Just $ toInteger cacheSize)
+      now <- liftIO getCurrentTime
+      tRef <- liftIO $ newIORef (Nothing, now)
       return
         ( realmName,
           RealmDetails
@@ -68,7 +76,9 @@ getRealmData realmInfos = fromList <$> mapM parseRealmMinInfo realmInfos
               realmClientId = clientId realmInfo,
               realmClientSecret = clientSecret realmInfo,
               associatedNodeUrl = nurl,
-              associatedFallback = nurl2
+              associatedFallback = nurl2,
+              cacheRef = cRef,
+              accessTokenRef = tRef
             }
         )
 
@@ -82,7 +92,10 @@ getEndpointsFromDiscovery url = do
 extractRealmName :: String -> String
 extractRealmName idProv = last $ splitOn "/" (if "/" `isSuffixOf` idProv then init idProv else idProv)
 
-newtype AccessToken = AccessToken {access_token :: Text}
+data AccessToken = AccessToken
+  { access_token :: Text,
+    expires_in :: Integer
+  }
   deriving (Show, Generic, ToJSON, FromJSON)
 
 getAccessToken :: MonadIO m => String -> String -> String -> m (Maybe AccessToken)
