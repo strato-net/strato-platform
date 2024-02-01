@@ -173,7 +173,7 @@ const TransfersTable = ({ user, selectedDate, download, isAllOrdersLoading }) =>
           disabled={isAllOrdersLoading}
           trigger={['click']}
         >
-          <Button loading={isAllOrdersLoading}>
+          <Button loading={isAllOrdersLoading} className="h-[32px] w-[33px] rounded-md border border-[#6A6A6A] flex md:hidden justify-center items-center">
             <Space>
               <DownloadOutlined />
             </Space>

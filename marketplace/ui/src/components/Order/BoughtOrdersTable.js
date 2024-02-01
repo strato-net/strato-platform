@@ -369,7 +369,7 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOr
           disabled={isAllOrdersLoading}
           trigger={['click']}
         >
-          <Button loading={isAllOrdersLoading}>
+          <Button loading={isAllOrdersLoading} className="h-[32px] w-[33px] rounded-md border border-[#6A6A6A] flex md:hidden justify-center items-center">
             <Space>
               <DownloadOutlined />
             </Space>
@@ -389,7 +389,7 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOr
           />
         </div>
         <div className="relative">
-          <div onClick={() => setMDropdownVisible(!mDropdownVisible)} className="h-[30px] w-8 rounded-md border border-[#6A6A6A] flex md:hidden justify-center items-center">
+          <div onClick={() => setMDropdownVisible(!mDropdownVisible)} className="h-[32px] w-[33px] rounded-md border border-[#6A6A6A] flex md:hidden justify-center items-center">
             <FilterIcon />
           </div>
           {mDropdownVisible && <Sorting className="md:hidden flex flex-col gap-1 absolute right-0 top-10 w-max shadow-card_shadow z-[99999] bg-white sort_conatiner py-1" />}
