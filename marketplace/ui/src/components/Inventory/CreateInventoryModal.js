@@ -7,6 +7,7 @@ import {
   Button,
   Upload,
   notification,
+  Radio,
 } from "antd";
 import {
   useInventoryDispatch,
@@ -17,6 +18,7 @@ import TextArea from "antd/es/input/TextArea";
 import TagManager from "react-gtm-module";
 import { unitOfMeasures } from "../../helpers/constants";
 import { categoricalProperties } from "./CategoryFields";
+import CreateGroupForm from "./CreateGroupForm";
 
 const { Option } = Select;
 
@@ -33,13 +35,13 @@ const CreateInventoryModal = ({
   const dispatch = useInventoryDispatch();
   const [api, contextHolder] = notification.useNotification();
   const [uploadErr, setUploadErr] = useState("");
-  const { isCreateInventorySubmitting, isUploadImageSubmitting } =
-    useInventoryState();
+  const { isCreateInventorySubmitting, isUploadImageSubmitting } = useInventoryState();
   const [selectedImages, setSelectedImages] = useState(null);
   const [selectedFiles, setSelectedFiles] = useState(null);
   const [clothingType, setClothingType] = useState(null);
   const [sizeOptions, setSizeOptions] = useState([]);
   const [categoryValue, setCategoryValue] = useState("Art");
+  const [displayType, setDisplayType] = useState("single")
   const [subCategoryValue, setSubCategoryValue] = useState(form.getFieldValue("subCategory"));
 
   const beforeImageUpload = (file) => {
@@ -186,6 +188,10 @@ const CreateInventoryModal = ({
     }
   };
 
+  const changeDisplayType = (e) => {
+    setDisplayType(e.target.value);
+  }
+
   return (
     <>
       {contextHolder}
@@ -196,208 +202,222 @@ const CreateInventoryModal = ({
         width={673}
         footer={[
           <div className="flex justify-center mb-5 pt-4">
-            <Button
-              className="w-40"
-              type="primary"
-              onClick={() => {
-                form.validateFields().then((values) => {
-                  handleCreateFormSubmit(values);
-                })
-              }}
-              loading={isCreateInventorySubmitting || isUploadImageSubmitting}
-            >
-              Create Inventory
-            </Button>
+            {displayType === "single" ?
+              <Button
+                className="w-40"
+                type="primary"
+                onClick={() => {
+                  form.validateFields().then((values) => {
+                    handleCreateFormSubmit(values);
+                  })
+                }}
+                loading={isCreateInventorySubmitting || isUploadImageSubmitting}
+              >
+                Create Inventory
+              </Button>
+              :
+              null
+            }
           </div>,
         ]}
       >
-        <h1 className=" font-semibold text-lg text-[#202020]">
-          Create Inventory
-        </h1>
+        <div className="flex justify-between">
+          <h1 className="font-semibold text-lg text-[#202020]">
+            {displayType === "single" ? "Create Inventory" : "Create Group"}
+          </h1>
+          <Radio.Group onChange={changeDisplayType} className="mr-6" defaultValue="single">
+            <Radio.Button value="single">Single</Radio.Button>
+            <Radio.Button value="group">Group</Radio.Button>
+          </Radio.Group>
+        </div>
         <hr className="text-secondryD mt-3" />
-        <Form
-          form={form}
-          layout="vertical"
-          className="mt-5 inventory_modal"
-          initialValues={{
-            name: "",
-            description: "",
-            artist: "",
-            source: "",
-            leastSellableUnits: 1,
-            unitOfMeasurement: 1,
-            purity: "",
-            quantity: 1,
-            expirationPeriodInMonths: 1,
-            clothingType: null,
-            images: [],
-            files: [],
-            category: "Art",
-            subCategory: null,
-            size: null,
-            skuNumber: null,
-            condition: null,
-            brand: null,
-          }}
-        >
-          <div className="w-full mb-3">
-            <div className="flex flex-wrap sm:flex-nowrap justify-between gap-4 mt-4">
-              <Form.Item
-                label="Name"
-                name="name"
-                className="w-full sm:w-[200px] md:w-72"
-                rules={[
-                  {
-                    required: true,
-                    message: 'Please enter a name',
-                  },
-                ]}
-              >
-                <Input placeholder="Enter Name" />
-              </Form.Item>
-
-              <Form.Item
-                label="Category"
-                name="category"
-                className="w-full sm:w-[200px] md:w-72"
-                rules={[
-                  {
-                    required: true,
-                    message: 'Please select a category',
-                  },
-                ]}
-              >
-                <Select
-                  placeholder="Select Category"
-                  allowClear
-                  value={categoryValue}
-                  onChange={(value) => {
-                    form.setFieldValue("category", value);
-                    setCategoryValue(value);
-                    form.setFieldValue("subCategory", null);
-                    setSubCategoryValue(null);
-                  }}
+        {displayType === "single" ?
+          <Form
+            form={form}
+            layout="vertical"
+            className="mt-5 inventory_modal"
+            initialValues={{
+              name: "",
+              description: "",
+              artist: "",
+              source: "",
+              leastSellableUnits: 1,
+              unitOfMeasurement: 1,
+              purity: "",
+              quantity: 1,
+              expirationPeriodInMonths: 1,
+              clothingType: null,
+              images: [],
+              files: [],
+              category: "Art",
+              subCategory: null,
+              size: null,
+              skuNumber: null,
+              condition: null,
+              brand: null,
+            }}
+          >
+            <div className="w-full mb-3">
+              <div className="flex flex-wrap sm:flex-nowrap justify-between gap-4 mt-4">
+                <Form.Item
+                  label="Name"
+                  name="name"
+                  className="w-full sm:w-[200px] md:w-72"
+                  rules={[
+                    {
+                      required: true,
+                      message: 'Please enter a name',
+                    },
+                  ]}
                 >
-                  {categorys.map((e, index) => (
-                    <Option value={e.name} key={index}>
-                      {e.name}
-                    </Option>
-                  ))}
-                </Select>
-              </Form.Item>
+                  <Input placeholder="Enter Name" />
+                </Form.Item>
 
-              <Form.Item
-                label="Sub Category"
-                name="subCategory"
-                className="w-full sm:w-[200px] md:w-72"
-                rules={[
-                  {
-                    required: true,
-                    message: 'Please select a subcategory',
-                  },
-                ]}
-              >
-                <Select
-                  id="subCategory"
-                  placeholder="Select Sub Category"
-                  allowClear
-                  value={subCategoryValue}
-                  onChange={(value) => {
-                    form.setFieldValue("subCategory", value);
-                    setSubCategoryValue(value);
-                  }}
+                <Form.Item
+                  label="Category"
+                  name="category"
+                  className="w-full sm:w-[200px] md:w-72"
+                  rules={[
+                    {
+                      required: true,
+                      message: 'Please select a category',
+                    },
+                  ]}
                 >
-                  {categorys.map((category) =>
-                    category.name === categoryValue ? category.subCategories.map((e, index) => (
-                      <Option value={e.contract} key={index}>
+                  <Select
+                    placeholder="Select Category"
+                    allowClear
+                    value={categoryValue}
+                    onChange={(value) => {
+                      form.setFieldValue("category", value);
+                      setCategoryValue(value);
+                      form.setFieldValue("subCategory", null);
+                      setSubCategoryValue(null);
+                    }}
+                  >
+                    {categorys.map((e, index) => (
+                      <Option value={e.name} key={index}>
                         {e.name}
                       </Option>
-                    )) : null
-                  )}
-                </Select>
-              </Form.Item>
-            </div>
-            {categoricalProperties(form, handleClothingTypeChange, clothingType, sizeOptions, unitOfMeasures)}
-            <div className="flex justify-between mt-4 ">
-              <Form.Item
-                label="Description"
-                name="description"
-                className="w-full"
-                rules={[
-                  {
-                    required: true,
-                    message: 'Please enter a description',
-                  },
-                ]}
-              >
-                <TextArea placeholder="Enter Description" />
-              </Form.Item>
-            </div>
-            <div className="mt-4 flex-wrap gap-5 sm:flex-nowrap flex justify-between">
-              <Form.Item
-                label="Upload Images"
-                name="images"
-                className="w-full sm:w-[200px] md:w-72"
-                rules={[
-                  {
-                    required: true,
-                    message: 'Please upload an image',
-                  },
-                ]}
-              >
-                <div className="p-4 border-secondryD border rounded flex flex-col justify-around">
-                  <Upload
-                    onChange={handleImageChange}
-                    fileList={selectedImages}
-                    accept="image/png, image/jpeg"
-                    multiple={true}
-                    maxCount={10}
-                    beforeUpload={beforeImageUpload}
-                    listType="picture"
-                  >
-                    <div className="text-primary border border-primary rounded px-4 py-2 text-center hover:text-white hover:bg-primary cursor-pointer">
-                      Browse Images
-                    </div>
-                  </Upload>
-                </div>
+                    ))}
+                  </Select>
+                </Form.Item>
 
-                <div className="flex items-start">
-                  <p className="mt-1 text-xs italic font-medium ">Note:</p>
-                  <p className="mt-1 text-xs italic ml-1 mr-4">
-                    use jpg, png format of size less than 1mb. Limit of 10.
-                  </p>
-                </div>
-              </Form.Item>
-              <Form.Item
-                label="Upload Files"
-                name="files"
-                className="w-full sm:w-[200px] md:w-72"
-              >
-                <div className="p-4 border-secondryD border rounded flex flex-col justify-around">
-                  <Upload
-                    onChange={handleFileChange}
-                    fileList={selectedFiles}
-                    accept="application/pdf"
-                    multiple={true}
-                    maxCount={10}
-                    beforeUpload={beforeFileUpload}
+                <Form.Item
+                  label="Sub Category"
+                  name="subCategory"
+                  className="w-full sm:w-[200px] md:w-72"
+                  rules={[
+                    {
+                      required: true,
+                      message: 'Please select a subcategory',
+                    },
+                  ]}
+                >
+                  <Select
+                    id="subCategory"
+                    placeholder="Select Sub Category"
+                    allowClear
+                    value={subCategoryValue}
+                    onChange={(value) => {
+                      form.setFieldValue("subCategory", value);
+                      setSubCategoryValue(value);
+                    }}
                   >
-                    <div className="text-primary border border-primary rounded px-4 py-2 text-center hover:text-white hover:bg-primary cursor-pointer">
-                      Browse Files
-                    </div>
-                  </Upload>
-                </div>
+                    {categorys.map((category) =>
+                      category.name === categoryValue ? category.subCategories.map((e, index) => (
+                        <Option value={e.contract} key={index}>
+                          {e.name}
+                        </Option>
+                      )) : null
+                    )}
+                  </Select>
+                </Form.Item>
+              </div>
+              {categoricalProperties(form, handleClothingTypeChange, clothingType, sizeOptions, unitOfMeasures)}
+              <div className="flex justify-between mt-4 ">
+                <Form.Item
+                  label="Description"
+                  name="description"
+                  className="w-full"
+                  rules={[
+                    {
+                      required: true,
+                      message: 'Please enter a description',
+                    },
+                  ]}
+                >
+                  <TextArea placeholder="Enter Description" />
+                </Form.Item>
+              </div>
+              <div className="mt-4 flex-wrap gap-5 sm:flex-nowrap flex justify-between">
+                <Form.Item
+                  label="Upload Images"
+                  name="images"
+                  className="w-full sm:w-[200px] md:w-72"
+                  rules={[
+                    {
+                      required: true,
+                      message: 'Please upload an image',
+                    },
+                  ]}
+                >
+                  <div className="p-4 border-secondryD border rounded flex flex-col justify-around">
+                    <Upload
+                      onChange={handleImageChange}
+                      fileList={selectedImages}
+                      accept="image/png, image/jpeg"
+                      multiple={true}
+                      maxCount={10}
+                      beforeUpload={beforeImageUpload}
+                      listType="picture"
+                    >
+                      <div className="text-primary border border-primary rounded px-4 py-2 text-center hover:text-white hover:bg-primary cursor-pointer">
+                        Browse Images
+                      </div>
+                    </Upload>
+                  </div>
 
-                <div className="flex items-start">
-                  <p className="mt-1 text-xs italic font-medium ">Note:</p>
-                  <p className="mt-1 text-xs italic ml-1 mr-4">
-                    use pdf format of size less than 1mb. Limit of 10.
-                  </p>
-                </div>
-              </Form.Item>
+                  <div className="flex items-start">
+                    <p className="mt-1 text-xs italic font-medium ">Note:</p>
+                    <p className="mt-1 text-xs italic ml-1 mr-4">
+                      use jpg, png format of size less than 1mb. Limit of 10.
+                    </p>
+                  </div>
+                </Form.Item>
+                <Form.Item
+                  label="Upload Files"
+                  name="files"
+                  className="w-full sm:w-[200px] md:w-72"
+                >
+                  <div className="p-4 border-secondryD border rounded flex flex-col justify-around">
+                    <Upload
+                      onChange={handleFileChange}
+                      fileList={selectedFiles}
+                      accept="application/pdf"
+                      multiple={true}
+                      maxCount={10}
+                      beforeUpload={beforeFileUpload}
+                    >
+                      <div className="text-primary border border-primary rounded px-4 py-2 text-center hover:text-white hover:bg-primary cursor-pointer">
+                        Browse Files
+                      </div>
+                    </Upload>
+                  </div>
+
+                  <div className="flex items-start">
+                    <p className="mt-1 text-xs italic font-medium ">Note:</p>
+                    <p className="mt-1 text-xs italic ml-1 mr-4">
+                      use pdf format of size less than 1mb. Limit of 10.
+                    </p>
+                  </div>
+                </Form.Item>
+              </div>
             </div>
-          </div>
-        </Form>
+          </Form>
+          :
+          <CreateGroupForm />
+        }
       </Modal>
       {uploadErr && openToast("bottom")}
     </>

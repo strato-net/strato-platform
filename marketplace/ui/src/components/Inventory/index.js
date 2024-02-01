@@ -1,18 +1,15 @@
 import React, { useState, useEffect } from "react";
 import {
   Breadcrumb,
-  Input,
   Button,
   Pagination,
   notification,
   Spin,
-  Typography,
   Tooltip,
   Tabs
 } from "antd";
 import InventoryCard from "./InventoryCard";
 import CreateInventoryModal from "./CreateInventoryModal";
-import CreateBundleModal from "./CreateBundleModal";
 //categories
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
@@ -31,13 +28,8 @@ import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
 import { useAuthenticateState } from "../../contexts/authentication";
 
-const { Search } = Input;
-
-const { Title, Text } = Typography;
-
 const Inventory = ({ user }) => {
   const [open, setOpen] = useState(false);
-  const [openBundleModal, setOpenBundleModal] = useState(false);
   const [queryValue, setQueryValue] = useState("");
   const debouncedSearchTerm = useDebounce(queryValue, 1000);
   const limit = 10;
@@ -110,15 +102,6 @@ const Inventory = ({ user }) => {
   const handleCancel = () => {
     setOpen(false);
   };
-
-  const showBundleModal = () => {
-    setOpenBundleModal(true);
-  };
-
-  const handleCancelBundleModal = () => {
-    setOpenBundleModal(false);
-  };
-
 
   const openToast = (placement) => {
     if (success) {
@@ -240,23 +223,6 @@ const Inventory = ({ user }) => {
               >
                 {"Connect Stripe"}
               </Button>
-              <Button
-                type="primary"
-                className="w-40 h-9 flex items-center justify-center gap-[6px]"
-                onClick={() => {
-                  if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                    window.location.href = loginUrl;
-                  } else {
-                    showBundleModal()
-                  }
-                }}
-                disabled={!stripeStatus.chargesEnabled || !stripeStatus.detailsSubmitted || !stripeStatus.payoutsEnabled}
-              >
-                <div className="flex items-center justify-center gap-[6px]">
-                  <img src={Images.CreateInventory} alt="Inventory" className="w-[18px] h-[18px]" />
-                  Create Bundle
-                </div>
-              </Button>
               <Tooltip
                 title={
                   stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled
@@ -374,14 +340,6 @@ const Inventory = ({ user }) => {
             resetPage={onPageChange}
             page={page}
             categoryName={category}
-          />
-        )
-      }
-      {
-        openBundleModal && (
-          <CreateBundleModal
-            open={openBundleModal}
-            handleCancel={handleCancelBundleModal}
           />
         )
       }
