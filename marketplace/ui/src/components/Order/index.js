@@ -1,4 +1,5 @@
-import { Tabs, DatePicker, Breadcrumb, Button } from "antd";
+import { Tabs, DatePicker, Breadcrumb, Button, Dropdown, Menu, Space  } from "antd";
+import { DownloadOutlined, DownOutlined } from '@ant-design/icons';
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import SoldOrdersTable from "./SoldOrdersTable";
@@ -14,6 +15,7 @@ import { actions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { useCategoryState, useCategoryDispatch } from "../../contexts/category";
+import startCase from 'lodash/startCase';
 
 const Order = ({ user }) => {
 
@@ -68,14 +70,6 @@ const Order = ({ user }) => {
     return new Date(epochTime * 1000).toLocaleDateString("en-US"); // Adjust date format as needed
   }
   
-  function camelCaseToTitleCase(camelCase) {
-    return camelCase
-      // Insert a space before all caps
-      .replace(/([A-Z])/g, ' $1')
-      // Uppercase the first character
-      .replace(/^./, str => str.toUpperCase());
-  }
-  
   function formatDataObject(dataObject) {
     let formattedObject = {};
     Object.keys(dataObject).forEach(key => {
@@ -85,7 +79,7 @@ const Order = ({ user }) => {
       } else if (key === 'comments') {
         value = decodeURIComponent(value);
       }
-      formattedObject[camelCaseToTitleCase(key)] = value;
+      formattedObject[startCase(key)] = value;
     });
     return formattedObject;
   }
@@ -95,22 +89,19 @@ const Order = ({ user }) => {
       order.assets.map((asset, index) => {
         const { category, subCategory } = getCategoryAndSubcategory(asset.contract_name);
         return formatDataObject({
-          address: order.address,
+          orderNumber: order.orderId,
           category,
           subCategory,
           assetName: asset.name,
-          assetPricePerUnit: asset.salePrice,
+          assetPrice: asset.salePrice,
           quantity: order.quantities[index],
-          salePrice: asset.salePrice * order.quantities[index],
-          orderTotalPrice: order.totalPrice,
-          createdDate: order.createdDate,
-          orderId: order.orderId,
-          purchasersAddress: order.purchasersAddress,
-          purchasersCommonName: order.purchasersCommonName,
+          totalOrderAmount: order.totalPrice,
+          orderDate: order.createdDate,
+          purchaserName: order.purchasersCommonName,
           status: OrderStatus[order.status] || "Unknown",
           comments: order.comments,
-          fulfillmentDate: order.fulfillmentDate,
-          sellersCommonName: order.sellersCommonName,
+          orderFulfillmentDate: order.fulfillmentDate,
+          address: order.address
         });
       })
     );
@@ -120,19 +111,15 @@ const Order = ({ user }) => {
     return transfers.map(order => {
       const { category, subCategory } = getCategoryAndSubcategory(order.contract_name);
       return formatDataObject({
-        address: order.address,
+        orderNumber: order.id,
         category,
         subCategory,
         assetName: order.assetName,
         quantity: order.quantity,
-        createdDate: order.transferDate,
-        orderId: order.id,
-        address: order.address,
-        assetAddress: order.assetAddress,
-        oldOwner: order.oldOwner,
+        transferDate: order.transferDate,
         oldOwnerCommonName: order.oldOwnerCommonName,
-        newOwner: order.newOwner,
-        newOwnerCommonName: order.newOwnerCommonName
+        newOwnerCommonName: order.newOwnerCommonName,
+        address: order.address
       });
     });
   }
@@ -205,6 +192,19 @@ const Order = ({ user }) => {
     for (let i=0; i<s.length; i++) view[i] = s.charCodeAt(i) & 0xFF;
     return buf;
   }
+  
+  const menuItems = [
+    {
+      key: 'xlsx',
+      label: 'Excel',
+      disabled: isAllOrdersLoading,
+    },
+    {
+      key: 'csv',
+      label: 'CSV',
+      disabled: isAllOrdersLoading,
+    },
+  ];
   // --------------------- EXPORT TO EXCEL AND CSV END ---------------------
 
   return (
@@ -232,12 +232,18 @@ const Order = ({ user }) => {
         onChange={onChange}
         tabBarExtraContent={
           <div className="text-xs md:flex items-center orders_page">
-            <Button className="md:hidden customButton" onClick={() => download('xlsx')} disabled={isAllOrdersLoading} loading={isAllOrdersLoading}>Excel</Button>
-            <Button className="md:hidden customButton" onClick={() => download('csv')} disabled={isAllOrdersLoading} loading={isAllOrdersLoading}>CSV</Button>
-
-            <Button className="hidden md:block customButton" onClick={() => download('xlsx')} disabled={isAllOrdersLoading} loading={isAllOrdersLoading}>Export to Excel</Button>
-            <Button className="hidden md:block customButton" onClick={() => download('csv')} disabled={isAllOrdersLoading} loading={isAllOrdersLoading}>Export to CSV</Button>
-
+            <Dropdown
+              className="md:flex hidden"
+              menu={{ items: menuItems, onClick: (e) => download(e.key) }}
+              disabled={isAllOrdersLoading}
+              trigger={['click']}
+            >
+              <Button loading={isAllOrdersLoading}>
+                <Space>
+                  <DownloadOutlined />
+                </Space>
+              </Button>
+            </Dropdown>
 
             <DatePicker
               className="md:flex hidden"
@@ -261,17 +267,17 @@ const Order = ({ user }) => {
           {
             label: <p id="sold-tab" className="font-semibold text-sm md:text-base">Orders (Sold)</p>,
             key: "sold",
-            children: <SoldOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} onDateChange={onDateChange} />
+            children: <SoldOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} onDateChange={onDateChange} download={download} isAllOrdersLoading={isAllOrdersLoading}/>
           },
           {
             label: <p id="bought-tab" className="font-semibold text-sm md:text-base">Orders (Bought)</p>,
             key: "bought",
-            children: <BoughtOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} onDateChange={onDateChange} />
+            children: <BoughtOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} onDateChange={onDateChange} download={download} isAllOrdersLoading={isAllOrdersLoading}/>
           },
           {
             label: <p id="transfers-tab" className="font-semibold text-sm md:text-base">Transfers</p>,
             key: "transfers",
-            children: <TransfersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
+            children: <TransfersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} download={download} isAllOrdersLoading={isAllOrdersLoading}/>
           }
         ]}
       />

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import classNames from "classnames";
-import { EyeOutlined, DownOutlined, UpOutlined, FilterFilled, SearchOutlined } from "@ant-design/icons";
+import { EyeOutlined, DownOutlined, UpOutlined, DownloadOutlined, SearchOutlined } from "@ant-design/icons";
 import routes from "../../helpers/routes";
 import DataTableComponent from "../DataTableComponent";
 import { getStatus, getStatusByName } from "./constant";
@@ -10,7 +10,7 @@ import { actions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import useDebounce from "../UseDebounce";
 import { apiUrl, HTTP_METHODS, US_DATE_FORMAT } from "../../helpers/constants";
-import { Pagination, Button, Radio, Space, Typography, Input, DatePicker } from "antd";
+import { Pagination, Button, Dropdown, Space, Typography, Input, DatePicker } from "antd";
 import TagManager from "react-gtm-module";
 import "./ordersTable.css"
 import { FilterIcon } from "../../images/SVGComponents";
@@ -21,7 +21,7 @@ import RestStatus from "http-status-codes";
 import { Images } from "../../images";
 
 
-const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
+const BoughtOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrdersLoading }) => {
   const navigate = useNavigate();
   const params = useParams();
   const location = useLocation();
@@ -342,6 +342,17 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
     const value = e.target.value;
     setSearch(value)
   }
+  
+  const menuItems = [
+    {
+      key: 'xlsx',
+      label: 'Excel',
+    },
+    {
+      key: 'csv',
+      label: 'CSV',
+    },
+  ];
 
   return (
     <div>
@@ -352,6 +363,18 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
           defaultValue={searchVal}
           prefix={<SearchOutlined />}
           placeholder="Search Bought Orders by Seller or Order #" />
+        <Dropdown
+          className="md:hidden"
+          menu={{ items: menuItems, onClick: (e) => download(e.key) }}
+          disabled={isAllOrdersLoading}
+          trigger={['click']}
+        >
+          <Button loading={isAllOrdersLoading}>
+            <Space>
+              <DownloadOutlined />
+            </Space>
+          </Button>
+        </Dropdown>
         <div className="text-xs flex items-center md:hidden">
           <DatePicker
             disabledDate={(current) => {

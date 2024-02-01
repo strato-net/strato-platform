@@ -3,16 +3,16 @@ import DataTableComponent from "../DataTableComponent";
 import { getStringDate } from "../../helpers/utils";
 import { actions } from "../../contexts/inventory/actions";
 import { US_DATE_FORMAT } from "../../helpers/constants";
-import { Input, Pagination } from "antd";
+import { Input, Pagination, Dropdown, Button, Space } from "antd";
 import "./ordersTable.css"
-import { DownOutlined, SearchOutlined, UpOutlined } from "@ant-design/icons";
+import { DownOutlined, SearchOutlined, UpOutlined, DownloadOutlined } from "@ant-design/icons";
 import { ResponsiveOrderCard } from "./ResponsiveOrdersCard";
 import { ResponsiveTransferOrderCard } from "./ResponsiveTransferOrdersCard";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 
-const TransfersTable = ({ user, selectedDate }) => {
+const TransfersTable = ({ user, selectedDate, download, isAllOrdersLoading }) => {
   const navigate = useNavigate();
   const params = useParams();
   const location = useLocation();
@@ -147,14 +147,39 @@ const TransfersTable = ({ user, selectedDate }) => {
     setSearch(value)
   }
 
+  const menuItems = [
+    {
+      key: 'xlsx',
+      label: 'Excel',
+    },
+    {
+      key: 'csv',
+      label: 'CSV',
+    },
+  ];
+  
   return (
     <div>
-      <Input className="text-base orders_searchbar md:p-3 rounded-full bg-[#F6F6F6]"
-        key={searchVal}
-        onChange={(e) => { handleChangeSearch(e) }}
-        defaultValue={searchVal}
-        prefix={<SearchOutlined />}
-        placeholder="Search Transfers by Buyer or Transfer #" />
+      <div className="flex gap-2 items-center mb-5">
+        <Input className="text-base orders_searchbar md:p-3 rounded-full bg-[#F6F6F6]"
+          key={searchVal}
+          onChange={(e) => { handleChangeSearch(e) }}
+          defaultValue={searchVal}
+          prefix={<SearchOutlined />}
+          placeholder="Search Transfers by Buyer or Transfer #" />
+        <Dropdown
+          className="md:hidden"
+          menu={{ items: menuItems, onClick: (e) => download(e.key) }}
+          disabled={isAllOrdersLoading}
+          trigger={['click']}
+        >
+          <Button loading={isAllOrdersLoading}>
+            <Space>
+              <DownloadOutlined />
+            </Space>
+          </Button>
+        </Dropdown>
+      </div>
       <div className="flex md:hidden order_responsive">
         <ResponsiveTransferOrderCard
           data={data}
