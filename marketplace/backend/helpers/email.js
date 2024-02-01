@@ -11,7 +11,8 @@ async function sendEmail(to, subject, htmlContent) {
     from: { email: "no_reply@blockapps.net", name: "BlockApps.net" },
     subject: subject,
     html: htmlContent,
-    bcc: 'sales@blockapps.net',
+    // Temp rm sales from these emails for testnet testing. This needs to be included for production. 
+    // bcc: 'sales@blockapps.net',
     // attachments: [
     //   {
     //     content: pdf.toString("base64"),

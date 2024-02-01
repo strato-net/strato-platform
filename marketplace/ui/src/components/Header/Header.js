@@ -121,7 +121,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
             {user == null ? "" : user.commonName}
           </p>
           <p className="text-xs">
-            {user == null ? "" : user.preferred_username}
+            {user == null ? "" : user.email}
           </p>
         </div>
       ),
