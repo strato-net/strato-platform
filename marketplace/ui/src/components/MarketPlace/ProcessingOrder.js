@@ -56,11 +56,11 @@ const ProcessingOrder = ({user}) => {
 
   useEffect(() => {
     // getCartData();
-    if (sessionId !== undefined) {
+    if (sessionId !== undefined && user !== undefined) {
       getCartData();
     }
 
-  }, [sessionId])
+  }, [sessionId, user])
 
 
   const getCartData = async () => {
