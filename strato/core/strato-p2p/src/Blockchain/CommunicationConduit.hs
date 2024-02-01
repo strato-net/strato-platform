@@ -69,6 +69,7 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8)
 import Data.Void
+import qualified GHC.Conc as CONC
 import Ki.Unlifted hiding (await)
 import Text.Printf
 import UnliftIO.Concurrent hiding (yield)
@@ -174,6 +175,8 @@ handleMsgClientConduit ::
   PPeer ->
   ConduitM Event (Either P2PCNC Message) m ()
 handleMsgClientConduit myId peer = do
+  threadId <- liftIO $ CONC.myThreadId
+  liftIO $ CONC.labelThread threadId $ "message handler: " ++ T.unpack (pPeerIp peer)
   $logDebugS "handleMsgClientConduit" $ T.pack $ "<waving hand emoji>"
   yield $
     Right

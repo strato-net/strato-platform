@@ -20,7 +20,10 @@ import Blockchain.Data.Wire
 import Control.Monad.IO.Class
 import Data.Aeson
 import Data.Data
+import Data.Maybe
 import qualified Data.Text as T
+import GHC.Conc
+import GHC.Conc.Sync
 import GHC.Generics
 import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Prometheus
@@ -71,19 +74,21 @@ checkOutbound msg = do
       _ -> allow
 
 type P2PAPI =
-  "participation_mode" :> Get '[JSON] ParticipationMode
+    "threads" :> Get '[JSON] [String]
+    :<|> "participation_mode" :> Get '[JSON] ParticipationMode
     :<|> "participation_mode" :> ReqBody '[JSON] ParticipationMode :> Post '[JSON] ParticipationMode
 
 p2pServer :: Server P2PAPI
 p2pServer =
-  getParticipationMode
+    getThreads
+    :<|> getParticipationMode
     :<|> \m -> setParticipationMode m >> getParticipationMode
 
 p2pApp :: Application
 p2pApp = serve (Proxy :: Proxy P2PAPI) p2pServer
 
 postParticipationMode :: ParticipationMode -> ClientM ParticipationMode
-_ :<|> postParticipationMode = client (Proxy @P2PAPI)
+_ :<|> _ :<|> postParticipationMode = client (Proxy @P2PAPI)
 
 remoteSetParticipationMode :: ParticipationMode -> IO ()
 remoteSetParticipationMode mode = do
@@ -91,3 +96,17 @@ remoteSetParticipationMode mode = do
   let url = BaseUrl Http "localhost" 10248 ""
   eRes <- runClientM (postParticipationMode mode) $ mkClientEnv mgr url
   either (die . show) (printf "Participation mode set to: %s\n" . show) eRes
+
+formatThread :: MonadIO m =>
+                ThreadId -> m String
+formatThread threadId = do
+  maybeLabel <- liftIO $ threadLabel threadId
+  return $ "(" ++ show threadId ++ ") " ++ fromMaybe "" maybeLabel
+  
+
+getThreads :: Handler [String]
+getThreads = do
+  threadId <- liftIO $ myThreadId
+  liftIO $ labelThread threadId "p2p API"
+  threads <- liftIO listThreads
+  sequence $ map formatThread threads
