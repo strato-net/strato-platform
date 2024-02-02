@@ -133,11 +133,11 @@ const Order = ({ user }) => {
       XLSX.utils.book_append_sheet(wb, wsTransferred, 'Transfers');
     
       // Write the workbook to a binary string
-      const wbout = XLSX.write(wb, {bookType: 'xlsx', type: 'binary'});
+      const wbout = XLSX.write(wb, {bookType: 'xls', type: 'binary'});
     
       // Convert the binary string to a Blob and save it
-      const blob = new Blob([s2ab(wbout)], {type: 'application/octet-stream'});
-      saveAs(blob, 'Mercata-Marketplace-Order-History.xlsx');
+      const blob = new Blob([s2ab(wbout)], {type: 'application/vnd.ms-excel'});
+      saveAs(blob, 'Mercata-Marketplace-Order-History.xls');
       setCallExcel(false);
       setCallCSV(false);
     }
@@ -167,7 +167,7 @@ const Order = ({ user }) => {
       await actions.fetchAllOrders(
         dispatch
       );
-      if (format === 'xlsx'){
+      if (format === 'xls'){
         setCallExcel(true);
         setCallCSV(false);
       } 
@@ -189,7 +189,7 @@ const Order = ({ user }) => {
   
   const menuItems = [
     {
-      key: 'xlsx',
+      key: 'xls',
       label: 'Excel',
       disabled: isAllOrdersLoading,
     },

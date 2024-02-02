@@ -149,7 +149,7 @@ const TransfersTable = ({ user, selectedDate, download, isAllOrdersLoading }) =>
 
   const menuItems = [
     {
-      key: 'xlsx',
+      key: 'xls',
       label: 'Excel',
     },
     {

@@ -339,7 +339,7 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrde
 
   const menuItems = [
     {
-      key: 'xlsx',
+      key: 'xls',
       label: 'Excel',
     },
     {

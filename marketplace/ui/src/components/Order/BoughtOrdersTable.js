@@ -345,7 +345,7 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOr
   
   const menuItems = [
     {
-      key: 'xlsx',
+      key: 'xls',
       label: 'Excel',
     },
     {
