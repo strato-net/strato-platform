@@ -121,6 +121,9 @@ fromList = StoragePath
 size :: StoragePath -> Int
 size (StoragePath p) = length p
 
+last :: StoragePath -> StoragePathPiece
+last (StoragePath p) = Prelude.last p
+
 type StorageDelta = [(StoragePath, BasicValue)]
 
 parseInteger :: Parser Integer
