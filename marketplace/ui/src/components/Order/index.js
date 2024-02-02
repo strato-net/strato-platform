@@ -137,7 +137,7 @@ const Order = ({ user }) => {
     
       // Convert the binary string to a Blob and save it
       const blob = new Blob([s2ab(wbout)], {type: 'application/octet-stream'});
-      saveAs(blob, 'mercata-orders.xlsx');
+      saveAs(blob, 'Mercata-Marketplace-Order-History.xlsx');
       setCallExcel(false);
       setCallCSV(false);
     }
@@ -156,7 +156,7 @@ const Order = ({ user }) => {
 
       const wbout = XLSX.write(wb, {bookType: 'csv', type: 'binary'});
       const blob = new Blob([s2ab(wbout)], {type: 'text/csv'});
-      saveAs(blob, 'mercata-orders.csv');
+      saveAs(blob, 'Mercata-Marketplace-Order-History.csv');
       setCallCSV(false);
       setCallExcel(false);
     }
