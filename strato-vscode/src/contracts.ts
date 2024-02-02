@@ -5,6 +5,8 @@ import { getApplicationUser } from './auth';
 import getConfig from './load.config';
 
 export class ContractsProvider implements vscode.TreeDataProvider<ContractTreeItem> {
+  private selectedContractAddresses: string[] = [];
+
   constructor() {}
 
   getTreeItem(element: ContractTreeItem): ContractTreeItem {
@@ -15,44 +17,30 @@ export class ContractsProvider implements vscode.TreeDataProvider<ContractTreeIt
     if (element) {
       switch(element.itemType) {
         case 'node': {
-          // no more private chains :(
-          const contracts = await this.getContracts(null, element.nodeId); 
-          const compareFn = (a,b) => {
-            if (!a.id) return -1;
-            if (!b.id) return 1;
-            return a.info.label.localeCompare(b.info.label)
-          }
-          const items = Object.entries(contracts).sort(compareFn).map((e) => new ContractTreeItem('contractName', {contractName: e[0], chainId: null, contracts: e[1], label: `${e[0]}`, tooltip: `${e[0]}`}, element.nodeId, vscode.TreeItemCollapsibleState.Collapsed));
-          return Promise.resolve(items);
-        }
-        case 'contractName': {
-          const { contractName, chainId, contracts } = element.item
-          const items = contracts.map((e) => new ContractTreeItem('address', {contractName, contractAddress: e.address, chainId, label: `📝 ${e.address}`, tooltip: `${e.address}`}, element.nodeId, vscode.TreeItemCollapsibleState.Collapsed));
-          return Promise.resolve(items);
+            const results = await Promise.all(this.selectedContractAddresses.map(async (c) => { return this.searchContracts(c) }))
+            const items = results.map((e, i) => new ContractTreeItem('address', {chainId: null, contractName: e._contractName, contractAddress: this.selectedContractAddresses[i], label: `${this.selectedContractAddresses[i]}`, tooltip: `${e._contractName}`}, vscode.TreeItemCollapsibleState.Collapsed));
+            return Promise.resolve(items)
         }
         case 'address': {
           const { contractName, chainId, contractAddress } = element.item
-          const state = await this.getContractState(element.item.contractName, element.item.contractAddress, element.item.chainId, element.nodeId);
-          const items = Object.entries(state).map((e) => new ContractTreeItem('stateItem', {label: `${e[0]}`, description: `${e[1]}`, tooltip: `${e[0]}: ${e[1]}`, contractName, chainId, contractAddress, variableName: e[0]}, element.nodeId, vscode.TreeItemCollapsibleState.None));
+          const state = await this.getContractState(contractName, contractAddress, chainId, null);
+          console.debug(state)
+          const items = Object.entries(state).map((e) => new ContractTreeItem('stateItem', {label: `${e[0]}`, description: `${e[1]}`, tooltip: `${e[0]}: ${e[1]}`, contractName, chainId, contractAddress, variableName: e[0]}, vscode.TreeItemCollapsibleState.None));
           return Promise.resolve(items);
         }
       }
       return Promise.resolve([]);
     } else {
-      const items = this.getNodes();
+      const items = this.getSelectedContracts();
       return Promise.resolve(items);
     }
   }
 
-  async searchContracts(name) {
+  async searchContracts(address) {
     const config = getConfig() || {}
     const options = { config, node: 0 };
     const appUser = await getApplicationUser()
-    const query = {
-      name,
-      limit: 10000
-    }
-    const results = await rest.search(appUser, { name }, { ...options, query })
+    const results = await rest.getContractsDetails(appUser, { address }, { ...options })
     return results
   }
 
@@ -79,17 +67,14 @@ export class ContractsProvider implements vscode.TreeDataProvider<ContractTreeIt
     return results
   }
 
-  private async getNodes() {
-    const config = getConfig() || {}
-    const nodes = config.nodes || []
-    const toDep = (dep: any): ContractTreeItem => {
-      const prefixedLabel = `🖥️ ${dep.label ? dep.label : dep.url}`;
-      return new ContractTreeItem( 'node',
-        { ...dep, label: prefixedLabel, tooltip: dep.url },
-        dep.id, vscode.TreeItemCollapsibleState.Collapsed
-      );
-    };
-    return nodes.map((a: any) => toDep(a));
+  async addContract(address) {
+    this.selectedContractAddresses.push(address)
+    this.refresh()
+  }
+
+  private async getSelectedContracts() {
+    const results = await Promise.all(this.selectedContractAddresses.map(async (c) => { return this.searchContracts(c) }))
+    return results.map((e, i) => new ContractTreeItem('address', {chainId: null, contractName: e._contractName, contractAddress: this.selectedContractAddresses[i], label: `${this.selectedContractAddresses[i]}`, tooltip: `${e._contractName}`}, vscode.TreeItemCollapsibleState.Collapsed));
   }
 
   private _onDidChangeTreeData: vscode.EventEmitter<
@@ -109,18 +94,15 @@ export class ContractsProvider implements vscode.TreeDataProvider<ContractTreeIt
 class ContractTreeItem extends vscode.TreeItem {
   itemType: 'node' | 'chainId' | 'contractName' | 'address' | 'stateItem';
   item: any;
-  nodeId: number;
   constructor(
     public readonly _itemType: 'node' | 'chainId' | 'contractName' | 'address' | 'stateItem',
     public readonly _item: any,
-    public readonly _nodeId: number,
     public readonly collapsibleState: vscode.TreeItemCollapsibleState,
 		public readonly command?: vscode.Command
   ) {
     super(_item.label, collapsibleState);
     this.itemType = _itemType;
     this.item = _item;
-    this.nodeId = _nodeId;
     this.tooltip = this.item.tooltip;
     this.description = this.item.description;
     if ( _itemType === 'stateItem'

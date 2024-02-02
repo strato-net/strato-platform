@@ -43,14 +43,25 @@ export async function activate(context: vscode.ExtensionContext) {
 		applicationUserLogin(context, user, password)
     });
 
+	// Register the contracts provider for the sidebar
+	const contractsProvider = new ContractsProvider();
+	vscode.commands.registerCommand('contracts.refreshEntry', async () => contractsProvider.refresh());
+	vscode.commands.registerCommand('contracts.searchContract', async () => {
+		const argInput = await vscode.window.showInputBox({
+			placeHolder: 'ex: Certificate',
+			prompt: `Search for a contract by name`
+		});
+		if (!argInput) return;
+		contractsProvider.searchContracts(argInput);
+	})
+
+	vscode.window.registerTreeDataProvider('contracts', contractsProvider)
 	// Uploads a contract to the targetted node
 	vscode.commands.registerCommand('contracts.uploadContract', async (element) => {
-		const { nodeId, item } = element;
-		const { chainId } = item;
 		const tokens = await getAccessTokenSecrets(context);
-		const user = await getApplicationUser(nodeId, tokens);
+		const user = await getApplicationUser(0, tokens);
 		const config = getConfig() || {};
-		const nodeOptions = { config, node: nodeId };
+		const nodeOptions = { config, node: 0};
 		if (vscode.window.activeTextEditor) {
 			const doc = vscode.window.activeTextEditor.document;
 			if (doc.uri.path.slice(-4) === '.sol') {
@@ -93,10 +104,11 @@ export async function activate(context: vscode.ExtensionContext) {
 						source: await importer.combine(doc.uri.path),
 						args,
 						name: contractName,
-						chainid: chainId,
+						chainid: null,
 					}
 					const res = await rest.createContract(user, uploadArgs, nodeOptions);
 					vscode.window.showInformationMessage(`Contract ${contractName} created at address: ${res.address}`);
+					contractsProvider.addContract(res.address)
 				} catch (e) {
 					vscode.window.showErrorMessage(`${e}`);
 				}
@@ -116,20 +128,19 @@ export async function activate(context: vscode.ExtensionContext) {
 		const tokens = await getAccessTokenSecrets(context);
 		const user = await getApplicationUser(nodeId, tokens);
 		const config = getConfig() || {}
-		const nodeOptions = { config, node: nodeId };
+		const nodeOptions = { config, node: nodeId || 0 };
 		const val = await rest.getContractsContract(user, contractName, contractAddress, chainId, nodeOptions);
-		const { xabi } = val;
-		const func = ((xabi || {}).funcs || {})[variableName]
+		const func = ((val || {})._functions || {})[variableName]
 		if (variableName && variableName !== 'constructor' && func) {
-			const argNames = Object.keys(func.args || {});
+			const argNames = func._funcArgs || []
 			let args = {}
 			for (let i = 0; i < argNames.length; i++) {
 				const argInput = await vscode.window.showInputBox({
 					placeHolder: '',
-					prompt: `Enter a value for ${argNames[i]}: `
+					prompt: `Enter a value for ${argNames[i][0]}: `
 				});
 				if (!argInput) return;
-				args = { ...args, [argNames[i]]: argInput }
+				args = { ...args, [argNames[i][0]]: argInput }
 			}
 			try {
 				const contract = { name: contractName, address: contractAddress }
@@ -141,6 +152,7 @@ export async function activate(context: vscode.ExtensionContext) {
 				}
 				const res = await rest.call(user, callArgs, nodeOptions);
 				vscode.window.showInformationMessage(`${res}`);
+				contractsProvider.refresh()
 			} catch (e) {
 				vscode.window.showErrorMessage(`${e}`);
 			}
@@ -150,18 +162,6 @@ export async function activate(context: vscode.ExtensionContext) {
 	});
 
 
-	// Register the contracts provider for the sidebar
-	const contractsProvider = new ContractsProvider();
-	vscode.commands.registerCommand('contracts.refreshEntry', async () => contractsProvider.refresh());
-	vscode.commands.registerCommand('contracts.searchContract', async () => {
-		const argInput = await vscode.window.showInputBox({
-			placeHolder: 'ex: Certificate',
-			prompt: `Search for a contract by name`
-		});
-		if (!argInput) return;
-		contractsProvider.searchContracts(argInput);
-	})
-	vscode.window.registerTreeDataProvider('contracts', contractsProvider)
 
 	// Register the Cirrus provider
 	const cirrusProvider = new CirrusProvider();

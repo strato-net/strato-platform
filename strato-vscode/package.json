@@ -183,6 +183,11 @@
 					"group": "navigation"
 				},
 				{
+					"command": "contracts.uploadContract",
+					"when": "view == contracts",
+					"group": "navigation"
+				},
+				{
 					"command": "cirrus.queryCirrus",
 					"when": "view == cirrus",
 					"group": "navigation"
@@ -204,11 +209,6 @@
 				}
 			],
 			"view/item/context": [
-				{
-					"command": "contracts.uploadContract",
-					"when": "view == contracts && viewItem == node",
-					"group": "inline"
-				},
 				{
 					"command": "contracts.callFunction",
 					"when": "view == contracts && viewItem == function",
