@@ -416,7 +416,7 @@ const CreateInventoryModal = ({
             </div>
           </Form>
           :
-          <CreateGroupForm />
+          <CreateGroupForm handleCancel={handleCancel} />
         }
       </Modal>
       {uploadErr && openToast("bottom")}

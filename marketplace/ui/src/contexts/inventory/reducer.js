@@ -288,6 +288,23 @@ const reducer = (state, action) => {
         error: action.error,
         isCreateInventorySubmitting: false,
       }
+    case actionDescriptors.createAssetGroup:
+      return {
+        ...state,
+        isCreatingAssetGroup: true
+      };
+    case actionDescriptors.createAssetGroupSuccessful:
+      return {
+        ...state,
+        assetGroup: action.payload,
+        isCreatingAssetGroup: false
+      };
+    case actionDescriptors.createAssetGroupFailed:
+      return {
+        ...state,
+        error: action.error,
+        isCreatingAssetGroup: false
+      };
     default:
       throw new Error(`Unhandled action: '${action.type}'`);
   }

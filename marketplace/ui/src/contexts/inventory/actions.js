@@ -52,6 +52,9 @@ const actionDescriptors = {
   createItem: "create_item",
   createItemSuccessful: "create_item_successful",
   createItemFailed: "create_item_failed",
+  createAssetGroup: "create_asset_group",
+  createAssetGroupSuccessful: "create_asset_group_successful",
+  createAssetGroupFailed: "create_asset_group_failed",
 };
 
 const actions = {
@@ -555,7 +558,7 @@ const actions = {
         }
       }
       let url = `${apiUrl}/inventory/transfers/items?limit=${limit}&order=transferDate.${order}&offset=${offset}&or=(oldOwnerCommonName.eq.${ownerCommonName},newOwnerCommonName.eq.${ownerCommonName})${search ? searchQuery : ''}${date ? range : ''}`
-     
+
       const response = await fetch(url, {
         method: HTTP_METHODS.GET,
 
@@ -850,7 +853,61 @@ const actions = {
       });
       actions.setMessage(dispatch, "Error while creating Item");
     }
-  }
+  },
+
+  createAssetGroup: async (dispatch, payload) => {
+    dispatch({ type: actionDescriptors.createAssetGroup });
+
+    try {
+      const response = await fetch(`${apiUrl}/assetGroup`, {
+        method: HTTP_METHODS.POST,
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.createAssetGroupSuccessful,
+          payload: body.data,
+        });
+        actions.setMessage(dispatch, "Asset Group created successfully", true);
+        return true;
+      } else if (response.status === RestStatus.CONFLICT) {
+        dispatch({ type: actionDescriptors.createAssetGroupFailed, error: body.error.message });
+        actions.setMessage(dispatch, "Error while creating Asset Group");
+        return false;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({ type: actionDescriptors.createAssetGroupFailed, error: "Error while creating Asset Group" });
+        actions.setMessage(dispatch, "Error while creating Asset Group")
+        return false;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.createAssetGroupFailed,
+          error: "Unauthorized while creating Asset Group"
+        });
+        window.location.href = body.error.loginUrl;
+      }
+
+      dispatch({
+        type: actionDescriptors.createAssetGroupFailed,
+        error: body.error
+      });
+      actions.setMessage(dispatch, "Error while creating Asset Group");
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.createAssetGroupFailed,
+        error: "Error while creating Asset Group",
+      });
+      actions.setMessage(dispatch, "Error while creating Asset Group");
+    }
+  },
 
 };
 

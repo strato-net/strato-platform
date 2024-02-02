@@ -7,6 +7,7 @@ import category from './Category'
 import subCategory from './SubCategory'
 import product from './Product'
 import inventory from './Inventory'
+import assetGroup from './AssetGroup'
 import item from './Item'
 import art from './Art'
 import carbonOffset from './CarbonOffset'
@@ -32,6 +33,7 @@ import {
   SubCategory,
   Product,
   Inventory,
+  AssetGroup,
   Item,
   Art,
   CarbonOffset,
@@ -58,6 +60,7 @@ router.use(Category.prefix, category)
 router.use(SubCategory.prefix, subCategory)
 router.use(Product.prefix, product)
 router.use(Inventory.prefix, inventory)
+router.use(AssetGroup.prefix, assetGroup)
 router.use(Item.prefix, item)
 router.use(Art.prefix, art)
 router.use(CarbonOffset.prefix, carbonOffset)

@@ -57,6 +57,13 @@ export const Inventory = {
   // audit: '/:address/:chainId/audit',
 }
 
+export const AssetGroup = {
+  prefix: '/assetGroup',
+  get: '/:address',
+  getAll: '/',
+  create: '/',
+}
+
 export const Item = {
   prefix: '/item',
   ownershipHistory: '/ownership/:address',
