@@ -29,7 +29,6 @@ import Blockchain.Strato.Model.Secp256k1
 import Blockchain.TCPClientWithTimeout
 import Conduit
 import Control.Lens ((^.))
-import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Trans.Resource
 import qualified Data.ByteString as B
@@ -60,7 +59,7 @@ ethServerHandler ::
 ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
   let peerStr = T.unpack i
   ender <- toIO . $logInfoS "runEthServer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow peerStr
-  void $ register ender
+  reg   <- register ender
   getPeerByIP ipAsText >>= \case
     Nothing -> do
       $logErrorS "runEthServer" . T.pack $ "Didn't see peer in discovery at IP " ++ peerStr ++ ". rejecting violently."
@@ -72,7 +71,8 @@ ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
             attempt <- withCertifiedPeer p . withActivePeer p . scoped $
                          runEthServerConduit p pSource pSink seqSrc peerStr
             case attempt of
-              Nothing  -> $logDebugS "runEthServer" "Peer ran successfully!"
+              Nothing  -> do _ <- $logDebugS "runEthServer" "Peer ran successfully!"
+                             release reg
               Just err -> do
                 $logErrorS "runEthServer" . T.pack $ "Peer did not run successfully: " ++ show err
                 _ <- case err of
@@ -122,6 +122,7 @@ ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
                         lengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) p
                       _ -> return $ Right ()
                   _ -> return $ Right ()
+                release reg
                 throwIO err
 
 runEthServerConduit ::

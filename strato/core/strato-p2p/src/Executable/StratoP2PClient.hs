@@ -60,7 +60,7 @@ runPeer ::
   m ()
 runPeer peer sSource = do
   ender <- toIO . $logInfoS "runPeer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
-  void $ register ender
+  reg   <- register ender
   myPublic <- getPub
   otherPubKey <- case (pPeerPubkey peer) of
     Nothing -> do
@@ -72,6 +72,7 @@ runPeer peer sSource = do
           return pub
         Left e -> do
           $logErrorS "getPubKeyRunPeer" $ T.pack $ "Error, couldn't get public key for peer: " ++ show e
+          release reg
           throwIO NoPeerPubKey
     Just pub -> return pub
 
@@ -91,8 +92,10 @@ runPeer peer sSource = do
             (c ^. seqSource)
             pStr
       case attempt of
-        Nothing  -> $logDebugS "runPeer" "Peer ran successfully!"
+        Nothing  -> do $logDebugS "runPeer" "Peer ran successfully!"
+                       release reg
         Just err -> do $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err
+                       release reg
                        throwIO err
 
 runEthClientConduit ::
