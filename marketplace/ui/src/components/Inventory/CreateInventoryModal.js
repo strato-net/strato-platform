@@ -182,7 +182,7 @@ const CreateInventoryModal = ({
 
   const updateSizeOptions = (type) => {
     if (type === "Shoes") {
-      setSizeOptions(["5", "5.5", "6", "6.5", "7", "7.5", "8", "8.5", "9", "9.5", "10", "10.5", "11", "11.5", "12", "12.5", "13", "13.5", "14",]);
+      setSizeOptions(["3.5", "4", "4.5", "5", "5.5", "6", "6.5", "7", "7.5", "8", "8.5", "9", "9.5", "10", "10.5", "11", "11.5", "12", "12.5", "13", "13.5", "14", "14.5", "15", "16", "17", "18"]);
     } else {
       setSizeOptions(["XXS", "XS", "S", "M", "L", "XL", "XXL"]);
     }
@@ -190,6 +190,19 @@ const CreateInventoryModal = ({
 
   const changeDisplayType = (e) => {
     setDisplayType(e.target.value);
+  }
+
+  const handleCategory = (value) => {
+    form.setFieldValue("category", value);
+    setCategoryValue(value);
+    if (value === 'Carbon') {
+      form.setFieldValue("subCategory", null);
+      setSubCategoryValue(null);
+    } else {
+      const subCat = categorys.find(item => item.name === value).subCategories[0].name
+      form.setFieldValue("subCategory", subCat);
+      setSubCategoryValue(subCat);
+    }
   }
 
   return (
@@ -289,10 +302,7 @@ const CreateInventoryModal = ({
                     allowClear
                     value={categoryValue}
                     onChange={(value) => {
-                      form.setFieldValue("category", value);
-                      setCategoryValue(value);
-                      form.setFieldValue("subCategory", null);
-                      setSubCategoryValue(null);
+                      handleCategory(value)
                     }}
                   >
                     {categorys.map((e, index) => (
