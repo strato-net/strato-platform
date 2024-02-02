@@ -65,7 +65,7 @@ class AssetGroupController {
         assetAddress: Joi.string().required(),
         assetQuantity: Joi.number().integer().greater(0).required()
       })).required(),
-      groupName: Joi.string().required(),
+      name: Joi.string().required(),
       description: Joi.string().required(),
       groupPrice: Joi.number().integer().greater(0).required(),
       images: Joi.array().items(Joi.string().allow(null)).required(),

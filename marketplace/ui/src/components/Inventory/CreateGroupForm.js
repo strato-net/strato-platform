@@ -164,7 +164,7 @@ const CreateGroupForm = ({ handleCancel }) => {
                     firstQuantity: 1,
                     secondQuantity: 1,
                     assets: [],
-                    groupName: "",
+                    name: "",
                     groupPrice: 1,
                     description: "",
                     images: [],
@@ -174,7 +174,7 @@ const CreateGroupForm = ({ handleCancel }) => {
                 <div className='grid grid-cols-1 md:grid-cols-2 gap-4 mt-4'>
                     <Form.Item
                         label="Group Name"
-                        name="groupName"
+                        name="name"
                         rules={[
                             {
                                 required: true,

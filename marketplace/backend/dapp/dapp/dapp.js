@@ -264,11 +264,23 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.createAssetGroup = async function (args, options = defaultOptions) {
     const createdDate = Math.floor(Date.now() / 1000);
+    const { assets, groupPrice, ...restArgs } = args;
+    
+    const assetAddresses = assets.map(asset => {
+      return asset.assetAddress;
+    })
+    const assetQuantities = assets.map(asset => {
+      return asset.assetQuantity;
+    })
+
     const newArgs = {
-      ...args.itemArgs,
+      ...restArgs,
+      assetAddresses,
+      assetQuantities,
       createdDate,
       owner: rawAdmin.address,
     };
+
     return assetGroupJs.uploadContract(rawAdmin, newArgs, options);
   };
 
