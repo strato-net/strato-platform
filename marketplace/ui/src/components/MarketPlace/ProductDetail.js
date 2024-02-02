@@ -238,6 +238,36 @@ const ProductDetails = ({ user, users }) => {
     },
   ];
 
+  const assetGroupColumns = [
+    {
+      title: "",
+      dataIndex: "images",
+      key: "images",
+      render: (text) => <img className="w-[75px] h-[60px] object-contain" alt="" src={text} />,
+    },
+    {
+      title: <Text className="text-primaryC text-[13px]">Product Name</Text>,
+      render: (text) => (
+        <p
+          className="text-primary text-[17px] cursor-pointer"
+          onClick={() => {
+            console.log(text)
+            navigate(`${routes.MarketplaceProductDetail.url.replace(":address", text.address)}`)
+          }}
+        >
+          {decodeURIComponent(text.name)}
+        </p>
+      ),
+    },
+    {
+      title: <Text className="text-primaryC text-[13px]">Quantity</Text>,
+      dataIndex: "groupQuantity",
+      key: "groupQuantity",
+      align: "center",
+      render: (text) => <p>{text}</p>,
+    },
+  ];
+
   const getCategory = (data) => {
     const parts = data.contract_name.split('-');
     return parts[parts.length - 1];
@@ -326,7 +356,7 @@ const ProductDetails = ({ user, users }) => {
                     <div
                       onClick={subtract}
                       className={`h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer ${qty > 1 ? '' : 'cursor-not-allowed opacity-50'}`}>
-                      <p className=" text-2xl md:text-3xl lg:text-4xl font-semibold lg:text-[#202020] text-[#989898]">-</p> 
+                      <p className=" text-2xl md:text-3xl lg:text-4xl font-semibold lg:text-[#202020] text-[#989898]">-</p>
                     </div>
                     <InputNumber className="w-full md:w-[280px] h-9 md:h-10 lg:h-[46px] border text-[#6A6A6A] border-[#00000029] text-center flex flex-col justify-center font-semibold !rounded-lg" min={1} max={availableQuantity} value={`${qty}`} defaultValue={`${qty}`} controls={false}
                       onChange={e => {
@@ -339,7 +369,7 @@ const ProductDetails = ({ user, users }) => {
                     <div
                       onClick={add}
                       className={`h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer ${qty < availableQuantity ? '' : 'cursor-not-allowed opacity-50'}`}>
-                       <p className="text-2xl md:text-3xl lg:text-4xl font-semibold lg:text-[#202020] text-[#989898]">+</p> 
+                      <p className="text-2xl md:text-3xl lg:text-4xl font-semibold lg:text-[#202020] text-[#989898]">+</p>
                     </div>
                   </div>
 
@@ -492,74 +522,88 @@ const ProductDetails = ({ user, users }) => {
                 defaultActiveKey="0"
                 items={
                   [
-                  {
-                    label: <span className="text-sm md:text-base">Description</span>,
-                    key: "0",
-                    children: (
-                      <div>
-                        <Paragraph
-                          className="text-[#202020] text-sm"
-                        >
-                          {details?.description?.split('\n').map((line, index) => (
-                            <React.Fragment key={index}>
-                              {line}
-                              <br />
-                            </React.Fragment>
-                          ))}
-                        </Paragraph>
-                      </div>
-                    ),
-                  }
-                  ,{
-                    label: <span className="text-sm md:text-base">Details</span>,
-                    key: "1",
-                    children: (
-                      <div>
-                        <ProductItemDetails
-                          categoryName={getCategory(details)}
-                          itemData={itemData}
-                        />
-                      </div>
-                    ),
-                  },
-                  user && { //if user is logged in then display Ownership History
-                    label: <span className="text-sm md:text-base">Ownership History</span>,
-                    key: "2",
-                    children: (
-                      <div>
-                        <DataTableComponent
-                          columns={ownershipDetailColumn}
-                          scrollX="100%"
-                          data={inventoryOwnershipHistory}
-                          isLoading={isInventoryOwnershipHistoryLoading}
-                          pagination={{
-                            defaultPageSize: 10,
-                            position: ["bottomCenter"],
-                            showSizeChanger: false,
-                          }}
-                        />
-                      </div>
-                    ),
-                  },
-                  {
-                    label: <span className="text-sm md:text-base">Additional Information</span>,
-                    key: "3",
-                    children: (
-                      <div>
-                        <List
-                          size="small"
-                          boardered
-                          dataSource={!details.files ? [] : details.files}
-                          renderItem={(item) =>
-                            <List.Item>
-                              <a href={item} rel="noreferrer" target="_blank" className="hover:underline break-all text-[#1e40af]">
-                                {item}
-                              </a>
-                            </List.Item>}
-                        />
-                      </div>
-                    )
-                  },
+                    {
+                      label: <span className="text-sm md:text-base">Description</span>,
+                      key: "0",
+                      children: (
+                        <div>
+                          <Paragraph
+                            className="text-[#202020] text-sm"
+                          >
+                            {details?.description?.split('\n').map((line, index) => (
+                              <React.Fragment key={index}>
+                                {line}
+                                <br />
+                              </React.Fragment>
+                            ))}
+                          </Paragraph>
+                        </div>
+                      ),
+                    }
+                    , {
+                      label: <span className="text-sm md:text-base">Details</span>,
+                      key: "1",
+                      children: (
+                        <div>
+                          <ProductItemDetails
+                            categoryName={getCategory(details)}
+                            itemData={itemData}
+                          />
+                        </div>
+                      ),
+                    },
+                    user && { //if user is logged in then display Ownership History
+                      label: <span className="text-sm md:text-base">Ownership History</span>,
+                      key: "2",
+                      children: (
+                        <div>
+                          <DataTableComponent
+                            columns={ownershipDetailColumn}
+                            scrollX="100%"
+                            data={inventoryOwnershipHistory}
+                            isLoading={isInventoryOwnershipHistoryLoading}
+                            pagination={{
+                              defaultPageSize: 10,
+                              position: ["bottomCenter"],
+                              showSizeChanger: false,
+                            }}
+                          />
+                        </div>
+                      ),
+                    },
+                    {
+                      label: <span className="text-sm md:text-base">Additional Information</span>,
+                      key: "3",
+                      children: (
+                        <div>
+                          <List
+                            size="small"
+                            boardered
+                            dataSource={!details.files ? [] : details.files}
+                            renderItem={(item) =>
+                              <List.Item>
+                                <a href={item} rel="noreferrer" target="_blank" className="hover:underline break-all text-[#1e40af]">
+                                  {item}
+                                </a>
+                              </List.Item>}
+                          />
+                        </div>
+                      )
+                    },
+                    details.assets && {
+                      label: <span className="text-sm md:text-base">Assets</span>,
+                      key: "4",
+                      children: (
+                        <div>
+                          <DataTableComponent
+                            columns={assetGroupColumns}
+                            data={details.assets}
+                            scrollX="100%"
+                            isLoading={false}
+                          />
+                        </div>
+                      ),
+                    },
                   ]}
               />
             </div>

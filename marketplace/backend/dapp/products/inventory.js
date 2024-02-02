@@ -67,17 +67,17 @@ async function uploadSaleContract(user, _constructorArgs, options) {
 
     const contract = await rest.createContract(user, contractArgs, copyOfOptions);
     contract.src = 'removed';
-    
+
     const searchOptions = {
         ...options,
         org: constants.blockAppsOrg,
         query: {
             address: `eq.${contract.address}`
         }
-      }
-      
-    await waitForAddress(user, {name: saleContract}, searchOptions);
-    
+    }
+
+    await waitForAddress(user, { name: saleContract }, searchOptions);
+
     return contract;
 }
 
@@ -193,7 +193,7 @@ async function unlistItem(user, _contract, args, options) {
             { callArgs }
         );
     }
-    
+
     const searchOptions = {
         ...options,
         org: constants.blockAppsOrg,
@@ -201,10 +201,10 @@ async function unlistItem(user, _contract, args, options) {
             address: `eq.${callArgs.contract.address}`,
             isOpen: `eq.false`
         }
-      }
-      
-    await waitForAddress(user, {name: saleContract}, searchOptions);
-    
+    }
+
+    await waitForAddress(user, { name: saleContract }, searchOptions);
+
     return unlistStatus;
 }
 
@@ -214,7 +214,7 @@ async function resellItem(user, contract, args, options) {
         method: "mintNewUnits",
         args: util.usc({ ...args }),
     };
-    
+
     const resellStatus = await rest.call(user, callArgs, options);
 
     if (parseInt(resellStatus, 10) !== RestStatus.OK) {
@@ -224,7 +224,7 @@ async function resellItem(user, contract, args, options) {
             { callArgs }
         );
     }
-    
+
     return resellStatus;
 }
 
@@ -243,16 +243,16 @@ async function transferItem(user, contract, args, options) {
             { callArgs }
         );
     }
-    
+
     const searchOptions = {
         ...options,
         org: constants.blockAppsOrg,
         query: {
             address: `eq.${callArgs.contract.address}`
         }
-      }
-      
-    await waitForAddress(user, {name: transferContractName}, searchOptions);
+    }
+
+    await waitForAddress(user, { name: transferContractName }, searchOptions);
 
     return transferStatus;
 }
@@ -344,6 +344,19 @@ async function get(user, args, options) {
         }
     }
 
+    if (inventory.data.assetAddresses) {
+        let { assetAddresses, assetQuantities } = inventory.data;
+        const groupedAssets = await searchAllWithQueryArgs(contractName, { address: JSON.parse(assetAddresses), }, newOptions, user);
+        const assets = groupedAssets.map((asset, index) => ({
+            ...asset,
+            groupQuantity: JSON.parse(assetQuantities).map(Number)[index],
+        }))
+        inventory = {
+            ...inventory,
+            assets
+        };
+    }
+
     return marshalOut({
         ...inventory,
     });
@@ -423,7 +436,7 @@ async function getAll(admin, args = {}, defaultOptions) {
 async function getAllItemTransferEvents(admin, args = {}, defaultOptions) {
     const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
     const itemTransferEvents = await searchAllWithQueryArgs(`${contractName}.${contractEvents.ITEM_TRANSFER}`, args, options, admin);
-    const total  = await searchAllWithQueryArgs( `${contractName}.${contractEvents.ITEM_TRANSFER}`, { ...args, limit: undefined, offset: 0, order: undefined, queryOptions: { select: "count", } }, options, admin );
+    const total = await searchAllWithQueryArgs(`${contractName}.${contractEvents.ITEM_TRANSFER}`, { ...args, limit: undefined, offset: 0, order: undefined, queryOptions: { select: "count", } }, options, admin);
     return { transfers: itemTransferEvents.map((item) => marshalOut(item)), total: total[0].count };
 }
 
