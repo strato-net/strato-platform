@@ -23,7 +23,12 @@ class UsersController {
         rest.response.status400(res, { username })
       }
       else {
-        const stratsBalance = await dapp.getStratsBalance({ userAddress })
+        let stratsBalance = 0;
+        try {
+          stratsBalance = await dapp.getStratsBalance({ userAddress })
+        } catch (e) {
+          console.log("Couldn't load STRATS");
+        }
 
         rest.response.status200(res, {
           ...user,
