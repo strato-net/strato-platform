@@ -62,7 +62,6 @@ export async function activate(context: vscode.ExtensionContext) {
 		}
 	})
 
-	vscode.window.registerTreeDataProvider('contracts', contractsProvider)
 	// Uploads a contract to the targetted node
 	vscode.commands.registerCommand('contracts.uploadContract', async (element) => {
 		const tokens = await getAccessTokenSecrets(context);
@@ -70,6 +69,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		const config = getConfig() || {};
 		const nodeOptions = { config, node: 0};
 		if (vscode.window.activeTextEditor) {
+			vscode.window.activeTextEditor.document.save();
 			const doc = vscode.window.activeTextEditor.document;
 			if (doc.uri.path.slice(-4) === '.sol') {
 				let src: any = doc.getText();
@@ -167,8 +167,7 @@ export async function activate(context: vscode.ExtensionContext) {
 			vscode.window.showErrorMessage(`Could not find a function called ${variableName} in ${contractName} at address ${contractAddress} on chain ${chainId} on node ${nodeId}.`);
 		}
 	});
-
-
+	vscode.window.registerTreeDataProvider('contracts', contractsProvider)
 
 	// Register the Cirrus provider
 	const cirrusProvider = new CirrusProvider();

@@ -55,7 +55,7 @@
 			{
 				"command": "contracts.uploadContract",
 				"title": "Upload Contract",
-				"icon": "$(add)"
+				"icon": "$(cloud-upload)"
 			},
 			{
 				"command": "contracts.callFunction",
@@ -64,8 +64,8 @@
 			},
 			{
 				"command": "contracts.addContractToList",
-				"title": "Search",
-				"icon": "$(search)"
+				"title": "Add Contract Address to List",
+				"icon": "$(search-expand-results)"
 			},
 			{
 				"command": "cirrus.queryCirrus",
@@ -175,17 +175,17 @@
 				{
 					"command": "contracts.refreshEntry",
 					"when": "view == contracts",
-					"group": "navigation"
+					"group": "navigation@3"
 				},
 				{
 					"command": "contracts.addContractToList",
 					"when": "view == contracts",
-					"group": "navigation"
+					"group": "navigation@1"
 				},
 				{
 					"command": "contracts.uploadContract",
 					"when": "view == contracts",
-					"group": "navigation"
+					"group": "navigation@0"
 				},
 				{
 					"command": "cirrus.queryCirrus",
@@ -200,12 +200,12 @@
 				{
 					"command": "nodes.settings",
 					"when": "view == nodes",
-					"group": "navigation@1"
+					"group": "navigation@2"
 				},
 				{
 					"command": "extension.oauthLogin",
-					"when": "view == contracts",
-					"group": "navigation"
+					"when": "view == nodes",
+					"group": "navigation@1"
 				}
 			],
 			"view/item/context": [
