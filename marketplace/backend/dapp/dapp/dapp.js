@@ -16,6 +16,7 @@ import clothingJs from "/dapp/items/clothing";
 import membershipJs from "/dapp/items/membership";
 import carbonDAOJs from "/dapp/items/carbonDAO";
 import collectibleJs from "dapp/items/collectibles";
+import assetGroupJs from "dapp/items/assetGroup";
 
 import saleJs from "/dapp/orders/sale";
 import saleOrderJs from "/dapp/orders/saleOrder";
@@ -260,6 +261,16 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const contract = { name: itemContract, address: itemAddress };
     return await inventoryJs.updateInventory(rawAdmin, contract, restArgs, options);
   }
+
+  contract.createAssetGroup = async function (args, options = defaultOptions) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const newArgs = {
+      ...args.itemArgs,
+      createdDate,
+      owner: rawAdmin.address,
+    };
+    return assetGroupJs.uploadContract(rawAdmin, newArgs, options);
+  };
 
   // ------------------------------ INVENTORY ENDS--------------------------------
 
