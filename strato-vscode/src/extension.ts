@@ -31,11 +31,11 @@ export async function activate(context: vscode.ExtensionContext) {
 		
 		// Take a user and password through input boxes
 		const user = await vscode.window.showInputBox({
-			prompt: `Enter your STRATO Mercata username`
+			prompt: `Enter your STRATO Mercata username.`
 		});
 		if (!user) return;
 		const password = await vscode.window.showInputBox({
-			prompt: `Enter your password`,
+			prompt: `Enter your password.`,
 			password: true
 		});
 		if (!password) return;
@@ -46,13 +46,20 @@ export async function activate(context: vscode.ExtensionContext) {
 	// Register the contracts provider for the sidebar
 	const contractsProvider = new ContractsProvider();
 	vscode.commands.registerCommand('contracts.refreshEntry', async () => contractsProvider.refresh());
-	vscode.commands.registerCommand('contracts.searchContract', async () => {
+	vscode.commands.registerCommand('contracts.addContractToList', async () => {
 		const argInput = await vscode.window.showInputBox({
-			placeHolder: 'ex: Certificate',
-			prompt: `Search for a contract by name`
+			placeHolder: 'ex: 1002f61aec1692bd2fa35be14d3b66b074313ed9',
+			prompt: `Add contract address to interact with.`
 		});
 		if (!argInput) return;
-		contractsProvider.searchContracts(argInput);
+		// regex that determines ethereum address
+		const addressRegex = /^[0-9a-fA-F]{40}$/;
+		// check the argInput for an address
+		if (addressRegex.test(argInput)) {
+			contractsProvider.addContract(argInput)
+		} else {
+			vscode.window.showErrorMessage('Please enter a valid Ethereum address.')
+		}
 	})
 
 	vscode.window.registerTreeDataProvider('contracts', contractsProvider)
@@ -94,7 +101,7 @@ export async function activate(context: vscode.ExtensionContext) {
 						for (let i = 0; i < argNames.length; i++) {
 							const argInput = await vscode.window.showInputBox({
 								placeHolder: '',
-								prompt: `Enter a value for ${argNames[i]}: `
+								prompt: `Enter a value for ${argNames[i]}.`
 							});
 							if (!argInput) return;
 							args = { ...args, [argNames[i]]: argInput }
@@ -137,7 +144,7 @@ export async function activate(context: vscode.ExtensionContext) {
 			for (let i = 0; i < argNames.length; i++) {
 				const argInput = await vscode.window.showInputBox({
 					placeHolder: '',
-					prompt: `Enter a value for ${argNames[i][0]}: `
+					prompt: `Enter a value for ${argNames[i][0]}.`
 				});
 				if (!argInput) return;
 				args = { ...args, [argNames[i][0]]: argInput }
@@ -168,7 +175,7 @@ export async function activate(context: vscode.ExtensionContext) {
 	vscode.commands.registerCommand('cirrus.queryCirrus', async () => {
 		const argInput = await vscode.window.showInputBox({
 			placeHolder: 'ex: Certificate?address=eq.0000000000000000000000000000000000001337',
-			prompt: `Enter cirrus query`
+			prompt: `Enter cirrus query.`
 		});
 		if (!argInput) return;
 		cirrusProvider.query(argInput);

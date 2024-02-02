@@ -63,7 +63,7 @@
 				"icon": "$(play)"
 			},
 			{
-				"command": "contracts.searchContract",
+				"command": "contracts.addContractToList",
 				"title": "Search",
 				"icon": "$(search)"
 			},
@@ -178,7 +178,7 @@
 					"group": "navigation"
 				},
 				{
-					"command": "contracts.searchContract",
+					"command": "contracts.addContractToList",
 					"when": "view == contracts",
 					"group": "navigation"
 				},
