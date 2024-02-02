@@ -106,11 +106,11 @@ runMemCompilerT :: Monad m => MemCompilerT m a -> m a
 runMemCompilerT = runNewMemCodeDB . runNewMemAddressStateDB . runMainChainT . unMemCompilerT
 
 maxCacheSize :: Integer
-maxCacheSize = 10
+maxCacheSize = 1
 
-{-# NOINLINE unsafeCodeCahcheLRUIORef #-}
-unsafeCodeCahcheLRUIORef :: IORef (LRU.LRU Keccak256 CodeCollection)
-unsafeCodeCahcheLRUIORef = unsafePerformIO $ newIORef $ LRU.newLRU (Just maxCacheSize)
+{-# NOINLINE unsafeCodeCacheLRUIORef #-}
+unsafeCodeCacheLRUIORef :: IORef (LRU.LRU Keccak256 CodeCollection)
+unsafeCodeCacheLRUIORef = unsafePerformIO $ newIORef $ LRU.newLRU (Just maxCacheSize)
 
 withAnnotations :: Monad m => (a -> m (Either CompilationError b)) -> a -> m (Either [SourceAnnotation T.Text] b)
 withAnnotations f = fmap (first unwind) . f
@@ -232,11 +232,11 @@ codeCollectionFromSource typeCheck initCode = do
         [(t, src)] | T.null t -> encodeUtf8 src -- for backwards compatibility
         _ -> BL.toStrict $ Aeson.encode initList
       hsh = hash canonicalInitCode
-  codeCache <- liftIO $ readIORef unsafeCodeCahcheLRUIORef
+  codeCache <- liftIO $ readIORef unsafeCodeCacheLRUIORef
   case LRU.lookup hsh codeCache of
     (newCache, (Just cc)) -> do
       recordCacheEvent CacheHit
-      liftIO $ writeIORef unsafeCodeCahcheLRUIORef newCache
+      liftIO $ writeIORef unsafeCodeCacheLRUIORef newCache
       return (hsh, cc)
     (_, Nothing) -> do
       recordCacheEvent StorageWrite
@@ -248,7 +248,7 @@ codeCollectionFromSource typeCheck initCode = do
             Left (IEx p) -> typeError "codeCollectionFromSource" p
             Left (SVMEx (s, _)) -> throw s
             Left (TCEx xs) -> typeError "Typechecker" (typeErrorToAnnotation xs)
-      liftIO $ modifyIORef' unsafeCodeCahcheLRUIORef (LRU.insert hsh cc)
+      liftIO $ modifyIORef' unsafeCodeCacheLRUIORef (LRU.insert hsh cc)
       return $ assert (hsh == hsh') (hsh, cc)
 
 codeCollectionFromHash ::
@@ -261,16 +261,16 @@ codeCollectionFromHash ::
   Keccak256 ->
   m CodeCollection
 codeCollectionFromHash typeCheck hsh = do
-  codeCache <- liftIO $ readIORef unsafeCodeCahcheLRUIORef
+  codeCache <- liftIO $ readIORef unsafeCodeCacheLRUIORef
   case LRU.lookup hsh codeCache of
     (newCache, (Just cc)) -> do
       recordCacheEvent CacheHit
-      liftIO $ writeIORef unsafeCodeCahcheLRUIORef newCache
+      liftIO $ writeIORef unsafeCodeCacheLRUIORef newCache
       return cc
     (_, Nothing) -> do
       recordCacheEvent CacheMiss
       cc <- codeCollectionFromHashNoCache True typeCheck hsh
-      liftIO $ modifyIORef' unsafeCodeCahcheLRUIORef (LRU.insert hsh cc)
+      liftIO $ modifyIORef' unsafeCodeCacheLRUIORef (LRU.insert hsh cc)
       return cc
 
 codeCollectionFromHashNoCache ::
