@@ -67,9 +67,12 @@ class AssetGroupController {
       })).required(),
       name: Joi.string().required(),
       description: Joi.string().required(),
-      groupPrice: Joi.number().integer().greater(0).required(),
+      price: Joi.number().integer().greater(0).required(),
       images: Joi.array().items(Joi.string().allow(null)).required(),
       files: Joi.array().items(Joi.string().allow(null)).required(),
+      paymentProviders: Joi.array().min(1).items(
+        Joi.string().min(0).required(),
+      ).required(),
     });
 
 

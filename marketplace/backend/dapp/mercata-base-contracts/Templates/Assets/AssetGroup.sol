@@ -5,7 +5,6 @@ import <BASE_CODE_COLLECTION>;
 
 /// @title A representation of Art assets
 contract AssetGroup is UTXO {
-    // string public artist;
     address[] public assetAddresses;
     uint[] public assetQuantities;
 

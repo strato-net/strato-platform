@@ -49,7 +49,9 @@ async function uploadContract(user, _constructorArgs, options) {
       
     await waitForAddress(user, {name: constants.assetTableName}, searchOptions);
     
-    return bind(user, contract, copyOfOptions);
+    await bind(user, contract, copyOfOptions);
+
+    return contract.address;
 }
 
 /**
@@ -222,7 +224,7 @@ export default {
     contractFilename,
     bindAddress,
     get,
-    getAll,
+    // getAll,
     getAllOwnershipEvents,
     transferOwnership,
     marshalIn,

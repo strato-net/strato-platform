@@ -17,6 +17,7 @@ const CreateGroupForm = ({ handleCancel }) => {
         inventories,
         isUploadImageSubmitting,
         isCreatingAssetGroup,
+        stripeStatus,
         message,
         success
     } = useInventoryState();
@@ -121,6 +122,7 @@ const CreateGroupForm = ({ handleCancel }) => {
             assets,
             images: imageKeys || [],
             files: fileKeys || [],
+            paymentProviders: stripeStatus ? [stripeStatus.paymentProviderAddress] : []
         };
 
         console.log('Received values of form:', body);
@@ -165,7 +167,7 @@ const CreateGroupForm = ({ handleCancel }) => {
                     secondQuantity: 1,
                     assets: [],
                     name: "",
-                    groupPrice: 1,
+                    price: 1,
                     description: "",
                     images: [],
                     files: [],
@@ -186,7 +188,7 @@ const CreateGroupForm = ({ handleCancel }) => {
                     </Form.Item>
                     <Form.Item
                         label="Group Price"
-                        name="groupPrice"
+                        name="price"
                         rules={[
                             {
                                 required: true,

@@ -264,8 +264,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.createAssetGroup = async function (args, options = defaultOptions) {
     const createdDate = Math.floor(Date.now() / 1000);
-    const { assets, groupPrice, ...restArgs } = args;
-    
+    const { assets, price, paymentProviders, ...restArgs } = args;
+
     const assetAddresses = assets.map(asset => {
       return asset.assetAddress;
     })
@@ -281,7 +281,16 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       owner: rawAdmin.address,
     };
 
-    return assetGroupJs.uploadContract(rawAdmin, newArgs, options);
+    const assetToBeSold = await assetGroupJs.uploadContract(rawAdmin, newArgs, options);
+
+    const saleArgs = {
+      assetToBeSold,
+      price,
+      quantity: 1,
+      paymentProviders
+    }
+
+    return await inventoryJs.uploadSaleContract(rawAdmin, saleArgs, options);
   };
 
   // ------------------------------ INVENTORY ENDS--------------------------------
