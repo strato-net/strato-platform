@@ -16,9 +16,9 @@
     align-items: center;
 }
 
-.custom-picker input {
-    visibility: hidden;
-  }
+.custom-picker .ant-picker-input input {
+    display: none;
+}
 
 .ant-picker-input {
     padding: 4px 2px;
