@@ -510,13 +510,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return saleOrderJs.updateOrderComment(rawAdmin, contract, options, comments);
   };
   
-  contract.export = async function (args, options = defaultOptions) {
+  contract.export = async function ( options = defaultOptions) {
     const getOptions = { ...options, app: contractName };
-    const { commonName } = args;
     
     const processOrders = async (orderArg) => {
       const orders = await saleOrderJs.getAll(rawAdmin, orderArg, getOptions);
-      
+      if (orders.orders.length === 0) {
+        return [];
+      }
       const saleAddresses = orders.orders.flatMap(order => order.saleAddresses);
       const sales = await saleJs.getAll(rawAdmin, { saleAddresses }, options);
       const uniqueAssetAddresses = new Set(sales.map(sale => sale.assetToBeSold));
@@ -544,6 +545,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     
     const getItemTransferEventsWithAssetInfo = async (orderArg) => {
       const itemTransferEvents = await inventoryJs.getAllItemTransferEvents(rawAdmin, orderArg, getOptions);
+      if (itemTransferEvents.transfers.length === 0) {
+        return [];
+      }
       const assetAddresses = itemTransferEvents.transfers.map(event => event.assetAddress);
       const uniqueAssetAddresses = [...new Set(assetAddresses)];
       const assets = await inventoryJs.getAll(rawAdmin, { assetAddresses: uniqueAssetAddresses }, getOptions);
@@ -554,13 +558,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       });
     };
     
-    let soldOrderArgs = { limit: 2000, offset: 0, order: 'createdDate.desc', sellersCommonName: commonName };
+    let soldOrderArgs = { limit: 2000, offset: 0, order: 'createdDate.desc', sellersCommonName: userCommonName };
     const soldOrders = await processOrders(soldOrderArgs);
     
-    let boughtOrderArgs = { ...soldOrderArgs, sellersCommonName: undefined, purchasersCommonName: commonName };
+    let boughtOrderArgs = { limit: 2000, offset: 0, order: 'createdDate.desc', purchasersCommonName: userCommonName };
     const boughtOrders = await processOrders(boughtOrderArgs);
     
-    let transferArgs = { ...boughtOrderArgs, purchasersCommonName: undefined, order: 'transferDate.desc', or: `(oldOwnerCommonName.eq.${commonName},newOwnerCommonName.eq.${commonName})` };
+    let transferArgs = { limit: 2000, offset: 0, order: 'transferDate.desc', or: `(oldOwnerCommonName.eq.${userCommonName},newOwnerCommonName.eq.${userCommonName})` };
     const itemTransferEvents = await getItemTransferEventsWithAssetInfo(transferArgs);
     
     return { 

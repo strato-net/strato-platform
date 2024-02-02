@@ -381,13 +381,12 @@ const actions = {
     }
   },
   
-  fetchAllOrders: async (dispatch, commonName) => {
+  fetchAllOrders: async (dispatch) => {
     dispatch({ type: actionDescriptors.fetchAllOrders });
-    const encodedCommonName = encodeURIComponent(commonName);
     
     try {
       const ordersSold = await fetch(
-        `${apiUrl}/order/exportOrders?commonName=${encodedCommonName}`,
+        `${apiUrl}/order/exportOrders`,
         {
           method: HTTP_METHODS.GET,
         }

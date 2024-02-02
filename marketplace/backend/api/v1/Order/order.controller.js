@@ -118,8 +118,8 @@ class OrderController {
   
   static async export(req, res, next) {
     try {
-      const { dapp, query } = req
-      const orders = await dapp.export({ ...query })
+      const { dapp } = req
+      const orders = await dapp.export()
       rest.response.status200(res, orders)
 
       return next()

@@ -1,5 +1,5 @@
-import { Tabs, DatePicker, Breadcrumb, Button, Dropdown, Menu, Space  } from "antd";
-import { DownloadOutlined, DownOutlined } from '@ant-design/icons';
+import { Tabs, DatePicker, Breadcrumb, Button, Dropdown, Space  } from "antd";
+import { DownloadOutlined } from '@ant-design/icons';
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import SoldOrdersTable from "./SoldOrdersTable";
@@ -16,6 +16,9 @@ import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { useCategoryState, useCategoryDispatch } from "../../contexts/category";
 import startCase from 'lodash/startCase';
+import { epochToDate } from "../../helpers/utils";
+import { ORDER_STATUS } from "../../helpers/constants";
+const INVERTED_ORDER_STATUS = Object.fromEntries(Object.entries(ORDER_STATUS).map(([key, value]) => [value, key]));
 
 const Order = ({ user }) => {
 
@@ -57,25 +60,12 @@ const Order = ({ user }) => {
     return { category: 'Unknown', subCategory: 'Unknown' };
   }
   
-  const OrderStatus = [
-    "NULL",
-    "AWAITING_FULFILLMENT",
-    "AWAITING_SHIPMENT",
-    "CLOSED",
-    "CANCELED",
-    "PAYMENT_PENDING"
-  ];
-  
-  function formatDate(epochTime) {
-    return new Date(epochTime * 1000).toLocaleDateString("en-US");
-  }
-  
   function formatDataObject(dataObject) {
     let formattedObject = {};
     Object.keys(dataObject).forEach(key => {
       let value = dataObject[key];
       if (key.endsWith('Date')) {
-        value = formatDate(value);
+        value = epochToDate(value);
       } else if (key === 'comments') {
         value = decodeURIComponent(value);
       }
@@ -104,7 +94,7 @@ const Order = ({ user }) => {
           totalOrderAmount: order.totalPrice,
           orderDate: order.createdDate,
           orderFulfillmentDate: order.fulfillmentDate,
-          orderStatus: OrderStatus[order.status] || "Unknown",
+          orderStatus: INVERTED_ORDER_STATUS[order.status] || "Unknown",
           comments: order.comments,
           blockchainAddress: order.address
         });
@@ -175,8 +165,7 @@ const Order = ({ user }) => {
   const download = async (format) => {
     if (user?.commonName) {
       await actions.fetchAllOrders(
-        dispatch,
-        user?.commonName
+        dispatch
       );
       if (format === 'xlsx'){
         setCallExcel(true);
