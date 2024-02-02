@@ -106,7 +106,7 @@ runMemCompilerT :: Monad m => MemCompilerT m a -> m a
 runMemCompilerT = runNewMemCodeDB . runNewMemAddressStateDB . runMainChainT . unMemCompilerT
 
 maxCacheSize :: Integer
-maxCacheSize = 1
+maxCacheSize = 10
 
 {-# NOINLINE unsafeCodeCacheLRUIORef #-}
 unsafeCodeCacheLRUIORef :: IORef (LRU.LRU Keccak256 CodeCollection)
