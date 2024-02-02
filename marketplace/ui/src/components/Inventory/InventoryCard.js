@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Card, Popover, Button, Typography } from "antd";
+import { Card, Popover, Button, Typography, Tooltip } from "antd";
 import {
   DollarOutlined,
   MoreOutlined,
@@ -251,17 +251,23 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
     <div className=" p-3 md:p-[18px] border border-[#BABABA] md:border-[#E9E9E9] rounded-lg sm:w-[343px] md:w-full  ">
       <div className="bg-[#F2F2F9] rounded-md px-[14px] flex justify-between items-center pb-[13px] pt-2 w-full">
         <div>
-        <p className="text-lg lg:text-xl font-semibold text-[#202020] cursor-default" onClick={callDetailPage}>{inventory?.name || "N/A"}</p>
-        <Typography className="pt-1">{`(${getCategory()})`}</Typography>
+          <p className="text-lg lg:text-xl font-semibold text-[#202020] cursor-default" onClick={callDetailPage}>
+            {/* {inventory?.name || "N/A"} */}
+            <Tooltip title={inventory?.name.length > 20 ? inventory?.name : null}>
+              <span className=" whitespace-nowrap max-w-[160px] inline-block">
+                {inventory?.name.length > 20 ? `${inventory?.name.slice(0, 20)}...` : `${inventory?.name}`}
+              </span>
+            </Tooltip>
+          </p>
+          <Typography className="pt-1">{`(${getCategory()})`}</Typography>
         </div>
         <div className=" pt-[5px]  flex">
           
           <div className="flex  items-center">
           <Button type="link" className="text-[#13188A] font-semibold text-base h-6 mb-2" onClick={callDetailPage}>Preview</Button>
 
-          {((itemData.isMint === "True" && inventory.quantity === 0) || inventory.quantity > 0) &&
-          
-            <Popover
+        {((itemData.isMint === "True" && inventory.quantity === 0) || inventory.quantity > 0) &&
+           <Popover
             placement="bottomLeft"
             open={openPop}
             className=""
