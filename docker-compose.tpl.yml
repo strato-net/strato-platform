@@ -106,6 +106,7 @@ services:
       - ASSET_TABLE_NAME=${ASSET_TABLE_NAME}
       - SALE_TABLE_NAME=${SALE_TABLE_NAME}
       - SITE_ID=${SITE_ID:-038fe3fa}
+      - FILE_SERVER_URL=${FILE_SERVER_URL:https://fileserver.mercata-testnet2.blockapps.net/highway/}
 
     build: .
     image: ${MARKETPLACEUI_IMAGE:-<REPO_URL>marketplace-ui:<VERSION>}
