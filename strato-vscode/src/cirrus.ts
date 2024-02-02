@@ -83,9 +83,12 @@ class CirrusItem extends vscode.TreeItem {
     public readonly collapsibleState: vscode.TreeItemCollapsibleState
   ) {
     super(item.label, collapsibleState);
+    this.tooltip = item.tooltip;
+    this.description = item.description;
+    delete item.tooltip
+    delete item.description
+    delete item.label
     this._item = item;
-    this.tooltip = this._item.tooltip;
-    this.description = this._item.description;
   }
 
   iconPath = {
