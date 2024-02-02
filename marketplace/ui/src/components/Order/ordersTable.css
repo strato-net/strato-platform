@@ -16,6 +16,10 @@
     align-items: center;
 }
 
+.custom-picker input {
+    visibility: hidden;
+  }
+
 .ant-picker-input {
     padding: 4px 2px;
 }

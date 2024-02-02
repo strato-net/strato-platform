@@ -377,7 +377,7 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOr
         </Dropdown>
         <div className="text-xs flex items-center md:hidden">
           <DatePicker
-          className="h-[32px] w-[33px]"
+          className="h-[32px] w-[33px] custom-picker"
             disabledDate={(current) => {
               const currentDate = dayjs().startOf('day'); // Get the start of today
               const selectedDate = dayjs(current).startOf('day');
