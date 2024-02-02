@@ -42,7 +42,7 @@ let userCert = null;
 // }
 
 function deploy(contract, args, options) {
-  console.log(contract)
+  console.log(options)
   // author the deployment
   const { deployFilePath } = args;
 
@@ -53,13 +53,6 @@ function deploy(contract, args, options) {
         name: contract.name,
         address: contract.address
       },
-    },
-    strats: {
-      contract: {
-        org: process.env.STRATS_ORG,
-        name: process.env.STRATS_CONTRACT_NAME,
-        address: process.env.STRATS_ADDRESS
-      }
     }
   };
 
@@ -885,13 +878,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getStratsBalance = async function (args, options = defaultOptions) {
     const { userAddress } = args;
-    const yaml = getYamlFile('./config/localhost.deploy.yaml');
-    const getOptions = { ...options, org: yaml.strats.contract.org, app: '' };
+    const getOptions = { ...options, org: process.env.STRATS_ORG, app: '' };
     const args2 = {
-      address: yaml.strats.contract.address,
+      address: process.env.STRATS_ADDRESS,
       key: userAddress
     }
-    
+
     const balance = await strats.getStratsBalance(rawAdmin, args2, getOptions);
     return balance;
   }

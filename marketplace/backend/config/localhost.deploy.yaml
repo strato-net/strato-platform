@@ -1,10 +1,5 @@
-url: https://node1.mercata-testnet2.blockapps.net/
+url: https://art.mercata-testnet2.blockapps.net
 dapp:
   contract:
     name: Mercata
-    address: 8673fd03dfa8c75a9bb94bc8f3f1b248027f7388
-strats:
-    contract:
-      org: BlockApps
-      name: ERC20Dapp
-      address: 0ed2fd477867a1f8c5d7f798c8a4856251b0ebce
+    address: da455b106e4567adacd7ce6d97b8058e5a3214a6
