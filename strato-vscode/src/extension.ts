@@ -149,10 +149,12 @@ export async function activate(context: vscode.ExtensionContext) {
 			for (let i = 0; i < argNames.length; i++) {
 				const argInput = await vscode.window.showInputBox({
 					placeHolder: '',
-					prompt: `Enter a value for ${argNames[i][0]}.`
+					prompt: argNames[i][1].type.tag === 'Array' ?
+							`Enter a value for ${argNames[i][0]} with comma-separated values`:
+							`Enter a value for ${argNames[i][0]}.`
 				});
 				if (!argInput) return;
-				args = { ...args, [argNames[i][0]]: argInput }
+				args[argNames[i][0]] = argNames[i][1].type.tag === 'Array' ? argInput.split(',').map(c => c.trim()) : argInput 
 			}
 			try {
 				const contract = { name: contractName, address: contractAddress }
@@ -160,10 +162,9 @@ export async function activate(context: vscode.ExtensionContext) {
 					contract,
 					args,
 					method: variableName,
-					chainid: chainId
 				}
 				const res = await rest.call(user, callArgs, nodeOptions);
-				vscode.window.showInformationMessage(`${res}`);
+				vscode.window.showInformationMessage(`Successfully called function ${variableName} on ${contractName} at address ${contractAddress}`);
 				contractsProvider.refresh()
 			} catch (e) {
 				vscode.window.showErrorMessage(`${e}`);
