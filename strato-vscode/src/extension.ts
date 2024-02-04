@@ -44,8 +44,26 @@ export async function activate(context: vscode.ExtensionContext) {
     });
 
 	// Register the contracts provider for the sidebar
-	const contractsProvider = new ContractsProvider();
+	const workspaceAddresses: string[] = context.workspaceState.get('contractAddresses') || []
+	const contractsProvider = new ContractsProvider(workspaceAddresses);
 	vscode.commands.registerCommand('contracts.refreshEntry', async () => contractsProvider.refresh());
+
+	// Clear contracts list
+	vscode.commands.registerCommand('contracts.clearContractList', async () => {
+		contractsProvider
+			.clearContracts()
+			.then(()=> context.workspaceState.update('contractAddresses', []))
+	})
+
+	// Clear contracts list
+	vscode.commands.registerCommand('contracts.removeContractFromList', async (element) => {
+		const { label } = element
+		contractsProvider
+			.removeContract(label)
+			.then(()=> context.workspaceState.update('contractAddresses', []))
+		contractsProvider.refresh()
+	})
+
 	vscode.commands.registerCommand('contracts.addContractToList', async () => {
 		const argInput = await vscode.window.showInputBox({
 			placeHolder: 'ex: 1002f61aec1692bd2fa35be14d3b66b074313ed9',
@@ -56,7 +74,19 @@ export async function activate(context: vscode.ExtensionContext) {
 		const addressRegex = /^[0-9a-fA-F]{40}$/;
 		// check the argInput for an address
 		if (addressRegex.test(argInput)) {
-			contractsProvider.addContract(argInput)
+			const user = await getApplicationUser();
+			const cfg = getConfig() || {};
+			try {
+				// check if the contract exists, err out otherwise
+				await rest.getContractsContract(user, { address: argInput }, cfg)
+				contractsProvider
+					.addContract(argInput)
+					.then(list => context.workspaceState.update('contractAddresses', list))
+			} catch (e) {
+				vscode.window.showErrorMessage(`Could not get contract details at address ${argInput}.`);
+				console.debug(e)
+			}
+
 		} else {
 			vscode.window.showErrorMessage('Please enter a valid Ethereum address.')
 		}
@@ -119,7 +149,9 @@ export async function activate(context: vscode.ExtensionContext) {
 					}
 					const res = await rest.createContract(user, uploadArgs, nodeOptions);
 					vscode.window.showInformationMessage(`Contract ${contractName} created at address: ${res.address}`);
-					contractsProvider.addContract(res.address)
+					contractsProvider
+						.addContract(res.address)
+						.then(list => context.workspaceState.update('contractAddresses', list))
 				} catch (e) {
 					vscode.window.showErrorMessage(`${e}`);
 				}
@@ -216,17 +248,22 @@ export async function activate(context: vscode.ExtensionContext) {
 		vscode.commands.executeCommand('workbench.action.openSettings', 'strato-vscode');
 	});
 
+	vscode.commands.registerCommand('nodes.refresh', async () => {
+		nodesProvider.refresh()
+	});
 	
 	vscode.window.registerTreeDataProvider('nodes', nodesProvider)
 
 	// Register clipboard copier
-	vscode.commands.registerCommand('extension.copyToClipboard', async (element) => {
-		const { tooltip } = element
-		console.debug(`copyToClipboard/element: ${element}`)
-		console.debug(`copyToClipboard/tooltip: ${tooltip}`)
-		copyToClipboard(tooltip)
+	vscode.commands.registerCommand('extension.copyLabelToClipboard', async (element) => {
+		const { label } = element
+		copyToClipboard(label)
 	})
 
+	vscode.commands.registerCommand('extension.copyTooltipToClipboard', async (element) => {
+		const { tooltip } = element
+		copyToClipboard(tooltip)
+	})
 	// Activate debug mode and diagnostics
 	// activateStratoDebug(context);
 	// const solidityDiagnostics = vscode.languages.createDiagnosticCollection("solidity");

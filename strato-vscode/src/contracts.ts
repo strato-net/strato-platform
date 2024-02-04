@@ -7,7 +7,7 @@ import getConfig from './load.config';
 export class ContractsProvider implements vscode.TreeDataProvider<ContractTreeItem> {
   private selectedContractAddresses: string[] = [];
 
-  constructor() {}
+  constructor(addresses: string[] = []) { addresses ? this.selectedContractAddresses = addresses : [] }
 
   getTreeItem(element: ContractTreeItem): ContractTreeItem {
     return element;
@@ -67,8 +67,22 @@ export class ContractsProvider implements vscode.TreeDataProvider<ContractTreeIt
     return results
   }
 
-  async addContract(address) {
+  // returns contract address list for extension to store in context
+  async addContract(address): Promise<string[]> {
     this.selectedContractAddresses.push(address)
+    this.selectedContractAddresses = Array.from(new Set(this.selectedContractAddresses))
+    this.refresh()
+    return this.selectedContractAddresses 
+  }
+
+  async removeContract(address) {
+    this.selectedContractAddresses = this.selectedContractAddresses.filter((c) => c !== address)
+    this.refresh()
+    return this.selectedContractAddresses
+  }
+
+  async clearContracts() {
+    this.selectedContractAddresses = []
     this.refresh()
   }
 

@@ -30,10 +30,6 @@
 		"configuration": {
 			"title": "STRATO IDE",
 			"properties": {
-				"strato-vscode.autoFuzz": {
-					"type": "boolean",
-					"default": true
-				},
 				"strato-vscode.configPath": {
 					"type": "string",
 					"default": "",
@@ -53,6 +49,11 @@
 				"icon": "$(refresh)"
 			},
 			{
+				"command": "contracts.clearContractList",
+				"title": "Clear Contract List",
+				"icon": "$(extensions-clear-search-results)"
+			},
+			{
 				"command": "contracts.uploadContract",
 				"title": "Upload Contract",
 				"icon": "$(cloud-upload)"
@@ -68,6 +69,11 @@
 				"icon": "$(search-expand-results)"
 			},
 			{
+				"command": "contracts.removeContractFromList",
+				"title": "Delete from List",
+				"icon": "$(trash)"
+			},
+			{
 				"command": "cirrus.queryCirrus",
 				"title": "Search",
 				"icon": "$(search)"
@@ -76,6 +82,11 @@
 				"command": "nodes.addConfig",
 				"title": "Select Configuration File",
 				"icon": "$(new-file)"
+			},
+			{
+				"command": "nodes.refresh",
+				"title": "Refresh",
+				"icon": "$(refresh)"
 			},
 			{
 				"command": "nodes.settings",
@@ -90,7 +101,12 @@
 				"icon": "$(debug-alt)"
 			},
 			{
-				"command": "extension.copyToClipboard",
+				"command": "extension.copyTooltipToClipboard",
+				"title": "Copy to Clipboard",
+				"icon": "$(clippy)"
+			},
+			{
+				"command": "extension.copyLabelToClipboard",
 				"title": "Copy to Clipboard",
 				"icon": "$(clippy)"
 			},
@@ -183,6 +199,11 @@
 					"group": "navigation@1"
 				},
 				{
+					"command": "contracts.clearContractList",
+					"when": "view == contracts",
+					"group": "navigation@4"
+				},
+				{
 					"command": "contracts.uploadContract",
 					"when": "view == contracts",
 					"group": "navigation@0"
@@ -203,6 +224,11 @@
 					"group": "navigation@2"
 				},
 				{
+					"command": "nodes.refresh",
+					"when": "view == nodes",
+					"group": "navigation@3"
+				},
+				{
 					"command": "extension.oauthLogin",
 					"when": "view == nodes",
 					"group": "navigation@1"
@@ -215,12 +241,17 @@
 					"group": "inline"
 				},
 				{
-					"command": "extension.copyToClipboard",
+					"command": "extension.copyLabelToClipboard",
 					"when": "view == contracts && (viewItem == address || viewItem == stateItem)",
 					"group": "inline"
 				},
 				{
-					"command": "extension.copyToClipboard",
+					"command": "contracts.removeContractFromList",
+					"when": "view == contracts && viewItem == address",
+					"group": "inline"
+				},
+				{
+					"command": "extension.copyTooltipToClipboard",
 					"when": "view == nodes || view == cirrus",
 					"group": "inline"
 				}
