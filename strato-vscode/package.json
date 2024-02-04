@@ -96,7 +96,7 @@
 			},
 			{
 				"command": "extension.oauthLogin",
-				"title": "Login",
+				"title": "Login to STRATO Mercata",
 				"icon": "$(log-in)"
 			}
 		],
@@ -175,7 +175,7 @@
 				{
 					"command": "contracts.refreshEntry",
 					"when": "view == contracts",
-					"group": "navigation@3"
+					"group": "navigation"
 				},
 				{
 					"command": "contracts.addContractToList",

@@ -65,6 +65,7 @@ export async function activate(context: vscode.ExtensionContext) {
 	// Uploads a contract to the targetted node
 	vscode.commands.registerCommand('contracts.uploadContract', async (element) => {
 		const tokens = await getAccessTokenSecrets(context);
+		if (Object.keys(tokens).length === 0) { return vscode.window.showErrorMessage('Please log in to STRATO Mercata to upload a contract.') }
 		const user = await getApplicationUser(0, tokens);
 		const config = getConfig() || {};
 		const nodeOptions = { config, node: 0};
@@ -101,10 +102,13 @@ export async function activate(context: vscode.ExtensionContext) {
 						for (let i = 0; i < argNames.length; i++) {
 							const argInput = await vscode.window.showInputBox({
 								placeHolder: '',
-								prompt: `Enter a value for ${argNames[i]}.`
+								prompt: 
+									constr.args[argNames[i]].tag === 'Array' ?
+									`Enter a value from ${argNames[i]} with comma-separated values`:
+									`Enter a value for ${argNames[i]}.`
 							});
 							if (!argInput) return;
-							args = { ...args, [argNames[i]]: argInput }
+							args = { ...args, [argNames[i]]: constr.args[argNames[i]].tag === 'Array' ? argInput.split(',').map(c => c.trim()) : argInput}
 						}
 					}
 					const uploadArgs = {
@@ -133,6 +137,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		const { nodeId, item } = element;
 		const { chainId, contractName, contractAddress, variableName } = item;
 		const tokens = await getAccessTokenSecrets(context);
+		if (Object.keys(tokens).length === 0) { return vscode.window.showErrorMessage('Please log in to STRATO Mercata to upload a contract.') }
 		const user = await getApplicationUser(nodeId, tokens);
 		const config = getConfig() || {}
 		const nodeOptions = { config, node: nodeId || 0 };
