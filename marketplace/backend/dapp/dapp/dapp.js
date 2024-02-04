@@ -727,7 +727,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           orderDetail: invoices,
           accountId: sellerStripeDetails[0].accountId,
         }
-        stripePaymentSession = await axios.post(new URL('/stripe/checkout', STRIPE_PAYMENT_SERVER_URL).href, checkoutBody)
+        stripePaymentSession = await axios.post(new URL('/stripe/checkout', STRIPE_PAYMENT_SERVER_URL).href, checkoutBody, {
+          headers: {
+            'referer': `${options.config.serverHost}${options.config.marketplaceUiUrlPrefix}`
+          }
+        })
           .then(function (res) {
             if (res.status === 200) {
               return res.data;
