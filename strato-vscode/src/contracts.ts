@@ -16,11 +16,6 @@ export class ContractsProvider implements vscode.TreeDataProvider<ContractTreeIt
   async getChildren(element?: ContractTreeItem): Promise<ContractTreeItem[]> {
     if (element) {
       switch(element.itemType) {
-        case 'node': {
-            const results = await Promise.all(this.selectedContractAddresses.map(async (c) => { return this.searchContracts(c) }))
-            const items = results.map((e, i) => new ContractTreeItem('address', {chainId: null, contractName: e._contractName, contractAddress: this.selectedContractAddresses[i], label: `${this.selectedContractAddresses[i]}`, tooltip: `${e._contractName}`}, vscode.TreeItemCollapsibleState.Collapsed));
-            return Promise.resolve(items)
-        }
         case 'address': {
           const { contractName, chainId, contractAddress } = element.item
           const state = await this.getContractState(contractName, contractAddress, chainId, null);
@@ -31,13 +26,13 @@ export class ContractsProvider implements vscode.TreeDataProvider<ContractTreeIt
       }
       return Promise.resolve([]);
     } else {
-      const items = this.getSelectedContracts();
+      const items = await this.getSelectedContracts();
       return Promise.resolve(items);
     }
   }
-
   async searchContracts(address) {
     const config = getConfig() || {}
+    if (Object.keys(config).length === 0) return []
     const options = { config, node: 0 };
     const appUser = await getApplicationUser()
     const results = await rest.getContractsDetails(appUser, { address }, { ...options })
@@ -46,6 +41,7 @@ export class ContractsProvider implements vscode.TreeDataProvider<ContractTreeIt
 
   async getContracts(chainId, i) {
     const config = getConfig() || {}
+    if (Object.keys(config).length === 0) return []
     const options = { config, node: i || 0 };
     const appUser = await getApplicationUser()
     const query = {
@@ -57,6 +53,7 @@ export class ContractsProvider implements vscode.TreeDataProvider<ContractTreeIt
 
   async getContractState(name, address, chainId, i) {
     const config = getConfig() || {}
+    if (Object.keys(config).length === 0) return {}
     const options = { config, node: i || 0 };
     const appUser = await getApplicationUser()
     const contract = {
@@ -87,6 +84,10 @@ export class ContractsProvider implements vscode.TreeDataProvider<ContractTreeIt
   }
 
   private async getSelectedContracts() {
+    if (this.selectedContractAddresses.length === 0) return []
+    const cfg = getConfig || {}
+    if (Object.keys(cfg).length === 0) return []
+
     const results = await Promise.all(this.selectedContractAddresses.map(async (c) => { return this.searchContracts(c) }))
     return results.map((e, i) => new ContractTreeItem('address', {chainId: null, contractName: e._contractName, contractAddress: this.selectedContractAddresses[i], label: `${this.selectedContractAddresses[i]}`, tooltip: `${e._contractName}`}, vscode.TreeItemCollapsibleState.Collapsed));
   }
