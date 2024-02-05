@@ -111,6 +111,13 @@ router.post(
   OrderController.executeSale
 )
 
+router.post(
+  Order.executeAssetGroupSale,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  OrderController.executeAssetGroupSale
+)
+
 router.put(
   Order.updateOrderComment,
   authHandler.authorizeRequest(),

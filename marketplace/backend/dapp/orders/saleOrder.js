@@ -276,6 +276,34 @@ async function completeOrder(user, args, options) {
 }
 
 /**
+ * Complete an Asset Group Order
+ * @param newOwner The common name of the new owner of the SimpleSale.
+ */
+async function completeAssetGroupOrder(user, args, options) {
+  const { orderAddress, ...restArgs } = args;
+  const contract = { name: contractName, address: orderAddress }
+  const callArgs = {
+    contract,
+    method: "completeAssetGroupOrder",
+    args: util.usc(restArgs),
+  };
+  const completionStatus = await rest.call(user, callArgs, options);
+
+  console.log("completionStatus", completionStatus);
+  console.log(parseInt(completionStatus, 10));
+  console.log(RestStatus.OK);
+  if (parseInt(completionStatus, 10) !== RestStatus.OK) {
+    throw new rest.RestError(
+      completionStatus,
+      "You cannot complete an Order you don't own",
+      { newOwner }
+    );
+  }
+
+  return completionStatus;
+}
+
+/**
  * Update an Order Comment
  */
 async function updateOrderComment(user, contract, options, comments) {
@@ -307,6 +335,7 @@ export default {
   cancelOrder,
   updateOrderStatus,
   completeOrder,
+  completeAssetGroupOrder,
   updateOrderComment,
   marshalIn,
   marshalOut,

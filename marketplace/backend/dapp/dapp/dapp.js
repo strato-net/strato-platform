@@ -536,6 +536,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return saleOrderJs.completeOrder(rawAdmin, args, options);
   };
 
+  contract.completeAssetGroupOrder = async function (args, options = defaultOptions) {
+    return saleOrderJs.completeAssetGroupOrder(rawAdmin, args, options);
+  };
+
   contract.updateOrderComment = async function (args, options = defaultOptions) {
     const { saleOrderAddress, comments, ...restArgs } = args;
     const contract = { name: saleOrderJs.contractName, address: saleOrderAddress }
