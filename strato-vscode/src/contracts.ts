@@ -19,7 +19,6 @@ export class ContractsProvider implements vscode.TreeDataProvider<ContractTreeIt
         case 'address': {
           const { contractName, chainId, contractAddress } = element.item
           const state = await this.getContractState(contractName, contractAddress, chainId, null);
-          console.debug(state)
           const items = Object.entries(state).map((e) => new ContractTreeItem('stateItem', {label: `${e[0]}`, description: `${e[1]}`, tooltip: `${e[0]}: ${e[1]}`, contractName, chainId, contractAddress, variableName: e[0]}, vscode.TreeItemCollapsibleState.None));
           return Promise.resolve(items);
         }
