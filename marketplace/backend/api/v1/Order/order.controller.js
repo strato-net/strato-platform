@@ -107,11 +107,10 @@ class OrderController {
   static async payment(req, res, next) {
     try {
       const { dapp, body, accessToken } = req
-      
-      const origin_url = req.headers.origin
+      const originUrl = req.headers.origin
       OrderController.validatePaymentArgs(body)
 
-      const result = await dapp.paymentCheckout(origin_url, body, options, accessToken)
+      const result = await dapp.paymentCheckout(originUrl, body, options, accessToken)
       rest.response.status200(res, result)
     } catch (e) {
       return next(e)
