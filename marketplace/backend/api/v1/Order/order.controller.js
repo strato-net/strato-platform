@@ -109,7 +109,7 @@ class OrderController {
       const { dapp, body, accessToken } = req
       OrderController.validatePaymentArgs(body)
 
-      const result = await dapp.paymentCheckout(body, options, accessToken)
+      const result = await dapp.paymentCheckout(req.headers.origin,body, options, accessToken)
       rest.response.status200(res, result)
     } catch (e) {
       return next(e)
