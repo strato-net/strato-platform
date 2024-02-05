@@ -45,7 +45,7 @@ module Slipstream.OutputData (
 import           BlockApps.Solidity.Value as V
 import           Conduit
 import           Control.Arrow                   ((***))
-import           Control.Lens ((^.))
+import           Control.Lens ((^.), (<&>))
 import           Control.Monad
 import qualified Data.Aeson                      as Aeson
 import qualified Data.ByteString.Base16         as Base16
@@ -56,7 +56,7 @@ import qualified Data.Map.Strict                 as Map
 import           Data.Maybe                      (catMaybes, listToMaybe, mapMaybe)
 import           Data.Text                       (Text)
 import qualified Data.Text                       as T
-import           Data.Traversable                (for)
+-- import           Data.Traversable                (for)
 import           Bloc.Server.Utils               (partitionWith)
 import           BlockApps.Logging
 import           Blockchain.Strato.Model.Account
@@ -346,41 +346,20 @@ getDeferredForeignKeys tableName c o a =
       }
 
 getDeferredForeignKeysAbstract ::
-  (MonadLogger m) => 
-  TableName -> ContractF () -> Text -> Text -> Map.Map (Account, Text) (Text, Text) -> CodeCollectionF () -> m [ForeignKeyInfo]
-getDeferredForeignKeysAbstract tableName c o a abstracts' cc = do
-  -- Log at the start
-  $logInfoS "getDeferredForeignKeysAbstract: Start" . T.pack $ 
-    "tableName: " ++ show tableName ++ ", c: " ++ show c ++ ", o: " ++ show o ++ 
-    ", a: " ++ show a ++ ", abstracts': " ++ show abstracts' ++ ", cc: " ++ show cc
-
-  result <- fmap catMaybes . for [(theName, x) | (theName, VariableDecl {_varType = SVMType.UnknownLabel x _}) <- Map.toList (c ^. storageDefs)] $ \(theName, x) -> do
-      let contract = getContractsBySolidString x cc
-      $logInfoS "getDeferredForeignKeysAbstract: x" . T.pack $ show x
-      $logInfoS "getDeferredForeignKeysAbstract: cc" . T.pack $ show cc
-      $logInfoS "getDeferredForeignKeysAbstract: contract" . T.pack $ show contract
-      case contract of
-              Just c' -> do
-                let (o',a',n') = case _importedFrom c' of
-                                  Nothing -> (o, a, _contractName c')
-                                  Just acct -> case Map.lookup (acct, T.pack $ _contractName c') abstracts' of
-                                    Nothing -> (o, a, _contractName c')
-                                    Just (o'', a'') -> (o'', a'', _contractName c')
-                $logInfoS "getDeferredForeignKeysAbstract: (o',a',n')" . T.pack $ show (o',a',n')
-                $logInfoS "getDeferredForeignKeysAbstract: tableName" . T.pack $ show tableName
-                $logInfoS "getDeferredForeignKeysAbstract: theName" . T.pack $ show theName
-                $logInfoS "getDeferredForeignKeysAbstract: abstractTableName o' a' $ T.pack n'" . T.pack $ show $ abstractTableName o' a' $ T.pack n'
-                pure $ Just $ ForeignKeyInfo
-                  { tableName = tableName,
-                    columnName = labelToText theName,
-                    foreignTableName = abstractTableName o' a' $ T.pack n'
-                    }
-              Nothing -> return Nothing
-
-  -- Log at the end
-  $logInfoS "getDeferredForeignKeysAbstract: End" . T.pack $ "Result: " ++ show result
-
-  return result
+  TableName -> ContractF () -> Text -> Text -> Map.Map (Account, Text) (Text, Text) -> CodeCollectionF () -> [ForeignKeyInfo]
+getDeferredForeignKeysAbstract tableName c o a abstracts' cc =
+  catMaybes . flip map [(theName, x) | (theName, VariableDecl {_varType = SVMType.UnknownLabel x _}) <- Map.toList (c ^. storageDefs)] $ \(theName, x) -> do
+      getContractsBySolidString x cc <&> \c' ->
+          let (o',a',n') = case _importedFrom c' of
+                Nothing -> (o, a, _contractName c')
+                Just acct -> case Map.lookup (acct, T.pack $ _contractName c') abstracts' of
+                  Nothing -> (o, a, _contractName c')
+                  Just (o'', a'') -> (o'', a'', _contractName c')
+           in ForeignKeyInfo
+                { tableName = tableName,
+                  columnName = labelToText theName,
+                  foreignTableName = abstractTableName o' a' $ T.pack n'
+                }
 
 
 
@@ -437,7 +416,7 @@ createAbstractTable globalsIORef contract (o, a, n) abstracts' cc = do
       let list = tableColumns $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
       yield $ createAbstractTableQuery contract (o, a, n)
       setTableCreated globalsIORef tableName (list ++ ["\"data\" jsonb"])
-      getDeferredForeignKeysAbstract tableName contract o a abstracts' cc
+      pure $ getDeferredForeignKeysAbstract tableName contract o a abstracts' cc
 
 -- if flag from solidvm that it is a record, vmevent
 createMappingTable ::
@@ -667,7 +646,7 @@ expandAbstractContractTable globalsIORef contract tableName abstracts' cc o a = 
             ]
         setTableCreated globalsIORef tableName $ cols ++ extraTableColumns
         yield $ expandTableQuery tableName extraTableColumns
-      getDeferredForeignKeysAbstract tableName contract o a abstracts' cc
+      pure $ getDeferredForeignKeysAbstract tableName contract o a abstracts' cc
 
 expandTableQuery :: TableName -> TableColumns -> Text
 expandTableQuery tableName cols =
