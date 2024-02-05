@@ -199,9 +199,9 @@
 			],
 			"view/title": [
 				{
-					"command": "contracts.refreshEntry",
+					"command": "contracts.uploadContract",
 					"when": "view == contracts",
-					"group": "navigation@3"
+					"group": "navigation@0"
 				},
 				{
 					"command": "contracts.addContractToList",
@@ -214,14 +214,19 @@
 					"group": "navigation@2"
 				},
 				{
-					"command": "contracts.uploadContract",
+					"command": "contracts.refreshEntry",
 					"when": "view == contracts",
-					"group": "navigation@0"
+					"group": "navigation@3"
 				},
 				{
 					"command": "cirrus.queryCirrus",
 					"when": "view == cirrus",
 					"group": "navigation"
+				},
+				{
+					"command": "extension.oauthLogin",
+					"when": "view == nodes",
+					"group": "navigation@1"
 				},
 				{
 					"command": "nodes.addConfig",
@@ -237,11 +242,6 @@
 					"command": "nodes.refresh",
 					"when": "view == nodes",
 					"group": "navigation@3"
-				},
-				{
-					"command": "extension.oauthLogin",
-					"when": "view == nodes",
-					"group": "navigation@1"
 				}
 			],
 			"view/item/context": [
