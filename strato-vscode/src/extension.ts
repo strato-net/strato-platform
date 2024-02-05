@@ -138,8 +138,13 @@ export async function activate(context: vscode.ExtensionContext) {
 									`Enter a value from ${argNames[i]} with comma-separated values`:
 									`Enter a value for ${argNames[i]}.`
 							});
-							if (!argInput) return;
-							args = { ...args, [argNames[i]]: constr.args[argNames[i]].tag === 'Array' ? argInput.split(',').map(c => c.trim()) : argInput}
+							if (!argInput && constr.args[argNames[i]].tag != 'Array') return;
+							args = { 
+								...args, 
+								[argNames[i]]: constr.args[argNames[i]].tag === 'Array' ? 
+								argInput?.split(',').map(c => c.trim()).filter(d => d != "") : 
+								argInput
+							}
 						}
 					}
 					const uploadArgs = {
@@ -187,8 +192,11 @@ export async function activate(context: vscode.ExtensionContext) {
 							`Enter a value for ${argNames[i][0]} with comma-separated values`:
 							`Enter a value for ${argNames[i][0]}.`
 				});
-				if (!argInput) return;
-				args[argNames[i][0]] = argNames[i][1].type.tag === 'Array' ? argInput.split(',').map(c => c.trim()) : argInput 
+				if (!argInput && argNames[i][1].type.tag != 'Array') return;
+				args[argNames[i][0]] = 
+					argNames[i][1].type.tag === 'Array' ? 
+					argInput?.split(',').map(c => c.trim()).filter(d => d != '') : 
+					argInput 
 			}
 			try {
 				const contract = { name: contractName, address: contractAddress }
