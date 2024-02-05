@@ -74,17 +74,17 @@ export async function activate(context: vscode.ExtensionContext) {
 		const addressRegex = /^[0-9a-fA-F]{40}$/;
 		// check the argInput for an address
 		if (addressRegex.test(argInput)) {
-			const user = await getApplicationUser();
-			const cfg = getConfig() || {};
 			try {
+				const user = await getApplicationUser();
+				const cfg = getConfig() || {};
 				// check if the contract exists, err out otherwise
-				await rest.getContractsContract(user, { address: argInput }, cfg)
+				const res = await rest.getContractsDetails(user, { address: argInput }, { config: cfg  })
 				contractsProvider
 					.addContract(argInput)
 					.then(list => context.workspaceState.update('contractAddresses', list))
+				vscode.window.showInformationMessage(`Inserting contract ${res._contractName} from address ${argInput}`);
 			} catch (e) {
-				vscode.window.showErrorMessage(`Could not get contract details at address ${argInput}.`);
-				console.debug(e)
+				vscode.window.showErrorMessage(`Could not get contract details at address ${argInput}`);
 			}
 
 		} else {
