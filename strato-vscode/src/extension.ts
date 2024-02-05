@@ -119,7 +119,7 @@ export async function activate(context: vscode.ExtensionContext) {
 					const { src: xabis } = await rest.postContractsXabi(user, { src }, nodeOptions);
 					const xabiKeys = Object.keys(xabis);
 					const items = xabiKeys.map((x) => ({ label: x }))
-					const quickPickOption = await vscode.window.showQuickPick(items, {
+					const quickPickOption = items.length === 1 ? items[0] : await vscode.window.showQuickPick(items, {
 						placeHolder: 'Pick a contract to upload',
 					});
 					if (!quickPickOption) return;
@@ -288,15 +288,11 @@ nodes:
 
 # You can have more than one node
 # - id: 1
-#	  label:
-#	  url:
-# ...`
+#	  label: ...
+#	  url: ...`
 		// open this file in the editor
 		const doc = await vscode.workspace.openTextDocument({ content: sampleConfig, language: 'yaml' });
 		await vscode.window.showTextDocument(doc);
-	
-		// give user a message to save this and import it
-		vscode.window.showInformationMessage('')
 	})
 
 
