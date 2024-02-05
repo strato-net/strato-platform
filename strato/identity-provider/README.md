@@ -4,8 +4,9 @@
 This project is meant to help with the registration flow on STRATO. The identity server handles account creation and setup as needed. Specifically, it
 1. creates a user's key in vault for them if they don't already have one
 2. creates, signs, and registers a certificate on-chain for a user if they don't already have one
+3. registers a user wallet on-chain for a user if they don't already have one
 
-To utilize this functionality, you call the PUT /identity endpoint. You must also provide an Authorization header with the user's bearer token, and you can optionally specify the `company` as a query parameter. Whenever possible, the bearer token will be used as the source of truth for information about the user. The common name for the cert will either come from the token's `name` claim, if one exists, or the `preferred_username` claim. Similarly, if there is a `company` claim within the token, that will be used for the cert's organization field. If no claim `company` is found, the identity server will use the `company` query param value instead.
+To utilize this functionality, you call the PUT /identity endpoint. You must also provide an Authorization header with the user's bearer token, and you can optionally specify the `company` as a query parameter. Whenever possible, the bearer token will be used as the source of truth for information about the user. The common name for the cert will either come from the token's `preferred_username` claim, if one exists, or the `name` claim. Similarly, if there is a `company` claim within the token, that will be used for the cert's organization field. If no claim `company` is found, the identity server will use the `company` query param value instead.
 
 ### Notes to the server admin
 
@@ -32,12 +33,12 @@ HTTP_PORT=8080 \
 
 Like all our getting-started scripts, this should be run within the same directory where the identity server's docker-compose, `docker-compose.identity.yml`, is located.
 
-3. Keep in mind that due to the identity server's reliance on `name` and `company` claims in the provided bearer token, we ideally want to have our realms support these claims. The identity server can function without those claims being in the token, but these certs may take a different form than is expected (for example, if a user's JWT has no `name` claim and their `preferred_username` is their email, then the common name in the certificate would be their email instead of their actual name). 
+3. Keep in mind that due to the identity server's reliance on the `company` claim in the provided bearer token, we ideally want to have our realms support this claim. The identity server can function without this claim being in the token, but these certs may take a different form than is expected (for example, if the `company` claim is missing, the cert created may have a suprising value for the `organization` field). 
 
 [!IMPORTANT]
 The information below is important!
 
-4. An important step is setting the URL to you ID-server for your strato node. As of writing this, you can pass the argument in your strato-getting-started script for your node `idServerUrl="https://yourIdServerUrl.com"`, but that is not needed. If that variable is not set in the `sgs` script, it will use `https://identity.blockapps.net` by default.
+4. An important step is setting the URL to you ID-server for your strato node. As of writing this, you can pass the argument in your strato-getting-started script for your node `idServerUrl="https://yourIdServerUrl.com"`, but that is not needed. If that variable is not set in the `sgs` script, it will use `https://identity.blockapps.net` by default on prod and `https://identity.mercata-testnet2.blockapps.net` on testnet
 
 5.  The `strato-getting-started` directory has an `identity-provider` subdirectory from which files will be mounted onto the docker container. These files include `identity-provider/certs/rootPriv.pem`, `identity-provider/certs/rootCert.pem`, and `identity-provider/idconf.yaml`. These files are not included in the docker image for security reasons, as they contain sensitive information. If you do not provide these files within the `identity-provider` subdirectory, the identity docker images will not build.
 
@@ -46,4 +47,4 @@ The information below is important!
 ### Things to consider when updating/restarting an identity server
 1. The main reason for wanting to update the identity server is to update the realms it supports. To do this, add a list element in `identity-provider/idconf.yaml` and specify at minimum a `clientId`, `clientSecret`, and `discoveryUrl` for the realm. You will need to explicitly stop the docker containers and restart them in order to have the identity server read in the new realm information. 
 
-2. The identity server is fairly stateless, so it's quite safe to wipe and restart the server arbitrarily.
+2. The identity server is fairly stateless (with the exception of some caches stored in-memory), so it's quite safe to wipe and restart the server arbitrarily.
