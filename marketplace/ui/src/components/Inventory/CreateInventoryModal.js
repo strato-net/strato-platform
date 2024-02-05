@@ -249,6 +249,7 @@ const CreateInventoryModal = ({
             form={form}
             layout="vertical"
             className="mt-5 inventory_modal"
+            requiredMark={false}
             initialValues={{
               name: "",
               description: "",

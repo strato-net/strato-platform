@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
-import { Button, Form, Input, Select, Upload, notification } from 'antd';
+import { Button, Form, Input, InputNumber, Select, Upload, notification } from 'antd';
 import TextArea from "antd/es/input/TextArea";
 import { useInventoryDispatch, useInventoryState, } from "../../contexts/inventory";
 import { actions } from "../../contexts/inventory/actions";
@@ -106,7 +106,9 @@ const CreateGroupForm = ({ handleCancel }) => {
         }
 
         const { firstAsset, firstQuantity, secondAsset, secondQuantity, assets, images, files, ...restOfValues } = values;
-        assets.push(
+        const newAssets = [...assets];
+
+        newAssets.push(
             {
                 assetAddress: firstAsset,
                 assetQuantity: firstQuantity
@@ -119,13 +121,11 @@ const CreateGroupForm = ({ handleCancel }) => {
 
         const body = {
             ...restOfValues,
-            assets,
+            assets: newAssets,
             images: imageKeys || [],
             files: fileKeys || [],
             paymentProviders: stripeStatus ? [stripeStatus.paymentProviderAddress] : []
         };
-
-        console.log('Received values of form:', body);
 
         let isDone = await actions.createAssetGroup(dispatch, body);
 
@@ -159,6 +159,7 @@ const CreateGroupForm = ({ handleCancel }) => {
             <Form
                 form={form}
                 className='inventory_modal'
+                requiredMark={false}
                 layout="vertical"
                 initialValues={{
                     firstAsset: "",
@@ -196,7 +197,7 @@ const CreateGroupForm = ({ handleCancel }) => {
                             },
                         ]}
                     >
-                        <Input placeholder="Enter group price" />
+                        <InputNumber min={1} controls={false} placeholder="Enter group price" />
                     </Form.Item>
                 </div>
                 <div className="flex justify-between mt-4 ">
@@ -310,7 +311,7 @@ const CreateGroupForm = ({ handleCancel }) => {
                             },
                         ]}
                     >
-                        <Input placeholder="Quantity" />
+                        <InputNumber min={1} controls={false} placeholder="Enter quantity" />
                     </Form.Item>
                 </div>
                 <div className='grid grid-cols-1 md:grid-cols-2 gap-4 mt-4'>
@@ -346,7 +347,7 @@ const CreateGroupForm = ({ handleCancel }) => {
                             },
                         ]}
                     >
-                        <Input placeholder="Quantity" />
+                        <InputNumber min={1} controls={false} placeholder="Enter quantity" />
                     </Form.Item>
                 </div>
                 <Form.List name="assets">
@@ -388,7 +389,7 @@ const CreateGroupForm = ({ handleCancel }) => {
                                             },
                                         ]}
                                     >
-                                        <Input placeholder="Enter quantity" />
+                                        <InputNumber min={1} controls={false} placeholder="Enter quantity" />
                                     </Form.Item>
                                     <MinusCircleOutlined onClick={() => remove(name)} />
                                 </div>

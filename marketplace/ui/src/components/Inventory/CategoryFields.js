@@ -1,7 +1,8 @@
 import {
     Form,
     Input,
-    Select
+    Select,
+    InputNumber
 } from "antd";
 
 const { Option } = Select;
@@ -40,7 +41,7 @@ export const categoricalProperties = (form, handleClothingTypeChange, clothingTy
                             },
                         ]}
                     >
-                        <Input placeholder="Enter Quantity" />
+                        <InputNumber min={1} controls={false} placeholder="Enter quantity" />
                     </Form.Item>
                 </div>
             );
@@ -58,7 +59,7 @@ export const categoricalProperties = (form, handleClothingTypeChange, clothingTy
                             },
                         ]}
                     >
-                        <Input placeholder="Enter Quantity" />
+                        <InputNumber min={1} controls={false} placeholder="Enter quantity" />
                     </Form.Item>
                 </div>
             );
@@ -159,7 +160,7 @@ export const categoricalProperties = (form, handleClothingTypeChange, clothingTy
                             },
                         ]}
                     >
-                        <Input placeholder="Enter Quantity" />
+                        <InputNumber min={1} controls={false} placeholder="Enter quantity" />
                     </Form.Item>
                 </div>
             );
@@ -194,7 +195,7 @@ export const categoricalProperties = (form, handleClothingTypeChange, clothingTy
                             },
                         ]}
                     >
-                        <Input placeholder="Enter Quantity" />
+                        <InputNumber min={1} controls={false} placeholder="Enter quantity" />
                     </Form.Item>
                 </div>
             );
@@ -266,7 +267,7 @@ export const categoricalProperties = (form, handleClothingTypeChange, clothingTy
                             },
                         ]}
                     >
-                        <Input placeholder="Enter Least Sellable Units" />
+                        <InputNumber min={1} max={8} controls={false} placeholder="Enter Least Sellable Units" />
                     </Form.Item>
                     <Form.Item
                         label="Quantity"
@@ -279,7 +280,7 @@ export const categoricalProperties = (form, handleClothingTypeChange, clothingTy
                             },
                         ]}
                     >
-                        <Input placeholder="Enter Quantity" />
+                        <InputNumber min={1} controls={false} placeholder="Enter quantity" />
                     </Form.Item>
                 </div>
             </div>);
@@ -297,7 +298,7 @@ export const categoricalProperties = (form, handleClothingTypeChange, clothingTy
                             },
                         ]}
                     >
-                        <Input placeholder="Enter Expiration (in months)" />
+                        <InputNumber min={1} controls={false} placeholder="Enter Expiration (in months)" />
                     </Form.Item>
                     <Form.Item
                         label="Quantity"
@@ -310,7 +311,7 @@ export const categoricalProperties = (form, handleClothingTypeChange, clothingTy
                             },
                         ]}
                     >
-                        <Input placeholder="Enter Quantity" />
+                        <InputNumber min={1} controls={false} placeholder="Enter quantity" />
                     </Form.Item>
                 </div>);
         default:

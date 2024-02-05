@@ -386,6 +386,18 @@ body{
 .inventory_modal .ant-input{
   height: 42px !important;
 }
+
+.inventory_modal .ant-input-number{
+  height: 42px !important;
+  width: 100%;
+}
+
+.inventory_modal .ant-input-number-input{
+  height: 42px !important;
+  text-align: left;
+  margin-left: 10px;
+}
+
 .ant-select-selector{
   height: 42px !important; 
   align-items: center;
