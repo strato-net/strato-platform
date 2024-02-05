@@ -98,7 +98,8 @@ export async function activate(context: vscode.ExtensionContext) {
 		if (Object.keys(tokens).length === 0) { return vscode.window.showErrorMessage('Please log in to STRATO Mercata to upload a contract.') }
 		const user = await getApplicationUser(0, tokens);
 		const config = getConfig() || {};
-		const nodeOptions = { config, node: 0};
+		const activeNode = vscode.workspace.getConfiguration().get('strato-vscode.activeNode');
+		const nodeOptions = { config, node: activeNode};
 		if (vscode.window.activeTextEditor) {
 			vscode.window.activeTextEditor.document.save();
 			const doc = vscode.window.activeTextEditor.document;
@@ -172,7 +173,8 @@ export async function activate(context: vscode.ExtensionContext) {
 		if (Object.keys(tokens).length === 0) { return vscode.window.showErrorMessage('Please log in to STRATO Mercata to upload a contract.') }
 		const user = await getApplicationUser(nodeId, tokens);
 		const config = getConfig() || {}
-		const nodeOptions = { config, node: nodeId || 0 };
+		const activeNode = vscode.workspace.getConfiguration().get('strato-vscode.activeNode');
+		const nodeOptions = { config, node: activeNode};
 		const val = await rest.getContractsContract(user, contractName, contractAddress, chainId, nodeOptions);
 		const func = ((val || {})._functions || {})[variableName]
 		if (variableName && variableName !== 'constructor' && func) {
@@ -251,6 +253,13 @@ export async function activate(context: vscode.ExtensionContext) {
 	vscode.commands.registerCommand('nodes.refresh', async () => {
 		nodesProvider.refresh()
 	});
+
+	vscode.commands.registerCommand('nodes.setActiveNode', async (element) => {
+		const id = element.node.id
+		await vscode.workspace.getConfiguration().update('strato-vscode.activeNode', id, true)
+		nodesProvider.refresh()
+		vscode.window.showInformationMessage(`Set active node to ${element.tooltip}.`)
+	})
 	
 	vscode.window.registerTreeDataProvider('nodes', nodesProvider)
 

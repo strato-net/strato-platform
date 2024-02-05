@@ -34,6 +34,11 @@
 					"type": "string",
 					"default": "",
 					"description": "The default configuration file containing STRATO node(s) information"
+				},
+				"strato-vscode.activeNode": {
+					"type": "number",
+					"default": 0,
+					"description": "The active node being used in the configuration file."
 				}
 			}
 		},
@@ -77,6 +82,11 @@
 				"command": "cirrus.queryCirrus",
 				"title": "Search",
 				"icon": "$(search)"
+			},
+			{
+				"command": "nodes.setActiveNode",
+				"title": "Set Active Node",
+				"icon": "$(star)"
 			},
 			{
 				"command": "nodes.addConfig",
@@ -253,6 +263,11 @@
 				{
 					"command": "extension.copyTooltipToClipboard",
 					"when": "view == nodes || view == cirrus",
+					"group": "inline"
+				},
+				{
+					"command": "nodes.setActiveNode",
+					"when": "view == nodes && viewItem == node",
 					"group": "inline"
 				}
 			]

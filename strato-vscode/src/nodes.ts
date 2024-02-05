@@ -142,6 +142,7 @@ class Node extends vscode.TreeItem {
     this.id = node.id;
     this.tooltip = node.tooltip;
     this.description = node.description;
+    this.contextValue = nodeType;
   }
 
   iconPath = {
