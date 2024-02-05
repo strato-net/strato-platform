@@ -4,22 +4,30 @@ All notable changes to the "strato-vscode" extension will be documented in this 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## [Unreleased]
-
-## [v0.3.0] - TODO
+## [v0.3.0]
 
 ### Added
 
 - Ability to log in to a STRATO Mercata account and access a node from the user identity
+- Allow user to select active node from `Nodes` view
+- Provide sample configuration file to user
+
+### Fixed
+
+- Ability to handle array arguments in constructors and function calls
 
 ### Changed
 
 - General UI/UX improvements
+- `Contracts` view shows contracts uploaded by extension
+- `Contracts` view allows user to manually insert addresses to list
+- Uploading a single contract will not prompt dropdown selection menu
 
 ### Removed
 
 - Removed the `Project Management` view and functions
 - Removed private chain interaction
+- Removed `node` level view in `Contracts` view - only lists by `address`
 
 ## [v0.2.0] - 2023-26-05
 
