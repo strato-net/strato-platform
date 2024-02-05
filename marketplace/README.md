@@ -74,11 +74,24 @@ yarn start
 
 #### Launch UI
 
-In a new terminal window, run the following commands:
+1. In a new terminal window, run the following commands:
 
 ```
 cd ui
+```
+
+2. Create a `.env` file with the below values: 
+```
+REACT_APP_FILE_SERVER_URL=<fileServerUrl>
+```
+
+3. Install dependencies: 
+```
 yarn install
+```
+
+4. Start the ui webserver:
+```
 yarn develop
 ```
 
