@@ -281,7 +281,7 @@ nodes:
     url: <nodeURL>
     oauth:
       openIdDiscoveryUrl: >-
-        <openIdURLK>/.well-known/openid-configuration
+        <openIdURL>/.well-known/openid-configuration
       clientId: <clientId>
       clientSecret: <clientSecret>
       # scope: <optional>
