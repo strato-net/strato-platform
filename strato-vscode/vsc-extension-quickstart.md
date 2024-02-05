@@ -9,9 +9,16 @@
   * The file exports one function, `activate`, which is called the very first time your extension is activated (in this case by executing the command). Inside the `activate` function we call `registerCommand`.
   * We pass the function containing the implementation of the command as the second parameter to `registerCommand`.
 
+## Preliminary Steps (for BlockApps devs)
+
+* Go to `strato-platform/blockapps-rest` and `yarn install && yarn build`
+  * The extension depends on a local build of `blockapps-rest`
+* Go to `strato-platform/strato-vscode` and `yarn install && yarn watch`
+  * This will leave the compiler on so any changes can instantly be reflected
+
 ## Get up and running straight away
 
-* Press `F5` to open a new window with your extension loaded.
+* Press `F5` in the editor with `extension.ts` opened to launch a new window with your extension loaded.
 * Run your command from the command palette by pressing (`Ctrl+Shift+P` or `Cmd+Shift+P` on Mac) and typing `Hello World`.
 * Set breakpoints in your code inside `src/extension.ts` to debug your extension.
 * Find output from your extension in the debug console.
