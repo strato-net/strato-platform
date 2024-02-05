@@ -665,7 +665,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
   // //-----------------------------PAYMENT starts here -------------------------------
 
-  contract.paymentCheckout = async function (url,args, options = defaultOptions) {
+  contract.paymentCheckout = async function (origin_url, args, options = defaultOptions) {
     try {
 
       const { orderList, orderTotal: recievedOrderTotal } = args;
@@ -729,7 +729,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         }
         stripePaymentSession = await axios.post(new URL('/stripe/checkout', STRIPE_PAYMENT_SERVER_URL).href, checkoutBody, {
           headers: {
-            'referer': `${url}${options.config.marketplaceUiUrlPrefix}`
+            'referer': `${origin_url}${options.config.marketplaceUiUrlPrefix}`
           }
         })
           .then(function (res) {
