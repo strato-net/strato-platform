@@ -1742,6 +1742,28 @@ async function waitForAddress(user, contract, _options:Options) {
   return results[0];
 }
 
+async function waitForAddressState(admin, contract, options:Options) {
+  const state = await util.until(
+    (res) => {
+      if (res) {
+        return true;
+      } else {
+        return false;
+      }
+    },
+    async (opts) => {
+      try {
+        const res = await getState(admin, contract, opts);
+        return res;
+      } catch(e) {
+        return undefined;
+      }
+    },
+    options
+  );
+  return state;
+}
+
 export default {
   fill,
   getAccounts,
@@ -1815,5 +1837,6 @@ export default {
   RestError,
   response,
   //
-  waitForAddress
+  waitForAddress,
+  waitForAddressState
 };

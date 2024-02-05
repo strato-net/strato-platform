@@ -308,9 +308,21 @@ create' creator newAccount ch cc contractName' argExps createBuiltinCall = do
                   _ -> pure ""
               )
 
-  initializeAction newAccount (labelToString contractName') parentName ch
-
   let !contract' = fromMaybe (missingType "create'/contract" contractName') (cc ^. CC.contracts . at contractName')
+      !abstracts' = getAbstractParentsFromContract contract' cc
+      !mappings = getMapNamesFromContract contract'
+      !arrays = getArrayNamesFromContract contract'
+
+  env' <- getEnv
+  let origin' = Env.origin env'
+      metadata = Env.metadata env'
+      maybeUseWallet = M.lookup "useWallet" =<< metadata
+      !useWallet = maybe False (const True) maybeUseWallet
+
+  org <- bool (getOrg creator) (getOrg origin') useWallet
+  !abstracts <- M.fromList <$> traverse (resolveNameParts newAccount (T.pack org) (T.pack parentName)) abstracts'
+
+  initializeAction newAccount (labelToString contractName') parentName ch cc abstracts mappings arrays
 
   A.adjustWithDefault_ (A.Proxy @AddressState) newAccount $ \newAddressState ->
     pure
@@ -345,14 +357,8 @@ create' creator newAccount ch cc contractName' argExps createBuiltinCall = do
     -- set creator again, in case the caller's cert changed during constructor execution
     (\env -> setCreator (Env.origin env) newAccount contract' (blockDataNumber $ Env.blockHeader env)) =<< getEnv
 
-  env <- getEnv
-  let origin' = Env.origin env
-      metadata = Env.metadata env
-      maybeUseWallet = M.lookup "useWallet" =<< metadata
-      !useWallet = maybe False (const True) maybeUseWallet
-      parentName' = bool parentName "" (useWallet && parentName == "User")
+  let parentName' = bool parentName "" (useWallet && parentName == "User")
   
-  org <- bool (getOrg creator) (getOrg origin') useWallet
 
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) newAccount
@@ -518,7 +524,9 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
   let contract = fromMaybe contract' $ mContract >>= \c -> M.lookup c $ CC._contracts cc
       parentName' = if parentName == (CC._contractName contract) then "" else parentName
 
-  initializeAction to (labelToString $ CC._contractName contract) (labelToString parentName') hsh
+  let !abstracts' = getAbstractParentsFromContract contract cc
+      !mappings = getMapNamesFromContract contract
+      !arrays = getArrayNamesFromContract contract
 
   -- grab the org from the senders account and set it to the codeAddress
   orgAccount <-
@@ -529,6 +537,10 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
           _ -> pure from
       else pure to
   org <- getOrg orgAccount
+  !abstracts <- M.fromList <$> traverse (resolveNameParts to' (T.pack org) (T.pack parentName')) abstracts'
+
+  initializeAction to (labelToString $ CC._contractName contract) (labelToString parentName') hsh cc abstracts mappings arrays
+
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) to
   when (isRCC) $
@@ -934,6 +946,19 @@ expressionType (CC.StringLiteral _ _) = SVMType.String $ Just True
 expressionType (CC.AccountLiteral _ _) = SVMType.Account False
 expressionType (CC.ArrayExpression _ xs) = SVMType.Array (expressionType (head xs)) Nothing
 expressionType ex = typeError "Cannot deduce a type from" (ex, ex)
+
+constant :: Variable -> Maybe Value
+constant (Variable _) = Nothing
+constant (Constant v) = Just v
+
+valueToExpression :: a -> Value -> Maybe (CC.ExpressionF a)
+valueToExpression x (SInteger i) = Just $ CC.NumberLiteral x i Nothing
+valueToExpression x (SString s) = Just $ CC.StringLiteral x s
+valueToExpression x (SBool b) = Just $ CC.BoolLiteral x b
+valueToExpression x (SAccount a _) = Just $ CC.AccountLiteral x a
+valueToExpression x (SEnumVal _ _ i) = Just $ CC.NumberLiteral x (fromIntegral i) Nothing
+valueToExpression x (SArray _ vs) = CC.ArrayExpression x . toList <$> traverse (valueToExpression x <=< constant) vs
+valueToExpression _ _ = Nothing -- TODO: Add more cases?
 
 -- | There can only be 1 variadic parameter and it must be the last parameter
 validVariadicSignature :: [SVMType.Type] -> Bool
@@ -1412,28 +1437,37 @@ doWhile condition code = do
     _ -> return result
 
 getIndexType :: MonadSM m => AccountPath -> m IndexType
-getIndexType (AccountPath addr p) = do
-  let field = MS.getField p
-  mType <- getXabiType addr field
-  let n = MS.size p - 1
-  case mType of
-    Nothing -> todo "getIndexType/unknown storage reference" field
-    Just v -> return $! loop n v
-  where
-    loop :: Int -> SVMType.Type -> IndexType
-    loop 0 t = case t of
-      SVMType.Mapping {SVMType.key = SVMType.Int {}} -> MapIntIndex
-      SVMType.Mapping {SVMType.key = SVMType.String {}} -> MapStringIndex
-      SVMType.Mapping {SVMType.key = SVMType.Bytes {}} -> MapStringIndex
-      SVMType.Mapping {SVMType.key = SVMType.Address {}} -> MapAccountIndex
-      SVMType.Mapping {SVMType.key = SVMType.Account {}} -> MapAccountIndex
-      SVMType.Mapping {SVMType.key = SVMType.Bool {}} -> MapBoolIndex
-      SVMType.Array {} -> ArrayIndex
-      _ -> typeError "unanticipated index type" t
-    loop n t = case t of
-      SVMType.Mapping {SVMType.value = t'} -> loop (n - 1) t'
-      SVMType.Array {SVMType.entry = t'} -> loop (n - 1) t'
-      _ -> typeError "indexing type in var dec" t
+getIndexType (AccountPath addr (MS.StoragePath path)) = case path of
+  (MS.Field field : path') -> do
+    mType <- getXabiType addr field
+    let loop :: MonadSM m => [MS.StoragePathPiece] -> SVMType.Type -> m IndexType
+        loop [] t = case t of
+          SVMType.Mapping {SVMType.key = SVMType.Int {}} -> return MapIntIndex
+          SVMType.Mapping {SVMType.key = SVMType.String {}} -> return MapStringIndex
+          SVMType.Mapping {SVMType.key = SVMType.Bytes {}} -> return MapStringIndex
+          SVMType.Mapping {SVMType.key = SVMType.Address {}} -> return MapAccountIndex
+          SVMType.Mapping {SVMType.key = SVMType.Account {}} -> return MapAccountIndex
+          SVMType.Mapping {SVMType.key = SVMType.Bool {}} -> return MapBoolIndex
+          SVMType.Array {} -> return ArrayIndex
+          _ -> typeError "unanticipated index type" t
+        loop (p:ps) t = case t of
+          SVMType.Mapping {SVMType.value = t'} -> loop ps t'
+          SVMType.Array {SVMType.entry = t'} -> loop ps t'
+          -- TODO lookup struct typos, this seems to be the case when there is a global struct reference
+          SVMType.UnknownLabel def _ -> do
+            t' <- getTypeOfName def
+            case t' of
+              StructTypo fs -> case p of
+                MS.Field f -> case UTF8.toString f `M.lookup` M.fromList fs of
+                  Nothing -> typeError "unknownField from StructTypo" field
+                  Just tt -> loop ps $ CC.fieldTypeType tt
+                _ -> typeError "non-field path piece found after struct type" ps
+              _ -> todo "hintFromType" t'
+          _ -> typeError "indexing type in var dec" t
+    case mType of
+      Nothing -> todo "getIndexType/unknown storage reference" field
+      Just v -> loop path' v
+  _ -> typeError "getIndexType called with non-field path" path
 
 expToPath :: MonadSM m => CC.Expression -> m AccountPath
 expToPath (CC.Variable _ x) = do
@@ -2801,7 +2835,7 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
     Just nca -> do
       when (not isRunningTests) $ 
         void $ VME.produceVMEvents [ VME.CodeCollectionAdded 
-                                     (T.pack contractSrc) 
+                                     (const () <$> cc)
                                      (SolidVMCode contractName' hsh) 
                                      (T.pack org) 
                                      (bool (T.pack $ CC._contractName currentContract) (T.pack contractName') useWallet) 
@@ -2809,6 +2843,7 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
                                          Nothing -> []
                                          Just v -> (T.splitOn "," v)
                                      )
+                                     M.empty
                                      []
                                    ]
       pure $ ((flip SAccount) False) $ accountOnUnspecifiedChain nca
@@ -2846,7 +2881,7 @@ callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SS
     Just nca -> do
       when (not isRunningTests) $ 
         void $ VME.produceVMEvents [ VME.CodeCollectionAdded 
-                                      (T.pack contractSrc) 
+                                      (const () <$> cc)
                                       (SolidVMCode contractName' hsh) 
                                       (T.pack org) 
                                       (bool (T.pack $ CC._contractName currentContract) (T.pack contractName') useWallet) 
@@ -2854,6 +2889,7 @@ callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SS
                                           Nothing -> []
                                           Just v -> (T.splitOn "," v)
                                       )
+                                      M.empty
                                       []
                                    ]
       pure $ ((flip SAccount) False) $ accountOnUnspecifiedChain nca
@@ -3025,12 +3061,22 @@ runTheConstructors from to hsh cc contractName' argExps = do
           for_ (toBasic defVal) $ markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n])
     -- SVMType.Bool -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) $ MS.BBool False
 
+    let isStrict = isJust $ find ((== "strict") . fst) $ CC._pragmas cc
     forM_ (reverse $ contract' ^. CC.parents) $ \parent -> do
-      let args =
-            CC.OrderedArgs
-              . fromMaybe []
-              $ M.lookup parent =<< (fmap CC._funcConstructorCalls $ contract' ^. CC.constructor)
-      runTheConstructors from to hsh cc parent args
+      if isStrict
+        then for_ (M.lookup parent . CC._funcConstructorCalls =<< contract' ^. CC.constructor) $ \args'' -> do
+          args' <- traverse (getVar <=< expToVar) args''
+          let argExprs = map (valueToExpression $ contract' ^. CC.contractContext) args'
+              mArgs = sequence $ uncurry (<|>) <$> zip argExprs (Just <$> args'')
+          case mArgs of
+            Just args -> runTheConstructors from to hsh cc parent $ CC.OrderedArgs args
+            Nothing -> typeError "Could not determine values for constructor arguments" args'
+        else do
+          let args =
+                CC.OrderedArgs
+                  . fromMaybe []
+                  $ M.lookup parent =<< (fmap CC._funcConstructorCalls $ contract' ^. CC.constructor)
+          runTheConstructors from to hsh cc parent args
 
     case contract' ^. CC.constructor of
       Just theFunction -> do

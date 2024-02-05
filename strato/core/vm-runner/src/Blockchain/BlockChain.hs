@@ -597,7 +597,7 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
             (fromMaybe "" $ erReturnVal r, unlines $ reverse $ erTrace r, erLogs r, erEvents r)
 
   yieldMany $ OutLog . mkLogEntry ranBlockHash theHash chainId <$> theLogs
-  yieldMany $ OutEvent . mkEventEntry chainId <$> theEvents
+  yield . OutEvent $ mkEventEntry chainId <$> theEvents
   when flags_createTransactionResults $ do
     yield . OutTXR $
       TransactionResult
