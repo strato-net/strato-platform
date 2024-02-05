@@ -8,6 +8,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE MonoLocalBinds  #-}
+{-# LANGUAGE BlockArguments #-}
+
 
 module Slipstream.OutputData (
   outputData,
@@ -293,7 +295,7 @@ createExpandAbstractTable ::
   ConduitM () Text m [ForeignKeyInfo]
 createExpandAbstractTable g c nameParts abstracts cc = do
   creationForeignKeys <- createAbstractTable g c nameParts abstracts cc
-  expansionForeignKeys <- expandAbstractTable g c nameParts
+  expansionForeignKeys <- expandAbstractTable g c nameParts abstracts cc
   return $ creationForeignKeys ++ expansionForeignKeys
 
 data ForeignKeyInfo = ForeignKeyInfo
@@ -346,7 +348,7 @@ getDeferredForeignKeys tableName c o a =
 getDeferredForeignKeysAbstract ::
   TableName -> ContractF () -> Text -> Text -> Map.Map (Account, Text) (Text, Text) -> CodeCollectionF () -> [ForeignKeyInfo]
 getDeferredForeignKeysAbstract tableName c o a abstracts' cc =
-  catMaybes . flip map [(theName, x) | (theName, VariableDecl {_varType = SVMType.Contract x}) <- Map.toList (c ^. storageDefs)] $ \(theName, x) -> do
+  catMaybes . flip map [(theName, x) | (theName, VariableDecl {_varType = SVMType.UnknownLabel x _}) <- Map.toList (c ^. storageDefs)] $ \(theName, x) -> do
       getContractsBySolidString x cc <&> \c' ->
           let (o',a',n') = case _importedFrom c' of
                 Nothing -> (o, a, _contractName c')
@@ -358,6 +360,8 @@ getDeferredForeignKeysAbstract tableName c o a abstracts' cc =
                   columnName = labelToText theName,
                   foreignTableName = abstractTableName o' a' $ T.pack n'
                 }
+
+
 
 getDeferredForeignKeysForMapping :: TableName -> Text -> Text -> [ForeignKeyInfo]
 getDeferredForeignKeysForMapping tableName o a =
@@ -489,10 +493,12 @@ expandAbstractTable ::
   IORef Globals ->
   ContractF () ->
   (Text, Text, Text) ->
+  Map.Map (Account, Text) (Text, Text) ->
+  CodeCollectionF () ->
   ConduitM () Text m [ForeignKeyInfo]
-expandAbstractTable globalsIORef contract (o, a, n) = do
+expandAbstractTable globalsIORef contract (o, a, n) abstracts' cc = do
   let tableName = abstractTableName o a n
-  expandAbstractContractTable globalsIORef contract tableName
+  expandAbstractContractTable globalsIORef contract tableName abstracts' cc o a
 
 expandHistoryTable ::
   OutputM m =>
@@ -608,8 +614,12 @@ expandAbstractContractTable ::
   IORef Globals ->
   ContractF () ->
   TableName ->
+  Map.Map (Account, Text) (Text, Text) ->
+  CodeCollectionF () ->
+  Text ->
+  Text ->
   ConduitM () Text m [ForeignKeyInfo]
-expandAbstractContractTable globalsIORef contract tableName = do
+expandAbstractContractTable globalsIORef contract tableName abstracts' cc o a = do
   columns <- getTableColumns globalsIORef tableName
   case columns of
     Nothing -> do
@@ -636,21 +646,7 @@ expandAbstractContractTable globalsIORef contract tableName = do
             ]
         setTableCreated globalsIORef tableName $ cols ++ extraTableColumns
         yield $ expandTableQuery tableName extraTableColumns
-      return $
-        case tableName of
-          AbstractTableName o a n ->
-            flip
-              map
-              [(colName, foreignName) | (colName, SVMType.Contract foreignName) <- extras]
-              $ \(colName, foreignName) ->
-                ForeignKeyInfo
-                  { tableName = tableName,
-                    columnName = colName,
-                    foreignTableName =
-                      let a' = case a of "" -> n; _ -> a
-                       in abstractTableName o a' $ labelToText foreignName
-                  }
-          _ -> []
+      pure $ getDeferredForeignKeysAbstract tableName contract o a abstracts' cc
 
 expandTableQuery :: TableName -> TableColumns -> Text
 expandTableQuery tableName cols =
@@ -1232,17 +1228,26 @@ valueToSQLTextFilterContract x = valueToSQLText x
 valueToSQLText :: Value -> Maybe Text
 valueToSQLText (SimpleValue (ValueBool x)) = Just $ wrapSingleQuotes $ tshow x
 valueToSQLText (SimpleValue (ValueInt _ _ v)) = Just $ wrapSingleQuotes $ tshow v
-valueToSQLText (SimpleValue (ValueString s)) = Just $ wrapSingleQuotes $ escapeQuotes $ V.unEscapeStringValue s
+valueToSQLText (SimpleValue (ValueString s)) = Just $ wrapSingleQuotes $ escapeQuotes s
 valueToSQLText (SimpleValue (ValueAddress (Address 0))) = Just "NULL"
-valueToSQLText (SimpleValue (ValueAddress (Address addr))) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ printf "%040x" (fromIntegral addr :: Integer)
-valueToSQLText (SimpleValue (ValueAccount acct)) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show acct
+valueToSQLText (SimpleValue (ValueAddress (Address addr))) =
+  if fromIntegral addr == (0 :: Integer)
+  then Just "NULL"
+  else Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ printf "%040x" (fromIntegral addr :: Integer)
+valueToSQLText (SimpleValue (ValueAccount acct@(NamedAccount (Address addr) _))) = 
+  if fromIntegral addr == (0 :: Integer)
+  then Just "NULL"
+  else Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show acct
 valueToSQLText (SimpleValue (ValueBytes _ bytes)) = Just $
   wrapSingleQuotes $
     escapeQuotes $ case decodeUtf8' bytes of
       Left _ -> decodeUtf8 $ Base16.encode bytes
       Right x -> x
 valueToSQLText (ValueEnum _ _ index) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show index
-valueToSQLText (ValueContract acct) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show acct
+valueToSQLText (ValueContract acct@(NamedAccount (Address addr) _)) = 
+  if fromIntegral addr == (0 :: Integer)
+  then Just "NULL"
+  else Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show acct
 valueToSQLText (ValueFunction _ _ _) = Nothing
 valueToSQLText (ValueMapping _) = Nothing
 valueToSQLText (ValueArrayFixed _ _) = Nothing
