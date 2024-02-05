@@ -201,7 +201,7 @@
 				{
 					"command": "contracts.refreshEntry",
 					"when": "view == contracts",
-					"group": "navigation"
+					"group": "navigation@3"
 				},
 				{
 					"command": "contracts.addContractToList",
@@ -211,7 +211,7 @@
 				{
 					"command": "contracts.clearContractList",
 					"when": "view == contracts",
-					"group": "navigation@4"
+					"group": "navigation@2"
 				},
 				{
 					"command": "contracts.uploadContract",
