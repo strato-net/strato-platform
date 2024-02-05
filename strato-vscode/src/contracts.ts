@@ -30,24 +30,13 @@ export class ContractsProvider implements vscode.TreeDataProvider<ContractTreeIt
       return Promise.resolve(items);
     }
   }
+
   async searchContracts(address) {
     const config = getConfig() || {}
     if (Object.keys(config).length === 0) return []
     const options = { config, node: 0 };
     const appUser = await getApplicationUser()
     const results = await rest.getContractsDetails(appUser, { address }, { ...options })
-    return results
-  }
-
-  async getContracts(chainId, i) {
-    const config = getConfig() || {}
-    if (Object.keys(config).length === 0) return []
-    const options = { config, node: i || 0 };
-    const appUser = await getApplicationUser()
-    const query = {
-      limit: 10000
-    }
-    const results = await rest.getContracts(appUser, chainId, {...options, query })
     return results
   }
 
@@ -84,8 +73,7 @@ export class ContractsProvider implements vscode.TreeDataProvider<ContractTreeIt
   }
 
   private async getSelectedContracts() {
-    if (this.selectedContractAddresses.length === 0) return []
-    const cfg = getConfig || {}
+    const cfg = getConfig() || {}
     if (Object.keys(cfg).length === 0) return []
 
     const results = await Promise.all(this.selectedContractAddresses.map(async (c) => { return this.searchContracts(c) }))
