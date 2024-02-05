@@ -5,7 +5,8 @@
 -- all OAuth-related data types and functions go here
 module IdentityProvider.OAuth where
 
-import Blockchain.Strato.Model.Address (Address)
+import Blockchain.Strato.Model.Address (Address(..))
+import Blockchain.Strato.Model.Keccak256 (Keccak256)
 import Control.Monad.IO.Class
 import Data.Aeson
 import Data.ByteString.Base64
@@ -15,6 +16,7 @@ import Data.IORef
 import Data.List (isSuffixOf)
 import Data.List.Split (splitOn)
 import Data.Map (Map, fromList)
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.Time.Clock (UTCTime, getCurrentTime)
 import GHC.Generics
@@ -29,7 +31,10 @@ data ProvidedRealmInfo -- info user provides to support realm
     clientId :: String,
     clientSecret :: String,
     nodeUrl :: Maybe String,
-    fallbackNodeUrl :: Maybe String
+    fallbackNodeUrl :: Maybe String,
+    userRegistryAddress :: Maybe Address,
+    userRegistryCodeHash :: Maybe Keccak256,
+    userTableName :: Maybe String
   }
   deriving (Show, Generic, FromJSON, ToJSON)
 
@@ -45,6 +50,9 @@ data RealmDetails = RealmDetails
     realmClientSecret :: String,
     associatedNodeUrl :: BaseUrl,
     associatedFallback :: BaseUrl,
+    realmUserRegAddr :: Address,
+    realmUserRegCodeHash :: Maybe Keccak256,
+    realmUserTableName :: String,
     cacheRef :: IORef (LRU String Address), -- commonName -> userAddress
     accessTokenRef :: IORef (Maybe AccessToken, UTCTime)
   }
@@ -77,6 +85,9 @@ getRealmMap realmInfos cacheSize = fromList <$> mapM parseRealmMinInfo realmInfo
               realmClientSecret = clientSecret realmInfo,
               associatedNodeUrl = nurl,
               associatedFallback = nurl2,
+              realmUserRegAddr = fromMaybe (Address 0x720) $ userRegistryAddress realmInfo,
+              realmUserRegCodeHash = userRegistryCodeHash realmInfo,
+              realmUserTableName = fromMaybe "User" $ userTableName realmInfo,
               cacheRef = cRef,
               accessTokenRef = tRef
             }

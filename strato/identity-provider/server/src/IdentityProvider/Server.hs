@@ -29,7 +29,7 @@ import Bloc.Client
 import BlockApps.Logging
 import BlockApps.Solidity.ArgValue
 import BlockApps.X509 hiding (isValid)
-import Blockchain.Strato.Model.Address (deriveAddressWithSalt, stringAddress)
+import Blockchain.Strato.Model.Address (deriveAddressWithSalt)
 import Blockchain.Strato.Model.Secp256k1 hiding (HasVault)
 import Control.Monad (void, when)
 import qualified Control.Monad.Change.Alter as A
@@ -42,11 +42,11 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.Cache.LRU as LRU
 import Data.List (elemIndex)
 import qualified Data.Map as M
-import Data.Maybe (fromJust)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Data.Time (diffUTCTime, getCurrentTime)
+import Debug.Trace (trace)
 import GHC.Generics
 import qualified IdentityProvider.API as IDAPI
 import IdentityProvider.Email
@@ -66,26 +66,6 @@ import UnliftIO hiding (Handler)
 data IdentityError
   = IdentityError Text
   deriving (Show, Exception)
-
--- getAccessTokenForRealm ::
---   ( MonadIO m,
---     MonadLogger m,
---     Accessible RealmMap m
---   ) =>
---   String ->
---   m (Maybe AccessToken)
--- getAccessTokenForRealm realm = do
---   rd <- access (Proxy @RealmMap)
---   case M.lookup realm rd of
---     Nothing -> do
---       $logErrorS "getAccessTokenForRealm" $ "Recieved PUT /identity request from a realm we don't support: " <> T.pack realm
---       throwIO $ IdentityError "Identity server does not support this realm"
---     Just
---       RealmDetails
---         { realmEndpoints = ep,
---           realmClientId = cid,
---           realmClientSecret = csec
---         } -> getAccessToken cid csec (token_endpoint ep)
 
 getDefaultEmptyOrg :: String -> String -> String
 getDefaultEmptyOrg name uuid = "Mercata Account " ++ getDefaultEmptyOrgOld name uuid
@@ -123,9 +103,7 @@ data IdentityServerData = IdentityServerData
     issuerCert :: X509Certificate, -- the signing cert
     issuerPrivKey :: PrivateKey, -- the signing private key
     realmNameToDetails :: RealmMap,
-    sendgridAPIKey :: Maybe SendgridAPIKey,
-    userRegistryAddress :: Address,
-    userTableName :: String
+    sendgridAPIKey :: Maybe SendgridAPIKey
   }
 
 instance Monad m => Accessible Issuer (ReaderT IdentityServerData m) where
@@ -142,12 +120,6 @@ instance Monad m => Accessible RealmMap (ReaderT IdentityServerData m) where
 
 instance Monad m => Accessible (Maybe SendgridAPIKey) (ReaderT IdentityServerData m) where
   access _ = asks sendgridAPIKey
-
-instance Monad m => Accessible Address (ReaderT IdentityServerData m) where
-  access _ = asks userRegistryAddress
-
-instance Monad m => Accessible String (ReaderT IdentityServerData m) where
-  access _ = asks userTableName
 
 instance MonadIO m => (String `A.Selectable` AccessToken) (ReaderT IdentityServerData m) where
   select _ realm = do
@@ -211,8 +183,6 @@ putIdentity ::
     Accessible PrivateKey m,
     Accessible RealmMap m,
     Accessible (Maybe SendgridAPIKey) m,
-    Accessible Address m,
-    Accessible String m,
     (String `A.Selectable` AccessToken) m,
     ((String, String) `A.Alters` Address) m
   ) =>
@@ -300,8 +270,6 @@ putIdentityExternal ::
     Accessible PrivateKey m,
     Accessible RealmMap m,
     Accessible (Maybe SendgridAPIKey) m,
-    Accessible Address m,
-    Accessible String m,
     (String `A.Selectable` AccessToken) m,
     ((String, String) `A.Alters` Address) m
   ) =>
@@ -376,45 +344,51 @@ certInCirrus token RealmDetails {associatedNodeUrl = nurl1, associatedFallback =
 
 walletInCirrus ::
   ( MonadIO m,
-    MonadLogger m,
-    Accessible String m,
-    Accessible Address m
+    MonadLogger m
   ) =>
   Text ->
   RealmDetails ->
   String ->
   m Bool
-walletInCirrus token RealmDetails {associatedNodeUrl = nurl1, associatedFallback = nurl2} commonName = do
-  userTableName <- access (Proxy @String)
-  userRegistryAddress <- access (Proxy @Address)
-  response1 <- callCirrus userRegistryAddress nurl1 userTableName
-  mWallet :: Maybe [WalletInCirrus] <-
-    if statusCode (responseStatus response1) == 200
-      then return . decode $ responseBody response1
-      else callCirrus userRegistryAddress nurl2 userTableName >>= return . decode . responseBody
-  case mWallet of
-    Just wallet -> do
-      $logInfoS "walletInCirrus" $ T.pack $ "Checked for user's wallet in Cirrus; response was: " <> show wallet
-      return . not $ null wallet -- maybe can also check if cert is valid and matches user attributes
-    Nothing -> do
-      $logErrorS "walletInCirrus" "Unexpected response from cirrus query. This should never happen"
-      throwIO $ IdentityError "Unable to decode cirrus query for user's wallet. Something went very wrong"
-  where
-    cirrusSearchPath :: Address -> String -> String
-    cirrusSearchPath userRegAddr userTableName =
-      let derivedAddr = deriveAddressWithSalt (Just userRegAddr) commonName Nothing (Just . show $ OrderedVals [SString $ commonName])
-       in "/cirrus/search/" <> userTableName <> "?address=eq." <> show derivedAddr
+walletInCirrus
+  token
+  RealmDetails
+    { associatedNodeUrl = nurl1,
+      associatedFallback = nurl2,
+      realmUserTableName = userTableName,
+      realmUserRegAddr = userRegAddr,
+      realmUserRegCodeHash = mHash
+    }
+  commonName = do
+    response1 <- callCirrus nurl1
+    mWallet :: Maybe [WalletInCirrus] <-
+      if statusCode (responseStatus response1) == 200
+        then return . decode $ responseBody response1
+        else callCirrus nurl2 >>= return . decode . responseBody
+    case mWallet of
+      Just wallet -> do
+        $logInfoS "walletInCirrus" $ T.pack $ "Checked for user's wallet in Cirrus; response was: " <> show wallet
+        return . not $ null wallet -- maybe can also check if cert is valid and matches user attributes
+      Nothing -> do
+        $logErrorS "walletInCirrus" "Unexpected response from cirrus query. This should never happen"
+        throwIO $ IdentityError "Unable to decode cirrus query for user's wallet. Something went very wrong"
+    where
+      cirrusSearchPath :: String
+      cirrusSearchPath =
+        let derivedAddr = deriveAddressWithSalt (Just userRegAddr) commonName mHash (Just . show $ OrderedVals [SString $ commonName])
+            derivedAddr' = trace ("DERIVED ADDR IS " <> show derivedAddr) (show derivedAddr)
+         in "/cirrus/search/" <> userTableName <> "?address=eq." <> derivedAddr'
 
-    callCirrus :: MonadIO m => Address -> BaseUrl -> String -> m (HTTP.Response BL.ByteString)
-    callCirrus userRegAddr nurl userTableName = do
-      let cirrusEndpoint = cirrusSearchPath userRegAddr userTableName
-          url = showBaseUrl nurl {baseUrlPath = baseUrlPath nurl <> cirrusEndpoint}
-      mgr <- liftIO $ case baseUrlScheme nurl of
-        Http -> newManager defaultManagerSettings
-        Https -> newManager tlsManagerSettings
-      request <- liftIO $ parseRequest url
-      let rHead = [(hContentType, "application/json"), (hAuthorization, encodeUtf8 $ "Bearer " <> token)]
-      liftIO $ httpLbs request {requestHeaders = rHead} mgr
+      callCirrus :: MonadIO m => BaseUrl -> m (HTTP.Response BL.ByteString)
+      callCirrus nurl = do
+        let cirrusEndpoint = cirrusSearchPath
+            url = showBaseUrl nurl {baseUrlPath = baseUrlPath nurl <> cirrusEndpoint}
+        mgr <- liftIO $ case baseUrlScheme nurl of
+          Http -> newManager defaultManagerSettings
+          Https -> newManager tlsManagerSettings
+        request <- liftIO $ parseRequest url
+        let rHead = [(hContentType, "application/json"), (hAuthorization, encodeUtf8 $ "Bearer " <> token)]
+        liftIO $ httpLbs request {requestHeaders = rHead} mgr
 
 createAndRegisterCert ::
   ( MonadIO m,
@@ -519,7 +493,6 @@ txSuccess _ = False
 registerUserWalletAsync ::
   ( MonadUnliftIO m,
     MonadLogger m,
-    Accessible Address m,
     ((String, String) `A.Alters` Address) m
   ) =>
   AccessToken ->
@@ -534,65 +507,69 @@ registerUserWalletAsync realmToken rd name' realm uuid' a = void . async $ do
   when regSuccess $ A.insert Proxy (realm, uuid') a
 
 registerUserWallet ::
-  (MonadUnliftIO m, MonadLogger m, Accessible Address m) =>
+  (MonadUnliftIO m, MonadLogger m) =>
   AccessToken ->
   RealmDetails ->
   String ->
   m Bool
-registerUserWallet token RealmDetails {associatedNodeUrl = nurl, associatedFallback = nurl2} commonName = do
-  userRegAddr <- access (Proxy @Address)
-  mgr <- liftIO $ case baseUrlScheme nurl of
-    Http -> newManager defaultManagerSettings
-    Https -> newManager tlsManagerSettings
-  let clientEnv = mkClientEnv mgr nurl {baseUrlPath = baseUrlPath nurl <> blocEndpoint}
-      txPayload =
-        BlocFunction
-          FunctionPayload
-            { functionpayloadContractAddress = userRegAddr,
-              functionpayloadMethod = "createUser",
-              functionpayloadArgs = M.singleton "_commonName" (ArgString $ T.pack commonName),
-              functionpayloadValue = Nothing,
-              functionpayloadTxParams = Nothing,
-              functionpayloadChainid = Nothing,
-              functionpayloadMetadata = Nothing
-            }
-      txRequest = PostBlocTransactionRequest Nothing [txPayload] Nothing Nothing
-      postBlocTx = runClientM (postBlocTransactionExternal (Just $ "Bearer " <> access_token token) Nothing Nothing True txRequest)
-  eresponse <- liftIO $ postBlocTx clientEnv
-  case eresponse of
-    Right response ->
-      if all txSuccess response
-        then do
-          $logInfoS "registerUserWallet"
-            . T.pack
-            $ "Response after registering user wallet was: " ++ show response
-          return True
-        else do
-          $logErrorS "registerUserWallet"
-            . T.pack
-            $ "Failed to register user wallet; response was: " ++ show response
-          return False
-    Left clienterr -> do
-      $logErrorS "registerUserWallet" $
-        T.pack $
-          "Attempting to register on fallback node because recieved the following error when registering user wallet on primary node: "
-            ++ show clienterr
-      mgr2 <- liftIO $ case baseUrlScheme nurl2 of
-        Http -> newManager defaultManagerSettings
-        Https -> newManager tlsManagerSettings
-      let clientEnv2 = mkClientEnv mgr2 nurl2 {baseUrlPath = baseUrlPath nurl2 <> blocEndpoint}
-      eresponse2 <- liftIO $ postBlocTx clientEnv2
-      case eresponse2 of
-        Right response2 | all txSuccess response2 -> do
-          $logInfoS "registerUserWallet" . T.pack $ "Response from fallback node was " ++ show response2
-          return True
-        err -> do
-          $logErrorS "registerUserWallet"
-            . T.pack
-            $ "Failed to register user wallet; response was: " ++ show err
-          return False
-
--- TODO: how to tell if cert successfully added to blockchain?
+registerUserWallet
+  token
+  RealmDetails
+    { associatedNodeUrl = nurl,
+      associatedFallback = nurl2,
+      realmUserRegAddr = userRegAddr
+    }
+  commonName = do
+    mgr <- liftIO $ case baseUrlScheme nurl of
+      Http -> newManager defaultManagerSettings
+      Https -> newManager tlsManagerSettings
+    let clientEnv = mkClientEnv mgr nurl {baseUrlPath = baseUrlPath nurl <> blocEndpoint}
+        txPayload =
+          BlocFunction
+            FunctionPayload
+              { functionpayloadContractAddress = userRegAddr,
+                functionpayloadMethod = "createUser",
+                functionpayloadArgs = M.singleton "_commonName" (ArgString $ T.pack commonName),
+                functionpayloadValue = Nothing,
+                functionpayloadTxParams = Nothing,
+                functionpayloadChainid = Nothing,
+                functionpayloadMetadata = Nothing
+              }
+        txRequest = PostBlocTransactionRequest Nothing [txPayload] Nothing Nothing
+        postBlocTx = runClientM (postBlocTransactionExternal (Just $ "Bearer " <> access_token token) Nothing Nothing True txRequest)
+    eresponse <- liftIO $ postBlocTx clientEnv
+    case eresponse of
+      Right response ->
+        if all txSuccess response
+          then do
+            $logInfoS "registerUserWallet"
+              . T.pack
+              $ "Response after registering user wallet was: " ++ show response
+            return True
+          else do
+            $logErrorS "registerUserWallet"
+              . T.pack
+              $ "Failed to register user wallet; response was: " ++ show response
+            return False
+      Left clienterr -> do
+        $logErrorS "registerUserWallet" $
+          T.pack $
+            "Attempting to register on fallback node because recieved the following error when registering user wallet on primary node: "
+              ++ show clienterr
+        mgr2 <- liftIO $ case baseUrlScheme nurl2 of
+          Http -> newManager defaultManagerSettings
+          Https -> newManager tlsManagerSettings
+        let clientEnv2 = mkClientEnv mgr2 nurl2 {baseUrlPath = baseUrlPath nurl2 <> blocEndpoint}
+        eresponse2 <- liftIO $ postBlocTx clientEnv2
+        case eresponse2 of
+          Right response2 | all txSuccess response2 -> do
+            $logInfoS "registerUserWallet" . T.pack $ "Response from fallback node was " ++ show response2
+            return True
+          err -> do
+            $logErrorS "registerUserWallet"
+              . T.pack
+              $ "Failed to register user wallet; response was: " ++ show err
+            return False
 
 getVaultKey :: (MonadIO m, MonadLogger m, HasVault m) => Text -> m (Maybe AddressAndKey)
 getVaultKey accessToken = do
@@ -632,8 +609,6 @@ server ::
     Accessible PrivateKey m,
     Accessible RealmMap m,
     Accessible (Maybe SendgridAPIKey) m,
-    Accessible Address m,
-    Accessible String m,
     (String `A.Selectable` AccessToken) m,
     ((String, String) `A.Alters` Address) m
   ) =>
@@ -647,10 +622,8 @@ hoistCoreServer ::
   PrivateKey ->
   RealmMap ->
   Maybe SendgridAPIKey ->
-  String ->
-  String ->
   Server IDAPI.IdentityProviderAPI
-hoistCoreServer vaulturl iss cert privk rd mEmailK userRegAddr userTableName =
+hoistCoreServer vaulturl iss cert privk rd mEmailK =
   hoistServer (Proxy :: Proxy IDAPI.IdentityProviderAPI) (convertErrors runM') server
   where
     convertErrors r x = Handler $ do
@@ -659,7 +632,7 @@ hoistCoreServer vaulturl iss cert privk rd mEmailK userRegAddr userTableName =
         Right a -> return a
         Left e -> throwE $ reThrowError e
     runM' :: ReaderT IdentityServerData (VaultM (LoggingT IO)) x -> IO x
-    runM' x = runLoggingT . runVaultM vaulturl $ runIdentityM iss cert privk rd mEmailK userRegAddr userTableName x
+    runM' x = runLoggingT . runVaultM vaulturl $ runIdentityM iss cert privk rd mEmailK x
     reThrowError :: IdentityError -> ServerError
     reThrowError =
       \case
@@ -671,12 +644,10 @@ runIdentityM ::
   PrivateKey ->
   RealmMap ->
   Maybe SendgridAPIKey ->
-  String ->
-  String ->
   ReaderT IdentityServerData m a ->
   m a
-runIdentityM iss cert privk rd mEmailK userRegAddr userTableName x =
-  runReaderT x $ IdentityServerData iss cert privk rd mEmailK (fromJust $ stringAddress userRegAddr) userTableName
+runIdentityM iss cert privk rd mEmailK x =
+  runReaderT x $ IdentityServerData iss cert privk rd mEmailK
 
 identityProviderApp ::
   String ->
@@ -685,8 +656,6 @@ identityProviderApp ::
   PrivateKey ->
   RealmMap ->
   Maybe SendgridAPIKey ->
-  String ->
-  String ->
   Application
-identityProviderApp vurl iss cert pk rd mEmailK userRegAddr userTableName =
-  serve (Proxy :: Proxy IDAPI.IdentityProviderAPI) $ hoistCoreServer vurl iss cert pk rd mEmailK userRegAddr userTableName
+identityProviderApp vurl iss cert pk rd mEmailK =
+  serve (Proxy :: Proxy IDAPI.IdentityProviderAPI) $ hoistCoreServer vurl iss cert pk rd mEmailK
