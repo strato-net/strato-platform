@@ -498,7 +498,7 @@ expandAbstractTable ::
   ConduitM () Text m [ForeignKeyInfo]
 expandAbstractTable globalsIORef contract (o, a, n) abstracts' cc = do
   let tableName = abstractTableName o a n
-  expandAbstractContractTable globalsIORef contract tableName abstracts' cc o a
+  expandAbstractContractTable globalsIORef contract tableName abstracts' cc
 
 expandHistoryTable ::
   OutputM m =>
@@ -616,10 +616,8 @@ expandAbstractContractTable ::
   TableName ->
   Map.Map (Account, Text) (Text, Text) ->
   CodeCollectionF () ->
-  Text ->
-  Text ->
   ConduitM () Text m [ForeignKeyInfo]
-expandAbstractContractTable globalsIORef contract tableName abstracts' cc o a = do
+expandAbstractContractTable globalsIORef contract tableName abstracts' cc = do
   columns <- getTableColumns globalsIORef tableName
   case columns of
     Nothing -> do
@@ -646,7 +644,23 @@ expandAbstractContractTable globalsIORef contract tableName abstracts' cc o a = 
             ]
         setTableCreated globalsIORef tableName $ cols ++ extraTableColumns
         yield $ expandTableQuery tableName extraTableColumns
-      pure $ getDeferredForeignKeysAbstract tableName contract o a abstracts' cc
+      return $
+        case tableName of
+          AbstractTableName o a _ ->
+            catMaybes . flip map [(colName, foreignName) | (colName, SVMType.UnknownLabel foreignName _) <- extras]
+              $ \(colName, foreignName) -> do
+                getContractsBySolidString foreignName cc <&> \c' ->
+                    let (o',a',n') = case _importedFrom c' of
+                          Nothing -> (o, a, _contractName c')
+                          Just acct -> case Map.lookup (acct, T.pack $ _contractName c') abstracts' of
+                            Nothing -> (o, a, _contractName c')
+                            Just (o'', a'') -> (o'', a'', _contractName c')
+                    in ForeignKeyInfo
+                          { tableName = tableName,
+                            columnName = colName,
+                            foreignTableName = abstractTableName o' a' $ T.pack n'
+                          }
+          _ -> []
 
 expandTableQuery :: TableName -> TableColumns -> Text
 expandTableQuery tableName cols =
