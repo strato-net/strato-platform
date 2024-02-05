@@ -153,7 +153,7 @@ export async function activate(context: vscode.ExtensionContext) {
 						.addContract(res.address)
 						.then(list => context.workspaceState.update('contractAddresses', list))
 				} catch (e) {
-					vscode.window.showErrorMessage(`${e}`);
+					vscode.window.showErrorMessage(`${e?.response?.data|| e}`);
 				}
 			} else {
 				vscode.window.showErrorMessage(`Please open a Solidity file to begin uploading a contract.`);
@@ -264,6 +264,42 @@ export async function activate(context: vscode.ExtensionContext) {
 		const { tooltip } = element
 		copyToClipboard(tooltip)
 	})
+
+	vscode.commands.registerCommand('extension.provideSampleConfiguration', async () => {
+		const sampleConfig =
+/**
+ * Bare minimum configuration to get the VS Code extension features running
+ * 
+ * TODO: make SolidVM the default VM in the API so "VM: SolidVM" can be removed
+ */
+`# STRATO VS Code Extension Node Configuration
+
+VM: SolidVM
+nodes:
+  - id: 0
+    label: node1 # Call this node whatever you like
+    url: <nodeURL>
+    oauth:
+      openIdDiscoveryUrl: >-
+        <openIdURLK>/.well-known/openid-configuration
+      clientId: <clientId>
+      clientSecret: <clientSecret>
+      # scope: <optional>
+
+# You can have more than one node
+# - id: 1
+#	  label:
+#	  url:
+# ...`
+		// open this file in the editor
+		const doc = await vscode.workspace.openTextDocument({ content: sampleConfig, language: 'yaml' });
+		await vscode.window.showTextDocument(doc);
+	
+		// give user a message to save this and import it
+		vscode.window.showInformationMessage('')
+	})
+
+
 	// Activate debug mode and diagnostics
 	// activateStratoDebug(context);
 	// const solidityDiagnostics = vscode.languages.createDiagnosticCollection("solidity");
