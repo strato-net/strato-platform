@@ -248,6 +248,7 @@ export async function activate(context: vscode.ExtensionContext) {
 			vscode.window.showErrorMessage('Please select a valid YAML file.')
 			return
 		}
+		await vscode.workspace.getConfiguration().update('strato-vscode.activeNode', 0, true)
 		await vscode.workspace.getConfiguration().update('strato-vscode.configPath', fp, true)
 		nodesProvider.refresh()
 	})
