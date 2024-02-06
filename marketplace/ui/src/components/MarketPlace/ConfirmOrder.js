@@ -365,14 +365,9 @@ const ConfirmOrder = () => {
   return (
     <>
       {responsiveAddress ? <ResponsiveAddAddress back={closeResponsiveAddress} /> :
-        <div className="h-screen md:mx-10 md:mt-5  mx-5 lg:mx-14   ">
-          {contextHolder}
-          {isCreateOrderSubmitting || isCreatePaymentSubmitting ? (
-            <div className="h-screen flex justify-center items-center">
-              <Spin spinning={isCreateOrderSubmitting || isCreatePaymentSubmitting} size="large" />
-            </div>
-          ) : (
-            <div className="pb-[30px]">
+        <>
+          <div className="fixed-component shadow-header">
+            <div className="fixed-component-child md:mx-10 mx-5 lg:mx-14">
               <Breadcrumb>
                 <Breadcrumb.Item href="javascript:;">
                   <ClickableCell href={routes.Marketplace.url}>
@@ -409,6 +404,16 @@ const ConfirmOrder = () => {
                   Review and Submit
                 </button>}
               </div>
+            </div>
+          </div>
+          <div className="h-screen md:mx-10 md:mt-5  mx-5 lg:mx-14   ">
+            {contextHolder}
+            {isCreateOrderSubmitting || isCreatePaymentSubmitting ? (
+              <div className="h-screen flex justify-center items-center">
+                <Spin spinning={isCreateOrderSubmitting || isCreatePaymentSubmitting} size="large" />
+              </div>
+            ) : (
+            <div className="pb-[30px] confirm-order-body">
               <div className="pt-4 hidden lg:block border-top cart">
                 <DataTableComponent
                   isLoading={false}
@@ -501,7 +506,8 @@ const ConfirmOrder = () => {
           )}
           {marketplaceMessage && openToastMarketplace("Bottom")}
           {message && openToastOrder("bottom")}
-        </div>}
+        </div>
+      </>}
     </>
   );
 };
