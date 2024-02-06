@@ -287,19 +287,19 @@ const actions = {
           type: actionDescriptors.updateSaleSuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, "Sale has been updated", true);
+        actions.setMessage(dispatch, "Listing updated successfully", true);
         return true;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.updateSaleFailed,
-          error: "Error while updating Sale",
+          error: "Error while updating listing",
         });
-        actions.setMessage(dispatch, "Error while updating Sale");
+        actions.setMessage(dispatch, "Error while updating listing");
         return false;
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
           type: actionDescriptors.updateSaleFailed,
-          error: "Unauthorized while updating Sale"
+          error: "Error while updating listing"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -308,14 +308,14 @@ const actions = {
         type: actionDescriptors.updateSaleFailed,
         error: body.error
       });
-      actions.setMessage(dispatch, "Error while updating Sale");
+      actions.setMessage(dispatch, "Error while updating listing");
       return false;
     } catch (err) {
       dispatch({
         type: actionDescriptors.updateSaleFailed,
-        error: "Error while updating Sale",
+        error: "Error while updating listing",
       });
-      actions.setMessage(dispatch, "Error while updating Sale");
+      actions.setMessage(dispatch, "Error while updating listing");
     }
   },
 
@@ -340,15 +340,15 @@ const actions = {
           type: actionDescriptors.listInventorySuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, "Listing Item was successful", true);
+        actions.setMessage(dispatch, "Inventory listed successfully", true);
         return true;
       } else if (response.status === RestStatus.CONFLICT) {
         dispatch({ type: actionDescriptors.listInventoryFailed, error: body.error.message });
         actions.setMessage(dispatch, body.error.message)
         return false;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
-        dispatch({ type: actionDescriptors.listInventoryFailed, error: "Error while listing Item" });
-        actions.setMessage(dispatch, "Error while listing Item")
+        dispatch({ type: actionDescriptors.listInventoryFailed, error: "Error while listing inventory" });
+        actions.setMessage(dispatch, "Error while listing inventory")
         return false;
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
@@ -367,9 +367,9 @@ const actions = {
     } catch (err) {
       dispatch({
         type: actionDescriptors.listInventoryFailed,
-        error: "Error while listing Item",
+        error: "Error while listing inventory",
       });
-      actions.setMessage(dispatch, "Error while listing Item");
+      actions.setMessage(dispatch, "Error while listing inventory");
     }
   },
 
@@ -394,15 +394,15 @@ const actions = {
           type: actionDescriptors.unlistInventorySuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, "Unlisting Item was successful", true);
+        actions.setMessage(dispatch, "Inventory unlisted successfully", true);
         return true;
       } else if (response.status === RestStatus.CONFLICT) {
         dispatch({ type: actionDescriptors.unlistInventoryFailed, error: body.error.message });
         actions.setMessage(dispatch, body.error.message)
         return false;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
-        dispatch({ type: actionDescriptors.unlistInventoryFailed, error: "Error while unlisting Item" });
-        actions.setMessage(dispatch, "Error while unlisting Item")
+        dispatch({ type: actionDescriptors.unlistInventoryFailed, error: "Error while unlisting inventory" });
+        actions.setMessage(dispatch, "Error while unlisting inventory")
         return false;
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
@@ -421,9 +421,9 @@ const actions = {
     } catch (err) {
       dispatch({
         type: actionDescriptors.unlistInventoryFailed,
-        error: "Error while unlisting Item",
+        error: "Error while unlisting inventory",
       });
-      actions.setMessage(dispatch, "Error while unlisting Item");
+      actions.setMessage(dispatch, "Error while unlisting inventory");
     }
   },
 
