@@ -17,9 +17,8 @@ describe('Test Offline Transactions', async function () {
   }
 
   const getNonce = async function(){
-    const eth_db_name = await exec(dockerPrefix + `docker exec strato-postgres-1 psql -U postgres -t -c "select datname from pg_database where datname like '%eth_%';" | tr -d "[:space:]"`)
-    const n = await exec(dockerPrefix + `docker exec strato-postgres-1 psql -U postgres -d ` + eth_db_name.stdout + ` -t -c "select nonce from address_state_ref where address='74f014fef932d2728c6c7e2b4d3b88ac37a7e1d0';" | tr -d "[:space:]"`)
-    return parseInt(n.stdout)
+    const n = await exec(dockerPrefix + `docker exec strato-strato-1 curl "localhost:3000/eth/v1.2/account?address=74f014fef932d2728c6c7e2b4d3b88ac37a7e1d0" -s`)
+    return parseInt(JSON.parse(n.stdout)[0]['nonce'])
   }
 
   before(async function () {
