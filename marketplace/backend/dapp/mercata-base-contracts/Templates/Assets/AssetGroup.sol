@@ -3,7 +3,7 @@ pragma strict;
 
 import <BASE_CODE_COLLECTION>;
 
-/// @title A representation of Art assets
+/// @title A representation of AssetGroup assets
 contract AssetGroup is UTXO {
     address[] public assetAddresses;
     uint[] public assetQuantities;
