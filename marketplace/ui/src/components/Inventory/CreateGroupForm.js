@@ -76,7 +76,61 @@ const CreateGroupForm = ({ handleCancel }) => {
         form.setFieldValue("files", info.fileList.map((e) => e.originFileObj))
     };
 
+    const isNotAssetGroup = (inventory) => {
+        const parts = inventory.contract_name.split('-');
+        const contractName = parts[parts.length - 1];
+
+        if (contractName !== "AssetGroup") {
+            return true;
+        } else {
+            return false;
+        }
+    };
+
     const handleCreateFormSubmit = async (values) => {
+        const { firstAsset, firstQuantity, secondAsset, secondQuantity, assets, images, files, ...restOfValues } = values;
+        const newAssets = [...assets];
+        let canCreate = true;
+
+        newAssets.push(
+            {
+                assetAddress: firstAsset,
+                assetQuantity: firstQuantity
+            },
+            {
+                assetAddress: secondAsset,
+                assetQuantity: secondQuantity
+            }
+        );
+
+        // check if there is enough quantity for each selected asset
+        outerLoop:
+        for (const asset of newAssets) {
+            for (const inventory of inventories) {
+                if (asset.assetAddress === inventory.address && asset.assetQuantity > inventory.quantity) {
+                    api.error({
+                        message: "Inputted more quantity than available",
+                        onClose: actions.resetMessage(dispatch),
+                        placement: "bottom",
+                    });
+                    canCreate = false;
+                    break outerLoop;
+                }
+            }
+        }
+
+        // check if there are any duplicate selected assets
+        const assetAddresses = newAssets.map((asset) => asset.assetAddress);
+        if (new Set(assetAddresses).size !== assetAddresses.length) {
+            api.error({
+                message: "Same asset selected more than once",
+                onClose: actions.resetMessage(dispatch),
+                placement: "bottom",
+            });
+            canCreate = false;
+            return;
+        }
+
         let imageKeys = []
         if (values.images && values.images.length > 0) {
             for (const img of values.images) {
@@ -105,20 +159,6 @@ const CreateGroupForm = ({ handleCancel }) => {
             }
         }
 
-        const { firstAsset, firstQuantity, secondAsset, secondQuantity, assets, images, files, ...restOfValues } = values;
-        const newAssets = [...assets];
-
-        newAssets.push(
-            {
-                assetAddress: firstAsset,
-                assetQuantity: firstQuantity
-            },
-            {
-                assetAddress: secondAsset,
-                assetQuantity: secondQuantity
-            }
-        );
-
         const body = {
             ...restOfValues,
             assets: newAssets,
@@ -127,11 +167,13 @@ const CreateGroupForm = ({ handleCancel }) => {
             paymentProviders: stripeStatus ? [stripeStatus.paymentProviderAddress] : []
         };
 
-        let isDone = await actions.createAssetGroup(dispatch, body);
+        if (canCreate) {
+            let isDone = await actions.createAssetGroup(dispatch, body);
 
-        if (isDone) {
-            await actions.fetchInventory(dispatch, 10, 0, "", "");
-            handleCancel();
+            if (isDone) {
+                await actions.fetchInventory(dispatch, 10, 0, "", "");
+                handleCancel();
+            }
         }
     };
 
@@ -293,8 +335,9 @@ const CreateGroupForm = ({ handleCancel }) => {
                             placeholder="Select Asset"
                             allowClear
                             showSearch
+                            filterOption={(input, option) => (option?.children ?? '').toLowerCase().includes(input.toLowerCase())}
                         >
-                            {inventories.map((e, index) => (
+                            {inventories.filter((inv) => isNotAssetGroup(inv)).map((e, index) => (
                                 <Option value={e.address} key={index}>
                                     {e.name}
                                 </Option>
@@ -329,8 +372,9 @@ const CreateGroupForm = ({ handleCancel }) => {
                             placeholder="Select Asset"
                             allowClear
                             showSearch
+                            filterOption={(input, option) => (option?.children ?? '').toLowerCase().includes(input.toLowerCase())}
                         >
-                            {inventories.map((e, index) => (
+                            {inventories.filter((inv) => isNotAssetGroup(inv)).map((e, index) => (
                                 <Option value={e.address} key={index}>
                                     {e.name}
                                 </Option>
@@ -370,8 +414,9 @@ const CreateGroupForm = ({ handleCancel }) => {
                                             placeholder="Select Asset"
                                             allowClear
                                             showSearch
+                                            filterOption={(input, option) => (option?.children ?? '').toLowerCase().includes(input.toLowerCase())}
                                         >
-                                            {inventories.map((e, index) => (
+                                            {inventories.filter((inv) => isNotAssetGroup(inv)).map((e, index) => (
                                                 <Option value={e.address} key={index}>
                                                     {e.name}
                                                 </Option>
