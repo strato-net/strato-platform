@@ -12,7 +12,7 @@ RUN yarn install
 ### Builder
 FROM yarninstaller as builder
 COPY . /usr/src/ui/
-RUN REACT_APP_IN_DOCKER=true REACT_APP_UI_VERSION=$(node -e "console.log(require('./package.json').version);") yarn build
+RUN REACT_APP_IN_DOCKER=true REACT_APP_UI_VERSION=$(node -e "console.log(require('./package.json').version);") REACT_APP_FILE_SERVER_URL=https://fileserver.mercata-testnet2.blockapps.net/highway/ yarn build
 
 ### Prod
 FROM base as prod
