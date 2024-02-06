@@ -9,11 +9,17 @@ describe('Test Offline Transactions', async function () {
   
   let dockerPrefix
   let x509UserData
-  let nonceCounter = 0
+  let nonceCounter
 
   const getSimpleStorageCountFromCirrus = async function () {
     const cirrusResp = await exec(dockerPrefix + 'docker exec strato-postgrest-1 curl localhost:3001/BlockApps-SimpleStorageTest')
     return cirrusResp.stdout.split('transaction_hash').length - 1
+  }
+
+  const getNonce = async function(){
+    const eth_db_name = await exec(dockerPrefix + `docker exec strato-postgres-1 psql -U postgres -t -c "select datname from pg_database where datname like '%eth_%';" | tr -d "[:space:]"`)
+    const n = await exec(dockerPrefix + `docker exec strato-postgres-1 psql -U postgres -d ` + eth_db_name.stdout + ` -t -c "select nonce from address_state_ref where address='74f014fef932d2728c6c7e2b4d3b88ac37a7e1d0';" | tr -d "[:space:]"`)
+    return parseInt(n.stdout)
   }
 
   before(async function () {
@@ -41,6 +47,7 @@ describe('Test Offline Transactions', async function () {
   it ('should create contract using offline tx', async function () {
     const ssCount1 = await getSimpleStorageCountFromCirrus()
     let ssCount2
+    nonceCounter = await getNonce()
     const ss1Resp = await exec(dockerPrefix + `docker exec strato-strato-1 post-raw-transaction --contract=SimpleStorageTest --source=SimpleStorage1.sol --key=rootPriv.pem --nonce=${nonceCounter}`)
     nonceCounter+=1
     const startTimestamp = +new Date()
