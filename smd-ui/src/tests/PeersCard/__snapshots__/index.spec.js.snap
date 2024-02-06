@@ -74,7 +74,7 @@ ShallowWrapper {
           >
             <small>
               <HexText
-                value="687294782948972018571047ra9asd8f97381asdfasd"
+                value={undefined}
               />
             </small>
           </div>
@@ -130,7 +130,7 @@ ShallowWrapper {
           >
             <small>
               <HexText
-                value="687294782948972018571047ra9asd8f97381asdfasd"
+                value={undefined}
               />
             </small>
           </div>
@@ -194,7 +194,7 @@ ShallowWrapper {
             >
               <small>
                 <HexText
-                  value="687294782948972018571047ra9asd8f97381asdfasd"
+                  value={undefined}
                 />
               </small>
             </div>,
@@ -270,7 +270,7 @@ ShallowWrapper {
             "props": Object {
               "children": <small>
                 <HexText
-                  value="687294782948972018571047ra9asd8f97381asdfasd"
+                  value={undefined}
                 />
               </small>,
               "className": "col-xs-9",
@@ -282,7 +282,7 @@ ShallowWrapper {
               "nodeType": "host",
               "props": Object {
                 "children": <HexText
-                  value="687294782948972018571047ra9asd8f97381asdfasd"
+                  value={undefined}
                 />,
               },
               "ref": null,
@@ -291,7 +291,7 @@ ShallowWrapper {
                 "key": undefined,
                 "nodeType": "class",
                 "props": Object {
-                  "value": "687294782948972018571047ra9asd8f97381asdfasd",
+                  "value": undefined,
                 },
                 "ref": null,
                 "rendered": null,
@@ -452,7 +452,7 @@ ShallowWrapper {
             >
               <small>
                 <HexText
-                  value="687294782948972018571047ra9asd8f97381asdfasd"
+                  value={undefined}
                 />
               </small>
             </div>,
@@ -528,7 +528,7 @@ ShallowWrapper {
             "props": Object {
               "children": <small>
                 <HexText
-                  value="687294782948972018571047ra9asd8f97381asdfasd"
+                  value={undefined}
                 />
               </small>,
               "className": "col-xs-9",
@@ -540,7 +540,7 @@ ShallowWrapper {
               "nodeType": "host",
               "props": Object {
                 "children": <HexText
-                  value="687294782948972018571047ra9asd8f97381asdfasd"
+                  value={undefined}
                 />,
               },
               "ref": null,
@@ -549,7 +549,7 @@ ShallowWrapper {
                 "key": undefined,
                 "nodeType": "class",
                 "props": Object {
-                  "value": "687294782948972018571047ra9asd8f97381asdfasd",
+                  "value": undefined,
                 },
                 "ref": null,
                 "rendered": null,
@@ -717,7 +717,7 @@ ShallowWrapper {
             >
               <small>
                 <HexText
-                  value="687294782948972018571047ra9asd8f97381asdfasd"
+                  value={undefined}
                 />
               </small>
             </div>
@@ -773,7 +773,7 @@ ShallowWrapper {
             >
               <small>
                 <HexText
-                  value="687294782948972018571047ra9asd8f97381asdfasd"
+                  value={undefined}
                 />
               </small>
             </div>
@@ -837,7 +837,7 @@ ShallowWrapper {
               >
                 <small>
                   <HexText
-                    value="687294782948972018571047ra9asd8f97381asdfasd"
+                    value={undefined}
                   />
                 </small>
               </div>,
@@ -913,7 +913,7 @@ ShallowWrapper {
               "props": Object {
                 "children": <small>
                   <HexText
-                    value="687294782948972018571047ra9asd8f97381asdfasd"
+                    value={undefined}
                   />
                 </small>,
                 "className": "col-xs-9",
@@ -925,7 +925,7 @@ ShallowWrapper {
                 "nodeType": "host",
                 "props": Object {
                   "children": <HexText
-                    value="687294782948972018571047ra9asd8f97381asdfasd"
+                    value={undefined}
                   />,
                 },
                 "ref": null,
@@ -934,7 +934,7 @@ ShallowWrapper {
                   "key": undefined,
                   "nodeType": "class",
                   "props": Object {
-                    "value": "687294782948972018571047ra9asd8f97381asdfasd",
+                    "value": undefined,
                   },
                   "ref": null,
                   "rendered": null,
@@ -1095,7 +1095,7 @@ ShallowWrapper {
               >
                 <small>
                   <HexText
-                    value="687294782948972018571047ra9asd8f97381asdfasd"
+                    value={undefined}
                   />
                 </small>
               </div>,
@@ -1171,7 +1171,7 @@ ShallowWrapper {
               "props": Object {
                 "children": <small>
                   <HexText
-                    value="687294782948972018571047ra9asd8f97381asdfasd"
+                    value={undefined}
                   />
                 </small>,
                 "className": "col-xs-9",
@@ -1183,7 +1183,7 @@ ShallowWrapper {
                 "nodeType": "host",
                 "props": Object {
                   "children": <HexText
-                    value="687294782948972018571047ra9asd8f97381asdfasd"
+                    value={undefined}
                   />,
                 },
                 "ref": null,
@@ -1192,7 +1192,7 @@ ShallowWrapper {
                   "key": undefined,
                   "nodeType": "class",
                   "props": Object {
-                    "value": "687294782948972018571047ra9asd8f97381asdfasd",
+                    "value": undefined,
                   },
                   "ref": null,
                   "rendered": null,
