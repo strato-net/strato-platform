@@ -46,7 +46,6 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Data.Time (diffUTCTime, getCurrentTime)
-import Debug.Trace (trace)
 import GHC.Generics
 import qualified IdentityProvider.API as IDAPI
 import IdentityProvider.Email
@@ -373,16 +372,19 @@ walletInCirrus
         $logErrorS "walletInCirrus" "Unexpected response from cirrus query. This should never happen"
         throwIO $ IdentityError "Unable to decode cirrus query for user's wallet. Something went very wrong"
     where
-      cirrusSearchPath :: String
-      cirrusSearchPath =
+      cirrusSearchPath :: (MonadLogger m) => m String
+      cirrusSearchPath = do
         let derivedAddr = deriveAddressWithSalt (Just userRegAddr) commonName mHash (Just . show $ OrderedVals [SString $ commonName])
-            derivedAddr' = trace ("DERIVED ADDR IS " <> show derivedAddr) (show derivedAddr)
-         in "/cirrus/search/" <> userTableName <> "?address=eq." <> derivedAddr'
+            derivedAddr' = show derivedAddr
+            path = "/cirrus/search/" <> userTableName <> "?address=eq." <> derivedAddr' 
+        $logDebugS "walletInCirrus/cirrusSearchPath" $ "Derived address is " <> T.pack derivedAddr'
+        $logDebugS "walletInCirrus/cirrusSearchPath" $ "Cirrus search path is " <> T.pack path
+        return path
 
-      callCirrus :: MonadIO m => BaseUrl -> m (HTTP.Response BL.ByteString)
+      callCirrus :: (MonadIO m, MonadLogger m) => BaseUrl -> m (HTTP.Response BL.ByteString)
       callCirrus nurl = do
-        let cirrusEndpoint = cirrusSearchPath
-            url = showBaseUrl nurl {baseUrlPath = baseUrlPath nurl <> cirrusEndpoint}
+        cirrusEndpoint <- cirrusSearchPath
+        let url = showBaseUrl nurl {baseUrlPath = baseUrlPath nurl <> cirrusEndpoint}
         mgr <- liftIO $ case baseUrlScheme nurl of
           Http -> newManager defaultManagerSettings
           Https -> newManager tlsManagerSettings
