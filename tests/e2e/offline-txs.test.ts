@@ -18,7 +18,9 @@ describe('Test Offline Transactions', async function () {
 
   const getNonce = async function(){
     const n = await exec(dockerPrefix + `docker exec strato-strato-1 curl "localhost:3000/eth/v1.2/account?address=74f014fef932d2728c6c7e2b4d3b88ac37a7e1d0" -s`)
-    return parseInt(JSON.parse(n.stdout)[0]['nonce'])
+    const accountInfo = JSON.parse(n.stdout)
+    const nonce = accountInfo.length === 0 ? 0 : parseInt(accountInfo[0]['nonce'])
+    return nonce
   }
 
   before(async function () {
