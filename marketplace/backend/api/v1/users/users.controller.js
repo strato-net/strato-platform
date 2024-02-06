@@ -25,6 +25,7 @@ class UsersController {
       else {
         rest.response.status200(res, {
           ...user,
+          email: decodedToken.email,
           preferred_username: decodedToken.preferred_username,
         })
       }

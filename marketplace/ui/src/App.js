@@ -28,8 +28,9 @@ const App = () => {
     async (LO) => {
       await LO.$internal.ready("visitor");
       LO.visitor.identify({
-        email: user.preferred_username || null,
+        email: user.email || null,
         name: user.commonName || null,
+        username: user.preferred_username || null
       });
     },
   ]);

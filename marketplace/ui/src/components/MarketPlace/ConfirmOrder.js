@@ -335,7 +335,7 @@ const ConfirmOrder = () => {
         shippingAddressId: userAddresses[selectedAddress].address_id,
         tax: tax,
         user: user.commonName,
-        email: user.preferred_username,
+        email: user.email,
       };
 
       window.LOQ.push(['ready', async LO => {
