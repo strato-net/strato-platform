@@ -5,6 +5,7 @@ export const apiUrl = process.env.REACT_APP_URL
   : "/api/v1";
 
 export const fileServerUrl = process.env.REACT_APP_FILE_SERVER_URL;
+console.log('ProcessENVVar', process.env.REACT_APP_FILE_SERVER_URL)
 
 export const cirrusUrl = process.env.REACT_APP_URL
   ? process.env.REACT_APP_URL + "/cirrus/search"
