@@ -233,7 +233,7 @@ const ProcessingOrder = () => {
     {contextHolder}
     <div className="h-96 flex flex-col justify-center items-center">
       <Spin spinning={true} size="large" />
-      <p className="mt-4">Please wait while your order is placed successfully</p>
+      <p className="mt-4">Please wait while your order is being processed</p>
     </div>
     {error && openToastMarketplace("bottom")}
     {message && openToastOrder("bottom")}

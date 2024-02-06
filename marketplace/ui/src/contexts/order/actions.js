@@ -611,22 +611,22 @@ const actions = {
           type: actionDescriptors.createSaleOrderSuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, "Sale created successfully", true);
+        actions.setMessage(dispatch, "Order created successfully", true);
         return body.data;
       }
 
       dispatch({
         type: actionDescriptors.createSaleOrderFailed,
-        error: "Error while executing sale",
+        error: "There was an error processing your order. We are sorry for the inconvenience and will reach out to you to process a refund.",
       });
-      actions.setMessage(dispatch, "Error while creating sale");
+      actions.setMessage(dispatch, "There was an error processing your order. We are sorry for the inconvenience and will reach out to you to process a refund.");
       return false;
     } catch (err) {
       dispatch({
         type: actionDescriptors.createSaleOrderFailed,
-        error: "Error while creating Sale",
+        error: "There was an error processing your order. We are sorry for the inconvenience and will reach out to you to process a refund.",
       });
-      actions.setMessage(dispatch, "Error while creating sale");
+      actions.setMessage(dispatch, "There was an error processing your order. We are sorry for the inconvenience and will reach out to you to process a refund.");
     }
   },
 

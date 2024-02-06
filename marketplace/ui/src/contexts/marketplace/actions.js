@@ -370,7 +370,7 @@ const actions = {
           type: actionDescriptors.addShippingAddressSuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, "Shipping address added successfully", true);
+        actions.setMessage(dispatch, "Address added successfully", true);
         return body.data;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
