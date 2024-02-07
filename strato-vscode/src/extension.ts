@@ -96,9 +96,9 @@ export async function activate(context: vscode.ExtensionContext) {
 	vscode.commands.registerCommand('contracts.uploadContract', async (element) => {
 		const tokens = await getAccessTokenSecrets(context);
 		if (Object.keys(tokens).length === 0) { return vscode.window.showErrorMessage('Please log in to STRATO Mercata to upload a contract.') }
+		const activeNode = vscode.workspace.getConfiguration().get('strato-vscode.activeNode');
 		const user = await getApplicationUser(0, tokens);
 		const config = getConfig() || {};
-		const activeNode = vscode.workspace.getConfiguration().get('strato-vscode.activeNode');
 		const nodeOptions = { config, node: activeNode};
 		if (vscode.window.activeTextEditor) {
 			vscode.window.activeTextEditor.document.save();
@@ -176,9 +176,9 @@ export async function activate(context: vscode.ExtensionContext) {
 		const { chainId, contractName, contractAddress, variableName } = item;
 		const tokens = await getAccessTokenSecrets(context);
 		if (Object.keys(tokens).length === 0) { return vscode.window.showErrorMessage('Please log in to STRATO Mercata to upload a contract.') }
-		const user = await getApplicationUser(nodeId, tokens);
+		const activeNode: number = vscode.workspace.getConfiguration().get('strato-vscode.activeNode') || 0;
+		const user = await getApplicationUser(activeNode, tokens);
 		const config = getConfig() || {}
-		const activeNode = vscode.workspace.getConfiguration().get('strato-vscode.activeNode');
 		const nodeOptions = { config, node: activeNode};
 		const val = await rest.getContractsContract(user, contractName, contractAddress, chainId, nodeOptions);
 		const func = ((val || {})._functions || {})[variableName]
@@ -315,11 +315,11 @@ nodes:
 
 
 	// Activate debug mode and diagnostics
-	// activateStratoDebug(context);
-	// const solidityDiagnostics = vscode.languages.createDiagnosticCollection("solidity");
-	// context.subscriptions.push(solidityDiagnostics);
+	activateStratoDebug(context);
+	const solidityDiagnostics = vscode.languages.createDiagnosticCollection("solidity");
+	context.subscriptions.push(solidityDiagnostics);
 
-	// await subscribeToDocumentChanges(context, solidityDiagnostics);
+	await subscribeToDocumentChanges(context, solidityDiagnostics);
 }
 
 async function sleep(ms: number) {

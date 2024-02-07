@@ -304,11 +304,11 @@ async function findReusedBaseCons(doc: vscode.TextDocument, contractAST: any): P
 async function validate(counter: number, doc: vscode.TextDocument, solidityDiagnostics: vscode.DiagnosticCollection): Promise<void> {
   if (validationCounter === counter) {
     try {
-      const diagnostics: vscode.Diagnostic[] = [];
-
+      const diagnostics: vscode.Diagnostic[] = []; 
+      const activeNode: number = vscode.workspace.getConfiguration().get('strato-vscode.activeNode') || 0;
       const user = await getApplicationUser();
       const config = getConfig() || {};
-      const options = { config };
+      const options = { config, node: activeNode };
       let srcMap = {[doc.uri.path]: doc.getText()};
       const folders = vscode.workspace.workspaceFolders || [];
       if (folders.length > 0) {

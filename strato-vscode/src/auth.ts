@@ -56,7 +56,7 @@ export async function getApplicationUser(mNodeId?: number, tokens?: any): Promis
     if (nodes.length === 0) {
       return undefined
     }
-    const nodeId = mNodeId || 0
+    const nodeId: number = mNodeId || vscode.workspace.getConfiguration().get('strato-vscode.activeNode') || 0
     const nodeOauth = nodes[nodeId].oauth
     const oauth = await oauthUtil.init(nodeOauth)
 
