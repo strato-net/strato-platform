@@ -76,11 +76,11 @@ const CreateGroupForm = ({ handleCancel }) => {
         form.setFieldValue("files", info.fileList.map((e) => e.originFileObj))
     };
 
-    const isNotAssetGroup = (inventory) => {
+    const isAssetGroup = (inventory) => {
         const parts = inventory.contract_name.split('-');
         const contractName = parts[parts.length - 1];
 
-        if (contractName !== "AssetGroup") {
+        if (contractName === "AssetGroup") {
             return true;
         } else {
             return false;
@@ -337,7 +337,7 @@ const CreateGroupForm = ({ handleCancel }) => {
                             showSearch
                             filterOption={(input, option) => (option?.children ?? '').toLowerCase().includes(input.toLowerCase())}
                         >
-                            {inventories.filter((inv) => isNotAssetGroup(inv)).map((e, index) => (
+                            {inventories.filter((inv) => !isAssetGroup(inv)).map((e, index) => (
                                 <Option value={e.address} key={index}>
                                     {e.name}
                                 </Option>
@@ -374,7 +374,7 @@ const CreateGroupForm = ({ handleCancel }) => {
                             showSearch
                             filterOption={(input, option) => (option?.children ?? '').toLowerCase().includes(input.toLowerCase())}
                         >
-                            {inventories.filter((inv) => isNotAssetGroup(inv)).map((e, index) => (
+                            {inventories.filter((inv) => !isAssetGroup(inv)).map((e, index) => (
                                 <Option value={e.address} key={index}>
                                     {e.name}
                                 </Option>
@@ -416,7 +416,7 @@ const CreateGroupForm = ({ handleCancel }) => {
                                             showSearch
                                             filterOption={(input, option) => (option?.children ?? '').toLowerCase().includes(input.toLowerCase())}
                                         >
-                                            {inventories.filter((inv) => isNotAssetGroup(inv)).map((e, index) => (
+                                            {inventories.filter((inv) => !isAssetGroup(inv)).map((e, index) => (
                                                 <Option value={e.address} key={index}>
                                                     {e.name}
                                                 </Option>

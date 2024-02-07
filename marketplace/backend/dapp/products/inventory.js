@@ -322,6 +322,7 @@ async function get(user, args, options) {
     const { address, ...restArgs } = args;
     const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
     let inventory;
+    let isAssetGroup = false;
 
     const searchArgs = setSearchQueryOptions(restArgs, {
         key: "address",
@@ -344,13 +345,26 @@ async function get(user, args, options) {
         }
     }
 
-    if (inventory.data.assetAddresses) {
+    const parts = inventory.contract_name.split('-');
+    const partContractName = parts[parts.length - 1];
+
+    if (partContractName === "AssetGroup") {
+        isAssetGroup = true;
+    }
+
+    if (isAssetGroup) {
         let { assetAddresses, assetQuantities } = inventory.data;
-        const groupedAssets = await searchAllWithQueryArgs(contractName, { address: JSON.parse(assetAddresses), }, newOptions, user);
-        const assets = groupedAssets.map((asset, index) => ({
-            ...asset,
-            groupQuantity: JSON.parse(assetQuantities).map(Number)[index],
-        }))
+        const assets = await Promise.all(JSON.parse(assetAddresses).map(async (address, index) => {
+            let assetSearchArgs = setSearchQueryOptions(restArgs, {
+                key: "address",
+                value: address,
+            });
+            let asset = await searchOne(contractName, assetSearchArgs, newOptions, user);
+            return {
+                ...asset,
+                groupQuantity: JSON.parse(assetQuantities).map(Number)[index]
+            };
+        }));
         inventory = {
             ...inventory,
             assets
