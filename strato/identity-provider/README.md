@@ -42,6 +42,19 @@ The information below is important!
 
 5.  The `strato-getting-started` directory has an `identity-provider` subdirectory from which files will be mounted onto the docker container. These files include `identity-provider/certs/rootPriv.pem`, `identity-provider/certs/rootCert.pem`, and `identity-provider/idconf.yaml`. These files are not included in the docker image for security reasons, as they contain sensitive information. If you do not provide these files within the `identity-provider` subdirectory, the identity docker images will not build.
 
+6. The configuration file `identity-provider/idconf.yaml` contains a list of realm-specific information. Each realm's details is grouped in a single yaml list element. The minimum realm details to provide are 
+  a. `discoveryUrl` for the realm (needed to extract the issuer information and token endpoint)
+  b. `clientId` for the identity server
+  c. `clientSecret` for the identity server
+In addition, you may also choose to specifiy
+  d. `realmName` for readability's sake (does not affect functionality)
+  e. `nodeUrl` of the STRATO node to query and post transactions to. By default this will be `https://node2.<realmName>.blockapps.net`
+  f. `fallbackNodeUrl` of another STRATO node in case the first one is unresponsive. By default this will be `https://node1.<realmName>.blockapps.net`
+  g. `userRegistryAddress` the address of the UserRegistry contract. By default this will be the location hardcoded in new genesis blocks: `0x720`. 
+    *Note:* if using an older genesis block, you will not have this contract and should manually post it to the network, noting the address, code hash, and associated table name in cirrus.
+  h. `userRegistryCodeHash` the code hash of the UserRegistry contract mentioned above. By default this will be the code hash of the hardcoded contract. If using an older genesis block, please see the note under `userRegistryAddress`
+  i. `userTableName` the associated table name in cirrus for `User` contracts. By default this will be `User`. If using an older genesis block, please see the note under `userRegistryAddress`
+
 7. Keep in mind the client credentials you provide use MUST already have keys within the vault specified, and have a cert registered on the associated network.
 
 ### Things to consider when updating/restarting an identity server
