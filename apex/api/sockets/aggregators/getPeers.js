@@ -12,7 +12,6 @@ function getPeers() {
       attributes: [
         'ip',
         'tcp_port',
-        'udp_port',
         'pubkey',
       ],
       where: {
@@ -24,8 +23,6 @@ function getPeers() {
         obj[peer.ip] = peer
         return obj;
       }, {})
-
-      console.log(`current peers: ${JSON.stringify(currentPeers)}`)
 
       if (!_.isEqual(peers, currentPeers)) {
         peers = currentPeers
