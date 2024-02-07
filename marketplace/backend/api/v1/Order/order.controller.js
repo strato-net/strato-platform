@@ -3,6 +3,7 @@ import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
 import sendEmail from '../../../helpers/email'
+import slackMessage from '../../../helpers/slackUtil'
 const options = { config, cacheNonce: true }
 
 class OrderController {
@@ -192,11 +193,15 @@ class OrderController {
       const { dapp, body } = req
 
       const { to, subject, htmlContents, ...restBody } = body;
-
       OrderController.validateCreateSaleOrderArgs(restBody)
 
       const result = await dapp.createSaleOrder(restBody)
       rest.response.status200(res, result)
+
+      const userName =  req.username; //getting userName
+      const userMail = to; //getting userMail
+      const message = `${userName} has submitted order: {orderAddress : ${body.items[0].saleAddress}, quantity: ${body.items[0].quantity}} `;
+      slackMessage(userMail, message)
 
       // Only send email if order is created successfully
       if (res.statusMessage === "OK") {

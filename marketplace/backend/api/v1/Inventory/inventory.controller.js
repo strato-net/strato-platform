@@ -2,6 +2,7 @@ import { rest } from 'blockapps-rest'
 import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
+import slackMessage from '../../../helpers/slackUtil'
 
 const options = { config, cacheNonce: true }
 
@@ -77,11 +78,13 @@ class InventoryController {
   static async list(req, res, next) {
     try {
       const { dapp, body } = req
+      const username = req.username;
 
       InventoryController.validateListItemArgs(body)
 
       const result = await dapp.listItem(body)
       rest.response.status200(res, result)
+      slackMessage('marketplace', `${username} listed this ${body.assetToBeSold} Inventory`);
 
       return next()
     } catch (e) {
