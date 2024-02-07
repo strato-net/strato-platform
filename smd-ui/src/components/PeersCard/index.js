@@ -7,10 +7,6 @@ import HexText from '../HexText';
 import { getPeerIdentityRequest } from './peers.actions';
 class PeersCard extends Component {
 
-  extractPubkey(enode) {
-    return enode.substring(8, 128 + 8)
-  }
-
   render() {
     const node = this.props.node;
     const peers = node.peers ? Object.getOwnPropertyNames(node.peers) : [];
@@ -27,7 +23,7 @@ class PeersCard extends Component {
                 </div>
                 <div className="col-xs-9">
                   <small>
-                    <HexText value={this.extractPubkey(node.peers[peer].enode)}/>
+                    <HexText value={node.peers[peer].pubkey}/>
                   </small>
                 </div>
                 <div className="col-xs-3">
