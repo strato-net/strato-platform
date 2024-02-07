@@ -240,7 +240,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.transferItem = async function (args, options = defaultOptions) {
     const { assetAddress, ...restArgs } = args;
     const transferNumber = parseInt(util.uid())
-    const finalArgs = { transferNumber: transferNumber, ...restArgs };
+    const finalArgs = { transferNumber: transferNumber, isUserTransfer: true, ...restArgs };
     const contract = { address: assetAddress };
     return inventoryJs.transferItem(rawAdmin, contract, finalArgs, options);
   }

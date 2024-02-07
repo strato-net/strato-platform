@@ -100,13 +100,13 @@ abstract contract Sale is Utils {
             address a = assetGroup.assetAddresses[i];
             Asset asset = Asset(a);
             uint assetQuantity = assetGroup.assetQuantities[i];
-            asset.automaticTransfer(purchaser, assetQuantity, 0);
+            asset.automaticTransfer(purchaser, assetQuantity, false, 0);
         }
         closeSaleIfEmpty();
         return RestStatus.OK;
     }
 
-    function automaticTransfer(address _newOwner, uint _quantity, uint _transferNumber) public returns (uint) {
+    function automaticTransfer(address _newOwner, uint _quantity, bool _isUserTransfer, uint _transferNumber) public returns (uint) {
         require(msg.sender == address(assetToBeSold), "Only the underlying Asset can call automaticTransfer.");
         uint assetQuantity = assetToBeSold.quantity();
         require(_quantity <= assetQuantity - totalLockedQuantity, "Cannot transfer more units than are available.");
@@ -116,7 +116,7 @@ abstract contract Sale is Utils {
             quantity -= _quantity;
         }
         // transfer feature - isUserTransfer: true, transferNumber: _transferNumber
-        assetToBeSold.transferOwnership(_newOwner, _quantity, true, _transferNumber);
+        assetToBeSold.transferOwnership(_newOwner, _quantity, _isUserTransfer, _transferNumber);
         closeSaleIfEmpty();
         return RestStatus.OK;
     }
