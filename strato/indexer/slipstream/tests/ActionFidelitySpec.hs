@@ -14,6 +14,7 @@ import Data.Aeson.QQ
 import qualified Data.ByteString as B
 import Data.Either
 import qualified Data.Map.Strict as M
+import qualified Data.Map.Ordered as OMap
 import qualified Data.Sequence as S
 import Data.Time.Clock.POSIX
 import qualified LabeledError
@@ -30,7 +31,7 @@ emptySolidVMData :: Action.ActionData
 emptySolidVMData = Action.ActionData (SolidVMCode "ContractName" $ unsafeCreateKeccak256FromWord256 0) mempty "LambdaCorp2" "Clozure2" SolidVM (Action.SolidVMDiff M.empty) M.empty [] [] []
 
 emptyAction :: Action
-emptyAction = Action.Action (unsafeCreateKeccak256FromWord256 0) (posixSecondsToUTCTime 0) 0 (unsafeCreateKeccak256FromWord256 0) Nothing (Account 0x0 Nothing) M.empty Nothing S.empty S.empty
+emptyAction = Action.Action (unsafeCreateKeccak256FromWord256 0) (posixSecondsToUTCTime 0) 0 (unsafeCreateKeccak256FromWord256 0) Nothing (Account 0x0 Nothing) OMap.empty Nothing S.empty S.empty
 
 spec :: Spec
 spec = describe "Action conversions" $ do
@@ -38,22 +39,22 @@ spec = describe "Action conversions" $ do
     convert emptyAction `shouldSatisfy` isRight
 
   it "should parse empty Word256 actions" $ do
-    convert emptyAction {Action._actionData = M.singleton (Account 0x988 Nothing) emptyEVMData}
+    convert emptyAction {Action._actionData = OMap.singleton ((Account 0x988 Nothing), emptyEVMData)}
       `shouldSatisfy` isRight
 
   it "should parse empty ByteString actions" $ do
-    convert emptyAction {Action._actionData = M.singleton (Account 0x988 Nothing) emptySolidVMData}
+    convert emptyAction {Action._actionData = OMap.singleton ((Account 0x988 Nothing), emptySolidVMData)}
       `shouldSatisfy` isRight
 
   it "should parse basic Word256 actions" $ do
     let diff = Action.EVMDiff $ M.singleton 0xffffffffff 0xeeeeeeeeeeeeeee
         daytuh = emptyEVMData {Action._actionDataStorageDiffs = diff}
-    convert emptyAction {Action._actionData = M.singleton (Account 0x988 Nothing) daytuh} `shouldSatisfy` isRight
+    convert emptyAction {Action._actionData = OMap.singleton ((Account 0x988 Nothing), daytuh)} `shouldSatisfy` isRight
 
   it "should parse basic bytestring actions" $ do
     let diff = Action.SolidVMDiff $ M.singleton (B.replicate 34 0x6b) (B.replicate 33 0x76)
         daytuh = emptySolidVMData {Action._actionDataStorageDiffs = diff}
-    convert emptyAction {Action._actionData = M.singleton (Account 0x988 Nothing) daytuh} `shouldSatisfy` isRight
+    convert emptyAction {Action._actionData = OMap.singleton ((Account 0x988 Nothing), daytuh)} `shouldSatisfy` isRight
 
   it "should convert bytestrings properly" $ do
     toJSON ("\x80\x60\x40" :: B.ByteString) `shouldBe` String "806040"
@@ -134,7 +135,7 @@ spec = describe "Action conversions" $ do
               Action._transactionChainId = Nothing,
               Action._transactionSender = Account 0xc2191df3032cb8ee72e37ab6bbc4e83f92b9911c Nothing,
               Action._actionData =
-                M.singleton (Account 0x2f6ff9d4a35c07f7b630fe1ce039bc45559b5fb6 Nothing) $
+                OMap.singleton ((Account 0x2f6ff9d4a35c07f7b630fe1ce039bc45559b5fb6 Nothing) ,
                   Action.ActionData
                     { Action._actionDataStorageDiffs =
                         Action.EVMDiff . M.fromList $
@@ -154,7 +155,7 @@ spec = describe "Action conversions" $ do
                       Action._actionDataMappings = [],
                       Action._actionDataArrays = [],
                       Action._actionDataCallTypes = [Action.Create]
-                    },
+                    }),
               Action._metadata = Just . M.fromList $ [("name", "Vehicle"), ("src", "contract Vehicle {}")],
               Action._events = S.singleton $ Event zeroHash "BlockApps2" "LogisticsEngine2" "Vehicle" (Account 0x2e385b6a3aea46d4172df98617b5385c13b7100d Nothing) "Vehicle Event" [("field", "value"), ("anotherField", "anotherValue")],
               Action._delegatecalls = S.empty

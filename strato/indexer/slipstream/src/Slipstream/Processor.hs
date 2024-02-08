@@ -50,6 +50,7 @@ import Data.Either (lefts, rights)
 import Data.Foldable (toList)
 import Data.Function
 import Data.IORef
+import qualified Data.Map.Ordered as OMap
 import Data.List (foldl', sortOn)
 import qualified Data.Map as Map
 import Data.Maybe
@@ -238,7 +239,7 @@ parseEvents = concatMap parseEvent
           eventBlockNumber = Action._blockNumber a,
           eventTxHash = Action._transactionHash a,
           eventTxSender = Action._transactionSender a,
-          eventAbstracts = maybe Map.empty Action._actionDataAbstracts . Map.lookup (evContractAccount e) $ Action._actionData a,
+          eventAbstracts = maybe Map.empty Action._actionDataAbstracts . OMap.lookup (evContractAccount e) $ Action._actionData a,
           eventEvent = e
         }
 

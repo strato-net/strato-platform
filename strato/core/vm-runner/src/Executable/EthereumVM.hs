@@ -64,6 +64,7 @@ import qualified Data.DList as DL
 import Data.Foldable hiding (fold)
 import Data.List
 import qualified Data.Map as M
+import qualified Data.Map.Ordered as OMap
 import Data.Maybe
 import Data.Proxy
 import qualified Data.Text as T
@@ -166,7 +167,7 @@ sendOutEvent (OutAction act) = do
       extractCodeCollectionAddedMessages a =
         case ( join $ fmap (M.lookup "src") $ a ^. Action.metadata,
                join $ fmap (M.lookup "name") $ a ^. Action.metadata,
-               M.toList $ a ^. Action.actionData
+               OMap.assocs $ a ^. Action.actionData
              ) of
           (Just c, Just n, actionDatas) ->
             let cp = case join $ fmap (M.lookup "VM") $ a ^. Action.metadata of
@@ -196,7 +197,7 @@ sendOutEvent (OutAction act) = do
           _ -> Nothing
       ccEvents = maybeToList $ extractCodeCollectionAddedMessages act
       dcEvents = DelegatecallMade <$> toList (act ^. Action.delegatecalls)
-      act' = act { Action._actionData = M.map (Action.actionDataCodeCollection .~ mempty) (Action._actionData act) }
+      act' = act { Action._actionData = Action.omapMap (Action.actionDataCodeCollection .~ mempty) (Action._actionData act) }
       actionEvents = [NewAction act']
       vmes = ccEvents ++ dcEvents ++ actionEvents
   void . produceVMEvents $ toList vmes

@@ -358,6 +358,7 @@ getDeferredForeignKeys tableName c o a =
 getDeferredForeignKeysAbstract ::
   (MonadLogger m) =>
   TableName -> ContractF () -> Text -> Text -> Map.Map (Account, Text) (Text, Text) -> CodeCollectionF () -> m [ForeignKeyInfo]
+getDeferredForeignKeysAbstract (AbstractTableName "BlockApps" "Mercata" "Asset") _ _ _ _ _ = return []
 getDeferredForeignKeysAbstract tableName c o a abstracts' cc = do
   -- Log at the start
   $logDebugS "getDeferredForeignKeysAbstract: Start" . T.pack $

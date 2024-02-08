@@ -140,20 +140,41 @@ omapLens k = lens getter setter
     getter omap = OMap.lookup k omap
     setter omap newValue = OMap.alter (const newValue) k omap
 
+omapInsertWith ::
+  Ord k =>
+  (a -> a -> a)  -- ^ Function to combine the new value with the old value.
+  -> k           -- ^ Key.
+  -> a           -- ^ New value.
+  -> OMap.OMap k a  -- ^ Map to insert into.
+  -> OMap.OMap k a  -- ^ Resulting map.
+omapInsertWith f k x omap =
+  OMap.alter (Just . maybe x (f x)) k omap
 
--- omapInsertWith ::
---   Ord k =>
---   (a -> a -> a)  -- ^ Function to combine the new value with the old value.
---   -> k           -- ^ Key.
---   -> a           -- ^ New value.
---   -> OMap.OMap k a  -- ^ Map to insert into.
---   -> OMap.OMap k a  -- ^ Resulting map.
--- omapInsertWith f k x omap =
---   OMap.alter (Just . combine) k omap
---   where
---     combine :: Maybe b -> b
---     combine Nothing = x
---     combine (Just old) = f old x
+-- | Adjust a value at a specific key in an OMap.
+-- If the key is present, apply the function to the value.
+-- If the key is not present, return the original OMap.
+omapAdjust :: Ord k => (a -> a) -> k -> OMap.OMap k a -> OMap.OMap k a
+omapAdjust f k omap = omapAdjustWithKey (const f) k omap
+
+-- | Adjust a value at a specific key in an OMap using a key-dependent function.
+-- If the key is present, apply the function to the key and the value.
+-- If the key is not present, return the original OMap.
+omapAdjustWithKey :: Ord k => (k -> a -> a) -> k -> OMap.OMap k a -> OMap.OMap k a
+omapAdjustWithKey f k omap = OMap.alter (fmap (f k)) k omap
+
+-- | Take the union of two ordered maps. If a key appears in both maps,
+-- the first argument's index takes precedence, and the supplied function
+-- is used to combine the values.
+omapUnionWith :: Ord k => (v -> v -> v) -> OMap.OMap k v -> OMap.OMap k v -> OMap.OMap k v
+omapUnionWith f = omapUnionWithKey (\_ x y -> f x y)
+
+-- | Take the union of two ordered maps using a key-dependent combine function.
+-- If a key appears in both maps, the first argument's index takes precedence.
+omapUnionWithKey :: Ord k => (k -> v -> v -> v) -> OMap.OMap k v -> OMap.OMap k v -> OMap.OMap k v
+omapUnionWithKey f t1 t2 = OMap.unionWithL f t1 t2
+
+omapMap :: Ord k => (a -> b) -> OMap.OMap k a -> OMap.OMap k b
+omapMap f omap = OMap.fromList $ map (\(k, a) -> (k, f a)) $ OMap.assocs omap
 
 data DataDiff
   = EVMDiff (Map Word256 Word256)
