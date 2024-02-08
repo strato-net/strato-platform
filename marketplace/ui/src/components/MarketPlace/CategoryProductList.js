@@ -49,7 +49,6 @@ const CategoryProductList = ({ user }) => {
   // States
   const [selectedCategories, setSelectedCategories] = useState(categoryQueryValueArr);
   const [selectedSubCategories, setSelectedSubCategories] = useState([]);
-  const [selectedProducts, setSelectedProducts] = useState([]);
   const [selectedBrands, setSelectedBrands] = useState([]);
   const [maxPrice, setMaxPrice] = useState(MAX_PRICE);
   const [minPrice, setMinPrice] = useState(0);
@@ -113,10 +112,6 @@ const CategoryProductList = ({ user }) => {
     setSelectedSubCategories(valuesChecked);
   };
 
-  const onChangeProduct = (e) => {
-    let valuesChecked = checkValues(e, selectedProducts)
-    setSelectedProducts(valuesChecked);
-  };
 
   useEffect(() => {
     if (hasChecked && !isAuthenticated) {
@@ -124,7 +119,6 @@ const CategoryProductList = ({ user }) => {
         marketplaceDispatch,
         arrayToStr(selectedCategories),
         arrayToStr(selectedSubCategories),
-        arrayToStr(selectedProducts),
         arrayToStr(selectedBrands),
         minPrice,
         maxPrice,
@@ -135,7 +129,6 @@ const CategoryProductList = ({ user }) => {
         marketplaceDispatch,
         arrayToStr(selectedCategories),
         arrayToStr(selectedSubCategories),
-        arrayToStr(selectedProducts),
         arrayToStr(selectedBrands),
         minPrice,
         maxPrice,
@@ -145,7 +138,6 @@ const CategoryProductList = ({ user }) => {
   }, [
     selectedCategories,
     selectedSubCategories,
-    selectedProducts,
     selectedBrands,
     minPrice,
     maxPrice,
@@ -171,7 +163,7 @@ const CategoryProductList = ({ user }) => {
       if (categoryQueryValue) {
         baseUrl.searchParams.set('category', categoryQueryValue);
       }
-      if (search.length > 0) {
+      if (search?.length > 0) {
         baseUrl.searchParams.set('search', search);
       }
 
@@ -188,7 +180,6 @@ const CategoryProductList = ({ user }) => {
 
   const clearSelection = () => {
     setSelectedSubCategories([]);
-    setSelectedProducts([]);
     setSelectedBrands([]);
     setSubCategories([]);
   };
