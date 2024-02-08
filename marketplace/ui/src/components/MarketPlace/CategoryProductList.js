@@ -50,8 +50,10 @@ const CategoryProductList = ({ user }) => {
   const [selectedCategories, setSelectedCategories] = useState(categoryQueryValueArr);
   const [selectedSubCategories, setSelectedSubCategories] = useState([]);
   const [selectedBrands, setSelectedBrands] = useState([]);
-  const [maxPrice, setMaxPrice] = useState(MAX_PRICE);
-  const [minPrice, setMinPrice] = useState(0);
+  const [maxPrice, setMaxPrice] = useState();
+  const [minPrice, setMinPrice] = useState();
+  const minimumPrice = minPrice ? minPrice : 0
+  const maximumPrice = maxPrice ? maxPrice : MAX_PRICE
   const [subCategories, setSubCategories] = useState([]);
   const [uniqueProductNames, setUniqueProductNames] = useState([]);
   const [desktopOpenFilter, setDesktopOpenFilter] = useState(true);
@@ -120,8 +122,8 @@ const CategoryProductList = ({ user }) => {
         arrayToStr(selectedCategories),
         arrayToStr(selectedSubCategories),
         arrayToStr(selectedBrands),
-        minPrice,
-        maxPrice,
+        minimumPrice,
+        maximumPrice,
         searchQueryValue
       );
     } else if (hasChecked && isAuthenticated) {
@@ -130,8 +132,8 @@ const CategoryProductList = ({ user }) => {
         arrayToStr(selectedCategories),
         arrayToStr(selectedSubCategories),
         arrayToStr(selectedBrands),
-        minPrice,
-        maxPrice,
+        minimumPrice,
+        maximumPrice,
         searchQueryValue
       );
     }
@@ -188,8 +190,8 @@ const CategoryProductList = ({ user }) => {
     navigate('/category')
     clearSelection()
     setSelectedCategories([]);
-    setMaxPrice(MAX_PRICE)
-    setMinPrice(0)
+    setMaxPrice()
+    setMinPrice()
   }
 
   const checkValues = (e, arr) => {
@@ -372,11 +374,11 @@ const CategoryProductList = ({ user }) => {
       {DesktopCollapseComponent(
         <Panel header={<Text strong className="text-base">Price ($)</Text>} key="1">
           <Space>
-            <InputNumber min={0} prefix='$' placeholder="min" onChange={(e) => {
+            <InputNumber min={0} prefix='$' value={minPrice} placeholder="min" onChange={(e) => {
               e === null ? setMinPrice(0) : setMinPrice(e)
             }} />
             -
-            <InputNumber min={minPrice} prefix='$' placeholder="max" onChange={(e) => {
+            <InputNumber min={minPrice} prefix='$' value={maxPrice} placeholder="max" onChange={(e) => {
               e === null ? setMaxPrice(MAX_PRICE) : setMaxPrice(e)
             }} />
           </Space>
