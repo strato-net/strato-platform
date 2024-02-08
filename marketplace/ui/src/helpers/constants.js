@@ -4,10 +4,15 @@ export const apiUrl = process.env.REACT_APP_URL
   ? process.env.REACT_APP_URL + "/api/v1"
   : "/api/v1";
 
-export const fileServerUrl = process.env.REACT_APP_FILE_SERVER_URL;
-console.log('ProcessENVVar', process.env.REACT_APP_FILE_SERVER_URL)
+  
+export const fileServerUrl = window.REACT_APP_FILE_SERVER_URL && window.REACT_APP_FILE_SERVER_URL !== '__REACT_APP_FILE_SERVER_URL__' ? window.REACT_APP_FILE_SERVER_URL 
+                              : (process.env.REACT_APP_FILE_SERVER_URL ? process.env.REACT_APP_FILE_SERVER_URL : '');
 
-console.log('ProcessENVVar REACT_APP_URL', process.env.REACT_APP_URL)
+// export const fileServerUrl = process.env.REACT_APP_FILE_SERVER_URL;
+console.log('window.REACT_APP_FILE_SERVER_URL', window.REACT_APP_FILE_SERVER_URL)
+console.log('ProcessENVVar REACT_APP_FILE_SERVER_URL', process.env.REACT_APP_FILE_SERVER_URL)
+
+console.log('fileServerUrl', fileServerUrl)
 
 export const cirrusUrl = process.env.REACT_APP_URL
   ? process.env.REACT_APP_URL + "/cirrus/search"
