@@ -83,11 +83,6 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
     exit 16
   fi
   
-  if [ -z "${STRIPE_PAYMENT_SERVER_URL}" ]; then
-    echo "STRIPE_PAYMENT_SERVER_URL is empty, but is a required value"
-    exit 17
-  fi
-
   # Create /etc/hosts record to resolve STRATO_HOST to STRATO_LOCAL_IP
   if [ -n "${STRATO_LOCAL_IP}" ]; then
     _STRATO_NODE_HOSTNAME=$(echo "${STRATO_NODE_HOST}" | cut -d ":" -f 1)
