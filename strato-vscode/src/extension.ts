@@ -78,7 +78,7 @@ export async function activate(context: vscode.ExtensionContext) {
 				const user = await getApplicationUser();
 				const cfg = getConfig() || {};
 				// check if the contract exists, err out otherwise
-				const res = await rest.getContractsDetails(user, { address: argInput }, { config: cfg  })
+				const res = await rest.getContractsDetails(user, { address: argInput }, { config: cfg, node: await vscode.workspace.getConfiguration().get('strato-vscode.activeNode')})
 				contractsProvider
 					.addContract(argInput)
 					.then(list => context.workspaceState.update('contractAddresses', list))
