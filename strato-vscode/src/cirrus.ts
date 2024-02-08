@@ -26,7 +26,7 @@ export class CirrusProvider implements vscode.TreeDataProvider<CirrusItem> {
 
   async callCirrus(name, query): Promise<string[]> {
     const config = getConfig() || {}
-    const options = { config };
+    const options = { config, node: await vscode.workspace.getConfiguration().get('strato-vscode.activeNode')};
     const appUser = await getApplicationUser()
     const results = await rest.search(appUser, { name }, { ...options, query })
     return results
