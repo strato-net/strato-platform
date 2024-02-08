@@ -4,9 +4,18 @@ export const apiUrl = process.env.REACT_APP_URL
   ? process.env.REACT_APP_URL + "/api/v1"
   : "/api/v1";
 
-export const fileServerUrl = process.env.FILE_SERVER_URL
-  ? process.env.FILE_SERVER_URL
-  : "https://fileserver.mercata-testnet2.blockapps.net/highway/"; // TODO: Don't hardcode this here?
+const deriveFileUrl = function(envFileUrl, envNetwork){
+  if (envFileUrl !== '')
+    return envFileUrl;
+  else if (envNetwork === 'mercata')
+    return 'https://fileserver.mercata.blockapps.net/highway/';
+  else if (envNetwork === 'mercata-hydrogen')
+    return 'https://fileserver.mercata-testnet2.blockapps.net/highway/';
+  else 
+    throw new Error("File server was not specified and undeducible from given information");
+}
+
+export const fileServerUrl = deriveFileUrl(process.env.FILE_SERVER_URL, process.env.NETWORK)
 
 export const cirrusUrl = process.env.REACT_APP_URL
   ? process.env.REACT_APP_URL + "/cirrus/search"
