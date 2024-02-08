@@ -35,9 +35,13 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
 
   const marketplaceDispatch = useMarketplaceDispatch();
   const userDispatch = useAuthenticateDispatch();
-  const { cartList } = useMarketplaceState();
+  const { cartList, strats } = useMarketplaceState();
   const storedData = useMemo(() => {
     return window.localStorage.getItem("cartList") == null ? [] : JSON.parse(window.localStorage.getItem("cartList"));
+  }, []);
+
+  useEffect(() => {
+    actions.fetchStratsBalance(marketplaceDispatch);
   }, []);
 
   useEffect(() => {
@@ -55,9 +59,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
       items: [
         { label: <div id="Marketplace">Marketplace</div>, key: '0' },
         { label: <div id="Orders">Orders</div>, key: '1' },
-        { label: <div id="Inventory">My Store</div>, key: '2' },
-        // { label: <div id="Products">Products</div>, key: '3' },
-        // { label: <div id="Events">Events</div>, key: '4' }, // hiding events from marketplace
+        { label: <div id="Inventory">My Store</div>, key: '2' }
       ]
     },
     {
@@ -93,9 +95,6 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
 
   useEffect(() => {
     let pathName = window.location.pathname;
-    // if (pathName.includes("/marketplace")) {
-    //   setSelectedTab("0");
-    // } else 
     if (pathName.includes("/order") || pathName.includes("/orders") || pathName.includes('sold-orders') || pathName.includes('bought-orders')) {
       setSelectedTab("1");
     } else if (pathName.includes("/mystore")) {
@@ -121,9 +120,11 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
           <p className="text-xs">
             {user == null ? "" : user.preferred_username}
           </p>
-          <p className="text-xs mt-3">
-            {user == null ? "" : 'STRATS: ' + user.stratsBalance}
-          </p>
+          {user &&
+            <p className="text-xs mt-3">
+              {"STRATS: " + strats}
+            </p>
+          }
         </div>
       ),
     },
