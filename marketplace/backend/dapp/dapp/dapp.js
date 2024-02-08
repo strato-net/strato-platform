@@ -882,13 +882,23 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getStratsBalance = async function (args, options = defaultOptions) {
     const { userAddress } = args;
-    const getOptions = { ...options, org: process.env.STRATS_ORG, app: '' };
-    const args2 = {
-      address: process.env.STRATS_ADDRESS,
+    const getOptions = { ...options, org: "TestCompany", app: '' };
+    let address;
+
+    if (process.env.NETWORK_ID === "6909499098523985262") {         // prod networkId
+      address = "b220195543f652f735b7847c4af399d0323e1ff6"
+    } else if (process.env.NETWORK_ID === "7596898649924658542") {  // testnet2 network Id
+      address = "488cd3909d94606051e0684cf6caa5763fb78613"
+    } else {
+      address = "488cd3909d94606051e0684cf6caa5763fb78613"
+    }
+
+    const newArgs = {
+      address: address,
       key: userAddress
     }
 
-    const balance = await strats.getStratsBalance(rawAdmin, args2, getOptions);
+    const balance = await strats.getStratsBalance(rawAdmin, newArgs, getOptions);
     return balance;
   }
 

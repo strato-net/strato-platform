@@ -122,7 +122,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
           </p>
           {user &&
             <p className="text-xs mt-3">
-              {"STRATS: " + strats}
+              {strats ? "STRATS: " + strats : 0}
             </p>
           }
         </div>
