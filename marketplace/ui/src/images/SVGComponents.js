@@ -361,7 +361,7 @@ export const VISA = (props) => {
 
 export const FilterIcon = () => {
   return (
-    <svg width="18" height="19" viewBox="0 1 16 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width="18" height="19" viewBox="0 1 16 18" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ transform: 'translateY(1.5px) translateX(-1px)' }}>
       <path d="M4.05078 1.57422H13.9508C14.7758 1.57422 15.4508 2.24922 15.4508 3.07422V4.72422C15.4508 5.32422 15.0758 6.07422 14.7008 6.44922L11.4758 9.29923C11.0258 9.67423 10.7258 10.4242 10.7258 11.0242V14.2492C10.7258 14.6992 10.4258 15.2992 10.0508 15.5242L9.00077 16.1992C8.02577 16.7992 6.67578 16.1242 6.67578 14.9242V10.9492C6.67578 10.4242 6.37578 9.74923 6.07578 9.37423L3.22578 6.37422C2.85078 5.99922 2.55078 5.32422 2.55078 4.87422V3.14922C2.55078 2.24922 3.22578 1.57422 4.05078 1.57422Z" stroke="#202020" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" />
       </svg>
   )
