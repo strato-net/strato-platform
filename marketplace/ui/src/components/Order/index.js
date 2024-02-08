@@ -1,4 +1,4 @@
-import { Tabs, DatePicker, Breadcrumb, Button, Dropdown, Space  } from "antd";
+import { Tabs, DatePicker, Breadcrumb, Button, Dropdown, Space, notification } from "antd";
 import { DownloadOutlined } from '@ant-design/icons';
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -31,7 +31,7 @@ const Order = ({ user }) => {
   const [callCSV, setCallCSV] = useState(false);
   const { allOrders, isAllOrdersLoading } = useOrderState();
   const { categorys } = useCategoryState();
-  
+  const [api, contextHolder] = notification.useNotification();
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
   }, [categoryDispatch]);
@@ -80,52 +80,93 @@ const Order = ({ user }) => {
   }
   
   function mapOrderData(orders) {
-    return orders.flatMap(order => 
-      order.assets.map((asset, index) => {
-        const { category, subCategory } = getCategoryAndSubcategory(asset.contract_name);
-        return formatDataObject({
-          orderNumber: order.orderId,
-          purchaserName: order.purchasersCommonName,
-          category,
-          subCategory,
-          assetName: asset.name,
-          assetPrice: asset.salePrice,
-          quantity: order.quantities[index],
-          totalOrderAmount: order.totalPrice,
-          orderDate: order.createdDate,
-          orderFulfillmentDate: order.fulfillmentDate,
-          orderStatus: INVERTED_ORDER_STATUS[order.status] || "Unknown",
-          comments: order.comments,
-          blockchainAddress: order.address
-        });
-      })
-    );
+    try {
+      return orders.flatMap(order => 
+        order.assets.map((asset, index) => {
+          const { category, subCategory } = getCategoryAndSubcategory(asset.contract_name);
+          return formatDataObject({
+            orderNumber: order.orderId,
+            purchaserName: order.purchasersCommonName,
+            category,
+            subCategory,
+            assetName: asset.name,
+            assetPrice: asset.salePrice,
+            quantity: order.quantities[index],
+            totalOrderAmount: order.totalPrice,
+            orderDate: order.createdDate,
+            orderFulfillmentDate: order.fulfillmentDate,
+            orderStatus: INVERTED_ORDER_STATUS[order.status] || "Unknown",
+            comments: order.comments,
+            blockchainAddress: order.address
+          });
+        })
+      );
+    } catch (error) {
+      throw new Error("Failed to map order data");
+    }
   }
   
   function mapTransfersData(transfers) {
-    return transfers.map(order => {
-      const { category, subCategory } = getCategoryAndSubcategory(order.contract_name);
-      return formatDataObject({
-        transferNumber: order.id,
-        transferDate: order.transferDate,
-        category,
-        subCategory,
-        assetName: order.assetName,
-        quantity: order.quantity,
-        sender: order.oldOwnerCommonName,
-        recipient: order.newOwnerCommonName,
-        blockchainAddress: order.address
+    try {
+      return transfers.map(order => {
+        const { category, subCategory } = getCategoryAndSubcategory(order.contract_name);
+        return formatDataObject({
+          transferNumber: order.id,
+          transferDate: order.transferDate,
+          category,
+          subCategory,
+          assetName: order.assetName,
+          quantity: order.quantity,
+          sender: order.oldOwnerCommonName,
+          recipient: order.newOwnerCommonName,
+          blockchainAddress: order.address
+        });
       });
-    });
+    } catch (error) {
+      throw new Error("Failed to map transfers data");
+    }
   }
 
   
   useEffect(() => {
     if (allOrders && callExcel && !isAllOrdersLoading) {
       const wb = XLSX.utils.book_new();
-      const wsSold = XLSX.utils.json_to_sheet(mapOrderData(allOrders.bodySold));
-      const wsBought = XLSX.utils.json_to_sheet(mapOrderData(allOrders.bodyBought));
-      const wsTransferred = XLSX.utils.json_to_sheet(mapTransfersData(allOrders.bodyTransfers));
+      let sold;
+      let bought;
+      let transferred;
+      try {
+        sold = mapOrderData(allOrders.bodySold)
+      } catch (error) {
+        api.error({
+          message: 'Data Processing Error',
+          description: 'Failed to process order data. Please contact support.',
+          placement: 'bottom'
+        });
+        return;
+      }
+      const wsSold = XLSX.utils.json_to_sheet(sold ? sold : []);
+      try {
+        bought = mapOrderData(allOrders.bodyBought)
+      } catch (error) {
+        api.error({
+          message: 'Data Processing Error',
+          description: 'Failed to process order data. Please contact support.',
+          placement: 'bottom'
+        });
+        return;
+      }
+      const wsBought = XLSX.utils.json_to_sheet(bought ? bought : []);
+      try {
+        transferred = mapTransfersData(allOrders.bodyTransfers)
+      } catch (error) {
+        api.error({
+          message: 'Data Processing Error',
+          description: 'Failed to process order data. Please contact support.',
+          placement: 'bottom'
+        });
+        return;
+      }
+      const wsTransferred = XLSX.utils.json_to_sheet(transferred ? transferred : []);
     
       // Append each worksheet to the workbook
       XLSX.utils.book_append_sheet(wb, wsSold, 'Sold Orders');
@@ -144,10 +185,42 @@ const Order = ({ user }) => {
     if (allOrders && callCSV && !isAllOrdersLoading) {
       // Adding an extra column to distinguish data
       const addTypeColumn = (data, type) => data.map(row => ({ ...row, Type: type }));
-
-      const soldData = addTypeColumn(mapOrderData(allOrders.bodySold), 'Sold');
-      const boughtData = addTypeColumn(mapOrderData(allOrders.bodyBought), 'Bought');
-      const transferredData = addTypeColumn(mapTransfersData(allOrders.bodyTransfers), 'Transferred');
+      let sold;
+      let bought;
+      let transferred;
+      try {
+        sold = mapOrderData(allOrders.bodySold)
+      } catch (error) {
+        api.error({
+          message: 'Data Processing Error',
+          description: 'Failed to process order data. Please contact support.',
+          placement: 'bottom'
+        });
+        return;
+      }
+      try {
+        bought = mapOrderData(allOrders.bodyBought)
+      } catch (error) {
+        api.error({
+          message: 'Data Processing Error',
+          description: 'Failed to process order data. Please contact support.',
+          placement: 'bottom'
+        });
+        return;
+      }
+      try {
+        transferred = mapTransfersData(allOrders.bodyTransfers)
+      } catch (error) {
+        api.error({
+          message: 'Data Processing Error',
+          description: 'Failed to process order data. Please contact support.',
+          placement: 'bottom'
+        });
+        return;
+      }
+      const soldData = addTypeColumn(sold ? sold : [], 'Sold');
+      const boughtData = addTypeColumn(bought ? bought : [], 'Bought');
+      const transferredData = addTypeColumn(transferred ? transferred : [], 'Transferred');
 
       const combinedData = [...soldData, ...boughtData, ...transferredData];
       const ws = XLSX.utils.json_to_sheet(combinedData);
@@ -203,6 +276,7 @@ const Order = ({ user }) => {
 
   return (
     <div>
+      {contextHolder}
       <div className="px-4 md:px-20 lg:py-2 lg:mt-3 orders">
         <Breadcrumb>
           <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
