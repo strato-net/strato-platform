@@ -383,29 +383,7 @@ const CategoryProductList = ({ user }) => {
           </Space>
         </Panel>
       )}
-      <Divider className="m-auto w-[94%] min-w-[80%]" />
 
-      {marketplaceList?.length > 0 && (
-        <>
-          {DesktopCollapseComponent(
-            <Panel header={<Text strong className="text-base">Product</Text>} key="1">
-              <Checkbox.Group
-                value={selectedProducts}
-              >
-                <div className="flex flex-col gap-3">
-                  {uniqueProductNames.map((product, index) => (
-                    <Checkbox value={product} key={index} className="m-0" onChange={onChangeProduct}>
-                      {decodeURIComponent(product)}
-                    </Checkbox>
-                  ))}
-                </div>
-              </Checkbox.Group>
-            </Panel>
-          )}
-          <Divider className="m-auto w-[94%] min-w-[80%]" />
-        </>
-      )}
-      <div className="pb-2"></div>
     </div>
   </div>
 
@@ -473,30 +451,7 @@ const CategoryProductList = ({ user }) => {
             </Space>
           </Panel>
         )}
-        <Divider className="m-0" />
 
-        {/* Panel - Product */}
-        {marketplaceList?.length > 0 && (
-          <>
-            {MobileCollapseComponent(
-              <Panel header={<Text>Product</Text>} key="1">
-                <Checkbox.Group
-                  value={selectedProducts}
-                >
-                  <div className="flex flex-col gap-3">
-                    {uniqueProductNames.map((product, index) => (
-                      <Checkbox value={product} key={index} className="m-0" onChange={onChangeProduct}>
-                        {decodeURIComponent(product)}
-                      </Checkbox>
-                    ))}
-                  </div>
-                </Checkbox.Group>
-              </Panel>
-            )}
-            <Divider className="m-0" />
-          </>
-        )}
-        <div className="pb-8"></div>
       </div>
     </div>
     <div className="h-full w-full bg-[#00000020] absolute top-0 md:hidden"></div>
