@@ -5,7 +5,6 @@ module Debugger
     module Debugger.Types,
     module Debugger.WebSocket,
     flags_debugEnabled,
-    flags_wsDebug,
     flags_debugPort,
     flags_debugWSHost,
     flags_debugWSPort,

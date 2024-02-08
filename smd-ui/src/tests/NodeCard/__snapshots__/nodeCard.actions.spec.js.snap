@@ -29,11 +29,11 @@ exports[`NodeCard: actions peers update 1`] = `
 Object {
   "peers": Object {
     "192.168.10.33": Object {
-      "enode": "enode://687294782948972018571047ra9asd8f97381asdfasd",
+      "pubkey": "687294782948972018571047ra9asd8f97381asdfasd",
       "tcp_port": "30303",
     },
     "192.168.10.36": Object {
-      "enode": "enode://687294782948972018571047ra9asd8f97381asdfasd",
+      "pubkey": "687294782948972018571047ra9asd8f97381asdfasd",
       "tcp_port": "30303",
     },
   },

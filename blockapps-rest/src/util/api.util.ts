@@ -21,6 +21,7 @@ const Endpoint = {
   FILL: `${blocUrl}/users/user/:address/fill`,
   CONTRACTS: `${blocUrl}/contracts`,
   CONTRACTS_CONTRACT: `${blocUrl}/contracts/:name/:address`,
+  CONTRACTS_CONTRACT_DETAILS: `${blocUrl}/contracts/contract/:address/details`,
   STATE: `${blocUrl}/contracts/:name/:address/state`,
   TXRESULTS: `${blocUrl}/transactions/results`,
   SEND: `${strato23Url}/transaction`,
