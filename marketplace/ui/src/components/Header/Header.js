@@ -118,7 +118,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
             {user == null ? "" : user.commonName}
           </p>
           <p className="text-xs">
-            {user == null ? "" : user.preferred_username}
+            {user == null ? "" : user.email}
           </p>
           {user &&
             <p className="text-xs mt-3">
