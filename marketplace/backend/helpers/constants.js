@@ -36,9 +36,9 @@ export default {
 const derivePaymentUrl = function(envPaymentUrl, envNetwork){
   if (envPaymentUrl !==  '')
     return envPaymentUrl;
-  else if (envNetwork == 'mercata')
+  else if (envNetwork === 'mercata')
     return 'https://payments.mercata.blockapps.net';
-  else if (envNetork == 'mercata-hydrogen')
+  else if (envNetork === 'mercata-hydrogen')
     return 'https://payments.mercata-testnet2.blockapps.net';
   else 
     throw new Error("Payment server was not specified and undeducible from given information");
