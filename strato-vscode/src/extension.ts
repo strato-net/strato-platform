@@ -97,7 +97,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		const tokens = await getAccessTokenSecrets(context);
 		if (Object.keys(tokens).length === 0) { return vscode.window.showErrorMessage('Please log in to STRATO Mercata to upload a contract.') }
 		const activeNode = vscode.workspace.getConfiguration().get('strato-vscode.activeNode');
-		const user = await getApplicationUser(0, tokens);
+		const user = await getApplicationUser(activeNode, tokens);
 		const config = getConfig() || {};
 		const nodeOptions = { config, node: activeNode};
 		if (vscode.window.activeTextEditor) {
