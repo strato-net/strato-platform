@@ -319,6 +319,19 @@ const CategoryProductList = ({ user }) => {
     </Collapse>
   }
 
+  const PriceFilterComponent = () =>
+    <Panel header={<Text strong className="text-base">Price ($)</Text>} key="1">
+      <Space>
+        <InputNumber size="large" min={0} className="w-full" controls={false} prefix='$' value={minPrice} placeholder="min" onChange={(e) => {
+          e === null ? setMinPrice(0) : setMinPrice(e)
+        }} />
+        -
+        <InputNumber size="large" controls={false} className="w-full" min={minPrice} prefix='$' value={maxPrice} placeholder="max" onChange={(e) => {
+          e === null ? setMaxPrice(MAX_PRICE) : setMaxPrice(e)
+        }} />
+      </Space>
+    </Panel>
+
   const DesktopFilterComponent = () => <div className="mr-6 w-1/3 hidden md:flex md:flex-col">
     <div className="flex items-center">
       <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
@@ -370,17 +383,7 @@ const CategoryProductList = ({ user }) => {
       <Divider className="m-auto w-[94%] min-w-[80%]" />
 
       {DesktopCollapseComponent(
-        <Panel header={<Text strong className="text-base">Price ($)</Text>} key="1">
-          <Space>
-            <InputNumber size="large" min={0} controls={false} prefix='$' value={minPrice} placeholder="min" onChange={(e) => {
-              e === null ? setMinPrice(0) : setMinPrice(e)
-            }} />
-            -
-            <InputNumber size="large" controls={false} min={minPrice} prefix='$' value={maxPrice} placeholder="max" onChange={(e) => {
-              e === null ? setMaxPrice(MAX_PRICE) : setMaxPrice(e)
-            }} />
-          </Space>
-        </Panel>
+        PriceFilterComponent()
       )}
 
     </div>
@@ -399,7 +402,7 @@ const CategoryProductList = ({ user }) => {
         {categorys.length > 0 && (
           <>
             {MobileCollapseComponent(
-              <Panel header={<Text>Categories</Text>} key="1">
+              <Panel header={<Text strong className="text-base">Categories</Text>} key="1">
                 <Checkbox.Group
                   onChange={onChangeCategory}
                   value={selectedCategories}
@@ -420,7 +423,7 @@ const CategoryProductList = ({ user }) => {
         {/* Panel - Sub Category */}
         <>
           {MobileCollapseComponent(
-            <Panel header={<Text>Sub-Category</Text>} key="1">
+            <Panel header={<Text strong className="text-base">Sub-Category</Text>} key="1">
               <Checkbox.Group
                 value={selectedSubCategories}
               >
@@ -438,17 +441,7 @@ const CategoryProductList = ({ user }) => {
         </>
         {/* Panel - Price */}
         {MobileCollapseComponent(
-          <Panel header={<Text>Price ($)</Text>} key="1">
-            <Space>
-              <InputNumber min={0} prefix='$' placeholder="min" onChange={(e) => {
-                e === null ? setMinPrice(0) : setMinPrice(e)
-              }} />
-              -
-              <InputNumber min={minPrice} prefix='$' placeholder="max" onChange={(e) => {
-                e === null ? setMaxPrice(MAX_PRICE) : setMaxPrice(e)
-              }} />
-            </Space>
-          </Panel>
+          PriceFilterComponent()
         )}
 
       </div>
