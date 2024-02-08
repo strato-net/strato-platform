@@ -116,6 +116,18 @@ class OrderController {
       return next(e)
     }
   }
+  
+  static async export(req, res, next) {
+    try {
+      const { dapp } = req
+      const orders = await dapp.export()
+      rest.response.status200(res, orders)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
 
   static async createUserAddress(req, res, next) {
     try {
