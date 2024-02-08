@@ -305,7 +305,7 @@ async function validate(counter: number, doc: vscode.TextDocument, solidityDiagn
   if (validationCounter === counter) {
     try {
       const diagnostics: vscode.Diagnostic[] = []; 
-      const activeNode: number = vscode.workspace.getConfiguration().get('strato-vscode.activeNode') || 0;
+      const activeNode: number = await vscode.workspace.getConfiguration().get('strato-vscode.activeNode') || 0;
       const user = await getApplicationUser();
       const config = getConfig() || {};
       const options = { config, node: activeNode };

@@ -96,7 +96,7 @@ export async function activate(context: vscode.ExtensionContext) {
 	vscode.commands.registerCommand('contracts.uploadContract', async (element) => {
 		const tokens = await getAccessTokenSecrets(context);
 		if (Object.keys(tokens).length === 0) { return vscode.window.showErrorMessage('Please log in to STRATO Mercata to upload a contract.') }
-		const activeNode: number = vscode.workspace.getConfiguration().get('strato-vscode.activeNode') || 0;
+		const activeNode: number = await vscode.workspace.getConfiguration().get('strato-vscode.activeNode') || 0;
 		const user = await getApplicationUser(activeNode, tokens);
 		const config = getConfig() || {};
 		const nodeOptions = { config, node: activeNode};
@@ -176,7 +176,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		const { chainId, contractName, contractAddress, variableName } = item;
 		const tokens = await getAccessTokenSecrets(context);
 		if (Object.keys(tokens).length === 0) { return vscode.window.showErrorMessage('Please log in to STRATO Mercata to upload a contract.') }
-		const activeNode: number = vscode.workspace.getConfiguration().get('strato-vscode.activeNode') || 0;
+		const activeNode: number = await vscode.workspace.getConfiguration().get('strato-vscode.activeNode') || 0;
 		const user = await getApplicationUser(activeNode, tokens);
 		const config = getConfig() || {}
 		const nodeOptions = { config, node: activeNode};
