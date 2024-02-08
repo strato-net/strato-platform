@@ -184,6 +184,14 @@ const CategoryProductList = ({ user }) => {
     setSubCategories([]);
   };
 
+  const handleClearFilter = () => {
+    navigate('/category')
+    clearSelection()
+    setSelectedCategories([]);
+    setMaxPrice(MAX_PRICE)
+    setMinPrice(0)
+  }
+
   const checkValues = (e, arr) => {
     let tempValues = [...arr];
     const existingIndex = tempValues.indexOf(e.target.value);
@@ -466,6 +474,9 @@ const CategoryProductList = ({ user }) => {
               prefix={<img src={Images.Header_Search} alt="search" className="w-[18px] h-[18px]" />}
               className="bg-[#F6F6F6] border-none rounded-3xl p-[10px]"
             />
+          </div>
+          <div className="border border-solid border-[#6A6A6A] rounded-md cursor-pointer p-1 md:p-2" onClick={handleClearFilter}>
+            <img src={Images.Remove_filter} alt="filter" className=" w-5 h-5 md:w-6 md:h-6" />
           </div>
         </div>
 
