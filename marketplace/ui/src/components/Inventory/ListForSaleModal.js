@@ -19,7 +19,6 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
     } = useInventoryState();
 
     useEffect(() => {
-        console.log(inventory)
         if (quantity > inventory.quantity || quantity <= 0 || pricePerUnit <= 0) {
             setCanList(false);
         }

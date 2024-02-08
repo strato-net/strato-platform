@@ -74,7 +74,6 @@ const ProcessingOrder = () => {
       );
 
       const body = await response.json();
-      console.log(body);
       if (response.status === RestStatus.OK) {
         try {
           const cartObject = JSON.parse(body.data.metadata.cart);
