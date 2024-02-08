@@ -28,7 +28,6 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
         <div className={`trending_cards_container_card bg-white p-3 ${parent == 'Marketplace' ? 'w-[300px]' : 'min-w-[230px]'} min-w-[230px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}>
             {contextHolder}
             <a
-                className="m-4 block"
                 href={`/marketplace${naviroute.replace(":address", topSellingProduct.address)}`}
                 onClick={(e) => {
                     e.preventDefault(); // Prevent default link behavior
