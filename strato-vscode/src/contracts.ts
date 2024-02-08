@@ -33,7 +33,7 @@ export class ContractsProvider implements vscode.TreeDataProvider<ContractTreeIt
   async searchContracts(address) {
     const config = getConfig() || {}
     if (Object.keys(config).length === 0) return []
-    const options = { config, node: vscode.workspace.getConfiguration().get('strato-vscode.node') };
+    const options = { config, node: await vscode.workspace.getConfiguration().get('strato-vscode.activeNode') };
     const appUser = await getApplicationUser()
     const results = await rest.getContractsDetails(appUser, { address }, { ...options })
     return results
@@ -42,7 +42,7 @@ export class ContractsProvider implements vscode.TreeDataProvider<ContractTreeIt
   async getContractState(name, address, chainId, i) {
     const config = getConfig() || {}
     if (Object.keys(config).length === 0) return {}
-    const options = { config, node: vscode.workspace.getConfiguration().get('strato-vscode.node') };
+    const options = { config, node: await vscode.workspace.getConfiguration().get('strato-vscode.activeNode') };
     const appUser = await getApplicationUser()
     const contract = {
       name,
