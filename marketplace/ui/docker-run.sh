@@ -19,3 +19,7 @@ if [ -n "${ASSET_TABLE_NAME}" ] || [ -n "${SALE_TABLE_NAME}" ]; then
     sed -i `s/REACT_APP_SALE_TABLE_NAME=.*/REACT_APP_SALE_TABLE_NAME=${SALE_TABLE_NAME}/` .env
   fi
 fi
+
+echo 'Starting ui server...'	
+
+serve --single -l 3003 build
