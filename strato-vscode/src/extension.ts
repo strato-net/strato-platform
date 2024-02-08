@@ -266,6 +266,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		const id = element.node.id
 		await vscode.workspace.getConfiguration().update('strato-vscode.activeNode', id, true)
 		nodesProvider.refresh()
+		contractsProvider.refresh()
 		vscode.window.showInformationMessage(`Set active node to ${element.tooltip}.`)
 	})
 	
