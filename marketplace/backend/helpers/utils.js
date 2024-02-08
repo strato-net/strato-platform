@@ -471,7 +471,6 @@ export const setSearchColumns = (args, _columns) => {
 
 export function getEnvVariable(name) {
   const value = process.env[name] || ''
-  if (value == '') throw new Error("missing env var for " + name);
   return value
 }
 

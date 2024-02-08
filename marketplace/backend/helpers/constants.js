@@ -33,7 +33,18 @@ export default {
   testnetStratsAddress: "488cd3909d94606051e0684cf6caa5763fb78613"
 };
 
-export const STRIPE_PAYMENT_SERVER_URL = getEnvVariable('STRIPE_PAYMENT_SERVER_URL');
+const derivePaymentUrl = function(envPaymentUrl, envNetwork){
+  if (envPaymentUrl !==  '')
+    return envPaymentUrl;
+  else if (envNetwork == 'mercata')
+    return 'https://payments.mercata.blockapps.net';
+  else if (envNetork == 'mercata-hydrogen')
+    return 'https://payments.mercata-testnet2.blockapps.net';
+  else 
+    throw new Error("Payment server was not specified and undeducible from given information");
+}
+
+export const STRIPE_PAYMENT_SERVER_URL = derivePaymentUrl(getEnvVariable('STRIPE_PAYMENT_SERVER_URL'), getEnvVariable('NETWORK'))
 
 export const unitOfMeasurement = {}
 unitOfMeasurement[unitOfMeasurement['LB'] = 1] = 'LB';
