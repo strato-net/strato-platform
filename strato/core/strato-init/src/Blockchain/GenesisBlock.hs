@@ -252,7 +252,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
               A._transactionChainId = genesisChainId,
               A._transactionSender = Ac.Account (Ad.Address 0) genesisChainId,
               A._actionData =
-                Map.singleton a $
+                OMap.singleton a $
                   A.ActionData
                     (codeHash d)
                     emptyCodeCollection
@@ -267,7 +267,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
                         SolidVMDiff m -> A.SolidVMDiff $ Map.map fromDiff m
                         EVMDiff m -> A.EVMDiff $ Map.map fromDiff m
                     )
-                    Map.empty [] []
+                    OMap.empty [] []
                     [A.Create],
               A._metadata =
                 getMetadata

@@ -67,6 +67,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Short as BSS
+import qualified Data.Map.Ordered as OMap
 import Data.Char
 import Data.Data
 import Data.Foldable (traverse_)
@@ -395,7 +396,7 @@ runOperation SSTORE = do
   let ins = \case
         Action.EVMDiff m -> Action.EVMDiff $ M.insert p val m
         _ -> error "SolidVM Diff executing in EVM"
-  vmstateModify $ action . Action.actionData . at owner . mapped . Action.actionDataStorageDiffs %~ ins
+  vmstateModify $ action . Action.actionData . Action.omapLens owner . mapped . Action.actionDataStorageDiffs %~ ins
 
 --TODO- refactor so that I don't have to use this -1 hack
 runOperation JUMP = do
@@ -1152,7 +1153,11 @@ create
 create' :: EVMBase m => VMM m Code
 create' = do
   owner <- getEnvVar envOwner
-  vmstateModify $ action . Action.actionData %~ M.insert owner (Action.ActionData (EVMCode $ unsafeCreateKeccak256FromWord256 0) mempty "" "" EVM (Action.EVMDiff M.empty) M.empty [] [] [])
+  vmstateModify $ action . Action.actionData %~ OMap.alter alterFunc owner
+    where
+      alterFunc :: Maybe Action.ActionData -> Maybe Action.ActionData
+      alterFunc Nothing = Just $ Action.ActionData (EVMCode $ unsafeCreateKeccak256FromWord256 0) mempty "" "" EVM (Action.EVMDiff M.empty) M.empty [] [] []
+      alterFunc (Just existingData) = Just existingData -- Keep the existing data if it exists
 
   runCodeFromStart
 

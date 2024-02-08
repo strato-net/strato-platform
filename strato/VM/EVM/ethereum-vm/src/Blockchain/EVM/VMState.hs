@@ -32,7 +32,7 @@ import Control.Monad
 import qualified Data.ByteString as B
 import Data.IORef
 import Data.IORef.Unboxed
-import qualified Data.Map.Strict as M
+import qualified Data.Map.Ordered as OMap
 import qualified Data.Sequence as Seq
 import qualified Data.Set as S
 import qualified Data.Vector.Storable.Mutable as V
@@ -118,7 +118,7 @@ startingAction Environment {..} =
       _transactionHash = envTxHash,
       _transactionChainId = envChainId,
       _transactionSender = envSender,
-      _actionData = M.empty,
+      _actionData = OMap.empty,
       _metadata = envMetadata,
       _events = Seq.empty,
       _delegatecalls = Seq.empty

@@ -4,6 +4,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE RankNTypes #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.Stream.Action where
@@ -34,6 +36,7 @@ import Data.Foldable
 import Data.Function (on)
 import Data.List
 import Data.Map.Strict (Map)
+import qualified Data.Map.Ordered as OMap
 import qualified Data.Map.Strict as M
 import Data.Maybe
 import qualified Data.Sequence as S
@@ -130,6 +133,27 @@ emptyCallData =
       _callDataInput = BSS.empty,
       _callDataOutput = Nothing
     }
+
+omapLens :: (Ord k) => k -> Lens' (OMap.OMap k v) (Maybe v)
+omapLens k = lens getter setter
+  where
+    getter omap = OMap.lookup k omap
+    setter omap newValue = OMap.alter (const newValue) k omap
+
+
+-- omapInsertWith ::
+--   Ord k =>
+--   (a -> a -> a)  -- ^ Function to combine the new value with the old value.
+--   -> k           -- ^ Key.
+--   -> a           -- ^ New value.
+--   -> OMap.OMap k a  -- ^ Map to insert into.
+--   -> OMap.OMap k a  -- ^ Resulting map.
+-- omapInsertWith f k x omap =
+--   OMap.alter (Just . combine) k omap
+--   where
+--     combine :: Maybe b -> b
+--     combine Nothing = x
+--     combine (Just old) = f old x
 
 data DataDiff
   = EVMDiff (Map Word256 Word256)
@@ -310,14 +334,18 @@ data Action = Action
     _transactionHash :: Keccak256,
     _transactionChainId :: Maybe Word256,
     _transactionSender :: Account,
-    _actionData :: Map Account ActionData,
+    _actionData :: OMap.OMap Account ActionData,
     _metadata :: Maybe (Map Text Text),
     _events :: S.Seq Event,
     _delegatecalls :: S.Seq Delegatecall
   }
-  deriving (Eq, Show, Generic, NFData)
-
+  deriving (Eq, Show, Generic)
 makeLenses ''Action
+
+instance (NFData k, NFData v) => NFData (OMap.OMap k v) where
+    rnf omap = rnf (OMap.assocs omap) -- Convert OMap to list and apply rnf
+
+instance NFData Action
 
 instance Format Action where
   format Action {..} =
@@ -338,7 +366,7 @@ instance Format Action where
       ++ format _transactionSender
       ++ "\n"
       ++ "actionData:\n"
-      ++ unlines (map (\(k, v) -> tab $ format k ++ ":\n" ++ (tab $ format v)) $ M.toList _actionData)
+      ++ unlines (map (\(k, v) -> tab $ format k ++ ":\n" ++ (tab $ format v)) $ OMap.assocs _actionData)
       ++ "\n"
       ++ "actionMetadata: "
       ++ unwords (map (\(k, v) -> "(" ++ CL.blue (show k) ++ ": " ++ show (shorten 30 $ T.unpack v) ++ ")") $ M.toList $ fromMaybe M.empty $ _metadata)
@@ -351,6 +379,20 @@ instance Format Action where
       ++ "\n"
 
 instance Binary Action
+
+instance (Ord k, Binary k, Binary v) => Binary (OMap.OMap k v) where
+    put omap = put (OMap.assocs omap) -- Serialize OMap as list of key-value pairs
+    get = do
+        kvPairs <- get -- Deserialize a list of key-value pairs
+        return $ OMap.fromList kvPairs -- Convert list back to OMap
+
+instance (ToJSON k, ToJSON v) => ToJSON (OMap.OMap k v) where
+    toJSON omap = object [ "omapData" .= OMap.assocs omap ]
+
+instance (Ord k, FromJSON k, FromJSON v) => FromJSON (OMap.OMap k v) where
+    parseJSON = withObject "OMap" $ \obj -> do
+        omapData <- obj .: "omapData"
+        return $ OMap.fromList omapData
 
 instance ToJSON Action where
   toJSON Action {..} =
@@ -399,3 +441,8 @@ instance Arbitrary Delegatecall where
 
 instance Arbitrary Action where
   arbitrary = genericArbitrary
+
+instance (Ord k, Arbitrary k, Arbitrary v) => Arbitrary (OMap.OMap k v) where
+    arbitrary = do
+        kvPairs <- listOf arbitrary -- Generate a list of key-value pairs
+        return $ OMap.fromList kvPairs -- Convert list to OMap

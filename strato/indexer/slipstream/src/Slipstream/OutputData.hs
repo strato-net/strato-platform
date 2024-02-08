@@ -317,7 +317,7 @@ createForeignIndexesForJoins foreignKey = do
   let fkNameTargetToSrc = textToDoubleQuoteText $ tableNameToTextPostgres (foreignTableName foreignKey) <> "_" <> tableNameToTextPostgres (tableName foreignKey) <> "_fk"
 
   yield "BEGIN;"
-  -- Drop existing foreign keys so theres cyclical or old dependancy
+  -- Drop existing foreign keys so theres no cyclical or old dependancy
   yield $ "ALTER TABLE " <> srcTable 
           <> " DROP CONSTRAINT IF EXISTS " <> fkNameSrcToTarget <> ";"
   yield $ "ALTER TABLE " <> targetTable 
@@ -709,11 +709,10 @@ expandTableQuery tableName cols =
 
 insertIndexTable ::
   OutputM m =>
-  [E.ProcessedContract] ->
+  E.ProcessedContract ->
   ConduitM () Text m ()
-insertIndexTable [] = error "insertIndexTable: unhandled empty list"
-insertIndexTable contracts = do
-  yieldMany $ insertIndexTableQuery contracts 
+insertIndexTable contract = do
+  yield $ insertIndexTableQuery contract
 
 insertMappingTable ::
   OutputM m =>
@@ -730,42 +729,38 @@ insertMappingTable maps = do
 insertForeignKeys ::
   (MonadLogger m, MonadUnliftIO m) =>
   PGConnection ->
-  [E.ProcessedContract] ->
+  E.ProcessedContract ->
   m ()
-insertForeignKeys conn contracts = do
-  forM_ contracts $ \c@E.ProcessedContract {organization = org, application = app, contractName = cName, contractData = contractData} -> do
-    let tableName =
-          indexTableName
-            (org)
-            (app)
-            (cName)
+insertForeignKeys conn contract = do
+  let c@E.ProcessedContract {organization = org, application = app, contractName = cName, contractData = contractData} = contract
+      tableName = indexTableName org app cName
 
-    --There are still reasons why a foreign key insertion might fail
-    --  1. The field type was changed in a solidity contract version update
-    --  2. solidity uses inheritance, and the foreign key points to the parent table
-    --  3. The user just sets a variable to a made up invalid address (0x1234)
-    --When an invalid foreign pointer is set, STRATO's stated behavior will be to set the value to null
-    forM_ [(n, a) | (n, ValueContract a) <- Map.toList $ contractData] $ \(theName, acct) ->
-      do
-        dbQuery conn $
+  --There are still reasons why a foreign key insertion might fail
+  --  1. The field type was changed in a solidity contract version update
+  --  2. solidity uses inheritance, and the foreign key points to the parent table
+  --  3. The user just sets a variable to a made up invalid address (0x1234)
+  --When an invalid foreign pointer is set, STRATO's stated behavior will be to set the value to null
+  forM_ [(n, a) | (n, ValueContract a) <- Map.toList $ contractData] $ \(theName, acct) ->
+    do
+      dbQuery conn $
+        "UPDATE "
+          <> tableNameToDoubleQuoteText tableName
+          <> " SET "
+          <> wrapDoubleQuotes theName
+          <> "="
+          <> wrapSingleQuotes (escapeQuotes $ T.pack $ show acct)
+          <> " WHERE address="
+          <> wrapSingleQuotes (makeAccount (E.chain c) (E.address c))
+          <> ";"
+      `catch` \(e :: SomeException) -> do
+        $logInfoS "insertHistoryTable" $ T.pack $ "foreign key update failed, value will be set to null: " ++ show e
+        dbQueryCatchError conn $
           "UPDATE "
             <> tableNameToDoubleQuoteText tableName
             <> " SET "
             <> wrapDoubleQuotes theName
-            <> "="
-            <> wrapSingleQuotes (escapeQuotes $ T.pack $ show acct)
-            <> " WHERE address="
+            <> "=null WHERE address="
             <> wrapSingleQuotes (makeAccount (E.chain c) (E.address c))
-            <> ";"
-        `catch` \(e :: SomeException) -> do
-          $logInfoS "insertHistoryTable" $ T.pack $ "foreign key update failed, value will be set to null: " ++ show e
-          dbQueryCatchError conn $
-            "UPDATE "
-              <> tableNameToDoubleQuoteText tableName
-              <> " SET "
-              <> wrapDoubleQuotes theName
-              <> "=null WHERE address="
-              <> wrapSingleQuotes (makeAccount (E.chain c) (E.address c))
 
 insertHistoryTable ::
   OutputM m =>
@@ -893,19 +888,11 @@ addHistoryUnique (o, a, n) =
           <> ";"
       ]
 
-insertIndexTableQuery :: [E.ProcessedContract] -> [Text]
-insertIndexTableQuery [] = error "insertIndexTableQuery: unhandled empty list"
-insertIndexTableQuery cs =
-  concat $
-    let cs' = (\c@E.ProcessedContract {contractData = contractData} -> (c, Map.toList $ Map.mapMaybe valueToSQLTextFilterContract $ contractData)) <$> cs
-     in flip map (map snd $ partitionWith (length . snd) cs') $ \case
-          [] -> []
-          contracts@((x, list) : _) ->
-            let tableName =
-                  indexTableName
-                    (E.organization x)
-                    (E.application x)
-                    (E.contractName x)
+insertIndexTableQuery :: E.ProcessedContract -> Text
+insertIndexTableQuery cs = 
+    let cs' = (\c@E.ProcessedContract {contractData = contractData} -> (c, Map.toList $ Map.mapMaybe valueToSQLTextFilterContract $ contractData)) cs
+        processContract (contract, list) =
+            let tableName = indexTableName (E.organization contract) (E.application contract) (E.contractName contract)
                 keySt = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
                 baseVals =
                   [ tshow . E.address,
@@ -915,17 +902,14 @@ insertIndexTableQuery cs =
                     T.pack . keccak256ToHex . E.transactionHash,
                     tshow . E.transactionSender
                   ]
-                vals = flip map contracts $ \(row, rowList) ->
-                  wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
-                inserts = csv vals
-             in (: []) $
-                  T.concat
+                insert = wrapAndEscape $ map (wrapSingleQuotes . ($ contract)) baseVals ++ map snd list
+            in T.concat
                     [ "INSERT INTO ",
                       tableNameToDoubleQuoteText tableName,
                       " ",
                       keySt,
                       "\n  VALUES ",
-                      inserts,
+                      insert,
                       [r|
   ON CONFLICT (address) DO UPDATE SET
     address = excluded.address,
@@ -938,6 +922,8 @@ insertIndexTableQuery cs =
                       tableUpsert $ map fst list,
                       ";"
                     ]
+    in processContract cs'
+
 
 insertMappingTableQuery :: [ProcessedMappingRow] -> [Text]
 insertMappingTableQuery [] = error "insertMappingTableQuery: unhandled empty list"
