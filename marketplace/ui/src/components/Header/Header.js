@@ -41,8 +41,10 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   }, []);
 
   useEffect(() => {
-    actions.fetchStratsBalance(marketplaceDispatch);
-  }, []);
+    if (user) {
+      actions.fetchStratsBalance(marketplaceDispatch);
+    }
+  }, [user]);
 
   useEffect(() => {
     actions.fetchCartItems(marketplaceDispatch, storedData);
