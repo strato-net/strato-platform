@@ -17,6 +17,7 @@ import * as WebSocket from 'ws';
 import { rest } from 'blockapps-rest';
 import getConfig from './load.config';
 import { getApplicationUser } from './auth';
+import getOptions from './load.options';
 
 function timeout(ms: number) {
 	return new Promise(resolve => setTimeout(resolve, ms));
@@ -187,8 +188,7 @@ export class StratoDebugSession extends LoggingDebugSession {
 		    this._user = await getApplicationUser()
 		}
 		if (!this._options) {
-            const config = getConfig() || {}
-            this._options = { config };
+            this._options = getOptions() || {};
 		}
 		return { user: this._user, options: this._options }
 	}

@@ -20,7 +20,8 @@ export async function applicationUserLogin(context: vscode.ExtensionContext, use
     if (nodes.length === 0) {
       return undefined
     }
-    const nodeOauth = nodes[0].oauth
+    const activeNode: number = vscode.workspace.getConfiguration().get('strato-vscode.activeNode') || 0
+    const nodeOauth = nodes[activeNode].oauth
     const oauth = await oauthUtil.init(nodeOauth)
     const req = {
       method: 'post',

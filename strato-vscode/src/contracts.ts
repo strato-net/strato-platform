@@ -3,6 +3,7 @@ import * as path from 'path';
 import { rest } from 'blockapps-rest';
 import { getApplicationUser } from './auth';
 import getConfig from './load.config';
+import getOptions from './load.options';
 
 export class ContractsProvider implements vscode.TreeDataProvider<ContractTreeItem> {
   private selectedContractAddresses: string[] = [];
@@ -31,18 +32,16 @@ export class ContractsProvider implements vscode.TreeDataProvider<ContractTreeIt
   }
 
   async searchContracts(address) {
-    const config = getConfig() || {}
-    if (Object.keys(config).length === 0) return []
-    const options = { config, node: await vscode.workspace.getConfiguration().get('strato-vscode.activeNode') };
+    const options = getOptions()  || {}
+    if (Object.keys(options.config).length === 0) return []
     const appUser = await getApplicationUser()
     const results = await rest.getContractsDetails(appUser, { address }, { ...options })
     return results
   }
 
   async getContractState(name, address, chainId, i) {
-    const config = getConfig() || {}
-    if (Object.keys(config).length === 0) return {}
-    const options = { config, node: await vscode.workspace.getConfiguration().get('strato-vscode.activeNode') };
+    const options = getOptions() || {}
+    if (Object.keys(options.config).length === 0) return {}
     const appUser = await getApplicationUser()
     const contract = {
       name,

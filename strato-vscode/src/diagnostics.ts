@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { rest, importer } from 'blockapps-rest';
 import getConfig from './load.config';
+import getOptions from './load.options';
 import { getApplicationUser } from './auth';
 import { LOADIPHLPAPI } from 'dns';
 
@@ -305,10 +306,8 @@ async function validate(counter: number, doc: vscode.TextDocument, solidityDiagn
   if (validationCounter === counter) {
     try {
       const diagnostics: vscode.Diagnostic[] = []; 
-      const activeNode: number = await vscode.workspace.getConfiguration().get('strato-vscode.activeNode') || 0;
       const user = await getApplicationUser();
-      const config = getConfig() || {};
-      const options = { config, node: activeNode };
+      const options = getOptions() || {}
       let srcMap = {[doc.uri.path]: doc.getText()};
       const folders = vscode.workspace.workspaceFolders || [];
       if (folders.length > 0) {

@@ -3,6 +3,7 @@ import * as path from 'path';
 import { rest } from 'blockapps-rest';
 import { getApplicationUser } from './auth';
 import getConfig from './load.config';
+import getOptions from './load.options';
 
 export class CirrusProvider implements vscode.TreeDataProvider<CirrusItem> {
   _queryString: string;
@@ -25,8 +26,7 @@ export class CirrusProvider implements vscode.TreeDataProvider<CirrusItem> {
   }
 
   async callCirrus(name, query): Promise<string[]> {
-    const config = getConfig() || {}
-    const options = { config, node: await vscode.workspace.getConfiguration().get('strato-vscode.activeNode')};
+    const options = getOptions() 
     const appUser = await getApplicationUser()
     const results = await rest.search(appUser, { name }, { ...options, query })
     return results
