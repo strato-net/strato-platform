@@ -25,7 +25,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
     const navigate = useNavigate();
 
     return (
-        <div className={`trending_cards_container_card bg-white p-3 ${parent == 'Marketplace' ? 'w-[300px]' : 'min-w-[230px]'} min-w-[230px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}>
+        <div className={`trending_cards_container_card bg-white p-3 ${parent == 'Marketplace' ? 'min-w-[300px] w-auto' : 'min-w-[230px]'} min-w-[230px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}>
             {contextHolder}
             <img
                 onClick={() =>
