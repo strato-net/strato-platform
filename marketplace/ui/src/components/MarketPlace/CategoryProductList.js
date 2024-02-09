@@ -12,7 +12,7 @@ import {
   Input,
   notification,
 } from "antd";
-import { CloseOutlined } from "@ant-design/icons";
+import { CloseOutlined, DeleteOutlined } from "@ant-design/icons";
 // Actions
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { actions as subCategoryActions } from "../../contexts/subCategory/actions";
@@ -294,6 +294,17 @@ const CategoryProductList = ({ user }) => {
       ))}
     </Breadcrumb>
 
+  const ClearFilterComponent = () =>
+    <div className="flex justify-between max-[768px]:px-7">
+      <div className="flex items-center">
+        <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
+        <Text className="text-xl font-semibold pr-7 ml-1">Filters</Text>
+      </div>
+      <div className=" rounded-md cursor-pointer p-1 md:p-2" onClick={handleClearFilter}>
+        <Text className="text-xl font-semibold ml-1">Clear All <DeleteOutlined /></Text>
+      </div>
+    </div>
+
   const MobileCollapseComponent = (children) => {
     return <Collapse
       bordered={false}
@@ -335,10 +346,7 @@ const CategoryProductList = ({ user }) => {
     </Panel>
 
   const DesktopFilterComponent = () => <div className="mr-6 w-1/3 hidden md:flex md:flex-col">
-    <div className="flex items-center">
-      <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
-      <Text className="text-xl font-semibold pr-7 ml-1">Filters</Text>
-    </div>
+    {ClearFilterComponent()}
     <div className="bg-white border border-solid border-[#E9E9E9] my-6 mb-24">
 
       {categorys.length > 0 && (
@@ -394,6 +402,7 @@ const CategoryProductList = ({ user }) => {
   const MobileFilterComponent = () => <div>
     <div className="mr-6 fixed w-full h-full z-50 top-16 overflow-scroll md:hidden">
       <div className="bg-white shadow-[2px_-2px_4px_0_rgba(0,0,0,0.05)] mb-24">
+         {ClearFilterComponent()}
         <div className="flex items-center justify-between pt-5">
           <Text className="text-base font-semibold pr-7 pl-7 ml-1">Select</Text>
           <Avatar icon={<CloseOutlined />} style={{ color: "#202020" }} className="flex items-center pr-12" onClick={handleFilterClick} />
@@ -470,9 +479,6 @@ const CategoryProductList = ({ user }) => {
               prefix={<img src={Images.Header_Search} alt="search" className="w-[18px] h-[18px]" />}
               className="bg-[#F6F6F6] border-none rounded-3xl p-[10px]"
             />
-          </div>
-          <div className="border border-solid border-[#6A6A6A] rounded-md cursor-pointer p-1 md:p-2" onClick={handleClearFilter}>
-            <img src={Images.Remove_filter} alt="filter" className=" w-5 h-5 md:w-6 md:h-6" />
           </div>
         </div>
 
