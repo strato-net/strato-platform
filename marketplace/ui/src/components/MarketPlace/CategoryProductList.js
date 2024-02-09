@@ -56,7 +56,7 @@ const CategoryProductList = ({ user }) => {
   const [uniqueProductNames, setUniqueProductNames] = useState([]);
   const [desktopOpenFilter, setDesktopOpenFilter] = useState(true);
   const [mobileOpenFilter, setMobileOpenFilter] = useState(false);
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState()
   const searchVal = search ? search : searchQueryValue;
   //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
@@ -164,7 +164,7 @@ const CategoryProductList = ({ user }) => {
       if (categoryQueryValue) {
         baseUrl.searchParams.set('category', categoryQueryValue);
       }
-      if (search?.length > 0) {
+      if (search.length > 0) {
         baseUrl.searchParams.set('search', search);
       }
 
@@ -191,7 +191,7 @@ const CategoryProductList = ({ user }) => {
     setSelectedCategories([]);
     setMinPrice(0)
     setMaxPrice(MAX_PRICE)
-    setSearch('')
+    setSearch()
   }
 
   const checkValues = (e, arr) => {
