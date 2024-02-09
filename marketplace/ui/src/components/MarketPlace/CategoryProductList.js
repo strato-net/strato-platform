@@ -97,6 +97,8 @@ const CategoryProductList = ({ user }) => {
   };
 
   useEffect(() => {
+    const selection = subCategorys.map(item => item.contract)
+    setSelectedSubCategories(selection)
     setSubCategories(subCategorys);
   }, [subCategorys]);
 
@@ -137,7 +139,7 @@ const CategoryProductList = ({ user }) => {
       );
     }
   }, [
-    selectedCategories,
+    // selectedCategories,
     selectedSubCategories,
     selectedBrands,
     minPrice,
@@ -295,7 +297,7 @@ const CategoryProductList = ({ user }) => {
     </Breadcrumb>
 
   const ClearFilterComponent = () =>
-    <div className="flex justify-between max-[768px]:px-7">
+    <div className="flex justify-between max-[768px]:px-7 max-[768px]:py-4">
       <div className="flex items-center">
         <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
         <Text className="text-xl font-semibold pr-7 ml-1">Filters</Text>
@@ -345,6 +347,21 @@ const CategoryProductList = ({ user }) => {
       </Space>
     </Panel>
 
+  const SubCategoryFilterComponent = () =>
+    <Panel header={<Text strong className="text-base">Sub Categories</Text>} key="1">
+      <Checkbox.Group
+        value={selectedSubCategories}
+      >
+        <div className="flex flex-col gap-3">
+          {subCategories.filter(item=>item.name.toLowerCase().includes('carbon')).map((subcategory, index) => (
+            <Checkbox value={subcategory.contract} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
+              {subcategory.name}
+            </Checkbox>
+          ))}
+        </div>
+      </Checkbox.Group>
+    </Panel>
+
   const DesktopFilterComponent = () => <div className="mr-6 w-1/3 hidden md:flex md:flex-col">
     {ClearFilterComponent()}
     <div className="bg-white border border-solid border-[#E9E9E9] my-6 mb-24">
@@ -373,19 +390,7 @@ const CategoryProductList = ({ user }) => {
       {subCategories.length > 0 && (
         <>
           {DesktopCollapseComponent(
-            <Panel header={<Text strong className="text-base">Sub Categories</Text>} key="1">
-              <Checkbox.Group
-                value={selectedSubCategories}
-              >
-                <div className="flex flex-col gap-3">
-                  {subCategories.map((subcategory, index) => (
-                    <Checkbox value={subcategory.contract} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
-                      {subcategory.name}
-                    </Checkbox>
-                  ))}
-                </div>
-              </Checkbox.Group>
-            </Panel>
+            SubCategoryFilterComponent()
           )}
           <Divider className="m-auto w-[94%] min-w-[80%]" />
         </>
@@ -402,7 +407,7 @@ const CategoryProductList = ({ user }) => {
   const MobileFilterComponent = () => <div>
     <div className="mr-6 fixed w-full h-full z-50 top-16 overflow-scroll md:hidden">
       <div className="bg-white shadow-[2px_-2px_4px_0_rgba(0,0,0,0.05)] mb-24">
-         {ClearFilterComponent()}
+        {ClearFilterComponent()}
         <div className="flex items-center justify-between pt-5">
           <Text className="text-base font-semibold pr-7 pl-7 ml-1">Select</Text>
           <Avatar icon={<CloseOutlined />} style={{ color: "#202020" }} className="flex items-center pr-12" onClick={handleFilterClick} />
@@ -434,19 +439,7 @@ const CategoryProductList = ({ user }) => {
         {/* Panel - Sub Category */}
         <>
           {MobileCollapseComponent(
-            <Panel header={<Text strong className="text-base">Sub-Category</Text>} key="1">
-              <Checkbox.Group
-                value={selectedSubCategories}
-              >
-                <div className="flex flex-col gap-3">
-                  {subCategories.map((subcategory, index) => (
-                    <Checkbox value={subcategory.contract} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
-                      {subcategory.name}
-                    </Checkbox>
-                  ))}
-                </div>
-              </Checkbox.Group>
-            </Panel>
+            SubCategoryFilterComponent()
           )}
           <Divider className="m-0" />
         </>
