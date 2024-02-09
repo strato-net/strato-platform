@@ -188,12 +188,16 @@ const CategoryProductList = ({ user }) => {
   };
 
   const handleClearFilter = () => {
-    navigate('/category')
-    clearSelection()
-    setSelectedCategories([]);
-    setMinPrice(0)
-    setMaxPrice(MAX_PRICE)
-    setSearch()
+    const isFilter = selectedBrands.length !=0 || selectedCategories.length !=0 || selectedSubCategories.length !=0
+      || minPrice !== 0 || maxPrice !== MAX_PRICE || searchVal
+    if (isFilter) {
+      navigate('/category')
+      clearSelection()
+      setSelectedCategories([]);
+      setMinPrice(0)
+      setMaxPrice(MAX_PRICE)
+      setSearch()
+    }
   }
 
   const checkValues = (e, arr) => {
@@ -353,7 +357,7 @@ const CategoryProductList = ({ user }) => {
         value={selectedSubCategories}
       >
         <div className="flex flex-col gap-3">
-          {subCategories.filter(item=>item.name.toLowerCase().includes('carbon')).map((subcategory, index) => (
+          {subCategories.filter(item => item.name.toLowerCase().includes('carbon')).map((subcategory, index) => (
             <Checkbox value={subcategory.contract} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
               {subcategory.name}
             </Checkbox>
@@ -492,7 +496,7 @@ const CategoryProductList = ({ user }) => {
           <div className="hidden md:flex mt-2 items-center">
             <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
             <Text className="text-gray-800 ml-1 text-xl font-semibold">
-              {marketplaceList?.length} Results
+              {isLoading ? <Spin spinning={isLoading} size="small" /> : marketplaceList?.length} Results
             </Text>
           </div>
           {isLoading ?
