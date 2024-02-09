@@ -99,6 +99,23 @@ const reducer = (state, action) => {
         error: action.error,
         isordersLoading: false,
       };
+    case actionDescriptors.fetchAllOrders:
+      return {
+        ...state,
+        isAllOrdersLoading: true,
+      };
+    case actionDescriptors.fetchAllOrdersSuccessful:
+      return {
+        ...state,
+        allOrders: action.payload,
+        isAllOrdersLoading: false,
+      };
+    case actionDescriptors.fetchAllOrdersFailed:
+      return {
+        ...state,
+        error: action.error,
+        isAllOrdersLoading: false,
+      };
     case actionDescriptors.updateOrderStatus:
       return {
         ...state,

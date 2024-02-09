@@ -17,6 +17,7 @@ import * as WebSocket from 'ws';
 import { rest } from 'blockapps-rest';
 import getConfig from './load.config';
 import { getApplicationUser } from './auth';
+import getOptions from './load.options';
 
 function timeout(ms: number) {
 	return new Promise(resolve => setTimeout(resolve, ms));
@@ -87,7 +88,8 @@ export class StratoDebugSession extends LoggingDebugSession {
                 "Authorization" : "Bearer " + token
             }
         };
-        this._ws = new WebSocket(`${nodes[0].url}/vm-debug-ws/`, wsOptions);
+		const activeNode: number = vscode.workspace.getConfiguration().get('strato.activeNode') || 0;
+        this._ws = new WebSocket(`${nodes[activeNode].url}/vm-debug-ws/`, wsOptions);
         this._ws.on('message', (bytes) => {
            const message = JSON.parse(bytes.toString('utf-8'));
 		   if(message.tag === 'WSOStatus') {
@@ -108,7 +110,7 @@ export class StratoDebugSession extends LoggingDebugSession {
 				   }
 			   }
 		   }
-           console.log(`From websocket: ${message}`)
+           console.debug(`From websocket: ${message}`)
         });
 	}
 
@@ -186,8 +188,7 @@ export class StratoDebugSession extends LoggingDebugSession {
 		    this._user = await getApplicationUser()
 		}
 		if (!this._options) {
-            const config = getConfig() || {}
-            this._options = { config };
+            this._options = getOptions() || {};
 		}
 		return { user: this._user, options: this._options }
 	}

@@ -545,6 +545,70 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const contract = { name: saleOrderJs.contractName, address: saleOrderAddress }
     return saleOrderJs.updateOrderComment(rawAdmin, contract, options, comments);
   };
+  
+  contract.export = async function ( options = defaultOptions) {
+    const getOptions = { ...options, app: contractName };
+    
+    const processOrders = async (orderArg) => {
+      const orders = await saleOrderJs.getAll(rawAdmin, orderArg, getOptions);
+      if (orders.orders.length === 0) {
+        return [];
+      }
+      const saleAddresses = orders.orders.flatMap(order => order.saleAddresses);
+      const sales = await saleJs.getAll(rawAdmin, { saleAddresses }, options);
+      const uniqueAssetAddresses = new Set(sales.map(sale => sale.assetToBeSold));
+      
+      const assets = await inventoryJs.getAll(rawAdmin, { assetAddresses: [...uniqueAssetAddresses] }, options);
+      
+      const assetDetailsMap = new Map(assets.map(asset => [asset.address, asset]));
+      const assetLookup = new Map(sales.map(sale => [
+        sale.assetToBeSold, 
+        { 
+          ...assetDetailsMap.get(sale.assetToBeSold),
+          salePrice: sale.price
+        }
+      ]));
+      
+      orders.orders.forEach(order => {
+        order.assets = order.saleAddresses.map(saleAddress => {
+          const assetToBeSold = sales.find(sale => sale.address === saleAddress)?.assetToBeSold;
+          return assetLookup.get(assetToBeSold);
+        }).filter(asset => asset !== undefined);
+      });
+  
+      return orders.orders;
+    };
+    
+    const getItemTransferEventsWithAssetInfo = async (orderArg) => {
+      const itemTransferEvents = await inventoryJs.getAllItemTransferEvents(rawAdmin, orderArg, getOptions);
+      if (itemTransferEvents.transfers.length === 0) {
+        return [];
+      }
+      const assetAddresses = itemTransferEvents.transfers.map(event => event.assetAddress);
+      const uniqueAssetAddresses = [...new Set(assetAddresses)];
+      const assets = await inventoryJs.getAll(rawAdmin, { assetAddresses: uniqueAssetAddresses }, getOptions);
+
+      const assetInfoMap = new Map(assets.map(asset => [asset.address, { contract_name: asset.contract_name }]));
+      return itemTransferEvents.transfers.map(event => {
+        return { ...event, contract_name: assetInfoMap.get(event.assetAddress)?.contract_name };
+      });
+    };
+    
+    let soldOrderArgs = { limit: 2000, offset: 0, order: 'createdDate.desc', sellersCommonName: userCommonName };
+    const soldOrders = await processOrders(soldOrderArgs);
+    
+    let boughtOrderArgs = { limit: 2000, offset: 0, order: 'createdDate.desc', purchasersCommonName: userCommonName };
+    const boughtOrders = await processOrders(boughtOrderArgs);
+    
+    let transferArgs = { limit: 2000, offset: 0, order: 'transferDate.desc', or: `(oldOwnerCommonName.eq.${userCommonName},newOwnerCommonName.eq.${userCommonName})` };
+    const itemTransferEvents = await getItemTransferEventsWithAssetInfo(transferArgs);
+    
+    return { 
+      soldOrders: soldOrders ? soldOrders : [], 
+      boughtOrders: boughtOrders ? boughtOrders : [], 
+      transfers: itemTransferEvents ? itemTransferEvents : []
+    };
+  };
 
   // ------------------------------ SALE TEST ENDS ------------------------------
 
@@ -681,7 +745,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
   // //-----------------------------PAYMENT starts here -------------------------------
 
-  contract.paymentCheckout = async function (args, options = defaultOptions) {
+  contract.paymentCheckout = async function (originUrl, args, options = defaultOptions) {
     try {
 
       const { orderList, orderTotal: recievedOrderTotal } = args;
@@ -743,7 +807,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           orderDetail: invoices,
           accountId: sellerStripeDetails[0].accountId,
         }
-        stripePaymentSession = await axios.post(new URL('/stripe/checkout', STRIPE_PAYMENT_SERVER_URL).href, checkoutBody)
+        stripePaymentSession = await axios.post(new URL('/stripe/checkout', STRIPE_PAYMENT_SERVER_URL).href, checkoutBody, {
+          headers: {
+            'referer': `${originUrl}${options.config.marketplaceUiUrlPrefix}`
+          }
+        })
           .then(function (res) {
             if (res.status === 200) {
               return res.data;
