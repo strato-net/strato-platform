@@ -930,9 +930,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const getOptions = { ...options, org: "TestCompany", app: '' };
     let address;
 
-    if (process.env.NETWORK_ID === constants.prodNetworkId) {
+    if (process.env.networkID === constants.prodNetworkId) {
       address = constants.prodStratsAddress
-    } else if (process.env.NETWORK_ID === constants.testnetNetworkId) {
+    } else if (process.env.networkID === constants.testnetNetworkId) {
       address = constants.testnetStratsAddress
     } else {
       address = constants.testnetStratsAddress
