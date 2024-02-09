@@ -122,7 +122,7 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
   
   touch .env
   echo "STRIPE_PAYMENT_SERVER_URL = ${STRIPE_PAYMENT_SERVER_URL}" >> .env
-  echo "network = ${NETWORK}" >> .env
+  echo "NETWORK = ${NETWORK}" >> .env
   
   if test -f "${CONFIG_DIR_PATH}/${DEPLOY_FILE_NAME}"; then
     echo "deploy file exists - secondary node - nothing to deploy"
