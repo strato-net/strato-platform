@@ -40,7 +40,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                 }}
             >
                 <img
-                    className='md:h-[200px] md:w-[40vw] h-[150px] object-contain rounded-md cursor-pointer'
+                    className='md:h-[200px] md:w-[40vw] h-[150px] w-full object-contain rounded-md cursor-pointer mb-2'
                     src={topSellingProduct.images ? topSellingProduct?.images[0] : images_placeholder}
                     alt={topSellingProduct?.name || "N/A"}
                 />
