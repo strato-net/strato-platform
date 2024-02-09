@@ -30,8 +30,13 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
             <a
                 href={`/marketplace${naviroute.replace(":address", topSellingProduct.address)}`}
                 onClick={(e) => {
-                    e.preventDefault(); // Prevent default link behavior
-                    navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } });
+                    // Check if Command (metaKey) or Ctrl (ctrlKey) is pressed
+                    if (e.metaKey || e.ctrlKey) {
+                        // Let the browser handle it natively to open in a new tab
+                    } else {
+                        e.preventDefault();
+                        navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } });
+                    }
                 }}
             >
                 <img
