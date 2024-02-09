@@ -129,7 +129,7 @@ export async function activate(context: vscode.ExtensionContext) {
 					let args = {}
 					if (govXabi.constr) {
 						const constr = govXabi.constr;
-						const argNames = Object.keys(constr.args || {});
+						const argNames = Object.keys(constr.args || {}).sort((a,b) => constr.args[a].index - constr.args[b].index);
 						for (let i = 0; i < argNames.length; i++) {
 							const argInput = await vscode.window.showInputBox({
 								placeHolder: '',
