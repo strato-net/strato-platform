@@ -3,6 +3,7 @@ import * as path from 'path';
 import { rest } from 'blockapps-rest';
 import { getApplicationUser } from './auth';
 import getConfig from './load.config';
+import getOptions from './load.options';
 
 export class ContractsProvider implements vscode.TreeDataProvider<ContractTreeItem> {
   private selectedContractAddresses: string[] = [];
@@ -18,9 +19,13 @@ export class ContractsProvider implements vscode.TreeDataProvider<ContractTreeIt
       switch(element.itemType) {
         case 'address': {
           const { contractName, chainId, contractAddress } = element.item
-          const state = await this.getContractState(contractName, contractAddress, chainId, null);
-          const items = Object.entries(state).map((e) => new ContractTreeItem('stateItem', {label: `${e[0]}`, description: `${e[1]}`, tooltip: `${e[0]}: ${e[1]}`, contractName, chainId, contractAddress, variableName: e[0]}, vscode.TreeItemCollapsibleState.None));
-          return Promise.resolve(items);
+          try {
+            const state = await this.getContractState(contractName, contractAddress, chainId, null);
+            const items = Object.entries(state).map((e) => new ContractTreeItem('stateItem', {label: `${e[0]}`, description: `${e[1]}`, tooltip: `${e[0]}: ${e[1]}`, contractName, chainId, contractAddress, variableName: e[0]}, vscode.TreeItemCollapsibleState.None));
+            return Promise.resolve(items);
+          } catch (e) {
+            return Promise.resolve([])
+          }
         }
       }
       return Promise.resolve([]);
@@ -31,18 +36,22 @@ export class ContractsProvider implements vscode.TreeDataProvider<ContractTreeIt
   }
 
   async searchContracts(address) {
-    const config = getConfig() || {}
-    if (Object.keys(config).length === 0) return []
-    const options = { config, node: vscode.workspace.getConfiguration().get('strato-vscode.node') };
+    const options = getOptions()  || {}
+    if (Object.keys(options.config).length === 0) return []
     const appUser = await getApplicationUser()
-    const results = await rest.getContractsDetails(appUser, { address }, { ...options })
-    return results
+    try {
+      const results = await rest.getContractsDetails(appUser, { address }, { ...options })
+      return results
+    } catch (e) {
+      console.error(e)
+      vscode.window.showErrorMessage(`${address} could not be found on ${options.config.nodes[options.node].url}. Please check that the current selected node is on the correct network.`)
+      return []
+    }
   }
 
   async getContractState(name, address, chainId, i) {
-    const config = getConfig() || {}
-    if (Object.keys(config).length === 0) return {}
-    const options = { config, node: vscode.workspace.getConfiguration().get('strato-vscode.node') };
+    const options = getOptions() || {}
+    if (Object.keys(options.config).length === 0) return {}
     const appUser = await getApplicationUser()
     const contract = {
       name,
@@ -76,6 +85,7 @@ export class ContractsProvider implements vscode.TreeDataProvider<ContractTreeIt
     if (Object.keys(cfg).length === 0) return []
 
     const results = await Promise.all(this.selectedContractAddresses.map(async (c) => { return this.searchContracts(c) }))
+    if (results.length === 0) return []
     return results.map((e, i) => new ContractTreeItem('address', {chainId: null, contractName: e._contractName, contractAddress: this.selectedContractAddresses[i], label: `${this.selectedContractAddresses[i]}`, tooltip: `${e._contractName}`}, vscode.TreeItemCollapsibleState.Collapsed));
   }
 

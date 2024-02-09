@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import classNames from "classnames";
-import { EyeOutlined, DownOutlined, UpOutlined, FilterFilled, SearchOutlined } from "@ant-design/icons";
+import { EyeOutlined, DownOutlined, UpOutlined, DownloadOutlined, SearchOutlined } from "@ant-design/icons";
 import routes from "../../helpers/routes";
 import DataTableComponent from "../DataTableComponent";
 import { getStatus, getStatusByName } from "./constant";
@@ -10,7 +10,7 @@ import { actions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import useDebounce from "../UseDebounce";
 import { apiUrl, HTTP_METHODS, US_DATE_FORMAT } from "../../helpers/constants";
-import { Pagination, Button, Radio, Space, Typography, DatePicker, Input } from "antd";
+import { Pagination, Button, Dropdown, Menu, DatePicker, Space, Typography, Input } from "antd";
 import TagManager from "react-gtm-module";
 import "./ordersTable.css"
 import { FilterIcon } from "../../images/SVGComponents";
@@ -21,7 +21,7 @@ import RestStatus from "http-status-codes";
 import { Images } from "../../images";
 
 
-const SoldOrdersTable = ({ user, selectedDate, onDateChange }) => {
+const SoldOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrdersLoading }) => {
   const navigate = useNavigate();
   const params = useParams();
   const location = useLocation();
@@ -337,6 +337,17 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange }) => {
     setSearch(value)
   }
 
+  const menuItems = [
+    {
+      key: 'xls',
+      label: 'Excel',
+    },
+    {
+      key: 'csv',
+      label: 'CSV',
+    },
+  ];
+
   return (
     <div>
       <div className="flex gap-2 items-center mb-5">
@@ -346,8 +357,21 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange }) => {
           defaultValue={searchVal}
           prefix={<SearchOutlined />}
           placeholder="Search Sold Orders by Buyer or Order #" />
+        <Dropdown
+          className="md:hidden customButton"
+          menu={{ items: menuItems, onClick: (e) => download(e.key) }}
+          disabled={isAllOrdersLoading}
+          trigger={['click']}
+        >
+          <Button loading={isAllOrdersLoading} className="h-[32px] w-[33px] rounded-md border border-[#6A6A6A] flex md:hidden justify-center items-center">
+            <Space>
+              <DownloadOutlined />
+            </Space>
+          </Button>
+        </Dropdown>
         <div className="text-xs flex items-center md:hidden">
           <DatePicker
+            className="h-[32px] w-[33px] custom-picker"
             disabledDate={(current) => {
               const currentDate = dayjs().startOf('day'); // Get the start of today
               const selectedDate = dayjs(current).startOf('day');
@@ -360,7 +384,7 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange }) => {
           />
         </div>
         <div className="relative">
-          <div onClick={() => setMDropdownVisible(!mDropdownVisible)} className="h-[30px] w-8 rounded-md border border-[#6A6A6A] flex md:hidden justify-center items-center">
+          <div onClick={() => setMDropdownVisible(!mDropdownVisible)} className="h-[32px] w-[33px] rounded-md border border-[#6A6A6A] flex md:hidden justify-center items-center">
             <FilterIcon />
           </div>
           {mDropdownVisible && <Sorting className="md:hidden flex flex-col gap-1 absolute right-0 top-10 w-max shadow-card_shadow z-[99999] bg-white sort_conatiner py-1" />}
