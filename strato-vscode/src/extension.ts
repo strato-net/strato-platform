@@ -158,8 +158,8 @@ export async function activate(context: vscode.ExtensionContext) {
 					contractsProvider
 						.addContract(res.address)
 						.then(list => context.workspaceState.update('contractAddresses', list))
-				} catch (e) {
-					vscode.window.showErrorMessage(`${e?.response?.data|| e}`);
+				} catch (e: any) {
+					vscode.window.showErrorMessage(`${e.response.data|| e}`);
 				}
 			} else {
 				vscode.window.showErrorMessage(`Please open a Solidity file to begin uploading a contract.`);
