@@ -9,7 +9,8 @@ module.exports = {
       xl: "1440px",
       "2xl": "1600px",
       "3xl": "2000PX",
-      "4xl": "2400px"
+      "4xl": "2400px",
+      "5xl": "2800px"
     },
     colors: {
       black: "#000",
