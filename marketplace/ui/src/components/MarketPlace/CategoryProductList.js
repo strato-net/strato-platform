@@ -387,7 +387,7 @@ const CategoryProductList = ({ user }) => {
         </>
       )}
 
-      {subCategories.length > 0 && (
+      {selectedCategories.includes("Carbon") && (
         <>
           {DesktopCollapseComponent(
             SubCategoryFilterComponent()
@@ -438,7 +438,7 @@ const CategoryProductList = ({ user }) => {
         )}
         {/* Panel - Sub Category */}
         <>
-          {MobileCollapseComponent(
+          {selectedCategories.includes("Carbon") && MobileCollapseComponent(
             SubCategoryFilterComponent()
           )}
           <Divider className="m-0" />
@@ -489,7 +489,7 @@ const CategoryProductList = ({ user }) => {
 
         {/* Product list section */}
         <div className="mb-12 w-full">
-          <div className="hidden md:flex items-center">
+          <div className="hidden md:flex mt-2 items-center">
             <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
             <Text className="text-gray-800 ml-1 text-xl font-semibold">
               {marketplaceList?.length} Results
@@ -502,7 +502,7 @@ const CategoryProductList = ({ user }) => {
             :
             <div>
               {marketplaceList?.length > 0 ? (
-                <div className={`mt-[61px] md:mt-4 mb-8 flex w-full md:grid flex-col items-center ${desktopOpenFilter ? "grid-cols-1 gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 lg:gap-14 " : " sm:grid-cols-1 gap-4 md:grid-cols-2 md:gap-14 lg:grid-cols-3 lg:gap-16 xl:grid-cols-4"}`} id="product-list">
+                <div className={`mt-[61px] md:mt-7 mb-8 flex w-full md:grid flex-col items-center ${desktopOpenFilter ? "grid-cols-1 gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 lg:gap-14 " : " sm:grid-cols-1 gap-4 md:grid-cols-2 md:gap-14 lg:grid-cols-3 lg:gap-16 xl:grid-cols-4"}`} id="product-list">
                   {marketplaceList.map((product, index) => {
                     return (
                       <NewTrendingCard
