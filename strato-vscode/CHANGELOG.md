@@ -15,6 +15,8 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ### Fixed
 
 - Ability to handle array arguments in constructors and function calls
+- All API calls should use the activeNode configuration field
+- Improved error handling when switching networks
 
 ### Changed
 
