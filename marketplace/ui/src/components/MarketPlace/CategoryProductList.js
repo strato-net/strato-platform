@@ -56,8 +56,8 @@ const CategoryProductList = ({ user }) => {
   const [uniqueProductNames, setUniqueProductNames] = useState([]);
   const [desktopOpenFilter, setDesktopOpenFilter] = useState(true);
   const [mobileOpenFilter, setMobileOpenFilter] = useState(false);
-  const [search, setSearch] = useState()
-  const searchVal = search ? search : searchQueryValue;
+  const [search, setSearch] = useState(searchQueryValue)
+
   //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
   const subCategoryDispatch = useSubCategoryDispatch();
@@ -188,15 +188,20 @@ const CategoryProductList = ({ user }) => {
   };
 
   const handleClearFilter = () => {
-    const isFilter = selectedBrands.length !=0 || selectedCategories.length !=0 || selectedSubCategories.length !=0
-      || minPrice !== 0 || maxPrice !== MAX_PRICE || searchVal
+    const isFilter = selectedBrands.length != 0 || selectedCategories.length != 0 || selectedSubCategories.length != 0
+      || minPrice !== 0 || maxPrice !== MAX_PRICE
     if (isFilter) {
-      navigate('/category')
+      const baseUrl = new URL('/category', window.location.origin);
+      if (searchQueryValue) {
+        baseUrl.searchParams.set('search', searchQueryValue);
+      }
+      const url = baseUrl.pathname + baseUrl.search;
+      navigate(url)
       clearSelection()
       setSelectedCategories([]);
       setMinPrice(0)
       setMaxPrice(MAX_PRICE)
-      setSearch()
+
     }
   }
 
@@ -472,7 +477,6 @@ const CategoryProductList = ({ user }) => {
               size="large"
               onChange={(e) => { handleChangeSearch(e) }}
               placeholder="Search Marketplace"
-              value={searchVal}
               prefix={<img src={Images.Header_Search} alt="search" className="w-[18px] h-[18px]" />}
               className="bg-[#F6F6F6] border-none rounded-3xl p-[10px]"
             />
