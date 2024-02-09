@@ -359,7 +359,10 @@ async function getAll(admin, args = {}, defaultOptions) {
     if (isTrendingSearch) {
         // If it's a trending search, first search the sales
         // Order them by creation date and set limit here
-        sales = await saleJs.getAll(admin, { range, isOpen: true, order: 'block_timestamp.desc', limit: '25', offset: '0' }, options);
+
+        // added greater than query to make sure we only take the sales with quantity thats available to sell. 
+        // If the sale has 0 quantity it will throw an error when checking out, we will not show thee items for the trending search.
+        sales = await saleJs.getAll(admin, { range, isOpen: true, order: 'block_timestamp.desc', limit: '25', offset: '0', gtField: args.gtField, gtValue: args.gtValue}, options);
         const trendingAssetAddresses = sales.map(sale => sale.assetToBeSold);
 
         // Match the inventory with the sales
