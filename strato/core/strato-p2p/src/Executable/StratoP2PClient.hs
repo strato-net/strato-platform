@@ -19,8 +19,13 @@ module Executable.StratoP2PClient
 where
 
 import           BlockApps.Logging
+import           BlockApps.X509.Certificate
+import           Blockchain.Blockstanbul.Messages
 import           Blockchain.CommunicationConduit
 import           Blockchain.Context
+import           Blockchain.Data.Block
+import           Blockchain.Data.DataDefs
+import           Blockchain.Data.Enode
 import           Blockchain.Data.PubKey (secPubKeyToPoint)
 import           Blockchain.EthEncryptionException
 import           Blockchain.EventException
@@ -28,8 +33,12 @@ import           Blockchain.Metrics
 import           Blockchain.Options
 import           Blockchain.RLPx
 import           Blockchain.Sequencer.Event
+import           Blockchain.SeqEventNotify
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.UDP
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainMember
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.TCPClientWithTimeout
 import           Control.Concurrent hiding (yield)
@@ -38,10 +47,12 @@ import qualified Control.Concurrent.SSem as SSem
 import           Control.Exception.Base (ErrorCall (..))
 import           Control.Lens ((^.))
 import           Control.Monad (forever, unless, void)
+import           Control.Monad.Change.Modify
 import qualified Control.Monad.Change.Alter as A
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Trans.Resource
+import           Crypto.Types.PubKey.ECC
 import qualified Data.ByteString as B
 import           Data.Conduit
 import           Data.Either.Combinators
@@ -49,16 +60,70 @@ import           Data.Maybe
 import qualified Data.Text as T
 import           GHC.IO.Exception
 import           Ki.Unlifted as KIU
+import           Network.Haskoin.Crypto.BigWord
 import qualified Text.Colors as C
 import           Text.Format
 import           UnliftIO
+--import           Data.Set.Ordered (empty)
 
-runPeer ::
-  (RunsClient m, MonadP2P m) =>
-  PPeer ->
-  ConduitM () P2pEvent m () ->
-  m ()
-runPeer peer sSource = do
+--runPeer ::
+--  (RunsClient m, MonadP2P m) =>
+--  PPeer ->
+--  ConduitM () P2pEvent m () ->
+--  m ()
+--runPeer peer sSource = do
+runPeer :: ( MonadUnliftIO m
+           , MonadLogger m
+           , MonadResource m
+           , HasVault m
+           , RunsClient m
+           , Stacks Block m
+           , Outputs m [IngestEvent]
+           , Accessible [BlockData] m
+           , Accessible ActionTimestamp m
+           , Accessible RemainingBlockHeaders m
+           , Accessible PeerAddress m
+           , Accessible MaxReturnedHeaders m
+           , Accessible ConnectionTimeout m
+           , Accessible GenesisBlockHash m
+           , Accessible BestBlockNumber m
+           , Accessible AvailablePeers m
+           , Accessible BondedPeers m
+           , Accessible PublicKey m
+           , Modifiable [BlockData] m
+           , Modifiable ActionTimestamp m
+           , Modifiable RemainingBlockHeaders m
+           , Modifiable PeerAddress m
+           , Modifiable BestBlock m
+           , Modifiable WorldBestBlock m
+           , A.Selectable (IPAsText, UDPPort, B.ByteString) Point m
+           , A.Selectable Word256 ChainMemberRSet m
+           , A.Selectable Word256 ChainInfo m
+           , A.Selectable Integer (Canonical BlockData) m
+           , A.Selectable Keccak256 (Private (Word256, OutputTx)) m
+           , A.Selectable Keccak256 ChainTxsInBlock m
+           , A.Selectable Address X509CertInfoState m
+           , A.Selectable IPAsText PPeer m
+           , A.Selectable Point PPeer m
+           , A.Selectable ChainMemberParsedSet [ChainMemberParsedSet] m
+           , A.Selectable ChainMemberParsedSet TrueOrgNameChains m
+           , A.Selectable ChainMemberParsedSet FalseOrgNameChains m
+           , A.Selectable ChainMemberParsedSet X509CertInfoState m
+           , A.Selectable ChainMemberParsedSet IsValidator m
+           , A.Replaceable (IPAsText, Point) PeerBondingState m
+           , A.Replaceable PPeer TcpEnableTime m
+           , A.Replaceable PPeer UdpEnableTime m
+           , A.Replaceable PPeer PeerDisable m
+           , A.Replaceable PPeer T.Text m
+           , A.Alters (IPAsText, TCPPort) ActivityState m
+           , A.Alters (T.Text, Keccak256) (Proxy (Outbound WireMessage)) m
+           , A.Alters Keccak256 (Proxy (Inbound WireMessage)) m
+           , A.Alters Keccak256 BlockData m
+           , A.Alters Keccak256 OutputBlock m
+           )
+        => PPeer
+        -> m ()
+runPeer peer = do
   ender <- toIO . $logInfoS "runPeer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
   void $ register ender
   myPublic <- getPub
@@ -80,20 +145,28 @@ runPeer peer sSource = do
   $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "Attempting to connect to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
   $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "my pubkey is: " ++ format myPublic
   $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "server pubkey is: " ++ format otherPubKey 
-  runClientConnection (IPAsText $ pPeerIp peer) (TCPPort . fromIntegral $ pPeerTcpPort peer) sSource $ \c -> do
-      let pStr = pPeerString peer -- display string will show up as dns name
-      attempt :: (Maybe SomeException) <- 
-        withCertifiedPeer peer . withActivePeer peer . scoped $
-          runEthClientConduit
-            peer {pPeerPubkey = Just otherPubKey}
-            (c ^. peerSource)
-            (c ^. peerSink)
-            (c ^. seqSource)
-            pStr
-      case attempt of
-        Nothing  -> $logDebugS "runPeer" "Peer ran successfully!"
-        Just err -> do $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err
-                       throwIO err
+  --runClientConnection (IPAsText $ pPeerIp peer) (TCPPort . fromIntegral $ pPeerTcpPort peer) sSource $ \c -> do
+  scoped $ \scope -> do
+    peerthread <- fork scope (do --wireMessagesRef <- liftIO $ newIORef empty
+                                 --cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
+                                 let sSource  = seqEventNotificationSource $ contextKafkaState initContext
+                                 --    runner f = runContextM cfg $ f sSource
+                                 runClientConnection (IPAsText $ pPeerIp peer) (TCPPort . fromIntegral $ pPeerTcpPort peer) sSource $ \c -> do
+                                     let pStr = pPeerString peer -- display string will show up as dns name
+                                     attempt :: (Maybe SomeException) <- 
+                                       withCertifiedPeer peer . withActivePeer peer . scoped $
+                                         runEthClientConduit
+                                           peer {pPeerPubkey = Just otherPubKey}
+                                           (c ^. peerSource)
+                                           (c ^. peerSink)
+                                           (c ^. seqSource)
+                                           pStr
+                                     case attempt of
+                                       Nothing  -> $logDebugS "runPeer" "Peer ran successfully!"
+                                       Just err -> do $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err
+                                                      throwIO err
+                             )
+    atomically $ KIU.await peerthread
 
 runEthClientConduit ::
   MonadP2P m =>
@@ -120,14 +193,67 @@ runEthClientConduit peer pSource pSink seqSrc peerStr scp = do
            .| eventSink
            .| pSink
 
-runPeerInList ::
-  ( MonadP2P m,
-    RunsClient m
-  ) =>
-  PPeer ->
-  ConduitM () P2pEvent m () ->
-  m (Either SomeException ())
-runPeerInList thePeer sSource = do 
+--runPeerInList ::
+--  ( MonadP2P m,
+--    RunsClient m
+--  ) =>
+--  PPeer ->
+--  ConduitM () P2pEvent m () ->
+--  m (Either SomeException ())
+--runPeerInList thePeer sSource = do
+runPeerInList :: ( MonadUnliftIO m
+                 , MonadLogger m
+                 --, Exception e
+                 , MonadResource m
+                 , HasVault m
+                 , RunsClient m
+                 , Stacks Block m
+                 , Outputs m [IngestEvent]
+                 , Accessible [BlockData] m
+                 , Accessible ActionTimestamp m
+                 , Accessible RemainingBlockHeaders m
+                 , Accessible PeerAddress m
+                 , Accessible MaxReturnedHeaders m
+                 , Accessible ConnectionTimeout m
+                 , Accessible GenesisBlockHash m
+                 , Accessible BestBlockNumber m
+                 , Accessible AvailablePeers m
+                 , Accessible BondedPeers m
+                 , Accessible PublicKey m
+                 , Modifiable [BlockData] m
+                 , Modifiable ActionTimestamp m
+                 , Modifiable RemainingBlockHeaders m
+                 , Modifiable PeerAddress m
+                 , Modifiable BestBlock m
+                 , Modifiable WorldBestBlock m
+                 , A.Selectable (IPAsText, UDPPort, B.ByteString) Point m
+                 , A.Selectable Word256 ChainMemberRSet m
+                 , A.Selectable Word256 ChainInfo m
+                 , A.Selectable Integer (Canonical BlockData) m
+                 , A.Selectable Keccak256 (Private (Word256, OutputTx)) m
+                 , A.Selectable Keccak256 ChainTxsInBlock m
+                 , A.Selectable Address X509CertInfoState m
+                 , A.Selectable IPAsText PPeer m
+                 , A.Selectable Point PPeer m
+                 , A.Selectable ChainMemberParsedSet [ChainMemberParsedSet] m
+                 , A.Selectable ChainMemberParsedSet TrueOrgNameChains m
+                 , A.Selectable ChainMemberParsedSet FalseOrgNameChains m
+                 , A.Selectable ChainMemberParsedSet X509CertInfoState m
+                 , A.Selectable ChainMemberParsedSet IsValidator m
+                 , A.Replaceable (IPAsText, Point) PeerBondingState m
+                 , A.Replaceable PPeer TcpEnableTime m
+                 , A.Replaceable PPeer UdpEnableTime m
+                 , A.Replaceable PPeer PeerDisable m
+                 , A.Replaceable PPeer T.Text m
+                 , A.Alters (IPAsText, TCPPort) ActivityState m
+                 , A.Alters (T.Text, Keccak256) (Proxy (Outbound WireMessage)) m
+                 , A.Alters Keccak256 (Proxy (Inbound WireMessage)) m
+                 , A.Alters Keccak256 BlockData m
+                 , A.Alters Keccak256 OutputBlock m
+                 )
+              => PPeer
+              -> m (Either SomeException ())
+runPeerInList thePeer = do
   eErr <- nonviolentDisable thePeer --don't connect to a peer too frequently, out of politeness
   case eErr of
     Left err -> do
@@ -135,10 +261,60 @@ runPeerInList thePeer sSource = do
       $logErrorS "runPeerInList" "Simulating disable..."
       liftIO $ threadDelay $ 10 * 1000 * 1000
     Right () -> pure ()
-  try $ runPeer thePeer sSource
+  --try $ runPeer thePeer sSource
+  try $ runPeer thePeer
 
-stratoP2PClient :: (MonadP2P m, RunsClient m) => PeerRunner m (LoggingT IO) () -> LoggingT IO ()
-stratoP2PClient runner = runner $ \sSource -> do
+--stratoP2PClient :: (MonadP2P m, RunsClient m) => PeerRunner m (LoggingT IO) () -> LoggingT IO ()
+--stratoP2PClient runner = runner $ \sSource -> do
+stratoP2PClient :: ( MonadP2P m
+                   , Stacks Block (LoggingT m)
+                   , Accessible BondedPeers (LoggingT m)
+                   , HasVault (LoggingT m)
+                   , Outputs (LoggingT m) [IngestEvent]
+                   , Accessible [BlockData] (LoggingT m)
+                   , Accessible ActionTimestamp (LoggingT m)
+                   , Accessible RemainingBlockHeaders (LoggingT m)
+                   , Accessible PeerAddress (LoggingT m)
+                   , Accessible MaxReturnedHeaders (LoggingT m)
+                   , Accessible ConnectionTimeout (LoggingT m)
+                   , Accessible GenesisBlockHash (LoggingT m)
+                   , Accessible BestBlockNumber (LoggingT m)
+                   , Accessible AvailablePeers (LoggingT m)
+                   , Accessible PublicKey (LoggingT m)
+                   , Modifiable [BlockData] (LoggingT m)
+                   , Modifiable ActionTimestamp (LoggingT m)
+                   , Modifiable RemainingBlockHeaders (LoggingT m)
+                   , Modifiable PeerAddress (LoggingT m)
+                   , Modifiable BestBlock (LoggingT m)
+                   , Modifiable WorldBestBlock (LoggingT m)
+                   , A.Selectable (IPAsText, UDPPort, B.ByteString) Point (LoggingT m)
+                   , A.Selectable Word256 ChainMemberRSet (LoggingT m)
+                   , A.Selectable Word256 ChainInfo (LoggingT m)
+                   , A.Selectable Integer (Canonical BlockData) (LoggingT m)
+                   , A.Selectable Keccak256 (Private (Word256,OutputTx)) (LoggingT m)
+                   , A.Selectable Keccak256 ChainTxsInBlock (LoggingT m)
+                   , A.Selectable Address X509CertInfoState (LoggingT m)
+                   , A.Selectable IPAsText PPeer (LoggingT m)
+                   , A.Selectable Point PPeer (LoggingT m)
+                   , A.Selectable ChainMemberParsedSet [ChainMemberParsedSet] (LoggingT m)
+                   , A.Selectable ChainMemberParsedSet TrueOrgNameChains (LoggingT m)
+                   , A.Selectable ChainMemberParsedSet FalseOrgNameChains (LoggingT m)
+                   , A.Selectable ChainMemberParsedSet X509CertInfoState (LoggingT m)
+                   , A.Selectable ChainMemberParsedSet IsValidator (LoggingT m)
+                   , A.Replaceable (IPAsText,Point) PeerBondingState (LoggingT m)
+                   , A.Replaceable PPeer TcpEnableTime (LoggingT m)
+                   , A.Replaceable PPeer UdpEnableTime (LoggingT m)
+                   , A.Replaceable PPeer PeerDisable (LoggingT m)
+                   , A.Replaceable PPeer T.Text (LoggingT m)
+                   , A.Alters (T.Text,Keccak256) (Proxy (Outbound WireMessage)) (LoggingT m)
+                   , A.Alters (IPAsText,TCPPort) ActivityState (LoggingT m)
+                   , A.Alters Keccak256 (Proxy (Inbound WireMessage)) (LoggingT m)
+                   , A.Alters Keccak256 BlockData (LoggingT m)
+                   , A.Alters Keccak256 OutputBlock (LoggingT m)
+                   , RunsClient (LoggingT m)
+                   )
+                => LoggingT m ()
+stratoP2PClient = do
   $logInfoS "stratoP2PClient" $ T.pack $ "maxConn: " ++ show flags_maxConn
   activePeersSem <- liftIO (SSem.new flags_maxConn)
   forever $ do
@@ -149,21 +325,26 @@ stratoP2PClient runner = runner $ \sSource -> do
         $logErrorS "stratoP2PClient" . T.pack $ "Could not fetch peers: " ++ show err
         liftIO $ threadDelay 1000000
       Right peers -> do
-        _ <- async (multiThreadedClient peers activePeersSem sSource)
+        --_ <- async (multiThreadedClient peers activePeersSem sSource)
+        _ <- async (multiThreadedClient peers activePeersSem)
         $logInfoS "stratoP2PClient" "Waiting 5 seconds before looping over peers again"
         liftIO $ threadDelay 5000000
   where
-    multiThreadedClient :: (MonadP2P m, RunsClient m) => [PPeer] -> SSem -> ConduitM () P2pEvent m () -> m ()
-    multiThreadedClient [] _ _ = do
+    --multiThreadedClient :: (MonadP2P m, RunsClient m) => [PPeer] -> SSem -> ConduitM () P2pEvent m () -> m ()
+    --multiThreadedClient [] _ _ = do
+    multiThreadedClient :: (MonadP2P m, RunsClient m) => [PPeer] -> SSem -> m ()
+    multiThreadedClient [] _ = do
       $logInfoS "stratoP2PClient/multiThreadedClient" "No available peers, will try again in 10 seconds"
       liftIO $ threadDelay 10000000
-    multiThreadedClient peers sem sSource = do
+    --multiThreadedClient peers sem sSource = do
+    multiThreadedClient peers sem = do
       let notRunningPeers = filter ((== 0) . pPeerActiveState) peers
       unless (null notRunningPeers) . void . forConcurrently notRunningPeers $ \p -> do
         liftIO (SSem.tryWait sem) >>= \case
           Nothing -> return ()
           Just _ -> do
-            result <- runPeerInList p sSource
+            --result <- runPeerInList p sSource
+            result <- runPeerInList p
             _ <- handleRunPeerResult p result
             liftIO $ SSem.signal sem
     handleRunPeerResult :: MonadP2P m => PPeer -> Either SomeException () -> m ()

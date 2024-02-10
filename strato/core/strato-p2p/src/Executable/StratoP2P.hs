@@ -21,6 +21,7 @@ raceAll :: [BL.LoggingT IO a]
         -> BL.LoggingT IO a
 raceAll = runConcurrently . asum . map Concurrently
 
+{-
 stratoP2P :: ( MonadP2P n
              , RunsClient n
              , RunsServer n (BL.LoggingT IO)
@@ -30,4 +31,17 @@ stratoP2P runner =
   raceAll [ stratoP2PLoopback runner `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PLoopback ERROR" . T.pack $ show e)
           , stratoP2PClient   runner `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PClient ERROR" . T.pack $ show e)
           , stratoP2PServer   runner `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PServer ERROR" . T.pack $ show e)
+          ]
+-}
+
+--stratoP2P :: ( MonadP2P n
+--             , RunsClient n
+--             , RunsServer n (BL.LoggingT IO)
+--             )
+--          => PeerRunner n (BL.LoggingT IO) () -> BL.LoggingT IO ()
+--stratoP2P runner =
+stratoP2P =
+  raceAll [ stratoP2PLoopback `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PLoopback ERROR" . T.pack $ show e)
+          , stratoP2PClient          `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PClient ERROR" . T.pack $ show e)
+          , stratoP2PServer   `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PServer ERROR" . T.pack $ show e)
           ]

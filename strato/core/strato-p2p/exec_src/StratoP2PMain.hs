@@ -35,6 +35,11 @@ initP2P = do
   liftIO $ resetPeers
   _ <- liftIO $ $initHFlags "Strato P2P"
   setParticipationMode flags_participationMode
+  liftIO $
+    race_
+      (run 10248 $ prometheus def p2pApp)
+      (runLoggingT stratoP2P)
+  {-
   wireMessagesRef <- liftIO $ newIORef empty
   cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
   let sSource  = seqEventNotificationSource $ contextKafkaState initContext
@@ -43,3 +48,4 @@ initP2P = do
     race_
       (run 10248 $ prometheus def p2pApp)
       (runLoggingT $ stratoP2P runner)
+  -}
