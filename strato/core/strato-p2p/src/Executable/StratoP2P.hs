@@ -42,6 +42,6 @@ stratoP2P runner =
 --stratoP2P runner =
 stratoP2P =
   raceAll [ stratoP2PLoopback `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PLoopback ERROR" . T.pack $ show e)
-          , stratoP2PClient          `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PClient ERROR" . T.pack $ show e)
+          , stratoP2PClient   `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PClient ERROR" . T.pack $ show e)
           , stratoP2PServer   `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PServer ERROR" . T.pack $ show e)
           ]

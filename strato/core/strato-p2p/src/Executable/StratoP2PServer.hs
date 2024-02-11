@@ -24,14 +24,18 @@ import Blockchain.EventException
 import Blockchain.Options
 import Blockchain.RLPx
 import Blockchain.Sequencer.Event
+import Blockchain.SeqEventNotify
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.TCPClientWithTimeout
 import Conduit
 import Control.Lens ((^.))
 import Control.Monad
+import Control.Monad.Change.Modify
 import qualified Control.Monad.Change.Alter as A
+import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Resource
+import Crypto.Types.PubKey.ECC
 import qualified Data.ByteString as B
 import Data.Either.Combinators
 import Data.Maybe (fromMaybe)
@@ -40,13 +44,27 @@ import GHC.IO.Exception
 import Ki.Unlifted as KIU
 import qualified Text.Colors as C
 import UnliftIO
+import Data.Set.Ordered (empty)
 
-runEthServer ::
-  (RunsServer n m, MonadP2P n) =>
-  Int ->
-  PeerRunner n m () ->
-  m ()
-runEthServer listenPort runner =
+runEthServer :: ( MonadLogger m
+                , MonadUnliftIO m
+                , RunsServer (ReaderT Config (ResourceT m)) m
+                , Accessible AvailablePeers (ReaderT Config (ResourceT m))
+                , Accessible BondedPeers (ReaderT Config (ResourceT m))
+                , A.Replaceable (IPAsText,Point) PeerBondingState (ReaderT Config (ResourceT m))
+                , A.Replaceable PPeer TcpEnableTime (ReaderT Config (ResourceT m))
+                , A.Replaceable PPeer UdpEnableTime (ReaderT Config (ResourceT m))
+                , A.Replaceable PPeer PeerDisable (ReaderT Config (ResourceT m))
+                , A.Replaceable PPeer T.Text (ReaderT Config (ResourceT m))
+                , A.Alters (IPAsText,TCPPort) ActivityState (ReaderT Config (ResourceT m))
+                )
+             => Int
+             -> m ()
+runEthServer listenPort = do
+  wireMessagesRef <- liftIO $ newIORef empty
+  cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
+  let sSource  = seqEventNotificationSource $ contextKafkaState initContext
+      runner f = runContextM cfg $ f sSource 
   runServer (TCPPort listenPort) runner $ \c a ->
     ethServerHandler (c ^. peerSource) (c ^. peerSink) (c ^. seqSource) a
 
@@ -149,11 +167,20 @@ runEthServerConduit p pSource pSink seqSrc peerStr scp = do
           .| eventSink
           .| pSink
 
-stratoP2PServer ::
-  (MonadP2P n, RunsServer n (LoggingT IO)) =>
-  PeerRunner n (LoggingT IO) () ->
-  LoggingT IO ()
-stratoP2PServer runner = do
+stratoP2PServer :: ( MonadLogger m
+                   , MonadUnliftIO m
+                   , Accessible AvailablePeers (ReaderT Config (ResourceT (LoggingT m)))
+                   , Accessible BondedPeers (ReaderT Config (ResourceT (LoggingT m)))
+                   , A.Replaceable (IPAsText,Point) PeerBondingState (ReaderT Config (ResourceT (LoggingT m)))
+                   , A.Replaceable PPeer TcpEnableTime (ReaderT Config (ResourceT (LoggingT m)))
+                   , A.Replaceable PPeer UdpEnableTime (ReaderT Config (ResourceT (LoggingT m)))
+                   , A.Replaceable PPeer PeerDisable (ReaderT Config (ResourceT (LoggingT m)))
+                   , A.Replaceable PPeer T.Text (ReaderT Config (ResourceT (LoggingT m)))
+                   , A.Alters (IPAsText,TCPPort) ActivityState (ReaderT Config (ResourceT (LoggingT m)))
+                   , RunsServer (ReaderT Config (ResourceT (LoggingT m))) (LoggingT m)
+                   )
+                => LoggingT m ()
+stratoP2PServer = do
   $logInfoS "stratoP2PServer" $ T.pack $ "connect address: " ++ flags_address
   $logInfoS "stratoP2PServer" $ T.pack $ "listen port:     " ++ show flags_listen
-  runEthServer flags_listen runner
+  runEthServer flags_listen
