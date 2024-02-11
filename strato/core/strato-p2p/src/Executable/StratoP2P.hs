@@ -5,19 +5,16 @@
 
 module Executable.StratoP2P where
 
---import           Control.Concurrent.Async.Lifted.Safe(Concurrently(..),runConcurrently)
 import           Control.Exception hiding (catch)
 import           Control.Exception.Lifted (catch)
 import           Control.Monad.Change.Alter
 import           Control.Monad.Change.Modify
---import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
 import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Logger
 import           Crypto.Types.PubKey.ECC
 import           Data.ByteString
---import           Data.Foldable            (asum)
 import qualified Data.Text as T
 import           UnliftIO.Async (race_)
 import           BlockApps.Logging as BL
@@ -38,33 +35,6 @@ import           Executable.StratoP2PClient
 import           Executable.StratoP2PLoopback
 import           Executable.StratoP2PServer
 
---raceAll :: [BL.LoggingT IO a]
---        -> BL.LoggingT IO a
---raceAll :: ( MonadBaseControl IO m
---           )
---        => [BL.LoggingT m a]
---        -> BL.LoggingT m a
---raceAll = runConcurrently . asum . map Concurrently
-
-{-
-stratoP2P :: ( MonadP2P n
-             , RunsClient n
-             , RunsServer n (BL.LoggingT IO)
-             )
-          => PeerRunner n (BL.LoggingT IO) () -> BL.LoggingT IO ()
-stratoP2P runner =
-  raceAll [ stratoP2PLoopback runner `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PLoopback ERROR" . T.pack $ show e)
-          , stratoP2PClient   runner `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PClient ERROR" . T.pack $ show e)
-          , stratoP2PServer   runner `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PServer ERROR" . T.pack $ show e)
-          ]
--}
-
---stratoP2P :: ( MonadP2P n
---             , RunsClient n
---             , RunsServer n (BL.LoggingT IO)
---             )
---          => PeerRunner n (BL.LoggingT IO) () -> BL.LoggingT IO ()
---stratoP2P runner =
 stratoP2P :: ( MonadBaseControl IO m
              , MonadResource m
              , MonadLogger m
@@ -127,11 +97,6 @@ stratoP2P :: ( MonadBaseControl IO m
           => BL.LoggingT m ()
 stratoP2P =
   race_ (stratoP2PLoopback `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PLoopback ERROR" . T.pack $ show e))
-        ( race_ (stratoP2PClient   `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PClient ERROR" . T.pack $ show e))
-                (stratoP2PServer   `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PServer ERROR" . T.pack $ show e))
-        )   
-     
-  --raceAll [ stratoP2PLoopback `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PLoopback ERROR" . T.pack $ show e)
-  --        , stratoP2PClient   `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PClient ERROR" . T.pack $ show e)
-  --        , stratoP2PServer   `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PServer ERROR" . T.pack $ show e)
-  --        ]
+        ( race_ (stratoP2PClient `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PClient ERROR" . T.pack $ show e))
+                (stratoP2PServer `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PServer ERROR" . T.pack $ show e))
+        )
