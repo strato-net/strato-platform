@@ -178,7 +178,8 @@ export const Marketplace = {
   getAll: '/',
   getAllLoggedIn: '/all',
   getTopSellingProducts: '/topselling',
-  getTopSellingProductsLoggedIn: '/user/topselling'
+  getTopSellingProductsLoggedIn: '/user/topselling',
+  getStratsBalance: '/strats'
 }
 
 export const PaymentService = {
