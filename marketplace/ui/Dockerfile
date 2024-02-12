@@ -7,7 +7,7 @@ WORKDIR /usr/src/ui/
 FROM base as yarninstaller
 COPY package*.json /usr/src/ui/
 COPY yarn.lock /usr/src/ui/
-RUN yarn install --frozen-lockfile --prod
+RUN yarn install --frozen-lockfile
 
 ### Builder
 FROM yarninstaller as builder

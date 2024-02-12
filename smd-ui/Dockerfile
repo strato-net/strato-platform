@@ -6,7 +6,7 @@ WORKDIR /usr/src/app
 
 FROM base as npminstaller
 COPY package*.json /usr/src/app/
-RUN npm ci --only=production
+RUN npm ci
 
 ### Builder
 FROM npminstaller as builder
