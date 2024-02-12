@@ -408,11 +408,7 @@ setEnv pgHost ${postgres_host}
 setEnv redisBDBHost ${redisHost}
 setEnv redisBDBPort ${redisPort}
 setEnv zkHost ${zkHost}
-
-if [[ -z ${VAULT_URL} ]] ; then
-  echo -e "Error: VAULT_URL is required"
-  exit 1
-fi
+setEnv VAULT_URL "https://vault.blockapps.net:8093"
 
 # TODO: the check is temporarily disabled until issues with urls are resolved
 ## This will check if the link provided is valid format, and if it is HTTPS
