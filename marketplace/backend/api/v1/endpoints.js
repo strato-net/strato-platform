@@ -136,7 +136,6 @@ export const Order = {
   createSaleOrder: '/sale',
   cancelSaleOrder: '/sale/cancel',
   executeSale: '/closeSale',
-  executeAssetGroupSale: '/closeAssetGroupSale',
   updateOrderComment: '/updateComment',
   export: '/exportOrders'
 }
