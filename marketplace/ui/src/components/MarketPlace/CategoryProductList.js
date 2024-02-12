@@ -43,14 +43,16 @@ const CategoryProductList = ({ user }) => {
 
   const searchQueryValue = queryParams.get('search');
   const categoryQueryValue = queryParams.get('category');
+  const minPriceQuery = queryParams.get('minPrice') || 0;
+  const maxPriceQuery = queryParams.get('maxPrice') || MAX_PRICE;
   const categoryQueryValueArr = categoryQueryValue ? categoryQueryValue.split(',') : []
 
   const [api] = notification.useNotification();
   // States
   const [selectedCategories, setSelectedCategories] = useState(categoryQueryValueArr);
   const [selectedSubCategories, setSelectedSubCategories] = useState([]);
-  const [minPrice, setMinPrice] = useState(0);
-  const [maxPrice, setMaxPrice] = useState(MAX_PRICE);
+  const [minPrice, setMinPrice] = useState(minPriceQuery);
+  const [maxPrice, setMaxPrice] = useState(maxPriceQuery);
   const [subCategories, setSubCategories] = useState([]);
   const [uniqueProductNames, setUniqueProductNames] = useState([]);
   const [desktopOpenFilter, setDesktopOpenFilter] = useState(true);
@@ -121,8 +123,8 @@ const CategoryProductList = ({ user }) => {
         marketplaceDispatch,
         arrayToStr(selectedCategories),
         arrayToStr(selectedSubCategories),
-        minPrice,
-        maxPrice,
+        minPriceQuery,
+        maxPriceQuery,
         searchQueryValue
       );
     } else if (hasChecked && isAuthenticated) {
@@ -130,16 +132,16 @@ const CategoryProductList = ({ user }) => {
         marketplaceDispatch,
         arrayToStr(selectedCategories),
         arrayToStr(selectedSubCategories),
-        minPrice,
-        maxPrice,
+        minPriceQuery,
+        maxPriceQuery,
         searchQueryValue
       );
     }
   }, [
     // selectedCategories,
     selectedSubCategories,
-    minPrice,
-    maxPrice,
+    minPriceQuery,
+    maxPriceQuery,
     hasChecked,
     isAuthenticated,
     searchQueryValue
@@ -162,9 +164,9 @@ const CategoryProductList = ({ user }) => {
       if (categoryQueryValue) {
         baseUrl.searchParams.set('category', categoryQueryValue);
       }
-      if (search.length > 0) {
-        baseUrl.searchParams.set('search', search);
-      }
+      baseUrl.searchParams.set('search', search);
+      baseUrl.searchParams.set('minPrice', minPrice);
+      baseUrl.searchParams.set('maxPrice', maxPrice);
 
       const url = baseUrl.pathname + baseUrl.search;
       navigate(url, { replace: true });
@@ -173,7 +175,7 @@ const CategoryProductList = ({ user }) => {
     return () => {
       clearTimeout(timeOut);
     };
-  }, [search]);
+  }, [search, minPrice, maxPrice]);
 
   //=========================Other functions===============================//
 
