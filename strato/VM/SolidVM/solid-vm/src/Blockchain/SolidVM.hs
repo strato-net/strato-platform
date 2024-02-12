@@ -2193,7 +2193,7 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
                       OrderedVals as -> zip (map (\(a, _, _) -> a) vals') as
                       NamedVals ns -> ns
             Constant (SContractDef contractName') -> do
-              decrementGas 700
+              decrementGas 500
               case argVals of
                 OrderedVals [SInteger address] ->
                   --TODO- clean up this ambiguity between SAddress and SInteger....
