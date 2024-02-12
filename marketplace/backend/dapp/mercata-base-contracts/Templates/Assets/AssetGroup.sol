@@ -2,6 +2,7 @@ pragma es6;
 pragma strict;
 
 import <BASE_CODE_COLLECTION>;
+import "./Asset.sol";
 
 /// @title A representation of AssetGroup assets
 contract AssetGroup is UTXO {
@@ -23,6 +24,15 @@ contract AssetGroup is UTXO {
     function mint(uint splitQuantity) internal override returns (UTXO) {
         AssetGroup a = new AssetGroup(name, description, images, files, createdDate, assetAddresses, assetQuantities);
         return UTXO(address(a)); 
+    }
+
+    function _transfer(address _newOwner, uint _quantity, bool _isUserTransfer, uint _transferNumber) internal override {
+        for (uint = 0; i < assetAddresses.length; i++) {
+            address a = assetAddresses[i];
+            Asset asset = Asset(a);
+            uint assetQuantity = assetQuantities[i];
+            asset.automaticTransfer(_newOwner, assetQuantity, _isUserTransfer, _transferNumber);
+        }
     }
 }
 

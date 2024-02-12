@@ -231,22 +231,6 @@ const reducer = (state, action) => {
         error: action.error,
         isCreateOrderSubmitting: false,
       }
-    case actionDescriptors.executeAssetGroupSale:
-      return {
-        ...state,
-        isCreateOrderSubmitting: true,
-      }
-    case actionDescriptors.executeAssetGroupSaleSuccessful:
-      return {
-        ...state,
-        isCreateOrderSubmitting: false,
-      }
-    case actionDescriptors.executeAssetGroupSaleFailed:
-      return {
-        ...state,
-        error: action.error,
-        isCreateOrderSubmitting: false,
-      }
     case actionDescriptors.updateOrderComment:
       return {
         ...state,

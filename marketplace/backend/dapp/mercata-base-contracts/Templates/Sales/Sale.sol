@@ -7,7 +7,6 @@ import "../Enums/RestStatus.sol";
 import "../Orders/Order.sol";
 import "../Payments/BasePaymentProvider.sol";
 import "../Utils/Utils.sol";
-import "../Assets/AssetGroup.sol";
 
 abstract contract Sale is Utils { 
     Asset public assetToBeSold;
@@ -87,21 +86,6 @@ abstract contract Sale is Utils {
         uint orderQuantity = takeLockedQuantity(msg.sender);
         // regular transfer - isUserTransfer: false, transferNumber: 0
         assetToBeSold.transferOwnership(purchaser, orderQuantity, false, 0);
-        closeSaleIfEmpty();
-        return RestStatus.OK;
-    }
-
-    function completeAssetGroupSale() public requireSeller("complete sale") returns (uint) {
-        Order order = Order(msg.sender);
-        address purchaser = order.purchasersAddress();
-        uint orderQuantity = takeLockedQuantity(msg.sender);
-        AssetGroup assetGroup = AssetGroup(assetToBeSold);
-        for (uint = 0; i < assetGroup.assetAddresses.length; i++) {
-            address a = assetGroup.assetAddresses[i];
-            Asset asset = Asset(a);
-            uint assetQuantity = assetGroup.assetQuantities[i];
-            asset.automaticTransfer(purchaser, assetQuantity, false, 0);
-        }
         closeSaleIfEmpty();
         return RestStatus.OK;
     }

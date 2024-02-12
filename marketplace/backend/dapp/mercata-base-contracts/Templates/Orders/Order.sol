@@ -89,24 +89,6 @@ abstract contract Order is Utils {
         return RestStatus.OK;
     }
 
-    function completeAssetGroupOrder(uint _fulfillmentDate, string _comments) external returns (uint) {
-        require(status != OrderStatus.CLOSED && status != OrderStatus.CANCELED, "Order already closed.");
-        for (uint i = 0; i < saleAddresses.length; i++) {
-            if (!completedSales[i]) {
-                Sale(saleAddresses[i]).completeAssetGroupSale();
-                completedSales[i] = true;
-                outstandingSales--;
-            }
-        }
-        if (outstandingSales == 0) {
-            fulfillmentDate = _fulfillmentDate;
-            comments = _comments;
-            emit OrderCompleted(_fulfillmentDate, _comments);
-            status = OrderStatus.CLOSED;
-        }
-        return RestStatus.OK;
-    }
-
     function updateComment(string _comments) external returns (uint) {
         require(status != OrderStatus.CLOSED && status != OrderStatus.CANCELED, "Order already closed.");
         comments = _comments;

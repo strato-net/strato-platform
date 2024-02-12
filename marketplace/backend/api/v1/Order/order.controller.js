@@ -272,21 +272,6 @@ class OrderController {
     }
   }
 
-  static async executeAssetGroupSale(req, res, next) {
-    try {
-      const { dapp, body } = req
-
-      OrderController.validateExecuteSaleArgs(body)
-
-      const result = await dapp.completeAssetGroupOrder(body)
-      rest.response.status200(res, result)
-
-      return next()
-    } catch (e) {
-      return next(e)
-    }
-  }
-
   static async updateOrderComment(req, res, next) {
     try {
       const { dapp, body } = req

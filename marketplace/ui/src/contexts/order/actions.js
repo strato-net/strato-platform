@@ -46,9 +46,6 @@ const actionDescriptors = {
   executeSale: "execute_sale",
   executeSaleSuccessful: "execute_sale_successful",
   executeSaleFailed: "execute_sale_failed",
-  executeAssetGroupSale: "execute_asset_grouo_sale",
-  executeAssetGroupSaleSuccessful: "execute_asset_grouo_sale_successful",
-  executeAssetGroupSaleFailed: "execute_asset_grouo_sale_failed",
   updateOrderComment: "update_order_comment",
   updateOrderCommentSuccessful: "update_order_comment_successful",
   updateOrderCommentFailed: "update_order_comment_failed",
@@ -549,46 +546,6 @@ const actions = {
     } catch (err) {
       dispatch({
         type: actionDescriptors.executeSaleFailed,
-        error: "Error while fulfilling order",
-      });
-      actions.setMessage(dispatch, "Error while fulfilling order");
-    }
-  },
-
-  executeAssetGroupSale: async (dispatch, payload) => {
-    dispatch({ type: actionDescriptors.executeAssetGroupSale });
-
-    try {
-      const response = await fetch(`${apiUrl}/order/closeAssetGroupSale`, {
-        method: HTTP_METHODS.POST,
-        credentials: "same-origin",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const body = await response.json();
-
-      if (response.status === RestStatus.OK) {
-        dispatch({
-          type: actionDescriptors.executeAssetGroupSaleSuccessful,
-          payload: body.data,
-        });
-        actions.setMessage(dispatch, "Order fulfilled successfully", true);
-        return body.data;
-      }
-
-      dispatch({
-        type: actionDescriptors.executeAssetGroupSaleFailed,
-        error: "Error while fulfilling order",
-      });
-      actions.setMessage(dispatch, "Error while fulfilling order");
-      return false;
-    } catch (err) {
-      dispatch({
-        type: actionDescriptors.executeAssetGroupSaleFailed,
         error: "Error while fulfilling order",
       });
       actions.setMessage(dispatch, "Error while fulfilling order");

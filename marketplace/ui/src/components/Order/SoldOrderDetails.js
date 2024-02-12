@@ -224,8 +224,6 @@ const SoldOrderDetails = ({ user, users }) => {
   };
 
   const handleCloseOrder = async () => {
-    const parts = orderDetails.assets[0].contract_name.split('-');
-    const contractName = parts[parts.length - 1];
     let body = {};
     let isDone = false;
 
@@ -235,16 +233,9 @@ const SoldOrderDetails = ({ user, users }) => {
       comments: comment,
     };
 
-    if (contractName === "AssetGroup") {
-      isDone = await actions.executeAssetGroupSale(dispatch, body);
-      if (isDone) {
-        setStatus(getStatus(3));
-      }
-    } else {
-      isDone = await actions.executeSale(dispatch, body);
-      if (isDone) {
-        setStatus(getStatus(3));
-      }
+    isDone = await actions.executeSale(dispatch, body);
+    if (isDone) {
+      setStatus(getStatus(3));
     }
   };
 
