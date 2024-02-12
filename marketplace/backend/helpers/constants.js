@@ -27,6 +27,10 @@ export default {
   saleTableName: "Sale",
   orderTableName: "Order",
   blockAppsOrg: "BlockApps",
+  prodNetworkId: "6909499098523985262",
+  testnetNetworkId: "7596898649924658542",
+  prodStratsAddress: "b220195543f652f735b7847c4af399d0323e1ff6",
+  testnetStratsAddress: "488cd3909d94606051e0684cf6caa5763fb78613"
 };
 
 export const STRIPE_PAYMENT_SERVER_URL = getEnvVariable('STRIPE_PAYMENT_SERVER_URL');
