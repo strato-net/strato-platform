@@ -49,7 +49,6 @@ const CategoryProductList = ({ user }) => {
   // States
   const [selectedCategories, setSelectedCategories] = useState(categoryQueryValueArr);
   const [selectedSubCategories, setSelectedSubCategories] = useState([]);
-  const [selectedBrands, setSelectedBrands] = useState([]);
   const [minPrice, setMinPrice] = useState(0);
   const [maxPrice, setMaxPrice] = useState(MAX_PRICE);
   const [subCategories, setSubCategories] = useState([]);
@@ -108,7 +107,7 @@ const CategoryProductList = ({ user }) => {
       categorys = arrayToStr(selectedCategories);
       subCategoryActions.fetchSubCategoryList(subCategoryDispatch, categorys);
     }
-  }, [subCategoryDispatch, selectedCategories]);
+  }, [selectedCategories]);
 
   const onChangeSubCategory = (e) => {
     let valuesChecked = checkValues(e, selectedSubCategories)
@@ -122,7 +121,6 @@ const CategoryProductList = ({ user }) => {
         marketplaceDispatch,
         arrayToStr(selectedCategories),
         arrayToStr(selectedSubCategories),
-        arrayToStr(selectedBrands),
         minPrice,
         maxPrice,
         searchQueryValue
@@ -132,7 +130,6 @@ const CategoryProductList = ({ user }) => {
         marketplaceDispatch,
         arrayToStr(selectedCategories),
         arrayToStr(selectedSubCategories),
-        arrayToStr(selectedBrands),
         minPrice,
         maxPrice,
         searchQueryValue
@@ -141,7 +138,6 @@ const CategoryProductList = ({ user }) => {
   }, [
     // selectedCategories,
     selectedSubCategories,
-    selectedBrands,
     minPrice,
     maxPrice,
     hasChecked,
@@ -149,15 +145,15 @@ const CategoryProductList = ({ user }) => {
     searchQueryValue
   ]);
 
-  useEffect(() => {
-    if (marketplaceList?.length > 0) {
-      const uniqueNames = marketplaceList.map((p) => p.name)
-        .filter(
-          (name, index, arr) => arr.indexOf(name) == index
-        );
-      setUniqueProductNames(uniqueNames);
-    }
-  }, [marketplaceList]);
+  // useEffect(() => {
+  //   if (marketplaceList?.length > 0) {
+  //     const uniqueNames = marketplaceList.map((p) => p.name)
+  //       .filter(
+  //         (name, index, arr) => arr.indexOf(name) == index
+  //       );
+  //     setUniqueProductNames(uniqueNames);
+  //   }
+  // }, [marketplaceList]);
 
   useEffect(() => {
     const timeOut = setTimeout(() => {
@@ -183,12 +179,11 @@ const CategoryProductList = ({ user }) => {
 
   const clearSelection = () => {
     setSelectedSubCategories([]);
-    setSelectedBrands([]);
     setSubCategories([]);
   };
 
   const handleClearFilter = () => {
-    const isFilter = selectedBrands.length != 0 || selectedCategories.length != 0 || selectedSubCategories.length != 0
+    const isFilter =  selectedCategories.length != 0 || selectedSubCategories.length != 0
       || minPrice !== 0 || maxPrice !== MAX_PRICE
     if (isFilter) {
       const baseUrl = new URL('/category', window.location.origin);
