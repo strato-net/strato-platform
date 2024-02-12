@@ -27,7 +27,7 @@ contract AssetGroup is UTXO {
     }
 
     function _transfer(address _newOwner, uint _quantity, bool _isUserTransfer, uint _transferNumber) internal override {
-        for (uint = 0; i < assetAddresses.length; i++) {
+        for (uint i = 0; i < assetAddresses.length; i++) {
             address a = assetAddresses[i];
             Asset asset = Asset(a);
             uint assetQuantity = assetQuantities[i];
