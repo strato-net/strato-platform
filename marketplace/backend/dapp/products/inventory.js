@@ -422,8 +422,14 @@ async function getAll(admin, args = {}, defaultOptions) {
 
 async function getAllItemTransferEvents(admin, args = {}, defaultOptions) {
     const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
-    const itemTransferEvents = await searchAllWithQueryArgs(`${contractName}.${contractEvents.ITEM_TRANSFER}`, args, options, admin);
-    const total  = await searchAllWithQueryArgs( `${contractName}.${contractEvents.ITEM_TRANSFER}`, { ...args, limit: undefined, offset: 0, order: undefined, queryOptions: { select: "count", } }, options, admin );
+    let itemTransferEvents = await searchAllWithQueryArgs(`${contractName}.${contractEvents.ITEM_TRANSFER}`, args, options, admin);
+    const itemAddressArr = itemTransferEvents.map(item => item.assetAddress)
+    const itemsSale = await searchAllWithQueryArgs(`Sale`, { assetToBeSold: itemAddressArr }, options, admin);
+    const total = await searchAllWithQueryArgs(`${contractName}.${contractEvents.ITEM_TRANSFER}`, { ...args, limit: undefined, offset: 0, order: undefined, queryOptions: { select: "count", } }, options, admin);
+    itemTransferEvents = itemTransferEvents.map(item=>{
+       const saleData = itemsSale.find((sale)=>sale.assetToBeSold === item.address)
+       return {...item, price:saleData?.price }
+    })
     return { transfers: itemTransferEvents.map((item) => marshalOut(item)), total: total[0].count };
 }
 
