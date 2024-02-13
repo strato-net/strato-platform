@@ -38,7 +38,7 @@ import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Stream.Action as Action
 import Blockchain.Stream.VMEvent
-import Control.Arrow ((&&&))
+-- import Control.Arrow ((&&&))
 import Control.Lens ((^.))
 import Control.Monad (forM, forM_, unless, when)
 import qualified Control.Monad.Change.Modify as Mod
@@ -50,7 +50,7 @@ import Data.Either (lefts, rights)
 import Data.Foldable (toList)
 import Data.Function
 import Data.IORef
-import qualified Data.IntMap as I
+import qualified Data.Map.Ordered as OMap
 import Data.List (foldl', sortOn)
 import qualified Data.Map as Map
 import Data.Maybe
@@ -63,7 +63,7 @@ import Database.PostgreSQL.Typed (PGConnection)
 import SelectAccessible ()
 import Slipstream.Data.Action
 import Slipstream.Events
-import qualified Slipstream.Events as SE
+-- import qualified Slipstream.Events as SE
 import Slipstream.Globals
 import Slipstream.Metrics
 import Slipstream.OutputData
@@ -264,7 +264,7 @@ parseEvents = concatMap parseEvent
           eventBlockNumber = Action._blockNumber a,
           eventTxHash = Action._transactionHash a,
           eventTxSender = Action._transactionSender a,
-          eventAbstracts = maybe Map.empty Action._actionDataAbstracts . Map.lookup (evContractAccount e) $ Action._actionData a,
+          eventAbstracts = maybe Map.empty Action._actionDataAbstracts . OMap.lookup (evContractAccount e) $ Action._actionData a,
           eventEvent = e
         }
 
@@ -342,8 +342,8 @@ processTheMessages env conn messages = do
 
             return $ deferredForeignKeys ++ deferredForeignKeysForCollections
 
-        forM_ deferredForeignKeys $ \deferredForeignKey -> do
-          outputData conn $ createForeignIndexesForJoins deferredForeignKey
+        -- forM_ deferredForeignKeys $ \deferredForeignKey -> do
+        --   outputData conn $ createForeignIndexesForJoins deferredForeignKey
         pure $ Right deferredForeignKeys
   -- TODO: Add delegatecall indexing back in
   -- dfkeys' <- forM delegates $ \d@(Action.Delegatecall s c' o a) -> do
@@ -397,16 +397,17 @@ processTheMessages env conn messages = do
                     aiChain = cid
                   }
               cont = error "internal error: contract should be unused for SolidVM"
-          $logDebugLS "Contract name is: " $ show name
+          $logInfoS "Contract name is: " $ T.pack $ show name
           oldState <- readPreviousSolidVMState g acct
           indexContract <- rowToInsert g abiid row cont oldState
+          $logInfoS "Contract is: " $ T.pack $ show indexContract
           hs <- rowToHistories g abiid actions cont oldState
           let mapNames = actionMappings row
               arrNames = actionArrays row
               collectionNames = mapNames ++ arrNames
               abstracts = actionAbstracts row
           --get columns for abstract table
-          $logDebugLS "abstractColumns" $ T.pack $ "Getting abstract columns from " ++ (show abstracts)
+          $logInfoS "abstractColumns" $ T.pack $ "Getting abstract columns from " ++ (show abstracts)
           abstractColumns <- fmap catMaybes . for (Map.toList abstracts) $ \((_, n'), (o', a')) -> do
             let tableName = AbstractTableName o' a' n'
                 tableNameText = tableNameToDoubleQuoteText tableName
@@ -423,21 +424,27 @@ processTheMessages env conn messages = do
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
 
   -- TODO: might need to group inserts by TableName
-  let insertsByCodeHash =
-        map snd
-          -- SolidVM contracts can have the same codehash and be different:
-          -- the codehash is just a sourcehash.
-          . partitionWith (SE.codehash . indexInsert &&& SE.contractName . indexInsert)
-          $ rights inserts
+  let insertsByCodeHash = rights inserts
+
   forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
-  forM_ insertsByCodeHash $ \ins -> do
-    unless (null ins) $ outputData conn . insertIndexTable $ map indexInsert ins
-    outputData conn . insertHistoryTable $ concatMap historyInserts ins
-    unless ((length (concatMap collectionInserts ins) < 1)) $ outputData conn . insertCollectionTable $ concatMap collectionInserts ins
-    unless (null ins) $ outputData conn . insertAbstractTable $ concatMap abstractInsert ins
 
   forM_ insertsByCodeHash $ \ins -> do
-    unless (null ins) $ insertForeignKeys conn $ map indexInsert ins
+    outputData conn $ insertIndexTable $ indexInsert ins
+    outputData conn $ insertHistoryTable $ historyInserts ins
+    unless ((length (collectionInserts ins) < 1)) $ outputData conn $ insertCollectionTable $ collectionInserts ins
+
+  unless (null insertsByCodeHash) $ do
+    let allAbstractInserts = concatMap abstractInsert insertsByCodeHash
+    outputData conn $ insertBegin
+    outputData conn $ insertAbstractTable $ allAbstractInserts
+    outputData conn $ insertCommit
+
+  forM_ insertsByCodeHash $ \ins -> do
+    insertForeignKeys conn $ indexInsert ins
+
+  let concatFkeys = concat fkeys
+  forM_ concatFkeys $ \deferredForeignKey -> do
+    outputData conn $ createForeignIndexesForJoins deferredForeignKey
 
   when ((length creates > 0) && any (\k -> length k > 0) fkeys) $ do
     $logDebugLS "processTheMessages" $ T.pack $ "Updating PostgREST schema cache for " ++ show (sum $ map length fkeys) ++ " foreign key relationships"

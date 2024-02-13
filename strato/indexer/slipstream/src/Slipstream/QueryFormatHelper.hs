@@ -97,6 +97,9 @@ tableNameToSingleQuoteText = wrapSingleQuotes . escapeQuotes . tableNameToTextPo
 tableNameToDoubleQuoteText :: TableName -> T.Text
 tableNameToDoubleQuoteText = wrapDoubleQuotes . escapeQuotes . tableNameToText
 
+textToDoubleQuoteText :: T.Text -> T.Text
+textToDoubleQuoteText =  wrapDoubleQuotes . escapeQuotes
+
 removeSingleQuotes :: T.Text -> T.Text
 removeSingleQuotes inputText =
   let str = T.unpack inputText

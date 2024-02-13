@@ -72,6 +72,7 @@ import qualified Data.List as L
 import qualified Data.Map as M
 import Data.Maybe
 import qualified Data.Text as T
+import qualified Data.Map.Ordered as OMap
 import Data.Text.Encoding
 import Data.Time.Clock.POSIX
 import Executable.EVMFlags ()
@@ -2875,7 +2876,7 @@ contract qq {
     let diffs = fmap Action._actionDataStorageDiffs . Action._actionData <$> erAction xr
     diffs
       `shouldBe` Just
-        ( M.fromList
+        ( OMap.fromList
             [ ( uploadAddress,
                 Action.SolidVMDiff $
                   M.singleton

@@ -23,6 +23,8 @@ module Slipstream.OutputData (
   insertCollectionTableQuery,
   insertAbstractTable,
   insertAbstractTableQuery,
+  insertBegin,
+  insertCommit,
   createIndexTable,
   createCollectionTable,
   createHistoryTable,
@@ -53,10 +55,10 @@ import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Lazy            as BL
 import qualified Data.Map.Strict                 as Map
-import           Data.Maybe                      (catMaybes, listToMaybe, mapMaybe)
+import           Data.Maybe                      (catMaybes, listToMaybe, mapMaybe, isJust)
 import           Data.Text                       (Text)
 import qualified Data.Text                       as T
--- import           Data.Traversable                (for)
+import           Data.Traversable                (for)
 import           Bloc.Server.Utils               (partitionWith)
 import           BlockApps.Logging
 import           Blockchain.Strato.Model.Account
@@ -310,14 +312,28 @@ createForeignIndexesForJoins ::
   ForeignKeyInfo ->
   ConduitM () Text m ()
 createForeignIndexesForJoins foreignKey = do
-  yield $
-    "ALTER TABLE "
-      <> tableNameToDoubleQuoteText (tableName foreignKey)
-      <> " ADD FOREIGN KEY ("
-      <> wrapDoubleQuotes (columnName foreignKey)
-      <> ") REFERENCES "
-      <> tableNameToDoubleQuoteText (foreignTableName foreignKey)
-      <> " (address);"
+  let srcTable = textToDoubleQuoteText $ tableNameToTextPostgres (tableName foreignKey)
+      srcColumn =wrapDoubleQuotes (columnName foreignKey)
+      targetTable = textToDoubleQuoteText $ tableNameToTextPostgres (foreignTableName foreignKey)
+      fkNameSrcToTarget = textToDoubleQuoteText $ tableNameToTextPostgres (tableName foreignKey) <> "_" <> tableNameToTextPostgres (foreignTableName foreignKey) <> "_fk"
+      fkNameTargetToSrc = textToDoubleQuoteText $ tableNameToTextPostgres (foreignTableName foreignKey) <> "_" <> tableNameToTextPostgres (tableName foreignKey) <> "_fk"
+      logMessage = 
+        "createForeignIndexesForJoins srcTable: " <> (T.pack $ show $ tableName foreignKey) <>
+        ", targetTable: " <> (T.pack $ show $ foreignTableName foreignKey) 
+  $logInfoS "createForeignIndexesForJoins" logMessage
+
+  yield "BEGIN;"
+  -- Drop existing foreign keys so theres no cyclical or old dependancy
+  yield $ "ALTER TABLE " <> srcTable 
+          <> " DROP CONSTRAINT IF EXISTS " <> fkNameSrcToTarget <> ";"
+  yield $ "ALTER TABLE " <> targetTable 
+          <> " DROP CONSTRAINT IF EXISTS " <> fkNameTargetToSrc <> ";"
+
+  -- Add new foreign key
+  yield $ "ALTER TABLE " <> srcTable 
+          <> " ADD CONSTRAINT " <> fkNameSrcToTarget <> " FOREIGN KEY (" 
+          <> srcColumn <> ") REFERENCES " <> targetTable <> " (address) DEFERRABLE INITIALLY DEFERRED;"
+  yield "COMMIT;"
 
 notifyPostgREST ::
   OutputM m =>
@@ -346,20 +362,44 @@ getDeferredForeignKeys tableName c o a =
       }
 
 getDeferredForeignKeysAbstract ::
-  TableName -> ContractF () -> Text -> Text -> Map.Map (Account, Text) (Text, Text) -> CodeCollectionF () -> [ForeignKeyInfo]
-getDeferredForeignKeysAbstract tableName c o a abstracts' cc =
-  catMaybes . flip map [(theName, x) | (theName, VariableDecl {_varType = SVMType.UnknownLabel x _}) <- Map.toList (c ^. storageDefs)] $ \(theName, x) -> do
-      getContractsBySolidString x cc <&> \c' ->
-          let (o',a',n') = case _importedFrom c' of
-                Nothing -> (o, a, _contractName c')
-                Just acct -> case Map.lookup (acct, T.pack $ _contractName c') abstracts' of
-                  Nothing -> (o, a, _contractName c')
-                  Just (o'', a'') -> (o'', a'', _contractName c')
-           in ForeignKeyInfo
-                { tableName = tableName,
-                  columnName = labelToText theName,
-                  foreignTableName = abstractTableName o' a' $ T.pack n'
-                }
+  (MonadLogger m) =>
+  TableName -> ContractF () -> Text -> Text -> Map.Map (Account, Text) (Text, Text) -> CodeCollectionF () -> m [ForeignKeyInfo]
+getDeferredForeignKeysAbstract tableName c o a abstracts' cc = do
+  -- Log at the start
+  $logDebugS "getDeferredForeignKeysAbstract: Start" . T.pack $
+    "tableName: " ++ show tableName ++ ", c: " ++ show c ++ ", o: " ++ show o ++
+    ", a: " ++ show a ++ ", abstracts': " ++ show abstracts' ++ ", cc: " ++ show cc
+  result <- fmap catMaybes . for [(theName, x) | (theName, VariableDecl {_varType = SVMType.UnknownLabel x _}) <- Map.toList (c ^. storageDefs)] $ \(theName, x) -> do
+      let contract = getContractsBySolidString x cc
+      $logDebugS "getDeferredForeignKeysAbstract: x" . T.pack $ show x
+      $logDebugS "getDeferredForeignKeysAbstract: cc" . T.pack $ show cc
+      $logDebugS "getDeferredForeignKeysAbstract: contract" . T.pack $ show contract
+      case contract of
+              Just c' -> do
+                let enumExists = isJust $ Map.lookup (_contractName c') (_enums c')
+                if enumExists
+                then do
+                  $logDebugS "getDeferredForeignKeysAbstract: Enum with the same name as contract found, skipping fkey creation" . T.pack $ _contractName c'
+                  return Nothing
+                else do
+                  let (o',a',n') = case _importedFrom c' of
+                                    Nothing -> (o, a, _contractName c')
+                                    Just acct -> case Map.lookup (acct, T.pack $ _contractName c') abstracts' of
+                                      Nothing -> (o, a, _contractName c')
+                                      Just (o'', a'') -> (o'', a'', _contractName c')
+                  $logDebugS "getDeferredForeignKeysAbstract: (o',a',n')" . T.pack $ show (o',a',n')
+                  $logDebugS "getDeferredForeignKeysAbstract: tableName" . T.pack $ show tableName
+                  $logDebugS "getDeferredForeignKeysAbstract:   theName" . T.pack $ show theName
+                  $logDebugS "getDeferredForeignKeysAbstract: abstractTableName o' a' $ T.pack n'" . T.pack $ show $ abstractTableName o' a' $ T.pack n'
+                  pure $ Just $ ForeignKeyInfo
+                    { tableName = tableName,
+                      columnName = labelToText theName,
+                      foreignTableName = abstractTableName o' a' $ T.pack n'
+                      }
+              Nothing -> return Nothing
+  -- Log at the end
+  $logDebugS "getDeferredForeignKeysAbstract: End" . T.pack $ "Result: " ++ show result
+  return result
 
 
 
@@ -416,7 +456,7 @@ createAbstractTable globalsIORef contract (o, a, n) abstracts' cc = do
       let list = tableColumns $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
       yield $ createAbstractTableQuery contract (o, a, n)
       setTableCreated globalsIORef tableName (list ++ ["\"data\" jsonb"])
-      pure $ getDeferredForeignKeysAbstract tableName contract o a abstracts' cc
+      getDeferredForeignKeysAbstract tableName contract o a abstracts' cc
 
 -- if flag from solidvm that it is a record, vmevent
 createCollectionTable ::
@@ -498,7 +538,7 @@ expandAbstractTable ::
   ConduitM () Text m [ForeignKeyInfo]
 expandAbstractTable globalsIORef contract (o, a, n) abstracts' cc = do
   let tableName = abstractTableName o a n
-  expandAbstractContractTable globalsIORef contract tableName abstracts' cc o a
+  expandAbstractContractTable globalsIORef contract tableName abstracts' cc
 
 expandHistoryTable ::
   OutputM m =>
@@ -616,10 +656,8 @@ expandAbstractContractTable ::
   TableName ->
   Map.Map (Account, Text) (Text, Text) ->
   CodeCollectionF () ->
-  Text ->
-  Text ->
   ConduitM () Text m [ForeignKeyInfo]
-expandAbstractContractTable globalsIORef contract tableName abstracts' cc o a = do
+expandAbstractContractTable globalsIORef contract tableName abstracts' cc = do
   columns <- getTableColumns globalsIORef tableName
   case columns of
     Nothing -> do
@@ -646,7 +684,24 @@ expandAbstractContractTable globalsIORef contract tableName abstracts' cc o a = 
             ]
         setTableCreated globalsIORef tableName $ cols ++ extraTableColumns
         yield $ expandTableQuery tableName extraTableColumns
-      pure $ getDeferredForeignKeysAbstract tableName contract o a abstracts' cc
+      return $
+        case tableName of
+          -- AbstractTableName "BlockApps" "Mercata" "Asset" -> []
+          AbstractTableName o a _ ->
+            catMaybes . flip map [(colName, foreignName) | (colName, SVMType.UnknownLabel foreignName _) <- extras]
+              $ \(colName, foreignName) -> do
+                getContractsBySolidString foreignName cc <&> \c' ->
+                    let (o',a',n') = case _importedFrom c' of
+                          Nothing -> (o, a, _contractName c')
+                          Just acct -> case Map.lookup (acct, T.pack $ _contractName c') abstracts' of
+                            Nothing -> (o, a, _contractName c')
+                            Just (o'', a'') -> (o'', a'', _contractName c')
+                    in ForeignKeyInfo
+                          { tableName = tableName,
+                            columnName = colName,
+                            foreignTableName = abstractTableName o' a' $ T.pack n'
+                          }
+          _ -> []
 
 expandTableQuery :: TableName -> TableColumns -> Text
 expandTableQuery tableName cols =
@@ -660,11 +715,10 @@ expandTableQuery tableName cols =
 
 insertIndexTable ::
   OutputM m =>
-  [E.ProcessedContract] ->
+  E.ProcessedContract ->
   ConduitM () Text m ()
-insertIndexTable [] = error "insertIndexTable: unhandled empty list"
-insertIndexTable contracts = do
-  yieldMany $ insertIndexTableQuery contracts 
+insertIndexTable contract = do
+  yield $ insertIndexTableQuery contract
 
 insertCollectionTable ::
   OutputM m =>
@@ -681,42 +735,38 @@ insertCollectionTable maps = do
 insertForeignKeys ::
   (MonadLogger m, MonadUnliftIO m) =>
   PGConnection ->
-  [E.ProcessedContract] ->
+  E.ProcessedContract ->
   m ()
-insertForeignKeys conn contracts = do
-  forM_ contracts $ \c@E.ProcessedContract {organization = org, application = app, contractName = cName, contractData = contractData} -> do
-    let tableName =
-          indexTableName
-            (org)
-            (app)
-            (cName)
+insertForeignKeys conn contract = do
+  let c@E.ProcessedContract {organization = org, application = app, contractName = cName, contractData = contractData} = contract
+      tableName = indexTableName org app cName
 
-    --There are still reasons why a foreign key insertion might fail
-    --  1. The field type was changed in a solidity contract version update
-    --  2. solidity uses inheritance, and the foreign key points to the parent table
-    --  3. The user just sets a variable to a made up invalid address (0x1234)
-    --When an invalid foreign pointer is set, STRATO's stated behavior will be to set the value to null
-    forM_ [(n, a) | (n, ValueContract a) <- Map.toList $ contractData] $ \(theName, acct) ->
-      do
-        dbQuery conn $
+  --There are still reasons why a foreign key insertion might fail
+  --  1. The field type was changed in a solidity contract version update
+  --  2. solidity uses inheritance, and the foreign key points to the parent table
+  --  3. The user just sets a variable to a made up invalid address (0x1234)
+  --When an invalid foreign pointer is set, STRATO's stated behavior will be to set the value to null
+  forM_ [(n, a) | (n, ValueContract a) <- Map.toList $ contractData] $ \(theName, acct) ->
+    do
+      dbQuery conn $
+        "UPDATE "
+          <> tableNameToDoubleQuoteText tableName
+          <> " SET "
+          <> wrapDoubleQuotes theName
+          <> "="
+          <> wrapSingleQuotes (escapeQuotes $ T.pack $ show acct)
+          <> " WHERE address="
+          <> wrapSingleQuotes (makeAccount (E.chain c) (E.address c))
+          <> ";"
+      `catch` \(e :: SomeException) -> do
+        $logInfoS "insertHistoryTable" $ T.pack $ "foreign key update failed, value will be set to null: " ++ show e
+        dbQueryCatchError conn $
           "UPDATE "
             <> tableNameToDoubleQuoteText tableName
             <> " SET "
             <> wrapDoubleQuotes theName
-            <> "="
-            <> wrapSingleQuotes (escapeQuotes $ T.pack $ show acct)
-            <> " WHERE address="
+            <> "=null WHERE address="
             <> wrapSingleQuotes (makeAccount (E.chain c) (E.address c))
-            <> ";"
-        `catch` \(e :: SomeException) -> do
-          $logInfoS "insertHistoryTable" $ T.pack $ "foreign key update failed, value will be set to null: " ++ show e
-          dbQueryCatchError conn $
-            "UPDATE "
-              <> tableNameToDoubleQuoteText tableName
-              <> " SET "
-              <> wrapDoubleQuotes theName
-              <> "=null WHERE address="
-              <> wrapSingleQuotes (makeAccount (E.chain c) (E.address c))
 
 insertHistoryTable ::
   OutputM m =>
@@ -731,6 +781,14 @@ insertHistoryTable contracts@(E.ProcessedContract {organization = org, applicati
           (cName)
   $logDebugLS "insertHistoryTable" $ T.pack $ "Inserting row in history table for: " ++ show tableName
   yieldMany $ insertHistoryTableQuery contracts
+
+insertBegin ::
+  OutputM m => ConduitM () Text m ()
+insertBegin = yield "BEGIN; SET CONSTRAINTS ALL DEFERRED;"
+
+insertCommit ::
+  OutputM m => ConduitM () Text m ()
+insertCommit = yield "COMMIT;"
 
 insertAbstractTable ::
   OutputM m =>
@@ -844,19 +902,11 @@ addHistoryUnique (o, a, n) =
           <> ";"
       ]
 
-insertIndexTableQuery :: [E.ProcessedContract] -> [Text]
-insertIndexTableQuery [] = error "insertIndexTableQuery: unhandled empty list"
-insertIndexTableQuery cs =
-  concat $
-    let cs' = (\c@E.ProcessedContract {contractData = contractData} -> (c, Map.toList $ Map.mapMaybe valueToSQLTextFilterContract $ contractData)) <$> cs
-     in flip map (map snd $ partitionWith (length . snd) cs') $ \case
-          [] -> []
-          contracts@((x, list) : _) ->
-            let tableName =
-                  indexTableName
-                    (E.organization x)
-                    (E.application x)
-                    (E.contractName x)
+insertIndexTableQuery :: E.ProcessedContract -> Text
+insertIndexTableQuery cs = 
+    let cs' = (\c@E.ProcessedContract {contractData = contractData} -> (c, Map.toList $ Map.mapMaybe valueToSQLTextFilterContract $ contractData)) cs
+        processContract (contract, list) =
+            let tableName = indexTableName (E.organization contract) (E.application contract) (E.contractName contract)
                 keySt = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
                 baseVals =
                   [ tshow . E.address,
@@ -866,17 +916,14 @@ insertIndexTableQuery cs =
                     T.pack . keccak256ToHex . E.transactionHash,
                     tshow . E.transactionSender
                   ]
-                vals = flip map contracts $ \(row, rowList) ->
-                  wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
-                inserts = csv vals
-             in (: []) $
-                  T.concat
+                insert = wrapAndEscape $ map (wrapSingleQuotes . ($ contract)) baseVals ++ map snd list
+            in T.concat
                     [ "INSERT INTO ",
                       tableNameToDoubleQuoteText tableName,
                       " ",
                       keySt,
                       "\n  VALUES ",
-                      inserts,
+                      insert,
                       [r|
   ON CONFLICT (address) DO UPDATE SET
     address = excluded.address,
@@ -889,6 +936,8 @@ insertIndexTableQuery cs =
                       tableUpsert $ map fst list,
                       ";"
                     ]
+    in processContract cs'
+
 
 insertCollectionTableQuery :: [ProcessedCollectionRow] -> [Text]
 insertCollectionTableQuery [] = error "insertCollectionTableQuery: unhandled empty list"

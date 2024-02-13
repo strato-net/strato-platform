@@ -51,6 +51,7 @@ import Control.Monad.Change.Modify
 import Control.Monad.IO.Class
 import Crypto.Util (i2bs_unsized)
 import Data.ByteString as BS hiding (map, zip)
+import qualified Data.Map.Ordered as OMap
 import qualified Data.ByteString.Lazy.Char8 as BLC
 import Data.Functor.Identity
 import Data.List.Split (chunksOf)
@@ -373,7 +374,7 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo {..} _) org app = do
               A._transactionChainId = chainId,
               A._transactionSender = Account (Ad.Address 0) chainId,
               A._actionData =
-                Map.singleton a $
+                OMap.singleton (a,
                   A.ActionData
                     (codeHash d)
                     emptyCodeCollection
@@ -385,7 +386,7 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo {..} _) org app = do
                         SolidVMDiff m -> A.SolidVMDiff $ Map.map fromDiff m
                     )
                     Map.empty [] []
-                    [A.Create],
+                    [A.Create]),
               A._metadata = getMetadata ch,
               A._events = S.empty,
               A._delegatecalls = S.empty
