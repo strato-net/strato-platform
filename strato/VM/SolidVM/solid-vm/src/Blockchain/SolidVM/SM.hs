@@ -876,9 +876,20 @@ getXabiValueType (AccountPath loc path) = do
               (_, ContractTypo {}) -> todo "getValueType/contract access" t'
               (_, EnumTypo {}) -> todo "getValueType/enum acess" t'
       t'' -> t''
-    loop ccs (_ : rs) = \case
+    loop ccs (x : rs) = \case
       SVMType.Mapping {SVMType.value = t'} -> loop ccs rs t'
       SVMType.Array {SVMType.entry = t'} -> loop ccs rs t'
+      SVMType.UnknownLabel s _ ->
+        let t' = getTypeOfName' s ccs
+         in case (x, t') of
+              (MS.Field n, StructTypo fs) ->
+                let mt'' = lookup (textToLabel $ decodeUtf8 n) fs
+                 in case mt'' of
+                      Just t'' -> loop ccs rs $ CC.fieldTypeType t''
+                      Nothing -> missingField "field not present in struct definition" $ show (n, fs)
+              (_, StructTypo {}) -> typeError "non field access to struct" x
+              (_, ContractTypo {}) -> todo "getValueType/contract access" t'
+              (_, EnumTypo {}) -> todo "getValueType/enum acess" t'
       t -> todo "getXabiValueType/loopnext unsupported type" t
 
 getValueType :: MonadSM m => AccountPath -> m BasicType

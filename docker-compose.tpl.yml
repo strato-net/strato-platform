@@ -88,6 +88,7 @@ services:
     - GLOBAL_ADMIN_PASSWORD=${GLOBAL_ADMIN_PASSWORD}
     - ORG_NAME='BlockApps' # TODO: can be removed?
     - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+    - networkID=${networkID}
     build: .
     image: ${MARKETPLACEBACKEND_IMAGE:-<REPO_URL>marketplace-backend:<VERSION>}
     restart: unless-stopped
@@ -207,11 +208,10 @@ services:
     - useWalletsByDefault=${useWalletsByDefault}
     - VAULT_URL=${VAULT_URL}
     - VAULT_PROXY_DEBUG=${VAULT_PROXY_DEBUG}
-    - vmDebug=${vmDebug}
+    - VM_DEBUGGER=${VM_DEBUGGER}
     - VM_DEBUG_LOG=${VM_DEBUG_LOG:-false}
     - vmRunnerRTSOPTs=${vmRunnerRTSOPTs}
     - wireMessageCacheSize=${wireMessageCacheSize}
-    - wsDebug=${wsDebug}
     - zkHost=zookeeper
     build: .
     image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>}
@@ -300,7 +300,7 @@ services:
     - STRATO_PORT_BLOCKSTANBUL_VOTE=${STRATO_PORT_BLOCKSTANBUL_VOTE}
     - STRATO_PORT_LOGS=${STRATO_PORT_LOGS}
     - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
-    - vmDebug=${vmDebug}
+    - VM_DEBUGGER=${VM_DEBUGGER}
     build: .
     image: ${NGINX_IMAGE:-<REPO_URL>nginx:<VERSION>}
     ports:
@@ -351,7 +351,7 @@ services:
       KAFKA_OFFSETS_RETENTION_MINUTES: 2147483647
       KAFKA_MAX_REQUEST_SIZE: ${KAFKA_MAX_REQUEST_SIZE:-100663296}
       KAFKA_MESSAGE_MAX_BYTES: ${KAFKA_MESSAGE_MAX_BYTES:-100663296}
-    image: wurstmeister/kafka:1.1.0
+    image: wurstmeister/kafka:2.12-2.0.1
     restart: unless-stopped
     volumes:
     - kafkadata:/kafka

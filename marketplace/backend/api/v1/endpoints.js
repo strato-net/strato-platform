@@ -129,7 +129,8 @@ export const Order = {
   createSaleOrder: '/sale',
   cancelSaleOrder: '/sale/cancel',
   executeSale: '/closeSale',
-  updateOrderComment: '/updateComment'
+  updateOrderComment: '/updateComment',
+  export: '/exportOrders'
 }
 
 export const OrderLine = {
@@ -169,7 +170,8 @@ export const Marketplace = {
   getAll: '/',
   getAllLoggedIn: '/all',
   getTopSellingProducts: '/topselling',
-  getTopSellingProductsLoggedIn: '/user/topselling'
+  getTopSellingProductsLoggedIn: '/user/topselling',
+  getStratsBalance: '/strats'
 }
 
 export const PaymentService = {

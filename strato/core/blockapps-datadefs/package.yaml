@@ -8,6 +8,7 @@ dependencies:
   - bytestring
   - crypto-pubkey-types
   - deepseq
+  - ethereum-encryption
   - ethereum-rlp
   - evm-solidity
   - format
