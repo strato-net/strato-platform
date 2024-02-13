@@ -14,6 +14,8 @@ import { useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
 import { useAuthenticateState } from "../../contexts/authentication";
 import NewTrendingCard from "./NewTrendingCard";
+import { actions as orderActions } from "../../contexts/order/actions"
+import { useOrderDispatch, useOrderState} from "../../contexts/order";
 
 const { Title } = Typography;
 
@@ -26,6 +28,14 @@ const TopSellingProductCard = () => {
   const { topSellingProducts, isTopSellingProductsLoading, cartList } = useMarketplaceState();
   let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
   const [api, contextHolder] = notification.useNotification();
+
+  const orderDispatch = useOrderDispatch();
+  const { saleQuantity, saleQuantityLoading } = useOrderState()
+
+  useEffect(() => {
+      orderActions.fetchSaleQuantity(orderDispatch, ['015ae9a7641a45cedc5fc547d480cc9bd164fb4d', 'd50c8c309ee2eed5fcf76cb85e62bfc0cdc53d53'], [2, 3]);
+    }, [orderDispatch]);
+  console.log("saleQuantities", saleQuantity, saleQuantityLoading)
 
   useEffect(() => {
     if (!isAuthenticated) {

@@ -464,6 +464,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return saleOrderJs.getAll(rawAdmin, args, getOptions);
   }
 
+  contract.checkSaleQuantity = async function (args, options = defaultOptions) {
+    const getOptions = { ...options, app: contractName }
+    return saleJs.checkSaleQuantity(rawAdmin, args, getOptions)
+  }
+
   contract.getOrder = async function (args, options = defaultOptions) {
     try {
       const order = await saleOrderJs.get(rawAdmin, args, options);

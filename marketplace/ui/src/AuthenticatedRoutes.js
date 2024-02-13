@@ -45,7 +45,9 @@ const AuthenticatedRoutes = ({ user, users }) => {
         element={
           <UsersProvider>
             <CategorysProvider>
-              <MarketPlace user={user} users={users} />
+              <OrdersProvider>
+                <MarketPlace user={user} users={users} />
+              </OrdersProvider>
             </CategorysProvider>
           </UsersProvider>
         }
