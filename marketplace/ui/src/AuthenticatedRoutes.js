@@ -34,7 +34,7 @@ import ProcessingOrder from "./components/MarketPlace/ProcessingOrder";
 import Invoice from "./components/Order/Invoice";
 import { CertifiersProvider } from "./contexts/certifier";
 import LoginRedirect from "./components/LoginRedirect";
-
+import UserProfile from "./components/UserProfile";
 
 const AuthenticatedRoutes = ({ user, users }) => {
   return (
@@ -224,6 +224,25 @@ const AuthenticatedRoutes = ({ user, users }) => {
                   <InventoriesProvider>
                     <ItemsProvider>
                       <ProductDetails user={user} users={users} />
+                    </ItemsProvider>
+                  </InventoriesProvider>
+                </SubCategorysProvider>
+              </CategorysProvider>
+            </EventsProvider>
+          </UsersProvider>
+        }
+      />
+      <Route
+        exact
+        path={routes.MarketplaceUserProfile.url}
+        element={
+          <UsersProvider>
+            <EventsProvider>
+              <CategorysProvider>
+                <SubCategorysProvider>
+                  <InventoriesProvider>
+                    <ItemsProvider>
+                      <UserProfile user={user} users={users} />
                     </ItemsProvider>
                   </InventoriesProvider>
                 </SubCategorysProvider>

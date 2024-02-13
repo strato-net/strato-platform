@@ -115,7 +115,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     {
       key: '2',
       label: (
-        <div>
+        <div onClick={()=>{navigate(`${routes.MarketplaceUserProfile.url.replace(":address", user.userAddress)}`)}}>
           <p>
             {user == null ? "" : user.commonName}
           </p>

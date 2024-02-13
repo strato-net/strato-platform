@@ -309,9 +309,9 @@ const ProductDetails = ({ user, users }) => {
 
                     {decodeURIComponent(details?.name)}
                   </Text>
-                  <div className="flex pt-[6px] ">
+                  <div className="flex pt-[6px] " onClick={()=>{navigate(routes.MarketplaceUserProfile.url.replace(":address", details?.owner))}}>
                     <Text className="text-[#202020] text-xs  font-medium">Owned By: {details?.ownerCommonName}</Text>
-                    <Text className="text-[#202020] text-xs  font-medium" >{details?.ownerOrganization}</Text>
+                    <Text className="text-[#202020] text-xs  font-medium" >{details?.ownerOrganization}</Text>               
                   </div>
                 </div>
                 <div className=" pt-4 lg:pt-[22px]">
