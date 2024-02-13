@@ -23,6 +23,8 @@ module Slipstream.OutputData (
   insertMappingTableQuery,
   insertAbstractTable,
   insertAbstractTableQuery,
+  insertBegin,
+  insertCommit,
   createIndexTable,
   createMappingTable,
   createHistoryTable,
@@ -311,10 +313,14 @@ createForeignIndexesForJoins ::
   ConduitM () Text m ()
 createForeignIndexesForJoins foreignKey = do
   let srcTable = textToDoubleQuoteText $ tableNameToTextPostgres (tableName foreignKey)
-  let srcColumn =wrapDoubleQuotes (columnName foreignKey)
-  let targetTable = textToDoubleQuoteText $ tableNameToTextPostgres (foreignTableName foreignKey)
-  let fkNameSrcToTarget = textToDoubleQuoteText $ tableNameToTextPostgres (tableName foreignKey) <> "_" <> tableNameToTextPostgres (foreignTableName foreignKey) <> "_fk"
-  let fkNameTargetToSrc = textToDoubleQuoteText $ tableNameToTextPostgres (foreignTableName foreignKey) <> "_" <> tableNameToTextPostgres (tableName foreignKey) <> "_fk"
+      srcColumn =wrapDoubleQuotes (columnName foreignKey)
+      targetTable = textToDoubleQuoteText $ tableNameToTextPostgres (foreignTableName foreignKey)
+      fkNameSrcToTarget = textToDoubleQuoteText $ tableNameToTextPostgres (tableName foreignKey) <> "_" <> tableNameToTextPostgres (foreignTableName foreignKey) <> "_fk"
+      fkNameTargetToSrc = textToDoubleQuoteText $ tableNameToTextPostgres (foreignTableName foreignKey) <> "_" <> tableNameToTextPostgres (tableName foreignKey) <> "_fk"
+      logMessage = 
+        "createForeignIndexesForJoins srcTable: " <> (T.pack $ show $ tableName foreignKey) <>
+        ", targetTable: " <> (T.pack $ show $ foreignTableName foreignKey) 
+  $logInfoS "createForeignIndexesForJoins" logMessage
 
   yield "BEGIN;"
   -- Drop existing foreign keys so theres no cyclical or old dependancy
@@ -326,7 +332,7 @@ createForeignIndexesForJoins foreignKey = do
   -- Add new foreign key
   yield $ "ALTER TABLE " <> srcTable 
           <> " ADD CONSTRAINT " <> fkNameSrcToTarget <> " FOREIGN KEY (" 
-          <> srcColumn <> ") REFERENCES " <> targetTable <> " (address);"
+          <> srcColumn <> ") REFERENCES " <> targetTable <> " (address) DEFERRABLE INITIALLY DEFERRED;"
   yield "COMMIT;"
 
 notifyPostgREST ::
@@ -358,7 +364,6 @@ getDeferredForeignKeys tableName c o a =
 getDeferredForeignKeysAbstract ::
   (MonadLogger m) =>
   TableName -> ContractF () -> Text -> Text -> Map.Map (Account, Text) (Text, Text) -> CodeCollectionF () -> m [ForeignKeyInfo]
-getDeferredForeignKeysAbstract (AbstractTableName "BlockApps" "Mercata" "Asset") _ _ _ _ _ = return []
 getDeferredForeignKeysAbstract tableName c o a abstracts' cc = do
   -- Log at the start
   $logDebugS "getDeferredForeignKeysAbstract: Start" . T.pack $
@@ -776,6 +781,14 @@ insertHistoryTable contracts@(E.ProcessedContract {organization = org, applicati
           (cName)
   $logDebugLS "insertHistoryTable" $ T.pack $ "Inserting row in history table for: " ++ show tableName
   yieldMany $ insertHistoryTableQuery contracts
+
+insertBegin ::
+  OutputM m => ConduitM () Text m ()
+insertBegin = yield "BEGIN; SET CONSTRAINTS ALL DEFERRED;"
+
+insertCommit ::
+  OutputM m => ConduitM () Text m ()
+insertCommit = yield "COMMIT;"
 
 insertAbstractTable ::
   OutputM m =>
