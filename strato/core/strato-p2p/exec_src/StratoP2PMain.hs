@@ -5,6 +5,8 @@
 {-# LANGUAGE OverloadedStrings     #-}
 
 import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Resource
+--import           Control.Monad.IO.Unlift
 import           Control.Concurrent.Async.Lifted.Safe
 import           Blockchain.VMOptions       ()
 
@@ -28,17 +30,28 @@ import           Data.Set.Ordered (empty)
 
 main :: IO ()
 main = runLoggingT initP2P
+--main = initP2P
 
 initP2P :: LoggingT IO ()
+--initP2P :: ( MonadIO m
+--           )
+--        => LoggingT m ()
 initP2P = do
   liftIO $ blockappsInit "strato_p2p"
   liftIO $ resetPeers
   _ <- liftIO $ $initHFlags "Strato P2P"
   setParticipationMode flags_participationMode
+  wireMessagesRef <- liftIO $ newIORef empty
+  cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
   liftIO $
     race_
       (run 10248 $ prometheus def p2pApp)
-      (runLoggingT stratoP2P)
+      (runLoggingT $ stratoP2P cfg)
+    --(runResourceT $ runLoggingT stratoP2P)
+      --(runLoggingT stratoP2P)
+      --(runResourceT $ runLoggingT stratoP2P)
+      --( withRunInIO (\run -> run $ runResourceT $ runLoggingT stratoP2P)
+      --)
   {-
   wireMessagesRef <- liftIO $ newIORef empty
   cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders

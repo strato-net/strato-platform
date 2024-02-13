@@ -17,7 +17,7 @@ import           Crypto.Types.PubKey.ECC
 import           Data.ByteString
 import qualified Data.Text as T
 import           UnliftIO.Async (race_)
-import           BlockApps.Logging as BL
+--import           BlockApps.Logging as BL
 import           BlockApps.X509.Certificate
 import           Blockchain.Blockstanbul.Messages
 import           Blockchain.Context
@@ -35,6 +35,7 @@ import           Executable.StratoP2PClient
 import           Executable.StratoP2PLoopback
 import           Executable.StratoP2PServer
 
+{-
 stratoP2P :: ( MonadBaseControl IO m
              , MonadResource m
              , MonadLogger m
@@ -94,9 +95,78 @@ stratoP2P :: ( MonadBaseControl IO m
              , RunsClient (ReaderT Config (ResourceT (BL.LoggingT m)))
              , RunsServer (ReaderT Config (ResourceT (BL.LoggingT m))) (BL.LoggingT m)
              )
-          => BL.LoggingT m ()
-stratoP2P =
-  race_ (stratoP2PLoopback `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PLoopback ERROR" . T.pack $ show e))
-        ( race_ (stratoP2PClient `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PClient ERROR" . T.pack $ show e))
-                (stratoP2PServer `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PServer ERROR" . T.pack $ show e))
+          => BL.LoggingT m () 
+          -- => BL.LoggingT IO ()
+          -- => BL.LoggingT (ResourceT IO) ()
+-}
+stratoP2P :: ( MonadUnliftIO m
+             , MonadBaseControl IO m
+             , MonadLogger m
+             , MonadResource m
+             , HasVault m
+             , RunsClient (ReaderT Config (ResourceT m))
+             , Stacks Block m
+             , Stacks Block (ReaderT Config (ResourceT m))
+             , Outputs m [IngestEvent]
+             , Outputs (ReaderT Config (ResourceT m)) [IngestEvent]
+             , Accessible [BlockData] m
+             , Accessible [BlockData] (ReaderT Config (ResourceT m))
+             , Accessible ActionTimestamp m
+             , Accessible ActionTimestamp (ReaderT Config (ResourceT m))
+             , Accessible RemainingBlockHeaders m
+             , Accessible RemainingBlockHeaders (ReaderT Config (ResourceT m))
+             , Accessible PeerAddress m
+             , Accessible PeerAddress (ReaderT Config (ResourceT m))
+             , Accessible MaxReturnedHeaders m, Accessible ConnectionTimeout m
+             , Accessible GenesisBlockHash m, Accessible BestBlockNumber m
+             , Accessible AvailablePeers m
+             , Accessible AvailablePeers (ReaderT Config (ResourceT m))
+             , Accessible BondedPeers m
+             , Accessible BondedPeers (ReaderT Config (ResourceT m))
+             , Accessible PublicKey m, Modifiable [BlockData] m
+             , Modifiable [BlockData] (ReaderT Config (ResourceT m))
+             , Modifiable ActionTimestamp m
+             , Modifiable ActionTimestamp (ReaderT Config (ResourceT m))
+             , Modifiable RemainingBlockHeaders m
+             , Modifiable RemainingBlockHeaders (ReaderT Config (ResourceT m))
+             , Modifiable PeerAddress m
+             , Modifiable PeerAddress (ReaderT Config (ResourceT m))
+             , Modifiable BestBlock m, Modifiable WorldBestBlock m
+             , Selectable (IPAsText, UDPPort, ByteString) Point m
+             , Selectable Word256 ChainMemberRSet m
+             , Selectable Word256 ChainInfo m
+             , Selectable Integer (Canonical BlockData) m
+             , Selectable Keccak256 (Private (Word256, OutputTx)) m
+             , Selectable Keccak256 ChainTxsInBlock m
+             , Selectable Address X509CertInfoState m
+             , Selectable IPAsText PPeer m, Selectable Point PPeer m
+             , Selectable ChainMemberParsedSet [ChainMemberParsedSet] m
+             , Selectable ChainMemberParsedSet TrueOrgNameChains m
+             , Selectable ChainMemberParsedSet FalseOrgNameChains m
+             , Selectable ChainMemberParsedSet X509CertInfoState m
+             , Selectable ChainMemberParsedSet IsValidator m
+             , Replaceable (IPAsText, Point) PeerBondingState m
+             , Replaceable (IPAsText, Point) PeerBondingState (ReaderT Config (ResourceT m))
+             , Replaceable PPeer TcpEnableTime m
+             , Replaceable PPeer TcpEnableTime (ReaderT Config (ResourceT m))
+             , Replaceable PPeer UdpEnableTime m
+             , Replaceable PPeer UdpEnableTime (ReaderT Config (ResourceT m))
+             , Replaceable PPeer PeerDisable m
+             , Replaceable PPeer PeerDisable (ReaderT Config (ResourceT m))
+             , Replaceable PPeer T.Text m
+             , Replaceable PPeer T.Text (ReaderT Config (ResourceT m))
+             , Alters (T.Text, Keccak256) (Proxy (Outbound WireMessage)) m
+             , Alters (T.Text, Keccak256) (Proxy (Outbound WireMessage)) (ReaderT Config (ResourceT m))
+             , Alters (IPAsText, TCPPort) ActivityState m
+             , Alters (IPAsText, TCPPort) ActivityState (ReaderT Config (ResourceT m))
+             , Alters Keccak256 (Proxy (Inbound WireMessage)) m
+             , Alters Keccak256 BlockData m, Alters Keccak256 OutputBlock m
+             , RunsServer (ReaderT Config (ResourceT m)) m
+             )
+          => Config
+          -> m ()
+stratoP2P cfg =
+  race_ (stratoP2PLoopback       cfg `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PLoopback ERROR" . T.pack $ show e))
+        ( race_ (stratoP2PClient cfg `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PClient ERROR" . T.pack $ show e))
+                (stratoP2PServer cfg `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PServer ERROR" . T.pack $ show e))
         )

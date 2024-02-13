@@ -30,6 +30,7 @@ module Blockchain.Context
     , Outbound(..)
     , IsValidator(..)
     , Context(..)
+    , ContextIOR(..)
     , Config(..)
     , ContextM
     , P2pConduits(..)
@@ -52,6 +53,7 @@ module Blockchain.Context
     , PeerRunner
     , initConfig
     , initContext
+    , initContextIOR
     , runContextM
     , blockstanbulPeerAddr
     , getBlockHeaders
@@ -96,6 +98,7 @@ import qualified Data.Set.Ordered                      as S
 import qualified Data.Text                             as T
 import           Data.Time.Clock
 import           GHC.Exts                              (Constraint)
+--import           Ki.Unlifted                           as KIU
 
 import           BlockApps.Logging
 import           BlockApps.X509.Certificate
@@ -114,6 +117,7 @@ import           Blockchain.Options
 import           Blockchain.P2PUtil
 import           Blockchain.Sequencer.Event
 import qualified Blockchain.Sequencer.Kafka            as SK
+--import           Blockchain.SeqEventNotify
 
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.ContextLite ()
@@ -181,7 +185,7 @@ data Config = Config
     configConnectionTimeout :: ConnectionTimeout,
     configMaxReturnedHeaders :: MaxReturnedHeaders,
     configVaultClient :: ClientEnv,
-    configContext :: IORef Context,
+    --configContext :: IORef Context,
     configBlockstanbulWireMessages :: IORef (S.OSet Keccak256),
     configPubKey :: PublicKey
   }
@@ -213,11 +217,20 @@ data Context = Context
 
 makeLenses ''Context
 
+data ContextIOR = ContextIOR
+  { contextiorConfig  :: Config
+  , contextiorContext :: IORef Context
+  }
+
+makeLenses ''ContextIOR
+
 newtype GenesisBlockHash = GenesisBlockHash {unGenesisBlockHash :: Keccak256}
 
 newtype BestBlockNumber = BestBlockNumber {unBestBlockNumber :: Integer}
 
 type ContextM = ReaderT Config (ResourceT (LoggingT IO))
+
+type ContextIORM = ReaderT ContextIOR (ResourceT (LoggingT IO))
 
 data P2pConduits m = P2pConduits
   { _peerSource :: ConduitM () B.ByteString m (),
@@ -246,6 +259,53 @@ instance RunsClient ContextM where
           pSink = appSink app
           conduits = P2pConduits pSource pSink sSource
       handler conduits
+
+instance RunsClient ContextIORM where
+  runClientConnection (IPAsText ip) (TCPPort p) sSource handler = do
+    let peerAddress = BC.pack $ T.unpack ip
+    runTCPClientWithConnectTimeout (clientSettings p peerAddress) 5 $ \app -> do
+      let pSource = appSource app
+          pSink = appSink app
+          conduits = P2pConduits pSource pSink sSource
+      handler conduits
+
+{-
+class RunsClientKI m where
+  runClientConnectionKI ::
+    IPAsText ->
+    TCPPort ->
+    (P2pConduits m -> m ()) ->
+    m ()
+
+instance RunsClientKI ContextM where
+  runClientConnectionKI (IPAsText ip) (TCPPort p) handler =
+    KIU.scoped $ \scope -> do
+      peerthread <- KIU.fork scope
+                             (do wireMessagesRef <- liftIO $ newIORef empty
+                                 cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
+                                 let sSource  = seqEventNotificationSource $ contextKafkaState initContext
+                                     runner f = runContextM cfg $ f sSource
+                                 runner $ \sSource' -> do
+                                   let peerAddress = BC.pack $ T.unpack ip
+                                   runTCPClientWithConnectTimeout (clientSettings p peerAddress) 5 $ \app -> do
+                                     let pSource = appSource app
+                                         pSink = appSink app
+                                         conduits = P2pConduits pSource pSink sSource'
+                                     handler conduits
+                             )
+      atomically $ KIU.await peerthread
+-}
+
+{-
+instance (MonadIO m,MonadUnliftIO m) => RunsClient (ReaderT Config (ResourceT (LoggingT m))) where
+  runClientConnection (IPAsText ip) (TCPPort p) sSource handler = do
+    let peerAddress = BC.pack $ T.unpack ip
+    runTCPClientWithConnectTimeout (clientSettings p peerAddress) 5 $ \app -> do
+      let pSource = appSource app
+          pSink = appSink app
+          conduits = P2pConduits pSource pSink sSource
+      handler conduits    
+-}
 
 instance RunsServer ContextM (LoggingT IO) where
   runServer (TCPPort listenPort) runner handler = do
@@ -388,7 +448,24 @@ instance MonadIO m => (Keccak256 `A.Alters` (Proxy (Inbound WireMessage))) (Read
              in (wms', ())
         )
 
+{-
 instance MonadIO m => ((T.Text, Keccak256) `A.Alters` (Proxy (Outbound WireMessage))) (ReaderT Config m) where
+  lookup _ k = do
+    wms <- _outboundWireMessages <$> Mod.get (Mod.Proxy @Context)
+    let b = S.member k wms
+    pure $ if b then Just (Proxy @(Outbound WireMessage)) else Nothing
+  insert _ k _ = Mod.modifyStatefully_ (Mod.Proxy @Context) $ do
+    wms <- use outboundWireMessages
+    let s = S.size wms
+        wms' = if s >= flags_wireMessageCacheSize then S.delete (head $ toList wms) wms else wms
+        !wms'' = wms' S.>| k
+    assign outboundWireMessages wms''
+  delete _ k =
+    Mod.modifyStatefully_ (Mod.Proxy @Context) $
+      outboundWireMessages %= S.delete k
+-}
+
+instance MonadIO m => ((T.Text,Keccak256) `A.Alters` (Proxy (Outbound WireMessage))) (ReaderT ContextIOR m) where
   lookup _ k = do
     wms <- _outboundWireMessages <$> Mod.get (Mod.Proxy @Context)
     let b = S.member k wms
@@ -413,21 +490,37 @@ instance
 instance MonadIO m => Mod.Accessible BestBlockNumber (ReaderT Config m) where
   access _ = BestBlockNumber <$> liftIO getBestKafkaBlockNumber
 
-instance MonadIO m => Mod.Modifiable Context (ReaderT Config m) where
-  get _ = readIORef =<< asks configContext
-  put _ c = asks configContext >>= flip atomicModifyIORef' (const (c, ()))
+--instance MonadIO m => Mod.Modifiable Context (ReaderT Config m) where
+--  get _ = readIORef =<< asks configContext
+--  put _ c = asks configContext >>= flip atomicModifyIORef' (const (c, ()))
 
-instance MonadIO m => Mod.Modifiable K.KafkaState (ReaderT Config m) where
-  get _ = contextKafkaState <$> Mod.get (Proxy @Context)
-  put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c {contextKafkaState = k}, ()))
+instance MonadIO m => Mod.Modifiable Context (ReaderT ContextIOR m) where
+  get _   = readIORef =<< asks contextiorContext
+  put _ c = asks contextiorContext >>= flip atomicModifyIORef' (const (c,()))
 
-instance MonadIO m => Mod.Modifiable ActionTimestamp (ReaderT Config m) where
-  get _ = actionTimestamp <$> Mod.get (Proxy @Context)
-  put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c {actionTimestamp = k}, ()))
+--instance MonadIO m => Mod.Modifiable K.KafkaState (ReaderT Config m) where
+--  get _ = contextKafkaState <$> Mod.get (Proxy @Context)
+--  put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c {contextKafkaState = k}, ()))
 
-instance MonadIO m => Mod.Accessible ActionTimestamp (ReaderT Config m) where
+instance MonadIO m => Mod.Modifiable K.KafkaState (ReaderT ContextIOR m) where
+  get _   = contextKafkaState <$> Mod.get (Proxy @Context)
+  put _ k = asks contextiorContext >>= flip atomicModifyIORef' (\c -> (c {contextKafkaState = k},()))
+
+--instance MonadIO m => Mod.Modifiable ActionTimestamp (ReaderT Config m) where
+--  get _ = actionTimestamp <$> Mod.get (Proxy @Context)
+--  put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c {actionTimestamp = k}, ()))
+
+instance MonadIO m => Mod.Modifiable ActionTimestamp (ReaderT ContextIOR m) where
+  get _   = actionTimestamp <$> Mod.get (Proxy @Context)
+  put _ k = asks contextiorContext >>= flip atomicModifyIORef' (\c -> (c {actionTimestamp = k},()))
+
+--instance MonadIO m => Mod.Accessible ActionTimestamp (ReaderT Config m) where
+--  access _ = Mod.get (Proxy @ActionTimestamp)
+
+instance MonadIO m => Mod.Accessible ActionTimestamp (ReaderT ContextIOR m) where
   access _ = Mod.get (Proxy @ActionTimestamp)
 
+{-
 instance MonadIO m => Mod.Modifiable [BlockData] (ReaderT Config m) where
   get _ = do
     (bHeaders, lastUpdateTS) <- blockHeaders <$> Mod.get (Proxy @Context)
@@ -443,10 +536,33 @@ instance MonadIO m => Mod.Modifiable [BlockData] (ReaderT Config m) where
   put _ k = do
     now <- liftIO getCurrentTime
     asks configContext >>= flip atomicModifyIORef' (\c -> (c {blockHeaders = (k, now)}, ()))
+-}
 
-instance MonadIO m => Mod.Accessible [BlockData] (ReaderT Config m) where
+instance MonadIO m => Mod.Modifiable [BlockData] (ReaderT ContextIOR m) where
+  get _ = do
+    (bHeaders, lastUpdateTS) <- blockHeaders <$> Mod.get (Proxy @Context)
+    now <- liftIO getCurrentTime
+    let diffTime = now `diffUTCTime` lastUpdateTS
+    env <- ask
+    --maxTime <- fromIntegral . unConnectionTimeout <$> Mod.access (Proxy @ConnectionTimeout)
+    let maxTime = fromIntegral $ unConnectionTimeout $ configConnectionTimeout $ contextiorConfig env
+    if diffTime > maxTime
+      then do
+        -- stale cache; override it
+        Mod.put (Proxy @[BlockData]) []
+        pure []
+      else pure bHeaders
+  put _ k = do
+    now <- liftIO getCurrentTime
+    asks contextiorContext >>= flip atomicModifyIORef' (\c -> (c {blockHeaders = (k, now)},()))
+
+--instance MonadIO m => Mod.Accessible [BlockData] (ReaderT Config m) where
+--  access _ = Mod.get (Proxy @[BlockData])
+
+instance MonadIO m => Mod.Accessible [BlockData] (ReaderT ContextIOR m) where
   access _ = Mod.get (Proxy @[BlockData])
 
+{-
 instance MonadIO m => Mod.Modifiable RemainingBlockHeaders (ReaderT Config m) where
   get _ = do
     (remBHeaders, lastUpdateTS) <- remainingBlockHeaders <$> Mod.get (Proxy @Context)
@@ -463,18 +579,48 @@ instance MonadIO m => Mod.Modifiable RemainingBlockHeaders (ReaderT Config m) wh
   put _ k = do
     now <- liftIO getCurrentTime
     asks configContext >>= flip atomicModifyIORef' (\c -> (c {remainingBlockHeaders = (k, now)}, ()))
+-}
 
-instance MonadIO m => Mod.Accessible RemainingBlockHeaders (ReaderT Config m) where
+instance MonadIO m => Mod.Modifiable RemainingBlockHeaders (ReaderT ContextIOR m) where
+  get _ = do
+    (remBHeaders,lastUpdateTS) <- remainingBlockHeaders <$> Mod.get (Proxy @Context)
+    now <- liftIO getCurrentTime
+    let diffTime = now `diffUTCTime` lastUpdateTS
+    env <- ask
+    --maxTime <- fromIntegral . unConnectionTimeout <$> Mod.access (Proxy @ConnectionTimeout)
+    let maxTime = fromIntegral $ unConnectionTimeout $ configConnectionTimeout $ contextiorConfig env
+    if diffTime > maxTime
+      then do
+        -- stale cache; override it
+        let emptyRBH = RemainingBlockHeaders []
+        Mod.put (Proxy @RemainingBlockHeaders) emptyRBH
+        pure emptyRBH
+      else pure remBHeaders
+  put _ k = do
+    now <- liftIO getCurrentTime
+    asks contextiorContext >>= flip atomicModifyIORef' (\c -> (c {remainingBlockHeaders = (k,now)},()))
+
+--instance MonadIO m => Mod.Accessible RemainingBlockHeaders (ReaderT Config m) where
+--  access _ = Mod.get (Proxy @RemainingBlockHeaders)
+
+instance MonadIO m => Mod.Accessible RemainingBlockHeaders (ReaderT ContextIOR m) where
   access _ = Mod.get (Proxy @RemainingBlockHeaders)
 
 instance MonadIO m => Mod.Accessible MaxReturnedHeaders (ReaderT Config m) where
   access _ = asks configMaxReturnedHeaders
 
-instance MonadIO m => Mod.Modifiable PeerAddress (ReaderT Config m) where
-  get _ = _blockstanbulPeerAddr <$> Mod.get (Proxy @Context)
-  put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c {_blockstanbulPeerAddr = k}, ()))
+--instance MonadIO m => Mod.Modifiable PeerAddress (ReaderT Config m) where
+--  get _ = _blockstanbulPeerAddr <$> Mod.get (Proxy @Context)
+--  put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c {_blockstanbulPeerAddr = k}, ()))
 
-instance MonadIO m => Mod.Accessible PeerAddress (ReaderT Config m) where
+instance MonadIO m => Mod.Modifiable PeerAddress (ReaderT ContextIOR m) where
+  get _   = _blockstanbulPeerAddr <$> Mod.get (Proxy @Context)
+  put _ k = asks contextiorContext >>= flip atomicModifyIORef' (\c -> (c {_blockstanbulPeerAddr = k},()))
+
+--instance MonadIO m => Mod.Accessible PeerAddress (ReaderT Config m) where
+--  access _ = Mod.get (Proxy @PeerAddress)
+
+instance MonadIO m => Mod.Accessible PeerAddress (ReaderT ContextIOR m) where
   access _ = Mod.get (Proxy @PeerAddress)
 
 instance MonadIO m => Mod.Accessible ConnectionTimeout (ReaderT Config m) where
@@ -489,7 +635,15 @@ instance MonadIO m => Mod.Accessible SQLDB (ReaderT Config m) where
 instance {-# OVERLAPPING #-} MonadIO m => AccessibleEnv SQLDB (ReaderT Config m) where
   accessEnv = asks configSQLDB
 
+{-
 instance (MonadIO m, MonadLogger m) => Stacks Block (ReaderT Config m) where
+  takeStack _ n = do
+    vmEvents <- liftIO . fetchLastVMOutputs $ fromIntegral n
+    pure [b | ChainBlock b <- vmEvents]
+  pushStack b = void . produceVMOutputsM $ ChainBlock <$> b
+-}
+
+instance (MonadIO m,MonadLogger m) => Stacks Block (ReaderT ContextIOR m) where
   takeStack _ n = do
     vmEvents <- liftIO . fetchLastVMOutputs $ fromIntegral n
     pure [b | ChainBlock b <- vmEvents]
@@ -511,8 +665,11 @@ instance MonadUnliftIO m => A.Selectable Point PPeer (ReaderT Config m) where
     where
       actions = SQL.selectList [PPeerPubkey SQL.==. (Just pk)] []
 
-instance (MonadIO m, MonadLogger m) => Mod.Outputs (ReaderT Config m) [IngestEvent] where
-  output = void . K.withKafkaRetry1s . SK.writeUnseqEvents
+--instance (MonadIO m, MonadLogger m) => Mod.Outputs (ReaderT Config m) [IngestEvent] where
+--  output = void . K.withKafkaRetry1s . SK.writeUnseqEvents
+
+instance (MonadIO m,MonadLogger m) => Mod.Outputs (ReaderT ContextIOR m) [IngestEvent] where
+  output = void . K.withKafkaRetry1s . SK.writeUnseqEvents 
 
 instance (MonadIO m, MonadLogger m) => HasVault (ReaderT Config m) where
   sign bs = do
@@ -655,15 +812,15 @@ initConfig wireMessagesRef maxHeaders = do
     $logInfoS "HasVault" "Calling vault-wrapper to get the node's public key"
     fmap VC.unPubKey $ waitOnVault $ liftIO $ runClientM (VC.getKey Nothing Nothing) vaultClient
 
-  let initState  = initContext
-  initStateF <- newIORef initState
+  --let initState  = initContext
+  --initStateF <- newIORef initState
   return $ Config
     { configSQLDB = sqlDB' dbs
     , configRedisBlockDB = RBDB.RedisConnection redisBDBPool
     , configConnectionTimeout = ConnectionTimeout flags_connectionTimeout
     , configMaxReturnedHeaders = MaxReturnedHeaders maxHeaders
     , configVaultClient = vaultClient
-    , configContext = initStateF
+    --, configContext = initStateF
     , configBlockstanbulWireMessages = wireMessagesRef
     , configPubKey = nodePubKey
     }
@@ -677,6 +834,17 @@ initContext =
           , _blockstanbulPeerAddr = PeerAddress Nothing
           , _outboundWireMessages = S.empty
           }
+
+initContextIOR :: MonadIO m
+               => Config
+               -> m ContextIOR
+initContextIOR config = do
+  let initState = initContext
+  initStateF    <- newIORef initState
+  return $ ContextIOR
+    { contextiorConfig  = config
+    , contextiorContext = initStateF
+    }
 
 getPeerByIP ::
   A.Selectable IPAsText PPeer m =>
