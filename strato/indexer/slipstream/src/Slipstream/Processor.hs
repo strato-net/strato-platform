@@ -374,22 +374,23 @@ processTheMessages env conn messages = do
                     aiChain = cid
                   }
               cont = error "internal error: contract should be unused for SolidVM"
-          $logDebugLS "Contract name is: " $ show name
+          $logInfoS "Contract name is: " $ T.pack $ show name
           oldState <- readPreviousSolidVMState g acct
           indexContract <- rowToInsert g abiid row cont oldState
+          $logInfoS "Contract is: " $ T.pack $ show indexContract
           hs <- rowToHistories g abiid actions cont oldState
           let mapNames = actionMappings row
               abstracts = actionAbstracts row
           --get columns for abstract table
-          $logDebugLS "abstractColumns" $ T.pack $ "Getting abstract columns from " ++ (show abstracts)
+          $logInfoS "abstractColumns" $ T.pack $ "Getting abstract columns from " ++ (show abstracts)
           abstractColumns <- fmap catMaybes . for (Map.toList abstracts) $ \((_, n'), (o', a')) -> do
             let tableName = AbstractTableName o' a' n'
                 tableNameText = tableNameToDoubleQuoteText tableName
             $logInfoS "Row will be inserted into abstract table: " tableNameText
             mCols <- getTableColumns g tableName
             pure $ (indexContract,tableNameText,) . map extractTextInsideQuotes <$> mCols
-          $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
-          $logDebugLS "History inserts are: " $ show hs
+          $logInfoS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
+          $logInfoS "History inserts are: " $ T.pack $ show hs
           stateDiff <- rowToMappings row
           pMappings <- processedContractToProcessedMappingRows stateDiff (mapNames) row abiid --get all mapping rows to insert
           pure . Right $ BatchedInserts indexContract abstractColumns hs pMappings
@@ -405,7 +406,12 @@ processTheMessages env conn messages = do
     outputData conn $ insertIndexTable $ indexInsert ins
     outputData conn $ insertHistoryTable $ historyInserts ins
     unless ((length (mappingInserts ins) < 1)) $ outputData conn $ insertMappingTable $ mappingInserts ins
-    outputData conn $ insertAbstractTable $ abstractInsert ins
+
+  unless (null insertsByCodeHash) $ do
+    let allAbstractInserts = concatMap abstractInsert insertsByCodeHash
+    outputData conn $ insertBegin
+    outputData conn $ insertAbstractTable $ allAbstractInserts
+    outputData conn $ insertCommit
 
   forM_ insertsByCodeHash $ \ins -> do
     insertForeignKeys conn $ indexInsert ins
