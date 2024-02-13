@@ -74,7 +74,6 @@ function bind(user, _contract, options) {
 
     contract.get = async (args) => get(user, args, options);
     contract.getState = async () => getState(user, contract, options);
-    contract.checkSaleQuantity = async (args) => checkSaleQuantity(user, args, options)
     contract.getHistory = async (args, options = contractOptions) => getHistory(user, chainId, args, options);
     contract.chainIds = options.chainIds;
 
@@ -166,32 +165,6 @@ async function getAll(admin, args = {}, defaultOptions) {
     return sales ? sales.map((sale) => marshalOut(sale)) : undefined;
 }
 
-async function checkSaleQuantity(admin, args, defaultOptions) {
-    const { saleAddresses, orderQuantity } = args
-    const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
-    const availableQuantities = await searchAllWithQueryArgs(contractName, { address: saleAddresses }, options, admin);
-
-        let insufficientDetails = [];
-
-    availableQuantities.forEach((sale, index) => {
-        const actualAvailableQuantity = sale.quantity - sale.totalLockedQuantity;
-        // Check if the available quantity for the sale is less than the required order quantity
-        if (actualAvailableQuantity < orderQuantity[index]) {
-            // If insufficient, add details to the insufficientDetails array
-            insufficientDetails.push({
-                asset: sale.assetToBeSold,
-                availableQuantity: sale.quantity, // How much is actually available
-            });
-        }
-    });
-
-    if (insufficientDetails.length > 0) {
-        return insufficientDetails;
-    } else {
-        // If all sales have sufficient quantities, return true
-        return true;
-    }
-}
 
 /**
  * Get contract state in bloc.
@@ -207,7 +180,6 @@ export default {
     bindAddress,
     get,
     getAll,
-    checkSaleQuantity,
     marshalIn,
     marshalOut,
     getHistory

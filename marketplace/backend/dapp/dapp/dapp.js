@@ -466,7 +466,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.checkSaleQuantity = async function (args, options = defaultOptions) {
     const getOptions = { ...options, app: contractName }
-    return saleJs.checkSaleQuantity(rawAdmin, args, getOptions)
+    return inventoryJs.checkSaleQuantity(rawAdmin, args, getOptions)
   }
 
   contract.getOrder = async function (args, options = defaultOptions) {

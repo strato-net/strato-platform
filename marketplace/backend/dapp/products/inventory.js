@@ -154,6 +154,7 @@ function bind(user, _contract, options) {
     contract.get = async (args) => get(user, args, options);
     contract.getState = async () => getState(user, contract, options);
     contract.getHistory = async (args, options = contractOptions) => getHistory(user, chainId, args, options);
+    contract.checkSaleQuantity = async (args) => checkSaleQuantity(user, args, options)
     contract.chainIds = options.chainIds;
 
     return contract;
@@ -471,6 +472,42 @@ async function inventoryCount(admin, args = {}, defaultOptions) {
     return totalResult[0].count
 }
 
+async function checkSaleQuantity(admin, args, defaultOptions) {
+    const { saleAddresses, orderQuantity } = args; // Assuming orderQuantity here is used differently now
+    const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' };
+
+    // Fetch sales and assets data
+    const sales = await saleJs.getAll(admin, { address: saleAddresses }, options);
+    console.log("sales here", sales)
+    const assets = await searchAllWithQueryArgs(contractName, { sale: saleAddresses }, options, admin);
+    console.log("assets here", assets)
+    let insufficientDetails = [];
+
+    sales.forEach((sale, index) => {
+        const actualAvailableQuantity = sale.quantity; 
+        const requestedQuantity = orderQuantity[index]; // Accessing requested quantity via sale address
+
+        if (actualAvailableQuantity < requestedQuantity) {
+            const asset = assets.find(asset => asset.sale === sale.address);
+            if (asset) {
+                insufficientDetails.push({
+                    assetName: asset.name, 
+                    assetAddress: sale.assetToBeSold,
+                    availableQuantity: actualAvailableQuantity,
+                });
+            }
+        }
+    });
+
+    if (insufficientDetails.length > 0) {
+        return insufficientDetails;
+    } else {
+        // If all sales have sufficient quantities, return true
+        return true;
+    }
+}
+
+
 /**
  * Get contract state in bloc.
  * @deprecated Use {@link get `get`} instead.
@@ -493,6 +530,7 @@ export default {
     transferItem,
     updateInventory,
     updateSale,
+    checkSaleQuantity,
     get,
     getAll,
     getOwnershipHistory,
