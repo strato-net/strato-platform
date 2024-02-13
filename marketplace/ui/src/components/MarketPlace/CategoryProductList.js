@@ -164,7 +164,9 @@ const CategoryProductList = ({ user }) => {
       if (categoryQueryValue) {
         baseUrl.searchParams.set('category', categoryQueryValue);
       }
-      baseUrl.searchParams.set('search', search);
+      if(search){
+        baseUrl.searchParams.set('search', search);
+      }
       baseUrl.searchParams.set('minPrice', minPrice);
       baseUrl.searchParams.set('maxPrice', maxPrice);
 
