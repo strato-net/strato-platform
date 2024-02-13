@@ -207,4 +207,5 @@ export const subscribeRoomMock = [
   ['TRANSACTIONS_COUNT'],
   ['TRANSACTIONS_TYPE'],
   ['GET_SHARD_COUNT'],
+  ['GET_SYSTEM_INFO']
 ]
