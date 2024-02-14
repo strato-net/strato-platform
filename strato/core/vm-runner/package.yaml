@@ -58,6 +58,7 @@ library:
   - transformers
   - unliftio
   - vm-tools
+  - ordered-containers
 
 executables:
   vm-runner:
