@@ -141,7 +141,7 @@ const actions = {
     categorys,
     subCategorys,
     // products,
-    manufacturers,
+    // manufacturers,
     minPrice,
     maxPrice,
     search
@@ -154,9 +154,9 @@ const actions = {
       ? `&subCategory[]=${subCategorys}`
       : "";
 
-    const manufacturerQuery = manufacturers
-      ? `&manufacturer[]=${manufacturers}`
-      : "";
+    // const manufacturerQuery = manufacturers
+    //   ? `&manufacturer[]=${manufacturers}`
+    //   : "";
 
     // const productIdQuery = products ? `&name[]=${products}` : "";
     const searchQuery = search
@@ -167,7 +167,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace?${priceQuery}${categoryQuery}${subCategoryQuery}${manufacturerQuery}${searchQuery}`,
+        `${apiUrl}/marketplace?${priceQuery}${categoryQuery}${subCategoryQuery}${searchQuery}`,
         {
           method: HTTP_METHODS.GET,
         }

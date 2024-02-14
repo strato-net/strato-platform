@@ -361,10 +361,10 @@ create' creator newAccount ch cc contractName' argExps createBuiltinCall = do
   
 
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) newAccount
+    Action.actionData %= Action.omapAdjust (Action.actionDataOrganization .~ (T.pack org)) newAccount
 
   when (useWallet && parentName == "User") $ Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    Action.actionData %= M.adjust (Action.actionDataApplication .~ (T.pack "")) newAccount
+    Action.actionData %= Action.omapAdjust (Action.actionDataApplication .~ (T.pack "")) newAccount
 
   -- I'm showing these strings because I like them to be in quotes in the logs :)
   multilineLog "create'/versioning" $ boringBox ["Contract Name: " ++ (C.yellow contractName'), "App: " ++ (C.yellow parentName), "Org: " ++ (C.yellow org)]
@@ -542,7 +542,7 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
   initializeAction to (labelToString $ CC._contractName contract) (labelToString parentName') hsh cc abstracts mappings arrays
 
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) to
+    Action.actionData %= Action.omapAdjust (Action.actionDataOrganization .~ (T.pack org)) to
   when (isRCC) $
     (\env -> setCreator (Env.origin env) to contract (blockDataNumber $ Env.blockHeader env)) =<< getEnv
 
@@ -2193,6 +2193,7 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
                       OrderedVals as -> zip (map (\(a, _, _) -> a) vals') as
                       NamedVals ns -> ns
             Constant (SContractDef contractName') -> do
+              decrementGas 500
               case argVals of
                 OrderedVals [SInteger address] ->
                   --TODO- clean up this ambiguity between SAddress and SInteger....
@@ -2260,6 +2261,7 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
                 _ -> pure $ Nothing
               --get only the contract containing the sweet succulent ContractF definition
               (!contract, _, _) <- getCodeAndCollection toAccount
+              decrementGas 1000 -- Discourage creating/calling contract instances willy nilly
               let codeSnippets :: [String]
                   codeSnippets =
                     case (fromMaybe "" searchTerms) of
