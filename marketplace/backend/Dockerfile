@@ -11,6 +11,8 @@ COPY . /usr/src/backend/
 
 WORKDIR /usr/src/backend
 
-RUN yarn install
+ENV NODE_ENV=production
+
+RUN yarn install --frozen-lockfile --prod
 
 CMD [ "sh", "/usr/src/backend/docker-run.sh" ]

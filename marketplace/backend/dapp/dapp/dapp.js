@@ -24,6 +24,9 @@ import inventoryJs from "/dapp/products/inventory";
 import marketplaceJs from "/dapp/marketplace/marketplace.js";
 import paymentProviderJs from '/dapp/payments/paymentProvider';
 
+import strats from "../strats/strats";
+import constants from "../../helpers/constants";
+
 const allAssetNames = [];
 
 const contractName = "Mercata";
@@ -40,7 +43,7 @@ let userCert = null;
 // }
 
 function deploy(contract, args, options) {
-  console.log(options);
+  console.log(options)
   // author the deployment
   const { deployFilePath } = args;
 
@@ -51,7 +54,7 @@ function deploy(contract, args, options) {
         name: contract.name,
         address: contract.address
       },
-    },
+    }
   };
 
   if (options.config.apiDebug) {
@@ -926,6 +929,28 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching address: ${JSON.stringify(err)} `);
     }
   };
+
+  contract.getStratsBalance = async function (args, options = defaultOptions) {
+    const { userAddress } = args;
+    const getOptions = { ...options, org: "TestCompany", app: '' };
+    let address;
+
+    if (process.env.networkID === constants.prodNetworkId) {
+      address = constants.prodStratsAddress
+    } else if (process.env.networkID === constants.testnetNetworkId) {
+      address = constants.testnetStratsAddress
+    } else {
+      address = constants.testnetStratsAddress
+    }
+
+    const newArgs = {
+      address: address,
+      key: userAddress
+    }
+
+    const balance = await strats.getStratsBalance(rawAdmin, newArgs, getOptions);
+    return balance;
+  }
 
   return contract;
 };

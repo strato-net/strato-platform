@@ -88,6 +88,7 @@ services:
     - GLOBAL_ADMIN_PASSWORD=${GLOBAL_ADMIN_PASSWORD}
     - ORG_NAME='BlockApps' # TODO: can be removed?
     - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+    - networkID=${networkID}
     build: .
     image: ${MARKETPLACEBACKEND_IMAGE:-<REPO_URL>marketplace-backend:<VERSION>}
     restart: unless-stopped
@@ -350,7 +351,7 @@ services:
       KAFKA_OFFSETS_RETENTION_MINUTES: 2147483647
       KAFKA_MAX_REQUEST_SIZE: ${KAFKA_MAX_REQUEST_SIZE:-100663296}
       KAFKA_MESSAGE_MAX_BYTES: ${KAFKA_MESSAGE_MAX_BYTES:-100663296}
-    image: wurstmeister/kafka:1.1.0
+    image: wurstmeister/kafka:2.12-2.0.1
     restart: unless-stopped
     volumes:
     - kafkadata:/kafka

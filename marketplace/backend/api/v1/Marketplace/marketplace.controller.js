@@ -14,7 +14,7 @@ class MarketplaceController {
       const productsWithImageUrl = inventories?.inventoryResults.sort((a, b) => {
         return b.saleDate.localeCompare(a.saleDate);
       });
-      rest.response.status200(res, {productsWithImageUrl: productsWithImageUrl, inventoryCount: inventories?.inventoryCount})
+      rest.response.status200(res, { productsWithImageUrl: productsWithImageUrl, inventoryCount: inventories?.inventoryCount })
 
       return next()
     } catch (e) {
@@ -25,7 +25,7 @@ class MarketplaceController {
   static async getAllLoggedIn(req, res, next) {
     try {
       const { dapp, query } = req
-      
+
       if (query.manufacturer) {
         const encodedManufacturers = query.manufacturer.map(product => { return encodeURIComponent(product) })
         query.manufacturer = encodedManufacturers
@@ -35,7 +35,7 @@ class MarketplaceController {
       const productsWithImageUrl = inventories?.inventoryResults.sort((a, b) => {
         return b.saleDate.localeCompare(a.saleDate);
       });
-      rest.response.status200(res, {productsWithImageUrl: productsWithImageUrl, inventoryCount: inventories?.inventoryCount})
+      rest.response.status200(res, { productsWithImageUrl: productsWithImageUrl, inventoryCount: inventories?.inventoryCount })
 
       return next()
     } catch (e) {
@@ -71,6 +71,20 @@ class MarketplaceController {
 
       return next()
     } catch (e) {
+      return next(e)
+    }
+  }
+
+  static async getStratsBalance(req, res, next) {
+    try {
+      const { dapp, address: userAddress } = req
+      let stratsBalance = 0;
+
+      stratsBalance = await dapp.getStratsBalance({ userAddress: userAddress });
+
+      return rest.response.status200(res, stratsBalance)
+    } catch (e) {
+      console.log("Couldn't load STRATS");
       return next(e)
     }
   }
