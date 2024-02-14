@@ -366,11 +366,13 @@ getDeferredForeignKeysAbstract ::
   TableName -> ContractF () -> Text -> Text -> Map.Map (Account, Text) (Text, Text) -> CodeCollectionF () -> m [ForeignKeyInfo]
 getDeferredForeignKeysAbstract tableName c o a abstracts' cc = do
   result <- fmap catMaybes . for [(theName, x) | (theName, VariableDecl {_varType = SVMType.UnknownLabel x _}) <- Map.toList (c ^. storageDefs)] $ \(theName, x) -> do
+      let contract = getContractsBySolidString x cc
       case contract of
               Just c' -> do
                 let enumExists = isJust $ Map.lookup (_contractName c') (_enums c')
                 if enumExists
                 then do
+                  $logDebugS "getDeferredForeignKeysAbstract: Enum with the same name as contract found, skipping fkey creation" . T.pack $ _contractName c'
                   return Nothing
                 else do
                   let (o',a',n') = case _importedFrom c' of
