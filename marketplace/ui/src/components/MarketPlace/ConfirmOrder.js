@@ -403,7 +403,7 @@ const ConfirmOrder = () => {
                           saleAddresses.push(item.saleAddress)
                           quantities.push(item.qty)
                       })
-                      const checkQuantity = orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities)
+                      const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities)
                       if (checkQuantity === true) {
                         handlePaymentConfirm();
                       } else {
