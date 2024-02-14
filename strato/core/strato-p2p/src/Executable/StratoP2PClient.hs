@@ -28,6 +28,7 @@ import           Blockchain.Metrics
 import           Blockchain.Options
 import           Blockchain.RLPx
 import           Blockchain.Sequencer.Event
+import           Blockchain.SeqEventNotify
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.UDP
 import           Blockchain.Strato.Model.Secp256k1
@@ -52,6 +53,7 @@ import           Ki.Unlifted as KIU
 import qualified Text.Colors as C
 import           Text.Format
 import           UnliftIO
+import           Data.Set.Ordered (empty)
 
 runPeer ::
   (RunsClient m, MonadP2P m) =>
@@ -127,7 +129,7 @@ runPeerInList ::
   PPeer ->
   ConduitM () P2pEvent m () ->
   m (Either SomeException ())
-runPeerInList thePeer sSource = do 
+runPeerInList thePeer sSource = do
   eErr <- nonviolentDisable thePeer --don't connect to a peer too frequently, out of politeness
   case eErr of
     Left err -> do
@@ -137,10 +139,15 @@ runPeerInList thePeer sSource = do
     Right () -> pure ()
   try $ runPeer thePeer sSource
 
-stratoP2PClient :: (MonadP2P m, RunsClient m) => PeerRunner m (LoggingT IO) () -> LoggingT IO ()
-stratoP2PClient runner = runner $ \sSource -> do
+--stratoP2PClient :: (MonadIO m, MonadP2P m, RunsClient m) => ((ConduitM () P2pEvent m () -> m ()) -> m ()) -> m ()
+--stratoP2PClient :: (MonadP2P m, RunsClient m) => PeerRunner (LoggingT m) (LoggingT IO) () -> LoggingT IO ()
+--stratoP2PClient runner = runner $ \sSource -> do
+--stratoP2PClient :: LoggingT IO ()
+--stratoP2PClient :: IO ()
+--stratoP2PClient :: (MonadP2P m, RunsClient m, Control.Monad.Change.Modify.Accessible AvailablePeers (Control.Monad.Trans.Reader.ReaderT Config (ResourceT m))) => PeerRunner m (LoggingT IO) () -> LoggingT IO ()
+stratoP2PClient runner = runner $ \_ -> do
   $logInfoS "stratoP2PClient" $ T.pack $ "maxConn: " ++ show flags_maxConn
-  activePeersSem <- liftIO (SSem.new flags_maxConn)
+  activePeersSem <- liftIO $ SSem.new flags_maxConn
   forever $ do
     $logDebugS "stratoP2PClient" "About to fetch available peers and loop over them"
     ePeers <- getBondedPeers
@@ -149,22 +156,31 @@ stratoP2PClient runner = runner $ \sSource -> do
         $logErrorS "stratoP2PClient" . T.pack $ "Could not fetch peers: " ++ show err
         liftIO $ threadDelay 1000000
       Right peers -> do
-        _ <- async (multiThreadedClient peers activePeersSem sSource)
+        _ <- async (multiThreadedClient peers activePeersSem)
         $logInfoS "stratoP2PClient" "Waiting 5 seconds before looping over peers again"
         liftIO $ threadDelay 5000000
   where
-    multiThreadedClient :: (MonadP2P m, RunsClient m) => [PPeer] -> SSem -> ConduitM () P2pEvent m () -> m ()
-    multiThreadedClient [] _ _ = do
+--    multiThreadedClient :: (MonadP2P m, RunsClient m) => [PPeer] -> SSem -> ConduitM () P2pEvent (LoggingT m) () -> LoggingT m ()
+--    multiThreadedClient [] _ _ = do
+--    multiThreadedClient :: [PPeer] -> SSem -> LoggingT IO ()
+--    multiThreadedClient :: (MonadP2P m, RunsClient m) => [PPeer] -> SSem -> m ()
+    multiThreadedClient [] _ = do
       $logInfoS "stratoP2PClient/multiThreadedClient" "No available peers, will try again in 10 seconds"
       liftIO $ threadDelay 10000000
-    multiThreadedClient peers sem sSource = do
+--    multiThreadedClient peers sem sSource = do
+    multiThreadedClient peers sem = do--runner $ \_ -> do
       let notRunningPeers = filter ((== 0) . pPeerActiveState) peers
       unless (null notRunningPeers) . void . forConcurrently notRunningPeers $ \p -> do
         liftIO (SSem.tryWait sem) >>= \case
           Nothing -> return ()
-          Just _ -> do
-            result <- runPeerInList p sSource
-            _ <- handleRunPeerResult p result
+          Just _  -> do
+            wireMessagesRef <- liftIO $ newIORef empty
+            cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
+            let sSource'  = seqEventNotificationSource $ contextKafkaState initContext
+                runner' f = runContextM cfg $ f sSource'
+            runner' $ \sSource'' -> do
+              result <- runPeerInList p sSource''
+              handleRunPeerResult p result
             liftIO $ SSem.signal sem
     handleRunPeerResult :: MonadP2P m => PPeer -> Either SomeException () -> m ()
     handleRunPeerResult thePeer = \case
