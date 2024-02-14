@@ -21,10 +21,12 @@ import routes from "../../helpers/routes";
 //categories
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { actions as marketPlaceActions } from "../../contexts/marketplace/actions";
+import { actions as orderActions } from "../../contexts/order/actions"
 import {
   useMarketplaceDispatch,
   useMarketplaceState,
 } from "../../contexts/marketplace";
+import { useOrderDispatch } from "../../contexts/order";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
 import { useNavigate, useLocation } from "react-router-dom";
 //Items - ownership history
@@ -62,6 +64,7 @@ const ProductDetails = ({ user, users }) => {
   const [qty, setQty] = useState(1);
   const dispatch = useInventoryDispatch();
   const categoryDispatch = useCategoryDispatch();
+  const orderDispatch = useOrderDispatch();
   const [categoryName, setCategoryName] = useState("");
   const [api, contextHolder] = notification.useNotification();
   const { categorys, iscategorysLoading } = useCategoryState();
@@ -353,7 +356,7 @@ const ProductDetails = ({ user, users }) => {
                     <Button
                       type="primary"
                       className="w-[90%] md:w-[365px] h-9  !bg-[#13188A] !hover:bg-primaryHover !text-white"
-                      onClick={() => {
+                      onClick={async () => {
                         if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                           setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
                           window.location.href = loginUrl;
@@ -375,8 +378,14 @@ const ProductDetails = ({ user, users }) => {
                               productId: details.productId
                             },
                           });
-                          addItemToCart();
-                          navigate("/checkout");
+
+                          const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, details.saleAddress, qty)
+                          if (checkQuantity === true) {
+                            addItemToCart();
+                            navigate("/checkout");
+                          } else {
+                            openToast("bottom", true, `Currently available quantity for ${details.name}: ${checkQuantity[0].availableQuantity}`)
+                          }
                         }
                       }}
                       disabled={ownerSameAsUser()}
@@ -393,7 +402,7 @@ const ProductDetails = ({ user, users }) => {
                         className=" !w-9 h-9 border border-primary  !bg-[#13188A] rounded-md"
                         disabled={true}
                         id="addToCart"
-                        onClick={() => {
+                        onClick={async () => {
                           if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                             setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
                             window.location.href = loginUrl;
@@ -415,7 +424,12 @@ const ProductDetails = ({ user, users }) => {
                                 productId: details?.productId
                               },
                             });
-                            addItemToCart();
+                            const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, details.saleAddress, qty)
+                            if (checkQuantity === true) {
+                              addItemToCart();
+                            } else {
+                              openToast("bottom", true, `Currently available quantity for ${details.name}: ${checkQuantity[0].availableQuantity}`)
+                            }
                           }
                         }}
                       />
@@ -425,7 +439,7 @@ const ProductDetails = ({ user, users }) => {
                           <img src={Images.Cart} alt="cart" width={18} height={18} className="object-contain" />
                         </div>}
                         className=" !w-9 h-9 rounded-md  !bg-[#13188A]"
-                        onClick={() => {
+                        onClick={async () => {
                           if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                             setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
                             window.location.href = loginUrl;
@@ -447,7 +461,12 @@ const ProductDetails = ({ user, users }) => {
                                 productId: details?.productId
                               },
                             });
-                            addItemToCart();
+                            const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, details.saleAddress, qty)
+                            if (checkQuantity === true) {
+                              addItemToCart();
+                            } else {
+                              openToast("bottom", true, `Currently available quantity for ${details.name}: ${checkQuantity[0].availableQuantity}`)
+                            }
                           }
                         }}
                       />

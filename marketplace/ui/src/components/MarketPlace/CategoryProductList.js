@@ -230,7 +230,7 @@ const CategoryProductList = ({ user }) => {
     if (!found) {
       // TODO: Fix these toast messages, currently not throwing the errors
       items = [...cartList, { product, qty: quantity }];
-      const quantityCheck = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [2000])
+      const quantityCheck = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity])
       if (quantityCheck === true){
         marketplaceActions.addItemToCart(marketplaceDispatch, items);
   

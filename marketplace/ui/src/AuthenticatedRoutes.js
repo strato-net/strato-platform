@@ -168,7 +168,9 @@ const AuthenticatedRoutes = ({ user, users }) => {
                 <SubCategorysProvider>
                   <InventoriesProvider>
                     <ItemsProvider>
-                      <ProductDetails user={user} users={users} />
+                      <OrdersProvider>
+                        <ProductDetails user={user} users={users} />
+                      </OrdersProvider>
                     </ItemsProvider>
                   </InventoriesProvider>
                 </SubCategorysProvider>
@@ -227,7 +229,9 @@ const AuthenticatedRoutes = ({ user, users }) => {
                 <SubCategorysProvider>
                   <InventoriesProvider>
                     <ItemsProvider>
-                      <ProductDetails user={user} users={users} />
+                      <OrdersProvider>
+                        <ProductDetails user={user} users={users} />
+                      </OrdersProvider>
                     </ItemsProvider>
                   </InventoriesProvider>
                 </SubCategorysProvider>
