@@ -9,6 +9,8 @@ import {
 } from "../../contexts/marketplace";
 import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
+import { actions as orderActions } from "../../contexts/order/actions"
+import { useOrderDispatch } from "../../contexts/order";
 
 
 const ResponsiveCart = ({
@@ -18,6 +20,7 @@ const ResponsiveCart = ({
   MinusQty,
   ValueQty,
   removeCartList,
+  openToastOrder
 }) => {
   const navigate = useNavigate();
   const [tax, setTax] = useState(0);
@@ -25,6 +28,8 @@ const ResponsiveCart = ({
   const { cartList } = useMarketplaceState();
   const [total, setTotal] = useState(0);
   const marketplaceDispatch = useMarketplaceDispatch();
+  const orderDispatch = useOrderDispatch();
+
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   const [faqOpenState, setFaqOpenState] = useState(
     Array(data.length).fill(false)
@@ -228,26 +233,42 @@ const ResponsiveCart = ({
               type="primary"
               id="submit-order-button"
               className=" w-full sm:w-44 h-9 !bg-[#13188A]"
-              onClick={() => {
+              onClick={async () => {
                 if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                   window.location.href = loginUrl;
-                } else {
-                  actions.addItemToConfirmOrder(marketplaceDispatch, data);
-                  window.LOQ.push([
-                    "ready",
-                    async (LO) => {
-                      // Track an event
-                      await LO.$internal.ready("events");
-                      LO.events.track("Submit Order (from cart)");
-                    },
-                  ]);
-                  TagManager.dataLayer({
-                    dataLayer: {
-                      event: "submit_order_from_cart",
-                    },
-                  });
-                  navigate("/confirmOrder");
-                }
+              } else {
+                  const saleAddresses = [];
+                  const quantities = [];
+                  data.forEach((item) => {
+                      saleAddresses.push(item.saleAddress)
+                      quantities.push(item.qty)
+                  })
+                  const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities)
+                  if (checkQuantity === true ) {
+                      actions.addItemToConfirmOrder(marketplaceDispatch, data);
+                      window.LOQ.push(['ready', async LO => {
+                          // Track an event
+                          await LO.$internal.ready('events')
+                          LO.events.track('Submit Order (from cart)')
+                      }])
+                      TagManager.dataLayer({
+                          dataLayer: {
+                              event: 'submit_order_from_cart',
+                          },
+                      });
+
+                      navigate("/confirmOrder");
+
+                  } else {
+                      let insufficientItemsMessage = "The following items may no longer be available in the desired quantities:\n";
+
+                      checkQuantity.forEach(detail => {
+                      insufficientItemsMessage += `(${detail.assetName}-Available Quantity: ${detail.availableQuantity})\n`;
+                      });
+
+                      openToastOrder("bottom", insufficientItemsMessage)
+                  }
+              }
               }}
               disabled={data.length === 0}
             >

@@ -13,9 +13,11 @@ import {
 } from "../../contexts/marketplace";
 import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
+import { actions as orderActions } from "../../contexts/order/actions"
+import { useOrderDispatch } from "../../contexts/order";
 
 
-const CartComponent = ({ columns, data }) => {
+const CartComponent = ({ columns, data, openToastOrder }) => {
 
 
     const navigate = useNavigate();
@@ -24,6 +26,7 @@ const CartComponent = ({ columns, data }) => {
     const [innerWidth, setInnerWidth] = useState(0)
     const [total, setTotal] = useState(0);
     const marketplaceDispatch = useMarketplaceDispatch();
+    const orderDispatch = useOrderDispatch();
 
     let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
@@ -98,22 +101,41 @@ const CartComponent = ({ columns, data }) => {
                                 type="primary"
                                 id="submit-order-button"
                                 className="flex items-center px-4 py-5 bg-primary !hover:bg-primaryHover"
-                                onClick={() => {
+                                onClick={async () => {
                                     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                                         window.location.href = loginUrl;
                                     } else {
-                                        actions.addItemToConfirmOrder(marketplaceDispatch, data);
-                                        window.LOQ.push(['ready', async LO => {
-                                            // Track an event
-                                            await LO.$internal.ready('events')
-                                            LO.events.track('Submit Order (from cart)')
-                                        }])
-                                        TagManager.dataLayer({
-                                            dataLayer: {
-                                                event: 'submit_order_from_cart',
-                                            },
-                                        });
-                                        navigate("/confirmOrder");
+                                        const saleAddresses = [];
+                                        const quantities = [];
+                                        data.forEach((item) => {
+                                            saleAddresses.push(item.saleAddress)
+                                            quantities.push(item.qty)
+                                        })
+                                        const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities)
+                                        if (checkQuantity === true ) {
+                                            actions.addItemToConfirmOrder(marketplaceDispatch, data);
+                                            window.LOQ.push(['ready', async LO => {
+                                                // Track an event
+                                                await LO.$internal.ready('events')
+                                                LO.events.track('Submit Order (from cart)')
+                                            }])
+                                            TagManager.dataLayer({
+                                                dataLayer: {
+                                                    event: 'submit_order_from_cart',
+                                                },
+                                            });
+
+                                            navigate("/confirmOrder");
+
+                                        } else {
+                                            let insufficientItemsMessage = "The following items may no longer be available in the desired quantities:\n";
+
+                                            checkQuantity.forEach(detail => {
+                                            insufficientItemsMessage += `(${detail.assetName}-Available Quantity: ${detail.availableQuantity})\n`;
+                                            });
+
+                                            openToastOrder("bottom", insufficientItemsMessage)
+                                        }
                                     }
                                 }}
                                 disabled={data.length === 0}

@@ -15,7 +15,7 @@ import routes from "../../helpers/routes";
 import { useAuthenticateState } from "../../contexts/authentication";
 import NewTrendingCard from "./NewTrendingCard";
 import { actions as orderActions } from "../../contexts/order/actions"
-import { useOrderDispatch, useOrderState} from "../../contexts/order";
+import { useOrderDispatch } from "../../contexts/order";
 
 const { Title } = Typography;
 
@@ -30,12 +30,6 @@ const TopSellingProductCard = () => {
   const [api, contextHolder] = notification.useNotification();
 
   const orderDispatch = useOrderDispatch();
-  const { saleQuantity, saleQuantityLoading } = useOrderState()
-
-  useEffect(() => {
-      orderActions.fetchSaleQuantity(orderDispatch, ['015ae9a7641a45cedc5fc547d480cc9bd164fb4d', 'd50c8c309ee2eed5fcf76cb85e62bfc0cdc53d53'], [2, 3]);
-    }, [orderDispatch]);
-  console.log("saleQuantities", saleQuantity, saleQuantityLoading)
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -66,7 +60,7 @@ const TopSellingProductCard = () => {
     }
   };
 
-  const addItemToCart = (product, quantity) => {
+  const addItemToCart = async (product, quantity) => {
     if (product.ownerCommonName === user?.commonName) {
       openToast("bottom", true, "Cannot buy your own item")
       return false;
@@ -81,21 +75,34 @@ const TopSellingProductCard = () => {
     let items = [];
     if (!found) {
       items = [...cartList, { product, qty: quantity }];
-      actions.addItemToCart(marketplaceDispatch, items);
+      const quantityCheck = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity])
+      if (quantityCheck === true){
+        actions.addItemToCart(marketplaceDispatch, items);
+  
+        openToast("bottom", false, "Item added to cart");
+        return true;
+      } else {
+        openToast("bottom", true, `Currently available quantity for ${product.name}: ${quantityCheck[0].availableQuantity}`)
+        return false
+      }
 
-      openToast("bottom", false, "Item added to cart");
-      return true;
     } else {
       items = [...cartList];
-      cartList.forEach((element, index) => {
+      cartList.forEach(async (element, index) => {
         if (element.product.address === product.address) {
           const availableQuantity = product.saleQuantity ? product.saleQuantity : 1;
           if (items[index].qty + 1 <= availableQuantity) {
             items[index].qty += 1;
-            actions.addItemToCart(marketplaceDispatch, items);
-
-            openToast("bottom", false, "Item updated in cart");
-            return true;
+            const quantityCheck = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity])
+            if (quantityCheck === true){
+              actions.addItemToCart(marketplaceDispatch, items);
+        
+              openToast("bottom", false, "Item updated in cart");
+              return true;
+            } else {
+              openToast("bottom", true, `Currently available quantity for ${product.name}: ${quantityCheck[0].availableQuantity}`)
+              return false
+            }
           } else {
             openToast(
               "bottom",

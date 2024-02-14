@@ -31,6 +31,8 @@ import ClickableCell from "../ClickableCell";
 import NewTrendingCard from "./NewTrendingCard";
 import { Images } from "../../images";
 import './index.css'
+import { actions as orderActions } from "../../contexts/order/actions"
+import { useOrderDispatch} from "../../contexts/order";
 
 const { Panel } = Collapse;
 const { Text } = Typography;
@@ -62,6 +64,7 @@ const CategoryProductList = ({ user }) => {
   const categoryDispatch = useCategoryDispatch();
   const subCategoryDispatch = useSubCategoryDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
+  const orderDispatch = useOrderDispatch();
   // states
   const { marketplaceList, isMarketplaceLoading } = useMarketplaceState();
   const { categorys } = useCategoryState();
@@ -211,7 +214,7 @@ const CategoryProductList = ({ user }) => {
     setMobileOpenFilter(!mobileOpenFilter);
   };
 
-  const addItemToCart = (product, quantity) => {
+  const addItemToCart = async (product, quantity) => {
     if (product.ownerCommonName === user?.commonName) {
       openToast("bottom", true, "Cannot buy your own item")
       return false;
@@ -225,22 +228,36 @@ const CategoryProductList = ({ user }) => {
     }
     let items = [];
     if (!found) {
+      // TODO: Fix these toast messages, currently not throwing the errors
       items = [...cartList, { product, qty: quantity }];
-      marketplaceActions.addItemToCart(marketplaceDispatch, items);
-
-      openToast("bottom", false, "Item added to cart");
-      return true;
+      const quantityCheck = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [2000])
+      if (quantityCheck === true){
+        marketplaceActions.addItemToCart(marketplaceDispatch, items);
+  
+        openToast("bottom", false, "Item added to cart");
+        return true;
+      } else {
+        openToast("bottom", true, `Currently available quantity for ${product.name}: ${quantityCheck.availableQuantity}`)
+        return false
+      }
     } else {
       items = [...cartList];
-      cartList.forEach((element, index) => {
+      cartList.forEach(async (element, index) => {
         if (element.product.address === product.address) {
           const availableQuantity = product.saleQuantity ? product.saleQuantity : 1;
           if (items[index].qty + 1 <= availableQuantity) {
             items[index].qty += 1;
-            marketplaceActions.addItemToCart(marketplaceDispatch, items);
 
-            openToast("bottom", false, "Item updated in cart");
-            return true;
+            const quantityCheck = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [2000])
+            if (quantityCheck === true){
+              marketplaceActions.addItemToCart(marketplaceDispatch, items);
+        
+              openToast("bottom", false, "Item updated in cart");
+              return true;
+            } else {
+              openToast("bottom", true, `Currently available quantity for ${product.name}: ${quantityCheck.availableQuantity}`)
+              return false
+            }
           } else {
             openToast(
               "bottom",
