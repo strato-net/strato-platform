@@ -303,6 +303,7 @@ pipeline {
               }
               post {
                 always {
+                  sh 'sudo docker system prune -fa' // remove older unused images to save diskspace
                   dir('strato-getting-started') {
                     sh 'sudo rm -rf strato_logs*'
                     sh 'sudo ./fetchlogs --as-dir'
