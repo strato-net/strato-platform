@@ -7,7 +7,7 @@ WORKDIR /usr/src/ui/
 FROM base as yarninstaller
 COPY package*.json /usr/src/ui/
 COPY yarn.lock /usr/src/ui/
-RUN yarn install
+RUN yarn install --frozen-lockfile
 
 ### Builder
 FROM yarninstaller as builder
@@ -16,6 +16,7 @@ RUN REACT_APP_IN_DOCKER=true REACT_APP_UI_VERSION=$(node -e "console.log(require
 
 ### Prod
 FROM base as prod
+ENV NODE_ENV=production
 COPY docker-run.sh /usr/src/ui/
 COPY --from=builder /usr/src/ui/build build/
 EXPOSE 3003
@@ -28,5 +29,5 @@ CMD [ "sh", "/usr/src/ui/docker-run.sh" ]
 FROM base as test
 COPY . /usr/src/ui/
 COPY --from=yarninstaller /usr/src/ui/node_modules /usr/src/ui/node_modules/
-RUN yarn install
+RUN yarn install --frozen-lockfile
 RUN yarn test
