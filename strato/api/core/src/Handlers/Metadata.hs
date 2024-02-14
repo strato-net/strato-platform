@@ -27,6 +27,7 @@ import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
+import Blockchain.Strato.Model.Options (computeNetworkID)
 import Blockchain.Strato.Model.Secp256k1 hiding (HasVault (..))
 import Blockchain.Strato.RedisBlockDB (getSyncStatusNow, runStratoRedisIO)
 import Control.Lens
@@ -53,7 +54,8 @@ data MetadataResponse = MetadataResponse
     nodeAddress :: Address,
     validators :: [ChainMemberParsedSet],
     isSynced :: Bool,
-    isVaultPasswordSet :: Bool
+    isVaultPasswordSet :: Bool,
+    networkID :: String -- cuz JSON can't rep integers > 2^53
   }
   deriving (Eq, Show, Generic, FromJSON, ToJSON)
 
@@ -85,6 +87,7 @@ exMetadataRespone =
         [CommonName "BlockApps" "Engineering" "Admin" True]
         True
         True
+        "0"
 
 -- | The model's field modifiers will match the JSON instances
 metadataSchemaOptions :: SchemaOptions
@@ -109,7 +112,7 @@ getMetaData =
     validators <- access (Proxy @[ChainMemberParsedSet])
     isSynced <- checkIsSynced
     V.AddressAndKey a k <- getPubKeyAndAddress
-    pure $ MetadataResponse k a validators isSynced True
+    pure $ MetadataResponse k a validators isSynced True (show computeNetworkID)
 
 blocVaultWrapper ::
   (MonadIO m, MonadLogger m, HasVault m, HasCallStack) =>

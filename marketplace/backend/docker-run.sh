@@ -6,7 +6,8 @@ export DEPLOY_FILE_NAME=marketplace.deploy.yaml
 export STRATO_NODE_PROTOCOL=${STRATO_NODE_PROTOCOL:-http}
 export STRATO_NODE_HOST=${STRATO_NODE_HOST:-nginx}
 export BASE_CODE_COLLECTION=${BASE_CODE_COLLECTION:-8f8d4cef7232db7001bae657db85eb4325ee2f3d} # Current deployment address on testnet2
-export NETWORK=${NETWORK:-mercata}
+export STRATO_HOSTNAME=${STRATO_HOSTNAME:-strato}
+export STRATO_PORT_API=${STRATO_PORT_API:-3000}
 
 echo "Waiting for STRATO to become available at ${STRATO_NODE_PROTOCOL}://${STRATO_NODE_HOST}/health ..."
 until curl --silent --output /dev/null --fail --location ${STRATO_NODE_PROTOCOL}://${STRATO_NODE_HOST}/health ; do sleep 0.5 ; done
@@ -120,9 +121,11 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
 
   mv /tmp/tmp.config.yaml ./config/generated.config.yaml
   
+  # note to self: possible api not up yet??
+  export networkID=$(curl --silent --fail ${STRATO_NODE_PROTOCOL}://${STRATO_HOSTNAME}:${STRATO_PORT_API}/eth/v1.2/metadata | jq -r .networkID) 
   touch .env
-  echo "STRIPE_PAYMENT_SERVER_URL = ${STRIPE_PAYMENT_SERVER_URL}" >> .env
-  echo "NETWORK = ${NETWORK}" >> .env
+  echo "STRIPE_PAYMENT_SERVER_URL=${STRIPE_PAYMENT_SERVER_URL}" >> .env
+  echo "networkID=${networkID}" >> .env
   
   if test -f "${CONFIG_DIR_PATH}/${DEPLOY_FILE_NAME}"; then
     echo "deploy file exists - secondary node - nothing to deploy"

@@ -1,21 +1,13 @@
 import { AMEX, Discover, Mastercard, VISA, BANK } from "../images/SVGComponents";
 
+export const networkIds = {
+  prodNetworkId: "6909499098523985262",
+  testnetNetworkId: "7596898649924658542",
+}
+
 export const apiUrl = process.env.REACT_APP_URL
   ? process.env.REACT_APP_URL + "/api/v1"
   : "/api/v1";
-
-const deriveFileUrl = function(envFileUrl, envNetwork){
-  if (envFileUrl !== '')
-    return envFileUrl;
-  else if (envNetwork === 'mercata')
-    return 'https://fileserver.mercata.blockapps.net/highway/';
-  else if (envNetwork === 'mercata-hydrogen')
-    return 'https://fileserver.mercata-testnet2.blockapps.net/highway/';
-  else 
-    throw new Error("File server was not specified and undeducible from given information");
-}
-
-export const fileServerUrl = deriveFileUrl(process.env.FILE_SERVER_URL, process.env.NETWORK)
 
 export const cirrusUrl = process.env.REACT_APP_URL
   ? process.env.REACT_APP_URL + "/cirrus/search"

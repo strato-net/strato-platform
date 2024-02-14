@@ -1,6 +1,3 @@
-import { getEnvVariable } from 'helpers/utils';
-import config from '/load.config';
-
 export default {
   baseUrl: `/api/v1`,
   deployParamName: "deploy",
@@ -32,19 +29,6 @@ export default {
   prodStratsAddress: "b220195543f652f735b7847c4af399d0323e1ff6",
   testnetStratsAddress: "488cd3909d94606051e0684cf6caa5763fb78613"
 };
-
-const derivePaymentUrl = function(envPaymentUrl, envNetwork){
-  if (envPaymentUrl !==  '')
-    return envPaymentUrl;
-  else if (envNetwork === 'mercata')
-    return 'https://payments.mercata.blockapps.net';
-  else if (envNetork === 'mercata-hydrogen')
-    return 'https://payments.mercata-testnet2.blockapps.net';
-  else 
-    throw new Error("Payment server was not specified and undeducible from given information");
-}
-
-export const STRIPE_PAYMENT_SERVER_URL = derivePaymentUrl(getEnvVariable('STRIPE_PAYMENT_SERVER_URL'), getEnvVariable('NETWORK'))
 
 export const unitOfMeasurement = {}
 unitOfMeasurement[unitOfMeasurement['LB'] = 1] = 'LB';
