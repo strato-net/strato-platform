@@ -7,7 +7,6 @@ BLOCK_TIME_MULTIPLIER_FOR_TIMEOUT=10
 blockTime=${blockTime:-13} # keep default the same as strato
 ssl=${ssl:-false}
 sslCertFileType=${sslCertFileType:-pem}
-OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-NULL}
 OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-NULL}
 OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
 OAUTH_SCOPE=${OAUTH_SCOPE:-openid email profile}
@@ -37,9 +36,27 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ########
   ### Check the validity of variables combination
   ########
-  if [[ ${OAUTH_DISCOVERY_URL} = NULL || ${OAUTH_CLIENT_ID} = NULL || ${OAUTH_CLIENT_SECRET} = NULL ]] ; then
-    echo 'OAUTH_DISCOVERY_URL, OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET are required for OAuth. Exit'
-    exit 5
+  if [[ ${OAUTH_CLIENT_ID} = NULL || ${OAUTH_CLIENT_SECRET} = NULL ]] ; then
+    echo 'OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET are required for OAuth. Exit'
+    exit 4
+  elif [[ -z ${OAUTH_DISCOVERY_URL} ]]; then
+    # oauth discovery url not provided so try derive based on network id
+    # make sure strato api is up first
+    ETH_ENDPOINT=http://${STRATO_HOSTNAME}:${STRATO_PORT_API}/eth/v1.2
+    until curl --silent --output /dev/null --fail --location ${ETH_ENDPOINT}/uuid
+    do
+      echo "  Check at $(date)"
+      sleep 1
+    done
+    networkID=$(curl --silent --fail ${ETH_ENDPOINT}/metadata | jq -r .networkID)
+    if [ "${networkID}" == "6909499098523985262" ]; then # PROD
+      OAUTH_DISCOVERY_URL="https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration"
+    elif [ "${networkID}" == "7596898649924658542" ]; then # TESTNET
+      OAUTH_DISCOVERY_URL="https://keycloak.blockapps.net/auth/realms/mercata-testnet2/.well-known/openid-configuration"
+    else 
+      echo "OAUTH_DISCOVERY_URL was not provided and could not be derived"
+      exit 5
+    fi
   fi
   if ! curl --silent --output /dev/null --fail --location ${OAUTH_DISCOVERY_URL}
   then

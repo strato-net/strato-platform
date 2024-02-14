@@ -13,6 +13,9 @@ echo "Waiting for STRATO to become available at ${STRATO_NODE_PROTOCOL}://${STRA
 until curl --silent --output /dev/null --fail --location ${STRATO_NODE_PROTOCOL}://${STRATO_NODE_HOST}/health ; do sleep 0.5 ; done
 echo 'STRATO is available via nginx'
 
+# note to self: possible api not up yet??
+export networkID=$(curl --silent --fail ${STRATO_NODE_PROTOCOL}://${STRATO_HOSTNAME}:${STRATO_PORT_API}/eth/v1.2/metadata | jq -r .networkID) 
+
 # Validate configuration
 if [ "${MP_IS_BOOTNODE}" = "false" ]; then
   if [ ! -f "${CONFIG_DIR_PATH}/${DEPLOY_FILE_NAME}" ]; then
@@ -70,8 +73,14 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
   fi
   
   if [ -z "${OAUTH_OPENID_DISCOVERY_URL}" ]; then
-    echo "OAUTH_OPENID_DISCOVERY_URL is empty but is a required value"
-    exit 14
+    if [ "${networkID}" == "6909499098523985262" ]; then # prod network id
+      OAUTH_OPENID_DISCOVERY_URL="https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration"
+    elif [ "${networkID}" == "7596898649924658542" ]; then # testnet network id
+      OAUTH_OPENID_DISCOVERY_URL="https://keycloak.blockapps.net/auth/realms/mercata-testnet2/.well-known/openid-configuration"
+    else
+      echo "OAUTH_OPENID_DISCOVERY_URL was empty and could not be derived"
+      exit 14
+    fi
   fi
   
   if [ -z "${OAUTH_CLIENT_ID}" ]; then
@@ -121,8 +130,6 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
 
   mv /tmp/tmp.config.yaml ./config/generated.config.yaml
   
-  # note to self: possible api not up yet??
-  export networkID=$(curl --silent --fail ${STRATO_NODE_PROTOCOL}://${STRATO_HOSTNAME}:${STRATO_PORT_API}/eth/v1.2/metadata | jq -r .networkID) 
   touch .env
   echo "STRIPE_PAYMENT_SERVER_URL=${STRIPE_PAYMENT_SERVER_URL}" >> .env
   echo "networkID=${networkID}" >> .env

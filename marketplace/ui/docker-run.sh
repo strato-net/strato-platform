@@ -1,10 +1,9 @@
 #!/usr/bin/env sh
 SITE_ID=${SITE_ID:-}
 
-export STRATO_NODE_PROTOCOL=${STRATO_NODE_PROTOCOL:-http}
 export STRATO_HOSTNAME=${STRATO_HOSTNAME:-strato}
 export STRATO_PORT_API=${STRATO_PORT_API:-3000}
-export ETH_ENDPOINT=${STRATO_NODE_PROTOCOL}://${STRATO_HOSTNAME}:${STRATO_PORT_API}/eth/v1.2
+export ETH_ENDPOINT=http://${STRATO_HOSTNAME}:${STRATO_PORT_API}/eth/v1.2
 echo 'Waiting for Strato api to be available...'
 until curl --silent --output /dev/null --fail --location ${ETH_ENDPOINT}/uuid
 do
