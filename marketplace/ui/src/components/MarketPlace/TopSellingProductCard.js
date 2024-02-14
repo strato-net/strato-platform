@@ -75,14 +75,14 @@ const TopSellingProductCard = () => {
     let items = [];
     if (!found) {
       items = [...cartList, { product, qty: quantity }];
-      const quantityCheck = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity])
-      if (quantityCheck === true){
+      const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity])
+      if (checkQuantity === true){
         actions.addItemToCart(marketplaceDispatch, items);
   
         openToast("bottom", false, "Item added to cart");
         return true;
       } else {
-        openToast("bottom", true, `Currently available quantity for ${product.name}: ${quantityCheck[0].availableQuantity}`)
+        openToast("bottom", true, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantiy to continue.`)
         return false
       }
 
@@ -93,14 +93,14 @@ const TopSellingProductCard = () => {
           const availableQuantity = product.saleQuantity ? product.saleQuantity : 1;
           if (items[index].qty + 1 <= availableQuantity) {
             items[index].qty += 1;
-            const quantityCheck = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity])
-            if (quantityCheck === true){
+            const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity])
+            if (checkQuantity === true){
               actions.addItemToCart(marketplaceDispatch, items);
         
               openToast("bottom", false, "Item updated in cart");
               return true;
             } else {
-              openToast("bottom", true, `Currently available quantity for ${product.name}: ${quantityCheck[0].availableQuantity}`)
+              openToast("bottom", true, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantiy to continue.`)
               return false
             }
           } else {

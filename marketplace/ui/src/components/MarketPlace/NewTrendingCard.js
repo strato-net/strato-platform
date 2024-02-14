@@ -116,7 +116,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                                     productId: topSellingProduct.productId
                                 },
                             });
-                            if (addItemToCart(topSellingProduct, quantity)) {
+                            if (addItemToCart(topSellingProduct, quantity) === true) {
                                 navigate("/checkout")
                             }
                         }

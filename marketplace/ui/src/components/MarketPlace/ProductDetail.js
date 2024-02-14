@@ -379,12 +379,12 @@ const ProductDetails = ({ user, users }) => {
                             },
                           });
 
-                          const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, details.saleAddress, qty)
+                          const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [details.saleAddress], [qty])
                           if (checkQuantity === true) {
                             addItemToCart();
                             navigate("/checkout");
                           } else {
-                            openToast("bottom", true, `Currently available quantity for ${details.name}: ${checkQuantity[0].availableQuantity}`)
+                            openToast("bottom", true, `Currently available quantity for ${details.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantiy to continue.`)
                           }
                         }
                       }}
@@ -424,11 +424,11 @@ const ProductDetails = ({ user, users }) => {
                                 productId: details?.productId
                               },
                             });
-                            const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, details.saleAddress, qty)
+                            const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [details.saleAddress], [qty])
                             if (checkQuantity === true) {
                               addItemToCart();
                             } else {
-                              openToast("bottom", true, `Currently available quantity for ${details.name}: ${checkQuantity[0].availableQuantity}`)
+                              openToast("bottom", true, `Currently available quantity for ${details.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantiy to continue.`)
                             }
                           }
                         }}
@@ -461,11 +461,11 @@ const ProductDetails = ({ user, users }) => {
                                 productId: details?.productId
                               },
                             });
-                            const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, details.saleAddress, qty)
+                            const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [details.saleAddress], [qty])
                             if (checkQuantity === true) {
                               addItemToCart();
                             } else {
-                              openToast("bottom", true, `Currently available quantity for ${details.name}: ${checkQuantity[0].availableQuantity}`)
+                              openToast("bottom", true, `Currently available quantity for ${details.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantiy to continue.`)
                             }
                           }
                         }}

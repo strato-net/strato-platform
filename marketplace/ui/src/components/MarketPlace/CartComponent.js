@@ -133,6 +133,7 @@ const CartComponent = ({ columns, data, openToastOrder }) => {
                                             checkQuantity.forEach(detail => {
                                             insufficientItemsMessage += `(${detail.assetName}-Available Quantity: ${detail.availableQuantity})\n`;
                                             });
+                                            insufficientItemsMessage += "Try lowering the quantiy to continue."
 
                                             openToastOrder("bottom", insufficientItemsMessage)
                                         }
