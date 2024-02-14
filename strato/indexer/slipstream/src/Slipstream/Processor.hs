@@ -374,23 +374,22 @@ processTheMessages env conn messages = do
                     aiChain = cid
                   }
               cont = error "internal error: contract should be unused for SolidVM"
-          $logInfoS "Contract name is: " $ T.pack $ show name
+          $logDebugLS "Contract name is: " $ T.pack $ show name
           oldState <- readPreviousSolidVMState g acct
           indexContract <- rowToInsert g abiid row cont oldState
-          $logInfoS "Contract is: " $ T.pack $ show indexContract
           hs <- rowToHistories g abiid actions cont oldState
           let mapNames = actionMappings row
               abstracts = actionAbstracts row
           --get columns for abstract table
-          $logInfoS "abstractColumns" $ T.pack $ "Getting abstract columns from " ++ (show abstracts)
+          $logDebugLS "abstractColumns" $ T.pack $ "Getting abstract columns from " ++ (show abstracts)
           abstractColumns <- fmap catMaybes . for (Map.toList abstracts) $ \((_, n'), (o', a')) -> do
             let tableName = AbstractTableName o' a' n'
                 tableNameText = tableNameToDoubleQuoteText tableName
             $logInfoS "Row will be inserted into abstract table: " tableNameText
             mCols <- getTableColumns g tableName
             pure $ (indexContract,tableNameText,) . map extractTextInsideQuotes <$> mCols
-          $logInfoS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
-          $logInfoS "History inserts are: " $ T.pack $ show hs
+          $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
+          $logDebugLS "History inserts are: " $ T.pack $ show hs
           stateDiff <- rowToMappings row
           pMappings <- processedContractToProcessedMappingRows stateDiff (mapNames) row abiid --get all mapping rows to insert
           pure . Right $ BatchedInserts indexContract abstractColumns hs pMappings

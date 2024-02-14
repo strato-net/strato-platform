@@ -365,21 +365,12 @@ getDeferredForeignKeysAbstract ::
   (MonadLogger m) =>
   TableName -> ContractF () -> Text -> Text -> Map.Map (Account, Text) (Text, Text) -> CodeCollectionF () -> m [ForeignKeyInfo]
 getDeferredForeignKeysAbstract tableName c o a abstracts' cc = do
-  -- Log at the start
-  $logDebugS "getDeferredForeignKeysAbstract: Start" . T.pack $
-    "tableName: " ++ show tableName ++ ", c: " ++ show c ++ ", o: " ++ show o ++
-    ", a: " ++ show a ++ ", abstracts': " ++ show abstracts' ++ ", cc: " ++ show cc
   result <- fmap catMaybes . for [(theName, x) | (theName, VariableDecl {_varType = SVMType.UnknownLabel x _}) <- Map.toList (c ^. storageDefs)] $ \(theName, x) -> do
-      let contract = getContractsBySolidString x cc
-      $logDebugS "getDeferredForeignKeysAbstract: x" . T.pack $ show x
-      $logDebugS "getDeferredForeignKeysAbstract: cc" . T.pack $ show cc
-      $logDebugS "getDeferredForeignKeysAbstract: contract" . T.pack $ show contract
       case contract of
               Just c' -> do
                 let enumExists = isJust $ Map.lookup (_contractName c') (_enums c')
                 if enumExists
                 then do
-                  $logDebugS "getDeferredForeignKeysAbstract: Enum with the same name as contract found, skipping fkey creation" . T.pack $ _contractName c'
                   return Nothing
                 else do
                   let (o',a',n') = case _importedFrom c' of
@@ -387,18 +378,12 @@ getDeferredForeignKeysAbstract tableName c o a abstracts' cc = do
                                     Just acct -> case Map.lookup (acct, T.pack $ _contractName c') abstracts' of
                                       Nothing -> (o, a, _contractName c')
                                       Just (o'', a'') -> (o'', a'', _contractName c')
-                  $logDebugS "getDeferredForeignKeysAbstract: (o',a',n')" . T.pack $ show (o',a',n')
-                  $logDebugS "getDeferredForeignKeysAbstract: tableName" . T.pack $ show tableName
-                  $logDebugS "getDeferredForeignKeysAbstract:   theName" . T.pack $ show theName
-                  $logDebugS "getDeferredForeignKeysAbstract: abstractTableName o' a' $ T.pack n'" . T.pack $ show $ abstractTableName o' a' $ T.pack n'
                   pure $ Just $ ForeignKeyInfo
                     { tableName = tableName,
                       columnName = labelToText theName,
                       foreignTableName = abstractTableName o' a' $ T.pack n'
                       }
               Nothing -> return Nothing
-  -- Log at the end
-  $logDebugS "getDeferredForeignKeysAbstract: End" . T.pack $ "Result: " ++ show result
   return result
 
 
