@@ -22,6 +22,7 @@ import Event from "./components/Event";
 import EventDetails from "./components/Event/EventDetails";
 import { EventsProvider } from "./contexts/event";
 import { UsersProvider } from "./contexts/users";
+import { UserActivityProvider } from "./contexts/userActivity";
 import EventList from "./components/Inventory/EventList";
 import InventoryEventDetails from "./components/Inventory/EventDetail";
 import Certifier from "./components/Certifier";
@@ -242,7 +243,9 @@ const AuthenticatedRoutes = ({ user, users }) => {
                 <SubCategorysProvider>
                   <InventoriesProvider>
                     <ItemsProvider>
-                      <UserProfile user={user} users={users} />
+                      <UserActivityProvider>
+                        <UserProfile user={user} users={users} />
+                      </UserActivityProvider>
                     </ItemsProvider>
                   </InventoriesProvider>
                 </SubCategorysProvider>

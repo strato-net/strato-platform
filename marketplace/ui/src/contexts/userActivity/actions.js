@@ -16,12 +16,13 @@ const actions = {
     dispatch({ type: actionDescriptors.setMessage, message, success });
   },
 
-  fetchUserActivity: async (dispatch) => {
+  fetchUserActivity: async (dispatch, body) => {
     dispatch({ type: actionDescriptors.fetchUserActivity });
-
+    const { user, gtValue, gtField } = body
+    console.log("body", body)
     try {
       const ordersSold = await fetch(
-        `${apiUrl}/`,
+        `${apiUrl}/userActivity?sellersCommonName=${user}&gtValue=${gtValue}&gtField=${gtField}&purchasersCommonName=${user}&newOwnerCommonName=${user}`,
         {
           method: HTTP_METHODS.GET,
         }
