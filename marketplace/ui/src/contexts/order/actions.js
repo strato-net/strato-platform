@@ -86,7 +86,7 @@ const actions = {
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
           type: actionDescriptors.createOrderFailed,
-          error: "Unauthorized while creating Order"
+          error: "Error while creating Order"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -131,23 +131,23 @@ const actions = {
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
           type: actionDescriptors.createPaymentFailed,
-          error: "Error while redirecting to checkout page"
+          error: "Error while creating Order"
         });
         window.location.href = body.error.loginUrl;
       }
 
       dispatch({
         type: actionDescriptors.createPaymentFailed,
-        error: "Error while redirecting to checkout page",
+        error: "Error while creating Order",
       });
-      actions.setMessage(dispatch, "Error while redirecting to checkout page");
+      actions.setMessage(dispatch, "Error while creating Order");
       return false;
     } catch (err) {
       dispatch({
         type: actionDescriptors.createPaymentFailed,
-        error: "Error while redirecting to checkout page",
+        error: "Error while creating Order",
       });
-      actions.setMessage(dispatch, "Error while redirecting to checkout page");
+      actions.setMessage(dispatch, "Error while creating Order");
     }
   },
 
