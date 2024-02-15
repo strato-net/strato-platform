@@ -14,7 +14,7 @@ export default {
   },
   MarketplaceUserProfile: {
     label: "Marketplace User Profile",
-    url: "/profile/:address",
+    url: "/profile/:commonName",
   },
   MarketplaceProductDetail: {
     label: "Marketplace Product Detail",

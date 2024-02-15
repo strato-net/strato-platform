@@ -350,7 +350,7 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, defaultOptions) {
-    const { range, ownerCommonName, assetAddresses, status, isMarketplaceSearch, isTrendingSearch, ...restArgs } = args;
+    const { range, ownerCommonName, assetAddresses, status, isMarketplaceSearch, userAddressForProfile, isUserProfile, userProfileGtField, userProfileGtValue, isTrendingSearch, ...restArgs } = args;//isUserProfile, userAddressForProfile,
     let inventories;
     let sales;
     let finalInventory = [];
@@ -367,7 +367,30 @@ async function getAll(admin, args = {}, defaultOptions) {
             {
                 address: trendingAssetAddresses,
             }, options, admin);
-    } else {
+    } 
+    else if(isUserProfile) {
+
+        console.log("inside inventory.js:",args)
+
+        //Fetch User address
+        // const user = await certificate.getCertificate(admin, {userAddress: '11c21cdf023498a02b8f66b472d6eab0302ad83a'}, options)
+
+        console.log("Fetched user from cert",userAddressForProfile)
+        //this fetches sales without filtering by the user--> need to pass transaction_sender: ownerAddress(Seller),
+         sales = await saleJs.getAll(admin, { range, isOpen: true, transaction_sender: userAddressForProfile, limit: args.limit, offset: args.offset, gtField: args.gtField, gtValue: args.gtValue, order: 'block_timestamp.desc'}, options); 
+        const userAssetAddresses = sales.map(sale => sale.assetToBeSold);
+
+        console.log("Assets inside isUserProfile",userAssetAddresses) //10 asset addresses received on testing
+        
+        // Match the inventory with the sales
+        inventories = await searchAllWithQueryArgs(contractName,
+            {
+                address: userAssetAddresses,
+            }, options, admin);
+
+            console.log("TOTAL INVENTORIES GOT",inventories)
+    }
+    else {
         // Original logic
         if (ownerCommonName) {
             inventories = await searchAllWithQueryArgs(contractName,
