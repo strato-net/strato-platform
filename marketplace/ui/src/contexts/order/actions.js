@@ -126,13 +126,12 @@ const actions = {
         dispatch({
           type: actionDescriptors.createPaymentSuccessful,
           payload: body.data,
-        });
-        actions.setMessage(dispatch, "Payment created successfully", true);
+        });        
         return body.data;
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
           type: actionDescriptors.createPaymentFailed,
-          error: "Unauthorized while creating Order"
+          error: "Error while creating Order"
         });
         window.location.href = body.error.loginUrl;
       }
