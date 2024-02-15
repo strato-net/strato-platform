@@ -87,7 +87,9 @@ const CategoryProductList = ({ user }) => {
     if (searchQueryValue) {
       baseUrl.searchParams.set('search', searchQueryValue);
     }
-
+    baseUrl.searchParams.set('minPrice', minPrice);
+    baseUrl.searchParams.set('maxPrice', maxPrice);
+    
     const url = baseUrl.pathname + baseUrl.search;
     navigate(url);
     setSelectedCategories(checkedValues);
