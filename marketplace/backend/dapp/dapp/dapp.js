@@ -579,6 +579,34 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   // ------------------------------ SALE TEST ENDS ------------------------------
 
+  /* ------------------------ User Activity Starts ------------------------ */
+  contract.getAllUserActivity = async function (args, options = defaultOptions) {
+    const getOptions = { ...options, app: contractName };
+    const { sellersCommonName, gtField, gtValue, purchasersCommonName, newOwnerCommonName } = args
+
+    // Need to fetch purchases, closed orders, transfers for the user.
+    // New Purchases of User's Products---Fetch Orders with filters of sellersCommonName, block_timestamp and Order Status = AWAITING_FULFILLMENT (1) 
+    // TODO: Add logic to utils for gtField and gtValue. We are using these to filter the block timestamps greater than 10 days ago. 
+    const purchaseArgs = { sellersCommonName, status: 1}
+    const purchases = await saleOrderJs.getAll(rawAdmin, purchaseArgs, getOptions);
+
+    // These are my orders that ave been closed by a seller
+    // TODO: Add logic to utils for gtField and gtValue. We are using these to filter the block timestamps greater than 10 days ago. 
+    const orderArgs = { purchasersCommonName, status: 3}
+    const orders = await saleOrderJs.getAll(rawAdmin, orderArgs, getOptions);
+
+    // These are transfers the usre has recieved
+    // TODO: Add logic to utils for gtField and gtValue. We are using these to filter the block timestamps greater than 10 days ago. 
+    const transferArgs = {newOwnerCommonName};
+    const transfers = await inventoryJs.getAllItemTransferEvents(rawAdmin, transferArgs, getOptions);
+
+    // TODO: figure out how we want to arrange the data
+    return { soldOrders: purchases.orders, boughtOrders: orders.orders, transfers: transfers.transfers }
+
+  };
+
+  /* ------------------------ User Activity Ends------------------------ */
+
 
   /* ------------------------ Stripe account connect starts here ------------------------ */
   contract.stripeOnboarding = async function (args, options = defaultOptions) {

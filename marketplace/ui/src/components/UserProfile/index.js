@@ -19,6 +19,9 @@ const UserProfile = (user) => {
   const { Title, Text, Paragraph } = Typography;
 
   const userActivityDispatch = useUserActivityDispatch();
+  const { userActivity } = useUserActivityState()
+
+  console.log("userActiity", userActivity)
 
   // Temp values for body
   // Get the current date and time
@@ -34,15 +37,14 @@ const tenDaysAgoDate = new Date(currentDate.getTime() - tenDaysInMilliseconds);
 const tenDaysAgoTimestampSeconds = Math.floor(tenDaysAgoDate.getTime() / 1000);
 console.log(tenDaysAgoTimestampSeconds);
 
-  const body = {
-    user: "Vijay Rajasekaran",
-    gtField: "block_timestamp",
-    gtValue: tenDaysAgoTimestampSeconds,
-  }
-
   useEffect(() => {
+    const body = {
+      user: "Vijay Rajasekaran",
+      gtField: "block_timestamp",
+      gtValue: tenDaysAgoTimestampSeconds,
+    }
     userActivityActions.fetchUserActivity(userActivityDispatch, body)
-  });
+  }, [userActivityDispatch, tenDaysAgoTimestampSeconds]);
 
   // Mock data for the collection items
   const collectionItems = [

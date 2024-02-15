@@ -5,12 +5,11 @@ class UserActivityController {
   static async getAll(req, res, next) {
     try {
       const { dapp, query } = req
-     const orderRecieved = await dapp.
+      const userActivity = await dapp.getAllUserActivity({...query})
 
-      // const productsWithImageUrl = inventories?.inventoryResults.sort((a, b) => {
-      //   return b.saleDate.localeCompare(a.saleDate);
-      // });
-      rest.response.status200(res, { })
+      console.log("controller-userActivity", userActivity)
+
+      rest.response.status200(res, userActivity)
 
       return next()
     } catch (e) {
