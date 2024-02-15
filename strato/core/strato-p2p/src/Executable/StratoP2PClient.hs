@@ -34,15 +34,18 @@ import           Blockchain.Strato.Discovery.UDP
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.TCPClientWithTimeout
 import           Control.Concurrent hiding (yield)
-import           Control.Concurrent.SSem (SSem)
+--import           Control.Concurrent.SSem (SSem)
 import qualified Control.Concurrent.SSem as SSem
 import           Control.Exception.Base (ErrorCall (..))
 import           Control.Lens ((^.))
 import           Control.Monad (forever, unless, void)
 import qualified Control.Monad.Change.Alter as A
+import           Control.Monad.Change.Modify
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
+import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Resource
+import           Crypto.Types.PubKey.ECC
 import qualified Data.ByteString as B
 import           Data.Conduit
 import           Data.Either.Combinators
@@ -139,13 +142,18 @@ runPeerInList thePeer sSource = do
     Right () -> pure ()
   try $ runPeer thePeer sSource
 
---stratoP2PClient :: (MonadIO m, MonadP2P m, RunsClient m) => ((ConduitM () P2pEvent m () -> m ()) -> m ()) -> m ()
---stratoP2PClient :: (MonadP2P m, RunsClient m) => PeerRunner (LoggingT m) (LoggingT IO) () -> LoggingT IO ()
---stratoP2PClient runner = runner $ \sSource -> do
---stratoP2PClient :: LoggingT IO ()
---stratoP2PClient :: IO ()
---stratoP2PClient :: (MonadP2P m, RunsClient m, Control.Monad.Change.Modify.Accessible AvailablePeers (Control.Monad.Trans.Reader.ReaderT Config (ResourceT m))) => PeerRunner m (LoggingT IO) () -> LoggingT IO ()
-stratoP2PClient runner = runner $ \_ -> do
+stratoP2PClient :: ( Accessible BondedPeers (LoggingT IO)
+                   , Accessible AvailablePeers (ReaderT Config (ResourceT (LoggingT IO)))
+                   , Accessible BondedPeers (ReaderT Config (ResourceT (LoggingT IO)))
+                   , A.Replaceable (IPAsText, Point) PeerBondingState (ReaderT Config (ResourceT (LoggingT IO)))
+                   , A.Replaceable PPeer TcpEnableTime (ReaderT Config (ResourceT (LoggingT IO)))
+                   , A.Replaceable PPeer UdpEnableTime (ReaderT Config (ResourceT (LoggingT IO)))
+                   , A.Replaceable PPeer PeerDisable (ReaderT Config (ResourceT (LoggingT IO)))
+                   , A.Replaceable PPeer T.Text (ReaderT Config (ResourceT (LoggingT IO)))
+                   , A.Alters (IPAsText, TCPPort) ActivityState (ReaderT Config (ResourceT (LoggingT IO)))
+                   )
+                => LoggingT IO ()
+stratoP2PClient = do
   $logInfoS "stratoP2PClient" $ T.pack $ "maxConn: " ++ show flags_maxConn
   activePeersSem <- liftIO $ SSem.new flags_maxConn
   forever $ do
@@ -160,28 +168,23 @@ stratoP2PClient runner = runner $ \_ -> do
         $logInfoS "stratoP2PClient" "Waiting 5 seconds before looping over peers again"
         liftIO $ threadDelay 5000000
   where
---    multiThreadedClient :: (MonadP2P m, RunsClient m) => [PPeer] -> SSem -> ConduitM () P2pEvent (LoggingT m) () -> LoggingT m ()
---    multiThreadedClient [] _ _ = do
---    multiThreadedClient :: [PPeer] -> SSem -> LoggingT IO ()
---    multiThreadedClient :: (MonadP2P m, RunsClient m) => [PPeer] -> SSem -> m ()
     multiThreadedClient [] _ = do
       $logInfoS "stratoP2PClient/multiThreadedClient" "No available peers, will try again in 10 seconds"
       liftIO $ threadDelay 10000000
---    multiThreadedClient peers sem sSource = do
-    multiThreadedClient peers sem = do--runner $ \_ -> do
+    multiThreadedClient peers sem = do
       let notRunningPeers = filter ((== 0) . pPeerActiveState) peers
-      unless (null notRunningPeers) . void . forConcurrently notRunningPeers $ \p -> do
+      unless (null notRunningPeers) . void . forConcurrently notRunningPeers $ \p -> --do
         liftIO (SSem.tryWait sem) >>= \case
           Nothing -> return ()
           Just _  -> do
             wireMessagesRef <- liftIO $ newIORef empty
             cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
-            let sSource'  = seqEventNotificationSource $ contextKafkaState initContext
-                runner' f = runContextM cfg $ f sSource'
-            runner' $ \sSource'' -> do
-              result <- runPeerInList p sSource''
+            let sSource  = seqEventNotificationSource $ contextKafkaState initContext
+                runner f = runContextM cfg $ f sSource
+            runner $ \sSource' -> do
+              result <- runPeerInList p sSource'
               handleRunPeerResult p result
-            liftIO $ SSem.signal sem
+              liftIO $ SSem.signal sem
     handleRunPeerResult :: MonadP2P m => PPeer -> Either SomeException () -> m ()
     handleRunPeerResult thePeer = \case
       Left e | Just (ErrorCall x) <- fromException e -> error x

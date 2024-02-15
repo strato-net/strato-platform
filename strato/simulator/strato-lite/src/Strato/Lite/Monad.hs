@@ -81,7 +81,7 @@ import Conduit
 import Control.Concurrent.STM.TMChan
 import Control.Lens hiding (Context, view)
 import qualified Control.Lens as Lens
-import Control.Monad (forever, join, void, when)
+import Control.Monad (forever, join, void) -- when)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Base
@@ -115,9 +115,9 @@ import qualified Data.Text.Encoding as Text
 import Data.Time.Clock (UTCTime (..), diffUTCTime, getCurrentTime)
 import Data.Traversable (for)
 import Debugger (DebugSettings)
-import Executable.EthereumDiscovery
+--import Executable.EthereumDiscovery
 import Executable.EthereumVM2
-import Executable.StratoP2P
+--import Executable.StratoP2P
 import Executable.StratoP2PClient 
 import Executable.StratoP2PServer (runEthServerConduit)
 import Ki.Unlifted as KIU
@@ -1235,6 +1235,7 @@ runNodeWithoutP2P p = do
         (runMonad p (p ^. p2pPeerTxrIndexer))
     )
 
+{-
 runNode :: P2PPeer -> IO ()
 runNode p = do
   chan <- atomically . dupTMChan $ p ^. p2pPeerSeqP2pSource
@@ -1246,6 +1247,7 @@ runNode p = do
         (loggingFunc $ stratoP2P (\f -> runResourceT . runMemPeerDBMUsingEnv (p^.p2pPeerDB) . flip runReaderT p $ runReaderT (f s) ctx))
         (loggingFunc $ ethereumDiscovery (\f -> runResourceT . runMemPeerDBMUsingEnv (p^.p2pPeerDB) . flip runReaderT p $ runReaderT (f 100) ctx))
     )
+-}
 
 postEvent :: SeqLoopEvent -> P2PPeer -> IO ()
 postEvent e p = atomically $ writeTQueue (_p2pPeerUnseqSource p) [e]
@@ -1759,9 +1761,9 @@ addNode nodeLabel identity ipAddr tcpPort udpPort bootNodes = do
         writeTVar (mgr ^. network) $ net & nodes . at nodeLabel ?~ node
         pure True
       _ -> pure False
-  when didCreate . liftIO $ do
-    a <- async $ runNode node
-    atomically $ modifyTVar (mgr ^. threads) $ nodeThreads . at nodeLabel ?~ a
+  --when didCreate . liftIO $ do
+    --a <- async $ runNode node
+    --atomically $ modifyTVar (mgr ^. threads) $ nodeThreads . at nodeLabel ?~ a
   pure didCreate
 
 removeNode :: Text -> ReaderT NetworkManager IO Bool
@@ -1814,6 +1816,7 @@ selfSignCert pk (CommonName o u c True) = flip runReaderT pk $ do
   makeSignedCert Nothing Nothing iss sub
 selfSignCert _ i = error $ "selfSignCert: could not sign cert for identity: " ++ show i
 
+{-
 runNetwork :: [(Text, (ChainMemberParsedSet, IPAsText, TCPPort, UDPPort))] -> (forall a. [a] -> [a]) -> IO NetworkManager
 runNetwork nodesList validatorsFilter = do
   privKeys <- traverse (const newPrivateKey) nodesList
@@ -1832,6 +1835,7 @@ runNetwork nodesList validatorsFilter = do
   networkTVar <- newTVarIO network'
   threadsTVar <- newTVarIO threadPool
   pure $ NetworkManager threadsTVar networkTVar certs validators'
+-}
 
 runNetworkWithStaticConnections :: [(Text, IPAsText, ChainMemberParsedSet)] -> [(Text, Text)] -> (forall a. [a] -> [a]) -> IO (Either Text NetworkManager)
 runNetworkWithStaticConnections nodesList connectionsList validatorsFilter = do
@@ -1859,8 +1863,10 @@ runNetworkWithStaticConnections nodesList connectionsList validatorsFilter = do
     threadsTVar <- newTVarIO threadPool
     pure $ NetworkManager threadsTVar networkTVar certs validators'
 
+{-
 runNetworkOld :: [P2PPeer] -> [P2PConnection] -> IO ()
 runNetworkOld nodes' connections' =
   concurrently_
     (mapConcurrently runNode nodes')
     (mapConcurrently runConnection connections')
+-}

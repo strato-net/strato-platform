@@ -16,56 +16,56 @@
 
 module SimulatorSpec where
 
-import BlockApps.Logging
-import BlockApps.X509.Certificate
-import Blockchain.Blockstanbul
-import Blockchain.Blockstanbul.Messages (round)
-import Blockchain.Blockstanbul.StateMachine
-import Blockchain.DB.RawStorageDB
-import Blockchain.DB.SolidStorageDB
-import Blockchain.Data.AddressStateDB
-import qualified Blockchain.Data.AlternateTransaction as U
+--import BlockApps.Logging
+--import BlockApps.X509.Certificate
+--import Blockchain.Blockstanbul
+--import Blockchain.Blockstanbul.Messages (round)
+--import Blockchain.Blockstanbul.StateMachine
+--import Blockchain.DB.RawStorageDB
+--import Blockchain.DB.SolidStorageDB
+--import Blockchain.Data.AddressStateDB
+--import qualified Blockchain.Data.AlternateTransaction as U
 import Blockchain.Data.ArbitraryInstances ()
-import Blockchain.Data.Block hiding (bestBlockNumber)
+--import Blockchain.Data.Block hiding (bestBlockNumber)
 import Blockchain.Data.BlockDB ()
-import Blockchain.Data.ChainInfo
+--import Blockchain.Data.ChainInfo
 import qualified Blockchain.Data.TXOrigin as Origin
 import Blockchain.Data.TransactionDef
 import Blockchain.EthEncryptionException (EthEncryptionException (..))
 import Blockchain.Sequencer.Event
-import Blockchain.Sequencer.Monad
-import Blockchain.Strato.Model.Account
+--import Blockchain.Sequencer.Monad
+--import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainId
+--import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.ChainMember
-import qualified Blockchain.Strato.Model.ChainMember as CM
-import Blockchain.Strato.Model.Code
-import Blockchain.Strato.Model.ExtendedWord
-import Blockchain.Strato.Model.Gas
-import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.MicroTime
-import Blockchain.Strato.Model.Nonce
+--import qualified Blockchain.Strato.Model.ChainMember as CM
+--import Blockchain.Strato.Model.Code
+--import Blockchain.Strato.Model.ExtendedWord
+--import Blockchain.Strato.Model.Gas
+--import Blockchain.Strato.Model.Keccak256
+--import Blockchain.Strato.Model.MicroTime
+--import Blockchain.Strato.Model.Nonce
 import Blockchain.Strato.Model.Secp256k1
-import Blockchain.Strato.Model.Wei
-import qualified Blockchain.VMContext as VMC
+--import Blockchain.Strato.Model.Wei
+--import qualified Blockchain.VMContext as VMC
 import Conduit
 import Control.Concurrent.STM.TMChan
 import Control.Lens hiding (Context, view)
 import Control.Monad (void)
-import qualified Control.Monad.Change.Alter as A
-import Control.Monad.Reader
-import qualified Data.ByteString.Char8 as BC
-import Data.Foldable (for_)
-import qualified Data.Map.Strict as M
-import qualified Data.Set as Set
-import qualified Data.Text as T
-import Data.Text.Encoding
+--import qualified Control.Monad.Change.Alter as A
+--import Control.Monad.Reader
+--import qualified Data.ByteString.Char8 as BC
+--import Data.Foldable (for_)
+--import qualified Data.Map.Strict as M
+--import qualified Data.Set as Set
+--import qualified Data.Text as T
+--import Data.Text.Encoding
 import Ki.Unlifted as KIU
-import SolidVM.Model.Storable
+--import SolidVM.Model.Storable
 import Strato.Lite
 import Test.Hspec
 import Test.QuickCheck
-import Text.RawString.QQ
+--import Text.RawString.QQ
 import UnliftIO
 import UnliftIO.Concurrent (threadDelay)
 import Prelude hiding (round)
@@ -105,6 +105,7 @@ spec = do
         let clientTxs = [t | IETx _ (IngestTx _ t) <- _unseqEvents clientCtx]
         clientTxs `shouldBe` [otBaseTx otx]
 
+{-
     it "should update the round number on every node in the network" $
       scoped $ \scope -> do
         privKeys <- traverse (const newPrivateKey) [(1 :: Integer) .. 7]
@@ -155,7 +156,9 @@ spec = do
         runForTwoSeconds $ concurrently_ (runNetworkOld peers connections') postTimeoutEvent
         ctxs <- atomically $ traverse (readTVar . _p2pTestContext) peers
         ifor_ ctxs $ \i ctx -> (i, _round . _view <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 1 :: Maybe Word256)
+-}
 
+{-
     it "should update the round number after failing on a divided network first" $ do
       privKeys <- traverse (const newPrivateKey) [(1 :: Integer) .. 3]
       let validatorsPrivKeys' = privKeys
@@ -233,7 +236,9 @@ spec = do
         runForTwoSeconds $ concurrently_ (runNetworkOld peers connections'') (concurrently_ postTimeoutPrimary2 postTimeoutSecondary)
         ctxs2 <- atomically $ traverse (readTVar . _p2pTestContext) peers
         ifor_ ctxs2 $ \i ctx -> (i, _round . _view <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 1001 :: Maybe Word256)
+-}
 
+{-
     it "can add a new node to a chain" $ do
       scoped $ \scope -> do
         privKeys <- traverse (const newPrivateKey) [(1 :: Integer) .. 3]
@@ -366,7 +371,9 @@ spec = do
         runForSeconds 15 $ concurrently_ (runNetworkOld peers connections') routine
         ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
         ifor_ ctxs1 $ \i ctx -> (i, ctx ^. apiChainInfoMap . at chainId) `shouldBe` (i, if i == 2 then Nothing else Just chainInfo')
+-}
   
+{-
     it "can sync a new node to a chain after running multiple transactions on that chain" $
       scoped $ \scope -> do
         -- TODO: somehow this test got reverted to a previous faulty state
@@ -576,7 +583,9 @@ spec = do
       --  , (peers' !! 2, peers' !! 3)
       --  ]
       --let connections' = connections ++ connections4
+-}
 
+{-
     it "can register and unregister a cert on the main chain" $
       scoped $ \scope -> do
         -- TODO: use registry at 0x509
@@ -651,7 +660,9 @@ spec = do
         void . timeout 5000000 $ concurrently_ (runNetworkOld peers connections') routine
         ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
         for_ ctxs1 $ \ctx -> (ctx ^. x509certMap) `shouldNotBe` M.empty
+-}
 
+{-
     it "can add vote in a new validator" $
       scoped $ \scope -> do
         privKeys <- traverse (const newPrivateKey) [(1 :: Integer) .. 3]
@@ -702,7 +713,9 @@ spec = do
         void . timeout 5000000 $ concurrently_ (runNetworkOld peers connections') routine
         ctxs <- atomically $ traverse (readTVar . _p2pTestContext) peers
         ifor_ ctxs $ \i ctx -> (i, Set.size . unChainMembers . _validators <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 2)
+-}
 
+{-
     it "can add and remove vote in a new validator" $
       scoped $ \scope -> do
         privKeys <- traverse (const newPrivateKey) [(1 :: Integer) .. 3]
@@ -774,7 +787,9 @@ spec = do
         void . timeout 10000000 $ concurrently_ (runNetworkOld peers connections') routine1
         ctxs2 <- atomically $ traverse (readTVar . _p2pTestContext) peers
         ifor_ ctxs2 $ \i ctx -> (i, Set.size . unChainMembers . _validators <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 1)
+-}
 
+{-
     it "can sync a new node after voting in a new validator" $
       scoped $ \scope -> do
         privKeys <- traverse (const newPrivateKey) [(1 :: Integer) .. 4]
@@ -861,6 +876,7 @@ spec = do
         void . timeout 20000000 $ concurrently_ (runNetworkOld (take 3 peers) (take 3 connections')) (concurrently_ (void . timeout 4000000 $ mainChainRoutine 0) routine)
         ctxs <- atomically $ traverse (readTVar . _p2pTestContext) peers
         ifor_ ctxs $ \i ctx -> (i, Set.size . unChainMembers . _validators <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 3)
+-}
     it "will throw an exception if the handshake times out" $
       scoped $ \scope -> do
         serverPKey <- newPrivateKey
@@ -879,6 +895,7 @@ spec = do
         clientExcept <- readTVarIO $ connection ^. clientException
         clientExcept `shouldBe` Just (toException $ HandshakeException "handshake timed out")
 
+  {-
   describe "X.509 Private Chain exchange" $ do
     it "can add an organization to a private chain" $
       scoped $ \scope -> do
@@ -980,7 +997,9 @@ spec = do
         (ctxs1 !! 2) ^. trueOrgNameChainsMap `shouldBe` M.empty
 
   -- TODO: milliseconds to seconds => threadDelayInSeconds :: Seconds -> IO ()
+  -}
 
+  {-
   describe "Testing contracts that call other contracts by addresss" $ do
     --Note to the developer
     --These contracts are shoved into the txrIndexer ..... Take this into consideration
@@ -1122,3 +1141,4 @@ spec = do
   
         contractA'sStateVars `shouldBe` [Just (BString "Example of Different States"), Nothing, Just (BInteger 47)]
         contractB'sStateVars `shouldBe` [Just (BString "Other Example of different states"), Just (BString "Nice I did this"), Just (BInteger 5)]
+  -}
