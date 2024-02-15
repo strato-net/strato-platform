@@ -189,7 +189,9 @@ const ProcessingOrder = ({user}) => {
         }
       });
       actions.addItemToCart(marketplaceDispatch, updatedCart);
-      navigate(routes.Orders.url.replace(':type', 'bought'));      
+      setTimeout(() => {
+        navigate(routes.Orders.url.replace(':type', 'bought'));
+      }, 500);      
     } else {
       setTimeout(function () {
         navigate(routes.Checkout.url)
