@@ -58,6 +58,7 @@ const CategoryProductList = ({ user }) => {
   const [desktopOpenFilter, setDesktopOpenFilter] = useState(true);
   const [mobileOpenFilter, setMobileOpenFilter] = useState(false);
   const [search, setSearch] = useState(searchQueryValue)
+  const [unSelected, setUnSelected] = useState([])
 
   //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
@@ -89,7 +90,7 @@ const CategoryProductList = ({ user }) => {
     }
     baseUrl.searchParams.set('minPrice', minPrice);
     baseUrl.searchParams.set('maxPrice', maxPrice);
-    
+
     const url = baseUrl.pathname + baseUrl.search;
     navigate(url);
     setSelectedCategories(checkedValues);
@@ -100,7 +101,11 @@ const CategoryProductList = ({ user }) => {
   };
 
   useEffect(() => {
-    const selection = subCategorys.map(item => item.contract)
+    let selection = subCategorys.map(item => item.contract)
+    selection = selection.filter((item) => {
+      if (unSelected.includes(item)) { }
+      else { return item }
+    })
     setSelectedSubCategories(selection)
     setSubCategories(subCategorys);
   }, [subCategorys]);
@@ -115,6 +120,32 @@ const CategoryProductList = ({ user }) => {
 
   const onChangeSubCategory = (e) => {
     let valuesChecked = checkValues(e, selectedSubCategories)
+    const unSelectedSubCat = subCategorys.filter((item) => {
+      if(valuesChecked.includes(item.contract)){}
+      else{ return item }
+    }).map(item => item.contract)
+
+    if(unSelectedSubCat.includes("CarbonDAO") && unSelectedSubCat.includes("CarbonOffset")){
+      const baseUrl = new URL('/category', window.location.origin);
+      const categoryData = selectedCategories.filter(item=>item!=="Carbon")
+      const selectedCategory = categoryData.join(',')
+
+      if (selectedCategory) {
+        baseUrl.searchParams.set('category', selectedCategory);
+      }
+      if (search) {
+        baseUrl.searchParams.set('search', search);
+      }
+      baseUrl.searchParams.set('minPrice', minPrice);
+      baseUrl.searchParams.set('maxPrice', maxPrice);
+
+      const url = baseUrl.pathname + baseUrl.search;
+      setUnSelected([])
+      setSelectedCategories(categoryData)
+      navigate(url, { replace: true });
+    }
+
+    setUnSelected(unSelectedSubCat)
     setSelectedSubCategories(valuesChecked);
   };
 
@@ -166,7 +197,7 @@ const CategoryProductList = ({ user }) => {
       if (categoryQueryValue) {
         baseUrl.searchParams.set('category', categoryQueryValue);
       }
-      if(search){
+      if (search) {
         baseUrl.searchParams.set('search', search);
       }
       baseUrl.searchParams.set('minPrice', minPrice);
@@ -189,7 +220,7 @@ const CategoryProductList = ({ user }) => {
   };
 
   const handleClearFilter = () => {
-    const isFilter =  selectedCategories.length != 0 || selectedSubCategories.length != 0
+    const isFilter = selectedCategories.length != 0 || selectedSubCategories.length != 0
       || minPrice !== 0 || maxPrice !== MAX_PRICE
     if (isFilter) {
       const baseUrl = new URL('/category', window.location.origin);
