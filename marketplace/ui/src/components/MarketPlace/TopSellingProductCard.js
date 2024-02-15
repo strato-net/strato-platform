@@ -62,59 +62,47 @@ const TopSellingProductCard = () => {
 
   const addItemToCart = async (product, quantity) => {
     if (product.ownerCommonName === user?.commonName) {
-      openToast("bottom", true, "Cannot buy your own item")
+      openToast("bottom", true, "Cannot buy your own item");
       return false;
     }
-    let found = false;
-    for (var i = 0; i < cartList.length; i++) {
-      if (cartList[i].product.address === product.address) {
-        found = true;
-        break;
-      }
-    }
-    let items = [];
-    if (!found) {
-      items = [...cartList, { product, qty: quantity }];
-      const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity])
-      if (checkQuantity === true){
-        actions.addItemToCart(marketplaceDispatch, items);
   
+    // Search for the product in the cart
+    let foundIndex = cartList.findIndex((item) => item.product.address === product.address);
+    let items = [...cartList]; 
+  
+    if (foundIndex === -1) {
+      // Product not found, check quantity before adding
+      const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity]);
+      if (checkQuantity === true) {
+        // Quantity check passed, add new item to the cart
+        items.push({ product, qty: quantity });
+        actions.addItemToCart(marketplaceDispatch, items);
         openToast("bottom", false, "Item added to cart");
         return true;
       } else {
-        openToast("bottom", true, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantiy to continue.`)
-        return false
+        // Not enough quantity, inform the user
+        openToast("bottom", true, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantity to continue.`);
+        return false;
       }
-
     } else {
-      items = [...cartList];
-      cartList.forEach(async (element, index) => {
-        if (element.product.address === product.address) {
-          const availableQuantity = product.saleQuantity ? product.saleQuantity : 1;
-          if (items[index].qty + 1 <= availableQuantity) {
-            items[index].qty += 1;
-            const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity])
-            if (checkQuantity === true){
-              actions.addItemToCart(marketplaceDispatch, items);
-        
-              openToast("bottom", false, "Item updated in cart");
-              return true;
-            } else {
-              openToast("bottom", true, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantiy to continue.`)
-              return false
-            }
-          } else {
-            openToast(
-              "bottom",
-              true,
-              "Cannot add more than available quantity"
-            );
-            return false;
-          }
-        }
-      });
+      // Product found, prepare to update quantity after check
+      const potentialNewQty = items[foundIndex].qty + quantity;
+      const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [potentialNewQty]);
+      if (checkQuantity === true) {
+        // Quantity check passed, update item quantity in the cart
+        items[foundIndex].qty = potentialNewQty;
+        actions.addItemToCart(marketplaceDispatch, items);
+        openToast("bottom", false, "Item updated in cart");
+        return true;
+      } else {
+        // Not enough quantity, inform the user
+        openToast("bottom", true, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantity to continue.`);
+        return false;
+      }
     }
   };
+  
+  
 
   const [prevVisible, setPrevVisible] = useState(false);
   const [nextVisible, setNextVisible] = useState(true);
