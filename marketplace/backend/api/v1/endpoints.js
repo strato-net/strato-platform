@@ -182,4 +182,7 @@ export const PaymentService = {
   stripeWebhookConnect: '/stripe/webhook/connect',
 }
 
-
+export const UserActivity = {
+  prefix: '/userActivity',
+  getAll: '/',
+}

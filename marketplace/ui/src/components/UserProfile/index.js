@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Button, Avatar, Tabs, Input } from 'antd';
-import { EditOutlined } from '@ant-design/icons';
+import { Card, Button, Avatar, Tabs, Input, Row, Col, Typography } from 'antd';
+import { EditOutlined, ShoppingCartOutlined } from '@ant-design/icons';
 import { UserOutlined } from '@ant-design/icons';
 import { Images } from "../../images";
 import routes from "../../helpers/routes";
 import { useLocation, useMatch } from "react-router-dom";
 import { useInventoryDispatch } from '../../contexts/inventory';
-
 
 
 const UserProfile = (user) => {
@@ -16,6 +15,7 @@ const [activeTab, setActiveTab] = useState('1');
 const dispatch = useInventoryDispatch();
 
 const { TabPane } = Tabs;
+const {Title, Text, Paragraph} = Typography
 
 
 
@@ -137,6 +137,23 @@ useEffect(() => {
         <TabPane tab="Activity" key="2">
     
          {/* Activity Content */}
+         <Row>
+          <Col xs={24} md={24} xl={24} xxl={12}>
+          <Row>
+            <Col xs={4} xl={2} className='text-2xl'><ShoppingCartOutlined /></Col>
+            <Col xs={20} xxl={22}>
+            <Row className='flex justify-between'>
+            <Title level={5} className='p-1'>Invoice Downloaded</Title>
+            <Text type="secondary" className='p-1' > 04 min ago </Text>
+            </Row>
+            <Row>
+              <Paragraph> You have changed the order close date for order You have changed the order close date for order </Paragraph>
+              <a href=''> Review Now </a>
+            </Row>
+            </Col>
+          </Row>
+          </Col>
+         </Row>
      
         </TabPane>
      
