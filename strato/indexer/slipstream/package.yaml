@@ -58,6 +58,7 @@ library:
     - unliftio
     - unliftio-core
     - vm-tools
+    - ordered-containers
 
 executables:
   slipstream:
@@ -103,3 +104,4 @@ tests:
       - time
       - unliftio
       - vm-tools
+      - ordered-containers

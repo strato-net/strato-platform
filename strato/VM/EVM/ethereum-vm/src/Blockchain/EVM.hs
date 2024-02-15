@@ -55,7 +55,7 @@ import Blockchain.VMOptions
 import Clockwork
 import Control.Arrow ((&&&))
 import Control.DeepSeq
-import Control.Lens (at, mapped, (%~), (.~), (^.))
+import Control.Lens (mapped, (%~), (.~), (^.))
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
@@ -67,6 +67,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Short as BSS
+import qualified Data.Map.Ordered as OMap
 import Data.Char
 import Data.Data
 import Data.Foldable (traverse_)
@@ -395,7 +396,7 @@ runOperation SSTORE = do
   let ins = \case
         Action.EVMDiff m -> Action.EVMDiff $ M.insert p val m
         _ -> error "SolidVM Diff executing in EVM"
-  vmstateModify $ action . Action.actionData . at owner . mapped . Action.actionDataStorageDiffs %~ ins
+  vmstateModify $ action . Action.actionData . Action.omapLens owner . mapped . Action.actionDataStorageDiffs %~ ins
 
 --TODO- refactor so that I don't have to use this -1 hack
 runOperation JUMP = do
@@ -1152,14 +1153,14 @@ create
 create' :: EVMBase m => VMM m Code
 create' = do
   owner <- getEnvVar envOwner
-  vmstateModify $ action . Action.actionData %~ M.insert owner (Action.ActionData (EVMCode $ unsafeCreateKeccak256FromWord256 0) mempty "" "" EVM (Action.EVMDiff M.empty) M.empty [] [] [])
+  vmstateModify $ action . Action.actionData %~ OMap.alter insertFunc owner
 
   runCodeFromStart
 
   vmState <- vmstateGet
 
   let codeBytes = fromMaybe B.empty $ returnVal vmState
-  vmstateModify $ action . Action.actionData . at owner . mapped . Action.actionDataCodeHash .~ EVMCode (hash codeBytes)
+  vmstateModify $ action . Action.actionData . Action.omapLens owner . mapped . Action.actionDataCodeHash .~ EVMCode (hash codeBytes)
   when flags_debug $ $logInfoS "create'" . T.pack $ "Result: " ++ show codeBytes
 
   -- this used to say "not enough ether, but im pretty sure it meant gas -io
@@ -1192,8 +1193,11 @@ create' = do
       vmState <- vmstateGet
       let Environment {..} = environment vmState
       vmstateModify $
-        action . Action.actionData . at envOwner . mapped . Action.actionDataCallTypes
+        action . Action.actionData . Action.omapLens envOwner . mapped . Action.actionDataCallTypes
           %~ (:) Action.Create
+
+    -- insertFunc :: Maybe Action.ActionData -> Maybe Action.ActionData
+    -- insertFunc _ = Just $ Action.ActionData (EVMCode $ unsafeCreateKeccak256FromWord256 0) mempty "" "" EVM (Action.EVMDiff M.empty) M.empty [] [] []
 
 call ::
   EVMBase m =>
@@ -1272,7 +1276,7 @@ call' noValueTransfer = do
   let ch = case cp of
         EVMCode x -> x
         _ -> error "internal error- the EVM was called for non-evm code"
-  vmstateModify $ action . Action.actionData %~ M.insert receiveAddress (Action.ActionData (EVMCode ch) mempty "" "" EVM (Action.EVMDiff M.empty) M.empty [] [] [])
+  vmstateModify $ action . Action.actionData %~ OMap.alter (insertFunc2 ch) receiveAddress
 
   --TODO- Deal with this return value
   unless noValueTransfer $ do
@@ -1290,17 +1294,24 @@ call' noValueTransfer = do
   --    --putStrLn $ show (pretty address) ++ ": " ++ format result
   let Environment {..} = environment vmState
   vmstateModify $
-    action . Action.actionData . at envOwner . mapped . Action.actionDataCallTypes
+    action . Action.actionData . Action.omapLens envOwner . mapped . Action.actionDataCallTypes
       %~ (:) Action.Update
 
   return (fromMaybe B.empty $ returnVal vmState)
+  where
+    insertFunc2 :: Keccak256 -> Maybe Action.ActionData -> Maybe Action.ActionData
+    insertFunc2 ch _ = Just $ Action.ActionData (EVMCode $ ch) mempty "" "" EVM (Action.EVMDiff M.empty) M.empty [] [] []
+
+
+insertFunc :: Maybe Action.ActionData -> Maybe Action.ActionData
+insertFunc _ = Just $ Action.ActionData (EVMCode $ unsafeCreateKeccak256FromWord256 0) mempty "" "" EVM (Action.EVMDiff M.empty) M.empty [] [] []
 
 callPrecompiled' :: EVMBase m => Bool -> PrecompiledCode -> VMM m B.ByteString
 callPrecompiled' noValueTransfer precompiled = do
   value <- getEnvVar envValue
   receiveAddress <- getEnvVar envOwner
   sender <- getEnvVar envSender
-  vmstateModify $ action . Action.actionData %~ M.insert receiveAddress (Action.ActionData (EVMCode (unsafeCreateKeccak256FromWord256 0)) mempty "" "" EVM (Action.EVMDiff M.empty) M.empty [] [] [])
+  vmstateModify $ action . Action.actionData %~ OMap.alter insertFunc receiveAddress
 
   --TODO- Deal with this return value
   unless noValueTransfer $ do
@@ -1313,7 +1324,7 @@ callPrecompiled' noValueTransfer precompiled = do
 
   let Environment {..} = environment vmState
   vmstateModify $
-    action . Action.actionData . at envOwner . mapped . Action.actionDataCallTypes
+    action . Action.actionData . Action.omapLens envOwner . mapped . Action.actionDataCallTypes
       %~ (:) Action.Update
 
   return (fromMaybe B.empty $ returnVal vmState)
@@ -1377,7 +1388,7 @@ create_debugWrapper block owner value initCodeBytes = do
         Nothing -> do
           forM_ (reverse $ erLogs execResults) addLog
           vmstateModify $ \st -> st {suicideList = erSuicideList execResults}
-          vmstateModify $ action . Action.actionData %~ M.unionWith Action.mergeActionData (Action._actionData $ fromMaybe (error "internal error in VM.hs: somehow erAction was set to Nothing, this should never happen inside of the VM") $ erAction execResults)
+          vmstateModify $ action . Action.actionData %~ Action.omapUnionWith Action.mergeActionData (Action._actionData $ fromMaybe (error "internal error in VM.hs: somehow erAction was set to Nothing, this should never happen inside of the VM") $ erAction execResults)
           addToRefund $ fromIntegral $ erRefund execResults
 
           return $ Just newAddress
@@ -1425,7 +1436,7 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress owner sender value inp
     Nothing -> do
       forM_ (reverse $ erLogs execResults) addLog
       vmstateModify $ \state' -> state' {suicideList = erSuicideList execResults}
-      vmstateModify $ action . Action.actionData %~ M.unionWith Action.mergeActionData (Action._actionData $ fromMaybe (error "internal error in VM.hs: somehow erAction was set to Nothing, this should never happen inside of the VM") $ erAction execResults)
+      vmstateModify $ action . Action.actionData %~ Action.omapUnionWith Action.mergeActionData (Action._actionData $ fromMaybe (error "internal error in VM.hs: somehow erAction was set to Nothing, this should never happen inside of the VM") $ erAction execResults)
       when flags_debug $
         $logInfoS "nestedRun_debugWrapper" $ T.pack $ "Refunding: " ++ show (erRemainingTxGas execResults)
       useGas $ negate $ fromIntegral $ erRemainingTxGas execResults

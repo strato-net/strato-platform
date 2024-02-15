@@ -45,6 +45,7 @@ library:
       - ethereum-rlp
       - x509-certs
       - lens
+      - ordered-containers
 
 
 executables:
