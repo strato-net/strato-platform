@@ -16,11 +16,11 @@
 
 module Bloc.Server.Transaction
   ( postBlocTransaction,
-    postBlocTransactionExternal,
     postBlocTransactionRaw,
     postBlocTransactionBody,
     postBlocTransactionUnsigned,
     postBlocTransactionParallel,
+    postBlocTransactionParallelExternal,
   )
 where
 
@@ -574,7 +574,7 @@ postBlocTransaction ::
   m [BlocChainOrTransactionResult]
 postBlocTransaction = postBlocTransaction' (Don't CacheNonce)
 
-postBlocTransactionExternal ::
+postBlocTransactionParallelExternal ::
   ( MonadLogger m,
     A.Selectable Account Contract m,
     A.Selectable Account AddressState m,
@@ -588,10 +588,11 @@ postBlocTransactionExternal ::
   Maybe Text ->
   Maybe ChainId ->
   Maybe Bool -> -- use_wallet
-  Bool ->
+  Bool -> -- resolve
+  Bool -> -- queue
   PostBlocTransactionRequest ->
   m [BlocChainOrTransactionResult]
-postBlocTransactionExternal bearerToken = postBlocTransaction' (Don't CacheNonce) (Text.replace "Bearer " "" <$> bearerToken)
+postBlocTransactionParallelExternal bearerToken = postBlocTransactionParallel (Text.replace "Bearer " "" <$> bearerToken)
 
 postBlocTransaction' ::
   ( MonadLogger m,
