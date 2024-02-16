@@ -12,11 +12,9 @@ do
 done
 echo 'Strato api is available'
 
-export networkID=$(curl --silent --fail ${ETH_ENDPOINT}/metadata | jq -r .networkID)
-export FILE_SERVER_URL=${FILE_SERVER_URL}
+FILE_SERVER_URL=$(curl --silent --fail ${ETH_ENDPOINT}/metadata | jq -r .urls.fileServer)
 
 sed -i "s|__SITE_ID__|$SITE_ID|g" build/index.html
-sed -i "s|__networkID__|$networkID|g" build/index.html
 sed -i "s|__FILE_SERVER_URL__|$FILE_SERVER_URL|g" build/index.html
 if [ ! -f .env ]; then
   # If it doesn't exist, create the .env file and insert environment variables.

@@ -1,6 +1,5 @@
 import RestStatus from "http-status-codes";
-import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
-import { fileServerUrl } from "../../helpers/utils";
+import { apiUrl, fileServerUrl, HTTP_METHODS } from "../../helpers/constants";
 
 const actionDescriptors = {
   createInventory: "create_inventory",

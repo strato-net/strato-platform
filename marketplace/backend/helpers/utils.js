@@ -464,29 +464,6 @@ export const setSearchColumns = (args, _columns) => {
   return searchArgs
 }
 
-/**
- * @param {string} name of the variable to be fetched from env
- * @returns {string} variable value
- */
-
-export function getEnvVariable(name) {
-  const value = process.env[name] || ''
-  return value
-}
-
-const derivePaymentUrl = function(envPaymentUrl, envNetworkID){
-  if (envPaymentUrl !==  '')
-    return envPaymentUrl;
-  else if (envNetworkID === constants.prodNetworkId)
-    return 'https://payments.mercata.blockapps.net';
-  else if (envNetworkID === constants.testnetNetworkId)
-    return 'https://payments.mercata-testnet2.blockapps.net';
-  else 
-    throw new Error("Payment server was not specified and undeducible from given information");
-}
-
-export const STRIPE_PAYMENT_SERVER_URL = derivePaymentUrl(getEnvVariable('STRIPE_PAYMENT_SERVER_URL'), getEnvVariable('networkID'))
-
 export const pollingHelper = async (func, argsToFunc, attemptNumber = 0, attemptsAllowed = 8, milliseconds = 1000) => {
   if (attemptsAllowed < attemptNumber) return null;
   let result = await func(...argsToFunc);

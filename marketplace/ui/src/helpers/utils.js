@@ -1,5 +1,5 @@
 import dayjs from "dayjs";
-import { US_DATE_FORMAT, networkIds } from "./constants";
+import { US_DATE_FORMAT } from "./constants";
 
 export function getStringDate(time, format) {
   const timestamp = Number(time);
@@ -49,16 +49,3 @@ export const downloadSample = () => {
 export function epochToDate(epoch) {
   return dayjs.unix(epoch).format(US_DATE_FORMAT);
 }
-
-const deriveFileUrl = function(fileUrl, networkID){
-  if (fileUrl !== '')
-    return fileUrl;
-  else if (networkID === networkIds.prodNetworkId)
-    return 'https://fileserver.mercata.blockapps.net/highway/';
-  else if (networkID === networkIds.testnetNetworkId)
-    return 'https://fileserver.mercata-testnet2.blockapps.net/highway/';
-  else 
-    throw new Error("File server was not specified and undeducible from given information");
-}
-
-export const fileServerUrl = deriveFileUrl(window.FILE_SERVER_URL, window.networkID);

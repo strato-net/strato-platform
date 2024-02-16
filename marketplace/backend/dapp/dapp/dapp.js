@@ -1,7 +1,8 @@
 import { rest, util, importer } from "blockapps-rest";
 const { createContract } = rest;
 import { yamlWrite, yamlSafeDumpSync, getYamlFile } from "/helpers/config";
-import { pollingHelper, STRIPE_PAYMENT_SERVER_URL } from "/helpers/utils";
+import { pollingHelper } from "/helpers/utils";
+import { STRIPE_PAYMENT_SERVER_URL } from "/helpers/constants";
 
 import axios from 'axios';
 import dayjs from 'dayjs';

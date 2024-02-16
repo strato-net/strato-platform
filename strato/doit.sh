@@ -56,13 +56,13 @@ function newnode {
     echo "Could not obtain OAUTH parameters for Vault Proxy"
     exit 2
   elif [[ -z ${OAUTH_DISCOVERY_URL} ]]; then
-    if [ "${network}" == "mercata" ] || [ "${networkID}" == "6909499098523985262" ]; then # connecting to prod
-      OAUTH_DISCOVERY_URL="https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration"
-    elif [ "${network}" == "mercata-hydrogen" ] || [ "${networkID}" == "7596898649924658542" ]; then # connecting to testnet
+    if [ "${network}" == "mercata-hydrogen" ] || [ "${networkID}" == "7596898649924658542" ]; then # connecting to testnet
       OAUTH_DISCOVERY_URL="https://keycloak.blockapps.net/auth/realms/mercata-testnet2/.well-known/openid-configuration"
-    else
+    elif [ -n "${network}" -a "${network}" != "mercata" ] || [ -n "${networkID}" -a "${networkID}" != "6909499098523985262" ]; then # connecting to...not prod
       echo "OAUTH_DISCOVERY_URL was not provided and could not be derived"
       exit 3
+    else
+      OAUTH_DISCOVERY_URL="https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration"
     fi
   else
     echo "OAUTH parameters for Vault Proxy are available"
@@ -200,6 +200,12 @@ function newnode {
   if [ -n "${useWalletsByDefault}" ]; then
       udFlag="--useWalletsByDefault=${useWalletsByDefault}"
   fi
+  if [ -n "${FILE_SERVER_URL}" ]; then
+      fsFlag="--fileServerUrl=${FILE_SERVER_URL}"
+  fi
+  if [ -n "${STRIPE_PAYMENT_SERVER_URL}" ]; then
+      psFlag="--paymentServerUrl=${STRIPE_PAYMENT_SERVER_URL}"
+  fi
 
   echo "Starting vm-runner"
   runBackgroundProcess vm-runner \
@@ -236,6 +242,8 @@ function newnode {
     --gasOn=${gasOn:-true} \
     --minLogLevel=$apiDebugMode \
     --networkID=${networkID:--1} \
+    --vaultUrl=${VAULT_URL} \
+    --oauthDiscoveryUrl=${OAUTH_DISCOVERY_URL} \
     "${networkFlag}" \
     "${aclFlag}" \
     "${txsFlag}" \
@@ -244,7 +252,9 @@ function newnode {
     "${urFlag}" \
     "${ucFlag}" \
     "${ubFlag}" \
-    "${udFlag}" +RTS -N1 >> logs/strato-api 2>&1
+    "${udFlag}" \
+    "${fsFlag}" \
+    "${psFlag}" +RTS -N1 >> logs/strato-api 2>&1
 
   SLIPSTREAM_CMD="slipstream \
   --database=${postgres_slipstream_db} \
