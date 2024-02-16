@@ -229,7 +229,7 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOr
       title: "Order Total ($)",
       dataIndex: "orderTotal",
       key: "orderTotal",
-      render: (text) => <p className="sm:w-20 lg:w-28 text-right">{text}</p>,
+      render: (text) => <p className="sm:w-20 lg:w-28 lg:pr-5 text-right">{text}</p>,
     },
     {
       dataIndex: "date",
