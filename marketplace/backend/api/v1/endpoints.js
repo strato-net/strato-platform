@@ -47,6 +47,7 @@ export const Inventory = {
   getOwnershipHistory: '/ownership/history',
   get: '/:address',
   getAll: '/',
+  getAllUserInventories: '/user/inventories/',
   create: '/',
   update: '/update',
   list: '/list',

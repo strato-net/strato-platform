@@ -218,6 +218,18 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return { inventories: inventories, inventoryCount: inventoryCount }
   };
 
+  contract.getInventoriesForUser = async function (args, options = optionsNoChainIds) {
+    // const getOptions = { ...options, app: contractName };
+    console.log("INSIDE DAPP:",args)
+    // isUserProfile:true to be passed when MKT-248 is merged and relevant modifications to be done at inventory.js & other places as needed
+    // const {commonName, ...restArgs} = args;
+    const getOptions = { ...options, app: contractName };
+    const {userAddressForProfile, userProfileGtField, userProfileGtValue, ...restArgs} = args;
+    const inventories = await inventoryJs.getAll(rawAdmin, { ...restArgs, userAddressForProfile, isUserProfile:true, sort: '-createdDate' }, getOptions);
+    const inventoryCount = await inventoryJs.inventoryCount(rawAdmin, { ...restArgs, sort: '-createdDate' }, getOptions);//isUserProile:true,
+    return { inventories: inventories, inventoryCount: inventoryCount }
+  };
+
   contract.getOwnershipHistory = async function (args, options = optionsNoChainIds) {
     console.log('#### GET OWNERSHIP HISTORY ARGS', JSON.stringify(args))
     return await inventoryJs.getOwnershipHistory(rawAdmin, args, options);
