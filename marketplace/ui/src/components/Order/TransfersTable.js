@@ -78,7 +78,7 @@ const TransfersTable = ({ user, selectedDate, download, isAllOrdersLoading }) =>
       title: "Transfer Number",
       dataIndex: "transferNumber",
       key: "transferNumber",
-      render: (text) => <p>{text}</p>,
+      render: (text) => <p>#{text}</p>,
     },
     {
       title: "From",
@@ -117,15 +117,17 @@ const TransfersTable = ({ user, selectedDate, download, isAllOrdersLoading }) =>
       title: "Quantity",
       dataIndex: "quantity",
       key: "quantity",
-      render: (text) => <p>{text}</p>,
-      width: "15%",
+      align: "right",
+      render: (text) => <p className="text-right" >{text}</p>,
+      width: "10%",
     },
     {
       title: "Price",
       dataIndex: "price",
       key: "price",
-      render: (text) => <p>{text ? `$ ${text}` : '--'}</p>,
-      width: "5%",
+      align: "right",
+      render: (text) => <p className="text-right">{text ? `$ ${text}` : '--'}</p>,
+      width: "10%",
     },
   ];
 

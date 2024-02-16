@@ -430,7 +430,7 @@ async function getAllItemTransferEvents(admin, args = {}, defaultOptions) {
        const saleData = itemsSale.find((sale)=>sale.assetToBeSold === item.address)
        return {...item, price:saleData?.price }
     })
-    return { transfers: itemTransferEvents.map((item) => marshalOut(item)), total: total[0].count };
+    return { transfers: itemTransferEvents.map((item) => marshalOut(item)), total: total[0]?.count };
 }
 
 async function getOwnershipHistory(user, args, options) {
