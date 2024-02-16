@@ -146,6 +146,19 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     },
   ];
 
+  const stratoItem = [{
+    key: '2',
+    label: (
+      <div>
+        {user &&
+          <p className="text-xs mt-1">
+            STRATS: {(Object.keys(strats).length > 0) ? strats : 0}
+          </p>
+        }
+      </div>
+    ),
+  }]
+
   useEffect(() => {
     let temp = "";
     if (user != null) {
@@ -307,12 +320,18 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
           }
 
           {(roleIndex !== undefined && roleIndex !== 1)
-            && <Badge
+            && <Dropdown menu={{ items: stratoItem }} placement="bottomRight" trigger={["hover","click"]} className="xs:mt-5 md:mt-0" overlayStyle={{ position: 'fixed' }}>
+              <a onClick={(e) => e.preventDefault()} className="md:flex mx-2 text-base text-white" id="user-dropdown">
+              <Badge
               color="grey"
-              className="cursor-pointer mt-7 mx-2"
-              count={strato}>
+              className="cursor-pointer mt-7 md:mt-0 mx-2"
+              count={strats}
+              overflowCount={9999999}
+              >
               <img src={Images.logo} className="w-[30px] h-[30px] " />
             </Badge>
+              </a>
+            </Dropdown>
           }
           {
             roleIndex === undefined || roleIndex === 1 ? (
