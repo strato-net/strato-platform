@@ -36,6 +36,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const marketplaceDispatch = useMarketplaceDispatch();
   const userDispatch = useAuthenticateDispatch();
   const { cartList, strats } = useMarketplaceState();
+
   const storedData = useMemo(() => {
     return window.localStorage.getItem("cartList") == null ? [] : JSON.parse(window.localStorage.getItem("cartList"));
   }, []);
@@ -54,6 +55,8 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const [initials, setInitials] = useState("");
   const [roleIndex, setRoleIndex] = useState();
   const [showSearch, setShowSearch] = useState(false)
+
+  const strato = (Object.keys(strats).length > 0) ? strats : 0
 
   const navItems = [
     {
@@ -142,19 +145,6 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
       ),
     },
   ];
-
-  const stratoItem = [{
-    key: '2',
-    label: (
-      <div>
-        {user &&
-          <p className="text-xs mt-1">
-            STRATS: {(Object.keys(strats).length > 0) ? strats : 0}
-          </p>
-        }
-      </div>
-    ),
-  }]
 
   useEffect(() => {
     let temp = "";
@@ -317,11 +307,13 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
           }
 
           {(roleIndex !== undefined && roleIndex !== 1)
-            && <Dropdown menu={{ items: stratoItem }} placement="bottomRight" trigger={["click"]} overlayStyle={{ marginTop: "40px", position:'fixed' }}>
-              <a onClick={(e) => e.preventDefault()} className="md:flex mx-2 text-base text-white" id="user-dropdown">
-                <img src={Images.logo} className="w-[30px] h-[30px] " />
-              </a>
-            </Dropdown>}
+            && <Badge
+              color="grey"
+              className="cursor-pointer mt-7 mx-2"
+              count={strato}>
+              <img src={Images.logo} className="w-[30px] h-[30px] " />
+            </Badge>
+          }
           {
             roleIndex === undefined || roleIndex === 1 ? (
               loginUrl ? <a href={loginUrl} id="Login" className="text-base text-white flex gap-3 items-center"
