@@ -15,9 +15,8 @@ import { setCookie } from "../../helpers/cookie";
 import { Images } from '../../images';
 import images_placeholder from "../../images/resources/image_placeholder.png"
 
-const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
+const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, contextHolder }) => {
     const [quantity, setQuantity] = useState(1)
-    const [api, contextHolder] = notification.useNotification();
 
     let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
 

@@ -47,7 +47,7 @@ const CategoryProductList = ({ user }) => {
   const categoryQueryValue = queryParams.get('category');
   const categoryQueryValueArr = categoryQueryValue ? categoryQueryValue.split(',') : []
 
-  const [api] = notification.useNotification();
+  const [api, contextHolder] = notification.useNotification();
   // States
   const [selectedCategories, setSelectedCategories] = useState(categoryQueryValueArr);
   const [selectedSubCategories, setSelectedSubCategories] = useState([]);
@@ -227,6 +227,7 @@ const CategoryProductList = ({ user }) => {
     if (foundIndex === -1) {
       // Product not found, check quantity before adding
       const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity]);
+      console.log("checkQuantity", checkQuantity)
       if (checkQuantity === true) {
         // Quantity check passed, add new item to the cart
         items.push({ product, qty: quantity });
@@ -235,7 +236,7 @@ const CategoryProductList = ({ user }) => {
         return true;
       } else {
         // Not enough quantity, inform the user
-        openToast("bottom", true, `Currently available quantity for ${product.name}: ${checkQuantity.availableQuantity}. Try lowering the quantity to continue.`);
+        openToast("bottom", true, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantity to continue.`);
         return false;
       }
     } else {
@@ -250,7 +251,7 @@ const CategoryProductList = ({ user }) => {
         return true;
       } else {
         // Not enough quantity, inform the user
-        openToast("bottom", true, `Currently available quantity for ${product.name}: ${checkQuantity.availableQuantity}. Try lowering the quantity to continue.`);
+        openToast("bottom", true, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantity to continue.`);
         return false;
       }
     }
@@ -565,6 +566,8 @@ const CategoryProductList = ({ user }) => {
                           key={index}
                           addItemToCart={addItemToCart}
                           parent={"Marketplace"}
+                          api={api}
+                          contextHolder={contextHolder}
                         />
                       );
                     })}
