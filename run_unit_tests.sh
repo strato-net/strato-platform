@@ -17,7 +17,6 @@ stack test $1\
       blockapps-init \
       blockapps-mpdbs \
       blockapps-tools \
-      blockapps-privacy \
       blockapps-vault-proxy-server \
       blockstanbul \
       bloc2api \
@@ -27,8 +26,6 @@ stack test $1\
       ethereum-discovery \
       ethereum-encryption \
       ethereum-rlp \
-      ethereum-vm \
-      evm-solidity \
       fast-keccak256 \
       format \
       labeled-error \
@@ -57,9 +54,3 @@ then
       mkdir hpc
       cp -r $(stack path --local-hpc-root) hpc/
 fi
-
-stack bench vm-runner
-
-stack bench solid-vm
-
-stack bench solid-vm-model

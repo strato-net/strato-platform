@@ -8523,3 +8523,38 @@ contract qq {
   }
 }
 |]) `shouldThrow` anyTypeError
+
+  it "can delete arrays and indexes values" $ runTest ( do
+      runBS [r|
+contract qq {
+  uint[] arr = [1,2,3,4];
+  uint[] arr2 = [5,6,7,8];
+  uint res;
+  string xyz = "Hello SolidVM";
+  bool b = true;
+  uint yy = 36;
+  constructor() {
+    delete arr[1];
+    res = arr[1]; // to extract in getFields
+
+    delete arr2;
+    delete xyz;
+    delete b;
+    delete yy;
+  }
+}|]
+      getFields ["res", "arr2"] `shouldReturn` [BDefault, BDefault]) 
+
+  it "can error handle using delete keyword on local variables" $ runTest ( do
+      runBS [r|
+contract qq {
+  constructor() {
+    string xyz = "Hello SolidVM";
+    bool b = true;
+    uint yy = 36;
+
+    delete xyz;
+    delete b;
+    delete yy;
+  }
+}|]) `shouldThrow` anyTODO 
