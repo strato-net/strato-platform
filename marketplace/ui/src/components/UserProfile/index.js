@@ -7,7 +7,11 @@ import routes from "../../helpers/routes";
 import { useLocation, useMatch } from "react-router-dom";
 import { useInventoryDispatch } from "../../contexts/inventory";
 import { actions as userActivityActions } from "../../contexts/userActivity/actions";
-import { useUserActivityDispatch, useUserActivityState, } from "../../contexts/userActivity";
+import {
+  useUserActivityDispatch,
+  useUserActivityState,
+} from "../../contexts/userActivity";
+import ActivityFeed from "./ActivityFeed";
 
 const UserProfile = (user) => {
   //states
@@ -19,31 +23,35 @@ const UserProfile = (user) => {
   const { Title, Text, Paragraph } = Typography;
 
   const userActivityDispatch = useUserActivityDispatch();
-  const { userActivity } = useUserActivityState()
+  const { userActivity } = useUserActivityState();
 
-  console.log("userActiity", userActivity)
+  console.log("userActiity", userActivity);
 
   // Temp values for body
   // Get the current date and time
-const currentDate = new Date();
+  const currentDate = new Date();
 
-// Subtract 10 days from the current date
-// Note: The Date object in JavaScript counts dates in milliseconds, so you need to convert 10 days to milliseconds
-// 1 day = 24 hours, 1 hour = 60 minutes, 1 minute = 60 seconds, 1 second = 1000 milliseconds
-const tenDaysInMilliseconds = 10 * 24 * 60 * 60 * 1000;
-const tenDaysAgoDate = new Date(currentDate.getTime() - tenDaysInMilliseconds);
+  // Subtract 10 days from the current date
+  // Note: The Date object in JavaScript counts dates in milliseconds, so you need to convert 10 days to milliseconds
+  // 1 day = 24 hours, 1 hour = 60 minutes, 1 minute = 60 seconds, 1 second = 1000 milliseconds
+  const tenDaysInMilliseconds = 10 * 24 * 60 * 60 * 1000;
+  const tenDaysAgoDate = new Date(
+    currentDate.getTime() - tenDaysInMilliseconds
+  );
 
-// If you need the timestamp in seconds (common for Unix timestamps used in backends), you can convert it as follows
-const tenDaysAgoTimestampSeconds = Math.floor(tenDaysAgoDate.getTime() / 1000);
-console.log(tenDaysAgoTimestampSeconds);
+  // If you need the timestamp in seconds (common for Unix timestamps used in backends), you can convert it as follows
+  const tenDaysAgoTimestampSeconds = Math.floor(
+    tenDaysAgoDate.getTime() / 1000
+  );
+  console.log(tenDaysAgoTimestampSeconds);
 
   useEffect(() => {
     const body = {
       user: "Vijay Rajasekaran",
       gtField: "block_timestamp",
       gtValue: tenDaysAgoTimestampSeconds,
-    }
-    userActivityActions.fetchUserActivity(userActivityDispatch, body)
+    };
+    userActivityActions.fetchUserActivity(userActivityDispatch, body);
   }, [userActivityDispatch, tenDaysAgoTimestampSeconds]);
 
   // Mock data for the collection items
@@ -85,6 +93,17 @@ console.log(tenDaysAgoTimestampSeconds);
 
     return false;
   };
+
+  const allActivities = [
+    ...userActivity.soldOrders.map((item) => ({ ...item, type: "sold" })),
+    ...userActivity.boughtOrders.map((item) => ({ ...item, type: "bought" })),
+    ...userActivity.transfers.map((item) => ({ ...item, type: "transfer" })),
+  ];
+
+  // Sort activities by timestamp if needed
+  allActivities.sort(
+    (a, b) => new Date(b.block_timestamp) - new Date(a.block_timestamp)
+  );
 
   return (
     <div className="container mx-auto p-6">
@@ -165,36 +184,34 @@ console.log(tenDaysAgoTimestampSeconds);
           </div>
         </TabPane>
 
-        <TabPane tab="Activity" key="2">
+        <TabPane tab="My Activity" key="2">
           {/* Activity Content */}
-          <Row>
-            <Col xs={24} md={24} xl={24} xxl={12}>
-              <Row>
-                <Col xs={4} xl={2} className="text-2xl">
-                  <ShoppingCartOutlined />
-                </Col>
-                <Col xs={20} xxl={22}>
-                  <Row className="flex justify-between">
-                    <Title level={5} className="p-1">
-                      Invoice Downloaded
-                    </Title>
-                    <Text type="secondary" className="p-1">
-                      {" "}
-                      04 min ago{" "}
-                    </Text>
-                  </Row>
-                  <Row>
-                    <Paragraph>
-                      {" "}
-                      You have changed the order close date for order You have
-                      changed the order close date for order{" "}
-                    </Paragraph>
-                    <a href=""> Review Now </a>
-                  </Row>
-                </Col>
-              </Row>
-            </Col>
-          </Row>
+          <div className="activity-list">
+            {allActivities.map((activity, index) => {
+              let description;
+              switch (activity.type) {
+                case "sold":
+                  description = `Sold to ${activity.purchasersCommonName} for $${activity.totalPrice}`;
+                  break;
+                case "bought":
+                  description = `Bought from ${activity.sellersCommonName} for $${activity.totalPrice}`;
+                  break;
+                case "transfer":
+                  description = `Transferred ${activity.assetName} to ${activity.newOwnerCommonName}`;
+                  break;
+                default:
+                  description = "Activity occurred";
+              }
+              return (
+                <ActivityFeed
+                  key={index}
+                  type={activity.type}
+                  description={description}
+                  timestamp={activity.block_timestamp}
+                />
+              );
+            })}
+          </div>
         </TabPane>
       </Tabs>
 
