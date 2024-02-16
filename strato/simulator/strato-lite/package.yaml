@@ -20,9 +20,17 @@ executables:
     dependencies:
       - aeson
       - bytestring
+      - common-log
+      - composable-monads-base
+      - crypto-pubkey-types
+      - ethereum-discovery
       - hflags
+      - monad-alter
+      - monad-logger
+      - resourcet
       - strato-lite
       - strato-p2p
+      - transformers
       - vm-tools
 
 library:
@@ -69,6 +77,7 @@ library:
   - nibblestring
   - ordered-containers
   - Ranged-sets
+  - resourcet
   - seqevents
   - stm-chans
   - stm-conduit

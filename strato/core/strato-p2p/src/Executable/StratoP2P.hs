@@ -38,6 +38,20 @@ raceAll :: [LoggingT IO a]
         -> LoggingT IO a
 raceAll = runConcurrently . asum . Prelude.map Concurrently
 
+stratoP2P' :: ( Accessible AvailablePeers (ReaderT Config (ResourceT (LoggingT IO)))
+              , Accessible BondedPeers (ReaderT Config (ResourceT (LoggingT IO)))
+              , Accessible BondedPeers (LoggingT IO)
+              , Replaceable (IPAsText, Point) PeerBondingState (ReaderT Config (ResourceT (LoggingT IO)))
+              , Replaceable PPeer TcpEnableTime (ReaderT Config (ResourceT (LoggingT IO)))
+              , Replaceable PPeer UdpEnableTime (ReaderT Config (ResourceT (LoggingT IO)))
+              , Replaceable PPeer PeerDisable (ReaderT Config (ResourceT (LoggingT IO)))
+              , Replaceable PPeer T.Text (ReaderT Config (ResourceT (LoggingT IO)))
+              , Alters (IPAsText, TCPPort) ActivityState (ReaderT Config (ResourceT (LoggingT IO)))
+              )
+           => LoggingT IO ()
+stratoP2P' =
+  stratoP2PClient `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PClient ERROR" . T.pack $ show e)
+
 stratoP2P :: ( HasVault n
              , MonadLogger n
              , MonadResource n
@@ -86,19 +100,9 @@ stratoP2P :: ( HasVault n
              , Alters Keccak256 BlockData n
              , Alters Keccak256 OutputBlock n
              , RunsServer n (LoggingT IO)
-             , Accessible AvailablePeers (ReaderT Config (ResourceT (LoggingT IO)))
-             , Accessible BondedPeers (ReaderT Config (ResourceT (LoggingT IO)))
-             , Accessible BondedPeers (LoggingT IO)
-             , Replaceable (IPAsText, Point) PeerBondingState (ReaderT Config (ResourceT (LoggingT IO)))
-             , Replaceable PPeer TcpEnableTime (ReaderT Config (ResourceT (LoggingT IO)))
-             , Replaceable PPeer UdpEnableTime (ReaderT Config (ResourceT (LoggingT IO)))
-             , Replaceable PPeer PeerDisable (ReaderT Config (ResourceT (LoggingT IO)))
-             , Replaceable PPeer T.Text (ReaderT Config (ResourceT (LoggingT IO)))
-             , Alters (IPAsText, TCPPort) ActivityState (ReaderT Config (ResourceT (LoggingT IO)))
              )
           => PeerRunner n (LoggingT IO) () -> LoggingT IO ()
 stratoP2P runner =
-  raceAll [ stratoP2PLoopback runner `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PLoopback ERROR" . T.pack $ show e)
-          , stratoP2PClient          `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PClient ERROR" . T.pack $ show e)
+  raceAll [ stratoP2PLoopback runner `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PLoopback ERROR" . T.pack $ show e) 
           , stratoP2PServer   runner `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PServer ERROR" . T.pack $ show e)
           ]

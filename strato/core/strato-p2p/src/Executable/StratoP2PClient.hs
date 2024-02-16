@@ -34,7 +34,7 @@ import           Blockchain.Strato.Discovery.UDP
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.TCPClientWithTimeout
 import           Control.Concurrent hiding (yield)
---import           Control.Concurrent.SSem (SSem)
+import           Control.Concurrent.SSem (SSem)
 import qualified Control.Concurrent.SSem as SSem
 import           Control.Exception.Base (ErrorCall (..))
 import           Control.Lens ((^.))
@@ -168,6 +168,9 @@ stratoP2PClient = do
         $logInfoS "stratoP2PClient" "Waiting 5 seconds before looping over peers again"
         liftIO $ threadDelay 5000000
   where
+    multiThreadedClient :: [PPeer]
+                        -> SSem
+                        -> LoggingT IO ()
     multiThreadedClient [] _ = do
       $logInfoS "stratoP2PClient/multiThreadedClient" "No available peers, will try again in 10 seconds"
       liftIO $ threadDelay 10000000
