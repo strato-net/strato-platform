@@ -28,7 +28,6 @@ import           Blockchain.Metrics
 import           Blockchain.Options
 import           Blockchain.RLPx
 import           Blockchain.Sequencer.Event
-import           Blockchain.SeqEventNotify
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.UDP
 import           Blockchain.Strato.Model.Secp256k1
@@ -40,12 +39,9 @@ import           Control.Exception.Base (ErrorCall (..))
 import           Control.Lens ((^.))
 import           Control.Monad (forever, unless, void)
 import qualified Control.Monad.Change.Alter as A
-import           Control.Monad.Change.Modify
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
-import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Resource
-import           Crypto.Types.PubKey.ECC
 import qualified Data.ByteString as B
 import           Data.Conduit
 import           Data.Either.Combinators
@@ -56,7 +52,6 @@ import           Ki.Unlifted as KIU
 import qualified Text.Colors as C
 import           Text.Format
 import           UnliftIO
-import           Data.Set.Ordered (empty)
 
 runPeer ::
   (RunsClient m, MonadP2P m) =>

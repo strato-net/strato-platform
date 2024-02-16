@@ -43,7 +43,4 @@ initP2P = do
   liftIO $
     race_
       (run 10248 $ prometheus def p2pApp)
-      (race_ 
-        (runLoggingT $ stratoP2P runner)
-        (runLoggingT $ stratoP2P')
-      )
+      (runLoggingT $ stratoP2P runner)
