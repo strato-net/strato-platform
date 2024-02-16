@@ -99,14 +99,15 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
     sleep 1
   done
   echo 'Strato api is available'
+  METADATA=$(curl --silent --fail ${ETH_ENDPOINT}/metadata)
   
-  export networkID=$(curl --silent --fail ${ETH_ENDPOINT}/metadata | jq -r .networkID)
-  export STRIPE_PAYMENT_SERVER_URL=$(curl --silent --fail ${ETH_ENDPOINT}/metadata | jq -r .urls.paymentServer)
+  export networkID=$(echo ${METADATA} | jq -r .networkID)
+  export STRIPE_PAYMENT_SERVER_URL=$(echo ${METADATA} | jq -r .urls.paymentServer)
   touch .env
   echo "networkID=${networkID}" >> .env
   echo "STRIPE_PAYMENT_SERVER_URL=${STRIPE_PAYMENT_SERVER_URL}" >> .env
 
-  OAUTH_OPENID_DISCOVERY_URL=$(curl --silent --fail ${ETH_ENDPOINT}/metadata | jq -r .urls.oauthDiscovery)
+  OAUTH_OPENID_DISCOVERY_URL=$(echo ${METADATA} | jq -r .urls.oauthDiscovery)
 
   sed -i 's*<apiDebug_value>*'"${MP_API_DEBUG}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<configDirPath_value>*'"${CONFIG_DIR_PATH}"'*g' /tmp/tmp.config.yaml
