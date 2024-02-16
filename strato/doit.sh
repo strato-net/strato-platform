@@ -138,7 +138,6 @@ function newnode {
      --networkID=${networkID:--1} \
      --sqlPeers=true \
      --txGossipFanout=${txGossipFanount:-3} \
-     --wireMessageCacheSize=${wireMessageCacheSize:-2000} \
      ${networkFlag} &>> logs/strato-p2p
 
   echo "Starting strato-sequencer"
