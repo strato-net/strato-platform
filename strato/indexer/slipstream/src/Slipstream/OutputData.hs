@@ -771,7 +771,7 @@ insertHistoryTable contracts@(E.ProcessedContract {organization = org, applicati
 
 insertBegin ::
   OutputM m => ConduitM () Text m ()
-insertBegin = yield "BEGIN; SET CONSTRAINTS ALL DEFERRED;"
+insertBegin = yieldMany $ ["BEGIN;", "SET CONSTRAINTS ALL DEFERRED;"]
 
 insertCommit ::
   OutputM m => ConduitM () Text m ()
