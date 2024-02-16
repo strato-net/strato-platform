@@ -24,7 +24,7 @@ where
 import BlockApps.Logging
 import BlockApps.X509
 import Blockchain.Constants hiding (ethVersion)
-import Blockchain.Context hiding (Inbound, Outbound)
+import Blockchain.Context
 import Blockchain.Data.Block
 import Blockchain.Data.ChainInfo (UnsignedChainInfo (..))
 import Blockchain.Data.Control (P2PCNC (..))

@@ -673,8 +673,6 @@ spec:
           value: ""
         - name: vmRunnerRTSOPTs
           value: ""
-        - name: wireMessageCacheSize
-          value: ""
         - name: zkHost
           value: "localhost"
         - name: API_DEBUG_LOG
