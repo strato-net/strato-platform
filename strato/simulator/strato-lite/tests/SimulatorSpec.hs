@@ -366,6 +366,7 @@ spec = do
         runForSeconds 15 $ concurrently_ (runNetworkOld peers connections') routine
         ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
         ifor_ ctxs1 $ \i ctx -> (i, ctx ^. apiChainInfoMap . at chainId) `shouldBe` (i, if i == 2 then Nothing else Just chainInfo')
+
     it "can sync a new node to a chain after running multiple transactions on that chain" $
       scoped $ \scope -> do
         -- TODO: somehow this test got reverted to a previous faulty state
