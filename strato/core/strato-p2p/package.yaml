@@ -76,7 +76,6 @@ library:
     - monadIO
     - mtl
     - network
-    - ordered-containers
     - persistent
     - prometheus-client
     - random
