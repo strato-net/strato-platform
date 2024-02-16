@@ -935,7 +935,7 @@ instance (MonadUnliftIO m, MonadLogger m, MonadReader P2PPeer m, HasMemPeerDB m)
         (VSocket i o, otherIP) <- atomically $ readTQueue s
         let pSource = sourceTQueue i
             pSink = sinkTQueue o
-        void . UnliftIO.async $ f (P2pConduits pSource pSink sSource) otherIP
+        void . async $ f (P2pConduits pSource pSink sSource) otherIP
 
 instance Monad m => Mod.Accessible TCPPort (MonadP2PTest m) where
   access _ = pure $ TCPPort 30303

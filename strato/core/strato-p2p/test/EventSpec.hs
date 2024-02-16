@@ -109,9 +109,9 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as Text
 import Data.Traversable (for)
 import Debugger (DebugSettings)
---import Executable.EthereumDiscovery
+import Executable.EthereumDiscovery
 import Executable.EthereumVM2
---import Executable.StratoP2P
+import Executable.StratoP2P
 import Executable.StratoP2PClient
 import Executable.StratoP2PServer
 import Ki.Unlifted as KIU
@@ -1183,7 +1183,6 @@ runNodeWithoutP2P p = do
         (runMonad p (p ^. p2pPeerTxrIndexer))
     )
 
-{-
 runNode :: P2PPeer -> IO ()
 runNode p = do
   chan <- atomically . dupTMChan $ p ^. p2pPeerSeqP2pSource
@@ -1195,7 +1194,6 @@ runNode p = do
         (runNoLoggingT $ stratoP2P (\f -> runResourceT . runMemPeerDBMUsingEnv (p^.p2pPeerDB) . flip runReaderT p $ runReaderT (f s) ctx))
         (runNoLoggingT $ ethereumDiscovery (\f -> runResourceT . runMemPeerDBMUsingEnv (p^.p2pPeerDB) . flip runReaderT p $ runReaderT (f 100) ctx))
     )
--}
 
 postEvent :: SeqLoopEvent -> P2PPeer -> IO ()
 postEvent e p = atomically $ writeTQueue (_p2pPeerUnseqSource p) [e]
@@ -1543,13 +1541,11 @@ runConnection connection = do
         atomically $ writeTVar (connection ^. clientException) mEx
   concurrently_ rServer rClient
 
-{-
 runNetwork :: [P2PPeer] -> [P2PConnection] -> IO ()
 runNetwork nodes connections =
   concurrently_
     (mapConcurrently runNode nodes)
     (mapConcurrently runConnection connections)
--}
 
 makeValidators :: [PrivateKey] -> [Address]
 makeValidators = map fromPrivateKey

@@ -366,7 +366,6 @@ spec = do
         runForSeconds 15 $ concurrently_ (runNetworkOld peers connections') routine
         ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
         ifor_ ctxs1 $ \i ctx -> (i, ctx ^. apiChainInfoMap . at chainId) `shouldBe` (i, if i == 2 then Nothing else Just chainInfo')
- 
     it "can sync a new node to a chain after running multiple transactions on that chain" $
       scoped $ \scope -> do
         -- TODO: somehow this test got reverted to a previous faulty state
@@ -861,7 +860,6 @@ spec = do
         void . timeout 20000000 $ concurrently_ (runNetworkOld (take 3 peers) (take 3 connections')) (concurrently_ (void . timeout 4000000 $ mainChainRoutine 0) routine)
         ctxs <- atomically $ traverse (readTVar . _p2pTestContext) peers
         ifor_ ctxs $ \i ctx -> (i, Set.size . unChainMembers . _validators <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 3)
-
     it "will throw an exception if the handshake times out" $
       scoped $ \scope -> do
         serverPKey <- newPrivateKey
