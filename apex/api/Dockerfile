@@ -10,6 +10,7 @@ HEALTHCHECK --interval=5s --timeout=2s --start-period=180s \
   CMD lsof -i :3009 || \
     exit 1
 COPY package*.json  /usr/src/app/
-RUN npm install
+ENV NODE_ENV=production
+RUN npm ci --only=production
 COPY . /usr/src/app
 CMD [ "sh", "-c", "/usr/src/app/docker-run.sh" ]

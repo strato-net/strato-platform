@@ -73,6 +73,7 @@ library:
   - vm-tools
   - x509-certs
   - yaml
+  - ordered-containers
 
 executables:
   strato-setup:

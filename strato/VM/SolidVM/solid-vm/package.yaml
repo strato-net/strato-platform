@@ -51,6 +51,7 @@ library:
   - vector
   - vm-tools
   - x509-certs
+  - ordered-containers
 
 
 
@@ -111,6 +112,7 @@ tests:
       - utf8-string
       - vm-tools
       - x509-certs
+      - ordered-containers
 
 benchmarks:
     codebench:
