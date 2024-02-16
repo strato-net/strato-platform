@@ -11,7 +11,14 @@ router.get(
   authHandler.authorizeRequest(),
   loadDapp,
   OrderController.export
-)
+);
+
+router.get(
+  Order.activity,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  OrderController.activity
+);
 
 router.get(
   Order.get,

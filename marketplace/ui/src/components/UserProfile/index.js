@@ -1,15 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Button, Avatar, Tabs, Input, notification } from 'antd';
+import { Card, Button, Avatar, Tabs, Input, notification, Spin } from 'antd';
 import { EditOutlined } from '@ant-design/icons';
 import { UserOutlined } from '@ant-design/icons';
 import { Images } from "../../images";
 import routes from "../../helpers/routes";
 import { actions as inventoryActions } from "../../contexts/inventory/actions";
+import { actions as orderActions } from "../../contexts/order/actions";
 import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
 import { useAuthenticateState } from "../../contexts/authentication";
+import { useOrderState } from '../../contexts/order';
 import { useLocation, useMatch } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { useInventoryDispatch } from '../../contexts/inventory';
+import { useOrderDispatch } from '../../contexts/order';
 import {
   useMarketplaceDispatch,
   useMarketplaceState,
@@ -23,14 +26,18 @@ const [Id, setId] = useState(undefined);
 const [activeTab, setActiveTab] = useState('1');
 const [offset, setOffset] = useState(0);
 const dispatch = useInventoryDispatch();
+const orderDispatch = useOrderDispatch();
 const { cartList } = useMarketplaceState();
 const [api, contextHolder] = notification.useNotification();
 const marketplaceDispatch = useMarketplaceDispatch();
 
 let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
+let { isActivitiesLoading, activities } = useOrderState();
 const { TabPane } = Tabs;
 
 const navigate = useNavigate();
+
+
 
 const openToast = (placement, isError, msg) => {
   if (isError) {
@@ -102,17 +109,6 @@ const collectionItems = [
   // ... other items
 ];
 
-// Mock data for the acitivity items
-const activityItems = [
-  { id: 1, header: 'New Order Received!', message: 'You have received a new order <order number> from <buyer>. <<Fulfill order>><url to Order Details page under Orders (Sold)>.' },
-  { id: 2, header: 'Order Fulfilled', message: 'Your order <order number> was fulfilled by <seller>. <<View or List for Sale>><url to MyStore page>' },
-  { id: 3, header: 'Inventory Received through Transfer', message: 'You have received one or more items as a free transfer from <transferer>. <<View Transfer>><url to MyStore page>.' },
-  { id: 4, header: 'New Order Received!', message: 'You have received a new order <order number> from <buyer>. <<Fulfill order>><url to Order Details page under Orders (Sold)>.' },
-  { id: 5, header: 'Order Fulfilled', message: 'Your order <order number> was fulfilled by <seller>. <<View or List for Sale>><url to MyStore page>' },
-  { id: 6, header: 'Inventory Received through Transfer', message: 'You have received one or more items as a free transfer from <transferer>. <<View Transfer>><url to MyStore page>.' },
-  // ... other items
-];
-
 const routeMatch = useMatch({
     path: routes.MarketplaceUserProfile.url,
     strict: true,
@@ -130,6 +126,7 @@ useEffect(() => {
     } else {
       inventoryActions.fetchInventoryForUser(dispatch, 10, offset, Id);
     }
+    orderActions.fetchActivity(orderDispatch)
   }, [dispatch, offset, hasChecked, isAuthenticated, loginUrl, Id]);
 
  
@@ -160,7 +157,7 @@ useEffect(() => {
 
     return false;
   }
-
+  console.log("activities", activities)
   return (
     <div className="container mx-auto p-6">
 
@@ -237,18 +234,32 @@ useEffect(() => {
         <TabPane tab="Activity" key="2">
     
          {/* Activity Content */}
-         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 ml-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 ml-6">
+            {isActivitiesLoading ? 
+            (
+              <Spin className="mt-5" size="large" />
+            ) : (
+              activities.map((item, index) => (
+                <Card
+                  key={index}
+                  hoverable
+                  title={item.header}
+                  extra={
+                    item.type === 'sold' ?
+                    <button style={{color: '#0000EE'}} onClick={() => navigate(routes.SoldOrderDetails.url.replace(":id", item.link))}>More</button> :
+                    item.type === 'bought' ?
+                    <button style={{color: '#0000EE'}} onClick={() => navigate(routes.BoughtOrderDetails.url.replace(":id", item.link))}>More</button> :
+                    null
+                  }                  
+                >
+                  <div>{item.timeAgo}</div>
+                  <br />
+                  <div>{item.message}</div>
+                </Card>
+              ))
+            )}
+          </div>
 
-          {activityItems.map((item) => (
-          <Card
-            key={item.id}
-            hoverable
-          >
-            <Card.Meta title={item.header} description={item.message} />
-          </Card>
-          ))}
-
-         </div>
      
         </TabPane>
      

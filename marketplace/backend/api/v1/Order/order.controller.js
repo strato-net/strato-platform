@@ -128,6 +128,18 @@ class OrderController {
       return next(e)
     }
   }
+  
+  static async activity(req, res, next) {
+    try {
+      const { dapp } = req
+      const orders = await dapp.activity()
+      rest.response.status200(res, orders)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
 
   static async createUserAddress(req, res, next) {
     try {

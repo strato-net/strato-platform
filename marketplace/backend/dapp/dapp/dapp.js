@@ -588,6 +588,78 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       transfers: itemTransferEvents ? itemTransferEvents : []
     };
   };
+  
+  contract.activity = async function ( options = defaultOptions) {
+    const getOptions = { ...options, app: contractName };
+    let soldOrderArgs = { limit: 10, offset: 0, order: 'createdDate.desc', sellersCommonName: userCommonName, status: 1 };
+    const soldOrders = await saleOrderJs.getAll(rawAdmin, soldOrderArgs, getOptions);
+    let boughtOrderArgs = { limit: 10, offset: 0, order: 'createdDate.desc', purchasersCommonName: userCommonName, status: 3 };
+    const boughtOrders = await saleOrderJs.getAll(rawAdmin, boughtOrderArgs, getOptions);
+    let transferArgs = { limit: 10, offset: 0, order: 'transferDate.desc', newOwnerCommonName: userCommonName };
+    const itemTransferEvents = await inventoryJs.getAllItemTransferEvents(rawAdmin, transferArgs, getOptions);
+    
+    let activity = soldOrders.orders.concat(boughtOrders.orders).concat(itemTransferEvents.transfers);
+    activity.sort((a, b) => a.block_timestamp - b.block_timestamp);
+    
+    function timeAgo(datePast) {
+      const now = new Date();
+      const past = new Date(datePast);
+      const diffInSeconds = Math.floor((now - past) / 1000);
+      const minute = 60;
+      const hour = minute * 60;
+      const day = hour * 24;
+      const month = day * 30;
+      const year = day * 365;
+    
+      if (diffInSeconds < minute) {
+        return `${diffInSeconds} seconds ago`;
+      } else if (diffInSeconds < hour) {
+        return `${Math.floor(diffInSeconds / minute)} minutes ago`;
+      } else if (diffInSeconds < day) {
+        return `${Math.floor(diffInSeconds / hour)} hours ago`;
+      } else if (diffInSeconds < month) {
+        return `${Math.floor(diffInSeconds / day)} days ago`;
+      } else if (diffInSeconds < year) {
+        return `${Math.floor(diffInSeconds / month)} months ago`;
+      } else {
+        return `${Math.floor(diffInSeconds / year)} years ago`;
+      }
+    }
+    
+    const activityItems = activity.slice(0, 10).map(item => {
+      const timeAgoString = timeAgo(item.block_timestamp);
+      if (item.sellersCommonName === userCommonName) {
+        return {
+          id: item.id,
+          header: 'New Order Received!',
+          message: `You have received a new order ${item.orderId} from ${item.purchasersCommonName}.`,
+          link: item.address,
+          timeAgo: timeAgoString,
+          type: 'sold'
+        };
+      } else if (item.purchasersCommonName === userCommonName) {
+        return {
+          id: item.id,
+          header: 'Order Fulfilled',
+          message: `Your order ${item.orderId} was fulfilled by ${item.sellersCommonName}.`,
+          link: item.address,
+          timeAgo: timeAgoString,
+          type: 'bought'
+        };
+      } else if (item.newOwnerCommonName === userCommonName) {
+        return {
+          id: item.id,
+          header: 'Inventory Received through Transfer',
+          message: `You have received one or more items as a free transfer from ${item.oldOwnerCommonName}`,
+          link: item.address,
+          timeAgo: timeAgoString,
+          type: 'transfer'
+        };
+      }
+    });
+    
+    return activityItems;
+  };
 
   // ------------------------------ SALE TEST ENDS ------------------------------
 

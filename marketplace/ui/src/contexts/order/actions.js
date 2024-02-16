@@ -20,6 +20,9 @@ const actionDescriptors = {
   fetchAllOrders: "fetch_all_orders",
   fetchAllOrdersSuccessful: "fetch_all_orders_successful",
   fetchAllOrdersFailed: "fetch_all_orders_failed",
+  fetchActivity: "fetch_activity",
+  fetchActivitySuccessful: "fetch_activity_successful",
+  fetchActivityFailed: "fetch_activity_failed",
   fetchOrderDetails: "fetch_order_details",
   fetchOrderDetailsSuccessful: "fetch_order_details_successful",
   fetchOrderDetailsFailed: "fetch_order_details_failed",
@@ -415,6 +418,46 @@ const actions = {
     } catch (err) {
       dispatch({
         type: actionDescriptors.fetchAllOrdersFailed,
+        error: undefined,
+      });
+    }
+  },
+  
+    
+  fetchActivity: async (dispatch) => {
+    dispatch({ type: actionDescriptors.fetchActivity });
+    
+    try {
+      const orders = await fetch(
+        `${apiUrl}/order/activity`,
+        {
+          method: HTTP_METHODS.GET,
+        }
+      );
+      
+      const bodyOrders = await orders.json();
+      
+      if (orders.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchActivitySuccessful,
+          payload: bodyOrders.data,
+        });
+        return;
+      }
+      else if (bodyOrders.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchActivityFailed,
+          error: "Unauthorized while fetching all orders"
+        });
+        window.location.href = bodyOrders.error.loginUrl
+      }
+      dispatch({
+        type: actionDescriptors.fetchActivityFailed,
+        error: bodyOrders.error,
+      });
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.fetchActivityFailed,
         error: undefined,
       });
     }

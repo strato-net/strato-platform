@@ -116,6 +116,23 @@ const reducer = (state, action) => {
         error: action.error,
         isAllOrdersLoading: false,
       };
+    case actionDescriptors.fetchActivity:
+      return {
+        ...state,
+        isActivitiesLoading: true,
+      };
+    case actionDescriptors.fetchActivitySuccessful:
+      return {
+        ...state,
+        activities: action.payload,
+        isActivitiesLoading: false,
+      };
+    case actionDescriptors.fetchActivityFailed:
+      return {
+        ...state,
+        error: action.error,
+        isActivitiesLoading: false,
+      };
     case actionDescriptors.updateOrderStatus:
       return {
         ...state,
