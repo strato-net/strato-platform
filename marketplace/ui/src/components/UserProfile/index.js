@@ -25,6 +25,17 @@ const collectionItems = [
   // ... other items
 ];
 
+// Mock data for the acitivity items
+const activityItems = [
+  { id: 1, header: 'New Order Received!', message: 'You have received a new order <order number> from <buyer>. <<Fulfill order>><url to Order Details page under Orders (Sold)>.' },
+  { id: 2, header: 'Order Fulfilled', message: 'Your order <order number> was fulfilled by <seller>. <<View or List for Sale>><url to MyStore page>' },
+  { id: 3, header: 'Inventory Received through Transfer', message: 'You have received one or more items as a free transfer from <transferer>. <<View Transfer>><url to MyStore page>.' },
+  { id: 4, header: 'New Order Received!', message: 'You have received a new order <order number> from <buyer>. <<Fulfill order>><url to Order Details page under Orders (Sold)>.' },
+  { id: 5, header: 'Order Fulfilled', message: 'Your order <order number> was fulfilled by <seller>. <<View or List for Sale>><url to MyStore page>' },
+  { id: 6, header: 'Inventory Received through Transfer', message: 'You have received one or more items as a free transfer from <transferer>. <<View Transfer>><url to MyStore page>.' },
+  // ... other items
+];
+
 const routeMatch = useMatch({
     path: routes.MarketplaceUserProfile.url,
     strict: true,
@@ -137,6 +148,18 @@ useEffect(() => {
         <TabPane tab="Activity" key="2">
     
          {/* Activity Content */}
+         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 ml-6">
+
+          {activityItems.map((item) => (
+          <Card
+            key={item.id}
+            hoverable
+          >
+            <Card.Meta title={item.header} description={item.message} />
+          </Card>
+          ))}
+
+         </div>
      
         </TabPane>
      
