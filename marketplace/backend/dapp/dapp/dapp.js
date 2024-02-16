@@ -591,15 +591,26 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   
   contract.activity = async function ( options = defaultOptions) {
     const getOptions = { ...options, app: contractName };
-    let soldOrderArgs = { limit: 10, offset: 0, order: 'createdDate.desc', sellersCommonName: userCommonName, status: 1 };
+    
+    // Current date and time
+    const now = new Date();
+    // Convert 'now' to a Unix timestamp (in seconds)
+    const nowTimestamp = Math.floor(now.getTime() / 1000);
+
+    // Calculate 10 days ago
+    const tenDaysAgo = new Date(now.getTime() - (10 * 24 * 60 * 60 * 1000));
+    // Convert 'tenDaysAgo' to a Unix timestamp (in seconds)
+    const tenDaysAgoTimestamp = Math.floor(tenDaysAgo.getTime() / 1000);
+
+    let soldOrderArgs = { order: 'createdDate.desc', sellersCommonName: userCommonName, status: 1, range: [`createdDate, ${tenDaysAgoTimestamp}, ${nowTimestamp}`] };
     const soldOrders = await saleOrderJs.getAll(rawAdmin, soldOrderArgs, getOptions);
-    let boughtOrderArgs = { limit: 10, offset: 0, order: 'createdDate.desc', purchasersCommonName: userCommonName, status: 3 };
+    let boughtOrderArgs = { order: 'createdDate.desc', purchasersCommonName: userCommonName, status: 3, range: [`createdDate, ${tenDaysAgoTimestamp}, ${nowTimestamp}`] };
     const boughtOrders = await saleOrderJs.getAll(rawAdmin, boughtOrderArgs, getOptions);
-    let transferArgs = { limit: 10, offset: 0, order: 'transferDate.desc', newOwnerCommonName: userCommonName };
+    let transferArgs = { order: 'transferDate.desc', newOwnerCommonName: userCommonName, range: [`transferDate, ${tenDaysAgoTimestamp}, ${nowTimestamp}`]};
     const itemTransferEvents = await inventoryJs.getAllItemTransferEvents(rawAdmin, transferArgs, getOptions);
     
     let activity = soldOrders.orders.concat(boughtOrders.orders).concat(itemTransferEvents.transfers);
-    activity.sort((a, b) => a.block_timestamp - b.block_timestamp);
+    activity.sort((a, b) => b.block_timestamp - a.block_timestamp);
     
     function timeAgo(datePast) {
       const now = new Date();
@@ -626,7 +637,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       }
     }
     
-    const activityItems = activity.slice(0, 10).map(item => {
+    const activityItems = activity.map(item => {
       const timeAgoString = timeAgo(item.block_timestamp);
       if (item.sellersCommonName === userCommonName) {
         return {
