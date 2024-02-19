@@ -86,7 +86,7 @@ const actions = {
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
           type: actionDescriptors.createOrderFailed,
-          error: "Unauthorized while creating Order"
+          error: "Error while creating Order"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -126,13 +126,12 @@ const actions = {
         dispatch({
           type: actionDescriptors.createPaymentSuccessful,
           payload: body.data,
-        });
-        actions.setMessage(dispatch, "Payment created successfully", true);
+        });        
         return body.data;
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
           type: actionDescriptors.createPaymentFailed,
-          error: "Unauthorized while creating Order"
+          error: "Error while creating Order"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -653,22 +652,22 @@ const actions = {
           type: actionDescriptors.createSaleOrderSuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, "Sale created successfully", true);
+        actions.setMessage(dispatch, "Order created successfully", true);
         return body.data;
       }
 
       dispatch({
         type: actionDescriptors.createSaleOrderFailed,
-        error: "Error while executing sale",
+        error: "There was an error processing your order. We are sorry for the inconvenience and will reach out to you to process a refund.",
       });
-      actions.setMessage(dispatch, "Error while creating sale");
+      actions.setMessage(dispatch, "There was an error processing your order. We are sorry for the inconvenience and will reach out to you to process a refund.");
       return false;
     } catch (err) {
       dispatch({
         type: actionDescriptors.createSaleOrderFailed,
-        error: "Error while creating Sale",
+        error: "There was an error processing your order. We are sorry for the inconvenience and will reach out to you to process a refund.",
       });
-      actions.setMessage(dispatch, "Error while creating sale");
+      actions.setMessage(dispatch, "There was an error processing your order. We are sorry for the inconvenience and will reach out to you to process a refund.");
     }
   },
 
