@@ -2235,9 +2235,6 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
 
             _ -> typeError "cannot call non-function" var
 
-{-
-SimpleStatement (ExpressionStatement (Binary "=" (Variable "tickets") (FunctionCall (NewExpression (SolidString "Hashmap")) [])))
--}
 
 expToVar' ep@(CC.Binary _ "=" dst@(CC.IndexAccess _ parent (Just indExp)) src) = do
   !srcVar <- expToVar src

@@ -614,7 +614,7 @@ typecheckStatic (SVMType.Mapping d1 k1 v1) (SVMType.Mapping d2 k2 v2) = do
     _ -> Right $ SVMType.Mapping (d1 <|> d2) k v
 typecheckStatic (SVMType.Bytes d1 b1) (SVMType.String _) = Right (SVMType.Bytes d1 b1)
 typecheckStatic (SVMType.UserDefined alias1 a) (SVMType.UserDefined alias2 b) =
-  if alias1 == alias2
+  if alias1 == alias2 
     then typecheckStatic a b
     else
       Left $
@@ -625,7 +625,7 @@ typecheckStatic (SVMType.UserDefined alias1 a) (SVMType.UserDefined alias2 b) =
           <> " do not match."
 typecheckStatic (SVMType.UserDefined a c) b =
   Left $
-    "Type mismatch Test1: "
+    "Type mismatch: "
       <> showType (SVMType.UserDefined a c)
       <> " and "
       <> showType b
