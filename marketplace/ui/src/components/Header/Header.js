@@ -323,7 +323,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
             && <Dropdown menu={{ items: stratoItem }} placement="bottomRight" trigger={["hover","click"]} className="xs:mt-5 md:mt-0" overlayStyle={{ position: 'fixed' }}>
               <a onClick={(e) => e.preventDefault()} className="md:flex mx-2 text-base text-white" id="user-dropdown">
               <Badge
-              color="grey"
+              style={{backgroundColor:"#101481"}}
               className="cursor-pointer mt-7 md:mt-0 mx-2"
               count={strats}
               overflowCount={9999999}
