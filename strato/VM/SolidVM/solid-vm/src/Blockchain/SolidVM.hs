@@ -2502,12 +2502,11 @@ callBuiltin "account" [(SAccount a _), SString ('0' : 'x' : xs)] _ = return . ((
 callBuiltin "account" [(SAccount a _), SString name] _ = a `castToAncestor` name
 callBuiltin ("addmod") [SInteger a, SInteger b, SInteger c] _ = return . SInteger $ (a + b) `mod` c
 callBuiltin ("mulmod") [SInteger a, SInteger b, SInteger c] _ = return . SInteger $ (a * b) `mod` c
+callBuiltin ("blockhash") [SInteger blockNum] _ | blockNum < 0 = invalidArguments "blockhash() only accepts arguments greater than or equal to 0" [blockNum]
 callBuiltin ("blockhash") [SInteger blockNum] _ = do
-  when (blockNum < 0) (invalidArguments "Does not Exist" [blockNum])
   env' <- getEnv
   let curBlock = Env.blockHeader env'
   maybeTheHash <- getBlockHashWithNumber blockNum (blockDataParentHash curBlock)
-  --theHash :: Maybe Keccak256
   maybe (invalidArguments "the block number given does not exist" [blockNum]) (return . SString . BC.unpack . keccak256ToByteString) maybeTheHash
 callBuiltin ("selfdestruct") [SAccount a _] _ = do
   contract' <- getCurrentAccount

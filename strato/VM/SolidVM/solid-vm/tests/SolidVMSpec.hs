@@ -252,14 +252,6 @@ secondAddress = Account (getNewAddress_unsafe (sender ^. accountAddress) 1) Noth
 recursiveAddr :: Account
 recursiveAddr = Account (getNewAddress_unsafe (uploadAddress ^. accountAddress) 0) Nothing
 
--- makeStrArgs :: [T.Text] -> T.Text
--- makeStrArgs xs =
---   let
---     escp :: T.Text -> T.Text
---     escp s = "\"" <> s <> "\""
---     repl = map escp
---   in "(" <> (T.intercalate (T.pack ", ") (repl xs)) <> ")"
-
 devNull :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
 devNull _ _ _ _ = return ()
 
@@ -467,6 +459,8 @@ runArgsWithSender acc args bs = do
       txHash = unsafeCreateKeccak256FromWord256 0x776622233444
       chainId = Nothing
       metadata = Just $ M.fromList [("name", "qq"), ("args", args)]
+  
+  insert (Proxy @BlockSummary) (unsafeCreateKeccak256FromWord256 0x0) (blockHeaderToBSum blockData 900 1)
 
   newAddress <- getNewAddress acc
   er <-
@@ -8558,3 +8552,25 @@ contract qq {
     delete yy;
   }
 }|]) `shouldThrow` anyTODO 
+
+  it "can successfully use the 'blockhash' built-in" $ runTest ( do 
+    runBS [r|
+contract qq {
+  string hsh = blockhash(block.number);
+  constructor() {}
+}|]
+    getFields ["hsh"] `shouldReturn` [BString $ keccak256ToByteString $ unsafeCreateKeccak256FromWord256 0x0])
+
+  it "can error handle the 'blockhash' built-in - less than 0 argument" $ runTest ( do 
+    runBS [r|
+contract qq {
+  string hsh = blockhash(-1);
+  constructor() {}
+}|]) `shouldThrow` anyInvalidArgumentsError
+
+  it "can error handle the 'blockhash' built-in - non-existent block number" $ runTest ( do 
+    runBS [r|
+contract qq {
+  string hsh = blockhash(900000);
+  constructor() {}
+}|]) `shouldThrow` anyInvalidArgumentsError
