@@ -28,34 +28,14 @@ const UserProfile = (user) => {
   const boughtOrdersBaseUrl = new URL("/marketplace/bought-orders", window.location.origin).toString();
   const transfersBaseUrl = new URL("/marketplace/order/transfers", window.location.origin).toString();
 
-  console.log("userActiity", userActivity);
-
-  // Temp values for body
-  // Get the current date and time
-  const currentDate = new Date();
-
-  // Subtract 10 days from the current date
-  // Note: The Date object in JavaScript counts dates in milliseconds, so you need to convert 10 days to milliseconds
-  // 1 day = 24 hours, 1 hour = 60 minutes, 1 minute = 60 seconds, 1 second = 1000 milliseconds
-  const tenDaysInMilliseconds = 10 * 24 * 60 * 60 * 1000;
-  const tenDaysAgoDate = new Date(
-    currentDate.getTime() - tenDaysInMilliseconds
-  );
-
-  // If you need the timestamp in seconds (common for Unix timestamps used in backends), you can convert it as follows
-  const tenDaysAgoTimestampSeconds = Math.floor(
-    tenDaysAgoDate.getTime() / 1000
-  );
-  console.log(tenDaysAgoTimestampSeconds);
 
   useEffect(() => {
-    const body = {
-      user: "Vijay Rajasekaran",
-      gtField: "block_timestamp",
-      gtValue: tenDaysAgoTimestampSeconds,
-    };
-    userActivityActions.fetchUserActivity(userActivityDispatch, body);
-  }, [userActivityDispatch, tenDaysAgoTimestampSeconds]);
+    if (!user.user) {
+      return
+    }
+    const profile = user.user.commonName
+    userActivityActions.fetchUserActivity(userActivityDispatch, profile);
+  }, [userActivityDispatch, user.user]);
 
   // Mock data for the collection items
   const collectionItems = [
@@ -96,17 +76,6 @@ const UserProfile = (user) => {
 
     return false;
   };
-
-  const allActivities = [
-    ...userActivity.soldOrders.map(item => ({ ...item, type: 'sold', href: `http://localhost/marketplace/sold-orders/${item.address}` })),
-    ...userActivity.boughtOrders.map(item => ({ ...item, type: 'bought', href: `http://localhost/marketplace/bought-orders/${item.address}` })),
-    ...userActivity.transfers.map(item => ({ ...item, type: 'transfer', href: `http://localhost/marketplace/order/transfers` })), // Currently no trnsfer details page
-  ];
-
-  // Sort activities by timestamp if needed
-  allActivities.sort(
-    (a, b) => new Date(b.block_timestamp) - new Date(a.block_timestamp)
-  );
 
   return (
     <div className="container mx-auto lg:px-20 xl:px-32">
@@ -190,7 +159,7 @@ const UserProfile = (user) => {
         <TabPane tab="My Activity" key="2">
           {/* Activity Content */}
           <div className="activity-list">
-            {allActivities.map((activity, index) => {
+            {userActivity.map((activity, index) => {
               let description;
               let href;
               switch (activity.type) {

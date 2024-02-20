@@ -22,11 +22,7 @@ const reducer = (state, action) => {
     case actionDescriptors.fetchUserActivitySuccessful:
       return {
         ...state,
-        userActivity: {
-          soldOrders: action.payload.bodySold,
-          boughtOrders: action.payload.bodyBought,
-          transfers: action.payload.bodyTransfers,
-        },
+        userActivity: action.payload,
         isUserActivityLoading: false,
       };
     case actionDescriptors.fetchUserActivityFailed:

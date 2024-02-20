@@ -16,13 +16,11 @@ const actions = {
     dispatch({ type: actionDescriptors.setMessage, message, success });
   },
 
-  fetchUserActivity: async (dispatch, body) => {
+  fetchUserActivity: async (dispatch, user) => {
     dispatch({ type: actionDescriptors.fetchUserActivity });
-    const { user, gtValue, gtField } = body
-    console.log("body", body)
     try {
       const ordersSold = await fetch(
-        `${apiUrl}/userActivity?sellersCommonName=${user}&gtValue=${gtValue}&gtField=${gtField}&purchasersCommonName=${user}&newOwnerCommonName=${user}`,
+        `${apiUrl}/userActivity?sellersCommonName=${user}&purchasersCommonName=${user}&newOwnerCommonName=${user}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -33,7 +31,7 @@ const actions = {
       if (ordersSold.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchUserActivitySuccessful,
-          payload: { bodySold: bodysold.data.soldOrders, bodyBought: bodysold.data.boughtOrders, bodyTransfers: bodysold.data.transfers },
+          payload: bodysold.data,
         });
         return;
       }

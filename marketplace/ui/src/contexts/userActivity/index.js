@@ -8,11 +8,7 @@ const UserActivityDispatchContext = createContext();
 const UserActivityProvider = ({ children }) => {
   // Adjust initial state to match the user activity context
   const initialState = {
-    userActivity: {
-      soldOrders: [],
-      boughtOrders: [],
-      transfers: [],
-    },
+    userActivity: [],
     isUserActivityLoading: false,
     error: undefined,
     success: false,

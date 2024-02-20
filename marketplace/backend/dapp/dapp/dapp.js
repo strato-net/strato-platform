@@ -582,27 +582,38 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   /* ------------------------ User Activity Starts ------------------------ */
   contract.getAllUserActivity = async function (args, options = defaultOptions) {
     const getOptions = { ...options, app: contractName };
-    const { sellersCommonName, gtField, gtValue, purchasersCommonName, newOwnerCommonName } = args
+    const { sellersCommonName, purchasersCommonName, newOwnerCommonName } = args
+
+    const currentDate = new Date();
+    // Subtract 10 days from the current date
+    const tenDaysAgoDate = new Date(currentDate.getTime() - (10 * 24 * 60 * 60 * 1000));
+    // Format the date as 'YYYY-MM-DD HH:MM:SS UTC'
+    const tenDaysAgoTimestamp = tenDaysAgoDate.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
 
     // Need to fetch purchases, closed orders, transfers for the user.
     // New Purchases of User's Products---Fetch Orders with filters of sellersCommonName, block_timestamp and Order Status = AWAITING_FULFILLMENT (1) 
-    // TODO: Add logic to utils for gtField and gtValue. We are using these to filter the block timestamps greater than 10 days ago. 
-    const purchaseArgs = { sellersCommonName, status: 1}
+    const purchaseArgs = { sellersCommonName, status: 1, gtField: "block_timestamp", gtValue: tenDaysAgoTimestamp}
     const purchases = await saleOrderJs.getAll(rawAdmin, purchaseArgs, getOptions);
 
     // These are my orders that ave been closed by a seller
-    // TODO: Add logic to utils for gtField and gtValue. We are using these to filter the block timestamps greater than 10 days ago. 
-    const orderArgs = { purchasersCommonName, status: 3}
+    const orderArgs = { purchasersCommonName, status: 3, gtField: "block_timestamp", gtValue: tenDaysAgoTimestamp}
     const orders = await saleOrderJs.getAll(rawAdmin, orderArgs, getOptions);
 
     // These are transfers the usre has recieved
-    // TODO: Add logic to utils for gtField and gtValue. We are using these to filter the block timestamps greater than 10 days ago. 
-    const transferArgs = {newOwnerCommonName};
+    const transferArgs = {newOwnerCommonName, gtField: "block_timestamp", gtValue: tenDaysAgoTimestamp};
     const transfers = await inventoryJs.getAllItemTransferEvents(rawAdmin, transferArgs, getOptions);
 
-    // TODO: figure out how we want to arrange the data
-    return { soldOrders: purchases.orders, boughtOrders: orders.orders, transfers: transfers.transfers }
+    // Fetch activities and add type to each item
+    const purchasesWithTypes = purchases.orders.map(p => ({ ...p, type: 'sold' }));
+    const ordersWithTypes = orders.orders.map(o => ({ ...o, type: 'bought' }));
+    const transfersWithTypes = transfers.transfers.map(t => ({ ...t, type: 'transfer' }));
 
+    // Combine all activities into one array
+    const allActivities = [...purchasesWithTypes, ...ordersWithTypes, ...transfersWithTypes];
+    // Sort by block_timestamp
+    allActivities.sort((a, b) => new Date(b.block_timestamp) - new Date(a.block_timestamp));
+
+    return allActivities;
   };
 
   /* ------------------------ User Activity Ends------------------------ */
