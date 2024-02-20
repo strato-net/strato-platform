@@ -7,7 +7,10 @@ module.exports = {
       md: "768px",
       lg: "976px",
       xl: "1440px",
-      "2xl":"1600px" 
+      "2xl": "1600px",
+      "3xl": "2000PX",
+      "4xl": "2400px",
+      "5xl": "2800px"
     },
     colors: {
       black: "#000",
@@ -32,16 +35,16 @@ module.exports = {
       orange: "#FF8C00",
     },
     boxShadow: {
-      form  : "0px 4px 59px 10px #73737326" ,
-      card_shadow : "0px 0px 14px 0px #00000015",
-      category : "0px 4px 14px 0px #00000026",
-      header : "0px 4px 6px 0px #00000010"
+      form: "0px 4px 59px 10px #73737326",
+      card_shadow: "0px 0px 14px 0px #00000015",
+      category: "0px 4px 14px 0px #00000026",
+      header: "0px 4px 6px 0px #00000010"
     },
     fontFamily: {
       sans: ["Montserrat", "sans-serif"],
       serif: ["Montserrat", "serif"],
     },
- 
+
     extend: {
       spacing: {
         128: "32rem",
@@ -50,10 +53,10 @@ module.exports = {
       borderRadius: {
         "4xl": "2rem",
       },
-      boxShadow:{
-        Footer : "0px -4px 4px 0px #00000029"
+      boxShadow: {
+        Footer: "0px -4px 4px 0px #00000029"
       }
-      
+
     },
   },
   plugins: [],

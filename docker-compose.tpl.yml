@@ -211,7 +211,6 @@ services:
     - VM_DEBUGGER=${VM_DEBUGGER}
     - VM_DEBUG_LOG=${VM_DEBUG_LOG:-false}
     - vmRunnerRTSOPTs=${vmRunnerRTSOPTs}
-    - wireMessageCacheSize=${wireMessageCacheSize}
     - zkHost=zookeeper
     build: .
     image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>}
@@ -351,7 +350,7 @@ services:
       KAFKA_OFFSETS_RETENTION_MINUTES: 2147483647
       KAFKA_MAX_REQUEST_SIZE: ${KAFKA_MAX_REQUEST_SIZE:-100663296}
       KAFKA_MESSAGE_MAX_BYTES: ${KAFKA_MESSAGE_MAX_BYTES:-100663296}
-    image: wurstmeister/kafka:1.1.0
+    image: wurstmeister/kafka:2.12-2.0.1
     restart: unless-stopped
     volumes:
     - kafkadata:/kafka
