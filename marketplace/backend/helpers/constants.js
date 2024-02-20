@@ -30,6 +30,8 @@ export default {
   testnetStratsAddress: "488cd3909d94606051e0684cf6caa5763fb78613"
 };
 
+export const STRIPE_PAYMENT_SERVER_URL = process.env.STRIPE_PAYMENT_SERVER_URL
+
 export const unitOfMeasurement = {}
 unitOfMeasurement[unitOfMeasurement['LB'] = 1] = 'LB';
 unitOfMeasurement[unitOfMeasurement['OZ'] = 2] = 'OZ';
@@ -76,6 +78,3 @@ export const SERVICE_PROVIDERS = {}
 SERVICE_PROVIDERS[SERVICE_PROVIDERS['STRIPE'] = 1] = 'STRIPE';
 SERVICE_PROVIDERS[SERVICE_PROVIDERS['PAYPAL'] = 2] = 'PAYPAL';
 Object.freeze(SERVICE_PROVIDERS)
-
-export const STRIPE_PAYMENT_SERVER_URL = process.env.STRIPE_PAYMENT_SERVER_URL
-

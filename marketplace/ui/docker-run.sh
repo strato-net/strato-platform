@@ -16,17 +16,6 @@ FILE_SERVER_URL=$(curl --silent --fail ${ETH_ENDPOINT}/metadata | jq -r .urls.fi
 
 sed -i "s|__SITE_ID__|$SITE_ID|g" build/index.html
 sed -i "s|__FILE_SERVER_URL__|$FILE_SERVER_URL|g" build/index.html
-if [ ! -f .env ]; then
-  # If it doesn't exist, create the .env file and insert environment variables.
-  touch .env
-
-  echo "REACT_APP_ASSET_TABLE_NAME=${ASSET_TABLE_NAME}" >> .env
-  echo "REACT_APP_SALE_TABLE_NAME=${SALE_TABLE_NAME}" >> .env
-else
-  # If the .env file exists, replace the environment variables.
-  sed -i `s/REACT_APP_ASSET_TABLE_NAME=.*/REACT_APP_ASSET_TABLE_NAME=${ASSET_TABLE_NAME}/` .env
-  sed -i `s/REACT_APP_SALE_TABLE_NAME=.*/REACT_APP_SALE_TABLE_NAME=${SALE_TABLE_NAME}/` .env
-fi
 
 echo 'Starting ui server...'
 

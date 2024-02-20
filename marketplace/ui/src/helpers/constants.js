@@ -1,10 +1,10 @@
 import { AMEX, Discover, Mastercard, VISA, BANK } from "../images/SVGComponents";
 
-export const fileServerUrl = window.FILE_SERVER_URL;
-
 export const apiUrl = process.env.REACT_APP_URL
   ? process.env.REACT_APP_URL + "/api/v1"
   : "/api/v1";
+
+export const fileServerUrl = window.FILE_SERVER_URL;
 
 export const cirrusUrl = process.env.REACT_APP_URL
   ? process.env.REACT_APP_URL + "/cirrus/search"

@@ -112,11 +112,9 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
   sed -i 's*<apiDebug_value>*'"${MP_API_DEBUG}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<configDirPath_value>*'"${CONFIG_DIR_PATH}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<deployFilename_value>*'"${DEPLOY_FILE_NAME}"'*g' /tmp/tmp.config.yaml
-  sed -i 's*<orgDeployFilename_value>*'"${ORG_DEPLOY_FILE_NAME}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<serverHost_value>*'"${SERVER_URL}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<node_label_value>*'"${NODE_LABEL}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<node_url_value>*'"${STRATO_NODE_PROTOCOL}://${STRATO_NODE_HOST}"'*g' /tmp/tmp.config.yaml
-  sed -i 's*<node_publicKey_value>*'"${NODE_PUBLIC_KEY}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<oauth_appTokenCookieName_value>*'"${OAUTH_APP_TOKEN_COOKIE_NAME}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<oauth_openIdDiscoveryUrl_value>*'"${OAUTH_OPENID_DISCOVERY_URL}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<oauth_clientId_value>*'"${OAUTH_CLIENT_ID}"'*g' /tmp/tmp.config.yaml
@@ -128,9 +126,6 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
   sed -i 's*<oauth_tokenField_value>*'"${OAUTH_TOKEN_FIELD}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<oauth_tokenUsernameProperty_value>*'"${OAUTH_TOKEN_USERNAME_PROPERTY}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<oauth_tokenUsernamePropertyServiceFlow_value>*'"${OAUTH_TOKEN_USERNAME_PROPERTY_SERVICE_FLOW}"'*g' /tmp/tmp.config.yaml
-  sed -i 's*<orgName_value>*'"${ORG_NAME}"'*g' /tmp/tmp.config.yaml
-  sed -i 's*<adminName_value>*'"${ADMIN_NAME}"'*g' /tmp/tmp.config.yaml
-  sed -i 's*<adminPassword_value>*'"${ADMIN_PASSWORD}"'*g' /tmp/tmp.config.yaml
   find . -type f -name '*.sol' -exec sed -i 's*BASE_CODE_COLLECTION*'"${BASE_CODE_COLLECTION}"'*g' {} +
 
   mv /tmp/tmp.config.yaml ./config/generated.config.yaml

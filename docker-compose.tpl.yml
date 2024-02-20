@@ -66,7 +66,6 @@ services:
     - MP_IS_BOOTNODE=${MP_IS_BOOTNODE:-false}
     - MP_API_DEBUG=${MP_API_DEBUG:-false}
     - MP_DELAY_DEPLOYMENT=${MP_DELAY_DEPLOYMENT}
-    - ORG_DEPLOY_FILE_NAME=${DEPLOY_FILE_NAME:-org.deploy.yaml}
     - MP_SERVER_HOST=${NODE_HOST}
     - MP_SERVER_SSL=${ssl}
     - STRATO_NODE_PROTOCOL=${STRATO_NODE_PROTOCOL}
@@ -75,8 +74,6 @@ services:
     - OAUTH_APP_TOKEN_COOKIE_NAME=${OAUTH_APP_TOKEN_COOKIE_NAME:-stratomp_session}
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
-    - OAUTH_VAULT_PROXY_ALT_CLIENT_ID=${OAUTH_VAULT_PROXY_ALT_CLIENT_ID}
-    - OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET=${OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET}
     - OAUTH_SCOPE=${OAUTH_SCOPE:-email openid} # TODO: to be removed after app oauth changes
     - OAUTH_SERVICE_OAUTH_FLOW=client-credential
     - OAUTH_TOKEN_FIELD=access_token
@@ -86,7 +83,6 @@ services:
     - STRATO_PORT_API=${STRATO_PORT_API}
     - GLOBAL_ADMIN_NAME=${GLOBAL_ADMIN_NAME}
     - GLOBAL_ADMIN_PASSWORD=${GLOBAL_ADMIN_PASSWORD}
-    - ORG_NAME='BlockApps' # TODO: can be removed?
     - SENDGRID_API_KEY=${SENDGRID_API_KEY}
     build: .
     image: ${MARKETPLACEBACKEND_IMAGE:-<REPO_URL>marketplace-backend:<VERSION>}
@@ -102,9 +98,6 @@ services:
     depends_on:
       - marketplace-backend
     environment:
-      - NODE_ENV=${NODE_ENV:-production}
-      - ASSET_TABLE_NAME=${ASSET_TABLE_NAME}
-      - SALE_TABLE_NAME=${SALE_TABLE_NAME}
       - SITE_ID=${SITE_ID:-038fe3fa}
       - STRATO_HOSTNAME=${STRATO_HOSTNAME}
       - STRATO_PORT_API=${STRATO_PORT_API}
