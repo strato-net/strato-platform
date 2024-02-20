@@ -18,7 +18,6 @@ stack test $1\
       blockapps-mpdbs \
       blockapps-tools \
       blockapps-vault-proxy-server \
-      blockstanbul \
       bloc2api \
       common-log \
       cross-monitoring \
@@ -37,15 +36,12 @@ stack test $1\
       solid-vm-parser \
       source-tools \
       strato-index \
-      strato-init \
       strato-lite \
       strato-genesis \
       strato-model \
-      strato-p2p \
       strato-redis-blockdb \
       strato-sequencer \
       vm-runner \
-      vm-tools \
       x509-certs
 
 if [ $1 = --coverage ]
