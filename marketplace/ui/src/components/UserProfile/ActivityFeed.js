@@ -17,9 +17,9 @@ const ActivityIcon = ({ type }) => {
   }
 };
 
-const ActivityFeed = ({ type, description, timestamp }) => {
+const ActivityFeed = ({ type, description, timestamp, href }) => {
   return (
-    <div className="activity-item flex items-center p-4 border-b">
+    <div className="activity-item flex items-center py-4 border-b">
       <div className="activity-icon mr-4">
         <ActivityIcon type={type} />
       </div>
@@ -32,7 +32,9 @@ const ActivityFeed = ({ type, description, timestamp }) => {
         </div>
       </div>
       <div className="activity-action">
-        <Button type="link">Check Now</Button>
+        <a href={href} target="_blank" rel="noopener noreferrer">
+          <Button type="link">Review Now</Button>
+        </a>
       </div>
     </div>
   );

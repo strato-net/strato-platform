@@ -35,6 +35,10 @@ export default {
     label: "Bought Order Detail",
     url: "/bought-orders/:id",
   },
+  Transfers: {
+    label: "Transfers",
+    url: "/order/transfers",
+  },
   SoldOrderItemDetail: {
     label: "Order Item Detail",
     url: "/sold-orders-details/:id",

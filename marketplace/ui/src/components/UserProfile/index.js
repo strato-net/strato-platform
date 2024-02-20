@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { Card, Button, Avatar, Tabs, Input, Row, Col, Typography } from "antd";
-import { EditOutlined, ShoppingCartOutlined } from "@ant-design/icons";
 import { UserOutlined } from "@ant-design/icons";
 import { Images } from "../../images";
 import routes from "../../helpers/routes";
-import { useLocation, useMatch } from "react-router-dom";
+import { useMatch } from "react-router-dom";
 import { useInventoryDispatch } from "../../contexts/inventory";
 import { actions as userActivityActions } from "../../contexts/userActivity/actions";
 import {
@@ -24,6 +23,10 @@ const UserProfile = (user) => {
 
   const userActivityDispatch = useUserActivityDispatch();
   const { userActivity } = useUserActivityState();
+
+  const soldOrdersBaseUrl = new URL("/marketplace/sold-orders", window.location.origin).toString();
+  const boughtOrdersBaseUrl = new URL("/marketplace/bought-orders", window.location.origin).toString();
+  const transfersBaseUrl = new URL("/marketplace/order/transfers", window.location.origin).toString();
 
   console.log("userActiity", userActivity);
 
@@ -95,9 +98,9 @@ const UserProfile = (user) => {
   };
 
   const allActivities = [
-    ...userActivity.soldOrders.map((item) => ({ ...item, type: "sold" })),
-    ...userActivity.boughtOrders.map((item) => ({ ...item, type: "bought" })),
-    ...userActivity.transfers.map((item) => ({ ...item, type: "transfer" })),
+    ...userActivity.soldOrders.map(item => ({ ...item, type: 'sold', href: `http://localhost/marketplace/sold-orders/${item.address}` })),
+    ...userActivity.boughtOrders.map(item => ({ ...item, type: 'bought', href: `http://localhost/marketplace/bought-orders/${item.address}` })),
+    ...userActivity.transfers.map(item => ({ ...item, type: 'transfer', href: `http://localhost/marketplace/order/transfers` })), // Currently no trnsfer details page
   ];
 
   // Sort activities by timestamp if needed
@@ -106,7 +109,7 @@ const UserProfile = (user) => {
   );
 
   return (
-    <div className="container mx-auto p-6">
+    <div className="container mx-auto lg:px-20 xl:px-32">
       {/* User Cover and Prodile Picture Zone */}
       <div className="flex justify-center items-center mb-6 relative p-2 h-[222px] sm:h-[380px] mx-1 sm:mx-2 sm:mt-6 lg:mx-3">
         <img
@@ -189,18 +192,23 @@ const UserProfile = (user) => {
           <div className="activity-list">
             {allActivities.map((activity, index) => {
               let description;
+              let href;
               switch (activity.type) {
                 case "sold":
-                  description = `Sold to ${activity.purchasersCommonName} for $${activity.totalPrice}`;
+                  description = `You have received a new order ${activity.orderId} from ${activity.purchasersCommonName}.`;
+                  href = `${soldOrdersBaseUrl}/${activity.address}`;
                   break;
                 case "bought":
-                  description = `Bought from ${activity.sellersCommonName} for $${activity.totalPrice}`;
+                  description = `Your order ${activity.orderId} was fulfilled by ${activity.sellersCommonName}.`;
+                  href = `${boughtOrdersBaseUrl}/${activity.address}`;
                   break;
                 case "transfer":
-                  description = `Transferred ${activity.assetName} to ${activity.newOwnerCommonName}`;
+                  description = `You have received one or more items as a free transfer from ${activity.oldOwnerCommonName}.`;
+                  href = transfersBaseUrl; 
                   break;
                 default:
                   description = "Activity occurred";
+                  href = "#";
               }
               return (
                 <ActivityFeed
@@ -208,6 +216,7 @@ const UserProfile = (user) => {
                   type={activity.type}
                   description={description}
                   timestamp={activity.block_timestamp}
+                  href={href}
                 />
               );
             })}
