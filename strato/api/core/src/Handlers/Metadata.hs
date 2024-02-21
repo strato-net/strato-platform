@@ -27,6 +27,7 @@ import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
+import Blockchain.Strato.Model.Options (computeNetworkID)
 import Blockchain.Strato.Model.Secp256k1 hiding (HasVault (..))
 import Blockchain.Strato.RedisBlockDB (getSyncStatusNow, runStratoRedisIO)
 import Control.Lens
@@ -35,11 +36,13 @@ import Control.Monad.Composable.SQL
 import Control.Monad.Composable.Vault
 import Data.Aeson hiding (Success)
 import Data.Aeson.Casing.Internal (camelCase, dropFPrefix)
+import Data.Map (Map, fromList)
 import Data.Maybe (fromJust, fromMaybe)
 import Data.Swagger hiding (url)
 import qualified Database.Esqueleto.Legacy as E
 import GHC.Generics
 import GHC.Stack
+import Handlers.Options
 import qualified LabeledError
 import SQLM
 import Servant
@@ -53,7 +56,9 @@ data MetadataResponse = MetadataResponse
     nodeAddress :: Address,
     validators :: [ChainMemberParsedSet],
     isSynced :: Bool,
-    isVaultPasswordSet :: Bool
+    isVaultPasswordSet :: Bool,
+    networkID :: String, -- cuz JSON can't rep integers > 2^53
+    urls :: Map String String
   }
   deriving (Eq, Show, Generic, FromJSON, ToJSON)
 
@@ -85,6 +90,8 @@ exMetadataRespone =
         [CommonName "BlockApps" "Engineering" "Admin" True]
         True
         True
+        "0"
+        (fromList [("vault", "http://vault.com")])
 
 -- | The model's field modifiers will match the JSON instances
 metadataSchemaOptions :: SchemaOptions
@@ -109,7 +116,24 @@ getMetaData =
     validators <- access (Proxy @[ChainMemberParsedSet])
     isSynced <- checkIsSynced
     V.AddressAndKey a k <- getPubKeyAndAddress
-    pure $ MetadataResponse k a validators isSynced True
+    let nid = computeNetworkID
+    pure $ MetadataResponse k a validators isSynced True (show nid) 
+      (fromList [
+        ("vault", flags_vaultUrl), 
+        ("oauthDiscovery", flags_oauthDiscoveryUrl),
+        ("fileServer", networkIdToFileServer nid),
+        ("paymentServer", networkIdToPaymentServer nid)])
+  where
+    networkIdToFileServer networkId = case (flags_fileServerUrl, networkId) of 
+      ("", 7596898649924658542) -> "https://fileserver.mercata-testnet2.blockapps.net/highway"
+      ("", 6909499098523985262) -> "https://fileserver.mercata.blockapps.net/highway"
+      ("", _) -> error "File server url was not provided and cannot be derived"
+      (fileServer, _) -> fileServer
+    networkIdToPaymentServer networkId = case (flags_paymentServerUrl, networkId) of 
+      ("", 7596898649924658542) -> "https://payments.mercata-testnet2.blockapps.net"
+      ("", 6909499098523985262) -> "https://payments.mercata.blockapps.net"
+      ("", _) -> error "Payment server url was not provided and cannot be derived"
+      (paymentServer, _) -> paymentServer
 
 blocVaultWrapper ::
   (MonadIO m, MonadLogger m, HasVault m, HasCallStack) =>
