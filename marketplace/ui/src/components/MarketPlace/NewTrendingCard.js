@@ -16,13 +16,15 @@ import { Images } from '../../images';
 import images_placeholder from "../../images/resources/image_placeholder.png"
 
 const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
+    const {Text} = Typography;
+    const navigate = useNavigate();
     const [quantity, setQuantity] = useState(1)
     const [api, contextHolder] = notification.useNotification();
 
     let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
 
     const naviroute = routes.MarketplaceProductDetail.url;
-    const navigate = useNavigate();
+    const isAvailableForSale = (!topSellingProduct.price || topSellingProduct.saleQuantity===0)
 
     return (
         <div className={`trending_cards_container_card bg-white p-3 ${parent == 'Marketplace' ? 'min-w-[300px] w-auto' : 'min-w-[230px]'} min-w-[230px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}>
@@ -97,10 +99,11 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                     </Typography>
                 </div>
             </div>
-            <div className='flex gap-4 mt-1'>
+            <div className={`flex gap-4 mt-1 ${isAvailableForSale && 'opacity-50'}`}>
                 <Button
                     id={`${topSellingProduct.name.replace(/ /g, "_")}-buy-now`}
                     type='primary'
+                    disabled={isAvailableForSale}
                     className='flex-1 h-9 !bg-[#13188A] !text-white'
                     onClick={() => {
                         if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
@@ -133,6 +136,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                 </Button>
                 <Button
                 className='h-9 w-9 flex items-center justify-center !bg-[#13188A] '
+                disabled={isAvailableForSale}
                     onClick={() => {
                         if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                             setCookie("returnUrl", `/marketplace/productList/${topSellingProduct.address}`, 10);
@@ -165,6 +169,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                     {/* <ShoppingCartOutlined style={{ color: '#EEEFFA' , width:'18px' ,  height:'18px' }} /> */}
                 </Button>
             </div>
+            {isAvailableForSale && <Text type="danger text-center"> Currently unavailable </Text>}
         </div>
     )
 }

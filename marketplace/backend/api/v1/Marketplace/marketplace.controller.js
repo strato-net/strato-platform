@@ -12,7 +12,7 @@ class MarketplaceController {
       const inventories = await dapp.getMarketplaceInventories({ ...query })
 
       const productsWithImageUrl = inventories?.inventoryResults.sort((a, b) => {
-        return b.saleDate.localeCompare(a.saleDate);
+        return b?.saleDate?.localeCompare(a?.saleDate);
       });
       rest.response.status200(res, { productsWithImageUrl: productsWithImageUrl, inventoryCount: inventories?.inventoryCount })
 
@@ -33,7 +33,7 @@ class MarketplaceController {
       const inventories = await dapp.getMarketplaceInventoriesLoggedIn({ ...query })
 
       const productsWithImageUrl = inventories?.inventoryResults.sort((a, b) => {
-        return b.saleDate.localeCompare(a.saleDate);
+        return b?.saleDate?.localeCompare(a?.saleDate);
       });
       rest.response.status200(res, { productsWithImageUrl: productsWithImageUrl, inventoryCount: inventories?.inventoryCount })
 

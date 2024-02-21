@@ -409,6 +409,13 @@ async function getAll(admin, args = {}, defaultOptions) {
                 });
             }
             else if (isMarketplaceSearch) {
+                finalInventory.push({
+                    ...inventory,
+                    price: null,
+                    saleAddress: null,
+                    saleQuantity: null,
+                    saleDate: null
+                });
                 //skip
             } else {
                 finalInventory.push(inventory);
