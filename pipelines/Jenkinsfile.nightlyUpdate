@@ -34,6 +34,7 @@ pipeline {
         dir ('/home/ec2-user/strato-getting-started') {
           sh 'sudo ./ restart.sh'
           sh 'sudo docker cp nginx.conf strato_nginx_1:/usr/local/openresty/nginx/conf/nginx.conf'
+          sh 'sudo docker exec -it strato_nginx_1 openresty -s reload'
         }
         sh 'sudo docker image prune'
       }
