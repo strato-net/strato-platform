@@ -50,6 +50,10 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   done
   echo "Strato api is available"
   OAUTH_DISCOVERY_URL=$(curl --silent --fail ${ETH_ENDPOINT}/metadata | jq -r .urls.oauthDiscovery)
+  if [ -z "${OAUTH_DISCOVERY_URL}" ]; then
+    echo "Could not get OAuth discovery url from strato api, but it is a required value"
+    exit 5
+  fi
   if ! curl --silent --output /dev/null --fail --location ${OAUTH_DISCOVERY_URL}
   then
     echo "OAuth OpenID Connect Discovery URL is unreachable: ${OAUTH_DISCOVERY_URL}. Exit"
