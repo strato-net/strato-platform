@@ -338,7 +338,7 @@ const CategoryProductList = ({ user }) => {
     </Breadcrumb>
 
   const ClearFilterComponent = () =>
-    <div className="flex justify-between max-[768px]:px-7 max-[768px]:py-4">
+    <div className="flex justify-between m-2 max-[768px]:px-7 max-[768px]:py-4">
       <div className="flex items-center">
         <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
         <Text className="text-xl font-semibold pr-7 ml-1">Filters</Text>
@@ -529,7 +529,7 @@ const CategoryProductList = ({ user }) => {
 
         {/* Product list section */}
         <div className="mb-12 w-full">
-          <div className="hidden md:flex mt-2 items-center">
+          <div className="hidden md:flex mt-4 items-center">
             <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
             <Text className="text-gray-800 ml-1 text-xl font-semibold">
               {isLoading ? <Spin spinning={isLoading} size="small" /> : marketplaceList?.length} Results
@@ -542,7 +542,7 @@ const CategoryProductList = ({ user }) => {
             :
             <div>
               {marketplaceList?.length > 0 ? (
-                <div className={`mt-[61px] md:mt-4 mb-8 flex w-full md:grid flex-col items-center ${desktopOpenFilter ? "grid-cols-1 gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 4xl:grid-cols-5 lg:gap-14 xl:gap-x-10 2xl:gap-x-20" : " sm:grid-cols-1 gap-4 md:grid-cols-2 md:gap-14 lg:grid-cols-3 lg:gap-16 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 5xl:grid-cols-7"}`} id="product-list">
+                <div className={`mt-[61px] md:mt-10 mb-8 flex w-full md:grid flex-col items-center ${desktopOpenFilter ? "grid-cols-1 gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 4xl:grid-cols-5 lg:gap-14 xl:gap-x-10 2xl:gap-x-20" : " sm:grid-cols-1 gap-4 md:grid-cols-2 md:gap-14 lg:grid-cols-3 lg:gap-16 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 5xl:grid-cols-7"}`} id="product-list">
                   {marketplaceList.map((product, index) => {
                     return (
                       <NewTrendingCard
