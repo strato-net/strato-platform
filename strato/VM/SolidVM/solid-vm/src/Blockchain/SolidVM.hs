@@ -1241,7 +1241,7 @@ runStatement (CC.AssemblyStatement (CC.MloadAdd32 dst src) pos) = do
   dstVar <- expToVar $ CC.Variable pos $ textToLabel dst
 
   -- TODO(tim): should this hex encode src and pad?
-  setVar dstVar =<< getString srcVar
+  setVar dstVar =<< getVar srcVar
   return Nothing
 runStatement st@(CC.EmitStatement eventName exptups pos) = do
   -- emit MemberAdded(<address>, <enode>);
@@ -1400,7 +1400,7 @@ expToPath x@(CC.IndexAccess _ parent mIndex) = do
       n <- getInt idxVar
       return . MS.MapIndex $ MS.INum n
     MapStringIndex -> do
-      idx <- getString idxVar
+      idx <- getVar idxVar
       return $ case idx of
         SString s -> MS.MapIndex $ MS.IText $ UTF8.fromString s
         _ -> typeError "invalid map of strings index" idx

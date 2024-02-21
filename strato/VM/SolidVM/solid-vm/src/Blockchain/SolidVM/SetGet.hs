@@ -15,8 +15,6 @@ module Blockchain.SolidVM.SetGet
     getVar,
     getInt,
     getBool,
-    getAccount,
-    getString,
     deleteVar,
     toBasic,
     fromBasic,
@@ -142,12 +140,6 @@ setVal dst@(SReference addressedPath@(AccountPath addr path)) src = do
 setVal (SInteger dst) (SInteger _) = immutableError "Cannot assign immutable or constants after assigned ->" dst -- typeError "Cannot assign immutables after assigned" ("src = " ++ show src ++ ", dst = " ++ show dst)
 setVal (SNULL) _ = return ()
 setVal dst src = typeError "unknown case called in setVal (Probably tried to change the value of a constant):" ("src = " ++ show src ++ ", dst = " ++ show dst)
-
-getAccount :: MonadSM m => Variable -> m Value
-getAccount = getVar
-
-getString :: MonadSM m => Variable -> m Value
-getString = getVar
 
 weakGetVar :: MonadIO m => Variable -> m Value
 weakGetVar (Constant c) = return c
