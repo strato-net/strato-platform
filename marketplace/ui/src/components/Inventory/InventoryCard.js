@@ -365,13 +365,13 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
        
         <div className="flex flex-col gap-4 px-[18px] py-4 border border-[#E9E9E9] rounded-md w-full ">
           <div className="flex justify-between  ">
-            <p className="text-[#6A6A6A]">Sub Category</p>
-            <p className="text-[#202020] font-semibold">{getCategory() || "N/A"}</p>
-          </div> <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity Owned</p>
             <p className="text-[#202020] font-semibold">{inventory.quantity || "N/A"}</p>
           </div> <div className="flex justify-between  ">
-            <p className="text-[#6A6A6A]">Quantity for Sale </p>
+            <p className="text-[#6A6A6A]">Quantity Available for Sale </p>
+            <p className="text-[#202020] font-semibold">{(inventory.quantity - inventory.totalLockedQuantity) || "N/A"}</p>
+          </div> <div className="flex justify-between  ">
+            <p className="text-[#6A6A6A]">Quantity Listed for Sale</p>
             <p className="text-[#202020] font-semibold">{inventory.saleQuantity || "N/A"}</p>
           </div>
           <div className="flex justify-between  ">
