@@ -122,7 +122,8 @@ getMetaData =
         ("vault", flags_vaultUrl), 
         ("oauthDiscovery", flags_oauthDiscoveryUrl),
         ("fileServer", networkIdToFileServer nid),
-        ("paymentServer", networkIdToPaymentServer nid)])
+        ("paymentServer", networkIdToPaymentServer nid),
+        ("monitor", networkIdToMonitor nid)])
   where
     networkIdToFileServer networkId = case (flags_fileServerUrl, networkId) of 
       ("", 7596898649924658542) -> "https://fileserver.mercata-testnet2.blockapps.net/highway"
@@ -134,6 +135,10 @@ getMetaData =
       ("", 6909499098523985262) -> "https://payments.mercata.blockapps.net"
       ("", _) -> error "Payment server url was not provided and cannot be derived"
       (paymentServer, _) -> paymentServer
+    networkIdToMonitor networkId = case networkId of 
+      7596898649924658542 -> "https://monitor.mercata-testnet2.blockapps.net:18080"
+      6909499098523985262 -> "https://monitor.mercata.blockapps.net:18080"
+      _ -> ""
 
 blocVaultWrapper ::
   (MonadIO m, MonadLogger m, HasVault m, HasCallStack) =>
