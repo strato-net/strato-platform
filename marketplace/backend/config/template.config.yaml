@@ -3,9 +3,7 @@ timeout: 600000
 VM: SolidVM
 configDirPath: <configDirPath_value>
 deployFilename: <deployFilename_value>
-orgDeployFilename: <orgDeployFilename_value>
 serverHost: <serverHost_value>
-orgName: <orgName_value>
 dockerized: true
 marketplaceUiUrlPrefix: "/marketplace"
 

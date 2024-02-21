@@ -1,5 +1,5 @@
 FROM node:14.21.3-alpine3.17 as base
-RUN apk add --no-cache curl yarn git lsof && \
+RUN apk add --no-cache curl yarn git lsof jq && \
     yarn global add serve@13.0.2 && \
     mkdir -p /usr/src/ui
 WORKDIR /usr/src/ui/
