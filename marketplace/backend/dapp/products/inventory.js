@@ -405,7 +405,8 @@ async function getAll(admin, args = {}, defaultOptions) {
                     price: itemSale?.price,
                     saleAddress: itemSale?.address,
                     saleQuantity: itemSale?.quantity,
-                    saleDate: itemSale?.block_timestamp
+                    saleDate: itemSale?.block_timestamp,
+                    totalLockedQuantity: itemSale?.totalLockedQuantity
                 });
             }
             else if (isMarketplaceSearch) {

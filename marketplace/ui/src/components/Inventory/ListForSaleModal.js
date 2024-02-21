@@ -19,7 +19,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
     } = useInventoryState();
 
     useEffect(() => {
-        if ( inventory.saleAddress ? quantity > inventory.saleQuantity : quantity > inventory.quantity || quantity <= 0 || pricePerUnit <= 0) {
+        if ( inventory.saleAddress ? quantity > (inventory.quantity - inventory.totalLockedQuantity) : quantity > inventory.quantity || quantity <= 0 || pricePerUnit <= 0) {
             setCanList(false);
         }
         else {
