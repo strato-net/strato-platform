@@ -1388,7 +1388,7 @@ expToPath x@(CC.IndexAccess _ parent mIndex) = do
   idxVar <- maybe (typeError "empty index is only valid at type level" x) expToVar mIndex
   apSnoc parPath <$> case idxType of
     MapAccountIndex -> do
-      idx <- getAccount idxVar
+      idx <- getVar idxVar
       return $ case idx of
         SAccount a _ -> MS.MapIndex $ MS.IAccount a
         SInteger i -> MS.MapIndex $ MS.IAccount . unspecifiedChain $ fromIntegral i
