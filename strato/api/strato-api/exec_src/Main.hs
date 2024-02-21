@@ -62,6 +62,7 @@ import qualified Handlers.Faucet as Faucet
 import qualified Handlers.IdentityServerCallback as Identity
 import qualified Handlers.Log as Log
 import qualified Handlers.Metadata as Metadata
+import Handlers.Options ()
 import qualified Handlers.Peers as Peers
 import qualified Handlers.QueuedTransactions as QueuedTransactions
 import qualified Handlers.Stats as Stats
