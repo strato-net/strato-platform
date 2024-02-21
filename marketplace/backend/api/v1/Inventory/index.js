@@ -22,7 +22,7 @@ router.get(
 
 router.get(
   Inventory.getAllUserInventories,
-  authHandler.authorizeRequest(),
+  authHandler.authorizeRequest(true),
   loadDapp,
   InventoryController.getAllUserInventories
 );

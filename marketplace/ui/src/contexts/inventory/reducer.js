@@ -52,20 +52,20 @@ const reducer = (state, action) => {
       case actionDescriptors.fetchInventoryForUser:
         return {
           ...state,
-          isInventoriesLoading: true
+          isUserInventoriesLoading: true
         };
       case actionDescriptors.fetchInventoryForUserSuccessful:
         return {
           ...state,
-          inventories: action.payload.data,
-          inventoriesTotal: action.payload.count,
-          isInventoriesLoading: false
+          userInventories: action.payload.data,
+          userInventoriesTotal: action.payload.count,
+          isUserInventoriesLoading: false
         };
       case actionDescriptors.fetchInventoryForUserFailed:
         return {
           ...state,
           error: action.error,
-          isInventoriesLoading: false
+          isUserInventoriesLoading: false
         };
     case actionDescriptors.fetchInventorySearch:
       return {

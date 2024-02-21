@@ -24,6 +24,17 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
     const naviroute = routes.MarketplaceProductDetail.url;
     const navigate = useNavigate();
 
+
+    const ownerSameAsUser = () => {
+
+        if (user?.commonName === topSellingProduct?.ownerCommonName) {
+          return true;
+        }
+    
+        return false;
+      }
+
+
     return (
         <div className={`trending_cards_container_card bg-white p-3 ${parent == 'Marketplace' ? 'w-[300px]' : 'min-w-[230px]'} min-w-[230px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}>
             {contextHolder}
@@ -53,7 +64,8 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
             </div>
             <Typography className='font-normal text-black'>{'$' + topSellingProduct?.price || "N/A"}</Typography>
             <Typography className={`#989898 opacity-40 max-h-5 overflow-hidden ${parent == 'Marketplace' ? 'hidden md:flex' : ''}`}>{topSellingProduct?.description || "N/A"}</Typography>
-            <div className='flex justify-between items-center bg-[#EEEFFA] p-2 rounded-[4px]'>
+                {!ownerSameAsUser()===true? (
+                <div className='flex justify-between items-center bg-[#EEEFFA] p-2 rounded-[4px]'>
                 <Typography>Quantity:</Typography>
                 <div className='flex gap-3 p-1 bg-white'>
                     <Typography className={`px-2 bg-[#EEEFFA] rounded-sm ${quantity === 1 ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`} onClick={() => {
@@ -90,6 +102,18 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                     </Typography>
                 </div>
             </div>
+            ):(
+
+                <div className='flex justify-between items-center bg-[#EEEFFA] p-2 rounded-[4px]'>
+                <Typography>Quantity For Sale: <b>{topSellingProduct.saleQuantity}</b></Typography>
+                
+                </div>
+            )
+            
+            
+            }
+            
+            {!ownerSameAsUser() && (
             <div className='flex gap-4 mt-1'>
                 <Button
                     id={`${topSellingProduct.name.replace(/ /g, "_")}-buy-now`}
@@ -133,7 +157,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                         } else {
                             window.LOQ.push(['ready', async LO => {
                                 await LO.$internal.ready('events')
-                                LO.events.track('Add To Cart (from Top Selling Product)', {
+                                LO.events.track('Add To Cart (from User Profile)', {
                                     product: topSellingProduct.name,
                                     category: topSellingProduct.category,
                                     productId: topSellingProduct.productId
@@ -141,7 +165,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                             }])
                             TagManager.dataLayer({
                                 dataLayer: {
-                                    event: 'add_to_cart_from_top_selling_product',
+                                    event: 'add_to_cart_from_user_profile',
                                     product_name: topSellingProduct.name,
                                     category: topSellingProduct.category,
                                     productId: topSellingProduct.productId
@@ -158,6 +182,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                     {/* <ShoppingCartOutlined style={{ color: '#EEEFFA' , width:'18px' ,  height:'18px' }} /> */}
                 </Button>
             </div>
+            )}
         </div>
     )
 }

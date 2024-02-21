@@ -350,7 +350,7 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, defaultOptions) {
-    const { range, ownerCommonName, assetAddresses, status, isMarketplaceSearch, userAddressForProfile, isUserProfile, userProfileGtField, userProfileGtValue, isTrendingSearch, ...restArgs } = args;//isUserProfile, userAddressForProfile,
+    const { range, ownerCommonName, assetAddresses, status, isMarketplaceSearch, isTrendingSearch, userProfile, userProfileGtField, userProfileGtValue, ...restArgs } = args;
     let inventories;
     let sales;
     let finalInventory = [];
@@ -368,28 +368,6 @@ async function getAll(admin, args = {}, defaultOptions) {
                 address: trendingAssetAddresses,
             }, options, admin);
     } 
-    else if(isUserProfile) {
-
-        console.log("inside inventory.js:",args)
-
-        //Fetch User address
-        // const user = await certificate.getCertificate(admin, {userAddress: '11c21cdf023498a02b8f66b472d6eab0302ad83a'}, options)
-
-        console.log("Fetched user from cert",userAddressForProfile)
-        //this fetches sales without filtering by the user--> need to pass transaction_sender: ownerAddress(Seller),
-         sales = await saleJs.getAll(admin, { range, isOpen: true, transaction_sender: userAddressForProfile, limit: args.limit, offset: args.offset, gtField: args.gtField, gtValue: args.gtValue, order: 'block_timestamp.desc'}, options); 
-        const userAssetAddresses = sales.map(sale => sale.assetToBeSold);
-
-        console.log("Assets inside isUserProfile",userAssetAddresses) //10 asset addresses received on testing
-        
-        // Match the inventory with the sales
-        inventories = await searchAllWithQueryArgs(contractName,
-            {
-                address: userAssetAddresses,
-            }, options, admin);
-
-            console.log("TOTAL INVENTORIES GOT",inventories)
-    }
     else {
         // Original logic
         if (ownerCommonName) {
@@ -412,8 +390,12 @@ async function getAll(admin, args = {}, defaultOptions) {
                     ...restArgs,
                 }, options, admin);
         }
-
-        if (inventories) {
+        if (inventories && userProfile) {
+            const assetAddresses = inventories.map((inventory) => inventory.address);
+            // (sale.js): `getAll` method needs to be refactored as it has logic specific to passing `assetAddresses`
+            sales = await saleJs.getAll(admin, {  assetAddresses, range, saleGtField: userProfileGtField, saleGtValue: userProfileGtValue, isOpen: true, order: 'block_timestamp.desc' }, options);
+        }
+        else if (inventories) {
             const assetAddresses = inventories.map((inventory) => inventory.address);
             sales = await saleJs.getAll(admin, { assetAddresses, range, isOpen: true }, options);
         }
@@ -468,7 +450,7 @@ async function getOwnershipHistory(user, args, options) {
 
 async function inventoryCount(admin, args = {}, defaultOptions) {
     const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
-    const { range, ...newArgs } = args;
+    const { range, userProfile, userProfileGtField, userProfileGtValue, ...newArgs } = args;
     const queryArgs = setSearchQueryOptionsPrime({
         ...newArgs,
         limit: undefined,

@@ -46,12 +46,15 @@ class InventoryController {
   static async getAllUserInventories(req, res, next) {
     try {
       const { dapp, query } = req
-      console.log("GETALL USER",query)
-      const {gtField, gtValue, ...restQuery} = query
-      const user = await dapp.getCertificate({commonName:restQuery.ownerCommonName});
-      const inventories = await dapp.getInventoriesForUser({ ...restQuery, userAddressForProfile:user.userAddress}) //userAddressForProfile:user.userAddress
-      const inventoriesWithImageUrl = inventories?.inventories
-      rest.response.status200(res, {inventoriesWithImageUrl:inventoriesWithImageUrl, count: inventories.inventoryCount})
+      const {gtField, gtValue, ...restQuery} = query;
+
+      const inventories = await dapp.getInventoriesForUser({ userProfileGtField: gtField, userProfileGtValue: gtValue, ...restQuery});
+      const productsWithImageUrl = inventories?.inventoryResults.sort((a, b) => {
+        return b.saleDate.localeCompare(a.saleDate);
+      });
+
+      rest.response.status200(res, { inventoriesWithImageUrl: productsWithImageUrl, count: productsWithImageUrl.length })
+
 
       return next()
     } catch (e) {

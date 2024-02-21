@@ -46,7 +46,7 @@ export const ResponsiveBoughtOrderCard = ({ data, isLoading }) => {
                         </div>
                         <div className={` px-4 w-full flex justify-between`}>
                             <Typography>Buyer</Typography>
-                            <Typography className="text-[#202020] font-semibold">{item?.sellersCommonName || 'N/A'}</Typography>
+                            <Typography className="text-[#202020] font-semibold" onClick={()=>{navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", item?.sellersCommonName)}`)}}>{item?.sellersCommonName || 'N/A'}</Typography>
                         </div>
                         <div className={` px-4 w-full flex justify-between`}>
                             <Typography>Order Total($)</Typography>

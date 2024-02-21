@@ -218,16 +218,13 @@ const actions = {
   },
 
   fetchInventoryForUser: async (dispatch, limit, offset, queryValue) => {
-    console.log("ACTION DESCRIPTOR commonName",queryValue)
-    // const query = queryValue ? `&ownerCommonName=${queryValue}` : ``;
     const query = queryValue ? `&ownerCommonName=${encodeURIComponent(queryValue)}` : ``;
-
 
     dispatch({ type: actionDescriptors.fetchInventoryForUser });
 
     try {
       const response = await fetch(
-        `${apiUrl}/inventory/user/inventories?gtField=quantity&gtValue=0&limit=${limit}&offset=${offset}${query}&isMint=true`,//gtField=quantity&gtValue=0
+        `${apiUrl}/inventory/user/inventories?gtField=quantity&gtValue=0&limit=${limit}&offset=${offset}${query}&isMint=true`,
         {
           method: HTTP_METHODS.GET,
         }

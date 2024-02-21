@@ -218,7 +218,7 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrde
       title: "Buyer",
       dataIndex: "buyersCommonName",
       key: "buyersCommonName",
-      render: (text) => <p>{text}</p>,
+      render: (text) => <p onClick={()=>{navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", text)}`)}}>{text}</p>,
     },
     {
       title: "Order Total ($)",

@@ -10,6 +10,7 @@ import { ResponsiveOrderCard } from "./ResponsiveOrdersCard";
 import { ResponsiveTransferOrderCard } from "./ResponsiveTransferOrdersCard";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import routes from "../../helpers/routes";
 
 
 const TransfersTable = ({ user, selectedDate, download, isAllOrdersLoading }) => {
@@ -82,12 +83,12 @@ const TransfersTable = ({ user, selectedDate, download, isAllOrdersLoading }) =>
     {
       title: "From",
       key: "oldOwnerCommonName",
-      render: (text, record) => <p>{record.oldOwnerCommonName}</p>,
+      render: (text, record) => <p onClick={()=>{navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", record.oldOwnerCommonName)}`)}}>{record.oldOwnerCommonName}</p>,
     },
     {
       title: "To",
       key: "newOwnerCommonName",
-      render: (text, record) => <p>{record.newOwnerCommonName}</p>,
+      render: (text, record) => <p onClick={()=>{navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", record.newOwnerCommonName)}`)}}>{record.newOwnerCommonName}</p>,
     },
     {
       dataIndex: "transferDate",

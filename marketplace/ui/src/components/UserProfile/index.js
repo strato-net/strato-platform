@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Button, Avatar, Tabs, Input, notification } from 'antd';
+import { Button, Avatar, Tabs, Spin, notification } from 'antd';
 import { EditOutlined } from '@ant-design/icons';
 import { UserOutlined } from '@ant-design/icons';
 import { Images } from "../../images";
@@ -7,30 +7,60 @@ import routes from "../../helpers/routes";
 import { actions as inventoryActions } from "../../contexts/inventory/actions";
 import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
 import { useAuthenticateState } from "../../contexts/authentication";
-import { useLocation, useMatch } from "react-router-dom";
+import { useLocation, useMatch, Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
-import { useInventoryDispatch } from '../../contexts/inventory';
+import { useInventoryDispatch, useInventoryState } from '../../contexts/inventory';
 import {
   useMarketplaceDispatch,
   useMarketplaceState,
 } from "../../contexts/marketplace";
-
+import NewTrendingCard from './NewTrendingCard';
 
 
 const UserProfile = (user) => {
-//states
-const [Id, setId] = useState(undefined);
+
+const [commonName, setCommonName] = useState(undefined);
 const [activeTab, setActiveTab] = useState('1');
 const [offset, setOffset] = useState(0);
 const dispatch = useInventoryDispatch();
 const { cartList } = useMarketplaceState();
 const [api, contextHolder] = notification.useNotification();
 const marketplaceDispatch = useMarketplaceDispatch();
-
+const { userInventories, isUserInventoriesLoading } = useInventoryState();
 let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 const { TabPane } = Tabs;
 
 const navigate = useNavigate();
+const location = useLocation();
+const [breadcrumbs, setBreadcrumbs] = useState([]);
+
+
+useEffect(() => {
+  // Define a base breadcrumb path
+  const baseCrumbs = [
+    { label: 'Home', path: '/' },
+  ];
+
+  // Determine the source and set breadcrumbs
+  const path = location.pathname;
+  let sourceCrumbs = [];
+  
+  if (path.includes('/marketplace/productList/')) {
+    sourceCrumbs.push({ label: 'Product Detail', path: path });
+  } else if (path.includes('/marketplace/order/bought')) {
+    sourceCrumbs.push({ label: 'Orders (Bought)', path: path });
+  } else if (path.includes('/marketplace/order/sold')) {
+    sourceCrumbs.push({ label: 'Orders (Sold)', path: path });
+  } else if (path.includes('/marketplace/order/transfers')) {
+    sourceCrumbs.push({ label: 'Transfers', path: path });
+  }
+  
+  // Append the "Profile" as the last part of the breadcrumbs
+  sourceCrumbs.push({ label: 'Profile', path: `/marketplace/profile/${commonName}` });
+
+  // Combine the base with source-specific breadcrumbs
+  setBreadcrumbs(baseCrumbs.concat(sourceCrumbs));
+}, [location, commonName]);
 
 const openToast = (placement, isError, msg) => {
   if (isError) {
@@ -50,7 +80,6 @@ const openToast = (placement, isError, msg) => {
 
 const addItemToCart = (product, quantity) => {
   if (product.ownerCommonName === user?.commonName) {
-    //instead how about not displaying buttons at all
     openToast("bottom", true, "Cannot buy your own item")
     return false;
   }
@@ -96,11 +125,6 @@ const addItemToCart = (product, quantity) => {
 
 
 
-// Mock data for the collection items
-const collectionItems = [
-  { id: 1, name: 'Envira Amazonia Project', price: 2000 },
-  // ... other items
-];
 
 const routeMatch = useMatch({
     path: routes.MarketplaceUserProfile.url,
@@ -108,67 +132,64 @@ const routeMatch = useMatch({
   });
 
 useEffect(() => {
-    setId(routeMatch?.params?.commonName);
+    setCommonName(routeMatch?.params?.commonName);
   }, [routeMatch]);
 
 
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      inventoryActions.fetchInventoryForUser(dispatch, 10, offset, Id);
-    } else {
-      inventoryActions.fetchInventoryForUser(dispatch, 10, offset, Id);
-    }
-  }, [dispatch, offset, hasChecked, isAuthenticated, loginUrl, Id]);
-
- 
-  // useEffect(() => {
-  //   if (Id !== undefined) {
-  //     getData();
-  //   }
-  // }, [Id, dispatch, user]);
-  // const getData = async () => {
-  //   const data = await inventoryActions.fetchInventoryForUser(dispatch, 10,0,"", "",Id);
-  //   console.log(data)
-  //   // await actions.fetchInventory(inventoryDispatch, 10, 0, "", categoryName);
-  //   // 
-  //   // if (data != null) {
-  //   //   getPaymentStatus(data.order.paymentSessionId, data.order.sellersCommonName);
-  //   // }
-  // };
+      if(commonName) inventoryActions.fetchInventoryForUser(dispatch, 10, offset, commonName);
+  }, [dispatch, offset, hasChecked, isAuthenticated, loginUrl, commonName]);
 
   const handleTabSelect = (key) => {
     setActiveTab(key);
   };
 
-  const ownerSameAsUser = () => {
-
-    // if (user?.commonName === inventoryDetails?.ownerCommonName) {
-    //   return true;
-    // }
-
-    return false;
-  }
 
   return (
+    
     <div className="container mx-auto p-6">
-
-      {/* User Cover and Prodile Picture Zone */}
-      <div className="flex justify-center items-center mb-6 relative p-2 h-[222px] sm:h-[380px] mx-1 sm:mx-2 sm:mt-6 lg:mx-3">
-      <img 
-        className="absolute inset-0 object-cover z-10 h-[222px] sm:h-[380px] w-full sm:w-[90%] lg:w-[95%] xl:w-[100%] rounded-md sm:rounded-[14px]" 
-        src={Images.collectibles} 
-        alt="Cover" 
-      />
-  
-      <div className='flex flex-col gap-3 backdrop-blur-2xl text-left p-4 px-3 sm:px-8 h-[67%] sm:h-32 md:h-40 w-[92%] sm:w-[70%] md:w-[500px] rounded-md sm:rounded-2xl absolute left-2 sm:left-10 top-10 sm:top-20 md:top-44 bg-[rgba(255,255,255,0.17)] z-50'>
-        <h1 className="text-xl font-bold"><Avatar size={100} icon={<UserOutlined />} className="mr-6" />{Id}</h1>
-        {/* <Button icon={<EditOutlined />} type="primary">
-          Edit Profile
-        </Button> */}
+      {/* Breadcrumb */}
+      <div className="mb-4 text-sm">
+        {console.log(breadcrumbs)}
+        {breadcrumbs.map((crumb, index) => (
+          <span key={index}>
+            {index > 0 && " / "}
+            {index < breadcrumbs.length - 1 ? (
+              <Link to={crumb.path}>{crumb.label}</Link>
+            ) : (
+              crumb.label
+            )}
+          </span>
+        ))}
       </div>
-    </div>
-    {/* End of Cover & Profile Picture */}
+      
+      {/* User Cover */}
+      <div className="relative mb-6">
+        <img 
+          className="w-full h-36 sm:h-52 md:h-60 lg:h-68 object-cover rounded-lg" 
+          src={Images.collectibles} 
+          alt="Cover"
+        />
+
+        {/* Profile Picture */}
+        <div className="absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2" style={{ bottom: '-90px' }}>
+          <Avatar 
+            size={100} 
+            // src={profileImage} 
+            icon={<UserOutlined />} 
+            className="border-4 border-black"
+          />
+        </div>
+      </div>
+
+      {/* User Name and Edit Profile */}
+      <div className="text-center my-12">
+        <h1 className="text-lg sm:text-xl md:text-2xl font-bold">{commonName}</h1>
+        {/* <p className="text-gray-600">Joined Oct 2023</p> */}
+        <Button disabled type="primary" icon={<EditOutlined />} className="mt-4">Edit Profile</Button>
+      </div>
+
 
 
 
@@ -203,22 +224,30 @@ useEffect(() => {
         <TabPane tab="Assets For Sale" key="1">
        
         {/* Assets of the User */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 ml-6">
 
-          {collectionItems.map((item) => (
-          <Card
-            key={item.id}
-            hoverable
-            cover={<img alt={item.name} src="/path/to/image" />}
-            actions={[
-              <Button type="primary">Buy Now</Button>
-            ]}
-          >
-            <Card.Meta title={item.name} description={`$${item.price}`} />
-          </Card>
-          ))}
-
+        {isUserInventoriesLoading ?
+          <div className="h-96 w-full flex justify-center items-center">
+            <Spin spinning={isUserInventoriesLoading} size="large" />
           </div>
+          :
+          <div className="mt-4 md:mt-4 mb-8 w-full" id="product-list">
+            {userInventories?.length > 0 ? (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {userInventories.map((product, index) => (
+                  <NewTrendingCard
+                    topSellingProduct={product}
+                    key={index}
+                    addItemToCart={addItemToCart}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="h-96 flex justify-center items-center">
+                No Assets Found
+              </div>
+            )}
+          </div>
+        }
 
         </TabPane>
 
