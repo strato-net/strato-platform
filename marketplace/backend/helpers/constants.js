@@ -30,6 +30,7 @@ export default {
   testnetStratsAddress: "488cd3909d94606051e0684cf6caa5763fb78613"
 };
 
+require('dotenv').config();
 export const STRIPE_PAYMENT_SERVER_URL = process.env.STRIPE_PAYMENT_SERVER_URL
 
 export const unitOfMeasurement = {}
