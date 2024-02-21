@@ -1,6 +1,6 @@
 FROM node:14.21.3-alpine3.17
 
-RUN apk add --no-cache yarn curl git lsof && \
+RUN apk add --no-cache yarn curl git lsof jq && \
     mkdir -p /usr/src/backend
 
 HEALTHCHECK --interval=3s --timeout=2s --start-period=300s \

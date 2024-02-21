@@ -1,20 +1,21 @@
 #!/usr/bin/env sh
 SITE_ID=${SITE_ID:-}
-sed -i "s|__SITE_ID__|$SITE_ID|g" build/index.html
-# Creating .env file if using the relevant flags
-if [ -n "${ASSET_TABLE_NAME}" ] || [ -n "${SALE_TABLE_NAME}" ]; then
-  if [ ! -f .env ]; then
-    # If it doesn't exist, create the .env file and insert environment variables.
-    touch .env
 
-    echo "REACT_APP_ASSET_TABLE_NAME=${ASSET_TABLE_NAME}" >> .env
-    echo "REACT_APP_SALE_TABLE_NAME=${SALE_TABLE_NAME}" >> .env
-  else
-    # If the .env file exists, replace the environment variables.
-    sed -i `s/REACT_APP_ASSET_TABLE_NAME=.*/REACT_APP_ASSET_TABLE_NAME=${ASSET_TABLE_NAME}/` .env
-    sed -i `s/REACT_APP_SALE_TABLE_NAME=.*/REACT_APP_SALE_TABLE_NAME=${SALE_TABLE_NAME}/` .env
-  fi
-fi
+export STRATO_HOSTNAME=${STRATO_HOSTNAME:-strato}
+export STRATO_PORT_API=${STRATO_PORT_API:-3000}
+export ETH_ENDPOINT=http://${STRATO_HOSTNAME}:${STRATO_PORT_API}/eth/v1.2
+echo 'Waiting for Strato api to be available...'
+until curl --silent --output /dev/null --fail --location ${ETH_ENDPOINT}/uuid
+do
+  echo "  Check at $(date)"
+  sleep 1
+done
+echo 'Strato api is available'
+
+FILE_SERVER_URL=$(curl --silent --fail ${ETH_ENDPOINT}/metadata | jq -r .urls.fileServer)
+
+sed -i "s|__SITE_ID__|$SITE_ID|g" build/index.html
+sed -i "s|__FILE_SERVER_URL__|$FILE_SERVER_URL|g" build/index.html
 
 echo 'Starting ui server...'
 
