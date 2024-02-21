@@ -19,6 +19,24 @@ pipeline {
         sh 'sudo docker image prune'
       }
     }
+
+    stage('Update stratodemo node') {
+      agent { label "mercata-testnet2-stratodemo" }
+      steps {
+        copyArtifacts filter: 'docker-compose.yml', fingerprintArtifacts: true, projectName: 'STRATO_develop_nightly_build', selector: lastSuccessful()
+        
+        
+        dir ('/home/ec2-user/strato-getting-started') {
+          sh 'mv docker-compose.yml docker-compose.$(date \'+%Y%m%d\').yml'
+        }
+        sh 'mv docker-compose.yml /home/ec2-user/strato-getting-started'
+        
+        dir ('/home/ec2-user/strato-getting-started') {
+          sh 'sudo ./ restart.sh'
+        }
+        sh 'sudo docker image prune'
+      }
+    }
   }
   post {
     success {
