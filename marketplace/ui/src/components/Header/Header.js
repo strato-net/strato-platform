@@ -152,7 +152,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
       <div>
         {user &&
           <p className="text-xs mt-1">
-            STRATS: {(Object.keys(strats).length > 0) ? strats : 0}
+            STRATs: {(Object.keys(strats).length > 0) ? strats : 0}
           </p>
         }
       </div>
