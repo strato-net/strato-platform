@@ -13,6 +13,10 @@ done
 echo 'Strato api is available'
 
 FILE_SERVER_URL=$(curl --silent --fail ${ETH_ENDPOINT}/metadata | jq -r .urls.fileServer)
+if [ -z "${FILE_SERVER_URL}" ]; then
+  echo "Could not get file server url from strato api, but it is a required value"
+  exit 1
+fi
 
 sed -i "s|__SITE_ID__|$SITE_ID|g" build/index.html
 sed -i "s|__FILE_SERVER_URL__|$FILE_SERVER_URL|g" build/index.html
