@@ -4,6 +4,8 @@ import config from '../../../util/load.config';
 import * as hashmapJs from '../hashmap';
 import { getCredentialArgs } from '../../../util/util';
 const { createUser } = rest;
+import constants from '../../../../../helpers/constants';
+const zeroAddress = constants.zeroAddress;
 
 const adminArgs = getCredentialArgs(util.uid(), 'Admin', '1234');
 const otherAdminArgs = getCredentialArgs(util.uid(), 'OtherAdmin', '5678');
@@ -89,7 +91,7 @@ describe('Hashmap', function () {
     await hashmap.transferOwnership({ newOwner: otherAdmin.address });
 
     const result = await hashmap.get({ key: args.key });
-    assert.equal(result.toString(), "0000000000000000000000000000000000000000");
+    assert.equal(result.toString(), zeroAddress);
   });
 
   it('reject put from original admin', async function () {
@@ -100,7 +102,7 @@ describe('Hashmap', function () {
 
     await hashmap.put(args);
     const result = await hashmapJs.get(otherAdmin, hashmap, { key: args.key })
-    assert.equal(result.toString(), "0000000000000000000000000000000000000000");
+    assert.equal(result.toString(), zeroAddress);
 
     const result2 = await hashmapJs.size(otherAdmin, hashmap, { key: args.key })
     assert.equal(result2, 0);

@@ -1,13 +1,15 @@
 import { util } from "blockapps-rest";
+import constants from '../../../helpers/constants';
 /** Factory creation for Item arguments. */
+const zeroAddress = constants.zeroAddress;
 const factory = {
     /** Sample arguments for creating a Item contract. Use util.uid() to generate a uid. */
     getItemArgs(uid) {
         const args = {
             itemArgs: {
-                productId: '0000000000000000000000000000000000000000',
+                productId: zeroAddress,
                 uniqueProductCode: parseInt(util.iuid()),
-                inventoryId: '0000000000000000000000000000000000000000',
+                inventoryId: zeroAddress,
                 serialNumber: `serialNumber_${uid}`,
                 itemNumber: parseInt(util.iuid()),
                 status: 2,

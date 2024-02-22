@@ -1,4 +1,6 @@
-const zeroAddress=''.padStart(40,'0')
+import constants from '../../../helpers/constants';
+const zeroAddress = constants.zeroAddress;
+// const zeroAddress=''.padStart(40,'0')
 const factory={
   getCreateOrderArgs(uid,buyerOrganization="",inventories=[],orderTotal){
     const args = {
@@ -8,7 +10,7 @@ const factory={
        quantity:2 
       })),
       orderTotal:40,
-      shippingAddress: '0000000000000000000000000000000000000000'
+      shippingAddress: zeroAddress
 
     }
     return args

@@ -1,4 +1,7 @@
 import { util } from "blockapps-rest";
+import constants from '../../../helpers/constants';
+
+const zeroAddress = constants.zeroAddress;
 /** Factory creation for Product arguments. */
 const factory = {
     /** Sample arguments for creating a Product from ProductManager Contract. Use util.uid() to generate a uid. */
@@ -14,8 +17,8 @@ const factory = {
                 leastSellableUnit: uid,
                 imageKey: `imageKey_${uid}`,
                 isActive: true,
-                category: `0000000000000000000000000000000000000000`,
-                subCategory: `0000000000000000000000000000000000000000`,
+                category: zeroAddress,
+                subCategory: zeroAddress,
                 createdDate: 1673251301,
             }
         }

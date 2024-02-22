@@ -1,11 +1,13 @@
-import constants from "/helpers/constants";
+import constants from "../../../helpers/constants";
 /** Factory creation for Event arguments. */
+const zeroAddress = constants.zeroAddress;
+
 const factory = {
     /** Sample arguments for creating a Event contract. Use util.uid() to generate a uid. */
     getEventArgs(uid) {
         const args = {
-            itemAddress: '0000000000000000000000000000000000000000',
-            eventTypeId: '0000000000000000000000000000000000000000',
+            itemAddress: zeroAddress,
+            eventTypeId: zeroAddress,
             eventBatchId: uid,
             itemSerialNumber: `${uid}`,
             date: uid,
