@@ -70,6 +70,7 @@ const TopSellingProductCard = () => {
     let foundIndex = cartList.findIndex((item) => item.product.address === product.address);
     let items = [...cartList]; 
   
+    // Found index returns -1 if nothing is found in the cartlist
     if (foundIndex === -1) {
       // Product not found, check quantity before adding
       const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity]);
@@ -81,13 +82,17 @@ const TopSellingProductCard = () => {
         return true;
       } else {
         // Not enough quantity, inform the user
-        openToast("bottom", true, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantity to continue.`);
+        if (checkQuantity[0].availableQuantity === 0) {
+          openToast("bottom", true, `Unfortunately, ${product.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
+        } else { // Case 2: We are trying to add too much quantity
+          openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${product.name} are available. Please update your cart quantity accordingly.`);
+        }
         return false;
       }
     } else {
       // Product found, prepare to update quantity after check
       const potentialNewQty = items[foundIndex].qty + quantity;
-      const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [potentialNewQty]);
+      const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity]);
       if (checkQuantity === true) {
         // Quantity check passed, update item quantity in the cart
         items[foundIndex].qty = potentialNewQty;
@@ -96,7 +101,11 @@ const TopSellingProductCard = () => {
         return true;
       } else {
         // Not enough quantity, inform the user
-        openToast("bottom", true, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantity to continue.`);
+        if (checkQuantity[0].availableQuantity === 0) {
+          openToast("bottom", true, `Unfortunately, ${product.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
+        } else { // Case 2: We are trying to add too much quantity
+          openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${product.name} are available. Please update your cart quantity accordingly.`);
+        }
         return false;
       }
     }

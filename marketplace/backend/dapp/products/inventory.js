@@ -478,9 +478,7 @@ async function checkSaleQuantity(admin, args, defaultOptions) {
 
     // Fetch sales and assets data
     const sales = await saleJs.getAll(admin, { address: saleAddresses }, options);
-    console.log("sales here", sales)
     const assets = await searchAllWithQueryArgs(contractName, { sale: saleAddresses }, options, admin);
-    console.log("assets here", assets)
     let insufficientDetails = [];
 
     sales.forEach((sale, index) => {

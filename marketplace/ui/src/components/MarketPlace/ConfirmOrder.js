@@ -407,13 +407,26 @@ const ConfirmOrder = () => {
                       if (checkQuantity === true) {
                         handlePaymentConfirm();
                       } else {
-                        let insufficientItemsMessage = "The following items may no longer be available in the desired quantities:\n";
-
+                        let insufficientQuantityMessage = "";
+                        let outOfStockMessage = "";
+                
                         checkQuantity.forEach(detail => {
-                        insufficientItemsMessage += `(${detail.assetName}-Available Quantity: ${detail.availableQuantity})\n`;
+                            if (detail.availableQuantity === 0) {
+                                outOfStockMessage += `Product ${detail.assetName}\n`;
+                            } else {
+                                insufficientQuantityMessage += `Product ${detail.assetName}: ${detail.availableQuantity}\n`;
+                            }
                         });
-                        insufficientItemsMessage += "Try lowering the quantiy to continue."
-                        openToastOrder("bottom", insufficientItemsMessage)
+                
+                        let errorMessage = "";
+                        if (insufficientQuantityMessage) {
+                            errorMessage += `The following item(s) in your cart have limited quantity available and will need to be adjusted. Please reduce the quantity to proceed:\n${insufficientQuantityMessage}`;
+                        }
+                        if (outOfStockMessage) {
+                            if (errorMessage) errorMessage += "\n"; // Add a new line if there's already an error message
+                            errorMessage += `The following item(s) are temporarily out of stock and should be removed:\n${outOfStockMessage}`;
+                        }
+                        openToastOrder("bottom", errorMessage);
                       }
                     }
                   }}
