@@ -61,7 +61,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                 </div>
             </a>
             <Typography className='font-normal text-black'>{topSellingProduct?.price && `$ ${topSellingProduct?.price}`}
-            {isAvailableForSale && <Text type="danger"> Currently unavailable </Text>}
+            {isAvailableForSale && <Text type="danger" strong> Currently unavailable </Text>}
             </Typography>
             <Typography className={`#989898 opacity-40 max-h-5 overflow-hidden ${parent == 'Marketplace' ? 'hidden md:flex' : ''}`}>{topSellingProduct?.description || "N/A"}</Typography>
             <div className='flex justify-between items-center bg-[#EEEFFA] p-2 rounded-[4px]'>
@@ -101,7 +101,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                     </Typography>
                 </div>
             </div>
-            <div className={`flex gap-4 mt-1 ${isAvailableForSale && 'opacity-50'}`}>
+            <div className={`flex gap-4 mt-1`}>
                 <Button
                     id={`${topSellingProduct.name.replace(/ /g, "_")}-buy-now`}
                     type='primary'

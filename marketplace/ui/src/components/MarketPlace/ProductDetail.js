@@ -292,7 +292,7 @@ const ProductDetails = ({ user, users }) => {
               </Breadcrumb.Item>
             </Breadcrumb>
           </Row>
-          <div className="flex w-full flex-col  px-4 sm:px-8 md:px-0  items-center lg:items-start  md:w-[750px] lg:w-[835px] xl:w-[858px]  md:mx-auto ">
+          <div className="flex w-full flex-col lg:leading-12 px-4 sm:px-8 md:px-0  items-center lg:items-start  md:w-[750px] lg:w-[835px] xl:w-[858px]  md:mx-auto ">
             <div className="flex md:justify-center gap-[15px] lg:gap-6 flex-col lg:flex-row   ">
               <Carousel showIndicators={
                 details.images.length > 1 ? true : false
@@ -321,7 +321,7 @@ const ProductDetails = ({ user, users }) => {
                   <Paragraph level={4} className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold">
                     {details?.price ? <>${details?.price}</> : "No Price Available"}
                   </Paragraph>
-                  {isAvailableForSale && <Text type="danger"> Currently unavailable </Text>}
+                  {isAvailableForSale && <Text type="danger" strong> Currently unavailable </Text>}
                 </div>
 
                 {availableQuantity !== 0 ?

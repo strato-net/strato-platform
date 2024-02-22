@@ -55,7 +55,10 @@ module.exports = {
       },
       boxShadow: {
         Footer: "0px -4px 4px 0px #00000029"
-      }
+      },
+      lineHeight: {
+        "12": "4.25rem"
+      },
 
     },
   },
