@@ -354,7 +354,8 @@ async function getAll(admin, args = {}, defaultOptions) {
     const isNullData = range ? range[0].split(",")[1] == 0 : true;
     let inventories;
     let sales;
-    let finalInventory = [];
+    let listedInventory = [];
+    let unlistedInventory = [];
     const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' };
 
     if (isTrendingSearch) {
@@ -399,30 +400,32 @@ async function getAll(admin, args = {}, defaultOptions) {
 
     if (inventories) {
         inventories.forEach(inventory => {
-            const itemSale = sales.find(sale => sale.assetToBeSold == inventory.address && sale.isOpen);
+            const itemSale = sales.find(sale => sale.assetToBeSold == inventory.address && sale.isOpen && sale.quantity !==0);
             if (itemSale) {
-                finalInventory.push({
-                    ...inventory,
-                    price: itemSale?.price,
-                    saleAddress: itemSale?.address,
-                    saleQuantity: itemSale?.quantity,
-                    saleDate: itemSale?.block_timestamp
-                });
+                    listedInventory.push({
+                        ...inventory,
+                        price: itemSale?.price,
+                        saleAddress: itemSale?.address,
+                        saleQuantity: itemSale?.quantity,
+                        saleDate: itemSale?.block_timestamp
+                    });
             }
             else if (isMarketplaceSearch) {
                 if(isNullData){
-                finalInventory.push({
-                    ...inventory,
-                    price: null,
-                    saleAddress: null,
-                    saleQuantity: null,
-                    saleDate: null
-                })}
+                    unlistedInventory.push({
+                        ...inventory,
+                        price: null,
+                        saleAddress: null,
+                        saleQuantity: null,
+                        saleDate: null
+                    })
+                }
             } else {
-                finalInventory.push(inventory);
+                unlistedInventory.push(inventory);
             }
         });
     }
+    const finalInventory = [...listedInventory, ...unlistedInventory]
 
     return finalInventory ? finalInventory.map((inventory) => marshalOut(inventory)) : undefined;
 }
