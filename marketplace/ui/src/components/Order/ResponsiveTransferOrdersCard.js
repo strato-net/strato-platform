@@ -32,6 +32,10 @@ export const ResponsiveTransferOrderCard = ({ data, isLoading}) => {
                             <Typography>Quantity</Typography>
                             <Typography className={`text-[#202020]`}>{item?.quantity || 'N/A'}</Typography>
                         </div>
+                        <div className={`p-2 px-4 w-full flex justify-between`}>
+                            <Typography>Price</Typography>
+                            <Typography className={`text-[#202020]`}>{item?.price ? `$ ${item?.price}` : 'N/A'}</Typography>
+                        </div>
                 </div>
                     )
             }) : <Typography  className="text-center text-lg m-6 font-semibold">No data</Typography> }
