@@ -470,21 +470,24 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     try {
       const order = await saleOrderJs.get(rawAdmin, args, options);
       const sales = await saleJs.getAll(rawAdmin, { saleAddresses: order.saleAddresses }, options);
-      const assetAddresses = sales.map(sale => {
-        return sale.assetToBeSold;
-      })
       let assets = [];
-      const assetsWithoutQuantity = await inventoryJs.getAll(rawAdmin, { assetAddresses: assetAddresses }, options);
-      assetsWithoutQuantity.map(asset => {
-        const saleForAsset = sales.find(sale => sale.assetToBeSold === asset.address);
+      
+      for (const sale of sales) {
+        const history = await saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, transaction_hash: order.transaction_hash }, options);
+        const price = history['0'] ? history['0'].price : null;
+        
+        const assetAddress = sale.assetToBeSold;
+        const assetWithoutQuantity = await inventoryJs.get(rawAdmin, { address: assetAddress }, options);
+        
         assets.push({
-          ...asset,
-          price: saleForAsset.price,
-          saleQuantity: saleForAsset.quantity,
-          saleAddress: saleForAsset.address,
-          amount: saleForAsset.quantity * saleForAsset.price,
-        })
-      })
+          ...assetWithoutQuantity,
+          price: price,
+          saleQuantity: sale.quantity,
+          saleAddress: sale.address,
+          amount: sale.quantity * price,
+        });
+      }
+      
       const result = { userContactAddress: order.shippingAddress, order, assets };
 
       return result;

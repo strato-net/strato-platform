@@ -147,6 +147,22 @@ async function get(user, args, options) {
     });
 }
 
+async function getSaleHistory(user, args, options) {
+    const { contract, transaction_hash } = args;
+    
+    const newOptions = { ...options, org: undefined, app: undefined }
+    let historySale = await searchAllWithQueryArgs(`history@${contract}`, {transaction_hash: transaction_hash}, newOptions, user);
+        
+  
+    if (!historySale) {
+      return undefined;
+    }
+  
+    return marshalOut({
+      ...historySale,
+    });
+  }
+
 async function getAll(admin, args = {}, defaultOptions) {
     const { saleAddresses, assetAddresses, isOpen, range, ...restArgs } = args;
     const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
@@ -181,5 +197,6 @@ export default {
     getAll,
     marshalIn,
     marshalOut,
-    getHistory
+    getHistory,
+    getSaleHistory
 }
