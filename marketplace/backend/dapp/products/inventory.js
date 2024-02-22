@@ -351,6 +351,7 @@ async function get(user, args, options) {
 
 async function getAll(admin, args = {}, defaultOptions) {
     const { range, ownerCommonName, assetAddresses, status, isMarketplaceSearch, isTrendingSearch, ...restArgs } = args;
+    const isNullData = range ? range[0].split(",")[1] == 0 : true;
     let inventories;
     let sales;
     let finalInventory = [];
@@ -359,7 +360,7 @@ async function getAll(admin, args = {}, defaultOptions) {
     if (isTrendingSearch) {
         // If it's a trending search, first search the sales
         // Order them by creation date and set limit here
-        sales = await saleJs.getAll(admin, { range, isOpen: true, order: 'block_timestamp.desc', limit: '25', offset: '0' }, options);
+        sales = await saleJs.getAll(admin, { range, isOpen: true, gteField: 'quantity', gteValue: 1, order: 'block_timestamp.desc', limit: '25', offset: '0' }, options);
         const trendingAssetAddresses = sales.map(sale => sale.assetToBeSold);
 
         // Match the inventory with the sales
@@ -409,14 +410,14 @@ async function getAll(admin, args = {}, defaultOptions) {
                 });
             }
             else if (isMarketplaceSearch) {
+                if(isNullData){
                 finalInventory.push({
                     ...inventory,
                     price: null,
                     saleAddress: null,
                     saleQuantity: null,
                     saleDate: null
-                });
-                //skip
+                })}
             } else {
                 finalInventory.push(inventory);
             }

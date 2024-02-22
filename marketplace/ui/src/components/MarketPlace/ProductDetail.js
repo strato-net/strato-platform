@@ -243,6 +243,8 @@ const ProductDetails = ({ user, users }) => {
     return parts[parts.length - 1];
   };
 
+  const isAvailableForSale = (!details?.saleQuantity || details?.saleQuantity==0) 
+
   return (
     <>
       {contextHolder}
@@ -316,9 +318,10 @@ const ProductDetails = ({ user, users }) => {
                 </div>
                 <div className=" pt-4 lg:pt-[22px]">
 
-                  <Text level={4} className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold">
+                  <Paragraph level={4} className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold">
                     {details?.price ? <>${details?.price}</> : "No Price Available"}
-                  </Text>
+                  </Paragraph>
+                  {isAvailableForSale && <Text type="danger"> Currently unavailable </Text>}
                 </div>
 
                 {availableQuantity !== 0 ?
@@ -379,7 +382,7 @@ const ProductDetails = ({ user, users }) => {
                           navigate("/checkout");
                         }
                       }}
-                      disabled={ownerSameAsUser()}
+                      disabled={ownerSameAsUser() || isAvailableForSale}
                       id="buyNow"
                     >
                       Buy Now
@@ -425,6 +428,7 @@ const ProductDetails = ({ user, users }) => {
                           <img src={Images.Cart} alt="cart" width={18} height={18} className="object-contain" />
                         </div>}
                         className=" !w-9 h-9 rounded-md  !bg-[#13188A]"
+                        disabled={isAvailableForSale}
                         onClick={() => {
                           if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                             setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);

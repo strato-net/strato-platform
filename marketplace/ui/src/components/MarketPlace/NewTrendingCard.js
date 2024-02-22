@@ -60,7 +60,9 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                     <img className='w-4 h-4' src={Images.Verified} alt='verified' />
                 </div>
             </a>
-            <Typography className='font-normal text-black'>{'$' + topSellingProduct?.price || "N/A"}</Typography>
+            <Typography className='font-normal text-black'>{topSellingProduct?.price && `$ ${topSellingProduct?.price}`}
+            {isAvailableForSale && <Text type="danger"> Currently unavailable </Text>}
+            </Typography>
             <Typography className={`#989898 opacity-40 max-h-5 overflow-hidden ${parent == 'Marketplace' ? 'hidden md:flex' : ''}`}>{topSellingProduct?.description || "N/A"}</Typography>
             <div className='flex justify-between items-center bg-[#EEEFFA] p-2 rounded-[4px]'>
                 <Typography>Quantity:</Typography>
@@ -169,7 +171,6 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                     {/* <ShoppingCartOutlined style={{ color: '#EEEFFA' , width:'18px' ,  height:'18px' }} /> */}
                 </Button>
             </div>
-            {isAvailableForSale && <Text type="danger text-center"> Currently unavailable </Text>}
         </div>
     )
 }
