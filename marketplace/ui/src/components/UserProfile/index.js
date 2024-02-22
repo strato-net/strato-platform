@@ -4,6 +4,8 @@ import { UserOutlined, EditOutlined } from "@ant-design/icons";
 import { Images } from "../../images";
 import routes from "../../helpers/routes";
 import { actions as userActivityActions } from "../../contexts/userActivity/actions";
+import { actions as orderActions } from "../../contexts/order/actions";
+import { useOrderDispatch } from "../../contexts/order";
 import {
   useUserActivityDispatch,
   useUserActivityState,
@@ -33,7 +35,7 @@ const marketplaceDispatch = useMarketplaceDispatch();
 const { userInventories, isUserInventoriesLoading } = useInventoryState();
 let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 const { TabPane } = Tabs;
-
+const orderDispatch = useOrderDispatch();
 const navigate = useNavigate();
 const location = useLocation();
 // const [breadcrumbs, setBreadcrumbs] = useState('Home / Profile');
@@ -120,48 +122,48 @@ const openToast = (placement, isError, msg) => {
   }
 };
 
-const addItemToCart = (product, quantity) => {
+const addItemToCart = async (product, quantity) => {
   if (product.ownerCommonName === user?.commonName) {
-    openToast("bottom", true, "Cannot buy your own item")
+    openToast("bottom", true, "Cannot buy your own item");
     return false;
   }
-  let found = false;
-  for (var i = 0; i < cartList.length; i++) {
-    if (cartList[i].product.address === product.address) {
-      found = true;
-      break;
+
+  // Search for the product in the cart
+  let foundIndex = cartList.findIndex((item) => item.product.address === product.address);
+  let items = [...cartList]; 
+
+  if (foundIndex === -1) {
+    // Product not found, check quantity before adding
+    const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity]);
+    if (checkQuantity === true) {
+      // Quantity check passed, add new item to the cart
+      items.push({ product, qty: quantity });
+      marketplaceActions.addItemToCart(marketplaceDispatch, items);
+      openToast("bottom", false, "Item added to cart");
+      return true;
+    } else {
+      // Not enough quantity, inform the user
+      openToast("bottom", true, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantity to continue.`);
+      return false;
+    }
+  } else {
+    // Product found, prepare to update quantity after check
+    const potentialNewQty = items[foundIndex].qty + quantity;
+    const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [potentialNewQty]);
+    if (checkQuantity === true) {
+      // Quantity check passed, update item quantity in the cart
+      items[foundIndex].qty = potentialNewQty;
+      marketplaceActions.addItemToCart(marketplaceDispatch, items);
+      openToast("bottom", false, "Item updated in cart");
+      return true;
+    } else {
+      // Not enough quantity, inform the user
+      openToast("bottom", true, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantity to continue.`);
+      return false;
     }
   }
-  let items = [];
-  if (!found) {
-    items = [...cartList, { product, qty: quantity }];
-    marketplaceActions.addItemToCart(marketplaceDispatch, items);
-
-    openToast("bottom", false, "Item added to cart");
-    return true;
-  } else {
-    items = [...cartList];
-    cartList.forEach((element, index) => {
-      if (element.product.address === product.address) {
-        const availableQuantity = product.saleQuantity ? product.saleQuantity : 1;
-        if (items[index].qty + 1 <= availableQuantity) {
-          items[index].qty += 1;
-          marketplaceActions.addItemToCart(marketplaceDispatch, items);
-
-          openToast("bottom", false, "Item updated in cart");
-          return true;
-        } else {
-          openToast(
-            "bottom",
-            true,
-            "Cannot add more than available quantity"
-          );
-          return false;
-        }
-      }
-    });
-  }
 };
+
 
 
 
