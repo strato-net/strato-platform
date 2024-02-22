@@ -106,7 +106,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                     id={`${topSellingProduct.name.replace(/ /g, "_")}-buy-now`}
                     type='primary'
                     disabled={isAvailableForSale}
-                    className='flex-1 h-9 !bg-[#13188A] !text-white'
+                    className={`flex-1 h-9 ${isAvailableForSale? '!bg-[#808080]': '!bg-[#13188A]'}  !text-white`}
                     onClick={() => {
                         if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                             setCookie("returnUrl", `/marketplace/productList/${topSellingProduct.address}`, 10);
@@ -137,7 +137,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                     Buy Now
                 </Button>
                 <Button
-                className='h-9 w-9 flex items-center justify-center !bg-[#13188A] '
+                className={`h-9 w-9 flex items-center justify-center ${isAvailableForSale? '!bg-[#808080]':'!bg-[#13188A]'} `}
                 disabled={isAvailableForSale}
                     onClick={() => {
                         if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
