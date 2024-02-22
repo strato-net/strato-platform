@@ -3,7 +3,7 @@ import { Card, Button, Avatar, Tabs, Input, Row, Col, Typography } from "antd";
 import { UserOutlined } from "@ant-design/icons";
 import { Images } from "../../images";
 import routes from "../../helpers/routes";
-import { useMatch } from "react-router-dom";
+import { useMatch, useParams } from "react-router-dom";
 import { useInventoryDispatch } from "../../contexts/inventory";
 import { actions as userActivityActions } from "../../contexts/userActivity/actions";
 import {
@@ -28,7 +28,8 @@ const UserProfile = (user) => {
   const boughtOrdersBaseUrl = new URL("/marketplace/bought-orders", window.location.origin).toString();
   const transfersBaseUrl = new URL("/marketplace/order/transfers", window.location.origin).toString();
 
-
+  const params = useParams();
+  const isUsersOwnProfile = user?.user.userAddress === params?.address;
   useEffect(() => {
     if (!user.user) {
       return
@@ -36,6 +37,16 @@ const UserProfile = (user) => {
     const profile = user.user.commonName
     userActivityActions.fetchUserActivity(userActivityDispatch, profile);
   }, [userActivityDispatch, user.user]);
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const tab = searchParams.get('tab');
+
+    // Check if the 'tab' query parameter is set to 'my-activity'
+    if (tab === 'my-activity') {
+      setActiveTab('2'); // Set '2' to open the "My Activity" tab
+    }
+  }, [Id]);
 
   // Mock data for the collection items
   const collectionItems = [
@@ -136,7 +147,7 @@ const UserProfile = (user) => {
       {/* TABS Start */}
 
       <Tabs
-        defaultActiveKey={activeTab}
+        activeKey={activeTab}
         onChange={handleTabSelect}
         className="p-3 ml-6 mr-6 mb-6"
       >
@@ -155,42 +166,51 @@ const UserProfile = (user) => {
             ))}
           </div>
         </TabPane>
-
-        <TabPane tab="My Activity" key="2">
-          {/* Activity Content */}
-          <div className="activity-list">
-            {userActivity.map((activity, index) => {
-              let description;
-              let href;
-              switch (activity.type) {
-                case "sold":
-                  description = `You have received a new order ${activity.orderId} from ${activity.purchasersCommonName}.`;
-                  href = `${soldOrdersBaseUrl}/${activity.address}`;
-                  break;
-                case "bought":
-                  description = `Your order ${activity.orderId} was fulfilled by ${activity.sellersCommonName}.`;
-                  href = `${boughtOrdersBaseUrl}/${activity.address}`;
-                  break;
-                case "transfer":
-                  description = `You have received one or more items as a free transfer from ${activity.oldOwnerCommonName}.`;
-                  href = transfersBaseUrl; 
-                  break;
-                default:
-                  description = "Activity occurred";
-                  href = "#";
-              }
-              return (
-                <ActivityFeed
-                  key={index}
-                  type={activity.type}
-                  description={description}
-                  timestamp={activity.block_timestamp}
-                  href={href}
-                />
-              );
-            })}
-          </div>
-        </TabPane>
+        {isUsersOwnProfile && (
+          <TabPane tab="My Activity" key="2">
+            {/* Activity Content */}
+            {userActivity && userActivity.length > 0 ? (
+            <div className="activity-list">
+              {userActivity.map((activity, index) => {
+                let description;
+                let href;
+                switch (activity.type) {
+                  case "sold":
+                    description = `You have received a new order ${activity.orderId} from ${activity.purchasersCommonName}.`;
+                    href = `${soldOrdersBaseUrl}/${activity.address}`;
+                    break;
+                  case "bought":
+                    description = `Your order ${activity.orderId} was fulfilled by ${activity.sellersCommonName}.`;
+                    href = `${boughtOrdersBaseUrl}/${activity.address}`;
+                    break;
+                  case "transfer":
+                    description = `You have received one or more items as a free transfer from ${activity.oldOwnerCommonName}.`;
+                    href = transfersBaseUrl; 
+                    break;
+                  default:
+                    description = "Activity occurred";
+                    href = "#";
+                }
+                return (
+                  <ActivityFeed
+                    key={index}
+                    type={activity.type}
+                    description={description}
+                    timestamp={activity.block_timestamp}
+                    href={href}
+                  />
+                );
+              })}
+            </div>
+          ) : (
+            <div className="no-activity-message">
+              <Typography.Text type="secondary">
+                You have no recent activity.
+              </Typography.Text>
+            </div>
+          )}
+          </TabPane>
+        )}
       </Tabs>
 
       {/* TABS End */}
