@@ -32,6 +32,7 @@ const contractName = "Mercata";
 const contractFileName = `dapp/mercata-base-contracts/BaseCodeCollection.sol`;
 
 const balance = 100000000000000000000;
+const zeroAddress = constants.zeroAddress;
 let userCert = null;
 
 // interface Member {
@@ -267,7 +268,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
-    const newArgs = { ...args, notEqualsField: 'sale', notEqualsValue: '0000000000000000000000000000000000000000' }
+    const newArgs = { ...args, notEqualsField: 'sale', notEqualsValue: zeroAddress }
     return marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
   };
 
@@ -275,14 +276,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const getOptions = { ...options, app: contractName };
     const newArgs = {
       ...args, notEqualsField: ['sale', 'ownerCommonName'],
-      notEqualsValue: ['0000000000000000000000000000000000000000', userCommonName]
+      notEqualsValue: [zeroAddress, userCommonName]
     }
     return marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
   };
 
   contract.getTopSellingProducts = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName }
-    const newArgs = { ...args, notEqualsField: 'sale', notEqualsValue: '0000000000000000000000000000000000000000' }
+    const newArgs = { ...args, notEqualsField: 'sale', notEqualsValue: zeroAddress }
     return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions)
   }
 
@@ -290,7 +291,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const getOptions = { ...options, app: contractName }
     const newArgs = {
       ...args, notEqualsField: ['sale', 'ownerCommonName'],
-      notEqualsValue: ['0000000000000000000000000000000000000000', userCommonName]
+      notEqualsValue: [zeroAddress, userCommonName]
     }
     return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions)
   }
