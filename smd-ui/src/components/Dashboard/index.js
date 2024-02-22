@@ -93,14 +93,19 @@ class Dashboard extends Component {
     const isCPUCurrentHealthy = cpu.currentLoad < limits.cpuCurrentLoadAlertLevel;
     const isMemoryHealthy = memory.use < limits.memoryUsedAlertLevel;
     const isDiskSpaceHealthy = maxUsageFilesystem.use < limits.diskspaceUsedAlertLevel;
+    const isCPUAvgHealthy = cpu.avgLoad < limits.cpuAvgLoadAlertLevel;
 
-    const healthy = isCPUCurrentHealthy && isMemoryHealthy && isDiskSpaceHealthy;
+    const healthy = isCPUCurrentHealthy && isCPUAvgHealthy && isMemoryHealthy && isDiskSpaceHealthy;
 
       return (
         <div className="sys-info-container col-sm-6 text-right row" style={{marginTop: '25px', marginBottom:'10px', marginLeft:'0px', marginRight:'0px' }}>
             <p className='text-right'> 
               <span id='cpuCurrentMetric' className={`metric ${isCPUCurrentHealthy ? 'good-metric' : 'bad-metric'}`}>
                   {`CPU: ${cpu.currentLoad.toFixed(2)}%`}
+              </span>
+              {' | '}
+              <span id='cpuAvgMetric' className={`metric ${isCPUAvgHealthy ? 'good-metric' : 'bad-metric'}`}>
+                    {`Avg CPU : ${cpu.avgLoad.toFixed(2)}`}
               </span>
               {' | '}
               <span id='memoryMetric' className={`metric ${isMemoryHealthy ? 'good-metric' : 'bad-metric'}`}>
@@ -153,7 +158,8 @@ class Dashboard extends Component {
     const limits = this.props.dashboard.limits || {
       cpuCurrentLoadAlertLevel: 90,
       memoryUsedAlertLevel: 80,
-      diskspaceUsedAlertLevel: 80
+      diskspaceUsedAlertLevel: 80,
+      cpuAvgLoadAlertLevel: 1.2
     }
     const synced = this.props.appMetadata.metadata ? this.props.appMetadata.metadata.isSynced : false
     const metadata = this.props.appMetadata.metadata
