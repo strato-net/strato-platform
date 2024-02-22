@@ -1,10 +1,11 @@
 import { Button, Spin, Typography } from "antd";
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
 
 export const ResponsiveSoldOrderCard = ({ data, isLoading }) => {
     const navigate = useNavigate();
+    const location = useLocation();
 
     const statusComponent = (status) => {
         let classes
@@ -46,7 +47,7 @@ export const ResponsiveSoldOrderCard = ({ data, isLoading }) => {
                         </div>
                         <div className={` px-4 w-full flex justify-between`}>
                             <Typography>Buyer</Typography>
-                            <Typography className="font-semibold text-[#202020]" onClick={()=>{navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", item?.buyersCommonName)}`)}}>{item?.buyersCommonName || 'N/A'}</Typography>
+                            <Typography className="font-semibold text-[#202020]" onClick={()=>{navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", item?.buyersCommonName)}`, { state: { from: location.pathname } })}}>{item?.buyersCommonName || 'N/A'}</Typography>
                         </div>
                         <div className={` px-4 w-full flex justify-between`}>
                             <Typography>Order Total($)</Typography>

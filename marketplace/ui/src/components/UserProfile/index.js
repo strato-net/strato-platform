@@ -1,9 +1,14 @@
-import React, { useEffect, useState } from 'react';
-import { Button, Avatar, Tabs, Spin, notification } from 'antd';
-import { EditOutlined } from '@ant-design/icons';
-import { UserOutlined } from '@ant-design/icons';
+import React, { useEffect, useState } from "react";
+import { Button, Avatar, Tabs, Spin, notification, Row, Col, Typography } from "antd";
+import { UserOutlined, EditOutlined } from "@ant-design/icons";
 import { Images } from "../../images";
 import routes from "../../helpers/routes";
+import { actions as userActivityActions } from "../../contexts/userActivity/actions";
+import {
+  useUserActivityDispatch,
+  useUserActivityState,
+} from "../../contexts/userActivity";
+import ActivityFeed from "./ActivityFeed";
 import { actions as inventoryActions } from "../../contexts/inventory/actions";
 import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
 import { useAuthenticateState } from "../../contexts/authentication";
@@ -21,7 +26,6 @@ const UserProfile = (user) => {
 
 const [commonName, setCommonName] = useState(undefined);
 const [activeTab, setActiveTab] = useState('1');
-const [offset, setOffset] = useState(0);
 const dispatch = useInventoryDispatch();
 const { cartList } = useMarketplaceState();
 const [api, contextHolder] = notification.useNotification();
@@ -32,35 +36,73 @@ const { TabPane } = Tabs;
 
 const navigate = useNavigate();
 const location = useLocation();
-const [breadcrumbs, setBreadcrumbs] = useState([]);
+// const [breadcrumbs, setBreadcrumbs] = useState('Home / Profile');
+const [breadcrumb, setBreadcrumb] = useState('Home / My Profile');
+
+const { Title, Text, Paragraph } = Typography;
+
+const userActivityDispatch = useUserActivityDispatch();
+const { userActivity } = useUserActivityState();
+
+const soldOrdersBaseUrl = new URL("/marketplace/sold-orders", window.location.origin).toString();
+const boughtOrdersBaseUrl = new URL("/marketplace/bought-orders", window.location.origin).toString();
+const transfersBaseUrl = new URL("/marketplace/order/transfers", window.location.origin).toString();
+
+
+  useEffect(() => {
+    if (!user.user) {
+      return
+    }
+    const profile = user.user.commonName
+    userActivityActions.fetchUserActivity(userActivityDispatch, profile);
+  }, [userActivityDispatch, user.user]);
+
+// useEffect(() => {
+//   // Define a base breadcrumb path
+//   const baseCrumbs = [
+//     { label: 'Home', path: '/' },
+//   ];
+
+//   // Determine the source and set breadcrumbs
+//   const path = location.pathname;
+//   let sourceCrumbs = [];
+  
+//   if (path.includes('/marketplace/productList/')) {
+//     sourceCrumbs.push({ label: 'Product Detail', path: path });
+//   } else if (path.includes('/marketplace/order/bought')) {
+//     sourceCrumbs.push({ label: 'Orders (Bought)', path: path });
+//   } else if (path.includes('/marketplace/order/sold')) {
+//     sourceCrumbs.push({ label: 'Orders (Sold)', path: path });
+//   } else if (path.includes('/marketplace/order/transfers')) {
+//     sourceCrumbs.push({ label: 'Transfers', path: path });
+//   }
+  
+//   // Append the "Profile" as the last part of the breadcrumbs
+//   sourceCrumbs.push({ label: 'Profile', path: `/marketplace/profile/${commonName}` });
+
+//   // Combine the base with source-specific breadcrumbs
+//   setBreadcrumbs(baseCrumbs.concat(sourceCrumbs));
+// }, [location, commonName]);
 
 
 useEffect(() => {
-  // Define a base breadcrumb path
-  const baseCrumbs = [
-    { label: 'Home', path: '/' },
-  ];
+  // Determine the breadcrumb based on the referrer
+  const referrer = location.state?.from || location.pathname;
+  // console.log(referrer)
+  let breadcrumbText = 'Home / Profile';
 
-  // Determine the source and set breadcrumbs
-  const path = location.pathname;
-  let sourceCrumbs = [];
-  
-  if (path.includes('/marketplace/productList/')) {
-    sourceCrumbs.push({ label: 'Product Detail', path: path });
-  } else if (path.includes('/marketplace/order/bought')) {
-    sourceCrumbs.push({ label: 'Orders (Bought)', path: path });
-  } else if (path.includes('/marketplace/order/sold')) {
-    sourceCrumbs.push({ label: 'Orders (Sold)', path: path });
-  } else if (path.includes('/marketplace/order/transfers')) {
-    sourceCrumbs.push({ label: 'Transfers', path: path });
-  }
-  
-  // Append the "Profile" as the last part of the breadcrumbs
-  sourceCrumbs.push({ label: 'Profile', path: `/marketplace/profile/${commonName}` });
+  if (referrer.includes('/productList/')) {
+    breadcrumbText = 'Home / Product Details / Profile';
+  } else if (referrer.includes('/order/bought')) {
+    breadcrumbText = 'Home / Orders (Bought) / Profile';
+  } else if (referrer.includes('/order/sold')) {
+    breadcrumbText = 'Home / Orders (Sold) / Profile';
+  } else if (referrer.includes('/order/transfers')) {
+    breadcrumbText = 'Home / Transfers / Profile';
+  } // Add more conditions if needed
 
-  // Combine the base with source-specific breadcrumbs
-  setBreadcrumbs(baseCrumbs.concat(sourceCrumbs));
-}, [location, commonName]);
+  setBreadcrumb(breadcrumbText);
+}, [location]);
 
 const openToast = (placement, isError, msg) => {
   if (isError) {
@@ -126,7 +168,7 @@ const addItemToCart = (product, quantity) => {
 
 
 
-const routeMatch = useMatch({
+  const routeMatch = useMatch({
     path: routes.MarketplaceUserProfile.url,
     strict: true,
   });
@@ -138,8 +180,8 @@ useEffect(() => {
 
 
   useEffect(() => {
-      if(commonName) inventoryActions.fetchInventoryForUser(dispatch, 10, offset, commonName);
-  }, [dispatch, offset, hasChecked, isAuthenticated, loginUrl, commonName]);
+      if(commonName) inventoryActions.fetchInventoryForUser(dispatch, 10, 0, commonName);
+  }, [dispatch, hasChecked, isAuthenticated, loginUrl, commonName]);
 
   const handleTabSelect = (key) => {
     setActiveTab(key);
@@ -150,7 +192,7 @@ useEffect(() => {
     
     <div className="container mx-auto p-6">
       {/* Breadcrumb */}
-      <div className="mb-4 text-sm">
+      {/* <div className="mb-4 text-sm">
         {console.log(breadcrumbs)}
         {breadcrumbs.map((crumb, index) => (
           <span key={index}>
@@ -162,6 +204,10 @@ useEffect(() => {
             )}
           </span>
         ))}
+      </div> */}
+      {/* Breadcrumb */}
+      <div className="mb-4 text-sm">
+        <span>{breadcrumb}</span>
       </div>
       
       {/* User Cover */}
@@ -193,14 +239,18 @@ useEffect(() => {
 
 
 
-    {/* Search Bar and Filter */}
+      {/* Search Bar and Filter */}
 
       {/* <div className="flex items-center justify-center ml-4 md:ml-14 mr-14 mt-6 lg:mt-8 gap-4">
           <div className="border border-solid border-[#6A6A6A] rounded-md cursor-pointer p-1 md:p-2" 
           // onClick={handleFilterClick}
-          >
-            <img src={Images.filter} alt="filter" className=" w-5 h-5 md:w-6 md:h-6" />
-          </div>
+        >
+          <img
+            src={Images.filter}
+            alt="filter"
+            className=" w-5 h-5 md:w-6 md:h-6"
+          />
+        </div>
 
           <div className={`flex-1 `}>
             <Input
@@ -215,12 +265,13 @@ useEffect(() => {
 
       {/* End of Search Bar */}
 
-
       {/* TABS Start */}
 
-      <Tabs defaultActiveKey={activeTab} onChange={handleTabSelect} className="p-3 ml-6 mr-6 mb-6">
-
-        
+      <Tabs
+        defaultActiveKey={activeTab}
+        onChange={handleTabSelect}
+        className="p-3 ml-6 mr-6 mb-6"
+      >
         <TabPane tab="Assets For Sale" key="1">
        
         {/* Assets of the User */}
@@ -251,18 +302,44 @@ useEffect(() => {
 
         </TabPane>
 
-
-        <TabPane tab="Activity" key="2">
-    
-         {/* Activity Content */}
-     
+        <TabPane tab="My Activity" key="2">
+          {/* Activity Content */}
+          <div className="activity-list">
+            {userActivity.map((activity, index) => {
+              let description;
+              let href;
+              switch (activity.type) {
+                case "sold":
+                  description = `You have received a new order ${activity.orderId} from ${activity.purchasersCommonName}.`;
+                  href = `${soldOrdersBaseUrl}/${activity.address}`;
+                  break;
+                case "bought":
+                  description = `Your order ${activity.orderId} was fulfilled by ${activity.sellersCommonName}.`;
+                  href = `${boughtOrdersBaseUrl}/${activity.address}`;
+                  break;
+                case "transfer":
+                  description = `You have received one or more items as a free transfer from ${activity.oldOwnerCommonName}.`;
+                  href = transfersBaseUrl; 
+                  break;
+                default:
+                  description = "Activity occurred";
+                  href = "#";
+              }
+              return (
+                <ActivityFeed
+                  key={index}
+                  type={activity.type}
+                  description={description}
+                  timestamp={activity.block_timestamp}
+                  href={href}
+                />
+              );
+            })}
+          </div>
         </TabPane>
-     
       </Tabs>
 
       {/* TABS End */}
-
-
     </div>
   );
 };

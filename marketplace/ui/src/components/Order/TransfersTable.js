@@ -83,12 +83,12 @@ const TransfersTable = ({ user, selectedDate, download, isAllOrdersLoading }) =>
     {
       title: "From",
       key: "oldOwnerCommonName",
-      render: (text, record) => <p onClick={()=>{navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", record.oldOwnerCommonName)}`)}}>{record.oldOwnerCommonName}</p>,
+      render: (text, record) => <p onClick={()=>{navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", record.oldOwnerCommonName)}`, { state: { from: location.pathname } })}}>{record.oldOwnerCommonName}</p>,
     },
     {
       title: "To",
       key: "newOwnerCommonName",
-      render: (text, record) => <p onClick={()=>{navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", record.newOwnerCommonName)}`)}}>{record.newOwnerCommonName}</p>,
+      render: (text, record) => <p onClick={()=>{navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", record.newOwnerCommonName)}`, { state: { from: location.pathname } })}}>{record.newOwnerCommonName}</p>,
     },
     {
       dataIndex: "transferDate",

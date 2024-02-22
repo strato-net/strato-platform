@@ -1,10 +1,11 @@
 import { Spin, Typography } from "antd";
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
 
 export const ResponsiveTransferOrderCard = ({ data, isLoading}) => {
   const navigate = useNavigate();
+  const location = useLocation();
     
     return (
         <Spin wrapperClassName="orders_responsive_cards" spinning={isLoading} delay={500} size="large">
@@ -17,11 +18,11 @@ export const ResponsiveTransferOrderCard = ({ data, isLoading}) => {
                         </div>
                         <div className={`p-2 px-4 w-full flex justify-between`}>
                             <Typography>From</Typography>
-                            <Typography onClick={()=>{navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", item?.oldOwnerCommonName)}`)}}>{item?.oldOwnerCommonName || 'N/A'}</Typography>
+                            <Typography onClick={()=>{navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", item?.oldOwnerCommonName)}`, { state: { from: location.pathname } })}}>{item?.oldOwnerCommonName || 'N/A'}</Typography>
                         </div>
                         <div className={`p-2 px-4 w-full flex justify-between`}>
                             <Typography>To</Typography>
-                            <Typography className={`text-[#202020]`} onClick={()=>{navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", item?.newOwnerCommonName)}`)}}>{item?.newOwnerCommonName || 'N/A'}</Typography>
+                            <Typography className={`text-[#202020]`} onClick={()=>{navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", item?.newOwnerCommonName)}`, { state: { from: location.pathname } })}}>{item?.newOwnerCommonName || 'N/A'}</Typography>
                         </div>
                         <div className={`p-2 px-4 w-full flex justify-between`}>
                             <Typography>Date</Typography>
