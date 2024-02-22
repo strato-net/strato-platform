@@ -282,7 +282,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace/topselling?offset=${offset}&limit=${limit}`,
+        `${apiUrl}/marketplace/topselling?offset=${offset}&limit=${limit}&gtField=quantity&gtValue=0`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -320,7 +320,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace/user/topselling?offset=${offset}&limit=${limit}`,
+        `${apiUrl}/marketplace/user/topselling?offset=${offset}&limit=${limit}&gtField=quantity&gtValue=0`,
         {
           method: HTTP_METHODS.GET,
         }
