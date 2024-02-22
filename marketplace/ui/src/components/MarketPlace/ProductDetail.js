@@ -427,7 +427,7 @@ const ProductDetails = ({ user, users }) => {
                         icon={<div className="flex justify-center items-center">
                           <img src={Images.Cart} alt="cart" width={18} height={18} className="object-contain" />
                         </div>}
-                        className={`!w-9 h-9 rounded-md  !bg-[#13188A] `}
+                        className={`!w-9 h-9 rounded-md  ${isAvailableForSale? '!bg-[#808080]':'!bg-[#13188A]'}  `}
                         disabled={isAvailableForSale}
                         onClick={() => {
                           if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
