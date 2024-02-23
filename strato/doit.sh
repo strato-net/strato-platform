@@ -416,7 +416,7 @@ function setEnv {
 }
 
 echo "Processed environment variables:"
-setEnv addBootnodes false
+setEnv addBootnodes true
 setEnv bootnode ""
 setEnv genesisBlock ""
 setEnv kafkaHost ${kafkaHost}
