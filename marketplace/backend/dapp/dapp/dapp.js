@@ -525,6 +525,21 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       }
       const saleAddresses = orders.orders.flatMap(order => order.saleAddresses);
       const sales = await saleJs.getAll(rawAdmin, { saleAddresses }, options);
+      
+      for (const sale of sales) {
+        const order = orders.orders.find(o => o.saleAddresses.includes(sale.address));
+        if (order) {
+          const history = await saleJs.getSaleHistory(rawAdmin, {
+            contract: sale.contract_name, 
+            address: sale.address, 
+            transaction_hash: order.transaction_hash
+          }, options);
+          if (history && history['0']) {
+            sale.price = history['0'].price;
+          }
+        }
+      }
+      
       const uniqueAssetAddresses = new Set(sales.map(sale => sale.assetToBeSold));
       
       const assets = await inventoryJs.getAll(rawAdmin, { assetAddresses: [...uniqueAssetAddresses] }, options);

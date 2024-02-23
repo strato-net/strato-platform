@@ -102,6 +102,7 @@ const Order = ({ user }) => {
         })
       );
     } catch (error) {
+      console.log("error1: ", error);
       throw new Error("Failed to map order data");
     }
   }
@@ -123,6 +124,7 @@ const Order = ({ user }) => {
         });
       });
     } catch (error) {
+      console.log("error2: ", error);
       throw new Error("Failed to map transfers data");
     }
   }
@@ -137,6 +139,7 @@ const Order = ({ user }) => {
       try {
         sold = mapOrderData(allOrders.bodySold)
       } catch (error) {
+        console.log("error sold: ", error);
         api.error({
           message: 'Data Processing Error',
           description: 'Failed to process order data. Please contact support.',
@@ -148,6 +151,7 @@ const Order = ({ user }) => {
       try {
         bought = mapOrderData(allOrders.bodyBought)
       } catch (error) {
+        console.log("error bought: ", error);
         api.error({
           message: 'Data Processing Error',
           description: 'Failed to process order data. Please contact support.',
@@ -159,6 +163,7 @@ const Order = ({ user }) => {
       try {
         transferred = mapTransfersData(allOrders.bodyTransfers)
       } catch (error) {
+        console.log("error transferred: ", error);
         api.error({
           message: 'Data Processing Error',
           description: 'Failed to process order data. Please contact support.',
