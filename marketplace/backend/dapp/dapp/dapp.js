@@ -1,6 +1,6 @@
 import { rest, util, importer } from "blockapps-rest";
 const { createContract } = rest;
-import { SERVICE_PROVIDERS, STRIPE_PAYMENT_SERVER_URL } from "/helpers/constants";
+import constants, { STRIPE_PAYMENT_SERVER_URL } from "/helpers/constants";
 import { yamlWrite, yamlSafeDumpSync, getYamlFile } from "/helpers/config";
 import { pollingHelper } from "/helpers/utils";
 
@@ -25,7 +25,6 @@ import marketplaceJs from "/dapp/marketplace/marketplace.js";
 import paymentProviderJs from '/dapp/payments/paymentProvider';
 
 import strats from "../strats/strats";
-import constants from "../../helpers/constants";
 
 const allAssetNames = [];
 

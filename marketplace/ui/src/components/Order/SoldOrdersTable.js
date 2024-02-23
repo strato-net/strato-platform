@@ -245,7 +245,7 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrde
       title: "Order Total ($)",
       dataIndex: "orderTotal",
       key: "orderTotal",
-      render: (text) => <p>${text}</p>,
+      render: (text) => <p className="sm:w-20 lg:w-28 lg:pr-5 text-right">{text}</p>,
     },
     {
       dataIndex: "date",
