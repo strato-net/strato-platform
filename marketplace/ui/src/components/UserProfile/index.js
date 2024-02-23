@@ -14,7 +14,7 @@ import ActivityFeed from "./ActivityFeed";
 import { actions as inventoryActions } from "../../contexts/inventory/actions";
 import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
 import { useAuthenticateState } from "../../contexts/authentication";
-import { useLocation, useMatch, Link } from "react-router-dom";
+import { useLocation, useMatch, useParams } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { useInventoryDispatch, useInventoryState } from '../../contexts/inventory';
 import {
@@ -59,8 +59,17 @@ const { userActivity } = useUserActivityState();
 const soldOrdersBaseUrl = new URL("/marketplace/sold-orders", window.location.origin).toString();
 const boughtOrdersBaseUrl = new URL("/marketplace/bought-orders", window.location.origin).toString();
 const transfersBaseUrl = new URL("/marketplace/order/transfers", window.location.origin).toString();
+const params = useParams();
 
-
+useEffect(() => {
+  const searchParams = new URLSearchParams(window.location.search);
+  const tab = searchParams.get('tab');
+  console.log(tab)
+  // Check if the 'tab' query parameter is set to 'my-activity'
+  if (tab === 'my-activity') {
+    setActiveTab('2'); // Set '2' to open the "My Activity" tab
+  }
+  }, [commonName]);
 
     const ownerSameAsUser = (commonNameOfUser) => {
         if (user.user?.commonName === commonNameOfUser) {
@@ -457,6 +466,7 @@ const transfersBaseUrl = new URL("/marketplace/order/transfers", window.location
         {isOwner && (
           <TabPane tab="My Activity" key="2">
               {/* Activity Content */}
+              {userActivity && userActivity.length > 0 ? (
               <div className="activity-list">
                 {userActivity.map((activity, index) => {
                   let description;
@@ -489,6 +499,13 @@ const transfersBaseUrl = new URL("/marketplace/order/transfers", window.location
                   );
                 })}
               </div>
+              ) : (
+                <div className="no-activity-message">
+                  <Typography.Text type="secondary">
+                    You have no recent activity.
+                  </Typography.Text>
+                </div>
+              )}
         </TabPane>
       )}
       </Tabs>
