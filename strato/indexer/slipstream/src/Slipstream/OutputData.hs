@@ -374,68 +374,57 @@ getDeferredForeignKeysAbstract ::
   (MonadLogger m) =>
   TableName -> ContractF () -> Text -> Text -> Map.Map (Account, Text) (Text, Text) -> CodeCollectionF () -> m [ForeignKeyInfo]
 getDeferredForeignKeysAbstract tableName c o a abstracts' cc = do
-  $logInfoS "getDeferredForeignKeysAbstract: Start" . T.pack $
-    "tableName: " ++ show tableName ++ ", c: " ++ show c ++ ", o: " ++ show o ++
-    ", a: " ++ show a ++ ", abstracts': " ++ show abstracts' ++ ", cc: " ++ show cc
-  result <- fmap catMaybes . for [(theName, x) | (theName, VariableDecl {_varType = SVMType.UnknownLabel x _}) <- Map.toList (c ^. storageDefs)] $ \(theName, x) -> do
-      let contract = getContractsBySolidString x cc
-      $logInfoS "getDeferredForeignKeysAbstract: x" . T.pack $ show x
-      $logInfoS "getDeferredForeignKeysAbstract: cc" . T.pack $ show cc
-      $logInfoS "getDeferredForeignKeysAbstract: contract" . T.pack $ show contract
-      case contract of
-              Just c' -> do
-                $logInfoS "getDeferredForeignKeysAbstract: enums" . T.pack $ show (_enums c')
-                $logInfoS "getDeferredForeignKeysAbstract: structs" . T.pack $ show (_structs c')
-                $logInfoS "getDeferredForeignKeysAbstract: contractName" . T.pack $ show (_contractName c')
-                $logInfoS "getDeferredForeignKeysAbstract: theName" . T.pack $ show (show theName)
+  let skipForeignKeyCreation = case tableName of
+        AbstractTableName "BlockApps" "Mercata" "Asset" -> True
+        AbstractTableName "BlockApps" "Mercata" "Order" -> True
+        _ -> False
+
+  -- Additional condition for BlockApps Mercata Sale
+  let isMercataSale = case tableName of
+        AbstractTableName "BlockApps" "Mercata" "Sale" -> True
+        _ -> False
+  $logDebugS "getDeferredForeignKeysAbstract: skipForeignKeyCreation" . T.pack $ show skipForeignKeyCreation
+  if skipForeignKeyCreation
+  then return []
+  else do
+    result <- fmap catMaybes . for [(theName, x) | (theName, VariableDecl {_varType = SVMType.UnknownLabel x _}) <- Map.toList (c ^. storageDefs)] $ \(theName, x) -> do
+        let contract = getContractsBySolidString x cc
+        case contract of
+                Just c' -> do
 
 
-                -- Add logs for each variable involved in enumOrStructWithNameExists
-                let enumExists = isJust (Map.lookup (_contractName c') (_enums c'))
-                $logInfoS "getDeferredForeignKeysAbstract: enumExists" . T.pack $ show enumExists
-
-                let structWithNameExists = isJust (Map.lookup (show theName) (_structs c'))
-                $logInfoS "getDeferredForeignKeysAbstract: structWithNameExists" . T.pack $ show structWithNameExists
-
-                let structWithNameExists2 = isJust (Map.lookup (show x) (_structs c'))
-                $logInfoS "getDeferredForeignKeysAbstract: structWithNameExists2" . T.pack $ show structWithNameExists2
-
-                let structExists = isJust (Map.lookup (_contractName c') (_structs c'))
-                $logInfoS "getDeferredForeignKeysAbstract: structExists" . T.pack $ show structExists
-
-                let enumWithNameExists = isJust (Map.lookup (show theName) (_enums c'))
-                $logInfoS "getDeferredForeignKeysAbstract: enumWithNameExists" . T.pack $ show enumWithNameExists
-                
-                let enumWithNameExists2 = isJust (Map.lookup (show x) (_enums c'))
-                $logInfoS "getDeferredForeignKeysAbstract: enumWithNameExists2" . T.pack $ show enumWithNameExists2
-
-                let enumOrStructWithNameExists = enumExists || structWithNameExists || structExists || enumWithNameExists || enumWithNameExists2 || structWithNameExists2
-                if enumOrStructWithNameExists
-                then do
-                  $logInfoS "getDeferredForeignKeysAbstract: Enum with the same name as contract found, skipping fkey creation" . T.pack $ _contractName c'
-                  return Nothing
-                else do
-                  let (o',a',n') = case _importedFrom c' of
-                                    Nothing -> (o, a, _contractName c')
-                                    Just acct -> case Map.lookup (acct, T.pack $ _contractName c') abstracts' of
+                  -- Add logs for each variable involved in enumOrStructWithNameExists
+                  let enumExists = isJust (Map.lookup (_contractName c') (_enums c'))
+                      structWithNameExists = isJust (Map.lookup (show theName) (_structs c'))
+                      structWithNameExists2 = isJust (Map.lookup (show x) (_structs c'))
+                      structExists = isJust (Map.lookup (_contractName c') (_structs c'))
+                      enumWithNameExists = isJust (Map.lookup (show theName) (_enums c'))
+                      enumWithNameExists2 = isJust (Map.lookup (show x) (_enums c'))
+                      enumOrStructWithNameExists = enumExists || structWithNameExists || structExists || enumWithNameExists || enumWithNameExists2 || structWithNameExists2
+                  if enumOrStructWithNameExists
+                  then do
+                    $logInfoS "getDeferredForeignKeysAbstract: Enum with the same name as contract found, skipping fkey creation" . T.pack $ _contractName c'
+                    return Nothing
+                  else do
+                    let (o',a',n') = case _importedFrom c' of
                                       Nothing -> (o, a, _contractName c')
-                                      Just (o'', a'') -> (o'', a'', _contractName c')
-                  $logInfoS "getDeferredForeignKeysAbstract: (o',a',n')" . T.pack $ show (o',a',n')
-                  $logInfoS "getDeferredForeignKeysAbstract: tableName" . T.pack $ show tableName
-                  $logInfoS "getDeferredForeignKeysAbstract: theName2" . T.pack $ show theName
-                  $logInfoS "getDeferredForeignKeysAbstract: abstractTableName o' a' $ T.pack n'" . T.pack $ show $ abstractTableName o' a' $ T.pack n'
-                  pure $ Just $ ForeignKeyInfo
-                    { tableName = tableName,
-                      columnName = labelToText theName,
-                      foreignTableName = abstractTableName o' a' $ T.pack n'
-                      }
-              Nothing -> return Nothing
-   -- Log at the end
-  $logInfoS "getDeferredForeignKeysAbstract: End" . T.pack $ "Result: " ++ show result
-  return result
-
-
-
+                                      Just acct -> case Map.lookup (acct, T.pack $ _contractName c') abstracts' of
+                                        Nothing -> (o, a, _contractName c')
+                                        Just (o'', a'') -> (o'', a'', _contractName c')
+                    let proceedWithForeignKeyCreation = if isMercataSale
+                            then (o', a', T.pack n') == ("BlockApps", "Mercata", "Asset")
+                            else True
+                    if proceedWithForeignKeyCreation
+                    then do
+                      pure $ Just $ ForeignKeyInfo
+                        { tableName = tableName,
+                          columnName = labelToText theName,
+                          foreignTableName = abstractTableName o' a' $ T.pack n'
+                          }
+                    else return Nothing
+                Nothing -> return Nothing
+    -- Log at the end
+    return result
 
 getDeferredForeignKeysForMapping :: TableName -> Text -> Text -> [ForeignKeyInfo]
 getDeferredForeignKeysForMapping tableName o a =
