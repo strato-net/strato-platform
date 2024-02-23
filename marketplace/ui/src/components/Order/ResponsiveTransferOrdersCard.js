@@ -18,11 +18,54 @@ export const ResponsiveTransferOrderCard = ({ data, isLoading}) => {
                         </div>
                         <div className={`p-2 px-4 w-full flex justify-between`}>
                             <Typography>From</Typography>
-                            <Typography onClick={()=>{navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", item?.oldOwnerCommonName)}`, { state: { from: location.pathname } })}}>{item?.oldOwnerCommonName || 'N/A'}</Typography>
+                            {/* <Typography onClick={()=>{navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", item?.oldOwnerCommonName)}`, { state: { from: location.pathname } })}}>{item?.oldOwnerCommonName || 'N/A'}</Typography> */}
+                            <Typography
+                            style={{ cursor: item?.oldOwnerCommonName ? 'pointer' : 'default', color: 'black', textDecoration: item?.newOwnerCommonName ? 'underline' : 'none' }}
+                            onClick={(e) => {
+                                if (item?.oldOwnerCommonName && item.oldOwnerCommonName !== 'N/A') {
+                                e.preventDefault();
+                                const userProfileUrl = `/marketplace/profile/${encodeURIComponent(item.oldOwnerCommonName)}`;
+                                const fullUrl = `${window.location.origin}${userProfileUrl}`;
+
+                                if (e.ctrlKey || e.metaKey) {
+                                    // Open in a new tab if Ctrl/Cmd is pressed
+                                    window.open(fullUrl, '_blank');
+                                } else {
+                                    // Use navigate for a normal click, without Ctrl/Cmd
+                                    navigate(routes.MarketplaceUserProfile.url.replace(":commonName", item.oldOwnerCommonName), { state: { from: location.pathname } });
+                                }
+                                }
+                            }}
+                            >
+                            {item?.oldOwnerCommonName || 'N/A'}
+                            </Typography>
+
+
                         </div>
                         <div className={`p-2 px-4 w-full flex justify-between`}>
                             <Typography>To</Typography>
-                            <Typography className={`text-[#202020]`} onClick={()=>{navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", item?.newOwnerCommonName)}`, { state: { from: location.pathname } })}}>{item?.newOwnerCommonName || 'N/A'}</Typography>
+                            {/* <Typography className={`text-[#202020]`} onClick={()=>{navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", item?.newOwnerCommonName)}`, { state: { from: location.pathname } })}}>{item?.newOwnerCommonName || 'N/A'}</Typography> */}
+                            <Typography
+                                style={{ cursor: item?.newOwnerCommonName ? 'pointer' : 'default', color: 'black', textDecoration: item?.newOwnerCommonName ? 'underline' : 'none' }}
+                                onClick={(e) => {
+                                    if (item?.newOwnerCommonName && item.newOwnerCommonName !== 'N/A') {
+                                    e.preventDefault();
+                                    const userProfileUrl = `/marketplace/profile/${encodeURIComponent(item.newOwnerCommonName)}`;
+                                    const fullUrl = `${window.location.origin}${userProfileUrl}`;
+
+                                    if (e.ctrlKey || e.metaKey) {
+                                        // Open in a new tab if Ctrl/Cmd is pressed
+                                        window.open(fullUrl, '_blank');
+                                    } else {
+                                        // Use navigate for a normal click, without Ctrl/Cmd
+                                        navigate(routes.MarketplaceUserProfile.url.replace(":commonName", item.newOwnerCommonName), { state: { from: location.pathname } });
+                                    }
+                                    }
+                                }}
+                                >
+                                {item?.newOwnerCommonName || 'N/A'}
+                            </Typography>
+
                         </div>
                         <div className={`p-2 px-4 w-full flex justify-between`}>
                             <Typography>Date</Typography>

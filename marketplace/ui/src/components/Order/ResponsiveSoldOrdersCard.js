@@ -47,7 +47,32 @@ export const ResponsiveSoldOrderCard = ({ data, isLoading }) => {
                         </div>
                         <div className={` px-4 w-full flex justify-between`}>
                             <Typography>Buyer</Typography>
-                            <Typography className="font-semibold text-[#202020]" onClick={()=>{navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", item?.buyersCommonName)}`, { state: { from: location.pathname } })}}>{item?.buyersCommonName || 'N/A'}</Typography>
+                            {/* <Typography className="font-semibold text-[#202020]" onClick={()=>{navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", item?.buyersCommonName)}`, { state: { from: location.pathname } })}}>{item?.buyersCommonName || 'N/A'}</Typography> */}
+                            <Typography
+                                className="font-semibold text-[#202020] cursor-pointer" // Add cursor-pointer for visual cue
+                                style={{
+                                    textDecoration: item?.buyersCommonName && item.buyersCommonName !== 'N/A' ? 'underline' : 'none',
+                                    cursor: item?.buyersCommonName && item.buyersCommonName !== 'N/A' ? 'pointer' : 'default'
+                                }}
+                                onClick={(e) => {
+                                    if (item?.buyersCommonName && item.buyersCommonName !== 'N/A') {
+                                    e.preventDefault();
+                                    const userProfileUrl = `/marketplace/profile/${encodeURIComponent(item.buyersCommonName)}`;
+                                    const fullUrl = `${window.location.origin}${userProfileUrl}`;
+
+                                    if (e.ctrlKey || e.metaKey) {
+                                        // Open in a new tab if Ctrl/Cmd is pressed
+                                        window.open(fullUrl, '_blank');
+                                    } else {
+                                        // Use navigate for a normal click, without Ctrl/Cmd
+                                        navigate(routes.MarketplaceUserProfile.url.replace(":commonName", item?.buyersCommonName), { state: { from: location.pathname } });
+                                    }
+                                    }
+                                }}
+                                >
+                                {item?.buyersCommonName || 'N/A'}
+                                </Typography>
+
                         </div>
                         <div className={` px-4 w-full flex justify-between`}>
                             <Typography>Order Total($)</Typography>

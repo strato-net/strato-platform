@@ -113,9 +113,17 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
 
   const items = user ? [
     {
+      key: '3',
+      label: (
+        <div onClick={() => { navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", user.commonName)}`) }}>
+          <p>My Profile</p>
+        </div>
+      ),
+    },
+    {
       key: '2',
       label: (
-        <div onClick={()=>{navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", user.commonName)}`)}}>
+        <div>
           <p>
             {user == null ? "" : user.commonName}
           </p>
@@ -147,6 +155,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
       ),
     },
   ];
+  
 
   useEffect(() => {
     let temp = "";
@@ -169,6 +178,15 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     { value: "marketplace", path: routes.MarketplaceProductList.url, label: "Marketplace" },
     { value: "orders", path: routes.Orders.url.replace(':type', 'sold'), label: "Orders" },
     { value: "mystore", path: "/mystore", label: "My Store" },
+    user ? {
+      value: "my-profile",
+      path: routes.MarketplaceUserProfile.url.replace(':commonName', user.commonName),
+      label: (
+        <div>
+          <p className="!mb-0">My Profile</p>
+        </div>
+      )
+    } : null,
     user ? { value: "logout", path: "/logout", label: <div><p className="!mb-0">Logout</p><p className="text-xs text-gray">{user?.preferred_username}</p></div> } : null,
   ]
 

@@ -25,55 +25,65 @@ import NewTrendingCard from './NewTrendingCard';
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
 import { actions as categoryActions } from "../../contexts/category/actions";
 import InventoryCard from "../Inventory/InventoryCard";
-
-
+import { useItemDispatch, useItemState } from "../../contexts/item";
+import { actions as itemActions } from "../../contexts/item/actions";
 
 
 
 
 const UserProfile = (user) => {
 
-const [commonName, setCommonName] = useState(undefined);
-const [activeTab, setActiveTab] = useState('1');
-const dispatch = useInventoryDispatch();
-const categoryDispatch = useCategoryDispatch();
-const [category, setCategory] = useState(undefined);
-const { cartList } = useMarketplaceState();
-const [api, contextHolder] = notification.useNotification();
-const marketplaceDispatch = useMarketplaceDispatch();
-const { userInventories, isUserInventoriesLoading, inventories, isInventoriesLoading, message, success, isLoadingStripeStatus, stripeStatus, inventoriesTotal } = useInventoryState();
-let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
-const { TabPane } = Tabs;
-const orderDispatch = useOrderDispatch();
-const navigate = useNavigate();
-const location = useLocation();
-const [breadcrumb, setBreadcrumb] = useState('Home / Profile');
-const { categorys } = useCategoryState();
-const [isOwner, setIsOwner] = useState(false);
-const limit = 10;
-const [offset, setOffset] = useState(0);
-const [page, setPage] = useState(1);
-const userActivityDispatch = useUserActivityDispatch();
-const { userActivity } = useUserActivityState();
+  const [commonName, setCommonName] = useState(undefined);
+  const [activeTab, setActiveTab] = useState('1');
+  const dispatch = useInventoryDispatch();
+  const categoryDispatch = useCategoryDispatch();
+  const [category, setCategory] = useState(undefined);
+  const { cartList } = useMarketplaceState();
+  const [api, contextHolder] = notification.useNotification();
+  const marketplaceDispatch = useMarketplaceDispatch();
+  const { userInventories, isUserInventoriesLoading, inventories, isInventoriesLoading, message, success, isLoadingStripeStatus, stripeStatus, inventoriesTotal } = useInventoryState();
+  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
+  const { TabPane } = Tabs;
+  const orderDispatch = useOrderDispatch();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [breadcrumb, setBreadcrumb] = useState('Home / Profile');
+  const { categorys } = useCategoryState();
+  const [isOwner, setIsOwner] = useState(false);
+  const limit = 10;
+  const [offset, setOffset] = useState(0);
+  const [page, setPage] = useState(1);
+  const userActivityDispatch = useUserActivityDispatch();
+  const { userActivity } = useUserActivityState();
 
-const soldOrdersBaseUrl = new URL("/marketplace/sold-orders", window.location.origin).toString();
-const boughtOrdersBaseUrl = new URL("/marketplace/bought-orders", window.location.origin).toString();
-const transfersBaseUrl = new URL("/marketplace/order/transfers", window.location.origin).toString();
-const params = useParams();
+  const soldOrdersBaseUrl = new URL("/marketplace/sold-orders", window.location.origin).toString();
+  const boughtOrdersBaseUrl = new URL("/marketplace/bought-orders", window.location.origin).toString();
+  const transfersBaseUrl = new URL("/marketplace/order/transfers", window.location.origin).toString();
+  const params = useParams();
 
-useEffect(() => {
-  const searchParams = new URLSearchParams(window.location.search);
-  const tab = searchParams.get('tab');
-  console.log(tab)
-  // Check if the 'tab' query parameter is set to 'my-activity'
-  if (tab === 'my-activity') {
-    setActiveTab('2'); // Set '2' to open the "My Activity" tab
-  }
-  }, [commonName]);
+    //items
+  const itemDispatch = useItemDispatch();
+  const {
+    message: itemMsg,
+    success: itemSuccess
+  } = useItemState();
+
+
+
+    useEffect(() => {
+      const searchParams = new URLSearchParams(window.location.search);
+      const tab = searchParams.get('tab');
+      console.log(tab)
+      // Check if the 'tab' query parameter is set to 'my-activity'
+      if (tab === 'my-activity') {
+        setActiveTab('2'); // Set '2' to open the "My Activity" tab
+      }
+      }, [commonName]);
 
     const ownerSameAsUser = (commonNameOfUser) => {
         if (user.user?.commonName === commonNameOfUser) {
           setIsOwner(true);
+          setBreadcrumb('Home / My Profile');
           return true;
         }
         setIsOwner(false);
@@ -160,7 +170,7 @@ useEffect(() => {
       // breadcrumb based on the referrer
       const referrer = location.state?.from || location.pathname;
       // console.log(referrer)
-      let breadcrumbText = 'Home / My Profile';
+      let breadcrumbText = 'Home / Profile';
 
       if (referrer.includes('/productList/')) {
         breadcrumbText = 'Home / Product Details / Profile';
@@ -174,6 +184,24 @@ useEffect(() => {
 
       setBreadcrumb(breadcrumbText);
     }, [location]);
+
+    const itemToast = (placement) => {
+      if (itemSuccess) {
+        api.success({
+          message: itemMsg,
+          onClose: itemActions.resetMessage(itemDispatch),
+          placement,
+          key: 3,
+        });
+      } else {
+        api.error({
+          message: itemMsg,
+          onClose: itemActions.resetMessage(itemDispatch),
+          placement,
+          key: 4,
+        });
+      }
+    };
 
     const openToast = (placement, isError, msg) => {
       if (isError) {
@@ -511,6 +539,8 @@ useEffect(() => {
       </Tabs>
 
       {/* TABS End */}
+      {message && openToast("bottom")}
+      {itemMsg && itemToast("bottom")}
     </div>
   );
 };
