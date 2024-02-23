@@ -10,11 +10,21 @@ class MarketplaceController {
         query.manufacturer = encodedManufacturers
       }
       const inventories = await dapp.getMarketplaceInventories({ ...query })
+      let unlisted = [];
+      let listed = inventories?.inventoryResults?.filter((item,index)=>{
+        if(item.saleQuantity && item.saleQuantity!==0){
+          return item
+        }else{
+          unlisted.push(item)
+        }
+      });
+      
+      listed = listed.sort((a, b) => {
+          return b?.saleDate?.localeCompare(a?.saleDate);
+      });
 
-      // const productsWithImageUrl = inventories?.inventoryResults.sort((a, b) => {
-      //   return b?.saleDate?.localeCompare(a?.saleDate);
-      // });
-      rest.response.status200(res, { productsWithImageUrl: inventories?.inventoryResults, inventoryCount: inventories?.inventoryCount })
+      const finalInventory = [...listed, ...unlisted];
+      rest.response.status200(res, { productsWithImageUrl: finalInventory, inventoryCount: inventories?.inventoryCount })
 
       return next()
     } catch (e) {
@@ -32,10 +42,22 @@ class MarketplaceController {
       }
       const inventories = await dapp.getMarketplaceInventoriesLoggedIn({ ...query })
 
-      // const productsWithImageUrl = inventories?.inventoryResults.sort((a, b) => {
-      //   return b?.saleDate?.localeCompare(a?.saleDate);
-      // });
-      rest.response.status200(res, { productsWithImageUrl: inventories?.inventoryResults, inventoryCount: inventories?.inventoryCount })
+      let unlisted = [];
+      let listed = inventories?.inventoryResults?.filter((item,index)=>{
+        if(item.saleQuantity && item.saleQuantity!==0){
+          return item
+        }else{
+          unlisted.push(item)
+        }
+      });
+      
+      listed = listed.sort((a, b) => {
+          return b?.saleDate?.localeCompare(a?.saleDate);
+      });
+
+      const finalInventory = [...listed, ...unlisted];
+
+      rest.response.status200(res, { productsWithImageUrl: finalInventory, inventoryCount: inventories?.inventoryCount })
 
       return next()
     } catch (e) {
