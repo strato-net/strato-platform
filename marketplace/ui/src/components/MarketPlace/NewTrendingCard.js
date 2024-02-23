@@ -60,9 +60,13 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "" }) => {
                     <img className='w-4 h-4' src={Images.Verified} alt='verified' />
                 </div>
             </a>
-            <Typography className='font-normal text-black'>{topSellingProduct?.price && `$ ${topSellingProduct?.price}`}
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            {topSellingProduct?.price && <Typography className='font-normal text-black'>{ `$ ${topSellingProduct?.price}`}</Typography>}
             {isAvailableForSale && <Text type="danger" strong> Currently unavailable </Text>}
-            </Typography>
+                 {topSellingProduct?.contract_name.toLowerCase().includes("clothing") && (
+                    <Typography className='font-normal text-black'>Size: { topSellingProduct?.data?.size ? topSellingProduct?.data?.size : "N/A"}</Typography>
+                )}
+            </div>
             <Typography className={`#989898 opacity-40 max-h-5 overflow-hidden ${parent == 'Marketplace' ? 'hidden md:flex' : ''}`}>{topSellingProduct?.description || "N/A"}</Typography>
             <div className='flex justify-between items-center bg-[#EEEFFA] p-2 rounded-[4px]'>
                 <Typography>Quantity:</Typography>

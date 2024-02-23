@@ -65,6 +65,7 @@ const TransfersTable = ({ user, selectedDate, download, isAllOrdersLoading }) =>
           quantity: transfer.quantity,
           transferDate: getStringDate(transfer.transferDate, US_DATE_FORMAT),
           transferNumber: transfer.transferNumber,
+          price: transfer?.price
         });
       });
     }
@@ -77,7 +78,7 @@ const TransfersTable = ({ user, selectedDate, download, isAllOrdersLoading }) =>
       title: "Transfer Number",
       dataIndex: "transferNumber",
       key: "transferNumber",
-      render: (text) => <p>{text}</p>,
+      render: (text) => <p>#{text}</p>,
     },
     {
       title: "From",
@@ -116,8 +117,17 @@ const TransfersTable = ({ user, selectedDate, download, isAllOrdersLoading }) =>
       title: "Quantity",
       dataIndex: "quantity",
       key: "quantity",
-      render: (text) => <p>{text}</p>,
-      width: "15%",
+      align: "right",
+      render: (text) => <p className="text-right" >{text}</p>,
+      width: "10%",
+    },
+    {
+      title: "Price",
+      dataIndex: "price",
+      key: "price",
+      align: "right",
+      render: (text) => <p className="text-right">{text ? `$ ${text}` : '--'}</p>,
+      width: "10%",
     },
   ];
 
