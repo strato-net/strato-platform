@@ -366,7 +366,7 @@ export const setSearchQueryOptionsLike = (args = {}, _queryOptionsArray) => {
 }
 
 export const searchAllWithQueryArgs = async (contractName, args, options, user) => {
-  const nonQueryOptions = ['queryValue', 'queryFields', 'queryOptions', 'limit', 'offset', 'sort', 'range', 'gtField', 'gtValue', 'lteField', 'lteValue', 'notEqualsField', 'notEqualsValue']
+  const nonQueryOptions = ['queryValue', 'queryFields', 'queryOptions', 'limit', 'offset', 'sort', 'range', 'gtField', 'gtValue', 'gteField', 'gteValue', 'ltField', 'ltValue', 'lteField', 'lteValue', 'notEqualsField', 'notEqualsValue']
   const queryArgs = setSearchQueryOptions(args, Object.keys(args).reduce((result, key) => {
     if (!nonQueryOptions.includes(key) && key != 'category' && key != 'subCategory' && key != 'isMint') {
       if (Array.isArray(args[key])) {
