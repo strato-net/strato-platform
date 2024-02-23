@@ -371,10 +371,10 @@ async function checkSystemInfo(isGlobalPasswordSet) {
       'currentLoad': metadataLoad.currentLoad,
       'avgLoad': metadataLoad.avgLoad,
     };
-     if (metadataLoad.avgLoad >= cpudata.cores * config.healthCheck.cpuAvgLoadAlertLevel/100) {
-       isHealthy = false;
-       additional_info.push(`Average CPU load is high (${metadataLoad.avgLoad})`)
-     }
+    if (metadataLoad.avgLoad >= cpudata.cores * config.healthCheck.cpuAvgLoadAlertLevel/100) {
+      isHealthy = false;
+      additional_info.push(`Average CPU load is high (${metadataLoad.avgLoad})`)
+    }
     if (metadataLoad.currentLoad >= config.healthCheck.cpuCurrentLoadAlertLevel) {
       isHealthy = false;
       additional_info.push(`Current CPU load is high (${metadataLoad.currentLoad})`)
