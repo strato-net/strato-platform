@@ -1,6 +1,3 @@
-import { getEnvVariable } from 'helpers/utils';
-import config from '/load.config';
-
 export default {
   baseUrl: `/api/v1`,
   deployParamName: "deploy",
@@ -27,9 +24,14 @@ export default {
   saleTableName: "Sale",
   orderTableName: "Order",
   blockAppsOrg: "BlockApps",
+  prodNetworkId: "6909499098523985262",
+  testnetNetworkId: "7596898649924658542",
+  prodStratsAddress: "b220195543f652f735b7847c4af399d0323e1ff6",
+  testnetStratsAddress: "488cd3909d94606051e0684cf6caa5763fb78613"
 };
 
-export const STRIPE_PAYMENT_SERVER_URL = getEnvVariable('STRIPE_PAYMENT_SERVER_URL');
+require('dotenv').config();
+export const STRIPE_PAYMENT_SERVER_URL = process.env.STRIPE_PAYMENT_SERVER_URL
 
 export const unitOfMeasurement = {}
 unitOfMeasurement[unitOfMeasurement['LB'] = 1] = 'LB';
@@ -77,4 +79,3 @@ export const SERVICE_PROVIDERS = {}
 SERVICE_PROVIDERS[SERVICE_PROVIDERS['STRIPE'] = 1] = 'STRIPE';
 SERVICE_PROVIDERS[SERVICE_PROVIDERS['PAYPAL'] = 2] = 'PAYPAL';
 Object.freeze(SERVICE_PROVIDERS)
-

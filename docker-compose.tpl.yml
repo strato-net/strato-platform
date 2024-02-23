@@ -66,27 +66,23 @@ services:
     - MP_IS_BOOTNODE=${MP_IS_BOOTNODE:-false}
     - MP_API_DEBUG=${MP_API_DEBUG:-false}
     - MP_DELAY_DEPLOYMENT=${MP_DELAY_DEPLOYMENT}
-    - ORG_DEPLOY_FILE_NAME=${DEPLOY_FILE_NAME:-org.deploy.yaml}
     - MP_SERVER_HOST=${NODE_HOST}
     - MP_SERVER_SSL=${ssl}
     - STRATO_NODE_PROTOCOL=${STRATO_NODE_PROTOCOL}
     - STRATO_NODE_HOST=${STRATO_NODE_HOST}
     - NODE_LABEL=${NODE_NAME} # TODO: obsolete? (label is not used from config.yaml)
     - OAUTH_APP_TOKEN_COOKIE_NAME=${OAUTH_APP_TOKEN_COOKIE_NAME:-stratomp_session}
-    - OAUTH_OPENID_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
-    - OAUTH_VAULT_PROXY_ALT_CLIENT_ID=${OAUTH_VAULT_PROXY_ALT_CLIENT_ID}
-    - OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET=${OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET}
     - OAUTH_SCOPE=${OAUTH_SCOPE:-email openid} # TODO: to be removed after app oauth changes
     - OAUTH_SERVICE_OAUTH_FLOW=client-credential
     - OAUTH_TOKEN_FIELD=access_token
     - OAUTH_TOKEN_USERNAME_PROPERTY=${OAUTH_TOKEN_USERNAME_PROPERTY:-email}
     - OAUTH_TOKEN_USERNAME_PROPERTY_SERVICE_FLOW=${OAUTH_TOKEN_USERNAME_PROPERTY_SERVICE_FLOW:-sub}
-    - STRIPE_PAYMENT_SERVER_URL=${STRIPE_PAYMENT_SERVER_URL}
+    - STRATO_HOSTNAME=${STRATO_HOSTNAME}
+    - STRATO_PORT_API=${STRATO_PORT_API}
     - GLOBAL_ADMIN_NAME=${GLOBAL_ADMIN_NAME}
     - GLOBAL_ADMIN_PASSWORD=${GLOBAL_ADMIN_PASSWORD}
-    - ORG_NAME='BlockApps' # TODO: can be removed?
     - SENDGRID_API_KEY=${SENDGRID_API_KEY}
     build: .
     image: ${MARKETPLACEBACKEND_IMAGE:-<REPO_URL>marketplace-backend:<VERSION>}
@@ -102,11 +98,9 @@ services:
     depends_on:
       - marketplace-backend
     environment:
-      - NODE_ENV=${NODE_ENV:-production}
-      - ASSET_TABLE_NAME=${ASSET_TABLE_NAME}
-      - SALE_TABLE_NAME=${SALE_TABLE_NAME}
       - SITE_ID=${SITE_ID:-038fe3fa}
-
+      - STRATO_HOSTNAME=${STRATO_HOSTNAME}
+      - STRATO_PORT_API=${STRATO_PORT_API}
     build: .
     image: ${MARKETPLACEUI_IMAGE:-<REPO_URL>marketplace-ui:<VERSION>}
     restart: unless-stopped
@@ -153,6 +147,7 @@ services:
     - validatorBehavior=${validatorBehavior:-true}
     - evmDebugMode=${evmDebugMode}
     - faucetEnabled=${faucetEnabled}
+    - FILE_SERVER_URL=${FILE_SERVER_URL}
     - FULL_DEBUG_LOG=${FULL_DEBUG_LOG:-false}
     - gasLimit=${gasLimit}
     - gasOn=${gasOn:-false}
@@ -196,6 +191,7 @@ services:
     - SLIPSTREAM_OPTIONAL=${SLIPSTREAM_OPTIONAL}
     - splitinit=true
     - stratoHost=strato:3000
+    - STRIPE_PAYMENT_SERVER_URL=${STRIPE_PAYMENT_SERVER_URL}
     - svmTrace=${svmTrace}
     - sqlDiff=${sqlDiff}
     - svmDev=${svmDev}
@@ -210,7 +206,6 @@ services:
     - VM_DEBUGGER=${VM_DEBUGGER}
     - VM_DEBUG_LOG=${VM_DEBUG_LOG:-false}
     - vmRunnerRTSOPTs=${vmRunnerRTSOPTs}
-    - wireMessageCacheSize=${wireMessageCacheSize}
     - zkHost=zookeeper
     build: .
     image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>}
@@ -282,7 +277,6 @@ services:
     - MARKETPLACE_UI_HOST=${MARKETPLACE_UI_HOST}
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
-    - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
     - OAUTH_SCOPE=${OAUTH_SCOPE}
     - POSTGREST_HOST=${POSTGREST_HOST}
     - PROMETHEUS_HOST=${PROMETHEUS_HOST}
@@ -350,7 +344,7 @@ services:
       KAFKA_OFFSETS_RETENTION_MINUTES: 2147483647
       KAFKA_MAX_REQUEST_SIZE: ${KAFKA_MAX_REQUEST_SIZE:-100663296}
       KAFKA_MESSAGE_MAX_BYTES: ${KAFKA_MESSAGE_MAX_BYTES:-100663296}
-    image: wurstmeister/kafka:1.1.0
+    image: wurstmeister/kafka:2.12-2.0.1
     restart: unless-stopped
     volumes:
     - kafkadata:/kafka

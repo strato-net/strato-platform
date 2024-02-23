@@ -11,6 +11,7 @@ import { subscribeToDocumentChanges } from './diagnostics';
 import { rest, importer } from 'blockapps-rest';
 import { getApplicationUser, applicationUserLogin } from './auth';
 import getConfig from './load.config';
+import getOptions from './load.options';
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
@@ -76,9 +77,9 @@ export async function activate(context: vscode.ExtensionContext) {
 		if (addressRegex.test(argInput)) {
 			try {
 				const user = await getApplicationUser();
-				const cfg = getConfig() || {};
+				const options = getOptions() || {}
 				// check if the contract exists, err out otherwise
-				const res = await rest.getContractsDetails(user, { address: argInput }, { config: cfg  })
+				const res = await rest.getContractsDetails(user, { address: argInput }, options)
 				contractsProvider
 					.addContract(argInput)
 					.then(list => context.workspaceState.update('contractAddresses', list))
@@ -96,10 +97,9 @@ export async function activate(context: vscode.ExtensionContext) {
 	vscode.commands.registerCommand('contracts.uploadContract', async (element) => {
 		const tokens = await getAccessTokenSecrets(context);
 		if (Object.keys(tokens).length === 0) { return vscode.window.showErrorMessage('Please log in to STRATO Mercata to upload a contract.') }
-		const user = await getApplicationUser(0, tokens);
-		const config = getConfig() || {};
-		const activeNode = vscode.workspace.getConfiguration().get('strato-vscode.activeNode');
-		const nodeOptions = { config, node: activeNode};
+		const activeNode: number = await vscode.workspace.getConfiguration().get('strato-vscode.activeNode') || 0;
+		const user = await getApplicationUser(activeNode, tokens);
+		const nodeOptions = getOptions() || {}
 		if (vscode.window.activeTextEditor) {
 			vscode.window.activeTextEditor.document.save();
 			const doc = vscode.window.activeTextEditor.document;
@@ -176,10 +176,9 @@ export async function activate(context: vscode.ExtensionContext) {
 		const { chainId, contractName, contractAddress, variableName } = item;
 		const tokens = await getAccessTokenSecrets(context);
 		if (Object.keys(tokens).length === 0) { return vscode.window.showErrorMessage('Please log in to STRATO Mercata to upload a contract.') }
-		const user = await getApplicationUser(nodeId, tokens);
-		const config = getConfig() || {}
-		const activeNode = vscode.workspace.getConfiguration().get('strato-vscode.activeNode');
-		const nodeOptions = { config, node: activeNode};
+		const activeNode: number = await vscode.workspace.getConfiguration().get('strato-vscode.activeNode') || 0;
+		const user = await getApplicationUser(activeNode, tokens);
+		const nodeOptions = getOptions() || {}
 		const val = await rest.getContractsContract(user, contractName, contractAddress, chainId, nodeOptions);
 		const func = ((val || {})._functions || {})[variableName]
 		if (variableName && variableName !== 'constructor' && func) {
@@ -221,7 +220,7 @@ export async function activate(context: vscode.ExtensionContext) {
 	const cirrusProvider = new CirrusProvider();
 	vscode.commands.registerCommand('cirrus.queryCirrus', async () => {
 		const argInput = await vscode.window.showInputBox({
-			placeHolder: 'ex: Certificate?address=eq.0000000000000000000000000000000000001337',
+			placeHolder: 'ex: BlockApps-Mercata-Asset?address=eq.9b617d82a19cde1a5ad3489bfb91716c88f928a6',
 			prompt: `Enter cirrus query.`
 		});
 		if (!argInput) return;
@@ -267,6 +266,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		const id = element.node.id
 		await vscode.workspace.getConfiguration().update('strato-vscode.activeNode', id, true)
 		nodesProvider.refresh()
+		contractsProvider.refresh()
 		vscode.window.showInformationMessage(`Set active node to ${element.tooltip}.`)
 	})
 	
@@ -315,11 +315,11 @@ nodes:
 
 
 	// Activate debug mode and diagnostics
-	// activateStratoDebug(context);
-	// const solidityDiagnostics = vscode.languages.createDiagnosticCollection("solidity");
-	// context.subscriptions.push(solidityDiagnostics);
+	activateStratoDebug(context);
+	const solidityDiagnostics = vscode.languages.createDiagnosticCollection("solidity");
+	context.subscriptions.push(solidityDiagnostics);
 
-	// await subscribeToDocumentChanges(context, solidityDiagnostics);
+	await subscribeToDocumentChanges(context, solidityDiagnostics);
 }
 
 async function sleep(ms: number) {

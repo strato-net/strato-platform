@@ -3,7 +3,6 @@ import {
   Layout,
   Input,
   Menu,
-  Image,
   Space,
   Badge,
   Avatar,
@@ -11,7 +10,7 @@ import {
   Button,
   Typography
 } from "antd";
-import { ArrowLeftOutlined, LogoutOutlined, } from "@ant-design/icons";
+import { ArrowLeftOutlined, LogoutOutlined } from "@ant-design/icons";
 import { Images } from "../../images";
 import "./header.css";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -24,11 +23,10 @@ import { actions } from "../../contexts/marketplace/actions";
 import { actions as userActions } from "../../contexts/authentication/actions";
 import { useAuthenticateDispatch } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
-import { ProfileIcon } from "../../images/SVGComponents";
 
 const { Header } = Layout;
 
-const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, handleMenuTab }) => {
+const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTab }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const queryParams = new URLSearchParams(location.search);
@@ -37,10 +35,16 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
 
   const marketplaceDispatch = useMarketplaceDispatch();
   const userDispatch = useAuthenticateDispatch();
-  const { cartList } = useMarketplaceState();
+  const { cartList, strats } = useMarketplaceState();
   const storedData = useMemo(() => {
     return window.localStorage.getItem("cartList") == null ? [] : JSON.parse(window.localStorage.getItem("cartList"));
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      actions.fetchStratsBalance(marketplaceDispatch);
+    }
+  }, [user]);
 
   useEffect(() => {
     actions.fetchCartItems(marketplaceDispatch, storedData);
@@ -57,9 +61,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
       items: [
         { label: <div id="Marketplace">Marketplace</div>, key: '0' },
         { label: <div id="Orders">Orders</div>, key: '1' },
-        { label: <div id="Inventory">My Store</div>, key: '2' },
-        // { label: <div id="Products">Products</div>, key: '3' },
-        // { label: <div id="Events">Events</div>, key: '4' }, // hiding events from marketplace
+        { label: <div id="Inventory">My Store</div>, key: '2' }
       ]
     },
     {
@@ -95,9 +97,6 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
 
   useEffect(() => {
     let pathName = window.location.pathname;
-    // if (pathName.includes("/marketplace")) {
-    //   setSelectedTab("0");
-    // } else 
     if (pathName.includes("/order") || pathName.includes("/orders") || pathName.includes('sold-orders') || pathName.includes('bought-orders')) {
       setSelectedTab("1");
     } else if (pathName.includes("/mystore")) {
@@ -123,6 +122,11 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
           <p className="text-xs">
             {user == null ? "" : user.email}
           </p>
+          {user &&
+            <p className="text-xs mt-3">
+              STRATS: {(Object.keys(strats).length > 0) ? strats : 0}
+            </p>
+          }
         </div>
       ),
     },
