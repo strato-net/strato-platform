@@ -259,7 +259,12 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
               </span>
             </Tooltip>
           </p>
-          <Typography className="pt-1">{`(${getCategory()})`}</Typography>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <Typography className="pt-1">{`(${getCategory()})`}</Typography>
+            {inventory?.contract_name.toLowerCase().includes("clothing") && (
+              <Typography className='pt-1'>{'Size: ' + inventory?.data?.size || "N/A"}</Typography>
+            )}
+          </div>
         </div>
         <div className=" pt-[5px]  flex">
           

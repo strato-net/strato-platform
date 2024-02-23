@@ -103,11 +103,23 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
   
   export networkID=$(echo ${METADATA} | jq -r .networkID)
   export STRIPE_PAYMENT_SERVER_URL=$(echo ${METADATA} | jq -r .urls.paymentServer)
+  if [ -z "${networkID}" ]; then
+    echo "Could not get networkID from strato api, but it is a required value"
+    exit 19
+  fi
+  if [ -z "${STRIPE_PAYMENT_SERVER_URL}" ]; then
+    echo "Could not get payment server url from strato api, but it is a required value"
+    exit 20
+  fi
   touch .env
   echo "networkID=${networkID}" >> .env
   echo "STRIPE_PAYMENT_SERVER_URL=${STRIPE_PAYMENT_SERVER_URL}" >> .env
 
   OAUTH_OPENID_DISCOVERY_URL=$(echo ${METADATA} | jq -r .urls.oauthDiscovery)
+  if [ -z "${OAUTH_OPENID_DISCOVERY_URL}" ]; then
+    echo "Could not get OAuth discovery url from strato api, but it is a required value"
+    exit 21
+  fi
 
   sed -i 's*<apiDebug_value>*'"${MP_API_DEBUG}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<configDirPath_value>*'"${CONFIG_DIR_PATH}"'*g' /tmp/tmp.config.yaml
