@@ -17,8 +17,8 @@ module.exports = {
     stallCheckProgressWindow: 10 * 60 * 1000,
     memoryUsedAlertLevel: 80, // Alert when used memory (RAM) >= N%
     diskspaceUsedAlertLevel: 80, // Alert when used diskspace >= N%
-    cpuAvgLoadAlertLevel: 1.2, // Alert when cpu avg load > N
-    cpuCurrentLoadAlertLevel: 97, // Alert when cpu current load > N%,
+    cpuAvgLoadAlertLevel: 97, // Alert when cpu avg load > N%
+    cpuCurrentLoadAlertLevel: 99, // Alert when cpu current load > N%,
     maxStalledIntervals: 20 , //max number of failed stall checks before reporting stalled: 300 seconds / poll freq (15) = 20 
   },
   // Unused code notice. Node stats disabled, to be deprecated  #node-stats-deprecation
