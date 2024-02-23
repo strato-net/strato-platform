@@ -305,7 +305,7 @@ pipeline {
                   dir('strato-getting-started') {
                     sh 'sudo rm -rf strato_logs*'
                     sh 'sudo ./fetchlogs --as-dir'
-                    sh 'mv strato_logs/ strato_logs_testsync/'
+                    sh 'sudo chmod -R 777 strato_logs/ && mv strato_logs/ strato_logs_testsync/'
                     archiveArtifacts artifacts: 'strato_logs_testsync/**', fingerprint: true, allowEmptyArchive: true
                   }
                 }
