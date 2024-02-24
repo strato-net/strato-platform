@@ -187,9 +187,7 @@ export const setSearchQueryOptions = (args = {}, _queryOptionsArray) => {
       }
     }
     let option = {}
-    if (predicate === 'gte' || predicate === 'lte' || predicate === 'gt' || predicate === 'lt') {
-      option = { [key]: `${predicate}.${value}`};
-    } else if (predicate === 'or') {
+    if (predicate === 'or') {
       const { subPredicate = 'eq' } = cur
       const valueArray = key.reduce((orAgg, orCur) => {
         orAgg.push(`${orCur}.${subPredicate}.${value}`)
@@ -403,32 +401,24 @@ export const searchAllWithQueryArgs = async (contractName, args, options, user) 
       }
     }
 
-    if (key === 'gteValue') {
-      const { gteField, gteValue } = args
-      if (gteField && (gteValue || gteValue === 0)) {
-        result.push({ key: gteField, value: gteValue, predicate: 'gte' });
-      }
-    }
-
-    if (key === 'lteValue') {
-      const { lteField, lteValue } = args
-      if (lteField && (lteValue || lteValue === 0)) {
-        result.push({ key: lteField, value: lteValue, predicate: 'lte' });
-      }
-    }
-
     if (key === 'gtValue') {
       const { gtField, gtValue } = args
-      if (gtField && (gtValue || gtValue === 0)) {
-        result.push({ key: gtField, value: gtValue, predicate: 'gt' });
-      }
+       result.push({ key: gtField, value: gtValue, predicate: 'gt' });
     }
 
     if (key === 'ltValue') {
       const { ltField, ltValue } = args
-      if (ltField && (ltValue || ltValue === 0)) {
-        result.push({ key: ltField, value: ltValue, predicate: 'lt' });
-      }
+      result.push({ key: ltField, value: ltValue, predicate: 'lt' });
+    }
+
+    if (key === 'gteValue') {
+      const { gteField, gteValue } = args
+      result.push({ key: gteField, value: gteValue, predicate: 'gte' })
+    }
+
+    if (key === 'lteValue') {
+      const { lteField, lteValue } = args
+      result.push({ key: lteField, value: lteValue, predicate: 'lte' })
     }
 
     if (key === 'notEqualsValue') {
