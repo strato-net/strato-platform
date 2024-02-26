@@ -81,7 +81,7 @@ abstract contract Sale is Utils {
     }
 
     function completeSale(
-    ) public requireSeller("complete sale") returns (uint) {
+    ) public returns (uint) {
         Order order = Order(msg.sender);
         address purchaser = order.purchasersAddress();
         uint orderQuantity = takeLockedQuantity(msg.sender);
