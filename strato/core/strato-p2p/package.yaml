@@ -65,7 +65,6 @@ library:
     # - json-rpc
     - json-rpc-server
     - json-rpc-client
-    - ki-unlifted
     - lens
     - lifted-async
     - lifted-base
@@ -126,7 +125,6 @@ tests:
       - hspec
       - hspec-expectations-lifted
       - hourglass
-      - ki-unlifted
       - labeled-error
       - lens
       - merkle-patricia-db

@@ -1,40 +1,29 @@
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 
-{-# OPTIONS -fno-warn-unused-imports #-}
--- TODO- We need to formally remove the watchdog, then
-{-# OPTIONS -fno-warn-unused-matches #-}
---       we can remove these "no-warn" options
-
 module Blockchain.CommunicationConduit
   ( handleMsgServerConduit,
     handleMsgClientConduit,
-    mkEthP2PEventSource,
-    mkEthP2PEventConduit,
+    bytesToMessages,
+    debounceTxSendsAndUnseq,
+    messageToBytes
   )
 where
 
 import BlockApps.Logging
-import BlockApps.X509
 import Blockchain.Constants hiding (ethVersion)
 import Blockchain.Context
 import Blockchain.Data.Block
-import Blockchain.Data.ChainInfo (UnsignedChainInfo (..))
 import Blockchain.Data.Control (P2PCNC (..))
-import Blockchain.Data.Enode
 import Blockchain.Data.RLP
 import Blockchain.Data.Wire as W
-import Blockchain.Display
 import Blockchain.Event
 import Blockchain.EventException
-import Blockchain.ExtMergeSources
 import Blockchain.Frame
 import Blockchain.Metrics
 import Blockchain.Options
@@ -44,36 +33,20 @@ import Blockchain.Sequencer.Event
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Model.Options (computeNetworkID)
 import Blockchain.Strato.Model.Util
-import Blockchain.TimerSource
-import Blockchain.Watchdog
-import BroadcastChan
 import Conduit
-import Control.Concurrent (ThreadId)
-import Control.Monad (forever, void, when)
-import qualified Control.Monad.Change.Alter as A
+import Control.Monad (forever, when)
 import qualified Control.Monad.Change.Modify as Mod
-import Control.Monad.IO.Unlift
-import Control.Monad.State
-import Control.Monad.Trans.Resource
 import Crypto.Types.PubKey.ECC
 import Data.Bits (shiftL)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Conduit.Binary as CB
-import Data.Conduit.Combinators (yieldMany)
-import qualified Data.Conduit.List as CL
 import Data.Conduit.TQueue
 import Data.List.Split
-import qualified Data.Map.Strict as M
 import Data.Maybe
 import qualified Data.Set as S
 import qualified Data.Text as T
-import Data.Text.Encoding (decodeUtf8)
-import Data.Void
-import qualified GHC.Conc as CONC
-import Ki.Unlifted hiding (await)
 import Text.Printf
-import UnliftIO.Concurrent hiding (yield)
 import UnliftIO.Exception
 import UnliftIO.STM
 
@@ -84,81 +57,6 @@ ethVersion = 62
 blockstanbulVersion :: Int
 blockstanbulVersion = 1
 
-mkEthP2PEventSource ::
-  ( MonadResource m
-  ,  MonadLogger m
-  ,  MonadUnliftIO m
-  ) =>
-  ConduitM () B.ByteString m () ->
-  ConduitM () P2pEvent m () ->
-  String ->
-  EthCryptState ->
-  Scope ->
-  m (ConduitM () Event m ())
-mkEthP2PEventSource peerSourceConduit seqEventSource peerStr inCtx scp = do
-  canarySource <- mkCanarySource
-  eventsourcethreadid <- myThreadId
-  recvWatchdog <- mkWatchdog eventsourcethreadid $ fromIntegral flags_connectionTimeout
-  merged <- mergeSourcesByForce
-              ( [ ( ("peerSourceConduit" :: String)
-                  , labelTheThread ("peerSourceConduit: " ++ peerStr) $
-                    peerSourceConduit
-                    .| ethDecrypt inCtx
-                    .| CL.iterM (recordTraffic Inbound)
-                    .| bytesToMessages
-                    .| CL.iterM (displayMessage Inbound peerStr)
-                    .| CL.map MsgEvt
-                    .| CL.iterM (const $ petWatchdog recvWatchdog)
-                  )
-                , ( ("seqEventSource" :: String)
-                  , labelTheThread ("seqEventSource: " ++ peerStr) $
-                    seqEventSource
-                    .| CL.map NewSeqEvent
-                  )
-                , ( ("canarySource" :: String)
-                  , labelTheThread ("canarySource: " ++ peerStr) $
-                    canarySource
-                    .| CL.map absurd
-                  )
-                , ( ("timerSource" :: String)
-                  , labelTheThread ("timerSource: " ++ peerStr) $
-                    timerSource
-                  )
-                ]
-              )
-              4096 -- 🙏
-              scp
-  return $
-    merged
-      .| CL.iterM recordEvent
-
-mkCanarySource :: ( MonadLogger m
-                  , MonadUnliftIO m
-                  )
-               => m (ConduitM () Void m ())
-mkCanarySource = do
-  q <- atomically newTQueue
-  $logInfoS "canary/enter" ""
-  addCanary
-  -- Wait forever on nothing
-  return $ sourceTQueue q
-
-mkEthP2PEventConduit ::
-  (MonadResource m, MonadLogger m, MonadUnliftIO m, m `Mod.Outputs` [IngestEvent]) =>
-  String ->
-  EthCryptState ->
-  m (ConduitM (Either P2PCNC Message) BC.ByteString m ())
-mkEthP2PEventConduit str outCtx = do
-  tid <- myThreadId
-  sendWatchdog <- mkWatchdog tid $ fromIntegral flags_connectionTimeout
-  return $
-    debounceTxSendsAndUnseq
-      .| CL.iterM recordMessage
-      .| CL.iterM (displayMessage Outbound str)
-      .| CL.iterM (const $ petWatchdog sendWatchdog)
-      .| messageToBytes
-      .| CL.iterM (recordTraffic Outbound)
-      .| ethEncrypt outCtx
 
 debounceTxSendsAndUnseq :: (MonadIO m, m `Mod.Outputs` [IngestEvent]) => ConduitT (Either P2PCNC Message) Message m ()
 debounceTxSendsAndUnseq = labelTheThread "debounceTxSendsAndUnseq" $ do
@@ -180,8 +78,6 @@ handleMsgClientConduit ::
   PPeer ->
   ConduitM Event (Either P2PCNC Message) m ()
 handleMsgClientConduit myId peer = do
-  threadId <- liftIO $ CONC.myThreadId
-  liftIO $ CONC.labelThread threadId $ "message handler: " ++ T.unpack (pPeerIp peer)
   $logDebugS "handleMsgClientConduit" $ T.pack $ "<waving hand emoji>"
   yield $
     Right

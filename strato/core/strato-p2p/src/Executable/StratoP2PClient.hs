@@ -22,8 +22,12 @@ import           BlockApps.Logging
 import           Blockchain.CommunicationConduit
 import           Blockchain.Context
 import           Blockchain.Data.PubKey (secPubKeyToPoint)
+import           Blockchain.Display (displayMessage, MsgDirection(..))
 import           Blockchain.EthEncryptionException
+import           Blockchain.Event
 import           Blockchain.EventException
+import           Blockchain.ExtMergeSources
+import           Blockchain.Frame
 import           Blockchain.Metrics
 import           Blockchain.Options
 import           Blockchain.P2PUtil
@@ -33,6 +37,7 @@ import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.UDP
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.TCPClientWithTimeout
+import           Blockchain.TimerSource
 import           Control.Concurrent hiding (yield)
 import           Control.Concurrent.SSem (SSem)
 import qualified Control.Concurrent.SSem as SSem
@@ -45,11 +50,11 @@ import           Control.Monad.IO.Unlift
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString as B
 import           Data.Conduit
+import qualified Data.Conduit.List as CL
 import           Data.Either.Combinators
 import           Data.Maybe
 import qualified Data.Text as T
 import           GHC.IO.Exception
-import           Ki.Unlifted as KIU
 import qualified Text.Colors as C
 import           Text.Format
 import           UnliftIO
@@ -84,13 +89,14 @@ runPeer peer sSource = do
   runClientConnection (IPAsText $ pPeerIp peer) (TCPPort . fromIntegral $ pPeerTcpPort peer) sSource $ \c -> do
       let pStr = pPeerString peer -- display string will show up as dns name
       attempt :: (Maybe SomeException) <- 
-        withCertifiedPeer peer . withActivePeer peer . scoped $
+        withCertifiedPeer peer . withActivePeer peer $
           runEthClientConduit
             peer {pPeerPubkey = Just otherPubKey}
             (c ^. peerSource)
             (c ^. peerSink)
             (c ^. seqSource)
             pStr
+
       case attempt of
         Nothing  -> $logDebugS "runPeer" "Peer ran successfully!"
         Just err -> do $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err
@@ -103,9 +109,8 @@ runEthClientConduit ::
   ConduitM B.ByteString Void m () ->
   ConduitM () P2pEvent m () ->
   String ->
-  Scope ->
   m (Maybe SomeException)
-runEthClientConduit peer pSource pSink seqSrc peerStr scp = do
+runEthClientConduit peer pSource pSink seqSrc peerStr = do
   myPublic' <- getPub
   let myPublic = secPubKeyToPoint myPublic'
       otherPubKey = fromMaybe (error "programmer error: runEthClientConduit was called without a pubkey") $ pPeerPubkey peer
@@ -113,13 +118,32 @@ runEthClientConduit peer pSource pSink seqSrc peerStr scp = do
   case mConnectionResult of
     Nothing                   -> pure $ Just $ toException $ HandshakeException "handshake timed out"
     Just (_, (outCtx, inCtx)) -> do
-      !eventSource <- mkEthP2PEventSource pSource seqSrc peerStr inCtx scp
-      !eventSink   <- mkEthP2PEventConduit peerStr outCtx
-      fmap (either Just (const Nothing)) . try . runConduit $
-        eventSource
-           .| handleMsgClientConduit myPublic peer
-           .| eventSink
+      fmap (either Just (const Nothing)) . try $ 
+        [
+          labelTheThread ("peerSourceConduit: " ++ peerStr) $
+          pSource
+          .| ethDecrypt inCtx
+          .| CL.iterM (recordTraffic Inbound)
+          .| bytesToMessages
+          .| CL.iterM (displayMessage Inbound peerStr)
+          .| CL.map MsgEvt
+        , labelTheThread ("seqEventSource: " ++ peerStr) $
+          seqSrc
+          .| CL.map NewSeqEvent
+        , labelTheThread ("timerSource: " ++ peerStr) $
+          timerSource
+        ] `mergeConnect` (labelTheThread ("merged2: " ++ peerStr) $ 
+           CL.iterM recordEvent
+           .| labelTheThread ("handleMsgClientConduit: " ++ peerStr)
+                           (handleMsgClientConduit myPublic peer)
+           .| debounceTxSendsAndUnseq
+           .| CL.iterM recordMessage
+           .| CL.iterM (displayMessage Outbound peerStr)
+           .| messageToBytes
+           .| CL.iterM (recordTraffic Outbound)
+           .| ethEncrypt outCtx
            .| pSink
+           )
 
 runPeerInList ::
   ( MonadP2P m,
