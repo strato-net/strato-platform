@@ -235,8 +235,8 @@ const ResponsiveCart = ({
               className=" w-full sm:w-44 h-9 !bg-[#13188A]"
               onClick={async () => {
                 if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                  window.location.href = loginUrl;
-              } else {
+                    window.location.href = loginUrl;
+                } else {
                   const saleAddresses = [];
                   const quantities = [];
                   data.forEach((item) => {
@@ -245,6 +245,7 @@ const ResponsiveCart = ({
                   })
                   const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities)
                   if (checkQuantity === true ) {
+                      // Proceed with order submission
                       actions.addItemToConfirmOrder(marketplaceDispatch, data);
                       window.LOQ.push(['ready', async LO => {
                           // Track an event
@@ -260,16 +261,30 @@ const ResponsiveCart = ({
                       navigate("/confirmOrder");
 
                   } else {
-                      let insufficientItemsMessage = "The following items may no longer be available in the desired quantities:\n";
+                      let insufficientQuantityMessage = "";
+                      let outOfStockMessage = "";
 
+                      // Generate the messages of products with too little or no quantity
                       checkQuantity.forEach(detail => {
-                      insufficientItemsMessage += `(${detail.assetName}-Available Quantity: ${detail.availableQuantity})\n`;
+                          if (detail.availableQuantity === 0) {
+                              outOfStockMessage += `Product ${detail.assetName}\n`;
+                          } else {
+                              insufficientQuantityMessage += `Product ${detail.assetName}: ${detail.availableQuantity}\n`;
+                          }
                       });
-                      insufficientItemsMessage += "Try lowering the quantiy to continue."
-
-                      openToastOrder("bottom", insufficientItemsMessage)
+                      
+                      // Throw the appropriate error messages. Throw both if applicable. 
+                      let errorMessage = "";
+                      if (insufficientQuantityMessage) {
+                          errorMessage += `The following item(s) in your cart have limited quantity available and will need to be adjusted. Please reduce the quantity to proceed:\n${insufficientQuantityMessage}`;
+                      }
+                      if (outOfStockMessage) {
+                          if (errorMessage) errorMessage += "\n"; // Add a new line if there's already an error message
+                          errorMessage += `The following item(s) are temporarily out of stock and should be removed:\n${outOfStockMessage}`;
+                      }
+                      openToastOrder("bottom", errorMessage);
                   }
-              }
+                }
               }}
               disabled={data.length === 0}
             >

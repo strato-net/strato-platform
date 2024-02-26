@@ -200,14 +200,10 @@ const ProductDetails = ({ user, users }) => {
       items = [...cartList];
       cartList.forEach((element, index) => {
         if (element.product.address === details.address) {
-          if (items[index].qty + qty <= availableQuantity) {
-            items[index].qty += qty;
-            marketPlaceActions.addItemToCart(marketplaceDispatch, items);
-            setQty(1);
-            openToast("bottom", false, "Item updated in cart");
-          } else {
-            return;
-          }
+          items[index].qty += qty;
+          marketPlaceActions.addItemToCart(marketplaceDispatch, items);
+          setQty(1);
+          openToast("bottom", false, "Item updated in cart");
         }
       });
     }
@@ -449,7 +445,11 @@ const ProductDetails = ({ user, users }) => {
                             addItemToCart();
                             navigate("/checkout");
                           } else {
-                            openToast("bottom", true, `Currently available quantity for ${details.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantiy to continue.`)
+                            if (checkQuantity[0].availableQuantity === 0) {
+                              openToast("bottom", true, `Unfortunately, ${details.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
+                            } else { // Case 2: We are trying to add too much quantity
+                              openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${details.name} are available. Please update your cart quantity accordingly.`);
+                            }
                           }
                         }
                       }}
@@ -493,7 +493,11 @@ const ProductDetails = ({ user, users }) => {
                             if (checkQuantity === true) {
                               addItemToCart();
                             } else {
-                              openToast("bottom", true, `Currently available quantity for ${details.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantiy to continue.`)
+                              if (checkQuantity[0].availableQuantity === 0) {
+                                openToast("bottom", true, `Unfortunately, ${details.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
+                              } else { // Case 2: We are trying to add too much quantity
+                                openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${details.name} are available. Please update your cart quantity accordingly.`);
+                              }
                             }
                           }
                         }}
@@ -530,7 +534,11 @@ const ProductDetails = ({ user, users }) => {
                             if (checkQuantity === true) {
                               addItemToCart();
                             } else {
-                              openToast("bottom", true, `Currently available quantity for ${details.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantiy to continue.`)
+                              if (checkQuantity[0].availableQuantity === 0) {
+                                openToast("bottom", true, `Unfortunately, ${details.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
+                              } else { // Case 2: We are trying to add too much quantity
+                                openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${details.name} are available. Please update your cart quantity accordingly.`);
+                              }    
                             }
                           }
                         }}
