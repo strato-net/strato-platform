@@ -10,8 +10,14 @@ const counter = new Prometheus.Counter({
   help: 'health_status_counter'
 })
 
-let healthStatus, uptimeDur, systemInfoStatus, systemInfoMessages;
+let healthStatus, uptimeDur, systemInfoStatus, systemInfoMessages, systemInfoStats;
 
+const alertLimits = {
+  memoryUsedAlertLevel: config.healthCheck.memoryUsedAlertLevel,
+  diskspaceUsedAlertLevel: config.healthCheck.diskspaceUsedAlertLevel, 
+  cpuAvgLoadAlertLevel: config.healthCheck.cpuAvgLoadAlertLevel,
+  cpuCurrentLoadAlertLevel: config.healthCheck.cpuCurrentLoadAlertLevel,
+}
 
 async function getHealthStatus() {
   counter.inc()
@@ -68,10 +74,11 @@ async function getHealthStatus() {
   if (systemInfo) {
     systemInfoStatus = systemInfo.latestHealthStatus;
     systemInfoMessages = systemInfoStatus ? "" : JSON.parse(systemInfo.additionalInfo).Alerts;
+    systemInfoStats = JSON.parse(systemInfo.additionalInfo);
   }
   emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_HEALTH, healthStatus);
   emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_NODE_UPTIME, uptimeDur / 1000);
-  emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_SYSTEM_INFO, { status: systemInfoStatus, warnings: systemInfoMessages })
+  emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_SYSTEM_INFO, { status: systemInfoStatus, warnings: systemInfoMessages, stats: systemInfoStats, limits: alertLimits })
 }
 
 getHealthStatus()
@@ -86,7 +93,7 @@ function initialHydrateUptime(socket) {
 }
 
 function initialHydrateSystemInfo(socket) {
-  socket.emit(`PRELOAD_${GET_SYSTEM_INFO}`, { status: systemInfoStatus, warnings: systemInfoMessages });
+  socket.emit(`PRELOAD_${GET_SYSTEM_INFO}`, { status: systemInfoStatus, warnings: systemInfoMessages, stats: systemInfoStats, limits: alertLimits});
 }
 
 module.exports = {
