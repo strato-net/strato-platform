@@ -11,6 +11,7 @@ import {
   InputNumber,
   List,
 } from "antd";
+import { HeartOutlined, HeartFilled } from '@ant-design/icons';
 import { useMatch } from "react-router-dom";
 import { actions } from "../../contexts/inventory/actions";
 import {
@@ -60,6 +61,8 @@ const ProductDetails = ({ user, users }) => {
   const { Text, Paragraph } = Typography;
   const [Id, setId] = useState(undefined);
   const [itemData, setItemData] = useState({});
+  // For Wishlist Icon Rendering
+  const [isWishlisted, setIsWishlisted] = useState(false);
   const [availableQuantity, setAvailableQuantity] = useState(1);
   const [qty, setQty] = useState(1);
   const dispatch = useInventoryDispatch();
@@ -140,6 +143,28 @@ const ProductDetails = ({ user, users }) => {
       }
     }
   }, [categorys, details]);
+
+  // This checks to see if an item is in the wishlist. This will help us render the correct icon
+  useEffect(() => {
+    const wishList = JSON.parse(localStorage.getItem('wishList')) || [];
+    const productInWishlist = wishList.some(product => product.address === details?.address);
+    setIsWishlisted(productInWishlist);
+  }, [details]);
+
+  const toggleWishlist = () => {
+    const wishList = JSON.parse(localStorage.getItem('wishList')) || [];
+    if (isWishlisted) {
+      // Remove product from wishlist
+      const updatedWishList = wishList.filter(product => product.address !== details.address);
+      localStorage.setItem('wishList', JSON.stringify(updatedWishList));
+      setIsWishlisted(false);
+    } else {
+      // Add product to wishlist
+      wishList.push(details);
+      localStorage.setItem('wishList', JSON.stringify(wishList));
+      setIsWishlisted(true);
+    }
+  };
 
   const subtract = () => {
     if (qty !== 1) {
@@ -314,10 +339,12 @@ const ProductDetails = ({ user, users }) => {
                   </div>
                 </div>
                 <div className=" pt-4 lg:pt-[22px]">
-
                   <Text level={4} className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold">
                     {details?.price ? <>${details?.price}</> : "No Price Available"}
                   </Text>
+                  <div onClick={toggleWishlist} style={{ cursor: 'pointer' }}>
+                    {isWishlisted ? <HeartFilled style={{ color: 'red' }} /> : <HeartOutlined />}
+                  </div>
                 </div>
 
                 {availableQuantity !== 0 ?
