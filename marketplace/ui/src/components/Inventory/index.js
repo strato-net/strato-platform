@@ -190,7 +190,7 @@ const allSubcategories = getAllSubcategories(categorys);
     return;
   };
 
-  const testVehicleAPI = () =>{
+  const testVehicleCategoryAPI = () =>{
     const url = 'http://localhost/api/v1/Vehicle';
    const data = {
     "itemArgs":{
@@ -208,6 +208,53 @@ const allSubcategories = getAllSubcategories(categorys);
     "skuNumber": "1",
     "quantity": 1,
     "fuel": "Diesel"
+  }
+}
+    const options = {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json', // Specify that you're sending JSON data
+        // You can add more headers if needed, like authorization headers
+      },
+      body: JSON.stringify(data) // Convert the data object to a JSON string
+    };
+
+    fetch(url, options)
+  .then(response => {
+    if (!response.ok) {
+      throw new Error('Network response was not ok');
+    }
+    return response.json(); // Parse the JSON response
+  })
+  .then(data => {
+    // Handle the data returned from the server
+    console.log('Response from server:', data);
+  })
+  .catch(error => {
+    // Handle any errors that occur during the fetch request
+    console.error('Error during fetch:', error);
+  });
+  }
+
+  const testVehicleSubCategoryAPI = () =>{
+    const url = 'http://localhost/api/v1/VehicleType1';
+   const data = {
+    "itemArgs":{
+    "images": [
+        "https://fileserver.mercata-testnet2.blockapps.net/highway/89010b366c6a4e4d3372eea06b11703d2cc94117d9d366940dbf5d000cc715f8.jpg"
+    ],
+    "files": [],
+    "name": "HM-H1",
+    "description": "Sports car",
+    "vehicleType": "Hatchback",
+    "seater": 5,
+    "brand": "JMS",
+    // "size": "XL",
+    "condition": "New",
+    "skuNumber": "1",
+    "quantity": 1,
+    "fuel": "Diesel",
+    // "wheels": 4
   }
 }
     const options = {
@@ -294,7 +341,8 @@ const allSubcategories = getAllSubcategories(categorys);
                       window.location.href = loginUrl;
                     } else {
                       showModal()
-                      testVehicleAPI()
+                      // testVehicleCategoryAPI()
+                      testVehicleSubCategoryAPI()
                     }
                   }}
                   disabled={!stripeStatus.chargesEnabled || !stripeStatus.detailsSubmitted || !stripeStatus.payoutsEnabled}

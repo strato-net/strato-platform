@@ -5,12 +5,12 @@ import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs, wa
 import dayjs from 'dayjs';
 import constants from '../../helpers/constants';
 
-const contractName = "Vehicle";
-const contractFilename = `${util.cwd}/dapp/items/contracts/Vehicle.sol`;
+const contractName = "VehicleType1";
+const contractFilename = `${util.cwd}/dapp/items/contracts/VehicleType1.sol`;
 const contractEvents = { OWNERSHIP_UPDATE: "OwnershipUpdate" }
 
 /** 
- * Uploads a new Vehicle item 
+ * Uploads a new VehicleType1 item 
  * @param user User token (typically an admin)
  * @param _constructorArgs Arguments of Item's constructor
  * @param options  deployment options (found in _/config/*.config.yaml_ via _load.config.js_) 
@@ -128,7 +128,7 @@ function bind(user, _contract, options) {
 }
 
 /** 
- * Bind an existing Vehicle contract to a new user token. Useful for having multiple users test
+ * Bind an existing VehicleType1 contract to a new user token. Useful for having multiple users test
  * the same contract.
  * @example <caption>Create an admin and user bound to the same new item contract.</caption>
  * const adminBoundContract = createArt(adminToken, args, options);
@@ -172,7 +172,7 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, options) {
-    const inventories = await searchAllWithQueryArgs(constants.assetTableName, { ...args, category: `['Vehicle']` }, options, admin);
+    const inventories = await searchAllWithQueryArgs(constants.assetTableName, { ...args, category: `['VehicleType1']` }, options, admin);
     return inventories.map((inventory) => marshalOut(inventory));
   }
   

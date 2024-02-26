@@ -39,8 +39,12 @@
             "imageKey": "",
             "subCategories": [
                 {
-                    "name": "Vehicle",
-                    "contract": "Vehicle"
+                    "name": "VehicleType1",
+                    "contract": "VehicleType1"
+                },
+                {
+                    "name": "VehicleType2",
+                    "contract": "VehicleType2"
                 }
             ]
         },

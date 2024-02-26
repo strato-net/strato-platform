@@ -94,8 +94,14 @@ export const Clothing = {
   create: '/'
 }
 
-export const Vehicle = {
-  prefix: '/vehicle',
+export const VehicleType1 = {
+  prefix: '/vehicleType1',
+  getAll: '/',
+  create: '/'
+}
+
+export const VehicleType2 = {
+  prefix: '/vehicleType2',
   getAll: '/',
   create: '/'
 }

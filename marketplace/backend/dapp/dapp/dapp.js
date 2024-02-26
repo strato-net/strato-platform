@@ -13,7 +13,9 @@ import artJs from "/dapp/items/art";
 import carbonOffsetJs from "/dapp/items/carbonOffset";
 import metalsJs from "/dapp/items/metals";
 import clothingJs from "/dapp/items/clothing";
-import VehicleJs from "/dapp/items/vehicle";
+
+import VehicleType1Js from "/dapp/items/vehicleType1";
+import VehicleType2Js from "/dapp/items/vehicleType2";
 import membershipJs from "/dapp/items/membership";
 import carbonDAOJs from "/dapp/items/carbonDAO";
 import collectibleJs from "dapp/items/collectibles";
@@ -371,18 +373,33 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   // ------------------------------ CLOTHING ENDS--------------------------------
 
   // ------------------------------ VEHICLE STARTS -------------------------------
-  contract.createVehicle = async function (args, options = defaultOptions) {
+  contract.createVehicleType1 = async function (args, options = defaultOptions) {
     const createdDate = Math.floor(Date.now() / 1000);
     const newArgs = {
       ...args.itemArgs,
       createdDate,
     };
-    return VehicleJs.uploadContract(rawAdmin, newArgs, options);
+    return VehicleType1Js.uploadContract(rawAdmin, newArgs, options);
   };
 
-  contract.getVehicles = async function (args = {}, options = optionsNoChainIds) {
+  contract.getVehiclesType1 = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName, };
-    return VehicleJs.getAll(rawAdmin, args, getOptions);
+    return VehicleType1Js.getAll(rawAdmin, args, getOptions);
+  };
+
+  // -------------------------------||||||||||-----------------------------------
+  contract.createVehicleType2 = async function (args, options = defaultOptions) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const newArgs = {
+      ...args.itemArgs,
+      createdDate,
+    };
+    return VehicleType2Js.uploadContract(rawAdmin, newArgs, options);
+  };
+
+  contract.getVehicleType2 = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName, };
+    return VehicleType2Js.getAll(rawAdmin, args, getOptions);
   };
   // ------------------------------ VEHICLE ENDS --------------------------------
 

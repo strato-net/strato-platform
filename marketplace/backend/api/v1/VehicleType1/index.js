@@ -1,23 +1,23 @@
 import express from "express";
-import VehicleController from "./vehicle.controller";
-import { Vehicle } from "../endpoints";
+import VehicleType1Controller from "./vehicleType1.controller";
+import { VehicleType1 } from "../endpoints";
 import authHandler from "../../middleware/authHandler";
 import loadDapp from "../../middleware/loadDappHandler";
 
 const router = express.Router();
 
 router.get(
-  Vehicle.getAll,
+  VehicleType1.getAll,
   authHandler.authorizeRequest(true),
   loadDapp,
-  VehicleController.getAll
+  VehicleType1Controller.getAll
 );
 
 router.post(
-  Vehicle.create,
+  VehicleType1.create,
   authHandler.authorizeRequest(),
   loadDapp,
-  VehicleController.create
+  VehicleType1Controller.create
 );
 
 export default router;

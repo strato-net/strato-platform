@@ -5,12 +5,12 @@ import config from '../../../load.config'
 
 const options = { config, cacheNonce: true }
 
-class VehicleController {
+class VehicleType1Controller {
   static async getAll(req, res, next) {
     try {
       const { dapp, query } = req
 
-      const vehicles = await dapp.getVehicles({ ...query })
+      const vehicles = await dapp.getVehiclesType1({ ...query })
       rest.response.status200(res, vehicles)
 
       return next()
@@ -23,9 +23,9 @@ class VehicleController {
     try {
       const { dapp, body } = req
 
-      VehicleController.validateCreateVehicleArgs(body)
+      VehicleType1Controller.validateCreateVehicleArgs(body)
 
-      const result = await dapp.createVehicle(body)
+      const result = await dapp.createVehicleType1(body)
       rest.response.status200(res, result)
 
       return next()
@@ -64,4 +64,4 @@ class VehicleController {
   }
 }
 
-export default VehicleController;
+export default VehicleType1Controller;

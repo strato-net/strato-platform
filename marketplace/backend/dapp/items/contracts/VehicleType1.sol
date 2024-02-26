@@ -4,7 +4,7 @@ pragma strict;
 import <8f8d4cef7232db7001bae657db85eb4325ee2f3d>;
 
 /// @title A representation of vehicle assets
-contract Vehicle is Mintable {
+contract VehicleType1 is Mintable {
     string public vehicleType; 
     uint public seater; 
     string public skuNumber; 
@@ -41,7 +41,7 @@ contract Vehicle is Mintable {
     }
 
     function mint(uint _quantity) internal override returns (UTXO) {
-        Vehicle newAsset = new Vehicle(
+        VehicleType1 newAsset = new VehicleType1(
             name,
             description,
             images,
