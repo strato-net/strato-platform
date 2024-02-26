@@ -168,7 +168,8 @@ const reducer = function (state = initialState, action) {
     case UPDATE_SYSTEM_INFO:
       return {
         ...state,
-        systemWarnings: action.data.warnings
+        systemWarnings: action.data.warnings,
+        systemStats: action.data.stats
       }
 
     case CHANGE_HEALTH_STATUS:

@@ -36,6 +36,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const marketplaceDispatch = useMarketplaceDispatch();
   const userDispatch = useAuthenticateDispatch();
   const { cartList, strats } = useMarketplaceState();
+
   const storedData = useMemo(() => {
     return window.localStorage.getItem("cartList") == null ? [] : JSON.parse(window.localStorage.getItem("cartList"));
   }, []);
@@ -54,6 +55,8 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const [initials, setInitials] = useState("");
   const [roleIndex, setRoleIndex] = useState();
   const [showSearch, setShowSearch] = useState(false)
+
+  const stratsBalance = (Object.keys(strats).length > 0) ? strats : 0
 
   const navItems = [
     {
@@ -122,11 +125,6 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
           <p className="text-xs">
             {user == null ? "" : user.email}
           </p>
-          {user &&
-            <p className="text-xs mt-3">
-              STRATS: {(Object.keys(strats).length > 0) ? strats : 0}
-            </p>
-          }
         </div>
       ),
     },
@@ -147,6 +145,19 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
       ),
     },
   ];
+
+  const stratoItem = [{
+    key: '2',
+    label: (
+      <div>
+        {user &&
+          <p className="text-xs mt-1">
+            STRATs: {(Object.keys(strats).length > 0) ? strats : 0}
+          </p>
+        }
+      </div>
+    ),
+  }]
 
   useEffect(() => {
     let temp = "";
@@ -307,6 +318,21 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
             </div>
           </Badge>
           }
+
+          {(roleIndex !== undefined && roleIndex !== 1)
+            && <Dropdown menu={{ items: stratoItem }} placement="bottomRight" trigger={["hover","click"]} className="xs:mt-5 md:mt-0" overlayStyle={{ position: 'fixed' }}>
+              <a onClick={(e) => e.preventDefault()} className="md:flex mx-2 text-base text-white" id="user-dropdown">
+              <Badge
+              style={{backgroundColor:"#13188A"}}
+              className="cursor-pointer mt-7 md:mt-0 mx-2"
+              count={stratsBalance}
+              overflowCount={9999999}
+              >
+              <img src={Images.logo} className="w-[30px] h-[30px] " />
+            </Badge>
+              </a>
+            </Dropdown>
+          }
           {
             roleIndex === undefined || roleIndex === 1 ? (
               loginUrl ? <a href={loginUrl} id="Login" className="text-base text-white flex gap-3 items-center"
@@ -322,7 +348,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
                 <Button size="large" className="flex sm:hidden bg-primary text-white w-[90%] !h-[25%] !text-sm justify-center items-center">Login/Register</Button>
               </a> : null
             ) :
-              <Dropdown menu={{ items }} placement="bottomRight" trigger={["click"]} overlayStyle={{ marginTop: "40px" }}>
+              <Dropdown menu={{ items }} placement="bottomRight" trigger={["click"]} overlayStyle={{ marginTop: "40px", position:'fixed' }}>
                 <a onClick={(e) => e.preventDefault()} className="hidden md:flex text-base text-white" id="user-dropdown">
                   <img src={Images.Setting_icon} className="w-[30px] h-[30px] " />
                 </a>
