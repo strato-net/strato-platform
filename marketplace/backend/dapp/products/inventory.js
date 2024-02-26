@@ -154,6 +154,7 @@ function bind(user, _contract, options) {
     contract.get = async (args) => get(user, args, options);
     contract.getState = async () => getState(user, contract, options);
     contract.getHistory = async (args, options = contractOptions) => getHistory(user, chainId, args, options);
+    contract.checkSaleQuantity = async (args) => checkSaleQuantity(user, args, options)
     contract.chainIds = options.chainIds;
 
     return contract;
@@ -359,7 +360,10 @@ async function getAll(admin, args = {}, defaultOptions) {
     if (isTrendingSearch) {
         // If it's a trending search, first search the sales
         // Order them by creation date and set limit here
-        sales = await saleJs.getAll(admin, { range, isOpen: true, order: 'block_timestamp.desc', limit: '25', offset: '0' }, options);
+
+        // added greater than query to make sure we only take the sales with quantity thats available to sell. 
+        // If the sale has 0 quantity it will throw an error when checking out, we will not show thee items for the trending search.
+        sales = await saleJs.getAll(admin, { range, isOpen: true, order: 'block_timestamp.desc', limit: '25', offset: '0', gtField: args.gtField, gtValue: args.gtValue}, options);
         const trendingAssetAddresses = sales.map(sale => sale.assetToBeSold);
 
         // Match the inventory with the sales
@@ -475,6 +479,40 @@ async function inventoryCount(admin, args = {}, defaultOptions) {
     return totalResult[0].count
 }
 
+async function checkSaleQuantity(admin, args, defaultOptions) {
+    const { saleAddresses, orderQuantity } = args; // Assuming orderQuantity here is used differently now
+    const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' };
+
+    // Fetch sales and assets data
+    const sales = await saleJs.getAll(admin, { address: saleAddresses }, options);
+    const assets = await searchAllWithQueryArgs(contractName, { sale: saleAddresses }, options, admin);
+    let insufficientDetails = [];
+
+    sales.forEach((sale, index) => {
+        const actualAvailableQuantity = sale.quantity; 
+        const requestedQuantity = orderQuantity[index]; // Accessing requested quantity via sale address
+
+        if (actualAvailableQuantity < requestedQuantity) {
+            const asset = assets.find(asset => asset.sale === sale.address);
+            if (asset) {
+                insufficientDetails.push({
+                    assetName: asset.name, 
+                    assetAddress: sale.assetToBeSold,
+                    availableQuantity: actualAvailableQuantity,
+                });
+            }
+        }
+    });
+
+    if (insufficientDetails.length > 0) {
+        return insufficientDetails;
+    } else {
+        // If all sales have sufficient quantities, return true
+        return true;
+    }
+}
+
+
 /**
  * Get contract state in bloc.
  * @deprecated Use {@link get `get`} instead.
@@ -497,6 +535,7 @@ export default {
     transferItem,
     updateInventory,
     updateSale,
+    checkSaleQuantity,
     get,
     getAll,
     getOwnershipHistory,
