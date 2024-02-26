@@ -68,7 +68,7 @@ type BlocAPI =
     :<|> PostBlocTransactionBody
     :<|> PostBlocTransactionUnsigned
     :<|> PostBlocTransaction
-    :<|> PostBlocTransactionExternal
+    :<|> PostBlocTransactionParallelExternal
 
 --Unsure what this will break if anything but remove later
 instance ToSample Text where

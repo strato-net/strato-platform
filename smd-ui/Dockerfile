@@ -6,7 +6,7 @@ WORKDIR /usr/src/app
 
 FROM base as npminstaller
 COPY package*.json /usr/src/app/
-RUN npm install
+RUN npm ci
 
 ### Builder
 FROM npminstaller as builder
@@ -17,6 +17,7 @@ RUN npm run build
 FROM base as prod
 ARG STRATO_VERSION
 ENV STRATO_VERSION=${STRATO_VERSION}
+ENV NODE_ENV=production
 COPY docker-run.sh /usr/src/app/
 COPY --from=builder /usr/src/app/build build/
 EXPOSE 3002
@@ -29,5 +30,5 @@ CMD [ "sh", "/usr/src/app/docker-run.sh" ]
 FROM base as test
 COPY . /usr/src/app
 COPY --from=npminstaller /usr/src/app/node_modules /usr/src/app/node_modules/
-RUN npm install
+RUN npm ci
 RUN npm test

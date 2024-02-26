@@ -19,7 +19,7 @@ function useQuery() {
   return useMemo(() => new URLSearchParams(search), [search]);
 }
 
-const ProcessingOrder = () => {
+const ProcessingOrder = ({user}) => {
 
   const navigate = useNavigate();
   const [sessionId, setSessionId] = useState(undefined);
@@ -56,11 +56,11 @@ const ProcessingOrder = () => {
 
   useEffect(() => {
     // getCartData();
-    if (sessionId !== undefined) {
+    if (sessionId !== undefined && user !== undefined) {
       getCartData();
     }
 
-  }, [sessionId])
+  }, [sessionId, user])
 
 
   const getCartData = async () => {
@@ -74,19 +74,18 @@ const ProcessingOrder = () => {
       );
 
       const body = await response.json();
-      console.log(body);
       if (response.status === RestStatus.OK) {
         try {
           const cartObject = JSON.parse(body.data.metadata.cart);
           if (Object.keys(cartObject).length !== 0) {
             if (body.data["payment_status"] === "paid") {
-              const customerEmail = body.data["customer_details"]["email"];
+              const customerEmail = user.email;
               const cart = JSON.parse(body.data.metadata.cart);
               let object = { paymentSessionId: sessionId, status:ORDER_STATUS.AWAITING_FULFILLMENT, paymentMethod: body.data.payment_method, ...cart };
               handleOrderConfirm(object, customerEmail);
             }
             else if (body.data["payment_method_options"].hasOwnProperty("us_bank_account")) {
-              const customerEmail = body.data["customer_details"]["email"];
+              const customerEmail = user.email;
               const cart = JSON.parse(body.data.metadata.cart);
               let object = { paymentSessionId: sessionId, status:ORDER_STATUS.PAYMENT_PENDING, paymentMethod: body.data.payment_method, ...cart };
               handleOrderConfirm(object, customerEmail);
@@ -190,7 +189,9 @@ const ProcessingOrder = () => {
         }
       });
       actions.addItemToCart(marketplaceDispatch, updatedCart);
-      navigate(routes.Orders.url.replace(':type', 'bought'));
+      setTimeout(() => {
+        navigate(routes.Orders.url.replace(':type', 'bought'));
+      }, 500);      
     } else {
       setTimeout(function () {
         navigate(routes.Checkout.url)
@@ -233,7 +234,7 @@ const ProcessingOrder = () => {
     {contextHolder}
     <div className="h-96 flex flex-col justify-center items-center">
       <Spin spinning={true} size="large" />
-      <p className="mt-4">Please wait while your order is placed successfully</p>
+      <p className="mt-4">Please wait while your order is being processed</p>
     </div>
     {error && openToastMarketplace("bottom")}
     {message && openToastOrder("bottom")}

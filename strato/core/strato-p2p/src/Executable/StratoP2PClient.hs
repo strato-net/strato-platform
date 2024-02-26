@@ -127,8 +127,8 @@ runPeerInList ::
   ) =>
   PPeer ->
   ConduitM () P2pEvent m () ->
-  m (Either SomeException ())
-runPeerInList thePeer sSource = do 
+  m ()
+runPeerInList thePeer sSource = do
   eErr <- nonviolentDisable thePeer --don't connect to a peer too frequently, out of politeness
   case eErr of
     Left err -> do
@@ -136,12 +136,12 @@ runPeerInList thePeer sSource = do
       $logErrorS "runPeerInList" "Simulating disable..."
       liftIO $ threadDelay $ 10 * 1000 * 1000
     Right () -> pure ()
-  try $ runPeer thePeer sSource
+  runPeer thePeer sSource
 
 stratoP2PClient :: (MonadP2P m, RunsClient m) => PeerRunner m (LoggingT IO) () -> LoggingT IO ()
-stratoP2PClient runner = runner $ \sSource -> labelTheThread "strato P2P Client main loop" $ do
+stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main loop" $ do
   $logInfoS "stratoP2PClient" $ T.pack $ "maxConn: " ++ show flags_maxConn
-  activePeersSem <- liftIO (SSem.new flags_maxConn)
+  activePeersSem <- liftIO $ SSem.new flags_maxConn
   forever $ do
     $logDebugS "stratoP2PClient" "About to fetch available peers and loop over them"
     ePeers <- getBondedPeers
@@ -150,21 +150,21 @@ stratoP2PClient runner = runner $ \sSource -> labelTheThread "strato P2P Client 
         $logErrorS "stratoP2PClient" . T.pack $ "Could not fetch peers: " ++ show err
         liftIO $ threadDelay 1000000
       Right peers -> do
-        _ <- async (multiThreadedClient peers activePeersSem sSource)
+        _ <- async (multiThreadedClient peers activePeersSem)
         $logInfoS "stratoP2PClient" "Waiting 5 seconds before looping over peers again"
         liftIO $ threadDelay 5000000
   where
-    multiThreadedClient :: (MonadP2P m, RunsClient m) => [PPeer] -> SSem -> ConduitM () P2pEvent m () -> m ()
-    multiThreadedClient [] _ _ = do
+    multiThreadedClient :: MonadP2P m => [PPeer] -> SSem -> m ()
+    multiThreadedClient [] _ = do
       $logInfoS "stratoP2PClient/multiThreadedClient" "No available peers, will try again in 10 seconds"
       liftIO $ threadDelay 10000000
-    multiThreadedClient peers sem sSource = do
+    multiThreadedClient peers sem = do
       let notRunningPeers = filter ((== 0) . pPeerActiveState) peers
-      unless (null notRunningPeers) . void . forConcurrently notRunningPeers $ \p -> do
+      unless (null notRunningPeers) . void . forConcurrently notRunningPeers $ \p -> --do
         liftIO (SSem.tryWait sem) >>= \case
           Nothing -> return ()
           Just _ -> do
-            result <- runPeerInList p sSource
+            result <- try . liftIO . runLoggingT . runner $ runPeerInList p
             _ <- handleRunPeerResult p result
             liftIO $ SSem.signal sem
     handleRunPeerResult :: MonadP2P m => PPeer -> Either SomeException () -> m ()

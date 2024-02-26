@@ -16,6 +16,10 @@
     align-items: center;
 }
 
+.custom-picker .ant-picker-input input {
+    display: none;
+}
+
 .ant-picker-input {
     padding: 4px 2px;
 }
@@ -42,9 +46,14 @@
     font-size: 16px !important;
 }
 
-.orders_page .ant-picker {
+.orders_page {
     margin-bottom: 12px;
+    gap: 8px;
 }
+
+.customButton:hover {
+    color: black !important;
+  }
 
 @media (min-width: 768px) {
     .orders_searchbar input {

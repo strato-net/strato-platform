@@ -8,7 +8,8 @@ module.exports = {
   ping: async function (req, res) {
     res.status(200).send('pong');
   },
-
+  getPbftData,
+  findView,
   nodeStatus: async function (req, res, next) {
     try {
       //get node's block number, best block hash, best block parent hash, total difficulty
@@ -28,15 +29,15 @@ module.exports = {
         raw: true,
       });
 
-      let healthStatus, stallStatus, uptime, isInc, isPending, healthAI, systemInfoAI, systemInfoStatus, warningMessages, systemInfoBody;
+      let healthStatus, stallStatus, uptime, isInc, isPending, healthAI, systemInfoAI, systemInfoStatus, warningMessages, systemInfoBody, syncStallStatus, syncStatus;
 
       const currentTime = Date.now();
 
       const responses = await Promise.all([getLatestHealth(), getPbftData()]);
 
-      const [[healthInfo, stallInfo, systemInfo], pbftData] = responses;
+      const [[healthInfo, stallInfo, systemInfo, syncInfo], pbftData] = responses;
 
-      if (healthInfo && stallInfo) {
+      if (healthInfo && stallInfo && syncInfo) {
         healthStatus = healthInfo.latestHealthStatus;
         stallStatus = stallInfo.latestHealthStatus;
         uptime = (healthStatus) ? currentTime - healthInfo.lastFailureTimestamp : 0;
@@ -46,13 +47,16 @@ module.exports = {
         systemInfoAI = JSON.parse(systemInfo.additionalInfo);
         systemInfoStatus = systemInfo.latestHealthStatus;
         warningMessages = systemInfoStatus ? "" : systemInfoAI.Alerts;
-        systemInfoBody = systemInfoAI
+        systemInfoBody = systemInfoAI;
+        syncStallStatus = JSON.parse(syncInfo.additionalInfo)?.isStalled;
+        syncStatus = syncInfo.latestHealthStatus;
         if (systemInfoStatus) {
           delete systemInfoBody.Alerts
         }
       } else {
         winston.warn(`Health table has no entries; Health endpoint is called too soon`)
       }
+
 
       res.status(200).json(
         {
@@ -72,7 +76,9 @@ module.exports = {
             isNotStalled: stallStatus,
             isValidBlocksInc: isInc,
             isLastPending: isPending,
-            unhealthyProcess: healthAI
+            unhealthyProcess: healthAI,
+            isSynced: syncStatus,
+            isSyncStalled: syncStallStatus
           },
           warnings: {
             warningsActive: !systemInfoStatus,
@@ -89,18 +95,20 @@ module.exports = {
 
   healthStatus: async function (req, res, next) {
     try {
-      let healthStatus, stallStatus, uptime, isInc, isPending;
+      let healthStatus, stallStatus, uptime, isInc, isPending, syncStallStatus, syncStatus;
 
       const currentTime = Date.now();
 
-      const [healthInfo, stallInfo, _ignored_systemInfo] = await getLatestHealth();
+      const [healthInfo, stallInfo, _ignored_systemInfo, syncInfo] = await getLatestHealth();
 
-      if (healthInfo && stallInfo) {
+      if (healthInfo && stallInfo && syncInfo) {
         healthStatus = healthInfo.latestHealthStatus;
         stallStatus = stallInfo.latestHealthStatus;
         uptime = (healthStatus) ? currentTime - healthInfo.lastFailureTimestamp : 0;
         isInc = stallInfo.isBlocksValidInc;
         isPending = stallInfo.isLastPending;
+        syncStallStatus = JSON.parse(syncInfo.additionalInfo)?.isStalled;
+        syncStatus = syncInfo.latestHealthStatus;
       } else {
         winston.warn(`Health table has no entires; Health endpoint is called too soon`)
       }
@@ -114,7 +122,9 @@ module.exports = {
               isHealthy: healthStatus,
               isNotStalled: stallStatus,
               isValidBlocksInc: isInc,
-              isLastPending: isPending
+              isLastPending: isPending,
+              isSynced: syncStatus,
+              isSyncStalled: syncStallStatus
             },
           }
       )
@@ -127,7 +137,7 @@ module.exports = {
 };
 
 async function getLatestHealth() {
-  const [healthInfo, stallInfo, systemInfo] = await Promise.all([
+  const [healthInfo, stallInfo, systemInfo, syncInfo] = await Promise.all([
     
     models.CurrentHealth.findOne({
       where: {
@@ -171,9 +181,21 @@ async function getLatestHealth() {
       raw:true,
     }),
     
+    models.CurrentHealth.findOne({
+      where: {
+        processName: "SyncStat"
+      },
+      attributes: [
+        'latestHealthStatus',
+        'latestCheckTimestamp',
+        'lastFailureTimestamp',
+        'additionalInfo'
+      ],
+      raw:true,
+    }),
   ])
   
-  return [healthInfo, stallInfo, systemInfo]
+  return [healthInfo, stallInfo, systemInfo, syncInfo];
 }
 
 function getPbftData() {

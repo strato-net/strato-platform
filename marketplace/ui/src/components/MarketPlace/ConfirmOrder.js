@@ -136,7 +136,7 @@ const ConfirmOrder = () => {
     setTotal(sum);
   }, [marketplaceDispatch, confirmOrderList, storedData]);
 
-  const openToastOrder = (placement) => {
+  const openToastOrder = (placement, message) => {
     if (success) {
       api.success({
         message: message,
@@ -335,7 +335,7 @@ const ConfirmOrder = () => {
         shippingAddressId: userAddresses[selectedAddress].address_id,
         tax: tax,
         user: user.commonName,
-        email: user.preferred_username,
+        email: user.email,
       };
 
       window.LOQ.push(['ready', async LO => {
@@ -365,14 +365,9 @@ const ConfirmOrder = () => {
   return (
     <>
       {responsiveAddress ? <ResponsiveAddAddress back={closeResponsiveAddress} /> :
-        <div className="h-screen md:mx-10 md:mt-5  mx-5 lg:mx-14   ">
-          {contextHolder}
-          {isCreateOrderSubmitting || isCreatePaymentSubmitting ? (
-            <div className="h-screen flex justify-center items-center">
-              <Spin spinning={isCreateOrderSubmitting || isCreatePaymentSubmitting} size="large" />
-            </div>
-          ) : (
-            <div className="pb-[30px]">
+        <>
+          <div className="fixed-component shadow-header">
+            <div className="fixed-component-child md:mx-10 mx-5 lg:mx-14">
               <Breadcrumb>
                 <Breadcrumb.Item href="javascript:;">
                   <ClickableCell href={routes.Marketplace.url}>
@@ -400,15 +395,55 @@ const ConfirmOrder = () => {
               <div className="flex justify-between items-center pt-6 md:pb-2">
                 <Typography className="text-[#202020] text-base md:text-xl lg:text-2xl  font-bold lg:font-semibold">My Cart</Typography>
                 {stripeStatus && <button id="pay-now-button" className={`p-1 md:p-3 h-max rounded-lg border ${stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled ? 'border-primary bg-primary hover:bg-primaryHover text-white' : 'cursor-not-allowed border-[#999999] rounded bg-[#cccccc] text-[#666666]'}`}
-                  onClick={() => {
+                  onClick={async () => {
                     if (stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled) {
-                      handlePaymentConfirm();
+                      const saleAddresses = [];
+                      const quantities = [];
+                      data.forEach((item) => {
+                          saleAddresses.push(item.saleAddress)
+                          quantities.push(item.qty)
+                      })
+                      const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities)
+                      if (checkQuantity === true) {
+                        handlePaymentConfirm();
+                      } else {
+                        let insufficientQuantityMessage = "";
+                        let outOfStockMessage = "";
+                
+                        checkQuantity.forEach(detail => {
+                            if (detail.availableQuantity === 0) {
+                                outOfStockMessage += `Product ${detail.assetName}\n`;
+                            } else {
+                                insufficientQuantityMessage += `Product ${detail.assetName}: ${detail.availableQuantity}\n`;
+                            }
+                        });
+                
+                        let errorMessage = "";
+                        if (insufficientQuantityMessage) {
+                            errorMessage += `The following item(s) in your cart have limited quantity available and will need to be adjusted. Please reduce the quantity to proceed:\n${insufficientQuantityMessage}`;
+                        }
+                        if (outOfStockMessage) {
+                            if (errorMessage) errorMessage += "\n"; // Add a new line if there's already an error message
+                            errorMessage += `The following item(s) are temporarily out of stock and should be removed:\n${outOfStockMessage}`;
+                        }
+                        openToastOrder("bottom", errorMessage);
+                      }
                     }
                   }}
                 >
                   Review and Submit
                 </button>}
               </div>
+            </div>
+          </div>
+          <div className="h-screen md:mx-10 md:mt-5  mx-5 lg:mx-14   ">
+            {contextHolder}
+            {isCreateOrderSubmitting || isCreatePaymentSubmitting ? (
+              <div className="h-screen flex justify-center items-center">
+                <Spin spinning={isCreateOrderSubmitting || isCreatePaymentSubmitting} size="large" />
+              </div>
+            ) : (
+            <div className="pb-[30px] confirm-order-body">
               <div className="pt-4 hidden lg:block border-top cart">
                 <DataTableComponent
                   isLoading={false}
@@ -419,7 +454,7 @@ const ConfirmOrder = () => {
                 />
               </div>
               <div className=" grid sm:place-items-center grid-cols-1 lg:hidden ">
-                <ResponsiveCart data={data} key={data} confirm={true} />
+                <ResponsiveCart data={data} key={data} confirm={true} openToastOrder={openToastOrder} />
               </div>
 
               <div className="bg-[#EEEFFA] rounded-b-md py-[15px] px-4  hidden lg:flex lg:justify-end ">
@@ -500,8 +535,9 @@ const ConfirmOrder = () => {
             </div>
           )}
           {marketplaceMessage && openToastMarketplace("Bottom")}
-          {message && openToastOrder("bottom")}
-        </div>}
+          {message && openToastOrder("bottom", message)}
+        </div>
+      </>}
     </>
   );
 };

@@ -12,54 +12,41 @@ trap "docker rm -f ${REDIS}" EXIT
 
 cd strato
 
-stack test $1\
+stack test --fast $1\
       blockapps-data \
+      blockapps-init \
       blockapps-mpdbs \
       blockapps-tools \
-      blockstanbul \
+      blockapps-vault-proxy-server \
+      bloc2api \
+      common-log \
+      cross-monitoring \
+      debugger \
       ethereum-discovery \
       ethereum-encryption \
       ethereum-rlp \
-      ethereum-vm \
       fast-keccak256 \
+      format \
+      labeled-error \
       merkle-patricia-db \
+      seqevents \
+      slipstream \
       solid-vm \
       solid-vm-model \
       solid-vm-parser \
-      strato-genesis \
+      source-tools \
       strato-index \
-      strato-init \
+      strato-lite \
+      strato-genesis \
       strato-model \
-      strato-p2p \
       strato-redis-blockdb \
       strato-sequencer \
       vm-runner \
-      vm-tools \
-      x509-certs \
-      evm-solidity \
-      bloc2api \
-      blockapps-vault-proxy-server \
-      slipstream \
-      blockapps-privacy \
-      seqevents \
-      debugger \
-      blockapps-init \
-      common-log \
-      cross-monitoring \
-      format \
-      labeled-error \
-      source-tools \
-      strato-lite
+      x509-certs
 
 if [ $1 = --coverage ]
 then
       rm -rf hpc
       mkdir hpc
-      cp -r $(stack path --local-hpc-root) hpc/
+      cp -r $(stack path --local-hpc-root) .
 fi
-
-stack bench vm-runner
-
-stack bench solid-vm
-
-stack bench solid-vm-model

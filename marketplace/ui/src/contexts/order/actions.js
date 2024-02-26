@@ -17,12 +17,18 @@ const actionDescriptors = {
   fetchOrderSold: "fetch_orders_sold",
   fetchOrderSoldSuccessful: "fetch_order_sold_successful",
   fetchOrderSoldFailed: "fetch_order_sold_failed",
+  fetchAllOrders: "fetch_all_orders",
+  fetchAllOrdersSuccessful: "fetch_all_orders_successful",
+  fetchAllOrdersFailed: "fetch_all_orders_failed",
   fetchOrderDetails: "fetch_order_details",
   fetchOrderDetailsSuccessful: "fetch_order_details_successful",
   fetchOrderDetailsFailed: "fetch_order_details_failed",
   fetchOrderLineItemDetails: "fetch_order_line_item_details",
   fetchOrderLineItemDetailsSuccessful: "fetch_order_line_item_details_successful",
   fetchOrderLineItemDetailsFailed: "fetch_order_line_item_details_failed",
+  fetchSaleQuantity: "fetch_sale_quantity",
+  fetchSaleQuantitySuccessful: "fetch_sale_quantity_successful",
+  fetchSaleQuantityFailed: "fetch_sale_quantity_failed",
   updateBuyerDetails: "update_buyer_details",
   updateBuyerDetailsSuccessful: "update_buyer_details_successful",
   updateBuyerDetailsFailed: "update_buyer_details_failed",
@@ -83,7 +89,7 @@ const actions = {
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
           type: actionDescriptors.createOrderFailed,
-          error: "Unauthorized while creating Order"
+          error: "Error while creating Order"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -123,13 +129,12 @@ const actions = {
         dispatch({
           type: actionDescriptors.createPaymentSuccessful,
           payload: body.data,
-        });
-        actions.setMessage(dispatch, "Payment created successfully", true);
+        });        
         return body.data;
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
           type: actionDescriptors.createPaymentFailed,
-          error: "Unauthorized while creating Order"
+          error: "Error while creating Order"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -377,6 +382,87 @@ const actions = {
       });
     }
   },
+  
+  fetchAllOrders: async (dispatch) => {
+    dispatch({ type: actionDescriptors.fetchAllOrders });
+    
+    try {
+      const ordersSold = await fetch(
+        `${apiUrl}/order/exportOrders`,
+        {
+          method: HTTP_METHODS.GET,
+        }
+      );
+      
+      const bodysold = await ordersSold.json();
+      
+      if (ordersSold.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchAllOrdersSuccessful,
+          payload: {bodySold: bodysold.data.soldOrders, bodyBought: bodysold.data.boughtOrders, bodyTransfers: bodysold.data.transfers},
+        });
+        return;
+      }
+      else if (bodysold.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchAllOrdersFailed,
+          error: "Unauthorized while fetching all orders"
+        });
+        window.location.href = bodysold.error.loginUrl
+      }
+      dispatch({
+        type: actionDescriptors.fetchAllOrdersFailed,
+        error: bodysold.error,
+      });
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.fetchAllOrdersFailed,
+        error: undefined,
+      });
+    }
+  },
+
+  fetchSaleQuantity: async (dispatch, saleAddresses, orderQuantity) => {
+    dispatch({ type: actionDescriptors.fetchSaleQuantity });
+    try {
+      const response = await fetch(`${apiUrl}/order/saleQuantity`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ saleAddresses, orderQuantity }),
+      });
+  
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchSaleQuantitySuccessful,
+          payload: body.data,
+        });
+
+        return body.data;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchSaleQuantityFailed,
+          error: "Unauthorized while fetching Order"
+        });
+        window.location.href = body.error.loginUrl;
+      }
+
+      dispatch({
+        type: actionDescriptors.fetchSaleQuantityFailed,
+        error: body.error,
+      });
+      return null;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.fetchSaleQuantityFailed,
+        error: "Error while fetching Order",
+      });
+    }
+  },
 
   updateBuyerDetails: async (dispatch, payload) => {
     dispatch({ type: actionDescriptors.updateBuyerDetails });
@@ -611,22 +697,22 @@ const actions = {
           type: actionDescriptors.createSaleOrderSuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, "Sale created successfully", true);
+        actions.setMessage(dispatch, "Order created successfully", true);
         return body.data;
       }
 
       dispatch({
         type: actionDescriptors.createSaleOrderFailed,
-        error: "Error while executing sale",
+        error: "There was an error processing your order. We are sorry for the inconvenience and will reach out to you to process a refund.",
       });
-      actions.setMessage(dispatch, "Error while creating sale");
+      actions.setMessage(dispatch, "There was an error processing your order. We are sorry for the inconvenience and will reach out to you to process a refund.");
       return false;
     } catch (err) {
       dispatch({
         type: actionDescriptors.createSaleOrderFailed,
-        error: "Error while creating Sale",
+        error: "There was an error processing your order. We are sorry for the inconvenience and will reach out to you to process a refund.",
       });
-      actions.setMessage(dispatch, "Error while creating sale");
+      actions.setMessage(dispatch, "There was an error processing your order. We are sorry for the inconvenience and will reach out to you to process a refund.");
     }
   },
 

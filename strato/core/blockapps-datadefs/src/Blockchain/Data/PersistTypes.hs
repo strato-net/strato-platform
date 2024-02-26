@@ -6,10 +6,13 @@
 module Blockchain.Data.PersistTypes where
 
 import BlockApps.Solidity.Xabi
+import Blockchain.Data.PubKey
 import Blockchain.SolidVM.Model
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.StateRoot
 import Crypto.Types.PubKey.ECC
+import Data.Bifunctor (bimap)
+import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Short as BSS
 import qualified Data.Text as T
@@ -21,7 +24,7 @@ import qualified LabeledError
 import Numeric
 
 derivePersistField "Integer"
-derivePersistField "Point"
+-- derivePersistField "Point"
 derivePersistFieldJSON "Xabi"
 
 integerCap :: Integer
@@ -84,15 +87,13 @@ instance PersistField StateRoot where
 instance PersistFieldSql StateRoot where
   sqlType _ = SqlOther $ T.pack "varchar(64)"
 
-{-
 instance PersistField Point where
-  toPersistValue p@(Point p1 p2) = PersistText . decodeUtf8 . B16.encode $ B.pack $ pointToBytes p
-  fromPersistValue (PersistText s) = Right . bytesToPoint . B.unpack . fst . B16.decode . encodeUtf8 $ s
+  toPersistValue p = PersistText . decodeUtf8 . B16.encode $ B.singleton 0x04 `B.append` pointToBytes p
+  fromPersistValue (PersistText s) = bimap T.pack (bytesToPoint . B.tail) . B16.decode . encodeUtf8 $ s
   fromPersistValue _ = Left $ "Point must be persisted as PersistText"
 
 instance PersistFieldSql Point where
   sqlType _ = SqlOther $ T.pack "varchar"
--}
 
 instance PersistField BSS.ShortByteString where
   toPersistValue = toPersistValue . BSS.fromShort
