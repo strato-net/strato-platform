@@ -80,8 +80,7 @@ abstract contract Sale is Utils {
         return paymentProvidersMap[_paymentProvider] != 0;
     }
 
-    function completeSale(
-    ) public returns (uint) {
+    function completeSale() public returns (uint) {
         Order order = Order(msg.sender);
         address purchaser = order.purchasersAddress();
         uint orderQuantity = takeLockedQuantity(msg.sender);
@@ -113,7 +112,7 @@ abstract contract Sale is Utils {
         }
     }
 
-    function closeSale() public requireSeller("close sale") returns (uint) {
+    function closeSale() public returns (uint) {
         close();
         isOpen = false;
         return RestStatus.OK;
