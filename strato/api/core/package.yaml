@@ -28,6 +28,7 @@ library:
   - extra
   - filepath
   - format
+  - hflags
   - http-types
   - labeled-error
   - lens

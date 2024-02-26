@@ -464,17 +464,6 @@ export const setSearchColumns = (args, _columns) => {
   return searchArgs
 }
 
-/**
- * @param {string} name of the variable to be fetched from env
- * @returns {string} variable value
- */
-
-export function getEnvVariable(name) {
-  const value = process.env[name] || ''
-  if (value == '') throw new Error("missing env var for " + name);
-  return value
-}
-
 export const pollingHelper = async (func, argsToFunc, attemptNumber = 0, attemptsAllowed = 8, milliseconds = 1000) => {
   if (attemptsAllowed < attemptNumber) return null;
   let result = await func(...argsToFunc);
