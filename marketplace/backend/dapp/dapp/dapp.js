@@ -13,6 +13,7 @@ import artJs from "/dapp/items/art";
 import carbonOffsetJs from "/dapp/items/carbonOffset";
 import metalsJs from "/dapp/items/metals";
 import clothingJs from "/dapp/items/clothing";
+import VehicleJs from "/dapp/items/vehicle";
 import membershipJs from "/dapp/items/membership";
 import carbonDAOJs from "/dapp/items/carbonDAO";
 import collectibleJs from "dapp/items/collectibles";
@@ -368,6 +369,22 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   // ------------------------------ CLOTHING ENDS--------------------------------
+
+  // ------------------------------ VEHICLE STARTS -------------------------------
+  contract.createVehicle = async function (args, options = defaultOptions) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const newArgs = {
+      ...args.itemArgs,
+      createdDate,
+    };
+    return VehicleJs.uploadContract(rawAdmin, newArgs, options);
+  };
+
+  contract.getVehicles = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName, };
+    return VehicleJs.getAll(rawAdmin, args, getOptions);
+  };
+  // ------------------------------ VEHICLE ENDS --------------------------------
 
   // ------------------------------ MEMBERSHIP STARTS------------------------------
 

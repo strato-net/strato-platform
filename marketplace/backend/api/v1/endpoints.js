@@ -94,6 +94,12 @@ export const Clothing = {
   create: '/'
 }
 
+export const Vehicle = {
+  prefix: '/vehicle',
+  getAll: '/',
+  create: '/'
+}
+
 export const Membership = {
   prefix: '/membership',
   getAll: '/',

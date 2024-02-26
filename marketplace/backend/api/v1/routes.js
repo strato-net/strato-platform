@@ -24,6 +24,7 @@ import users from './users'
 import marketplace from './Marketplace'
 import paymentService from './PaymentService'
 import orderLine from "./OrderLine"
+import vehicle from "./Vehicle"
 
 import {
   Authentication,
@@ -47,6 +48,7 @@ import {
   Marketplace,
   OrderLine,
   PaymentService,
+  Vehicle,
 } from './endpoints'
 
 
@@ -62,6 +64,7 @@ router.use(Item.prefix, item)
 router.use(Art.prefix, art)
 router.use(CarbonOffset.prefix, carbonOffset)
 router.use(Clothing.prefix, clothing)
+router.use(Vehicle.prefix, vehicle)
 router.use(Membership.prefix, membership)
 router.use(CarbonDAO.prefix, carbonDAO)
 router.use(Collectibles.prefix, collectibles)

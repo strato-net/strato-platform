@@ -35,6 +35,16 @@
             ]
         },
         {
+            "name": "Vehicle",
+            "imageKey": "",
+            "subCategories": [
+                {
+                    "name": "Vehicle",
+                    "contract": "Vehicle"
+                }
+            ]
+        },
+        {
             "name": "Collectibles",
             "imageKey": "",
             "subCategories": [
