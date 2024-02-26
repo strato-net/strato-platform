@@ -23,6 +23,7 @@ executables:
     - cache
     - clock
     - common-log
+    - containers
     - core-api2
     - format
     - http-types
