@@ -72,7 +72,7 @@ abstract contract Order is Utils {
         completeOrder();
     }
 
-    function completeOrder(uint _fulfillmentDate) external returns (uint) {
+    function completeOrder() external returns (uint) {
         require(status != OrderStatus.CLOSED && status != OrderStatus.CANCELED, "Order already closed.");
         for (uint i = 0; i < saleAddresses.length; i++) {
             if (!completedSales[i]) {
@@ -82,9 +82,9 @@ abstract contract Order is Utils {
             }
         }
         if (outstandingSales == 0) {
-            fulfillmentDate = _fulfillmentDate;
+            fulfillmentDate = block.timestamp;
             // comments = _comments;
-            emit OrderCompleted(_fulfillmentDate);
+            emit OrderCompleted(fulfillmentDate);
             status = OrderStatus.CLOSED;
         }
         return RestStatus.OK;
