@@ -72,7 +72,7 @@ abstract contract Order is Utils {
         completeOrder();
     }
 
-    function completeOrder() external returns (uint) {
+    function completeOrder() returns (uint) {
         require(status != OrderStatus.CLOSED && status != OrderStatus.CANCELED, "Order already closed.");
         for (uint i = 0; i < saleAddresses.length; i++) {
             if (!completedSales[i]) {
