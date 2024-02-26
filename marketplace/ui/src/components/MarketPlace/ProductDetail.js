@@ -240,14 +240,54 @@ const ProductDetails = ({ user, users }) => {
       dataIndex: "sellerCommonName",
       key: "sellerCommonName",
       align: "center",
-      render: (text) => <p>{text}</p>,
+      // render: (text) => <p>{text}</p>,
+      render: (text) => (
+        <a 
+          href={`${window.location.origin}/marketplace/profile/${encodeURIComponent(text)}`}
+          onClick={(e) => {
+            e.preventDefault();
+            const userProfileUrl = `/marketplace/profile/${encodeURIComponent(text)}`;
+      
+            if (e.ctrlKey || e.metaKey) {
+              // Open in a new tab if Ctrl/Cmd is pressed
+              window.open(`${window.location.origin}${userProfileUrl}`, '_blank');
+            } else {
+              // Use navigate for a normal click, without Ctrl/Cmd
+              navigate(routes.MarketplaceUserProfile.url.replace(':commonName',text), { state: { from: pathname } });
+            }
+          }}
+          style={{ textDecoration: 'underline', color: 'black', cursor: 'pointer' }}
+        >
+          {text}
+        </a>
+      ),
     },
     {
       title: <Text className="text-primaryC text-[13px]">Owner</Text>,
       dataIndex: "purchaserCommonName",
       key: "purchaserCommonName",
       align: "center",
-      render: (text) => <p>{text}</p>,
+      // render: (text) => <p>{text}</p>,
+      render: (text) => (
+        <a 
+          href={`${window.location.origin}/marketplace/profile/${encodeURIComponent(text)}`}
+          onClick={(e) => {
+            e.preventDefault();
+            const userProfileUrl = `/marketplace/profile/${encodeURIComponent(text)}`;
+      
+            if (e.ctrlKey || e.metaKey) {
+              // Open in a new tab if Ctrl/Cmd is pressed
+              window.open(`${window.location.origin}${userProfileUrl}`, '_blank');
+            } else {
+              // Use navigate for a normal click, without Ctrl/Cmd
+              navigate(routes.MarketplaceUserProfile.url.replace(':commonName',text), { state: { from: pathname } });
+            }
+          }}
+          style={{ textDecoration: 'underline', color: 'black', cursor: 'pointer' }}
+        >
+          {text}
+        </a>
+      ),
     },
     {
       title: (
@@ -334,8 +374,33 @@ const ProductDetails = ({ user, users }) => {
                     {decodeURIComponent(details?.name)}
                   </Text>
                   <div className="flex pt-[6px] ">
-                    <Text className="text-[#202020] text-xs  font-medium">Owned By: {details?.ownerCommonName}</Text>
-                    <Text className="text-[#202020] text-xs  font-medium" >{details?.ownerOrganization}</Text>
+                    {/* <Text className="text-[#202020] text-xs  font-medium">Owned By: {details?.ownerCommonName}</Text>
+                     */}
+                     {/* <Text className="text-[#202020] text-xs font-medium">Owned By: </Text> 
+                      */}
+                       <span className="text-xs  self-center">Owned By:&nbsp;</span>
+                     <div
+                      style={{ cursor: details?.ownerCommonName && details.ownerCommonName !== 'N/A' ? 'pointer' : 'default', color: 'black', textDecoration: details?.ownerCommonName && details.ownerCommonName !== 'N/A' ? 'underline' : 'none' }}
+                      onClick={(e) => {
+                        if (details?.ownerCommonName && details.ownerCommonName !== 'N/A') {
+                          e.preventDefault();
+                          const userProfileUrl = `/marketplace/profile/${encodeURIComponent(details.ownerCommonName)}`;
+                          const fullUrl = `${window.location.origin}${userProfileUrl}`;
+
+                          if (e.ctrlKey || e.metaKey) {
+                            // Open in a new tab if Ctrl/Cmd is pressed
+                            window.open(fullUrl, '_blank');
+                          } else {
+                            // Use navigate for a normal click, without Ctrl/Cmd
+                            navigate(routes.MarketplaceUserProfile.url.replace(':commonName',details?.ownerCommonName), { state: { from: pathname } });
+                          }
+                        }
+                      }}
+                    >
+                      <Text className="text-[#202020] text-xs font-medium  self-center">{details?.ownerCommonName || 'N/A'}</Text>
+                    </div>
+
+                    <Text className="text-[#202020] text-xs  font-medium" >{details?.ownerOrganization}</Text>               
                   </div>
                 </div>
                 <div className=" pt-4 lg:pt-[22px]">

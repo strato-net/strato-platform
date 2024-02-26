@@ -21,6 +21,13 @@ router.get(
 );
 
 router.get(
+  Inventory.getAllUserInventories,
+  authHandler.authorizeRequest(true),
+  loadDapp,
+  InventoryController.getAllUserInventories
+);
+
+router.get(
   Inventory.getOwnershipHistory,
   authHandler.authorizeRequest(true),
   loadDapp,

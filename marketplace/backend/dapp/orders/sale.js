@@ -148,12 +148,15 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, defaultOptions) {
-    const { saleAddresses, assetAddresses, isOpen, range, ...restArgs } = args;
+    const { saleAddresses, assetAddresses, isOpen, range, saleGtField, saleGtValue, ...restArgs } = args;
     const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
     let sales;
     if (assetAddresses) {
+        // console.log("")
         sales = await searchAllWithQueryArgs(contractName, {
             assetToBeSold: assetAddresses,
+            gtField: saleGtField,
+            gtValue: saleGtValue,
             isOpen: isOpen,
             range: range
         }, options, admin);
