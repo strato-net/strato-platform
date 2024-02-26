@@ -30,9 +30,9 @@ abstract contract Order is Utils {
     uint public shippingAddressId;
     string public paymentSessionId;
     uint public fulfillmentDate;
-    string public comments;
+    // string public comments;
 
-    event OrderCompleted(uint fulfillmentDate, string comments);
+    event OrderCompleted(uint fulfillmentDate);
 
     constructor(
         uint _orderId,
@@ -69,9 +69,10 @@ abstract contract Order is Utils {
         status = _status;
         shippingAddressId = _shippingAddressId;
         paymentSessionId = _paymentSessionId;
+        completeOrder();
     }
 
-    function completeOrder(uint _fulfillmentDate, string _comments) external returns (uint) {
+    function completeOrder(uint _fulfillmentDate) external returns (uint) {
         require(status != OrderStatus.CLOSED && status != OrderStatus.CANCELED, "Order already closed.");
         for (uint i = 0; i < saleAddresses.length; i++) {
             if (!completedSales[i]) {
@@ -82,30 +83,30 @@ abstract contract Order is Utils {
         }
         if (outstandingSales == 0) {
             fulfillmentDate = _fulfillmentDate;
-            comments = _comments;
-            emit OrderCompleted(_fulfillmentDate, _comments);
+            // comments = _comments;
+            emit OrderCompleted(_fulfillmentDate);
             status = OrderStatus.CLOSED;
         }
         return RestStatus.OK;
     }
 
-    function updateComment(string _comments) external returns (uint) {
-        require(status != OrderStatus.CLOSED && status != OrderStatus.CANCELED, "Order already closed.");
-        comments = _comments;
+    // function updateComment(string _comments) external returns (uint) {
+    //     require(status != OrderStatus.CLOSED && status != OrderStatus.CANCELED, "Order already closed.");
+    //     comments = _comments;
 
-        return RestStatus.OK;
-    }
+    //     return RestStatus.OK;
+    // }
 
-    function unlockSales() internal {
-        for (uint i = 0; i < saleAddresses.length; i++) {
-            Sale s = Sale(saleAddresses[i]);
-            try {
-                s.unlockQuantity();
-            } catch {
+    // function unlockSales() internal {
+    //     for (uint i = 0; i < saleAddresses.length; i++) {
+    //         Sale s = Sale(saleAddresses[i]);
+    //         try {
+    //             s.unlockQuantity();
+    //         } catch {
 
-            }
-        }
-    }
+    //         }
+    //     }
+    // }
 
     function updateOrderStatus(OrderStatus _status) external returns (uint) {
         require((tx.origin == purchasersAddress || getCommonName(tx.origin) == sellersCommonName), "Only the purchaser/seller can update the order status");
@@ -125,14 +126,14 @@ abstract contract Order is Utils {
         return RestStatus.OK;
     }
 
-    function onCancel(string _comments) internal virtual {}
+    // function onCancel(string _comments) internal virtual {}
 
-    function cancelOrder(string _comments) external returns (uint) {
-        require(status != OrderStatus.CLOSED && status != OrderStatus.CANCELED, "Order already closed.");
-        require((tx.origin == purchasersAddress || getCommonName(tx.origin) == sellersCommonName), "Only the purchaser/seller can cancel the order");
-        onCancel(_comments);
-        unlockSales();
-        status = OrderStatus.CANCELED;
-        return RestStatus.OK;
-    }
+    // function cancelOrder(string _comments) external returns (uint) {
+    //     require(status != OrderStatus.CLOSED && status != OrderStatus.CANCELED, "Order already closed.");
+    //     require((tx.origin == purchasersAddress || getCommonName(tx.origin) == sellersCommonName), "Only the purchaser/seller can cancel the order");
+    //     onCancel(_comments);
+    //     unlockSales();
+    //     status = OrderStatus.CANCELED;
+    //     return RestStatus.OK;
+    // }
 }

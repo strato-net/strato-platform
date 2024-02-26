@@ -143,15 +143,15 @@ abstract contract Sale is Utils {
         return quantityToUnlock;
     }
 
-    function unlockQuantity() public {
-        uint quantityToReturn = takeLockedQuantity(msg.sender);
-        quantity += quantityToReturn;
-    }
+    // function unlockQuantity() public {
+    //     uint quantityToReturn = takeLockedQuantity(msg.sender);
+    //     quantity += quantityToReturn;
+    // }
 
-    function cancelOrder() public requireSeller("cancel order") returns (uint) {
-        unlockQuantity();
-        return RestStatus.OK;
-    }
+    // function cancelOrder() public requireSeller("cancel order") returns (uint) {
+    //     unlockQuantity();
+    //     return RestStatus.OK;
+    // }
 
     function update(
         uint _quantity,

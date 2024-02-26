@@ -21,9 +21,9 @@ contract SimpleOrder is Order {
         _status
     ) {
     }
-    function onCancel(string _comments) internal override {
-        comments= _comments;
-    }
+    // function onCancel(string _comments) internal override {
+    //     comments= _comments;
+    // }
 
         
 }
