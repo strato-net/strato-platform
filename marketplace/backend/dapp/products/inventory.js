@@ -402,12 +402,13 @@ async function getAll(admin, args = {}, defaultOptions) {
             const itemSale = sales.find(sale => sale.assetToBeSold == inventory.address && sale.isOpen);
             if (itemSale) {
                 finalInventory.push({
-                        ...inventory,
-                        price: itemSale?.price,
-                        saleAddress: itemSale?.address,
-                        saleQuantity: itemSale?.quantity,
-                        saleDate: itemSale?.block_timestamp
-                    });
+                    ...inventory,
+                    price: itemSale?.price,
+                    saleAddress: itemSale?.address,
+                    saleQuantity: itemSale?.quantity,
+                    saleDate: itemSale?.block_timestamp,
+                    totalLockedQuantity: itemSale?.totalLockedQuantity
+                });
             }
             else if (isMarketplaceSearch) {
                 if(isNullData){
@@ -416,7 +417,8 @@ async function getAll(admin, args = {}, defaultOptions) {
                         price: null,
                         saleAddress: null,
                         saleQuantity: null,
-                        saleDate: null
+                        saleDate: null,
+                        totalLockedQuantity: null
                     })}
                 }
              else {

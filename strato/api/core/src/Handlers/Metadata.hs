@@ -19,6 +19,7 @@ module Handlers.Metadata
     getMetaDataClient,
     MetadataResponse,
     server,
+    UrlMap,
   )
 where
 
@@ -42,7 +43,6 @@ import Data.Swagger hiding (url)
 import qualified Database.Esqueleto.Legacy as E
 import GHC.Generics
 import GHC.Stack
-import Handlers.Options
 import qualified LabeledError
 import SQLM
 import Servant
@@ -51,6 +51,8 @@ import qualified Strato.Strato23.API.Types as V
 import Strato.Strato23.Client hiding (verifyPassword)
 import UnliftIO
 
+type UrlMap = Map String String
+
 data MetadataResponse = MetadataResponse
   { nodePubKey :: V.PublicKey,
     nodeAddress :: Address,
@@ -58,7 +60,7 @@ data MetadataResponse = MetadataResponse
     isSynced :: Bool,
     isVaultPasswordSet :: Bool,
     networkID :: String, -- cuz JSON can't rep integers > 2^53
-    urls :: Map String String
+    urls :: UrlMap
   }
   deriving (Eq, Show, Generic, FromJSON, ToJSON)
 
@@ -67,7 +69,7 @@ type API = "metadata" :> Get '[JSON] MetadataResponse
 getMetaDataClient :: ClientM MetadataResponse
 getMetaDataClient = client (Proxy @API)
 
-server :: (HasVault m, MonadLogger m, HasSQL m) => ServerT API m
+server :: (HasVault m, MonadLogger m, HasSQL m, Accessible UrlMap m) => ServerT API m
 server = getMetaData
 
 instance HasSQL m => Accessible [ChainMemberParsedSet] m where
@@ -108,6 +110,7 @@ getMetaData ::
   ( MonadLogger m,
     HasVault m,
     Accessible [ChainMemberParsedSet] m,
+    Accessible UrlMap m,
     HasSQL m
   ) =>
   m MetadataResponse
@@ -116,29 +119,8 @@ getMetaData =
     validators <- access (Proxy @[ChainMemberParsedSet])
     isSynced <- checkIsSynced
     V.AddressAndKey a k <- getPubKeyAndAddress
-    let nid = computeNetworkID
-    pure $ MetadataResponse k a validators isSynced True (show nid) 
-      (fromList [
-        ("vault", flags_vaultUrl), 
-        ("oauthDiscovery", flags_oauthDiscoveryUrl),
-        ("fileServer", networkIdToFileServer nid),
-        ("paymentServer", networkIdToPaymentServer nid),
-        ("monitor", networkIdToMonitor nid)])
-  where
-    networkIdToFileServer networkId = case (flags_fileServerUrl, networkId) of 
-      ("", 7596898649924658542) -> "https://fileserver.mercata-testnet2.blockapps.net/highway"
-      ("", 6909499098523985262) -> "https://fileserver.mercata.blockapps.net/highway"
-      ("", _) -> error "File server url was not provided and cannot be derived"
-      (fileServer, _) -> fileServer
-    networkIdToPaymentServer networkId = case (flags_paymentServerUrl, networkId) of 
-      ("", 7596898649924658542) -> "https://payments.mercata-testnet2.blockapps.net"
-      ("", 6909499098523985262) -> "https://payments.mercata.blockapps.net"
-      ("", _) -> error "Payment server url was not provided and cannot be derived"
-      (paymentServer, _) -> paymentServer
-    networkIdToMonitor networkId = case networkId of 
-      7596898649924658542 -> "https://monitor.mercata-testnet2.blockapps.net:18080"
-      6909499098523985262 -> "https://monitor.mercata.blockapps.net:18080"
-      _ -> ""
+    urlMap <- access (Proxy @UrlMap)
+    pure $ MetadataResponse k a validators isSynced True (show computeNetworkID) urlMap
 
 blocVaultWrapper ::
   (MonadIO m, MonadLogger m, HasVault m, HasCallStack) =>

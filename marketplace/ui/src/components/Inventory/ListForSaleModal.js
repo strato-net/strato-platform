@@ -8,7 +8,7 @@ const { Option } = Select;
 
 const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddress, categoryName }) => {
     const [data, setData] = useState([inventory]);
-    const [quantity, setQuantity] = useState(inventory.quantity);
+    const [quantity, setQuantity] = useState(inventory.saleAddress ? inventory.saleQuantity : inventory.quantity);
     const [paymentTypes, setPaymentTypes] = useState([PAYMENT_TYPE[0].value]);
     const [pricePerUnit, setpricePerUnit] = useState(inventory.price ? inventory.price : inventory.pricePerUnit);
     const inventoryDispatch = useInventoryDispatch();
@@ -19,7 +19,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
     } = useInventoryState();
 
     useEffect(() => {
-        if (quantity > inventory.quantity || quantity <= 0 || pricePerUnit <= 0) {
+        if ( inventory.saleAddress ? quantity > (inventory.quantity - inventory.totalLockedQuantity) : quantity > inventory.quantity || quantity <= 0 || pricePerUnit <= 0) {
             setCanList(false);
         }
         else {

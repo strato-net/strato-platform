@@ -27,14 +27,5 @@ push (SArray varType vec) (Just (Variable ref)) (OrderedVals [av]) = do
       newArr = V.snoc vec newVar
   setVar (Variable ref) (SArray varType newArr)
   return $ Constant (SInteger $ fromIntegral $ V.length newArr)
-
---  liftIO $ putStrLn $ "address = " ++ show address
---  liftIO $ putStrLn $ "apt = " ++ show apt
---  liftIO $ putStrLn $ "vallist = " ++ show newVal
---  error "undefined push"
 push _ _ argVals = do
   invalidArguments "push" argVals
-
-{-
-    Constant (SPush apt) -> do
--}
