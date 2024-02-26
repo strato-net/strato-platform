@@ -55,6 +55,7 @@ const UserProfile = (user) => {
   const [page, setPage] = useState(1);
   const userActivityDispatch = useUserActivityDispatch();
   const { userActivity } = useUserActivityState();
+  const [wishlistData, setWishlistData] = useState([]);
 
   const soldOrdersBaseUrl = new URL("/marketplace/sold-orders", window.location.origin).toString();
   const boughtOrdersBaseUrl = new URL("/marketplace/bought-orders", window.location.origin).toString();
@@ -68,6 +69,12 @@ const UserProfile = (user) => {
     success: itemSuccess
   } = useItemState();
 
+  // This gets our wishlist data
+  useEffect(() => {
+    const storedWishlist = localStorage.getItem('wishList');
+    const parsedWishlist = storedWishlist ? JSON.parse(storedWishlist) : [];
+    setWishlistData(parsedWishlist);
+  }, []);
 
 
     useEffect(() => {
@@ -488,9 +495,30 @@ const UserProfile = (user) => {
         </TabPane>
         )}
 
+            {/* Wishlist Section - For Owners */}
+        {isOwner && (
+          <TabPane tab="Wishlist" key="3">
+            <div className="mt-4 md:mt-4 mb-8 w-full" id="wishlist">
+              {wishlistData.length > 0 ? (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {wishlistData.map((product, index) => (
+                    <NewTrendingCard
+                      topSellingProduct={product}
+                      key={index}
+                      addItemToCart={addItemToCart}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="h-96 flex justify-center items-center">
+                  Your wishlist is empty.
+                </div>
+              )}
+            </div>
+          </TabPane>
+        )}
+
               {/* Activity Section - For Owners */}
-
-
         {isOwner && (
           <TabPane tab="My Activity" key="2">
               {/* Activity Content */}
