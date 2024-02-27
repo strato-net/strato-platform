@@ -118,7 +118,7 @@ abstract contract Sale is Utils {
         return RestStatus.OK;
     }
 
-    function close() internal {
+    function close() public {
         try {
             assetToBeSold.closeSale();
         } catch {
