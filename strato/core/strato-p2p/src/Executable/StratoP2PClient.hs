@@ -30,13 +30,13 @@ import           Blockchain.ExtMergeSources
 import           Blockchain.Frame
 import           Blockchain.Metrics
 import           Blockchain.Options
-import           Blockchain.P2PUtil
 import           Blockchain.RLPx
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.UDP
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.TCPClientWithTimeout
+import           Blockchain.Threads
 import           Blockchain.TimerSource
 import           Control.Concurrent hiding (yield)
 import           Control.Concurrent.SSem (SSem)
@@ -65,6 +65,8 @@ runPeer ::
   ConduitM () P2pEvent m () ->
   m ()
 runPeer peer sSource = do
+  let pStr = ">" ++ pPeerString peer -- display string will show up as dns name
+  labelTheThreadM $ pStr ++ "/runPeer"
   ender <- toIO . $logInfoS "runPeer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
   void $ register ender
   myPublic <- getPub
@@ -87,7 +89,6 @@ runPeer peer sSource = do
   $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "my pubkey is: " ++ format myPublic
   $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "server pubkey is: " ++ format otherPubKey 
   runClientConnection (IPAsText $ pPeerIp peer) (TCPPort . fromIntegral $ pPeerTcpPort peer) sSource $ \c -> do
-      let pStr = pPeerString peer -- display string will show up as dns name
       attempt :: (Maybe SomeException) <- 
         withCertifiedPeer peer . withActivePeer peer $
           runEthClientConduit
@@ -120,21 +121,21 @@ runEthClientConduit peer pSource pSink seqSrc peerStr = do
     Just (_, (outCtx, inCtx)) -> do
       fmap (either Just (const Nothing)) . try $ 
         [
-          labelTheThread ("peerSourceConduit: " ++ peerStr) $
+          labelTheThread (peerStr ++ "/peerSourceConduit") $
           pSource
           .| ethDecrypt inCtx
           .| CL.iterM (recordTraffic Inbound)
           .| bytesToMessages
           .| CL.iterM (displayMessage Inbound peerStr)
           .| CL.map MsgEvt
-        , labelTheThread ("seqEventSource: " ++ peerStr) $
+        , labelTheThread (peerStr ++ "/seqEventSource") $
           seqSrc
           .| CL.map NewSeqEvent
-        , labelTheThread ("timerSource: " ++ peerStr) $
+        , labelTheThread (peerStr ++ "/timerSource") $
           timerSource
-        ] `mergeConnect` (labelTheThread ("merged2: " ++ peerStr) $ 
+        ] `mergeConnect` (
            CL.iterM recordEvent
-           .| labelTheThread ("handleMsgClientConduit: " ++ peerStr)
+           .| labelTheThread (peerStr ++ "/handleMsgClientConduit")
                            (handleMsgClientConduit myPublic peer)
            .| debounceTxSendsAndUnseq
            .| CL.iterM recordMessage
@@ -189,6 +190,11 @@ stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main l
           Nothing -> return ()
           Just _ -> do
             result <- try . liftIO . runLoggingT . runner $ runPeerInList p
+            let status =
+                  case result of
+                    Right v -> "runPeer Normal disconnect: " ++ show v
+                    Left e -> "runPeer disconnecting: " ++ show e
+            changeLabelStatusM status
             _ <- handleRunPeerResult p result
             liftIO $ SSem.signal sem
     handleRunPeerResult :: MonadP2P m => PPeer -> Either SomeException () -> m ()

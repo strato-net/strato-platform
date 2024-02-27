@@ -27,12 +27,12 @@ import Blockchain.EventException
 import Blockchain.Frame
 import Blockchain.Metrics
 import Blockchain.Options
-import Blockchain.P2PUtil
 import Blockchain.Participation
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Model.Options (computeNetworkID)
 import Blockchain.Strato.Model.Util
+import Blockchain.Threads
 import Conduit
 import Control.Monad (forever, when)
 import qualified Control.Monad.Change.Modify as Mod

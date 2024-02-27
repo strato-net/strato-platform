@@ -13,6 +13,7 @@ import BlockApps.Logging
 import Blockchain.Event
 import Blockchain.P2PRPC
 import Blockchain.P2PUtil
+import Blockchain.Threads
 import Conduit
 import Control.Concurrent (threadDelay)
 import Control.Monad

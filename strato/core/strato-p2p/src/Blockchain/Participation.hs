@@ -17,13 +17,12 @@ module Blockchain.Participation
 where
 
 import Blockchain.Data.Wire
+import Blockchain.Threads
 import Control.Monad.IO.Class
 import Data.Aeson
 import Data.Data
-import Data.Maybe
 import qualified Data.Text as T
 import GHC.Conc
-import GHC.Conc.Sync
 import GHC.Generics
 import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Prometheus
@@ -75,12 +74,14 @@ checkOutbound msg = do
 
 type P2PAPI =
     "threads" :> Get '[JSON] [String]
+    :<|> "peers" :> Get '[JSON] [String]
     :<|> "participation_mode" :> Get '[JSON] ParticipationMode
     :<|> "participation_mode" :> ReqBody '[JSON] ParticipationMode :> Post '[JSON] ParticipationMode
 
 p2pServer :: Server P2PAPI
 p2pServer =
     getThreads
+    :<|> getPeers
     :<|> getParticipationMode
     :<|> \m -> setParticipationMode m >> getParticipationMode
 
@@ -88,7 +89,7 @@ p2pApp :: Application
 p2pApp = serve (Proxy :: Proxy P2PAPI) p2pServer
 
 postParticipationMode :: ParticipationMode -> ClientM ParticipationMode
-_ :<|> _ :<|> postParticipationMode = client (Proxy @P2PAPI)
+_ :<|> _ :<|> _ :<|> postParticipationMode = client (Proxy @P2PAPI)
 
 remoteSetParticipationMode :: ParticipationMode -> IO ()
 remoteSetParticipationMode mode = do
@@ -97,16 +98,14 @@ remoteSetParticipationMode mode = do
   eRes <- runClientM (postParticipationMode mode) $ mkClientEnv mgr url
   either (die . show) (printf "Participation mode set to: %s\n" . show) eRes
 
-formatThread :: MonadIO m =>
-                ThreadId -> m String
-formatThread threadId = do
-  maybeLabel <- liftIO $ threadLabel threadId
-  return $ "(" ++ show threadId ++ ") " ++ fromMaybe "" maybeLabel
-  
-
 getThreads :: Handler [String]
 getThreads = do
   threadId <- liftIO $ myThreadId
   liftIO $ labelThread threadId "p2p API"
   threads <- liftIO listThreads
   sequence $ map formatThread threads
+
+getPeers :: Handler [String]
+getPeers = do
+  peersByThreads <- liftIO $ getPeersByThreads
+  return $ map (\(peer, status) -> peer ++ "/" ++ status) peersByThreads

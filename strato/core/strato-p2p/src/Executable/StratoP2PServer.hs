@@ -27,12 +27,12 @@ import Blockchain.ExtMergeSources
 import Blockchain.Frame
 import Blockchain.Metrics
 import Blockchain.Options
-import Blockchain.P2PUtil
 import Blockchain.RLPx
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.TCPClientWithTimeout
+import Blockchain.Threads
 import Blockchain.TimerSource
 import Conduit
 import Control.Lens ((^.))
@@ -65,7 +65,7 @@ ethServerHandler ::
   IPAsText ->
   m ()
 ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
-  let peerStr = T.unpack i
+  let peerStr = "<" ++ T.unpack i
   ender <- toIO . $logInfoS "runEthServer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow peerStr
   void $ register ender
   getPeerByIP ipAsText >>= \case
