@@ -1,5 +1,8 @@
 import { rest } from 'blockapps-rest'
 
+const usersArr = ['blockapps_carbon', 'blockapps_metals', 'blockapps_clothing',
+'blockapps_collectibles', 'blockapps_memberships', 'blockapps_art']
+
 class MarketplaceController {
 
   static async getAll(req, res, next) {
@@ -9,7 +12,7 @@ class MarketplaceController {
         const encodedManufacturers = query.manufacturer.map(product => { return encodeURIComponent(product) })
         query.manufacturer = encodedManufacturers
       }
-      const inventories = await dapp.getMarketplaceInventories({ ...query })
+      const inventories = await dapp.getMarketplaceInventories({ ...query, ownerCommonName: usersArr })
       let unlisted = [];
       let listed = inventories?.inventoryResults?.filter((item,index)=>{
         if(item.saleQuantity && item.saleQuantity!==0){
@@ -40,7 +43,7 @@ class MarketplaceController {
         const encodedManufacturers = query.manufacturer.map(product => { return encodeURIComponent(product) })
         query.manufacturer = encodedManufacturers
       }
-      const inventories = await dapp.getMarketplaceInventoriesLoggedIn({ ...query })
+      const inventories = await dapp.getMarketplaceInventoriesLoggedIn({ ...query, ownerCommonName: usersArr })
 
       let unlisted = [];
       let listed = inventories?.inventoryResults?.filter((item,index)=>{
