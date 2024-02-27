@@ -267,22 +267,29 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
-    const newArgs = { ...args}
+    const users = ['blockapps_carbon', 'blockapps_metals', 'blockapps_clothing',
+      'blockapps_collectibles', 'blockapps_memberships', 'blockapps_art']
+    const newArgs = { ...args, ownerCommonName: users }
     return marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
   };
 
   contract.getMarketplaceInventoriesLoggedIn = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
+    const users = ['blockapps_carbon', 'blockapps_metals', 'blockapps_clothing',
+      'blockapps_collectibles', 'blockapps_memberships', 'blockapps_art']
     const newArgs = {
       ...args, notEqualsField: 'ownerCommonName',
-      notEqualsValue: userCommonName
+      notEqualsValue: userCommonName,
+      ownerCommonName: users
     }
     return marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
   };
 
   contract.getTopSellingProducts = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName }
-    const newArgs = { ...args, notEqualsField: 'sale', notEqualsValue: '0000000000000000000000000000000000000000' }
+    const users = ['blockapps_carbon', 'blockapps_metals', 'blockapps_clothing',
+      'blockapps_collectibles', 'blockapps_memberships', 'blockapps_art']
+    const newArgs = { ...args, notEqualsField: 'sale', notEqualsValue: '0000000000000000000000000000000000000000', ownerCommonName: users }
     return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions)
   }
 
@@ -517,7 +524,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return saleOrderJs.updateOrderComment(rawAdmin, contract, options, comments);
   };
   
-  contract.export = async function ( options = defaultOptions) {
+  contract.export = async function (options = defaultOptions) {
     const getOptions = { ...options, app: contractName };
     
     const processOrders = async (orderArg) => {
