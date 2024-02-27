@@ -165,6 +165,7 @@ async function getAll(admin, args = {}, defaultOptions) {
     return sales ? sales.map((sale) => marshalOut(sale)) : undefined;
 }
 
+
 /**
  * Get contract state in bloc.
  * @deprecated Use {@link get `get`} instead.

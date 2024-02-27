@@ -128,6 +128,7 @@ export const Order = {
   getAddressFromId: '/userAddress/:id',
   createSaleOrder: '/sale',
   cancelSaleOrder: '/sale/cancel',
+  checkSaleQuantity: '/saleQuantity',
   executeSale: '/closeSale',
   updateOrderComment: '/updateComment',
   export: '/exportOrders'
