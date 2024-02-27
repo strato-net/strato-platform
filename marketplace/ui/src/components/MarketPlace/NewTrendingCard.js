@@ -1,24 +1,18 @@
-import { ShoppingCartOutlined } from '@ant-design/icons'
 import React, { useState } from "react";
 import {
     Typography,
     Button,
-    notification,
     InputNumber,
     Tooltip
 } from "antd";
 import { useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
-import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
-import { setCookie } from "../../helpers/cookie";
 import { Images } from '../../images';
 import images_placeholder from "../../images/resources/image_placeholder.png"
 
 const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, contextHolder }) => {
     const [quantity, setQuantity] = useState(1)
-
-    let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
 
     const naviroute = routes.MarketplaceProductDetail.url;
     const navigate = useNavigate();
@@ -48,10 +42,10 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                         className='font-semibold overflow-hidden cursor-pointer w-[180px] md:w-[220px] whitespace-nowrap text-ellipsis'
                     >
                         <Tooltip title={topSellingProduct?.name.length > 20 ? topSellingProduct?.name : null}>
-                <span className=" whitespace-nowrap max-w-[160px] inline-block">
-                    {topSellingProduct?.name.length > 20 ? `${topSellingProduct?.name.slice(0, 20)}...` : `${topSellingProduct?.name}`}
-                </span>
-                </Tooltip>
+                            <span className=" whitespace-nowrap max-w-[160px] inline-block">
+                                {topSellingProduct?.name.length > 20 ? `${topSellingProduct?.name.slice(0, 20)}...` : `${topSellingProduct?.name}`}
+                            </span>
+                        </Tooltip>
                         {/* {topSellingProduct?.name || "N/A"} */}
                     </Typography>
                     <img className='w-4 h-4' src={Images.Verified} alt='verified' />
@@ -72,11 +66,11 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                     }}>
                         -
                     </Typography>
-                    <InputNumber 
-                        className="w-10" 
-                        size="small" 
-                        bordered={false} 
-                        value={quantity} 
+                    <InputNumber
+                        className="w-10"
+                        size="small"
+                        bordered={false}
+                        value={quantity}
                         max={topSellingProduct.saleQuantity}
                         min={1}
                         onChange={setQuantity}
@@ -90,8 +84,8 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                                     placement: "bottom",
                                 });
                             }
-                        }}  
-                        controls={false}/>
+                        }}
+                        controls={false} />
                     <Typography className={`px-2 bg-[#EEEFFA] rounded-sm ${quantity >= Math.min(topSellingProduct.saleQuantity, topSellingProduct.quantity) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`} onClick={() => {
                         if ((quantity + 1 <= topSellingProduct.saleQuantity) && (quantity + 1 <= topSellingProduct.quantity)) {
                             setQuantity(quantity + 1)
@@ -107,65 +101,55 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                     type='primary'
                     className='flex-1 h-9 !bg-[#13188A] !text-white'
                     onClick={async () => {
-                        if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                            setCookie("returnUrl", `/marketplace/productList/${topSellingProduct.address}`, 10);
-                            window.location.href = loginUrl;
-                        } else {
-                            window.LOQ.push(['ready', async LO => {
-                                await LO.$internal.ready('events')
-                                LO.events.track('Buy Now (from Top Selling Product)', {
-                                    product: topSellingProduct.name,
-                                    category: topSellingProduct.category,
-                                    productId: topSellingProduct.productId
-                                })
-                            }])
-                            TagManager.dataLayer({
-                                dataLayer: {
-                                    event: 'buy_now_from_top_selling_product',
-                                    product_name: topSellingProduct.name,
-                                    category: topSellingProduct.category,
-                                    productId: topSellingProduct.productId
-                                },
-                            });
-                            if (await addItemToCart(topSellingProduct, quantity) === true) {
-                                navigate("/checkout")
-                            }
+                        window.LOQ.push(['ready', async LO => {
+                            await LO.$internal.ready('events')
+                            LO.events.track('Buy Now (from Top Selling Product)', {
+                                product: topSellingProduct.name,
+                                category: topSellingProduct.category,
+                                productId: topSellingProduct.productId
+                            })
+                        }])
+                        TagManager.dataLayer({
+                            dataLayer: {
+                                event: 'buy_now_from_top_selling_product',
+                                product_name: topSellingProduct.name,
+                                category: topSellingProduct.category,
+                                productId: topSellingProduct.productId
+                            },
+                        });
+                        if (await addItemToCart(topSellingProduct, quantity) === true) {
+                            navigate("/checkout")
                         }
                     }}
                 >
                     Buy Now
                 </Button>
                 <Button
-                className='h-9 w-9 flex items-center justify-center !bg-[#13188A] '
+                    className='h-9 w-9 flex items-center justify-center !bg-[#13188A] '
                     onClick={() => {
-                        if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                            setCookie("returnUrl", `/marketplace/productList/${topSellingProduct.address}`, 10);
-                            window.location.href = loginUrl;
-                        } else {
-                            window.LOQ.push(['ready', async LO => {
-                                await LO.$internal.ready('events')
-                                LO.events.track('Add To Cart (from Top Selling Product)', {
-                                    product: topSellingProduct.name,
-                                    category: topSellingProduct.category,
-                                    productId: topSellingProduct.productId
-                                })
-                            }])
-                            TagManager.dataLayer({
-                                dataLayer: {
-                                    event: 'add_to_cart_from_top_selling_product',
-                                    product_name: topSellingProduct.name,
-                                    category: topSellingProduct.category,
-                                    productId: topSellingProduct.productId
-                                },
-                            });
-                            addItemToCart(topSellingProduct, quantity);
-                        }
+                        window.LOQ.push(['ready', async LO => {
+                            await LO.$internal.ready('events')
+                            LO.events.track('Add To Cart (from Top Selling Product)', {
+                                product: topSellingProduct.name,
+                                category: topSellingProduct.category,
+                                productId: topSellingProduct.productId
+                            })
+                        }])
+                        TagManager.dataLayer({
+                            dataLayer: {
+                                event: 'add_to_cart_from_top_selling_product',
+                                product_name: topSellingProduct.name,
+                                category: topSellingProduct.category,
+                                productId: topSellingProduct.productId
+                            },
+                        });
+                        addItemToCart(topSellingProduct, quantity);
                     }}
                     type='primary'
                 >
-                   
-                    <img src={Images.Cart} alt='Cart' width={18} height={18} className='max-w-[18px]'/>
-                    
+
+                    <img src={Images.Cart} alt='Cart' width={18} height={18} className='max-w-[18px]' />
+
                     {/* <ShoppingCartOutlined style={{ color: '#EEEFFA' , width:'18px' ,  height:'18px' }} /> */}
                 </Button>
             </div>

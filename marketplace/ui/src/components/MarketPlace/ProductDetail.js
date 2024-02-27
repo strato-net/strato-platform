@@ -325,7 +325,7 @@ const ProductDetails = ({ user, users }) => {
                     <div
                       onClick={subtract}
                       className={`h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer ${qty > 1 ? '' : 'cursor-not-allowed opacity-50'}`}>
-                      <p className=" text-2xl md:text-3xl lg:text-4xl font-semibold lg:text-[#202020] text-[#989898]">-</p> 
+                      <p className=" text-2xl md:text-3xl lg:text-4xl font-semibold lg:text-[#202020] text-[#989898]">-</p>
                     </div>
                     <InputNumber className="w-full md:w-[280px] h-9 md:h-10 lg:h-[46px] border text-[#6A6A6A] border-[#00000029] text-center flex flex-col justify-center font-semibold !rounded-lg" min={1} max={availableQuantity} value={`${qty}`} defaultValue={`${qty}`} controls={false}
                       onChange={e => {
@@ -338,7 +338,7 @@ const ProductDetails = ({ user, users }) => {
                     <div
                       onClick={add}
                       className={`h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer ${qty < availableQuantity ? '' : 'cursor-not-allowed opacity-50'}`}>
-                       <p className="text-2xl md:text-3xl lg:text-4xl font-semibold lg:text-[#202020] text-[#989898]">+</p> 
+                      <p className="text-2xl md:text-3xl lg:text-4xl font-semibold lg:text-[#202020] text-[#989898]">+</p>
                     </div>
                   </div>
 
@@ -353,38 +353,33 @@ const ProductDetails = ({ user, users }) => {
                       type="primary"
                       className="w-[90%] md:w-[365px] h-9  !bg-[#13188A] !hover:bg-primaryHover !text-white"
                       onClick={async () => {
-                        if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                          setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
-                          window.location.href = loginUrl;
-                        } else {
-                          window.LOQ.push(['ready', async LO => {
-                            // Track an event
-                            await LO.$internal.ready('events')
-                            LO.events.track('Buy Now (from Product Details)', {
-                              product: details.name,
-                              category: details.category,
-                              productId: details.productId
-                            })
-                          }])
-                          TagManager.dataLayer({
-                            dataLayer: {
-                              event: 'buy_now_from_product_details',
-                              product_name: details.name,
-                              category: details.category,
-                              productId: details.productId
-                            },
-                          });
+                        window.LOQ.push(['ready', async LO => {
+                          // Track an event
+                          await LO.$internal.ready('events')
+                          LO.events.track('Buy Now (from Product Details)', {
+                            product: details.name,
+                            category: details.category,
+                            productId: details.productId
+                          })
+                        }])
+                        TagManager.dataLayer({
+                          dataLayer: {
+                            event: 'buy_now_from_product_details',
+                            product_name: details.name,
+                            category: details.category,
+                            productId: details.productId
+                          },
+                        });
 
-                          const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [details.saleAddress], [qty])
-                          if (checkQuantity === true) {
-                            addItemToCart();
-                            navigate("/checkout");
-                          } else {
-                            if (checkQuantity[0].availableQuantity === 0) {
-                              openToast("bottom", true, `Unfortunately, ${details.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
-                            } else { // Case 2: We are trying to add too much quantity
-                              openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${details.name} are available. Please update your cart quantity accordingly.`);
-                            }
+                        const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [details.saleAddress], [qty])
+                        if (checkQuantity === true) {
+                          addItemToCart();
+                          navigate("/checkout");
+                        } else {
+                          if (checkQuantity[0].availableQuantity === 0) {
+                            openToast("bottom", true, `Unfortunately, ${details.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
+                          } else { // Case 2: We are trying to add too much quantity
+                            openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${details.name} are available. Please update your cart quantity accordingly.`);
                           }
                         }
                       }}
@@ -403,36 +398,31 @@ const ProductDetails = ({ user, users }) => {
                         disabled={true}
                         id="addToCart"
                         onClick={async () => {
-                          if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                            setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
-                            window.location.href = loginUrl;
+                          window.LOQ.push(['ready', async LO => {
+                            // Track an event
+                            await LO.$internal.ready('events')
+                            LO.events.track('Add to Cart (from Product Details)', {
+                              product: details.name,
+                              category: details.category,
+                              productId: details.productId
+                            })
+                          }])
+                          TagManager.dataLayer({
+                            dataLayer: {
+                              event: 'add_to_cart_from_product_details',
+                              product_name: details?.name,
+                              category: details?.category,
+                              productId: details?.productId
+                            },
+                          });
+                          const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [details.saleAddress], [qty])
+                          if (checkQuantity === true) {
+                            addItemToCart();
                           } else {
-                            window.LOQ.push(['ready', async LO => {
-                              // Track an event
-                              await LO.$internal.ready('events')
-                              LO.events.track('Add to Cart (from Product Details)', {
-                                product: details.name,
-                                category: details.category,
-                                productId: details.productId
-                              })
-                            }])
-                            TagManager.dataLayer({
-                              dataLayer: {
-                                event: 'add_to_cart_from_product_details',
-                                product_name: details?.name,
-                                category: details?.category,
-                                productId: details?.productId
-                              },
-                            });
-                            const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [details.saleAddress], [qty])
-                            if (checkQuantity === true) {
-                              addItemToCart();
-                            } else {
-                              if (checkQuantity[0].availableQuantity === 0) {
-                                openToast("bottom", true, `Unfortunately, ${details.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
-                              } else { // Case 2: We are trying to add too much quantity
-                                openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${details.name} are available. Please update your cart quantity accordingly.`);
-                              }
+                            if (checkQuantity[0].availableQuantity === 0) {
+                              openToast("bottom", true, `Unfortunately, ${details.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
+                            } else { // Case 2: We are trying to add too much quantity
+                              openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${details.name} are available. Please update your cart quantity accordingly.`);
                             }
                           }
                         }}
@@ -444,36 +434,31 @@ const ProductDetails = ({ user, users }) => {
                         </div>}
                         className=" !w-9 h-9 rounded-md  !bg-[#13188A]"
                         onClick={async () => {
-                          if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                            setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
-                            window.location.href = loginUrl;
+                          window.LOQ.push(['ready', async LO => {
+                            // Track an event
+                            await LO.$internal.ready('events')
+                            LO.events.track('Add to Cart (from Product Details)', {
+                              product: details?.name,
+                              category: details?.category,
+                              productId: details?.productId
+                            })
+                          }])
+                          TagManager.dataLayer({
+                            dataLayer: {
+                              event: 'add_to_cart_from_product_details',
+                              product_name: details?.name,
+                              category: details?.category,
+                              productId: details?.productId
+                            },
+                          });
+                          const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [details.saleAddress], [qty])
+                          if (checkQuantity === true) {
+                            addItemToCart();
                           } else {
-                            window.LOQ.push(['ready', async LO => {
-                              // Track an event
-                              await LO.$internal.ready('events')
-                              LO.events.track('Add to Cart (from Product Details)', {
-                                product: details?.name,
-                                category: details?.category,
-                                productId: details?.productId
-                              })
-                            }])
-                            TagManager.dataLayer({
-                              dataLayer: {
-                                event: 'add_to_cart_from_product_details',
-                                product_name: details?.name,
-                                category: details?.category,
-                                productId: details?.productId
-                              },
-                            });
-                            const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [details.saleAddress], [qty])
-                            if (checkQuantity === true) {
-                              addItemToCart();
-                            } else {
-                              if (checkQuantity[0].availableQuantity === 0) {
-                                openToast("bottom", true, `Unfortunately, ${details.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
-                              } else { // Case 2: We are trying to add too much quantity
-                                openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${details.name} are available. Please update your cart quantity accordingly.`);
-                              }    
+                            if (checkQuantity[0].availableQuantity === 0) {
+                              openToast("bottom", true, `Unfortunately, ${details.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
+                            } else { // Case 2: We are trying to add too much quantity
+                              openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${details.name} are available. Please update your cart quantity accordingly.`);
                             }
                           }
                         }}
@@ -519,74 +504,74 @@ const ProductDetails = ({ user, users }) => {
                 defaultActiveKey="0"
                 items={
                   [
-                  {
-                    label: <span className="text-sm md:text-base">Description</span>,
-                    key: "0",
-                    children: (
-                      <div>
-                        <Paragraph
-                          className="text-[#202020] text-sm"
-                        >
-                          {details?.description?.split('\n').map((line, index) => (
-                            <React.Fragment key={index}>
-                              {line}
-                              <br />
-                            </React.Fragment>
-                          ))}
-                        </Paragraph>
-                      </div>
-                    ),
-                  }
-                  ,{
-                    label: <span className="text-sm md:text-base">Details</span>,
-                    key: "1",
-                    children: (
-                      <div>
-                        <ProductItemDetails
-                          categoryName={getCategory(details)}
-                          itemData={itemData}
-                        />
-                      </div>
-                    ),
-                  },
-                  user && { //if user is logged in then display Ownership History
-                    label: <span className="text-sm md:text-base">Ownership History</span>,
-                    key: "2",
-                    children: (
-                      <div>
-                        <DataTableComponent
-                          columns={ownershipDetailColumn}
-                          scrollX="100%"
-                          data={inventoryOwnershipHistory}
-                          isLoading={isInventoryOwnershipHistoryLoading}
-                          pagination={{
-                            defaultPageSize: 10,
-                            position: ["bottomCenter"],
-                            showSizeChanger: false,
-                          }}
-                        />
-                      </div>
-                    ),
-                  },
-                  {
-                    label: <span className="text-sm md:text-base">Additional Information</span>,
-                    key: "3",
-                    children: (
-                      <div>
-                        <List
-                          size="small"
-                          boardered
-                          dataSource={!details.files ? [] : details.files}
-                          renderItem={(item) =>
-                            <List.Item>
-                              <a href={item} rel="noreferrer" target="_blank" className="hover:underline break-all text-[#1e40af]">
-                                {item}
-                              </a>
-                            </List.Item>}
-                        />
-                      </div>
-                    )
-                  },
+                    {
+                      label: <span className="text-sm md:text-base">Description</span>,
+                      key: "0",
+                      children: (
+                        <div>
+                          <Paragraph
+                            className="text-[#202020] text-sm"
+                          >
+                            {details?.description?.split('\n').map((line, index) => (
+                              <React.Fragment key={index}>
+                                {line}
+                                <br />
+                              </React.Fragment>
+                            ))}
+                          </Paragraph>
+                        </div>
+                      ),
+                    }
+                    , {
+                      label: <span className="text-sm md:text-base">Details</span>,
+                      key: "1",
+                      children: (
+                        <div>
+                          <ProductItemDetails
+                            categoryName={getCategory(details)}
+                            itemData={itemData}
+                          />
+                        </div>
+                      ),
+                    },
+                    user && { //if user is logged in then display Ownership History
+                      label: <span className="text-sm md:text-base">Ownership History</span>,
+                      key: "2",
+                      children: (
+                        <div>
+                          <DataTableComponent
+                            columns={ownershipDetailColumn}
+                            scrollX="100%"
+                            data={inventoryOwnershipHistory}
+                            isLoading={isInventoryOwnershipHistoryLoading}
+                            pagination={{
+                              defaultPageSize: 10,
+                              position: ["bottomCenter"],
+                              showSizeChanger: false,
+                            }}
+                          />
+                        </div>
+                      ),
+                    },
+                    {
+                      label: <span className="text-sm md:text-base">Additional Information</span>,
+                      key: "3",
+                      children: (
+                        <div>
+                          <List
+                            size="small"
+                            boardered
+                            dataSource={!details.files ? [] : details.files}
+                            renderItem={(item) =>
+                              <List.Item>
+                                <a href={item} rel="noreferrer" target="_blank" className="hover:underline break-all text-[#1e40af]">
+                                  {item}
+                                </a>
+                              </List.Item>}
+                          />
+                        </div>
+                      )
+                    },
                   ]}
               />
             </div>

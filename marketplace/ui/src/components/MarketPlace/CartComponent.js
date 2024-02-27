@@ -2,6 +2,8 @@ import {
     Button,
     Row,
     Col,
+    Modal,
+    Spin
 } from "antd";
 import DataTableComponent from "../DataTableComponent";
 import "./index.css";
@@ -15,11 +17,10 @@ import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
 import { actions as orderActions } from "../../contexts/order/actions"
 import { useOrderDispatch } from "../../contexts/order";
+import { setCookie } from "../../helpers/cookie";
 
 
 const CartComponent = ({ columns, data, openToastOrder }) => {
-
-
     const navigate = useNavigate();
     const [tax, setTax] = useState(0);
     const [shipping, setShipping] = useState(0);
@@ -27,6 +28,29 @@ const CartComponent = ({ columns, data, openToastOrder }) => {
     const [total, setTotal] = useState(0);
     const marketplaceDispatch = useMarketplaceDispatch();
     const orderDispatch = useOrderDispatch();
+    const [modal, contextHolder] = Modal.useModal();
+
+    const countDown = () => {
+        modal.info({
+            okButtonProps: { hidden: true },
+            content: (
+                <>
+                    <p className="font-medium">
+                        In order to proceed with your purchase, you will first need to log in or register an account with Mercata.
+                    </p>
+                    <br />
+                    <p>
+                        You will be redirected to the sign-in page shortly.
+                    </p>
+                    <Spin className="flex justify-center mt-2" />
+                </>
+            ),
+        });
+        setTimeout(() => {
+            setCookie("returnUrl", `/marketplace/confirmOrder`, 10);
+            window.location.href = loginUrl;
+        }, 4000);
+    };
 
     let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
@@ -61,6 +85,7 @@ const CartComponent = ({ columns, data, openToastOrder }) => {
 
     return (
         <>
+            {contextHolder}
             <div className="pt-2  ">
                 <div>
                     <div className=" cart">
@@ -103,7 +128,7 @@ const CartComponent = ({ columns, data, openToastOrder }) => {
                                 className="flex items-center px-4 py-5 bg-primary !hover:bg-primaryHover"
                                 onClick={async () => {
                                     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                                        window.location.href = loginUrl;
+                                        countDown();
                                     } else {
                                         const saleAddresses = [];
                                         const quantities = [];
@@ -112,7 +137,7 @@ const CartComponent = ({ columns, data, openToastOrder }) => {
                                             quantities.push(item.qty)
                                         })
                                         const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities)
-                                        if (checkQuantity === true ) {
+                                        if (checkQuantity === true) {
                                             // Proceed with order submission
                                             actions.addItemToConfirmOrder(marketplaceDispatch, data);
                                             window.LOQ.push(['ready', async LO => {
@@ -140,7 +165,7 @@ const CartComponent = ({ columns, data, openToastOrder }) => {
                                                     insufficientQuantityMessage += `Product ${detail.assetName}: ${detail.availableQuantity}\n`;
                                                 }
                                             });
-                                            
+
                                             // Throw the appropriate error messages. Throw both if applicable. 
                                             let errorMessage = "";
                                             if (insufficientQuantityMessage) {

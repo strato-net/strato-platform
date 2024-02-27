@@ -144,12 +144,6 @@ const actions = {
           type: actionDescriptors.fetchInventorySearchFailed,
           error: "Error while fetching Inventory",
         });
-      } else if (response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({
-          type: actionDescriptors.fetchInventorySearchFailed,
-          error: "Unauthorized while fetching Inventory"
-        });
-        window.location.href = body.error.loginUrl;
       }
       dispatch({
         type: actionDescriptors.fetchInventorySearchFailed,
@@ -194,12 +188,6 @@ const actions = {
           type: actionDescriptors.fetchInventoryFailed,
           error: "Error while fetching Inventory",
         });
-      } else if (response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({
-          type: actionDescriptors.fetchInventoryFailed,
-          error: "Unauthorized while fetching Inventory"
-        });
-        window.location.href = body.error.loginUrl;
       }
       dispatch({
         type: actionDescriptors.fetchInventoryFailed,
@@ -555,7 +543,7 @@ const actions = {
         }
       }
       let url = `${apiUrl}/inventory/transfers/items?limit=${limit}&order=transferDate.${order}&offset=${offset}&or=(oldOwnerCommonName.eq.${ownerCommonName},newOwnerCommonName.eq.${ownerCommonName})${search ? searchQuery : ''}${date ? range : ''}`
-     
+
       const response = await fetch(url, {
         method: HTTP_METHODS.GET,
 
@@ -570,13 +558,7 @@ const actions = {
         });
 
         return true;
-      } else if (response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({
-          type: actionDescriptors.fetchItemTransfersFailed,
-          error: "Unauthorized while fetching item transfers"
-        });
-        window.location.href = body.error.loginUrl;
-      }
+      } 
 
       dispatch({
         type: actionDescriptors.fetchItemTransfersFailed,
@@ -609,12 +591,6 @@ const actions = {
         });
 
         return true;
-      } else if (response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({
-          type: actionDescriptors.fetchInventoryDetailFailed,
-          error: "Unauthorized while fetching Inventory"
-        });
-        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -736,12 +712,6 @@ const actions = {
           payload: body.data,
         });
         return body.data;
-      } else if (response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({
-          type: actionDescriptors.sellerStripeStatusFailed,
-          error: "Unauthorized while trying to get Stripe status"
-        });
-        window.location.href = body.error.loginUrl;
       }
 
       dispatch({

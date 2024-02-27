@@ -58,13 +58,7 @@ const actions = {
         });
 
         return true;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchSerialNumbersFailed, 
-          error: "Unauthorized while fetching serial numbers" 
-        });
-        window.location.href = body.error.loginUrl;
-      }
+      } 
 
       dispatch({
         type: actionDescriptors.fetchSerialNumbersFailed,
@@ -96,13 +90,7 @@ const actions = {
         });
 
         return true;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchItemOwnershipHistoryFailed, 
-          error: "Unauthorized while fetching ownership history" 
-        });
-        window.location.href = body.error.loginUrl;
-      }
+      } 
 
       dispatch({
         type: actionDescriptors.fetchItemOwnershipHistoryFailed,
@@ -142,13 +130,7 @@ const actions = {
         });
 
         return true;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchItemTransfersFailed, 
-          error: "Unauthorized while fetching item transfers" 
-        });
-        window.location.href = body.error.loginUrl;
-      }
+      } 
 
       dispatch({
         type: actionDescriptors.fetchItemTransfersFailed,
@@ -190,13 +172,7 @@ const actions = {
           error: "Error while fetching item raw materials"
         });
         return;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchItemRawMaterialsFailed, 
-          error: "Unauthorized while fetching item raw materials" 
-        });
-        window.location.href = body.error.loginUrl;
-      }
+      } 
 
       dispatch({ type: actionDescriptors.fetchItemRawMaterialsFailed, error: body.error });
     } catch (err) {
@@ -228,13 +204,7 @@ const actions = {
           payload: body.data,
         });
         return;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchItemFailed, 
-          error: "Unauthorized while fetching item" 
-        });
-        window.location.href = body.error.loginUrl;
-      }
+      } 
       dispatch({ type: actionDescriptors.fetchItemFailed, error: undefined });
     } catch (err) {
       dispatch({ type: actionDescriptors.fetchItemFailed, error: undefined });
@@ -271,13 +241,7 @@ const actions = {
         });
         actions.setMessage(dispatch, "Error while transferring Items");
         return false;;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.transferOwnershipFailed, 
-          error: "Unauthorized while transferring Items" 
-        });
-        window.location.href = body.error.loginUrl;
-      }
+      } 
 
       dispatch({
         type: actionDescriptors.transferOwnershipFailed,
