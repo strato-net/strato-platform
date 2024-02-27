@@ -309,9 +309,9 @@ processTheMessages env conn messages = do
 
             deferredForeignKeys <- case (_contractType c) of
               AbstractType -> do
-                abstractfkeys <- outputData conn $ createExpandAbstractTable g c nameParts abstracts' cc
-                $logInfoS "processTheMessages/deferredForeignKeys/abstractfkeys" $ T.pack $ show abstractfkeys
-                return abstractfkeys
+                _ <- outputData conn $ createExpandAbstractTable g c nameParts abstracts' cc
+                -- $logInfoS "processTheMessages/deferredForeignKeys/abstractfkeys" $ T.pack $ show abstractfkeys
+                return []
               _ -> do
                 indexfkeys <- outputData conn $ createExpandIndexTable g c nameParts
                 $logInfoS "processTheMessages/deferredForeignKeys/indexfkeys" $ T.pack $ show indexfkeys
