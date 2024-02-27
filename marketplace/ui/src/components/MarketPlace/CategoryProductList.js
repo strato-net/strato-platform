@@ -31,6 +31,8 @@ import ClickableCell from "../ClickableCell";
 import NewTrendingCard from "./NewTrendingCard";
 import { Images } from "../../images";
 import './index.css'
+import { actions as orderActions } from "../../contexts/order/actions"
+import { useOrderDispatch} from "../../contexts/order";
 
 const { Panel } = Collapse;
 const { Text } = Typography;
@@ -45,7 +47,7 @@ const CategoryProductList = ({ user }) => {
   const categoryQueryValue = queryParams.get('category');
   const categoryQueryValueArr = categoryQueryValue ? categoryQueryValue.split(',') : []
 
-  const [api] = notification.useNotification();
+  const [api, contextHolder] = notification.useNotification();
   // States
   const [selectedCategories, setSelectedCategories] = useState(categoryQueryValueArr);
   const [selectedSubCategories, setSelectedSubCategories] = useState([]);
@@ -62,6 +64,7 @@ const CategoryProductList = ({ user }) => {
   const categoryDispatch = useCategoryDispatch();
   const subCategoryDispatch = useSubCategoryDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
+  const orderDispatch = useOrderDispatch();
   // states
   const { marketplaceList, isMarketplaceLoading } = useMarketplaceState();
   const { categorys } = useCategoryState();
@@ -211,48 +214,59 @@ const CategoryProductList = ({ user }) => {
     setMobileOpenFilter(!mobileOpenFilter);
   };
 
-  const addItemToCart = (product, quantity) => {
+  const addItemToCart = async (product, quantity) => {
     if (product.ownerCommonName === user?.commonName) {
-      openToast("bottom", true, "Cannot buy your own item")
+      openToast("bottom", true, "Cannot buy your own item");
       return false;
     }
-    let found = false;
-    for (var i = 0; i < cartList.length; i++) {
-      if (cartList[i].product.address === product.address) {
-        found = true;
-        break;
+  
+    // Search for the product in the cart
+    let foundIndex = cartList.findIndex((item) => item.product.address === product.address);
+    let items = [...cartList];
+  
+    // Found index will be -1 if it's not in the cart list
+    if (foundIndex === -1) {
+      // Product not found, check quantity before adding
+      const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity]);
+      if (checkQuantity === true) {
+        // Quantity check passed, add new item to the cart
+        items.push({ product, qty: quantity });
+        marketplaceActions.addItemToCart(marketplaceDispatch, items);
+        openToast("bottom", false, "Item added to cart");
+        return true;
+      } else {
+        // Not enough quantity, inform the user
+        // Case 1: Item is out of stock
+        if (checkQuantity[0].availableQuantity === 0) {
+          openToast("bottom", true, `Unfortunately, ${product.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
+        } else { // Case 2: We are trying to add too much quantity
+          openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${product.name} are available. Please update your cart quantity accordingly.`);
+        }
+        return false;
+      }
+    } else {
+      // Product found, prepare to update quantity after check
+      const potentialNewQty = items[foundIndex].qty + quantity; 
+      const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity]);
+      if (checkQuantity === true) {
+        // Quantity check passed, update item quantity in the cart
+        items[foundIndex].qty = potentialNewQty; 
+        marketplaceActions.addItemToCart(marketplaceDispatch, items);
+        openToast("bottom", false, "Item updated in cart");
+        return true;
+      } else {
+        // Not enough quantity, inform the user
+        if (checkQuantity[0].availableQuantity === 0) {
+          openToast("bottom", true, `Unfortunately, ${product.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
+        } else { // Case 2: We are trying to add too much quantity
+          openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${product.name} are available. Please update your cart quantity accordingly.`);
+        }        
+        return false;
       }
     }
-    let items = [];
-    if (!found) {
-      items = [...cartList, { product, qty: quantity }];
-      marketplaceActions.addItemToCart(marketplaceDispatch, items);
-
-      openToast("bottom", false, "Item added to cart");
-      return true;
-    } else {
-      items = [...cartList];
-      cartList.forEach((element, index) => {
-        if (element.product.address === product.address) {
-          const availableQuantity = product.saleQuantity ? product.saleQuantity : 1;
-          if (items[index].qty + 1 <= availableQuantity) {
-            items[index].qty += 1;
-            marketplaceActions.addItemToCart(marketplaceDispatch, items);
-
-            openToast("bottom", false, "Item updated in cart");
-            return true;
-          } else {
-            openToast(
-              "bottom",
-              true,
-              "Cannot add more than available quantity"
-            );
-            return false;
-          }
-        }
-      });
-    }
   };
+  
+  
 
   const openToast = (placement, isError, msg) => {
     let msgObj = {
@@ -550,17 +564,23 @@ const CategoryProductList = ({ user }) => {
             :
             <div>
               {marketplaceList?.length > 0 ? (
+
                 <div className={`mt-[61px] md:mt-4 mb-8 flex w-full md:grid flex-col items-center ${desktopOpenFilter ? "grid-cols-1 gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 4xl:grid-cols-5 lg:gap-14 xl:gap-x-10 2xl:gap-x-20" : " sm:grid-cols-1 gap-4 md:grid-cols-2 md:gap-14 lg:grid-cols-3 lg:gap-16 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 5xl:grid-cols-7"}`} id="product-list">
-                  {marketplaceList.map((product, index) => {
-                    return (
-                      <NewTrendingCard
-                        topSellingProduct={product}
-                        key={index}
-                        addItemToCart={addItemToCart}
-                        parent={"Marketplace"}
-                      />
-                    );
-                  })}
+                  {marketplaceList
+                    // .filter(product => product.saleQuantity > 0)
+                    .map((product, index) => {
+                      return (
+                        <NewTrendingCard
+                          topSellingProduct={product}
+                          key={index}
+                          addItemToCart={addItemToCart}
+                          parent={"Marketplace"}
+                          api={api}
+                          contextHolder={contextHolder}
+                        />
+                      );
+                    })}
+
                 </div>
               ) : (
                 <div className="h-96 flex justify-center items-center" id="product-list">

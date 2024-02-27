@@ -20,6 +20,7 @@ import Blockchain.Init.Monad
 import Blockchain.Init.Options
 import Blockchain.KafkaTopics
 import qualified Blockchain.Network as Net
+import Blockchain.Strato.Model.Options (flags_network)
 import Control.Concurrent
 import Control.Monad
 import Control.Monad.Composable.Redis

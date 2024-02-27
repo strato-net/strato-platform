@@ -56,7 +56,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const [roleIndex, setRoleIndex] = useState();
   const [showSearch, setShowSearch] = useState(false)
 
-  const strato = (Object.keys(strats).length > 0) ? strats : 0
+  const stratsBalance = (Object.keys(strats).length > 0) ? strats : 0
 
   const navItems = [
     {
@@ -325,7 +325,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
               <Badge
               style={{backgroundColor:"#13188A"}}
               className="cursor-pointer mt-7 md:mt-0 mx-2"
-              count={strats}
+              count={stratsBalance}
               overflowCount={9999999}
               >
               <img src={Images.logo} className="w-[30px] h-[30px] " />

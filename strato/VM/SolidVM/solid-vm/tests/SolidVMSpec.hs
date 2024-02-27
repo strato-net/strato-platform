@@ -6079,8 +6079,8 @@ contract qq {
     return keccak256("hello", "world");
   }
 }|]
-      `shouldReturn` Just ("(\"\\250&\\219|\\168^\\173\\&9\\146\\SYN\\231\\198\\&1k\\197\\SO\\210C\\147\\195\\DC2+X'5\\231\\243\\176\\249\\ESC\\147\\240\")")
-  --keccak256ToByteString function implementation wrong
+      `shouldReturn` Just "(\"fa26db7ca85ead399216e7c6316bc50ed24393c3122b582735e7f3b0f91b93f0\")"
+
   it "cant use  a commented pragma" . runTest $ do
     runCall'
       "a"

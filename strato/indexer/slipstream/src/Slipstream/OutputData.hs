@@ -47,7 +47,7 @@ module Slipstream.OutputData (
 import           BlockApps.Solidity.Value as V
 import           Conduit
 import           Control.Arrow                   ((***))
-import           Control.Lens ((^.), (<&>))
+import           Control.Lens ((^.))
 import           Control.Monad
 import qualified Data.Aeson                      as Aeson
 import qualified Data.ByteString.Base16         as Base16
@@ -313,7 +313,7 @@ createForeignIndexesForJoins ::
   ConduitM () Text m ()
 createForeignIndexesForJoins foreignKey = do
   let srcTable = textToDoubleQuoteText $ tableNameToTextPostgres (tableName foreignKey)
-      srcColumn =wrapDoubleQuotes (columnName foreignKey)
+      srcColumn = wrapDoubleQuotes (columnName foreignKey)
       targetTable = textToDoubleQuoteText $ tableNameToTextPostgres (foreignTableName foreignKey)
       fkNameSrcToTarget = textToDoubleQuoteText $ tableNameToTextPostgres (tableName foreignKey) <> "_" <> tableNameToTextPostgres (foreignTableName foreignKey) <> "_fk"
       fkNameTargetToSrc = textToDoubleQuoteText $ tableNameToTextPostgres (foreignTableName foreignKey) <> "_" <> tableNameToTextPostgres (tableName foreignKey) <> "_fk"
@@ -333,6 +333,15 @@ createForeignIndexesForJoins foreignKey = do
   yield $ "ALTER TABLE " <> srcTable 
           <> " ADD CONSTRAINT " <> fkNameSrcToTarget <> " FOREIGN KEY (" 
           <> srcColumn <> ") REFERENCES " <> targetTable <> " (address) DEFERRABLE INITIALLY DEFERRED;"
+
+  -- Check for specific case of AbstractTableName
+  case (tableName foreignKey, foreignTableName foreignKey) of
+    (AbstractTableName "BlockApps" "Mercata" "Sale", AbstractTableName "BlockApps" "Mercata" "Asset") -> do
+      -- Create indexes for faster join operation
+      yield $ "CREATE INDEX IF NOT EXISTS idx_assetToBeSold" <> " ON " <> srcTable <> " (" <> srcColumn <> ");"
+      yield $ "CREATE INDEX IF NOT EXISTS idx_address ON " <> targetTable <> " (address);"
+    _ -> return ()
+
   yield "COMMIT;"
 
 notifyPostgREST ::
@@ -365,30 +374,57 @@ getDeferredForeignKeysAbstract ::
   (MonadLogger m) =>
   TableName -> ContractF () -> Text -> Text -> Map.Map (Account, Text) (Text, Text) -> CodeCollectionF () -> m [ForeignKeyInfo]
 getDeferredForeignKeysAbstract tableName c o a abstracts' cc = do
-  result <- fmap catMaybes . for [(theName, x) | (theName, VariableDecl {_varType = SVMType.UnknownLabel x _}) <- Map.toList (c ^. storageDefs)] $ \(theName, x) -> do
-      let contract = getContractsBySolidString x cc
-      case contract of
-              Just c' -> do
-                let enumExists = isJust $ Map.lookup (_contractName c') (_enums c')
-                if enumExists
-                then do
-                  $logDebugS "getDeferredForeignKeysAbstract: Enum with the same name as contract found, skipping fkey creation" . T.pack $ _contractName c'
-                  return Nothing
-                else do
-                  let (o',a',n') = case _importedFrom c' of
-                                    Nothing -> (o, a, _contractName c')
-                                    Just acct -> case Map.lookup (acct, T.pack $ _contractName c') abstracts' of
+  let skipForeignKeyCreation = case tableName of
+        AbstractTableName "BlockApps" "Mercata" "Asset" -> True
+        AbstractTableName "BlockApps" "Mercata" "Order" -> True
+        _ -> False
+
+  -- Additional condition for BlockApps Mercata Sale
+  let isMercataSale = case tableName of
+        AbstractTableName "BlockApps" "Mercata" "Sale" -> True
+        _ -> False
+  $logDebugS "getDeferredForeignKeysAbstract: skipForeignKeyCreation" . T.pack $ show skipForeignKeyCreation
+  if skipForeignKeyCreation
+  then return []
+  else do
+    result <- fmap catMaybes . for [(theName, x) | (theName, VariableDecl {_varType = SVMType.UnknownLabel x _}) <- Map.toList (c ^. storageDefs)] $ \(theName, x) -> do
+        let contract = getContractsBySolidString x cc
+        case contract of
+                Just c' -> do
+
+
+                  -- Add logs for each variable involved in enumOrStructWithNameExists
+                  let enumExists = isJust (Map.lookup (_contractName c') (_enums c'))
+                      structWithNameExists = isJust (Map.lookup (show theName) (_structs c'))
+                      structWithNameExists2 = isJust (Map.lookup (show x) (_structs c'))
+                      structExists = isJust (Map.lookup (_contractName c') (_structs c'))
+                      enumWithNameExists = isJust (Map.lookup (show theName) (_enums c'))
+                      enumWithNameExists2 = isJust (Map.lookup (show x) (_enums c'))
+                      enumOrStructWithNameExists = enumExists || structWithNameExists || structExists || enumWithNameExists || enumWithNameExists2 || structWithNameExists2
+                  if enumOrStructWithNameExists
+                  then do
+                    $logInfoS "getDeferredForeignKeysAbstract: Enum with the same name as contract found, skipping fkey creation" . T.pack $ _contractName c'
+                    return Nothing
+                  else do
+                    let (o',a',n') = case _importedFrom c' of
                                       Nothing -> (o, a, _contractName c')
-                                      Just (o'', a'') -> (o'', a'', _contractName c')
-                  pure $ Just $ ForeignKeyInfo
-                    { tableName = tableName,
-                      columnName = labelToText theName,
-                      foreignTableName = abstractTableName o' a' $ T.pack n'
-                      }
-              Nothing -> return Nothing
-  return result
-
-
+                                      Just acct -> case Map.lookup (acct, T.pack $ _contractName c') abstracts' of
+                                        Nothing -> (o, a, _contractName c')
+                                        Just (o'', a'') -> (o'', a'', _contractName c')
+                    let proceedWithForeignKeyCreation = if isMercataSale
+                            then (o', a', T.pack n') == ("BlockApps", "Mercata", "Asset")
+                            else True
+                    if proceedWithForeignKeyCreation
+                    then do
+                      pure $ Just $ ForeignKeyInfo
+                        { tableName = tableName,
+                          columnName = labelToText theName,
+                          foreignTableName = abstractTableName o' a' $ T.pack n'
+                          }
+                    else return Nothing
+                Nothing -> return Nothing
+    -- Log at the end
+    return result
 
 getDeferredForeignKeysForMapping :: TableName -> Text -> Text -> [ForeignKeyInfo]
 getDeferredForeignKeysForMapping tableName o a =
@@ -671,24 +707,9 @@ expandAbstractContractTable globalsIORef contract tableName abstracts' cc = do
             ]
         setTableCreated globalsIORef tableName $ cols ++ extraTableColumns
         yield $ expandTableQuery tableName extraTableColumns
-      return $
-        case tableName of
-          -- AbstractTableName "BlockApps" "Mercata" "Asset" -> []
-          AbstractTableName o a _ ->
-            catMaybes . flip map [(colName, foreignName) | (colName, SVMType.UnknownLabel foreignName _) <- extras]
-              $ \(colName, foreignName) -> do
-                getContractsBySolidString foreignName cc <&> \c' ->
-                    let (o',a',n') = case _importedFrom c' of
-                          Nothing -> (o, a, _contractName c')
-                          Just acct -> case Map.lookup (acct, T.pack $ _contractName c') abstracts' of
-                            Nothing -> (o, a, _contractName c')
-                            Just (o'', a'') -> (o'', a'', _contractName c')
-                    in ForeignKeyInfo
-                          { tableName = tableName,
-                            columnName = colName,
-                            foreignTableName = abstractTableName o' a' $ T.pack n'
-                          }
-          _ -> []
+      case tableName of
+        AbstractTableName o a _ -> getDeferredForeignKeysAbstract tableName contract o a abstracts' cc
+        _ -> return $ []
 
 expandTableQuery :: TableName -> TableColumns -> Text
 expandTableQuery tableName cols =
