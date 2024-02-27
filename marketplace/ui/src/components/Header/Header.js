@@ -295,7 +295,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
             <img src={Images.Responsive_search} className="w-6 h-6" />
           </div>}
           <Badge
-            className="cursor-pointer"
+            className="cursor-pointer mr-3 md:mr-1"
             count={cartList.length}
             onClick={() => {
               TagManager.dataLayer({
