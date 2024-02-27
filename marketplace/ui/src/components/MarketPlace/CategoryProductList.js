@@ -592,6 +592,7 @@ const CategoryProductList = ({ user }) => {
                     current={page}
                     onChange={onPageChange}
                     total={marketplaceListCount}
+                    defaultPageSize={limit}
                     showSizeChanger={false}
                     className="flex justify-center my-5 "
                   />
