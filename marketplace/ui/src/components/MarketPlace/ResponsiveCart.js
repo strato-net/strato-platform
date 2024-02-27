@@ -9,6 +9,8 @@ import {
 } from "../../contexts/marketplace";
 import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
+import { actions as orderActions } from "../../contexts/order/actions"
+import { useOrderDispatch } from "../../contexts/order";
 
 
 const ResponsiveCart = ({
@@ -18,6 +20,7 @@ const ResponsiveCart = ({
   MinusQty,
   ValueQty,
   removeCartList,
+  openToastOrder
 }) => {
   const navigate = useNavigate();
   const [tax, setTax] = useState(0);
@@ -25,6 +28,8 @@ const ResponsiveCart = ({
   const { cartList } = useMarketplaceState();
   const [total, setTotal] = useState(0);
   const marketplaceDispatch = useMarketplaceDispatch();
+  const orderDispatch = useOrderDispatch();
+
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   const [faqOpenState, setFaqOpenState] = useState(
     Array(data.length).fill(false)
@@ -228,25 +233,57 @@ const ResponsiveCart = ({
               type="primary"
               id="submit-order-button"
               className=" w-full sm:w-44 h-9 !bg-[#13188A]"
-              onClick={() => {
+              onClick={async () => {
                 if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                  window.location.href = loginUrl;
+                    window.location.href = loginUrl;
                 } else {
-                  actions.addItemToConfirmOrder(marketplaceDispatch, data);
-                  window.LOQ.push([
-                    "ready",
-                    async (LO) => {
-                      // Track an event
-                      await LO.$internal.ready("events");
-                      LO.events.track("Submit Order (from cart)");
-                    },
-                  ]);
-                  TagManager.dataLayer({
-                    dataLayer: {
-                      event: "submit_order_from_cart",
-                    },
-                  });
-                  navigate("/confirmOrder");
+                  const saleAddresses = [];
+                  const quantities = [];
+                  data.forEach((item) => {
+                      saleAddresses.push(item.saleAddress)
+                      quantities.push(item.qty)
+                  })
+                  const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities)
+                  if (checkQuantity === true ) {
+                      // Proceed with order submission
+                      actions.addItemToConfirmOrder(marketplaceDispatch, data);
+                      window.LOQ.push(['ready', async LO => {
+                          // Track an event
+                          await LO.$internal.ready('events')
+                          LO.events.track('Submit Order (from cart)')
+                      }])
+                      TagManager.dataLayer({
+                          dataLayer: {
+                              event: 'submit_order_from_cart',
+                          },
+                      });
+
+                      navigate("/confirmOrder");
+
+                  } else {
+                      let insufficientQuantityMessage = "";
+                      let outOfStockMessage = "";
+
+                      // Generate the messages of products with too little or no quantity
+                      checkQuantity.forEach(detail => {
+                          if (detail.availableQuantity === 0) {
+                              outOfStockMessage += `Product ${detail.assetName}\n`;
+                          } else {
+                              insufficientQuantityMessage += `Product ${detail.assetName}: ${detail.availableQuantity}\n`;
+                          }
+                      });
+                      
+                      // Throw the appropriate error messages. Throw both if applicable. 
+                      let errorMessage = "";
+                      if (insufficientQuantityMessage) {
+                          errorMessage += `The following item(s) in your cart have limited quantity available and will need to be adjusted. Please reduce the quantity to proceed:\n${insufficientQuantityMessage}`;
+                      }
+                      if (outOfStockMessage) {
+                          if (errorMessage) errorMessage += "\n"; // Add a new line if there's already an error message
+                          errorMessage += `The following item(s) are temporarily out of stock and should be removed:\n${outOfStockMessage}`;
+                      }
+                      openToastOrder("bottom", errorMessage);
+                  }
                 }
               }}
               disabled={data.length === 0}
