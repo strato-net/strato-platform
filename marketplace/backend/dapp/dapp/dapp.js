@@ -526,40 +526,27 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const saleAddresses = orders.orders.flatMap(order => order.saleAddresses);
       const sales = await saleJs.getAll(rawAdmin, { saleAddresses }, options);
       
-      for (const sale of sales) {
-        const order = orders.orders.find(o => o.saleAddresses.includes(sale.address));
-        if (order) {
+      const uniqueAssetAddresses = [...new Set(sales.map(sale => sale.assetToBeSold))];
+      const assets = await inventoryJs.getAll(rawAdmin, { assetAddresses: uniqueAssetAddresses }, options);
+      const assetLookup = new Map(assets.map(asset => [asset.address, asset]));
+      
+      for (const order of orders.orders) {
+        const assetsPromises = order.saleAddresses.map(async (saleAddress) => {
+          const sale = sales.find(sale => sale.address === saleAddress);
+          if (!sale) return undefined;
+
           const history = await saleJs.getSaleHistory(rawAdmin, {
-            contract: sale.contract_name, 
-            address: sale.address, 
+            contract: sale.contract_name,
             transaction_hash: order.transaction_hash
           }, options);
-          if (history && history['0']) {
-            sale.price = history['0'].price;
-          }
-        }
+
+          const asset = assetLookup.get(sale.assetToBeSold);
+          return asset ? { ...asset, salePrice: history['0']?.price || 0 } : undefined;
+        });
+
+        order.assets = (await Promise.all(assetsPromises)).filter(asset => asset !== undefined);
       }
-      
-      const uniqueAssetAddresses = new Set(sales.map(sale => sale.assetToBeSold));
-      
-      const assets = await inventoryJs.getAll(rawAdmin, { assetAddresses: [...uniqueAssetAddresses] }, options);
-      
-      const assetDetailsMap = new Map(assets.map(asset => [asset.address, asset]));
-      const assetLookup = new Map(sales.map(sale => [
-        sale.assetToBeSold, 
-        { 
-          ...assetDetailsMap.get(sale.assetToBeSold),
-          salePrice: sale.price
-        }
-      ]));
-      
-      orders.orders.forEach(order => {
-        order.assets = order.saleAddresses.map(saleAddress => {
-          const assetToBeSold = sales.find(sale => sale.address === saleAddress)?.assetToBeSold;
-          return assetLookup.get(assetToBeSold);
-        }).filter(asset => asset !== undefined);
-      });
-  
+
       return orders.orders;
     };
     
