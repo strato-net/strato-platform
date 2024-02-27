@@ -118,7 +118,7 @@ abstract contract Asset is Utils {
     }
 
     // Updated function to remove a sale from the whitelist
-    function closeSale() internal fromSale("close sale") {
+    function closeSale() public fromSale("close sale") {
         close();
     }
 
