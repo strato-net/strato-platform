@@ -11,7 +11,7 @@ import {
   InputNumber,
   List,
 } from "antd";
-import { HeartOutlined, HeartFilled } from '@ant-design/icons';
+import { HeartTwoTone, HeartFilled } from '@ant-design/icons';
 import { useMatch } from "react-router-dom";
 import { actions } from "../../contexts/inventory/actions";
 import {
@@ -64,6 +64,8 @@ const ProductDetails = ({ user, users }) => {
   // For Wishlist Icon Rendering
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [availableQuantity, setAvailableQuantity] = useState(1);
+  const shouldShowWishlistIcon = isAuthenticated && user;
+
   const [qty, setQty] = useState(1);
   const dispatch = useInventoryDispatch();
   const categoryDispatch = useCategoryDispatch();
@@ -367,7 +369,12 @@ const ProductDetails = ({ user, users }) => {
                   <img width={"100%"} className="object-contain rounded-md h-full " src={image_placeholder} />
                 </div></>}
               </Carousel>
-              <div className=" w-full lg:w-1/2 ">
+              <div className=" w-full lg:w-1/2">
+                {shouldShowWishlistIcon && (
+                  <div className="flex justify-end">
+                      {isWishlisted ? <HeartFilled className="cursor-pointer" onClick={toggleWishlist} style={{fontSize: "20px", color: "#A15E49"}} /> : <HeartTwoTone className="cursor-pointer" onClick={toggleWishlist} style={{ fontSize: "20px" }} twoToneColor="#A15E49"/>}
+                  </div>
+                )}
                 <div className=" lg:border-b lg:border-[#E9E9E9] pb-[6px]">
                   <Text className="font-semibold text-base lg:text-3xl text-[#202020]">
 
@@ -407,9 +414,6 @@ const ProductDetails = ({ user, users }) => {
                   <Text level={4} className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold">
                     {details?.price ? <>${details?.price}</> : "No Price Available"}
                   </Text>
-                  <div onClick={toggleWishlist} style={{ cursor: 'pointer' }}>
-                    {isWishlisted ? <HeartFilled style={{ color: 'red' }} /> : <HeartOutlined />}
-                  </div>
                 </div>
 
                 {availableQuantity !== 0 ?

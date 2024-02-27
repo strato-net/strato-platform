@@ -1,5 +1,5 @@
-import { ShoppingCartOutlined } from '@ant-design/icons'
-import React, { useState } from "react";
+import { ShoppingCartOutlined, HeartFilled, HeartTwoTone } from '@ant-design/icons';
+import React, { useState, useEffect } from "react";
 import {
     Typography,
     Button,
@@ -20,12 +20,45 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
 
     let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
 
+    // For Wishlist Icon Rendering
+    const [isWishlisted, setIsWishlisted] = useState(false);
+    const shouldShowWishlistIcon = isAuthenticated && user;
+    
     const naviroute = routes.MarketplaceProductDetail.url;
     const navigate = useNavigate();
 
+    // This checks to see if an item is in the wishlist. This will help us render the correct icon
+    useEffect(() => {
+        const wishList = JSON.parse(localStorage.getItem('wishList')) || [];
+        const productInWishlist = wishList.some(product => product.address === topSellingProduct?.address);
+        setIsWishlisted(productInWishlist);
+    }, [topSellingProduct]);
+
+    const toggleWishlist = () => {
+        const wishList = JSON.parse(localStorage.getItem('wishList')) || [];
+        if (isWishlisted) {
+          // Remove product from wishlist
+          const updatedWishList = wishList.filter(product => product.address !== topSellingProduct.address);
+          localStorage.setItem('wishList', JSON.stringify(updatedWishList));
+          setIsWishlisted(false);
+        } else {
+          // Add product to wishlist
+          wishList.push(topSellingProduct);
+          localStorage.setItem('wishList', JSON.stringify(wishList));
+          setIsWishlisted(true);
+        }
+      };
+
+    
+
     return (
-        <div className={`trending_cards_container_card bg-white p-3 ${parent == 'Marketplace' ? 'min-w-[300px] w-auto' : 'min-w-[230px]'} min-w-[230px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}>
+        <div className={`relative trending_cards_container_card bg-white p-3 ${parent == 'Marketplace' ? 'min-w-[300px] w-auto' : 'min-w-[230px]'} min-w-[230px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}>
             {contextHolder}
+            {shouldShowWishlistIcon && (
+                <div onClick={toggleWishlist} className="absolute top-2 right-2 cursor-pointer hover:scale-110 transition-transform duration-200">
+                    {isWishlisted ? <HeartFilled style={{ fontSize: "20px", color: "#A15E49" }} /> : <HeartTwoTone style={{ fontSize: "20px" }} twoToneColor="#A15E49" />}
+                </div>
+            )}
             <a
                 href={`/marketplace${naviroute.replace(":address", topSellingProduct.address)}`}
                 onClick={(e) => {
