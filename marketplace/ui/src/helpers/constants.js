@@ -4,9 +4,9 @@ export const apiUrl = process.env.REACT_APP_URL
   ? process.env.REACT_APP_URL + "/api/v1"
   : "/api/v1";
 
-export const fileServerUrl = process.env.FILE_SERVER_URL
-  ? process.env.FILE_SERVER_URL
-  : "https://fileserver.mercata-testnet2.blockapps.net/highway/"; // TODO: Don't hardcode this here?
+export const fileServerUrl = window.FILE_SERVER_URL === '__FILE_SERVER_URL__'
+  ? 'https://fileserver.mercata-testnet2.blockapps.net/highway' // hardcoding for non-dockerized dev mode
+  : window.FILE_SERVER_URL;
 
 export const cirrusUrl = process.env.REACT_APP_URL
   ? process.env.REACT_APP_URL + "/cirrus/search"

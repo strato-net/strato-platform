@@ -41,10 +41,6 @@ describe("Marketplace Dapp - deploy secondary org", function() {
         config.deployFilename,
         "deployFilename is missing. Set in config"
     )
-    assert.isDefined(
-        config.orgDeployFilename,
-        "orgDeployFilename is missing. Set in config"
-    )
     
     MembershipStates = await getMembershipStates()
 
@@ -76,36 +72,4 @@ describe("Marketplace Dapp - deploy secondary org", function() {
 
 
 
-  /*
-  it.skip('Apply for membership to app and wait for approval', async () => {
-    const enodeAddress = await getCurrentEnode()
-    const requestArgs = {
-      orgCert,
-      enodeAddress,
-    }
-
-    const membership = await dapp.requestMembership(requestArgs)
-
-    // spin baby, spin!
-    const status = new Spinner(
-      'Membership request pending, please wait...',
-    )
-
-    status.start()
-    const result = await membership.waitTillProcessed() // global admin needs to approve
-    status.stop()
-
-
-    // write org deploy file
-    const orgDeployFilePath = `${config.configDirPath}/${config.orgDeployFilename}`
-    console.log(`Writing org info to ${orgDeployFilePath}`)
-    
-    const deployment = {
-      url: config.nodes[0].url,
-      orgAddress,
-      orgPubKey,
-    }
-    yamlWrite(deployment, orgDeployFilePath)
-  })
-  */
 })

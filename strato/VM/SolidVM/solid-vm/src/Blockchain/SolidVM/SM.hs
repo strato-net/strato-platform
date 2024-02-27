@@ -105,6 +105,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.UTF8 as UTF8
 import Data.Map (Map)
+import qualified Data.Map.Ordered as OMap
 import qualified Data.Map as M
 import Data.Maybe
 import qualified Data.NibbleString as N
@@ -413,7 +414,7 @@ startingAction maybeCode env' chainId' =
       _transactionHash = Env.txHash env',
       _transactionChainId = chainId',
       _transactionSender = Env.sender env',
-      _actionData = M.empty,
+      _actionData = OMap.empty,
       _metadata =
         case maybeCode of
           Just theCode ->
@@ -875,9 +876,20 @@ getXabiValueType (AccountPath loc path) = do
               (_, ContractTypo {}) -> todo "getValueType/contract access" t'
               (_, EnumTypo {}) -> todo "getValueType/enum acess" t'
       t'' -> t''
-    loop ccs (_ : rs) = \case
+    loop ccs (x : rs) = \case
       SVMType.Mapping {SVMType.value = t'} -> loop ccs rs t'
       SVMType.Array {SVMType.entry = t'} -> loop ccs rs t'
+      SVMType.UnknownLabel s _ ->
+        let t' = getTypeOfName' s ccs
+         in case (x, t') of
+              (MS.Field n, StructTypo fs) ->
+                let mt'' = lookup (textToLabel $ decodeUtf8 n) fs
+                 in case mt'' of
+                      Just t'' -> loop ccs rs $ CC.fieldTypeType t''
+                      Nothing -> missingField "field not present in struct definition" $ show (n, fs)
+              (_, StructTypo {}) -> typeError "non field access to struct" x
+              (_, ContractTypo {}) -> todo "getValueType/contract access" t'
+              (_, EnumTypo {}) -> todo "getValueType/enum acess" t'
       t -> todo "getXabiValueType/loopnext unsupported type" t
 
 getValueType :: MonadSM m => AccountPath -> m BasicType
@@ -897,7 +909,7 @@ initializeAction acct name appName hsh cc ab maps arrs = do
   -- org name to be set later, b/c the lookup is complex
   let newData = Action.ActionData (SolidVMCode name hsh) cc "" (T.pack appName) SolidVM (Action.SolidVMDiff M.empty) ab maps arrs []
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    Action.actionData %= M.insertWith Action.mergeActionData acct newData
+    Action.actionData %= Action.omapInsertWith Action.mergeActionData acct newData
 
 markDiffForAction :: Mod.Modifiable Action m => Account -> MS.StoragePath -> MS.BasicValue -> m ()
 markDiffForAction owner key' val' = do
@@ -907,7 +919,7 @@ markDiffForAction owner key' val' = do
         Action.SolidVMDiff m -> Action.SolidVMDiff $ M.insert key val m
         e -> internalError "SolidVM Diff executing in EVM" $ show e
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    Action.actionData . at owner . mapped . Action.actionDataStorageDiffs %= ins
+    Action.actionData . Action.omapLens owner . mapped . Action.actionDataStorageDiffs %= ins
 
 addEvent :: Mod.Modifiable (Q.Seq Event) m => Event -> m ()
 addEvent newEvent = Mod.modify_ (Mod.Proxy @(Q.Seq Event)) $ pure . (Q.|> newEvent)
@@ -937,8 +949,8 @@ getCodeAndCollection address' = do
           (current' : _) -> Just $ currentAccount current'
           _ -> Nothing
 
-  $logDebugS "getCodeAndCollection" . T.pack $ "----------------- caller address: " ++ fromMaybe "Nothing" (fmap format maybeAddress)
-  $logDebugS "getCodeAndCollection" . T.pack $ "----------------- callee address: " ++ format address'
+  -- $logDebugS "getCodeAndCollection" . T.pack $ "----------------- caller address: " ++ fromMaybe "Nothing" (fmap format maybeAddress)
+  -- $logDebugS "getCodeAndCollection" . T.pack $ "----------------- callee address: " ++ format address'
   if Just address' == maybeAddress
     then do
       c' <- getCurrentContract

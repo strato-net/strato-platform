@@ -99,6 +99,40 @@ const reducer = (state, action) => {
         error: action.error,
         isordersLoading: false,
       };
+    case actionDescriptors.fetchAllOrders:
+      return {
+        ...state,
+        isAllOrdersLoading: true,
+      };
+    case actionDescriptors.fetchAllOrdersSuccessful:
+      return {
+        ...state,
+        allOrders: action.payload,
+        isAllOrdersLoading: false,
+      };
+    case actionDescriptors.fetchAllOrdersFailed:
+      return {
+        ...state,
+        error: action.error,
+        isAllOrdersLoading: false,
+      };
+    case actionDescriptors.fetchSaleQuantity:
+      return {
+        ...state, 
+        saleQuantityLoading: true,
+      };
+      case actionDescriptors.fetchSaleQuantitySuccessful:
+        return {
+          ...state,
+          saleQuantity: action.payload,
+          saleQuantityLoading: false,
+        };
+      case actionDescriptors.fetchSaleQuantityFailed:
+        return {
+          ...state, 
+          error: action.error,
+          saleQuantityLoading: false,
+        };
     case actionDescriptors.updateOrderStatus:
       return {
         ...state,

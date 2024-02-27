@@ -66,6 +66,7 @@ import qualified Data.ByteString.Char8 as BC
 import Data.Foldable hiding (fold)
 import Data.List
 import qualified Data.Map as M
+import qualified Data.Map.Ordered as OMap
 import Data.Maybe
 import Data.Proxy
 import qualified Data.Set as S
@@ -264,12 +265,12 @@ outputNewChains = traverse_ $ \(cId, cInfo, bHash, execr) -> do
   let org = fromMaybe "" $ do
         e <- listToMaybe execr
         a <- erAction e
-        d <- listToMaybe . M.toList $ a ^. Action.actionData
+        d <- listToMaybe . OMap.assocs $ a ^. Action.actionData
         pure $ d ^. _2 . Action.actionDataOrganization
       app = fromMaybe "" $ do
         e <- listToMaybe execr
         a <- erAction e
-        d <- listToMaybe . M.toList $ a ^. Action.actionData
+        d <- listToMaybe . OMap.assocs $ a ^. Action.actionData
         pure $ d ^. _2 . Action.actionDataApplication
   yield $ OutToStateDiff cId cInfo bHash org app
   for_ (catMaybes $ erAction <$> execr) $ yield . OutAction
