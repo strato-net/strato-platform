@@ -66,7 +66,13 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
         { label: <div id="Orders">Orders</div>, key: '1' },
         { label: <div id="Inventory">My Store</div>, key: '2' }
       ]
-    }
+    },
+    {
+      role: 1,
+      items: [
+        { label: <div id="Marketplace">Marketplace</div>, key: '0' },
+      ]
+    },
   ];
 
   const navUrls = [
