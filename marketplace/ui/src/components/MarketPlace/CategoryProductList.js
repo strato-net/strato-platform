@@ -11,6 +11,7 @@ import {
   Avatar,
   Input,
   notification,
+  Pagination,
 } from "antd";
 import { CloseOutlined, DeleteOutlined } from "@ant-design/icons";
 // Actions
@@ -32,10 +33,11 @@ import NewTrendingCard from "./NewTrendingCard";
 import { Images } from "../../images";
 import './index.css'
 import { actions as orderActions } from "../../contexts/order/actions"
-import { useOrderDispatch} from "../../contexts/order";
+import { useOrderDispatch } from "../../contexts/order";
 
 const { Panel } = Collapse;
 const { Text } = Typography;
+const limit = 10;
 
 const CategoryProductList = ({ user }) => {
 
@@ -48,6 +50,7 @@ const CategoryProductList = ({ user }) => {
   const minPriceQuery = queryParams.get('minPrice') || 0;
   const maxPriceQuery = queryParams.get('maxPrice') || MAX_PRICE;
   const categoryQueryValueArr = categoryQueryValue ? categoryQueryValue.split(',') : []
+  const pageQueryValue = queryParams.get('page') || 1;
 
   const [api, contextHolder] = notification.useNotification();
   // States
@@ -59,8 +62,11 @@ const CategoryProductList = ({ user }) => {
   const [uniqueProductNames, setUniqueProductNames] = useState([]);
   const [desktopOpenFilter, setDesktopOpenFilter] = useState(true);
   const [mobileOpenFilter, setMobileOpenFilter] = useState(false);
-  const [search, setSearch] = useState(searchQueryValue)
-  const [unSelected, setUnSelected] = useState([])
+  const [search, setSearch] = useState(searchQueryValue);
+  const [unSelected, setUnSelected] = useState([]);
+  const [page, setPage] = useState(pageQueryValue);
+  const total = 50;
+  const offset = limit * (page-1);
 
   //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
@@ -68,7 +74,7 @@ const CategoryProductList = ({ user }) => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const orderDispatch = useOrderDispatch();
   // states
-  const { marketplaceList, isMarketplaceLoading } = useMarketplaceState();
+  const { marketplaceList, isMarketplaceLoading, marketplaceListCount } = useMarketplaceState();
   const { categorys } = useCategoryState();
   let { hasChecked, isAuthenticated } = useAuthenticateState();
   const { subCategorys } = useSubCategoryState();
@@ -161,7 +167,9 @@ const CategoryProductList = ({ user }) => {
         arrayToStr(selectedSubCategories),
         minPriceQuery,
         maxPriceQuery,
-        searchQueryValue
+        searchQueryValue,
+        limit,
+        offset
       );
     } else if (hasChecked && isAuthenticated) {
       marketplaceActions.fetchMarketplaceLoggedIn(
@@ -170,7 +178,9 @@ const CategoryProductList = ({ user }) => {
         arrayToStr(selectedSubCategories),
         minPriceQuery,
         maxPriceQuery,
-        searchQueryValue
+        searchQueryValue,
+        limit,
+        offset
       );
     }
   }, [
@@ -180,7 +190,8 @@ const CategoryProductList = ({ user }) => {
     maxPriceQuery,
     hasChecked,
     isAuthenticated,
-    searchQueryValue
+    searchQueryValue,
+    page
   ]);
 
   // useEffect(() => {
@@ -205,6 +216,7 @@ const CategoryProductList = ({ user }) => {
       }
       baseUrl.searchParams.set('minPrice', minPrice);
       baseUrl.searchParams.set('maxPrice', maxPrice);
+      baseUrl.searchParams.set('page', page);
 
       const url = baseUrl.pathname + baseUrl.search;
       navigate(url, { replace: true });
@@ -213,7 +225,7 @@ const CategoryProductList = ({ user }) => {
     return () => {
       clearTimeout(timeOut);
     };
-  }, [search, minPrice, maxPrice]);
+  }, [search, minPrice, maxPrice, page]);
 
   //=========================Other functions===============================//
 
@@ -311,7 +323,9 @@ const CategoryProductList = ({ user }) => {
     }
   };
   
-  
+  const onPageChange = (page) => {
+    setPage(page)
+  }
 
   const openToast = (placement, isError, msg) => {
     let msgObj = {
@@ -533,7 +547,7 @@ const CategoryProductList = ({ user }) => {
         <div className="flex items-center ml-4 mt-2 md:ml-14 md:hidden">
           <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
           <Text className="text-gray-800 ml-1 text-sm font-normal">
-            {marketplaceList?.length} Results
+            {marketplaceListCount} Results
           </Text>
         </div>
       </div>
@@ -547,7 +561,7 @@ const CategoryProductList = ({ user }) => {
           <div className="hidden md:flex mt-4 items-center">
             <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
             <Text className="text-gray-800 ml-1 text-xl font-semibold">
-              {isLoading ? <Spin spinning={isLoading} size="small" /> : marketplaceList?.length} Results
+              {isLoading ? <Spin spinning={isLoading} size="small" /> : marketplaceListCount} Results
             </Text>
           </div>
           {isLoading ?
@@ -557,7 +571,7 @@ const CategoryProductList = ({ user }) => {
             :
             <div>
               {marketplaceList?.length > 0 ? (
-
+              <>
                 <div className={`mt-[61px] md:mt-4 mb-8 flex w-full md:grid flex-col items-center ${desktopOpenFilter ? "grid-cols-1 gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 4xl:grid-cols-5 lg:gap-14 xl:gap-x-10 2xl:gap-x-20" : " sm:grid-cols-1 gap-4 md:grid-cols-2 md:gap-14 lg:grid-cols-3 lg:gap-16 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 5xl:grid-cols-7"}`} id="product-list">
                   {marketplaceList
                     // .filter(product => product.saleQuantity > 0)
@@ -573,8 +587,15 @@ const CategoryProductList = ({ user }) => {
                         />
                       );
                     })}
-
                 </div>
+                  <Pagination
+                    current={page}
+                    onChange={onPageChange}
+                    total={marketplaceListCount}
+                    showSizeChanger={false}
+                    className="flex justify-center my-5 "
+                  />
+                </>
               ) : (
                 <div className="h-96 flex justify-center items-center" id="product-list">
                   No data found
