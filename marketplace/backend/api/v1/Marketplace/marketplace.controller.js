@@ -87,7 +87,7 @@ class MarketplaceController {
   static async getTopSellingProductsLoggedIn(req, res, next) {
     try {
       const { dapp, query } = req
-      const inventories = await dapp.getTopSellingProductsLoggedIn({ ...query })
+      const inventories = await dapp.getTopSellingProductsLoggedIn({ ...query,ownerCommonName: usersArr })
       const productsWithImageUrl = inventories.sort((a, b) => {
         return b.saleDate.localeCompare(a.saleDate);
       });
