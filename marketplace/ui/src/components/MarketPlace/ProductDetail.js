@@ -320,7 +320,7 @@ const ProductDetails = ({ user, users }) => {
                   <Paragraph level={4} className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold">
                     {details?.price ? <>${details?.price}</> : "No Price Available"}
                   </Paragraph>
-                  {isAvailableForSale && <Text type="danger" strong> Currently unavailable </Text>}
+                  {isAvailableForSale && <Text type="danger" strong> Sold Out </Text>}
                 </div>
 
                 {availableQuantity !== 0 ?
