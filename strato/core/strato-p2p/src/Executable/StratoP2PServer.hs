@@ -139,7 +139,7 @@ runEthServerConduit ::
   ConduitM () P2pEvent m () ->
   String ->
   m (Maybe SomeException)
-runEthServerConduit p pSource pSink seqSrc peerStr = do
+runEthServerConduit p pSource pSink seqSrc peerStr = labelTheThread (peerStr ++ "/runEthServerConduit") $ do
   myPubKey' <- getPub
   let myPubkey = secPubKeyToPoint myPubKey'
       otherPubKey = fromMaybe (error "programmer error: runEthServerConduit was called without a pubkey") $ pPeerPubkey p
@@ -148,21 +148,21 @@ runEthServerConduit p pSource pSink seqSrc peerStr = do
     Nothing -> pure $ Just $ toException $ HandshakeException "handshake timed out"
     Just (_, (outCtx, inCtx)) -> do
       fmap (either Just (const Nothing)) . try $
-        [ labelTheThread ("peerSourceConduit: " ++ peerStr) $
+        [ labelTheThread ("peerStr" ++ "/peerSourceConduit") $
           pSource
           .| ethDecrypt inCtx
           .| CL.iterM (recordTraffic Inbound)
           .| bytesToMessages
           .| CL.iterM (displayMessage Inbound peerStr)
           .| CL.map MsgEvt
-        , labelTheThread ("seqEventSource: " ++ peerStr) $
+        , labelTheThread (peerStr ++ "/seqEventSource") $
           seqSrc
           .| CL.map NewSeqEvent
-        , labelTheThread ("timerSource: " ++ peerStr) $
+        , labelTheThread (peerStr ++ "/timerSource") $
           timerSource
         ] `mergeConnect` (
         CL.iterM recordEvent
-          .| labelTheThread ("handleMsgServerConduit: " ++ peerStr) (handleMsgServerConduit myPubkey p)
+          .| labelTheThread (peerStr ++ "handleMsgServerConduit") (handleMsgServerConduit myPubkey p)
           .| debounceTxSendsAndUnseq
           .| CL.iterM recordMessage
           .| CL.iterM (displayMessage Outbound peerStr)
@@ -176,7 +176,7 @@ stratoP2PServer ::
   (MonadP2P n, RunsServer n (LoggingT IO)) =>
   PeerRunner n (LoggingT IO) () ->
   LoggingT IO ()
-stratoP2PServer runner = do
+stratoP2PServer runner = labelTheThread "stratoP2PServer" $ do
   $logInfoS "stratoP2PServer" $ T.pack $ "connect address: " ++ flags_address
   $logInfoS "stratoP2PServer" $ T.pack $ "listen port:     " ++ show flags_listen
   runEthServer flags_listen runner

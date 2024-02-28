@@ -8,6 +8,7 @@ module Blockchain.TCPClientWithTimeout
   )
 where
 
+import Blockchain.Threads
 import Control.Exception.Lifted (throw)
 import Control.Monad.IO.Class
 import Control.Monad.IO.Unlift
@@ -29,16 +30,16 @@ runTCPClientWithConnectTimeout ::
   Double ->
   (AppData -> m ()) ->
   m ()
-runTCPClientWithConnectTimeout settings secs cont = do
+runTCPClientWithConnectTimeout settings secs cont = labelTheThread "runTCPClientWithConnectTimeout" $ do
   race <- liftIO newChan
   resultMVar <- liftIO newEmptyMVar
 
-  timerThreadID <- forkIO $
+  timerThreadID <- forkIO $ labelTheThread "TCP connect timer thread" $ 
     liftIO $ do
       threadDelaySeconds secs
       writeChan race False
 
-  clientThreadID <- forkIO $ do
+  clientThreadID <- forkIO $ labelTheThread "TCP connect" $ do
     result <-
       try $
         runGeneralTCPClient settings $ \appData -> do
