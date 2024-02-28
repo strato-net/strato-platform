@@ -5,7 +5,7 @@ export CONFIG_DIR_PATH=/config
 export DEPLOY_FILE_NAME=marketplace.deploy.yaml
 export STRATO_NODE_PROTOCOL=${STRATO_NODE_PROTOCOL:-http}
 export STRATO_NODE_HOST=${STRATO_NODE_HOST:-nginx}
-export BASE_CODE_COLLECTION=${BASE_CODE_COLLECTION:-d736617f2bf25b636949623420ed16cc44ef665a} # Current deployment address on testnet2
+export BASE_CODE_COLLECTION=${BASE_CODE_COLLECTION:-8ee24403fbd1f24537a2b96e9022c42eb4b4d79c} # Current deployment address on testnet2
 export STRATO_HOSTNAME=${STRATO_HOSTNAME:-strato}
 export STRATO_PORT_API=${STRATO_PORT_API:-3000}
 
