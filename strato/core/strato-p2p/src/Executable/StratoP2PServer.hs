@@ -31,7 +31,6 @@ import Blockchain.RLPx
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Model.Secp256k1
-import Blockchain.TCPClientWithTimeout
 import Blockchain.Threads
 import Blockchain.TimerSource
 import Conduit
@@ -105,10 +104,6 @@ ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
                     lengthenPeerDisable p
                   e' | Just PeerDisconnected <- fromException e' -> do
                     disErr <- storeDisableException p (T.pack "PeerDisconnected")
-                    whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
-                    lengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) p
-                  e' | Just TimeoutException <- fromException e' -> do
-                    disErr <- storeDisableException p (T.pack "TimeoutException")
                     whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
                     lengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) p
                   e' | Just NoPeerCertificate <- fromException e' -> do
