@@ -421,7 +421,7 @@ async function getAll(admin, args = {}, defaultOptions) {
         });
     }
 
-    return finalInventory ? finalInventory.map((inventory) => marshalOut(inventory)) : undefined;
+    return inventories ? inventories.map((inventory) => marshalOut(inventory)) : undefined;
 }
 
 

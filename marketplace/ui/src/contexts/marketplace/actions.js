@@ -149,7 +149,7 @@ const actions = {
     offset
   ) => {
     dispatch({ type: actionDescriptors.fetchMarketplace });
-
+    const joinQuery = `join=*,BlockApps-Mercata-Sale(*)`
     const categoryQuery = categorys ? `&category[]=${categorys}` : "";
 
     const subCategoryQuery = subCategorys
@@ -170,7 +170,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace?${priceQuery}${categoryQuery}${subCategoryQuery}${searchQuery}${pageQuery}`,
+        `${apiUrl}/marketplace?${joinQuery}${priceQuery}${categoryQuery}${subCategoryQuery}${searchQuery}${pageQuery}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -222,7 +222,7 @@ const actions = {
     offset
   ) => {
     dispatch({ type: actionDescriptors.fetchMarketplaceLoggedIn });
-
+    const joinQuery = `join=*,BlockApps-Mercata-Sale(*)`
     const categoryQuery = categorys ? `&category[]=${categorys}` : "";
 
     const subCategoryQuery = subCategorys
@@ -243,7 +243,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace/all?${priceQuery}${categoryQuery}${subCategoryQuery}${searchQuery}${pageQuery}`,
+        `${apiUrl}/marketplace/all?${joinQuery}${priceQuery}${categoryQuery}${subCategoryQuery}${searchQuery}${pageQuery}`,
         {
           method: HTTP_METHODS.GET,
         }

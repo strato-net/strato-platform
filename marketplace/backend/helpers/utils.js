@@ -91,10 +91,10 @@ export const search = async (contractName, args, options, user) => {
   const searchOptions = {
     ...options,
     query: {
+      ...queryOptions,
       limit: limit || constants.searchLimit,
       offset: offset || 0,
       ...(order ? { order } : {}),
-      ...queryOptions,
     },
   }
 
@@ -147,6 +147,12 @@ export const setSearchQueryOptions = (args = {}, _queryOptionsArray) => {
   const queryOptionsArray = Array.isArray(_queryOptionsArray) ? _queryOptionsArray : [_queryOptionsArray]
   const queryOptions = queryOptionsArray.reduce((agg, cur) => {
     const { key, value, predicate = 'eq' } = cur
+    if (key === 'join') {
+      return {
+        ...agg,
+        ['select']: `*,BlockApps-Mercata-Sale(*)`
+      }
+    }
     if (key === 'order') {
       return {
         ...agg,
