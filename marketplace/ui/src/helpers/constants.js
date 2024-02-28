@@ -142,7 +142,8 @@ export const ORDER_STATUS = {
   "AWAITING_SHIPMENT": 2,
   "CLOSED": 3,
   "CANCELED": 4,
-  "PAYMENT_PENDING": 5
+  "PAYMENT_PENDING": 5,
+  "PAID": 6
 }
 
 export const PAYMENT_LIST = ['card','us_bank_account']
