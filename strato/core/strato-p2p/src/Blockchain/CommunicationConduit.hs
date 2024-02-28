@@ -32,7 +32,6 @@ import Blockchain.Sequencer.Event
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Model.Options (computeNetworkID)
 import Blockchain.Strato.Model.Util
-import Blockchain.Threads
 import Conduit
 import Control.Monad (forever, when)
 import qualified Control.Monad.Change.Modify as Mod
@@ -59,7 +58,7 @@ blockstanbulVersion = 1
 
 
 debounceTxSendsAndUnseq :: (MonadIO m, m `Mod.Outputs` [IngestEvent]) => ConduitT (Either P2PCNC Message) Message m ()
-debounceTxSendsAndUnseq = labelTheThread "debounceTxSendsAndUnseq" $ do
+debounceTxSendsAndUnseq = do
   txq <- atomically newTQueue
   awaitForever $ \case
     Right (W.Transactions txs) -> do
