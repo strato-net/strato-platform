@@ -5,7 +5,7 @@ export CONFIG_DIR_PATH=/config
 export DEPLOY_FILE_NAME=marketplace.deploy.yaml
 export STRATO_NODE_PROTOCOL=${STRATO_NODE_PROTOCOL:-http}
 export STRATO_NODE_HOST=${STRATO_NODE_HOST:-nginx}
-export BASE_CODE_COLLECTION=${BASE_CODE_COLLECTION:-8d01ec20264040b7e6907453ed3d8ccd242caae4} # Current deployment address on testnet2
+export BASE_CODE_COLLECTION=${BASE_CODE_COLLECTION:-53c1743d063af5c5759541791a9d0a58a61d7095} # Current deployment address on testnet2
 
 echo "Waiting for STRATO to become available at ${STRATO_NODE_PROTOCOL}://${STRATO_NODE_HOST}/health ..."
 until curl --silent --output /dev/null --fail --location ${STRATO_NODE_PROTOCOL}://${STRATO_NODE_HOST}/health ; do sleep 0.5 ; done
