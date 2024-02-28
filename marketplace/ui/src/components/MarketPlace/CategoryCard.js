@@ -21,7 +21,6 @@ const CategoryCard = () => {
     Images["membership_card"],
   ];
 
-
   return (
     <>
       <Title className="md:px-10 !text-xl md:!text-4xl !text-left py-2">
@@ -33,21 +32,23 @@ const CategoryCard = () => {
             <div
               id={category.name}
               key={index}
-              className=" w-[162px] md:w-[210px] 2xl:w-[248px] h-[160px] md:h-[180px] 2xl:h-[200px] border border-tertiaryB shadow-category rounded-lg cursor-pointer"
+              className="transition-transform duration-500 hover:scale-110 w-[162px] md:w-[210px] 2xl:w-[248px] h-[160px] md:h-[180px] 2xl:h-[200px] border border-tertiaryB shadow-category rounded-lg cursor-pointer"
               onClick={() => {
                 navigate(`${naviroute}?category=${category.name}`);
-                window.LOQ.push(['ready', async LO => {
-                  // Track an event
-                  await LO.$internal.ready('events')
-                  LO.events.track(`Homepage Filter - ${category.name}`)
-                }])
+                window.LOQ.push([
+                  "ready",
+                  async (LO) => {
+                    // Track an event
+                    await LO.$internal.ready("events");
+                    LO.events.track(`Homepage Filter - ${category.name}`);
+                  },
+                ]);
                 TagManager.dataLayer({
                   dataLayer: {
-                    event: `${category.name}_filter_homepage`
+                    event: `${category.name}_filter_homepage`,
                   },
                 });
-              }
-              }
+              }}
             >
               <div className="flex flex-col">
                 <img
@@ -55,11 +56,13 @@ const CategoryCard = () => {
                   className="rounded-t-lg px-[9px] py-[6px] lg:px-[0px] lg:py-[0px] h-[110px] md:h-[125px] 2xl:h-[140px]"
                   preview={false}
                 />
+
                 <div className="py-2 xl:py-3 flex justify-center md:justify-start ">
-                  <Text type="secondary" className="text-lg md:text-xl lg:text-2xl !text-primaryB font-semibold" >
-                    <span className="p-3 font-sans">
-                      {category.name}
-                    </span>
+                  <Text
+                    type="secondary"
+                    className="text-lg md:text-xl lg:text-2xl !text-primaryB font-semibold"
+                  >
+                    <span className="p-3 font-sans">{category.name}</span>
                   </Text>
                 </div>
               </div>
