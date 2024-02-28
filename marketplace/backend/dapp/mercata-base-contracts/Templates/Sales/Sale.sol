@@ -48,17 +48,17 @@ abstract contract Sale is Utils {
     modifier requireSellerOrBuyer(string action) {
         string sellersCommonName = assetToBeSold.ownerCommonName();
         Order order = Order(msg.sender);
-        string purchasersAddress = order.purchasersAddress();
+        address purchasersCommonName = order.purchasersCommonName();
         string err = "Only "
                    + sellersCommonName
-                   + ","
-                   + purchasersAddress
+                   + ", "
+                   + purchasersCommonName
                    + " can perform "
                    + action
                    + ".";
         string commonName = getCommonName(tx.origin);
 
-        require((tx.origin == purchasersAddress || commonName == sellersCommonName), err);
+        require((commonName == purchasersCommonName || commonName == sellersCommonName), err);
 
     }    
 

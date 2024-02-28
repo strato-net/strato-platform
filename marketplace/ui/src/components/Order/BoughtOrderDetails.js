@@ -268,7 +268,7 @@ const BoughtOrderDetails = ({ user, users }) => {
     } else if (status === "Closed") {
       bgClass = "bg-[#119B2D]";
     } else if (status === "Paid") {
-      textClass = "bg-[#119B2D33]";
+      textClass = "bg-[#119B2D]";
     } else if (status === "Canceled") {
       bgClass = "bg-[#FF0000]";
     }

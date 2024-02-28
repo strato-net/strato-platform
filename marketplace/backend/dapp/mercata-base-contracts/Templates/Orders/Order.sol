@@ -133,7 +133,7 @@ abstract contract Order is Utils {
 
     function onCancel(string _comments) internal virtual {}
 
-    function cancelOrder(string _comments) external returns (uint) {
+    function cancelOrder(string _comments)  returns (uint) {
         require(status != OrderStatus.CLOSED && status != OrderStatus.CANCELED, "Order already closed.");
         require((tx.origin == purchasersAddress || getCommonName(tx.origin) == sellersCommonName), "Only the purchaser/seller can cancel the order");
         onCancel(_comments);
