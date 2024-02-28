@@ -128,6 +128,10 @@ const CategoryProductList = ({ user }) => {
       else{ return item }
     }).map(item => item.contract)
 
+    // The state variable unSelectedSubCat tracks the deselected subcategories. 
+    // Initially, all subcategories are stored as selected, which occurs when a new category is chosen. 
+    // In this context, if both "CarbonDAO" and "CarbonOffset" 
+    // are found within unSelectedSubCat, the "Carbon" category is also deselected.
     if(unSelectedSubCat.includes("CarbonDAO") && unSelectedSubCat.includes("CarbonOffset")){
       const baseUrl = new URL('/category', window.location.origin);
       const categoryData = selectedCategories.filter(item=>item!=="Carbon")
@@ -182,16 +186,6 @@ const CategoryProductList = ({ user }) => {
     isAuthenticated,
     searchQueryValue
   ]);
-
-  // useEffect(() => {
-  //   if (marketplaceList?.length > 0) {
-  //     const uniqueNames = marketplaceList.map((p) => p.name)
-  //       .filter(
-  //         (name, index, arr) => arr.indexOf(name) == index
-  //       );
-  //     setUniqueProductNames(uniqueNames);
-  //   }
-  // }, [marketplaceList]);
 
   useEffect(() => {
     const timeOut = setTimeout(() => {
