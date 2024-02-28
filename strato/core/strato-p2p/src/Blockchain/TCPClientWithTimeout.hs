@@ -30,7 +30,7 @@ runTCPClientWithConnectTimeout ::
   Double ->
   (AppData -> m ()) ->
   m ()
-runTCPClientWithConnectTimeout settings secs cont = labelTheThread "runTCPClientWithConnectTimeout" $ do
+runTCPClientWithConnectTimeout settings secs cont = do
   race <- liftIO newChan
   resultMVar <- liftIO newEmptyMVar
 

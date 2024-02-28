@@ -59,6 +59,7 @@ getPeersByThreads = do
 
 summarizeThreadState :: [String] -> String
 summarizeThreadState ["handleMsgClientConduit","peerSourceConduit","runPeer","seqEventSource","timerSource"] = "CONNECTED"
+summarizeThreadState ["handleMsgServerConduit","peerSourceConduit","runEthServerConduit","seqEventSource","timerSource"] = "CONNECTED"
 summarizeThreadState [v] | "runPeer disconnecting" `isPrefixOf` v =
                            let (_, reason) = break (==':') v
                            in "DISCONNECTING" ++ reason

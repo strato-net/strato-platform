@@ -148,7 +148,7 @@ runEthServerConduit p pSource pSink seqSrc peerStr = labelTheThread (peerStr ++ 
     Nothing -> pure $ Just $ toException $ HandshakeException "handshake timed out"
     Just (_, (outCtx, inCtx)) -> do
       fmap (either Just (const Nothing)) . try $
-        [ labelTheThread ("peerStr" ++ "/peerSourceConduit") $
+        [ labelTheThread (peerStr ++ "/peerSourceConduit") $
           pSource
           .| ethDecrypt inCtx
           .| CL.iterM (recordTraffic Inbound)
@@ -162,7 +162,7 @@ runEthServerConduit p pSource pSink seqSrc peerStr = labelTheThread (peerStr ++ 
           timerSource
         ] `mergeConnect` (
         CL.iterM recordEvent
-          .| labelTheThread (peerStr ++ "handleMsgServerConduit") (handleMsgServerConduit myPubkey p)
+          .| labelTheThread (peerStr ++ "/handleMsgServerConduit") (handleMsgServerConduit myPubkey p)
           .| debounceTxSendsAndUnseq
           .| CL.iterM recordMessage
           .| CL.iterM (displayMessage Outbound peerStr)
