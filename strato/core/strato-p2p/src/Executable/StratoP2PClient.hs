@@ -35,7 +35,6 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.UDP
 import           Blockchain.Strato.Model.Secp256k1
-import           Blockchain.TCPClientWithTimeout
 import           Blockchain.Threads
 import           Blockchain.TimerSource
 import           Control.Concurrent hiding (yield)
@@ -234,10 +233,6 @@ stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main l
             lengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) thePeer
           e' | Just PeerNonResponsive <- fromException e' -> do
             disErr <- storeDisableException thePeer (T.pack "PeerNonResponsive")
-            whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
-            lengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) thePeer
-          e' | Just TimeoutException <- fromException e' -> do
-            disErr <- storeDisableException thePeer (T.pack "TimeoutException")
             whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
             lengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) thePeer
           e' | Just NoPeerCertificate <- fromException e' -> do
