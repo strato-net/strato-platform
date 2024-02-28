@@ -48,7 +48,7 @@ abstract contract Sale is Utils {
     modifier requireSellerOrBuyer(string action) {
         string sellersCommonName = assetToBeSold.ownerCommonName();
         Order order = Order(msg.sender);
-        address purchasersCommonName = order.purchasersCommonName();
+        string purchasersCommonName = order.purchasersCommonName();
         string err = "Only "
                    + sellersCommonName
                    + ", "
