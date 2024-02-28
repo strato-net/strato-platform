@@ -58,7 +58,7 @@ abstract contract Sale is Utils {
                    + ".";
         string commonName = getCommonName(tx.origin);
 
-        require((commonName == purchasersAddress || commonName == sellersCommonName), err);
+        require((commonName == purchasersCommonName || commonName == sellersCommonName), err);
 
     }
 
