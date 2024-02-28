@@ -27,7 +27,7 @@ const ProcessingOrder = ({user}) => {
   // const { cartList } = useMarketplaceState();
   const marketplaceDispatch = useMarketplaceDispatch();
   const [error, seterror] = useState(null)
-  const { message, success } = useOrderState();
+  const { order, message, success } = useOrderState();
   const [api, contextHolder] = notification.useNotification();
 
 
@@ -82,7 +82,7 @@ const ProcessingOrder = ({user}) => {
             if (body.data["payment_status"] === "paid") {
               const customerEmail = user.email;
               const cart = JSON.parse(body.data.metadata.cart);
-              let object = { paymentSessionId: sessionId, status:ORDER_STATUS.AWAITING_FULFILLMENT, paymentMethod: body.data.payment_method, ...cart };
+              let object = { paymentSessionId: sessionId, status:ORDER_STATUS.PAID, paymentMethod: body.data.payment_method, ...cart };
               handleOrderConfirm(object, customerEmail);
             }
             else if (body.data["payment_method_options"].hasOwnProperty("us_bank_account")) {
@@ -231,6 +231,7 @@ const ProcessingOrder = ({user}) => {
 
   return <div>
     {contextHolder}
+    {console.log(order)}
     <div className="h-96 flex flex-col justify-center items-center">
       <Spin spinning={true} size="large" />
       <p className="mt-4">Please wait while your order is placed successfully</p>
