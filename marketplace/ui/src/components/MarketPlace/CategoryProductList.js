@@ -390,6 +390,8 @@ const CategoryProductList = ({ user }) => {
     </Collapse>
   }
 
+  const maxPriceValue = maxPrice == MAX_PRICE ? null : maxPrice;
+
   const PriceFilterComponent = () =>
     <Panel header={<Text strong className="text-base">Price ($)</Text>} key="1">
       <Space>
@@ -397,7 +399,7 @@ const CategoryProductList = ({ user }) => {
           e === null ? setMinPrice(0) : setMinPrice(e)
         }} />
         -
-        <InputNumber size="large" controls={false} className="w-full" min={minPrice} prefix='$' value={maxPrice} placeholder="max" onChange={(e) => {
+        <InputNumber size="large" controls={false} className="w-full" min={minPrice} prefix='$' value={maxPriceValue} placeholder="max" onChange={(e) => {
           e === null ? setMaxPrice(MAX_PRICE) : setMaxPrice(e)
         }} />
       </Space>
