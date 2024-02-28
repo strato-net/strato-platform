@@ -27,7 +27,7 @@ const ProcessingOrder = ({user}) => {
   // const { cartList } = useMarketplaceState();
   const marketplaceDispatch = useMarketplaceDispatch();
   const [error, seterror] = useState(null)
-  const { order, message, success } = useOrderState();
+  const { message, success } = useOrderState();
   const [api, contextHolder] = notification.useNotification();
 
 
@@ -232,7 +232,6 @@ const ProcessingOrder = ({user}) => {
 
   return <div>
     {contextHolder}
-    {console.log(order)}
     <div className="h-96 flex flex-col justify-center items-center">
       <Spin spinning={true} size="large" />
       <p className="mt-4">Please wait while your order is being processed</p>
