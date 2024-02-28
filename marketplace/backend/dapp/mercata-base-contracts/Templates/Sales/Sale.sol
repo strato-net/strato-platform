@@ -45,6 +45,23 @@ abstract contract Sale is Utils {
         require(commonName == sellersCommonName, err);
     }
 
+    modifier requireSellerOrBuyer(string action) {
+        string sellersCommonName = assetToBeSold.ownerCommonName();
+        Order order = Order(msg.sender);
+        string purchasersAddress = order.purchasersAddress();
+        string err = "Only "
+                   + sellersCommonName
+                   + ","
+                   + purchasersAddress
+                   + " can perform "
+                   + action
+                   + ".";
+        string commonName = getCommonName(tx.origin);
+
+        require((tx.origin == purchasersAddress || commonName == sellersCommonName), err);
+
+    }
+
     function changePrice(uint _price) public requireSeller("change price"){
         price=_price;
     }
@@ -81,7 +98,7 @@ abstract contract Sale is Utils {
     }
 
     function completeSale(
-    ) public requireSeller("complete sale") returns (uint) {
+    ) public requireSellerOrBuyer("complete sale") returns (uint) {
         Order order = Order(msg.sender);
         address purchaser = order.purchasersAddress();
         uint orderQuantity = takeLockedQuantity(msg.sender);
