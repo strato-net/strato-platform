@@ -13,7 +13,6 @@ import BlockApps.Logging
 import Blockchain.Event
 import Blockchain.P2PRPC
 import Blockchain.P2PUtil
-import Blockchain.Threads
 import Conduit
 import Control.Concurrent (threadDelay)
 import Control.Monad
@@ -28,7 +27,7 @@ deLoopSource ::
   CommPort ->
   String ->
   ConduitM () Event m ()
-deLoopSource commHost commPort peerIP = labelTheThread "deloop source" $ forever $ do
+deLoopSource commHost commPort peerIP = forever $ do
   resolveIPOrHost peerIP >>= \case
     Left err -> $logInfoS "deLoopSource" . T.pack $ "Couldn't resolve IP or Host " ++ (show peerIP) ++ ": " ++ show err
     Right resolvedPeerIPs ->
