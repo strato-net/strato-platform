@@ -11,8 +11,8 @@ module.exports = function(sequelize, DataTypes) {
             type: DataTypes.DATE, //'TIMESTAMP',
             allowNull: false},
         additionalInfo: {type: DataTypes.JSONB, allowNull: true},
-        isBlocksValidInc: {type: DataTypes.BOOLEAN, allowNull: true},
-        isLastPending: {type: DataTypes.BOOLEAN, allowNull: true}
+        validBlocksIncreased: {type: DataTypes.BOOLEAN, allowNull: true},
+        hasPendingTxs: {type: DataTypes.BOOLEAN, allowNull: true}
     });
     CurrentHealth.prototype.toJson = function() {
         return {
@@ -22,8 +22,8 @@ module.exports = function(sequelize, DataTypes) {
             latestCheckTimestamp: this.latestCheckTimestamp,
             lastFailureTimestamp: this.lastFailureTimestamp,
             additionalInfo: this.additionalInfo,
-            isBlocksValidInc: this.isBlocksValidInc,
-            isLastPending: this.isLastPending
+            validBlocksIncreased: this.validBlocksIncreased,
+            hasPendingTxs: this.hasPendingTxs
         };
     };
     return CurrentHealth;
