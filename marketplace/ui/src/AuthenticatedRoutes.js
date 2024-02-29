@@ -25,7 +25,7 @@ import { UsersProvider } from "./contexts/users";
 import EventList from "./components/Inventory/EventList";
 import InventoryEventDetails from "./components/Inventory/EventDetail";
 import Certifier from "./components/Certifier";
-import OnboardingIntermediate from "./components/Inventory/OnboardingIntermediate"
+import OnboardingIntermediate from "./components/Inventory/OnboardingIntermediate";
 import ProductDetails from "./components/MarketPlace/ProductDetail";
 import Checkout from "./components/MarketPlace/AddCart";
 import ConfirmOrder from "./components/MarketPlace/ConfirmOrder";
@@ -36,6 +36,7 @@ import { CertifiersProvider } from "./contexts/certifier";
 import LoginRedirect from "./components/LoginRedirect";
 
 import Error from "./components/404";
+import FAQ from "./components/FAQ";
 
 const AuthenticatedRoutes = ({ user, users }) => {
   return (
@@ -56,9 +57,7 @@ const AuthenticatedRoutes = ({ user, users }) => {
       <Route
         exact
         path={routes.LoginRedirect.url}
-        element={
-          <LoginRedirect />
-        }
+        element={<LoginRedirect />}
       />
       <Route
         exact
@@ -416,15 +415,16 @@ const AuthenticatedRoutes = ({ user, users }) => {
         }
       />
       <Route
-        path="/"
-        element={<Navigate
-          to={"/marketplace"}
-          replace />}
+        exact
+        path={routes.FAQ.url}
+        element={
+          <UsersProvider>
+            <FAQ />
+          </UsersProvider>
+        }
       />
-      <Route
-        path="*"
-        element={<Error />}
-      />
+      <Route path="/" element={<Navigate to={"/marketplace"} replace />} />
+      <Route path="*" element={<Error />} />
     </Routes>
   );
 };

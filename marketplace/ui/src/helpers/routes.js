@@ -56,5 +56,5 @@ export default {
   Invoice: { label: "Invoice", url: "/orders/invoice/:id" },
   OnboardingSellerToStripe: { label: "Onboarding Seller to Stripe", url: "/inventories/stripe/onboarding" },
   Error: { label: "Error", url: "/404" },
-  FAQ: { label: "FAQ", url: "/faq" },
+  FAQ: { label: "FAQ", url: "/frequently-asked-questions" },
 };

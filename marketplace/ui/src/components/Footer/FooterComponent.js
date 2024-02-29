@@ -133,7 +133,6 @@ export default function FooterComponent() {
           <div className="space-y-8">
             <img
               src={Images.logo_white}
-              // className="h-[31px] w-[120px] md:w-[170px] md:h-[44px]"
               className="h-[48px] md:h-[60px]"
               preview={false}
             />
@@ -145,6 +144,8 @@ export default function FooterComponent() {
                 <a
                   key={item.name}
                   href={item.href}
+                  target="_blank"
+                  rel="noreferrer"
                   className="text-white hover:text-gray-400"
                 >
                   <span className="sr-only">{item.name}</span>
@@ -164,6 +165,8 @@ export default function FooterComponent() {
                     <li key={item.name}>
                       <a
                         href={item.href}
+                        target="_blank"
+                        rel="noreferrer"
                         className="text-sm leading-6 text-white hover:text-white"
                       >
                         {item.name}
@@ -181,6 +184,8 @@ export default function FooterComponent() {
                     <li key={item.name}>
                       <a
                         href={item.href}
+                        target="_blank"
+                        rel="noreferrer"
                         className="text-sm leading-6 text-white hover:text-white"
                       >
                         {item.name}
@@ -200,6 +205,8 @@ export default function FooterComponent() {
                     <li key={item.name}>
                       <a
                         href={item.href}
+                        target="_blank"
+                        rel="noreferrer"
                         className="text-sm leading-6 text-white hover:text-white"
                       >
                         {item.name}
@@ -217,6 +224,8 @@ export default function FooterComponent() {
                     <li key={item.name}>
                       <a
                         href={item.href}
+                        target="_blank"
+                        rel="noreferrer"
                         className="text-sm leading-6 text-white hover:text-white"
                       >
                         {item.name}
