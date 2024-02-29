@@ -47,6 +47,7 @@ const CategoryProductList = ({ user }) => {
   const categoryQueryValue = queryParams.get('category');
   const minPriceQuery = queryParams.get('minPrice') || 0;
   const maxPriceQuery = queryParams.get('maxPrice') || MAX_PRICE;
+  const scrollQuery = queryParams.get('scroll') || 0;
   const categoryQueryValueArr = categoryQueryValue ? categoryQueryValue.split(',') : []
 
   const [api, contextHolder] = notification.useNotification();
@@ -59,8 +60,9 @@ const CategoryProductList = ({ user }) => {
   const [uniqueProductNames, setUniqueProductNames] = useState([]);
   const [desktopOpenFilter, setDesktopOpenFilter] = useState(true);
   const [mobileOpenFilter, setMobileOpenFilter] = useState(false);
-  const [search, setSearch] = useState(searchQueryValue)
-  const [unSelected, setUnSelected] = useState([])
+  const [search, setSearch] = useState(searchQueryValue);
+  const [unSelected, setUnSelected] = useState([]);
+  const [scrollPosition, setScrollPosition] = useState(scrollQuery);
 
   //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
@@ -77,6 +79,28 @@ const CategoryProductList = ({ user }) => {
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
   }, []);
+
+  const isLoading = isMarketplaceLoading;
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrollPosition(window.scrollY);
+    };
+  
+   if(!isLoading){
+     window.addEventListener('scroll', handleScroll);
+   }
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
+  useEffect(() => {
+    if(!isLoading){
+      window.scrollTo(0, scrollQuery);
+    }
+  }, [isLoading]);
 
   const onChangeCategory = (checkedValues) => {
     const categoryStr = checkedValues.join(",");
@@ -199,6 +223,11 @@ const CategoryProductList = ({ user }) => {
       }
       baseUrl.searchParams.set('minPrice', minPrice);
       baseUrl.searchParams.set('maxPrice', maxPrice);
+      if(!isLoading){
+        baseUrl.searchParams.set('scroll', scrollPosition);
+      }else{
+        baseUrl.searchParams.set('scroll', scrollQuery);
+      }
 
       const url = baseUrl.pathname + baseUrl.search;
       navigate(url, { replace: true });
@@ -207,7 +236,7 @@ const CategoryProductList = ({ user }) => {
     return () => {
       clearTimeout(timeOut);
     };
-  }, [search, minPrice, maxPrice]);
+  }, [search, minPrice, maxPrice, scrollPosition]);
 
   //=========================Other functions===============================//
 
@@ -321,7 +350,6 @@ const CategoryProductList = ({ user }) => {
     setSearch(value)
   }
 
-  const isLoading = isMarketplaceLoading;
 
   const BreadCrumbComponent = () =>
     <Breadcrumb className="text-xs ml-4 md:ml-14 mt-14 lg:mt-5">
