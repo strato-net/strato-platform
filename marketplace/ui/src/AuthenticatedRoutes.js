@@ -35,6 +35,7 @@ import Invoice from "./components/Order/Invoice";
 import { CertifiersProvider } from "./contexts/certifier";
 import LoginRedirect from "./components/LoginRedirect";
 
+import Error from "./components/404";
 
 const AuthenticatedRoutes = ({ user, users }) => {
   return (
@@ -422,9 +423,7 @@ const AuthenticatedRoutes = ({ user, users }) => {
       />
       <Route
         path="*"
-        element={<Navigate
-          to={"/"}
-          replace />}
+        element={<Error />}
       />
     </Routes>
   );

@@ -56,4 +56,5 @@ export const Images = {
   'filter' : require('./resources/Filter.png'),
   'Remove_filter' : require('./resources/remove-filter.png'),
   'calender' : require('./resources/Calendar.png'),
+  'logo_white' : require('./resources/logo_white.png'),
 };
