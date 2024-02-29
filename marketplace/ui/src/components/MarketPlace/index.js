@@ -13,6 +13,7 @@ import { Carousel } from "react-responsive-carousel";
 import { Fade } from "react-awesome-reveal";
 import HelmetComponent from "../Helmet/HelmetComponent";
 import { SEO } from "../../helpers/seoConstant";
+import { Fade } from "react-awesome-reveal";
 
 const MarketPlace = ({ user, isAuthenticated }) => {
   const limit = 10, offset = 0;
