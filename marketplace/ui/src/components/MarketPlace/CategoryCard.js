@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { useCategoryState } from "../../contexts/category";
 import { Images } from "../../images";
 import TagManager from "react-gtm-module";
+import { Fade } from "react-awesome-reveal";
+
 
 const { Title, Text } = Typography;
 
@@ -23,9 +25,12 @@ const CategoryCard = () => {
 
   return (
     <>
+      <Fade>
       <Title className="md:px-10 !text-xl md:!text-4xl !text-left py-2">
         Shop by Category
       </Title>
+      </Fade>
+      <Fade direction="left">
       <div className="flex justify-start sm:justify-center md:justify-start gap-3 lg:gap-[15px] flex-wrap px-0 md:px-10 xl:grid xl:grid-cols-6">
         {categorys.map((category, index) => {
           return (
@@ -70,6 +75,7 @@ const CategoryCard = () => {
           );
         })}
       </div>
+      </Fade>
     </>
   );
 };

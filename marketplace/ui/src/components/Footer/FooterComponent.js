@@ -5,7 +5,10 @@ const navigation = {
     { name: "Carbon", href: "/marketplace/category?category=Carbon" },
     { name: "Metals", href: "/marketplace/category?category=Metal" },
     { name: "Clothing", href: "/marketplace/category?category=Clothing" },
-    { name: "Collectibles", href: "/marketplace/category?category=Collectibles" },
+    {
+      name: "Collectibles",
+      href: "/marketplace/category?category=Collectibles",
+    },
     { name: "Art", href: "/marketplace/category?category=Art" },
     { name: "Memberships", href: "/marketplace/category?category=Memberships" },
   ],
@@ -13,13 +16,22 @@ const navigation = {
     { name: "Documentation", href: "https://docs.blockapps.net/" },
     { name: "Guides", href: "https://docs.blockapps.net/api-basics/" },
     { name: "API Status", href: "https://docs.blockapps.net/api/" },
-    { name: "Contact Support", href: "https://blockapps.net/company/connect/contact-us/"}
+    {
+      name: "Contact Support",
+      href: "https://blockapps.net/company/connect/contact-us/",
+    },
   ],
   company: [
     { name: "About", href: "https://blockapps.net/company/about-us/" },
     { name: "Blog", href: "https://blockapps.net/blog/" },
-    { name: "Careers", href: "https://blockapps.net/company/about-us/careers/"},
-    { name: "Press", href: "https://blockapps.net/blog/category/press-release/" },
+    {
+      name: "Careers",
+      href: "https://blockapps.net/company/about-us/careers/",
+    },
+    {
+      name: "Press",
+      href: "https://blockapps.net/blog/category/press-release/",
+    },
   ],
   legal: [
     { name: "Claim", href: "#" },
@@ -145,10 +157,10 @@ export default function FooterComponent() {
             <div className="md:grid md:grid-cols-2 md:gap-8">
               <div>
                 <h3 className="text-sm font-semibold leading-6 text-white">
-                  Support
+                  Categories
                 </h3>
                 <ul role="list" className="mt-6 space-y-4">
-                  {navigation.support.map((item) => (
+                  {navigation.categories.map((item) => (
                     <li key={item.name}>
                       <a
                         href={item.href}
@@ -162,10 +174,10 @@ export default function FooterComponent() {
               </div>
               <div className="mt-10 md:mt-0">
                 <h3 className="text-sm font-semibold leading-6 text-white">
-                  Categories
+                  Support
                 </h3>
                 <ul role="list" className="mt-6 space-y-4">
-                  {navigation.categories.map((item) => (
+                  {navigation.support.map((item) => (
                     <li key={item.name}>
                       <a
                         href={item.href}
