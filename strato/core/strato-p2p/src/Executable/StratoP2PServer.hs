@@ -134,7 +134,7 @@ runEthServerConduit ::
   ConduitM () P2pEvent m () ->
   String ->
   m (Maybe SomeException)
-runEthServerConduit p pSource pSink seqSrc peerStr = labelTheThread (peerStr ++ "/runEthServerConduit") $ do
+runEthServerConduit p pSource pSink seqSrc peerStr = labelPeerThread peerStr "Peer Manager" (Just "CONNECTED") $ do
   myPubKey' <- getPub
   let myPubkey = secPubKeyToPoint myPubKey'
       otherPubKey = fromMaybe (error "programmer error: runEthServerConduit was called without a pubkey") $ pPeerPubkey p
@@ -142,22 +142,23 @@ runEthServerConduit p pSource pSink seqSrc peerStr = labelTheThread (peerStr ++ 
   case mConnectionResult of
     Nothing -> pure $ Just $ toException $ HandshakeException "handshake timed out"
     Just (_, (outCtx, inCtx)) -> do
-      fmap (either Just (const Nothing)) . try $
-        [ labelTheThread (peerStr ++ "/peerSourceConduit") $
+      ret <-
+        fmap (either Just (const Nothing)) . try $
+        [ labelPeerThread peerStr "Peer Source" Nothing $
           pSource
           .| ethDecrypt inCtx
           .| CL.iterM (recordTraffic Inbound)
           .| bytesToMessages
           .| CL.iterM (displayMessage Inbound peerStr)
           .| CL.map MsgEvt
-        , labelTheThread (peerStr ++ "/seqEventSource") $
+        , labelPeerThread peerStr "Sequencer Source" Nothing $
           seqSrc
           .| CL.map NewSeqEvent
-        , labelTheThread (peerStr ++ "/timerSource") $
+        , labelPeerThread peerStr "Timer Source" Nothing $
           timerSource
         ] `mergeConnect` (
         CL.iterM recordEvent
-          .| labelTheThread (peerStr ++ "/handleMsgServerConduit") (handleMsgServerConduit myPubkey p)
+          .| labelPeerThread peerStr "P2P Handler" Nothing (handleMsgServerConduit myPubkey p)
           .| debounceTxSendsAndUnseq
           .| CL.iterM recordMessage
           .| CL.iterM (displayMessage Outbound peerStr)
@@ -166,6 +167,12 @@ runEthServerConduit p pSource pSink seqSrc peerStr = labelTheThread (peerStr ++ 
           .| ethEncrypt outCtx
           .| pSink
         )
+
+      case ret of
+        Nothing -> changeLabelStatusM $ "DISCONNECTING"
+        Just e -> changeLabelStatusM $ "DISCONNECTING: " ++ show e
+
+      return ret
 
 stratoP2PServer ::
   (MonadP2P n, RunsServer n (LoggingT IO)) =>

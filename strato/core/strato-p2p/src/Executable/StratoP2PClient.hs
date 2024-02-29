@@ -65,7 +65,7 @@ runPeer ::
   m ()
 runPeer peer sSource = do
   let pStr = ">" ++ pPeerString peer -- display string will show up as dns name
-  labelTheThreadM $ pStr ++ "/runPeer"
+  labelPeerThreadM pStr "Peer Manager" (Just "CONNECTING...")
   ender <- toIO . $logInfoS "runPeer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
   void $ register ender
   myPublic <- getPub
@@ -111,6 +111,7 @@ runEthClientConduit ::
   String ->
   m (Maybe SomeException)
 runEthClientConduit peer pSource pSink seqSrc peerStr = do
+  changeLabelStatusM $ "CONNECTED"
   myPublic' <- getPub
   let myPublic = secPubKeyToPoint myPublic'
       otherPubKey = fromMaybe (error "programmer error: runEthClientConduit was called without a pubkey") $ pPeerPubkey peer
@@ -118,23 +119,24 @@ runEthClientConduit peer pSource pSink seqSrc peerStr = do
   case mConnectionResult of
     Nothing                   -> pure $ Just $ toException $ HandshakeException "handshake timed out"
     Just (_, (outCtx, inCtx)) -> do
-      fmap (either Just (const Nothing)) . try $ 
+      ret <-
+        fmap (either Just (const Nothing)) . try $ 
         [
-          labelTheThread (peerStr ++ "/peerSourceConduit") $
+          labelPeerThread peerStr "Peer Source" Nothing $
           pSource
           .| ethDecrypt inCtx
           .| CL.iterM (recordTraffic Inbound)
           .| bytesToMessages
           .| CL.iterM (displayMessage Inbound peerStr)
           .| CL.map MsgEvt
-        , labelTheThread (peerStr ++ "/seqEventSource") $
+        , labelPeerThread peerStr "Sequencer Source" Nothing $
           seqSrc
           .| CL.map NewSeqEvent
-        , labelTheThread (peerStr ++ "/timerSource") $
+        , labelPeerThread peerStr "Timer Source" Nothing $
           timerSource
         ] `mergeConnect` (
            CL.iterM recordEvent
-           .| labelTheThread (peerStr ++ "/handleMsgClientConduit")
+           .| labelPeerThread peerStr "P2P Handler" Nothing
                            (handleMsgClientConduit myPublic peer)
            .| debounceTxSendsAndUnseq
            .| CL.iterM recordMessage
@@ -144,6 +146,12 @@ runEthClientConduit peer pSource pSink seqSrc peerStr = do
            .| ethEncrypt outCtx
            .| pSink
            )
+
+      case ret of
+        Nothing -> changeLabelStatusM $ "DISCONNECTING"
+        Just e -> changeLabelStatusM $ "DISCONNECTING: " ++ show e
+
+      return ret
 
 runPeerInList ::
   ( MonadP2P m,
