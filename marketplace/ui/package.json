@@ -36,6 +36,8 @@
   "dependencies": {
     "@ant-design/icons": "^4.8.0",
     "@emotion/react": "^11.11.4",
+    "@headlessui/react": "^1.7.18",
+    "@heroicons/react": "^2.1.1",
     "@react-pdf/renderer": "^3.1.5",
     "@shopify/polaris": "^10.16.1",
     "antd": "^5.1.0",

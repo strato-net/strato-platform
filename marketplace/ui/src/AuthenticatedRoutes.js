@@ -36,7 +36,7 @@ import { CertifiersProvider } from "./contexts/certifier";
 import LoginRedirect from "./components/LoginRedirect";
 
 import Error from "./components/404";
-import FAQ from "./components/FAQ";
+import FAQ from "./components/FAQ/index";
 
 const AuthenticatedRoutes = ({ user, users }) => {
   return (
@@ -418,9 +418,7 @@ const AuthenticatedRoutes = ({ user, users }) => {
         exact
         path={routes.FAQ.url}
         element={
-          <UsersProvider>
             <FAQ />
-          </UsersProvider>
         }
       />
       <Route path="/" element={<Navigate to={"/marketplace"} replace />} />

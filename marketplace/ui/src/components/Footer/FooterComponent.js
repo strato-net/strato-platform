@@ -130,7 +130,7 @@ export default function FooterComponent() {
       </h2>
       <div className="mx-auto max-w-7xl px-6 pb-8 pt-16 sm:pt-24 lg:px-8 lg:pt-32">
         <div className="xl:grid xl:grid-cols-3 xl:gap-8">
-          <div className="space-y-8">
+          <div className="space-y-4">
             <img
               src={Images.logo_white}
               className="h-[48px] md:h-[60px]"
