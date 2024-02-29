@@ -39,7 +39,6 @@ import UserProfile from "./components/UserProfile";
 import Error from "./components/404";
 import FAQ from "./components/FAQ/index";
 
-const AuthenticatedRoutes = ({ user, users }) => {
 const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
   return (
     <Routes>
