@@ -41,13 +41,9 @@ function executeCheck() {
             // If executing for the very first time - no previous data exists in database, so using current values as previous.
             const validBlocksCount_prev = (validBlocksCount_prev_fromDB) ? validBlocksCount_prev_fromDB.dataValues.blockCount : validBlocksCount_current;
             const pendingTxsCount_prev = (pendingTxsCount_prev_fromDB) ? pendingTxsCount_prev_fromDB.dataValues.blockCount : pendingTxsCount_current;
-
             await createStallStats(validBlocksCount_current, pendingTxsCount_current);
-            
             const currentStallHealthData = await getCurrentHealth(pendingTxsCount_prev, pendingTxsCount_current, validBlocksCount_prev, validBlocksCount_current);
-
             await updateCurrentStallStat(currentStallHealthData);
-
             return resolve();
 
         } catch (error) {
@@ -130,8 +126,8 @@ async function getCurrentHealth(pendingBlocksCount_prev, pendingBlocksCount_curr
     // TODO: Potential flaw - what if the prev pending transaction got discarded and the current pending transactions are just new pending to be processed?
     const stallHealthStatus = ! (pendingBlocksCount_prev > 0 && pendingBlocksCount_current > 0 && validBlocksCount_current === validBlocksCount_prev);
     const validBlocksCountIncreased = validBlocksCount_current > validBlocksCount_prev;
-    const hasCurrentlyPending = validBlocksCount_current > 0
-    return {stallHealthStatus, validBlocksCountIncreased, hasCurrentlyPending}
+    const hasPendingTxs = validBlocksCount_current > 0
+    return {stallHealthStatus, validBlocksCountIncreased, hasPendingTxs}
 }
 
 async function updateCurrentStallStat(currentStallHealthData){
@@ -142,7 +138,7 @@ async function updateCurrentStallStat(currentStallHealthData){
             latestHealthStatus: currentStallHealthData.stallHealthStatus,
             validBlocksIncreased: currentStallHealthData.validBlocksCountIncreased,
             lastFailureTimestamp: currentStallHealthData.stallHealthStatus ? undefined : currentTime, // do not update if not stalling ('undefined' to skip property)
-            hasPendingTxs: currentStallHealthData.hasCurrentlyPending
+            hasPendingTxs: currentStallHealthData.hasPendingTxs,
         },
         {
             where: {processName: 'StallStat'},
@@ -153,11 +149,11 @@ async function updateCurrentStallStat(currentStallHealthData){
     if (affectedRows < 1) {
         await models.CurrentHealth.create({
             processName: 'StallStat',
-            latestHealthStatus: currentStallHealthData.stallStatus,
+            latestHealthStatus: currentStallHealthData.stallHealthStatus,
             latestCheckTimestamp: currentTime,
             lastFailureTimestamp: currentTime,   //default first time marked as failure
             validBlocksIncreased: currentStallHealthData.validBlocksCountIncreased,
-            hasPendingTxs: currentStallHealthData.hasCurrentlyPending
+            hasPendingTxs: currentStallHealthData.hasPendingTxs
         });
     }
 }
