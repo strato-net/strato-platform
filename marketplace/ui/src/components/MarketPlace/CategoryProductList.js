@@ -62,7 +62,6 @@ const CategoryProductList = ({ user }) => {
   const [mobileOpenFilter, setMobileOpenFilter] = useState(false);
   const [search, setSearch] = useState(searchQueryValue);
   const [unSelected, setUnSelected] = useState([]);
-  const [scrollPosition, setScrollPosition] = useState(scrollQuery);
 
   //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
@@ -70,37 +69,24 @@ const CategoryProductList = ({ user }) => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const orderDispatch = useOrderDispatch();
   // states
-  const { marketplaceList, isMarketplaceLoading } = useMarketplaceState();
+  const { marketplaceList, isMarketplaceLoading, cartList, lastVisitedProduct } = useMarketplaceState();
   const { categorys } = useCategoryState();
   let { hasChecked, isAuthenticated } = useAuthenticateState();
   const { subCategorys } = useSubCategoryState();
-  const { cartList } = useMarketplaceState();
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
   }, []);
 
   const isLoading = isMarketplaceLoading;
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setScrollPosition(window.scrollY);
-    };
-  
-   if(!isLoading){
-     window.addEventListener('scroll', handleScroll);
-   }
-
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-    };
-  }, []);
-
-  useEffect(() => {
-    if(!isLoading){
-      window.scrollTo(0, scrollQuery);
+ 
+  const scrollToProduct = (id) => {
+    const productElement = document.getElementById(id);
+    if (productElement && !isLoading) {
+      productElement.scrollIntoView({ behavior: 'smooth' });
+      marketplaceActions.setLastVisitedProduct(marketplaceDispatch, '');
     }
-  }, [isLoading]);
+  };
 
   const onChangeCategory = (checkedValues) => {
     const categoryStr = checkedValues.join(",");
@@ -223,11 +209,6 @@ const CategoryProductList = ({ user }) => {
       }
       baseUrl.searchParams.set('minPrice', minPrice);
       baseUrl.searchParams.set('maxPrice', maxPrice);
-      if(!isLoading){
-        baseUrl.searchParams.set('scroll', scrollPosition);
-      }else{
-        baseUrl.searchParams.set('scroll', scrollQuery);
-      }
 
       const url = baseUrl.pathname + baseUrl.search;
       navigate(url, { replace: true });
@@ -236,7 +217,7 @@ const CategoryProductList = ({ user }) => {
     return () => {
       clearTimeout(timeOut);
     };
-  }, [search, minPrice, maxPrice, scrollPosition]);
+  }, [search, minPrice, maxPrice]);
 
   //=========================Other functions===============================//
 
@@ -581,13 +562,15 @@ const CategoryProductList = ({ user }) => {
             :
             <div>
               {marketplaceList?.length > 0 ? (
-
+                <>
+                {scrollToProduct(lastVisitedProduct)}
                 <div className={`mt-[61px] md:mt-4 mb-8 flex w-full md:grid flex-col items-center ${desktopOpenFilter ? "grid-cols-1 gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 4xl:grid-cols-5 lg:gap-14 xl:gap-x-10 2xl:gap-x-20" : " sm:grid-cols-1 gap-4 md:grid-cols-2 md:gap-14 lg:grid-cols-3 lg:gap-16 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 5xl:grid-cols-7"}`} id="product-list">
                   {marketplaceList
                     // .filter(product => product.saleQuantity > 0)
                     .map((product, index) => {
                       return (
                         <NewTrendingCard
+                          id={`product-${product.address}`}
                           topSellingProduct={product}
                           key={index}
                           addItemToCart={addItemToCart}
@@ -599,6 +582,7 @@ const CategoryProductList = ({ user }) => {
                     })}
 
                 </div>
+                </>
               ) : (
                 <div className="h-96 flex justify-center items-center" id="product-list">
                   No data found

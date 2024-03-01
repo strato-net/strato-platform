@@ -2,6 +2,7 @@ import RestStatus from "http-status-codes";
 import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
 
 const actionDescriptors = {
+  setLastVisitedProduct: "set_last_visited_product",
   fetchMarketplace: "fetch_marketplace",
   fetchMarketplaceSuccessful: "fetch_marketplace_successful",
   fetchMarketplaceFailed: "fetch_marketplace_failed",
@@ -53,7 +54,9 @@ const actions = {
   setMessage: (dispatch, message, success = false) => {
     dispatch({ type: actionDescriptors.setMessage, message, success });
   },
-
+  setLastVisitedProduct: (dispatch, lastVisitedProduct) => {
+    dispatch({ type: actionDescriptors.setLastVisitedProduct, lastVisitedProduct });
+  },
   fetchCartItems: (dispatch, cartList) => {
     dispatch({ type: actionDescriptors.fetchCartItems });
     try {

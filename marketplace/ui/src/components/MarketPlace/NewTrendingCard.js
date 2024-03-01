@@ -10,12 +10,15 @@ import {
 import { useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
 import { useAuthenticateState } from "../../contexts/authentication";
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
+import { useMarketplaceDispatch } from "../../contexts/marketplace";
 import TagManager from "react-gtm-module";
 import { setCookie } from "../../helpers/cookie";
 import { Images } from '../../images';
 import images_placeholder from "../../images/resources/image_placeholder.png"
 
-const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, contextHolder }) => {
+const NewTrendingCard = ({ id,topSellingProduct, addItemToCart, parent = "", api, contextHolder }) => {
+    const marketplaceDispatch = useMarketplaceDispatch();
     const [quantity, setQuantity] = useState(1)
 
     let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
@@ -24,7 +27,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
     const navigate = useNavigate();
 
     return (
-        <div className={`trending_cards_container_card bg-white p-3 ${parent == 'Marketplace' ? 'min-w-[320px] w-auto' : 'min-w-[230px]'} xs:min-w-[230px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}>
+        <div id={id} className={`trending_cards_container_card bg-white p-3 ${parent == 'Marketplace' ? 'min-w-[320px] w-auto' : 'min-w-[230px]'} xs:min-w-[230px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}>
             {contextHolder}
             <a
                 href={`/marketplace${naviroute.replace(":address", topSellingProduct.address)}`}
@@ -34,6 +37,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                         // Let the browser handle it natively to open in a new tab
                     } else {
                         e.preventDefault();
+                        marketplaceActions.setLastVisitedProduct(marketplaceDispatch, id);
                         navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } });
                     }
                 }}

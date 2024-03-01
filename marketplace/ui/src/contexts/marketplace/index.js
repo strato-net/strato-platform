@@ -6,6 +6,7 @@ const MarketplaceDispatchContext = createContext();
 
 const MarketplaceProvider = ({ children }) => {
   const initialState = {
+    lastVisitedProduct: "",
     marketplaceList: [],
     marketplaceListCount: 10,
     isMarketplaceLoading: false,

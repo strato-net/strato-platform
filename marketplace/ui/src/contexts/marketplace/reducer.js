@@ -14,6 +14,11 @@ const reducer = (state, action) => {
         success: action.success,
         message: action.message,
       };
+    case actionDescriptors.setLastVisitedProduct:
+        return {
+          ...state,
+          lastVisitedProduct: action.lastVisitedProduct,
+        };
     case actionDescriptors.fetchMarketplace:
       return {
         ...state,
