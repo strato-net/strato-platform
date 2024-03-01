@@ -275,7 +275,7 @@ const UserProfile = (user) => {
       <div className="relative mb-6">
         <img 
           className="w-full h-36 sm:h-52 md:h-60 lg:h-68 object-cover rounded-lg" 
-          src={Images.collectibles} 
+          src={Images.blockapps_cover} 
           alt="Cover"
         />
 
