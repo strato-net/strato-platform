@@ -391,9 +391,6 @@ getDeferredForeignKeysAbstract tableName c o a abstracts' cc = do
         let contract = getContractsBySolidString x cc
         case contract of
                 Just c' -> do
-
-
-                  -- Add logs for each variable involved in enumOrStructWithNameExists
                   let enumExists = isJust (Map.lookup (_contractName c') (_enums c'))
                       structWithNameExists = isJust (Map.lookup (show theName) (_structs c'))
                       structWithNameExists2 = isJust (Map.lookup (show x) (_structs c'))
@@ -414,8 +411,18 @@ getDeferredForeignKeysAbstract tableName c o a abstracts' cc = do
                     let proceedWithForeignKeyCreation = if isMercataSale
                             then (o', a', T.pack n') == ("BlockApps", "Mercata", "Asset")
                             else True
+                        itDontMessWithAsset = (o', a', T.pack n') /= ("BlockApps", "Mercata", "Asset")
+                        itDontMessWithOrder = (o', a', T.pack n') /= ("BlockApps", "Mercata", "Order")
+                        itDontMessWithSale =  (o', a', T.pack n') /= ("BlockApps", "Mercata", "Sale")
                     if proceedWithForeignKeyCreation
                     then do
+                      pure $ Just $ ForeignKeyInfo
+                        { tableName = tableName,
+                          columnName = labelToText theName,
+                          foreignTableName = abstractTableName o' a' $ T.pack n'
+                          }
+                    else if itDontMessWithAsset && itDontMessWithSale && itDontMessWithOrder
+                    then do 
                       pure $ Just $ ForeignKeyInfo
                         { tableName = tableName,
                           columnName = labelToText theName,
