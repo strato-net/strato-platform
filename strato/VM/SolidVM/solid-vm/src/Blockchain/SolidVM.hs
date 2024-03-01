@@ -3044,7 +3044,6 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
 
     -- theCallInfo <- getCurrentCallInfo
     -- when (True || (not $ null matchedArgvals)) $ error (show theCallInfo)
-    onTraced $ liftIO $ putStrLn $ show (CC._contracts cc)
     let !commands = fromMaybe (missingField "Function call: function has been declared but not defined" funcName) $ CC._funcContents theFunction
     let modContentsList = map (\m -> fromMaybe (missingField "Function call: Modifier has been declared but not defined" m) (CC._modifierContents m)) theModifiers
     let isNotModExec = \case
