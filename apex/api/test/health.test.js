@@ -108,21 +108,22 @@ describe('Tests - Node-level Health Check', function () {
   })
 
   it('StallStat update -- FAILURE', async function () {
-
-    const lastV = 0;
+    
     const lastP = 1;
+    const thisP = 1;
+    const lastV = 0;
     const thisV = 0;
-    const checkRes = await stallCheckJs.getCurrentHealth(lastP, lastV, thisV);
-    assert.equal(checkRes[0], false, "Unhealthy");
-    await stallCheckJs.updateNodeStallStatus(checkRes);
+    const checkRes = await stallCheckJs.getCurrentHealth(lastP, thisP, lastV, thisV);
+    assert.equal(checkRes.stallHealthStatus, false, "Unhealthy");
+    await stallCheckJs.updateCurrentStallStat(checkRes);
     const currentStat = await models.CurrentHealth.findOne({
       where: {
         processName: "StallStat",
       },
     });
     assert.equal(currentStat.dataValues.latestHealthStatus, false, 'Current Health')
-    assert.equal(currentStat.dataValues.isBlocksValidInc, false, 'isInc')
-    assert.equal(currentStat.dataValues.isLastPending, true, 'isPending')
+    assert.equal(currentStat.dataValues.validBlocksIncreased, false, 'validBlocksIncreased')
+    assert.equal(currentStat.dataValues.hasPendingTxs, true, 'hasPendingTxs')
     const currentTime = Date.now();
     assert.equal(Math.abs(currentStat.dataValues.latestCheckTimestamp - currentTime) < config.healthCheck.requestTimeout, true, 'Current Timestamp')
 
@@ -131,13 +132,14 @@ describe('Tests - Node-level Health Check', function () {
   })
 
   it('StallStat update -- SUCCESS', async function () {
-
-    const lastV = 0;
+    
     const lastP = 1;
+    const thisP = 0;
+    const lastV = 0;
     const thisV = 1;
-    const checkRes = await stallCheckJs.getCurrentHealth(lastP, lastV, thisV);
-    assert.equal(checkRes[0], true, "Healthy");
-    await stallCheckJs.updateNodeStallStatus(checkRes);
+    const checkRes = await stallCheckJs.getCurrentHealth(lastP, thisP, lastV, thisV);
+    assert.equal(checkRes.stallHealthStatus, true, "Healthy");
+    await stallCheckJs.updateCurrentStallStat(checkRes);
     const currentStat = await models.CurrentHealth.findOne({
       where: {
         processName: "StallStat",
@@ -145,31 +147,57 @@ describe('Tests - Node-level Health Check', function () {
     });
 
     assert.equal(currentStat.dataValues.latestHealthStatus, true, 'Current Health')
-    assert.equal(currentStat.dataValues.isBlocksValidInc, true, 'isInc')
-    assert.equal(currentStat.dataValues.isLastPending, true, 'isPending')
+    assert.equal(currentStat.dataValues.validBlocksIncreased, true, 'validBlocksIncreased')
+    assert.equal(currentStat.dataValues.hasPendingTxs, true, 'hasPendingTxs')
     const currentTime = Date.now();
     assert.equal(Math.abs(currentStat.dataValues.latestCheckTimestamp - currentTime) < config.healthCheck.requestTimeout, true, 'Current Timestamp')
 
     assert.equal((currentStat.dataValues.lastFailureTimestamp < currentStat.dataValues.latestCheckTimestamp), true, 'Last Failure Timestamp')
 
   })
-
-  it('StallStat update -- SUCCESS - Zero pending', async function () {
-
+  
+  it('StallStat update -- SUCCESS - Has Currently Pending', async function () {
+    
+    const lastP = 1;
+    const thisP = 1;
     const lastV = 0;
+    const thisV = 1;
+    const checkRes = await stallCheckJs.getCurrentHealth(lastP, thisP, lastV, thisV);
+    assert.equal(checkRes.stallHealthStatus, true, "Healthy");
+    await stallCheckJs.updateCurrentStallStat(checkRes);
+    const currentStat = await models.CurrentHealth.findOne({
+      where: {
+        processName: "StallStat",
+      },
+    });
+    
+    assert.equal(currentStat.dataValues.latestHealthStatus, true, 'Current Health')
+    assert.equal(currentStat.dataValues.validBlocksIncreased, true, 'validBlocksIncreased')
+    assert.equal(currentStat.dataValues.hasPendingTxs, true, 'hasPendingTxs')
+    const currentTime = Date.now();
+    assert.equal(Math.abs(currentStat.dataValues.latestCheckTimestamp - currentTime) < config.healthCheck.requestTimeout, true, 'Current Timestamp')
+    
+    assert.equal((currentStat.dataValues.lastFailureTimestamp < currentStat.dataValues.latestCheckTimestamp), true, 'Last Failure Timestamp')
+    
+  })
+  
+  it('StallStat update -- SUCCESS - Zero pending', async function () {
+    
     const lastP = 0;
+    const lastV = 0;
+    const thisP = 0;
     const thisV = 0;
-    const checkRes = await stallCheckJs.getCurrentHealth(lastP, lastV, thisV);
-    assert.equal(checkRes[0], true, "Healthy");
-    await stallCheckJs.updateNodeStallStatus(checkRes);
+    const checkRes = await stallCheckJs.getCurrentHealth(lastP, thisP, lastV, thisV);
+    assert.equal(checkRes.stallHealthStatus, true, "Healthy");
+    await stallCheckJs.updateCurrentStallStat(checkRes);
     const currentStat = await models.CurrentHealth.findOne({
       where: {
         processName: "StallStat",
       },
     });
     assert.equal(currentStat.dataValues.latestHealthStatus, true, 'Current Health')
-    assert.equal(currentStat.dataValues.isBlocksValidInc, false, 'isInc')
-    assert.equal(currentStat.dataValues.isLastPending, false, 'isPending')
+    assert.equal(currentStat.dataValues.validBlocksIncreased, false, 'validBlocksIncreased')
+    assert.equal(currentStat.dataValues.hasPendingTxs, false, 'hasPendingTxs')
     const currentTime = Date.now();
     assert.equal(Math.abs(currentStat.dataValues.latestCheckTimestamp - currentTime) < config.healthCheck.requestTimeout, true, 'Current Timestamp')
 
