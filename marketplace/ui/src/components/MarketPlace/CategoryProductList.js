@@ -231,7 +231,7 @@ const CategoryProductList = ({ user }) => {
 
       const url = baseUrl.pathname + baseUrl.search;
       navigate(url, { replace: true });
-    }, 1000);
+    }, 500);
 
     return () => {
       clearTimeout(timeOut);
