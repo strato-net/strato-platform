@@ -16,6 +16,7 @@ const navigation = {
     { name: "Documentation", href: "https://docs.blockapps.net/" },
     { name: "Guides", href: "https://docs.blockapps.net/api-basics/" },
     { name: "API Status", href: "https://docs.blockapps.net/api/" },
+    { name: "FAQ", href: "/marketplace/frequently-asked-questions" },
     {
       name: "Contact Support",
       href: "https://blockapps.net/company/connect/contact-us/",
