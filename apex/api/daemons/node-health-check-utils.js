@@ -355,9 +355,12 @@ async function checkSystemInfo(isGlobalPasswordSet) {
       "free": memdata.free,
       "available": memdata.available,
       "total": memdata.total,
-      "use": useLevel,
+      "use": { 
+        value: useLevel,
+        isHealthy: useLevel < config.healthCheck.memoryUsedAlertLevel
+      }
     }
-    if (useLevel >= config.healthCheck.memoryUsedAlertLevel) {
+    if (!sysInfoCollected.memory.use.isHealthy) {
       isHealthy = false;
       additional_info.push(`Low Memory (used ${useLevel}%)`)
     }
@@ -368,14 +371,20 @@ async function checkSystemInfo(isGlobalPasswordSet) {
       'brand': cpudata.brand,
       'cores': cpudata.cores,
       'physicalCores': cpudata.physicalCores,
-      'currentLoad': metadataLoad.currentLoad,
-      'avgLoad': metadataLoad.avgLoad,
+      'currentLoad':  {
+        value: metadataLoad.currentLoad,
+        isHealthy: metadataLoad.avgLoad < cpudata.cores * config.healthCheck.cpuAvgLoadAlertLevel/100
+      },
+      'avgLoad': { 
+        value: metadataLoad.avgLoad,
+        isHealthy: metadataLoad.currentLoad < (config.healthCheck.cpuCurrentLoadAlertLevel)
+      }
     };
-    if (metadataLoad.avgLoad >= cpudata.cores * config.healthCheck.cpuAvgLoadAlertLevel/100) {
+    if (!sysInfoCollected.cpu.avgLoad.isHealthy) {
       isHealthy = false;
       additional_info.push(`Average CPU load is high (${metadataLoad.avgLoad})`)
     }
-    if (metadataLoad.currentLoad >= config.healthCheck.cpuCurrentLoadAlertLevel) {
+    if (!sysInfoCollected.cpu.currentLoad.isHealthy) {
       isHealthy = false;
       additional_info.push(`Current CPU load is high (${metadataLoad.currentLoad})`)
     }
@@ -384,20 +393,25 @@ async function checkSystemInfo(isGlobalPasswordSet) {
     const fsData = []
     metadataFs.forEach(function (fs) {
       if (fs.fs !== 'overlay') {
+        const isDiskHealthy = fs.use < config.healthCheck.diskspaceUsedAlertLevel;
         fsData.push(
             {
               'name': fs.fs,
               'size': fs.size,
               'used': fs.used,
-              'use': fs.use,
+              'use': {
+                value: fs.use,
+                isHealthy: isDiskHealthy
+              }
             }
         )
-        if (fs.use >= config.healthCheck.diskspaceUsedAlertLevel) {
+        if (!isDiskHealthy) {
           isHealthy = false;
           additional_info.push(`Low Disk Space on ${fs.fs} (used ${fs.use}%)`)
         }
       }
     })
+    fsData.sort((a,b) => b.use.value - a.use.value);
     sysInfoCollected.filesystem = fsData;
 
     // NETWORK

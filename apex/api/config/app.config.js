@@ -21,6 +21,10 @@ module.exports = {
     cpuCurrentLoadAlertLevel: 99, // Alert when cpu current load > N%,
     maxStalledIntervals: 20 , //max number of failed stall checks before reporting stalled: 300 seconds / poll freq (15) = 20 
   },
+  networkHealthCheck: {
+    requestTimeout: 3 * 1000,
+    pollFrequency: 15 * 1000,
+  }
   // Unused code notice. Node stats disabled, to be deprecated  #node-stats-deprecation
   // statistics: {
   //   apiCallCounterDbSaveTimer: 60 * 1000,
