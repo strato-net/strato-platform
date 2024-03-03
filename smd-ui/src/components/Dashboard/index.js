@@ -203,7 +203,6 @@ class Dashboard extends Component {
     const metadata = this.props.appMetadata.metadata;
     const networkHealth = this.props.dashboard.networkStatus;
 
-    console.log(`props:${JSON.stringify(this.props)}`);
     return (
       <div className="container-fluid pt-dark" id="tour-welcome">
         <Tour
