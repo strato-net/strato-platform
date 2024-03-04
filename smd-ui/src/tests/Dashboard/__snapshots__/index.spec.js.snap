@@ -392,7 +392,7 @@ ShallowWrapper {
                   description="Network"
                   iconClass="fa-exclamation-circle"
                   mode="danger"
-                  number="Unhealthy"
+                  number="UNKNOWN"
                 />
               </Link>
             </div>
@@ -1262,7 +1262,7 @@ ShallowWrapper {
                     description="Network"
                     iconClass="fa-exclamation-circle"
                     mode="danger"
-                    number="Unhealthy"
+                    number="UNKNOWN"
                   />
                 </Link>
               </div>
@@ -1319,7 +1319,7 @@ ShallowWrapper {
                       description="Network"
                       iconClass="fa-exclamation-circle"
                       mode="danger"
-                      number="Unhealthy"
+                      number="UNKNOWN"
                     />
                   </Link>
                 </div>,
@@ -1361,7 +1361,7 @@ ShallowWrapper {
                       description="Network"
                       iconClass="fa-exclamation-circle"
                       mode="danger"
-                      number="Unhealthy"
+                      number="UNKNOWN"
                     />
                   </Link>,
                   "className": "row",
@@ -1377,7 +1377,7 @@ ShallowWrapper {
                       description="Network"
                       iconClass="fa-exclamation-circle"
                       mode="danger"
-                      number="Unhealthy"
+                      number="UNKNOWN"
                     />,
                     "replace": false,
                     "to": "",
@@ -1392,7 +1392,7 @@ ShallowWrapper {
                       "description": "Network",
                       "iconClass": "fa-exclamation-circle",
                       "mode": "danger",
-                      "number": "Unhealthy",
+                      "number": "UNKNOWN",
                     },
                     "ref": null,
                     "rendered": null,
@@ -2244,7 +2244,7 @@ ShallowWrapper {
                     description="Network"
                     iconClass="fa-exclamation-circle"
                     mode="danger"
-                    number="Unhealthy"
+                    number="UNKNOWN"
                   />
                 </Link>
               </div>
@@ -3114,7 +3114,7 @@ ShallowWrapper {
                       description="Network"
                       iconClass="fa-exclamation-circle"
                       mode="danger"
-                      number="Unhealthy"
+                      number="UNKNOWN"
                     />
                   </Link>
                 </div>
@@ -3171,7 +3171,7 @@ ShallowWrapper {
                         description="Network"
                         iconClass="fa-exclamation-circle"
                         mode="danger"
-                        number="Unhealthy"
+                        number="UNKNOWN"
                       />
                     </Link>
                   </div>,
@@ -3213,7 +3213,7 @@ ShallowWrapper {
                         description="Network"
                         iconClass="fa-exclamation-circle"
                         mode="danger"
-                        number="Unhealthy"
+                        number="UNKNOWN"
                       />
                     </Link>,
                     "className": "row",
@@ -3229,7 +3229,7 @@ ShallowWrapper {
                         description="Network"
                         iconClass="fa-exclamation-circle"
                         mode="danger"
-                        number="Unhealthy"
+                        number="UNKNOWN"
                       />,
                       "replace": false,
                       "to": "",
@@ -3244,7 +3244,7 @@ ShallowWrapper {
                         "description": "Network",
                         "iconClass": "fa-exclamation-circle",
                         "mode": "danger",
-                        "number": "Unhealthy",
+                        "number": "UNKNOWN",
                       },
                       "ref": null,
                       "rendered": null,
@@ -4450,7 +4450,7 @@ ShallowWrapper {
                   description="Network"
                   iconClass="fa-exclamation-circle"
                   mode="danger"
-                  number="Unhealthy"
+                  number="UNKNOWN"
                 />
               </Link>
             </div>
@@ -5320,7 +5320,7 @@ ShallowWrapper {
                     description="Network"
                     iconClass="fa-exclamation-circle"
                     mode="danger"
-                    number="Unhealthy"
+                    number="UNKNOWN"
                   />
                 </Link>
               </div>
@@ -5377,7 +5377,7 @@ ShallowWrapper {
                       description="Network"
                       iconClass="fa-exclamation-circle"
                       mode="danger"
-                      number="Unhealthy"
+                      number="UNKNOWN"
                     />
                   </Link>
                 </div>,
@@ -5419,7 +5419,7 @@ ShallowWrapper {
                       description="Network"
                       iconClass="fa-exclamation-circle"
                       mode="danger"
-                      number="Unhealthy"
+                      number="UNKNOWN"
                     />
                   </Link>,
                   "className": "row",
@@ -5435,7 +5435,7 @@ ShallowWrapper {
                       description="Network"
                       iconClass="fa-exclamation-circle"
                       mode="danger"
-                      number="Unhealthy"
+                      number="UNKNOWN"
                     />,
                     "replace": false,
                     "to": "",
@@ -5450,7 +5450,7 @@ ShallowWrapper {
                       "description": "Network",
                       "iconClass": "fa-exclamation-circle",
                       "mode": "danger",
-                      "number": "Unhealthy",
+                      "number": "UNKNOWN",
                     },
                     "ref": null,
                     "rendered": null,
@@ -6302,7 +6302,7 @@ ShallowWrapper {
                     description="Network"
                     iconClass="fa-exclamation-circle"
                     mode="danger"
-                    number="Unhealthy"
+                    number="UNKNOWN"
                   />
                 </Link>
               </div>
@@ -7172,7 +7172,7 @@ ShallowWrapper {
                       description="Network"
                       iconClass="fa-exclamation-circle"
                       mode="danger"
-                      number="Unhealthy"
+                      number="UNKNOWN"
                     />
                   </Link>
                 </div>
@@ -7229,7 +7229,7 @@ ShallowWrapper {
                         description="Network"
                         iconClass="fa-exclamation-circle"
                         mode="danger"
-                        number="Unhealthy"
+                        number="UNKNOWN"
                       />
                     </Link>
                   </div>,
@@ -7271,7 +7271,7 @@ ShallowWrapper {
                         description="Network"
                         iconClass="fa-exclamation-circle"
                         mode="danger"
-                        number="Unhealthy"
+                        number="UNKNOWN"
                       />
                     </Link>,
                     "className": "row",
@@ -7287,7 +7287,7 @@ ShallowWrapper {
                         description="Network"
                         iconClass="fa-exclamation-circle"
                         mode="danger"
-                        number="Unhealthy"
+                        number="UNKNOWN"
                       />,
                       "replace": false,
                       "to": "",
@@ -7302,7 +7302,7 @@ ShallowWrapper {
                         "description": "Network",
                         "iconClass": "fa-exclamation-circle",
                         "mode": "danger",
-                        "number": "Unhealthy",
+                        "number": "UNKNOWN",
                       },
                       "ref": null,
                       "rendered": null,
@@ -8203,7 +8203,7 @@ ShallowWrapper {
                   description="Network"
                   iconClass="fa-exclamation-circle"
                   mode="danger"
-                  number="Unhealthy"
+                  number="UNKNOWN"
                 />
               </Link>
             </div>
@@ -8967,7 +8967,7 @@ ShallowWrapper {
                     description="Network"
                     iconClass="fa-exclamation-circle"
                     mode="danger"
-                    number="Unhealthy"
+                    number="UNKNOWN"
                   />
                 </Link>
               </div>
@@ -9024,7 +9024,7 @@ ShallowWrapper {
                       description="Network"
                       iconClass="fa-exclamation-circle"
                       mode="danger"
-                      number="Unhealthy"
+                      number="UNKNOWN"
                     />
                   </Link>
                 </div>,
@@ -9066,7 +9066,7 @@ ShallowWrapper {
                       description="Network"
                       iconClass="fa-exclamation-circle"
                       mode="danger"
-                      number="Unhealthy"
+                      number="UNKNOWN"
                     />
                   </Link>,
                   "className": "row",
@@ -9082,7 +9082,7 @@ ShallowWrapper {
                       description="Network"
                       iconClass="fa-exclamation-circle"
                       mode="danger"
-                      number="Unhealthy"
+                      number="UNKNOWN"
                     />,
                     "replace": false,
                     "to": "",
@@ -9097,7 +9097,7 @@ ShallowWrapper {
                       "description": "Network",
                       "iconClass": "fa-exclamation-circle",
                       "mode": "danger",
-                      "number": "Unhealthy",
+                      "number": "UNKNOWN",
                     },
                     "ref": null,
                     "rendered": null,
@@ -9639,7 +9639,7 @@ ShallowWrapper {
                     description="Network"
                     iconClass="fa-exclamation-circle"
                     mode="danger"
-                    number="Unhealthy"
+                    number="UNKNOWN"
                   />
                 </Link>
               </div>
@@ -10403,7 +10403,7 @@ ShallowWrapper {
                       description="Network"
                       iconClass="fa-exclamation-circle"
                       mode="danger"
-                      number="Unhealthy"
+                      number="UNKNOWN"
                     />
                   </Link>
                 </div>
@@ -10460,7 +10460,7 @@ ShallowWrapper {
                         description="Network"
                         iconClass="fa-exclamation-circle"
                         mode="danger"
-                        number="Unhealthy"
+                        number="UNKNOWN"
                       />
                     </Link>
                   </div>,
@@ -10502,7 +10502,7 @@ ShallowWrapper {
                         description="Network"
                         iconClass="fa-exclamation-circle"
                         mode="danger"
-                        number="Unhealthy"
+                        number="UNKNOWN"
                       />
                     </Link>,
                     "className": "row",
@@ -10518,7 +10518,7 @@ ShallowWrapper {
                         description="Network"
                         iconClass="fa-exclamation-circle"
                         mode="danger"
-                        number="Unhealthy"
+                        number="UNKNOWN"
                       />,
                       "replace": false,
                       "to": "",
@@ -10533,7 +10533,7 @@ ShallowWrapper {
                         "description": "Network",
                         "iconClass": "fa-exclamation-circle",
                         "mode": "danger",
-                        "number": "Unhealthy",
+                        "number": "UNKNOWN",
                       },
                       "ref": null,
                       "rendered": null,
