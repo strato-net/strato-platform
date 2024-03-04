@@ -28,18 +28,17 @@ let healthBody = {
       latestCheckTimestamp: null,
       lastFailureTimestamp: null,
     },
-    systemHealth: {
-      health: null,
-      systemInfo: null,
-      warnings: null,
-      unhealthyProcess: null,
-      latestCheckTimestamp: null,
-      lastFailureTimestamp: null,
-    },
     stallHealth: {
       health: null,
       validBlocksIncreased: null,
       hasPendingTxs: null,
+      latestCheckTimestamp: null,
+      lastFailureTimestamp: null,
+    },
+    systemHealth: {
+      health: null,
+      systemInfo: null,
+      warnings: null,
       latestCheckTimestamp: null,
       lastFailureTimestamp: null,
     },
@@ -48,7 +47,10 @@ let healthBody = {
 
 let networkHealthInfo = {
   latestHealthStatus: false,
-  additionalInfo: "{}",
+  additionalInfo: JSON.stringify({
+    needsAttention: true,
+    statusMessage: "UNKNOWN",
+  }),
 };
 
 const counter = new Prometheus.Counter({
@@ -149,16 +151,14 @@ async function getHealthStatus() {
     emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_SYSTEM_INFO, {
       status: healthBody.healthData.systemHealth.health,
       warnings: healthBody.healthData.systemHealth.warnings,
-      stats: healthBody.healthData.systemHealth.stats,
+      systemInfo: healthBody.healthData.systemHealth.systemInfo,
     });
   }
 
   if (networkHealthInfo) {
     emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_NETWORK_HEALTH, {
       status: networkHealthInfo.latestHealthStatus,
-      additionalInfo: networkHealthInfo
-        ? JSON.parse(networkHealthInfo.additionalInfo)
-        : null,
+      statusMessage: JSON.parse(networkHealthInfo.additionalInfo).statusMessage,
     });
   }
 }
@@ -185,14 +185,14 @@ function initialHydrateSystemInfo(socket) {
   socket.emit(`PRELOAD_${GET_SYSTEM_INFO}`, {
     status: healthBody.healthData.systemHealth.health,
     warnings: healthBody.healthData.systemHealth.warnings,
-    stats: healthBody.healthData.systemHealth.stats,
+    systemInfo: healthBody.healthData.systemHealth.systemInfo,
   });
 }
 
 function initialHydrateNetworkHealthInfo(socket) {
   socket.emit(`PRELOAD_${GET_NETWORK_HEALTH}`, {
     status: networkHealthInfo.latestHealthStatus,
-    additionalInfo: JSON.parse(networkHealthInfo.additionalInfo),
+    statusMessage: JSON.parse(networkHealthInfo.additionalInfo).statusMessage,
   });
 }
 

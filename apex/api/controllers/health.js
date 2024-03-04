@@ -5,6 +5,8 @@ const rp = require("request-promise");
 const config = require("../config/app.config");
 const utils = require("../lib/utils");
 
+const API_VERSION = "1.0";
+
 module.exports = {
   ping: async function (req, res) {
     res.status(200).send("pong");
@@ -35,10 +37,10 @@ module.exports = {
       let healthBody = {
         healthStatus: null,
         healthIssues: null,
+        uptime: null,
         healthData: {
           healthChecks: {
             health: null,
-            uptime: null,
             latestCheckTimestamp: null,
             lastFailureTimestamp: null,
           },
@@ -48,18 +50,17 @@ module.exports = {
             latestCheckTimestamp: null,
             lastFailureTimestamp: null,
           },
-          systemHealth: {
-            health: null,
-            systemInfo: null,
-            warnings: null,
-            unhealthyProcess: null,
-            latestCheckTimestamp: null,
-            lastFailureTimestamp: null,
-          },
           stallHealth: {
             health: null,
             validBlocksIncreased: null,
             hasPendingTxs: null,
+            latestCheckTimestamp: null,
+            lastFailureTimestamp: null,
+          },
+          systemHealth: {
+            health: null,
+            systemInfo: null,
+            warnings: null,
             latestCheckTimestamp: null,
             lastFailureTimestamp: null,
           },
@@ -85,6 +86,7 @@ module.exports = {
       }
 
       res.status(200).json({
+        apiVersion: API_VERSION,
         version: process.env.STRATO_VERSION,
         timestamp: +new Date() / 1000,
         lastBlock: {
@@ -105,28 +107,17 @@ module.exports = {
 
   healthStatus: async function (req, res, next) {
     try {
-      let healthBody = {
-        health: null,
-        healthData: {
-          healthChecks: {
-            health: null,
-            uptime: null,
-            latestCheckTimestamp: null,
-            lastFailureTimestamp: null,
-          },
-        },
-      };
-
+      let health = null;
       const [healthInfo, stallInfo, systemInfo, syncInfo] =
         await getLatestHealth();
 
       if (healthInfo && stallInfo && systemInfo && syncInfo) {
-        healthBody = utils.consolidateHealthData(
+        ({ health } = utils.consolidateHealthData(
           healthInfo,
           stallInfo,
           systemInfo,
           syncInfo
-        );
+        ));
       } else {
         winston.warn(
           `Health table has no entries; Health endpoint is called too soon`
@@ -134,14 +125,10 @@ module.exports = {
       }
 
       res.status(200).json({
+        apiVersion: API_VERSION,
         version: process.env.STRATO_VERSION,
         timestamp: +new Date() / 1000,
-        health: healthBody.health,
-        healthData: {
-          healthChecks: {
-            ...healthBody.healthData.healthChecks,
-          },
-        },
+        health: health,
       });
     } catch (error) {
       console.error(error);

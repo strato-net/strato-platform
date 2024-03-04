@@ -188,14 +188,14 @@ const reducer = function (state = initialState, action) {
       return {
         ...state,
         networkStatus: action.data.status,
-        networkInfo: action.data.additionalInfo,
+        networkStatusMessage: action.data.statusMessage,
       };
 
     case UPDATE_NETWORK_HEALTH:
       return {
         ...state,
         networkStatus: action.data.status,
-        networkInfo: action.data.additionalInfo,
+        networkStatusMessage: action.data.statusMessage,
       };
 
     case CHANGE_HEALTH_STATUS:

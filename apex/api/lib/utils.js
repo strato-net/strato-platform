@@ -45,12 +45,12 @@ function consolidateHealthData(healthInfo, stallInfo, systemInfo, syncInfo) {
     health,
     healthStatus,
     healthIssues,
+    uptime: healthStatHealth
+      ? currentTime - healthInfo.lastFailureTimestamp
+      : 0,
     healthData: {
       healthChecks: {
         health: healthStatHealth,
-        uptime: healthStatHealth
-          ? currentTime - healthInfo.lastFailureTimestamp
-          : 0,
         latestCheckTimestamp: healthInfo.latestCheckTimestamp,
         lastFailureTimestamp: healthInfo.lastFailureTimestamp,
       },
@@ -60,20 +60,19 @@ function consolidateHealthData(healthInfo, stallInfo, systemInfo, syncInfo) {
         latestCheckTimestamp: syncInfo.latestCheckTimestamp,
         lastFailureTimestamp: syncInfo.lastFailureTimestamp,
       },
-      systemHealth: {
-        health: systemStatHealth,
-        systemInfo: JSON.parse(systemInfo.additionalInfo),
-        warnings: systemWarnings,
-        stats: JSON.parse(systemInfo.additionalInfo),
-        latestCheckTimestamp: systemInfo.latestCheckTimestamp,
-        lastFailureTimestamp: systemInfo.lastFailureTimestamp,
-      },
       stallHealth: {
         health: stallStatHealth,
         validBlocksIncreased: stallInfo.validBlocksIncreased,
         hasPendingTxs: stallInfo.hasPendingTxs,
         latestCheckTimestamp: stallInfo.latestCheckTimestamp,
         lastFailureTimestamp: stallInfo.lastFailureTimestamp,
+      },
+      systemHealth: {
+        health: systemStatHealth,
+        systemInfo: JSON.parse(systemInfo.additionalInfo),
+        warnings: systemWarnings,
+        latestCheckTimestamp: systemInfo.latestCheckTimestamp,
+        lastFailureTimestamp: systemInfo.lastFailureTimestamp,
       },
     },
   };

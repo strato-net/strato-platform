@@ -202,6 +202,7 @@ class Dashboard extends Component {
       : false;
     const metadata = this.props.appMetadata.metadata;
     const networkHealth = this.props.dashboard.networkStatus;
+    const networkStatusMessage = this.props.dashboard.networkStatusMessage;
 
     return (
       <div className="container-fluid pt-dark" id="tour-welcome">
@@ -356,7 +357,7 @@ class Dashboard extends Component {
             <div className="row">
               <Link to="">
                 <NumberCard
-                  number={networkHealth ? "Healthy" : "Unhealthy"}
+                  number={networkStatusMessage || "UNKNOWN"}
                   description="Network"
                   iconClass={
                     networkHealth ? "fa-check-circle" : "fa-exclamation-circle"
