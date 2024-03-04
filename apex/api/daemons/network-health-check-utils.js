@@ -83,13 +83,14 @@ async function updateNetworkHealthStatus(status, statusMessage) {
         lastFailureTimestamp: !status.needsAttention
           ? stat.lastFailureTimestamp
           : currentTime,
-        additionalInfo: JSON.stringify(status),
+        additionalInfo: JSON.stringify({ ...status, statusMessage }),
       },
       {
         where: { processName: "NetworkHealthStat" },
       }
     );
   }
+
   return;
 }
 
