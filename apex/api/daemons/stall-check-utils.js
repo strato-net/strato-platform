@@ -121,12 +121,12 @@ async function getBaggerPending() {
     }
 }
 
-async function getCurrentHealth(pendingBlocksCount_prev, pendingBlocksCount_current, validBlocksCount_prev, validBlocksCount_current){
+async function getCurrentHealth(pendingTxsCount_prev, pendingTxsCount_current, validBlocksCount_prev, validBlocksCount_current){
     // If previous check had pending transactions and the current check has the same number of valid blocks as the previous node - the network is considered stalled
     // TODO: Potential flaw - what if the prev pending transaction got discarded and the current pending transactions are just new pending to be processed?
-    const stallHealthStatus = ! (pendingBlocksCount_prev > 0 && pendingBlocksCount_current > 0 && validBlocksCount_current === validBlocksCount_prev);
+    const stallHealthStatus = ! (pendingTxsCount_prev > 0 && pendingTxsCount_current > 0 && validBlocksCount_current === validBlocksCount_prev);
     const validBlocksCountIncreased = validBlocksCount_current > validBlocksCount_prev;
-    const hasPendingTxs = validBlocksCount_current > 0
+    const hasPendingTxs = pendingTxsCount_current > 0
     return {stallHealthStatus, validBlocksCountIncreased, hasPendingTxs}
 }
 
