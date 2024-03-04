@@ -41,6 +41,7 @@ import "react-responsive-carousel/lib/styles/carousel.min.css"; // requires a lo
 import { Carousel } from "react-responsive-carousel"
 import { Images } from "../../images";
 import ProductItemDetails from "./ProductItemDetails";
+import HelmetComponent from "../Helmet/HelmetComponent";
 
 const ProductDetails = ({ user, users }) => {
   const { state, pathname } = useLocation();
@@ -241,6 +242,8 @@ const ProductDetails = ({ user, users }) => {
     const parts = data.contract_name.split('-');
     return parts[parts.length - 1];
   };
+  
+  const URLlink = window.location.url;
 
   return (
     <>
@@ -253,6 +256,9 @@ const ProductDetails = ({ user, users }) => {
         </div>
       ) : (
         <div>
+          <HelmetComponent 
+          title={`${decodeURIComponent(details.name)} | `} // need to add category in the title,currently we are not getting category in the detail api
+          description={details?.description} link={URLlink} />
           <Row>
             <Breadcrumb className="text-xs   mb-4 md:mt-5  md:mb-6 lg:mb-[44px] ml-4 lg:ml-16">
               <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
