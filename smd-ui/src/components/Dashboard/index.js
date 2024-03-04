@@ -196,7 +196,7 @@ class Dashboard extends Component {
     const systemHealth = this.props.dashboard.systemStatus;
     const systemWarnings = this.props.dashboard.systemWarnings;
     const { cpu, memory, filesystem, networkStats } =
-      this.props.dashboard.stats || {};
+      this.props.dashboard.systemInfo || {};
     const synced = this.props.appMetadata.metadata
       ? this.props.appMetadata.metadata.isSynced
       : false;

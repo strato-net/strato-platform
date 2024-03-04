@@ -173,7 +173,7 @@ const reducer = function (state = initialState, action) {
         ...state,
         systemStatus: action.data.status,
         warnings: action.data.warnings,
-        stats: action.data.stats,
+        systemInfo: action.data.systemInfo,
       };
 
     case UPDATE_SYSTEM_INFO:
@@ -181,7 +181,7 @@ const reducer = function (state = initialState, action) {
         ...state,
         systemStatus: action.data.status,
         warnings: action.data.warnings,
-        stats: action.data.stats,
+        systemInfo: action.data.systemInfo,
       };
 
     case PRELOAD_NETWORK_HEALTH:

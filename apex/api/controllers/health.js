@@ -37,7 +37,7 @@ module.exports = {
       let healthBody = {
         healthStatus: null,
         healthIssues: null,
-        uptime: null,
+        uptime: 0,
         healthData: {
           healthChecks: {
             health: null,

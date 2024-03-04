@@ -15,10 +15,10 @@ const health = require("../../controllers/health");
 let healthBody = {
   healthStatus: null,
   healthIssues: null,
+  uptime: 0,
   healthData: {
     healthChecks: {
       health: null,
-      uptime: null,
       latestCheckTimestamp: null,
       lastFailureTimestamp: null,
     },
@@ -146,7 +146,7 @@ async function getHealthStatus() {
     emitter.emit(
       ON_SOCKET_PUBLISH_EVENTS,
       GET_NODE_UPTIME,
-      healthBody.healthData.healthChecks.uptime / 1000
+      healthBody.uptime / 1000
     );
     emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_SYSTEM_INFO, {
       status: healthBody.healthData.systemHealth.health,
@@ -175,10 +175,7 @@ function initialHydrateHealthStatus(socket) {
 }
 
 function initialHydrateUptime(socket) {
-  socket.emit(
-    `PRELOAD_${GET_NODE_UPTIME}`,
-    healthBody.healthData.healthChecks.uptime / 1000
-  );
+  socket.emit(`PRELOAD_${GET_NODE_UPTIME}`, healthBody.uptime / 1000);
 }
 
 function initialHydrateSystemInfo(socket) {
