@@ -16,19 +16,23 @@ async function singleCheck() {
     if (MONITOR_URL) {
       await queryNetworkHealthStatus();
     } else {
-      updateNetworkHealthStatus({
-        needsAttention: true,
-        statusMessage: "UNKNOWN",
-      });
+      updateNetworkHealthStatus(
+        {
+          needsAttention: true,
+        },
+        "UNKNOWN"
+      );
     }
 
     winston.info("Network health status queried at " + moment().format());
   } catch (err) {
     winston.error("Network health status error: " + err.message);
-    updateNetworkHealthStatus({
-      needsAttention: true,
-      statusMessage: "UNKNOWN",
-    });
+    updateNetworkHealthStatus(
+      {
+        needsAttention: true,
+      },
+      "UNKNOWN"
+    );
   }
 }
 
@@ -43,7 +47,10 @@ function queryNetworkHealthStatus() {
         `Network is ${status.needsAttention ? "unhealthy" : "healthy"}`
       );
       winston.info("Updating network health");
-      await updateNetworkHealthStatus(status);
+      await updateNetworkHealthStatus(
+        status,
+        `${status.needsAttention ? "UNHEALTHY" : "HEALTHY"}`
+      );
       winston.info("Network health updated");
       return resolve();
     } catch (error) {
@@ -57,10 +64,7 @@ function queryNetworkHealthStatus() {
   }).timeout(config.networkHealthCheck.requestTimeout - 80);
 }
 
-async function updateNetworkHealthStatus(status) {
-  const statusMessage =
-    status.statusMessage ||
-    `${status.needsAttention ? "UNHEALTHY" : "HEALTHY"}`;
+async function updateNetworkHealthStatus(status, statusMessage) {
   let currentTime = Date.now();
   let [stat, created] = await models.CurrentHealth.findOrCreate({
     where: { processName: "NetworkHealthStat" },
@@ -68,7 +72,7 @@ async function updateNetworkHealthStatus(status) {
       latestHealthStatus: !status.needsAttention,
       latestCheckTimestamp: currentTime,
       lastFailureTimestamp: currentTime, //default first time marked as failure
-      additionalInfo: JSON.stringify({ statusMessage, ...status }),
+      additionalInfo: JSON.stringify({ ...status, statusMessage }),
     },
   });
   if (!created) {
