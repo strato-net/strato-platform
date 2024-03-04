@@ -598,36 +598,6 @@ instance HasVault (ReaderT PrivateKey IO) where
   getPub = error "called getPub, but this should never happen"
   getShared _ = error "called getShared, but this should never happen"
 
-instance MonadIO m => (Keccak256 `A.Alters` (A.Proxy (Inbound WireMessage))) (MonadTest m) where
-  lookup _ k = do
-    wms <- use pbftMessages
-    pure $ if S.member k wms then Just (A.Proxy @(Inbound WireMessage)) else Nothing
-  insert _ k _ =
-    pbftMessages
-      %= ( \wms ->
-             let s = S.size wms
-                 wms' = if s >= 2000 then S.delete (head $ toList wms) wms else wms
-              in wms' S.>| k
-         )
-  delete _ k = pbftMessages %= S.delete k
-
-instance (Keccak256 `A.Alters` (A.Proxy (Inbound WireMessage))) m => (Keccak256 `A.Alters` (A.Proxy (Inbound WireMessage))) (MonadP2PTest m) where
-  lookup p k = lift $ A.lookup p k
-  insert p k v = lift $ A.insert p k v
-  delete p k = lift $ A.delete p k
-
-instance MonadIO m => ((Text, Keccak256) `A.Alters` (A.Proxy (Outbound WireMessage))) (MonadP2PTest m) where
-  lookup _ k = do
-    wms <- use outboundPbftMessages
-    pure $ if S.member k wms then Just (A.Proxy @(Outbound WireMessage)) else Nothing
-  insert _ k _ = do
-    wms <- use outboundPbftMessages
-    let s = S.size wms
-        wms' = if s >= 2000 then S.delete (head $ toList wms) wms else wms
-        wms'' = wms' S.>| k
-    assign outboundPbftMessages wms''
-  delete _ k = outboundPbftMessages %= S.delete k
-
 getMemContext :: MonadIO m => MonadTest m MemContext
 getMemContext = asks _p2pTestContext >>= fmap _vmContext . readTVarIO
 

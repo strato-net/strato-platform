@@ -74,7 +74,6 @@ const ProcessingOrder = ({user}) => {
       );
 
       const body = await response.json();
-      console.log(body);
       if (response.status === RestStatus.OK) {
         try {
           const cartObject = JSON.parse(body.data.metadata.cart);
@@ -82,7 +81,7 @@ const ProcessingOrder = ({user}) => {
             if (body.data["payment_status"] === "paid") {
               const customerEmail = user.email;
               const cart = JSON.parse(body.data.metadata.cart);
-              let object = { paymentSessionId: sessionId, status:ORDER_STATUS.AWAITING_FULFILLMENT, paymentMethod: body.data.payment_method, ...cart };
+              let object = { paymentSessionId: sessionId, status:ORDER_STATUS.PAID, paymentMethod: body.data.payment_method, ...cart };
               handleOrderConfirm(object, customerEmail);
             }
             else if (body.data["payment_method_options"].hasOwnProperty("us_bank_account")) {
@@ -190,7 +189,9 @@ const ProcessingOrder = ({user}) => {
         }
       });
       actions.addItemToCart(marketplaceDispatch, updatedCart);
-      navigate(routes.Orders.url.replace(':type', 'bought'));
+      setTimeout(() => {
+        navigate(routes.Orders.url.replace(':type', 'bought'));
+      }, 500);      
     } else {
       setTimeout(function () {
         navigate(routes.Checkout.url)
@@ -233,7 +234,7 @@ const ProcessingOrder = ({user}) => {
     {contextHolder}
     <div className="h-96 flex flex-col justify-center items-center">
       <Spin spinning={true} size="large" />
-      <p className="mt-4">Please wait while your order is placed successfully</p>
+      <p className="mt-4">Please wait while your order is being processed</p>
     </div>
     {error && openToastMarketplace("bottom")}
     {message && openToastOrder("bottom")}

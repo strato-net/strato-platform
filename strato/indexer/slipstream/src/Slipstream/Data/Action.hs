@@ -22,6 +22,7 @@ import Control.DeepSeq
 import Data.Aeson
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
+import qualified Data.Map.Ordered as OMap
 import Data.Maybe (fromMaybe, listToMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -61,7 +62,7 @@ data AggregateEvent = AggregateEvent
   deriving (Show, Generic, NFData, ToJSON, FromJSON)
 
 flatten :: Action -> [AggregateAction]
-flatten Action.Action {..} = flip map (M.toList _actionData) $
+flatten Action.Action {..} = flip map (OMap.assocs _actionData) $
   \(account, Action.ActionData {..}) ->
     -- It's a Create because I said so
     let t = fromMaybe Action.Create $ listToMaybe _actionDataCallTypes

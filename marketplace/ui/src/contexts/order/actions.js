@@ -26,6 +26,9 @@ const actionDescriptors = {
   fetchOrderLineItemDetails: "fetch_order_line_item_details",
   fetchOrderLineItemDetailsSuccessful: "fetch_order_line_item_details_successful",
   fetchOrderLineItemDetailsFailed: "fetch_order_line_item_details_failed",
+  fetchSaleQuantity: "fetch_sale_quantity",
+  fetchSaleQuantitySuccessful: "fetch_sale_quantity_successful",
+  fetchSaleQuantityFailed: "fetch_sale_quantity_failed",
   updateBuyerDetails: "update_buyer_details",
   updateBuyerDetailsSuccessful: "update_buyer_details_successful",
   updateBuyerDetailsFailed: "update_buyer_details_failed",
@@ -86,7 +89,7 @@ const actions = {
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
           type: actionDescriptors.createOrderFailed,
-          error: "Unauthorized while creating Order"
+          error: "Error while creating Order"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -126,13 +129,12 @@ const actions = {
         dispatch({
           type: actionDescriptors.createPaymentSuccessful,
           payload: body.data,
-        });
-        actions.setMessage(dispatch, "Payment created successfully", true);
+        });        
         return body.data;
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
           type: actionDescriptors.createPaymentFailed,
-          error: "Unauthorized while creating Order"
+          error: "Error while creating Order"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -420,6 +422,48 @@ const actions = {
     }
   },
 
+  fetchSaleQuantity: async (dispatch, saleAddresses, orderQuantity) => {
+    dispatch({ type: actionDescriptors.fetchSaleQuantity });
+    try {
+      const response = await fetch(`${apiUrl}/order/saleQuantity`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ saleAddresses, orderQuantity }),
+      });
+  
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchSaleQuantitySuccessful,
+          payload: body.data,
+        });
+
+        return body.data;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchSaleQuantityFailed,
+          error: "Unauthorized while fetching Order"
+        });
+        window.location.href = body.error.loginUrl;
+      }
+
+      dispatch({
+        type: actionDescriptors.fetchSaleQuantityFailed,
+        error: body.error,
+      });
+      return null;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.fetchSaleQuantityFailed,
+        error: "Error while fetching Order",
+      });
+    }
+  },
+
   updateBuyerDetails: async (dispatch, payload) => {
     dispatch({ type: actionDescriptors.updateBuyerDetails });
 
@@ -653,22 +697,22 @@ const actions = {
           type: actionDescriptors.createSaleOrderSuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, "Sale created successfully", true);
+        actions.setMessage(dispatch, "Order created successfully", true);
         return body.data;
       }
 
       dispatch({
         type: actionDescriptors.createSaleOrderFailed,
-        error: "Error while executing sale",
+        error: "There was an error processing your order. We are sorry for the inconvenience and will reach out to you to process a refund.",
       });
-      actions.setMessage(dispatch, "Error while creating sale");
+      actions.setMessage(dispatch, "There was an error processing your order. We are sorry for the inconvenience and will reach out to you to process a refund.");
       return false;
     } catch (err) {
       dispatch({
         type: actionDescriptors.createSaleOrderFailed,
-        error: "Error while creating Sale",
+        error: "There was an error processing your order. We are sorry for the inconvenience and will reach out to you to process a refund.",
       });
-      actions.setMessage(dispatch, "Error while creating sale");
+      actions.setMessage(dispatch, "There was an error processing your order. We are sorry for the inconvenience and will reach out to you to process a refund.");
     }
   },
 

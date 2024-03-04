@@ -13,6 +13,7 @@ abstract contract Order is Utils {
         CLOSED,
         CANCELED,
         PAYMENT_PENDING,
+        PAID,
         MAX
     }
 

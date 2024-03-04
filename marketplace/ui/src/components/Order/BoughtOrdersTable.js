@@ -229,7 +229,7 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOr
       title: "Order Total ($)",
       dataIndex: "orderTotal",
       key: "orderTotal",
-      render: (text) => <p>{text}</p>,
+      render: (text) => <p className="sm:w-20 lg:w-28 lg:pr-5 text-right">{text}</p>,
     },
     {
       dataIndex: "date",
@@ -302,6 +302,8 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOr
     } else if (status === "Payment Pending") {
       textClass = "bg-[#FF8C0033]"
     } else if (status === "Closed") {
+      textClass = "bg-[#119B2D33]";
+    } else if (status === "Paid") {
       textClass = "bg-[#119B2D33]";
     } else if (status === "Canceled") {
       textClass = "bg-[#FFF0F0]";

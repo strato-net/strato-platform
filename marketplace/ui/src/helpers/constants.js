@@ -4,9 +4,9 @@ export const apiUrl = process.env.REACT_APP_URL
   ? process.env.REACT_APP_URL + "/api/v1"
   : "/api/v1";
 
-export const fileServerUrl = process.env.FILE_SERVER_URL
-  ? process.env.FILE_SERVER_URL
-  : "https://fileserver.mercata-testnet2.blockapps.net/highway/"; // TODO: Don't hardcode this here?
+export const fileServerUrl = window.FILE_SERVER_URL === '__FILE_SERVER_URL__'
+  ? 'https://fileserver.mercata-testnet2.blockapps.net/highway' // hardcoding for non-dockerized dev mode
+  : window.FILE_SERVER_URL;
 
 export const cirrusUrl = process.env.REACT_APP_URL
   ? process.env.REACT_APP_URL + "/cirrus/search"
@@ -142,7 +142,8 @@ export const ORDER_STATUS = {
   "AWAITING_SHIPMENT": 2,
   "CLOSED": 3,
   "CANCELED": 4,
-  "PAYMENT_PENDING": 5
+  "PAYMENT_PENDING": 5,
+  "PAID": 6
 }
 
 export const PAYMENT_LIST = ['card','us_bank_account']

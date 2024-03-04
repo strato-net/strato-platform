@@ -74,7 +74,7 @@ bloc =
     :<|> postBlocTransactionBody
     :<|> postBlocTransactionUnsigned
     :<|> postBlocTransaction
-    :<|> postBlocTransactionExternal
+    :<|> postBlocTransactionParallelExternal
 
 --serveBloc :: BlocEnv -> Server BlocAPI
 --serveBloc env = hoistServer blocApi (enterBloc env) bloc
