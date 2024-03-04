@@ -15,7 +15,7 @@ import { setCookie } from "../../helpers/cookie";
 import { Images } from '../../images';
 import images_placeholder from "../../images/resources/image_placeholder.png"
 
-const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, contextHolder }) => {
+const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, contextHolder, isUserProfile=false }) => {
     const [quantity, setQuantity] = useState(1)
 
     let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
@@ -111,17 +111,19 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                             setCookie("returnUrl", `/marketplace/productList/${topSellingProduct.address}`, 10);
                             window.location.href = loginUrl;
                         } else {
+                            const dataLayerEventName = isUserProfile ? 'buy_now_from_user_profile' : 'buy_now_from_top_selling_product';
                             window.LOQ.push(['ready', async LO => {
-                                await LO.$internal.ready('events')
-                                LO.events.track('Buy Now (from Top Selling Product)', {
+                                await LO.$internal.ready('events');
+                                const eventName = isUserProfile ? 'Buy Now (from User Profile)' : 'Buy Now (from Top Selling Product)';
+                                LO.events.track(eventName, {
                                     product: topSellingProduct.name,
                                     category: topSellingProduct.category,
                                     productId: topSellingProduct.productId
-                                })
-                            }])
+                                });
+                            }]);
                             TagManager.dataLayer({
                                 dataLayer: {
-                                    event: 'buy_now_from_top_selling_product',
+                                    event: dataLayerEventName,
                                     product_name: topSellingProduct.name,
                                     category: topSellingProduct.category,
                                     productId: topSellingProduct.productId

@@ -21,7 +21,7 @@ import {
   useMarketplaceDispatch,
   useMarketplaceState,
 } from "../../contexts/marketplace";
-import NewTrendingCard from './NewTrendingCard';
+import NewTrendingCard from "../MarketPlace/NewTrendingCard";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
 import { actions as categoryActions } from "../../contexts/category/actions";
 import InventoryCard from "../Inventory/InventoryCard";
@@ -73,7 +73,6 @@ const UserProfile = (user) => {
     useEffect(() => {
       const searchParams = new URLSearchParams(window.location.search);
       const tab = searchParams.get('tab');
-      console.log(tab)
       // Check if the 'tab' query parameter is set to 'my-activity'
       if (tab === 'my-activity') {
         setActiveTab('2'); // Set '2' to open the "My Activity" tab
@@ -474,6 +473,7 @@ const UserProfile = (user) => {
                         topSellingProduct={product}
                         key={index}
                         addItemToCart={addItemToCart}
+                        isUserProfile={true}
                       />
                     ))}
                   </div>
