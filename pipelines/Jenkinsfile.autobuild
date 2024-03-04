@@ -53,7 +53,7 @@ pipeline {
     stage('Build') {
       steps {
         sh 'rm -rf .docker-work'
-        sh 'REPO=private make all_develop'
+        sh 'REPO=private make all'
         dir ('blockapps-rest') {
           sh 'yarn install --pure-lockfile'
           sh 'yarn build'
