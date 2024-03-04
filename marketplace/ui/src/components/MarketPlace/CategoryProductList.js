@@ -101,22 +101,28 @@ const CategoryProductList = ({ user }) => {
   };
 
   useEffect(() => {
-    let selection = subCategorys.map(item => item.contract)
-    selection = selection.filter((item) => {
-      if (unSelected.includes(item)) { }
-      else { return item }
-    })
-    setSelectedSubCategories(selection)
-    setSubCategories(subCategorys);
-  }, [subCategorys]);
-
+    let selection = subCategorys
+      .map(item => item.contract)
+      .filter(item => !unSelected.includes(item));
+  
+    // Update only if there's a change
+    if (JSON.stringify(selection) !== JSON.stringify(selectedSubCategories)) {
+      setSelectedSubCategories(selection);
+    }
+  
+    // update subCategories only if it's different
+    if (JSON.stringify(subCategorys) !== JSON.stringify(subCategories)) {
+      setSubCategories(subCategorys);
+    }
+  }, [unSelected, subCategorys, selectedSubCategories, subCategories]);
+  
   useEffect(() => {
     let categorys = null;
     if (selectedCategories.length) {
       categorys = arrayToStr(selectedCategories);
       subCategoryActions.fetchSubCategoryList(subCategoryDispatch, categorys);
     }
-  }, [selectedCategories]);
+  }, [subCategoryDispatch, selectedCategories]);
 
   const onChangeSubCategory = (e) => {
     let valuesChecked = checkValues(e, selectedSubCategories)
