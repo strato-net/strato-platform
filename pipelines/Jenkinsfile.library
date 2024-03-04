@@ -213,7 +213,7 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
     sh '''#!/bin/bash -le
       check_availability() {
         counter=0
-        until curl --silent --fail --location https://$(</host):8080/health | jq .healthData.healthChecks.health | grep true
+        until curl --silent --fail --location https://$(</host):8080/health | jq .health | grep true
         do
           if [[ "$counter" -gt 120 ]]; then
             echo "STRATO node took longer than 2 minutes to initialize! aborting."
