@@ -70,15 +70,16 @@ abstract contract Order is Utils {
         status = _status;
         shippingAddressId = _shippingAddressId;
         paymentSessionId = _paymentSessionId;
-        
-        if(status == OrderStatus.PAID)
+
+        // Credit Card Payment Orders go in this block
+        if(status == OrderStatus.AWAITING_FULFILLMENT)
         {
             completeOrder(_createdDate,"Thank you for your payment.");
         }
     }
 
-    function completeOrder(uint _fulfillmentDate, string _comments) returns (uint) {
-        require(status != OrderStatus.CLOSED && status != OrderStatus.CANCELED, "Order already closed.");
+    function completeOrder(uint _fulfillmentDate, string _comments) public returns (uint) {
+        require(status == OrderStatus.AWAITING_FULFILLMENT, "Order is not in AWAITING FULFILLMENT state.");
         for (uint i = 0; i < saleAddresses.length; i++) {
             if (!completedSales[i]) {
                 Sale(saleAddresses[i]).completeSale();
@@ -133,7 +134,7 @@ abstract contract Order is Utils {
 
     function onCancel(string _comments) internal virtual {}
 
-    function cancelOrder(string _comments)  returns (uint) {
+    function cancelOrder(string _comments) external returns (uint) {
         require(status != OrderStatus.CLOSED && status != OrderStatus.CANCELED, "Order already closed.");
         require((tx.origin == purchasersAddress || getCommonName(tx.origin) == sellersCommonName), "Only the purchaser/seller can cancel the order");
         onCancel(_comments);
