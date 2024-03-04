@@ -30,7 +30,7 @@ const CategoryCard = () => {
         Shop by Category
       </Title>
       </Fade>
-      <Fade direction="left">
+      <Fade direction="left" triggerOnce>
       <div className="flex justify-start sm:justify-center md:justify-start gap-3 lg:gap-[15px] flex-wrap px-0 md:px-10 xl:grid xl:grid-cols-6">
         {categorys.map((category, index) => {
           return (

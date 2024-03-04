@@ -205,7 +205,7 @@ const TopSellingProductCard = () => {
           >
             {"<"}
           </div>
-          <Fade direction="right">
+          <Fade direction="right" triggerOnce>
           <div
             ref={containerRef}
             className="overflow-x-auto gap-6 px-1 py-2 flex trending_cards"
