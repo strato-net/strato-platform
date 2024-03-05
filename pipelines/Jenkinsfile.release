@@ -279,8 +279,10 @@ pipeline {
     always {
       dir ('strato-getting-started') {
         sh 'rm -rf strato_logs*'
-        sh './fetchlogs --as-dir'
-        archiveArtifacts artifacts: 'strato_logs/**', fingerprint: true
+        sh './fetchlogs'
+        sh 'sudo chmod 777 strato_logs.zip'
+        archiveArtifacts artifacts: 'strato_logs.zip', fingerprint: true, allowEmptyArchive: true
+        sh 'sudo rm -rf strato_logs.zip'
       }
     }
 
