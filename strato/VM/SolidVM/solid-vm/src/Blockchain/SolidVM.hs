@@ -2532,13 +2532,12 @@ callBuiltin "keccak256" args Nothing = do
   let allStrings [] = True
       allStrings ((SString _) : xs) = True && (allStrings xs)
       allStrings _ = False
-      customConcat :: [Value] -> String 
       customConcat [] = ""
       customConcat ((SString str) : ys) = str ++ customConcat ys
       customConcat _ = invalidArguments "cannot use a non string arguments in keccak256" args
   case allStrings args of
     False -> invalidArguments "cannot use a non string arguments in keccak256" args
-    True -> return . SString . keccak256ToHex . hash . BC.pack $ customConcat args
+    True -> return . SString . BC.unpack . keccak256ToByteString . hash . BC.pack $ customConcat args
 callBuiltin ("ecrecover") [SString h, SInteger v, SString r, SString s] _ = case B16.decode (BC.pack h) of
   Left err -> invalidArguments err ("" :: String)
   Right bytestringHash -> do
