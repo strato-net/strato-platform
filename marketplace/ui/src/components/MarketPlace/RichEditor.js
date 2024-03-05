@@ -1,27 +1,170 @@
-import React, { useState } from "react";
-import { useEditor, EditorContent, EditorProvider } from "@tiptap/react";
+import React, { useState, useEffect } from "react";
+import { useEditor, EditorContent, BubbleMenu, Extension } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Color from "@tiptap/extension-color";
 import TextStyle from "@tiptap/extension-text-style";
 import ListItem from "@tiptap/extension-list-item";
 import TextAlign from "@tiptap/extension-text-align";
+import Link from "@tiptap/extension-link";
 import "./index.css";
+import { Dropdown } from "antd";
+import { DownOutlined } from "@ant-design/icons";
+import {
+  BoldOutlined,
+  ItalicOutlined,
+  StrikethroughOutlined,
+  AlignLeftOutlined,
+  AlignCenterOutlined,
+  AlignRightOutlined,
+  OrderedListOutlined,
+  UnorderedListOutlined,
+  LinkOutlined,
+} from "@ant-design/icons";
 
-const MenuBar = ({ editor }) => {
+const FontSize = Extension.create({
+  name: "fontSize",
+
+  addGlobalAttributes() {
+    return [
+      {
+        types: ["textStyle"],
+        attributes: {
+          fontSize: {
+            default: null,
+            parseHTML: (element) => element.style.fontSize,
+            renderHTML: (attributes) => {
+              if (!attributes.fontSize) {
+                return {};
+              }
+              return { style: `font-size: ${attributes.fontSize}` };
+            },
+          },
+        },
+      },
+    ];
+  },
+
+  addCommands() {
+    return {
+      setFontSize:
+        (fontSize) =>
+        ({ chain }) => {
+          return chain().setMark("textStyle", { fontSize }).run();
+        },
+      unsetFontSize:
+        () =>
+        ({ chain }) => {
+          return chain()
+            .setMark("textStyle", { fontSize: null })
+            .removeEmptyTextStyle()
+            .run();
+        },
+    };
+  },
+});
+
+const FontFamily = Extension.create({
+  name: "fontFamily",
+
+  addGlobalAttributes() {
+    return [
+      {
+        types: ["textStyle"],
+        attributes: {
+          fontFamily: {
+            default: null,
+            parseHTML: (element) => element.style.fontFamily,
+            renderHTML: (attributes) => {
+              if (!attributes.fontFamily) {
+                return {};
+              }
+              return { style: `font-family: ${attributes.fontFamily}` };
+            },
+          },
+        },
+      },
+    ];
+  },
+
+  addCommands() {
+    return {
+      setFontFamily:
+        (fontFamily) =>
+        ({ chain }) => {
+          return chain().setMark("textStyle", { fontFamily }).run();
+        },
+      unsetFontFamily:
+        () =>
+        ({ chain }) => {
+          return chain()
+            .setMark("textStyle", { fontFamily: null })
+            .removeEmptyTextStyle()
+            .run();
+        },
+    };
+  },
+});
+
+const MenuBar = ({ editor, addLink }) => {
+  const [selectedFontSize, setSelectedFontSize] = useState("12px");
+  const [selectedFontFamily, setSelectedFontFamily] = useState("Arial");
+
   if (!editor) {
-    return null;
+    return;
   }
 
-  // Define preset colors
-  const colors = [
-    { name: "purple", value: "#958DF1" },
-    { name: "red", value: "#F98181" },
-    { name: "orange", value: "#FBBC88" },
-    { name: "yellow", value: "#FAF594" },
-    { name: "blue", value: "#70CFF8" },
-    { name: "teal", value: "#94FADB" },
-    { name: "green", value: "#B9F18D" },
+  editor.on("selectionUpdate", ({ editor }) => {
+    const attrs = editor.getAttributes("textStyle");
+
+      // Set the active attributes if they are consistent across the selection
+      setSelectedFontSize(attrs.fontSize || "");
+      setSelectedFontFamily(
+        attrs.fontFamily ? attrs.fontFamily.split(",")[0] : ""
+      );
+  });
+
+  const fontSizes = [
+    "12px",
+    "14px",
+    "16px",
+    "18px",
+    "20px",
+    "24px",
+    "28px",
+    "32px",
+    "36px",
   ];
+
+  const handleFontSizeClick = (key) => {
+    const fontSize = fontSizes[key];
+    editor.chain().focus().setFontSize(fontSize).run();
+    setSelectedFontSize(fontSize);
+  };
+
+  const fontSizeMenuItems = fontSizes.map((size, index) => ({
+    key: index.toString(),
+    label: size,
+  }));
+
+  const fontFamilies = [
+    "Arial, sans-serif",
+    "Georgia, serif",
+    "Impact, sans-serif",
+    "Tahoma, sans-serif",
+    "Times New Roman, serif",
+    "Verdana, sans-serif",
+  ];
+
+  const handleFontFamilyClick = (key) => {
+    const fontFamily = fontFamilies[key];
+    editor.chain().focus().setFontFamily(fontFamily).run();
+    setSelectedFontFamily(fontFamily);
+  };
+
+  const fontFamilyMenuItems = fontFamilies.map((family, index) => ({
+    key: index.toString(),
+    label: family,
+  }));
 
   return (
     <>
@@ -72,34 +215,32 @@ const MenuBar = ({ editor }) => {
         Right
       </button>
 
-      {/* Clear Marks */}
-      <button onClick={() => editor.chain().focus().unsetAllMarks().run()}>
-        Clear Marks
-      </button>
-
-      {/* Clear Nodes */}
-      <button onClick={() => editor.chain().focus().clearNodes().run()}>
-        Clear Nodes
-      </button>
-
-      {/* Paragraph */}
-      <button
-        onClick={() => editor.chain().focus().setParagraph().run()}
-        className={editor.isActive("paragraph") ? "is-active" : ""}
+      <Dropdown
+        className="ant-dropdown-link"
+        menu={{
+          items: fontSizeMenuItems,
+          onClick: ({ key }) => handleFontSizeClick(key),
+        }}
+        trigger={["click"]}
       >
-        Paragraph
-      </button>
-
-      {/* Headings */}
-      {[1, 2, 3, 4, 5, 6].map((level) => (
-        <button
-          key={level}
-          onClick={() => editor.chain().focus().toggleHeading({ level }).run()}
-          className={editor.isActive("heading", { level }) ? "is-active" : ""}
-        >
-          H{level}
+        <button onClick={(e) => e.preventDefault()}>
+          {selectedFontSize || "12px"} <DownOutlined />
         </button>
-      ))}
+      </Dropdown>
+
+      <Dropdown
+        className="ant-dropdown-link"
+        menu={{
+          items: fontFamilyMenuItems,
+          onClick: ({ key }) => handleFontFamilyClick(key),
+        }}
+        trigger={["click"]}
+      >
+        <button onClick={(e) => e.preventDefault()}>
+          {selectedFontFamily ? selectedFontFamily.split(",")[0] : "Arial"}{" "}
+          <DownOutlined />
+        </button>
+      </Dropdown>
 
       {/* Bullet List */}
       <button
@@ -125,14 +266,17 @@ const MenuBar = ({ editor }) => {
         Blockquote
       </button>
 
+      {/* Button for inserting links */}
+      <button onClick={addLink}>Insert Link</button>
+
       {/* Horizontal Rule */}
       <button onClick={() => editor.chain().focus().setHorizontalRule().run()}>
-        Horizontal Rule
+        Divider
       </button>
 
       {/* Hard Break */}
       <button onClick={() => editor.chain().focus().setHardBreak().run()}>
-        Hard Break
+        New Line
       </button>
 
       {/* Undo */}
@@ -150,34 +294,39 @@ const MenuBar = ({ editor }) => {
       >
         Redo
       </button>
+      {/* Clear Marks */}
+      <button onClick={() => editor.chain().focus().unsetAllMarks().run()}>
+        Clear Marks
+      </button>
 
-      {/* Color */}
-      {colors.map((color) => (
-        <button
-          key={color.name}
-          onClick={() => editor.chain().focus().setColor(color.value).run()}
-          className={
-            editor.isActive("textStyle", { color: color.value })
-              ? "is-active"
-              : ""
-          }
-          style={{ backgroundColor: color.value, color: "#fff" }} // Add more styling as needed
-        >
-          {color.name}
-        </button>
-      ))}
+      {/* Clear Nodes */}
+      <button onClick={() => editor.chain().focus().clearNodes().run()}>
+        Clear Formatting
+      </button>
 
       {/* Custom color picker */}
-      <button>
+      <div className="toolbar-color-picker">
         <input
           type="color"
-          className="toolbar-color-input"
           onInput={(event) =>
             editor.chain().focus().setColor(event.target.value).run()
           }
           value={editor.getAttributes("textStyle").color || "#000000"} // Default color
+          style={{
+            opacity: 0,
+            position: "absolute",
+            zIndex: -1,
+          }}
         />
-      </button>
+        <button
+          onClick={() =>
+            document.querySelector(".toolbar-color-picker input").click()
+          }
+          className="toolbar-button"
+        >
+          Color
+        </button>
+      </div>
     </>
   );
 };
@@ -191,6 +340,9 @@ const Tiptap = () => {
       TextAlign.configure({
         types: ["heading", "paragraph"], // Make sure to configure it for the node types you want to align.
       }),
+      Link,
+      FontSize,
+      FontFamily,
     ],
     content: `<p>Hello World!</p>`,
   });
@@ -199,9 +351,96 @@ const Tiptap = () => {
     return null; // Or some loading state
   }
 
+  const addLink = () => {
+    // Prompt the user for a URL
+    const url = window.prompt("Enter the URL");
+
+    // Check if a URL was provided
+    if (url) {
+      // Use the editor commands to insert the link
+      editor
+        .chain()
+        .focus()
+        .extendMarkRange("link")
+        .setLink({ href: url })
+        .run();
+    }
+  };
+
   return (
     <div className="tiptap">
-      <MenuBar editor={editor} />
+      {editor && (
+        <BubbleMenu
+          className="bubble-menu"
+          editor={editor}
+          tippyOptions={{ duration: 100 }}
+        >
+          {/* Bold */}
+          <button
+            onClick={() => editor.chain().focus().toggleBold().run()}
+            disabled={!editor.can().chain().focus().toggleBold().run()}
+            className={editor.isActive("bold") ? "is-active" : ""}
+          >
+            <BoldOutlined />
+          </button>
+
+          {/* Italic */}
+          <button
+            onClick={() => editor.chain().focus().toggleItalic().run()}
+            disabled={!editor.can().chain().focus().toggleItalic().run()}
+            className={editor.isActive("italic") ? "is-active" : ""}
+          >
+            <ItalicOutlined />
+          </button>
+
+          {/* Strike */}
+          <button
+            onClick={() => editor.chain().focus().toggleStrike().run()}
+            disabled={!editor.can().chain().focus().toggleStrike().run()}
+            className={editor.isActive("strike") ? "is-active" : ""}
+          >
+            <StrikethroughOutlined />
+          </button>
+
+          {/* Align Text */}
+          <button
+            onClick={() => editor.chain().focus().setTextAlign("left").run()}
+          >
+            <AlignLeftOutlined />
+          </button>
+          <button
+            onClick={() => editor.chain().focus().setTextAlign("center").run()}
+          >
+            <AlignCenterOutlined />
+          </button>
+          <button
+            onClick={() => editor.chain().focus().setTextAlign("right").run()}
+          >
+            <AlignRightOutlined />
+          </button>
+
+          {/* Lists */}
+          <button
+            onClick={() => editor.chain().focus().toggleBulletList().run()}
+            className={editor.isActive("bulletList") ? "is-active" : ""}
+          >
+            <UnorderedListOutlined />
+          </button>
+          <button
+            onClick={() => editor.chain().focus().toggleOrderedList().run()}
+            className={editor.isActive("orderedList") ? "is-active" : ""}
+          >
+            <OrderedListOutlined />
+          </button>
+
+          {/* Insert Link */}
+          <button onClick={addLink}>
+            <LinkOutlined />
+          </button>
+        </BubbleMenu>
+      )}
+
+      <MenuBar editor={editor} addLink={addLink} />
       <EditorContent editor={editor} />
     </div>
   );

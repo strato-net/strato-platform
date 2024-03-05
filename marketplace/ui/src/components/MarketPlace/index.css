@@ -171,22 +171,33 @@ img.ant-image-preview-img {
   min-height: 100%; /* Ensures the padding applies even when the editor is empty */
 }
 
-.color-selector {
-  margin: 0 5px;
-  border: none;
-  height: 38px;
-  width: 38px;
-  cursor: pointer;
-  border-radius: 4px;
-  appearance: none;
-  -webkit-appearance: none;
-  outline: none;
+.toolbar-color-picker {
+  position: relative;
+  display: inline-block;
+  margin: 0;
+}
 
-  &::-webkit-color-swatch-wrapper {
-    padding: 0;
-  }
-  &::-webkit-color-swatch {
+
+
+.bubble-menu {
+  display: flex;
+  background-color: #0D0D0D;
+  padding: 0.2rem;
+  border-radius: 0.5rem;
+
+  button {
     border: none;
-    border-radius: 4px;
+    background: none;
+    color: #FFF;
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 0 0.2rem;
+    opacity: 0.6;
+
+    &:hover,
+    &.is-active {
+      opacity: 1;
+    }
   }
 }
+
