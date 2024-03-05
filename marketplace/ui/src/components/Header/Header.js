@@ -198,8 +198,19 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
         </div>
       )
     } : null,
-    user ? { value: "logout", path: "/logout", label: <div><p className="!mb-0">Logout</p><p className="text-xs text-gray">{user?.preferred_username}</p></div> } : null,
-  ]
+    user ? { 
+      value: "logout", 
+      path: "/logout", 
+      label: (
+        <div>
+          <p className="text-gray">{user?.commonName}</p>
+          <p className="text-xs text-gray">{user?.preferred_username}</p>
+          <p className="!mb-0">Logout</p>
+        </div>
+      )
+    } : null,
+  ].filter(Boolean);
+  
 
   const handleIntMenuTab = (data) => {
     data.value == 'logout' ? logout() : data.value == 'orders' ? navigate(routes.Orders.url.replace(':type', 'sold'), { state: { defaultKey: "Sold" } }) : navigate(data.path)
