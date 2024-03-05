@@ -41,6 +41,7 @@ import "react-responsive-carousel/lib/styles/carousel.min.css"; // requires a lo
 import { Carousel } from "react-responsive-carousel"
 import { Images } from "../../images";
 import ProductItemDetails from "./ProductItemDetails";
+import RichEditor from "./RichEditor";
 
 const ProductDetails = ({ user, users }) => {
   const { state, pathname } = useLocation();
@@ -527,12 +528,11 @@ const ProductDetails = ({ user, users }) => {
                         <Paragraph
                           className="text-[#202020] text-sm"
                         >
-                          {details?.description?.split('\n').map((line, index) => (
-                            <React.Fragment key={index}>
-                              {line}
-                              <br />
-                            </React.Fragment>
-                          ))}
+                          <RichEditor
+                            details={details}
+                            user={user}
+                            isAuthenticated={isAuthenticated}
+                          />
                         </Paragraph>
                       </div>
                     ),
