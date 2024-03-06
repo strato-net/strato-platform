@@ -207,7 +207,7 @@ export async function activate(context: vscode.ExtensionContext) {
 				const res = await rest.call(user, callArgs, nodeOptions);
 				vscode.window.showInformationMessage(`Successfully called function ${variableName} on ${contractName} at address ${contractAddress}`);
 				contractsProvider.refresh()
-			} catch (e) {
+			} catch (e: any) {
 				vscode.window.showErrorMessage(`${e}`);
 			}
 		} else {
