@@ -1870,7 +1870,7 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
                       _ -> typeError "This should not be possible to reach..." args'
                   salt = case convertedFirstArg of
                     SString s -> s
-                    _ -> typeError "first arugment must be a string " args
+                    _ -> typeError "first argument must be a string " args
                   newAddress =
                     getNewAddressWithSalt_unsafe
                       addr

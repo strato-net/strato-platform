@@ -336,6 +336,7 @@ simpleVariableDeclaration = do
   let isRecord = KRecord `elem` keywords
   -- check to see if the "account" variable is being used
   variableName <- identifier
+  when ('\'' `elem` variableName) $ fail "state variable names cannot contain single quotes" 
   pragmaVersion' <- getPragmaVersion
   when (isReservedWord pragmaVersion' variableName) $ reservedWordError pragmaVersion' variableName
   value <- optionMaybe $ do
