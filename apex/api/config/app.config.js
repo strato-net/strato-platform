@@ -14,7 +14,7 @@ module.exports = {
     pollTimeoutsForUnhealthy: 3, // number of timed out polls in a row to consider node unhealthy
     cleanFrequency: 5 * 60 * 1000, //clean db every 5 mins
     retentionHours: 1 * 24,
-    stallCheckProgressWindow: 10 * 60 * 1000,
+    stallCheckFrequency: 5 * 60 * 1000,
     memoryUsedAlertLevel: 80, // Alert when used memory (RAM) >= N%
     diskspaceUsedAlertLevel: 80, // Alert when used diskspace >= N%
     cpuAvgLoadAlertLevel: 97, // Alert when cpu avg load > N%

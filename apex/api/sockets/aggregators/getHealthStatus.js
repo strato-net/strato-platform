@@ -50,8 +50,6 @@ async function getHealthStatus() {
       'latestHealthStatus',
       'latestCheckTimestamp',
       'lastFailureTimestamp',
-      'isBlocksValidInc',
-      'isLastPending',
       'additionalInfo'
     ],
     raw: true,

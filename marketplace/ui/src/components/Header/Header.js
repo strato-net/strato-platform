@@ -146,13 +146,13 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     },
   ];
 
-  const stratoItem = [{
+  const stratsItem = [{
     key: '2',
     label: (
       <div>
         {user &&
           <p className="text-xs mt-1">
-            STRATs: {(Object.keys(strats).length > 0) ? strats : 0}
+            STRATs: {stratsBalance}
           </p>
         }
       </div>
@@ -320,7 +320,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
           }
 
           {(roleIndex !== undefined && roleIndex !== 1)
-            && <Dropdown menu={{ items: stratoItem }} placement="bottomRight" trigger={["hover","click"]} className="xs:mt-5 md:mt-0" overlayStyle={{ position: 'fixed' }}>
+            && <Dropdown menu={{ items: stratsItem }} placement="bottomRight" trigger={["hover","click"]} className="xs:mt-5 md:mt-0" overlayStyle={{ position: 'fixed' }}>
               <a onClick={(e) => e.preventDefault()} className="md:flex mx-2 text-base text-white" id="user-dropdown">
               <Badge
               style={{backgroundColor:"#13188A"}}
