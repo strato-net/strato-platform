@@ -303,8 +303,6 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOr
       textClass = "bg-[#FF8C0033]"
     } else if (status === "Closed") {
       textClass = "bg-[#119B2D33]";
-    } else if (status === "Paid") {
-      textClass = "bg-[#119B2D33]";
     } else if (status === "Canceled") {
       textClass = "bg-[#FFF0F0]";
     }
