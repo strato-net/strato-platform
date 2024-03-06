@@ -253,7 +253,9 @@ class Dashboard extends Component {
                     ? "Cannot connect to the Node's API"
                     : !health
                     ? `Health issues: ${
-                        healthIssues?.join(". ") || "unknown issue."
+                        healthIssues.length > 0
+                          ? healthIssues.join(". ")
+                          : "unknown issue."
                       }`
                     : "Connected to STRATO Mercata"}
                 </div>
