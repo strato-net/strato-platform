@@ -24,6 +24,7 @@ so that they could be properly moved to their respective version's subsection.
 
 ### Fixed
 - Contracts that inherit from abstract contracts at the grandparent+ level are indexed in Cirrus at all levels
+- State variable identifiers should not be allowed to have single quotes
 
 ### Removed
 - NewStatus message type from strato-p2p
