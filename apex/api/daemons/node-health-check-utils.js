@@ -423,7 +423,7 @@ async function checkSystemInfo(isGlobalPasswordSet) {
       available: memdata.available,
       total: memdata.total,
       use: {
-        value: useLevel.toFixed(2),
+        value: +useLevel.toFixed(2),
         isHealthy: useLevel < config.healthCheck.memoryUsedAlertLevel,
       },
     };
@@ -439,13 +439,13 @@ async function checkSystemInfo(isGlobalPasswordSet) {
       cores: cpudata.cores,
       physicalCores: cpudata.physicalCores,
       currentLoad: {
-        value: metadataLoad.currentLoad.toFixed(2),
+        value: +metadataLoad.currentLoad.toFixed(2),
         isHealthy:
           metadataLoad.currentLoad <
           config.healthCheck.cpuCurrentLoadAlertLevel,
       },
       avgLoad: {
-        value: ((metadataLoad.avgLoad * 100) / cpudata.cores).toFixed(2),
+        value: +((metadataLoad.avgLoad * 100) / cpudata.cores).toFixed(2),
         isHealthy:
           metadataLoad.avgLoad <
           (cpudata.cores * config.healthCheck.cpuAvgLoadAlertLevel) / 100,
@@ -475,7 +475,7 @@ async function checkSystemInfo(isGlobalPasswordSet) {
           size: fs.size,
           used: fs.used,
           use: {
-            value: fs.use.toFixed(2),
+            value: +fs.use.toFixed(2),
             isHealthy: isDiskHealthy,
           },
         });
