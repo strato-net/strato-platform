@@ -51,7 +51,7 @@ abstract contract Sale is Utils {
         string purchasersCommonName = order.purchasersCommonName();
         string err = "Only "
                    + sellersCommonName
-                   + ", "
+                   + ","
                    + purchasersCommonName
                    + " can perform "
                    + action
@@ -60,7 +60,7 @@ abstract contract Sale is Utils {
 
         require((commonName == purchasersCommonName || commonName == sellersCommonName), err);
 
-    }    
+    }
 
     function changePrice(uint _price) public requireSeller("change price"){
         price=_price;
