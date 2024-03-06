@@ -242,9 +242,18 @@ const ProductDetails = ({ user, users }) => {
     const parts = data.contract_name.split('-');
     return parts[parts.length - 1];
   };
+
+  function getCategoryName(str) {
+    const lastIndex = str.lastIndexOf('-');
+    if (lastIndex !== -1) {
+      return str.substring(lastIndex + 1);
+    } else {
+      return str;
+    }
+  }
   
   const assetName = decodeURIComponent(details?.name)
-  const contractName = decodeURIComponent(details?.contract_name)
+  const contractName = getCategoryName(decodeURIComponent(details?.contract_name))
 
   return (
     <>
