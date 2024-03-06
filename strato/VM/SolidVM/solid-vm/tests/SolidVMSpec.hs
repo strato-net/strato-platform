@@ -6380,14 +6380,14 @@ contract qq {
           [r|
 
 contract qq {
-  account contract';
+  account contractAddr;
   account payable contractPay;
   account owner;
   account payable ownerPay;
 
   constructor() public {
-    contract' = account(this);
-    contractPay = payable(contract');
+    contractAddr = account(this);
+    contractPay = payable(contractAddr);
     owner = account(0xdeadbeef);
     ownerPay = payable(owner);
   }
@@ -6398,13 +6398,13 @@ contract qq {
 }|]
     runBS contract
     -- Get the contract's accounts
-    [BAccount contract', BAccount owner] <- getFields ["contract'", "owner"]
+    [BAccount contractAddr, BAccount owner] <- getFields ["contractAddr", "owner"]
     -- Adjust the preset balances
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing contract') (\as -> pure $ as {addressStateBalance = 14})
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing contractAddr) (\as -> pure $ as {addressStateBalance = 14})
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing owner) (\bs -> pure $ bs {addressStateBalance = 10})
     -- Check return of balance
-    void $ call2 "selfDestructThis" "()" (namedAccountToAccount Nothing contract')
-    getFields ["contract'", "contractPay", "owner", "ownerPay"]
+    void $ call2 "selfDestructThis" "()" (namedAccountToAccount Nothing contractAddr)
+    getFields ["contractAddr", "contractPay", "owner", "ownerPay"]
       `shouldReturn` [ BDefault,
                        BDefault,
                        BDefault,
@@ -6527,10 +6527,10 @@ contract qq {
   X public x;
   Y public y;
   X public z;
-  bytes32 salt';
+  bytes32 saltString;
   constructor() public {
-    salt' = "salt";
-    x = new X{salt: salt'}();
+    saltString = "salt";
+    x = new X{salt: saltString}();
     y = new Y{salt: "something"}();
 
   }
@@ -6563,11 +6563,11 @@ contract qq {
   X public x;
   Y public y;
   X public z;
-  bytes32 salt';
+  bytes32 saltString;
   constructor() public {
-    salt' = "salt";
-    x = new X{salt: salt'}("xNum");
-    y = new Y{salt: salt'}(100);
+    saltString = "salt";
+    x = new X{salt: saltString}("xNum");
+    y = new Y{salt: saltString}(100);
 
   }
 }|]
