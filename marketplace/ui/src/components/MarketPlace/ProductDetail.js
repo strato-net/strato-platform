@@ -244,6 +244,7 @@ const ProductDetails = ({ user, users }) => {
   };
   
   const URLlink = window.location.url;
+  const AssetName = decodeURIComponent(details?.name)
 
   return (
     <>
@@ -257,8 +258,9 @@ const ProductDetails = ({ user, users }) => {
       ) : (
         <div>
           <HelmetComponent 
-          title={`${decodeURIComponent(details.name)} | `} // need to add category in the title,currently we are not getting category in the detail api
-          description={details?.description} link={URLlink} />
+          title={`${AssetName} | STRATO Mercata Marketplace`} // need to add category in the title,currently we are not getting category in the detail api
+          description={details?.description} 
+          link={URLlink} />
           <Row>
             <Breadcrumb className="text-xs   mb-4 md:mt-5  md:mb-6 lg:mb-[44px] ml-4 lg:ml-16">
               <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
@@ -302,10 +304,16 @@ const ProductDetails = ({ user, users }) => {
               } className="product_detail w-full  sm:w-[417px]   lg:h-[348px] md:w-[343px] lg:w-[417px]" showStatus={false} showArrows swipeable emulateTouch infiniteLoop >
                 {details.images.length > 0 ? details.images.map((element, index) => {
                   return (<><div key={index} className="sm:w-[343px ] h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
-                    <img width={"100%"} className="object-contain rounded-md h-full " src={element ? element : image_placeholder} />
+                    <img width={"100%"} 
+                    alt={AssetName}
+                    title="STRATO Mercata Marketplace"
+                    className="object-contain rounded-md h-full " src={element ? element : image_placeholder} />
                   </div></>)
                 }) : <><div className="sm:w-[343px ] sm:h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
-                  <img width={"100%"} className="object-contain rounded-md h-full " src={image_placeholder} />
+                  <img width={"100%"}
+                  title="STRATO Mercata Marketplace"
+                  alt={AssetName} 
+                  className="object-contain rounded-md h-full " src={image_placeholder} />
                 </div></>}
               </Carousel>
               <div className=" w-full lg:w-1/2 ">
@@ -403,7 +411,7 @@ const ProductDetails = ({ user, users }) => {
                     {ownerSameAsUser() ?
                       <Button
                         icon={<div className="flex justify-center items-center">
-                          <img src={Images.Cart} alt="cart" width={18} height={18} className="object-contain" />
+                          <img src={Images.Cart} alt="cart" title="STRATO Mercata Marketplace" width={18} height={18} className="object-contain" />
                         </div>}
                         className=" !w-9 h-9 border border-primary  !bg-[#13188A] rounded-md"
                         disabled={true}
@@ -446,7 +454,7 @@ const ProductDetails = ({ user, users }) => {
                       :
                       <Button
                         icon={<div className="flex justify-center items-center">
-                          <img src={Images.Cart} alt="cart" width={18} height={18} className="object-contain" />
+                          <img src={Images.Cart} alt="cart" title="STRATO Mercata Marketplace" width={18} height={18} className="object-contain" />
                         </div>}
                         className=" !w-9 h-9 rounded-md  !bg-[#13188A]"
                         onClick={async () => {

@@ -5,7 +5,7 @@ const HelmetComponent = ({ title, description, link }) => {
   return (
     <Helmet>
       <meta charSet="utf-8" />
-      <title>{title} | STRATO Mercata Marketplace</title>
+      <title>{title}</title>
       <meta name="description" content={description} />
       <link rel="canonical" href={link} />
     </Helmet>

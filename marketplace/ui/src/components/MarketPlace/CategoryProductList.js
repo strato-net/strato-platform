@@ -34,6 +34,7 @@ import './index.css'
 import { actions as orderActions } from "../../contexts/order/actions"
 import { useOrderDispatch} from "../../contexts/order";
 import { debounce } from 'lodash';
+import HelmetComponent from "../Helmet/HelmetComponent";
 
 const { Panel } = Collapse;
 const { Text } = Typography;
@@ -210,6 +211,9 @@ const CategoryProductList = ({ user }) => {
 
   //=========================Other functions===============================//
 
+  const metaTitle = selectedCategories.length === 1 ? `${selectedCategories[0]} | STRATO Mercata Marketplace ` : 'STRATO Mercata Marketplace'
+  const metaImg = selectedCategories.length === 1 ? `${selectedCategories[0]}` : 'STRATO Mercata Marketplace' 
+
   const clearSelection = () => {
     setSelectedSubCategories([]);
     setSubCategories([]);
@@ -303,8 +307,6 @@ const CategoryProductList = ({ user }) => {
       }
     }
   };
-  
-  
 
   const openToast = (placement, isError, msg) => {
     let msgObj = {
@@ -376,7 +378,15 @@ const CategoryProductList = ({ user }) => {
       ghost="true"
       reverse={false}
       expandIcon={({ isActive }) =>
-        isActive ? <img src={Images.Dropdown} alt="img" style={{ width: "24px", height: "24px", transform: "rotate(180deg)" }} /> : <img src={Images.Dropdown} alt="img" style={{ width: "24px", height: "24px" }} />
+        isActive ? 
+        <img src={Images.Dropdown} 
+        alt={metaImg} 
+        title={metaImg} 
+        style={{ width: "24px", height: "24px", transform: "rotate(180deg)" }} /> : 
+        <img src={Images.Dropdown} 
+        alt={metaImg} 
+        title={metaImg} 
+        style={{ width: "24px", height: "24px" }} />
       }
     >
       {children}
@@ -511,13 +521,23 @@ const CategoryProductList = ({ user }) => {
   </div>
 
   return (
+    <>
+   <HelmetComponent 
+          title={` ${metaTitle}`}
+          description={`Join the STRATO Mercata marketplace for buying, selling, and investing in  
+          fractionalized assets. Expand your collection or find buyers for your rare carbon,  
+          metals, art, collectibles, and clothing.`} 
+          link={`https://marketplace.mercata-testnet2.blockapps.net/marketplace/category`} />
     <div className={`${mobileOpenFilter ? 'overflow-y-hidden h-[100vh] w-[100vw] bg-[#00000020] relative mt-0 md:bg-white md:mt-[auto] md:overflow-scroll trending_cards' : ' '}`}>
       <div className="fixed bg-white w-full top-7 z-10 md:static">
         {BreadCrumbComponent()}
 
         <div className="flex items-center justify-center ml-4 md:ml-14 mr-14 mt-6 lg:mt-8 gap-4">
           <div className="border border-solid border-[#6A6A6A] rounded-md cursor-pointer p-1 md:p-2" onClick={handleFilterClick}>
-            <img src={Images.filter} alt="filter" className=" w-5 h-5 md:w-6 md:h-6" />
+            <img src={Images.filter} 
+            alt={metaImg}
+            title={metaImg}
+            className=" w-5 h-5 md:w-6 md:h-6" />
           </div>
 
           <div className={`flex-1`}>
@@ -525,7 +545,11 @@ const CategoryProductList = ({ user }) => {
               size="large"
               onChange={(e) => { handleChangeSearch(e) }}
               placeholder="Search Marketplace"
-              prefix={<img src={Images.Header_Search} alt="search" className="w-[18px] h-[18px]" />}
+              prefix={
+              <img src={Images.Header_Search} 
+              alt={metaImg} 
+              title={metaImg} 
+              className="w-[18px] h-[18px]" />}
               className="bg-[#F6F6F6] border-none rounded-3xl p-[10px]"
             />
           </div>
@@ -588,6 +612,7 @@ const CategoryProductList = ({ user }) => {
 
       {mobileOpenFilter && MobileFilterComponent()}
     </div>
+    </>
   );
 };
 
