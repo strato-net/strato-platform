@@ -29,7 +29,7 @@ module.exports = {
         raw: true,
       });
 
-      let healthStatus, stallStatus, uptime, isInc, isPending, healthAI, systemInfoAI, systemInfoStatus, warningMessages, systemInfoBody, syncStallStatus, syncStatus;
+      let healthStatus, stallHealthStatus, uptime, validBlocksIncreased, hasPendingTxs, healthAI, systemInfoAI, systemInfoStatus, warningMessages, systemInfoBody, syncStallStatus, syncStatus;
 
       const currentTime = Date.now();
 
@@ -38,11 +38,13 @@ module.exports = {
       const [[healthInfo, stallInfo, systemInfo, syncInfo], pbftData] = responses;
 
       if (healthInfo && stallInfo && syncInfo) {
+        // TODO: expose the lastFailureTimestamp for each health status
         healthStatus = healthInfo.latestHealthStatus;
-        stallStatus = stallInfo.latestHealthStatus;
+        stallHealthStatus = stallInfo.latestHealthStatus;
+        // TODO: expose the latestCheckTimestamp for stall health status
         uptime = (healthStatus) ? currentTime - healthInfo.lastFailureTimestamp : 0;
-        isInc = stallInfo.isBlocksValidInc;
-        isPending = stallInfo.isLastPending;
+        validBlocksIncreased = stallInfo.validBlocksIncreased;
+        hasPendingTxs = stallInfo.hasPendingTxs;
         healthAI = healthInfo.additionalInfo;
         systemInfoAI = JSON.parse(systemInfo.additionalInfo);
         systemInfoStatus = systemInfo.latestHealthStatus;
@@ -73,9 +75,9 @@ module.exports = {
           healthInfo: {
             uptime: uptime / 1000,
             isHealthy: healthStatus,
-            isNotStalled: stallStatus,
-            isValidBlocksInc: isInc,
-            isLastPending: isPending,
+            isStalled: !stallHealthStatus,
+            validBlocksIncreased: validBlocksIncreased,
+            hasPendingTxs: hasPendingTxs,
             unhealthyProcess: healthAI,
             isSynced: syncStatus,
             isSyncStalled: syncStallStatus
@@ -95,7 +97,7 @@ module.exports = {
 
   healthStatus: async function (req, res, next) {
     try {
-      let healthStatus, stallStatus, uptime, isInc, isPending, syncStallStatus, syncStatus;
+      let healthStatus, stallHealthStatus, uptime, validBlocksIncreased, hasPendingTxs, syncStallStatus, syncStatus;
 
       const currentTime = Date.now();
 
@@ -103,14 +105,14 @@ module.exports = {
 
       if (healthInfo && stallInfo && syncInfo) {
         healthStatus = healthInfo.latestHealthStatus;
-        stallStatus = stallInfo.latestHealthStatus;
+        stallHealthStatus = stallInfo.latestHealthStatus;
         uptime = (healthStatus) ? currentTime - healthInfo.lastFailureTimestamp : 0;
-        isInc = stallInfo.isBlocksValidInc;
-        isPending = stallInfo.isLastPending;
+        validBlocksIncreased = stallInfo.validBlocksIncreased;
+        hasPendingTxs = stallInfo.hasPendingTxs;
         syncStallStatus = JSON.parse(syncInfo.additionalInfo)?.isStalled;
         syncStatus = syncInfo.latestHealthStatus;
       } else {
-        winston.warn(`Health table has no entires; Health endpoint is called too soon`)
+        winston.warn(`Health table has no entries; Health endpoint is called too soon`)
       }
 
       res.status(200).json(
@@ -118,11 +120,12 @@ module.exports = {
             version: process.env.STRATO_VERSION,
             timestamp: +new Date()/1000,
             healthInfo: {
+              // TODO: only include the uptime and overallHealth in public endpoint
               uptime: uptime / 1000,
               isHealthy: healthStatus,
-              isNotStalled: stallStatus,
-              isValidBlocksInc: isInc,
-              isLastPending: isPending,
+              isStalled: !stallHealthStatus,
+              validBlocksIncreased: validBlocksIncreased,
+              hasPendingTxs: hasPendingTxs,
               isSynced: syncStatus,
               isSyncStalled: syncStallStatus
             },
@@ -160,8 +163,8 @@ async function getLatestHealth() {
         'latestHealthStatus',
         'latestCheckTimestamp',
         'lastFailureTimestamp',
-        'isBlocksValidInc',
-        'isLastPending'
+        'validBlocksIncreased',
+        'hasPendingTxs'
       ],
       raw: true,
     }),
@@ -174,8 +177,8 @@ async function getLatestHealth() {
         'latestHealthStatus',
         'latestCheckTimestamp',
         'lastFailureTimestamp',
-        'isBlocksValidInc',
-        'isLastPending',
+        'validBlocksIncreased',
+        'hasPendingTxs',
         'additionalInfo'
       ],
       raw:true,
