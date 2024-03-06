@@ -33,6 +33,7 @@ import { Images } from "../../images";
 import './index.css'
 import { actions as orderActions } from "../../contexts/order/actions"
 import { useOrderDispatch} from "../../contexts/order";
+import { debounce } from 'lodash';
 
 const { Panel } = Collapse;
 const { Text } = Typography;
@@ -45,16 +46,14 @@ const CategoryProductList = ({ user }) => {
 
   const searchQueryValue = queryParams.get('search');
   const categoryQueryValue = queryParams.get('category');
-  const minPriceQuery = queryParams.get('minPrice') || 0;
-  const maxPriceQuery = queryParams.get('maxPrice') || MAX_PRICE;
   const categoryQueryValueArr = categoryQueryValue ? categoryQueryValue.split(',') : []
 
   const [api, contextHolder] = notification.useNotification();
   // States
   const [selectedCategories, setSelectedCategories] = useState(categoryQueryValueArr);
   const [selectedSubCategories, setSelectedSubCategories] = useState([]);
-  const [minPrice, setMinPrice] = useState(minPriceQuery);
-  const [maxPrice, setMaxPrice] = useState(maxPriceQuery);
+  const [minPrice, setMinPrice] = useState(0);
+  const [maxPrice, setMaxPrice] = useState(MAX_PRICE);
   const [subCategories, setSubCategories] = useState([]);
   const [uniqueProductNames, setUniqueProductNames] = useState([]);
   const [desktopOpenFilter, setDesktopOpenFilter] = useState(true);
@@ -91,8 +90,6 @@ const CategoryProductList = ({ user }) => {
     if (searchQueryValue) {
       baseUrl.searchParams.set('search', searchQueryValue);
     }
-    baseUrl.searchParams.set('minPrice', minPrice);
-    baseUrl.searchParams.set('maxPrice', maxPrice);
 
     const url = baseUrl.pathname + baseUrl.search;
     navigate(url);
@@ -104,22 +101,28 @@ const CategoryProductList = ({ user }) => {
   };
 
   useEffect(() => {
-    let selection = subCategorys.map(item => item.contract)
-    selection = selection.filter((item) => {
-      if (unSelected.includes(item)) { }
-      else { return item }
-    })
-    setSelectedSubCategories(selection)
-    setSubCategories(subCategorys);
-  }, [subCategorys]);
-
+    let selection = subCategorys
+      .map(item => item.contract)
+      .filter(item => !unSelected.includes(item));
+  
+    // Update only if there's a change
+    if (JSON.stringify(selection) !== JSON.stringify(selectedSubCategories)) {
+      setSelectedSubCategories(selection);
+    }
+  
+    // update subCategories only if it's different
+    if (JSON.stringify(subCategorys) !== JSON.stringify(subCategories)) {
+      setSubCategories(subCategorys);
+    }
+  }, [unSelected, subCategorys, selectedSubCategories, subCategories]);
+  
   useEffect(() => {
     let categorys = null;
     if (selectedCategories.length) {
       categorys = arrayToStr(selectedCategories);
       subCategoryActions.fetchSubCategoryList(subCategoryDispatch, categorys);
     }
-  }, [selectedCategories]);
+  }, [subCategoryDispatch, selectedCategories]);
 
   const onChangeSubCategory = (e) => {
     let valuesChecked = checkValues(e, selectedSubCategories)
@@ -143,8 +146,6 @@ const CategoryProductList = ({ user }) => {
       if (search) {
         baseUrl.searchParams.set('search', search);
       }
-      baseUrl.searchParams.set('minPrice', minPrice);
-      baseUrl.searchParams.set('maxPrice', maxPrice);
 
       const url = baseUrl.pathname + baseUrl.search;
       setUnSelected([])
@@ -163,8 +164,8 @@ const CategoryProductList = ({ user }) => {
         marketplaceDispatch,
         arrayToStr(selectedCategories),
         arrayToStr(selectedSubCategories),
-        minPriceQuery,
-        maxPriceQuery,
+        minPrice,
+        maxPrice,
         searchQueryValue
       );
     } else if (hasChecked && isAuthenticated) {
@@ -172,16 +173,16 @@ const CategoryProductList = ({ user }) => {
         marketplaceDispatch,
         arrayToStr(selectedCategories),
         arrayToStr(selectedSubCategories),
-        minPriceQuery,
-        maxPriceQuery,
+        minPrice,
+        maxPrice,
         searchQueryValue
       );
     }
   }, [
     // selectedCategories,
     selectedSubCategories,
-    minPriceQuery,
-    maxPriceQuery,
+    minPrice,
+    maxPrice,
     hasChecked,
     isAuthenticated,
     searchQueryValue
@@ -197,8 +198,6 @@ const CategoryProductList = ({ user }) => {
       if (search) {
         baseUrl.searchParams.set('search', search);
       }
-      baseUrl.searchParams.set('minPrice', minPrice);
-      baseUrl.searchParams.set('maxPrice', maxPrice);
 
       const url = baseUrl.pathname + baseUrl.search;
       navigate(url, { replace: true });
@@ -384,18 +383,24 @@ const CategoryProductList = ({ user }) => {
     </Collapse>
   }
 
+  const debouncedSetMinPrice = debounce((value) => {
+    setMinPrice(value || 0);
+  }, 500);
+
+  const debouncedSetMaxPrice = debounce((value) => {
+    setMaxPrice(value || MAX_PRICE);
+  }, 500);
+
   const maxPriceValue = maxPrice == MAX_PRICE ? null : maxPrice;
 
   const PriceFilterComponent = () =>
     <Panel header={<Text strong className="text-base">Price ($)</Text>} key="1">
       <Space>
-        <InputNumber size="large" min={0} className="w-full" controls={false} prefix='$' value={minPrice} placeholder="min" onChange={(e) => {
-          e === null ? setMinPrice(0) : setMinPrice(e)
-        }} />
+        <InputNumber size="large" min={0} className="w-full" controls={false} prefix='$' value={minPrice} placeholder="min" 
+         onChange={(value) => debouncedSetMinPrice(value)} />
         -
-        <InputNumber size="large" controls={false} className="w-full" min={minPrice} prefix='$' value={maxPriceValue} placeholder="max" onChange={(e) => {
-          e === null ? setMaxPrice(MAX_PRICE) : setMaxPrice(e)
-        }} />
+        <InputNumber size="large" controls={false} className="w-full" min={minPrice} prefix='$' value={maxPriceValue} placeholder="max" 
+        onChange={(value) => debouncedSetMaxPrice(value)} />
       </Space>
     </Panel>
 
