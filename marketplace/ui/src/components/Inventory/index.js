@@ -31,6 +31,7 @@ import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
 import { useAuthenticateState } from "../../contexts/authentication";
 import CategoryCard from "../MarketPlace/CategoryCard";
+import HelmetComponent from "../Helmet/HelmetComponent";
 
 const { Search } = Input;
 
@@ -190,9 +191,16 @@ const allSubcategories = getAllSubcategories(categorys);
     return;
   };
   // ------------------ Tabs END------------------
-
+const metaImg = category ? category : ""
   return (
     <>
+     <HelmetComponent 
+          title={`${category ? `${category} |` :''} STRATO Mercata Marketplace `} // need to add category in the title,currently we are not getting category in the detail api
+          description={` Join the STRATO Mercata marketplace for buying, selling, and investing in  
+          fractionalized assets. Expand your collection or find buyers for your rare carbon,  
+          metals, art, collectibles, and clothing.
+           `} 
+          link={`https://marketplace.mercata-testnet2.blockapps.net/marketplace/mystore`} />
       {contextHolder}
       {stripeStatus == null || isLoadingStripeStatus ? (
         <div className="h-screen flex justify-center items-center">
@@ -216,7 +224,12 @@ const allSubcategories = getAllSubcategories(categorys);
           </Breadcrumb>
           <div className="w-full h-[116px] py-4 px-4 md:h-[96px] bg-[#F6F6F6] flex flex-col md:flex-row md:px-14  justify-between items-center mt-6 lg:mt-8">
             <div className="flex justify-between w-full">
-              <Button className="!px-1 md:!px-0 flex items-center flex-row-reverse gap-[6px] text-lg md:text-2xl font-semibold !text-[#13188A] " type="link" icon={<img src={Images.ForwardIcon} alt="inventory" className="hidden md:block w-6 h-6" />}> Inventory
+              <Button className="!px-1 md:!px-0 flex items-center flex-row-reverse gap-[6px] text-lg md:text-2xl font-semibold !text-[#13188A] " 
+              type="link" 
+              icon={<img src={Images.ForwardIcon} 
+              alt={metaImg} 
+              title={metaImg}
+              className="hidden md:block w-6 h-6" />}> Inventory
               </Button>
             </div>
             <div className="flex gap-3">
@@ -253,7 +266,10 @@ const allSubcategories = getAllSubcategories(categorys);
                   disabled={!stripeStatus.chargesEnabled || !stripeStatus.detailsSubmitted || !stripeStatus.payoutsEnabled}
                 >
                   <div className="flex items-center justify-center gap-[6px]">
-                    <img src={Images.CreateInventory} alt="Inventory" className="w-[18px] h-[18px]" />
+                    <img src={Images.CreateInventory} 
+                    alt={metaImg}
+                    title={metaImg}
+                    className="w-[18px] h-[18px]" />
                     Create Inventory
                   </div>
                 </Button>
