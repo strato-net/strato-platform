@@ -5,7 +5,7 @@ const rp = require("request-promise");
 const config = require("../config/app.config");
 const utils = require("../lib/utils");
 
-const API_VERSION = "1.0";
+const API_VERSION = "2.0";
 
 module.exports = {
   ping: async function (req, res) {
