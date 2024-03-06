@@ -88,7 +88,7 @@ module.exports = {
       res.status(200).json({
         apiVersion: API_VERSION,
         version: process.env.STRATO_VERSION,
-        timestamp: +new Date() / 1000,
+        timestamp: new Date().toISOString(),
         lastBlock: {
           number: lastBlock.number,
           hash: lastBlock.hash,
@@ -127,7 +127,7 @@ module.exports = {
       res.status(200).json({
         apiVersion: API_VERSION,
         version: process.env.STRATO_VERSION,
-        timestamp: +new Date() / 1000,
+        timestamp: new Date().toISOString(),
         health: health,
       });
     } catch (error) {
@@ -223,7 +223,11 @@ function findView(obj) {
       ret[elem.metric.view_field] = elem.value[1];
     }
   });
-  ret.timestamp =
-    (res.length && res[0].value.length && res[0].value[0]) || null;
+  if (res.length && res[0].value.length && res[0].value[0]) {
+    ret.timestamp = new Date(res[0].value[0] * 1000).toISOString();
+  } else {
+    ret.timestamp = null;
+  }
+
   return ret;
 }
