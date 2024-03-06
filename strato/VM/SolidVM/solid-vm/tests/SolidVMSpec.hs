@@ -252,14 +252,6 @@ secondAddress = Account (getNewAddress_unsafe (sender ^. accountAddress) 1) Noth
 recursiveAddr :: Account
 recursiveAddr = Account (getNewAddress_unsafe (uploadAddress ^. accountAddress) 0) Nothing
 
--- makeStrArgs :: [T.Text] -> T.Text
--- makeStrArgs xs =
---   let
---     escp :: T.Text -> T.Text
---     escp s = "\"" <> s <> "\""
---     repl = map escp
---   in "(" <> (T.intercalate (T.pack ", ") (repl xs)) <> ")"
-
 devNull :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
 devNull _ _ _ _ = return ()
 
@@ -467,6 +459,8 @@ runArgsWithSender acc args bs = do
       txHash = unsafeCreateKeccak256FromWord256 0x776622233444
       chainId = Nothing
       metadata = Just $ M.fromList [("name", "qq"), ("args", args)]
+  
+  insert (Proxy @BlockSummary) (unsafeCreateKeccak256FromWord256 0x0) (blockHeaderToBSum blockData 900 1)
 
   newAddress <- getNewAddress acc
   er <-
@@ -6085,8 +6079,8 @@ contract qq {
     return keccak256("hello", "world");
   }
 }|]
-      `shouldReturn` Just ("(\"\\250&\\219|\\168^\\173\\&9\\146\\SYN\\231\\198\\&1k\\197\\SO\\210C\\147\\195\\DC2+X'5\\231\\243\\176\\249\\ESC\\147\\240\")")
-  --keccak256ToByteString function implementation wrong
+      `shouldReturn` Just "(\"fa26db7ca85ead399216e7c6316bc50ed24393c3122b582735e7f3b0f91b93f0\")"
+
   it "cant use  a commented pragma" . runTest $ do
     runCall'
       "a"
@@ -8523,3 +8517,60 @@ contract qq {
   }
 }
 |]) `shouldThrow` anyTypeError
+
+  it "can delete arrays and indexes values" $ runTest ( do
+      runBS [r|
+contract qq {
+  uint[] arr = [1,2,3,4];
+  uint[] arr2 = [5,6,7,8];
+  uint res;
+  string xyz = "Hello SolidVM";
+  bool b = true;
+  uint yy = 36;
+  constructor() {
+    delete arr[1];
+    res = arr[1]; // to extract in getFields
+
+    delete arr2;
+    delete xyz;
+    delete b;
+    delete yy;
+  }
+}|]
+      getFields ["res", "arr2"] `shouldReturn` [BDefault, BDefault]) 
+
+  it "can error handle using delete keyword on local variables" $ runTest ( do
+      runBS [r|
+contract qq {
+  constructor() {
+    string xyz = "Hello SolidVM";
+    bool b = true;
+    uint yy = 36;
+
+    delete xyz;
+    delete b;
+    delete yy;
+  }
+}|]) `shouldThrow` anyTODO 
+
+  it "can successfully use the 'blockhash' built-in" $ runTest ( do 
+    runBS [r|
+contract qq {
+  string hsh = blockhash(block.number);
+  constructor() {}
+}|]
+    getFields ["hsh"] `shouldReturn` [BString $ keccak256ToByteString $ unsafeCreateKeccak256FromWord256 0x0])
+
+  it "can error handle the 'blockhash' built-in - less than 0 argument" $ runTest ( do 
+    runBS [r|
+contract qq {
+  string hsh = blockhash(-1);
+  constructor() {}
+}|]) `shouldThrow` anyInvalidArgumentsError
+
+  it "can error handle the 'blockhash' built-in - non-existent block number" $ runTest ( do 
+    runBS [r|
+contract qq {
+  string hsh = blockhash(900000);
+  constructor() {}
+}|]) `shouldThrow` anyInvalidArgumentsError

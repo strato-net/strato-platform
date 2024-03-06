@@ -12,7 +12,7 @@ import {
   Input,
   notification,
 } from "antd";
-import { CloseOutlined } from "@ant-design/icons";
+import { CloseOutlined, DeleteOutlined } from "@ant-design/icons";
 // Actions
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { actions as subCategoryActions } from "../../contexts/subCategory/actions";
@@ -31,6 +31,9 @@ import ClickableCell from "../ClickableCell";
 import NewTrendingCard from "./NewTrendingCard";
 import { Images } from "../../images";
 import './index.css'
+import { actions as orderActions } from "../../contexts/order/actions"
+import { useOrderDispatch} from "../../contexts/order";
+import { debounce } from 'lodash';
 
 const { Panel } = Collapse;
 const { Text } = Typography;
@@ -45,23 +48,24 @@ const CategoryProductList = ({ user }) => {
   const categoryQueryValue = queryParams.get('category');
   const categoryQueryValueArr = categoryQueryValue ? categoryQueryValue.split(',') : []
 
-  const [api] = notification.useNotification();
+  const [api, contextHolder] = notification.useNotification();
   // States
   const [selectedCategories, setSelectedCategories] = useState(categoryQueryValueArr);
   const [selectedSubCategories, setSelectedSubCategories] = useState([]);
-  const [selectedProducts, setSelectedProducts] = useState([]);
-  const [selectedBrands, setSelectedBrands] = useState([]);
-  const [maxPrice, setMaxPrice] = useState(MAX_PRICE);
   const [minPrice, setMinPrice] = useState(0);
+  const [maxPrice, setMaxPrice] = useState(MAX_PRICE);
   const [subCategories, setSubCategories] = useState([]);
   const [uniqueProductNames, setUniqueProductNames] = useState([]);
   const [desktopOpenFilter, setDesktopOpenFilter] = useState(true);
   const [mobileOpenFilter, setMobileOpenFilter] = useState(false);
   const [search, setSearch] = useState(searchQueryValue)
+  const [unSelected, setUnSelected] = useState([])
+
   //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
   const subCategoryDispatch = useSubCategoryDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
+  const orderDispatch = useOrderDispatch();
   // states
   const { marketplaceList, isMarketplaceLoading } = useMarketplaceState();
   const { categorys } = useCategoryState();
@@ -97,9 +101,21 @@ const CategoryProductList = ({ user }) => {
   };
 
   useEffect(() => {
-    setSubCategories(subCategorys);
-  }, [subCategorys]);
-
+    let selection = subCategorys
+      .map(item => item.contract)
+      .filter(item => !unSelected.includes(item));
+  
+    // Update only if there's a change
+    if (JSON.stringify(selection) !== JSON.stringify(selectedSubCategories)) {
+      setSelectedSubCategories(selection);
+    }
+  
+    // update subCategories only if it's different
+    if (JSON.stringify(subCategorys) !== JSON.stringify(subCategories)) {
+      setSubCategories(subCategorys);
+    }
+  }, [unSelected, subCategorys, selectedSubCategories, subCategories]);
+  
   useEffect(() => {
     let categorys = null;
     if (selectedCategories.length) {
@@ -110,13 +126,37 @@ const CategoryProductList = ({ user }) => {
 
   const onChangeSubCategory = (e) => {
     let valuesChecked = checkValues(e, selectedSubCategories)
+    const unSelectedSubCat = subCategorys.filter((item) => {
+      if(valuesChecked.includes(item.contract)){}
+      else{ return item }
+    }).map(item => item.contract)
+
+    // The state variable unSelectedSubCat tracks the deselected subcategories. 
+    // Initially, all subcategories are stored as selected, which occurs when a new category is chosen. 
+    // In this context, if both "CarbonDAO" and "CarbonOffset" 
+    // are found within unSelectedSubCat, the "Carbon" category is also deselected.
+    if(unSelectedSubCat.includes("CarbonDAO") && unSelectedSubCat.includes("CarbonOffset")){
+      const baseUrl = new URL('/category', window.location.origin);
+      const categoryData = selectedCategories.filter(item=>item!=="Carbon")
+      const selectedCategory = categoryData.join(',')
+
+      if (selectedCategory) {
+        baseUrl.searchParams.set('category', selectedCategory);
+      }
+      if (search) {
+        baseUrl.searchParams.set('search', search);
+      }
+
+      const url = baseUrl.pathname + baseUrl.search;
+      setUnSelected([])
+      setSelectedCategories(categoryData)
+      navigate(url, { replace: true });
+    }
+
+    setUnSelected(unSelectedSubCat)
     setSelectedSubCategories(valuesChecked);
   };
 
-  const onChangeProduct = (e) => {
-    let valuesChecked = checkValues(e, selectedProducts)
-    setSelectedProducts(valuesChecked);
-  };
 
   useEffect(() => {
     if (hasChecked && !isAuthenticated) {
@@ -124,8 +164,6 @@ const CategoryProductList = ({ user }) => {
         marketplaceDispatch,
         arrayToStr(selectedCategories),
         arrayToStr(selectedSubCategories),
-        arrayToStr(selectedProducts),
-        arrayToStr(selectedBrands),
         minPrice,
         maxPrice,
         searchQueryValue
@@ -135,18 +173,14 @@ const CategoryProductList = ({ user }) => {
         marketplaceDispatch,
         arrayToStr(selectedCategories),
         arrayToStr(selectedSubCategories),
-        arrayToStr(selectedProducts),
-        arrayToStr(selectedBrands),
         minPrice,
         maxPrice,
         searchQueryValue
       );
     }
   }, [
-    selectedCategories,
+    // selectedCategories,
     selectedSubCategories,
-    selectedProducts,
-    selectedBrands,
     minPrice,
     maxPrice,
     hasChecked,
@@ -155,23 +189,13 @@ const CategoryProductList = ({ user }) => {
   ]);
 
   useEffect(() => {
-    if (marketplaceList?.length > 0) {
-      const uniqueNames = marketplaceList.map((p) => p.name)
-        .filter(
-          (name, index, arr) => arr.indexOf(name) == index
-        );
-      setUniqueProductNames(uniqueNames);
-    }
-  }, [marketplaceList]);
-
-  useEffect(() => {
     const timeOut = setTimeout(() => {
       const baseUrl = new URL('/category', window.location.origin);
 
       if (categoryQueryValue) {
         baseUrl.searchParams.set('category', categoryQueryValue);
       }
-      if (search?.length > 0) {
+      if (search) {
         baseUrl.searchParams.set('search', search);
       }
 
@@ -182,16 +206,32 @@ const CategoryProductList = ({ user }) => {
     return () => {
       clearTimeout(timeOut);
     };
-  }, [search]);
+  }, [search, minPrice, maxPrice]);
 
   //=========================Other functions===============================//
 
   const clearSelection = () => {
     setSelectedSubCategories([]);
-    setSelectedProducts([]);
-    setSelectedBrands([]);
     setSubCategories([]);
   };
+
+  const handleClearFilter = () => {
+    const isFilter = selectedCategories.length != 0 || selectedSubCategories.length != 0
+      || minPrice !== 0 || maxPrice !== MAX_PRICE
+    if (isFilter) {
+      const baseUrl = new URL('/category', window.location.origin);
+      if (searchQueryValue) {
+        baseUrl.searchParams.set('search', searchQueryValue);
+      }
+      const url = baseUrl.pathname + baseUrl.search;
+      navigate(url)
+      clearSelection()
+      setSelectedCategories([]);
+      setMinPrice(0)
+      setMaxPrice(MAX_PRICE)
+
+    }
+  }
 
   const checkValues = (e, arr) => {
     let tempValues = [...arr];
@@ -211,48 +251,60 @@ const CategoryProductList = ({ user }) => {
     setMobileOpenFilter(!mobileOpenFilter);
   };
 
-  const addItemToCart = (product, quantity) => {
+  const addItemToCart = async (product, quantity) => {
     if (product.ownerCommonName === user?.commonName) {
-      openToast("bottom", true, "Cannot buy your own item")
+      openToast("bottom", true, "Cannot buy your own item");
       return false;
     }
-    let found = false;
-    for (var i = 0; i < cartList.length; i++) {
-      if (cartList[i].product.address === product.address) {
-        found = true;
-        break;
+  
+    // Search for the product in the cart
+    let foundIndex = cartList.findIndex((item) => item.product.address === product.address);
+    let items = [...cartList];
+  
+    // Found index will be -1 if it's not in the cart list
+    if (foundIndex === -1) {
+      // Product not found, check quantity before adding
+      const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity]);
+      console.log("checkQuantity", checkQuantity)
+      if (checkQuantity === true) {
+        // Quantity check passed, add new item to the cart
+        items.push({ product, qty: quantity });
+        marketplaceActions.addItemToCart(marketplaceDispatch, items);
+        openToast("bottom", false, "Item added to cart");
+        return true;
+      } else {
+        // Not enough quantity, inform the user
+        // Case 1: Item is out of stock
+        if (checkQuantity[0].availableQuantity === 0) {
+          openToast("bottom", true, `Unfortunately, ${product.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
+        } else { // Case 2: We are trying to add too much quantity
+          openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${product.name} are available. Please update your cart quantity accordingly.`);
+        }
+        return false;
+      }
+    } else {
+      // Product found, prepare to update quantity after check
+      const potentialNewQty = items[foundIndex].qty + quantity; 
+      const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity]);
+      if (checkQuantity === true) {
+        // Quantity check passed, update item quantity in the cart
+        items[foundIndex].qty = potentialNewQty; 
+        marketplaceActions.addItemToCart(marketplaceDispatch, items);
+        openToast("bottom", false, "Item updated in cart");
+        return true;
+      } else {
+        // Not enough quantity, inform the user
+        if (checkQuantity[0].availableQuantity === 0) {
+          openToast("bottom", true, `Unfortunately, ${product.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
+        } else { // Case 2: We are trying to add too much quantity
+          openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${product.name} are available. Please update your cart quantity accordingly.`);
+        }        
+        return false;
       }
     }
-    let items = [];
-    if (!found) {
-      items = [...cartList, { product, qty: quantity }];
-      marketplaceActions.addItemToCart(marketplaceDispatch, items);
-
-      openToast("bottom", false, "Item added to cart");
-      return true;
-    } else {
-      items = [...cartList];
-      cartList.forEach((element, index) => {
-        if (element.product.address === product.address) {
-          const availableQuantity = product.saleQuantity ? product.saleQuantity : 1;
-          if (items[index].qty + 1 <= availableQuantity) {
-            items[index].qty += 1;
-            marketplaceActions.addItemToCart(marketplaceDispatch, items);
-
-            openToast("bottom", false, "Item updated in cart");
-            return true;
-          } else {
-            openToast(
-              "bottom",
-              true,
-              "Cannot add more than available quantity"
-            );
-            return false;
-          }
-        }
-      });
-    }
   };
+  
+  
 
   const openToast = (placement, isError, msg) => {
     let msgObj = {
@@ -293,6 +345,17 @@ const CategoryProductList = ({ user }) => {
       ))}
     </Breadcrumb>
 
+  const ClearFilterComponent = () =>
+    <div className="flex justify-between m-2 max-[768px]:px-7 max-[768px]:py-4">
+      <div className="flex items-center">
+        <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
+        <Text className="text-xl font-semibold pr-7 ml-1">Filters</Text>
+      </div>
+      <div className=" rounded-md cursor-pointer p-1 md:p-2" onClick={handleClearFilter}>
+        <Text className="text-xl font-semibold ml-1">Clear All <DeleteOutlined /></Text>
+      </div>
+    </div>
+
   const MobileCollapseComponent = (children) => {
     return <Collapse
       bordered={false}
@@ -320,11 +383,44 @@ const CategoryProductList = ({ user }) => {
     </Collapse>
   }
 
+  const debouncedSetMinPrice = debounce((value) => {
+    setMinPrice(value || 0);
+  }, 500);
+
+  const debouncedSetMaxPrice = debounce((value) => {
+    setMaxPrice(value || MAX_PRICE);
+  }, 500);
+
+  const maxPriceValue = maxPrice == MAX_PRICE ? null : maxPrice;
+
+  const PriceFilterComponent = () =>
+    <Panel header={<Text strong className="text-base">Price ($)</Text>} key="1">
+      <Space>
+        <InputNumber size="large" min={0} className="w-full" controls={false} prefix='$' value={minPrice} placeholder="min" 
+         onChange={(value) => debouncedSetMinPrice(value)} />
+        -
+        <InputNumber size="large" controls={false} className="w-full" min={minPrice} prefix='$' value={maxPriceValue} placeholder="max" 
+        onChange={(value) => debouncedSetMaxPrice(value)} />
+      </Space>
+    </Panel>
+
+  const SubCategoryFilterComponent = () =>
+    <Panel header={<Text strong className="text-base">Sub Categories</Text>} key="1">
+      <Checkbox.Group
+        value={selectedSubCategories}
+      >
+        <div className="flex flex-col gap-3">
+          {subCategories.filter(item => item.name.toLowerCase().includes('carbon')).map((subcategory, index) => (
+            <Checkbox value={subcategory.contract} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
+              {subcategory.name}
+            </Checkbox>
+          ))}
+        </div>
+      </Checkbox.Group>
+    </Panel>
+
   const DesktopFilterComponent = () => <div className="mr-6 w-1/3 hidden md:flex md:flex-col">
-    <div className="flex items-center">
-      <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
-      <Text className="text-xl font-semibold pr-7 ml-1">Filters</Text>
-    </div>
+    {ClearFilterComponent()}
     <div className="bg-white border border-solid border-[#E9E9E9] my-6 mb-24">
 
       {categorys.length > 0 && (
@@ -348,22 +444,10 @@ const CategoryProductList = ({ user }) => {
         </>
       )}
 
-      {subCategories.length > 0 && (
+      {selectedCategories.includes("Carbon") && (
         <>
           {DesktopCollapseComponent(
-            <Panel header={<Text strong className="text-base">Sub Categories</Text>} key="1">
-              <Checkbox.Group
-                value={selectedSubCategories}
-              >
-                <div className="flex flex-col gap-3">
-                  {subCategories.map((subcategory, index) => (
-                    <Checkbox value={subcategory.contract} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
-                      {subcategory.name}
-                    </Checkbox>
-                  ))}
-                </div>
-              </Checkbox.Group>
-            </Panel>
+            SubCategoryFilterComponent()
           )}
           <Divider className="m-auto w-[94%] min-w-[80%]" />
         </>
@@ -371,47 +455,16 @@ const CategoryProductList = ({ user }) => {
       <Divider className="m-auto w-[94%] min-w-[80%]" />
 
       {DesktopCollapseComponent(
-        <Panel header={<Text strong className="text-base">Price ($)</Text>} key="1">
-          <Space>
-            <InputNumber min={0} prefix='$' placeholder="min" onChange={(e) => {
-              e === null ? setMinPrice(0) : setMinPrice(e)
-            }} />
-            -
-            <InputNumber min={minPrice} prefix='$' placeholder="max" onChange={(e) => {
-              e === null ? setMaxPrice(MAX_PRICE) : setMaxPrice(e)
-            }} />
-          </Space>
-        </Panel>
+        PriceFilterComponent()
       )}
-      <Divider className="m-auto w-[94%] min-w-[80%]" />
 
-      {marketplaceList?.length > 0 && (
-        <>
-          {DesktopCollapseComponent(
-            <Panel header={<Text strong className="text-base">Product</Text>} key="1">
-              <Checkbox.Group
-                value={selectedProducts}
-              >
-                <div className="flex flex-col gap-3">
-                  {uniqueProductNames.map((product, index) => (
-                    <Checkbox value={product} key={index} className="m-0" onChange={onChangeProduct}>
-                      {decodeURIComponent(product)}
-                    </Checkbox>
-                  ))}
-                </div>
-              </Checkbox.Group>
-            </Panel>
-          )}
-          <Divider className="m-auto w-[94%] min-w-[80%]" />
-        </>
-      )}
-      <div className="pb-2"></div>
     </div>
   </div>
 
   const MobileFilterComponent = () => <div>
     <div className="mr-6 fixed w-full h-full z-50 top-16 overflow-scroll md:hidden">
       <div className="bg-white shadow-[2px_-2px_4px_0_rgba(0,0,0,0.05)] mb-24">
+        {ClearFilterComponent()}
         <div className="flex items-center justify-between pt-5">
           <Text className="text-base font-semibold pr-7 pl-7 ml-1">Select</Text>
           <Avatar icon={<CloseOutlined />} style={{ color: "#202020" }} className="flex items-center pr-12" onClick={handleFilterClick} />
@@ -422,7 +475,7 @@ const CategoryProductList = ({ user }) => {
         {categorys.length > 0 && (
           <>
             {MobileCollapseComponent(
-              <Panel header={<Text>Categories</Text>} key="1">
+              <Panel header={<Text strong className="text-base">Categories</Text>} key="1">
                 <Checkbox.Group
                   onChange={onChangeCategory}
                   value={selectedCategories}
@@ -442,61 +495,16 @@ const CategoryProductList = ({ user }) => {
         )}
         {/* Panel - Sub Category */}
         <>
-          {MobileCollapseComponent(
-            <Panel header={<Text>Sub-Category</Text>} key="1">
-              <Checkbox.Group
-                value={selectedSubCategories}
-              >
-                <div className="flex flex-col gap-3">
-                  {subCategories.map((subcategory, index) => (
-                    <Checkbox value={subcategory.contract} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
-                      {subcategory.name}
-                    </Checkbox>
-                  ))}
-                </div>
-              </Checkbox.Group>
-            </Panel>
+          {selectedCategories.includes("Carbon") && MobileCollapseComponent(
+            SubCategoryFilterComponent()
           )}
           <Divider className="m-0" />
         </>
         {/* Panel - Price */}
         {MobileCollapseComponent(
-          <Panel header={<Text>Price ($)</Text>} key="1">
-            <Space>
-              <InputNumber min={0} prefix='$' placeholder="min" onChange={(e) => {
-                e === null ? setMinPrice(0) : setMinPrice(e)
-              }} />
-              -
-              <InputNumber min={minPrice} prefix='$' placeholder="max" onChange={(e) => {
-                e === null ? setMaxPrice(MAX_PRICE) : setMaxPrice(e)
-              }} />
-            </Space>
-          </Panel>
+          PriceFilterComponent()
         )}
-        <Divider className="m-0" />
 
-        {/* Panel - Product */}
-        {marketplaceList?.length > 0 && (
-          <>
-            {MobileCollapseComponent(
-              <Panel header={<Text>Product</Text>} key="1">
-                <Checkbox.Group
-                  value={selectedProducts}
-                >
-                  <div className="flex flex-col gap-3">
-                    {uniqueProductNames.map((product, index) => (
-                      <Checkbox value={product} key={index} className="m-0" onChange={onChangeProduct}>
-                        {decodeURIComponent(product)}
-                      </Checkbox>
-                    ))}
-                  </div>
-                </Checkbox.Group>
-              </Panel>
-            )}
-            <Divider className="m-0" />
-          </>
-        )}
-        <div className="pb-8"></div>
       </div>
     </div>
     <div className="h-full w-full bg-[#00000020] absolute top-0 md:hidden"></div>
@@ -537,10 +545,10 @@ const CategoryProductList = ({ user }) => {
 
         {/* Product list section */}
         <div className="mb-12 w-full">
-          <div className="hidden md:flex items-center">
+          <div className="hidden md:flex mt-4 items-center">
             <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
             <Text className="text-gray-800 ml-1 text-xl font-semibold">
-              {marketplaceList?.length} Results
+              {isLoading ? <Spin spinning={isLoading} size="small" /> : marketplaceList?.length} Results
             </Text>
           </div>
           {isLoading ?
@@ -550,17 +558,23 @@ const CategoryProductList = ({ user }) => {
             :
             <div>
               {marketplaceList?.length > 0 ? (
+
                 <div className={`mt-[61px] md:mt-4 mb-8 flex w-full md:grid flex-col items-center ${desktopOpenFilter ? "grid-cols-1 gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 4xl:grid-cols-5 lg:gap-14 xl:gap-x-10 2xl:gap-x-20" : " sm:grid-cols-1 gap-4 md:grid-cols-2 md:gap-14 lg:grid-cols-3 lg:gap-16 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 5xl:grid-cols-7"}`} id="product-list">
-                  {marketplaceList.map((product, index) => {
-                    return (
-                      <NewTrendingCard
-                        topSellingProduct={product}
-                        key={index}
-                        addItemToCart={addItemToCart}
-                        parent={"Marketplace"}
-                      />
-                    );
-                  })}
+                  {marketplaceList
+                    // .filter(product => product.saleQuantity > 0)
+                    .map((product, index) => {
+                      return (
+                        <NewTrendingCard
+                          topSellingProduct={product}
+                          key={index}
+                          addItemToCart={addItemToCart}
+                          parent={"Marketplace"}
+                          api={api}
+                          contextHolder={contextHolder}
+                        />
+                      );
+                    })}
+
                 </div>
               ) : (
                 <div className="h-96 flex justify-center items-center" id="product-list">

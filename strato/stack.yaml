@@ -121,7 +121,7 @@ flags:
     recovery: true
 
 nix:
-  enable: true
+  enable: false
   pure: false
   # See https://docs.haskellstack.org/en/stable/nix_integration/#using-a-custom-shellnix-file
   shell-file: nix/stack-integration.nix
@@ -154,6 +154,3 @@ docker:
   image: "strato-buildbase:lts-22.4"
   set-user: true
   run-args: ["--ulimit=nofile=60000"]
-
-nix:
-  enable: false

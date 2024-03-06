@@ -1,10 +1,13 @@
 const winston = require('winston-color');
 const models = require('../models');
+const BlockDataRef = require('../models/strato/eth/blockDataRef');
 const Promise = require('bluebird');
 const rp = require('request-promise');
 const moment = require('moment');
 const si = require('systeminformation');
 const config = require('../config/app.config');
+const getPbftData = require('../controllers/health')['getPbftData'];
+const findView = require('../controllers/health')['findView'];
 
 // TODO: do the mass-refactoring of the daemon. Use the OOP! Really, don't even try refactoring this without the main Object (SingleCheck object with methods and shared params). Don't change any db data formats.
 
@@ -16,6 +19,8 @@ const neededJobs = {
   // TODO: add vault-proxy in prometheus
   "core-api": "core-api"
 }
+
+const maxStalledIntervals = config.healthCheck.maxStalledIntervals;
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
@@ -67,6 +72,86 @@ async function checkIfGlobalPasswordSet() {
   const options = {
     method: 'GET',
     url: `${process.env.vaultProxyUrl}/strato/v2.3/verify-password`,
+    followRedirects: false,
+    timeout: config.healthCheck.requestTimeout - 100,
+    json: true,
+  };
+
+  return await rp(options);
+}
+
+async function checkNodeSyncStallStatus(syncStat) {
+  let currentTime = Date.now();
+
+  let {lastVmBlockNum = 0, 
+    lastSeqBlockNum = 0,
+    stalledIntervalCount = 0
+  } = (syncStat?.additionalInfo) ? JSON.parse(syncStat?.additionalInfo) : {};
+
+  let isStalled = false;
+
+  const {number: currVmBlockNum = 0} = await BlockDataRef.findOne({
+    where: {
+      pow_verified: true,
+      is_confirmed: true
+    },
+    order: [['number', 'DESC']],
+    attributes: [
+      'number',
+    ],
+    raw: true,
+  });
+
+  const pbftInfo = await getPbftData()
+  const {sequence_number: currSeqBlockNum = 0} = findView(pbftInfo);
+
+  const {isSynced} = await getStratoMetadata();
+  
+  try {
+    if (isSynced) {
+      return [isSynced, {
+        stalledIntervalCount: 0,
+        lastVmBlockNum: 0,
+        lastSeqBlockNum: 0,
+        isStalled
+      }];
+    } else {
+      if (currVmBlockNum === lastVmBlockNum && currSeqBlockNum === lastSeqBlockNum) {
+        if (stalledIntervalCount < maxStalledIntervals) {
+          stalledIntervalCount++;
+        } else {
+          winston.error(`Node stalled during sync at ${currentTime}; went ${maxStalledIntervals * (config.healthCheck.pollFrequency / 1000)} seconds without increasing block number`);
+          isStalled = true;
+        }
+      } else {
+        stalledIntervalCount = 0;
+      }
+      winston.debug(`sync check: prev vm block #: ${lastVmBlockNum}, cur vm block #: ${currVmBlockNum}`);
+      winston.debug(`sync check: prev seq block #: ${lastSeqBlockNum}, cur seq block #: ${currSeqBlockNum}`);
+      winston.debug(`sync check: inverval ${stalledIntervalCount} of ${maxStalledIntervals}`);
+
+      lastVmBlockNum = currVmBlockNum;
+      lastSeqBlockNum = currSeqBlockNum;
+    }
+  } catch (e) {
+    winston.warn(`Error ${e.message ? e.message : ''} occurred while checking node's stall status`);
+  }
+
+  const additionalSyncInfo = {
+    stalledIntervalCount,
+    lastVmBlockNum,
+    lastSeqBlockNum,
+    isStalled
+  }
+
+  return [isSynced, additionalSyncInfo];
+}
+
+
+async function getStratoMetadata() {
+  const options = {
+    method: 'GET',
+    url: `http://strato:3000/eth/v1.2/metadata`,
     followRedirects: false,
     timeout: config.healthCheck.requestTimeout - 100,
     json: true,
@@ -190,6 +275,32 @@ async function updateNodeHealthStatus(nodeHealthData, isGlobalPasswordSet) {
         where: { processName: 'SystemInfoStat' }
       })
   }
+
+  let [syncStat, _] = await models.CurrentHealth.findOrCreate({
+    where: { processName: 'SyncStat' }, defaults: {
+      latestHealthStatus: false,
+      latestCheckTimestamp: currentTime,
+      additionalInfo:  JSON.stringify({
+        stalledIntervalCount: 0,
+        lastVmBlockNum: 0,
+        lastSeqBlockNum: 0
+      }),
+      lastFailureTimestamp: currentTime  // default first time marked as failure
+    }
+  });
+
+  const [isSynced, additionalSyncInfo] = await checkNodeSyncStallStatus(syncStat);
+  await syncStat.update(
+    {
+      latestCheckTimestamp: currentTime,
+      latestHealthStatus: isSynced,
+      additionalInfo: JSON.stringify(additionalSyncInfo),
+      lastFailureTimestamp: isSynced ? syncStat.lastFailureTimestamp : currentTime
+    },
+    {
+      where: { processName: 'SyncStat' }
+    })
+
   return
 }
 
@@ -260,7 +371,7 @@ async function checkSystemInfo(isGlobalPasswordSet) {
       'currentLoad': metadataLoad.currentLoad,
       'avgLoad': metadataLoad.avgLoad,
     };
-    if (metadataLoad.avgLoad >= config.healthCheck.cpuAvgLoadAlertLevel) {
+    if (metadataLoad.avgLoad >= cpudata.cores * config.healthCheck.cpuAvgLoadAlertLevel/100) {
       isHealthy = false;
       additional_info.push(`Average CPU load is high (${metadataLoad.avgLoad})`)
     }

@@ -91,6 +91,7 @@ executables:
     dependencies:
       - hflags
       - strato-init
+      - strato-model
 
     other-modules: []
 

@@ -3,6 +3,7 @@
 
 import Blockchain.Init.Generator
 import Blockchain.Init.Options
+import Blockchain.Strato.Model.Options ()
 import Data.String
 import HFlags
 

@@ -73,10 +73,60 @@ class Dashboard extends Component {
     this.props.subscribeRoom(TRANSACTIONS_COUNT)
     this.props.subscribeRoom(TRANSACTIONS_TYPE)
     this.props.subscribeRoom(GET_SHARD_COUNT)
+    this.props.subscribeRoom(GET_SYSTEM_INFO);
 
     mixpanelWrapper.track('dashboard_page_load');
     ReactGA.send({hitType: "pageview", page: "/dashboard", title: "Dashboard"});
 
+  }
+
+  displaySystemMetrics(cpu, memory, filesystem, networkStats, limits) {
+    if (cpu && memory && filesystem && networkStats) {
+      let maxUsageFilesystem = {};
+    
+      //when running in the docker container, there is only one fs, however, when running
+      //outside of the container, there are multiple - so display one with max use
+      maxUsageFilesystem = filesystem.reduce((maxUsage, filesystem) => { 
+        return filesystem.use > maxUsage.use ? filesystem : maxUsage;
+      }, filesystem[0]);
+  
+    const isCPUCurrentHealthy = cpu.currentLoad < limits.cpuCurrentLoadAlertLevel;
+    const isMemoryHealthy = memory.use < limits.memoryUsedAlertLevel;
+    const isDiskSpaceHealthy = maxUsageFilesystem.use < limits.diskspaceUsedAlertLevel;
+    const isCPUAvgHealthy = cpu.avgLoad < limits.cpuAvgLoadAlertLevel;
+
+    const healthy = isCPUCurrentHealthy && isCPUAvgHealthy && isMemoryHealthy && isDiskSpaceHealthy;
+
+      return (
+        <div className="sys-info-container col-sm-6 text-right row" style={{marginTop: '25px', marginBottom:'10px', marginLeft:'0px', marginRight:'0px' }}>
+            <p className='text-right'> 
+              <span id='cpuCurrentMetric' className={`metric ${isCPUCurrentHealthy ? 'good-metric' : 'bad-metric'}`}>
+                  {`CPU: ${cpu.currentLoad.toFixed(2)}%`}
+              </span>
+              {' | '}
+              <span id='cpuAvgMetric' className={`metric ${isCPUAvgHealthy ? 'good-metric' : 'bad-metric'}`}>
+                    {`Avg CPU : ${cpu.avgLoad.toFixed(2)}`}
+              </span>
+              {' | '}
+              <span id='memoryMetric' className={`metric ${isMemoryHealthy ? 'good-metric' : 'bad-metric'}`}>
+                  {`Mem: ${memory.use.toFixed(2)}%`}
+              </span>
+              { ' | '}
+              <span id='diskpaceMetric' className={`metric ${isDiskSpaceHealthy ? 'good-metric' : 'bad-metric'}`}>
+                  {`Disk: ${maxUsageFilesystem.use.toFixed(2)}%`}
+              </span>
+              { ' | '}
+              {healthy ? <i className="fa-solid fa-circle-check healthy-network"/> : <i className="fa-solid fa-circle-exclamation unhealthy-network"/>}
+            </p>
+        </div>
+     )
+    } else {
+      return (  
+          <div className="sys-info-container row col-sm-6 text-right" style={{marginTop: '25px', marginBottom:'10px', marginLeft:'0px', marginRight:'0px'}}>
+              <p className="text-right">System Metrics Loading...</p>
+          </div>
+      )
+    } 
   }
 
   componentWillUnmount() {
@@ -99,20 +149,29 @@ class Dashboard extends Component {
     const txCount = this.props.dashboard.transactionsCount;
     const blockPropData = this.props.dashboard.blockPropagation;
     const txTypeData = this.props.dashboard.transactionTypes;
-    const { usersCount, contractsCount, lastBlockNumber, shardCount } = this.props.dashboard;
+    const { usersCount, contractsCount, lastBlockNumber } = this.props.dashboard;
     const uptime = this.props.dashboard.uptime
     const health = this.props.dashboard.healthStatus;
     const systemHealth = this.props.dashboard.systemStatus;
     const systemWarnings = this.props.dashboard.systemWarnings;
+    const { cpu, memory, filesystem, networkStats} = this.props.dashboard.systemStats || {};
+    const limits = this.props.dashboard.limits || {
+      cpuCurrentLoadAlertLevel: 90,
+      memoryUsedAlertLevel: 80,
+      diskspaceUsedAlertLevel: 80,
+      cpuAvgLoadAlertLevel: 1.2
+    }
     const synced = this.props.appMetadata.metadata ? this.props.appMetadata.metadata.isSynced : false
     const metadata = this.props.appMetadata.metadata
+
     return (
       <div className="container-fluid pt-dark" id="tour-welcome">
         <Tour name='dashboard' finalStepSelector='#accounts' nextPage='accounts' steps={tourSteps} />
-        <div className="row">
-          <div className="col-sm-9 text-left">
+        <div className="row d-flex align-items-center">
+          <div className="col-sm-6 text-left">
             <h3>Node Stats</h3>
           </div>
+          {this.displaySystemMetrics(cpu, memory, filesystem, networkStats, limits)}
         </div>
         <div className="row">
           <div className="col-sm-12">
@@ -120,36 +179,40 @@ class Dashboard extends Component {
           </div>
         </div>
         <div className="row">
-          <div className="col-sm-3">
+          <div className="col-sm-4">
 
             <Popover
-              isDisabled={synced && health}
+              isDisabled={synced && health && systemHealth}
               interactionKind={PopoverInteractionKind.HOVER}
               position={Position.BOTTOM}
               className={'full-width'}
               content={
                 <div className={`pt-dark pt-callout smd-pad-8 pt-icon-info-sign pt-intent-${!metadata ? 'danger' : ((!health || !synced) ? 'warning' : 'success')}`}>
                   <h5 className="pt-callout-title">{
-                    !metadata ? 'API Disconnected' : !(health) ? 'Warning' : !synced ? 'Node Syncing' : 'Healthy'
+                    !metadata ? 'API Disconnected' : !(health) ? 'Warning' : !synced ? 'Node Syncing' : !systemHealth ? "Warning" : 'Healthy'
+                     //typically systemHealth becomes false during syncing due to high cpu usage, so putting syshealth check at end of ternary
                     }</h5>
                   {
                     !metadata ? 'Cannot connect to the Node\'s API' 
-                    : !(health) ? (systemWarnings || 'Reason currently unknown') 
-                    : !synced ? 'This Node is currently syncing with the network' 
-                    : 'Connected to STRATO Mercata'
-                  }
+                    : (!health) ? (systemWarnings || 'Reason currently unknown') 
+                    : !synced ? `This Node is currently syncing with the network.${systemWarnings ? ` ${systemWarnings}` : ''}` 
+                    : !systemHealth ? (systemWarnings || 'System unhealthy') : 'Connected to STRATO Mercata' 
+                    //typically systemHealth becomes false during syncing due to high avg cpu usage, so putting systemHealth check at end of ternary
+                  } 
             </div>}
             >
               <NumberCard
-                number={!metadata ? 'DISCONNECTED' : (health && !systemHealth ? 'UNHEALTHY' : !synced ? 'SYNCING' : 'HEALTHY')}
+                number={!metadata ? 'DISCONNECTED' : (!health ? 'UNHEALTHY' : !synced ? 'SYNCING' : !systemHealth ? 'UNHEALTHY' : 'HEALTHY') 
+                //moved systemHealth check to end of ternary to avoid unhealthy status when syncing due to high avg cpu usage
+              }
                 description= {sec2Date(uptime)}
-                mode={!metadata ? 'danger' : ((!health || !synced) ? 'warning' : 'success')}
+                mode={!metadata ? 'danger' : ((!health || !synced || !systemHealth) ? 'warning' : 'success')}
                 
-                iconClass={!metadata ? 'fa-triangle-exclamation' : (!health ? 'fa-exclamation-circle' : !synced ? 'fa-rotate' : 'fa-check-circle')}
+                iconClass={!metadata ? 'fa-triangle-exclamation' : (!health ? 'fa-exclamation-circle' : !synced ? 'fa-rotate' : (!systemHealth ? 'fa-exclamation-circle': 'fa-check-circle'))}
                 />
               </Popover>
             </div>
-          <div className="col-sm-3">
+          <div className="col-sm-4">
             <Link to="/accounts">
               <NumberCard
                 number={usersCount}
@@ -160,22 +223,12 @@ class Dashboard extends Component {
             </Link>
           </div>
           
-          <div className="col-sm-3">
+          <div className="col-sm-4">
             <Link to="/contracts">
               <NumberCard
                 number={contractsCount}
                 description="Contracts"
                 iconClass="fa-file-contract"
-                className="smd-pointer"
-              />
-            </Link>
-          </div>
-          <div className="col-sm-3">
-            <Link to="/shards">
-              <NumberCard
-                number={shardCount}
-                description="Shards"
-                iconClass="fa-diagram-project"
                 className="smd-pointer"
               />
             </Link>
@@ -187,7 +240,7 @@ class Dashboard extends Component {
           </div>
         </div>
         <div className="row">
-          <div className="col-sm-3">
+          <div className="col-sm-4">
             <NumberCard
                 number={
                   this.props.appMetadata && this.props.appMetadata.nodeInfo ?
@@ -207,7 +260,7 @@ class Dashboard extends Component {
                 textSize='h4'
               />
           </div>
-          <div className="col-sm-6">
+          <div className="col-sm-8">
             <NodeCard />
           </div>
           

@@ -304,9 +304,11 @@ pipeline {
                   sh 'sudo docker system prune -fa' // remove older unused images to save diskspace
                   dir('strato-getting-started') {
                     sh 'sudo rm -rf strato_logs*'
-                    sh 'sudo ./fetchlogs --as-dir'
-                    sh 'mv strato_logs/ strato_logs_testsync/'
-                    archiveArtifacts artifacts: 'strato_logs_testsync/**', fingerprint: true, allowEmptyArchive: true
+                    sh 'sudo ./fetchlogs'
+                    sh 'sudo chmod 777 strato_logs.zip'
+                    sh 'mv strato_logs.zip strato_logs_testsync.zip'
+                    archiveArtifacts artifacts: 'strato_logs_testsync.zip', fingerprint: true, allowEmptyArchive: true
+                    sh 'sudo rm -rf strato_logs_testsync.zip'
                   }
                 }
               }
@@ -403,8 +405,10 @@ pipeline {
       sh 'rm -rf .docker-work'
       dir ('strato-getting-started') {
         sh 'rm -rf strato_logs*'
-        sh './fetchlogs --as-dir'
-        archiveArtifacts artifacts: 'strato_logs/**', fingerprint: true
+        sh './fetchlogs'
+        sh 'sudo chmod 777 strato_logs.zip'
+        archiveArtifacts artifacts: 'strato_logs.zip', fingerprint: true, allowEmptyArchive: true
+        sh 'sudo rm -rf strato_logs.zip'
       }
     }
 

@@ -72,7 +72,6 @@ pipeline {
 
           // TODO: run node on https (also update check_availability function)
           withCredentials([
-              usernamePassword(credentialsId: 'stripe-key', passwordVariable: 'STRIPE_SECRET_KEY', usernameVariable: 'STRIPE_PUBLISHABLE_KEY'),
               usernamePassword(credentialsId: 'marketplace-global-admin', passwordVariable: 'GLOBAL_ADMIN_PASSWORD', usernameVariable: 'GLOBAL_ADMIN_NAME'),
               usernamePassword(credentialsId: 'marketplace-dev-aws-iam-user', passwordVariable: 'AWS_IAM_USER_ACCESS_KEY', usernameVariable: 'AWS_IAM_USER_KEY_ID'),
           ]) {
@@ -86,9 +85,8 @@ pipeline {
                 VAULT_URL=https://\$(</host):8093 \\
                 VAULT_PROXY_DEBUG=true \\
                 certInfo='{"orgName":"BlockApps","orgUnit":"Engineering","commonName":"Test"}' \\
-                STRIPE_PAYMENT_SERVER_URL='http://payments.mercata-testnet2.blockapps.net' \\
-                STRIPE_PUBLISHABLE_KEY='${STRIPE_PUBLISHABLE_KEY}' \\
-                STRIPE_SECRET_KEY='${STRIPE_SECRET_KEY}' \\
+                STRIPE_PAYMENT_SERVER_URL='https://payments.mercata-testnet2.blockapps.net' \\
+                FILE_SERVER_URL='https://fileserver.mercata-testnet2.blockapps.net/highway' \\
                 GLOBAL_ADMIN_NAME='${GLOBAL_ADMIN_NAME}' \\
                 GLOBAL_ADMIN_PASSWORD='${GLOBAL_ADMIN_PASSWORD}' \\
                 MP_IS_BOOTNODE='true' \\
@@ -283,9 +281,11 @@ pipeline {
                 always {
                   dir('strato-getting-started') {
                     sh 'sudo rm -rf strato_logs*'
-                    sh 'sudo ./fetchlogs --as-dir'
-                    sh 'mv strato_logs/ strato_logs_testsync/'
-                    archiveArtifacts artifacts: 'strato_logs_testsync/**', fingerprint: true, allowEmptyArchive: true
+                    sh 'sudo ./fetchlogs'
+                    sh 'sudo chmod 777 strato_logs.zip'
+                    sh 'mv strato_logs.zip strato_logs_testsync.zip'
+                    archiveArtifacts artifacts: 'strato_logs_testsync.zip', fingerprint: true, allowEmptyArchive: true
+                    sh 'sudo rm -rf strato_logs_testsync.zip'
                     sh 'sudo ./strato --wipe'
                     sh 'sudo ./vault --wipe'
                   }
@@ -433,8 +433,10 @@ module.exports = {
       sh 'rm -rf .docker-work'
       dir ('strato-getting-started') {
         sh 'rm -rf strato_logs*'
-        sh './fetchlogs --as-dir'
-        archiveArtifacts artifacts: 'strato_logs/**', fingerprint: true
+        sh './fetchlogs'
+        sh 'sudo chmod 777 strato_logs.zip'
+        archiveArtifacts artifacts: 'strato_logs.zip', fingerprint: true, allowEmptyArchive: true
+        sh 'sudo rm -rf strato_logs.zip'
       }
     }
 

@@ -287,6 +287,18 @@ class OrderController {
     }
   }
 
+  static async checkSaleQuantity(req, res, next) {
+    try {
+      const { dapp, body} = req;
+      const saleQuantity = await dapp.checkSaleQuantity(body)
+      rest.response.status200(res, saleQuantity)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
 
   // ----------------------- ARG VALIDATION ------------------------
 
