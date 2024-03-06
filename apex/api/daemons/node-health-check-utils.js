@@ -429,7 +429,7 @@ async function checkSystemInfo(isGlobalPasswordSet) {
     };
     if (!sysInfoCollected.memory.use.isHealthy) {
       isHealthy = false;
-      additional_info.push(`Low Memory (used ${useLevel}%)`);
+      additional_info.push(`Low Memory (used ${useLevel.toFixed(2)}%)`);
     }
 
     // CPU
@@ -454,13 +454,13 @@ async function checkSystemInfo(isGlobalPasswordSet) {
     if (!sysInfoCollected.cpu.avgLoad.isHealthy) {
       isHealthy = false;
       additional_info.push(
-        `Average CPU load is high (${metadataLoad.avgLoad})`
+        `Average CPU load is high (${metadataLoad.avgLoad.toFixed(2)})`
       );
     }
     if (!sysInfoCollected.cpu.currentLoad.isHealthy) {
       isHealthy = false;
       additional_info.push(
-        `Current CPU load is high (${metadataLoad.currentLoad})`
+        `Current CPU load is high (${metadataLoad.currentLoad.toFixed(2)})`
       );
     }
 
@@ -481,7 +481,9 @@ async function checkSystemInfo(isGlobalPasswordSet) {
         });
         if (!isDiskHealthy) {
           isHealthy = false;
-          additional_info.push(`Low Disk Space on ${fs.fs} (used ${fs.use}%)`);
+          additional_info.push(
+            `Low Disk Space on ${fs.fs} (used ${fs.use.toFixed(2)}%)`
+          );
         }
       }
     });
