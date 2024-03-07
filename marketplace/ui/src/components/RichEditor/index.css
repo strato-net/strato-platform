@@ -4,8 +4,24 @@
       margin-top: 0.75em;
     }
   
-    ul, ol {
+    ul {
       padding: 0 1rem;
+      list-style: disc;
+    }
+    ol {
+      padding: 0 1rem;
+      list-style: decimal;
+    }
+
+    /* This helps the links appear as they should. They are being overwritten in the editor without this */
+    a {
+        color: #1677ff !important;
+        text-decoration: none !important;
+        background-color: transparent !important;
+        outline: none !important;
+        cursor: pointer !important;
+        transition: color 0.3s !important;
+        -webkit-text-decoration-skip: objects !important;
     }
   
     h1, h2, h3, h4, h5, h6 {
@@ -82,6 +98,7 @@
   .ProseMirror {
     padding: 20px; /* Inner padding */
     min-height: 100%; /* Ensures the padding applies even when the editor is empty */
+    border: 1px solid #ccc;
   }
   
   .toolbar-color-picker {
