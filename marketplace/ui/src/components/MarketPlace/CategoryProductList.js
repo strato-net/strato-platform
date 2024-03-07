@@ -212,7 +212,7 @@ const CategoryProductList = ({ user }) => {
   //=========================Other functions===============================//
 
   const metaTitle = selectedCategories.length === 1 ? `${selectedCategories[0]} | STRATO Mercata Marketplace ` : 'STRATO Mercata Marketplace'
-  const metaImg = selectedCategories.length === 1 ? `${selectedCategories[0]}` : 'STRATO Mercata Marketplace'
+  const metaImg = selectedCategories.length === 1 ? `${selectedCategories[0]}` : 'STRATO Mercata Marketplace Banner'
   const metaCategory = selectedCategories.length === 1 ? `?category=${selectedCategories[0]}` : '' 
 
   const clearSelection = () => {
