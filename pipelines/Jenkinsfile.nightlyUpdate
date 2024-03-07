@@ -8,7 +8,7 @@ pipeline {
         
         
         dir ('/datadrive/testnet2/strato-getting-started') {
-          sh 'mv docker-compose.yml docker-compose.$(date \'+%Y%m%d\').yml'
+          sh 'mv docker-compose.yml docker-compose.$(date \'+%Y%m%d\').yml || true'
         }
         sh 'mv docker-compose.yml /datadrive/testnet2/strato-getting-started'
         
@@ -27,7 +27,7 @@ pipeline {
         
         
         dir ('/home/ec2-user/strato-getting-started') {
-          sh 'mv docker-compose.yml docker-compose.$(date \'+%Y%m%d\').yml'
+          sh 'mv docker-compose.yml docker-compose.$(date \'+%Y%m%d\').yml || true'
         }
         sh 'mv docker-compose.yml /home/ec2-user/strato-getting-started'
         
