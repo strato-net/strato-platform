@@ -314,14 +314,16 @@ const ProductDetails = ({ user, users }) => {
                 {details.images.length > 0 ? details.images.map((element, index) => {
                   return (<><div key={index} className="sm:w-[343px ] h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
                     <img width={"100%"} 
-                    alt={`${assetName} | ${index}`}
-                    title={`${assetName} | ${index}`}
+                    aria-hidden
+                    alt={`${assetName} | Image ${index}`}
+                    title={`${assetName} | Image ${index}`}
                     className="object-contain rounded-md h-full " src={element ? element : image_placeholder} />
                   </div></>)
                 }) : <><div className="sm:w-[343px ] sm:h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
                   <img width={"100%"}
-                  alt={assetName}
-                  title={assetName}
+                  aria-hidden
+                  alt={`${assetName} | Image`}
+                  title={`${assetName} | Image`}
                   className="object-contain rounded-md h-full " src={image_placeholder} />
                 </div></>}
               </Carousel>
@@ -420,7 +422,7 @@ const ProductDetails = ({ user, users }) => {
                     {ownerSameAsUser() ?
                       <Button
                         icon={<div className="flex justify-center items-center">
-                          <img src={Images.Cart} alt={assetName} title={assetName} width={18} height={18} className="object-contain" />
+                          <img aria-hidden src={Images.Cart} alt={`${assetName} | Image`} title={`${assetName} | Image`} width={18} height={18} className="object-contain" />
                         </div>}
                         className=" !w-9 h-9 border border-primary  !bg-[#13188A] rounded-md"
                         disabled={true}
@@ -463,7 +465,7 @@ const ProductDetails = ({ user, users }) => {
                       :
                       <Button
                         icon={<div className="flex justify-center items-center">
-                          <img src={Images.Cart} alt={assetName} title={assetName} width={18} height={18} className="object-contain" />
+                          <img aria-hidden src={Images.Cart} alt={`${assetName} | Image`} title={`${assetName} | Image`} width={18} height={18} className="object-contain" />
                         </div>}
                         className=" !w-9 h-9 rounded-md  !bg-[#13188A]"
                         onClick={async () => {
