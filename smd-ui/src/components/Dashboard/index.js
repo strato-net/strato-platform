@@ -358,7 +358,7 @@ class Dashboard extends Component {
         </div>
         <div className="row">
           <div className="col-sm-3">
-            <div className="row">
+            <div id="networkInfo">
               <Link to="">
                 <NumberCard
                   number={networkStatusMessage || "UNKNOWN"}
@@ -370,11 +370,7 @@ class Dashboard extends Component {
                   mode={networkHealth ? "success" : "danger"}
                 />
               </Link>
-            </div>
-            <div className="row">
               <br />
-            </div>
-            <div className="row">
               <Link to="/blocks">
                 <NumberCard
                   number={lastBlockNumber}
