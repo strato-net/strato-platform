@@ -14,7 +14,7 @@ BlockApps engineers - for more context, see [here](https://blockappsdev.slack.co
 All changes merged to `develop` should be documented in "Unreleased" until the version is finalized
 so that they could be properly moved to their respective version's subsection.
 
-## [Unreleased]
+## [11.1.0] - 3/7/2023
 
 #### Added
 - Custom `Show` instances for `CodeCollection`, `Function`, `Contract` data types
