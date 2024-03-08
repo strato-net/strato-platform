@@ -9,6 +9,7 @@ module Blockchain.Threads (
   getPeersByThreads
   ) where
 
+import Control.Monad
 import Control.Monad.IO.Class
 import Data.List
 import Data.List.Split
@@ -47,7 +48,12 @@ formatThread :: MonadIO m =>
                 ThreadId -> m String
 formatThread threadId = do
   maybeLabel <- liftIO $ threadLabel threadId
-  return $ "(" ++ show threadId ++ ") " ++ fromMaybe "" maybeLabel
+  status <- liftIO $ threadStatus threadId
+  let statusString =
+        case status of
+          ThreadFinished -> " [ThreadFinished]"
+          _ -> ""
+  return $ "(" ++ show threadId ++ ") " ++ fromMaybe "" maybeLabel ++ statusString
   
 
 data ParsedLabel = ParsedLabel {
@@ -69,7 +75,9 @@ getPeersByThreads = do
 
   threadIds <- liftIO listThreads
 
-  maybeThreadLabels <- liftIO $ sequence $ map threadLabel threadIds
+  activeThreadIds <- filterM (fmap (/= ThreadFinished) . threadStatus) threadIds
+
+  maybeThreadLabels <- liftIO $ sequence $ map threadLabel activeThreadIds
 
   let peerThreadGroups = Map.toList $ Map.fromListWith (++) $ 
                          [(p, [(l, s)]) | ParsedLabel p l s <- map parseLabel [ v | Just v <- maybeThreadLabels]]
