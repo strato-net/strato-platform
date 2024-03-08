@@ -87,9 +87,10 @@ runPeer peer sSource = do
   $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "Attempting to connect to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
   $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "my pubkey is: " ++ format myPublic
   $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "server pubkey is: " ++ format otherPubKey 
-  runClientConnection (IPAsText $ pPeerIp peer) (TCPPort . fromIntegral $ pPeerTcpPort peer) sSource $ \c -> do
+  withActivePeer peer $
+    runClientConnection (IPAsText $ pPeerIp peer) (TCPPort . fromIntegral $ pPeerTcpPort peer) sSource $ \c -> do
       attempt :: (Maybe SomeException) <- 
-        withCertifiedPeer peer . withActivePeer peer $
+        withCertifiedPeer peer $
           runEthClientConduit
             peer {pPeerPubkey = Just otherPubKey}
             (c ^. peerSource)
