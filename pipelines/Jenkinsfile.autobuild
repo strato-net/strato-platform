@@ -303,10 +303,10 @@ pipeline {
                         string(credentialsId: 'client-id1', variable: 'CLIENT_ID1'),
                         string(credentialsId: 'client-id1', variable: 'CLIENT_ID2'),
                         string(credentialsId: 'client-secret1', variable: 'CLIENT_SECRET1'),
-                        string(credentialsId: 'client-secret2', variable: 'CLIENT_SECRET2')
+                        string(credentialsId: 'client-secret2', variable: 'CLIENT_SECRET2'),
                         string(credentialsId: 'realm1', variable: 'REALM_1'),
                         string(credentialsId: 'realm2', variable: 'REALM_2'),
-                      ]utevent) {
+                      ]) {
                         // Now CLIENT_ID1, CLIENT_SECRET1, and CLIENT_SECRET2 are available as environment variables
                         sh 'python slipstream_sync.py $CLIENT_ID1 $CLIENT_ID2 $CLIENT_SECRET1 $CLIENT_SECRET2 $REALM_1 $REALM_2'
                       }
