@@ -34,6 +34,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
   const [transferModalOpen, setTransferModalOpen] = useState(false);
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
+  const imgMeta = category ? category : "STRATO Mercata Marketplace"
   
   const itemData = inventory.data;
   const showModalEdit = () => {
@@ -336,7 +337,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
         <div>
           <img
             className="rounded-md  w-[161px] h-[161px] md:object-contain"
-            alt=""
+            alt={imgMeta}
+            title={imgMeta}
             src={
               inventory.images && inventory.images.length > 0
                 ? inventory.images[0]
