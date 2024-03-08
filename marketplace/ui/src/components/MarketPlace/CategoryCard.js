@@ -51,6 +51,8 @@ const CategoryCard = () => {
             >
               <div className="flex flex-col">
                 <img
+                  alt="STRATO Mercata Marketplace Banner"
+                  title="STRATO Mercata Marketplace Banner"
                   src={categoryImages[index]}
                   className="rounded-t-lg px-[9px] py-[6px] lg:px-[0px] lg:py-[0px] h-[110px] md:h-[125px] 2xl:h-[140px]"
                   preview={false}
