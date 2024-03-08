@@ -5,7 +5,7 @@ import { actions as itemActions } from "../../contexts/item/actions";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import { useItemDispatch } from "../../contexts/item";
 
-const ResellModal = ({ open, handleCancel, inventory, categoryName }) => {
+const ResellModal = ({ open, handleCancel, inventory, categoryName, limit, offset }) => {
     const [quantity, setQuantity] = useState(1);
     const inventoryDispatch = useInventoryDispatch();
     const itemDispatch = useItemDispatch();
@@ -46,7 +46,7 @@ const ResellModal = ({ open, handleCancel, inventory, categoryName }) => {
         };
         let isDone = await actions.resellInventory(inventoryDispatch, body);
         if (isDone) {
-            await actions.fetchInventory(inventoryDispatch, 10, 0, "", categoryName);
+            await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
             handleCancel();
         }
     }

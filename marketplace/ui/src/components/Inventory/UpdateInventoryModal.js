@@ -23,7 +23,9 @@ const UpdateInventoryModal = ({
   handleCancel,
   debouncedSearchTerm,
   inventoryToUpdate,
-  categoryName
+  categoryName,
+  limit,
+  offset
 }) => {
   const schema = getSchema();
   const [formState, setFormState] = useState(null);
@@ -111,7 +113,7 @@ const UpdateInventoryModal = ({
     let isDone = await actions.updateInventory(dispatch, body);
 
     if (isDone) {
-      await actions.fetchInventory(dispatch, 10, 0, debouncedSearchTerm, categoryName);
+      await actions.fetchInventory(dispatch, limit, offset, debouncedSearchTerm, categoryName);
       handleCancel();
     }
   };
