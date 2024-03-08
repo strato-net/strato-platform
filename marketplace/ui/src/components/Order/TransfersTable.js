@@ -10,6 +10,7 @@ import { ResponsiveOrderCard } from "./ResponsiveOrdersCard";
 import { ResponsiveTransferOrderCard } from "./ResponsiveTransferOrdersCard";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import routes from "../../helpers/routes";
 
 
 const TransfersTable = ({ user, selectedDate, download, isAllOrdersLoading }) => {
@@ -83,12 +84,50 @@ const TransfersTable = ({ user, selectedDate, download, isAllOrdersLoading }) =>
     {
       title: "From",
       key: "oldOwnerCommonName",
-      render: (text, record) => <p>{record.oldOwnerCommonName}</p>,
+      render: (text, record) => (
+        <a 
+          href={`${window.location.origin}/marketplace/profile/${encodeURIComponent(record.oldOwnerCommonName)}`}
+          onClick={(e) => {
+            e.preventDefault();
+            const userProfileUrl = `/marketplace/profile/${encodeURIComponent(record.oldOwnerCommonName)}`;
+      
+            if (e.ctrlKey || e.metaKey) {
+              // Open in a new tab if Ctrl/Cmd is pressed
+              window.open(`${window.location.origin}${userProfileUrl}`, '_blank');
+            } else {
+              // Use navigate for a normal click, without Ctrl/Cmd
+              navigate(routes.MarketplaceUserProfile.url.replace(':commonName',record.oldOwnerCommonName), { state: { from: location.pathname } });
+            }
+          }}
+          style={{ textDecoration: 'underline', color: 'black', cursor: 'pointer' }}
+        >
+          {record.oldOwnerCommonName}
+        </a>
+      ),
     },
     {
       title: "To",
       key: "newOwnerCommonName",
-      render: (text, record) => <p>{record.newOwnerCommonName}</p>,
+      render: (text, record) => (
+        <a 
+          href={`${window.location.origin}/marketplace/profile/${encodeURIComponent(record.newOwnerCommonName)}`}
+          onClick={(e) => {
+            e.preventDefault();
+            const userProfileUrl = `/marketplace/profile/${encodeURIComponent(record.newOwnerCommonName)}`;
+      
+            if (e.ctrlKey || e.metaKey) {
+              // Open in a new tab if Ctrl/Cmd is pressed
+              window.open(`${window.location.origin}${userProfileUrl}`, '_blank');
+            } else {
+              // Use navigate for a normal click, without Ctrl/Cmd
+              navigate(routes.MarketplaceUserProfile.url.replace(':commonName',record.newOwnerCommonName), { state: { from: location.pathname } });
+            }
+          }}
+          style={{ textDecoration: 'underline', color: 'black', cursor: 'pointer' }}
+        >
+          {record.newOwnerCommonName}
+        </a>
+      ),
     },
     {
       dataIndex: "transferDate",
