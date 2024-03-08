@@ -7,11 +7,14 @@ import TextAlign from "@tiptap/extension-text-align";
 import Link from "@tiptap/extension-link";
 import Underline from "@tiptap/extension-underline";
 import "./index.css";
+import DOMPurify from 'dompurify';
 
 const PreviewMode = ({ content }) => {
-  // TODO: We need to snaitize the HTML before displaying in the UI.
-  // Currently all "s become \" which is throwing off the styling and the display of text.
-  // Depending on the sanitization library we may not need to use this component.
+  function cleanContent(content) {
+    const cleanContent = DOMPurify.sanitize(content);
+    return cleanContent.replace(/\\"/g, '"');
+  }
+
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -20,13 +23,13 @@ const PreviewMode = ({ content }) => {
       Underline,
       Link,
     ],
-    content: content,
+    content: cleanContent(content),
     editable: false
   });
 
   useEffect(() => {
     if (content && editor) {
-      editor.commands.setContent(content, false);
+      editor.commands.setContent(cleanContent(content), false);
     }
   }, [content, editor]);
 

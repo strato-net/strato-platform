@@ -65,6 +65,7 @@
     "classnames": "^2.3.2",
     "cypress-file-upload": "^5.0.8",
     "dayjs": "^1.11.7",
+    "dompurify": "^3.0.9",
     "file-saver": "^2.0.5",
     "formik": "^2.2.9",
     "http-status-codes": "^2.2.0",
