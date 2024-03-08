@@ -1,0 +1,135 @@
+import requests
+import base64
+import time
+import sys
+
+def wait_for_nodes_to_sync(node1_url, node2_url, headers1, headers2):
+    while True:
+        try:
+            response1 = requests.get(node1_url + "/cirrus/search/BlockApps-Mercata-Asset?order=block_timestamp.desc", headers=headers1)
+            response2 = requests.get(node2_url + "/cirrus/search/BlockApps-Mercata-Asset?order=block_timestamp.desc", headers=headers2)
+
+            if response1.ok and response2.ok:
+                block_number1 = response1.json()[0]["block_number"]
+                block_number2 = response2.json()[0]["block_number"]
+                if block_number1 == block_number2:
+                    print(f"Nodes are in sync with block number: {block_number1}")
+                    break
+                else:
+                    print(f"jenkins is at block {block_number1}, but Node1 is at block {block_number2}. Retrying in 30 seconds...")
+            else:
+                print(f"Failed to fetch data for one of the nodes. Retrying in 30 seconds...")
+        except Exception as e:
+            print(f"Exception occurred: {e}")
+
+        time.sleep(30)
+
+def get_auth_token(client_id, client_secret, realm_name):
+    basic_token = base64.b64encode(bytes('%s:%s' % (client_id, client_secret), 'utf-8')).decode('utf-8')
+    url = "https://keycloak.blockapps.net/auth/realms/%s/protocol/openid-connect/token" % realm_name
+    payload = {
+        'grant_type': 'client_credentials'
+    }
+    headers = {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': 'Basic %s' % basic_token
+    }
+    resp = requests.request("POST", url, headers=headers, data=payload)
+    return resp.json()['access_token']
+
+def check_table(table):
+    discrepancies, count = False, False
+    print("Checking table ", table)
+    endpoint = "/cirrus/search/" + table
+    a1_resp = requests.get(node1_url + endpoint, headers=headers1).json()
+    a2_resp = requests.get(node2_url + endpoint, headers=headers2).json()
+
+    assets1 = {a['address'] : a for a in a1_resp}
+    assets2 = {a['address'] : a for a in a2_resp}
+
+    count1 = len(a1_resp)
+    count2 = len(a2_resp)
+    print(f"Table '{table}': jenkins node count = {count1}, node1 count = {count2}")
+    if(count1 != count2):
+        count=false
+        print(f"Count discrepancy found for table '{table}': jenkins node has {count1} entries, node1 has {count2} entries.")
+
+    in1Not2 = set(assets1.keys()).difference(set(assets2.keys()))
+    if len(in1Not2) > 0:
+        print("found in ", node1_url, " but not in ", node2_url, ": ", in1Not2)
+        # discrepancies = True
+    in2Not1 = set(assets2.keys()).difference(set(assets1.keys()))
+    if len(in2Not1) > 0:
+        print("found in ", node2_url, " but not in ", node1_url, ": ", in2Not1)
+        # discrepancies = True
+
+    for a in assets1.keys():
+        if a not in assets2.keys():
+            print(a, " is in ", node1_url, "but not in ", node2_url)
+            # discrepancies = True
+        else:
+            if assets1[a] != assets2[a]:
+                print("inconsistency at ", a)
+                for k in assets1[a].keys():
+                    if assets1[a][k] != assets2[a][k]:
+                        #Only on contract name for now
+                        if k=='contract_name':
+                            print("\t", a, " on ", node1_url, " has ", k, ": ", assets1[a][k])
+                            print("\t", a, " on ", node2_url, " has ", k, ": ", assets2[a][k])
+                            discrepancies = True
+                        else:
+                            print("\t", a, " on ", node1_url, " has ", k, ": ", assets1[a][k])
+                            print("\t", a, " on ", node2_url, " has ", k, ": ", assets2[a][k])
+
+    return discrepancies, count
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 7:
+        print('Incorrect number of arguments supplied. Expected 4 arguments.')
+        sys.exit(1)
+
+    client_id1 = sys.argv[1]
+    client_id2 = sys.argv[2]
+    client_secret1 = sys.argv[3]
+    client_secret2 = sys.argv[4]
+    realm_1 = sys.argv[5]
+    realm_2 = sys.argv[6]
+
+    node1 = "172.17.0.1:80"
+    node2 = "node1"
+
+    node1_url = "http://" + node1
+    node2_url = f"https://{node2}.mercata-testnet2.blockapps.net"
+
+    token1 = get_auth_token(client_id1, client_secret1, realm_1)
+    token2 = get_auth_token(client_id2, client_secret2, realm_2)
+    headers1 = {'Authorization': f'Bearer {token1}'}
+    headers2 = {'Authorization': f'Bearer {token2}'}
+
+    # Wait until both nodes have the same latest block number
+    wait_for_nodes_to_sync(node1_url, node2_url, headers1, headers2)
+
+    discrepancies_asset = False
+    discrepancies_sale = False
+    discrepancies_order = False
+
+    count_asset_discrepancy = False
+    count_sale_discrepancy = False
+    count_order_discrepancy = False
+
+    discrepancies_asset, count_asset_discrepancy = check_table("BlockApps-Mercata-Asset")
+    discrepancies_sale, count_sale_discrepancy = check_table("BlockApps-Mercata-Order")
+    discrepancies_order, count_order_discrepancy = check_table("BlockApps-Mercata-Sale")
+    
+        # Print the results
+    print("\nFinal check summary:")
+    print(f"Asset Discrepancies: {'Yes' if discrepancies_asset else 'No'}")
+    print(f"Order Discrepancies: {'Yes' if discrepancies_order else 'No'}")
+    print(f"Sale Discrepancies: {'Yes' if discrepancies_sale else 'No'}")
+    print(f"Asset Count Match Discrepancies: {'Yes' if count_asset_discrepancy else 'No'}")
+    print(f"Order Count Match Discrepancies: {'Yes' if count_order_discrepancy else 'No'}")
+    print(f"Sale Count Match Discrepancies: {'Yes' if  count_sale_discrepancy else 'No'}")
+        
+    if discrepancies_asset or discrepancies_sale or discrepancies_order or count_asset_discrepancy or count_sale_discrepancy or count_order_discrepancy:
+        sys.exit(1)
