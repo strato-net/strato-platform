@@ -24,6 +24,7 @@ import users from './users'
 import marketplace from './Marketplace'
 import paymentService from './PaymentService'
 import orderLine from "./OrderLine"
+import userActivity from './UserActivity'
 
 import {
   Authentication,
@@ -47,6 +48,7 @@ import {
   Marketplace,
   OrderLine,
   PaymentService,
+  UserActivity
 } from './endpoints'
 
 
@@ -73,6 +75,7 @@ router.use(Event.prefix, event)
 router.use(Marketplace.prefix, marketplace)
 router.use(OrderLine.prefix, orderLine)
 router.use(PaymentService.prefix, paymentService)
+router.use(UserActivity.prefix, userActivity)
 
 
 router.get(`/health`, (req, res) => {

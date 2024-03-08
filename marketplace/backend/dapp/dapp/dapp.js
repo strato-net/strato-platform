@@ -217,6 +217,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return { inventories: inventories, inventoryCount: inventoryCount }
   };
 
+  contract.getInventoriesForUser = async function (args, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName };
+    const {ownerCommonName, ...restArgs} = args;
+    const newArgs = { ...restArgs, ownerCommonName:ownerCommonName, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, userProfile:true }//'0000000000000000000000000000000000000000'
+    return marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
+  };
+
   contract.getOwnershipHistory = async function (args, options = optionsNoChainIds) {
     console.log('#### GET OWNERSHIP HISTORY ARGS', JSON.stringify(args))
     return await inventoryJs.getOwnershipHistory(rawAdmin, args, options);
@@ -475,21 +482,24 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     try {
       const order = await saleOrderJs.get(rawAdmin, args, options);
       const sales = await saleJs.getAll(rawAdmin, { saleAddresses: order.saleAddresses }, options);
-      const assetAddresses = sales.map(sale => {
-        return sale.assetToBeSold;
-      })
       let assets = [];
-      const assetsWithoutQuantity = await inventoryJs.getAll(rawAdmin, { assetAddresses: assetAddresses }, options);
-      assetsWithoutQuantity.map(asset => {
-        const saleForAsset = sales.find(sale => sale.assetToBeSold === asset.address);
+      
+      for (const sale of sales) {
+        const history = await saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, transaction_hash: order.transaction_hash, assetToBeSold: sale.assetToBeSold }, options);
+        const price = history['0'] ? history['0'].price : null;
+        
+        const assetAddress = sale.assetToBeSold;
+        const assetWithoutQuantity = await inventoryJs.get(rawAdmin, { address: assetAddress }, options);
+        
         assets.push({
-          ...asset,
-          price: saleForAsset.price,
-          saleQuantity: saleForAsset.quantity,
-          saleAddress: saleForAsset.address,
-          amount: saleForAsset.quantity * saleForAsset.price,
-        })
-      })
+          ...assetWithoutQuantity,
+          price: price,
+          saleQuantity: sale.quantity,
+          saleAddress: sale.address,
+          amount: sale.quantity * price,
+        });
+      }
+      
       const result = { userContactAddress: order.shippingAddress, order, assets };
 
       return result;
@@ -527,26 +537,29 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       }
       const saleAddresses = orders.orders.flatMap(order => order.saleAddresses);
       const sales = await saleJs.getAll(rawAdmin, { saleAddresses }, options);
-      const uniqueAssetAddresses = new Set(sales.map(sale => sale.assetToBeSold));
       
-      const assets = await inventoryJs.getAll(rawAdmin, { assetAddresses: [...uniqueAssetAddresses] }, options);
+      const uniqueAssetAddresses = [...new Set(sales.map(sale => sale.assetToBeSold))];
+      const assets = await inventoryJs.getAll(rawAdmin, { assetAddresses: uniqueAssetAddresses }, options);
+      const assetLookup = new Map(assets.map(asset => [asset.address, asset]));
       
-      const assetDetailsMap = new Map(assets.map(asset => [asset.address, asset]));
-      const assetLookup = new Map(sales.map(sale => [
-        sale.assetToBeSold, 
-        { 
-          ...assetDetailsMap.get(sale.assetToBeSold),
-          salePrice: sale.price
-        }
-      ]));
-      
-      orders.orders.forEach(order => {
-        order.assets = order.saleAddresses.map(saleAddress => {
-          const assetToBeSold = sales.find(sale => sale.address === saleAddress)?.assetToBeSold;
-          return assetLookup.get(assetToBeSold);
-        }).filter(asset => asset !== undefined);
-      });
-  
+      for (const order of orders.orders) {
+        const assetsPromises = order.saleAddresses.map(async (saleAddress) => {
+          const sale = sales.find(sale => sale.address === saleAddress);
+          if (!sale) return undefined;
+
+          const history = await saleJs.getSaleHistory(rawAdmin, {
+            contract: sale.contract_name,
+            transaction_hash: order.transaction_hash,
+            assetToBeSold: sale.assetToBeSold
+          }, options);
+
+          const asset = assetLookup.get(sale.assetToBeSold);
+          return asset ? { ...asset, salePrice: history['0']?.price || 0 } : undefined;
+        });
+
+        order.assets = (await Promise.all(assetsPromises)).filter(asset => asset !== undefined);
+      }
+
       return orders.orders;
     };
     
@@ -582,6 +595,45 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   // ------------------------------ SALE TEST ENDS ------------------------------
+
+  /* ------------------------ User Activity Starts ------------------------ */
+  contract.getAllUserActivity = async function (args, options = defaultOptions) {
+    const getOptions = { ...options, app: contractName };
+    const { sellersCommonName, purchasersCommonName, newOwnerCommonName } = args
+
+    const currentDate = new Date();
+    // Subtract 10 days from the current date
+    const tenDaysAgoDate = new Date(currentDate.getTime() - (10 * 24 * 60 * 60 * 1000));
+    // Format the date as 'YYYY-MM-DD HH:MM:SS UTC'
+    const tenDaysAgoTimestamp = tenDaysAgoDate.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
+
+    // Need to fetch purchases, closed orders, transfers for the user.
+    // New Purchases of User's Products---Fetch Orders with filters of sellersCommonName, block_timestamp and Order Status = AWAITING_FULFILLMENT (1) 
+    const purchaseArgs = { sellersCommonName, status: 1, gtField: "block_timestamp", gtValue: tenDaysAgoTimestamp}
+    const purchases = await saleOrderJs.getAll(rawAdmin, purchaseArgs, getOptions);
+
+    // These are my orders that ave been closed by a seller
+    const orderArgs = { purchasersCommonName, status: 3, gtField: "block_timestamp", gtValue: tenDaysAgoTimestamp}
+    const orders = await saleOrderJs.getAll(rawAdmin, orderArgs, getOptions);
+
+    // These are transfers the usre has recieved
+    const transferArgs = {newOwnerCommonName, gtField: "block_timestamp", gtValue: tenDaysAgoTimestamp};
+    const transfers = await inventoryJs.getAllItemTransferEvents(rawAdmin, transferArgs, getOptions);
+
+    // Fetch activities and add type to each item
+    const purchasesWithTypes = purchases.orders.map(p => ({ ...p, type: 'sold' }));
+    const ordersWithTypes = orders.orders.map(o => ({ ...o, type: 'bought' }));
+    const transfersWithTypes = transfers.transfers.map(t => ({ ...t, type: 'transfer' }));
+
+    // Combine all activities into one array
+    const allActivities = [...purchasesWithTypes, ...ordersWithTypes, ...transfersWithTypes];
+    // Sort by block_timestamp
+    allActivities.sort((a, b) => new Date(b.block_timestamp) - new Date(a.block_timestamp));
+
+    return allActivities;
+  };
+
+  /* ------------------------ User Activity Ends------------------------ */
 
 
   /* ------------------------ Stripe account connect starts here ------------------------ */

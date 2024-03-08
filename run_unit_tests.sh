@@ -12,7 +12,7 @@ trap "docker rm -f ${REDIS}" EXIT
 
 cd strato
 
-stack test --fast $1\
+stack test $1\
       blockapps-data \
       blockapps-init \
       blockapps-mpdbs \

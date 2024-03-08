@@ -61,6 +61,7 @@ import qualified SolidVM.Model.CodeCollection.VarDef as SolidVM
 import SolidVM.Model.SolidString
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
+import qualified Text.Colors as CL
 
 --------------------------------------------------------------------------------
 soliditySchemaOptions :: SchemaOptions
@@ -161,7 +162,23 @@ data FuncF a = Func
     _funcIsFree :: Bool,
     _funcOverload :: [FuncF a]
   }
-  deriving (Eq, Show, Generic, Functor, NFData, Foldable, Traversable)
+  deriving (Eq, Generic, Functor, NFData, Foldable, Traversable)
+
+instance Show a => Show (FuncF a) where
+  show (Func {..}) =
+    (CL.underline "\nFunctionF")
+      ++ CL.magenta "\n_funcArgs\t" ++ show _funcArgs
+      ++ CL.magenta "\n_funcVals\t" ++ show _funcVals
+      ++ CL.magenta "\n_funcStateMutability\t" ++ show _funcStateMutability
+      ++ CL.magenta "\n_funcContents\t" ++ show _funcContents
+      ++ CL.magenta "\n_funcVisibility\t" ++ show _funcVisibility
+      ++ CL.magenta "\n_funcVirtual\t" ++ show _funcVirtual
+      ++ CL.magenta "\n_funcOverrides\t" ++ show _funcOverrides
+      ++ CL.magenta "\n_funcConstructorCalls\t" ++ show _funcConstructorCalls
+      ++ CL.magenta "\n_funcModifiers\t" ++ show _funcModifiers
+      ++ CL.magenta "\n_funcContext\t" ++ show _funcContext
+      ++ CL.magenta "\n_funcIsFree\t" ++ show _funcIsFree
+      ++ CL.magenta "\n_funcOverload\t" ++ show _funcOverload
 
 makeLenses ''FuncF
 
