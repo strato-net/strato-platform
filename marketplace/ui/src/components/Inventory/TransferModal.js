@@ -114,6 +114,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
             let isDone = await actions.transferInventory(inventoryDispatch, body);
             if (isDone) {
                 await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
+                await actions.fetchInventoryForUser(inventoryDispatch, limit, offset, user.commonName);
                 handleCancel();
             }
         }

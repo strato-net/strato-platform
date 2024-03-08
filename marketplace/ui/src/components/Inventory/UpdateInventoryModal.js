@@ -14,6 +14,7 @@ import {
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { useProductState } from "../../contexts/product";
 import TagManager from "react-gtm-module";
+import { useAuthenticateState } from "../../contexts/authentication";
 
 
 const { Option } = Select;
@@ -36,7 +37,7 @@ const UpdateInventoryModal = ({
   const { categoryBasedProducts, isCategoryBasedProductsLoading } =
     useProductState();
   
-
+  const { user } = useAuthenticateState();
   const { isinventoryUpdating, isReselling } =
     useInventoryState();
 
@@ -114,6 +115,8 @@ const UpdateInventoryModal = ({
 
     if (isDone) {
       await actions.fetchInventory(dispatch, limit, offset, debouncedSearchTerm, categoryName);
+      await actions.fetchInventoryForUser(dispatch, limit, offset, user.commonName);
+
       handleCancel();
     }
   };

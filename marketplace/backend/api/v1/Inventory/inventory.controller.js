@@ -43,6 +43,25 @@ class InventoryController {
     }
   }
 
+  static async getAllUserInventories(req, res, next) {
+    try {
+      const { dapp, query } = req
+      const {gtField, gtValue, ...restQuery} = query;
+
+      const inventories = await dapp.getInventoriesForUser({ userProfileGtField: gtField, userProfileGtValue: gtValue, ...restQuery});
+      const productsWithImageUrl = inventories?.inventoryResults.sort((a, b) => {
+        return b.saleDate.localeCompare(a.saleDate);
+      });
+
+      rest.response.status200(res, { inventoriesWithImageUrl: productsWithImageUrl, count: productsWithImageUrl.length })
+
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
   static async create(req, res, next) {
     try {
       const { dapp, body } = req
