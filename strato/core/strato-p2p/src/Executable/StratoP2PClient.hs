@@ -40,7 +40,7 @@ import           Blockchain.TimerSource
 import           Control.Concurrent hiding (yield)
 import           Control.Exception.Base (ErrorCall (..))
 import           Control.Lens ((^.))
-import           Control.Monad (forever, unless, void)
+import           Control.Monad (forever, forM_, void)
 import qualified Control.Monad.Change.Alter as A
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
@@ -180,24 +180,14 @@ stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main l
         $logErrorS "stratoP2PClient" . T.pack $ "Could not fetch peers: " ++ show err
         liftIO $ threadDelay 1000000
       Right peers -> do
-        _ <- async $ multiThreadedClient peers
+        forM_ (filter ((== 0) . pPeerActiveState) peers) $ \peer -> do
+          _ <- liftIO . forkIO . runLoggingT . runner $ \_ -> do
+              result <- try . liftIO . runLoggingT . runner $ runPeerInList peer
+              handleRunPeerResult peer result
+          return ()
         $logInfoS "stratoP2PClient" "Waiting 5 seconds before looping over peers again"
         liftIO $ threadDelay 5000000
   where
-    multiThreadedClient :: MonadP2P m => [PPeer] -> m ()
-    multiThreadedClient [] = do
-      $logInfoS "stratoP2PClient/multiThreadedClient" "No available peers, will try again in 10 seconds"
-      liftIO $ threadDelay 10000000
-    multiThreadedClient peers = do
-      let notRunningPeers = filter ((== 0) . pPeerActiveState) peers
-      unless (null notRunningPeers) . void . forConcurrently notRunningPeers $ \p -> do
-            result <- try . liftIO . runLoggingT . runner $ runPeerInList p
-            let status =
-                  case result of
-                    Right v -> "runPeer Normal disconnect: " ++ show v
-                    Left e -> "runPeer disconnecting: " ++ show e
-            changeLabelStatusM status
-            handleRunPeerResult p result
     handleRunPeerResult :: MonadP2P m => PPeer -> Either SomeException () -> m ()
     handleRunPeerResult thePeer = \case
       Left e | Just (ErrorCall x) <- fromException e -> error x
