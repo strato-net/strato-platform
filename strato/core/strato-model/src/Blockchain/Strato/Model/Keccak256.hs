@@ -63,7 +63,7 @@ import Web.FormUrlEncoded hiding (fieldLabelModifier)
 import Web.PathPieces
 
 newtype Keccak256 = Keccak256 ByteString
-  deriving (Eq, Read, Show, Ord, Generic, Data)
+  deriving (Eq, Read, Ord, Generic, Data)
   deriving anyclass (Hashable)
 
 newtype SHA = SHA ByteString
@@ -83,6 +83,9 @@ unsafeCreateKeccak256FromByteString = Keccak256
 
 unsafeCreateKeccak256FromWord256 :: Word256 -> Keccak256
 unsafeCreateKeccak256FromWord256 = Keccak256 . word256ToBytes
+
+instance Show Keccak256 where
+  show = keccak256ToHex
 
 instance Binary Keccak256 where
   put (Keccak256 x) = putByteString x
