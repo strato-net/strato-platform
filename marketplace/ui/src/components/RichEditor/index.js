@@ -11,6 +11,7 @@ import Underline from "@tiptap/extension-underline";
 import Paragraph from "@tiptap/extension-paragraph";
 import Document from "@tiptap/extension-document";
 import Text from "@tiptap/extension-text";
+import { FontFamily, FontSize } from "./customExtensions.js";
 
 import "./index.css";
 import {
@@ -27,7 +28,6 @@ import {
 } from "@ant-design/icons";
 import MenuBar from "./MenuBar.js";
 
-
 const RichEditor = ({ onChange, initialValue }) => {
   const editor = useEditor({
     extensions: [
@@ -35,6 +35,8 @@ const RichEditor = ({ onChange, initialValue }) => {
       Color.configure({ types: [TextStyle.name, ListItem.name] }),
       TextStyle.configure({ types: [ListItem.name] }),
       TextAlign.configure({ types: ["heading", "paragraph"] }),
+      FontFamily,
+      FontSize,
       Link,
       Heading,
       Underline,

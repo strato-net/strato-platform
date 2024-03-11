@@ -1,10 +1,67 @@
-import React from "react";
+import React, { useState } from "react";
+import { Dropdown } from "antd";
+import { DownOutlined } from "@ant-design/icons";
 import "./index.css";
 
 const MenuBar = ({ editor, addLink }) => {
+  const [selectedFontSize, setSelectedFontSize] = useState("12px");
+  const [selectedFontFamily, setSelectedFontFamily] = useState("Arial");
+
   if (!editor) {
     return;
   }
+
+  editor.on("selectionUpdate", ({ editor }) => {
+    const attrs = editor.getAttributes("textStyle");
+
+    setSelectedFontSize(attrs.fontSize || "");
+    setSelectedFontFamily(
+      attrs.fontFamily ? attrs.fontFamily.split(",")[0] : ""
+    );
+  });
+
+  const fontSizes = [
+    "12px",
+    "14px",
+    "16px",
+    "18px",
+    "20px",
+    "24px",
+    "28px",
+    "32px",
+    "36px",
+  ];
+
+  const handleFontSizeClick = (key) => {
+    const fontSize = fontSizes[key];
+    editor.chain().focus().setFontSize(fontSize).run();
+    setSelectedFontSize(fontSize);
+  };
+
+  const fontSizeMenuItems = fontSizes.map((size, index) => ({
+    key: index.toString(),
+    label: size,
+  }));
+
+  const fontFamilies = [
+    "Arial, sans-serif",
+    "Georgia, serif",
+    "Impact, sans-serif",
+    "Tahoma, sans-serif",
+    "Times New Roman, serif",
+    "Verdana, sans-serif",
+  ];
+
+  const handleFontFamilyClick = (key) => {
+    const fontFamily = fontFamilies[key];
+    editor.chain().focus().setFontFamily(fontFamily).run();
+    setSelectedFontFamily(fontFamily);
+  };
+
+  const fontFamilyMenuItems = fontFamilies.map((family, index) => ({
+    key: index.toString(),
+    label: family,
+  }));
 
   return (
     <>
@@ -61,6 +118,33 @@ const MenuBar = ({ editor, addLink }) => {
       >
         Right
       </button>
+
+      <Dropdown
+          className="ant-dropdown-link"
+          menu={{
+            items: fontSizeMenuItems,
+            onClick: ({ key }) => handleFontSizeClick(key),
+          }}
+          trigger={["click"]}
+        >
+          <button onClick={(e) => e.preventDefault()}>
+            {selectedFontSize || "12px"} <DownOutlined />
+          </button>
+        </Dropdown>
+
+        <Dropdown
+          className="ant-dropdown-link"
+          menu={{
+            items: fontFamilyMenuItems,
+            onClick: ({ key }) => handleFontFamilyClick(key),
+          }}
+          trigger={["click"]}
+        >
+          <button onClick={(e) => e.preventDefault()}>
+            {selectedFontFamily ? selectedFontFamily.split(",")[0] : "Arial"}{" "}
+            <DownOutlined />
+          </button>
+        </Dropdown>
 
       {/* Bullet List */}
       <button
@@ -122,6 +206,16 @@ const MenuBar = ({ editor, addLink }) => {
       {/* Clear Nodes */}
       <button onClick={() => editor.chain().focus().clearNodes().run()}>
         Clear Formatting
+      </button>
+
+      {/* Custom color picker */}
+      <button>
+        <input
+          type="color"
+          onInput={event => editor.chain().focus().setColor(event.target.value).run()}
+          value={editor.getAttributes('textStyle').color}
+          data-testid="setColor"
+        />
       </button>
     </>
   );

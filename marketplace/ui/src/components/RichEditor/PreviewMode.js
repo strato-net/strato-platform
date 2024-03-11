@@ -6,13 +6,17 @@ import ListItem from "@tiptap/extension-list-item";
 import TextAlign from "@tiptap/extension-text-align";
 import Link from "@tiptap/extension-link";
 import Underline from "@tiptap/extension-underline";
-import "./index.css";
+import Color from "@tiptap/extension-color";
 import DOMPurify from 'dompurify';
+import { FontFamily, FontSize } from "./customExtensions";
+import "./index.css";
 
 const PreviewMode = ({ content }) => {
+
   function cleanContent(content) {
-    const cleanContent = DOMPurify.sanitize(content);
-    return cleanContent.replace(/\\"/g, '"');
+    const removeEsacpes = content.replace(/\\\"/g, '"');
+    const cleanContent = DOMPurify.sanitize(removeEsacpes);
+    return cleanContent
   }
 
   const editor = useEditor({
@@ -22,6 +26,9 @@ const PreviewMode = ({ content }) => {
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       Underline,
       Link,
+      FontFamily, 
+      Color,
+      FontSize
     ],
     content: cleanContent(content),
     editable: false
