@@ -7,8 +7,10 @@ import { setSearchQueryOptions, search, searchOne, searchAll, searchAllWithQuery
 
 const contractName = 'BasePaymentProvider';
 const stripeContractName = 'StripePaymentProvider';
+const metamaskContractName = 'MetamaskPaymentProvider';
 const paymentContractName = 'StripePaymentProvider.StripePaymentInitialized';
 const contractFilename = `${util.cwd}/dapp/mercata-base-contracts/Templates/Payments/StripePaymentProvider.sol`;
+const metamaskContractFilename = `${util.cwd}/dapp/mercata-base-contracts/Templates/Payments/MetamaskPaymentProvider.sol`;
 
 /** 
  * Upload a new PaymentProvider 
@@ -20,11 +22,26 @@ const contractFilename = `${util.cwd}/dapp/mercata-base-contracts/Templates/Paym
 async function uploadContract(user, _constructorArgs, options) {
     const constructorArgs = marshalIn(_constructorArgs);
 
-    const contractArgs = {
-        name: stripeContractName,
-        source: await importer.combine(contractFilename),
-        args: util.usc(constructorArgs),
-    };
+    let contractArgs = {};
+    
+    switch (constructorArgs.name) {
+      case 'STRIPE':
+        contractArgs = {
+          name: stripeContractName,
+          source: await importer.combine(contractFilename),
+          args: util.usc(constructorArgs),
+        };
+        break;
+      case 'METAMASK':
+        contractArgs = {
+          name: metamaskContractName,
+          source: await importer.combine(metamaskContractFilename),
+          args: util.usc(constructorArgs),
+        };
+        break;
+      default:
+        throw new Error('Invalid contract name');
+    }
 
     let error = [];
 

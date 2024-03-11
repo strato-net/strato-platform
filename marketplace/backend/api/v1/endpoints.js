@@ -178,6 +178,8 @@ export const Marketplace = {
 
 export const PaymentService = {
   prefix: '/payment',
+  metamaskOnboarding: '/metamask/account/:walletId',
+  metamaskOnboardingStatus: '/metamask/account/status/:ownerCommonName',
   stripeOnboarding: '/stripe/account',
   stripeConnectStatus: '/stripe/account/status/:ownerCommonName',
   stripeWebhook: '/stripe/webhook',

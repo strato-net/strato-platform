@@ -7,6 +7,20 @@ import loadDapp from "../../middleware/loadDappHandler";
 const router = express.Router();
 
 router.get(
+    PaymentService.metamaskOnboarding,
+    authHandler.authorizeRequest(),
+    loadDapp,
+    PaymentServiceController.metamaskOnboarding
+);
+
+router.get(
+    PaymentService.metamaskOnboardingStatus,
+    authHandler.authorizeRequest(),
+    loadDapp,
+    PaymentServiceController.metamaskOnboardingStatus
+);
+
+router.get(
     PaymentService.stripeOnboarding,
     authHandler.authorizeRequest(),
     loadDapp,

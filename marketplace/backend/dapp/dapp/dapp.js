@@ -635,7 +635,49 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   /* ------------------------ User Activity Ends------------------------ */
 
+  /* ------------------------ MetaMask connect starts here ------------------------ */
+  contract.metamaskOnboarding = async function (args, options = defaultOptions) {
+    try {
+      const { walletId } = args;
+      const getOptions = { ...options, app: contractName };
+      
+      // get user paymentProvider details from cirrus
+      const sellerMetaMaskDetails = await paymentProviderJs.get(rawAdmin, { name: 'METAMASK', accountDeauthorized: false, ownerCommonName: userCert.commonName }, getOptions)
 
+      if (sellerMetaMaskDetails.length == 0 || Object.keys(sellerMetaMaskDetails[0]).length == 0) {
+        await paymentProviderJs.uploadContract(rawAdmin, {name: `METAMASK`, accountId: walletId}, options);
+        return { status: 201, success: true, message: "MetaMask account successfully linked with wallet." };
+      } else {
+        return { status: 200, success: true, message: "MetaMask account already exists." };
+      }
+    } catch (error) {
+      console.error(`${error}`)
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `${error.message}`)
+    }
+  }
+  
+  contract.getMetamaskOnboardingStatus = async function (args, options = defaultOptions) {
+    try {
+      const getOptions = { ...options, app: contractName };
+
+      // get user paymentProvider details from cirrus
+      const paymentProviders = await paymentProviderJs.get(rawAdmin, { name: 'METAMASK', accountDeauthorized: false, ...args }, getOptions);
+      /* TODO check if the provider contract exists on then initiate a update */
+      if (paymentProviders.length == 0 || Object.keys(paymentProviders[0]).length == 0) {
+        // throw new rest.RestError(RestStatus.NOT_FOUND, "User hasn't started their stripe setup.")
+        throw new rest.RestError(RestStatus.BAD_REQUEST, `no account found for ${args.ownerCommonName}`)
+      }
+      return { status: 200, success: true, message: "MetaMask account already exists." };
+    } catch (error) {
+      console.error(`${error}`)
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `${error.message}`)
+    }
+  }
+  
+  // contract.updateMetamaskOnboarding = async function (args, options = defaultOptions) {
+
+  /* ------------------------ MetaMask connect ends here ------------------------ */
+  
   /* ------------------------ Stripe account connect starts here ------------------------ */
   contract.stripeOnboarding = async function (args, options = defaultOptions) {
     try {

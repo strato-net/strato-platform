@@ -63,4 +63,5 @@ export default {
   ProcessingOrder: { label: "Processing Order", url: "/order/status" },
   Invoice: { label: "Invoice", url: "/orders/invoice/:id" },
   OnboardingSellerToStripe: { label: "Onboarding Seller to Stripe", url: "/inventories/stripe/onboarding" },
+  OnboardingSellerToMetamask: { label: "Onboarding Seller to Metamask", url: "/inventories/metamask/onboarding" },
 };
