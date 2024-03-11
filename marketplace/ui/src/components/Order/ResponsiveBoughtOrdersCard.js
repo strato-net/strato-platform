@@ -46,7 +46,7 @@ export const ResponsiveBoughtOrderCard = ({ data, isLoading }) => {
                             </Typography>
                         </div>
                         <div className={` px-4 w-full flex justify-between`}>
-                            <Typography>Buyer</Typography>
+                            <Typography>Seller</Typography>
                             {/* <Typography className="text-[#202020] font-semibold" onClick={()=>{navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", item?.sellersCommonName)}`, { state: { from: location.pathname } })}}>{item?.sellersCommonName || 'N/A'}</Typography> */}
                             <Typography
                                 className="font-semibold text-[#202020] cursor-pointer" // Add cursor-pointer for visual cue
