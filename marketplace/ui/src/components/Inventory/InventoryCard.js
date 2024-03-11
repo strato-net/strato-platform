@@ -23,7 +23,7 @@ import image_placeholder from "../../images/resources/image_placeholder.png";
 import { getUnitNameByIndex } from "../../helpers/constants";
 import "react-responsive-carousel/lib/styles/carousel.min.css";
 
-const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentProviderAddress, allSubcategories }) => {
+const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentProviderAddress, allSubcategories, limit, offset }) => {
   const [openPop, setOpenPop] = useState(false);
   const [open, setOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -571,6 +571,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
         <UpdateInventoryModal
           open={editModalOpen}
           handleCancel={handleEditModalClose}
+          limit={limit}
+          offset={offset}
           debouncedSearchTerm={debouncedSearchTerm}
           inventoryToUpdate={{
             inventory: inventory,
@@ -583,6 +585,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
         <ListForSaleModal
           open={listModalOpen}
           handleCancel={handleListModalClose}
+          limit={limit}
+          offset={offset}
           inventory={inventory}
           paymentProviderAddress={paymentProviderAddress}
           categoryName={category}
@@ -592,6 +596,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
         <UnlistModal
           open={unlistModalOpen}
           handleCancel={handleUnlistModalClose}
+          limit={limit}
+          offset={offset}
           inventory={inventory}
           saleAddress={inventory.saleAddress}
           categoryName={category}
@@ -601,6 +607,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
         <ResellModal
           open={resellModalOpen}
           handleCancel={handleResellModalClose}
+          limit={limit}
+          offset={offset}
           inventory={inventory}
           categoryName={category}
           
@@ -610,6 +618,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
         <TransferModal
           open={transferModalOpen}
           handleCancel={handleTransferModalClose}
+          limit={limit}
+          offset={offset}
           inventory={inventory}
           categoryName={category}
         />
