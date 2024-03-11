@@ -6,6 +6,7 @@ class StripeService {
     // TODO implement orderDetail to create actual order line items 
     static initiatePayment(marketplaceUrl, paymentTypes, cartData, orderDetail, CONNECTED_ACCOUNT_ID = '') {
         try {
+            console.log("DATA HERE",cartData, orderDetail)
             // Create a checkout session with Stripe
             return stripe.checkout.sessions.create({
                 payment_method_types: paymentTypes,
@@ -30,8 +31,8 @@ class StripeService {
                     cart: JSON.stringify(cartData)
                 },
                 payment_intent_data: {
-                    /* 3% of OrderTotal in Cents */
-                    application_fee_amount: Math.round(3 * cartData.orderTotal),
+                    // Calculation of Application Fee
+                    application_fee_amount: this.calculateApplicationFee(cartData.orderList),
                     /* To be used in case of destination charge */
                     // transfer_data: {
                     //     destination: CONNECTED_ACCOUNT_ID
@@ -44,6 +45,18 @@ class StripeService {
                 stripeAccount: CONNECTED_ACCOUNT_ID
             })
 
+        } catch (e) {
+            throw new Error(`Stripe error: ${e.message}`)
+        }
+    }
+
+    static calculateApplicationFee(orderList) {
+        try {
+        /* Based on the Type of Sale, this helper method is used to calculate application fee using the unit price and the item quantity */
+            return orderList.map(order => {
+                    const applicationFeePercentage = order.firstSale ? 10 : 3;
+                    return Math.round(applicationFeePercentage * order.unitPrice * order.quantity);
+                    }).reduce((acc, currentValue) => acc + currentValue, 0);
         } catch (e) {
             throw new Error(`Stripe error: ${e.message}`)
         }

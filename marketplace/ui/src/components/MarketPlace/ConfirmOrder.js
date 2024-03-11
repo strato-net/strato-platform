@@ -324,12 +324,14 @@ const ConfirmOrder = () => {
         orderList.push({
           quantity: item.qty,
           assetAddress: item.key,
+          firstSale: item.firstSale,
+          unitPrice: item.unitPrice
         });
       });
       // These additional fields need to be sent to form the request after stripe. 
       let body = {
         paymentList: PAYMENT_LIST,
-      buyerOrganization: userOrganization,
+        buyerOrganization: userOrganization,
         orderList,
         orderTotal: total + tax + shipping,
         shippingAddressId: userAddresses[selectedAddress].address_id,
