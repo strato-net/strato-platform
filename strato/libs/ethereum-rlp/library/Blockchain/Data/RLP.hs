@@ -78,7 +78,10 @@ splitAtEither i s = Right $ B.splitAt i s
 
 getLength :: Int -> B.ByteString -> (Integer, B.ByteString)
 getLength sizeOfLength bytes =
-  (bytes2Integer $ B.unpack $ B.take sizeOfLength bytes, B.drop sizeOfLength bytes)
+  (result,remainingbytes)
+  where
+    (lengthbytes,remainingbytes) = B.splitAt sizeOfLength bytes
+    result = byteString2Integer lengthbytes
 
 rlpSplit :: B.ByteString -> (RLPObject, B.ByteString)
 rlpSplit = either error id . rlpSplitEither
