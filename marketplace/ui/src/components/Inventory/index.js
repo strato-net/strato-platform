@@ -32,6 +32,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuthenticateState } from "../../contexts/authentication";
 import CategoryCard from "../MarketPlace/CategoryCard";
 import HelmetComponent from "../Helmet/HelmetComponent";
+import { SEO } from "../../helpers/seoConstant";
 
 const { Search } = Input;
 
@@ -48,7 +49,7 @@ const Inventory = ({ user }) => {
   const [api, contextHolder] = notification.useNotification();
   const [isSearch, setIsSearch] = useState(false);
   const [category, setCategory] = useState(undefined);
-
+  const linkUrl = window.location.href;
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
   //Categories
@@ -191,16 +192,13 @@ const allSubcategories = getAllSubcategories(categorys);
     return;
   };
   // ------------------ Tabs END------------------
-const metaImg = category ? category : ""
+const metaImg = category ? category : SEO.IMAGE_META
   return (
     <>
      <HelmetComponent 
-          title={`${category ? `${category} |` :''} STRATO Mercata Marketplace `} // need to add category in the title,currently we are not getting category in the detail api
-          description={` Join the STRATO Mercata marketplace for buying, selling, and investing in  
-          fractionalized assets. Expand your collection or find buyers for your rare carbon,  
-          metals, art, collectibles, and clothing.
-           `} 
-          link={`https://marketplace.mercata-testnet2.blockapps.net/marketplace/mystore`} />
+          title={`${category ? `${category} |` :''} ${SEO.TITLE_META} `}
+          description={SEO.DESCRIPTION_META} 
+          link={linkUrl} />
       {contextHolder}
       {stripeStatus == null || isLoadingStripeStatus ? (
         <div className="h-screen flex justify-center items-center">

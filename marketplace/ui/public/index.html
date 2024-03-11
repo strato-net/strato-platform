@@ -13,7 +13,7 @@
     metals, art, collectibles, and clothing
     ">
     <meta property="og:image" content="favicon_large.png">
-    <meta property="og:url" content="https://marketplace.mercata-testnet2.blockapps.net/marketplace/">
+    <meta property="og:url" >
     <meta name="twitter:card" content="Join the STRATO Mercata marketplace for buying, selling, and investing in  
     fractionalized assets. Expand your collection or find buyers for your rare carbon,  
     metals, art, collectibles, and clothing">
@@ -37,6 +37,7 @@
     <script async defer src="https://tools.luckyorange.com/core/lo.js?site-id=__SITE_ID__"></script>
     <script>
       window.FILE_SERVER_URL = '__FILE_SERVER_URL__';
+      document.querySelector('meta[property="og:url"]').setAttribute('content', window.location.origin);
     </script>
     <!--
       Notice the use of %PUBLIC_URL% in the tags above.

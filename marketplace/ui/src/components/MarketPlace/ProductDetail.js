@@ -42,6 +42,7 @@ import { Carousel } from "react-responsive-carousel"
 import { Images } from "../../images";
 import ProductItemDetails from "./ProductItemDetails";
 import HelmetComponent from "../Helmet/HelmetComponent";
+import { SEO } from "../../helpers/seoConstant";
 
 const ProductDetails = ({ user, users }) => {
   const { state, pathname } = useLocation();
@@ -254,6 +255,7 @@ const ProductDetails = ({ user, users }) => {
   
   const assetName = decodeURIComponent(details?.name)
   const contractName = getCategoryName(decodeURIComponent(details?.contract_name))
+  const linkUrl = window.location.href;
 
   return (
     <>
@@ -267,9 +269,9 @@ const ProductDetails = ({ user, users }) => {
       ) : (
         <div>
           <HelmetComponent 
-          title={`${assetName} | ${contractName} | STRATO Mercata Marketplace`} // need to add category in the title,currently we are not getting category in the detail api
+          title={`${assetName} | ${contractName} | ${SEO.TITLE_META}`}
           description={details?.description} 
-          link={`https://marketplace.mercata-testnet2.blockapps.net/marketplace/productList/${Id}`} />
+          link={linkUrl} />
           <Row>
             <Breadcrumb className="text-xs   mb-4 md:mt-5  md:mb-6 lg:mb-[44px] ml-4 lg:ml-16">
               <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>

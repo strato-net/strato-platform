@@ -35,6 +35,7 @@ import { actions as orderActions } from "../../contexts/order/actions"
 import { useOrderDispatch} from "../../contexts/order";
 import { debounce } from 'lodash';
 import HelmetComponent from "../Helmet/HelmetComponent";
+import { SEO } from "../../helpers/seoConstant";
 
 const { Panel } = Collapse;
 const { Text } = Typography;
@@ -210,10 +211,11 @@ const CategoryProductList = ({ user }) => {
   }, [search, minPrice, maxPrice]);
 
   //=========================Other functions===============================//
-
-  const metaTitle = selectedCategories.length === 1 ? `${selectedCategories[0]} | STRATO Mercata Marketplace ` : 'STRATO Mercata Marketplace'
-  const metaImg = selectedCategories.length === 1 ? `${selectedCategories[0]}` : 'STRATO Mercata Marketplace Banner'
+  const linkUrl = window.location.href;
+  const metaTitle = selectedCategories.length === 1 ? `${selectedCategories[0]} | ${SEO.TITLE_META} ` : `${SEO.TITLE_META}`
+  const metaImg = selectedCategories.length === 1 ? `${selectedCategories[0]}` : `${SEO.IMAGE_META}`
   const metaCategory = selectedCategories.length === 1 ? `?category=${selectedCategories[0]}` : '' 
+  const metaDescription = SEO.DESCRIPTION_META
 
   const clearSelection = () => {
     setSelectedSubCategories([]);
@@ -524,11 +526,9 @@ const CategoryProductList = ({ user }) => {
   return (
     <>
    <HelmetComponent 
-          title={` ${metaTitle}`}
-          description={`Join the STRATO Mercata marketplace for buying, selling, and investing in  
-          fractionalized assets. Expand your collection or find buyers for your rare carbon,  
-          metals, art, collectibles, and clothing.`} 
-          link={`https://marketplace.mercata-testnet2.blockapps.net/marketplace/category${metaCategory}`} />
+          title={metaTitle}
+          description={metaDescription} 
+          link={linkUrl} />
     <div className={`${mobileOpenFilter ? 'overflow-y-hidden h-[100vh] w-[100vw] bg-[#00000020] relative mt-0 md:bg-white md:mt-[auto] md:overflow-scroll trending_cards' : ' '}`}>
       <div className="fixed bg-white w-full top-7 z-10 md:static">
         {BreadCrumbComponent()}

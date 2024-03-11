@@ -14,6 +14,7 @@ import TagManager from "react-gtm-module";
 import { setCookie } from "../../helpers/cookie";
 import { Images } from '../../images';
 import images_placeholder from "../../images/resources/image_placeholder.png"
+import { SEO } from '../../helpers/seoConstant';
 
 const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, contextHolder }) => {
     const [quantity, setQuantity] = useState(1)
@@ -27,7 +28,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
     const queryParams = new URLSearchParams(location.search);
     const categoryQueryValue = queryParams.get('category');
     const categoryQueryValueArr = categoryQueryValue ? categoryQueryValue.split(',') : []
-    const imgMeta = categoryQueryValueArr.length === 1 ? categoryQueryValueArr[0] : 'STRATO Mercata Marketplace Banner'
+    const imgMeta = categoryQueryValueArr.length === 1 ? categoryQueryValueArr[0] : SEO.IMAGE_META
     
     return (
         <div className={`trending_cards_container_card bg-white p-3 ${parent == 'Marketplace' ? 'min-w-[320px] w-auto' : 'min-w-[230px]'} xs:min-w-[230px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}>

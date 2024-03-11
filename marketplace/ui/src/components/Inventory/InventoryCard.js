@@ -22,6 +22,7 @@ import { Carousel } from "react-responsive-carousel";
 import image_placeholder from "../../images/resources/image_placeholder.png";
 import { getUnitNameByIndex } from "../../helpers/constants";
 import "react-responsive-carousel/lib/styles/carousel.min.css";
+import { SEO } from "../../helpers/seoConstant";
 
 const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentProviderAddress, allSubcategories }) => {
   const [openPop, setOpenPop] = useState(false);
@@ -34,7 +35,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
   const [transferModalOpen, setTransferModalOpen] = useState(false);
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
-  const imgMeta = category ? category : "STRATO Mercata Marketplace"
+  const imgMeta = category ? category : SEO.TITLE_META
   
   const itemData = inventory.data;
   const showModalEdit = () => {
