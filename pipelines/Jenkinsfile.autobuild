@@ -237,7 +237,7 @@ pipeline {
                     docker compose -f docker-compose.stripe-ps.push.ecr.yml push 2>&1
                   '''
                   stash includes: 'strato-getting-started/**', name: 'stratoGettingStarted'
-                  stash includes: 'slipstream/integrity_tests/**', name: 'slipstream_integrity_tests'
+                  stash includes: 'strato-platform/strato/indexer/slipstream/integrity_tests/**', name: 'slipstream_integrity_tests'
                 }
                 
                 // Push docker-compose files to Jenkins artifacts and AWS S3
