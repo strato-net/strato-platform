@@ -1,3 +1,5 @@
+#!/bin/python3
+
 import requests
 import base64
 import time
@@ -96,11 +98,8 @@ if __name__ == "__main__":
     realm_1 = sys.argv[5]
     realm_2 = sys.argv[6]
 
-    node1 = "172.17.0.1:80"
-    node2 = "node1"
-
-    node1_url = "http://" + node1
-    node2_url = f"https://{node2}.mercata-testnet2.blockapps.net"
+    node1_url = "http://localhost"
+    node2_url = f"https://node1.mercata-testnet2.blockapps.net"
 
     token1 = get_auth_token(client_id1, client_secret1, realm_1)
     token2 = get_auth_token(client_id2, client_secret2, realm_2)
