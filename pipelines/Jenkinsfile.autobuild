@@ -171,7 +171,6 @@ pipeline {
           usernamePassword(credentialsId: 'keycloak-strato-devel-dev-testing2-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEVTESTING2_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEVTESTING2_ID'),
         ]) {
           script {
-            // TODO: replace with jenkins credentials here and in other places in pipelines
             lib.registerTestUserCert(
                 '.',
                 'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
