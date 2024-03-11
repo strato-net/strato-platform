@@ -164,7 +164,7 @@ data SState = SState
   { env :: Env.Environment,
     callStack :: [CallInfo],
     _ssMemDBs :: MemDBs,
-    _action :: Action,
+    _action :: !Action,
     _gasInfo :: GasInfo
   }
 
