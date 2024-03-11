@@ -1,7 +1,7 @@
 withCredentials([
         usernamePassword(credentialsId: 'aws-s3-test-bucket-access-user', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
         usernamePassword(credentialsId: 'beanstalk-internal-nodes-keycloak-client', passwordVariable: 'BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_SECRET', usernameVariable: 'BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_ID'),
-        usernamePassword(credentialsId: 'trace-harvest-demo-tech-keycloak-client', passwordVariable: 'TRACE_HARVEST_DEMO_KEYCLOAK_CLIENT_SECRET', usernameVariable: 'TRACE_HARVEST_DEMO_KEYCLOAK_CLIENT_ID')
+        usernamePassword(credentialsId: 'trace-harvest-demo-tech-keycloak-client', passwordVariable: 'TRACE_HARVEST_DEMO_KEYCLOAK_CLIENT_SECRET', usernameVariable: 'TRACE_HARVEST_DEMO_KEYCLOAK_CLIENT_ID'),
 ]) {
   NODE_DATA = [
         BEANSTALK_LOADTEST_BATCH_SIZE: 25,
