@@ -29,6 +29,7 @@ const ProcessingOrder = ({user}) => {
   const [error, seterror] = useState(null)
   const { message, success } = useOrderState();
   const [api, contextHolder] = notification.useNotification();
+  const [called, setCalled] = useState(false);
 
 
   const storedData = useMemo(() => {
@@ -55,8 +56,8 @@ const ProcessingOrder = ({user}) => {
   }, [routeMatch, query]);
 
   useEffect(() => {
-    // getCartData();
-    if (sessionId !== undefined && user !== undefined) {
+    if (sessionId !== undefined && user !== undefined && !called) {
+      setCalled(true);
       getCartData();
     }
 
@@ -81,7 +82,7 @@ const ProcessingOrder = ({user}) => {
             if (body.data["payment_status"] === "paid") {
               const customerEmail = user.email;
               const cart = JSON.parse(body.data.metadata.cart);
-              let object = { paymentSessionId: sessionId, status:ORDER_STATUS.PAID, paymentMethod: body.data.payment_method, ...cart };
+              let object = { paymentSessionId: sessionId, status:ORDER_STATUS.AWAITING_FULFILLMENT, paymentMethod: body.data.payment_method, ...cart };
               handleOrderConfirm(object, customerEmail);
             }
             else if (body.data["payment_method_options"].hasOwnProperty("us_bank_account")) {

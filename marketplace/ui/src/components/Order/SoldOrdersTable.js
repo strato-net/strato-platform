@@ -218,7 +218,28 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrde
       title: "Buyer",
       dataIndex: "buyersCommonName",
       key: "buyersCommonName",
-      render: (text) => <p>{text}</p>,
+      // render: (text) => <p onClick={()=>{navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", text)}`, { state: { from: location.pathname } })}}>{text}</p>,
+      render: (text) => (
+        <a 
+          href={`${window.location.origin}/marketplace/profile/${encodeURIComponent(text)}`}
+          onClick={(e) => {
+            e.preventDefault();
+            const userProfileUrl = `/marketplace/profile/${encodeURIComponent(text)}`;
+      
+            if (e.ctrlKey || e.metaKey) {
+              // Open in a new tab if Ctrl/Cmd is pressed
+              window.open(`${window.location.origin}${userProfileUrl}`, '_blank');
+            } else {
+              // Use navigate for a normal click, without Ctrl/Cmd
+              navigate(routes.MarketplaceUserProfile.url.replace(':commonName',text), { state: { from: location.pathname } });
+            }
+          }}
+          style={{ textDecoration: 'underline', color: 'black', cursor: 'pointer' }}
+        >
+          {text}
+        </a>
+      ),
+      
     },
     {
       title: "Order Total ($)",
@@ -298,8 +319,6 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrde
       textClass = "bg-[#FF8C0033]"
     } else if (status === "Closed") {
       textClass = "bg-[#119B2D33]";
-    } else if (status === "Paid") {
-      textClass = "bg-[#119B2D33]";
     } else if (status === "Canceled") {
       textClass = "bg-[#FFF0F0]";
     }
@@ -312,8 +331,6 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrde
       bgClass = "bg-[#FF8C00]"
     } else if (status === "Closed") {
       bgClass = "bg-[#119B2D]";
-    } else if (status === "Paid") {
-      textClass = "bg-[#119B2D]";
     } else if (status === "Canceled") {
       bgClass = "bg-[#FF0000]";
     }

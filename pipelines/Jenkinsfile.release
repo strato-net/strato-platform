@@ -92,6 +92,8 @@ pipeline {
               usernamePassword(credentialsId: 'stripe-key', passwordVariable: 'STRIPE_SECRET_KEY', usernameVariable: 'STRIPE_PUBLISHABLE_KEY'),
               usernamePassword(credentialsId: 'marketplace-global-admin', passwordVariable: 'GLOBAL_ADMIN_PASSWORD', usernameVariable: 'GLOBAL_ADMIN_NAME'),
               usernamePassword(credentialsId: 'marketplace-dev-aws-iam-user', passwordVariable: 'AWS_IAM_USER_ACCESS_KEY', usernameVariable: 'AWS_IAM_USER_KEY_ID'),
+              usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
+              usernamePassword(credentialsId: 'keycloak-strato-devel-dev-testing2-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEVTESTING2_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEVTESTING2_ID'),
           ]) {
             // TODO: run the temporary stripe payment server instead
             writeFile file: "run.sh", text: """#!/bin/bash
@@ -99,8 +101,8 @@ pipeline {
                 NODE_HOST=\$(</host) \\
                 SLIPSTREAM_OPTIONAL=false \\
                 OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \\
-                OAUTH_CLIENT_ID=dev \\
-                OAUTH_CLIENT_SECRET=d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f \\
+                OAUTH_CLIENT_ID='${KEYCLOAK_STRATODEVEL_DEV_ID}' \\
+                OAUTH_CLIENT_SECRET='${KEYCLOAK_STRATODEVEL_DEV_SECRET}' \\
                 VAULT_URL=https://\$(</host):8093 \\
                 VAULT_PROXY_DEBUG=true \\
                 certInfo='{"orgName":"BlockApps","orgUnit":"Engineering","commonName":"Test"}' \\
@@ -163,31 +165,32 @@ pipeline {
 
           sh './check_availability.sh'
         }
-
-        script {
-          // TODO: replace with jenkins credentials here and in other places in pipelines
-          lib.registerTestUserCert(
-              'strato-worktree',
-              'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
-              'dev',
-              'd5e67b8c-4fbf-42c6-a8d9-29a4dd13575f',
-              'user1',
-              '1234'
-          )
-          lib.registerTestUserCert(
-              'strato-worktree',
-              'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
-              'dev-testing2',
-              'd29bca04-c503-4329-a853-a9e6ef19a205',
-              '',
-              '',
-              'dev',
-              'd5e67b8c-4fbf-42c6-a8d9-29a4dd13575f'
-          )
-          // Unlock the marketplace deploy script:
-          sh 'docker exec strato-marketplace-backend-1 rm -f _deploy_blocked_while_I_exist'
+        withCredentials([
+          usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
+        ]) {
+          script {
+            lib.registerTestUserCert(
+                'strato-worktree',
+                'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
+                "${KEYCLOAK_STRATODEVEL_DEV_ID}",
+                "${KEYCLOAK_STRATODEVEL_DEV_SECRET}",
+                'user1',
+                '1234'
+            )
+            lib.registerTestUserCert(
+                'strato-worktree',
+                'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
+                "${KEYCLOAK_STRATODEVEL_DEVTESTING2_ID}",
+                "${KEYCLOAK_STRATODEVEL_DEVTESTING2_SECRET}",
+                '',
+                '',
+                "${KEYCLOAK_STRATODEVEL_DEV_ID}",
+                "${KEYCLOAK_STRATODEVEL_DEV_SECRET}",
+            )
+            // Unlock the marketplace deploy script:
+            sh 'docker exec strato-marketplace-backend-1 rm -f _deploy_blocked_while_I_exist'
+          }
         }
-
       }
     }
 
@@ -279,8 +282,10 @@ pipeline {
     always {
       dir ('strato-getting-started') {
         sh 'rm -rf strato_logs*'
-        sh './fetchlogs --as-dir'
-        archiveArtifacts artifacts: 'strato_logs/**', fingerprint: true
+        sh './fetchlogs'
+        sh 'sudo chmod 777 strato_logs.zip'
+        archiveArtifacts artifacts: 'strato_logs.zip', fingerprint: true, allowEmptyArchive: true
+        sh 'sudo rm -rf strato_logs.zip'
       }
     }
 

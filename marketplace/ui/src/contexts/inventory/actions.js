@@ -52,6 +52,10 @@ const actionDescriptors = {
   createItem: "create_item",
   createItemSuccessful: "create_item_successful",
   createItemFailed: "create_item_failed",
+  fetchInventoryForUser: "fetch_inventory_user_profile",
+  fetchInventoryForUserSuccessful: "fetch_inventory_user_profile_success",
+  fetchInventoryForUserFailed: "fetch_inventory_user_profile_failed"
+
 };
 
 const actions = {
@@ -196,6 +200,51 @@ const actions = {
     } catch (err) {
       dispatch({
         type: actionDescriptors.fetchInventoryFailed,
+        error: "Error while fetching Inventory",
+      });
+    }
+  },
+
+  fetchInventoryForUser: async (dispatch, limit, offset, queryValue) => {
+    const query = queryValue ? `&ownerCommonName=${encodeURIComponent(queryValue)}` : ``;
+
+    dispatch({ type: actionDescriptors.fetchInventoryForUser });
+
+    try {
+      const response = await fetch(
+        `${apiUrl}/inventory/user/inventories?gtField=quantity&gtValue=0&limit=${limit}&offset=${offset}${query}&isMint=true`,
+        {
+          method: HTTP_METHODS.GET,
+        }
+      );
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchInventoryForUserSuccessful,
+          payload: { data: body.data.inventoriesWithImageUrl, count: body.data.count },
+        });
+        return;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({
+          type: actionDescriptors.fetchInventoryForUserFailed,
+          error: "Error while fetching Inventory",
+        });
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchInventoryForUserFailed,
+          error: "Unauthorized while fetching Inventory"
+        });
+        window.location.href = body.error.loginUrl;
+      }
+      dispatch({
+        type: actionDescriptors.fetchInventoryForUserFailed,
+        error: body.error,
+      });
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.fetchInventoryForUserFailed,
         error: "Error while fetching Inventory",
       });
     }
