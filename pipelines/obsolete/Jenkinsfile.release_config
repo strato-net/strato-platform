@@ -2,8 +2,6 @@ withCredentials([
         usernamePassword(credentialsId: 'aws-s3-test-bucket-access-user', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
         usernamePassword(credentialsId: 'beanstalk-internal-nodes-keycloak-client', passwordVariable: 'BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_SECRET', usernameVariable: 'BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_ID'),
         usernamePassword(credentialsId: 'trace-harvest-demo-tech-keycloak-client', passwordVariable: 'TRACE_HARVEST_DEMO_KEYCLOAK_CLIENT_SECRET', usernameVariable: 'TRACE_HARVEST_DEMO_KEYCLOAK_CLIENT_ID'),
-        usernamePassword(credentialsId: 'keycloak-strato-devel-dev-testing1-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEVTESTING1_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEVTESTING1_ID'),
-        usernamePassword(credentialsId: 'keycloak-strato-devel-dev-testing2-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEVTESTING2_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEVTESTING2_ID'),
 ]) {
   NODE_DATA = [
         BEANSTALK_LOADTEST_BATCH_SIZE: 25,
@@ -20,8 +18,8 @@ withCredentials([
             PORT: 8080,
             BOOTNODE_IP: "18.235.213.241",
             OAUTH_DISCOVERY_URL: "https://keycloak.blockapps.net/auth/realms/strato-mercata-dev/.well-known/openid-configuration",
-            OAUTH_CLIENT_ID: "${KEYCLOAK_STRATODEVEL_DEVTESTING1_ID}",
-            OAUTH_CLIENT_SECRET: "${KEYCLOAK_STRATODEVEL_DEVTESTING1_SECRET}",
+            OAUTH_CLIENT_ID: "dev-testing1",
+            OAUTH_CLIENT_SECRET: "e5b36e89-c24e-461e-8272-13eaee5ec396",
             NETWORK_ID: 68935672347956345061654279345,
             CERT_INFO: "{\"orgName\":\"BlockApps\",\"orgUnit\":\"Engineering\",\"commonName\":\"Test\"}",
             BEANSTALK: [
@@ -44,8 +42,8 @@ withCredentials([
             PORT: 8080,
             BOOTNODE_IP: "3.81.197.53",
             OAUTH_DISCOVERY_URL: "https://keycloak.blockapps.net/auth/realms/strato-mercata-dev/.well-known/openid-configuration",
-            OAUTH_CLIENT_ID: "${KEYCLOAK_STRATODEVEL_DEVTESTING2_ID}",
-            OAUTH_CLIENT_SECRET: "${KEYCLOAK_STRATODEVEL_DEVTESTING2_SECRET}",
+            OAUTH_CLIENT_ID: "dev-testing2",
+            OAUTH_CLIENT_SECRET: "9f40b1df-1b9c-48c6-b50d-cc21e7108e13",
             NETWORK_ID: 68935672347956345061654279345,
             CERT_INFO: "{\"orgName\":\"Amazon\",\"orgUnit\":\"Sales\",\"commonName\":\"Alice\"}",
             BEANSTALK: [
