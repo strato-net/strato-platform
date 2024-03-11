@@ -237,7 +237,7 @@ pipeline {
                     docker compose -f docker-compose.stripe-ps.push.ecr.yml push 2>&1
                   '''
                   stash includes: 'strato-getting-started/**', name: 'stratoGettingStarted'
-                  stash includes: 'strato-platform/strato/indexer/slipstream/integrity_tests/**', name: 'slipstream_integrity_tests'
+                  // stash includes: 'strato-platform/strato/indexer/slipstream/integrity_tests/**', name: 'slipstream_integrity_tests'
                 }
                 
                 // Push docker-compose files to Jenkins artifacts and AWS S3
@@ -299,19 +299,19 @@ pipeline {
                     lib.runSyncTester()
                   }
 
-                  unstash 'slipstream_integrity_tests'
-                  script {
-                    dir('slipstream/integrity_tests') {
-                       withCredentials([
-                            usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
-                            usernamePassword(credentialsId: 'keycloak-mercata-testnet2-localhost-client', passwordVariable: 'KEYCLOAK_MERCATATESTNET2_LOCALHOST_SECRET', usernameVariable: 'KEYCLOAK_MERCATATESTNET2_LOCALHOST_ID'),
-                                ]) {
-                        // Now CLIENT_ID1, CLIENT_SECRET1, and CLIENT_SECRET2 are available as environment variables
-                        sh "python3 slipstream_sync.py '${KEYCLOAK_STRATODEVEL_DEV_ID}' '${KEYCLOAK_MERCATATESTNET2_LOCALHOST_ID}' '${KEYCLOAK_STRATODEVEL_DEV_SECRET}' '${KEYCLOAK_MERCATATESTNET2_LOCALHOST_SECRET}' 'strato-devel' 'mercata-testnet2'"
-                      }
-                    }
-                  }    
-                }
+                  // unstash 'slipstream_integrity_tests'
+                //   script {
+                //     dir('integrity_tests') {
+                //        withCredentials([
+                //             usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
+                //             usernamePassword(credentialsId: 'keycloak-mercata-testnet2-localhost-client', passwordVariable: 'KEYCLOAK_MERCATATESTNET2_LOCALHOST_SECRET', usernameVariable: 'KEYCLOAK_MERCATATESTNET2_LOCALHOST_ID'),
+                //                 ]) {
+                //         // Now CLIENT_ID1, CLIENT_SECRET1, and CLIENT_SECRET2 are available as environment variables
+                //         sh "python3 slipstream_sync.py '${KEYCLOAK_STRATODEVEL_DEV_ID}' '${KEYCLOAK_MERCATATESTNET2_LOCALHOST_ID}' '${KEYCLOAK_STRATODEVEL_DEV_SECRET}' '${KEYCLOAK_MERCATATESTNET2_LOCALHOST_SECRET}' 'strato-devel' 'mercata-testnet2'"
+                //       }
+                //     }
+                //   }    
+                // }
               }
               post {
                 always {
@@ -363,6 +363,22 @@ pipeline {
           }
         }
 
+        stage('Slipstream syncing tests') {
+          steps{
+            withCredentials([
+                            usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
+                            usernamePassword(credentialsId: 'keycloak-mercata-testnet2-localhost-client', passwordVariable: 'KEYCLOAK_MERCATATESTNET2_LOCALHOST_SECRET', usernameVariable: 'KEYCLOAK_MERCATATESTNET2_LOCALHOST_ID'),
+                                ])
+
+            sh '''#!/bin/bash -le
+              set -x
+              echo 'Running Slipstream syncing tests'
+              cd strato/indexer/slipstream/integrity_tests
+            '''
+            sh "python3 slipstream_sync.py '${KEYCLOAK_STRATODEVEL_DEV_ID}' '${KEYCLOAK_MERCATATESTNET2_LOCALHOST_ID}' '${KEYCLOAK_STRATODEVEL_DEV_SECRET}' '${KEYCLOAK_MERCATATESTNET2_LOCALHOST_SECRET}' 'strato-devel' 'mercata-testnet2'"
+          }
+        }
+        
         stage('STRATO API Tests') {
           steps{
             withCredentials([
