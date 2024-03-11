@@ -648,7 +648,7 @@ printTransactionMessage ot@OutputTx {otSigner = tAddr, otHash = theHash} (Right 
       extra =
         if isMessageTX t
           then ""
-          else fromMaybe "<failed>" $ fmap format $ erNewContractAccount results
+          else fromMaybe (CL.blink "<failed>") $ fmap format $ erNewContractAccount results
 
   multilineLog "printTx/ok" $
     boringBox

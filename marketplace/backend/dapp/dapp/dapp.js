@@ -217,6 +217,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return { inventories: inventories, inventoryCount: inventoryCount }
   };
 
+  contract.getInventoriesForUser = async function (args, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName };
+    const {ownerCommonName, ...restArgs} = args;
+    const newArgs = { ...restArgs, ownerCommonName:ownerCommonName, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, userProfile:true }//'0000000000000000000000000000000000000000'
+    return marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
+  };
+
   contract.getOwnershipHistory = async function (args, options = optionsNoChainIds) {
     console.log('#### GET OWNERSHIP HISTORY ARGS', JSON.stringify(args))
     return await inventoryJs.getOwnershipHistory(rawAdmin, args, options);
@@ -478,7 +485,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       let assets = [];
       
       for (const sale of sales) {
-        const history = await saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, transaction_hash: order.transaction_hash }, options);
+        const history = await saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, transaction_hash: order.transaction_hash, assetToBeSold: sale.assetToBeSold }, options);
         const price = history['0'] ? history['0'].price : null;
         
         const assetAddress = sale.assetToBeSold;
@@ -542,7 +549,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
           const history = await saleJs.getSaleHistory(rawAdmin, {
             contract: sale.contract_name,
-            transaction_hash: order.transaction_hash
+            transaction_hash: order.transaction_hash,
+            assetToBeSold: sale.assetToBeSold
           }, options);
 
           const asset = assetLookup.get(sale.assetToBeSold);
@@ -587,6 +595,45 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   // ------------------------------ SALE TEST ENDS ------------------------------
+
+  /* ------------------------ User Activity Starts ------------------------ */
+  contract.getAllUserActivity = async function (args, options = defaultOptions) {
+    const getOptions = { ...options, app: contractName };
+    const { sellersCommonName, purchasersCommonName, newOwnerCommonName } = args
+
+    const currentDate = new Date();
+    // Subtract 10 days from the current date
+    const tenDaysAgoDate = new Date(currentDate.getTime() - (10 * 24 * 60 * 60 * 1000));
+    // Format the date as 'YYYY-MM-DD HH:MM:SS UTC'
+    const tenDaysAgoTimestamp = tenDaysAgoDate.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
+
+    // Need to fetch purchases, closed orders, transfers for the user.
+    // New Purchases of User's Products---Fetch Orders with filters of sellersCommonName, block_timestamp and Order Status = AWAITING_FULFILLMENT (1) 
+    const purchaseArgs = { sellersCommonName, status: 1, gtField: "block_timestamp", gtValue: tenDaysAgoTimestamp}
+    const purchases = await saleOrderJs.getAll(rawAdmin, purchaseArgs, getOptions);
+
+    // These are my orders that ave been closed by a seller
+    const orderArgs = { purchasersCommonName, status: 3, gtField: "block_timestamp", gtValue: tenDaysAgoTimestamp}
+    const orders = await saleOrderJs.getAll(rawAdmin, orderArgs, getOptions);
+
+    // These are transfers the usre has recieved
+    const transferArgs = {newOwnerCommonName, gtField: "block_timestamp", gtValue: tenDaysAgoTimestamp};
+    const transfers = await inventoryJs.getAllItemTransferEvents(rawAdmin, transferArgs, getOptions);
+
+    // Fetch activities and add type to each item
+    const purchasesWithTypes = purchases.orders.map(p => ({ ...p, type: 'sold' }));
+    const ordersWithTypes = orders.orders.map(o => ({ ...o, type: 'bought' }));
+    const transfersWithTypes = transfers.transfers.map(t => ({ ...t, type: 'transfer' }));
+
+    // Combine all activities into one array
+    const allActivities = [...purchasesWithTypes, ...ordersWithTypes, ...transfersWithTypes];
+    // Sort by block_timestamp
+    allActivities.sort((a, b) => new Date(b.block_timestamp) - new Date(a.block_timestamp));
+
+    return allActivities;
+  };
+
+  /* ------------------------ User Activity Ends------------------------ */
 
 
   /* ------------------------ Stripe account connect starts here ------------------------ */

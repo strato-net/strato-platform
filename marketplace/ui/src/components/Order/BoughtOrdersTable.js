@@ -223,7 +223,27 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOr
       title: "Seller",
       dataIndex: "sellersCommonName",
       key: "sellersCommonName",
-      render: (text) => <p>{text}</p>,
+      // render: (text) => <p onClick={()=>{navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", text)}`, { state: { from: location.pathname } })}}>{text}</p>,
+      render: (text) => (
+        <a 
+          href={`${window.location.origin}/marketplace/profile/${encodeURIComponent(text)}`}
+          onClick={(e) => {
+            e.preventDefault();
+            const userProfileUrl = `/marketplace/profile/${encodeURIComponent(text)}`;
+      
+            if (e.ctrlKey || e.metaKey) {
+              // Open in a new tab if Ctrl/Cmd is pressed
+              window.open(`${window.location.origin}${userProfileUrl}`, '_blank');
+            } else {
+              // Use navigate for a normal click, without Ctrl/Cmd
+              navigate(routes.MarketplaceUserProfile.url.replace(':commonName',text), { state: { from: location.pathname } });
+            }
+          }}
+          style={{ textDecoration: 'underline', color: 'black', cursor: 'pointer' }}
+        >
+          {text}
+        </a>
+      ),
     },
     {
       title: "Order Total ($)",
@@ -302,8 +322,6 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOr
     } else if (status === "Payment Pending") {
       textClass = "bg-[#FF8C0033]"
     } else if (status === "Closed") {
-      textClass = "bg-[#119B2D33]";
-    } else if (status === "Paid") {
       textClass = "bg-[#119B2D33]";
     } else if (status === "Canceled") {
       textClass = "bg-[#FFF0F0]";

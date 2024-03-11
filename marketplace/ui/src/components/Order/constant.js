@@ -3,8 +3,7 @@ export const status = {
   2: "Awaiting Shipment",
   3: "Closed",
   4: "Canceled",
-  5: "Payment Pending",
-  6: "Paid"
+  5: "Payment Pending"
 };
 
 export const statusByName = {
@@ -12,8 +11,7 @@ export const statusByName = {
   "Awaiting Shipment": "Awaiting Shipment",
   "Closed": "Closed",
   "Canceled": "Canceled",
-  "Payment Pending": "Payment Pending",
-  "Paid": "Paid",
+  "Payment Pending": "Payment Pending"
 };
 
 export const getStatusByName = (name) => {
