@@ -8,11 +8,12 @@ class MarketplaceController {
   static async getAll(req, res, next) {
     try {
       const { dapp, query } = req
+      const {soldOut, forSale , ...restQuery} =  query  
       if (query.manufacturer) {
         const encodedManufacturers = query.manufacturer.map(product => { return encodeURIComponent(product) })
         query.manufacturer = encodedManufacturers
       }
-      const inventories = await dapp.getMarketplaceInventories({ ...query, ownerCommonName: usersArr })
+      const inventories = await dapp.getMarketplaceInventories({ ...restQuery, ownerCommonName: usersArr })
       let unlisted = [];
       let listed = inventories?.inventoryResults?.filter((item,index)=>{
         if(item.saleQuantity && item.saleQuantity!==0){
@@ -26,7 +27,17 @@ class MarketplaceController {
           return b?.saleDate?.localeCompare(a?.saleDate);
       });
 
-      const finalInventory = [...listed, ...unlisted];
+      let finalInventory;
+      if(forSale === 'true' && soldOut === 'true'){
+        finalInventory = [...listed, ...unlisted];
+       }else if(forSale === 'true' && soldOut === 'false'){
+         finalInventory = [...listed];
+        }else if(forSale === 'false' && soldOut === 'true'){
+         finalInventory = [...unlisted];
+        }else {
+         finalInventory = [];
+        }
+
       rest.response.status200(res, { productsWithImageUrl: finalInventory, inventoryCount: inventories?.inventoryCount })
 
       return next()
@@ -38,12 +49,12 @@ class MarketplaceController {
   static async getAllLoggedIn(req, res, next) {
     try {
       const { dapp, query } = req
-
+      const {soldOut, forSale , ...restQuery} =  query  
       if (query.manufacturer) {
         const encodedManufacturers = query.manufacturer.map(product => { return encodeURIComponent(product) })
         query.manufacturer = encodedManufacturers
       }
-      const inventories = await dapp.getMarketplaceInventoriesLoggedIn({ ...query, ownerCommonName: usersArr })
+      const inventories = await dapp.getMarketplaceInventoriesLoggedIn({ ...restQuery, ownerCommonName: usersArr })
 
       let unlisted = [];
       let listed = inventories?.inventoryResults?.filter((item,index)=>{
@@ -58,7 +69,16 @@ class MarketplaceController {
           return b?.saleDate?.localeCompare(a?.saleDate);
       });
 
-      const finalInventory = [...listed, ...unlisted];
+      let finalInventory;
+      if(forSale === 'true' && soldOut === 'true'){
+       finalInventory = [...listed, ...unlisted];
+      }else if(forSale === 'true' && soldOut === 'false'){
+        finalInventory = [...listed];
+       }else if(forSale === 'false' && soldOut === 'true'){
+        finalInventory = [...unlisted];
+       }else {
+        finalInventory = [];
+       } 
 
       rest.response.status200(res, { productsWithImageUrl: finalInventory, inventoryCount: inventories?.inventoryCount })
 

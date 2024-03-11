@@ -144,7 +144,8 @@ const actions = {
     // manufacturers,
     minPrice,
     maxPrice,
-    search
+    search,
+    availabilityQuery
   ) => {
     dispatch({ type: actionDescriptors.fetchMarketplace });
 
@@ -167,7 +168,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace?${priceQuery}${categoryQuery}${subCategoryQuery}${searchQuery}`,
+        `${apiUrl}/marketplace?${priceQuery}${categoryQuery}${subCategoryQuery}${searchQuery}${availabilityQuery}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -214,7 +215,8 @@ const actions = {
     // manufacturers,
     minPrice,
     maxPrice,
-    search
+    search,
+    availabilityQuery
   ) => {
     dispatch({ type: actionDescriptors.fetchMarketplaceLoggedIn });
 
@@ -237,7 +239,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace/all?${priceQuery}${categoryQuery}${subCategoryQuery}${searchQuery}`,
+        `${apiUrl}/marketplace/all?${priceQuery}${categoryQuery}${subCategoryQuery}${searchQuery}${availabilityQuery}`,
         {
           method: HTTP_METHODS.GET,
         }

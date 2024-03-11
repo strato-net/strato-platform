@@ -38,6 +38,9 @@ import { debounce } from 'lodash';
 const { Panel } = Collapse;
 const { Text } = Typography;
 
+const availabilityOptions = [{label:'For Sale', value:'forSale'},
+                             {label:'Sold Out', value:'soldOut'}]
+
 const CategoryProductList = ({ user }) => {
 
   const location = useLocation();
@@ -52,6 +55,7 @@ const CategoryProductList = ({ user }) => {
   // States
   const [selectedCategories, setSelectedCategories] = useState(categoryQueryValueArr);
   const [selectedSubCategories, setSelectedSubCategories] = useState([]);
+  const [selectedAvailability, setSelectedAvailability] = useState(['forSale', 'soldOut'])
   const [minPrice, setMinPrice] = useState(0);
   const [maxPrice, setMaxPrice] = useState(MAX_PRICE);
   const [subCategories, setSubCategories] = useState([]);
@@ -157,7 +161,7 @@ const CategoryProductList = ({ user }) => {
     setSelectedSubCategories(valuesChecked);
   };
 
-
+  const availabilityFilter = `&forSale=${selectedAvailability.includes('forSale')}&soldOut=${selectedAvailability.includes('soldOut')}`;
   useEffect(() => {
     if (hasChecked && !isAuthenticated) {
       marketplaceActions.fetchMarketplace(
@@ -166,7 +170,8 @@ const CategoryProductList = ({ user }) => {
         arrayToStr(selectedSubCategories),
         minPrice,
         maxPrice,
-        searchQueryValue
+        searchQueryValue,
+        availabilityFilter
       );
     } else if (hasChecked && isAuthenticated) {
       marketplaceActions.fetchMarketplaceLoggedIn(
@@ -175,7 +180,8 @@ const CategoryProductList = ({ user }) => {
         arrayToStr(selectedSubCategories),
         minPrice,
         maxPrice,
-        searchQueryValue
+        searchQueryValue,
+        availabilityFilter
       );
     }
   }, [
@@ -185,7 +191,8 @@ const CategoryProductList = ({ user }) => {
     maxPrice,
     hasChecked,
     isAuthenticated,
-    searchQueryValue
+    searchQueryValue,
+    selectedAvailability
   ]);
 
   useEffect(() => {
@@ -217,7 +224,7 @@ const CategoryProductList = ({ user }) => {
 
   const handleClearFilter = () => {
     const isFilter = selectedCategories.length != 0 || selectedSubCategories.length != 0
-      || minPrice !== 0 || maxPrice !== MAX_PRICE
+      || minPrice !== 0 || maxPrice !== MAX_PRICE || selectedAvailability.length !== 2
     if (isFilter) {
       const baseUrl = new URL('/category', window.location.origin);
       if (searchQueryValue) {
@@ -229,7 +236,7 @@ const CategoryProductList = ({ user }) => {
       setSelectedCategories([]);
       setMinPrice(0)
       setMaxPrice(MAX_PRICE)
-
+      setSelectedAvailability(['forSale', 'soldOut'])
     }
   }
 
@@ -250,6 +257,10 @@ const CategoryProductList = ({ user }) => {
     setDesktopOpenFilter(!desktopOpenFilter);
     setMobileOpenFilter(!mobileOpenFilter);
   };
+
+  const onChangeAvailability = (checkedValues) =>{
+    setSelectedAvailability(checkedValues);
+  }
 
   const addItemToCart = async (product, quantity) => {
     if (product.ownerCommonName === user?.commonName) {
@@ -403,6 +414,26 @@ const CategoryProductList = ({ user }) => {
       </Space>
     </Panel>
 
+
+const AvailabilityFilter = () =>
+<>
+<Panel header={<Text strong className="text-base">Availability</Text>} key="1">
+<Checkbox.Group
+  onChange={onChangeAvailability}
+  value={selectedAvailability}
+>
+  <div className="flex flex-col gap-3">
+    {availabilityOptions.map((category, index) => (
+      <Checkbox value={category.value} key={index} className="m-0">
+        {category.label}
+      </Checkbox>
+    ))}
+  </div>
+</Checkbox.Group>
+</Panel>
+<Divider className="m-auto w-[94%] min-w-[80%]" />
+</>
+
   const SubCategoryFilterComponent = () =>
     <Panel header={<Text strong className="text-base">Sub Categories</Text>} key="1">
       <Checkbox.Group
@@ -457,6 +488,7 @@ const CategoryProductList = ({ user }) => {
         PriceFilterComponent()
       )}
 
+      {DesktopCollapseComponent(AvailabilityFilter())}
     </div>
   </div>
 
@@ -504,6 +536,7 @@ const CategoryProductList = ({ user }) => {
           PriceFilterComponent()
         )}
 
+       {MobileCollapseComponent(AvailabilityFilter())}
       </div>
     </div>
     <div className="h-full w-full bg-[#00000020] absolute top-0 md:hidden"></div>
