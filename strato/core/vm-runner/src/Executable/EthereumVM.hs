@@ -68,6 +68,7 @@ import qualified Data.Map.Ordered as OMap
 import Data.Maybe
 import Data.Proxy
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as UTF8
 import Debugger
 import Executable.EthereumVM2
 import Executable.EVMCheckpoint
@@ -171,7 +172,7 @@ sendOutEvent (OutAction act) = do
              ) of
           (Just c, Just n, actionDatas) ->
             let cp = case join $ fmap (M.lookup "VM") $ a ^. Action.metadata of
-                  Just "SolidVM" -> SolidVMCode (T.unpack n) $ Keccak256.hash $ BC.pack $ T.unpack c
+                  Just "SolidVM" -> SolidVMCode (T.unpack n) $ Keccak256.hash $ UTF8.encodeUtf8 c
                   Just "EVM" -> EVMCode $ Keccak256.hash $ BC.pack $ T.unpack c
                   Just v -> error $ "Unknown VM: " ++ show v
                   Nothing -> EVMCode $ Keccak256.hash $ BC.pack $ T.unpack c
