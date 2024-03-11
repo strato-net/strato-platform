@@ -74,14 +74,15 @@ pipeline {
           withCredentials([
               usernamePassword(credentialsId: 'marketplace-global-admin', passwordVariable: 'GLOBAL_ADMIN_PASSWORD', usernameVariable: 'GLOBAL_ADMIN_NAME'),
               usernamePassword(credentialsId: 'marketplace-dev-aws-iam-user', passwordVariable: 'AWS_IAM_USER_ACCESS_KEY', usernameVariable: 'AWS_IAM_USER_KEY_ID'),
+              usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
           ]) {
             writeFile file: "run.sh", text: """#!/bin/bash
               sudo \\
                 NODE_HOST=\$(</host) \\
                 SLIPSTREAM_OPTIONAL=false \\
                 OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \\
-                OAUTH_CLIENT_ID=dev \\
-                OAUTH_CLIENT_SECRET=d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f \\
+                OAUTH_CLIENT_ID='${KEYCLOAK_STRATODEVEL_DEV_ID}' \\
+                OAUTH_CLIENT_SECRET='${KEYCLOAK_STRATODEVEL_DEV_SECRET}' \\
                 VAULT_URL=https://\$(</host):8093 \\
                 VAULT_PROXY_DEBUG=true \\
                 certInfo='{"orgName":"BlockApps","orgUnit":"Engineering","commonName":"Test"}' \\
@@ -145,47 +146,53 @@ pipeline {
 
           sh './check_availability.sh'
         }
-
-        script {
-          // TODO: replace with jenkins credentials here and in other places in pipelines
-          lib.registerTestUserCert(
-              'strato-worktree',
-              'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
-              'dev',
-              'd5e67b8c-4fbf-42c6-a8d9-29a4dd13575f',
-              'user1',
-              '1234'
-          )
-          lib.registerTestUserCert(
-              'strato-worktree',
-              'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
-              'dev',
-              'd5e67b8c-4fbf-42c6-a8d9-29a4dd13575f',
-              'user3',
-              '1234'
-          )
-          lib.registerTestUserCert(
-              'strato-worktree',
-              'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
-              'dev-testing1',
-              'e4ccbcec-1824-468a-a869-c90a842de9be',
-              '',
-              '',
-              'dev',
-              'd5e67b8c-4fbf-42c6-a8d9-29a4dd13575f'
-          )
-          lib.registerTestUserCert(
-              'strato-worktree',
-              'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
-              'dev-testing2',
-              'd29bca04-c503-4329-a853-a9e6ef19a205',
-              '',
-              '',
-              'dev',
-              'd5e67b8c-4fbf-42c6-a8d9-29a4dd13575f'
-          )
-          // Unlock the marketplace deploy script:
-          sh 'docker exec strato-marketplace-backend-1 rm -f _deploy_blocked_while_I_exist'
+        
+        withCredentials([
+          usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
+          usernamePassword(credentialsId: 'keycloak-strato-devel-dev-testing1-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEVTESTING1_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEVTESTING1_ID'),
+          usernamePassword(credentialsId: 'keycloak-strato-devel-dev-testing2-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEVTESTING2_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEVTESTING2_ID'),
+        ]) {
+          script {
+            // TODO: replace with jenkins credentials here and in other places in pipelines
+            lib.registerTestUserCert(
+                'strato-worktree',
+                'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
+                "${KEYCLOAK_STRATODEVEL_DEV_ID}",
+                "${KEYCLOAK_STRATODEVEL_DEV_SECRET}",
+                'user1',
+                '1234'
+            )
+            lib.registerTestUserCert(
+                'strato-worktree',
+                'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
+                "${KEYCLOAK_STRATODEVEL_DEV_ID}",
+                "${KEYCLOAK_STRATODEVEL_DEV_SECRET}",
+                'user3',
+                '1234'
+            )
+            lib.registerTestUserCert(
+                'strato-worktree',
+                'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
+                "${KEYCLOAK_STRATODEVEL_DEVTESTING1_ID}",
+                "${KEYCLOAK_STRATODEVEL_DEVTESTING1_SECRET}",
+                '',
+                '',
+                "${KEYCLOAK_STRATODEVEL_DEV_ID}",
+                "${KEYCLOAK_STRATODEVEL_DEV_SECRET}",
+            )
+            lib.registerTestUserCert(
+                'strato-worktree',
+                'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
+                "${KEYCLOAK_STRATODEVEL_DEVTESTING2_ID}",
+                "${KEYCLOAK_STRATODEVEL_DEVTESTING2_SECRET}",
+                '',
+                '',
+                "${KEYCLOAK_STRATODEVEL_DEV_ID}",
+                "${KEYCLOAK_STRATODEVEL_DEV_SECRET}",
+            )
+            // Unlock the marketplace deploy script:
+            sh 'docker exec strato-marketplace-backend-1 rm -f _deploy_blocked_while_I_exist'
+          }
         }
       }
     }
@@ -335,10 +342,12 @@ pipeline {
         stage('STRATO API Tests') {
           steps{
             withCredentials([
-              usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')
+              usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME'),
+              usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
+            
             ]) {
 
-              sh '''#!/bin/bash -le
+              sh """#!/bin/bash -le
                 set -x
                 # Re-cloning the repo might be redundant but we'll follow same approach as other tests. And the docker rebuild should be quick with docker layer caches.
                 rm -rf strato-api-tests
@@ -348,12 +357,12 @@ pipeline {
                 docker build --tag strato-api-tests .
                 docker run \
                   -e OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \
-                  -e OAUTH_CLIENT_ID=dev \
-                  -e OAUTH_CLIENT_SECRET=d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f \
+                  -e OAUTH_CLIENT_ID='${KEYCLOAK_STRATODEVEL_DEV_ID}' \
+                  -e OAUTH_CLIENT_SECRET='${KEYCLOAK_STRATODEVEL_DEV_SECRET}' \
                   -e STRATO_NODE_URL=http://172.17.0.1:80 \
                   -e DEBUG_LOG=false \
                   strato-api-tests
-              '''
+              """
             }
           }
         }
@@ -386,7 +395,8 @@ pipeline {
     stage('Test dev docs') {
       steps {
         withCredentials([
-            usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')
+            usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME'),
+            usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
         ]) {
           sh 'rm -rf docs-website'
           sh 'git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/docs-website -b develop'
@@ -398,8 +408,8 @@ module.exports = {
   stratoConfig: {
     "PASSWORD": '1234',
     "OAUTH_ENABLED": 'true',
-    "OAUTH_CLIENT_ID": "dev",
-    "OAUTH_CLIENT_SECRET": "d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f",
+    "OAUTH_CLIENT_ID": "${KEYCLOAK_STRATODEVEL_DEV_ID}",
+    "OAUTH_CLIENT_SECRET": "${KEYCLOAK_STRATODEVEL_DEV_SECRET}",
     "OAUTH_DISCOVERY_URL": "https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration",
     "OAUTH_JWT_USERNAME_PROPERTY": "email",
     "HTTP_PORT": "8080",
