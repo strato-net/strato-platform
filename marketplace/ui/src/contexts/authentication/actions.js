@@ -77,6 +77,7 @@ const actions = {
       const body = await response.json();
       if (response.status === RestStatus.OK) {
         window.location.href = body.data.logoutUrl;
+        localStorage.removeItem('loginCount');
         dispatch({ type: actionDescriptors.logoutSuccessful, payload: body.data.logoutUrl });
         return;
       } else if(response.status === RestStatus.UNAUTHORIZED) {

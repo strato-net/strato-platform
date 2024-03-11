@@ -29,6 +29,7 @@ const ProcessingOrder = ({user}) => {
   const [error, seterror] = useState(null)
   const { message, success } = useOrderState();
   const [api, contextHolder] = notification.useNotification();
+  const [called, setCalled] = useState(false);
 
 
   const storedData = useMemo(() => {
@@ -55,8 +56,8 @@ const ProcessingOrder = ({user}) => {
   }, [routeMatch, query]);
 
   useEffect(() => {
-    // getCartData();
-    if (sessionId !== undefined && user !== undefined) {
+    if (sessionId !== undefined && user !== undefined && !called) {
+      setCalled(true);
       getCartData();
     }
 
