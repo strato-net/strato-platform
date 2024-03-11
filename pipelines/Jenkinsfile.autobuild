@@ -298,7 +298,7 @@ pipeline {
                   script{
                     lib.runSyncTester()
                   }
-
+                }
                   // unstash 'slipstream_integrity_tests'
                 //   script {
                 //     dir('integrity_tests') {
@@ -378,7 +378,7 @@ pipeline {
             sh "python3 slipstream_sync.py '${KEYCLOAK_STRATODEVEL_DEV_ID}' '${KEYCLOAK_MERCATATESTNET2_LOCALHOST_ID}' '${KEYCLOAK_STRATODEVEL_DEV_SECRET}' '${KEYCLOAK_MERCATATESTNET2_LOCALHOST_SECRET}' 'strato-devel' 'mercata-testnet2'"
           }
         }
-        
+
         stage('STRATO API Tests') {
           steps{
             withCredentials([
