@@ -237,7 +237,7 @@ pipeline {
                     docker compose -f docker-compose.stripe-ps.push.ecr.yml push 2>&1
                   '''
                   stash includes: 'strato-getting-started/**', name: 'stratoGettingStarted'
-                  // stash includes: 'strato-platform/strato/indexer/slipstream/integrity_tests/**', name: 'slipstream_integrity_tests'
+                  stash includes: 'strato-platform/strato/indexer/slipstream/integrity_tests/**', name: 'slipstream_integrity_tests'
                 }
                 
                 // Push docker-compose files to Jenkins artifacts and AWS S3
@@ -301,7 +301,7 @@ pipeline {
                 }
                   unstash 'slipstream_integrity_tests'
                   // script {
-                    dir('integrity_tests') {
+                    dir('strato-platform/strato/indexer/slipstream/integrity_tests') {
                        withCredentials([
                             usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
                             usernamePassword(credentialsId: 'keycloak-mercata-testnet2-localhost-client', passwordVariable: 'KEYCLOAK_MERCATATESTNET2_LOCALHOST_SECRET', usernameVariable: 'KEYCLOAK_MERCATATESTNET2_LOCALHOST_ID'),
