@@ -150,7 +150,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
 
     const handleSubmit = async () => {
         let body = {
-            paymentProviders: paymentProviderAddress ? [paymentProviderAddress] : [],
+            paymentProviders: paymentProviderAddress.length !== 0 ? paymentProviderAddress : [],
             price: pricePerUnit,
         };
         if (inventory.saleAddress) {

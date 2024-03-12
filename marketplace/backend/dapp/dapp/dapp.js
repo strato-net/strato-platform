@@ -667,7 +667,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         // throw new rest.RestError(RestStatus.NOT_FOUND, "User hasn't started their stripe setup.")
         throw new rest.RestError(RestStatus.BAD_REQUEST, `no account found for ${args.ownerCommonName}`)
       }
-      return { status: 200, success: true, message: "MetaMask account already exists." };
+      return paymentProviders[0];
     } catch (error) {
       console.error(`${error}`)
       throw new rest.RestError(RestStatus.BAD_REQUEST, `${error.message}`)

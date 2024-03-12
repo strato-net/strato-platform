@@ -366,9 +366,10 @@ const allSubcategories = getAllSubcategories(categorys);
                             category={category}
                             key={index}
                             debouncedSearchTerm={debouncedSearchTerm}
-                            paymentProviderAddress={
-                              stripeStatus ? stripeStatus.paymentProviderAddress : undefined
-                            }
+                            paymentProviderAddress={[
+                              ...(stripeStatus ? [stripeStatus.paymentProviderAddress] : []),
+                              ...(metamaskStatus ? [metamaskStatus.address] : [])
+                            ]}
                             allSubcategories={allSubcategories}
                           />
                         );

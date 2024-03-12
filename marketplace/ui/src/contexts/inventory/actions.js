@@ -774,7 +774,6 @@ const actions = {
   },
   
   sellerMetamaskStatus: async (dispatch, username) => {
-    console.log("username:", username)
     dispatch({ type: actionDescriptors.sellerMetamaskStatus });
 
     try {
@@ -783,10 +782,11 @@ const actions = {
       });
 
       const body = await response.json();
-      console.log("body.data:", body.data)
+      
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.sellerMetamaskStatusSuccessful,
+          payload: body.data,
         });
         return body.data;
       } else if (response.status === RestStatus.UNAUTHORIZED) {

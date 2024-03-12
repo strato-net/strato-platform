@@ -32,7 +32,7 @@ const InventoriesProvider = ({ children }) => {
     isLoadingMetamaskStatus: false,
     onboardedSeller: null,
     stripeStatus: null,
-    metamaskStatus: false,
+    metamaskStatus: null,
     isLoadingStripeStatus: false,
     uploadedImg : null,
     isUploadImageSubmitting: false,
