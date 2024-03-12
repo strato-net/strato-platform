@@ -74,6 +74,7 @@ import Data.Source.Map
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Traversable
+import Handlers.AccountInfo
 import SQLM
 import SolidVM.Model.CodeCollection.Contract
 import SolidVM.Model.CodeCollection.Function
@@ -261,7 +262,7 @@ nth n
   | otherwise = Text.pack (show $ n + 1) <> "th"
 
 contractResult ::
-  MonadIO m =>
+  (HasSQL m) =>
   Integer ->
   Keccak256 ->
   TransactionResult ->
@@ -289,8 +290,22 @@ contractResult i txHash txResult@TransactionResult {..} mmd = do
           Nothing -> lift . throwIO . UserError $ "Transaction succeeded, but contract was neither created, nor destroyed"
       stratoMsg -> lift . throwIO . UserError $ Text.pack stratoMsg
     Just acct -> do
-      let details = UploadContractDetails {contractName = name, contractAccount = Just $ acct}
+      -- Checks if account exists in the address state ref table before returning results
+      details <- lift $ go acct name
       return $ BlocTransactionResult Success txHash (Just txResult) (Just $ Upload details)
+  where
+    go acct name = do
+      addressRefs <- 
+        getAccount' 
+          accountsFilterParams
+            { _qaAddress = Just $ _accountAddress acct,
+              _qaContractName = Just name,
+              _qaIgnoreChain = Just True
+            }
+      case addressRefs of
+        [] -> go acct name
+        _ -> return $ UploadContractDetails {contractName = name, contractAccount = Just $ acct}
+
 
 functionResult ::
   ( A.Selectable Account AddressState m,
