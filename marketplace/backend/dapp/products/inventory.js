@@ -351,7 +351,7 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, defaultOptions) {
-    const { range, ownerCommonName, assetAddresses, status, isMarketplaceSearch, isTrendingSearch, ...restArgs } = args;
+    const { range, ownerCommonName, assetAddresses, status, isMarketplaceSearch, isTrendingSearch, userProfile, userProfileGtField, userProfileGtValue, ...restArgs } = args;
     let inventories;
     let sales;
     let finalInventory = [];
@@ -371,7 +371,8 @@ async function getAll(admin, args = {}, defaultOptions) {
             {
                 address: trendingAssetAddresses,
             }, options, admin);
-    } else {
+    } 
+    else {
         // Original logic
         if (ownerCommonName) {
             inventories = await searchAllWithQueryArgs(contractName,
@@ -393,8 +394,12 @@ async function getAll(admin, args = {}, defaultOptions) {
                     ...restArgs,
                 }, options, admin);
         }
-
-        if (inventories) {
+        if (inventories && userProfile) {
+            const assetAddresses = inventories.map((inventory) => inventory.address);
+            // (sale.js): `getAll` method needs to be refactored as it has logic specific to passing `assetAddresses`
+            sales = await saleJs.getAll(admin, {  assetAddresses, range, saleGtField: userProfileGtField, saleGtValue: userProfileGtValue, isOpen: true, order: 'block_timestamp.desc' }, options);
+        }
+        else if (inventories) {
             const assetAddresses = inventories.map((inventory) => inventory.address);
             sales = await saleJs.getAll(admin, { assetAddresses, range, isOpen: true }, options);
         }
@@ -456,7 +461,7 @@ async function getOwnershipHistory(user, args, options) {
 
 async function inventoryCount(admin, args = {}, defaultOptions) {
     const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
-    const { range, ...newArgs } = args;
+    const { range, userProfile, userProfileGtField, userProfileGtValue, ...newArgs } = args;
     const queryArgs = setSearchQueryOptionsPrime({
         ...newArgs,
         limit: undefined,

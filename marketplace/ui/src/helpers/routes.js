@@ -12,6 +12,10 @@ export default {
     label: "Marketplace Product List",
     url: "/category/:category",
   },
+  MarketplaceUserProfile: {
+    label: "Marketplace User Profile",
+    url: "/profile/:commonName",
+  },
   MarketplaceProductDetail: {
     label: "Marketplace Product Detail",
     url: "/productList/:address",
@@ -30,6 +34,10 @@ export default {
   BoughtOrderDetails: {
     label: "Bought Order Detail",
     url: "/bought-orders/:id",
+  },
+  Transfers: {
+    label: "Transfers",
+    url: "/order/transfers",
   },
   SoldOrderItemDetail: {
     label: "Order Item Detail",
