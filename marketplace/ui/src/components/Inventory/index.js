@@ -1,13 +1,10 @@
 import React, { useState, useEffect } from "react";
 import {
   Breadcrumb,
-  Input,
   Button,
   Pagination,
   notification,
   Spin,
-  Typography,
-  Image,
   Tooltip, 
   Tabs
 } from "antd";
@@ -30,11 +27,7 @@ import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
 import { useAuthenticateState } from "../../contexts/authentication";
-import CategoryCard from "../MarketPlace/CategoryCard";
 
-const { Search } = Input;
-
-const { Title, Text } = Typography;
 
 const Inventory = ({ user }) => {
   const [open, setOpen] = useState(false);
