@@ -19,25 +19,31 @@ import BlockApps.Logging
 import Blockchain.CommunicationConduit
 import Blockchain.Context
 import Blockchain.Data.PubKey (secPubKeyToPoint)
+import Blockchain.Display (displayMessage, MsgDirection(..))
 import Blockchain.EthEncryptionException
+import Blockchain.Event
 import Blockchain.EventException
+import Blockchain.ExtMergeSources
+import Blockchain.Frame
+import Blockchain.Metrics
 import Blockchain.Options
 import Blockchain.RLPx
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Model.Secp256k1
-import Blockchain.TCPClientWithTimeout
+import Blockchain.Threads
+import Blockchain.TimerSource
 import Conduit
 import Control.Lens ((^.))
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Trans.Resource
 import qualified Data.ByteString as B
+import qualified Data.Conduit.List as CL
 import Data.Either.Combinators
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 import GHC.IO.Exception
-import Ki.Unlifted as KIU
 import qualified Text.Colors as C
 import UnliftIO
 
@@ -58,7 +64,7 @@ ethServerHandler ::
   IPAsText ->
   m ()
 ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
-  let peerStr = T.unpack i
+  let peerStr = "<" ++ T.unpack i
   ender <- toIO . $logInfoS "runEthServer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow peerStr
   void $ register ender
   getPeerByIP ipAsText >>= \case
@@ -69,7 +75,7 @@ ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
         Nothing -> do
           $logErrorS "runEthServer" . T.pack $ "Didn't get pubkey during discovery for peer " ++ peerStr ++ ". rejecting violently."
         Just pubkey -> do
-            attempt <- withCertifiedPeer p . withActivePeer p . scoped $
+            attempt <- withCertifiedPeer p . withActivePeer p $
                          runEthServerConduit p pSource pSink seqSrc peerStr
             case attempt of
               Nothing  -> $logDebugS "runEthServer" "Peer ran successfully!"
@@ -100,10 +106,6 @@ ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
                     disErr <- storeDisableException p (T.pack "PeerDisconnected")
                     whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
                     lengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) p
-                  e' | Just TimeoutException <- fromException e' -> do
-                    disErr <- storeDisableException p (T.pack "TimeoutException")
-                    whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
-                    lengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) p
                   e' | Just NoPeerCertificate <- fromException e' -> do
                     disErr <- storeDisableException p (T.pack "NoPeerCertificate")
                     whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
@@ -131,9 +133,8 @@ runEthServerConduit ::
   ConduitM B.ByteString Void m () ->
   ConduitM () P2pEvent m () ->
   String ->
-  Scope ->
   m (Maybe SomeException)
-runEthServerConduit p pSource pSink seqSrc peerStr scp = do
+runEthServerConduit p pSource pSink seqSrc peerStr = labelPeerThread peerStr "Peer Manager" (Just "CONNECTED") $ do
   myPubKey' <- getPub
   let myPubkey = secPubKeyToPoint myPubKey'
       otherPubKey = fromMaybe (error "programmer error: runEthServerConduit was called without a pubkey") $ pPeerPubkey p
@@ -141,19 +142,44 @@ runEthServerConduit p pSource pSink seqSrc peerStr scp = do
   case mConnectionResult of
     Nothing -> pure $ Just $ toException $ HandshakeException "handshake timed out"
     Just (_, (outCtx, inCtx)) -> do
-      !eventSource <- mkEthP2PEventSource pSource seqSrc peerStr inCtx scp
-      !eventSink <- mkEthP2PEventConduit peerStr outCtx
-      fmap (either Just (const Nothing)) . try . runConduit $
-        eventSource
-          .| handleMsgServerConduit myPubkey p
-          .| eventSink
+      ret <-
+        fmap (either Just (const Nothing)) . try $
+        [ labelPeerThread peerStr "Peer Source" Nothing $
+          pSource
+          .| ethDecrypt inCtx
+          .| CL.iterM (recordTraffic Inbound)
+          .| bytesToMessages
+          .| CL.iterM (displayMessage Inbound peerStr)
+          .| CL.map MsgEvt
+        , labelPeerThread peerStr "Sequencer Source" Nothing $
+          seqSrc
+          .| CL.map NewSeqEvent
+        , labelPeerThread peerStr "Timer Source" Nothing $
+          timerSource
+        ] `mergeConnect` (
+        CL.iterM recordEvent
+          .| labelPeerThread peerStr "P2P Handler" Nothing (handleMsgServerConduit myPubkey p)
+          .| debounceTxSendsAndUnseq
+          .| CL.iterM recordMessage
+          .| CL.iterM (displayMessage Outbound peerStr)
+          .| messageToBytes
+          .| CL.iterM (recordTraffic Outbound)
+          .| ethEncrypt outCtx
           .| pSink
+        )
+
+      case ret of
+        Nothing -> changeLabelStatusM $ "DISCONNECTING"
+        Just e -> changeLabelStatusM $ "DISCONNECTING: " ++ show e
+
+      return ret
 
 stratoP2PServer ::
   (MonadP2P n, RunsServer n (LoggingT IO)) =>
   PeerRunner n (LoggingT IO) () ->
   LoggingT IO ()
-stratoP2PServer runner = do
+stratoP2PServer runner = labelTheThread "stratoP2PServer" $ do
   $logInfoS "stratoP2PServer" $ T.pack $ "connect address: " ++ flags_address
   $logInfoS "stratoP2PServer" $ T.pack $ "listen port:     " ++ show flags_listen
   runEthServer flags_listen runner
+
