@@ -58,7 +58,7 @@ const actions = {
         });
 
         return true;
-      } 
+      }
 
       dispatch({
         type: actionDescriptors.fetchSerialNumbersFailed,
@@ -90,7 +90,13 @@ const actions = {
         });
 
         return true;
-      } 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchItemOwnershipHistoryFailed,
+          error: "Unauthorized while fetching ownership history"
+        });
+        window.location.href = body.error.loginUrl;
+      }
 
       dispatch({
         type: actionDescriptors.fetchItemOwnershipHistoryFailed,
@@ -114,7 +120,7 @@ const actions = {
     if (date) {
       range = `&range[]=transferDate,${date},${end}`
     }
-    
+
     try {
       const response = await fetch(`${apiUrl}/item/transfers?limit=${limit}&order=transferDate.${order}&offset=${offset}&or=(oldOwnerOrganization.eq.${ownerOrg},newOwnerOrganization.eq.${ownerOrg})${range}`, {
         method: HTTP_METHODS.GET,
@@ -130,7 +136,13 @@ const actions = {
         });
 
         return true;
-      } 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchItemTransfersFailed,
+          error: "Unauthorized while fetching item transfers"
+        });
+        window.location.href = body.error.loginUrl;
+      }
 
       dispatch({
         type: actionDescriptors.fetchItemTransfersFailed,
@@ -172,7 +184,7 @@ const actions = {
           error: "Error while fetching item raw materials"
         });
         return;
-      } 
+      }
 
       dispatch({ type: actionDescriptors.fetchItemRawMaterialsFailed, error: body.error });
     } catch (err) {
@@ -204,7 +216,7 @@ const actions = {
           payload: body.data,
         });
         return;
-      } 
+      }
       dispatch({ type: actionDescriptors.fetchItemFailed, error: undefined });
     } catch (err) {
       dispatch({ type: actionDescriptors.fetchItemFailed, error: undefined });
@@ -241,7 +253,7 @@ const actions = {
         });
         actions.setMessage(dispatch, "Error while transferring Items");
         return false;;
-      } 
+      }
 
       dispatch({
         type: actionDescriptors.transferOwnershipFailed,
