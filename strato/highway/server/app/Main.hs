@@ -26,7 +26,7 @@ import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Cors
 import Network.Wai.Middleware.Prometheus
-import Network.Wai.Parse (defaultParseRequestBodyOptions,setMaxRequestKeyLength)
+import Network.Wai.Parse (defaultParseRequestBodyOptions,setMaxRequestKeyLength,setMaxRequestFileSize)
 import Servant
 import Servant.Multipart
 import Servant.Multipart.Client
@@ -112,9 +112,11 @@ appHighwayWrapper env =
         ( Proxy
             @( HighwayWrapperAPI
              )
-        ) ctx
+        ) ctx''
     $ serveHighwayWrapper env
   where
-    ctx :: Context '[MultipartOptions Mem]
-    ctx    = (MultipartOptions (setMaxRequestKeyLength 100 defaultParseRequestBodyOptions) ()) :. EmptyContext
+    ctx    = setMaxRequestKeyLength 100 defaultParseRequestBodyOptions
+    ctx'   = setMaxRequestFileSize 6000000 ctx
+    ctx'' :: Context '[MultipartOptions Mem]
+    ctx''  = (MultipartOptions ctx' ()) :. EmptyContext
     policy = simpleCorsResourcePolicy {corsRequestHeaders = ["Content-Type"]}
