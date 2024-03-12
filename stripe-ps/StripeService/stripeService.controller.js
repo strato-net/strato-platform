@@ -143,6 +143,8 @@ class StripeServiceController {
         orderList: Joi.array().min(1).items(Joi.object({
               quantity: Joi.number().required(),
               assetAddress: Joi.string().required(),
+              firstSale: Joi.boolean().required(),
+              unitPrice: Joi.number().required()
             })).required(),
         orderTotal: Joi.number().required(),
         shippingAddressId: Joi.number().min(1).required(),
