@@ -82,7 +82,6 @@ library:
     - text
     - these
     - time
-    - transformers
     - unliftio-core
     - unliftio 
     - warp

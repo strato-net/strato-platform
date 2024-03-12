@@ -40,7 +40,6 @@ library:
     - lens
     - leveldb-haskell
     - lifted-async
-    - milena
     - monad-alter
     - prometheus-client
     - seqevents
