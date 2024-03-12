@@ -3,6 +3,7 @@ FROM ubuntu:22.04 as base
 RUN apt-get -y update && apt-get install -y \
       autoconf \
       curl \
+      jq \
       libblas-dev \
       libgmp-dev \
       liblapack-dev \
@@ -60,7 +61,7 @@ COPY \
   ./usr/local/bin/x509-generator \
   ./usr/local/bin/x509-keygen \
     /usr/local/bin/
-COPY ./strato /strato
+COPY ./strato /
 EXPOSE 30303 30303/udp 3000 3001 7065 8013 8050 8051 8052
 HEALTHCHECK --interval=5s --timeout=1s --start-period=20s \
   CMD pgrep vm-runner && pgrep slipstream || exit 1

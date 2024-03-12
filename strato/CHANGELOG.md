@@ -23,6 +23,8 @@ so that they could be properly moved to their respective version's subsection.
 - Derive service provider URLs from node's network ID for testnet and production nodes
 - Update foreign keys for `BlockApps-Mercata-Asset` + `Sale` contracts whenever there is a table expansion
 - Added a 6MB file size upload limit (enforced by highway).
+- functionality to enumerate threads and their details in `/threads` endpoint of `P2PAPI`
+- `/peers` endpoint in `P2PAPI` to list peer connections and their health
 
 ### Changed 
 - When a transaction fails, the `<failed>` message blinks :^)
@@ -35,9 +37,11 @@ so that they could be properly moved to their respective version's subsection.
 - Constructor arguments are passed by value instead of reference 
 - Escaped quotes for slipstream values
 - Properly escape `"` and `\` string arguments in `strato-api`
+- simplified p2p conduit code so that all threads handling a peer live or die together using the `async` library
 
 ### Removed
 - Removed slipstream's dependency on `eth` database for code collection data
+- Removed overcomplicated attempts at solving p2p thread issue (watchdogs, canaries, semaphore, threadmap, etc)
 
 ## [11.0.0] - 1/22/2024
 
