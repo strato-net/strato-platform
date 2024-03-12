@@ -42,6 +42,7 @@ import "react-responsive-carousel/lib/styles/carousel.min.css"; // requires a lo
 import { Carousel } from "react-responsive-carousel"
 import { Images } from "../../images";
 import ProductItemDetails from "./ProductItemDetails";
+import PreviewMode from "../RichEditor/PreviewMode";
 
 const ProductDetails = ({ user, users }) => {
   const { state, pathname } = useLocation();
@@ -244,18 +245,18 @@ const ProductDetails = ({ user, users }) => {
       align: "center",
       // render: (text) => <p>{text}</p>,
       render: (text) => (
-        <a 
+        <a
           href={`${window.location.origin}/marketplace/profile/${encodeURIComponent(text)}`}
           onClick={(e) => {
             e.preventDefault();
             const userProfileUrl = `/marketplace/profile/${encodeURIComponent(text)}`;
-      
+
             if (e.ctrlKey || e.metaKey) {
               // Open in a new tab if Ctrl/Cmd is pressed
               window.open(`${window.location.origin}${userProfileUrl}`, '_blank');
             } else {
               // Use navigate for a normal click, without Ctrl/Cmd
-              navigate(routes.MarketplaceUserProfile.url.replace(':commonName',text), { state: { from: pathname } });
+              navigate(routes.MarketplaceUserProfile.url.replace(':commonName', text), { state: { from: pathname } });
             }
           }}
           style={{ textDecoration: 'underline', color: 'black', cursor: 'pointer' }}
@@ -271,18 +272,18 @@ const ProductDetails = ({ user, users }) => {
       align: "center",
       // render: (text) => <p>{text}</p>,
       render: (text) => (
-        <a 
+        <a
           href={`${window.location.origin}/marketplace/profile/${encodeURIComponent(text)}`}
           onClick={(e) => {
             e.preventDefault();
             const userProfileUrl = `/marketplace/profile/${encodeURIComponent(text)}`;
-      
+
             if (e.ctrlKey || e.metaKey) {
               // Open in a new tab if Ctrl/Cmd is pressed
               window.open(`${window.location.origin}${userProfileUrl}`, '_blank');
             } else {
               // Use navigate for a normal click, without Ctrl/Cmd
-              navigate(routes.MarketplaceUserProfile.url.replace(':commonName',text), { state: { from: pathname } });
+              navigate(routes.MarketplaceUserProfile.url.replace(':commonName', text), { state: { from: pathname } });
             }
           }}
           style={{ textDecoration: 'underline', color: 'black', cursor: 'pointer' }}
@@ -372,7 +373,7 @@ const ProductDetails = ({ user, users }) => {
               <div className=" w-full lg:w-1/2">
                 {shouldShowWishlistIcon && (
                   <div className="flex justify-end">
-                      {isWishlisted ? <HeartFilled className="cursor-pointer" onClick={toggleWishlist} style={{fontSize: "20px", color: "#A15E49"}} /> : <HeartTwoTone className="cursor-pointer" onClick={toggleWishlist} style={{ fontSize: "20px" }} twoToneColor="#A15E49"/>}
+                    {isWishlisted ? <HeartFilled className="cursor-pointer" onClick={toggleWishlist} style={{ fontSize: "20px", color: "#A15E49" }} /> : <HeartTwoTone className="cursor-pointer" onClick={toggleWishlist} style={{ fontSize: "20px" }} twoToneColor="#A15E49" />}
                   </div>
                 )}
                 <div className=" lg:border-b lg:border-[#E9E9E9] pb-[6px]">
@@ -383,10 +384,10 @@ const ProductDetails = ({ user, users }) => {
                   <div className="flex pt-[6px] ">
                     {/* <Text className="text-[#202020] text-xs  font-medium">Owned By: {details?.ownerCommonName}</Text>
                      */}
-                     {/* <Text className="text-[#202020] text-xs font-medium">Owned By: </Text> 
+                    {/* <Text className="text-[#202020] text-xs font-medium">Owned By: </Text> 
                       */}
-                       <span className="text-xs  self-center">Owned By:&nbsp;</span>
-                     <div
+                    <span className="text-xs  self-center">Owned By:&nbsp;</span>
+                    <div
                       style={{ cursor: details?.ownerCommonName && details.ownerCommonName !== 'N/A' ? 'pointer' : 'default', color: 'black', textDecoration: details?.ownerCommonName && details.ownerCommonName !== 'N/A' ? 'underline' : 'none' }}
                       onClick={(e) => {
                         if (details?.ownerCommonName && details.ownerCommonName !== 'N/A') {
@@ -399,7 +400,7 @@ const ProductDetails = ({ user, users }) => {
                             window.open(fullUrl, '_blank');
                           } else {
                             // Use navigate for a normal click, without Ctrl/Cmd
-                            navigate(routes.MarketplaceUserProfile.url.replace(':commonName',details?.ownerCommonName), { state: { from: pathname } });
+                            navigate(routes.MarketplaceUserProfile.url.replace(':commonName', details?.ownerCommonName), { state: { from: pathname } });
                           }
                         }
                       }}
@@ -407,7 +408,7 @@ const ProductDetails = ({ user, users }) => {
                       <Text className="text-[#202020] text-xs font-medium  self-center">{details?.ownerCommonName || 'N/A'}</Text>
                     </div>
 
-                    <Text className="text-[#202020] text-xs  font-medium" >{details?.ownerOrganization}</Text>               
+                    <Text className="text-[#202020] text-xs  font-medium" >{details?.ownerOrganization}</Text>
                   </div>
                 </div>
                 <div className=" pt-4 lg:pt-[22px]">
@@ -604,18 +605,7 @@ const ProductDetails = ({ user, users }) => {
                       label: <span className="text-sm md:text-base">Description</span>,
                       key: "0",
                       children: (
-                        <div>
-                          <Paragraph
-                            className="text-[#202020] text-sm"
-                          >
-                            {details?.description?.split('\n').map((line, index) => (
-                              <React.Fragment key={index}>
-                                {line}
-                                <br />
-                              </React.Fragment>
-                            ))}
-                          </Paragraph>
-                        </div>
+                        <PreviewMode content={details?.description} />
                       ),
                     }
                     , {

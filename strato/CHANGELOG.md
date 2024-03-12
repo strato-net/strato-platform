@@ -26,6 +26,8 @@ so that they could be properly moved to their respective version's subsection.
 ### Changed 
 - When a transaction fails, the `<failed>` message blinks :^)
 - `keccak256` built-in function should return hex-encoded value instead of bytestring
+- Optimized the byteString2Integer function that lies at the foundation of strato's RLP-related functionality.
+- Removed unnecessary stateDiff (and threading) in the vm-runner codebase, fixing numerous sources of persistent memory build-up.
 
 ### Fixed
 - Mappings within a struct within a `(type => Struct)` mapping can be accessed
