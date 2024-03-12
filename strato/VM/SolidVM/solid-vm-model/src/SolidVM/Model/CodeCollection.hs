@@ -38,6 +38,7 @@ import Blockchain.SolidVM.Exception
 import Control.DeepSeq
 import Control.Lens
 import Data.Aeson as A
+import Data.Binary
 import Data.Default
 import Data.List (find)
 import Data.Map (Map)
@@ -59,6 +60,7 @@ import SolidVM.Model.CodeCollection.VariableDecl
 import SolidVM.Model.SolidString
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
+import qualified Text.Colors as CL
 
 data CodeCollectionF a = CodeCollection
   { _contracts :: Map SolidString (ContractF a),
@@ -70,7 +72,21 @@ data CodeCollectionF a = CodeCollection
     _pragmas :: [(String, String)],
     _imports :: [FileImportF a]
   }
-  deriving (Show, Generic, NFData, Functor)
+  deriving (Eq, Generic, NFData, Functor)
+
+instance (Show a) => Show (CodeCollectionF a) where
+  show (CodeCollection {..}) = 
+    (CL.underline "\nCodeCollectionF") 
+    ++ CL.yellow "\nCodeCollection._contracts\t" ++ concat (map (\(a,b) -> (CL.bright $ "\nCONTRACT " ++ show a) ++ "\n" ++ show b ++ "\n") (M.toList _contracts))
+    ++ CL.yellow "\nCodeCollection._flFuncs\t" ++ show _flFuncs 
+    ++ CL.yellow "\nCodeCollection._flConstants\t" ++ show _flConstants 
+    ++ CL.yellow "\nCodeCollection._flEnums\t" ++ show _flEnums 
+    ++ CL.yellow "\nCodeCollection._flStructs\t" ++ show _flStructs 
+    ++ CL.yellow "\nCodeCollection._flErrors\t" ++ show _flErrors 
+    ++ CL.yellow "\nCodeCollection._pragmas\t" ++ show _pragmas
+    ++ CL.yellow "\nCodeCollection._imports\t" ++ show _imports
+
+instance Binary a => Binary (CodeCollectionF a)
 
 instance ToJSON a => ToJSON (CodeCollectionF a)
 

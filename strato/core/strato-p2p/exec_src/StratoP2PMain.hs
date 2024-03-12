@@ -20,25 +20,27 @@ import           Blockchain.Participation (p2pApp, setParticipationMode)
 import           Blockchain.SeqEventNotify
 import           Blockchain.Strato.Discovery.Data.Peer (resetPeers)
 import           Blockchain.Strato.Discovery.Data.PeerIOWiring ()
+import           Blockchain.Threads
 import           Executable.StratoP2P
 import           BlockApps.Init
 import           BlockApps.Logging as BL
 import           Data.IORef
-import           Data.Set.Ordered (empty)
 
 main :: IO ()
 main = runLoggingT initP2P
 
 initP2P :: LoggingT IO ()
-initP2P = do
+initP2P = labelTheThread "initP2P" $ do
   liftIO $ blockappsInit "strato_p2p"
   liftIO $ resetPeers
   _ <- liftIO $ $initHFlags "Strato P2P"
   setParticipationMode flags_participationMode
-  wireMessagesRef <- liftIO $ newIORef empty
-  cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
+  cfg <- initConfig flags_maxReturnedHeaders
   let sSource  = seqEventNotificationSource $ contextKafkaState initContext
-      runner f = runContextM cfg $ f sSource
+      runner f = do
+        ctx <- liftIO $ newIORef initContext
+        let cfg' = cfg { configContext = ctx }
+        runContextM cfg' $ f sSource
   liftIO $
     race_
       (run 10248 $ prometheus def p2pApp)

@@ -65,3 +65,24 @@ img.ant-image-preview-img {
 :where(.css-dev-only-do-not-override-9ntgx0).ant-input-number .ant-input-number-input{
   padding: 0;
 }
+
+.confirm-order-body {
+  position: sticky;
+  top: 200px;
+  margin-top: 100px;
+}
+
+.fixed-component{
+  position: fixed;
+  z-index: 90;
+  background-color: white;
+  width: 100%;
+  height: 120px;
+  margin-top: -25px;
+}
+
+.fixed-component-child{
+  margin-top: 15px;
+  width: 90%;
+}
+

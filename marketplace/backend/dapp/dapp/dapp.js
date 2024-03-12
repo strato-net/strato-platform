@@ -1,6 +1,6 @@
 import { rest, util, importer } from "blockapps-rest";
 const { createContract } = rest;
-import { SERVICE_PROVIDERS, STRIPE_PAYMENT_SERVER_URL } from "/helpers/constants";
+import constants, { STRIPE_PAYMENT_SERVER_URL } from "/helpers/constants";
 import { yamlWrite, yamlSafeDumpSync, getYamlFile } from "/helpers/config";
 import { pollingHelper } from "/helpers/utils";
 
@@ -24,6 +24,8 @@ import inventoryJs from "/dapp/products/inventory";
 import marketplaceJs from "/dapp/marketplace/marketplace.js";
 import paymentProviderJs from '/dapp/payments/paymentProvider';
 
+import strats from "../strats/strats";
+
 const allAssetNames = [];
 
 const contractName = "Mercata";
@@ -40,7 +42,7 @@ let userCert = null;
 // }
 
 function deploy(contract, args, options) {
-  console.log(options);
+  console.log(options)
   // author the deployment
   const { deployFilePath } = args;
 
@@ -51,7 +53,7 @@ function deploy(contract, args, options) {
         name: contract.name,
         address: contract.address
       },
-    },
+    }
   };
 
   if (options.config.apiDebug) {
@@ -213,6 +215,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const inventories = await inventoryJs.getAll(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
     const inventoryCount = await inventoryJs.inventoryCount(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
     return { inventories: inventories, inventoryCount: inventoryCount }
+  };
+
+  contract.getInventoriesForUser = async function (args, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName };
+    const {ownerCommonName, ...restArgs} = args;
+    const newArgs = { ...restArgs, ownerCommonName:ownerCommonName, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, userProfile:true }//'0000000000000000000000000000000000000000'
+    return marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
   };
 
   contract.getOwnershipHistory = async function (args, options = optionsNoChainIds) {
@@ -436,27 +445,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const quantities = items.map(item => {
       return item.quantity;
     })
-    /*
-    const sales = await saleJs.getAll(rawAdmin, { assetAddresses, paymentMethod }, options);
-    const sellersAddress = sales[0].sellersAddress;
-    const sellersCommonName = sales[0].sellersCommonName;
-    const saleAddresses = await Promise.all(sales.map(async (sale) => {
-      const orderForSale = orderList.find(order => order.assetAddress === sale.assetToBeSold);
-      const saleData = sale.data;
-      if (saleData.units && orderForSale.quantity < saleData.units) {
-        const contract = { name: orderForSale.category, address: orderForSale.assetAddress }
-        const splitSaleAddress = await saleJs.createSplitSale(rawAdmin, {
-          paymentType: parseInt(PAYMENT_TYPES[paymentMethod]),
-          price: sale.price,
-          units: orderForSale.quantity,
-        }, options, contract);
-        return splitSaleAddress;
-      }
-      else {
-        return sale.address;
-      }
-    }));
-    */
+
     const newArgs = {
       ...restArgs,
       saleAddresses,
@@ -484,25 +473,33 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return saleOrderJs.getAll(rawAdmin, args, getOptions);
   }
 
+  contract.checkSaleQuantity = async function (args, options = defaultOptions) {
+    const getOptions = { ...options, app: contractName }
+    return inventoryJs.checkSaleQuantity(rawAdmin, args, getOptions)
+  }
+
   contract.getOrder = async function (args, options = defaultOptions) {
     try {
       const order = await saleOrderJs.get(rawAdmin, args, options);
       const sales = await saleJs.getAll(rawAdmin, { saleAddresses: order.saleAddresses }, options);
-      const assetAddresses = sales.map(sale => {
-        return sale.assetToBeSold;
-      })
       let assets = [];
-      const assetsWithoutQuantity = await inventoryJs.getAll(rawAdmin, { assetAddresses: assetAddresses }, options);
-      assetsWithoutQuantity.map(asset => {
-        const saleForAsset = sales.find(sale => sale.assetToBeSold === asset.address);
+      
+      for (const sale of sales) {
+        const history = await saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, transaction_hash: order.transaction_hash, assetToBeSold: sale.assetToBeSold }, options);
+        const price = history['0'] ? history['0'].price : null;
+        
+        const assetAddress = sale.assetToBeSold;
+        const assetWithoutQuantity = await inventoryJs.get(rawAdmin, { address: assetAddress }, options);
+        
         assets.push({
-          ...asset,
-          price: saleForAsset.price,
-          saleQuantity: saleForAsset.quantity,
-          saleAddress: saleForAsset.address,
-          amount: saleForAsset.quantity * saleForAsset.price,
-        })
-      })
+          ...assetWithoutQuantity,
+          price: price,
+          saleQuantity: sale.quantity,
+          saleAddress: sale.address,
+          amount: sale.quantity * price,
+        });
+      }
+      
       const result = { userContactAddress: order.shippingAddress, order, assets };
 
       return result;
@@ -529,8 +526,114 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const contract = { name: saleOrderJs.contractName, address: saleOrderAddress }
     return saleOrderJs.updateOrderComment(rawAdmin, contract, options, comments);
   };
+  
+  contract.export = async function ( options = defaultOptions) {
+    const getOptions = { ...options, app: contractName };
+    
+    const processOrders = async (orderArg) => {
+      const orders = await saleOrderJs.getAll(rawAdmin, orderArg, getOptions);
+      if (orders.orders.length === 0) {
+        return [];
+      }
+      const saleAddresses = orders.orders.flatMap(order => order.saleAddresses);
+      const sales = await saleJs.getAll(rawAdmin, { saleAddresses }, options);
+      
+      const uniqueAssetAddresses = [...new Set(sales.map(sale => sale.assetToBeSold))];
+      const assets = await inventoryJs.getAll(rawAdmin, { assetAddresses: uniqueAssetAddresses }, options);
+      const assetLookup = new Map(assets.map(asset => [asset.address, asset]));
+      
+      for (const order of orders.orders) {
+        const assetsPromises = order.saleAddresses.map(async (saleAddress) => {
+          const sale = sales.find(sale => sale.address === saleAddress);
+          if (!sale) return undefined;
+
+          const history = await saleJs.getSaleHistory(rawAdmin, {
+            contract: sale.contract_name,
+            transaction_hash: order.transaction_hash,
+            assetToBeSold: sale.assetToBeSold
+          }, options);
+
+          const asset = assetLookup.get(sale.assetToBeSold);
+          return asset ? { ...asset, salePrice: history['0']?.price || 0 } : undefined;
+        });
+
+        order.assets = (await Promise.all(assetsPromises)).filter(asset => asset !== undefined);
+      }
+
+      return orders.orders;
+    };
+    
+    const getItemTransferEventsWithAssetInfo = async (orderArg) => {
+      const itemTransferEvents = await inventoryJs.getAllItemTransferEvents(rawAdmin, orderArg, getOptions);
+      if (itemTransferEvents.transfers.length === 0) {
+        return [];
+      }
+      const assetAddresses = itemTransferEvents.transfers.map(event => event.assetAddress);
+      const uniqueAssetAddresses = [...new Set(assetAddresses)];
+      const assets = await inventoryJs.getAll(rawAdmin, { assetAddresses: uniqueAssetAddresses }, getOptions);
+
+      const assetInfoMap = new Map(assets.map(asset => [asset.address, { contract_name: asset.contract_name }]));
+      return itemTransferEvents.transfers.map(event => {
+        return { ...event, contract_name: assetInfoMap.get(event.assetAddress)?.contract_name };
+      });
+    };
+    
+    let soldOrderArgs = { limit: 2000, offset: 0, order: 'createdDate.desc', sellersCommonName: userCommonName };
+    const soldOrders = await processOrders(soldOrderArgs);
+    
+    let boughtOrderArgs = { limit: 2000, offset: 0, order: 'createdDate.desc', purchasersCommonName: userCommonName };
+    const boughtOrders = await processOrders(boughtOrderArgs);
+    
+    let transferArgs = { limit: 2000, offset: 0, order: 'transferDate.desc', or: `(oldOwnerCommonName.eq.${userCommonName},newOwnerCommonName.eq.${userCommonName})` };
+    const itemTransferEvents = await getItemTransferEventsWithAssetInfo(transferArgs);
+    
+    return { 
+      soldOrders: soldOrders ? soldOrders : [], 
+      boughtOrders: boughtOrders ? boughtOrders : [], 
+      transfers: itemTransferEvents ? itemTransferEvents : []
+    };
+  };
 
   // ------------------------------ SALE TEST ENDS ------------------------------
+
+  /* ------------------------ User Activity Starts ------------------------ */
+  contract.getAllUserActivity = async function (args, options = defaultOptions) {
+    const getOptions = { ...options, app: contractName };
+    const { sellersCommonName, purchasersCommonName, newOwnerCommonName } = args
+
+    const currentDate = new Date();
+    // Subtract 10 days from the current date
+    const tenDaysAgoDate = new Date(currentDate.getTime() - (10 * 24 * 60 * 60 * 1000));
+    // Format the date as 'YYYY-MM-DD HH:MM:SS UTC'
+    const tenDaysAgoTimestamp = tenDaysAgoDate.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
+
+    // Need to fetch purchases, closed orders, transfers for the user.
+    // New Purchases of User's Products---Fetch Orders with filters of sellersCommonName, block_timestamp and Order Status = AWAITING_FULFILLMENT (1) 
+    const purchaseArgs = { sellersCommonName, status: 1, gtField: "block_timestamp", gtValue: tenDaysAgoTimestamp}
+    const purchases = await saleOrderJs.getAll(rawAdmin, purchaseArgs, getOptions);
+
+    // These are my orders that ave been closed by a seller
+    const orderArgs = { purchasersCommonName, status: 3, gtField: "block_timestamp", gtValue: tenDaysAgoTimestamp}
+    const orders = await saleOrderJs.getAll(rawAdmin, orderArgs, getOptions);
+
+    // These are transfers the usre has recieved
+    const transferArgs = {newOwnerCommonName, gtField: "block_timestamp", gtValue: tenDaysAgoTimestamp};
+    const transfers = await inventoryJs.getAllItemTransferEvents(rawAdmin, transferArgs, getOptions);
+
+    // Fetch activities and add type to each item
+    const purchasesWithTypes = purchases.orders.map(p => ({ ...p, type: 'sold' }));
+    const ordersWithTypes = orders.orders.map(o => ({ ...o, type: 'bought' }));
+    const transfersWithTypes = transfers.transfers.map(t => ({ ...t, type: 'transfer' }));
+
+    // Combine all activities into one array
+    const allActivities = [...purchasesWithTypes, ...ordersWithTypes, ...transfersWithTypes];
+    // Sort by block_timestamp
+    allActivities.sort((a, b) => new Date(b.block_timestamp) - new Date(a.block_timestamp));
+
+    return allActivities;
+  };
+
+  /* ------------------------ User Activity Ends------------------------ */
 
 
   /* ------------------------ Stripe account connect starts here ------------------------ */
@@ -665,7 +768,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
   // //-----------------------------PAYMENT starts here -------------------------------
 
-  contract.paymentCheckout = async function (args, options = defaultOptions) {
+  contract.paymentCheckout = async function (originUrl, args, options = defaultOptions) {
     try {
 
       const { orderList, orderTotal: recievedOrderTotal } = args;
@@ -727,7 +830,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           orderDetail: invoices,
           accountId: sellerStripeDetails[0].accountId,
         }
-        stripePaymentSession = await axios.post(new URL('/stripe/checkout', STRIPE_PAYMENT_SERVER_URL).href, checkoutBody)
+        stripePaymentSession = await axios.post(new URL('/stripe/checkout', STRIPE_PAYMENT_SERVER_URL).href, checkoutBody, {
+          headers: {
+            'referer': `${originUrl}${options.config.marketplaceUiUrlPrefix}`
+          }
+        })
           .then(function (res) {
             if (res.status === 200) {
               return res.data;
@@ -873,6 +980,28 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching address: ${JSON.stringify(err)} `);
     }
   };
+
+  contract.getStratsBalance = async function (args, options = defaultOptions) {
+    const { userAddress } = args;
+    const getOptions = { ...options, org: "TestCompany", app: '' };
+    let address;
+
+    if (process.env.networkID === constants.prodNetworkId) {
+      address = constants.prodStratsAddress
+    } else if (process.env.networkID === constants.testnetNetworkId) {
+      address = constants.testnetStratsAddress
+    } else {
+      address = constants.testnetStratsAddress
+    }
+
+    const newArgs = {
+      address: address,
+      key: userAddress
+    }
+
+    const balance = await strats.getStratsBalance(rawAdmin, newArgs, getOptions);
+    return balance;
+  }
 
   return contract;
 };

@@ -14,8 +14,7 @@ services:
     - VAULT_PROXY_DEBUG=${VAULT_PROXY_DEBUG}
     - VAULT_URL=${VAULT_URL}
     - SENDGRID_APIKEY=${SENDGRID_APIKEY}
-    - userRegistryAddress=${userRegistryAddress}
-    - userTableName=${userTableName}
+    - cacheSize=${cacheSize}
     build: .
     image: ${IDENTTIYPROVIDER_IMAGE:-<REPO_URL>identity-provider:<VERSION>}
     restart: unless-stopped

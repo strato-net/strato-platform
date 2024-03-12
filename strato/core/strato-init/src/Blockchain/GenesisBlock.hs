@@ -43,6 +43,7 @@ import Blockchain.Generation
   )
 import Blockchain.Sequencer.Bootstrap (bootstrapSequencer)
 import Blockchain.Sequencer.Event (OutputBlock)
+import Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
 import qualified Blockchain.Strato.Indexer.IContext as IContext
 import qualified Blockchain.Strato.Indexer.Kafka as IdxKafka
@@ -70,14 +71,17 @@ import Control.Monad.IO.Class
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Char8 as C8
+import Data.Functor.Identity
 import qualified Data.Map as Map
 import Data.Map.Strict (Map)
+import qualified Data.Map.Ordered as OMap
 import Data.Maybe
 import qualified Data.Sequence as S
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Network.Kafka as K
 import qualified Network.Kafka.Protocol as KP
+import SolidVM.Model.CodeCollection (emptyCodeCollection)
 import System.Directory
 import Text.Format
 
@@ -249,9 +253,10 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
               A._transactionChainId = genesisChainId,
               A._transactionSender = Ac.Account (Ad.Address 0) genesisChainId,
               A._actionData =
-                Map.singleton a $
+                OMap.singleton (a,
                   A.ActionData
                     (codeHash d)
+                    emptyCodeCollection
                     ""
                     ""
                     ( case codeHash d of
@@ -263,7 +268,8 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
                         SolidVMDiff m -> A.SolidVMDiff $ Map.map fromDiff m
                         EVMDiff m -> A.EVMDiff $ Map.map fromDiff m
                     )
-                    [A.Create],
+                    Map.empty [] []
+                    [A.Create]),
               A._metadata =
                 getMetadata
                   ( case codeHash d of
@@ -296,8 +302,9 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
 
     forM_ (map (fromMaybe Map.empty . A._metadata) filteredActions) $ \md ->
       case (Map.lookup "src" md, Map.lookup "name" md) of
-        (Just src, Just n) ->
-          void $ produceVMEvents [CodeCollectionAdded src (SolidVMCode (T.unpack n) $ hash $ BC.pack $ T.unpack src) "" "" [] []]
+        (Just src, Just n) -> case runIdentity . runMemCompilerT $ compileSource False $ Map.singleton "" src of
+          Right cc -> void $ produceVMEvents [CodeCollectionAdded (const () <$> cc) (SolidVMCode (T.unpack n) $ hash $ BC.pack $ T.unpack src) "" "" [] Map.empty []]
+          Left _ -> pure ()
         _ -> return ()
 
     _ <- produceVMEvents $ map NewAction filteredActions

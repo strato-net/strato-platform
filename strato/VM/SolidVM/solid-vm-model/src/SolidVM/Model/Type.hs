@@ -8,6 +8,7 @@ module SolidVM.Model.Type where
 import Control.DeepSeq
 import Control.Lens (mapped, (&), (?~))
 import Data.Aeson
+import Data.Binary
 import Data.Int (Int32)
 import Data.Swagger
 import GHC.Generics
@@ -37,6 +38,8 @@ data Type
   | Mapping {dynamic :: Maybe Bool, key :: Type, value :: Type}
   | Variadic
   deriving (Eq, Show, Generic, NFData)
+
+instance Binary Type
 
 instance ToJSON Type where
   toJSON = genericToJSON typeAesonOptions {omitNothingFields = True}

@@ -49,6 +49,7 @@ import Control.Lens (makeLenses, mapped, (&), (?~))
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.Casing.Internal (dropFPrefix)
+import Data.Binary
 import Data.Map.Strict (Map)
 import Data.Source
 import Data.Swagger
@@ -60,6 +61,7 @@ import qualified SolidVM.Model.CodeCollection.VarDef as SolidVM
 import SolidVM.Model.SolidString
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
+import qualified Text.Colors as CL
 
 --------------------------------------------------------------------------------
 soliditySchemaOptions :: SchemaOptions
@@ -88,6 +90,8 @@ tRead "constant" = Just Constant
 tRead "view" = Just View
 tRead "payable" = Just Payable
 tRead _ = Nothing
+
+instance Binary StateMutability
 
 instance ToJSON StateMutability where
   toJSON = String . tShow
@@ -120,6 +124,8 @@ tShowVisibility Private = "private"
 tShowVisibility Public = "public"
 tShowVisibility Internal = "internal"
 tShowVisibility External = "external"
+
+instance Binary Visibility
 
 instance ToJSON Visibility where
   toJSON = String . tShowVisibility
@@ -156,9 +162,27 @@ data FuncF a = Func
     _funcIsFree :: Bool,
     _funcOverload :: [FuncF a]
   }
-  deriving (Eq, Show, Generic, Functor, NFData, Foldable, Traversable)
+  deriving (Eq, Generic, Functor, NFData, Foldable, Traversable)
+
+instance Show a => Show (FuncF a) where
+  show (Func {..}) =
+    (CL.underline "\nFunctionF")
+      ++ CL.magenta "\n_funcArgs\t" ++ show _funcArgs
+      ++ CL.magenta "\n_funcVals\t" ++ show _funcVals
+      ++ CL.magenta "\n_funcStateMutability\t" ++ show _funcStateMutability
+      ++ CL.magenta "\n_funcContents\t" ++ show _funcContents
+      ++ CL.magenta "\n_funcVisibility\t" ++ show _funcVisibility
+      ++ CL.magenta "\n_funcVirtual\t" ++ show _funcVirtual
+      ++ CL.magenta "\n_funcOverrides\t" ++ show _funcOverrides
+      ++ CL.magenta "\n_funcConstructorCalls\t" ++ show _funcConstructorCalls
+      ++ CL.magenta "\n_funcModifiers\t" ++ show _funcModifiers
+      ++ CL.magenta "\n_funcContext\t" ++ show _funcContext
+      ++ CL.magenta "\n_funcIsFree\t" ++ show _funcIsFree
+      ++ CL.magenta "\n_funcOverload\t" ++ show _funcOverload
 
 makeLenses ''FuncF
+
+instance Binary a => Binary (FuncF a)
 
 instance ToJSON a => ToJSON (FuncF a)
 
@@ -177,6 +201,8 @@ data ModifierF a = Modifier
 makeLenses ''ModifierF
 
 type Modifier = Positioned ModifierF
+
+instance Binary a => Binary (ModifierF a)
 
 instance ToJSON a => ToJSON (ModifierF a) where
   toJSON = genericToJSON (aesonPrefix camelCase)
@@ -197,6 +223,8 @@ data UsingF a = Using
 makeLenses ''UsingF
 
 type Using = Positioned UsingF
+
+instance Binary a => Binary (UsingF a)
 
 instance ToJSON a => ToJSON (UsingF a) where
   toJSON (Using dec typ ctx) =

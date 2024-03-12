@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import classNames from "classnames";
-import { EyeOutlined, DownOutlined, UpOutlined, FilterFilled, SearchOutlined } from "@ant-design/icons";
+import { EyeOutlined, DownOutlined, UpOutlined, DownloadOutlined, SearchOutlined } from "@ant-design/icons";
 import routes from "../../helpers/routes";
 import DataTableComponent from "../DataTableComponent";
 import { getStatus, getStatusByName } from "./constant";
@@ -10,7 +10,7 @@ import { actions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import useDebounce from "../UseDebounce";
 import { apiUrl, HTTP_METHODS, US_DATE_FORMAT } from "../../helpers/constants";
-import { Pagination, Button, Radio, Space, Typography, Input, DatePicker } from "antd";
+import { Pagination, Button, Dropdown, Space, Typography, Input, DatePicker } from "antd";
 import TagManager from "react-gtm-module";
 import "./ordersTable.css"
 import { FilterIcon } from "../../images/SVGComponents";
@@ -21,7 +21,7 @@ import RestStatus from "http-status-codes";
 import { Images } from "../../images";
 
 
-const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
+const BoughtOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrdersLoading }) => {
   const navigate = useNavigate();
   const params = useParams();
   const location = useLocation();
@@ -223,13 +223,33 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
       title: "Seller",
       dataIndex: "sellersCommonName",
       key: "sellersCommonName",
-      render: (text) => <p>{text}</p>,
+      // render: (text) => <p onClick={()=>{navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", text)}`, { state: { from: location.pathname } })}}>{text}</p>,
+      render: (text) => (
+        <a 
+          href={`${window.location.origin}/marketplace/profile/${encodeURIComponent(text)}`}
+          onClick={(e) => {
+            e.preventDefault();
+            const userProfileUrl = `/marketplace/profile/${encodeURIComponent(text)}`;
+      
+            if (e.ctrlKey || e.metaKey) {
+              // Open in a new tab if Ctrl/Cmd is pressed
+              window.open(`${window.location.origin}${userProfileUrl}`, '_blank');
+            } else {
+              // Use navigate for a normal click, without Ctrl/Cmd
+              navigate(routes.MarketplaceUserProfile.url.replace(':commonName',text), { state: { from: location.pathname } });
+            }
+          }}
+          style={{ textDecoration: 'underline', color: 'black', cursor: 'pointer' }}
+        >
+          {text}
+        </a>
+      ),
     },
     {
       title: "Order Total ($)",
       dataIndex: "orderTotal",
       key: "orderTotal",
-      render: (text) => <p>{text}</p>,
+      render: (text) => <p className="sm:w-20 lg:w-28 lg:pr-5 text-right">{text}</p>,
     },
     {
       dataIndex: "date",
@@ -342,6 +362,17 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
     const value = e.target.value;
     setSearch(value)
   }
+  
+  const menuItems = [
+    {
+      key: 'xls',
+      label: 'Excel',
+    },
+    {
+      key: 'csv',
+      label: 'CSV',
+    },
+  ];
 
   return (
     <div>
@@ -352,8 +383,21 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
           defaultValue={searchVal}
           prefix={<SearchOutlined />}
           placeholder="Search Bought Orders by Seller or Order #" />
+        <Dropdown
+          className="md:hidden customButton"
+          menu={{ items: menuItems, onClick: (e) => download(e.key) }}
+          disabled={isAllOrdersLoading}
+          trigger={['click']}
+        >
+          <Button loading={isAllOrdersLoading} className="h-[32px] w-[33px] rounded-md border border-[#6A6A6A] flex md:hidden justify-center items-center">
+            <Space>
+              <DownloadOutlined />
+            </Space>
+          </Button>
+        </Dropdown>
         <div className="text-xs flex items-center md:hidden">
           <DatePicker
+          className="h-[32px] w-[33px] custom-picker"
             disabledDate={(current) => {
               const currentDate = dayjs().startOf('day'); // Get the start of today
               const selectedDate = dayjs(current).startOf('day');
@@ -366,7 +410,7 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange }) => {
           />
         </div>
         <div className="relative">
-          <div onClick={() => setMDropdownVisible(!mDropdownVisible)} className="h-[30px] w-8 rounded-md border border-[#6A6A6A] flex md:hidden justify-center items-center">
+          <div onClick={() => setMDropdownVisible(!mDropdownVisible)} className="h-[32px] w-[33px] rounded-md border border-[#6A6A6A] flex md:hidden justify-center items-center">
             <FilterIcon />
           </div>
           {mDropdownVisible && <Sorting className="md:hidden flex flex-col gap-1 absolute right-0 top-10 w-max shadow-card_shadow z-[99999] bg-white sort_conatiner py-1" />}

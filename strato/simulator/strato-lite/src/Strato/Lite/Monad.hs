@@ -120,7 +120,6 @@ import Executable.EthereumVM2
 import Executable.StratoP2P
 import Executable.StratoP2PClient 
 import Executable.StratoP2PServer (runEthServerConduit)
-import Ki.Unlifted as KIU
 import Network.Socket
 import Text.Read (readMaybe)
 import UnliftIO
@@ -597,36 +596,6 @@ instance HasVault (ReaderT PrivateKey IO) where
   sign bs = ask >>= \pk -> return $ signMsg pk bs
   getPub = error "called getPub, but this should never happen"
   getShared _ = error "called getShared, but this should never happen"
-
-instance MonadIO m => (Keccak256 `A.Alters` (A.Proxy (Inbound WireMessage))) (MonadTest m) where
-  lookup _ k = do
-    wms <- use pbftMessages
-    pure $ if S.member k wms then Just (A.Proxy @(Inbound WireMessage)) else Nothing
-  insert _ k _ =
-    pbftMessages
-      %= ( \wms ->
-             let s = S.size wms
-                 wms' = if s >= 2000 then S.delete (head $ toList wms) wms else wms
-              in wms' S.>| k
-         )
-  delete _ k = pbftMessages %= S.delete k
-
-instance (Keccak256 `A.Alters` (A.Proxy (Inbound WireMessage))) m => (Keccak256 `A.Alters` (A.Proxy (Inbound WireMessage))) (MonadP2PTest m) where
-  lookup p k = lift $ A.lookup p k
-  insert p k v = lift $ A.insert p k v
-  delete p k = lift $ A.delete p k
-
-instance MonadIO m => ((Text, Keccak256) `A.Alters` (A.Proxy (Outbound WireMessage))) (MonadP2PTest m) where
-  lookup _ k = do
-    wms <- use outboundPbftMessages
-    pure $ if S.member k wms then Just (A.Proxy @(Outbound WireMessage)) else Nothing
-  insert _ k _ = do
-    wms <- use outboundPbftMessages
-    let s = S.size wms
-        wms' = if s >= 2000 then S.delete (head $ toList wms) wms else wms
-        wms'' = wms' S.>| k
-    assign outboundPbftMessages wms''
-  delete _ k = outboundPbftMessages %= S.delete k
 
 getMemContext :: MonadIO m => MonadTest m MemContext
 getMemContext = asks _p2pTestContext >>= fmap _vmContext . readTVarIO
@@ -1586,9 +1555,8 @@ makeLenses ''P2PConnection
 createConnection ::
   P2PPeer ->
   P2PPeer ->
-  Scope ->
   IO P2PConnection
-createConnection server' client' scp = do
+createConnection server' client' = do
   serverToClientTQueue <- newTQueueIO
   clientToServerTQueue <- newTQueueIO
   serverSeqSource <- atomically . dupTMChan $ _p2pPeerSeqP2pSource server'
@@ -1603,14 +1571,12 @@ createConnection server' client' scp = do
                   (sinkTQueue serverToClientTQueue)   
                   (sourceTMChan serverSeqSource .| (awaitForever $ either (const $ pure ()) yield))
                   ("Me: " ++ _p2pPeerName server' ++ ", Them: " ++ _p2pPeerName client')
-                  scp
   let rClient = runEthClientConduit         
                   (_p2pPeerPPeer server')   
                   (sourceTQueue serverToClientTQueue)
                   (sinkTQueue clientToServerTQueue)
                   (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
                   ("Me: " ++ _p2pPeerName client' ++ ", Them: " ++ _p2pPeerName server')
-                  scp
   pure $
     P2PConnection
       serverToClientTQueue
@@ -1625,9 +1591,8 @@ createConnection server' client' scp = do
 createGermophobicConnection ::
   P2PPeer ->
   P2PPeer ->
-  Scope ->
   IO P2PConnection
-createGermophobicConnection server' client' scp = do
+createGermophobicConnection server' client' = do
   serverToClientTQueue <- newTQueueIO
   clientToServerTQueue <- newTQueueIO
   clientSeqSource <- atomically . dupTMChan $ _p2pPeerSeqP2pSource client'
@@ -1642,7 +1607,6 @@ createGermophobicConnection server' client' scp = do
                   (sinkTQueue clientToServerTQueue)
                   (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
                   ("Me: " ++ _p2pPeerName client' ++ ", Them: " ++ _p2pPeerName server')
-                  scp
   pure $
     P2PConnection
       serverToClientTQueue
@@ -1790,8 +1754,7 @@ addConnection serverLabel clientLabel = do
     Nothing -> pure False
     Just (server', client') ->
       liftIO $ do
-        connection <- scoped $ \scope ->
-                        createConnection server' client' scope
+        connection <- createConnection server' client'
         a <- async $ runConnection connection
         atomically $ modifyTVar (mgr ^. threads) $ connectionThreads . at (serverLabel, clientLabel) ?~ a
         pure True
@@ -1847,8 +1810,7 @@ runNetworkWithStaticConnections nodesList connectionsList validatorsFilter = do
   eConnections <- runExceptT . for connectionsList $ \(server', client') -> do
     serverPeer <- maybeToExceptT ("Couldn't find server " <> server') . MaybeT . pure $ M.lookup server' nodesMap
     clientPeer <- maybeToExceptT ("Couldn't find client " <> client') . MaybeT . pure $ M.lookup client' nodesMap
-    liftIO $ scoped $ \scope  ->
-      createConnection serverPeer clientPeer scope
+    liftIO $ createConnection serverPeer clientPeer
   for eConnections $ \connections' -> do
     let connectionsMap = M.fromList $ zip connectionsList connections'
         network' = Network nodesMap connectionsMap inet

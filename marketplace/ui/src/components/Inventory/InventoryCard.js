@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Card, Popover, Button, Typography } from "antd";
+import { Card, Popover, Button, Typography, Tooltip } from "antd";
 import {
   DollarOutlined,
   MoreOutlined,
@@ -23,7 +23,7 @@ import image_placeholder from "../../images/resources/image_placeholder.png";
 import { getUnitNameByIndex } from "../../helpers/constants";
 import "react-responsive-carousel/lib/styles/carousel.min.css";
 
-const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentProviderAddress, allSubcategories }) => {
+const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentProviderAddress, allSubcategories, limit, offset }) => {
   const [openPop, setOpenPop] = useState(false);
   const [open, setOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -251,17 +251,28 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
     <div className=" p-3 md:p-[18px] border border-[#BABABA] md:border-[#E9E9E9] rounded-lg sm:w-[343px] md:w-full  ">
       <div className="bg-[#F2F2F9] rounded-md px-[14px] flex justify-between items-center pb-[13px] pt-2 w-full">
         <div>
-        <p className="text-lg lg:text-xl font-semibold text-[#202020] cursor-default" onClick={callDetailPage}>{inventory?.name || "N/A"}</p>
-        <Typography className="pt-1">{`(${getCategory()})`}</Typography>
+          <p className="text-lg lg:text-xl font-semibold text-[#202020] cursor-default" onClick={callDetailPage}>
+            {/* {inventory?.name || "N/A"} */}
+            <Tooltip title={inventory?.name.length > 20 ? inventory?.name : null}>
+              <span className=" whitespace-nowrap max-w-[160px] inline-block">
+                {inventory?.name.length > 20 ? `${inventory?.name.slice(0, 20)}...` : `${inventory?.name}`}
+              </span>
+            </Tooltip>
+          </p>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <Typography className="pt-1">{`(${getCategory()})`}</Typography>
+            {inventory?.contract_name.toLowerCase().includes("clothing") && (
+              <Typography className='pt-1'>{'Size: ' + inventory?.data?.size || "N/A"}</Typography>
+            )}
+          </div>
         </div>
         <div className=" pt-[5px]  flex">
           
           <div className="flex  items-center">
           <Button type="link" className="text-[#13188A] font-semibold text-base h-6 mb-2" onClick={callDetailPage}>Preview</Button>
 
-          {((itemData.isMint === "True" && inventory.quantity === 0) || inventory.quantity > 0) &&
-          
-            <Popover
+        {((itemData.isMint === "True" && inventory.quantity === 0) || inventory.quantity > 0) &&
+           <Popover
             placement="bottomLeft"
             open={openPop}
             className=""
@@ -359,13 +370,13 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
        
         <div className="flex flex-col gap-4 px-[18px] py-4 border border-[#E9E9E9] rounded-md w-full ">
           <div className="flex justify-between  ">
-            <p className="text-[#6A6A6A]">Sub Category</p>
-            <p className="text-[#202020] font-semibold">{getCategory() || "N/A"}</p>
-          </div> <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity Owned</p>
             <p className="text-[#202020] font-semibold">{inventory.quantity || "N/A"}</p>
           </div> <div className="flex justify-between  ">
-            <p className="text-[#6A6A6A]">Quantity for Sale </p>
+            <p className="text-[#6A6A6A]">Quantity Available for Sale </p>
+            <p className="text-[#202020] font-semibold">{(inventory.quantity - (inventory.totalLockedQuantity ? inventory.totalLockedQuantity : 0)) || "N/A"}</p>
+          </div> <div className="flex justify-between  ">
+            <p className="text-[#6A6A6A]">Quantity Listed for Sale</p>
             <p className="text-[#202020] font-semibold">{inventory.saleQuantity || "N/A"}</p>
           </div>
           <div className="flex justify-between  ">
@@ -560,6 +571,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
         <UpdateInventoryModal
           open={editModalOpen}
           handleCancel={handleEditModalClose}
+          limit={limit}
+          offset={offset}
           debouncedSearchTerm={debouncedSearchTerm}
           inventoryToUpdate={{
             inventory: inventory,
@@ -572,6 +585,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
         <ListForSaleModal
           open={listModalOpen}
           handleCancel={handleListModalClose}
+          limit={limit}
+          offset={offset}
           inventory={inventory}
           paymentProviderAddress={paymentProviderAddress}
           categoryName={category}
@@ -581,6 +596,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
         <UnlistModal
           open={unlistModalOpen}
           handleCancel={handleUnlistModalClose}
+          limit={limit}
+          offset={offset}
           inventory={inventory}
           saleAddress={inventory.saleAddress}
           categoryName={category}
@@ -590,6 +607,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
         <ResellModal
           open={resellModalOpen}
           handleCancel={handleResellModalClose}
+          limit={limit}
+          offset={offset}
           inventory={inventory}
           categoryName={category}
           
@@ -599,6 +618,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
         <TransferModal
           open={transferModalOpen}
           handleCancel={handleTransferModalClose}
+          limit={limit}
+          offset={offset}
           inventory={inventory}
           categoryName={category}
         />

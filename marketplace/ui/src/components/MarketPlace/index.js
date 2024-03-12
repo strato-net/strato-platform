@@ -1,4 +1,4 @@
-import { Button, Image, Typography, Spin } from "antd";
+import { Button, Image, Typography, Spin, notification } from "antd";
 import CategoryCard from "./CategoryCard";
 import TopSellingProductCard from "./TopSellingProductCard";
 import { Images } from "../../images";
@@ -11,12 +11,48 @@ import routes from "../../helpers/routes";
 import "react-responsive-carousel/lib/styles/carousel.min.css";
 import { Carousel } from "react-responsive-carousel";
 
-const MarketPlace = () => {
+const MarketPlace = ({ user, isAuthenticated }) => {
   const limit = 10, offset = 0;
   const navigate = useNavigate();
   const dispatch = useCategoryDispatch();
   const debouncedSearchTerm = useDebounce("", 1000);
   const { iscategorysLoading } = useCategoryState();
+  
+  useEffect(() => {
+    if (isAuthenticated) {
+      const loginCount = localStorage.getItem('loginCount');
+      // If loginCount is not set, it means this is the first login
+      if (!loginCount) {
+        // Show the notification
+        notification.open({
+          description: 'Click here to review some updates on your Assets and Orders!',
+          icon: null,
+          btn: (
+            <Button
+              type="primary"
+              onClick={() => navigateToUserProfile()}
+              style={{
+                borderRadius: '20px', 
+                color: '#fff',
+              }}
+            >
+              Explore now
+            </Button>
+          ),
+          placement: 'bottomRight',
+          style: {
+            borderRadius: '12px',
+          },
+        });
+        // Set loginCount to 1 to indicate the user has logged in at least once
+        localStorage.setItem('loginCount', '1');
+      }
+    }
+  }, [isAuthenticated, navigate]);
+
+  const navigateToUserProfile = () => {
+    navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", user.commonName)}?tab=my-activity`);
+  };
 
   useEffect(() => {
     actions.fetchCategories(dispatch, limit, offset, debouncedSearchTerm);

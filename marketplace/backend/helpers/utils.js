@@ -364,7 +364,7 @@ export const setSearchQueryOptionsLike = (args = {}, _queryOptionsArray) => {
 }
 
 export const searchAllWithQueryArgs = async (contractName, args, options, user) => {
-  const nonQueryOptions = ['queryValue', 'queryFields', 'queryOptions', 'limit', 'offset', 'sort', 'range', 'gteField', 'gteValue', 'lteField', 'lteValue', 'notEqualsField', 'notEqualsValue']
+  const nonQueryOptions = ['queryValue', 'queryFields', 'queryOptions', 'limit', 'offset', 'sort', 'range', 'gtField', 'gtValue', 'gteField', 'gteValue', 'ltField', 'ltValue', 'lteField', 'lteValue', 'notEqualsField', 'notEqualsValue']
   const queryArgs = setSearchQueryOptions(args, Object.keys(args).reduce((result, key) => {
     if (!nonQueryOptions.includes(key) && key != 'category' && key != 'subCategory' && key != 'isMint') {
       if (Array.isArray(args[key])) {
@@ -399,6 +399,16 @@ export const searchAllWithQueryArgs = async (contractName, args, options, user) 
           result.push({ key: queryFields, value: `*${queryValue}*`, predicate: 'ilike' })
         }
       }
+    }
+
+    if (key === 'gtValue') {
+      const { gtField, gtValue } = args
+       result.push({ key: gtField, value: gtValue, predicate: 'gt' });
+    }
+
+    if (key === 'ltValue') {
+      const { ltField, ltValue } = args
+      result.push({ key: ltField, value: ltValue, predicate: 'lt' });
     }
 
     if (key === 'gteValue') {
@@ -462,17 +472,6 @@ export const setSearchColumns = (args, _columns) => {
     },
   }
   return searchArgs
-}
-
-/**
- * @param {string} name of the variable to be fetched from env
- * @returns {string} variable value
- */
-
-export function getEnvVariable(name) {
-  const value = process.env[name] || ''
-  if (value == '') throw new Error("missing env var for " + name);
-  return value
 }
 
 export const pollingHelper = async (func, argsToFunc, attemptNumber = 0, attemptsAllowed = 8, milliseconds = 1000) => {

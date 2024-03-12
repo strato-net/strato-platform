@@ -16,6 +16,7 @@ import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.Gregor
 import Blockchain.Sequencer.Monad
 import Blockchain.Strato.Model.ChainMember
+import Blockchain.Strato.Model.Options (flags_network)
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async as Async
 import Control.Concurrent.STM

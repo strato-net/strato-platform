@@ -19,6 +19,7 @@ module Handlers.Metadata
     getMetaDataClient,
     MetadataResponse,
     server,
+    UrlMap,
   )
 where
 
@@ -27,6 +28,7 @@ import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
+import Blockchain.Strato.Model.Options (computeNetworkID)
 import Blockchain.Strato.Model.Secp256k1 hiding (HasVault (..))
 import Blockchain.Strato.RedisBlockDB (getSyncStatusNow, runStratoRedisIO)
 import Control.Lens
@@ -35,6 +37,7 @@ import Control.Monad.Composable.SQL
 import Control.Monad.Composable.Vault
 import Data.Aeson hiding (Success)
 import Data.Aeson.Casing.Internal (camelCase, dropFPrefix)
+import Data.Map (Map, fromList)
 import Data.Maybe (fromJust, fromMaybe)
 import Data.Swagger hiding (url)
 import qualified Database.Esqueleto.Legacy as E
@@ -48,12 +51,16 @@ import qualified Strato.Strato23.API.Types as V
 import Strato.Strato23.Client hiding (verifyPassword)
 import UnliftIO
 
+type UrlMap = Map String String
+
 data MetadataResponse = MetadataResponse
   { nodePubKey :: V.PublicKey,
     nodeAddress :: Address,
     validators :: [ChainMemberParsedSet],
     isSynced :: Bool,
-    isVaultPasswordSet :: Bool
+    isVaultPasswordSet :: Bool,
+    networkID :: String, -- cuz JSON can't rep integers > 2^53
+    urls :: UrlMap
   }
   deriving (Eq, Show, Generic, FromJSON, ToJSON)
 
@@ -62,7 +69,7 @@ type API = "metadata" :> Get '[JSON] MetadataResponse
 getMetaDataClient :: ClientM MetadataResponse
 getMetaDataClient = client (Proxy @API)
 
-server :: (HasVault m, MonadLogger m, HasSQL m) => ServerT API m
+server :: (HasVault m, MonadLogger m, HasSQL m, Accessible UrlMap m) => ServerT API m
 server = getMetaData
 
 instance HasSQL m => Accessible [ChainMemberParsedSet] m where
@@ -85,6 +92,8 @@ exMetadataRespone =
         [CommonName "BlockApps" "Engineering" "Admin" True]
         True
         True
+        "0"
+        (fromList [("vault", "http://vault.com")])
 
 -- | The model's field modifiers will match the JSON instances
 metadataSchemaOptions :: SchemaOptions
@@ -101,6 +110,7 @@ getMetaData ::
   ( MonadLogger m,
     HasVault m,
     Accessible [ChainMemberParsedSet] m,
+    Accessible UrlMap m,
     HasSQL m
   ) =>
   m MetadataResponse
@@ -109,7 +119,8 @@ getMetaData =
     validators <- access (Proxy @[ChainMemberParsedSet])
     isSynced <- checkIsSynced
     V.AddressAndKey a k <- getPubKeyAndAddress
-    pure $ MetadataResponse k a validators isSynced True
+    urlMap <- access (Proxy @UrlMap)
+    pure $ MetadataResponse k a validators isSynced True (show computeNetworkID) urlMap
 
 blocVaultWrapper ::
   (MonadIO m, MonadLogger m, HasVault m, HasCallStack) =>

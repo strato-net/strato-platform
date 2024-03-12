@@ -33,6 +33,7 @@ import Blockchain.Data.DataDefs
 import Blockchain.Data.GenesisInfo
 import Blockchain.Data.RLP
 import Blockchain.Database.MerklePatricia
+import Blockchain.SolidVM.CodeCollectionDB
 import Blockchain.Strato.Model.Account
 import qualified Blockchain.Strato.Model.Address as Ad
 import Blockchain.Strato.Model.ExtendedWord
@@ -50,7 +51,9 @@ import Control.Monad.Change.Modify
 import Control.Monad.IO.Class
 import Crypto.Util (i2bs_unsized)
 import Data.ByteString as BS hiding (map, zip)
+import qualified Data.Map.Ordered as OMap
 import qualified Data.ByteString.Lazy.Char8 as BLC
+import Data.Functor.Identity
 import Data.List.Split (chunksOf)
 import qualified Data.Map as Map
 import Data.Maybe (catMaybes, fromMaybe)
@@ -59,6 +62,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Data.Time.Clock.POSIX
 import Numeric
+import SolidVM.Model.CodeCollection (emptyCodeCollection)
 import Text.Format
 
 initializeBlankStateDB ::
@@ -337,7 +341,9 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo {..} _) org app = do
         resolveCodePtr chainId cp >>= \case
           Just (SolidVMCode name ch) ->
             fmap (T.decodeUtf8' . snd) <$> getCode ch >>= \case
-              Just (Right src) -> void $ produceVMEvents [CodeCollectionAdded src (SolidVMCode name ch) org app [] []]
+              Just (Right src) -> case runIdentity . runMemCompilerT $ compileSource False $ Map.singleton "" src of
+                Right cc -> void $ produceVMEvents [CodeCollectionAdded (const () <$> cc) (SolidVMCode name ch) org app [] Map.empty []]
+                Left _ -> pure ()
               _ -> pure ()
           _ -> pure ()
   forM_ accountInfo $ \case
@@ -368,9 +374,10 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo {..} _) org app = do
               A._transactionChainId = chainId,
               A._transactionSender = Account (Ad.Address 0) chainId,
               A._actionData =
-                Map.singleton a $
+                OMap.singleton (a,
                   A.ActionData
                     (codeHash d)
+                    emptyCodeCollection
                     ""
                     ""
                     vm
@@ -378,7 +385,8 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo {..} _) org app = do
                         EVMDiff m -> A.EVMDiff $ Map.map fromDiff m
                         SolidVMDiff m -> A.SolidVMDiff $ Map.map fromDiff m
                     )
-                    [A.Create],
+                    Map.empty [] []
+                    [A.Create]),
               A._metadata = getMetadata ch,
               A._events = S.empty,
               A._delegatecalls = S.empty

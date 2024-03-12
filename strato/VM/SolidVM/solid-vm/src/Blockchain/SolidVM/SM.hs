@@ -54,6 +54,11 @@ module Blockchain.SolidVM.SM
     addEvent,
     addDelegatecall,
     getCodeAndCollection,
+    getContractsForParents,
+    getAbstractParentsFromContract,
+    getMapNamesFromContract,
+    getArrayNamesFromContract,
+    resolveNameParts
   )
 where
 
@@ -64,6 +69,7 @@ import BlockApps.X509.Certificate
 import Blockchain.DB.CodeDB
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.RawStorageDB
+import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockSummary
@@ -99,6 +105,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.UTF8 as UTF8
 import Data.Map (Map)
+import qualified Data.Map.Ordered as OMap
 import qualified Data.Map as M
 import Data.Maybe
 import qualified Data.NibbleString as N
@@ -157,7 +164,7 @@ data SState = SState
   { env :: Env.Environment,
     callStack :: [CallInfo],
     _ssMemDBs :: MemDBs,
-    _action :: Action,
+    _action :: !Action,
     _gasInfo :: GasInfo
   }
 
@@ -407,7 +414,7 @@ startingAction maybeCode env' chainId' =
       _transactionHash = Env.txHash env',
       _transactionChainId = chainId',
       _transactionSender = Env.sender env',
-      _actionData = M.empty,
+      _actionData = OMap.empty,
       _metadata =
         case maybeCode of
           Just theCode ->
@@ -869,20 +876,40 @@ getXabiValueType (AccountPath loc path) = do
               (_, ContractTypo {}) -> todo "getValueType/contract access" t'
               (_, EnumTypo {}) -> todo "getValueType/enum acess" t'
       t'' -> t''
-    loop ccs (_ : rs) = \case
+    loop ccs (x : rs) = \case
       SVMType.Mapping {SVMType.value = t'} -> loop ccs rs t'
       SVMType.Array {SVMType.entry = t'} -> loop ccs rs t'
+      SVMType.UnknownLabel s _ ->
+        let t' = getTypeOfName' s ccs
+         in case (x, t') of
+              (MS.Field n, StructTypo fs) ->
+                let mt'' = lookup (textToLabel $ decodeUtf8 n) fs
+                 in case mt'' of
+                      Just t'' -> loop ccs rs $ CC.fieldTypeType t''
+                      Nothing -> missingField "field not present in struct definition" $ show (n, fs)
+              (_, StructTypo {}) -> typeError "non field access to struct" x
+              (_, ContractTypo {}) -> todo "getValueType/contract access" t'
+              (_, EnumTypo {}) -> todo "getValueType/enum acess" t'
       t -> todo "getXabiValueType/loopnext unsupported type" t
 
 getValueType :: MonadSM m => AccountPath -> m BasicType
 getValueType p = hintFromType =<< getXabiValueType p
 
-initializeAction :: MonadSM m => Account -> String -> String -> Keccak256 -> m ()
-initializeAction acct name appName hsh = do
+initializeAction :: MonadSM m
+                 => Account
+                 -> String
+                 -> String
+                 -> Keccak256
+                 -> CC.CodeCollection
+                 -> Map (Account, T.Text) (T.Text, T.Text)
+                 -> [T.Text]
+                 -> [T.Text]
+                 -> m ()
+initializeAction acct name appName hsh cc ab maps arrs = do
   -- org name to be set later, b/c the lookup is complex
-  let newData = Action.ActionData (SolidVMCode name hsh) "" (T.pack appName) SolidVM (Action.SolidVMDiff M.empty) []
+  let newData = Action.ActionData (SolidVMCode name hsh) cc "" (T.pack appName) SolidVM (Action.SolidVMDiff M.empty) ab maps arrs []
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    Action.actionData %= M.insertWith Action.mergeActionData acct newData
+    Action.actionData %= Action.omapInsertWith Action.mergeActionData acct newData
 
 markDiffForAction :: Mod.Modifiable Action m => Account -> MS.StoragePath -> MS.BasicValue -> m ()
 markDiffForAction owner key' val' = do
@@ -892,7 +919,7 @@ markDiffForAction owner key' val' = do
         Action.SolidVMDiff m -> Action.SolidVMDiff $ M.insert key val m
         e -> internalError "SolidVM Diff executing in EVM" $ show e
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    Action.actionData . at owner . mapped . Action.actionDataStorageDiffs %= ins
+    Action.actionData . Action.omapLens owner . mapped . Action.actionDataStorageDiffs %= ins
 
 addEvent :: Mod.Modifiable (Q.Seq Event) m => Event -> m ()
 addEvent newEvent = Mod.modify_ (Mod.Proxy @(Q.Seq Event)) $ pure . (Q.|> newEvent)
@@ -922,8 +949,8 @@ getCodeAndCollection address' = do
           (current' : _) -> Just $ currentAccount current'
           _ -> Nothing
 
-  $logDebugS "getCodeAndCollection" . T.pack $ "----------------- caller address: " ++ fromMaybe "Nothing" (fmap format maybeAddress)
-  $logDebugS "getCodeAndCollection" . T.pack $ "----------------- callee address: " ++ format address'
+  -- $logDebugS "getCodeAndCollection" . T.pack $ "----------------- caller address: " ++ fromMaybe "Nothing" (fmap format maybeAddress)
+  -- $logDebugS "getCodeAndCollection" . T.pack $ "----------------- callee address: " ++ format address'
   if Just address' == maybeAddress
     then do
       c' <- getCurrentContract
@@ -944,3 +971,63 @@ getCodeAndCollection address' = do
       let !contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc ^. CC.contracts
 
       return (contract', ch, cc)
+
+getContractsForParents :: [SolidString] -> M.Map SolidString (CC.ContractF a) -> [CC.ContractF a]
+getContractsForParents parents' cc =
+  let getContractForParent parent = M.lookup parent cc
+   in mapMaybe getContractForParent parents'
+
+getAbstractParentsFromContract :: CC.Contract -> CC.CodeCollection -> [CC.Contract]
+getAbstractParentsFromContract c cc =
+  -- recursively obtain parent + grandparent contracts
+  -- ex. B is A, C is B, then C should also be A
+  let go [] = []
+      go xs = xs ++ (go $ getContractsForParents (concatMap (CC._parents) xs) ccc)
+      ccc = CC._contracts cc
+      parents' = CC._parents c
+   in filter ((== CC.AbstractType) . CC._contractType) (go $ getContractsForParents parents' ccc)
+
+getMapNamesFromContract :: CC.Contract -> [T.Text]
+getMapNamesFromContract c =
+  let storageDefs' = c ^. CC.storageDefs
+      storageDefsList = M.toList storageDefs'
+      listOfMappings = filter (\(_, vd) -> case (CC._varType vd) of SVMType.Mapping _ _ _ -> True; _ -> False) storageDefsList
+      listOfMappingsWithRecords = filter (\(_, vd) -> CC._isRecord vd) listOfMappings
+   in T.pack . fst <$> listOfMappingsWithRecords
+
+getArrayNamesFromContract :: CC.Contract -> [T.Text]
+getArrayNamesFromContract c =
+  let storageDefs' = c ^. CC.storageDefs
+      storageDefsList = M.toList storageDefs'
+      listOfArrays = filter (\(_, vd) -> case (CC._varType vd) of SVMType.Array _ _ -> True; _ -> False) storageDefsList
+      listOfArraysWithRecords = filter (\(_, vd) -> CC._isRecord vd) listOfArrays
+   in T.pack . fst <$> listOfArraysWithRecords
+
+resolveNameParts ::
+  MonadSM m =>
+  Account ->
+  T.Text ->
+  T.Text ->
+  CC.Contract ->
+  m ((Account, T.Text), (T.Text, T.Text))
+resolveNameParts to' o a c = do
+  let tName = T.pack . CC._contractName
+  case c ^. CC.importedFrom of
+    Nothing -> pure ((to', tName c), (o, a))
+    Just acct ->
+      A.select (A.Proxy @AddressState) acct >>= \case
+        Nothing -> do
+          $logWarnS "processTheMessages/resolveNameParts" . T.pack $
+            "Could not find address state for account " ++ show acct
+          pure ((acct, tName c),(o, a))
+        Just s ->
+          resolveCodePtr (acct ^. accountChainId) (addressStateCodeHash s) >>= \case
+            Just (SolidVMCode appName _) -> do
+              appCreator <- getSolidStorageKeyVal' acct $ MS.StoragePath [MS.Field ":creator"]
+              case appCreator of
+                MS.BString org' -> pure ((acct, tName c), (T.pack $ BC.unpack org', T.pack appName))
+                _ -> pure ((acct, tName c),("", T.pack appName))
+            _ -> do
+              $logWarnS "resolveNameParts" . T.pack $
+                "Could not resolve code for account " ++ show acct
+              pure ((acct, tName c),(o, a))

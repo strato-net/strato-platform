@@ -39,7 +39,10 @@ const actionDescriptors = {
   fetchUserAddressFailed: "fetch_user_address_failed",
   fetchUserAddresses: "fetch_user_addresses",
   fetchUserAddressesSuccessful: "fetch_user_addresses_successful",
-  fetchUserAddressesFailed: "fetch_user_addresses_failed"
+  fetchUserAddressesFailed: "fetch_user_addresses_failed",
+  fetchStratsBalance: "fetch_strats_balance",
+  fetchStratsBalanceSuccessful: "fetch_strats_balance_successful",
+  fetchStratsBalanceFailed: "fetch_strats_balance_failed"
 };
 
 const actions = {
@@ -137,8 +140,8 @@ const actions = {
     dispatch,
     categorys,
     subCategorys,
-    products,
-    manufacturers,
+    // products,
+    // manufacturers,
     minPrice,
     maxPrice,
     search
@@ -151,11 +154,11 @@ const actions = {
       ? `&subCategory[]=${subCategorys}`
       : "";
 
-    const manufacturerQuery = manufacturers
-      ? `&manufacturer[]=${manufacturers}`
-      : "";
+    // const manufacturerQuery = manufacturers
+    //   ? `&manufacturer[]=${manufacturers}`
+    //   : "";
 
-    const productIdQuery = products ? `&name[]=${products}` : "";
+    // const productIdQuery = products ? `&name[]=${products}` : "";
     const searchQuery = search
       ? `&queryValue=${search}&queryFields=name`
       : "";
@@ -164,7 +167,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace?${priceQuery}${categoryQuery}${subCategoryQuery}${productIdQuery}${manufacturerQuery}${searchQuery}`,
+        `${apiUrl}/marketplace?${priceQuery}${categoryQuery}${subCategoryQuery}${searchQuery}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -207,8 +210,8 @@ const actions = {
     dispatch,
     categorys,
     subCategorys,
-    products,
-    manufacturers,
+    // products,
+    // manufacturers,
     minPrice,
     maxPrice,
     search
@@ -221,20 +224,20 @@ const actions = {
       ? `&subCategory[]=${subCategorys}`
       : "";
 
-    const manufacturerQuery = manufacturers
-      ? `&manufacturer[]=${manufacturers}`
-      : "";
+    // const manufacturerQuery = manufacturers
+    //   ? `&manufacturer[]=${manufacturers}`
+    //   : "";
 
-    const productIdQuery = products ? `&name[]=${products}` : "";
+    // const productIdQuery = products ? `&name[]=${products}` : "";
     const priceQuery = `&range[]=price,${minPrice},${maxPrice}`;
     // const sortLatest = "&order=createdDate.desc"
     const searchQuery = search
-    ? `&queryValue=${search}&queryFields=name`
-    : "";
+      ? `&queryValue=${search}&queryFields=name`
+      : "";
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace/all?${priceQuery}${categoryQuery}${subCategoryQuery}${productIdQuery}${manufacturerQuery}${searchQuery}`,
+        `${apiUrl}/marketplace/all?${priceQuery}${categoryQuery}${subCategoryQuery}${searchQuery}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -279,7 +282,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace/topselling?offset=${offset}&limit=${limit}`,
+        `${apiUrl}/marketplace/topselling?offset=${offset}&limit=${limit}&gtField=quantity&gtValue=0`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -317,7 +320,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace/user/topselling?offset=${offset}&limit=${limit}`,
+        `${apiUrl}/marketplace/user/topselling?offset=${offset}&limit=${limit}&gtField=quantity&gtValue=0`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -370,7 +373,7 @@ const actions = {
           type: actionDescriptors.addShippingAddressSuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, "Shipping address added successfully", true);
+        actions.setMessage(dispatch, "Address added successfully", true);
         return body.data;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
@@ -495,6 +498,33 @@ const actions = {
         error: undefined,
       });
       actions.setMessage(dispatch, "Error while getting Shipping address");
+    }
+  },
+  fetchStratsBalance: async (dispatch) => {
+    dispatch({ type: actionDescriptors.fetchStratsBalance });
+    try {
+      let response = await fetch(`${apiUrl}/marketplace/strats`, {
+        method: HTTP_METHODS.GET,
+        credentials: "same-origin",
+      });
+      const body = await response.json();
+      if (response.status === RestStatus.UNAUTHORIZED || response.status === RestStatus.FORBIDDEN) {
+        dispatch({
+          type: actionDescriptors.fetchStratsBalanceFailed,
+          payload: "Error while fetching STRATS",
+        });
+        return;
+      }
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchStratsBalanceSuccessful,
+          payload: body.data
+        });
+        return;
+      }
+      dispatch({ type: actionDescriptors.fetchStratsBalanceFailed, payload: "Error while fetching STRATS" });
+    } catch (err) {
+      dispatch({ type: actionDescriptors.fetchStratsBalanceFailed, payload: "Error while fetching STRATS" });
     }
   },
 

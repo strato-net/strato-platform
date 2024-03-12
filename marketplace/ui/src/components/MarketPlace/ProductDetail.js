@@ -11,6 +11,7 @@ import {
   InputNumber,
   List,
 } from "antd";
+import { HeartTwoTone, HeartFilled } from '@ant-design/icons';
 import { useMatch } from "react-router-dom";
 import { actions } from "../../contexts/inventory/actions";
 import {
@@ -21,10 +22,12 @@ import routes from "../../helpers/routes";
 //categories
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { actions as marketPlaceActions } from "../../contexts/marketplace/actions";
+import { actions as orderActions } from "../../contexts/order/actions"
 import {
   useMarketplaceDispatch,
   useMarketplaceState,
 } from "../../contexts/marketplace";
+import { useOrderDispatch } from "../../contexts/order";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
 import { useNavigate, useLocation } from "react-router-dom";
 //Items - ownership history
@@ -39,6 +42,7 @@ import "react-responsive-carousel/lib/styles/carousel.min.css"; // requires a lo
 import { Carousel } from "react-responsive-carousel"
 import { Images } from "../../images";
 import ProductItemDetails from "./ProductItemDetails";
+import PreviewMode from "../RichEditor/PreviewMode";
 
 const ProductDetails = ({ user, users }) => {
   const { state, pathname } = useLocation();
@@ -58,10 +62,15 @@ const ProductDetails = ({ user, users }) => {
   const { Text, Paragraph } = Typography;
   const [Id, setId] = useState(undefined);
   const [itemData, setItemData] = useState({});
+  // For Wishlist Icon Rendering
+  const [isWishlisted, setIsWishlisted] = useState(false);
   const [availableQuantity, setAvailableQuantity] = useState(1);
+  const shouldShowWishlistIcon = isAuthenticated && user;
+
   const [qty, setQty] = useState(1);
   const dispatch = useInventoryDispatch();
   const categoryDispatch = useCategoryDispatch();
+  const orderDispatch = useOrderDispatch();
   const [categoryName, setCategoryName] = useState("");
   const [api, contextHolder] = notification.useNotification();
   const { categorys, iscategorysLoading } = useCategoryState();
@@ -138,6 +147,28 @@ const ProductDetails = ({ user, users }) => {
     }
   }, [categorys, details]);
 
+  // This checks to see if an item is in the wishlist. This will help us render the correct icon
+  useEffect(() => {
+    const wishList = JSON.parse(localStorage.getItem('wishList')) || [];
+    const productInWishlist = wishList.some(product => product.address === details?.address);
+    setIsWishlisted(productInWishlist);
+  }, [details]);
+
+  const toggleWishlist = () => {
+    const wishList = JSON.parse(localStorage.getItem('wishList')) || [];
+    if (isWishlisted) {
+      // Remove product from wishlist
+      const updatedWishList = wishList.filter(product => product.address !== details.address);
+      localStorage.setItem('wishList', JSON.stringify(updatedWishList));
+      setIsWishlisted(false);
+    } else {
+      // Add product to wishlist
+      wishList.push(details);
+      localStorage.setItem('wishList', JSON.stringify(wishList));
+      setIsWishlisted(true);
+    }
+  };
+
   const subtract = () => {
     if (qty !== 1) {
       let value = qty - 1;
@@ -197,14 +228,10 @@ const ProductDetails = ({ user, users }) => {
       items = [...cartList];
       cartList.forEach((element, index) => {
         if (element.product.address === details.address) {
-          if (items[index].qty + qty <= availableQuantity) {
-            items[index].qty += qty;
-            marketPlaceActions.addItemToCart(marketplaceDispatch, items);
-            setQty(1);
-            openToast("bottom", false, "Item updated in cart");
-          } else {
-            return;
-          }
+          items[index].qty += qty;
+          marketPlaceActions.addItemToCart(marketplaceDispatch, items);
+          setQty(1);
+          openToast("bottom", false, "Item updated in cart");
         }
       });
     }
@@ -216,14 +243,54 @@ const ProductDetails = ({ user, users }) => {
       dataIndex: "sellerCommonName",
       key: "sellerCommonName",
       align: "center",
-      render: (text) => <p>{text}</p>,
+      // render: (text) => <p>{text}</p>,
+      render: (text) => (
+        <a 
+          href={`${window.location.origin}/marketplace/profile/${encodeURIComponent(text)}`}
+          onClick={(e) => {
+            e.preventDefault();
+            const userProfileUrl = `/marketplace/profile/${encodeURIComponent(text)}`;
+      
+            if (e.ctrlKey || e.metaKey) {
+              // Open in a new tab if Ctrl/Cmd is pressed
+              window.open(`${window.location.origin}${userProfileUrl}`, '_blank');
+            } else {
+              // Use navigate for a normal click, without Ctrl/Cmd
+              navigate(routes.MarketplaceUserProfile.url.replace(':commonName',text), { state: { from: pathname } });
+            }
+          }}
+          style={{ textDecoration: 'underline', color: 'black', cursor: 'pointer' }}
+        >
+          {text}
+        </a>
+      ),
     },
     {
       title: <Text className="text-primaryC text-[13px]">Owner</Text>,
       dataIndex: "purchaserCommonName",
       key: "purchaserCommonName",
       align: "center",
-      render: (text) => <p>{text}</p>,
+      // render: (text) => <p>{text}</p>,
+      render: (text) => (
+        <a 
+          href={`${window.location.origin}/marketplace/profile/${encodeURIComponent(text)}`}
+          onClick={(e) => {
+            e.preventDefault();
+            const userProfileUrl = `/marketplace/profile/${encodeURIComponent(text)}`;
+      
+            if (e.ctrlKey || e.metaKey) {
+              // Open in a new tab if Ctrl/Cmd is pressed
+              window.open(`${window.location.origin}${userProfileUrl}`, '_blank');
+            } else {
+              // Use navigate for a normal click, without Ctrl/Cmd
+              navigate(routes.MarketplaceUserProfile.url.replace(':commonName',text), { state: { from: pathname } });
+            }
+          }}
+          style={{ textDecoration: 'underline', color: 'black', cursor: 'pointer' }}
+        >
+          {text}
+        </a>
+      ),
     },
     {
       title: (
@@ -303,42 +370,55 @@ const ProductDetails = ({ user, users }) => {
                   <img width={"100%"} className="object-contain rounded-md h-full " src={image_placeholder} />
                 </div></>}
               </Carousel>
-              <div className=" w-full lg:w-1/2 ">
+              <div className=" w-full lg:w-1/2">
+                {shouldShowWishlistIcon && (
+                  <div className="flex justify-end">
+                      {isWishlisted ? <HeartFilled className="cursor-pointer" onClick={toggleWishlist} style={{fontSize: "20px", color: "#A15E49"}} /> : <HeartTwoTone className="cursor-pointer" onClick={toggleWishlist} style={{ fontSize: "20px" }} twoToneColor="#A15E49"/>}
+                  </div>
+                )}
                 <div className=" lg:border-b lg:border-[#E9E9E9] pb-[6px]">
                   <Text className="font-semibold text-base lg:text-3xl text-[#202020]">
 
                     {decodeURIComponent(details?.name)}
                   </Text>
                   <div className="flex pt-[6px] ">
-                    <Text className="text-[#202020] text-xs  font-medium">Owned By: {details?.ownerCommonName}</Text>
-                    <Text className="text-[#202020] text-xs  font-medium" >{details?.ownerOrganization}</Text>
+                    {/* <Text className="text-[#202020] text-xs  font-medium">Owned By: {details?.ownerCommonName}</Text>
+                     */}
+                     {/* <Text className="text-[#202020] text-xs font-medium">Owned By: </Text> 
+                      */}
+                       <span className="text-xs  self-center">Owned By:&nbsp;</span>
+                     <div
+                      style={{ cursor: details?.ownerCommonName && details.ownerCommonName !== 'N/A' ? 'pointer' : 'default', color: 'black', textDecoration: details?.ownerCommonName && details.ownerCommonName !== 'N/A' ? 'underline' : 'none' }}
+                      onClick={(e) => {
+                        if (details?.ownerCommonName && details.ownerCommonName !== 'N/A') {
+                          e.preventDefault();
+                          const userProfileUrl = `/marketplace/profile/${encodeURIComponent(details.ownerCommonName)}`;
+                          const fullUrl = `${window.location.origin}${userProfileUrl}`;
+
+                          if (e.ctrlKey || e.metaKey) {
+                            // Open in a new tab if Ctrl/Cmd is pressed
+                            window.open(fullUrl, '_blank');
+                          } else {
+                            // Use navigate for a normal click, without Ctrl/Cmd
+                            navigate(routes.MarketplaceUserProfile.url.replace(':commonName',details?.ownerCommonName), { state: { from: pathname } });
+                          }
+                        }
+                      }}
+                    >
+                      <Text className="text-[#202020] text-xs font-medium  self-center">{details?.ownerCommonName || 'N/A'}</Text>
+                    </div>
+
+                    <Text className="text-[#202020] text-xs  font-medium" >{details?.ownerOrganization}</Text>               
                   </div>
                 </div>
                 <div className=" pt-4 lg:pt-[22px]">
-
                   <Text level={4} className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold">
                     {details?.price ? <>${details?.price}</> : "No Price Available"}
                   </Text>
                 </div>
-                <div className=" pt-6 lg:pt-[18px] lg:block hidden">
-                  <Typography className="text-xl font-semibold text-[#202020]">Description</Typography>
-                </div>
-                <div className="pt-[7px]">
-                  <Paragraph
-                    className="text-[#202020] text-sm  h-[60px] overflow-auto"
-                  >
-                    {decodeURIComponent(details.description).split('\n').map((line, index) => (
-                      <React.Fragment key={index}>
-                        {line}
-                        <br />
-                      </React.Fragment>
-                    ))}
-
-                  </Paragraph>
-                </div>
 
                 {availableQuantity !== 0 ?
-                  <div className="flex justify-between lg:justify-start  w-full gap-3 lg:gap-[15px]" id="quantity">
+                  <div className="flex justify-between lg:justify-start  w-full gap-3 lg:gap-[15px] pt-6 lg:pt-[18px]" id="quantity" >
                     <div
                       onClick={subtract}
                       className={`h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer ${qty > 1 ? '' : 'cursor-not-allowed opacity-50'}`}>
@@ -369,7 +449,7 @@ const ProductDetails = ({ user, users }) => {
                     <Button
                       type="primary"
                       className="w-[90%] md:w-[365px] h-9  !bg-[#13188A] !hover:bg-primaryHover !text-white"
-                      onClick={() => {
+                      onClick={async () => {
                         if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                           setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
                           window.location.href = loginUrl;
@@ -391,8 +471,18 @@ const ProductDetails = ({ user, users }) => {
                               productId: details.productId
                             },
                           });
-                          addItemToCart();
-                          navigate("/checkout");
+
+                          const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [details.saleAddress], [qty])
+                          if (checkQuantity === true) {
+                            addItemToCart();
+                            navigate("/checkout");
+                          } else {
+                            if (checkQuantity[0].availableQuantity === 0) {
+                              openToast("bottom", true, `Unfortunately, ${details.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
+                            } else { // Case 2: We are trying to add too much quantity
+                              openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${details.name} are available. Please update your cart quantity accordingly.`);
+                            }
+                          }
                         }
                       }}
                       disabled={ownerSameAsUser()}
@@ -409,7 +499,7 @@ const ProductDetails = ({ user, users }) => {
                         className=" !w-9 h-9 border border-primary  !bg-[#13188A] rounded-md"
                         disabled={true}
                         id="addToCart"
-                        onClick={() => {
+                        onClick={async () => {
                           if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                             setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
                             window.location.href = loginUrl;
@@ -431,7 +521,16 @@ const ProductDetails = ({ user, users }) => {
                                 productId: details?.productId
                               },
                             });
-                            addItemToCart();
+                            const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [details.saleAddress], [qty])
+                            if (checkQuantity === true) {
+                              addItemToCart();
+                            } else {
+                              if (checkQuantity[0].availableQuantity === 0) {
+                                openToast("bottom", true, `Unfortunately, ${details.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
+                              } else { // Case 2: We are trying to add too much quantity
+                                openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${details.name} are available. Please update your cart quantity accordingly.`);
+                              }
+                            }
                           }
                         }}
                       />
@@ -441,7 +540,7 @@ const ProductDetails = ({ user, users }) => {
                           <img src={Images.Cart} alt="cart" width={18} height={18} className="object-contain" />
                         </div>}
                         className=" !w-9 h-9 rounded-md  !bg-[#13188A]"
-                        onClick={() => {
+                        onClick={async () => {
                           if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                             setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
                             window.location.href = loginUrl;
@@ -463,7 +562,16 @@ const ProductDetails = ({ user, users }) => {
                                 productId: details?.productId
                               },
                             });
-                            addItemToCart();
+                            const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [details.saleAddress], [qty])
+                            if (checkQuantity === true) {
+                              addItemToCart();
+                            } else {
+                              if (checkQuantity[0].availableQuantity === 0) {
+                                openToast("bottom", true, `Unfortunately, ${details.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
+                              } else { // Case 2: We are trying to add too much quantity
+                                openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${details.name} are available. Please update your cart quantity accordingly.`);
+                              }    
+                            }
                           }
                         }}
                       />
@@ -505,10 +613,18 @@ const ProductDetails = ({ user, users }) => {
             <div className=" mt-9 lg:mt-10 w-full md:w-[750px] sm:px-[10%] md:px-[15%] lg:px-0 pb-5 lg:w-[835px]  ">
               <Tabs
                 className="product_detail"
-                defaultActiveKey="1"
+                defaultActiveKey="0"
                 items={
-                  [{
-                    label: <span className="text-sm md:text-base">Item Details</span>,
+                  [
+                  {
+                    label: <span className="text-sm md:text-base">Description</span>,
+                    key: "0",
+                    children: (
+                      <PreviewMode content={details?.description} />
+                    ),
+                  }
+                  ,{
+                    label: <span className="text-sm md:text-base">Details</span>,
                     key: "1",
                     children: (
                       <div>

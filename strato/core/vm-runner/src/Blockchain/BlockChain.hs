@@ -597,7 +597,7 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
             (fromMaybe "" $ erReturnVal r, unlines $ reverse $ erTrace r, erLogs r, erEvents r)
 
   yieldMany $ OutLog . mkLogEntry ranBlockHash theHash chainId <$> theLogs
-  yieldMany $ OutEvent . mkEventEntry chainId <$> theEvents
+  yield . OutEvent $ mkEventEntry chainId <$> theEvents
   when flags_createTransactionResults $ do
     yield . OutTXR $
       TransactionResult
@@ -648,7 +648,7 @@ printTransactionMessage ot@OutputTx {otSigner = tAddr, otHash = theHash} (Right 
       extra =
         if isMessageTX t
           then ""
-          else fromMaybe "<failed>" $ fmap format $ erNewContractAccount results
+          else fromMaybe (CL.blink "<failed>") $ fmap format $ erNewContractAccount results
 
   multilineLog "printTx/ok" $
     boringBox

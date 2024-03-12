@@ -7,6 +7,7 @@ import Blockchain.Init.EthConf
 import Blockchain.Init.Options
 import Blockchain.Init.Protocol
 import qualified Blockchain.Network as Net
+import Blockchain.Strato.Model.Options (flags_network)
 import Control.Concurrent
 import Control.Lens.Combinators (use)
 import Control.Monad

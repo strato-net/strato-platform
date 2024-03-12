@@ -66,6 +66,7 @@ import qualified Data.ByteString.Char8 as BC
 import Data.Foldable hiding (fold)
 import Data.List
 import qualified Data.Map as M
+import qualified Data.Map.Ordered as OMap
 import Data.Maybe
 import Data.Proxy
 import qualified Data.Set as S
@@ -147,16 +148,11 @@ handleVmEvents useSyncMode = awaitForever $ \InBatch {..} -> do
 groupEithers :: [Either a b] -> [Either [a] [b]]
 groupEithers = foldr f []
   where
-    f (Left l) b =
-      let ~(ls, es) = case b of
-            (Left ls') : es' -> (ls', es')
-            es' -> ([], es')
-       in (Left $ l : ls) : es
-    f (Right r) b =
-      let ~(rs, es) = case b of
-            (Right rs') : es' -> (rs', es')
-            es' -> ([], es')
-       in (Right $ r : rs) : es
+    f :: Either a b -> [Either [a] [b]] -> [Either [a] [b]]
+    f (Left l) ((Left ls):es) = (Left (l:ls)) : es
+    f (Right r) ((Right rs):es) = (Right (r:rs)) : es
+    f (Left l) es = (Left [l]) : es
+    f (Right r) es = (Right [r]) : es
 
 processBlocksAndNewChains ::
   (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) =>
@@ -206,7 +202,7 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis {..} -> do
         case catMaybes $ erException <$> mExecResults of
           [] -> do
             yieldMany . concat $! map (OutLog . mkLogEntry bHash tHash (Just cId)) . erLogs <$> mExecResults
-            yieldMany . concat $! map (OutEvent . mkEventEntry (Just cId)) . erEvents <$> mExecResults
+            yield . OutEvent . concat $! map (mkEventEntry (Just cId)) . erEvents <$> mExecResults
             let (orgName, appName) = case mExecResults of
                   [] -> ("", "")
                   x : _ -> (erOrgName x, erAppName x)
@@ -269,16 +265,16 @@ outputNewChains = traverse_ $ \(cId, cInfo, bHash, execr) -> do
   let org = fromMaybe "" $ do
         e <- listToMaybe execr
         a <- erAction e
-        d <- listToMaybe . M.toList $ a ^. Action.actionData
+        d <- listToMaybe . OMap.assocs $ a ^. Action.actionData
         pure $ d ^. _2 . Action.actionDataOrganization
       app = fromMaybe "" $ do
         e <- listToMaybe execr
         a <- erAction e
-        d <- listToMaybe . M.toList $ a ^. Action.actionData
+        d <- listToMaybe . OMap.assocs $ a ^. Action.actionData
         pure $ d ^. _2 . Action.actionDataApplication
   yield $ OutToStateDiff cId cInfo bHash org app
   for_ (catMaybes $ erAction <$> execr) $ yield . OutAction
-  for_ (concatMap erEvents execr) $ yield . OutEvent . mkEventEntry (Just cId)
+  yield . OutEvent $ flip map (concatMap erEvents execr) $ mkEventEntry (Just cId)
 
 processBlocks ::
   (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) =>

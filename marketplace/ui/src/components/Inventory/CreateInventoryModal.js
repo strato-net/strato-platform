@@ -17,6 +17,7 @@ import TextArea from "antd/es/input/TextArea";
 import TagManager from "react-gtm-module";
 import { unitOfMeasures } from "../../helpers/constants";
 import { categoricalProperties } from "./CategoryFields";
+import RichEditor from "../RichEditor";
 
 const { Option } = Select;
 
@@ -180,11 +181,24 @@ const CreateInventoryModal = ({
 
   const updateSizeOptions = (type) => {
     if (type === "Shoes") {
-      setSizeOptions(["5", "5.5", "6", "6.5", "7", "7.5", "8", "8.5", "9", "9.5", "10", "10.5", "11", "11.5", "12", "12.5", "13", "13.5", "14",]);
+      setSizeOptions(["3.5", "4", "4.5", "5", "5.5", "6", "6.5", "7", "7.5", "8", "8.5", "9", "9.5", "10", "10.5", "11", "11.5", "12", "12.5", "13", "13.5", "14", "14.5", "15", "16", "17", "18"]);
     } else {
       setSizeOptions(["XXS", "XS", "S", "M", "L", "XL", "XXL"]);
     }
   };
+
+  const handleCategory = (value) => {
+    form.setFieldValue("category", value);
+    setCategoryValue(value);
+    if (value === 'Carbon') {
+      form.setFieldValue("subCategory", null);
+      setSubCategoryValue(null);
+    } else {
+      const subCat = categorys.find(item => item.name === value).subCategories[0].name
+      form.setFieldValue("subCategory", subCat);
+      setSubCategoryValue(subCat);
+    }
+  }
 
   return (
     <>
@@ -272,10 +286,7 @@ const CreateInventoryModal = ({
                   allowClear
                   value={categoryValue}
                   onChange={(value) => {
-                    form.setFieldValue("category", value);
-                    setCategoryValue(value);
-                    form.setFieldValue("subCategory", null);
-                    setSubCategoryValue(null);
+                    handleCategory(value)
                   }}
                 >
                   {categorys.map((e, index) => (
@@ -318,7 +329,7 @@ const CreateInventoryModal = ({
               </Form.Item>
             </div>
             {categoricalProperties(form, handleClothingTypeChange, clothingType, sizeOptions, unitOfMeasures)}
-            <div className="flex justify-between mt-4 ">
+            <div className="flex justify-between mt-4 !list-disc">
               <Form.Item
                 label="Description"
                 name="description"
@@ -330,7 +341,12 @@ const CreateInventoryModal = ({
                   },
                 ]}
               >
-                <TextArea placeholder="Enter Description" />
+                <RichEditor
+                  onChange={(content) => {
+                    form.setFieldsValue({ description: content });
+                  }}
+                  initialValue={form.getFieldValue("description") || ""}
+                />
               </Form.Item>
             </div>
             <div className="mt-4 flex-wrap gap-5 sm:flex-nowrap flex justify-between">

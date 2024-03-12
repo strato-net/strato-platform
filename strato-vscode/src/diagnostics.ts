@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { rest, importer } from 'blockapps-rest';
 import getConfig from './load.config';
+import getOptions from './load.options';
 import { getApplicationUser } from './auth';
 import { LOADIPHLPAPI } from 'dns';
 
@@ -304,11 +305,9 @@ async function findReusedBaseCons(doc: vscode.TextDocument, contractAST: any): P
 async function validate(counter: number, doc: vscode.TextDocument, solidityDiagnostics: vscode.DiagnosticCollection): Promise<void> {
   if (validationCounter === counter) {
     try {
-      const diagnostics: vscode.Diagnostic[] = [];
-
+      const diagnostics: vscode.Diagnostic[] = []; 
       const user = await getApplicationUser();
-      const config = getConfig() || {};
-      const options = { config };
+      const options = getOptions() || {}
       let srcMap = {[doc.uri.path]: doc.getText()};
       const folders = vscode.workspace.workspaceFolders || [];
       if (folders.length > 0) {
