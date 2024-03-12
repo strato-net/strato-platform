@@ -290,6 +290,8 @@ const metaImg = category ? category : SEO.IMAGE_META
                         return (
                           <InventoryCard
                             id={index}
+                            limit={limit}
+                            offset={offset}
                             inventory={inventory}
                             category={category}
                             key={index}
