@@ -276,6 +276,8 @@ const allSubcategories = getAllSubcategories(categorys);
                         return (
                           <InventoryCard
                             id={index}
+                            limit={limit}
+                            offset={offset}
                             inventory={inventory}
                             category={category}
                             key={index}

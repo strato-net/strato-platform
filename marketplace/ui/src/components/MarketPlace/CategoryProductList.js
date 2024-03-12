@@ -42,6 +42,9 @@ const CategoryProductList = ({ user }) => {
 
   const location = useLocation();
   const navigate = useNavigate();
+
+  const { state } = location;
+
   const queryParams = new URLSearchParams(location.search);
 
   const searchQueryValue = queryParams.get('search');
@@ -58,8 +61,9 @@ const CategoryProductList = ({ user }) => {
   const [uniqueProductNames, setUniqueProductNames] = useState([]);
   const [desktopOpenFilter, setDesktopOpenFilter] = useState(true);
   const [mobileOpenFilter, setMobileOpenFilter] = useState(false);
-  const [search, setSearch] = useState(searchQueryValue)
-  const [unSelected, setUnSelected] = useState([])
+  const [search, setSearch] = useState(searchQueryValue);
+  const [unSelected, setUnSelected] = useState([]);
+  const [scrollPosition, setScrollPosition] = useState(state?.scroll || 0);
 
   //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
@@ -68,7 +72,7 @@ const CategoryProductList = ({ user }) => {
   const orderDispatch = useOrderDispatch();
   // states
   const { marketplaceList, isMarketplaceLoading } = useMarketplaceState();
-  const { categorys } = useCategoryState();
+  const { categorys, iscategorysLoading } = useCategoryState();
   let { hasChecked, isAuthenticated } = useAuthenticateState();
   const { subCategorys } = useSubCategoryState();
   const { cartList } = useMarketplaceState();
@@ -76,6 +80,28 @@ const CategoryProductList = ({ user }) => {
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
   }, []);
+
+  const isLoading = isMarketplaceLoading;
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrollPosition(window.scrollY);
+    };
+  
+   if(!isLoading && !iscategorysLoading){
+     window.addEventListener('scroll', handleScroll);
+   }
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
+  useEffect(() => {
+    if(!isLoading){
+      window.scrollTo(0, state?.scroll);
+    }
+  }, [isLoading]);
 
   const onChangeCategory = (checkedValues) => {
     const categoryStr = checkedValues.join(",");
@@ -150,7 +176,7 @@ const CategoryProductList = ({ user }) => {
       const url = baseUrl.pathname + baseUrl.search;
       setUnSelected([])
       setSelectedCategories(categoryData)
-      navigate(url, { replace: true });
+      navigate(url);
     }
 
     setUnSelected(unSelectedSubCat)
@@ -188,25 +214,42 @@ const CategoryProductList = ({ user }) => {
     searchQueryValue
   ]);
 
+  const generateBaseUrl = () =>{
+    const baseUrl = new URL('/category', window.location.origin);
+
+    if (categoryQueryValue) {
+      baseUrl.searchParams.set('category', categoryQueryValue);
+    }
+    if (search) {
+      baseUrl.searchParams.set('search', search);
+    }
+
+    const url = baseUrl.pathname + baseUrl.search;
+    return url;
+  }
+
   useEffect(() => {
     const timeOut = setTimeout(() => {
-      const baseUrl = new URL('/category', window.location.origin);
-
-      if (categoryQueryValue) {
-        baseUrl.searchParams.set('category', categoryQueryValue);
-      }
-      if (search) {
-        baseUrl.searchParams.set('search', search);
-      }
-
-      const url = baseUrl.pathname + baseUrl.search;
-      navigate(url, { replace: true });
-    }, 1000);
+     const url = generateBaseUrl();
+      navigate(url, { state: { scroll: scrollPosition }});
+    }, 500);
 
     return () => {
       clearTimeout(timeOut);
     };
   }, [search, minPrice, maxPrice]);
+
+  useEffect(()=>{
+      
+
+      const url = generateBaseUrl();
+        if(!isLoading){
+          navigate(url, { state: { scroll: scrollPosition } });
+      }else{
+        navigate(url, { state: { scroll: state?.scroll || 0 } });
+      }
+      
+  },[scrollPosition])
 
   //=========================Other functions===============================//
 
@@ -265,7 +308,7 @@ const CategoryProductList = ({ user }) => {
     if (foundIndex === -1) {
       // Product not found, check quantity before adding
       const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity]);
-      console.log("checkQuantity", checkQuantity)
+
       if (checkQuantity === true) {
         // Quantity check passed, add new item to the cart
         items.push({ product, qty: quantity });
@@ -320,7 +363,6 @@ const CategoryProductList = ({ user }) => {
     setSearch(value)
   }
 
-  const isLoading = isMarketplaceLoading;
 
   const BreadCrumbComponent = () =>
     <Breadcrumb className="text-xs ml-4 md:ml-14 mt-14 lg:mt-5">
@@ -510,6 +552,12 @@ const CategoryProductList = ({ user }) => {
     <div className="h-full w-full bg-[#00000020] absolute top-0 md:hidden"></div>
   </div>
 
+  const handleSearchFocus = () =>{
+    const url = generateBaseUrl();
+    navigate(url, { state: { scroll: 0 }});
+    window.scrollTo(0, 0);
+  }
+
   return (
     <div className={`${mobileOpenFilter ? 'overflow-y-hidden h-[100vh] w-[100vw] bg-[#00000020] relative mt-0 md:bg-white md:mt-[auto] md:overflow-scroll trending_cards' : ' '}`}>
       <div className="fixed bg-white w-full top-7 z-10 md:static">
@@ -524,6 +572,7 @@ const CategoryProductList = ({ user }) => {
             <Input
               size="large"
               onChange={(e) => { handleChangeSearch(e) }}
+              onClick={handleSearchFocus}
               placeholder="Search Marketplace"
               prefix={<img src={Images.Header_Search} alt="search" className="w-[18px] h-[18px]" />}
               className="bg-[#F6F6F6] border-none rounded-3xl p-[10px]"
