@@ -114,7 +114,6 @@ import Executable.EthereumVM2
 import Executable.StratoP2P
 import Executable.StratoP2PClient
 import Executable.StratoP2PServer
-import Ki.Unlifted as KIU
 import Network.Socket
 import Test.Hspec
 import Text.Read (readMaybe)
@@ -1422,9 +1421,8 @@ makeLenses ''P2PConnection
 createConnection ::
   P2PPeer ->
   P2PPeer ->
-  Scope ->
   IO P2PConnection
-createConnection server' client' scp = do
+createConnection server' client' = do
   serverToClientTQueue <- newTQueueIO
   clientToServerTQueue <- newTQueueIO
   serverSeqSource <- atomically . dupTMChan $ _p2pPeerSeqP2pSource server'
@@ -1439,14 +1437,12 @@ createConnection server' client' scp = do
                   (sinkTQueue serverToClientTQueue)   
                   (sourceTMChan serverSeqSource .| (awaitForever $ either (const $ pure ()) yield))
                   ("Me: " ++ _p2pPeerName server' ++ ", Them: " ++ _p2pPeerName client')
-                  scp
   let rClient = runEthClientConduit         
                   (_p2pPeerPPeer server')
                   (sourceTQueue serverToClientTQueue)
                   (sinkTQueue clientToServerTQueue)
                   (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
                   ("Me: " ++ _p2pPeerName client' ++ ", Them: " ++ _p2pPeerName server')
-                  scp
   pure $
     P2PConnection
       serverToClientTQueue
