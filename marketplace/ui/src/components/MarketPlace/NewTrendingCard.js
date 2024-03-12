@@ -60,7 +60,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                 </div>
             )}
             <a
-                href={`/marketplace${naviroute.replace(":address", topSellingProduct.address)}`}
+                href={`${naviroute.replace(":address", topSellingProduct.address)}`}
                 onClick={(e) => {
                     // Check if Command (metaKey) or Ctrl (ctrlKey) is pressed
                     if (e.metaKey || e.ctrlKey) {
@@ -141,7 +141,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                     className='flex-1 h-9 !bg-[#13188A] !text-white'
                     onClick={async () => {
                         if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                            setCookie("returnUrl", `/marketplace/productList/${topSellingProduct.address}`, 10);
+                            setCookie("returnUrl", `/productList/${topSellingProduct.address}`, 10);
                             window.location.href = loginUrl;
                         } else {
                             const dataLayerEventName = isUserProfile ? 'buy_now_from_user_profile' : 'buy_now_from_top_selling_product';
@@ -174,7 +174,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                 className='h-9 w-9 flex items-center justify-center !bg-[#13188A] '
                     onClick={() => {
                         if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                            setCookie("returnUrl", `/marketplace/productList/${topSellingProduct.address}`, 10);
+                            setCookie("returnUrl", `/productList/${topSellingProduct.address}`, 10);
                             window.location.href = loginUrl;
                         } else {
                             window.LOQ.push(['ready', async LO => {

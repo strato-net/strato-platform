@@ -57,9 +57,9 @@ const UserProfile = (user) => {
   const { userActivity } = useUserActivityState();
   const [wishlistData, setWishlistData] = useState([]);
 
-  const soldOrdersBaseUrl = new URL("/marketplace/sold-orders", window.location.origin).toString();
-  const boughtOrdersBaseUrl = new URL("/marketplace/bought-orders", window.location.origin).toString();
-  const transfersBaseUrl = new URL("/marketplace/order/transfers", window.location.origin).toString();
+  const soldOrdersBaseUrl = new URL("/order/sold", window.location.origin).toString();
+  const boughtOrdersBaseUrl = new URL("/order/bought", window.location.origin).toString();
+  const transfersBaseUrl = new URL("/order/transfers", window.location.origin).toString();
   const params = useParams();
 
     //items

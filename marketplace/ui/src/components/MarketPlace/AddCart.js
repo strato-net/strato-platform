@@ -417,7 +417,7 @@ const Checkout = ({ user }) => {
     if (isDone) {
       actions.addItemToCart(marketplaceDispatch, []);
       setTimeout(function () {
-        navigate(`/marketplace`);
+        navigate(`/`);
       }, 2000);
     }
   };

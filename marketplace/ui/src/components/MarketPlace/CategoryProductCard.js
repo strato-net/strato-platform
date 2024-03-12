@@ -212,7 +212,7 @@ const CategoryProductCard = ({ product, category }) => {
                     className="group w-40 h-9 border border-primary hover:bg-primary"
                     onClick={() => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                        setCookie("returnUrl", `/marketplace/productList/${product.address}`, 10);
+                        setCookie("returnUrl", `/productList/${product.address}`, 10);
                         window.location.href = loginUrl;
                       } else {
                         window.LOQ.push(['ready', async LO => {
@@ -243,7 +243,7 @@ const CategoryProductCard = ({ product, category }) => {
                     className="w-40 h-9 m-3 bg-primary !hover:bg-primaryHover"
                     onClick={() => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                        setCookie("returnUrl", `/marketplace/productList/${product.address}`, 10);
+                        setCookie("returnUrl", `/productList/${product.address}`, 10);
                         window.location.href = loginUrl;
                       } else {
                         window.LOQ.push(['ready', async LO => {

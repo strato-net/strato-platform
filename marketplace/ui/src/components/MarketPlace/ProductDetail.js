@@ -245,10 +245,10 @@ const ProductDetails = ({ user, users }) => {
       // render: (text) => <p>{text}</p>,
       render: (text) => (
         <a 
-          href={`${window.location.origin}/marketplace/profile/${encodeURIComponent(text)}`}
+          href={`${window.location.origin}/profile/${encodeURIComponent(text)}`}
           onClick={(e) => {
             e.preventDefault();
-            const userProfileUrl = `/marketplace/profile/${encodeURIComponent(text)}`;
+            const userProfileUrl = `/profile/${encodeURIComponent(text)}`;
       
             if (e.ctrlKey || e.metaKey) {
               // Open in a new tab if Ctrl/Cmd is pressed
@@ -272,10 +272,10 @@ const ProductDetails = ({ user, users }) => {
       // render: (text) => <p>{text}</p>,
       render: (text) => (
         <a 
-          href={`${window.location.origin}/marketplace/profile/${encodeURIComponent(text)}`}
+          href={`${window.location.origin}/profile/${encodeURIComponent(text)}`}
           onClick={(e) => {
             e.preventDefault();
-            const userProfileUrl = `/marketplace/profile/${encodeURIComponent(text)}`;
+            const userProfileUrl = `/profile/${encodeURIComponent(text)}`;
       
             if (e.ctrlKey || e.metaKey) {
               // Open in a new tab if Ctrl/Cmd is pressed
@@ -391,7 +391,7 @@ const ProductDetails = ({ user, users }) => {
                       onClick={(e) => {
                         if (details?.ownerCommonName && details.ownerCommonName !== 'N/A') {
                           e.preventDefault();
-                          const userProfileUrl = `/marketplace/profile/${encodeURIComponent(details.ownerCommonName)}`;
+                          const userProfileUrl = `/profile/${encodeURIComponent(details.ownerCommonName)}`;
                           const fullUrl = `${window.location.origin}${userProfileUrl}`;
 
                           if (e.ctrlKey || e.metaKey) {
@@ -450,7 +450,7 @@ const ProductDetails = ({ user, users }) => {
                       className="w-[90%] md:w-[365px] h-9  !bg-[#13188A] !hover:bg-primaryHover !text-white"
                       onClick={async () => {
                         if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                          setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
+                          setCookie("returnUrl", `/productList/${details.address}`, 10);
                           window.location.href = loginUrl;
                         } else {
                           window.LOQ.push(['ready', async LO => {
@@ -500,7 +500,7 @@ const ProductDetails = ({ user, users }) => {
                         id="addToCart"
                         onClick={async () => {
                           if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                            setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
+                            setCookie("returnUrl", `/productList/${details.address}`, 10);
                             window.location.href = loginUrl;
                           } else {
                             window.LOQ.push(['ready', async LO => {
@@ -541,7 +541,7 @@ const ProductDetails = ({ user, users }) => {
                         className=" !w-9 h-9 rounded-md  !bg-[#13188A]"
                         onClick={async () => {
                           if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                            setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
+                            setCookie("returnUrl", `/productList/${details.address}`, 10);
                             window.location.href = loginUrl;
                           } else {
                             window.LOQ.push(['ready', async LO => {

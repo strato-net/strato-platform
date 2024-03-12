@@ -438,12 +438,13 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
           </UsersProvider>
         }
       />
-      <Route
+      {/* we don't require this anymore as we started using the empty path */}
+      {/* <Route
         path="/"
         element={<Navigate
           to={"/marketplace"}
           replace />}
-      />
+      /> */}
       <Route
         path="*"
         element={<Navigate

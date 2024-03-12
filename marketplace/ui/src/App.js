@@ -43,11 +43,12 @@ const App = () => {
 
   // useEffect if path is empty then redirect to marketplace without using navigate
   // This is needed for non dockerized version to redirect to marketplace after login and anon access
-  useEffect(() => {
-    if (window.location.pathname === "/") {
-      window.location.href = "/marketplace";
-    }
-  }, []);
+  // we don't require this anymore as we are started using the "/" empty url.
+  // useEffect(() => {
+  //   if (window.location.pathname === "/") {
+  //     window.location.href = "/marketplace";
+  //   }
+  // }, []);
 
   useEffect(() => {
     const referrer = document.referrer;
@@ -71,7 +72,7 @@ const App = () => {
   }
 
   return (
-    <BrowserRouter basename="/marketplace">
+    <BrowserRouter basename="/">
       <Layout className="overflow-auto">
         <UsersProvider>
           <HeaderComponent
