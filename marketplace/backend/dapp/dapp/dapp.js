@@ -212,9 +212,58 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getInventories = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
-    const inventories = await inventoryJs.getAll(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
+    let combinedInventories = [];
+    let processedAddresses = new Set();
+    let { limit, offset } = args;
+    offset = +offset // convert to a number (coming as string)
+  
+    while (combinedInventories.length < limit) {
+      const paginatedArgs = { ...args, offset: offset, limit: limit * 2 }; // Example adjustment
+      const inventories = await inventoryJs.getAll(rawAdmin, { ...paginatedArgs, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
+  
+      if (inventories.length === 0) break;
+      
+      // Loop through the inventories to see if there are duplicates.
+      for (const item of inventories) {
+        if (!processedAddresses.has(item.originAddress)) {
+          processedAddresses.add(item.originAddress);
+          const additionalItems = await inventoryJs.getAll(rawAdmin, {ownerCommonName: userCert.commonName, originAddress: item.originAddress }, getOptions);
+          
+          // If there is a duplicate we'll add it to the list
+          if (additionalItems.length > 0) {
+            let combinedItem = {
+              ...additionalItems[0],
+              quantity: additionalItems.reduce((acc, item) => acc + item.quantity, 0),
+              saleQuantity: additionalItems.reduce((acc, item) => acc + (item.saleQuantity || 0), 0),
+              totalLockedQuantity: additionalItems.reduce((acc, item) => acc + (item.totalLockedQuantity || 0), 0),
+            };
+  
+            // Adding a new field to track all the addresses of grouped items
+            const uniqueAddresses = [...new Set(additionalItems.map(item => item.address))];
+            if (uniqueAddresses.length > 1) {
+              combinedItem.groupedAddresses = uniqueAddresses;
+            }
+  
+            combinedInventories.push(combinedItem);
+            if (combinedInventories.length >= limit) {
+              break; // Stop adding more items once we reach the limit
+            }
+          }
+        }
+        if (combinedInventories.length >= limit) {
+          break; // Stop processing more items once we reach the limit
+        }
+      }
+  
+      offset += inventories.length; // Adjust for next iteration
+      if (inventories.length < limit * 2) break; // Have reached the end
+    }
+  
+    // Trim the list if we get an extra result. 
+    combinedInventories = combinedInventories.slice(0, limit);
+  
     const inventoryCount = await inventoryJs.inventoryCount(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
-    return { inventories: inventories, inventoryCount: inventoryCount }
+    return { inventories: combinedInventories, inventoryCount: inventoryCount };
   };
 
   contract.getInventoriesForUser = async function (args, options = optionsNoChainIds) {
