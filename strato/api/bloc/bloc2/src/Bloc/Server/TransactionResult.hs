@@ -262,7 +262,7 @@ nth n
   | otherwise = Text.pack (show $ n + 1) <> "th"
 
 contractResult ::
-  (HasSQL m) =>
+  HasSQL m =>
   Integer ->
   Keccak256 ->
   TransactionResult ->
@@ -291,20 +291,25 @@ contractResult i txHash txResult@TransactionResult {..} mmd = do
       stratoMsg -> lift . throwIO . UserError $ Text.pack stratoMsg
     Just acct -> do
       -- Checks if account exists in the address state ref table before returning results
-      details <- lift $ go acct name
+      details <- lift $ go acct name 0
       return $ BlocTransactionResult Success txHash (Just txResult) (Just $ Upload details)
   where
-    go acct name = do
-      addressRefs <- 
-        getAccount' 
-          accountsFilterParams
-            { _qaAddress = Just $ _accountAddress acct,
-              _qaContractName = Just name,
-              _qaIgnoreChain = Just True
-            }
-      case addressRefs of
-        [] -> go acct name
-        _ -> return $ UploadContractDetails {contractName = name, contractAccount = Just $ acct}
+    go :: HasSQL m => Account -> Text -> Integer -> m UploadContractDetails
+    go acct name num = do
+      if num >= 100 
+        then throwIO . UserError $ "Transaction succeeded, but contract was neither created, nor destroyed"
+        else do
+          void . liftIO $ threadDelay 100000
+          addressRefs <- 
+            getAccount' 
+              accountsFilterParams
+                { _qaAddress = Just $ _accountAddress acct,
+                  _qaContractName = Just name,
+                  _qaIgnoreChain = Just True
+                }
+          case addressRefs of
+            [] -> go acct name (num + 1)
+            _ -> return $ UploadContractDetails {contractName = name, contractAccount = Just $ acct}
 
 
 functionResult ::
