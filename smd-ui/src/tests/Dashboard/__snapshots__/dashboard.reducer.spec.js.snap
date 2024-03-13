@@ -378,6 +378,7 @@ Object {
   "healthStatus": false,
   "ifHovering": false,
   "lastBlockNumber": 0,
+  "networkStatus": false,
   "shardCount": 0,
   "systemStatus": false,
   "systemWarnings": "",

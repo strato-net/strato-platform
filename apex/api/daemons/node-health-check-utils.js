@@ -1,24 +1,24 @@
-const winston = require('winston-color');
-const models = require('../models');
-const BlockDataRef = require('../models/strato/eth/blockDataRef');
-const Promise = require('bluebird');
-const rp = require('request-promise');
-const moment = require('moment');
-const si = require('systeminformation');
-const config = require('../config/app.config');
-const getPbftData = require('../controllers/health')['getPbftData'];
-const findView = require('../controllers/health')['findView'];
+const winston = require("winston-color");
+const models = require("../models");
+const BlockDataRef = require("../models/strato/eth/blockDataRef");
+const Promise = require("bluebird");
+const rp = require("request-promise");
+const moment = require("moment");
+const si = require("systeminformation");
+const config = require("../config/app.config");
+const getPbftData = require("../controllers/health")["getPbftData"];
+const findView = require("../controllers/health")["findView"];
 
 // TODO: do the mass-refactoring of the daemon. Use the OOP! Really, don't even try refactoring this without the main Object (SingleCheck object with methods and shared params). Don't change any db data formats.
 
 const neededJobs = {
-  "slipstream_main": "slipstream",
-  "strato_p2p": "strato-p2p",
-  "vm_main": "vm-runner",
-  "seq_main": "strato-sequencer",
+  slipstream_main: "slipstream",
+  strato_p2p: "strato-p2p",
+  vm_main: "vm-runner",
+  seq_main: "strato-sequencer",
   // TODO: add vault-proxy in prometheus
-  "core-api": "core-api"
-}
+  "core-api": "core-api",
+};
 
 const maxStalledIntervals = config.healthCheck.maxStalledIntervals;
 
@@ -27,9 +27,9 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 async function singleCheck() {
   try {
     await queryHealthStatus();
-    winston.info('Health Status queried at ' + moment().format());
+    winston.info("Health Status queried at " + moment().format());
   } catch (err) {
-    winston.error(' Health Status error: ' + err.message);
+    winston.error(" Health Status error: " + err.message);
   }
 }
 
@@ -37,30 +37,39 @@ function queryHealthStatus() {
   return new Promise(async (resolve, _void) => {
     try {
       // TODO: you may think Promise.all() is a good idea here but I strongly recommend not to try refactoring it unless you also rewrite this file with OOP (see TODO in the beginning)
-      
+
       const isGlobalPasswordSet = await checkIfGlobalPasswordSet();
       await checkHealthIsFresh(isGlobalPasswordSet);
-      
+
       const prometheusData = await getPrometheusMetrics();
       const prometheusMetrics = reformatPrometheusMetrics(prometheusData);
-      
-      const nodeHealthData = await calcNodeHealthAndSaveVitalStats(prometheusMetrics, isGlobalPasswordSet);
+
+      const nodeHealthData = await calcNodeHealthAndSaveVitalStats(
+        prometheusMetrics,
+        isGlobalPasswordSet
+      );
       await updateNodeHealthStatus(nodeHealthData, isGlobalPasswordSet);
       return resolve();
     } catch (error) {
-      winston.error(`Error occurred while querying some of the health info: "${error.message ? error.message : 'no message'}"`);
+      winston.error(
+        `Error occurred while querying some of the health info: "${
+          error.message ? error.message : "no message"
+        }"`
+      );
       return resolve();
     }
   }).timeout(config.healthCheck.requestTimeout - 80);
 }
 
 function getPrometheusMetrics() {
-  if (!process.env['PROMETHEUS_HOST']) {
-    throw Error('PROMETHEUS_HOST env var is not set - unable to get prometheus data');
+  if (!process.env["PROMETHEUS_HOST"]) {
+    throw Error(
+      "PROMETHEUS_HOST env var is not set - unable to get prometheus data"
+    );
   }
   const options = {
-    method: 'GET',
-    url: `http://${process.env['PROMETHEUS_HOST']}/prometheus/api/v1/query?query=health_check`,
+    method: "GET",
+    url: `http://${process.env["PROMETHEUS_HOST"]}/prometheus/api/v1/query?query=health_check`,
     followRedirects: false,
     timeout: config.healthCheck.requestTimeout - 100,
     json: true,
@@ -70,7 +79,7 @@ function getPrometheusMetrics() {
 
 async function checkIfGlobalPasswordSet() {
   const options = {
-    method: 'GET',
+    method: "GET",
     url: `${process.env.vaultProxyUrl}/strato/v2.3/verify-password`,
     followRedirects: false,
     timeout: config.healthCheck.requestTimeout - 100,
@@ -83,74 +92,92 @@ async function checkIfGlobalPasswordSet() {
 async function checkNodeSyncStallStatus(syncStat) {
   let currentTime = Date.now();
 
-  let {lastVmBlockNum = 0, 
+  let {
+    lastVmBlockNum = 0,
     lastSeqBlockNum = 0,
-    stalledIntervalCount = 0
-  } = (syncStat?.additionalInfo) ? JSON.parse(syncStat?.additionalInfo) : {};
+    stalledIntervalCount = 0,
+  } = syncStat?.additionalInfo ? JSON.parse(syncStat?.additionalInfo) : {};
 
   let isStalled = false;
 
-  const {number: currVmBlockNum = 0} = await BlockDataRef.findOne({
+  const { number: currVmBlockNum = 0 } = await BlockDataRef.findOne({
     where: {
       pow_verified: true,
-      is_confirmed: true
+      is_confirmed: true,
     },
-    order: [['number', 'DESC']],
-    attributes: [
-      'number',
-    ],
+    order: [["number", "DESC"]],
+    attributes: ["number"],
     raw: true,
   });
 
-  const pbftInfo = await getPbftData()
-  const {sequence_number: currSeqBlockNum = 0} = findView(pbftInfo);
+  const pbftInfo = await getPbftData();
+  const { sequence_number: currSeqBlockNum = 0 } = findView(pbftInfo);
 
-  const {isSynced} = await getStratoMetadata();
-  
+  const { isSynced } = await getStratoMetadata();
+
   try {
     if (isSynced) {
-      return [isSynced, {
-        stalledIntervalCount: 0,
-        lastVmBlockNum: 0,
-        lastSeqBlockNum: 0,
-        isStalled
-      }];
+      return [
+        isSynced,
+        {
+          stalledIntervalCount: 0,
+          lastVmBlockNum: 0,
+          lastSeqBlockNum: 0,
+          isStalled,
+        },
+      ];
     } else {
-      if (currVmBlockNum === lastVmBlockNum && currSeqBlockNum === lastSeqBlockNum) {
+      if (
+        currVmBlockNum === lastVmBlockNum &&
+        currSeqBlockNum === lastSeqBlockNum
+      ) {
         if (stalledIntervalCount < maxStalledIntervals) {
           stalledIntervalCount++;
         } else {
-          winston.error(`Node stalled during sync at ${currentTime}; went ${maxStalledIntervals * (config.healthCheck.pollFrequency / 1000)} seconds without increasing block number`);
+          winston.error(
+            `Node stalled during sync at ${currentTime}; went ${
+              maxStalledIntervals * (config.healthCheck.pollFrequency / 1000)
+            } seconds without increasing block number`
+          );
           isStalled = true;
         }
       } else {
         stalledIntervalCount = 0;
       }
-      winston.debug(`sync check: prev vm block #: ${lastVmBlockNum}, cur vm block #: ${currVmBlockNum}`);
-      winston.debug(`sync check: prev seq block #: ${lastSeqBlockNum}, cur seq block #: ${currSeqBlockNum}`);
-      winston.debug(`sync check: inverval ${stalledIntervalCount} of ${maxStalledIntervals}`);
+      winston.debug(
+        `sync check: prev vm block #: ${lastVmBlockNum}, cur vm block #: ${currVmBlockNum}`
+      );
+      winston.debug(
+        `sync check: prev seq block #: ${lastSeqBlockNum}, cur seq block #: ${currSeqBlockNum}`
+      );
+      winston.debug(
+        `sync check: inverval ${stalledIntervalCount} of ${maxStalledIntervals}`
+      );
 
       lastVmBlockNum = currVmBlockNum;
       lastSeqBlockNum = currSeqBlockNum;
     }
   } catch (e) {
-    winston.warn(`Error ${e.message ? e.message : ''} occurred while checking node's stall status`);
+    winston.warn(
+      `Error ${
+        e.message ? e.message : ""
+      } occurred while checking node's stall status`
+    );
   }
 
   const additionalSyncInfo = {
     stalledIntervalCount,
     lastVmBlockNum,
     lastSeqBlockNum,
-    isStalled
-  }
+    isStalled,
+  };
 
   return [isSynced, additionalSyncInfo];
 }
 
-
 async function getStratoMetadata() {
   const options = {
-    method: 'GET',
+    method: "GET",
     url: `http://strato:3000/eth/v1.2/metadata`,
     followRedirects: false,
     timeout: config.healthCheck.requestTimeout - 100,
@@ -162,7 +189,9 @@ async function getStratoMetadata() {
 
 function reformatPrometheusMetrics(obj) {
   if (!(obj && obj.data && obj.data.result)) {
-    winston.warn(`Not Found results while querying health status: prometheus path might be incorrect`);
+    winston.warn(
+      `Not Found results while querying health status: prometheus path might be incorrect`
+    );
     return {};
   }
   const timeNow = Date.now() / 1000;
@@ -178,30 +207,44 @@ function reformatPrometheusMetrics(obj) {
       loc = elem.metric.location.toString();
 
       // check and remove from checkJObs list
-      if ((loc in checkJobs) && (checkJobs[loc] == name)) {
+      if (loc in checkJobs && checkJobs[loc] == name) {
         delete checkJobs[loc];
       } else {
-        winston.warn(`Jobs are updated? The following prometheus job is not in the check list required: `, loc);
+        winston.warn(
+          `Jobs are updated? The following prometheus job is not in the check list required: `,
+          loc
+        );
       }
 
-      ret[name] = (Math.abs(timeNow - elem.value[0]) < config.healthCheck.pollFrequency * config.healthCheck.pollTimeoutsForUnhealthy / 1000) && (elem.value[1] == 1) ? true : false;
+      ret[name] =
+        Math.abs(timeNow - elem.value[0]) <
+          (config.healthCheck.pollFrequency *
+            config.healthCheck.pollTimeoutsForUnhealthy) /
+            1000 && elem.value[1] == 1
+          ? true
+          : false;
     } else {
       winston.info(`Metric format is updated; need to update its handling`);
     }
-  })
+  });
 
   Object.keys(checkJobs).forEach((elem) => {
     ret[checkJobs[elem]] = false;
-    winston.warn(`${checkJobs[elem]} : ${elem} not found in the prometheus response; Not started`);
-  })
+    winston.warn(
+      `${checkJobs[elem]} : ${elem} not found in the prometheus response; Not started`
+    );
+  });
 
-  winston.info('Create entry for latest health status:', ret);
+  winston.info("Create entry for latest health status:", ret);
 
   return ret;
 }
 
 //TODO: refactor - make a batch db insert for all stats at once, divide node health calc and db insert (ridiculous function name)
-async function calcNodeHealthAndSaveVitalStats(prometheusHealthMetrics, isGlobalPasswordSet) {
+async function calcNodeHealthAndSaveVitalStats(
+  prometheusHealthMetrics,
+  isGlobalPasswordSet
+) {
   let isNodeHealthy = true;
   let currentTime = Date.now();
   let failedChecks = [];
@@ -214,14 +257,14 @@ async function calcNodeHealthAndSaveVitalStats(prometheusHealthMetrics, isGlobal
     await models.HealthStat.create({
       processName: keyProcess,
       HealthStatus: prometheusHealthMetrics[keyProcess],
-      timestamp: currentTime
+      timestamp: currentTime,
     });
   });
 
   // TODO: move out from here (into checkSystemInfo?)
   if (!isGlobalPasswordSet) {
     isNodeHealthy = false;
-    failedChecks.push('stratoPassword')
+    failedChecks.push("stratoPassword");
   }
 
   return [isNodeHealthy, failedChecks];
@@ -229,205 +272,254 @@ async function calcNodeHealthAndSaveVitalStats(prometheusHealthMetrics, isGlobal
 
 async function updateNodeHealthStatus(nodeHealthData, isGlobalPasswordSet) {
   let currentTime = Date.now();
-  
+
   // TODO: move checkSystemInfo out of here!
-  let [systemInfoStatus, systemInfo] = await checkSystemInfo(isGlobalPasswordSet);
+  let [systemInfoStatus, systemInfo] = await checkSystemInfo(
+    isGlobalPasswordSet
+  );
 
   // TODO: Should the unhealthy 'SystemInfoStat' make the HealthStat false??? Or add the status as a separate value in /health output
   let [stat, created] = await models.CurrentHealth.findOrCreate({
-    where: { processName: 'HealthStat' }, defaults: {
+    where: { processName: "HealthStat" },
+    defaults: {
       latestHealthStatus: nodeHealthData[0],
       latestCheckTimestamp: currentTime,
       additionalInfo: nodeHealthData[1].toString(),
-      lastFailureTimestamp: currentTime  // default first time marked as failure
-    }
-  })
+      lastFailureTimestamp: currentTime, // default first time marked as failure
+    },
+  });
   if (!created) {
     await stat.update(
       {
         latestCheckTimestamp: currentTime,
         latestHealthStatus: nodeHealthData[0],
         additionalInfo: nodeHealthData[1].toString(),
-        lastFailureTimestamp: nodeHealthData[0] ? stat.lastFailureTimestamp : currentTime
+        lastFailureTimestamp: nodeHealthData[0]
+          ? stat.lastFailureTimestamp
+          : currentTime,
       },
       {
-        where: { processName: 'HealthStat' }
+        where: { processName: "HealthStat" },
       }
     );
   }
   let [statSys, createdSys] = await models.CurrentHealth.findOrCreate({
-    where: { processName: 'SystemInfoStat' }, defaults: {
+    where: { processName: "SystemInfoStat" },
+    defaults: {
       latestHealthStatus: systemInfoStatus,
       latestCheckTimestamp: currentTime,
       additionalInfo: JSON.stringify(systemInfo),
-      lastFailureTimestamp: currentTime  // default first time marked as failure
-    }
-  })
+      lastFailureTimestamp: currentTime, // default first time marked as failure
+    },
+  });
   if (!createdSys) {
     await statSys.update(
       {
         latestCheckTimestamp: currentTime,
         latestHealthStatus: systemInfoStatus,
         additionalInfo: JSON.stringify(systemInfo),
-        lastFailureTimestamp: systemInfoStatus ? statSys.lastFailureTimestamp : currentTime
+        lastFailureTimestamp: systemInfoStatus
+          ? statSys.lastFailureTimestamp
+          : currentTime,
       },
       {
-        where: { processName: 'SystemInfoStat' }
-      })
+        where: { processName: "SystemInfoStat" },
+      }
+    );
   }
 
   let [syncStat, _] = await models.CurrentHealth.findOrCreate({
-    where: { processName: 'SyncStat' }, defaults: {
+    where: { processName: "SyncStat" },
+    defaults: {
       latestHealthStatus: false,
       latestCheckTimestamp: currentTime,
-      additionalInfo:  JSON.stringify({
+      additionalInfo: JSON.stringify({
         stalledIntervalCount: 0,
         lastVmBlockNum: 0,
-        lastSeqBlockNum: 0
+        lastSeqBlockNum: 0,
       }),
-      lastFailureTimestamp: currentTime  // default first time marked as failure
-    }
+      lastFailureTimestamp: currentTime, // default first time marked as failure
+    },
   });
 
-  const [isSynced, additionalSyncInfo] = await checkNodeSyncStallStatus(syncStat);
+  const [isSynced, additionalSyncInfo] = await checkNodeSyncStallStatus(
+    syncStat
+  );
   await syncStat.update(
     {
       latestCheckTimestamp: currentTime,
       latestHealthStatus: isSynced,
       additionalInfo: JSON.stringify(additionalSyncInfo),
-      lastFailureTimestamp: isSynced ? syncStat.lastFailureTimestamp : currentTime
+      lastFailureTimestamp: isSynced
+        ? syncStat.lastFailureTimestamp
+        : currentTime,
     },
     {
-      where: { processName: 'SyncStat' }
-    })
+      where: { processName: "SyncStat" },
+    }
+  );
 
-  return
+  return;
 }
 
 async function checkHealthIsFresh(isGlobalPasswordSet) {
   try {
     const healthInfo = await models.CurrentHealth.findOne({
       where: {
-        processName: "HealthStat"
+        processName: "HealthStat",
       },
       attributes: [
-        'latestHealthStatus',
-        'latestCheckTimestamp',
-        'lastFailureTimestamp'
+        "latestHealthStatus",
+        "latestCheckTimestamp",
+        "lastFailureTimestamp",
       ],
       raw: true,
-    })
-
+    });
 
     const currentTime = Date.now();
     if (healthInfo) {
-      const isHealthcheckUptodate = ((currentTime - healthInfo.latestCheckTimestamp) < config.healthCheck.pollFrequency * config.healthCheck.pollTimeoutsForUnhealthy);
+      const isHealthcheckUptodate =
+        currentTime - healthInfo.latestCheckTimestamp <
+        config.healthCheck.pollFrequency *
+          config.healthCheck.pollTimeoutsForUnhealthy;
       if (!isHealthcheckUptodate) {
-        const currentStatus = [false, 'Latest health check is outdated'];
+        const currentStatus = [false, "Latest health check is outdated"];
         await updateNodeHealthStatus(currentStatus, isGlobalPasswordSet);
       }
     }
   } catch (err) {
-    winston.warn(`Error occurred while checking and comparing the latest health: ${err.message ? err.message : err} `);
-    const currentStatus = [false, 'Server error: could not calculate the health status'];
+    winston.warn(
+      `Error occurred while checking and comparing the latest health: ${
+        err.message ? err.message : err
+      } `
+    );
+    const currentStatus = [
+      false,
+      "Server error: could not calculate the health status",
+    ];
     await updateNodeHealthStatus(currentStatus, isGlobalPasswordSet);
   }
 }
 
-
 async function checkSystemInfo(isGlobalPasswordSet) {
   try {
     let additional_info = [];
-    let sysInfoCollected = {}
+    let sysInfoCollected = {};
     let isHealthy = true;
-    const [memdata, cpudata, metadataLoad, metadataFs, metadataNetwork] = await Promise.all([
-      si.mem(),
-      si.cpu(),
-      si.currentLoad(),
-      si.fsSize(),
-      si.networkStats(),
-    ]);
-    
+    const [memdata, cpudata, metadataLoad, metadataFs, metadataNetwork] =
+      await Promise.all([
+        si.mem(),
+        si.cpu(),
+        si.currentLoad(),
+        si.fsSize(),
+        si.networkStats(),
+      ]);
+
     // MEMORY
-    const useLevel = (1 - (memdata.available / memdata.total)) * 100
+    const useLevel = (1 - memdata.available / memdata.total) * 100;
     sysInfoCollected.memory = {
-      "active": memdata.active,
-      "free": memdata.free,
-      "available": memdata.available,
-      "total": memdata.total,
-      "use": useLevel,
-    }
-    if (useLevel >= config.healthCheck.memoryUsedAlertLevel) {
+      active: memdata.active,
+      free: memdata.free,
+      available: memdata.available,
+      total: memdata.total,
+      use: {
+        value: +useLevel.toFixed(2),
+        isHealthy: useLevel < config.healthCheck.memoryUsedAlertLevel,
+      },
+    };
+    if (!sysInfoCollected.memory.use.isHealthy) {
       isHealthy = false;
-      additional_info.push(`Low Memory (used ${useLevel}%)`)
+      additional_info.push(`Low Memory (used ${useLevel.toFixed(2)}%)`);
     }
-    
+
     // CPU
     sysInfoCollected.cpu = {
-      'manufacturer': cpudata.manufacturer,
-      'brand': cpudata.brand,
-      'cores': cpudata.cores,
-      'physicalCores': cpudata.physicalCores,
-      'currentLoad': metadataLoad.currentLoad,
-      'avgLoad': metadataLoad.avgLoad,
+      manufacturer: cpudata.manufacturer,
+      brand: cpudata.brand,
+      cores: cpudata.cores,
+      physicalCores: cpudata.physicalCores,
+      currentLoad: {
+        value: +metadataLoad.currentLoad.toFixed(2),
+        isHealthy:
+          metadataLoad.currentLoad <
+          config.healthCheck.cpuCurrentLoadAlertLevel,
+      },
+      avgLoad: {
+        value: +((metadataLoad.avgLoad * 100) / cpudata.cores).toFixed(2),
+        isHealthy:
+          metadataLoad.avgLoad <
+          (cpudata.cores * config.healthCheck.cpuAvgLoadAlertLevel) / 100,
+      },
     };
-    if (metadataLoad.avgLoad >= cpudata.cores * config.healthCheck.cpuAvgLoadAlertLevel/100) {
+    if (!sysInfoCollected.cpu.avgLoad.isHealthy) {
       isHealthy = false;
-      additional_info.push(`Average CPU load is high (${metadataLoad.avgLoad})`)
+      additional_info.push(
+        `Average CPU load is high (${metadataLoad.avgLoad.toFixed(2)})`
+      );
     }
-    if (metadataLoad.currentLoad >= config.healthCheck.cpuCurrentLoadAlertLevel) {
+    if (!sysInfoCollected.cpu.currentLoad.isHealthy) {
       isHealthy = false;
-      additional_info.push(`Current CPU load is high (${metadataLoad.currentLoad})`)
+      additional_info.push(
+        `Current CPU load is high (${metadataLoad.currentLoad.toFixed(2)})`
+      );
     }
 
     // FILESYSTEM
-    const fsData = []
+    const fsData = [];
     metadataFs.forEach(function (fs) {
-      if (fs.fs !== 'overlay') {
-        fsData.push(
-            {
-              'name': fs.fs,
-              'size': fs.size,
-              'used': fs.used,
-              'use': fs.use,
-            }
-        )
-        if (fs.use >= config.healthCheck.diskspaceUsedAlertLevel) {
+      if (fs.fs !== "overlay") {
+        const isDiskHealthy =
+          fs.use < config.healthCheck.diskspaceUsedAlertLevel;
+        fsData.push({
+          name: fs.fs,
+          size: fs.size,
+          used: fs.used,
+          use: {
+            value: +fs.use.toFixed(2),
+            isHealthy: isDiskHealthy,
+          },
+        });
+        if (!isDiskHealthy) {
           isHealthy = false;
-          additional_info.push(`Low Disk Space on ${fs.fs} (used ${fs.use}%)`)
+          additional_info.push(
+            `Low Disk Space on ${fs.fs} (used ${fs.use.toFixed(2)}%)`
+          );
         }
       }
-    })
+    });
+    fsData.sort((a, b) => b.use.value - a.use.value);
     sysInfoCollected.filesystem = fsData;
 
     // NETWORK
-    const nwData = []
+    const nwData = [];
     metadataNetwork.forEach(function (nwStat) {
-      nwData.push(
-          {
-            'interface': nwStat.iface,
-            'networkStats_rx_bytes': nwStat.rx_bytes,
-            'networkStats_tx_bytes': nwStat.tx_bytes,
-          }
-      )
-    })
+      nwData.push({
+        interface: nwStat.iface,
+        networkStats_rx_bytes: nwStat.rx_bytes,
+        networkStats_tx_bytes: nwStat.tx_bytes,
+      });
+    });
     sysInfoCollected.networkStats = nwData;
 
     if (!isGlobalPasswordSet) {
       isHealthy = false;
-      additional_info.push("STRATO Vault password is not set")
+      additional_info.push("STRATO Vault password is not set");
     }
 
     if (additional_info) {
-      sysInfoCollected.Alerts = additional_info
+      sysInfoCollected.Alerts = additional_info;
     }
 
-    winston.info(`Sys info collected at ${moment().format()}`)
-    winston.debug('sysInfoCollected: ', sysInfoCollected)
+    winston.info(`Sys info collected at ${moment().format()}`);
+    winston.debug("sysInfoCollected: ", sysInfoCollected);
     return [isHealthy, sysInfoCollected];
   } catch (e) {
-    winston.warn(`Error ${e.message ? e.message : ''} occurred while checking System Information`)
-    const currentStatus = [false, ['Error when checking System Information']];
+    winston.warn(
+      `Error ${
+        e.message ? e.message : ""
+      } occurred while checking System Information`
+    );
+    const currentStatus = [false, ["Error when checking System Information"]];
     await updateNodeHealthStatus(currentStatus, isGlobalPasswordSet);
   }
 }
@@ -437,5 +529,5 @@ module.exports = {
   updateNodeHealthStatus,
   calcNodeHealthAndSaveVitalStats,
   reformatPrometheusMetrics,
-  neededJobs
-}
+  neededJobs,
+};

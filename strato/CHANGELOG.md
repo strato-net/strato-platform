@@ -25,6 +25,7 @@ so that they could be properly moved to their respective version's subsection.
 - Added a 5MB file size upload limit (enforced by highway).
 - functionality to enumerate threads and their details in `/threads` endpoint of `P2PAPI`
 - `/peers` endpoint in `P2PAPI` to list peer connections and their health
+- POST `/transaction` contract creation calls will now additionally check for address state ref table entry before resolving
 
 ### Changed 
 - When a transaction fails, the `<failed>` message blinks :^)
