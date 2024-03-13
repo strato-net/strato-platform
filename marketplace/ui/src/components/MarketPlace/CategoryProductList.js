@@ -149,6 +149,8 @@ const CategoryProductList = ({ user }) => {
     if (selectedCategories.length) {
       categorys = arrayToStr(selectedCategories);
       subCategoryActions.fetchSubCategoryList(subCategoryDispatch, categorys);
+    } else {
+      subCategoryActions.fetchSubCategoryList(subCategoryDispatch, null);
     }
   }, [subCategoryDispatch, selectedCategories]);
 

@@ -46,7 +46,7 @@ class SubCategoryController {
       }
 
       const categoryRecord = categories.find((record) => record.name === category);
-      const subCategories = categoryRecord.subCategories;
+      const subCategories = categoryRecord?.subCategories;
       
       rest.response.status200(res, subCategories)
      
