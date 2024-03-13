@@ -99,7 +99,7 @@ executables:
     dependencies:
       - blockstanbul
       - hflags
-      - milena
+      - kafka-monad
       - seqevents
       - strato-conf
 
