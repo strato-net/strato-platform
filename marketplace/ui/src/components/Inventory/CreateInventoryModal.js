@@ -407,7 +407,7 @@ const CreateInventoryModal = ({
                 <div className="flex items-start">
                   <p className="mt-1 text-xs italic font-medium ">Note:</p>
                   <p className="mt-1 text-xs italic ml-1 mr-4">
-                    use pdfs with total size of less than 5mb. Limit of 10 files.
+                    use pdf files with total size of less than 5mb. Limit of 10 files.
                   </p>
                 </div>
               </Form.Item>
