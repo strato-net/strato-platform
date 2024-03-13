@@ -74,9 +74,9 @@ const CreateInventoryModal = ({
       setUploadErr("File must be PDF format");
       return Upload.LIST_IGNORE;
     }
-    const isLt6M = file.size / 1024 / 1024 < 6; // Check if the file size is less than 6 MB
-    if (!isLt6M) {
-      setUploadErr("Cannot upload a PDF of size more than 6 MB");
+    const isLt5M = file.size / 1024 / 1024 < 5; // Check if the file size is less than 6 MB
+    if (!isLt5M) {
+      setUploadErr("Cannot upload a PDF of size more than 5 MB");
       return Upload.LIST_IGNORE;
     }
     const isNameLengthValid = file.name.length <= 100;
@@ -407,7 +407,7 @@ const CreateInventoryModal = ({
                 <div className="flex items-start">
                   <p className="mt-1 text-xs italic font-medium ">Note:</p>
                   <p className="mt-1 text-xs italic ml-1 mr-4">
-                    use pdf format of size less than 6mb. Limit of 10.
+                    use pdfs with total size of less than 5mb. Limit of 10 files.
                   </p>
                 </div>
               </Form.Item>

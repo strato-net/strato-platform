@@ -116,7 +116,7 @@ appHighwayWrapper env =
     $ serveHighwayWrapper env
   where
     ctx    = setMaxRequestKeyLength 100 defaultParseRequestBodyOptions
-    ctx'   = setMaxRequestFileSize 6000000 ctx
+    ctx'   = setMaxRequestFileSize 5000000 ctx
     ctx'' :: Context '[MultipartOptions Mem]
     ctx''  = (MultipartOptions ctx' ()) :. EmptyContext
     policy = simpleCorsResourcePolicy {corsRequestHeaders = ["Content-Type"]}
