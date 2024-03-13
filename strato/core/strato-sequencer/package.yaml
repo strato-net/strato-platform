@@ -76,7 +76,7 @@ executables:
       - extra
       - hflags
       - http-client
-      - milena
+      - kafka-monad
       - prometheus-client
       - safe
       - seqevents

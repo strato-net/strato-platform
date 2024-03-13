@@ -22,14 +22,15 @@ import Control.Concurrent.Async as Async
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TMChan
 import Control.Monad
+import Control.Monad.Composable.Kafka
 import qualified Data.Aeson as Ae
 import Data.ByteString.Base64
 import qualified Data.ByteString.Char8 as C8
 import Data.Either.Extra
+import Data.String
 import Flags
 import HFlags
 import Network.HTTP.Client (defaultManagerSettings, newManager)
-import qualified Network.Kafka.Protocol as KP
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Prometheus
 import Safe
@@ -60,14 +61,11 @@ main = do
   putStrLn $ "strato-sequencer certInfo: " ++ show flags_certInfo
 
   pkg <- atomically newCablePackage
-  let kafkaClientId' = KP.KString $ C8.pack flags_kafkaclientid
+  let kafkaClientId' = KString $ C8.pack flags_kafkaclientid
       mKafkaAddress = case span (/= ':') flags_kafkaaddress of
         (_, "") -> Nothing
         (khost, kport) ->
-          Just
-            ( KP.Host (KP.KString (C8.pack khost)),
-              KP.Port (readDef 9092 (drop 1 kport))
-            )
+          Just (fromString khost, fromInteger $ readDef 9092 $ drop 1 kport)
       gregorCfg =
         GregorConfig
           { kafkaAddress = mKafkaAddress,
