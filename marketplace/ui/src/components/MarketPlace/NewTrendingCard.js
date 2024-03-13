@@ -7,11 +7,12 @@ import {
     InputNumber,
     Tooltip
 } from "antd";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
 import TagManager from "react-gtm-module";
 import { Images } from '../../images';
 import images_placeholder from "../../images/resources/image_placeholder.png"
+import { SEO } from '../../helpers/seoConstant';
 import DOMPurify from 'dompurify';
 
 const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, contextHolder, isUserProfile = false }) => {
@@ -25,7 +26,13 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
 
     const naviroute = routes.MarketplaceProductDetail.url;
     const navigate = useNavigate();
+    const location = useLocation();
 
+    const queryParams = new URLSearchParams(location.search);
+    const categoryQueryValue = queryParams.get('category');
+    const categoryQueryValueArr = categoryQueryValue ? categoryQueryValue.split(',') : []
+    const imgMeta = categoryQueryValueArr.length === 1 ? categoryQueryValueArr[0] : SEO.IMAGE_META
+    
     const sanitizedDescription = DOMPurify.sanitize(topSellingProduct?.description || "N/A");
     const customStyle = {
         color: '#989898',
@@ -79,7 +86,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                 <img
                     className='md:h-[200px] md:w-[40vw] h-[150px] w-full object-contain rounded-md cursor-pointer mb-2'
                     src={topSellingProduct.images ? topSellingProduct?.images[0] : images_placeholder}
-                    alt={topSellingProduct?.name || "N/A"}
+                    alt={imgMeta}  title={imgMeta}
                 />
                 <div className='flex justify-between items-center'>
                     <Typography
@@ -92,7 +99,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                         </Tooltip>
                         {/* {topSellingProduct?.name || "N/A"} */}
                     </Typography>
-                    <img className='w-4 h-4' src={Images.Verified} alt='verified' />
+                    <img  alt={imgMeta} title={imgMeta} className='w-4 h-4' src={Images.Verified} />
                 </div>
             </a>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -198,9 +205,9 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                     }}
                     type='primary'
                 >
-
-                    <img src={Images.Cart} alt='Cart' width={18} height={18} className='max-w-[18px]' />
-
+                   
+                    <img alt={imgMeta} title={imgMeta} src={Images.Cart} width={18} height={18} className='max-w-[18px]'/>
+                    
                     {/* <ShoppingCartOutlined style={{ color: '#EEEFFA' , width:'18px' ,  height:'18px' }} /> */}
                 </Button>
             </div>

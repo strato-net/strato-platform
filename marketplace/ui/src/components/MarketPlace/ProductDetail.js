@@ -42,6 +42,8 @@ import "react-responsive-carousel/lib/styles/carousel.min.css"; // requires a lo
 import { Carousel } from "react-responsive-carousel"
 import { Images } from "../../images";
 import ProductItemDetails from "./ProductItemDetails";
+import HelmetComponent from "../Helmet/HelmetComponent";
+import { SEO } from "../../helpers/seoConstant";
 import PreviewMode from "../RichEditor/PreviewMode";
 
 const ProductDetails = ({ user, users }) => {
@@ -310,6 +312,19 @@ const ProductDetails = ({ user, users }) => {
     return parts[parts.length - 1];
   };
 
+  function getCategoryName(str) {
+    const lastIndex = str.lastIndexOf('-');
+    if (lastIndex !== -1) {
+      return str.substring(lastIndex + 1);
+    } else {
+      return str;
+    }
+  }
+  
+  const assetName = decodeURIComponent(details?.name)
+  const contractName = getCategoryName(decodeURIComponent(details?.contract_name))
+  const linkUrl = window.location.href;
+
   return (
     <>
       {contextHolder}
@@ -321,6 +336,10 @@ const ProductDetails = ({ user, users }) => {
         </div>
       ) : (
         <div>
+          <HelmetComponent 
+          title={`${assetName} | ${contractName} | ${SEO.TITLE_META}`}
+          description={details?.description} 
+          link={linkUrl} />
           <Row>
             <Breadcrumb className="text-xs   mb-4 md:mt-5  md:mb-6 lg:mb-[44px] ml-4 lg:ml-16">
               <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
@@ -364,10 +383,16 @@ const ProductDetails = ({ user, users }) => {
               } className="product_detail w-full  sm:w-[417px]   lg:h-[348px] md:w-[343px] lg:w-[417px]" showStatus={false} showArrows swipeable emulateTouch infiniteLoop >
                 {details.images.length > 0 ? details.images.map((element, index) => {
                   return (<><div key={index} className="sm:w-[343px ] h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
-                    <img width={"100%"} className="object-contain rounded-md h-full " src={element ? element : image_placeholder} />
+                    <img width={"100%"} 
+                    alt={`${assetName} | Image ${index}`}
+                    title={`${assetName} | Image ${index}`}
+                    className="object-contain rounded-md h-full " src={element ? element : image_placeholder} />
                   </div></>)
                 }) : <><div className="sm:w-[343px ] sm:h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
-                  <img width={"100%"} className="object-contain rounded-md h-full " src={image_placeholder} />
+                  <img width={"100%"}
+                  alt={`${assetName} | Image`}
+                  title={`${assetName} | Image`}
+                  className="object-contain rounded-md h-full " src={image_placeholder} />
                 </div></>}
               </Carousel>
               <div className=" w-full lg:w-1/2">
@@ -489,7 +514,7 @@ const ProductDetails = ({ user, users }) => {
                     {ownerSameAsUser() ?
                       <Button
                         icon={<div className="flex justify-center items-center">
-                          <img src={Images.Cart} alt="cart" width={18} height={18} className="object-contain" />
+                          <img src={Images.Cart} alt={`${assetName} | Image`} title={`${assetName} | Image`} width={18} height={18} className="object-contain" />
                         </div>}
                         className=" !w-9 h-9 border border-primary  !bg-[#13188A] rounded-md"
                         disabled={true}
@@ -527,7 +552,7 @@ const ProductDetails = ({ user, users }) => {
                       :
                       <Button
                         icon={<div className="flex justify-center items-center">
-                          <img src={Images.Cart} alt="cart" width={18} height={18} className="object-contain" />
+                          <img src={Images.Cart} alt={`${assetName} | Image`} title={`${assetName} | Image`} width={18} height={18} className="object-contain" />
                         </div>}
                         className=" !w-9 h-9 rounded-md  !bg-[#13188A]"
                         onClick={async () => {
