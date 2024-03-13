@@ -35,7 +35,8 @@ exports[`MenuBar: index renders Oauth mode component with values 1`] = `
             <br />
             <Blueprint.MenuDivider />
             <h5>
-              If your account still hasn&#39;t been verified, 
+              If your account still hasn&#39;t been verified,
+               
               <a onClick={[Function: onClick]} href=\\"https://support.blockapps.net\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\">
                 contact support here.
               </a>
@@ -97,7 +98,8 @@ exports[`MenuBar: index renders Oauth mode component without values 1`] = `
             <br />
             <Blueprint.MenuDivider />
             <h5>
-              If your account still hasn&#39;t been verified, 
+              If your account still hasn&#39;t been verified,
+               
               <a onClick={[Function: onClick]} href=\\"https://support.blockapps.net\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\">
                 contact support here.
               </a>

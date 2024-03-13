@@ -50,6 +50,7 @@ services:
     - STRATO_HOSTNAME=${STRATO_HOSTNAME}
     - STRATO_PORT_API=${STRATO_PORT_API}
     - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
+    - MONITOR_URL=${MONITOR_URL}
     build: .
     image: ${APEX_IMAGE:-<REPO_URL>apex:<VERSION>}
     restart: unless-stopped
