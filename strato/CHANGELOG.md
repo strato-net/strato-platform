@@ -14,9 +14,22 @@ BlockApps engineers - for more context, see [here](https://blockappsdev.slack.co
 All changes merged to `develop` should be documented in "Unreleased" until the version is finalized
 so that they could be properly moved to their respective version's subsection.
 
+## [Unreleased] 
+
+### Added
+
+### Changed
+
+### Fixed
+- `sendOutEvent` inconsistenly encoding code pointer hash
+
+### Removed
+- `bloc/v2.2/x509/createCert` is no more
+
+
 ## [11.1.0] - 3/7/2023
 
-#### Added
+### Added
 - Custom `Show` instances for `CodeCollection`, `Function`, `Contract` data types
 - Increase gas consumption for contract creation
 - `VM_DEBUGGER=bool` flag added for connecting to the VM debugger + static analysis websocket
