@@ -239,10 +239,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             };
   
             // Adding a new field to track all the addresses of grouped items
-            const uniqueAddresses = [...new Set(additionalItems.map(item => item.address))];
-            if (uniqueAddresses.length > 1) {
-              combinedItem.groupedAddresses = uniqueAddresses;
-            }
+            combinedItem.groupedAssets = additionalItems.map(item => ({
+              address: item.address,
+              quantity: item.quantity,
+              saleQuantity: item.saleQuantity || 0,
+              totalLockedQuantity: item.totalLockedQuantity || 0,
+            }));
   
             combinedInventories.push(combinedItem);
             if (combinedInventories.length >= limit) {
