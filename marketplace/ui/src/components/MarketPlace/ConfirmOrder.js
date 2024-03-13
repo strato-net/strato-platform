@@ -324,12 +324,14 @@ const ConfirmOrder = () => {
         orderList.push({
           quantity: item.qty,
           assetAddress: item.key,
+          firstSale: item.firstSale,
+          unitPrice: item.unitPrice
         });
       });
       // These additional fields need to be sent to form the request after stripe. 
       let body = {
         paymentList: PAYMENT_LIST,
-      buyerOrganization: userOrganization,
+        buyerOrganization: userOrganization,
         orderList,
         orderTotal: total + tax + shipping,
         shippingAddressId: userAddresses[selectedAddress].address_id,
@@ -400,8 +402,8 @@ const ConfirmOrder = () => {
                       const saleAddresses = [];
                       const quantities = [];
                       data.forEach((item) => {
-                          saleAddresses.push(item.saleAddress)
-                          quantities.push(item.qty)
+                        saleAddresses.push(item.saleAddress)
+                        quantities.push(item.qty)
                       })
                       const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities)
                       if (checkQuantity === true) {
@@ -409,22 +411,22 @@ const ConfirmOrder = () => {
                       } else {
                         let insufficientQuantityMessage = "";
                         let outOfStockMessage = "";
-                
+
                         checkQuantity.forEach(detail => {
-                            if (detail.availableQuantity === 0) {
-                                outOfStockMessage += `Product ${detail.assetName}\n`;
-                            } else {
-                                insufficientQuantityMessage += `Product ${detail.assetName}: ${detail.availableQuantity}\n`;
-                            }
+                          if (detail.availableQuantity === 0) {
+                            outOfStockMessage += `Product ${detail.assetName}\n`;
+                          } else {
+                            insufficientQuantityMessage += `Product ${detail.assetName}: ${detail.availableQuantity}\n`;
+                          }
                         });
-                
+
                         let errorMessage = "";
                         if (insufficientQuantityMessage) {
-                            errorMessage += `The following item(s) in your cart have limited quantity available and will need to be adjusted. Please reduce the quantity to proceed:\n${insufficientQuantityMessage}`;
+                          errorMessage += `The following item(s) in your cart have limited quantity available and will need to be adjusted. Please reduce the quantity to proceed:\n${insufficientQuantityMessage}`;
                         }
                         if (outOfStockMessage) {
-                            if (errorMessage) errorMessage += "\n"; // Add a new line if there's already an error message
-                            errorMessage += `The following item(s) are temporarily out of stock and should be removed:\n${outOfStockMessage}`;
+                          if (errorMessage) errorMessage += "\n"; // Add a new line if there's already an error message
+                          errorMessage += `The following item(s) are temporarily out of stock and should be removed:\n${outOfStockMessage}`;
                         }
                         openToastOrder("bottom", errorMessage);
                       }
@@ -443,101 +445,101 @@ const ConfirmOrder = () => {
                 <Spin spinning={isCreateOrderSubmitting || isCreatePaymentSubmitting} size="large" />
               </div>
             ) : (
-            <div className="pb-[30px] confirm-order-body">
-              <div className="pt-4 hidden lg:block border-top cart">
-                <DataTableComponent
-                  isLoading={false}
-                  scrollX="100%"
-                  columns={columns}
-                  data={data}
-                  pagination={false}
-                />
-              </div>
-              <div className=" grid sm:place-items-center grid-cols-1 lg:hidden ">
-                <ResponsiveCart data={data} key={data} confirm={true} openToastOrder={openToastOrder} />
-              </div>
-
-              <div className="bg-[#EEEFFA] rounded-b-md py-[15px] px-4  hidden lg:flex lg:justify-end ">
-                <div className="w-[235px] flex flex-col gap-[10px]">
-                  <Row className="justify-between ">
-                    <p className="text-base text-[#6A6A6A]  ">Sub Total:</p>
-                    <p className="text-xl text-[#202020]   text-right">${total}</p>
-                  </Row>
-                  <Row className="justify-between ">
-                    <p className="text-base text-[#6A6A6A]  ">Tax:</p>
-                    <p className="text-xl text-[#202020]   text-right">${tax}</p>
-                  </Row>
-                  <Row className="justify-between ">
-                    <p className="text-base text-[#6A6A6A] ">Shipping Charges:</p>
-                    <p className="text-xl text-[#202020]  text-right">${shipping}</p>
-                  </Row>
-                  <Row className="justify-between">
-                    <p className="text-base text-[#6A6A6A] ">Total:</p>
-                    <p className="text-xl text-[#202020]   text-right">
-                      ${total + tax + shipping}
-                    </p>
-                  </Row>
-                </div>
-              </div>
-              <Row align="middle pt-10 flex gap-3 items-center">
-                <p className="text-base md:text-xl lg:text-2xl text-[#202020] font-semibold ">Address Details</p>
-                {showAddress ?
-                  <MinusCircleOutlined className="text-xl text-primary"
-                    onClick={() => {
-                      setshowAddress(false);
-                    }}
+              <div className="pb-[30px] confirm-order-body">
+                <div className="pt-4 hidden lg:block border-top cart">
+                  <DataTableComponent
+                    isLoading={false}
+                    scrollX="100%"
+                    columns={columns}
+                    data={data}
+                    pagination={false}
                   />
-                  :
-                  <>
-                    <div className=" hidden md:block"><Button type="link" icon={<img src={Images.AddBlack} className=" w-4 h-4 lg:w-6 lg:h-6 " alt="add" />}
+                </div>
+                <div className=" grid sm:place-items-center grid-cols-1 lg:hidden ">
+                  <ResponsiveCart data={data} key={data} confirm={true} openToastOrder={openToastOrder} />
+                </div>
+
+                <div className="bg-[#EEEFFA] rounded-b-md py-[15px] px-4  hidden lg:flex lg:justify-end ">
+                  <div className="w-[235px] flex flex-col gap-[10px]">
+                    <Row className="justify-between ">
+                      <p className="text-base text-[#6A6A6A]  ">Sub Total:</p>
+                      <p className="text-xl text-[#202020]   text-right">${total}</p>
+                    </Row>
+                    <Row className="justify-between ">
+                      <p className="text-base text-[#6A6A6A]  ">Tax:</p>
+                      <p className="text-xl text-[#202020]   text-right">${tax}</p>
+                    </Row>
+                    <Row className="justify-between ">
+                      <p className="text-base text-[#6A6A6A] ">Shipping Charges:</p>
+                      <p className="text-xl text-[#202020]  text-right">${shipping}</p>
+                    </Row>
+                    <Row className="justify-between">
+                      <p className="text-base text-[#6A6A6A] ">Total:</p>
+                      <p className="text-xl text-[#202020]   text-right">
+                        ${total + tax + shipping}
+                      </p>
+                    </Row>
+                  </div>
+                </div>
+                <Row align="middle pt-10 flex gap-3 items-center">
+                  <p className="text-base md:text-xl lg:text-2xl text-[#202020] font-semibold ">Address Details</p>
+                  {showAddress ?
+                    <MinusCircleOutlined className="text-xl text-primary"
                       onClick={() => {
-                        setshowAddress(true);
-                        setmodalAddress(true);
+                        setshowAddress(false);
                       }}
-                    /></div>
-                    <div className="  md:hidden"><Button type="link" icon={<img src={Images.AddBlack} className=" w-4 h-4 lg:w-6 lg:h-6 " alt="add" />}
-                      onClick={() => {
-                        setResponsiveAddress(true);
-                      }}
-                    /></div>
-                  </>
-                }
-              </Row>
-              {modalAddress && <AddAddressModal open={modalAddress} close={CloseAddressModel} />}
-              <div>
-                <div className="mt-4">
-                  {isAddingShippingAddress || isLoadingUserAddresses || isLoadingStripeStatus ?
-                    <div className="h-80 flex justify-center items-center">
-                      <Spin spinning={isAddingShippingAddress || isLoadingUserAddresses || isLoadingStripeStatus} size="large" />
-                    </div>
+                    />
                     :
-                    userAddresses.length !== 0 ?
-                      <div className="grid grid-rows-2 sm:grid-rows-1 grid-flow-col gap-4 lg:flex  lg:flex-wrap overflow-x-auto lg:overflow-y-auto hide-Scroll lg:gap-x-6 lg:gap-y-[20px] pt-4 h-[50%] lg:h-[44vh]">
-                        {
-                          userAddresses.map((add, index) =>
-                            <div key={index}>
-                              <div className={`w-[307px] h-[200px] overflow-x-auto hide-Scroll py-3 px-[14px] rounded-[4px] ${index !== selectedAddress ? " cursor-pointer border border-[#0000002E] " : " border border-primary cursor-pointer"}`} onClick={() => { setSelectedAddress(index) }}>
-                                <AddressComponent userAddress={add} />
-                              </div>
-                            </div>
-                          )
-                        }
+                    <>
+                      <div className=" hidden md:block"><Button type="link" icon={<img src={Images.AddBlack} className=" w-4 h-4 lg:w-6 lg:h-6 " alt="add" />}
+                        onClick={() => {
+                          setshowAddress(true);
+                          setmodalAddress(true);
+                        }}
+                      /></div>
+                      <div className="  md:hidden"><Button type="link" icon={<img src={Images.AddBlack} className=" w-4 h-4 lg:w-6 lg:h-6 " alt="add" />}
+                        onClick={() => {
+                          setResponsiveAddress(true);
+                        }}
+                      /></div>
+                    </>
+                  }
+                </Row>
+                {modalAddress && <AddAddressModal open={modalAddress} close={CloseAddressModel} />}
+                <div>
+                  <div className="mt-4">
+                    {isAddingShippingAddress || isLoadingUserAddresses || isLoadingStripeStatus ?
+                      <div className="h-80 flex justify-center items-center">
+                        <Spin spinning={isAddingShippingAddress || isLoadingUserAddresses || isLoadingStripeStatus} size="large" />
                       </div>
                       :
-                      <div className="flex justify-center items-center h-48 ">
-                        <p className="text-2xl font-semibold text-[#202020]">
-                          Please Add Address
-                        </p>
-                      </div>
-                  }
+                      userAddresses.length !== 0 ?
+                        <div className="grid grid-rows-2 sm:grid-rows-1 grid-flow-col gap-4 lg:flex  lg:flex-wrap overflow-x-auto lg:overflow-y-auto hide-Scroll lg:gap-x-6 lg:gap-y-[20px] pt-4 h-[50%] lg:h-[44vh]">
+                          {
+                            userAddresses.map((add, index) =>
+                              <div key={index}>
+                                <div className={`w-[307px] h-[200px] overflow-x-auto hide-Scroll py-3 px-[14px] rounded-[4px] ${index !== selectedAddress ? " cursor-pointer border border-[#0000002E] " : " border border-primary cursor-pointer"}`} onClick={() => { setSelectedAddress(index) }}>
+                                  <AddressComponent userAddress={add} />
+                                </div>
+                              </div>
+                            )
+                          }
+                        </div>
+                        :
+                        <div className="flex justify-center items-center h-48 ">
+                          <p className="text-2xl font-semibold text-[#202020]">
+                            Please Add Address
+                          </p>
+                        </div>
+                    }
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-          {marketplaceMessage && openToastMarketplace("Bottom")}
-          {message && openToastOrder("bottom", message)}
-        </div>
-      </>}
+            )}
+            {marketplaceMessage && openToastMarketplace("Bottom")}
+            {message && openToastOrder("bottom", message)}
+          </div>
+        </>}
     </>
   );
 };

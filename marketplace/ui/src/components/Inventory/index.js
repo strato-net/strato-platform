@@ -1,13 +1,10 @@
 import React, { useState, useEffect } from "react";
 import {
   Breadcrumb,
-  Input,
   Button,
   Pagination,
   notification,
   Spin,
-  Typography,
-  Image,
   Tooltip, 
   Tabs
 } from "antd";
@@ -34,9 +31,6 @@ import CategoryCard from "../MarketPlace/CategoryCard";
 import HelmetComponent from "../Helmet/HelmetComponent";
 import { SEO } from "../../helpers/seoConstant";
 
-const { Search } = Input;
-
-const { Title, Text } = Typography;
 
 const Inventory = ({ user }) => {
   const [open, setOpen] = useState(false);

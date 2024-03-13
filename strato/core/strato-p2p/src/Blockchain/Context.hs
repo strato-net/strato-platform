@@ -126,7 +126,6 @@ import           Blockchain.Stream.VMOutput            ( VMOutput(..)
 
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models (RedisBestBlock(..))
-import           Blockchain.TCPClientWithTimeout
 import           Control.Monad                         (void, when)
 import           Control.Monad.Composable.Base
 import qualified Database.Persist.Sql                  as SQL
@@ -231,11 +230,13 @@ class RunsServer n m where
 instance RunsClient ContextM where
   runClientConnection (IPAsText ip) (TCPPort p) sSource handler = do
     let peerAddress = BC.pack $ T.unpack ip
-    runTCPClientWithConnectTimeout (clientSettings p peerAddress) 5 $ \app -> do
+    runGeneralTCPClient (clientSettings p peerAddress) $ \app -> do
       let pSource = appSource app
           pSink = appSink app
           conduits = P2pConduits pSource pSink sSource
       handler conduits
+
+
 
 instance RunsServer ContextM (LoggingT IO) where
   runServer (TCPPort listenPort) runner handler = do

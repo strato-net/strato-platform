@@ -327,8 +327,8 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
           {<div className="flex md:hidden mx-2" onClick={() => handleSearchShow(true)}>
             <img src={Images.Responsive_search} alt={IMG_META} title={IMG_META} className="w-6 h-6" />
           </div>}
-          {roleIndex === undefined || roleIndex === 1 ? null : <Badge
-            className="cursor-pointer"
+          <Badge
+            className="cursor-pointer mr-3 md:mr-1"
             count={cartList.length}
             onClick={() => {
               TagManager.dataLayer({
@@ -350,7 +350,6 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
               />
             </div>
           </Badge>
-          }
 
           {(roleIndex !== undefined && roleIndex !== 1)
             && <Dropdown menu={{ items: stratsItem }} placement="bottomRight" trigger={["hover","click"]} className="xs:mt-5 md:mt-0" overlayStyle={{ position: 'fixed' }}>
@@ -381,7 +380,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
                 <Button size="large" className="flex sm:hidden bg-primary text-white w-[90%] !h-[25%] !text-sm justify-center items-center">Login/Register</Button>
               </a> : null
             ) :
-              <Dropdown menu={{ items }} placement="bottomRight" trigger={["click"]} overlayStyle={{ marginTop: "40px", position:'fixed' }}>
+              <Dropdown menu={{ items }} placement="bottomRight" trigger={["click"]} overlayStyle={{ marginTop: "40px", position: 'fixed' }}>
                 <a onClick={(e) => e.preventDefault()} className="hidden md:flex text-base text-white" id="user-dropdown">
                   <img src={Images.Setting_icon} alt={IMG_META} title={IMG_META} className="w-[30px] h-[30px] " />
                 </a>
