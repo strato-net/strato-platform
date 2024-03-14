@@ -82,6 +82,7 @@ getLength sizeOfLength bytes =
   where
     (lengthbytes,remainingbytes) = B.splitAt sizeOfLength bytes
     result = byteString2Integer lengthbytes
+                                0
 
 rlpSplit :: B.ByteString -> (RLPObject, B.ByteString)
 rlpSplit = either error id . rlpSplitEither
@@ -179,7 +180,7 @@ instance RLPSerializable Integer where
   rlpEncode x | x < 128 = RLPScalar $ fromIntegral x
   rlpEncode x = RLPString $ integer2Bytes x
   rlpDecode (RLPScalar x) = fromIntegral x
-  rlpDecode (RLPString s) = byteString2Integer s
+  rlpDecode (RLPString s) = byteString2Integer s 0
   rlpDecode (RLPArray [x]) = -rlpDecode x
   rlpDecode (RLPArray _) = error "rlpDecode called for Integer for array of wrong size"
 
