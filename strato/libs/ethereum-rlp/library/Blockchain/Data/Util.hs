@@ -4,17 +4,21 @@ module Blockchain.Data.Util
   )
 where
 
-import Data.Bits
+import           Data.Bits
 import qualified Data.ByteString as B
-import qualified Data.Vector.Storable as V
 
 byteString2Integer :: B.ByteString
                    -> Integer
-byteString2Integer bs = do
-  let bsv = V.fromList $ B.unpack bs
-  V.foldl' (\acc byte -> acc * 256 + fromIntegral byte)
-           0
-           bsv
+                   -> Integer
+byteString2Integer bs
+                   acc = do
+  case B.uncons bs of
+    Nothing                 ->
+      acc
+    Just (byte,restofbytes) ->
+      let newacc = acc * 256 + fromIntegral byte
+        in byteString2Integer restofbytes
+                              newacc
 
 integer2Bytes :: Integer
               -> B.ByteString

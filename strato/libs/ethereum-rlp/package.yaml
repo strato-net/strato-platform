@@ -46,7 +46,6 @@ default-extensions:
 dependencies:
   - base
   - bytestring
-  - vector
 
 library:
   source-dirs: library/
