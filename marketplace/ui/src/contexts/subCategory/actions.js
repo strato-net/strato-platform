@@ -93,10 +93,6 @@ const actions = {
     dispatch({ type: actionDescriptors.fetchSubCategory });
 
     try {
-      if (!categories) {
-        dispatch({ type: actionDescriptors.fetchSubCategorySuccessful, payload: []});
-        return;
-      }
       const response = await fetch(`${apiUrl}/subcategory?category[]=${categories}`, {
         method: HTTP_METHODS.GET,
       });
