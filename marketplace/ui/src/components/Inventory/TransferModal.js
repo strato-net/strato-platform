@@ -103,22 +103,55 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
     ];
 
 
-    const handleSubmit = async () => {
-        const body = {
-            assetAddress: inventory.address,
-            newOwner: userAddress,
-            quantity
-        };
-
-        if (quantity > 0 && quantity <= inventory.quantity && userAddress) {
-            let isDone = await actions.transferInventory(inventoryDispatch, body);
-            if (isDone) {
-                await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
-                await actions.fetchInventoryForUser(inventoryDispatch, limit, offset, user.commonName);
-                handleCancel();
+    const handleSubmit = async () => {    
+        let totalTransferredQuantity = 0; // Track the total quantity transferred so far
+        const desiredQuantity = quantity; // The quantity the user wants to transfer
+    
+        // Main logic for handling grouped assets
+        if (inventory.groupedAssets && inventory.groupedAssets.length > 0) {
+            for (const asset of inventory.groupedAssets) {
+                const remainingQuantity = desiredQuantity - totalTransferredQuantity;
+                const availableQuantity = asset.quantity - (asset.saleQuantity + asset.totalLockedQuantity); // Calculate available quantity
+                const quantityToTransfer = Math.min(remainingQuantity, availableQuantity);
+    
+                if (quantityToTransfer > 0) {
+                    const body = {
+                        assetAddress: asset.address,
+                        newOwner: userAddress,
+                        quantity: quantityToTransfer,
+                    };
+    
+                    let isDone = await actions.transferInventory(inventoryDispatch, body);
+                    if (isDone) {
+                        totalTransferredQuantity += quantityToTransfer;
+                        // Check if we've transferred the desired total quantity
+                        if (totalTransferredQuantity >= desiredQuantity) break;
+                    } 
+                }
+            }
+        } else {
+            // original behavior if not dealing with grouped assets
+            if (quantity > 0 && quantity <= inventory.quantity) {
+                const body = {
+                    assetAddress: inventory.address,
+                    newOwner: userAddress,
+                    quantity,
+                };
+        
+                let isDone = await actions.transferInventory(inventoryDispatch, body);
+                if (isDone) {
+                    totalTransferredQuantity = desiredQuantity;
+                }
             }
         }
-    }
+
+        if (totalTransferredQuantity >= desiredQuantity) {
+            await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
+            await actions.fetchInventoryForUser(inventoryDispatch, limit, offset, user.commonName);
+            handleCancel();
+        }
+    };
+    
 
     return (
         <Modal

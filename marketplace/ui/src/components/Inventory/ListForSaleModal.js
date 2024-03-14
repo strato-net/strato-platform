@@ -149,31 +149,45 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
     };
 
     const handleSubmit = async () => {
-        let body = {
-            paymentProviders: paymentProviderAddress ? [paymentProviderAddress] : [],
-            price: pricePerUnit,
-        };
-        if (inventory.saleAddress) {
-            body = { ...body, saleAddress: inventory.saleAddress }
-        } else {
-            body = { ...body, assetToBeSold: inventory.address }
+        let successCount = 0;
+    
+        for (const address of inventory.groupedAssets) {
+            let body = {
+                paymentProviders: paymentProviderAddress ? [paymentProviderAddress] : [],
+                price: pricePerUnit,
+                quantity,
+            };
+    
+            if (inventory.saleAddress) {
+                body = { ...body, saleAddress: inventory.saleAddress };
+            } else {
+                body = { ...body, assetToBeSold: address };
+            }
+    
+            let isDone;
+            if (inventory.saleAddress) {
+                isDone = await actions.updateSale(inventoryDispatch, body);
+            } else {
+                isDone = await actions.listInventory(inventoryDispatch, body);
+            }
+    
+            if (isDone) {
+                successCount += 1;
+            } else {
+                // Optionally handle partial failure or log it
+                console.error(`Failed to process asset at address ${address}`);
+            }
         }
-        body = {
-            ...body,
-            quantity,
-        }
-        let isDone
-        
-        if (inventory.saleAddress) {
-            isDone = await actions.updateSale(inventoryDispatch, body);
-        } else {
-            isDone = await actions.listInventory(inventoryDispatch, body);
-        }
-        if ( isDone ) {
+    
+        // Check if the number of successful actions equals the total number of grouped assets
+        if (successCount === inventory.groupedAssets.length) {
             await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
             handleCancel();
         }
-    }
+    };
+    
+    
+    
 
     return (
         <Modal
