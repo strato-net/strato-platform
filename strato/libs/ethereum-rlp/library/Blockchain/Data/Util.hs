@@ -6,18 +6,15 @@ where
 
 import Data.Bits
 import qualified Data.ByteString as B
+import qualified Data.Vector.Storable as V
 
 byteString2Integer :: B.ByteString
                    -> Integer
-byteString2Integer bs =
-  go 0
-     0
-     (B.length bs - 1)
-  where
-    go acc _           (-1) = acc
-    go acc shiftamount n    = go (acc + (fromIntegral (bs `B.index` n) `shiftL` shiftamount))
-                                 (shiftamount + 8)
-                                 (n - 1)
+byteString2Integer bs = do
+  let bsv = V.fromList $ B.unpack bs
+  V.foldl' (\acc byte -> acc * 256 + fromIntegral byte)
+           0
+           bsv
 
 integer2Bytes :: Integer
               -> B.ByteString
