@@ -8,6 +8,9 @@ import dotenv from 'dotenv'
 
 import dappJs from "./dapp"
 import { ROLE } from "/helpers/constants";
+
+import { replaceInFiles } from './dapp.helper.js';
+
 const options = { config, logger: console }
 const loadEnv = dotenv.config()
 
@@ -42,6 +45,7 @@ describe("Marketplace Dapp - deploy contracts, bootnode organization", function 
       process.env.GLOBAL_ADMIN_PASSWORD,
       "GLOBAL_ADMIN_PASSWORD is missing. Add it to .env file"
     )
+
 
     adminUserName = process.env.GLOBAL_ADMIN_NAME
     adminUserPassword = process.env.GLOBAL_ADMIN_PASSWORD
@@ -88,13 +92,13 @@ describe("Marketplace Dapp - deploy contracts, bootnode organization", function 
     const deployment = dapp.deploy(deployArgs)
     assert.isDefined(deployment)
     assert.equal(deployment.dapp.contract.address, dapp.address)
+
+    const development = process.env.DEVELOP === "true" ? true : false
+    if (development === true) {
+      replaceInFiles('./dapp/', 'BASE_CODE_COLLECTION', dapp.address);
+      console.log(`All instances of <BASE_CODE_COLLECTION> have been replaced with <${dapp.address}>`)
+    }
   })
 
 
 })
-  // it('Should create and assign admin role', async () => {
-  //   await dapp.createUserMembershipAndPermissions({ isAdmin: true, isTradingEntity: false, isCertifier: false, userAddress: adminUser.address })
-  //   if (adminUser.address !== bayer.address) {
-  //     await dapp.createUserMembershipAndPermissions({ isAdmin: true, isTradingEntity: false, isCertifier: false, userAddress: bayer.address })
-  //   }
-  // })
