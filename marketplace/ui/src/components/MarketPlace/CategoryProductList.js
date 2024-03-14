@@ -144,18 +144,6 @@ const CategoryProductList = ({ user }) => {
       setSubCategories(subCategorys);
     }
   }, [unSelected, subCategorys, selectedSubCategories, subCategories]);
-  
-  // useEffect(() => {
-  //   let categorys = null
-  //   // function to fetch subcategories
-  //   const fetchSubCategories = async () => {
-  //     categorys = arrayToStr(selectedCategories);
-  //     await subCategoryActions.fetchSubCategoryList(subCategoryDispatch, categorys);
-  //   };
-  
-  //   fetchSubCategories();
-  
-  // }, [subCategoryDispatch, selectedCategories]);
 
   const onChangeSubCategory = (e) => {
     let valuesChecked = checkValues(e, selectedSubCategories)
