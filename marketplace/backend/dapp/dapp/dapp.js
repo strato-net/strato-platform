@@ -1043,7 +1043,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     } else if (process.env.networkID === constants.testnetNetworkId) {
       address = constants.testnetStratsAddress
     } else {
-      address = constants.testnetStratsAddress
+      address = constants.prodStratsAddress
     }
 
     const newArgs = {
