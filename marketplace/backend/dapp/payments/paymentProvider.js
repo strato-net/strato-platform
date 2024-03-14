@@ -5,10 +5,10 @@ import { setSearchQueryOptions, search, searchOne, searchAll, searchAllWithQuery
 // import dayjs from 'dayjs';
 
 
-const contractName = 'BasePaymentProvider';
-const stripeContractName = 'StripePaymentProvider';
-const paymentContractName = 'StripePaymentProvider.StripePaymentInitialized';
-const contractFilename = `${util.cwd}/dapp/mercata-base-contracts/Templates/Payments/StripePaymentProvider.sol`;
+const contractName = 'Payment';
+const stripeContractName = 'CreditCard';
+const paymentContractName = 'CreditCard.StripePaymentInitialized';
+const contractFilename = `${util.cwd}/dapp/mercata-base-contracts/Templates/Payments/CreditCard.sol`;
 
 /** 
  * Upload a new PaymentProvider 

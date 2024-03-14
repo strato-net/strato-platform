@@ -5,7 +5,6 @@ import <509>;
 import "../Assets/Asset.sol";
 import "../Enums/RestStatus.sol";
 import "../Orders/Order.sol";
-import "../Payments/BasePaymentProvider.sol";
 import "../Utils/Utils.sol";
 
 abstract contract Sale is Utils { 
@@ -45,21 +44,18 @@ abstract contract Sale is Utils {
         require(commonName == sellersCommonName, err);
     }
 
-    modifier requireSellerOrBuyer(string action) {
-        string sellersCommonName = assetToBeSold.ownerCommonName();
-        Order order = Order(msg.sender);
-        string purchasersCommonName = order.purchasersCommonName();
-        string err = "Only "
-                   + sellersCommonName
-                   + ","
-                   + purchasersCommonName
-                   + " can perform "
-                   + action
-                   + ".";
-        string commonName = getCommonName(tx.origin);
+    modifier onlyPaymentProvider() {
+        require(isPaymentProvider(msg.sender), "Not an authorized payment provider");
+        _;
+    }
 
-        require((commonName == purchasersCommonName || commonName == sellersCommonName), err);
-
+    function isPaymentProvider(address _address) public view returns (bool) {
+        for (uint i = 0; i < paymentProviders.length; i++) {
+            if (paymentProviders[i] == _address) {
+                return true;
+            }
+        }
+        return false;
     }
 
     function changePrice(uint _price) public requireSeller("change price"){
@@ -97,13 +93,10 @@ abstract contract Sale is Utils {
         return paymentProvidersMap[_paymentProvider] != 0;
     }
 
-    function completeSale(
-    ) public requireSellerOrBuyer("complete sale") returns (uint) {
-        Order order = Order(msg.sender);
-        address purchaser = order.purchasersAddress();
+    function completeSale(address _newOwner) public onlyPaymentProvider("complete sale") returns (uint) {
         uint orderQuantity = takeLockedQuantity(msg.sender);
         // regular transfer - isUserTransfer: false, transferNumber: 0
-        assetToBeSold.transferOwnership(purchaser, orderQuantity, false, 0);
+        assetToBeSold.transferOwnership(_newOwner, orderQuantity, false, 0);
         closeSaleIfEmpty();
         return RestStatus.OK;
     }
