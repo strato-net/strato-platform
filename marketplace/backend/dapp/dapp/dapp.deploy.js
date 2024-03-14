@@ -93,8 +93,7 @@ describe("Marketplace Dapp - deploy contracts, bootnode organization", function 
     assert.isDefined(deployment)
     assert.equal(deployment.dapp.contract.address, dapp.address)
 
-    const development = process.env.DEVELOP === "true" ? true : false
-    if (development === true) {
+    if (process.env.DEVELOP === "true") {
       replaceInFiles('./dapp/', 'BASE_CODE_COLLECTION', dapp.address);
       console.log(`All instances of <BASE_CODE_COLLECTION> have been replaced with <${dapp.address}>`)
     }
