@@ -49,9 +49,9 @@ const CreateInventoryModal = ({
       setUploadErr("Image must be of jpeg or png format");
       return Upload.LIST_IGNORE;
     }
-    const isLt1M = file.size / 1024 / 1024 < 1;
-    if (!isLt1M) {
-      setUploadErr("Cannot upload an image of size more than 1mb");
+    const isLt5M = file.size / 1024 / 1024 < 5;
+    if (!isLt5M) {
+      setUploadErr("Cannot upload image files of total size more than 5mb");
       return Upload.LIST_IGNORE;
     }
     const isNameLengthValid = file.name.length <= 100;
