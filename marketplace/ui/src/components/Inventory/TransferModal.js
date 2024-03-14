@@ -104,14 +104,14 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
 
 
     const handleSubmit = async () => {    
-        let totalTransferredQuantity = 0; // Track the total quantity transferred so far
+        let totalTransferredQuantity = 0; // Total quantity transferred so far
         const desiredQuantity = quantity; // The quantity the user wants to transfer
     
-        // Main logic for handling grouped assets
-        if (inventory.groupedAssets && inventory.groupedAssets.length > 0) {
+        // Logic for handling grouped assets
+        if (inventory.groupedAssets && inventory.groupedAssets.length > 1) {
             for (const asset of inventory.groupedAssets) {
                 const remainingQuantity = desiredQuantity - totalTransferredQuantity;
-                const availableQuantity = asset.quantity - (asset.saleQuantity + asset.totalLockedQuantity); // Calculate available quantity
+                const availableQuantity = asset.quantity - (asset.saleQuantity + asset.totalLockedQuantity);
                 const quantityToTransfer = Math.min(remainingQuantity, availableQuantity);
     
                 if (quantityToTransfer > 0) {

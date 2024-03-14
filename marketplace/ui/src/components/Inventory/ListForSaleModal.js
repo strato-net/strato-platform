@@ -149,41 +149,38 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
     };
 
     const handleSubmit = async () => {
-        let successCount = 0;
+        let totalQuantityToBeListed = quantity; // Total desired quantity to list
+        let listedQuantity = 0; // Keep track of the quantity successfully listed
     
-        for (const address of inventory.groupedAssets) {
+        for (const asset of inventory.groupedAssets) {
+            if (listedQuantity >= totalQuantityToBeListed) break; // Stop if we've listed the total desired quantity
+    
+            const maxAvailableQuantityForThisAsset = asset.quantity - asset.saleQuantity - asset.totalLockedQuantity;
+            const quantityForThisAsset = Math.min(maxAvailableQuantityForThisAsset, totalQuantityToBeListed - listedQuantity);
+    
+            if (quantityForThisAsset <= 0) {
+                continue; // Skip this asset if there's no available quantity to list
+            }
+    
             let body = {
+                assetToBeSold: asset.address,
                 paymentProviders: paymentProviderAddress ? [paymentProviderAddress] : [],
                 price: pricePerUnit,
-                quantity,
+                quantity: quantityForThisAsset,
             };
     
-            if (inventory.saleAddress) {
-                body = { ...body, saleAddress: inventory.saleAddress };
-            } else {
-                body = { ...body, assetToBeSold: address };
-            }
-    
             let isDone;
-            if (inventory.saleAddress) {
-                isDone = await actions.updateSale(inventoryDispatch, body);
-            } else {
-                isDone = await actions.listInventory(inventoryDispatch, body);
-            }
-    
+            isDone = await actions.listInventory(inventoryDispatch, body);
+            
             if (isDone) {
-                successCount += 1;
-            } else {
-                // Optionally handle partial failure or log it
-                console.error(`Failed to process asset at address ${address}`);
+                listedQuantity += quantityForThisAsset;
             }
         }
     
-        // Check if the number of successful actions equals the total number of grouped assets
-        if (successCount === inventory.groupedAssets.length) {
+        if (listedQuantity > 0) {
             await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
             handleCancel();
-        }
+        } 
     };
     
     

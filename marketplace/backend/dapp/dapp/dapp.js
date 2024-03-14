@@ -225,36 +225,48 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       // Loop through the inventories to see if there are duplicates.
       for (const item of inventories) {
         if (!processedAddresses.has(item.originAddress)) {
-          processedAddresses.add(item.originAddress);
-          const additionalItems = await inventoryJs.getAll(rawAdmin, {ownerCommonName: userCert.commonName, originAddress: item.originAddress }, getOptions);
-          
-          // If there is a duplicate we'll add it to the list
-          if (additionalItems.length > 0) {
-            let combinedItem = {
-              ...additionalItems[0],
-              quantity: additionalItems.reduce((acc, item) => acc + item.quantity, 0),
-              saleQuantity: additionalItems.reduce((acc, item) => acc + (item.saleQuantity || 0), 0),
-              totalLockedQuantity: additionalItems.reduce((acc, item) => acc + (item.totalLockedQuantity || 0), 0),
-            };
+            processedAddresses.add(item.originAddress);
+            const additionalItems = await inventoryJs.getAll(rawAdmin, {ownerCommonName: userCert.commonName, originAddress: item.originAddress }, getOptions);
+            
+            if (additionalItems.length > 0) {
+                let combinedItem = {
+                    ...additionalItems[0],
+                    quantity: additionalItems.reduce((acc, item) => acc + item.quantity, 0),
+                    saleQuantity: additionalItems.reduce((acc, item) => acc + (item.saleQuantity || 0), 0),
+                    totalLockedQuantity: additionalItems.reduce((acc, item) => acc + (item.totalLockedQuantity || 0), 0),
+                };
+    
+                let price = additionalItems[0].price;
+    
+                // This price field is needed for unlisting logic. It's easier to set it on the first asset if it exists.
+                for (const additionalItem of additionalItems) {
+                    if (additionalItem.price) {
+                        price = additionalItem.price;
+                        break;
+                    }
+                }
   
-            // Adding a new field to track all the addresses of grouped items
-            combinedItem.groupedAssets = additionalItems.map(item => ({
-              address: item.address,
-              quantity: item.quantity,
-              saleQuantity: item.saleQuantity || 0,
-              totalLockedQuantity: item.totalLockedQuantity || 0,
-            }));
-  
-            combinedInventories.push(combinedItem);
-            if (combinedInventories.length >= limit) {
-              break; // Stop adding more items once we reach the limit
+                combinedItem.price = price;
+    
+                combinedItem.groupedAssets = additionalItems.map(item => ({
+                    address: item.address,
+                    quantity: item.quantity,
+                    sale: item.sale,
+                    saleQuantity: item.saleQuantity || 0,
+                    totalLockedQuantity: item.totalLockedQuantity || 0,
+                    saleAddress: item.saleAddress,
+                }));
+    
+                combinedInventories.push(combinedItem);
+                if (combinedInventories.length >= limit) {
+                    break; // Stop adding more items once we reach the limit
+                }
             }
-          }
         }
         if (combinedInventories.length >= limit) {
-          break; // Stop processing more items once we reach the limit
+            break; // Stop processing more items once we reach the limit
         }
-      }
+    }
   
       offset += inventories.length; // Adjust for next iteration
       if (inventories.length < limit * 2) break; // Have reached the end
@@ -266,7 +278,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const inventories = await inventoryJs.getAll(rawAdmin, { ownerCommonName: userCert.commonName, isMint: 'true' }, getOptions);
     const uniqueOriginAddressesCount = Array.from(new Set(inventories.map(item => item.originAddress)));
 
-    return { inventories: combinedInventories, inventoryCount: uniqueOriginAddressesCount };
+    return { inventories: combinedInventories, inventoryCount: uniqueOriginAddressesCount.length };
   };
 
   contract.getInventoriesForUser = async function (args, options = optionsNoChainIds) {
