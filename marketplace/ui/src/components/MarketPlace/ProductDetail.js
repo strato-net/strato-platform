@@ -42,6 +42,9 @@ import "react-responsive-carousel/lib/styles/carousel.min.css"; // requires a lo
 import { Carousel } from "react-responsive-carousel"
 import { Images } from "../../images";
 import ProductItemDetails from "./ProductItemDetails";
+import HelmetComponent from "../Helmet/HelmetComponent";
+import { SEO } from "../../helpers/seoConstant";
+import PreviewMode from "../RichEditor/PreviewMode";
 
 const ProductDetails = ({ user, users }) => {
   const { state, pathname } = useLocation();
@@ -244,18 +247,18 @@ const ProductDetails = ({ user, users }) => {
       align: "center",
       // render: (text) => <p>{text}</p>,
       render: (text) => (
-        <a 
+        <a
           href={`${window.location.origin}/marketplace/profile/${encodeURIComponent(text)}`}
           onClick={(e) => {
             e.preventDefault();
             const userProfileUrl = `/marketplace/profile/${encodeURIComponent(text)}`;
-      
+
             if (e.ctrlKey || e.metaKey) {
               // Open in a new tab if Ctrl/Cmd is pressed
               window.open(`${window.location.origin}${userProfileUrl}`, '_blank');
             } else {
               // Use navigate for a normal click, without Ctrl/Cmd
-              navigate(routes.MarketplaceUserProfile.url.replace(':commonName',text), { state: { from: pathname } });
+              navigate(routes.MarketplaceUserProfile.url.replace(':commonName', text), { state: { from: pathname } });
             }
           }}
           style={{ textDecoration: 'underline', color: 'black', cursor: 'pointer' }}
@@ -271,18 +274,18 @@ const ProductDetails = ({ user, users }) => {
       align: "center",
       // render: (text) => <p>{text}</p>,
       render: (text) => (
-        <a 
+        <a
           href={`${window.location.origin}/marketplace/profile/${encodeURIComponent(text)}`}
           onClick={(e) => {
             e.preventDefault();
             const userProfileUrl = `/marketplace/profile/${encodeURIComponent(text)}`;
-      
+
             if (e.ctrlKey || e.metaKey) {
               // Open in a new tab if Ctrl/Cmd is pressed
               window.open(`${window.location.origin}${userProfileUrl}`, '_blank');
             } else {
               // Use navigate for a normal click, without Ctrl/Cmd
-              navigate(routes.MarketplaceUserProfile.url.replace(':commonName',text), { state: { from: pathname } });
+              navigate(routes.MarketplaceUserProfile.url.replace(':commonName', text), { state: { from: pathname } });
             }
           }}
           style={{ textDecoration: 'underline', color: 'black', cursor: 'pointer' }}
@@ -309,6 +312,19 @@ const ProductDetails = ({ user, users }) => {
     return parts[parts.length - 1];
   };
 
+  function getCategoryName(str) {
+    const lastIndex = str.lastIndexOf('-');
+    if (lastIndex !== -1) {
+      return str.substring(lastIndex + 1);
+    } else {
+      return str;
+    }
+  }
+  
+  const assetName = decodeURIComponent(details?.name)
+  const contractName = getCategoryName(decodeURIComponent(details?.contract_name))
+  const linkUrl = window.location.href;
+
   return (
     <>
       {contextHolder}
@@ -320,6 +336,10 @@ const ProductDetails = ({ user, users }) => {
         </div>
       ) : (
         <div>
+          <HelmetComponent 
+          title={`${assetName} | ${contractName} | ${SEO.TITLE_META}`}
+          description={details?.description} 
+          link={linkUrl} />
           <Row>
             <Breadcrumb className="text-xs   mb-4 md:mt-5  md:mb-6 lg:mb-[44px] ml-4 lg:ml-16">
               <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
@@ -363,16 +383,22 @@ const ProductDetails = ({ user, users }) => {
               } className="product_detail w-full  sm:w-[417px]   lg:h-[348px] md:w-[343px] lg:w-[417px]" showStatus={false} showArrows swipeable emulateTouch infiniteLoop >
                 {details.images.length > 0 ? details.images.map((element, index) => {
                   return (<><div key={index} className="sm:w-[343px ] h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
-                    <img width={"100%"} className="object-contain rounded-md h-full " src={element ? element : image_placeholder} />
+                    <img width={"100%"} 
+                    alt={`${assetName} | Image ${index}`}
+                    title={`${assetName} | Image ${index}`}
+                    className="object-contain rounded-md h-full " src={element ? element : image_placeholder} />
                   </div></>)
                 }) : <><div className="sm:w-[343px ] sm:h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
-                  <img width={"100%"} className="object-contain rounded-md h-full " src={image_placeholder} />
+                  <img width={"100%"}
+                  alt={`${assetName} | Image`}
+                  title={`${assetName} | Image`}
+                  className="object-contain rounded-md h-full " src={image_placeholder} />
                 </div></>}
               </Carousel>
               <div className=" w-full lg:w-1/2">
                 {shouldShowWishlistIcon && (
                   <div className="flex justify-end">
-                      {isWishlisted ? <HeartFilled className="cursor-pointer" onClick={toggleWishlist} style={{fontSize: "20px", color: "#A15E49"}} /> : <HeartTwoTone className="cursor-pointer" onClick={toggleWishlist} style={{ fontSize: "20px" }} twoToneColor="#A15E49"/>}
+                    {isWishlisted ? <HeartFilled className="cursor-pointer" onClick={toggleWishlist} style={{ fontSize: "20px", color: "#A15E49" }} /> : <HeartTwoTone className="cursor-pointer" onClick={toggleWishlist} style={{ fontSize: "20px" }} twoToneColor="#A15E49" />}
                   </div>
                 )}
                 <div className=" lg:border-b lg:border-[#E9E9E9] pb-[6px]">
@@ -383,10 +409,10 @@ const ProductDetails = ({ user, users }) => {
                   <div className="flex pt-[6px] ">
                     {/* <Text className="text-[#202020] text-xs  font-medium">Owned By: {details?.ownerCommonName}</Text>
                      */}
-                     {/* <Text className="text-[#202020] text-xs font-medium">Owned By: </Text> 
+                    {/* <Text className="text-[#202020] text-xs font-medium">Owned By: </Text> 
                       */}
-                       <span className="text-xs  self-center">Owned By:&nbsp;</span>
-                     <div
+                    <span className="text-xs  self-center">Owned By:&nbsp;</span>
+                    <div
                       style={{ cursor: details?.ownerCommonName && details.ownerCommonName !== 'N/A' ? 'pointer' : 'default', color: 'black', textDecoration: details?.ownerCommonName && details.ownerCommonName !== 'N/A' ? 'underline' : 'none' }}
                       onClick={(e) => {
                         if (details?.ownerCommonName && details.ownerCommonName !== 'N/A') {
@@ -399,7 +425,7 @@ const ProductDetails = ({ user, users }) => {
                             window.open(fullUrl, '_blank');
                           } else {
                             // Use navigate for a normal click, without Ctrl/Cmd
-                            navigate(routes.MarketplaceUserProfile.url.replace(':commonName',details?.ownerCommonName), { state: { from: pathname } });
+                            navigate(routes.MarketplaceUserProfile.url.replace(':commonName', details?.ownerCommonName), { state: { from: pathname } });
                           }
                         }
                       }}
@@ -407,7 +433,7 @@ const ProductDetails = ({ user, users }) => {
                       <Text className="text-[#202020] text-xs font-medium  self-center">{details?.ownerCommonName || 'N/A'}</Text>
                     </div>
 
-                    <Text className="text-[#202020] text-xs  font-medium" >{details?.ownerOrganization}</Text>               
+                    <Text className="text-[#202020] text-xs  font-medium" >{details?.ownerOrganization}</Text>
                   </div>
                 </div>
                 <div className=" pt-4 lg:pt-[22px]">
@@ -421,7 +447,7 @@ const ProductDetails = ({ user, users }) => {
                     <div
                       onClick={subtract}
                       className={`h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer ${qty > 1 ? '' : 'cursor-not-allowed opacity-50'}`}>
-                      <p className=" text-2xl md:text-3xl lg:text-4xl font-semibold lg:text-[#202020] text-[#989898]">-</p> 
+                      <p className=" text-2xl md:text-3xl lg:text-4xl font-semibold lg:text-[#202020] text-[#989898]">-</p>
                     </div>
                     <InputNumber className="w-full md:w-[280px] h-9 md:h-10 lg:h-[46px] border text-[#6A6A6A] border-[#00000029] text-center flex flex-col justify-center font-semibold !rounded-lg" min={1} max={availableQuantity} value={`${qty}`} defaultValue={`${qty}`} controls={false}
                       onChange={e => {
@@ -434,7 +460,7 @@ const ProductDetails = ({ user, users }) => {
                     <div
                       onClick={add}
                       className={`h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer ${qty < availableQuantity ? '' : 'cursor-not-allowed opacity-50'}`}>
-                       <p className="text-2xl md:text-3xl lg:text-4xl font-semibold lg:text-[#202020] text-[#989898]">+</p> 
+                      <p className="text-2xl md:text-3xl lg:text-4xl font-semibold lg:text-[#202020] text-[#989898]">+</p>
                     </div>
                   </div>
 
@@ -449,38 +475,33 @@ const ProductDetails = ({ user, users }) => {
                       type="primary"
                       className="w-[90%] md:w-[365px] h-9  !bg-[#13188A] !hover:bg-primaryHover !text-white"
                       onClick={async () => {
-                        if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                          setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
-                          window.location.href = loginUrl;
-                        } else {
-                          window.LOQ.push(['ready', async LO => {
-                            // Track an event
-                            await LO.$internal.ready('events')
-                            LO.events.track('Buy Now (from Product Details)', {
-                              product: details.name,
-                              category: details.category,
-                              productId: details.productId
-                            })
-                          }])
-                          TagManager.dataLayer({
-                            dataLayer: {
-                              event: 'buy_now_from_product_details',
-                              product_name: details.name,
-                              category: details.category,
-                              productId: details.productId
-                            },
-                          });
+                        window.LOQ.push(['ready', async LO => {
+                          // Track an event
+                          await LO.$internal.ready('events')
+                          LO.events.track('Buy Now (from Product Details)', {
+                            product: details.name,
+                            category: details.category,
+                            productId: details.productId
+                          })
+                        }])
+                        TagManager.dataLayer({
+                          dataLayer: {
+                            event: 'buy_now_from_product_details',
+                            product_name: details.name,
+                            category: details.category,
+                            productId: details.productId
+                          },
+                        });
 
-                          const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [details.saleAddress], [qty])
-                          if (checkQuantity === true) {
-                            addItemToCart();
-                            navigate("/checkout");
-                          } else {
-                            if (checkQuantity[0].availableQuantity === 0) {
-                              openToast("bottom", true, `Unfortunately, ${details.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
-                            } else { // Case 2: We are trying to add too much quantity
-                              openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${details.name} are available. Please update your cart quantity accordingly.`);
-                            }
+                        const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [details.saleAddress], [qty])
+                        if (checkQuantity === true) {
+                          addItemToCart();
+                          navigate("/checkout");
+                        } else {
+                          if (checkQuantity[0].availableQuantity === 0) {
+                            openToast("bottom", true, `Unfortunately, ${details.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
+                          } else { // Case 2: We are trying to add too much quantity
+                            openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${details.name} are available. Please update your cart quantity accordingly.`);
                           }
                         }
                       }}
@@ -493,42 +514,37 @@ const ProductDetails = ({ user, users }) => {
                     {ownerSameAsUser() ?
                       <Button
                         icon={<div className="flex justify-center items-center">
-                          <img src={Images.Cart} alt="cart" width={18} height={18} className="object-contain" />
+                          <img src={Images.Cart} alt={`${assetName} | Image`} title={`${assetName} | Image`} width={18} height={18} className="object-contain" />
                         </div>}
                         className=" !w-9 h-9 border border-primary  !bg-[#13188A] rounded-md"
                         disabled={true}
                         id="addToCart"
                         onClick={async () => {
-                          if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                            setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
-                            window.location.href = loginUrl;
+                          window.LOQ.push(['ready', async LO => {
+                            // Track an event
+                            await LO.$internal.ready('events')
+                            LO.events.track('Add to Cart (from Product Details)', {
+                              product: details.name,
+                              category: details.category,
+                              productId: details.productId
+                            })
+                          }])
+                          TagManager.dataLayer({
+                            dataLayer: {
+                              event: 'add_to_cart_from_product_details',
+                              product_name: details?.name,
+                              category: details?.category,
+                              productId: details?.productId
+                            },
+                          });
+                          const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [details.saleAddress], [qty])
+                          if (checkQuantity === true) {
+                            addItemToCart();
                           } else {
-                            window.LOQ.push(['ready', async LO => {
-                              // Track an event
-                              await LO.$internal.ready('events')
-                              LO.events.track('Add to Cart (from Product Details)', {
-                                product: details.name,
-                                category: details.category,
-                                productId: details.productId
-                              })
-                            }])
-                            TagManager.dataLayer({
-                              dataLayer: {
-                                event: 'add_to_cart_from_product_details',
-                                product_name: details?.name,
-                                category: details?.category,
-                                productId: details?.productId
-                              },
-                            });
-                            const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [details.saleAddress], [qty])
-                            if (checkQuantity === true) {
-                              addItemToCart();
-                            } else {
-                              if (checkQuantity[0].availableQuantity === 0) {
-                                openToast("bottom", true, `Unfortunately, ${details.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
-                              } else { // Case 2: We are trying to add too much quantity
-                                openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${details.name} are available. Please update your cart quantity accordingly.`);
-                              }
+                            if (checkQuantity[0].availableQuantity === 0) {
+                              openToast("bottom", true, `Unfortunately, ${details.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
+                            } else { // Case 2: We are trying to add too much quantity
+                              openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${details.name} are available. Please update your cart quantity accordingly.`);
                             }
                           }
                         }}
@@ -536,40 +552,35 @@ const ProductDetails = ({ user, users }) => {
                       :
                       <Button
                         icon={<div className="flex justify-center items-center">
-                          <img src={Images.Cart} alt="cart" width={18} height={18} className="object-contain" />
+                          <img src={Images.Cart} alt={`${assetName} | Image`} title={`${assetName} | Image`} width={18} height={18} className="object-contain" />
                         </div>}
                         className=" !w-9 h-9 rounded-md  !bg-[#13188A]"
                         onClick={async () => {
-                          if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                            setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
-                            window.location.href = loginUrl;
+                          window.LOQ.push(['ready', async LO => {
+                            // Track an event
+                            await LO.$internal.ready('events')
+                            LO.events.track('Add to Cart (from Product Details)', {
+                              product: details?.name,
+                              category: details?.category,
+                              productId: details?.productId
+                            })
+                          }])
+                          TagManager.dataLayer({
+                            dataLayer: {
+                              event: 'add_to_cart_from_product_details',
+                              product_name: details?.name,
+                              category: details?.category,
+                              productId: details?.productId
+                            },
+                          });
+                          const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [details.saleAddress], [qty])
+                          if (checkQuantity === true) {
+                            addItemToCart();
                           } else {
-                            window.LOQ.push(['ready', async LO => {
-                              // Track an event
-                              await LO.$internal.ready('events')
-                              LO.events.track('Add to Cart (from Product Details)', {
-                                product: details?.name,
-                                category: details?.category,
-                                productId: details?.productId
-                              })
-                            }])
-                            TagManager.dataLayer({
-                              dataLayer: {
-                                event: 'add_to_cart_from_product_details',
-                                product_name: details?.name,
-                                category: details?.category,
-                                productId: details?.productId
-                              },
-                            });
-                            const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [details.saleAddress], [qty])
-                            if (checkQuantity === true) {
-                              addItemToCart();
-                            } else {
-                              if (checkQuantity[0].availableQuantity === 0) {
-                                openToast("bottom", true, `Unfortunately, ${details.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
-                              } else { // Case 2: We are trying to add too much quantity
-                                openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${details.name} are available. Please update your cart quantity accordingly.`);
-                              }    
+                            if (checkQuantity[0].availableQuantity === 0) {
+                              openToast("bottom", true, `Unfortunately, ${details.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
+                            } else { // Case 2: We are trying to add too much quantity
+                              openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${details.name} are available. Please update your cart quantity accordingly.`);
                             }
                           }
                         }}
@@ -615,74 +626,63 @@ const ProductDetails = ({ user, users }) => {
                 defaultActiveKey="0"
                 items={
                   [
-                  {
-                    label: <span className="text-sm md:text-base">Description</span>,
-                    key: "0",
-                    children: (
-                      <div>
-                        <Paragraph
-                          className="text-[#202020] text-sm"
-                        >
-                          {details?.description?.split('\n').map((line, index) => (
-                            <React.Fragment key={index}>
-                              {line}
-                              <br />
-                            </React.Fragment>
-                          ))}
-                        </Paragraph>
-                      </div>
-                    ),
-                  }
-                  ,{
-                    label: <span className="text-sm md:text-base">Details</span>,
-                    key: "1",
-                    children: (
-                      <div>
-                        <ProductItemDetails
-                          categoryName={getCategory(details)}
-                          itemData={itemData}
-                        />
-                      </div>
-                    ),
-                  },
-                  user && { //if user is logged in then display Ownership History
-                    label: <span className="text-sm md:text-base">Ownership History</span>,
-                    key: "2",
-                    children: (
-                      <div>
-                        <DataTableComponent
-                          columns={ownershipDetailColumn}
-                          scrollX="100%"
-                          data={inventoryOwnershipHistory}
-                          isLoading={isInventoryOwnershipHistoryLoading}
-                          pagination={{
-                            defaultPageSize: 10,
-                            position: ["bottomCenter"],
-                            showSizeChanger: false,
-                          }}
-                        />
-                      </div>
-                    ),
-                  },
-                  {
-                    label: <span className="text-sm md:text-base">Additional Information</span>,
-                    key: "3",
-                    children: (
-                      <div>
-                        <List
-                          size="small"
-                          boardered
-                          dataSource={!details.files ? [] : details.files}
-                          renderItem={(item) =>
-                            <List.Item>
-                              <a href={item} rel="noreferrer" target="_blank" className="hover:underline break-all text-[#1e40af]">
-                                {item}
-                              </a>
-                            </List.Item>}
-                        />
-                      </div>
-                    )
-                  },
+                    {
+                      label: <span className="text-sm md:text-base">Description</span>,
+                      key: "0",
+                      children: (
+                        <PreviewMode content={details?.description} />
+                      ),
+                    }
+                    , {
+                      label: <span className="text-sm md:text-base">Details</span>,
+                      key: "1",
+                      children: (
+                        <div>
+                          <ProductItemDetails
+                            categoryName={getCategory(details)}
+                            itemData={itemData}
+                          />
+                        </div>
+                      ),
+                    },
+                    user && { //if user is logged in then display Ownership History
+                      label: <span className="text-sm md:text-base">Ownership History</span>,
+                      key: "2",
+                      children: (
+                        <div>
+                          <DataTableComponent
+                            columns={ownershipDetailColumn}
+                            scrollX="100%"
+                            data={inventoryOwnershipHistory}
+                            isLoading={isInventoryOwnershipHistoryLoading}
+                            pagination={{
+                              defaultPageSize: 10,
+                              position: ["bottomCenter"],
+                              showSizeChanger: false,
+                            }}
+                          />
+                        </div>
+                      ),
+                    },
+                    {
+                      label: <span className="text-sm md:text-base">Additional Information</span>,
+                      key: "3",
+                      children: (
+                        <div>
+                          <List
+                            size="small"
+                            boardered
+                            dataSource={!details.files ? [] : details.files}
+                            renderItem={(item) =>
+                              <List.Item>
+                                <a href={item} rel="noreferrer" target="_blank" className="hover:underline break-all text-[#1e40af]">
+                                  {item}
+                                </a>
+                              </List.Item>}
+                          />
+                        </div>
+                      )
+                    },
                   ]}
               />
             </div>

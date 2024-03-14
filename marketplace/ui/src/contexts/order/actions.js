@@ -443,12 +443,6 @@ const actions = {
         });
 
         return body.data;
-      } else if (response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({
-          type: actionDescriptors.fetchSaleQuantityFailed,
-          error: "Unauthorized while fetching Order"
-        });
-        window.location.href = body.error.loginUrl;
       }
 
       dispatch({

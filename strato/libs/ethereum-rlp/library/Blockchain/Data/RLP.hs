@@ -78,7 +78,10 @@ splitAtEither i s = Right $ B.splitAt i s
 
 getLength :: Int -> B.ByteString -> (Integer, B.ByteString)
 getLength sizeOfLength bytes =
-  (bytes2Integer $ B.unpack $ B.take sizeOfLength bytes, B.drop sizeOfLength bytes)
+  (result,remainingbytes)
+  where
+    (lengthbytes,remainingbytes) = B.splitAt sizeOfLength bytes
+    result = byteString2Integer lengthbytes
 
 rlpSplit :: B.ByteString -> (RLPObject, B.ByteString)
 rlpSplit = either error id . rlpSplitEither
@@ -174,7 +177,7 @@ instance RLPSerializable Integer where
   rlpEncode 0 = RLPString B.empty
   rlpEncode x | x < 0 = RLPArray [rlpEncode (-x)]
   rlpEncode x | x < 128 = RLPScalar $ fromIntegral x
-  rlpEncode x = RLPString $ B.pack $ integer2Bytes x
+  rlpEncode x = RLPString $ integer2Bytes x
   rlpDecode (RLPScalar x) = fromIntegral x
   rlpDecode (RLPString s) = byteString2Integer s
   rlpDecode (RLPArray [x]) = -rlpDecode x

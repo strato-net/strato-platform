@@ -5,7 +5,7 @@ import { useCategoryState } from "../../contexts/category";
 import { Images } from "../../images";
 import TagManager from "react-gtm-module";
 import { Fade } from "react-awesome-reveal";
-
+import { SEO } from "../../helpers/seoConstant";
 
 const { Title, Text } = Typography;
 
@@ -57,6 +57,8 @@ const CategoryCard = () => {
             >
               <div className="flex flex-col">
                 <img
+                  alt={SEO.IMAGE_META}
+                  title={SEO.IMAGE_META}
                   src={categoryImages[index]}
                   className="rounded-t-lg px-[9px] py-[6px] lg:px-[0px] lg:py-[0px] h-[110px] md:h-[125px] 2xl:h-[140px]"
                   preview={false}
