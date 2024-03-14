@@ -105,7 +105,7 @@ const CategoryProductList = ({ user }) => {
     }
   }, [isLoading]);
 
-  const onChangeCategory = (checkedValues) => {
+  const onChangeCategory = async (checkedValues) => {
     const categoryStr = checkedValues.join(",");
     const baseUrl = new URL('/category', window.location.origin);
 
@@ -122,7 +122,8 @@ const CategoryProductList = ({ user }) => {
     const url = baseUrl.pathname + baseUrl.search;
     navigate(url);
     setSelectedCategories(checkedValues);
-
+    let categorys = arrayToStr(checkedValues);
+    await subCategoryActions.fetchSubCategoryList(subCategoryDispatch, categorys);
     if (checkedValues.length === 0) {
       clearSelection();
     }
@@ -143,14 +144,6 @@ const CategoryProductList = ({ user }) => {
       setSubCategories(subCategorys);
     }
   }, [unSelected, subCategorys, selectedSubCategories, subCategories]);
-  
-  useEffect(() => {
-    let categorys = null;
-    if (selectedCategories.length) {
-      categorys = arrayToStr(selectedCategories);
-      subCategoryActions.fetchSubCategoryList(subCategoryDispatch, categorys);
-    }
-  }, [subCategoryDispatch, selectedCategories]);
 
   const onChangeSubCategory = (e) => {
     let valuesChecked = checkValues(e, selectedSubCategories)
