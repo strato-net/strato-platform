@@ -177,7 +177,7 @@ instance RLPSerializable Integer where
   rlpEncode 0 = RLPString B.empty
   rlpEncode x | x < 0 = RLPArray [rlpEncode (-x)]
   rlpEncode x | x < 128 = RLPScalar $ fromIntegral x
-  rlpEncode x = RLPString $ B.pack $ integer2Bytes x
+  rlpEncode x = RLPString $ integer2Bytes x
   rlpDecode (RLPScalar x) = fromIntegral x
   rlpDecode (RLPString s) = byteString2Integer s
   rlpDecode (RLPArray [x]) = -rlpDecode x

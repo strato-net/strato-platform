@@ -1,22 +1,22 @@
-import React, { Component } from 'react';
-import { connect } from 'react-redux';
-import { withRouter, Link } from 'react-router-dom';
-import NodeCard from '../NodeCard';
-import TransactionList from '../TransactionList';
-import NumberCard from '../NumberCard';
-import mixpanelWrapper from '../../lib/mixpanelWrapper';
-import { endTour } from '../Tour/tour.actions';
+import React, { Component } from "react";
+import { connect } from "react-redux";
+import { withRouter, Link } from "react-router-dom";
+import NodeCard from "../NodeCard";
+import TransactionList from "../TransactionList";
+import NumberCard from "../NumberCard";
+import mixpanelWrapper from "../../lib/mixpanelWrapper";
+import { endTour } from "../Tour/tour.actions";
 // import { callAfterTour } from '../Tour/tour.helpers';
 // import Tour from '../Tour';
-import Tour from '../Tour';
-import { env } from '../../env'
-import io from 'socket.io-client';
-import BarGraph from '../BarGraph';
-import PieChart from '../PieChart';
-import './dashboard.css';
-import { hideLoading } from 'react-redux-loading-bar';
-import { subscribeRoom, unSubscribeRoom } from '../../sockets/socket.actions';
-import { changeHealthStatus } from './dashboard.action'
+import Tour from "../Tour";
+import { env } from "../../env";
+import io from "socket.io-client";
+import BarGraph from "../BarGraph";
+import PieChart from "../PieChart";
+import "./dashboard.css";
+import { hideLoading } from "react-redux-loading-bar";
+import { subscribeRoom, unSubscribeRoom } from "../../sockets/socket.actions";
+import { changeHealthStatus } from "./dashboard.action";
 import {
   LAST_BLOCK_NUMBER,
   USERS_COUNT,
@@ -30,118 +30,156 @@ import {
   GET_HEALTH,
   GET_SYSTEM_INFO,
   GET_SHARD_COUNT,
-} from '../../sockets/rooms'
+  GET_NETWORK_HEALTH,
+} from "../../sockets/rooms";
 import { sec2Date } from "../../lib/formatSeconds";
 import ReactGA from "react-ga4";
-import { Popover, PopoverInteractionKind, Position } from '@blueprintjs/core';
-import ValidatorsCard from '../ValidatorsCard';
+import { Popover, PopoverInteractionKind, Position } from "@blueprintjs/core";
+import ValidatorsCard from "../ValidatorsCard";
 
-const socket = io(env.SOCKET_SERVER, { path: '/apex-ws', transports: ['websocket'] });
+const socket = io(env.SOCKET_SERVER, {
+  path: "/apex-ws",
+  transports: ["websocket"],
+});
 // TODO: these should be part of a reducer state. Do the same for other global variables.
 const tourSteps = [
   {
-    title: 'Welcome to STRATO!',
-    text: '<strong>STRATO</strong> makes it easy to create and manage your custom blockchains.<br><br><strong>Ready to get started?</strong>',
-    selector: '#tour-welcome',
-    position: 'bottom', type: 'hover',
+    title: "Welcome to STRATO!",
+    text: "<strong>STRATO</strong> makes it easy to create and manage your custom blockchains.<br><br><strong>Ready to get started?</strong>",
+    selector: "#tour-welcome",
+    position: "bottom",
+    type: "hover",
     isFixed: true,
   },
   {
-    title: 'Adding Users',
-    text: 'Before you write a Smart Contract, you must add some users that your Smart Contract will interact with.<br><br>For example, if you are splitting the bill for a monthly apartment rental, you might add <i>Roommate 1</i>, <i>Roommate 2</i>, and <i> Roommate 3.</i>',
-    selector: '#accounts',
-    position: 'bottom', type: 'hover',
+    title: "Adding Users",
+    text: "Before you write a Smart Contract, you must add some users that your Smart Contract will interact with.<br><br>For example, if you are splitting the bill for a monthly apartment rental, you might add <i>Roommate 1</i>, <i>Roommate 2</i>, and <i> Roommate 3.</i>",
+    selector: "#accounts",
+    position: "bottom",
+    type: "hover",
     isFixed: true,
   },
 ];
 
 class Dashboard extends Component {
-
   constructor(props) {
     super(props);
     this.state = {
       isHovering: false,
-    }
+    };
   }
   componentDidMount() {
-    this.props.subscribeRoom(LAST_BLOCK_NUMBER)
-    this.props.subscribeRoom(USERS_COUNT)
-    this.props.subscribeRoom(CONTRACTS_COUNT)
-    this.props.subscribeRoom(BLOCKS_PROPAGATION)
-    this.props.subscribeRoom(BLOCKS_FREQUENCY)
-    this.props.subscribeRoom(BLOCKS_DIFFICULTY)
-    this.props.subscribeRoom(TRANSACTIONS_COUNT)
-    this.props.subscribeRoom(TRANSACTIONS_TYPE)
-    this.props.subscribeRoom(GET_SHARD_COUNT)
+    this.props.subscribeRoom(LAST_BLOCK_NUMBER);
+    this.props.subscribeRoom(USERS_COUNT);
+    this.props.subscribeRoom(CONTRACTS_COUNT);
+    this.props.subscribeRoom(BLOCKS_PROPAGATION);
+    this.props.subscribeRoom(BLOCKS_FREQUENCY);
+    this.props.subscribeRoom(BLOCKS_DIFFICULTY);
+    this.props.subscribeRoom(TRANSACTIONS_COUNT);
+    this.props.subscribeRoom(TRANSACTIONS_TYPE);
+    this.props.subscribeRoom(GET_SHARD_COUNT);
     this.props.subscribeRoom(GET_SYSTEM_INFO);
+    this.props.subscribeRoom(GET_NETWORK_HEALTH);
 
-    mixpanelWrapper.track('dashboard_page_load');
-    ReactGA.send({hitType: "pageview", page: "/dashboard", title: "Dashboard"});
-
+    mixpanelWrapper.track("dashboard_page_load");
+    ReactGA.send({
+      hitType: "pageview",
+      page: "/dashboard",
+      title: "Dashboard",
+    });
   }
 
-  displaySystemMetrics(cpu, memory, filesystem, networkStats, limits) {
+  displaySystemMetrics(cpu, memory, filesystem, networkStats, systemHealth) {
     if (cpu && memory && filesystem && networkStats) {
-      let maxUsageFilesystem = {};
-    
-      //when running in the docker container, there is only one fs, however, when running
-      //outside of the container, there are multiple - so display one with max use
-      maxUsageFilesystem = filesystem.reduce((maxUsage, filesystem) => { 
-        return filesystem.use > maxUsage.use ? filesystem : maxUsage;
-      }, filesystem[0]);
-  
-    const isCPUCurrentHealthy = cpu.currentLoad < limits.cpuCurrentLoadAlertLevel;
-    const isMemoryHealthy = memory.use < limits.memoryUsedAlertLevel;
-    const isDiskSpaceHealthy = maxUsageFilesystem.use < limits.diskspaceUsedAlertLevel;
-    const isCPUAvgHealthy = cpu.avgLoad < limits.cpuAvgLoadAlertLevel;
-
-    const healthy = isCPUCurrentHealthy && isCPUAvgHealthy && isMemoryHealthy && isDiskSpaceHealthy;
+      //fileSystem data is sorted in descending order, max is first
+      const maxUsageFilesystem = filesystem[0];
 
       return (
-        <div className="sys-info-container col-sm-6 text-right row" style={{marginTop: '25px', marginBottom:'10px', marginLeft:'0px', marginRight:'0px' }}>
-            <p className='text-right'> 
-              <span id='cpuCurrentMetric' className={`metric ${isCPUCurrentHealthy ? 'good-metric' : 'bad-metric'}`}>
-                  {`CPU: ${cpu.currentLoad.toFixed(2)}%`}
-              </span>
-              {' | '}
-              <span id='cpuAvgMetric' className={`metric ${isCPUAvgHealthy ? 'good-metric' : 'bad-metric'}`}>
-                    {`Avg CPU : ${cpu.avgLoad.toFixed(2)}`}
-              </span>
-              {' | '}
-              <span id='memoryMetric' className={`metric ${isMemoryHealthy ? 'good-metric' : 'bad-metric'}`}>
-                  {`Mem: ${memory.use.toFixed(2)}%`}
-              </span>
-              { ' | '}
-              <span id='diskpaceMetric' className={`metric ${isDiskSpaceHealthy ? 'good-metric' : 'bad-metric'}`}>
-                  {`Disk: ${maxUsageFilesystem.use.toFixed(2)}%`}
-              </span>
-              { ' | '}
-              {healthy ? <i className="fa-solid fa-circle-check healthy-network"/> : <i className="fa-solid fa-circle-exclamation unhealthy-network"/>}
-            </p>
+        <div
+          className="sys-info-container col-sm-6 text-right row"
+          style={{
+            marginTop: "25px",
+            marginBottom: "10px",
+            marginLeft: "0px",
+            marginRight: "0px",
+          }}
+        >
+          <p className="text-right">
+            <span
+              id="cpuCurrentMetric"
+              className={`metric ${
+                cpu.currentLoad.isHealthy ? "good-metric" : "bad-metric"
+              }`}
+            >
+              {`CPU: ${cpu.currentLoad.value.toFixed(2)}%`}
+            </span>
+            {" | "}
+            <span
+              id="cpuAvgMetric"
+              className={`metric ${
+                cpu.avgLoad.isHealthy ? "good-metric" : "bad-metric"
+              }`}
+            >
+              {`Avg CPU : ${cpu.avgLoad.value.toFixed(2)}`}
+            </span>
+            {" | "}
+            <span
+              id="memoryMetric"
+              className={`metric ${
+                memory.use.isHealthy ? "good-metric" : "bad-metric"
+              }`}
+            >
+              {`Mem: ${memory.use.value.toFixed(2)}%`}
+            </span>
+            {" | "}
+            <span
+              id="diskpaceMetric"
+              className={`metric ${
+                maxUsageFilesystem.use.isHealthy ? "good-metric" : "bad-metric"
+              }`}
+            >
+              {`Disk: ${maxUsageFilesystem.use.value.toFixed(2)}%`}
+            </span>
+            {" | "}
+            {systemHealth ? (
+              <i className="fa-solid fa-circle-check healthy-network" />
+            ) : (
+              <i className="fa-solid fa-circle-exclamation unhealthy-network" />
+            )}
+          </p>
         </div>
-     )
+      );
     } else {
-      return (  
-          <div className="sys-info-container row col-sm-6 text-right" style={{marginTop: '25px', marginBottom:'10px', marginLeft:'0px', marginRight:'0px'}}>
-              <p className="text-right">System Metrics Loading...</p>
-          </div>
-      )
-    } 
+      return (
+        <div
+          className="sys-info-container row col-sm-6 text-right"
+          style={{
+            marginTop: "25px",
+            marginBottom: "10px",
+            marginLeft: "0px",
+            marginRight: "0px",
+          }}
+        >
+          <p className="text-right">System Metrics Loading...</p>
+        </div>
+      );
+    }
   }
 
   componentWillUnmount() {
-    this.props.unSubscribeRoom(LAST_BLOCK_NUMBER)
-    this.props.unSubscribeRoom(USERS_COUNT)
-    this.props.unSubscribeRoom(CONTRACTS_COUNT)
-    this.props.unSubscribeRoom(BLOCKS_PROPAGATION)
-    this.props.unSubscribeRoom(BLOCKS_FREQUENCY)
-    this.props.unSubscribeRoom(BLOCKS_DIFFICULTY)
-    this.props.unSubscribeRoom(TRANSACTIONS_COUNT)
-    this.props.unSubscribeRoom(TRANSACTIONS_TYPE)
-    this.props.unSubscribeRoom(GET_HEALTH)
-    this.props.unSubscribeRoom(GET_NODE_UPTIME)
-    this.props.unSubscribeRoom(GET_SYSTEM_INFO)
-    this.props.unSubscribeRoom(GET_SHARD_COUNT)
+    this.props.unSubscribeRoom(LAST_BLOCK_NUMBER);
+    this.props.unSubscribeRoom(USERS_COUNT);
+    this.props.unSubscribeRoom(CONTRACTS_COUNT);
+    this.props.unSubscribeRoom(BLOCKS_PROPAGATION);
+    this.props.unSubscribeRoom(BLOCKS_FREQUENCY);
+    this.props.unSubscribeRoom(BLOCKS_DIFFICULTY);
+    this.props.unSubscribeRoom(TRANSACTIONS_COUNT);
+    this.props.unSubscribeRoom(TRANSACTIONS_TYPE);
+    this.props.unSubscribeRoom(GET_HEALTH);
+    this.props.unSubscribeRoom(GET_NODE_UPTIME);
+    this.props.unSubscribeRoom(GET_SYSTEM_INFO);
+    this.props.unSubscribeRoom(GET_SHARD_COUNT);
+    this.props.unSubscribeRoom(GET_NETWORK_HEALTH);
   }
 
   render() {
@@ -149,29 +187,42 @@ class Dashboard extends Component {
     const txCount = this.props.dashboard.transactionsCount;
     const blockPropData = this.props.dashboard.blockPropagation;
     const txTypeData = this.props.dashboard.transactionTypes;
-    const { usersCount, contractsCount, lastBlockNumber } = this.props.dashboard;
-    const uptime = this.props.dashboard.uptime
-    const health = this.props.dashboard.healthStatus;
+    const { usersCount, contractsCount, lastBlockNumber } =
+      this.props.dashboard;
+    const uptime = this.props.dashboard.uptime;
+    const health = this.props.dashboard.health;
+    const healthStatus = this.props.dashboard.healthStatus;
+    const healthIssues = this.props.dashboard.healthIssues;
     const systemHealth = this.props.dashboard.systemStatus;
     const systemWarnings = this.props.dashboard.systemWarnings;
-    const { cpu, memory, filesystem, networkStats} = this.props.dashboard.systemStats || {};
-    const limits = this.props.dashboard.limits || {
-      cpuCurrentLoadAlertLevel: 90,
-      memoryUsedAlertLevel: 80,
-      diskspaceUsedAlertLevel: 80,
-      cpuAvgLoadAlertLevel: 1.2
-    }
-    const synced = this.props.appMetadata.metadata ? this.props.appMetadata.metadata.isSynced : false
-    const metadata = this.props.appMetadata.metadata
+    const { cpu, memory, filesystem, networkStats } =
+      this.props.dashboard.systemInfo || {};
+    const synced = this.props.appMetadata.metadata
+      ? this.props.appMetadata.metadata.isSynced
+      : false;
+    const metadata = this.props.appMetadata.metadata;
+    const networkHealth = this.props.dashboard.networkStatus;
+    const networkStatusMessage = this.props.dashboard.networkStatusMessage;
 
     return (
       <div className="container-fluid pt-dark" id="tour-welcome">
-        <Tour name='dashboard' finalStepSelector='#accounts' nextPage='accounts' steps={tourSteps} />
+        <Tour
+          name="dashboard"
+          finalStepSelector="#accounts"
+          nextPage="accounts"
+          steps={tourSteps}
+        />
         <div className="row d-flex align-items-center">
           <div className="col-sm-6 text-left">
             <h3>Node Stats</h3>
           </div>
-          {this.displaySystemMetrics(cpu, memory, filesystem, networkStats, limits)}
+          {this.displaySystemMetrics(
+            cpu,
+            memory,
+            filesystem,
+            networkStats,
+            systemHealth
+          )}
         </div>
         <div className="row">
           <div className="col-sm-12">
@@ -180,38 +231,58 @@ class Dashboard extends Component {
         </div>
         <div className="row">
           <div className="col-sm-4">
-
             <Popover
-              isDisabled={synced && health && systemHealth}
+              isDisabled={synced && health}
               interactionKind={PopoverInteractionKind.HOVER}
               position={Position.BOTTOM}
-              className={'full-width'}
+              className={"full-width"}
               content={
-                <div className={`pt-dark pt-callout smd-pad-8 pt-icon-info-sign pt-intent-${!metadata ? 'danger' : ((!health || !synced) ? 'warning' : 'success')}`}>
-                  <h5 className="pt-callout-title">{
-                    !metadata ? 'API Disconnected' : !(health) ? 'Warning' : !synced ? 'Node Syncing' : !systemHealth ? "Warning" : 'Healthy'
-                     //typically systemHealth becomes false during syncing due to high cpu usage, so putting syshealth check at end of ternary
-                    }</h5>
-                  {
-                    !metadata ? 'Cannot connect to the Node\'s API' 
-                    : (!health) ? (systemWarnings || 'Reason currently unknown') 
-                    : !synced ? `This Node is currently syncing with the network.${systemWarnings ? ` ${systemWarnings}` : ''}` 
-                    : !systemHealth ? (systemWarnings || 'System unhealthy') : 'Connected to STRATO Mercata' 
-                    //typically systemHealth becomes false during syncing due to high avg cpu usage, so putting systemHealth check at end of ternary
-                  } 
-            </div>}
+                <div
+                  className={`pt-dark pt-callout smd-pad-8 pt-icon-info-sign pt-intent-${
+                    !metadata
+                      ? "danger"
+                      : !health || !synced
+                      ? "warning"
+                      : "success"
+                  }`}
+                >
+                  <h5 className="pt-callout-title">
+                    {!metadata ? "API Disconnected" : healthStatus}
+                  </h5>
+                  {!metadata
+                    ? "Cannot connect to the Node's API"
+                    : !health
+                    ? `Health issues: ${
+                        healthIssues.length > 0
+                          ? healthIssues.join(". ")
+                          : "unknown issue."
+                      }`
+                    : "Connected to STRATO Mercata"}
+                </div>
+              }
             >
               <NumberCard
-                number={!metadata ? 'DISCONNECTED' : (!health ? 'UNHEALTHY' : !synced ? 'SYNCING' : !systemHealth ? 'UNHEALTHY' : 'HEALTHY') 
-                //moved systemHealth check to end of ternary to avoid unhealthy status when syncing due to high avg cpu usage
-              }
-                description= {sec2Date(uptime)}
-                mode={!metadata ? 'danger' : ((!health || !synced || !systemHealth) ? 'warning' : 'success')}
-                
-                iconClass={!metadata ? 'fa-triangle-exclamation' : (!health ? 'fa-exclamation-circle' : !synced ? 'fa-rotate' : (!systemHealth ? 'fa-exclamation-circle': 'fa-check-circle'))}
-                />
-              </Popover>
-            </div>
+                number={!metadata ? "DISCONNECTED" : healthStatus}
+                description={sec2Date(uptime)}
+                mode={
+                  !metadata
+                    ? "danger"
+                    : !health || !synced
+                    ? "warning"
+                    : "success"
+                }
+                iconClass={
+                  !metadata
+                    ? "fa-triangle-exclamation"
+                    : !health
+                    ? "fa-exclamation-circle"
+                    : !synced
+                    ? "fa-rotate"
+                    : "fa-check-circle"
+                }
+              />
+            </Popover>
+          </div>
           <div className="col-sm-4">
             <Link to="/accounts">
               <NumberCard
@@ -222,7 +293,7 @@ class Dashboard extends Component {
               />
             </Link>
           </div>
-          
+
           <div className="col-sm-4">
             <Link to="/contracts">
               <NumberCard
@@ -242,30 +313,39 @@ class Dashboard extends Component {
         <div className="row">
           <div className="col-sm-4">
             <NumberCard
-                number={
-                  this.props.appMetadata && this.props.appMetadata.nodeInfo ?
+              number={
+                this.props.appMetadata && this.props.appMetadata.nodeInfo ? (
                   <div>
                     <p>
-                      {this.props.appMetadata.nodeInfo.organization} {this.props.appMetadata.nodeInfo.organizationalUnit} 
+                      {this.props.appMetadata.nodeInfo.organization}{" "}
+                      {this.props.appMetadata.nodeInfo.organizationalUnit}
                     </p>
-                    <p>
-                      {this.props.appMetadata.nodeInfo.commonName}
-                    </p> 
+                    <p>{this.props.appMetadata.nodeInfo.commonName}</p>
                   </div>
-                  : 'No Identity'}
-                description="Node ID"
-                iconClass={this.props.appMetadata && this.props.appMetadata.nodeInfo ? 'fa-id-card' : 'fa-exclamation-circle' }
-                className={`smd-pointer`}
-                mode={this.props.appMetadata && this.props.appMetadata.nodeInfo ? '' : 'pt-intent-warning'}
-                textSize='h4'
-              />
+                ) : (
+                  "No Identity"
+                )
+              }
+              description="Node ID"
+              iconClass={
+                this.props.appMetadata && this.props.appMetadata.nodeInfo
+                  ? "fa-id-card"
+                  : "fa-exclamation-circle"
+              }
+              className={`smd-pointer`}
+              mode={
+                this.props.appMetadata && this.props.appMetadata.nodeInfo
+                  ? ""
+                  : "pt-intent-warning"
+              }
+              textSize="h4"
+            />
           </div>
           <div className="col-sm-8">
             <NodeCard />
           </div>
-          
         </div>
-        
+
         <div className="row">
           <div className="col-sm-12">
             <hr />
@@ -278,14 +358,29 @@ class Dashboard extends Component {
         </div>
         <div className="row">
           <div className="col-sm-3">
-            <Link to="/blocks">
-              <NumberCard
-                number={lastBlockNumber}
-                description="Blocks"
-                iconClass="fa-cube"
-              />
-            </Link>
+            <div id="networkInfo">
+              <Link to="">
+                <NumberCard
+                  number={networkStatusMessage || "UNKNOWN"}
+                  description="Network"
+                  iconClass={
+                    networkHealth ? "fa-check-circle" : "fa-exclamation-circle"
+                  }
+                  className={`smd-pointer`}
+                  mode={networkHealth ? "success" : "danger"}
+                />
+              </Link>
+              <br />
+              <Link to="/blocks">
+                <NumberCard
+                  number={lastBlockNumber}
+                  description="Blocks"
+                  iconClass="fa-cube"
+                />
+              </Link>
+            </div>
           </div>
+
           <div className="col-sm-3">
             <ValidatorsCard />
           </div>
@@ -293,7 +388,6 @@ class Dashboard extends Component {
             <TransactionList />
           </div>
         </div>
-
         <div className="row">
           <div className="col-sm-12">
             <hr />
@@ -306,16 +400,26 @@ class Dashboard extends Component {
         </div>
         <div className="row">
           <div className="col-sm-3">
-            <BarGraph data={txCount} number={txCount[0]} label={"Transactions per Last 15 Blocks"} identifier={"TxCount"} />
+            <BarGraph
+              data={txCount}
+              number={txCount[0]}
+              label={"Transactions per Last 15 Blocks"}
+              identifier={"TxCount"}
+            />
           </div>
           <div className="col-sm-3">
             <PieChart data={txTypeData} />
           </div>
           <div className="col-sm-3">
-            <BarGraph data={blockPropData} units="s" label={"Block Interval Last 15 Blocks"} identifier={"BlockProp"} />
+            <BarGraph
+              data={blockPropData}
+              units="s"
+              label={"Block Interval Last 15 Blocks"}
+              identifier={"BlockProp"}
+            />
           </div>
         </div>
-    </div>
+      </div>
     );
   }
 }
@@ -328,15 +432,12 @@ export function mapStateToProps(state) {
   };
 }
 
-const connected = connect(
-  mapStateToProps,
-  {
-    hideLoading,
-    endTour,
-    subscribeRoom,
-    unSubscribeRoom,
-    changeHealthStatus
-  }
-)(Dashboard)
+const connected = connect(mapStateToProps, {
+  hideLoading,
+  endTour,
+  subscribeRoom,
+  unSubscribeRoom,
+  changeHealthStatus,
+})(Dashboard);
 
 export default withRouter(connected);

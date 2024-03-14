@@ -60,7 +60,6 @@ import qualified Data.Map.Strict as M
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import Data.Text.Encoding
-import Ki.Unlifted as KIU
 import SolidVM.Model.Storable
 import Strato.Lite
 import Test.Hspec
@@ -76,8 +75,7 @@ instance Eq SomeException where
 spec :: Spec
 spec = do
   describe "network simulation" $ do
-    it "should send a transaction from server to client" $
-      scoped $ \scope -> do
+    it "should send a transaction from server to client" $ do
         serverPKey <- newPrivateKey
         clientPKey <- newPrivateKey
         let validatorAddresses = fromPrivateKey <$> [serverPKey, clientPKey]
@@ -89,7 +87,7 @@ spec = do
         certs <- traverse (uncurry selfSignCert) $ zip [serverPKey, clientPKey] validatorInfos
         server' <- createPeer' serverPKey (validatorInfos !! 0) zippedValidators certs "server" "1.2.3.4"
         client' <- createPeer' clientPKey (validatorInfos !! 1) zippedValidators certs "client" "5.6.7.8"
-        connection <- createConnection server' client' scope
+        connection <- createConnection server' client'
         let clearChainId tx = case tx of
               MessageTX {} -> tx {transactionChainId = Nothing}
               ContractCreationTX {} -> tx {transactionChainId = Nothing}
@@ -105,8 +103,7 @@ spec = do
         let clientTxs = [t | IETx _ (IngestTx _ t) <- _unseqEvents clientCtx]
         clientTxs `shouldBe` [otBaseTx otx]
 
-    it "should update the round number on every node in the network" $
-      scoped $ \scope -> do
+    it "should update the round number on every node in the network" $ do
         privKeys <- traverse (const newPrivateKey) [(1 :: Integer) .. 7]
         let identities =
               [ CommonName "BlockApps" "Engineering" "Admin" True,
@@ -136,17 +133,17 @@ spec = do
               ]
         let validators' = peers
         connections' <- traverse
-                          (\(a,b,c) -> createConnection a b c)
-                          [ (peers !! 0, peers !! 1, scope),
-                            (peers !! 0, peers !! 2, scope),
-                            (peers !! 0, peers !! 3, scope),
-                            (peers !! 0, peers !! 4, scope),
-                            (peers !! 0, peers !! 5, scope),
-                            (peers !! 0, peers !! 6, scope),
-                            (peers !! 1, peers !! 2, scope),
-                            (peers !! 1, peers !! 3, scope),
-                            (peers !! 1, peers !! 4, scope),
-                            (peers !! 1, peers !! 5, scope)
+                          (\(a,b) -> createConnection a b)
+                          [ (peers !! 0, peers !! 1),
+                            (peers !! 0, peers !! 2),
+                            (peers !! 0, peers !! 3),
+                            (peers !! 0, peers !! 4),
+                            (peers !! 0, peers !! 5),
+                            (peers !! 0, peers !! 6),
+                            (peers !! 1, peers !! 2),
+                            (peers !! 1, peers !! 3),
+                            (peers !! 1, peers !! 4),
+                            (peers !! 1, peers !! 5)
                           ]
         let runForTwoSeconds = void . timeout 2000000
             postTimeoutEvent = do
@@ -191,12 +188,12 @@ spec = do
           postTimeoutSecondary = do
             threadDelay 1000000
             for_ secondaryValidators $ postEvent (TimerFire 1000)
-      scoped $ \scope -> do
+      do
         connections' <- traverse
-                          (\(a,b,c) -> createConnection a b c)
-                          [ (peers !! 0, peers !! 1, scope),
-                            (peers !! 0, peers !! 2, scope),
-                            (peers !! 1, peers !! 2, scope)
+                          (\(a,b) -> createConnection a b)
+                          [ (peers !! 0, peers !! 1),
+                            (peers !! 0, peers !! 2),
+                            (peers !! 1, peers !! 2)
                           ]
         atomically $
           modifyTVar'
@@ -215,12 +212,12 @@ spec = do
         runForTwoSeconds $ concurrently_ (runNetworkOld peers connections') (concurrently_ postTimeoutPrimary1 postTimeoutSecondary)
         ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
         ifor_ ctxs1 $ \i ctx -> (i, _round . _view <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, if i == 0 then Just (1 :: Word256) else Just 1000)
-      scoped $ \scope -> do
+      do
         connections'' <- traverse
-                           (\(a,b,c) -> createConnection a b c)
-                           [ (peers !! 0, peers !! 1, scope),
-                             (peers !! 0, peers !! 2, scope),
-                             (peers !! 1, peers !! 2, scope)
+                           (\(a,b) -> createConnection a b)
+                           [ (peers !! 0, peers !! 1),
+                             (peers !! 0, peers !! 2),
+                             (peers !! 1, peers !! 2)
                            ]
 
         atomically $
@@ -235,7 +232,6 @@ spec = do
         ifor_ ctxs2 $ \i ctx -> (i, _round . _view <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 1001 :: Maybe Word256)
 
     it "can add a new node to a chain" $ do
-      scoped $ \scope -> do
         privKeys <- traverse (const newPrivateKey) [(1 :: Integer) .. 3]
         let validatorAddresses = fromPrivateKey <$> privKeys
             validatorInfos =
@@ -254,10 +250,10 @@ spec = do
                 ("node3", "9.10.11.12")
               ]
         connections' <- traverse
-                          (\(a,b,c) -> createConnection a b c)
-                          [ (peers !! 0, peers !! 1, scope),
-                            (peers !! 0, peers !! 2, scope),
-                            (peers !! 1, peers !! 2, scope)
+                          (\(a,b) -> createConnection a b)
+                          [ (peers !! 0, peers !! 1),
+                            (peers !! 0, peers !! 2),
+                            (peers !! 1, peers !! 2)
                           ]
   
         registryTs <- liftIO getCurrentMicrotime
@@ -366,9 +362,7 @@ spec = do
         runForSeconds 15 $ concurrently_ (runNetworkOld peers connections') routine
         ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
         ifor_ ctxs1 $ \i ctx -> (i, ctx ^. apiChainInfoMap . at chainId) `shouldBe` (i, if i == 2 then Nothing else Just chainInfo')
-
-    it "can sync a new node to a chain after running multiple transactions on that chain" $
-      scoped $ \scope -> do
+    it "can sync a new node to a chain after running multiple transactions on that chain" $ do
         -- TODO: somehow this test got reverted to a previous faulty state
         privKeys <- traverse (const newPrivateKey) [(1 :: Integer) .. 3]
         let validatorAddresses = fromPrivateKey <$> privKeys
@@ -388,10 +382,10 @@ spec = do
                 ("node3", "9.10.11.12")
               ]
         connections' <- traverse
-                          (\(a,b,c) -> createConnection a b c)
-                          [ (peers !! 0, peers !! 1, scope),
-                            (peers !! 0, peers !! 2, scope),
-                            (peers !! 1, peers !! 2, scope)
+                          (\(a,b) -> createConnection a b)
+                          [ (peers !! 0, peers !! 1),
+                            (peers !! 0, peers !! 2),
+                            (peers !! 1, peers !! 2)
                           ]
   
         let src =
@@ -577,8 +571,7 @@ spec = do
       --  ]
       --let connections' = connections ++ connections4
 
-    it "can register and unregister a cert on the main chain" $
-      scoped $ \scope -> do
+    it "can register and unregister a cert on the main chain" $ do
         -- TODO: use registry at 0x509
         privKeys <- traverse (const newPrivateKey) [(1 :: Integer) .. 2]
         let globalAdmin = privKeys !! 0
@@ -598,8 +591,8 @@ spec = do
                 ("node2", "5.6.7.8")
               ]
         connections' <- traverse
-                          (\(a,b,c) -> createConnection a b c)
-                          [ (peers !! 0, peers !! 1, scope)
+                          (\(a,b) -> createConnection a b)
+                          [ (peers !! 0, peers !! 1)
                           ]
         let src =
               [r|
@@ -652,8 +645,7 @@ spec = do
         ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
         for_ ctxs1 $ \ctx -> (ctx ^. x509certMap) `shouldNotBe` M.empty
 
-    it "can add vote in a new validator" $
-      scoped $ \scope -> do
+    it "can add vote in a new validator" $ do
         privKeys <- traverse (const newPrivateKey) [(1 :: Integer) .. 3]
         let validatorAddresses = fromPrivateKey <$> privKeys
             validatorInfos =
@@ -672,10 +664,10 @@ spec = do
                 ("node3", "9.10.11.12")
               ]
         connections' <- traverse
-                          (\(a,b,c) -> createConnection a b c)
-                          [ (peers !! 0, peers !! 1, scope),
-                            (peers !! 0, peers !! 2, scope),
-                            (peers !! 1, peers !! 2, scope)
+                          (\(a,b) -> createConnection a b)
+                          [ (peers !! 0, peers !! 1),
+                            (peers !! 0, peers !! 2),
+                            (peers !! 1, peers !! 2)
                           ]
         ts <- liftIO getCurrentMicrotime
         let toIetx = IETx ts . IngestTx Origin.API
@@ -703,8 +695,7 @@ spec = do
         ctxs <- atomically $ traverse (readTVar . _p2pTestContext) peers
         ifor_ ctxs $ \i ctx -> (i, Set.size . unChainMembers . _validators <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 2)
 
-    it "can add and remove vote in a new validator" $
-      scoped $ \scope -> do
+    it "can add and remove vote in a new validator" $ do
         privKeys <- traverse (const newPrivateKey) [(1 :: Integer) .. 3]
         let validatorAddresses = fromPrivateKey <$> privKeys
             validatorInfos =
@@ -723,10 +714,10 @@ spec = do
                 ("node3", "9.10.11.12")
               ]
         connections' <- traverse
-                          (\(a,b,c) -> createConnection a b c)
-                          [ (peers !! 0, peers !! 1, scope),
-                            (peers !! 0, peers !! 2, scope),
-                            (peers !! 1, peers !! 2, scope)
+                          (\(a,b) -> createConnection a b)
+                          [ (peers !! 0, peers !! 1),
+                            (peers !! 0, peers !! 2),
+                            (peers !! 1, peers !! 2)
                           ]
         ts <- liftIO getCurrentMicrotime
         let toIetx = IETx ts . IngestTx Origin.API
@@ -775,8 +766,7 @@ spec = do
         ctxs2 <- atomically $ traverse (readTVar . _p2pTestContext) peers
         ifor_ ctxs2 $ \i ctx -> (i, Set.size . unChainMembers . _validators <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 1)
 
-    it "can sync a new node after voting in a new validator" $
-      scoped $ \scope -> do
+    it "can sync a new node after voting in a new validator" $ do
         privKeys <- traverse (const newPrivateKey) [(1 :: Integer) .. 4]
         let validatorAddresses = fromPrivateKey <$> privKeys
             validatorInfos =
@@ -797,13 +787,13 @@ spec = do
                 ("node4", "13.14.15.16")
               ]
         connections' <- traverse
-                          (\(a,b,c) -> createConnection a b c)
-                          [ (peers !! 0, peers !! 1, scope),
-                            (peers !! 0, peers !! 2, scope),
-                            (peers !! 1, peers !! 2, scope),
-                            (peers !! 0, peers !! 3, scope),
-                            (peers !! 1, peers !! 3, scope),
-                            (peers !! 2, peers !! 3, scope)
+                          (\(a,b) -> createConnection a b)
+                          [ (peers !! 0, peers !! 1),
+                            (peers !! 0, peers !! 2),
+                            (peers !! 1, peers !! 2),
+                            (peers !! 0, peers !! 3),
+                            (peers !! 1, peers !! 3),
+                            (peers !! 2, peers !! 3)
                           ]
         ts <- liftIO getCurrentMicrotime
         let toIetx = IETx ts . IngestTx Origin.API
@@ -861,8 +851,7 @@ spec = do
         void . timeout 20000000 $ concurrently_ (runNetworkOld (take 3 peers) (take 3 connections')) (concurrently_ (void . timeout 4000000 $ mainChainRoutine 0) routine)
         ctxs <- atomically $ traverse (readTVar . _p2pTestContext) peers
         ifor_ ctxs $ \i ctx -> (i, Set.size . unChainMembers . _validators <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 3)
-    it "will throw an exception if the handshake times out" $
-      scoped $ \scope -> do
+    it "will throw an exception if the handshake times out" $ do
         serverPKey <- newPrivateKey
         clientPKey <- newPrivateKey
         let validatorAddresses = fromPrivateKey <$> [serverPKey, clientPKey]
@@ -874,14 +863,13 @@ spec = do
         certs <- traverse (uncurry selfSignCert) $ zip [serverPKey, clientPKey] validatorInfos
         server' <- createPeer' serverPKey (validatorInfos !! 0) zippedValidators certs "server" "1.1.1.1"
         client' <- createPeer' clientPKey (validatorInfos !! 1) zippedValidators certs "client" "2.2.2.2"
-        connection <- createGermophobicConnection server' client' scope
+        connection <- createGermophobicConnection server' client'
         void . timeout (3 * 1000 * 1000) $ runConnection connection
         clientExcept <- readTVarIO $ connection ^. clientException
         clientExcept `shouldBe` Just (toException $ HandshakeException "handshake timed out")
 
   describe "X.509 Private Chain exchange" $ do
-    it "can add an organization to a private chain" $
-      scoped $ \scope -> do
+    it "can add an organization to a private chain" $ do
         privKeys <- traverse (const newPrivateKey) [(1 :: Integer) .. 3]
         let validatorAddresses = fromPrivateKey <$> privKeys
             validatorInfos =
@@ -900,10 +888,10 @@ spec = do
                 ("node3", "9.10.11.12")
               ]
         connections' <- traverse
-                          (\(a,b,c) -> createConnection a b c)
-                          [ (peers !! 0, peers !! 1, scope),
-                            (peers !! 0, peers !! 2, scope),
-                            (peers !! 1, peers !! 2, scope)
+                          (\(a,b) -> createConnection a b)
+                          [ (peers !! 0, peers !! 1),
+                            (peers !! 0, peers !! 2),
+                            (peers !! 1, peers !! 2)
                           ]
         ts <- liftIO getCurrentMicrotime
         cIdRef <- newIORef undefined
@@ -984,8 +972,7 @@ spec = do
   describe "Testing contracts that call other contracts by addresss" $ do
     --Note to the developer
     --These contracts are shoved into the txrIndexer ..... Take this into consideration
-    it "can call delegatecall function and not change state variables of contract being called" $
-      scoped $ \scope -> do
+    it "can call delegatecall function and not change state variables of contract being called" $ do
         privKeys <- traverse (const newPrivateKey) [(1 :: Integer) .. 4]
         let validatorAddresses = fromPrivateKey <$> privKeys
             validatorInfos =
@@ -1004,10 +991,10 @@ spec = do
                 ("node3", "9.10.11.12")
               ]
         connections' <- traverse
-                          (\(a,b,c) -> createConnection a b c)
-                          [ (peers !! 0, peers !! 1, scope),
-                            (peers !! 0, peers !! 2, scope),
-                            (peers !! 1, peers !! 2, scope)
+                          (\(a,b) -> createConnection a b)
+                          [ (peers !! 0, peers !! 1),
+                            (peers !! 0, peers !! 2),
+                            (peers !! 1, peers !! 2)
                           ]
         ts <- liftIO getCurrentMicrotime
         let toIetx = IETx ts . IngestTx Origin.API

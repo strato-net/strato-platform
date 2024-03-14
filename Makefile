@@ -142,8 +142,7 @@ highway-nginx:
 
 strato: build_common
 	@echo Now building core-strato...
-	cp -fr strato/licenses ${STRATODIR}
-	cp strato/doit.sh ${STRATODIR}
+	cp -fr strato/extraFiles/* ${STRATODIR}
 	docker build --target strato --tag ${REPO_URL}strato:${VERSION} --file Dockerfile.multi ${FAKEROOT}
 	docker tag ${REPO_URL}strato:${VERSION} ${REPO_AWS_ECR_URL}strato:${VERSION}
 

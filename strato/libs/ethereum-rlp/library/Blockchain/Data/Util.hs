@@ -6,7 +6,6 @@ where
 
 import Data.Bits
 import qualified Data.ByteString as B
-import Data.Word
 
 byteString2Integer :: B.ByteString
                    -> Integer
@@ -20,6 +19,10 @@ byteString2Integer bs =
                                  (shiftamount + 8)
                                  (n - 1)
 
-integer2Bytes :: Integer -> [Word8]
-integer2Bytes 0 = []
-integer2Bytes x = integer2Bytes (x `shiftR` 8) ++ [fromInteger (x .&. 255)]
+integer2Bytes :: Integer
+              -> B.ByteString
+integer2Bytes = B.pack . go []
+  where
+    go acc 0 = acc
+    go acc x = go (fromInteger (x .&. 255) : acc)
+                  (x `shiftR` 8)

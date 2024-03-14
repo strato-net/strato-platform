@@ -105,6 +105,7 @@ const Checkout = ({ user }) => {
             status: "Active",
           },
           category: parts[parts.length - 1],
+          firstSale: item.product.address === item.product.originAddress? true: false,
           sellersCommonName: item.product.ownerCommonName,
           unitOfMeasure: item.product.unitOfMeasurement,
           unitPrice: item.product.price,

@@ -1,5 +1,5 @@
 #highway-version:<VERSION>
-#strato-getting-started-min-version:4.2.1
+#strato-getting-started-min-version:4.4.0
 version: "3"
 services:
   highway:

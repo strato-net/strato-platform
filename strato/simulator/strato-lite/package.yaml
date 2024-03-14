@@ -59,7 +59,6 @@ library:
   - ethereum-encryption
   - ethereum-rlp
   - hflags
-  - ki-unlifted
   - lens
   - merkle-patricia-db
   - monad-alter

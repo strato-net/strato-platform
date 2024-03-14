@@ -48,12 +48,6 @@ const actions = {
         dispatch({ type: actionDescriptors.createEventTypeFailed, error: "Error while creating Event Type" });
         actions.setMessage(dispatch, "Error while creating Event Type")
         return false;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.createEventTypeFailed, 
-          error: "Unauthorized while creating Event Type" 
-        });
-        window.location.href = body.error.loginUrl;
       }
 
       dispatch({ type: actionDescriptors.createEventTypeFailed, error: body.error });
@@ -88,13 +82,7 @@ const actions = {
         return;
       } else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({ type: actionDescriptors.fetchEventTypeFailed, error: "Error while fetching Event Type" });
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchEventTypeFailed, 
-          error: "Unauthorized while fetching Event Type" 
-        });
-        window.location.href = body.error.loginUrl;
-      }
+      } 
       dispatch({ type: actionDescriptors.fetchEventTypeFailed, error: body.error });
     } catch (err) {
       dispatch({ type: actionDescriptors.fetchEventTypeFailed, error: "Error while fetching Event Type" });
