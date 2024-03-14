@@ -216,7 +216,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     let processedAddresses = new Set();
     let { limit, offset } = args;
     offset = +offset // convert to a number (coming as string)
-  
     while (combinedInventories.length < limit) {
       const paginatedArgs = { ...args, offset: offset, limit: limit * 2 }; // Example adjustment
       const inventories = await inventoryJs.getAll(rawAdmin, { ...paginatedArgs, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
@@ -264,8 +263,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     // Trim the list if we get an extra result. 
     combinedInventories = combinedInventories.slice(0, limit);
   
-    const inventoryCount = await inventoryJs.inventoryCount(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
-    return { inventories: combinedInventories, inventoryCount: inventoryCount };
+    const inventories = await inventoryJs.getAll(rawAdmin, { ownerCommonName: userCert.commonName, isMint: 'true' }, getOptions);
+    const uniqueOriginAddressesCount = Array.from(new Set(inventories.map(item => item.originAddress)));
+
+    return { inventories: combinedInventories, inventoryCount: uniqueOriginAddressesCount };
   };
 
   contract.getInventoriesForUser = async function (args, options = optionsNoChainIds) {
