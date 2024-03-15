@@ -235,9 +235,9 @@ const CategoryProductList = ({ user }) => {
       || minPrice !== 0 || maxPrice !== MAX_PRICE
     if (isFilter) {
       const baseUrl = new URL(`/marketplace`, window.location.origin);
-      if (searchQueryValue) {
-        baseUrl.searchParams.set('s', searchQueryValue);
-      }
+      // if (searchQueryValue) {
+      //   baseUrl.searchParams.set('s', searchQueryValue);
+      // }
       const url = baseUrl.pathname + baseUrl.search;
       navigate(url)
       clearSelection()

@@ -41,7 +41,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
 
   const queryParams = new URLSearchParams(location.search);
   const categoryQueryValue = queryParams.get('c') || 'all';
-  const searchQueryValue = queryParams.get('s');
+  const searchQueryValue = queryParams.get('s') || '';
   const subCategoryQueryValue = queryParams.get('sc');
   const isSearch = searchQueryValue ? true : false;
   const marketplaceDispatch = useMarketplaceDispatch();
@@ -72,11 +72,13 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(categoryQueryValue);
   const [selectedSubCategory, setSelectedSubCategory] = useState(subCategoryQueryValue);
+  // const [searchText, setSearchText] = useState('')
 
   const stratsBalance = (Object.keys(strats).length > 0) ? strats : 0
 
   useEffect(()=>{
     setSelectedCategory(categoryQueryValue)
+    // setSearchText(searchQueryValue)
   },[categoryQueryValue])
 
   const navItems = [
@@ -367,13 +369,14 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
             <Select
               defaultValue="all"
               className="border-0"
-              style={{ width: 120 }}
+              dropdownStyle={{position:'fixed'}}
+              style={{ width: 150 }}
               onChange={handleCategoryChange}
               options={categories}
               value={selectedCategory}
             />
             <Input
-              // key={searchQueryValue}
+              key={searchQueryValue}
               ref={inputRef}
               size="large"
               placeholder="Search"
