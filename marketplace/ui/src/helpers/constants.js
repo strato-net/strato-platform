@@ -19,6 +19,13 @@ export const HTTP_METHODS = {
   PUT: "PUT",
 };
 
+export const homeUrl = new URL("/marketplace/", window.location.origin).toString();
+export const soldOrdersBaseUrl = new URL("/marketplace/order/sold", window.location.origin).toString();
+export const boughtOrdersBaseUrl = new URL("/marketplace/order/bought", window.location.origin).toString();
+export const transfersBaseUrl = new URL("/marketplace/order/transfers", window.location.origin).toString();
+export const soldOrderDetailssBaseUrl = new URL("/marketplace/sold-orders", window.location.origin).toString();
+export const boughtOrderDetailssBaseUrl = new URL("/marketplace/bought-orders", window.location.origin).toString();
+
 export const UNIT_OF_MEASUREMENTS = {
   1: "LB",
   2: "Ounce",

@@ -19,10 +19,16 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
     const [quantity, setQuantity] = useState(1)
 
     let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
+    const ownerSameAsUser = () => {
+        if (user?.commonName === topSellingProduct?.ownerCommonName) {
+            return true;
+        }
+        return false;
+    }
 
     // For Wishlist Icon Rendering
     const [isWishlisted, setIsWishlisted] = useState(false);
-    const shouldShowWishlistIcon = isAuthenticated && user;
+    const shouldShowWishlistIcon = isAuthenticated && user && !ownerSameAsUser();
 
     const naviroute = routes.MarketplaceProductDetail.url;
     const navigate = useNavigate();
@@ -32,7 +38,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
     const categoryQueryValue = queryParams.get('category');
     const categoryQueryValueArr = categoryQueryValue ? categoryQueryValue.split(',') : []
     const imgMeta = categoryQueryValueArr.length === 1 ? categoryQueryValueArr[0] : SEO.IMAGE_META
-    
+
     const sanitizedDescription = DOMPurify.sanitize(topSellingProduct?.description || "N/A");
     const customStyle = {
         color: '#989898',
@@ -86,7 +92,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                 <img
                     className='md:h-[200px] md:w-[40vw] h-[150px] w-full object-contain rounded-md cursor-pointer mb-2'
                     src={topSellingProduct.images ? topSellingProduct?.images[0] : images_placeholder}
-                    alt={imgMeta}  title={imgMeta}
+                    alt={imgMeta} title={imgMeta}
                 />
                 <div className='flex justify-between items-center'>
                     <Typography
@@ -99,7 +105,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                         </Tooltip>
                         {/* {topSellingProduct?.name || "N/A"} */}
                     </Typography>
-                    <img  alt={imgMeta} title={imgMeta} className='w-4 h-4' src={Images.Verified} />
+                    <img alt={imgMeta} title={imgMeta} className='w-4 h-4' src={Images.Verified} />
                 </div>
             </a>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -154,8 +160,9 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
             <div className='flex gap-4 mt-1'>
                 <Button
                     id={`${topSellingProduct.name.replace(/ /g, "_")}-buy-now`}
+                    disabled={ownerSameAsUser()}
                     type='primary'
-                    className='flex-1 h-9 !bg-[#13188A] !text-white'
+                    className={`flex-1 h-9 !bg-[#13188A] !text-white ${ownerSameAsUser() ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                     onClick={async () => {
                         const dataLayerEventName = isUserProfile ? 'buy_now_from_user_profile' : 'buy_now_from_top_selling_product';
                         window.LOQ.push(['ready', async LO => {
@@ -183,7 +190,8 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                     Buy Now
                 </Button>
                 <Button
-                    className='h-9 w-9 flex items-center justify-center !bg-[#13188A] '
+                    className={`h-9 w-9 flex items-center justify-center !bg-[#13188A] ${ownerSameAsUser() ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                    disabled={ownerSameAsUser()}
                     onClick={() => {
                         window.LOQ.push(['ready', async LO => {
                             await LO.$internal.ready('events')
@@ -205,9 +213,9 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                     }}
                     type='primary'
                 >
-                   
-                    <img alt={imgMeta} title={imgMeta} src={Images.Cart} width={18} height={18} className='max-w-[18px]'/>
-                    
+
+                    <img alt={imgMeta} title={imgMeta} src={Images.Cart} width={18} height={18} className='max-w-[18px]' />
+
                     {/* <ShoppingCartOutlined style={{ color: '#EEEFFA' , width:'18px' ,  height:'18px' }} /> */}
                 </Button>
             </div>

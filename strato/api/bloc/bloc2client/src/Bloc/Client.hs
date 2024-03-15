@@ -3,7 +3,6 @@
 module Bloc.Client
   ( getGitInfo,
     postUsersFill,
-    createCertificate,
     getContracts,
     postContractsBatchSeries,
     getContractsData,
@@ -33,8 +32,6 @@ module Bloc.Client
 where
 
 import Bloc.API
-import BlockApps.X509.Certificate
--- import BlockApps.Solidity.Xabi
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
@@ -49,10 +46,6 @@ getGitInfo = client (Proxy @GetGitInfo)
 ------------- /users endpoints -------------
 postUsersFill :: JwtToken -> Address -> Bool -> ClientM BlocTransactionResult
 postUsersFill = client (Proxy @PostUsersFill)
-
-------------- /x509 endpoints -------------
-createCertificate :: Text -> CreateCertEndpoint -> ClientM X509Certificate
-createCertificate = client (Proxy @CreateCertificate)
 
 ------------- /contracts endpoints -------------
 getContracts ::
