@@ -10,7 +10,7 @@ import TagManager from "react-gtm-module";
 import { UsersProvider } from "./contexts/users";
 import { getCookie, delete_cookie } from "./helpers/cookie";
 import { CategorysProvider } from "./contexts/category";
-import Sitemap from "./components/Sitemap/Sitemap.xml";
+import Sitemap from "./components/Sitemap/Sitemap";
 
 const { Content } = Layout;
 
