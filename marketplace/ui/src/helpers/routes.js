@@ -2,6 +2,7 @@
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default {
+  Sitemap: { label: "Site Map", url: "/sitemap" },
   Certifier: { label: "Certifier", url: "/certifier" },
   Marketplace: { label: "Marketplace", url: "/" },
   MarketplaceProductList: {

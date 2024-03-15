@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useAuthenticateState } from "./contexts/authentication";
 import AuthenticatedRoutes from "./AuthenticatedRoutes";
 import "@shopify/polaris/build/esm/styles.css";
-import { BrowserRouter } from "react-router-dom";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
 import "./styles/app.css";
 import { Layout } from "antd";
 import HeaderComponent from "./components/Header/Header";
@@ -10,6 +10,7 @@ import TagManager from "react-gtm-module";
 import { UsersProvider } from "./contexts/users";
 import { getCookie, delete_cookie } from "./helpers/cookie";
 import { CategorysProvider } from "./contexts/category";
+import Sitemap from "./components/Sitemap/Sitemap.xml";
 
 const { Content } = Layout;
 
@@ -76,7 +77,14 @@ const App = () => {
 
   return (
     <BrowserRouter basename="/">
-      <Layout className="overflow-auto">
+      <Routes>
+      <Route
+        path="/sitemap"
+        element={<Sitemap/>}
+      />
+      <Route
+        path="/*"
+        element={<Layout className="overflow-auto">
         <UsersProvider>
           <CategorysProvider>
             <HeaderComponent
@@ -93,7 +101,9 @@ const App = () => {
         <Content className={`${showMenu ? 'overflow-y-hidden md:overflow-auto h-[100vh] md:h-auto w-[100vw] md:w-auto bg-[#00000020] md:bg-white relative mt-0 md:mt-28' : 'mt-[89px] md:mt-[98px] '}`}>
           <AuthenticatedRoutes user={user} users={users} isAuthenticated={isAuthenticated} />
         </Content>
-      </Layout>
+      </Layout>}
+      />
+      </Routes>
     </BrowserRouter>
   );
 };
