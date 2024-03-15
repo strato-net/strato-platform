@@ -28,11 +28,13 @@ const App = () => {
     "ready",
     async (LO) => {
       await LO.$internal.ready("visitor");
-      LO.visitor.identify({
-        email: user?.email || null,
-        name: user?.commonName || null,
-        username: user?.preferred_username || null
-      });
+      if (user) {
+        LO.visitor.identify({
+          email: user.email,
+          name: user.commonName,
+          username: user.preferred_username
+        });
+      }
     },
   ]);
 

@@ -58,16 +58,11 @@ const ProductDetails = ({ user, users }) => {
     isCalledFromInventory = true
   }
 
-
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
   const { Text, Paragraph } = Typography;
   const [Id, setId] = useState(undefined);
   const [itemData, setItemData] = useState({});
-  // For Wishlist Icon Rendering
-  const [isWishlisted, setIsWishlisted] = useState(false);
-  const [availableQuantity, setAvailableQuantity] = useState(1);
-  const shouldShowWishlistIcon = isAuthenticated && user;
 
   const [qty, setQty] = useState(1);
   const dispatch = useInventoryDispatch();
@@ -97,6 +92,18 @@ const ProductDetails = ({ user, users }) => {
     strict: true,
   });
 
+  const ownerSameAsUser = () => {
+    if (user?.commonName === inventoryDetails?.ownerCommonName) {
+      return true;
+    }
+    return false;
+  }
+
+  // For Wishlist Icon Rendering
+  const [isWishlisted, setIsWishlisted] = useState(false);
+  const [availableQuantity, setAvailableQuantity] = useState(1);
+  const shouldShowWishlistIcon = isAuthenticated && user && !ownerSameAsUser();
+
   useEffect(() => {
     if (isCalledFromInventory) setId(routeMatch1?.params?.id);
     else setId(routeMatch?.params?.address);
@@ -114,7 +121,7 @@ const ProductDetails = ({ user, users }) => {
       //   itemsActions.fetchSerialNumbers(itemDispatch, Id);
       // }
     }
-  }, [Id, dispatch, user]);
+  }, [Id, dispatch]);
 
   useEffect(() => {
     if (inventoryDetails) {
@@ -201,15 +208,6 @@ const ProductDetails = ({ user, users }) => {
       });
     }
   };
-
-  const ownerSameAsUser = () => {
-
-    if (user?.commonName === inventoryDetails?.ownerCommonName) {
-      return true;
-    }
-
-    return false;
-  }
 
   const addItemToCart = () => {
     let found = false;
@@ -320,7 +318,7 @@ const ProductDetails = ({ user, users }) => {
       return str;
     }
   }
-  
+
   const assetName = decodeURIComponent(details?.name)
   const contractName = getCategoryName(decodeURIComponent(details?.contract_name))
   const linkUrl = window.location.href;
@@ -336,10 +334,10 @@ const ProductDetails = ({ user, users }) => {
         </div>
       ) : (
         <div>
-          <HelmetComponent 
-          title={`${assetName} | ${contractName} | ${SEO.TITLE_META}`}
-          description={details?.description} 
-          link={linkUrl} />
+          <HelmetComponent
+            title={`${assetName} | ${contractName} | ${SEO.TITLE_META}`}
+            description={details?.description}
+            link={linkUrl} />
           <Row>
             <Breadcrumb className="text-xs   mb-4 md:mt-5  md:mb-6 lg:mb-[44px] ml-4 lg:ml-16">
               <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
@@ -383,16 +381,16 @@ const ProductDetails = ({ user, users }) => {
               } className="product_detail w-full  sm:w-[417px]   lg:h-[348px] md:w-[343px] lg:w-[417px]" showStatus={false} showArrows swipeable emulateTouch infiniteLoop >
                 {details.images.length > 0 ? details.images.map((element, index) => {
                   return (<><div key={index} className="sm:w-[343px ] h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
-                    <img width={"100%"} 
-                    alt={`${assetName} | Image ${index}`}
-                    title={`${assetName} | Image ${index}`}
-                    className="object-contain rounded-md h-full " src={element ? element : image_placeholder} />
+                    <img width={"100%"}
+                      alt={`${assetName} | Image ${index}`}
+                      title={`${assetName} | Image ${index}`}
+                      className="object-contain rounded-md h-full " src={element ? element : image_placeholder} />
                   </div></>)
                 }) : <><div className="sm:w-[343px ] sm:h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
                   <img width={"100%"}
-                  alt={`${assetName} | Image`}
-                  title={`${assetName} | Image`}
-                  className="object-contain rounded-md h-full " src={image_placeholder} />
+                    alt={`${assetName} | Image`}
+                    title={`${assetName} | Image`}
+                    className="object-contain rounded-md h-full " src={image_placeholder} />
                 </div></>}
               </Carousel>
               <div className=" w-full lg:w-1/2">
