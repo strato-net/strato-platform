@@ -1,7 +1,7 @@
 import React from 'react';
 import { SEO } from '../../helpers/seoConstant';
 
-function Sitemap() {
+const Sitemap = () => {
 
   return (
           <pre>{
