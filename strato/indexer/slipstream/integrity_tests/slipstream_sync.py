@@ -8,8 +8,8 @@ import sys
 def wait_for_nodes_to_sync(node1_url, node2_url, headers1, headers2):
     while True:
         try:
-            response1 = requests.get(node1_url + "/cirrus/search/BlockApps-Mercata-Asset?order=block_timestamp.desc", headers=headers1, limit=1)
-            response2 = requests.get(node2_url + "/cirrus/search/BlockApps-Mercata-Asset?order=block_timestamp.desc", headers=headers2, limit=1)
+            response1 = requests.get(node1_url + "/cirrus/search/BlockApps-Mercata-Asset", headers=headers1, params={'order':'block_timestamp.desc', 'limit':1})
+            response2 = requests.get(node2_url + "/cirrus/search/BlockApps-Mercata-Asset", headers=headers1, params={'order':'block_timestamp.desc', 'limit':1})
 
             if response1.ok and response2.ok:
                 block_number1 = response1.json()[0]["block_number"]
@@ -108,14 +108,6 @@ if __name__ == "__main__":
 
     # Wait until both nodes have the same latest block number
     wait_for_nodes_to_sync(node1_url, node2_url, headers1, headers2)
-
-    discrepancies_asset = False
-    discrepancies_sale = False
-    discrepancies_order = False
-
-    count_asset_discrepancy = False
-    count_sale_discrepancy = False
-    count_order_discrepancy = False
 
     discrepancies_asset, count_asset_discrepancy = check_table("BlockApps-Mercata-Asset")
     discrepancies_sale, count_sale_discrepancy = check_table("BlockApps-Mercata-Order")
