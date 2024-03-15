@@ -50,17 +50,13 @@ import Blockchain.VMMetrics
 import Blockchain.VMOptions
 import Blockchain.Wiring
 import Conduit hiding (Flush)
-import Control.Concurrent.STM (TQueue, atomically, readTQueue, writeTQueue)
 import Control.Lens hiding (Context)
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
-import Control.Monad.Composable.Base
 import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.SQL
-import Control.Monad.Reader (ask, runReaderT)
 import qualified Data.ByteString.Char8 as BC
-import qualified Data.DList as DL
 import Data.Foldable hiding (fold)
 import Data.List
 import qualified Data.Map as M
@@ -68,13 +64,13 @@ import qualified Data.Map.Ordered as OMap
 import Data.Maybe
 import Data.Proxy
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as UTF8
 import Debugger
 import Executable.EthereumVM2
 import Executable.EVMCheckpoint
 import Executable.EVMFlags
 import qualified Network.Kafka.Protocol as KP
 import Text.Format (format)
-import UnliftIO (race_)
 
 -- newtype CertRoot = CertRoot { unCertRoot :: MP.StateRoot }
 --   deriving (Eq, Ord, Show)
@@ -82,7 +78,7 @@ import UnliftIO (race_)
 ethereumVM :: Maybe DebugSettings -> LoggingT IO ()
 ethereumVM d = runResourceT $ do
   ctx <- initContext d
-  race_ (deployCommitsSqlDiffs ctx) . runSQLM . runKafkaMConfigured "ethereum-vm" . execContextM' ctx $ do
+  void . runSQLM . runKafkaMConfigured "ethereum-vm" $ execContextM' ctx $ do
     Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
     (_, EVMCheckpoint cpHash cpHead cpBBI cpSR) <- getCheckpoint
     $logInfoLS "ethereumVM/getCheckpoint" (cpHash, cpBBI, cpSR)
@@ -100,8 +96,6 @@ ethereumVM d = runResourceT $ do
           yield vmInEventBatch
             .| handleVmEvents flags_useSyncMode
             .| mapM_C sendOutEvent
-        contx <- ask
-        void . liftIO $ enqueue (_stateDiffQueue contx) Flush
 
         loopTimeit "compactContextM" $ compactContextM
 
@@ -171,7 +165,7 @@ sendOutEvent (OutAction act) = do
              ) of
           (Just c, Just n, actionDatas) ->
             let cp = case join $ fmap (M.lookup "VM") $ a ^. Action.metadata of
-                  Just "SolidVM" -> SolidVMCode (T.unpack n) $ Keccak256.hash $ BC.pack $ T.unpack c
+                  Just "SolidVM" -> SolidVMCode (T.unpack n) $ Keccak256.hash $ UTF8.encodeUtf8 c
                   Just "EVM" -> EVMCode $ Keccak256.hash $ BC.pack $ T.unpack c
                   Just v -> error $ "Unknown VM: " ++ show v
                   Nothing -> EVMCode $ Keccak256.hash $ BC.pack $ T.unpack c
@@ -203,14 +197,10 @@ sendOutEvent (OutAction act) = do
   void . produceVMEvents $ toList vmes
 sendOutEvent (OutIndexEvent e) = void $ produceIndexEvents [e]
 sendOutEvent (OutToStateDiff cId cInfo bHash org app) = withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo org app
-sendOutEvent (OutStateDiff diff) = do
-  contx <- accessEnv
-  void . liftIO $ enqueue (_stateDiffQueue contx) (SD diff)
+sendOutEvent (OutStateDiff diff) = commitSqlDiffs diff
 sendOutEvent (OutLog l) = loopTimeit "flushLogEntries" $ void $ produceIndexEvents [LogDBEntry l]
 sendOutEvent (OutEvent e) = loopTimeit "flushEventEntries" $ void $ produceIndexEvents (EventDBEntry <$> e)
-sendOutEvent (OutTXR tr) = do
-  contx <- accessEnv
-  void . liftIO $ enqueue (_stateDiffQueue contx) (TXR tr)
+sendOutEvent (OutTXR tr) = void . produceVMEvents $ [NewTransactionResult tr]
 sendOutEvent (OutASM asm) =
   when (not flags_sqlDiff) $
     timeit "updateSQLBalanceAndNonce" (Just vmBlockInsertionMined) $
@@ -288,25 +278,3 @@ getUnprocessedKafkaEvents offset = do
 
       !ret' = eventLimit . countLimit $ ret
   return ret'
-
--- This function lives on its own thread
-checkQueueAndCommitsSqlDiffsForever :: (MonadLogger m, HasSQL m, HasContext m) => DL.DList VMEvent -> m ()
-checkQueueAndCommitsSqlDiffsForever vmEvents = do
-  context' <- accessEnv
-  let que = _stateDiffQueue context'
-  msg <- liftIO . atomically $ readTQueue que
-  case msg of
-    TXR !txResult -> checkQueueAndCommitsSqlDiffsForever $ vmEvents `DL.snoc` NewTransactionResult txResult
-    SD !stateDiff' -> do
-      commitSqlDiffs stateDiff'
-      checkQueueAndCommitsSqlDiffsForever vmEvents
-    Flush -> do
-      void . produceVMEvents $ toList vmEvents
-      checkQueueAndCommitsSqlDiffsForever DL.empty
-
-deployCommitsSqlDiffs :: Context -> ResourceT (LoggingT IO) ()
-deployCommitsSqlDiffs context' = runSQLM $ runReaderT (checkQueueAndCommitsSqlDiffsForever DL.empty) context'
-
--- Add an element to the end of the queue
-enqueue :: TQueue a -> a -> IO ()
-enqueue queue item = atomically $ writeTQueue queue item

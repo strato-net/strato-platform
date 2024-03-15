@@ -105,6 +105,7 @@ const Checkout = ({ user }) => {
             status: "Active",
           },
           category: parts[parts.length - 1],
+          firstSale: item.product.address === item.product.originAddress? true: false,
           sellersCommonName: item.product.ownerCommonName,
           unitOfMeasure: item.product.unitOfMeasurement,
           unitPrice: item.product.price,
@@ -234,7 +235,7 @@ const Checkout = ({ user }) => {
   //   }
   // };
 
-  const openToastOrder = (placement) => {
+  const openToastOrder = (placement, message) => {
     if (success) {
       api.success({
         message: message,
@@ -461,7 +462,7 @@ const Checkout = ({ user }) => {
                   <div
                     className={`hidden  lg:block ${index === 0 ? "" : "mt-10"}`}
                   >
-                    <CartComponent columns={columns} data={e.value} />{" "}
+                    <CartComponent columns={columns} data={e.value} openToastOrder={openToastOrder}/>{" "}
                   </div>{" "}
                   <div className="lg:hidden">
                     <ResponsiveCart
@@ -470,6 +471,7 @@ const Checkout = ({ user }) => {
                       MinusQty={MinusQty}
                       ValueQty={ValueQty}
                       removeCartList={removeCartList}
+                      openToastOrder={openToastOrder}
                     />
                   </div>
                 </React.Fragment>
@@ -483,7 +485,7 @@ const Checkout = ({ user }) => {
         handleCancel={handleCancel}
         handleConfirm={handleOrderConfirm}
       />
-      {message && openToastOrder("bottom")}
+      {message && openToastOrder("bottom", message)}
     </div>
   );
 };

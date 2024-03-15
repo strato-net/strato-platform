@@ -154,6 +154,7 @@ function bind(user, _contract, options) {
     contract.get = async (args) => get(user, args, options);
     contract.getState = async () => getState(user, contract, options);
     contract.getHistory = async (args, options = contractOptions) => getHistory(user, chainId, args, options);
+    contract.checkSaleQuantity = async (args) => checkSaleQuantity(user, args, options)
     contract.chainIds = options.chainIds;
 
     return contract;
@@ -350,7 +351,7 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, defaultOptions) {
-    const { range, ownerCommonName, assetAddresses, status, isMarketplaceSearch, isTrendingSearch, ...restArgs } = args;
+    const { range, ownerCommonName, assetAddresses, status, isMarketplaceSearch, isTrendingSearch, userProfile, userProfileGtField, userProfileGtValue, ...restArgs } = args;
     let inventories;
     let sales;
     let finalInventory = [];
@@ -359,7 +360,10 @@ async function getAll(admin, args = {}, defaultOptions) {
     if (isTrendingSearch) {
         // If it's a trending search, first search the sales
         // Order them by creation date and set limit here
-        sales = await saleJs.getAll(admin, { range, isOpen: true, order: 'block_timestamp.desc', limit: '25', offset: '0' }, options);
+
+        // added greater than query to make sure we only take the sales with quantity thats available to sell. 
+        // If the sale has 0 quantity it will throw an error when checking out, we will not show thee items for the trending search.
+        sales = await saleJs.getAll(admin, { range, isOpen: true, order: 'block_timestamp.desc', limit: '25', offset: '0', gtField: args.gtField, gtValue: args.gtValue}, options);
         const trendingAssetAddresses = sales.map(sale => sale.assetToBeSold);
 
         // Match the inventory with the sales
@@ -367,7 +371,8 @@ async function getAll(admin, args = {}, defaultOptions) {
             {
                 address: trendingAssetAddresses,
             }, options, admin);
-    } else {
+    } 
+    else {
         // Original logic
         if (ownerCommonName) {
             inventories = await searchAllWithQueryArgs(contractName,
@@ -389,8 +394,12 @@ async function getAll(admin, args = {}, defaultOptions) {
                     ...restArgs,
                 }, options, admin);
         }
-
-        if (inventories) {
+        if (inventories && userProfile) {
+            const assetAddresses = inventories.map((inventory) => inventory.address);
+            // (sale.js): `getAll` method needs to be refactored as it has logic specific to passing `assetAddresses`
+            sales = await saleJs.getAll(admin, {  assetAddresses, range, saleGtField: userProfileGtField, saleGtValue: userProfileGtValue, isOpen: true, order: 'block_timestamp.desc' }, options);
+        }
+        else if (inventories) {
             const assetAddresses = inventories.map((inventory) => inventory.address);
             sales = await saleJs.getAll(admin, { assetAddresses, range, isOpen: true }, options);
         }
@@ -405,7 +414,8 @@ async function getAll(admin, args = {}, defaultOptions) {
                     price: itemSale?.price,
                     saleAddress: itemSale?.address,
                     saleQuantity: itemSale?.quantity,
-                    saleDate: itemSale?.block_timestamp
+                    saleDate: itemSale?.block_timestamp,
+                    totalLockedQuantity: itemSale?.totalLockedQuantity
                 });
             }
             else if (isMarketplaceSearch) {
@@ -422,9 +432,15 @@ async function getAll(admin, args = {}, defaultOptions) {
 
 async function getAllItemTransferEvents(admin, args = {}, defaultOptions) {
     const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
-    const itemTransferEvents = await searchAllWithQueryArgs(`${contractName}.${contractEvents.ITEM_TRANSFER}`, args, options, admin);
-    const total  = await searchAllWithQueryArgs( `${contractName}.${contractEvents.ITEM_TRANSFER}`, { ...args, limit: undefined, offset: 0, order: undefined, queryOptions: { select: "count", } }, options, admin );
-    return { transfers: itemTransferEvents.map((item) => marshalOut(item)), total: total[0].count };
+    let itemTransferEvents = await searchAllWithQueryArgs(`${contractName}.${contractEvents.ITEM_TRANSFER}`, args, options, admin);
+    const itemAddressArr = itemTransferEvents.map(item => item.assetAddress)
+    const itemsSale = await searchAllWithQueryArgs(`Sale`, { assetToBeSold: itemAddressArr }, options, admin);
+    const total = await searchAllWithQueryArgs(`${contractName}.${contractEvents.ITEM_TRANSFER}`, { ...args, limit: undefined, offset: 0, order: undefined, queryOptions: { select: "count", } }, options, admin);
+    itemTransferEvents = itemTransferEvents.map(item=>{
+       const saleData = itemsSale.find((sale)=>sale.assetToBeSold === item.address)
+       return {...item, price:saleData?.price }
+    })
+    return { transfers: itemTransferEvents.map((item) => marshalOut(item)), total: total[0]?.count };
 }
 
 async function getOwnershipHistory(user, args, options) {
@@ -445,7 +461,7 @@ async function getOwnershipHistory(user, args, options) {
 
 async function inventoryCount(admin, args = {}, defaultOptions) {
     const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
-    const { range, ...newArgs } = args;
+    const { range, userProfile, userProfileGtField, userProfileGtValue, ...newArgs } = args;
     const queryArgs = setSearchQueryOptionsPrime({
         ...newArgs,
         limit: undefined,
@@ -467,6 +483,40 @@ async function inventoryCount(admin, args = {}, defaultOptions) {
     );
     return totalResult[0].count
 }
+
+async function checkSaleQuantity(admin, args, defaultOptions) {
+    const { saleAddresses, orderQuantity } = args; // Assuming orderQuantity here is used differently now
+    const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' };
+
+    // Fetch sales and assets data
+    const sales = await saleJs.getAll(admin, { address: saleAddresses }, options);
+    const assets = await searchAllWithQueryArgs(contractName, { sale: saleAddresses }, options, admin);
+    let insufficientDetails = [];
+
+    sales.forEach((sale, index) => {
+        const actualAvailableQuantity = sale.quantity; 
+        const requestedQuantity = orderQuantity[index]; // Accessing requested quantity via sale address
+
+        if (actualAvailableQuantity < requestedQuantity) {
+            const asset = assets.find(asset => asset.sale === sale.address);
+            if (asset) {
+                insufficientDetails.push({
+                    assetName: asset.name, 
+                    assetAddress: sale.assetToBeSold,
+                    availableQuantity: actualAvailableQuantity,
+                });
+            }
+        }
+    });
+
+    if (insufficientDetails.length > 0) {
+        return insufficientDetails;
+    } else {
+        // If all sales have sufficient quantities, return true
+        return true;
+    }
+}
+
 
 /**
  * Get contract state in bloc.
@@ -490,6 +540,7 @@ export default {
     transferItem,
     updateInventory,
     updateSale,
+    checkSaleQuantity,
     get,
     getAll,
     getOwnershipHistory,

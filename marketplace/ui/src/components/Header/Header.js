@@ -23,6 +23,7 @@ import { actions } from "../../contexts/marketplace/actions";
 import { actions as userActions } from "../../contexts/authentication/actions";
 import { useAuthenticateDispatch } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
+import { SEO } from "../../helpers/seoConstant";
 
 const { Header } = Layout;
 
@@ -36,6 +37,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const marketplaceDispatch = useMarketplaceDispatch();
   const userDispatch = useAuthenticateDispatch();
   const { cartList, strats } = useMarketplaceState();
+
   const storedData = useMemo(() => {
     return window.localStorage.getItem("cartList") == null ? [] : JSON.parse(window.localStorage.getItem("cartList"));
   }, []);
@@ -54,6 +56,8 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const [initials, setInitials] = useState("");
   const [roleIndex, setRoleIndex] = useState();
   const [showSearch, setShowSearch] = useState(false)
+
+  const stratsBalance = (Object.keys(strats).length > 0) ? strats : 0
 
   const navItems = [
     {
@@ -113,6 +117,14 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
 
   const items = user ? [
     {
+      key: '3',
+      label: (
+        <div onClick={() => { navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", user.commonName)}`) }}>
+          <p>My Profile</p>
+        </div>
+      ),
+    },
+    {
       key: '2',
       label: (
         <div>
@@ -122,11 +134,6 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
           <p className="text-xs">
             {user == null ? "" : user.email}
           </p>
-          {user &&
-            <p className="text-xs mt-3">
-              STRATS: {(Object.keys(strats).length > 0) ? strats : 0}
-            </p>
-          }
         </div>
       ),
     },
@@ -147,6 +154,20 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
       ),
     },
   ];
+  
+
+  const stratsItem = [{
+    key: '2',
+    label: (
+      <div>
+        {user &&
+          <p className="text-xs mt-1">
+            STRATs: {stratsBalance}
+          </p>
+        }
+      </div>
+    ),
+  }]
 
   useEffect(() => {
     let temp = "";
@@ -169,8 +190,28 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     { value: "marketplace", path: routes.MarketplaceProductList.url, label: "Marketplace" },
     { value: "orders", path: routes.Orders.url.replace(':type', 'sold'), label: "Orders" },
     { value: "mystore", path: "/mystore", label: "My Store" },
-    user ? { value: "logout", path: "/logout", label: <div><p className="!mb-0">Logout</p><p className="text-xs text-gray">{user?.preferred_username}</p></div> } : null,
-  ]
+    user ? {
+      value: "my-profile",
+      path: routes.MarketplaceUserProfile.url.replace(':commonName', user.commonName),
+      label: (
+        <div>
+          <p className="!mb-0">My Profile</p>
+        </div>
+      )
+    } : null,
+    user ? { 
+      value: "logout", 
+      path: "/logout", 
+      label: (
+        <div>
+          <p className="text-gray">{user?.commonName}</p>
+          <p className="text-xs text-gray">{user?.preferred_username}</p>
+          <p className="!mb-0">Logout</p>
+        </div>
+      )
+    } : null,
+  ].filter(Boolean);
+  
 
   const handleIntMenuTab = (data) => {
     data.value == 'logout' ? logout() : data.value == 'orders' ? navigate(routes.Orders.url.replace(':type', 'sold'), { state: { defaultKey: "Sold" } }) : navigate(data.path)
@@ -206,6 +247,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     const value = e.target.value;
     navigateSearch(value)
   };
+  const IMG_META = SEO.TITLE_META
 
   return (
     <>
@@ -215,7 +257,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
             className="mt-4 mr-5 md:mt-0 cursor-pointer flex-grow-0 w-max md:w-[170px] h-[44px]"
             onClick={() => { navigate(routes.Marketplace.url) }}
           >
-            <img src={Images.newLogo} className="h-[31px] w-[120px] md:w-[170px] md:h-[44px]" preview={false} />
+            <img src={Images.newLogo} alt={IMG_META} title={IMG_META} className="h-[31px] w-[120px] md:w-[170px] md:h-[44px]" preview={false} />
           </div>
           <div className={`lg:ml-28 md:ml-1 flex-1 ${showSearch ? '-mt-[6px] fixed top-[13px] left-0 flex w-[100vw] z-50 mb-4' : 'hidden md:flex mb-10'}`}>
             <Input
@@ -225,7 +267,9 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
               // defaultValue={searchQueryValue}
               onChange={(e) => { handleChangeSearch(e) }}
               onPressEnter={(e) => { handleEnterSearch(e) }}
-              prefix={showSearch ? <ArrowLeftOutlined onClick={() => handleSearchShow(false)} /> : <img src={Images.Header_Search} className="w-[18px] h-[18px]" />}
+              prefix={showSearch 
+                ? <ArrowLeftOutlined onClick={() => handleSearchShow(false)} /> 
+                : <img src={Images.Header_Search} alt={IMG_META} title={IMG_META} className="w-[18px] h-[18px]" />}
               className="bg-[#F6F6F6] border-none rounded-[100px] md:!w-[35%] lg:w-[40%] absolute p-[10px] "
             />
           </div>
@@ -281,10 +325,10 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
         />
         <Space size="large" className="!gap-0 md:!gap-4 mr-0 -ml-3">
           {<div className="flex md:hidden mx-2" onClick={() => handleSearchShow(true)}>
-            <img src={Images.Responsive_search} className="w-6 h-6" />
+            <img src={Images.Responsive_search} alt={IMG_META} title={IMG_META} className="w-6 h-6" />
           </div>}
-          {roleIndex === undefined || roleIndex === 1 ? null : <Badge
-            className="cursor-pointer"
+          <Badge
+            className="cursor-pointer mr-3 md:mr-1"
             count={cartList.length}
             onClick={() => {
               TagManager.dataLayer({
@@ -297,15 +341,29 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
           >
             <div className="md:hidden">
               <Avatar
-                icon={<img src={Images.Responsive_cart} alt="" className="w-6 h-6" />}
+                icon={<img src={Images.Responsive_cart} alt={IMG_META} title={IMG_META} className="w-6 h-6" />}
               />
             </div>
             <div className="hidden md:inline-block">
               <Avatar
-                icon={<img src={Images.Header_cart} alt="" className="w-6 h-6" />}
+                icon={<img src={Images.Header_cart} alt={IMG_META} title={IMG_META} className="w-6 h-6" />}
               />
             </div>
           </Badge>
+
+          {(roleIndex !== undefined && roleIndex !== 1)
+            && <Dropdown menu={{ items: stratsItem }} placement="bottomRight" trigger={["hover","click"]} className="xs:mt-5 md:mt-0" overlayStyle={{ position: 'fixed' }}>
+              <a onClick={(e) => e.preventDefault()} className="md:flex mx-2 text-base text-white" id="user-dropdown">
+              <Badge
+              style={{backgroundColor:"#13188A"}}
+              className="cursor-pointer mt-7 md:mt-0 mx-2"
+              count={stratsBalance}
+              overflowCount={9999999}
+              >
+              <img src={Images.logo} alt={IMG_META} title={IMG_META} className="w-[30px] h-[30px] " />
+            </Badge>
+              </a>
+            </Dropdown>
           }
           {
             roleIndex === undefined || roleIndex === 1 ? (
@@ -322,14 +380,14 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
                 <Button size="large" className="flex sm:hidden bg-primary text-white w-[90%] !h-[25%] !text-sm justify-center items-center">Login/Register</Button>
               </a> : null
             ) :
-              <Dropdown menu={{ items }} placement="bottomRight" trigger={["click"]} overlayStyle={{ marginTop: "40px" }}>
+              <Dropdown menu={{ items }} placement="bottomRight" trigger={["click"]} overlayStyle={{ marginTop: "40px", position: 'fixed' }}>
                 <a onClick={(e) => e.preventDefault()} className="hidden md:flex text-base text-white" id="user-dropdown">
-                  <img src={Images.Setting_icon} className="w-[30px] h-[30px] " />
+                  <img src={Images.Setting_icon} alt={IMG_META} title={IMG_META} className="w-[30px] h-[30px] " />
                 </a>
               </Dropdown>
           }
           {<div className="block md:hidden px-1" onClick={handleSubMenu}>
-            <img src={Images.menu_icon} alt="" className="w-6 h-6" />
+            <img src={Images.menu_icon} alt={IMG_META} title={IMG_META} className="w-6 h-6" />
           </div>}
         </Space>
       </Header>

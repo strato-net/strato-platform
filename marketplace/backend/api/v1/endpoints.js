@@ -47,6 +47,7 @@ export const Inventory = {
   getOwnershipHistory: '/ownership/history',
   get: '/:address',
   getAll: '/',
+  getAllUserInventories: '/user/inventories/',
   create: '/',
   update: '/update',
   list: '/list',
@@ -128,6 +129,7 @@ export const Order = {
   getAddressFromId: '/userAddress/:id',
   createSaleOrder: '/sale',
   cancelSaleOrder: '/sale/cancel',
+  checkSaleQuantity: '/saleQuantity',
   executeSale: '/closeSale',
   updateOrderComment: '/updateComment',
   export: '/exportOrders'
@@ -182,4 +184,7 @@ export const PaymentService = {
   stripeWebhookConnect: '/stripe/webhook/connect',
 }
 
-
+export const UserActivity = {
+  prefix: '/userActivity',
+  getAll: '/',
+}

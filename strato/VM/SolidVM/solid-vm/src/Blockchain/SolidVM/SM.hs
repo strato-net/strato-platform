@@ -164,7 +164,7 @@ data SState = SState
   { env :: Env.Environment,
     callStack :: [CallInfo],
     _ssMemDBs :: MemDBs,
-    _action :: Action,
+    _action :: !Action,
     _gasInfo :: GasInfo
   }
 
@@ -949,8 +949,8 @@ getCodeAndCollection address' = do
           (current' : _) -> Just $ currentAccount current'
           _ -> Nothing
 
-  $logDebugS "getCodeAndCollection" . T.pack $ "----------------- caller address: " ++ fromMaybe "Nothing" (fmap format maybeAddress)
-  $logDebugS "getCodeAndCollection" . T.pack $ "----------------- callee address: " ++ format address'
+  -- $logDebugS "getCodeAndCollection" . T.pack $ "----------------- caller address: " ++ fromMaybe "Nothing" (fmap format maybeAddress)
+  -- $logDebugS "getCodeAndCollection" . T.pack $ "----------------- callee address: " ++ format address'
   if Just address' == maybeAddress
     then do
       c' <- getCurrentContract

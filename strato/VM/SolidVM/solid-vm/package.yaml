@@ -11,7 +11,6 @@ library:
     - Blockchain.SolidVM.SM
   ghc-options: -Wall -O2
   dependencies:
-  - aeson
   - base16-bytestring
   - blockapps-data
   - blockapps-datadefs
@@ -30,17 +29,14 @@ library:
   - format
   - labeled-error
   - lens
-  - lrucache
   - merkle-patricia-db
   - monad-alter
   - nibblestring
   - ordered-containers
   - parsec
-  - prometheus-client
   - solid-vm-compiler
   - solid-vm-model
   - solid-vm-parser
-  - solid-vm-static-analysis
   - source-tools
   - strato-model
   - text
@@ -63,7 +59,6 @@ executables:
     dependencies:
       - containers
       - parsec
-      - solid-vm
       - solid-vm-compiler
       - solid-vm-model
       - solid-vm-parser

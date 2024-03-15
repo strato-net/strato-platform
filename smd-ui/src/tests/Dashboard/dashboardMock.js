@@ -195,6 +195,7 @@ export const unSubscribeRoomMock = [
   ['GET_NODE_UPTIME'],
   ['GET_SYSTEM_INFO'],
   ['GET_SHARD_COUNT'],
+  ['GET_NETWORK_HEALTH']
 ]
 
 export const subscribeRoomMock = [
@@ -207,4 +208,6 @@ export const subscribeRoomMock = [
   ['TRANSACTIONS_COUNT'],
   ['TRANSACTIONS_TYPE'],
   ['GET_SHARD_COUNT'],
+  ['GET_SYSTEM_INFO'],
+  ['GET_NETWORK_HEALTH']
 ]

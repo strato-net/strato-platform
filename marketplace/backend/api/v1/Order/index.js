@@ -125,5 +125,12 @@ router.put(
   OrderController.updateOrderComment
 )
 
+router.post(
+  Order.checkSaleQuantity,
+  authHandler.authorizeRequest(true),
+  loadDapp,
+  OrderController.checkSaleQuantity
+)
+
 
 export default router;

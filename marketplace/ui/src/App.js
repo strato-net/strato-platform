@@ -27,11 +27,13 @@ const App = () => {
     "ready",
     async (LO) => {
       await LO.$internal.ready("visitor");
-      LO.visitor.identify({
-        email: user.email || null,
-        name: user.commonName || null,
-        username: user.preferred_username || null
-      });
+      if (user) {
+        LO.visitor.identify({
+          email: user.email,
+          name: user.commonName,
+          username: user.preferred_username
+        });
+      }
     },
   ]);
 
@@ -85,7 +87,7 @@ const App = () => {
           />
         </UsersProvider>
         <Content className={`${showMenu ? 'overflow-y-hidden md:overflow-auto h-[100vh] md:h-auto w-[100vw] md:w-auto bg-[#00000020] md:bg-white relative mt-0 md:mt-28' : 'mt-[89px] md:mt-[98px] '}`}>
-          <AuthenticatedRoutes user={user} users={users} />
+          <AuthenticatedRoutes user={user} users={users} isAuthenticated={isAuthenticated} />
         </Content>
       </Layout>
     </BrowserRouter>

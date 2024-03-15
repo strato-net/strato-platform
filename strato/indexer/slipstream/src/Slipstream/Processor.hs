@@ -309,9 +309,15 @@ processTheMessages env conn messages = do
 
             deferredForeignKeys <- case (_contractType c) of
               AbstractType -> do
-                outputData conn $ createExpandAbstractTable g c nameParts abstracts' cc
+                _ <- outputData conn $ createExpandAbstractTable g c nameParts abstracts' cc
+                -- $logInfoS "processTheMessages/deferredForeignKeys/abstractfkeys" $ T.pack $ show abstractfkeys
+                return []
               _ -> do
-                outputData conn $ createExpandIndexTable g c nameParts
+                indexfkeys <- outputData conn $ createExpandIndexTable g c nameParts
+                $logInfoS "processTheMessages/deferredForeignKeys/indexfkeys" $ T.pack $ show indexfkeys
+                return indexfkeys
+
+            $logInfoS "processTheMessages/deferredForeignKeys" $ T.pack $ show deferredForeignKeys
 
             outputData' conn $ createExpandHistoryTable g c nameParts
 
@@ -405,12 +411,7 @@ processTheMessages env conn messages = do
     outputData conn $ insertIndexTable $ indexInsert ins
     outputData conn $ insertHistoryTable $ historyInserts ins
     unless ((length (mappingInserts ins) < 1)) $ outputData conn $ insertMappingTable $ mappingInserts ins
-
-  unless (null insertsByCodeHash) $ do
-    let allAbstractInserts = concatMap abstractInsert insertsByCodeHash
-    outputData conn $ insertBegin
-    outputData conn $ insertAbstractTable $ allAbstractInserts
-    outputData conn $ insertCommit
+    outputData conn $ insertAbstractTable $ abstractInsert ins
 
   forM_ insertsByCodeHash $ \ins -> do
     insertForeignKeys conn $ indexInsert ins
