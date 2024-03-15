@@ -129,7 +129,7 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
       />
       <Route
         exact
-        path={routes.MarketplaceProductList.url}
+        path={routes.MarketplaceCategoryProductList.url}
         element={
           <UsersProvider>
             <CategorysProvider>
@@ -144,7 +144,7 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
           </UsersProvider>
         }
       />
-      <Route
+      {/* <Route
         exact
         path={routes.MarketplaceCategoryProductList.url}
         element={
@@ -158,7 +158,7 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
             </CategorysProvider>
           </UsersProvider>
         }
-      />
+      /> */}
       <Route
         exact
         path={routes.MarketplaceProductDetail.url}
@@ -438,13 +438,6 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
           </UsersProvider>
         }
       />
-      {/* we don't require this anymore as we started using the empty path */}
-      {/* <Route
-        path="/"
-        element={<Navigate
-          to={"/marketplace"}
-          replace />}
-      /> */}
       <Route
         path="*"
         element={<Navigate

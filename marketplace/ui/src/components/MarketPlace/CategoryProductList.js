@@ -9,19 +9,20 @@ import {
   InputNumber,
   Space,
   Avatar,
-  Input,
   notification,
 } from "antd";
 import { CloseOutlined, DeleteOutlined } from "@ant-design/icons";
 // Actions
 import { actions as categoryActions } from "../../contexts/category/actions";
-import { actions as subCategoryActions } from "../../contexts/subCategory/actions";
+// import { actions as subCategoryActions } from "../../contexts/subCategory/actions";
 import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
+import { actions as orderActions } from "../../contexts/order/actions"
 // Dispatch and states
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
 import { useSubCategoryDispatch, useSubCategoryState } from "../../contexts/subCategory";
 import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/marketplace";
 import { useAuthenticateState } from "../../contexts/authentication";
+import { useOrderDispatch} from "../../contexts/order";
 // other
 import { arrayToStr } from "../../helpers/utils";
 import routes from "../../helpers/routes";
@@ -31,8 +32,6 @@ import ClickableCell from "../ClickableCell";
 import NewTrendingCard from "./NewTrendingCard";
 import { Images } from "../../images";
 import './index.css'
-import { actions as orderActions } from "../../contexts/order/actions"
-import { useOrderDispatch} from "../../contexts/order";
 import { debounce } from 'lodash';
 import HelmetComponent from "../Helmet/HelmetComponent";
 import { SEO } from "../../helpers/seoConstant";
@@ -49,18 +48,17 @@ const CategoryProductList = ({ user }) => {
 
   const queryParams = new URLSearchParams(location.search);
 
-  const searchQueryValue = queryParams.get('search');
-  const categoryQueryValue = queryParams.get('category');
-  const categoryQueryValueArr = categoryQueryValue ? categoryQueryValue.split(',') : []
-
+  const searchQueryValue = queryParams.get('s') || '';
+  const categoryQueryValue = queryParams.get('c') || '';
+  const subCategoryQueryValue = queryParams.get('sc') || '';
+  const selectedSubCat = subCategoryQueryValue.split(",") || [];
   const [api, contextHolder] = notification.useNotification();
   // States
-  const [selectedCategories, setSelectedCategories] = useState(categoryQueryValueArr);
-  const [selectedSubCategories, setSelectedSubCategories] = useState([]);
+  const [selectedCategories, setSelectedCategories] = useState(categoryQueryValue);
+  const [selectedSubCategories, setSelectedSubCategories] = useState(selectedSubCat);
   const [minPrice, setMinPrice] = useState(0);
   const [maxPrice, setMaxPrice] = useState(MAX_PRICE);
   const [subCategories, setSubCategories] = useState([]);
-  const [uniqueProductNames, setUniqueProductNames] = useState([]);
   const [desktopOpenFilter, setDesktopOpenFilter] = useState(true);
   const [mobileOpenFilter, setMobileOpenFilter] = useState(false);
   const [search, setSearch] = useState(searchQueryValue);
@@ -78,10 +76,6 @@ const CategoryProductList = ({ user }) => {
   let { hasChecked, isAuthenticated } = useAuthenticateState();
   const { subCategorys } = useSubCategoryState();
   const { cartList } = useMarketplaceState();
-
-  useEffect(() => {
-    categoryActions.fetchCategories(categoryDispatch);
-  }, []);
 
   const isLoading = isMarketplaceLoading;
 
@@ -105,52 +99,20 @@ const CategoryProductList = ({ user }) => {
     }
   }, [isLoading]);
 
-  const onChangeCategory = (checkedValues) => {
-    const categoryStr = checkedValues.join(",");
-    const baseUrl = new URL('/category', window.location.origin);
+  useEffect(() => {
+    categoryActions.fetchCategories(categoryDispatch);
+    const selectedSubCat = subCategoryQueryValue.split(",");
+    setSelectedSubCategories(selectedSubCat);
+  }, [categoryQueryValue]);
 
-    if (checkedValues.length === 0 && searchQueryValue) {
-      baseUrl.searchParams.set('search', searchQueryValue);
-    }
-    if (checkedValues.length > 0) {
-      baseUrl.searchParams.set('category', categoryStr);
-    }
-    if (searchQueryValue) {
-      baseUrl.searchParams.set('search', searchQueryValue);
-    }
-
-    const url = baseUrl.pathname + baseUrl.search;
-    navigate(url);
-    setSelectedCategories(checkedValues);
-
-    if (checkedValues.length === 0) {
-      clearSelection();
-    }
-  };
 
   useEffect(() => {
-    let selection = subCategorys
-      .map(item => item.contract)
-      .filter(item => !unSelected.includes(item));
-  
-    // Update only if there's a change
-    if (JSON.stringify(selection) !== JSON.stringify(selectedSubCategories)) {
-      setSelectedSubCategories(selection);
+    if(categorys.length > 0 && categoryQueryValue){
+      let subCat = categorys.find(item=>item.name===categoryQueryValue).subCategories
+      setSubCategories(subCat)
     }
-  
-    // update subCategories only if it's different
-    if (JSON.stringify(subCategorys) !== JSON.stringify(subCategories)) {
-      setSubCategories(subCategorys);
-    }
-  }, [unSelected, subCategorys, selectedSubCategories, subCategories]);
-  
-  useEffect(() => {
-    let categorys = null;
-    if (selectedCategories.length) {
-      categorys = arrayToStr(selectedCategories);
-      subCategoryActions.fetchSubCategoryList(subCategoryDispatch, categorys);
-    }
-  }, [subCategoryDispatch, selectedCategories]);
+  }, [categorys,categoryQueryValue]);
+
 
   const onChangeSubCategory = (e) => {
     let valuesChecked = checkValues(e, selectedSubCategories)
@@ -164,15 +126,12 @@ const CategoryProductList = ({ user }) => {
     // In this context, if both "CarbonDAO" and "CarbonOffset" 
     // are found within unSelectedSubCat, the "Carbon" category is also deselected.
     if(unSelectedSubCat.includes("CarbonDAO") && unSelectedSubCat.includes("CarbonOffset")){
-      const baseUrl = new URL('/category', window.location.origin);
-      const categoryData = selectedCategories.filter(item=>item!=="Carbon")
+      let baseUrl = new URL(`/marketplace`, window.location.origin);
+      const categoryData = selectedCategories.filter(item => item !== "Carbon")
       const selectedCategory = categoryData.join(',')
 
-      if (selectedCategory) {
-        baseUrl.searchParams.set('category', selectedCategory);
-      }
-      if (search) {
-        baseUrl.searchParams.set('search', search);
+      if (searchQueryValue) {
+        baseUrl.searchParams.set('s', searchQueryValue);
       }
 
       const url = baseUrl.pathname + baseUrl.search;
@@ -181,6 +140,21 @@ const CategoryProductList = ({ user }) => {
       navigate(url);
     }
 
+    let baseUrl = new URL(`/marketplace`, window.location.origin);
+    const subCategories = valuesChecked.join(',')
+    if (categoryQueryValue && valuesChecked.length > 0) {
+      baseUrl.searchParams.set('c', categoryQueryValue);
+      baseUrl.searchParams.set('sc', subCategories);
+    }
+    if(valuesChecked.length == 0){
+      setSubCategories([])
+    }
+    if (searchQueryValue) {
+      baseUrl.searchParams.set('s', searchQueryValue);
+    }
+    const url = baseUrl.pathname + baseUrl.search;
+    navigate(url, { replace: true });
+    
     setUnSelected(unSelectedSubCat)
     setSelectedSubCategories(valuesChecked);
   };
@@ -190,7 +164,7 @@ const CategoryProductList = ({ user }) => {
     if (hasChecked && !isAuthenticated) {
       marketplaceActions.fetchMarketplace(
         marketplaceDispatch,
-        arrayToStr(selectedCategories),
+        categoryQueryValue,
         arrayToStr(selectedSubCategories),
         minPrice,
         maxPrice,
@@ -199,7 +173,7 @@ const CategoryProductList = ({ user }) => {
     } else if (hasChecked && isAuthenticated) {
       marketplaceActions.fetchMarketplaceLoggedIn(
         marketplaceDispatch,
-        arrayToStr(selectedCategories),
+        categoryQueryValue,
         arrayToStr(selectedSubCategories),
         minPrice,
         maxPrice,
@@ -216,42 +190,33 @@ const CategoryProductList = ({ user }) => {
     searchQueryValue
   ]);
 
+
   const generateBaseUrl = () =>{
-    const baseUrl = new URL('/category', window.location.origin);
+    const baseUrl = new URL('/marketplace', window.location.origin);
 
     if (categoryQueryValue) {
-      baseUrl.searchParams.set('category', categoryQueryValue);
+      baseUrl.searchParams.set('c', categoryQueryValue);
     }
-    if (search) {
-      baseUrl.searchParams.set('search', search);
+    if(subCategoryQueryValue){
+      baseUrl.searchParams.set('sc', subCategoryQueryValue);
+    }
+    if (searchQueryValue) {
+      baseUrl.searchParams.set('s', searchQueryValue);
     }
 
     const url = baseUrl.pathname + baseUrl.search;
     return url;
   }
 
-  useEffect(() => {
-    const timeOut = setTimeout(() => {
-     const url = generateBaseUrl();
-      navigate(url, { state: { scroll: scrollPosition }});
-    }, 500);
-
-    return () => {
-      clearTimeout(timeOut);
-    };
-  }, [search, minPrice, maxPrice]);
-
   useEffect(()=>{
-      
+    const url = generateBaseUrl();
+      if(!isLoading){
+        navigate(url, { state: { scroll: scrollPosition } });
+    }else{
+      navigate(url, { state: { scroll: state?.scroll || 0 } });
+    }
 
-      const url = generateBaseUrl();
-        if(!isLoading){
-          navigate(url, { state: { scroll: scrollPosition } });
-      }else{
-        navigate(url, { state: { scroll: state?.scroll || 0 } });
-      }
-      
-  },[scrollPosition])
+},[scrollPosition])
 
   //=========================Other functions===============================//
   const linkUrl = window.location.href;
@@ -269,9 +234,9 @@ const CategoryProductList = ({ user }) => {
     const isFilter = selectedCategories.length != 0 || selectedSubCategories.length != 0
       || minPrice !== 0 || maxPrice !== MAX_PRICE
     if (isFilter) {
-      const baseUrl = new URL('/category', window.location.origin);
+      const baseUrl = new URL(`/marketplace`, window.location.origin);
       if (searchQueryValue) {
-        baseUrl.searchParams.set('search', searchQueryValue);
+        baseUrl.searchParams.set('s', searchQueryValue);
       }
       const url = baseUrl.pathname + baseUrl.search;
       navigate(url)
@@ -315,7 +280,6 @@ const CategoryProductList = ({ user }) => {
     if (foundIndex === -1) {
       // Product not found, check quantity before adding
       const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity]);
-
       if (checkQuantity === true) {
         // Quantity check passed, add new item to the cart
         items.push({ product, qty: quantity });
@@ -363,12 +327,6 @@ const CategoryProductList = ({ user }) => {
     isError ? api.error(msgObj) : api.success(msgObj)
   };
 
-  const handleChangeSearch = (e) => {
-    const value = e.target.value;
-    setSearch(value)
-  }
-
-
   const BreadCrumbComponent = () =>
     <Breadcrumb className="text-xs ml-4 md:ml-14 mt-14 lg:mt-5">
       <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
@@ -385,11 +343,9 @@ const CategoryProductList = ({ user }) => {
           </p>
         </ClickableCell>
       </Breadcrumb.Item>
-      {selectedCategories?.map((category, index) => (
-        <Breadcrumb.Item key={index} className="text-[#202020] font-medium text-sm">
-          {category ? category : ""}
+        <Breadcrumb.Item className="text-[#202020] font-medium text-sm">
+          {categoryQueryValue ? categoryQueryValue : ""}
         </Breadcrumb.Item>
-      ))}
     </Breadcrumb>
 
   const ClearFilterComponent = () =>
@@ -465,9 +421,9 @@ const CategoryProductList = ({ user }) => {
         value={selectedSubCategories}
       >
         <div className="flex flex-col gap-3">
-          {subCategories.filter(item => item.name.toLowerCase().includes('carbon')).map((subcategory, index) => (
-            <Checkbox value={subcategory.contract} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
-              {subcategory.name}
+          {subCategories.map(({name,contract}, index) => (
+            <Checkbox value={contract} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
+              {name}
             </Checkbox>
           ))}
         </div>
@@ -478,28 +434,7 @@ const CategoryProductList = ({ user }) => {
     {ClearFilterComponent()}
     <div className="bg-white border border-solid border-[#E9E9E9] my-6 mb-24">
 
-      {categorys.length > 0 && (
-        <>
-          {DesktopCollapseComponent(<Panel header={<Text strong className="text-base">Categories</Text>} key="1">
-            <Checkbox.Group
-              onChange={onChangeCategory}
-              value={selectedCategories}
-            >
-              <div className="flex flex-col gap-3">
-                {categorys.map((category, index) => (
-                  <Checkbox value={category.name} key={index} className="m-0">
-                    {category.name}
-                  </Checkbox>
-                ))}
-              </div>
-            </Checkbox.Group>
-          </Panel>)}
-
-          <Divider className="m-auto w-[94%] min-w-[80%]" />
-        </>
-      )}
-
-      {selectedCategories.includes("Carbon") && (
+      {subCategories.length > 1 && (
         <>
           {DesktopCollapseComponent(
             SubCategoryFilterComponent()
@@ -526,31 +461,9 @@ const CategoryProductList = ({ user }) => {
         </div>
         <Divider className="m-0 mt-3" />
 
-        {/* Panel - Category */}
-        {categorys.length > 0 && (
-          <>
-            {MobileCollapseComponent(
-              <Panel header={<Text strong className="text-base">Categories</Text>} key="1">
-                <Checkbox.Group
-                  onChange={onChangeCategory}
-                  value={selectedCategories}
-                >
-                  <div className="flex flex-col gap-3">
-                    {categorys.map((category, index) => (
-                      <Checkbox value={category.name} key={index} className="m-0">
-                        {category.name}
-                      </Checkbox>
-                    ))}
-                  </div>
-                </Checkbox.Group>
-              </Panel>
-            )}
-            <Divider className="m-0" />
-          </>
-        )}
         {/* Panel - Sub Category */}
         <>
-          {selectedCategories.includes("Carbon") && MobileCollapseComponent(
+          {subCategories.length > 1 && MobileCollapseComponent(
             SubCategoryFilterComponent()
           )}
           <Divider className="m-0" />
@@ -565,12 +478,6 @@ const CategoryProductList = ({ user }) => {
     <div className="h-full w-full bg-[#00000020] absolute top-0 md:hidden"></div>
   </div>
 
-  const handleSearchFocus = () =>{
-    const url = generateBaseUrl();
-    navigate(url, { state: { scroll: 0 }});
-    window.scrollTo(0, 0);
-  }
-
   return (
     <>
    <HelmetComponent 
@@ -580,36 +487,16 @@ const CategoryProductList = ({ user }) => {
     <div className={`${mobileOpenFilter ? 'overflow-y-hidden h-[100vh] w-[100vw] bg-[#00000020] relative mt-0 md:bg-white md:mt-[auto] md:overflow-scroll trending_cards' : ' '}`}>
       <div className="fixed bg-white w-full top-7 z-10 md:static">
         {BreadCrumbComponent()}
-
-        <div className="flex items-center justify-center ml-4 md:ml-14 mr-14 mt-6 lg:mt-8 gap-4">
-          <div className="border border-solid border-[#6A6A6A] rounded-md cursor-pointer p-1 md:p-2" onClick={handleFilterClick}>
-            <img src={Images.filter} 
-            alt={metaImg}
-            title={metaImg}
-            className=" w-5 h-5 md:w-6 md:h-6" />
-          </div>
-
-          <div className={`flex-1`}>
-            <Input
-              size="large"
-              onChange={(e) => { handleChangeSearch(e) }}
-              onClick={handleSearchFocus}
-              placeholder="Search Marketplace"
-              prefix={
-              <img src={Images.Header_Search} 
-              alt={metaImg} 
-              title={metaImg} 
-              className="w-[18px] h-[18px]" />}
-              className="bg-[#F6F6F6] border-none rounded-3xl p-[10px]"
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center ml-4 mt-2 md:ml-14 md:hidden">
+        <div className="flex justify-between items-center ml-4 px-2 mt-2 md:ml-14 md:hidden">
+          <div className="flex items-center">
           <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
           <Text className="text-gray-800 ml-1 text-sm font-normal">
             {marketplaceList?.length} Results
           </Text>
+          </div>
+          <div className="border border-solid border-[#6A6A6A] rounded-md cursor-pointer p-1 md:p-2" onClick={handleFilterClick}>
+            <img src={Images.filter} alt="filter" className=" w-5 h-5 md:w-6 md:h-6" />
+          </div>
         </div>
       </div>
 
@@ -620,6 +507,10 @@ const CategoryProductList = ({ user }) => {
         {/* Product list section */}
         <div className="mb-12 w-full">
           <div className="hidden md:flex mt-4 items-center">
+          <div className="border mx-2 border-solid border-[#6A6A6A] rounded-md cursor-pointer p-1 md:p-2" 
+            onClick={handleFilterClick}>
+            <img src={Images.filter} alt="filter" className=" w-5 h-5 md:w-6 md:h-6" />
+          </div>
             <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
             <Text className="text-gray-800 ml-1 text-xl font-semibold">
               {isLoading ? <Spin spinning={isLoading} size="small" /> : marketplaceList?.length} Results

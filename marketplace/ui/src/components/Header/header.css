@@ -43,3 +43,9 @@
 .anticon-user{
   color: #6A6A6A;
 }
+
+.header-search {
+  /* background-color: aqua; */
+  border-radius: 10px;
+  box-shadow: 0px 0px 5px darkgrey;
+}

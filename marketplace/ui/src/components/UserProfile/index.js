@@ -178,7 +178,7 @@ const UserProfile = (user) => {
       // console.log(referrer)
       let breadcrumbText = 'Home / Profile';
 
-      if (referrer.includes('/productList/')) {
+      if (referrer.includes('/dp/')) {
         breadcrumbText = 'Home / Product Details / Profile';
       } else if (referrer.includes('/order/bought')) {
         breadcrumbText = 'Home / Orders (Bought) / Profile';

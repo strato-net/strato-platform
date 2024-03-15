@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Layout,
   Input,
@@ -8,36 +8,45 @@ import {
   Avatar,
   Dropdown,
   Button,
-  Typography
+  Typography,
+  Select
 } from "antd";
 import { ArrowLeftOutlined, LogoutOutlined } from "@ant-design/icons";
 import { Images } from "../../images";
 import "./header.css";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import routes from "../../helpers/routes";
 import {
   useMarketplaceState,
   useMarketplaceDispatch,
 } from "../../contexts/marketplace";
 import { actions } from "../../contexts/marketplace/actions";
+import { actions as categoryActions } from "../../contexts/category/actions";
 import { actions as userActions } from "../../contexts/authentication/actions";
 import { useAuthenticateDispatch } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
 import { SEO } from "../../helpers/seoConstant";
+import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
 
 const { Header } = Layout;
 
 const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTab }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const queryParams = new URLSearchParams(location.search);
-  const categoryQueryValue = queryParams.get('category');
-  const searchQueryValue = queryParams.get('search');
+  const { category } = useParams();
+  const inputRef = useRef(null);
 
+  const queryParams = new URLSearchParams(location.search);
+  const categoryQueryValue = queryParams.get('c') || 'all';
+  const searchQueryValue = queryParams.get('s');
+  const subCategoryQueryValue = queryParams.get('sc');
+  const isSearch = searchQueryValue ? true : false;
   const marketplaceDispatch = useMarketplaceDispatch();
+  const categoryDispatch = useCategoryDispatch();
   const userDispatch = useAuthenticateDispatch();
   const { cartList, strats } = useMarketplaceState();
-
+  const { categorys } = useCategoryState();
+  
   const storedData = useMemo(() => {
     return window.localStorage.getItem("cartList") == null ? [] : JSON.parse(window.localStorage.getItem("cartList"));
   }, []);
@@ -55,9 +64,16 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const [selectedTab, setSelectedTab] = useState("0");
   const [initials, setInitials] = useState("");
   const [roleIndex, setRoleIndex] = useState();
-  const [showSearch, setShowSearch] = useState(false)
+  const [showSearch, setShowSearch] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState(categoryQueryValue);
+  const [selectedSubCategory, setSelectedSubCategory] = useState(subCategoryQueryValue);
 
   const stratsBalance = (Object.keys(strats).length > 0) ? strats : 0
+
+  useEffect(()=>{
+    setSelectedCategory(categoryQueryValue)
+  },[categoryQueryValue])
 
   const navItems = [
     {
@@ -113,7 +129,19 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     else {
       setSelectedTab("0");
     }
+    categoryActions.fetchCategories(categoryDispatch);
+
   }, [window.location.pathname]);
+
+  useEffect(() => {
+    const allCat = { label: 'All', value: 'all' }
+    let categories = categorys.map(({ name, subCategories }, index) => {
+      const subCat = subCategories.map(item=>item.contract).join(',')
+      return { label: name, value: name, subCategory:subCat }
+    })
+    categories = [allCat, ...categories];
+    setCategories(categories)
+  }, [categorys])
 
   const items = user ? [
     {
@@ -154,7 +182,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
       ),
     },
   ];
-  
+
 
   const stratsItem = [{
     key: '2',
@@ -199,9 +227,9 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
         </div>
       )
     } : null,
-    user ? { 
-      value: "logout", 
-      path: "/logout", 
+    user ? {
+      value: "logout",
+      path: "/logout",
       label: (
         <div>
           <p className="text-gray">{user?.commonName}</p>
@@ -211,7 +239,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
       )
     } : null,
   ].filter(Boolean);
-  
+
 
   const handleIntMenuTab = (data) => {
     data.value == 'logout' ? logout() : data.value == 'orders' ? navigate(routes.Orders.url.replace(':type', 'sold'), { state: { defaultKey: "Sold" } }) : navigate(data.path)
@@ -223,13 +251,16 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   }
 
   const navigateSearch = (value) => {
-    const baseUrl = new URL('/category', window.location.origin);
+    const baseUrl = new URL('/marketplace', window.location.origin);
 
-    if (categoryQueryValue) {
-      baseUrl.searchParams.set('category', categoryQueryValue);
+    if (selectedCategory && selectedCategory!='all') {
+      baseUrl.searchParams.set('c', selectedCategory);
+    }
+    if(selectedSubCategory && selectedCategory!='all'){
+      baseUrl.searchParams.set('sc', selectedSubCategory);
     }
     if (value.length > 0) {
-      baseUrl.searchParams.set('search', value);
+      baseUrl.searchParams.set('s', value);
     }
 
     const url = baseUrl.pathname + baseUrl.search;
@@ -249,6 +280,15 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   };
   const IMG_META = SEO.TITLE_META
 
+  const handleCategoryChange = (cat) => {
+    setSelectedCategory(cat)
+    const subCat = categorys.find((item)=>item.name===cat)
+    ?.subCategories.map(item=>item.contract).join(',')
+    setSelectedSubCategory(subCat)
+    
+    inputRef.current.focus();
+  }
+// const baseUrl = new URL('/marketplace', window.location.origin);
   return (
     <>
       <Header className={`fixed z-[100] !bg-[#ffffff] !pl-2 w-full !pr-4 md:px-12 flex md:!mb-10 ${showMenu ? '' : 'shadow-header'} md:p-10 justify-between md:justify-start`}>
@@ -259,18 +299,28 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
           >
             <img src={Images.newLogo} alt={IMG_META} title={IMG_META} className="h-[31px] w-[120px] md:w-[170px] md:h-[44px]" preview={false} />
           </div>
-          <div className={`lg:ml-28 md:ml-1 flex-1 ${showSearch ? '-mt-[6px] fixed top-[13px] left-0 flex w-[100vw] z-50 mb-4' : 'hidden md:flex mb-10'}`}>
+          <div className={`lg:ml-28 md:ml-1 bg-[#F6F6F6] shadow-md flex-1 header-search ${showSearch ? '-mt-[6px] fixed top-[13px] left-0 flex w-[100vw] z-50 mb-4' : 'hidden md:flex'}`}>
+            <Select
+              defaultValue="all"
+              className="border-0"
+              style={{ width: 120 }}
+              onChange={handleCategoryChange}
+              options={categories}
+              value={selectedCategory}
+            />
             <Input
               // key={searchQueryValue}
+              ref={inputRef}
               size="large"
               placeholder="Search"
-              // defaultValue={searchQueryValue}
+              defaultValue={searchQueryValue}
               onChange={(e) => { handleChangeSearch(e) }}
               onPressEnter={(e) => { handleEnterSearch(e) }}
-              prefix={showSearch 
+              suffix={showSearch 
                 ? <ArrowLeftOutlined onClick={() => handleSearchShow(false)} /> 
                 : <img src={Images.Header_Search} alt={IMG_META} title={IMG_META} className="w-[18px] h-[18px]" />}
-              className="bg-[#F6F6F6] border-none rounded-[100px] md:!w-[35%] lg:w-[40%] absolute p-[10px] "
+              // className="bg-[#F6F6F6] border-none rounded-[100px] md:!w-[35%] lg:w-[40%] absolute p-[10px] "
+              className="bg-[#F6F6F6] border-none outline-none"
             />
           </div>
         </Space>
@@ -352,7 +402,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
           </Badge>
 
           {(roleIndex !== undefined && roleIndex !== 1)
-            && <Dropdown menu={{ items: stratsItem }} placement="bottomRight" trigger={["hover","click"]} className="xs:mt-5 md:mt-0" overlayStyle={{ position: 'fixed' }}>
+            && <Dropdown menu={{ items: stratsItem }} placement="bottomRight" trigger={["hover", "click"]} className="xs:mt-5 md:mt-0" overlayStyle={{ position: 'fixed' }}>
               <a onClick={(e) => e.preventDefault()} className="md:flex mx-2 text-base text-white" id="user-dropdown">
               <Badge
               style={{backgroundColor:"#13188A"}}

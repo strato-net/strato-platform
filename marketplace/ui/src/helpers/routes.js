@@ -10,7 +10,7 @@ export default {
   },
   MarketplaceCategoryProductList: {
     label: "Marketplace Product List",
-    url: "/category/:category",
+    url: "/marketplace",
   },
   MarketplaceUserProfile: {
     label: "Marketplace User Profile",
@@ -18,7 +18,7 @@ export default {
   },
   MarketplaceProductDetail: {
     label: "Marketplace Product Detail",
-    url: "/productList/:address",
+    url: "/dp/:address/:name",
   },
   LoginRedirect: { label: "LoginRedirect", url: "/login" },
   Checkout: { label: "Checkout", url: "/checkout" },
