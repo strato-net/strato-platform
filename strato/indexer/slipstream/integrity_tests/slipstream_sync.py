@@ -8,8 +8,8 @@ import sys
 def wait_for_nodes_to_sync(node1_url, node2_url, headers1, headers2):
     while True:
         try:
-            response1 = requests.get(node1_url + "/cirrus/search/BlockApps-Mercata-Asset?order=block_timestamp.desc", headers=headers1)
-            response2 = requests.get(node2_url + "/cirrus/search/BlockApps-Mercata-Asset?order=block_timestamp.desc", headers=headers2)
+            response1 = requests.get(node1_url + "/cirrus/search/BlockApps-Mercata-Asset?order=block_timestamp.desc", headers=headers1, limit=1)
+            response2 = requests.get(node2_url + "/cirrus/search/BlockApps-Mercata-Asset?order=block_timestamp.desc", headers=headers2, limit=1)
 
             if response1.ok and response2.ok:
                 block_number1 = response1.json()[0]["block_number"]
@@ -53,7 +53,7 @@ def check_table(table):
     count2 = len(a2_resp)
     print(f"Table '{table}': jenkins node count = {count1}, node1 count = {count2}")
     if(count1 != count2):
-        count=false
+        count=True
         print(f"Count discrepancy found for table '{table}': jenkins node has {count1} entries, node1 has {count2} entries.")
 
     in1Not2 = set(assets1.keys()).difference(set(assets2.keys()))
@@ -99,7 +99,7 @@ if __name__ == "__main__":
     realm_2 = sys.argv[6]
 
     node1_url = "http://localhost"
-    node2_url = f"https://node1.mercata-testnet2.blockapps.net"
+    node2_url = "https://node1.mercata-testnet2.blockapps.net"
 
     token1 = get_auth_token(client_id1, client_secret1, realm_1)
     token2 = get_auth_token(client_id2, client_secret2, realm_2)
