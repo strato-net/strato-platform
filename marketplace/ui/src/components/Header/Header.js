@@ -23,10 +23,13 @@ import {
 import { actions } from "../../contexts/marketplace/actions";
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { actions as userActions } from "../../contexts/authentication/actions";
-import { useAuthenticateDispatch } from "../../contexts/authentication";
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
+import { useAuthenticateDispatch, useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
 import { SEO } from "../../helpers/seoConstant";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
+import { HTTP_METHODS, apiUrl } from "../../helpers/constants";
+import { debounce } from "lodash";
 
 const { Header } = Layout;
 
@@ -46,7 +49,8 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const userDispatch = useAuthenticateDispatch();
   const { cartList, strats } = useMarketplaceState();
   const { categorys } = useCategoryState();
-  
+  let { hasChecked, isAuthenticated } = useAuthenticateState();
+
   const storedData = useMemo(() => {
     return window.localStorage.getItem("cartList") == null ? [] : JSON.parse(window.localStorage.getItem("cartList"));
   }, []);
@@ -250,14 +254,66 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     setShowSearch(status)
   }
 
-  const navigateSearch = (value) => {
+  function getCategoryName(str) {
+    const lastIndex = str.lastIndexOf('-');
+    if (lastIndex !== -1) {
+      return str.substring(lastIndex + 1);
+    } else {
+      return str;
+    }
+  }
+
+  const checkCategory = (value) => {
+    const searchQuery = `&queryValue=${value}&queryFields=name`
+    
+    const fetchFunction = isAuthenticated
+      ? fetch(
+        `${apiUrl}//marketplace/all?${searchQuery}`,
+        { method: HTTP_METHODS.GET, } )
+      : fetch(
+        `${apiUrl}/marketplace?${searchQuery}`,
+        { method: HTTP_METHODS.GET, }
+      );
+     try {
+      fetchFunction.then(res=>res.json().then(res=>{
+        const arr = res.data.productsWithImageUrl.map(item=>item.contract_name)
+        const unique = [...new Set(arr)];
+        if(arr.length>0){
+        if(unique.length==1){
+          const category = getCategoryName(unique[0])
+          handleCategoryChange(category)
+          setSelectedCategory(category)
+          navigateSearch(category,value)
+        }else{
+          setSelectedCategory('all')
+          setSelectedSubCategory("")
+          navigateSearch("",value)
+        }
+      }else{
+        setSelectedCategory('all')
+        setSelectedSubCategory("")
+        navigateSearch("",value)
+      }
+        
+      }))    
+     } catch (error) {
+      console.log("err",error)
+     }
+     
+  
+  };
+
+  const navigateSearch = (selectedCateg, value) => {
     const baseUrl = new URL('/marketplace', window.location.origin);
 
-    if (selectedCategory && selectedCategory!='all') {
-      baseUrl.searchParams.set('c', selectedCategory);
+    if (selectedCateg && selectedCateg!='all') {
+      baseUrl.searchParams.set('c', selectedCateg);
     }
-    if(selectedSubCategory && selectedCategory!='all'){
-      baseUrl.searchParams.set('sc', selectedSubCategory);
+    if(selectedSubCategory && selectedCateg && selectedCateg!='all'){
+      const subCat = categorys.find((item)=>item.name===selectedCateg)
+    ?.subCategories.map(item=>item.contract).join(',')
+      setSelectedSubCategory(subCat)
+      baseUrl.searchParams.set('sc', subCat);
     }
     if (value.length > 0) {
       baseUrl.searchParams.set('s', value);
@@ -267,16 +323,23 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     navigate(url, { replace: true });
   }
 
+  const debouncedHandleChangeSearch = debounce((value, checkCategory) => {
+    checkCategory(value);
+  }, 600); 
+
   const handleChangeSearch = (e) => {
     const value = e.target.value;
-    if (value.length === 0 && searchQueryValue) {
-      navigateSearch(value)
-    }
+    // if (value.length === 0 && searchQueryValue) {
+    //   navigateSearch(value)
+    // }
+    // checkCategory(value)
+    debouncedHandleChangeSearch(value, checkCategory);
   }
 
   const handleEnterSearch = (e) => {
     const value = e.target.value;
-    navigateSearch(value)
+    // navigateSearch(value)
+    checkCategory(value)
   };
   const IMG_META = SEO.TITLE_META
 
@@ -284,6 +347,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     setSelectedCategory(cat)
     const subCat = categorys.find((item)=>item.name===cat)
     ?.subCategories.map(item=>item.contract).join(',')
+
     setSelectedSubCategory(subCat)
     
     inputRef.current.focus();
