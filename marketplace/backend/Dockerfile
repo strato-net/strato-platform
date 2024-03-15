@@ -1,4 +1,4 @@
-FROM node:14.21.3-alpine3.17
+FROM node:21.7.1-alpine3.19
 
 RUN apk add --no-cache yarn curl git lsof jq && \
     mkdir -p /usr/src/backend

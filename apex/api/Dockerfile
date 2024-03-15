@@ -1,4 +1,4 @@
-FROM node:18.18-alpine3.18
+FROM node:21.7.1-alpine3.19
 ARG STRATO_VERSION
 ENV STRATO_VERSION=${STRATO_VERSION}
 RUN apk add --no-cache postgresql-client curl lsof && \

@@ -1,4 +1,4 @@
-FROM node:14.21.3-alpine3.17 as base
+FROM node:21.7.1-alpine3.19 as base
 RUN apk add --no-cache curl yarn git lsof jq && \
     yarn global add serve@13.0.2 && \
     mkdir -p /usr/src/ui
