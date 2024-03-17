@@ -341,9 +341,9 @@ const CategoryProductList = ({ user }) => {
           </p>
         </ClickableCell>
       </Breadcrumb.Item>
-        <Breadcrumb.Item className="text-[#202020] font-medium text-sm">
-          {categoryQueryValue ? categoryQueryValue : ""}
-        </Breadcrumb.Item>
+       {categoryQueryValue && <Breadcrumb.Item className="text-[#202020] font-medium text-sm">
+          {categoryQueryValue}
+        </Breadcrumb.Item>}
     </Breadcrumb>
 
   const ClearFilterComponent = () =>

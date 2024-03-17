@@ -219,7 +219,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   }, [user])
 
   const subMenuItems = [
-    { value: "marketplace", path: routes.MarketplaceProductList.url, label: "Marketplace" },
+    { value: "marketplace", path: routes.Marketplace.url, label: "Marketplace" },
     { value: "orders", path: routes.Orders.url.replace(':type', 'sold'), label: "Orders" },
     { value: "mystore", path: "/mystore", label: "My Store" },
     user ? {
@@ -375,6 +375,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
               key={searchQueryValue}
               ref={inputRef}
               size="large"
+              type="search"
               placeholder="Search"
               defaultValue={searchQueryValue}
               onChange={(e) => { handleChangeSearch(e) }}

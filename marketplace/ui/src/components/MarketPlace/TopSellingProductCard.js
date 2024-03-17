@@ -151,14 +151,14 @@ const TopSellingProductCard = () => {
         </Title>
         <Button 
           size="large" 
-          onClick={()=>navigate(routes.MarketplaceProductList.url)}
+          onClick={()=>navigate(routes.MarketplaceCategoryProductList.url)}
           className="text-black hover:!text-black border-grayDark hidden md:flex"
         >
             View All
         </Button>
         <Button 
           size="small" 
-          onClick={()=>navigate(routes.MarketplaceProductList.url)}
+          onClick={()=>navigate(routes.MarketplaceCategoryProductList.url)}
           className="text-black hover:!text-black border-grayDark flex md:hidden"
         >
             View All
