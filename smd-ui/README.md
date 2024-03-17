@@ -11,7 +11,7 @@ To run react dev server locally with all features enabled go through the followi
 
 Requirements:
 
-- Node v21.7.1
+- Node v14.21.3 (updating to 21 made the problems to run jest tests - this needs some work, including replacing of yields with awaits)
 
 To run the React dev server locally with all features enabled, add the `SMD_DEV_MODE=true` and `SMD_DEV_MODE_HOST_IP=<MY_IP>` environment variables to your STRATO start script:
 
