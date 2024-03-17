@@ -61,7 +61,6 @@ const CategoryProductList = ({ user }) => {
   const [subCategories, setSubCategories] = useState([]);
   const [desktopOpenFilter, setDesktopOpenFilter] = useState(true);
   const [mobileOpenFilter, setMobileOpenFilter] = useState(false);
-  const [search, setSearch] = useState(searchQueryValue);
   const [unSelected, setUnSelected] = useState([]);
   const [scrollPosition, setScrollPosition] = useState(state?.scroll || 0);
 
@@ -165,7 +164,7 @@ const CategoryProductList = ({ user }) => {
       marketplaceActions.fetchMarketplace(
         marketplaceDispatch,
         categoryQueryValue,
-        arrayToStr(selectedSubCategories),
+        subCategoryQueryValue,
         minPrice,
         maxPrice,
         searchQueryValue
@@ -174,15 +173,14 @@ const CategoryProductList = ({ user }) => {
       marketplaceActions.fetchMarketplaceLoggedIn(
         marketplaceDispatch,
         categoryQueryValue,
-        arrayToStr(selectedSubCategories),
+        subCategoryQueryValue,
         minPrice,
         maxPrice,
         searchQueryValue
       );
     }
   }, [
-    // selectedCategories,
-    selectedSubCategories,
+    subCategoryQueryValue,
     minPrice,
     maxPrice,
     hasChecked,

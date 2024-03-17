@@ -72,7 +72,6 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(categoryQueryValue);
   const [selectedSubCategory, setSelectedSubCategory] = useState(subCategoryQueryValue);
-  // const [searchText, setSearchText] = useState('')
 
   const stratsBalance = (Object.keys(strats).length > 0) ? strats : 0
 
@@ -189,7 +188,6 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     },
   ];
 
-
   const stratsItem = [{
     key: '2',
     label: (
@@ -270,7 +268,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     
     const fetchFunction = isAuthenticated
       ? fetch(
-        `${apiUrl}//marketplace/all?${searchQuery}`,
+        `${apiUrl}/marketplace/all?${searchQuery}`,
         { method: HTTP_METHODS.GET, } )
       : fetch(
         `${apiUrl}/marketplace?${searchQuery}`,
@@ -283,9 +281,15 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
         if(arr.length>0){
         if(unique.length==1){
           const category = getCategoryName(unique[0])
+          if(category.includes('Carbon')){
+          handleCategoryChange('Carbon')
+          setSelectedCategory('Carbon')
+          navigateSearch('Carbon',value)
+        }else{
           handleCategoryChange(category)
           setSelectedCategory(category)
           navigateSearch(category,value)
+        }
         }else{
           setSelectedCategory('all')
           setSelectedSubCategory("")
@@ -296,24 +300,21 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
         setSelectedSubCategory("")
         navigateSearch("",value)
       }
-        
       }))    
      } catch (error) {
       console.log("err",error)
      }
-     
-  
   };
 
   const navigateSearch = (selectedCateg, value) => {
     const baseUrl = new URL('/marketplace', window.location.origin);
-
+    
     if (selectedCateg && selectedCateg!='all') {
       baseUrl.searchParams.set('c', selectedCateg);
     }
     if(selectedSubCategory && selectedCateg && selectedCateg!='all'){
       const subCat = categorys.find((item)=>item.name===selectedCateg)
-    ?.subCategories.map(item=>item.contract).join(',')
+      ?.subCategories.map(item=>item.contract).join(',')
       setSelectedSubCategory(subCat)
       baseUrl.searchParams.set('sc', subCat);
     }
@@ -325,17 +326,11 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     navigate(url, { replace: true });
   }
 
-  const debouncedHandleChangeSearch = debounce((value, checkCategory) => {
-    checkCategory(value);
-  }, 600); 
-
   const handleChangeSearch = (e) => {
     const value = e.target.value;
-    // if (value.length === 0 && searchQueryValue) {
-    //   navigateSearch(value)
-    // }
-    // checkCategory(value)
-    debouncedHandleChangeSearch(value, checkCategory);
+    if (value.length === 0 && searchQueryValue) {
+      navigateSearch('',value)
+    }
   }
 
   const handleEnterSearch = (e) => {
@@ -353,6 +348,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     setSelectedSubCategory(subCat)
     
     inputRef.current.focus();
+    inputRef.current.select();
   }
 // const baseUrl = new URL('/marketplace', window.location.origin);
   return (
@@ -470,7 +466,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
 
           {(roleIndex !== undefined && roleIndex !== 1)
             && <Dropdown menu={{ items: stratsItem }} placement="bottomRight" trigger={["hover", "click"]} className="xs:mt-5 md:mt-0" overlayStyle={{ position: 'fixed' }}>
-              <a onClick={(e) => e.preventDefault()} className="md:flex mx-2 text-base text-white" id="user-dropdown">
+              <a onClick={(e) => e.preventDefault()} className="md:flex mx-1 text-base text-white" id="user-dropdown">
               <Badge
               style={{backgroundColor:"#13188A"}}
               className="cursor-pointer mt-7 md:mt-0 mx-2"
