@@ -346,7 +346,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     ?.subCategories.map(item=>item.contract).join(',')
 
     setSelectedSubCategory(subCat)
-    
+    navigateSearch(cat,"")
     inputRef.current.focus();
     inputRef.current.select();
   }
