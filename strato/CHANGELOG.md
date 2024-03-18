@@ -24,15 +24,17 @@ so that they could be properly moved to their respective version's subsection.
 ### Changed
 - Optimized the byteString2Integer function that lies at the foundation of strato's RLP-related functionality (rlpDecode).
 - Optimized the integer2Bytes function that lies at the foundation of strato's RLP-related functionality (rlpEncode)
-- Removed unnecessary stateDiff (and threading) in the vm-runner codebase, fixing numerous sources of persistent memory build-up.
 
 ### Fixed
 - `sendOutEvent` inconsistenly encoding code pointer hash
 - simplified p2p conduit code so that all threads handling a peer live or die together using the `async` library
 - Removed overcomplicated attempts at solving p2p thread issue (watchdogs, canaries, semaphore, threadmap, etc)
 - Fixed bug in BlockApps.X509.Certificate that filled in empty orgUnit fields with a space, rather than the empty string
+- Bugfix for slipstream regarding escaping quotes in contract name
 
 ### Removed
+- Removed unnecessary stateDiff (and threading) in the vm-runner codebase, fixing numerous sources of persistent memory build-up.
+- Removed overcomplicated attempts at solving p2p thread issue (watchdogs, canaries, semaphore, threadmap, etc)
 - `bloc/v2.2/x509/createCert` is no more
 
 
