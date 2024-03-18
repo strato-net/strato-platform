@@ -29,18 +29,28 @@ import TagManager from "react-gtm-module";
 import { SEO } from "../../helpers/seoConstant";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
 import { HTTP_METHODS, apiUrl } from "../../helpers/constants";
-import { debounce } from "lodash";
 
 const { Header } = Layout;
 
 const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTab }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { category } = useParams();
+  // const { category } = useParams();
   const inputRef = useRef(null);
+  
+  const getCategoryFromURL = () => {
+    if(window.location.pathname.includes('/c/')){
+      const parts = window.location.pathname.split('/');
+      return parts[parts.length - 1];
+    }else{
+      return 'all'
+    }
+  };
+
+  const categoryQueryValue = getCategoryFromURL()
 
   const queryParams = new URLSearchParams(location.search);
-  const categoryQueryValue = queryParams.get('c') || 'all';
+  // const categoryQueryValue = queryParams.get('c') || 'all';
   const searchQueryValue = queryParams.get('s') || '';
   const subCategoryQueryValue = queryParams.get('sc');
   const isSearch = searchQueryValue ? true : false;
@@ -84,21 +94,21 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     {
       role: 0,
       items: [
-        { label: <div id="Marketplace">Marketplace</div>, key: '0' },
-        { label: <div id="Orders">Orders</div>, key: '1' },
-        { label: <div id="Inventory">My Store</div>, key: '2' }
+        // { label: <div id="Marketplace">Marketplace</div>, key: '0' },
+        { label: <div id="Orders">Orders</div>, key: '0' },
+        { label: <div id="Inventory">My Store</div>, key: '1' }
       ]
     },
     {
       role: 1,
       items: [
-        { label: <div id="Marketplace">Marketplace</div>, key: '0' },
+        // { label: <div id="Marketplace">Marketplace</div>, key: '0' },
       ]
     },
   ];
 
   const navUrls = [
-    routes.MarketplaceCategoryProductList.url,
+    // routes.MarketplaceCategoryProductList.url,
     routes.Orders.url.replace(':type', 'sold'),
     routes.MyStore.url,
     routes.Products.url,
@@ -219,7 +229,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   }, [user])
 
   const subMenuItems = [
-    { value: "marketplace", path: routes.MarketplaceCategoryProductList.url, label: "Marketplace" },
+    // { value: "marketplace", path: routes.MarketplaceCategoryProductList.url, label: "Marketplace" },
     { value: "orders", path: routes.Orders.url.replace(':type', 'sold'), label: "Orders" },
     { value: "mystore", path: "/mystore", label: "My Store" },
     user ? {
@@ -293,12 +303,12 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
         }else{
           setSelectedCategory('all')
           setSelectedSubCategory("")
-          navigateSearch("",value)
+          navigateSearch("all",value)
         }
       }else{
         setSelectedCategory('all')
         setSelectedSubCategory("")
-        navigateSearch("",value)
+        navigateSearch("all",value)
       }
       }))    
      } catch (error) {
@@ -307,11 +317,11 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   };
 
   const navigateSearch = (selectedCateg, value) => {
-    const baseUrl = new URL('/marketplace', window.location.origin);
+    const baseUrl = new URL(`/c/${selectedCateg}`, window.location.origin);
     
-    if (selectedCateg && selectedCateg!='all') {
-      baseUrl.searchParams.set('c', selectedCateg);
-    }
+    // if (selectedCateg && selectedCateg!='all') {
+    //   baseUrl.searchParams.set('c', selectedCateg);
+    // }
     if(selectedCateg && selectedCateg!='all'){
       const subCat = categorys.find((item)=>item.name===selectedCateg)
       ?.subCategories.map(item=>item.contract).join(',')
@@ -397,35 +407,35 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
           onClick={(item) => {
             setSelectedTab(item.key)
             // These pages will be tracked automatically with lucky orange, no need to create an event here unluess we want to include additional metadata
+            // if (item.key === "0") {
+            //   TagManager.dataLayer({
+            //     dataLayer: {
+            //       event: 'view_marketplace_page',
+            //     },
+            //   });
+            // }
             if (item.key === "0") {
-              TagManager.dataLayer({
-                dataLayer: {
-                  event: 'view_marketplace_page',
-                },
-              });
-            }
-            if (item.key === "1") {
               TagManager.dataLayer({
                 dataLayer: {
                   event: 'view_orders_page',
                 },
               });
             }
-            if (item.key === "2") {
+            if (item.key === "1") {
               TagManager.dataLayer({
                 dataLayer: {
                   event: 'view_inventory_page',
                 },
               });
             }
-            if (item.key === "3") {
+            if (item.key === "2") {
               TagManager.dataLayer({
                 dataLayer: {
                   event: 'view_products_page',
                 },
               });
             }
-            if (item.key === "4") {
+            if (item.key === "3") {
               TagManager.dataLayer({
                 dataLayer: {
                   event: 'view_events_page',

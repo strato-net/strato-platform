@@ -11,7 +11,7 @@ export default {
   },
   MarketplaceCategoryProductList: {
     label: "Marketplace Product List",
-    url: "/marketplace",
+    url: "/c/:category",
   },
   MarketplaceUserProfile: {
     label: "Marketplace User Profile",

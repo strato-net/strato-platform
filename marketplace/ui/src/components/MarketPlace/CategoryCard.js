@@ -37,7 +37,7 @@ const CategoryCard = () => {
               className=" w-[162px] md:w-[210px] 2xl:w-[248px] h-[160px] md:h-[180px] 2xl:h-[200px] border border-tertiaryB shadow-category rounded-lg cursor-pointer"
               onClick={() => {
                 const subCat = category.subCategories.map((item)=>item.contract).join(",")
-                const url = `${naviroute}?c=${category.name}&sc=${subCat}`
+                const url = `${naviroute.replace(':category', category.name)}?sc=${subCat}`
                 navigate(url)
                 window.LOQ.push(['ready', async LO => {
                   // Track an event

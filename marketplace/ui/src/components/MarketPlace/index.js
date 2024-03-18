@@ -62,6 +62,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
 
   const linkUrl = window.location.href;
   const metaImg = SEO.IMAGE_META
+  const navRoute = routes.MarketplaceCategoryProductList.url.replace(':category', 'all');
   
   return (
     <>
@@ -80,7 +81,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
             </Typography.Text>
             <Button
               id="viewMore"
-              onClick={() => navigate(routes.MarketplaceCategoryProductList.url)}
+              onClick={() => navigate(navRoute)}
               className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
               <div className="text-primary font-semibold md:text-lg">
                 View More
@@ -103,7 +104,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
             </Typography.Text>
             <Button
               id="viewMore"
-              onClick={() => navigate(routes.MarketplaceCategoryProductList.url)}
+              onClick={() => navigate(navRoute)}
               className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
               <div className="text-primary font-semibold md:text-lg">
                 View More
@@ -125,7 +126,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
             </Typography.Text>
             <Button
               id="viewMore"
-              onClick={() => navigate(routes.MarketplaceCategoryProductList.url)}
+              onClick={() => navigate(navRoute)}
               className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
               <div className="text-primary font-semibold md:text-lg">
                 View More
@@ -147,7 +148,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
             </Typography.Text>
             <Button
               id="viewMore"
-              onClick={() => navigate(routes.MarketplaceCategoryProductList.url)}
+              onClick={() => navigate(navRoute)}
               className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
               <div className="text-primary font-semibold md:text-lg">
                 View More
@@ -169,7 +170,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
             </Typography.Text>
             <Button
               id="viewMore"
-              onClick={() => navigate(routes.MarketplaceCategoryProductList.url)}
+              onClick={() => navigate(navRoute)}
               className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
               <div className="text-primary font-semibold md:text-lg">
                 View More

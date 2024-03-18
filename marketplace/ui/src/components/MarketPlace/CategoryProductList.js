@@ -26,7 +26,7 @@ import { useOrderDispatch} from "../../contexts/order";
 // other
 import { arrayToStr } from "../../helpers/utils";
 import routes from "../../helpers/routes";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { MAX_PRICE } from "../../helpers/constants";
 import ClickableCell from "../ClickableCell";
 import NewTrendingCard from "./NewTrendingCard";
@@ -45,6 +45,7 @@ const CategoryProductList = ({ user }) => {
   const navigate = useNavigate();
 
   const { state } = location;
+  const { category } = useParams()
 
   const queryParams = new URLSearchParams(location.search);
 
@@ -54,7 +55,7 @@ const CategoryProductList = ({ user }) => {
   const selectedSubCat = subCategoryQueryValue.split(",") || [];
   const [api, contextHolder] = notification.useNotification();
   // States
-  const [selectedCategories, setSelectedCategories] = useState(categoryQueryValue);
+  const [selectedCategories, setSelectedCategories] = useState(category);
   const [selectedSubCategories, setSelectedSubCategories] = useState(selectedSubCat);
   const [minPrice, setMinPrice] = useState(0);
   const [maxPrice, setMaxPrice] = useState(MAX_PRICE);
@@ -102,17 +103,17 @@ const CategoryProductList = ({ user }) => {
     categoryActions.fetchCategories(categoryDispatch);
     const selectedSubCat = subCategoryQueryValue.split(",");
     setSelectedSubCategories(selectedSubCat);
-  }, [categoryQueryValue]);
+  }, [category]);
 
 
   useEffect(() => {
-    if(categorys.length > 0 && categoryQueryValue){
-      let subCat = categorys.find(item=>item.name===categoryQueryValue).subCategories
+    if(categorys.length > 0 && category!=='all'){
+      let subCat = categorys.find(item=>item.name===category)?.subCategories
       setSubCategories(subCat)
     }else{
       setSubCategories([])
     }
-  }, [categorys,categoryQueryValue]);
+  }, [categorys,category]);
 
 
   const onChangeSubCategory = (e) => {
@@ -127,7 +128,7 @@ const CategoryProductList = ({ user }) => {
     // In this context, if both "CarbonDAO" and "CarbonOffset" 
     // are found within unSelectedSubCat, the "Carbon" category is also deselected.
     if(unSelectedSubCat.includes("CarbonDAO") && unSelectedSubCat.includes("CarbonOffset")){
-      let baseUrl = new URL(`/marketplace`, window.location.origin);
+      let baseUrl = new URL(`/all`, window.location.origin);
       const categoryData = selectedCategories.filter(item => item !== "Carbon")
       const selectedCategory = categoryData.join(',')
 
@@ -141,10 +142,10 @@ const CategoryProductList = ({ user }) => {
       navigate(url);
     }
 
-    let baseUrl = new URL(`/marketplace`, window.location.origin);
+    let baseUrl = new URL(`/c/${category}`, window.location.origin);
     const subCategories = valuesChecked.join(',')
-    if (categoryQueryValue && valuesChecked.length > 0) {
-      baseUrl.searchParams.set('c', categoryQueryValue);
+    if (category && valuesChecked.length > 0) {
+      // baseUrl.searchParams.set('c', category);
       baseUrl.searchParams.set('sc', subCategories);
     }
     if(valuesChecked.length == 0){
@@ -165,7 +166,7 @@ const CategoryProductList = ({ user }) => {
     if (hasChecked && !isAuthenticated) {
       marketplaceActions.fetchMarketplace(
         marketplaceDispatch,
-        categoryQueryValue,
+        category,
         subCategoryQueryValue,
         minPrice,
         maxPrice,
@@ -174,7 +175,7 @@ const CategoryProductList = ({ user }) => {
     } else if (hasChecked && isAuthenticated) {
       marketplaceActions.fetchMarketplaceLoggedIn(
         marketplaceDispatch,
-        categoryQueryValue,
+        category,
         subCategoryQueryValue,
         minPrice,
         maxPrice,
@@ -192,11 +193,11 @@ const CategoryProductList = ({ user }) => {
 
 
   const generateBaseUrl = () =>{
-    const baseUrl = new URL('/marketplace', window.location.origin);
+    const baseUrl = new URL(`/c/${category}`, window.location.origin);
 
-    if (categoryQueryValue) {
-      baseUrl.searchParams.set('c', categoryQueryValue);
-    }
+    // if (categoryQueryValue) {
+    //   baseUrl.searchParams.set('c', categoryQueryValue);
+    // }
     if(subCategoryQueryValue){
       baseUrl.searchParams.set('sc', subCategoryQueryValue);
     }
@@ -234,7 +235,7 @@ const CategoryProductList = ({ user }) => {
     const isFilter = selectedCategories.length != 0 || selectedSubCategories.length != 0
       || minPrice !== 0 || maxPrice !== MAX_PRICE
     if (isFilter) {
-      const baseUrl = new URL(`/marketplace`, window.location.origin);
+      const baseUrl = new URL(`/c/all`, window.location.origin);
       // if (searchQueryValue) {
       //   baseUrl.searchParams.set('s', searchQueryValue);
       // }
@@ -336,15 +337,15 @@ const CategoryProductList = ({ user }) => {
           </p>
         </ClickableCell>
       </Breadcrumb.Item>
-      <Breadcrumb.Item href="" onClick={e => setSelectedCategories([])}>
+      {/* <Breadcrumb.Item href="" onClick={e => setSelectedCategories([])}>
         <ClickableCell href={routes.MarketplaceProductList.url}>
           <p href={routes.MarketplaceProductList.url} className={`${selectedCategories.length > 0 ? "text-[#13188A] font-semibold " : "text-[#202020] font-medium"} text-sm hover:bg-transparent`}>
             Marketplace
           </p>
         </ClickableCell>
-      </Breadcrumb.Item>
-       {categoryQueryValue && <Breadcrumb.Item className="text-[#202020] font-medium text-sm">
-          {categoryQueryValue}
+      </Breadcrumb.Item> */}
+       {category && <Breadcrumb.Item className="text-[#202020] font-medium text-sm">
+          {category}
         </Breadcrumb.Item>}
     </Breadcrumb>
 
@@ -434,7 +435,7 @@ const CategoryProductList = ({ user }) => {
     {ClearFilterComponent()}
     <div className="bg-white border border-solid border-[#E9E9E9] my-6 mb-24">
 
-      {subCategories.length > 1 && categoryQueryValue === 'Carbon' && (
+      {subCategories.length > 1 && category === 'Carbon' && (
         <>
           {DesktopCollapseComponent(
             SubCategoryFilterComponent()
@@ -463,7 +464,7 @@ const CategoryProductList = ({ user }) => {
 
         {/* Panel - Sub Category */}
         <>
-          {subCategories.length > 1 && categoryQueryValue === 'Carbon' && MobileCollapseComponent(
+          {subCategories.length > 1 && category === 'Carbon' && MobileCollapseComponent(
             SubCategoryFilterComponent()
           )}
           <Divider className="m-0" />

@@ -141,7 +141,8 @@ const TopSellingProductCard = () => {
     });
   };
 
-
+  const navRoute = routes.MarketplaceCategoryProductList.url.replace(':category','all')
+  
   return (
     <div>
       {contextHolder}
@@ -151,14 +152,14 @@ const TopSellingProductCard = () => {
         </Title>
         <Button 
           size="large" 
-          onClick={()=>navigate(routes.MarketplaceCategoryProductList.url)}
+          onClick={()=>navigate(navRoute)}
           className="text-black hover:!text-black border-grayDark hidden md:flex"
         >
             View All
         </Button>
         <Button 
           size="small" 
-          onClick={()=>navigate(routes.MarketplaceCategoryProductList.url)}
+          onClick={()=>navigate(navRoute)}
           className="text-black hover:!text-black border-grayDark flex md:hidden"
         >
             View All
