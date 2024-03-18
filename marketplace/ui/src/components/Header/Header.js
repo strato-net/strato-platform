@@ -9,7 +9,9 @@ import {
   Dropdown,
   Button,
   Typography,
-  Select
+  Select,
+  Row,
+  Col
 } from "antd";
 import { ArrowLeftOutlined, LogoutOutlined } from "@ant-design/icons";
 import { Images } from "../../images";
@@ -363,15 +365,15 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
 // const baseUrl = new URL('/marketplace', window.location.origin);
   return (
     <>
-      <Header className={`fixed z-[100] !bg-[#ffffff] !pl-2 w-full !pr-4 md:px-12 flex md:!mb-10 ${showMenu ? '' : 'shadow-header'} md:p-10 justify-between md:justify-start`}>
-        <Space className="relative flex-grow-0 md:flex-1 ml-2 md:ml-5">
-          <div
+      <Header className={`fixed z-[100] !bg-[#ffffff] !pl-2 w-full !pr-4 md:px-12 flex md:!mb-10 ${showMenu ? '' : 'shadow-header'} items-center justify-between md:justify-start`}>
+        <Row className="relative flex-grow-0 md:flex-1 ml-2 md:ml-5">
+          <Col xs={20} md={6}
             className="mt-4 mr-5 md:mt-0 cursor-pointer flex-grow-0 w-max md:w-[170px] h-[44px]"
             onClick={() => { navigate(routes.Marketplace.url) }}
           >
             <img src={Images.newLogo} alt={IMG_META} title={IMG_META} className="h-[31px] w-[120px] md:w-[170px] md:h-[44px]" preview={false} />
-          </div>
-          <div className={`lg:ml-28 md:ml-1 bg-[#F6F6F6] shadow-md flex-1 header-search ${showSearch ? '-mt-[6px] fixed top-[13px] left-0 flex w-[100vw] z-50 mb-4' : 'hidden md:flex'}`}>
+          </Col>
+          <Col xs={showSearch ? 24 : 4} md={10} className={`lg:ml-28 md:ml-1 bg-[#F6F6F6] shadow-md flex-1 header-search ${showSearch ? '-mt-[6px] fixed top-[13px] left-0 flex w-[100vw] z-50 mb-4' : 'hidden md:flex '}`}>
             <Select
               defaultValue="all"
               className="border-0"
@@ -396,14 +398,14 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
               // className="bg-[#F6F6F6] border-none rounded-[100px] md:!w-[35%] lg:w-[40%] absolute p-[10px] "
               className="bg-[#F6F6F6] border-none outline-none"
             />
-          </div>
-        </Space>
+          </Col>
+        </Row>
         <Menu
           mode="horizontal"
           defaultSelectedKeys={["0"]}
           selectedKeys={[selectedTab]}
           disabledOverflow={true}
-          className="h-16 bg-white text-base mx-10 -mt-7 md:flex hidden"
+          className="h-16 bg-white text-base mx-10 md:flex hidden"
           onClick={(item) => {
             setSelectedTab(item.key)
             // These pages will be tracked automatically with lucky orange, no need to create an event here unluess we want to include additional metadata
