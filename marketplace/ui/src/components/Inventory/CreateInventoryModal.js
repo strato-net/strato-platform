@@ -17,7 +17,6 @@ import TextArea from "antd/es/input/TextArea";
 import TagManager from "react-gtm-module";
 import { unitOfMeasures } from "../../helpers/constants";
 import { categoricalProperties } from "./CategoryFields";
-import RichEditor from "../RichEditor";
 
 const { Option } = Select;
 
@@ -329,7 +328,7 @@ const CreateInventoryModal = ({
               </Form.Item>
             </div>
             {categoricalProperties(form, handleClothingTypeChange, clothingType, sizeOptions, unitOfMeasures)}
-            <div className="flex justify-between mt-4 !list-disc">
+            <div className="flex justify-between mt-4 ">
               <Form.Item
                 label="Description"
                 name="description"
@@ -341,12 +340,7 @@ const CreateInventoryModal = ({
                   },
                 ]}
               >
-                <RichEditor
-                  onChange={(content) => {
-                    form.setFieldsValue({ description: content });
-                  }}
-                  initialValue={form.getFieldValue("description") || ""}
-                />
+                <TextArea placeholder="Enter Description" />
               </Form.Item>
             </div>
             <div className="mt-4 flex-wrap gap-5 sm:flex-nowrap flex justify-between">

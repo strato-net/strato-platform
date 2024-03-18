@@ -13,7 +13,6 @@ import TagManager from "react-gtm-module";
 import { Images } from '../../images';
 import images_placeholder from "../../images/resources/image_placeholder.png"
 import { SEO } from '../../helpers/seoConstant';
-import DOMPurify from 'dompurify';
 
 const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, contextHolder, isUserProfile = false }) => {
     const [quantity, setQuantity] = useState(1)
@@ -39,14 +38,6 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
     const categoryQueryValueArr = categoryQueryValue ? categoryQueryValue.split(',') : []
     const imgMeta = categoryQueryValueArr.length === 1 ? categoryQueryValueArr[0] : SEO.IMAGE_META
 
-    const sanitizedDescription = DOMPurify.sanitize(topSellingProduct?.description || "N/A");
-    const customStyle = {
-        color: '#989898',
-        opacity: 0.4,
-        maxHeight: '1.25rem',
-        overflow: 'hidden',
-    };
-
     // This checks to see if an item is in the wishlist. This will help us render the correct icon
     useEffect(() => {
         const wishList = JSON.parse(localStorage.getItem('wishList')) || [];
@@ -68,6 +59,8 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
             setIsWishlisted(true);
         }
     };
+
+    
 
     return (
         <div className={`relative trending_cards_container_card bg-white p-3 ${parent == 'Marketplace' ? 'min-w-[300px] w-auto' : 'min-w-[230px]'} min-w-[230px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}>
@@ -114,12 +107,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                     <Typography className='font-normal text-black'>{'Size: ' + topSellingProduct?.data?.size || "N/A"}</Typography>
                 )}
             </div>
-            <div style={customStyle} className="custom-typography">
-                <div
-                    dangerouslySetInnerHTML={{ __html: sanitizedDescription }}
-                    className="truncate-html-content"
-                ></div>
-            </div>
+            <Typography className={`#989898 opacity-40 max-h-5 overflow-hidden ${parent == 'Marketplace' ? 'hidden md:flex' : ''}`}>{topSellingProduct?.description || "N/A"}</Typography>
             <div className='flex justify-between items-center bg-[#EEEFFA] p-2 rounded-[4px]'>
                 <Typography>Quantity:</Typography>
                 <div className='flex gap-3 p-1 bg-white'>

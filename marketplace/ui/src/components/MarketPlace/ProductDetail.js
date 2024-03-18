@@ -44,7 +44,6 @@ import { Images } from "../../images";
 import ProductItemDetails from "./ProductItemDetails";
 import HelmetComponent from "../Helmet/HelmetComponent";
 import { SEO } from "../../helpers/seoConstant";
-import PreviewMode from "../RichEditor/PreviewMode";
 
 const ProductDetails = ({ user, users }) => {
   const { state, pathname } = useLocation();
@@ -624,63 +623,74 @@ const ProductDetails = ({ user, users }) => {
                 defaultActiveKey="0"
                 items={
                   [
-                    {
-                      label: <span className="text-sm md:text-base">Description</span>,
-                      key: "0",
-                      children: (
-                        <PreviewMode content={details?.description} />
-                      ),
-                    }
-                    , {
-                      label: <span className="text-sm md:text-base">Details</span>,
-                      key: "1",
-                      children: (
-                        <div>
-                          <ProductItemDetails
-                            categoryName={getCategory(details)}
-                            itemData={itemData}
-                          />
-                        </div>
-                      ),
-                    },
-                    user && { //if user is logged in then display Ownership History
-                      label: <span className="text-sm md:text-base">Ownership History</span>,
-                      key: "2",
-                      children: (
-                        <div>
-                          <DataTableComponent
-                            columns={ownershipDetailColumn}
-                            scrollX="100%"
-                            data={inventoryOwnershipHistory}
-                            isLoading={isInventoryOwnershipHistoryLoading}
-                            pagination={{
-                              defaultPageSize: 10,
-                              position: ["bottomCenter"],
-                              showSizeChanger: false,
-                            }}
-                          />
-                        </div>
-                      ),
-                    },
-                    {
-                      label: <span className="text-sm md:text-base">Additional Information</span>,
-                      key: "3",
-                      children: (
-                        <div>
-                          <List
-                            size="small"
-                            boardered
-                            dataSource={!details.files ? [] : details.files}
-                            renderItem={(item) =>
-                              <List.Item>
-                                <a href={item} rel="noreferrer" target="_blank" className="hover:underline break-all text-[#1e40af]">
-                                  {item}
-                                </a>
-                              </List.Item>}
-                          />
-                        </div>
-                      )
-                    },
+                  {
+                    label: <span className="text-sm md:text-base">Description</span>,
+                    key: "0",
+                    children: (
+                      <div>
+                        <Paragraph
+                          className="text-[#202020] text-sm"
+                        >
+                          {details?.description?.split('\n').map((line, index) => (
+                            <React.Fragment key={index}>
+                              {line}
+                              <br />
+                            </React.Fragment>
+                          ))}
+                        </Paragraph>
+                      </div>
+                    ),
+                  }
+                  ,{
+                    label: <span className="text-sm md:text-base">Details</span>,
+                    key: "1",
+                    children: (
+                      <div>
+                        <ProductItemDetails
+                          categoryName={getCategory(details)}
+                          itemData={itemData}
+                        />
+                      </div>
+                    ),
+                  },
+                  user && { //if user is logged in then display Ownership History
+                    label: <span className="text-sm md:text-base">Ownership History</span>,
+                    key: "2",
+                    children: (
+                      <div>
+                        <DataTableComponent
+                          columns={ownershipDetailColumn}
+                          scrollX="100%"
+                          data={inventoryOwnershipHistory}
+                          isLoading={isInventoryOwnershipHistoryLoading}
+                          pagination={{
+                            defaultPageSize: 10,
+                            position: ["bottomCenter"],
+                            showSizeChanger: false,
+                          }}
+                        />
+                      </div>
+                    ),
+                  },
+                  {
+                    label: <span className="text-sm md:text-base">Additional Information</span>,
+                    key: "3",
+                    children: (
+                      <div>
+                        <List
+                          size="small"
+                          boardered
+                          dataSource={!details.files ? [] : details.files}
+                          renderItem={(item) =>
+                            <List.Item>
+                              <a href={item} rel="noreferrer" target="_blank" className="hover:underline break-all text-[#1e40af]">
+                                {item}
+                              </a>
+                            </List.Item>}
+                        />
+                      </div>
+                    )
+                  },
                   ]}
               />
             </div>
