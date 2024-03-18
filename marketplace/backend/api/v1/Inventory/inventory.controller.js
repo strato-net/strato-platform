@@ -321,21 +321,25 @@ class InventoryController {
   }
 
   static validateTransferItemArgs(args) {
+    const transferSchema = Joi.object({
+        assetAddress: Joi.string().required(),
+        quantity: Joi.number().integer().greater(0).required(),
+    });
     const transferItemSchema = Joi.object({
-      assetAddress: Joi.string().required(),
-      newOwner: Joi.string().required(),
-      quantity: Joi.number().integer().greater(0).required(),
+        transfers: Joi.array().items(transferSchema).min(1).required(), // Expect at least one transfer
+        newOwner: Joi.string().required(),
     });
 
     const validation = transferItemSchema.validate(args);
 
     if (validation.error) {
-      console.log('validation error: ', validation.error)
-      throw new rest.RestError(RestStatus.BAD_REQUEST, validation.error.message, {
-        message: `Missing args or bad format: ${validation.error.message}`,
-      })
+        console.log('validation error: ', validation.error);
+        throw new rest.RestError(RestStatus.BAD_REQUEST, validation.error.message, {
+            message: `Missing args or bad format: ${validation.error.message}`,
+        });
     }
-  }
+}
+
 
   static validateUpdateSaleArgs(args) {
     const updateSaleItemSchema = Joi.object({

@@ -363,13 +363,33 @@ contract.resellItem = async function (args, options = defaultOptions) {
 };
 
 
-  contract.transferItem = async function (args, options = defaultOptions) {
-    const { assetAddress, ...restArgs } = args;
-    const transferNumber = parseInt(util.uid())
-    const finalArgs = { transferNumber: transferNumber, ...restArgs };
-    const contract = { address: assetAddress };
-    return inventoryJs.transferItem(rawAdmin, contract, finalArgs, options);
-  }
+contract.transferItem = async function (args, options = defaultOptions) {
+  const transferPromises = args.transfers.map(transfer => {
+      const transferNumber = parseInt(util.uid(), 10);
+      const individualArgs = {
+          transferNumber: transferNumber,
+          newOwner: args.newOwner,
+      };
+      const contractDetails = { address: transfer.assetAddress };
+      return inventoryJs.transferItem(rawAdmin, contractDetails, individualArgs, options);
+  });
+
+  const results = await Promise.allSettled(transferPromises);
+
+  // Process the results to include the outcome of each transfer operation
+  const processedResults = results.map((result, index) => {
+      const transfer = args.transfers[index];
+      return {
+          assetAddress: transfer.assetAddress,
+          transferNumber: individualArgs.transferNumber,
+          status: result.status,
+          ...result.status === 'fulfilled' ? { success: true, result: result.value } : { success: false, error: result.reason },
+      };
+  });
+  
+  return processedResults;
+};
+
 
   contract.getAllItemTransferEvents = function (args, options = defaultOptions) {
     const getOptions = { ...options, app: contractName, };

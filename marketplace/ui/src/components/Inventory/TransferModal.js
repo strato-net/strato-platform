@@ -103,49 +103,38 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
     ];
 
 
-    const handleSubmit = async () => {    
-        let totalTransferredQuantity = 0; // Total quantity transferred so far
-        const desiredQuantity = quantity; // The quantity the user wants to transfer
+    const handleSubmit = async () => {
+        let requestBody = {
+            transfers: [], // This will hold the transfer information for each asset
+            newOwner: userAddress,
+        };
     
         // Logic for handling grouped assets
-        if (inventory.groupedAssets && inventory.groupedAssets.length > 1) {
+        if (inventory.groupedAssets && inventory.groupedAssets.length > 0) {
+            let totalTransferredQuantity = 0; // Total quantity transferred so far
+            const desiredQuantity = quantity; 
+    
             for (const asset of inventory.groupedAssets) {
                 const remainingQuantity = desiredQuantity - totalTransferredQuantity;
                 const availableQuantity = asset.quantity - (asset.saleQuantity + asset.totalLockedQuantity);
                 const quantityToTransfer = Math.min(remainingQuantity, availableQuantity);
     
                 if (quantityToTransfer > 0) {
-                    const body = {
+                    // Add each asset's transfer information to the requestBody
+                    requestBody.transfers.push({
                         assetAddress: asset.address,
-                        newOwner: userAddress,
                         quantity: quantityToTransfer,
-                    };
-    
-                    let isDone = await actions.transferInventory(inventoryDispatch, body);
-                    if (isDone) {
-                        totalTransferredQuantity += quantityToTransfer;
-                        // Check if we've transferred the desired total quantity
-                        if (totalTransferredQuantity >= desiredQuantity) break;
-                    } 
-                }
-            }
-        } else {
-            // original behavior if not dealing with grouped assets
-            if (quantity > 0 && quantity <= inventory.quantity) {
-                const body = {
-                    assetAddress: inventory.address,
-                    newOwner: userAddress,
-                    quantity,
-                };
-        
-                let isDone = await actions.transferInventory(inventoryDispatch, body);
-                if (isDone) {
-                    totalTransferredQuantity = desiredQuantity;
+                    });
+                    totalTransferredQuantity += quantityToTransfer;
+                    // Check if we've transferred the desired total quantity
+                    if (totalTransferredQuantity >= desiredQuantity) break;
                 }
             }
         }
-
-        if (totalTransferredQuantity >= desiredQuantity) {
+    
+        let isDone = await actions.transferInventory(inventoryDispatch, requestBody);
+        if (isDone) {
+            // If the bulk transfer operation was successful
             await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
             await actions.fetchInventoryForUser(inventoryDispatch, limit, offset, user.commonName);
             handleCancel();
