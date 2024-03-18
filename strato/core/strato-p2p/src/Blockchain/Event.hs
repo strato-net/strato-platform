@@ -435,7 +435,7 @@ handleEvents peer = awaitForever $ \case
         Just cm ->
           maybe False unIsValidator <$> lift (select (Proxy @IsValidator) cm) >>= \case
             False ->
-              $logInfoS "handleEvents/P2pBlockstanbul" . T.pack $
+              $logDebugS "handleEvents/P2pBlockstanbul" . T.pack $
                 concat
                   [ "Peer ",
                     show (pPeerIp peer),
