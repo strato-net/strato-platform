@@ -98,7 +98,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   ];
 
   const navUrls = [
-    routes.Marketplace.url,
+    routes.MarketplaceCategoryProductList.url,
     routes.Orders.url.replace(':type', 'sold'),
     routes.MyStore.url,
     routes.Products.url,
@@ -219,7 +219,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   }, [user])
 
   const subMenuItems = [
-    { value: "marketplace", path: routes.Marketplace.url, label: "Marketplace" },
+    { value: "marketplace", path: routes.MarketplaceCategoryProductList.url, label: "Marketplace" },
     { value: "orders", path: routes.Orders.url.replace(':type', 'sold'), label: "Orders" },
     { value: "mystore", path: "/mystore", label: "My Store" },
     user ? {

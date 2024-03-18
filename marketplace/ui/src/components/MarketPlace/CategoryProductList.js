@@ -109,6 +109,8 @@ const CategoryProductList = ({ user }) => {
     if(categorys.length > 0 && categoryQueryValue){
       let subCat = categorys.find(item=>item.name===categoryQueryValue).subCategories
       setSubCategories(subCat)
+    }else{
+      setSubCategories([])
     }
   }, [categorys,categoryQueryValue]);
 
@@ -432,7 +434,7 @@ const CategoryProductList = ({ user }) => {
     {ClearFilterComponent()}
     <div className="bg-white border border-solid border-[#E9E9E9] my-6 mb-24">
 
-      {subCategories.length > 1 && (
+      {subCategories.length > 1 && categoryQueryValue === 'Carbon' && (
         <>
           {DesktopCollapseComponent(
             SubCategoryFilterComponent()
@@ -461,7 +463,7 @@ const CategoryProductList = ({ user }) => {
 
         {/* Panel - Sub Category */}
         <>
-          {subCategories.length > 1 && MobileCollapseComponent(
+          {subCategories.length > 1 && categoryQueryValue === 'Carbon' && MobileCollapseComponent(
             SubCategoryFilterComponent()
           )}
           <Divider className="m-0" />
