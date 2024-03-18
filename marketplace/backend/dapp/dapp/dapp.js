@@ -294,37 +294,50 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.listItem = async function (args, options = defaultOptions) {
-    if (args.assets && Array.isArray(args.assets)) {
-        const uploadPromises = args.assets.map(asset => {
-            const individualArgs = {
-                ...args,
-                assetToBeSold: asset.assetToBeSold,
-                quantity: asset.quantity,
-            };
-            return inventoryJs.uploadSaleContract(rawAdmin, individualArgs, options);
-        });
+      const uploadPromises = args.assets.map(asset => {
+          const individualArgs = {
+              ...args,
+              assetToBeSold: asset.assetToBeSold,
+              quantity: asset.quantity,
+          };
+          return inventoryJs.uploadSaleContract(rawAdmin, individualArgs, options)
+                  .then(result => ({ success: true, result, assetToBeSold: asset.assetToBeSold }))
+                  .catch(error => ({ success: false, error, assetToBeSold: asset.assetToBeSold }));
+      });
 
-        const results = await Promise.allSettled(uploadPromises);
+      const results = await Promise.allSettled(uploadPromises);
 
-        const processedResults = results.map(result => {
-            if (result.status === 'fulfilled') {
-                return { success: true, value: result.value };
-            } else {
-                return { success: false, error: result.reason };
-            }
-        });
+      const processedResults = results.map(result => {
+          if (result.status === 'fulfilled') {
+              return result.value;
+          } else {
+              return { success: false, error: result.reason, assetToBeSold: result.assetToBeSold };
+          }
+      });
 
-        return processedResults; // This will be an array of objects with the outcome of each upload
-    } else {
-        throw new Error("Invalid args: Expected args.assets to be an array.");
-    }
+      return processedResults;
+}
+
+contract.unlistItem = async function (args, options = defaultOptions) {
+  // Prepare a promise for each unlist operation
+  const unlistPromises = args.saleAddresses.map(saleAddress => {
+      const contractDetails = { address: saleAddress };
+      return inventoryJs.unlistItem(rawAdmin, contractDetails, options);
+  });
+
+  const results = await Promise.allSettled(unlistPromises);
+
+  // Process results
+  const outcomes = results.map((result, index) => {
+      if (result.status === 'fulfilled') {
+          return { success: true, address: args.saleAddresses[index], result: result.value };
+      } else {
+          return { success: false, address: args.saleAddresses[index], reason: result.reason };
+      }
+  });
+  return outcomes;
 };
 
-  contract.unlistItem = async function (args, options = defaultOptions) {
-    const { saleAddress, ...restArgs } = args;
-    const contract = { address: saleAddress };
-    return await inventoryJs.unlistItem(rawAdmin, contract, restArgs, options);
-  }
 
   contract.resellItem = async function (args, options = defaultOptions) {
     const { assetAddress, ...restArgs } = args;

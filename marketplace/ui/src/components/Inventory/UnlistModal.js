@@ -11,24 +11,20 @@ const UnlistModal = ({ open, handleCancel, inventory, saleAddress, categoryName,
     const { user } = useAuthenticateState();
 
     const handleSubmit = async () => {
-        // Handles grouped and single assets
         if (inventory.groupedAssets) {
-            // Iterate over each groupedAsset and unlist each one
-            for (const asset of inventory.groupedAssets) {
-                if (asset.saleAddress) {
-                    let body = {
-                        saleAddress: asset.saleAddress,
-                    };
-        
-                    await actions.unlistInventory(inventoryDispatch, body);
-                }
+            let body = {
+                saleAddresses: inventory.groupedAssets.filter(asset => asset.saleAddress).map(asset => asset.saleAddress),
+            };
+    
+            if (body.saleAddresses.length > 0) {
+                await actions.unlistInventory(inventoryDispatch, body);
             }
         }
+        // Refresh inventory after unlisting
         await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
         await actions.fetchInventoryForUser(inventoryDispatch, limit, offset, user.commonName);
         handleCancel();
     };
-    
 
     return (
         <Modal
