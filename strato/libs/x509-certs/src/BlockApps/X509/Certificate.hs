@@ -470,7 +470,8 @@ getValidity :: IO (DateTime, DateTime)
 getValidity = do
   (DateTime dt tm') <- dateCurrent
   let curDate@(DateTime _ tm) = DateTime dt tm' {todNSec = 0} -- need to wipe out nanseconds b/c they won't serialize
-      endDate = DateTime dt {dateYear = (dateYear dt) + 1} tm -- all certs are valid for a year
+      oneYear = Period {periodYears = 1, periodMonths = 0, periodDays = 0}
+      endDate = DateTime (dt `dateAddPeriod` oneYear) tm -- all certs are valid for a year
   return (curDate, endDate)
 
 dateTimeToString :: DateTime -> String

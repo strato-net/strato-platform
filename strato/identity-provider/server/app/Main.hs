@@ -31,7 +31,7 @@ main = do
   crt <- case bsToCert certBS of
     Left err -> error $ "Error parsing issuer cert: " <> err
     Right crt -> do
-      putStrLn $ "Succuessfully parsed issuer cert: " ++ show crt
+      putStrLn "Succuessfully parsed issuer cert"
       return crt
   iss <- case getCertIssuer crt of
     Nothing -> error "Could not deduce issuer from provided cert. Perhaps it is malformed?"
@@ -44,7 +44,7 @@ main = do
   -- read and parse idconf.yaml
   yamlContents <- B.readFile "/identity-provider/idconf.yaml"
   let idconf :: [ProvidedRealmInfo] = either (error . show) id (decodeEither' yamlContents)
-  realmData <- getRealmData idconf
+  realmData <- getRealmMap idconf flags_cacheSize
   if Map.null realmData
     then error "Oh no! We have no realm data. How can we operate on this little info?"
     else putStrLn "Successfully parsed realm data from yaml file"

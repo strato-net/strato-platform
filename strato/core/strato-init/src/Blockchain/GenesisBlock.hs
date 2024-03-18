@@ -33,7 +33,7 @@ import Blockchain.Data.RLP
 import Blockchain.Data.ValidatorRef
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.Database.MerklePatricia.ForEach as MP
-import Blockchain.EthConf (runKafkaConfigured)
+import Blockchain.EthConf
 import Blockchain.Generation
   ( insertCertRegistryContract,
     insertMercataGovernanceContract,
@@ -41,9 +41,9 @@ import Blockchain.Generation
     readCertsFromGenesisInfo,
     readValidatorsFromGenesisInfo,
   )
-import Blockchain.MilenaTools (commitSingleOffset)
 import Blockchain.Sequencer.Bootstrap (bootstrapSequencer)
 import Blockchain.Sequencer.Event (OutputBlock)
+import Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
 import qualified Blockchain.Strato.Indexer.IContext as IContext
 import qualified Blockchain.Strato.Indexer.Kafka as IdxKafka
@@ -65,20 +65,23 @@ import Blockchain.Stream.VMEvent
 import Blockchain.Stream.VMOutput
 import Control.Monad
 import Control.Monad.Change.Alter (Alters, Selectable)
-import Control.Monad.Change.Modify (Accessible)
+import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Redis
 import Control.Monad.IO.Class
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Char8 as C8
-import Data.Either (isLeft)
+import Data.Functor.Identity
 import qualified Data.Map as Map
 import Data.Map.Strict (Map)
+import qualified Data.Map.Ordered as OMap
 import Data.Maybe
 import qualified Data.Sequence as S
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Network.Kafka as K
 import qualified Network.Kafka.Protocol as KP
+import SolidVM.Model.CodeCollection (emptyCodeCollection)
 import System.Directory
 import Text.Format
 
@@ -118,7 +121,7 @@ getGenesisBlockAndPopulateInitialMPs ::
     HasStorageDB m,
     HasMemStorageDB m,
     (Ac.Account `Alters` AddressState) m,
-    Accessible RBDB.RedisConnection m
+    HasRedis m
   ) =>
   String ->
   m ([(Ad.Address, X509CertInfoState)], [ChainMemberParsedSet], ([(AccountInfo, CodeInfo)], Block))
@@ -129,7 +132,7 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
   extraAccounts <- liftIO . readSupplementaryAccounts $ genesisBlockName
 
   -- Need to insert the X509 certificates INTO Redis
-  void . RBDB.withRedisBlockDB $ RBDB.insertRootCertificate
+  void . execRedis $ RBDB.insertRootCertificate
   $logInfoS "Redis/certInsertion" $ T.pack . format $ x509CertToCertInfoState rootCert
 
   extraCertInfoStates <-
@@ -137,7 +140,7 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
       ( \c -> do
           let c' = x509CertToCertInfoState c
               ua' = userAddress c'
-          insertCert <- RBDB.withRedisBlockDB $ RBDB.registerCertificate ua' c'
+          insertCert <- execRedis $ RBDB.registerCertificate ua' c'
           case insertCert of
             Right _ -> $logInfoS "Redis/certInsertion" $ T.pack "Certificate insertion was successful"
             Left e -> $logInfoS "Redis/certInsertion" $ T.pack $ "Certificate insertion failed: " ++ show e
@@ -145,7 +148,7 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
       )
       certs
 
-  insertValidators <- RBDB.withRedisBlockDB $ RBDB.addValidators validators
+  insertValidators <- execRedis $ RBDB.addValidators validators
   case insertValidators of
     Right _ -> $logInfoS "Redis/certInsertion" $ T.pack "Certificate insertion was successful"
     Left e -> $logInfoS "Redis/certInsertion" $ T.pack $ "Certificate insertion failed: " ++ show e
@@ -156,7 +159,7 @@ initializeGenesisBlock ::
   ( HasCodeDB m,
     HasHashDB m,
     Mem.HasMemAddressStateDB m,
-    Accessible RBDB.RedisConnection m,
+    HasRedis m,
     HasSQLDB m,
     HasStateDB m,
     HasStorageDB m,
@@ -182,7 +185,7 @@ initializeGenesisBlock genesisBlockName = do
 
   let genesisChainId = Nothing -- TODO: It's possible that we would call this function for private chain creation
   $logInfoS "initgen" "Beginning to write to redis"
-  void . RBDB.withRedisBlockDB $
+  void . execRedis $
     RBDB.forceBestBlockInfo
       (blockHash genesisBlock)
       (blockDataNumber . blockBlockData $ genesisBlock)
@@ -250,9 +253,10 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
               A._transactionChainId = genesisChainId,
               A._transactionSender = Ac.Account (Ad.Address 0) genesisChainId,
               A._actionData =
-                Map.singleton a $
+                OMap.singleton (a,
                   A.ActionData
                     (codeHash d)
+                    emptyCodeCollection
                     ""
                     ""
                     ( case codeHash d of
@@ -264,7 +268,8 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
                         SolidVMDiff m -> A.SolidVMDiff $ Map.map fromDiff m
                         EVMDiff m -> A.EVMDiff $ Map.map fromDiff m
                     )
-                    [A.Create],
+                    Map.empty [] []
+                    [A.Create]),
               A._metadata =
                 getMetadata
                   ( case codeHash d of
@@ -297,8 +302,9 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
 
     forM_ (map (fromMaybe Map.empty . A._metadata) filteredActions) $ \md ->
       case (Map.lookup "src" md, Map.lookup "name" md) of
-        (Just src, Just n) ->
-          void $ produceVMEvents [CodeCollectionAdded src (SolidVMCode (T.unpack n) $ hash $ BC.pack $ T.unpack src) "" "" [] []]
+        (Just src, Just n) -> case runIdentity . runMemCompilerT $ compileSource False $ Map.singleton "" src of
+          Right cc -> void $ produceVMEvents [CodeCollectionAdded (const () <$> cc) (SolidVMCode (T.unpack n) $ hash $ BC.pack $ T.unpack src) "" "" [] Map.empty []]
+          Left _ -> pure ()
         _ -> return ()
 
     _ <- produceVMEvents $ map NewAction filteredActions
@@ -318,10 +324,13 @@ bootstrapIndexer obGB =
         commit >>= \case
           Right (Right _) -> do
             putStrLn "bootstrapIndex API checkpoint successful!"
+
+            putStrLn "About to bootstrap index events"
+
             res <-
-              runKafkaConfigured clientId $
-                IdxKafka.writeIndexEvents [IdxModel.RanBlock obGB]
-            when (isLeft res) . error $ "bootstrapping index events failed: " ++ show res
+              runKafkaMConfigured clientId $
+                IdxKafka.produceIndexEvents [IdxModel.RanBlock obGB]
+
             print res
             putStrLn "bootstrapIndex genesis seed successful!"
           Right (Left l) -> do

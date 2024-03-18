@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -43,27 +44,24 @@ import Data.Aeson.Types
 import Data.Binary
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import Data.Data
 import Data.Hashable
 import Data.Maybe (fromMaybe)
 import qualified Data.NibbleString as N
-import qualified Data.RLP as RLP2
 import Data.Swagger hiding (Format, format, get, put)
 import qualified Data.Swagger as Sw
 import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
 import Database.Persist.Sql hiding (get)
+-- import Debug.Trace
 import GHC.Generics
-import qualified LabeledError
 import Numeric
 import Servant.API
 import Servant.Docs
 import Test.QuickCheck (Arbitrary (..))
 import qualified Text.Colors as CL
 import Text.Format
-import qualified Text.PrettyPrint.ANSI.Leijen as Lei
 import Text.Printf
 import Text.Read (readMaybe)
 import Text.ShortDescription
@@ -129,9 +127,6 @@ instance AS.FromJSON Address where
 instance FromJSONKey Address where
   fromJSONKey = FromJSONKeyTextParser (parseJSON . String)
 
-instance Lei.Pretty Address where
-  pretty = Lei.text . CL.yellow . formatAddressWithoutColor
-
 instance Format Address where
   format = CL.yellow . formatAddressWithoutColor
 
@@ -151,10 +146,11 @@ maybeToEither err m = maybe (Left err) Right m
 instance PersistField Address where
   toPersistValue = PersistText . T.pack . formatAddressWithoutColor
   fromPersistValue (PersistText t) =
-    maybeToEither "could not decode address"
-      . stringAddress
-      . T.unpack
-      $ t
+    let !eAddr = maybeToEither "could not decode address"
+               . stringAddress
+               . T.unpack
+               $ t
+     in eAddr
   fromPersistValue x = Left . T.pack $ "PersistField Address: expected PersistText: " ++ show x
 
 instance PersistFieldSql Address where
@@ -186,14 +182,6 @@ instance ToCapture (Capture "address" Address) where
 
 instance ToCapture (Capture "contractAddress" Address) where
   toCapture _ = DocCapture "contractAddress" "an Ethereum address"
-
-instance RLP2.RLPEncodable Address where
-  rlpEncode addr = RLP2.rlpEncode . LabeledError.b16Decode "RLPEncodable<Address>" . BC.pack $ formatAddressWithoutColor addr
-  rlpDecode obj = Address . fromInteger <$> RLP2.rlpDecode obj
-
-instance RLP2.RLPEncodable (Maybe Address) where
-  rlpEncode = maybe RLP2.rlp0 RLP2.rlpEncode
-  rlpDecode x = if x == RLP2.rlp0 then return Nothing else Just <$> RLP2.rlpDecode x
 
 instance ToCapture (Capture "userAddress" Address) where
   toCapture _ = DocCapture "userAddress" "an Ethereum address"
@@ -254,7 +242,7 @@ deriveAddressWithSalt sender salt srcHash args = do
                 rlpEncode $ SHA.keccak256ToByteString $ fromMaybe (SHA.hash $ encodeUtf8 userRegistryContract) srcHash,
                 rlpEncode $ fromMaybe "OrderedVals []" args
               ]
-  -- trace ((show theAddress) ++ " " ++ salt ++ " " ++ (show $ keccak256ToByteString $ hash src) ++ " " ++ args)
+  -- trace ((show theAddress) ++ " " ++ salt ++ " " ++ (show srcHash) ++ " " ++ show args) $
   (decode $ BL.drop 12 $ encode theHash)
 
 addressAsNibbleString :: Address -> N.NibbleString

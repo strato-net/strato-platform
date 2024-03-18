@@ -95,7 +95,7 @@ const actions = {
         });
 
         return true;
-      }
+      } 
 
       dispatch({ type: actionDescriptors.fetchEventDetailsFailed, error: 'Error while fetching Event' });
       return false;
@@ -127,7 +127,7 @@ const actions = {
         return;
       } else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({ type: actionDescriptors.fetchEventFailed, error: "Error while fetching Event" });
-      }
+      } 
 
       dispatch({ type: actionDescriptors.fetchEventFailed, error: body.error });
     } catch (err) {
@@ -158,7 +158,7 @@ const actions = {
           error: "Error while fetching certify events" 
         });
         actions.setMessage(dispatch, "Error while fetching certify events" )
-      }
+      } 
       dispatch({ 
         type: actionDescriptors.fetchCertifyEventFailed, 
         error: body.error 
@@ -220,7 +220,7 @@ const actions = {
           payload: body.data,
         });
         return;
-      }
+      } 
       dispatch({ type: actionDescriptors.fetchEventOfItemFailed, error: undefined });
     } catch (err) {
       dispatch({ type: actionDescriptors.fetchEventOfItemFailed, error: undefined });
@@ -253,7 +253,7 @@ const actions = {
       }else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({ type: actionDescriptors.updateEventFailed, error: 'Error while updating certifier comment' });
         return false;
-      }
+      } 
 
       dispatch({ type: actionDescriptors.updateEventFailed, error: body.error });
       actions.setMessage(dispatch, body.error)

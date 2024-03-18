@@ -24,6 +24,15 @@ import Data.Word
 import qualified Text.Colors as CL
 import Text.Format
 
+-- TODO: maybe move to own module? not sure this instance makes sense here
+instance Ord Point where 
+  compare PointO PointO = EQ
+  compare PointO _ = GT
+  compare _ PointO = LT
+  compare (Point x1 y1) (Point x2 y2) = case compare x1 x2 of 
+    EQ -> compare y1 y2
+    theComp -> theComp
+
 stringToPoint :: String -> Point
 stringToPoint string =
   case B16.decode $ BC.pack string of

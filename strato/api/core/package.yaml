@@ -28,6 +28,7 @@ library:
   - extra
   - filepath
   - format
+  - hflags
   - http-types
   - labeled-error
   - lens
@@ -35,9 +36,7 @@ library:
   - mtl
   - process
   - QuickCheck
-  - resourcet
   - seqevents
-  - servant
   - servant-client
   - servant-multipart
   - servant-multipart-client  
@@ -57,6 +56,5 @@ library:
   - blockapps-identity-provider-client
   - vault-monad
   - identity-monad
-  - blockapps-vault-wrapper-server
   - strato-redis-blockdb
   - evm-solidity

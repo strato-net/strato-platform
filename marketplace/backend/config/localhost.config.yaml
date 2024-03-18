@@ -3,10 +3,8 @@ timeout: 600000
 VM: SolidVM
 configDirPath: ./config
 deployFilename: localhost.deploy.yaml
-orgDeployFilename: org.deploy.yaml
 serverHost: http://localhost
 serverIP: 
-orgName: blockapps
 bootMembersFilename: boot_members.yaml
 cacheNonce: true
 dockerized: false
@@ -15,19 +13,18 @@ marketplaceUiUrlPrefix: "/marketplace"
 nodes:
   - id: 0
     label: localhost
-    url: http://localhost
-    port: 30303
+    url: https://art.mercata-testnet2.blockapps.net
     oauth:
       appTokenCookieName: asset_framework_session
       appTokenCookieMaxAge: 7776000000
       openIdDiscoveryUrl: >-
         https://keycloak.blockapps.net/auth/realms/mercata-testnet2/.well-known/openid-configuration
       clientId: localhost
-      clientSecret: ab85bdf6-9715-441f-b3e5-c8be53c3a55e
+      clientSecret: 7ea4b82a-2ca9-430d-9a6f-fa9985d97f9b
       scope: email openid
       serviceOAuthFlow: 
       redirectUri: http://localhost/api/v1/authentication/callback
       logoutRedirectUri: http://localhost
-      tokenField: 
+      tokenField: access_token
       tokenUsernameProperty: 
       tokenUsernamePropertyServiceFlow: 

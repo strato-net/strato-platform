@@ -1,38 +1,26 @@
 {
     "categories": [
         {
-            "name": "Art",
-            "imageKey": "",
-            "subCategories": [
-                {
-                    "name": "Art"
-                }
-            ]
-        },
-        {
             "name": "Carbon",
             "imageKey": "",
             "subCategories": [
                 {
-                    "name": "Carbon Credit"
+                    "name": "Carbon Offset",
+                    "contract": "CarbonOffset"
                 },
                 {
-                    "name": "Membership DAO"
+                    "name": "Carbon DAO",
+                    "contract": "CarbonDAO"
                 }
             ]
         },
         {
-            "name": "Materials",
+            "name": "Metals",
             "imageKey": "",
             "subCategories": [
                 {
-                    "name": "Nickel Reserve"
-                },
-                {
-                    "name": "Nickel"
-                },
-                {
-                    "name": "Silver"
+                    "name": "Metals",
+                    "contract": "Metals"
                 }
             ]
         },
@@ -41,15 +29,40 @@
             "imageKey": "",
             "subCategories": [
                 {
-                    "name": "Sneakers"
-                },
-                {
-                    "name": "Shirts"
-                },
-                {
-                    "name": "Pants"
+                    "name": "Clothing",
+                    "contract": "Clothing"
                 }
             ]
+        },
+        {
+            "name": "Collectibles",
+            "imageKey": "",
+            "subCategories": [
+                {
+                    "name": "Collectibles",
+                    "contract": "Collectibles"
+                }
+            ]           
+        },
+        {
+            "name": "Art",
+            "imageKey": "",
+            "subCategories": [
+                {
+                    "name": "Art",
+                    "contract": "Art"
+                }
+            ]
+        },
+        {
+            "name": "Membership",
+            "imageKey": "",
+            "subCategories": [
+                {
+                    "name": "Membership",
+                    "contract": "Membership"
+                }
+            ]            
         }
     ]
 }

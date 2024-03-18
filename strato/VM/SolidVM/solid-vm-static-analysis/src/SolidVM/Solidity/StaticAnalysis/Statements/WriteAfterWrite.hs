@@ -7,6 +7,7 @@ module SolidVM.Solidity.StaticAnalysis.Statements.WriteAfterWrite
   )
 where
 
+import Control.Monad (forM)
 import Control.Monad.State
 import Data.Foldable (for_)
 import qualified Data.Map.Strict as M

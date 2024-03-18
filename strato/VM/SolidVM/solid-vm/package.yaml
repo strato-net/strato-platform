@@ -2,9 +2,6 @@ name: solid-vm
 
 dependencies:
   - base
-  - blockapps-haskoin
-  - x509-certs
-  - monad-logger
 
 library:
   source-dirs: src/
@@ -12,15 +9,12 @@ library:
     - Blockchain.SolidVM
     - Blockchain.SolidVM.Simple
     - Blockchain.SolidVM.SM
-    - Blockchain.SolidVM.CodeCollectionDB
-    - SolidVM.CodeCollectionTools
   ghc-options: -Wall -O2
   dependencies:
-  - aeson
   - base16-bytestring
-  - binary
   - blockapps-data
   - blockapps-datadefs
+  - blockapps-haskoin
   - blockapps-mpdbs
   - bytestring
   - common-log
@@ -35,16 +29,14 @@ library:
   - format
   - labeled-error
   - lens
-  - lrucache
-  - memory
   - merkle-patricia-db
   - monad-alter
   - nibblestring
+  - ordered-containers
   - parsec
-  - prometheus-client
+  - solid-vm-compiler
   - solid-vm-model
   - solid-vm-parser
-  - solid-vm-static-analysis
   - source-tools
   - strato-model
   - text
@@ -54,6 +46,8 @@ library:
   - utf8-string
   - vector
   - vm-tools
+  - x509-certs
+  - ordered-containers
 
 
 
@@ -65,12 +59,11 @@ executables:
     dependencies:
       - containers
       - parsec
-      - solid-vm
+      - solid-vm-compiler
       - solid-vm-model
       - solid-vm-parser
       - solid-vm-static-analysis
       - text
-      - deepseq
 
 tests:
   solid-vm-spec:
@@ -78,24 +71,17 @@ tests:
     main: Main.hs
     ghc-options: -dynamic
     dependencies:
-      - strato-init
+      - QuickCheck
       - aeson
-      - json-stream
-      - seqevents
-      - mtl
-      - crypto-api
-      - binary
-      - blockapps-data
-      - core-api2
-      - strato-genesis
       - async
-      - base16-bytestring
+      - blockapps-data
       - blockapps-datadefs
       - blockapps-mpdbs
       - bytestring
       - common-log
+      - composable-monads-base
       - containers
-      - deepseq
+      - crypto-api
       - ethereum-rlp
       - hflags
       - hspec
@@ -105,19 +91,23 @@ tests:
       - merkle-patricia-db
       - monad-alter
       - raw-strings-qq
+      - seqevents
       - solid-vm
+      - solid-vm-compiler
       - solid-vm-model
+      - solid-vm-parser
       - solid-vm-static-analysis
       - source-tools
+      - strato-genesis
+      - strato-init
       - strato-model
       - text
       - time
-      - vm-tools
-      - utf8-string
-      - test-framework
-      - QuickCheck
-      - solid-vm-parser
       - transformers
+      - utf8-string
+      - vm-tools
+      - x509-certs
+      - ordered-containers
 
 benchmarks:
     codebench:
@@ -136,6 +126,7 @@ benchmarks:
         - text
         - parsec
         - strato-model
+        - solid-vm-compiler
         - solid-vm-parser
         - solid-vm-static-analysis
         - solid-vm-model

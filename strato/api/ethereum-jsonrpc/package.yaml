@@ -28,7 +28,6 @@ executables:
       - strato-model
       - seqevents
       - text
-      - unordered-containers
       - vector
       - wai
       - warp

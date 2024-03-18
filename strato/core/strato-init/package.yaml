@@ -11,14 +11,12 @@ ghc-options: -Wall -O2 -threaded
 
 dependencies:
   - base
-  - x509-certs
 
 library:
   source-dirs: src/
   dependencies:
   - aeson
   - base16-bytestring
-  - base64
   - blockapps-data
   - blockapps-datadefs
   - blockapps-mpdbs
@@ -33,15 +31,14 @@ library:
   - entropy
   - ethereum-discovery
   - ethereum-rlp
-  - extra
+  - evm-solidity
   - file-embed
   - filepath
   - format
-  - hedis
   - hflags
   - http-client
   - http-types
-  - json-stream
+  - kafka-monad
   - lens
   - leveldb-haskell
   - merkle-patricia-db
@@ -50,9 +47,13 @@ library:
   - monad-alter
   - nibblestring
   - persistent-postgresql
+  - redis-monad
   - resourcet
   - seqevents
   - servant-client
+  - solid-vm-compiler
+  - solid-vm-model
+  - sql-monad
   - strato-conf
   - strato-genesis
   - strato-index
@@ -69,7 +70,9 @@ library:
   - unliftio
   - unliftio-core
   - vm-tools
+  - x509-certs
   - yaml
+  - ordered-containers
 
 executables:
   strato-setup:
@@ -85,9 +88,9 @@ executables:
     source-dirs: exec_src/
     main: TabulaRasa.hs
     dependencies:
-      - common-log
       - hflags
       - strato-init
+      - strato-model
 
     other-modules: []
 
@@ -100,15 +103,9 @@ executables:
     source-dirs: exec_src/
     main: InitWorker.hs
     dependencies:
-      - aeson
-      - base64
-      - bytestring
       - common-log
-      - extra
       - hflags
       - strato-init
-      - strato-model
-      - strato-networks
     other-modules: []
 
   genesis-builder:
@@ -120,6 +117,7 @@ executables:
       - strato-genesis
       - strato-init
       - strato-model
+      - x509-certs
     other-modules: []
 
 tests:
@@ -129,7 +127,6 @@ tests:
     ghc-options: -dynamic
     dependencies:
       - aeson
-      - base16-bytestring
       - blockapps-data
       - bytestring
       - hspec

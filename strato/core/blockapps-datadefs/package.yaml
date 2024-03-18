@@ -2,16 +2,15 @@ name: blockapps-datadefs
 
 dependencies:
   - aeson
-  - ansi-wl-pprint
   - base
   - base16-bytestring
   - binary
   - bytestring
   - crypto-pubkey-types
   - deepseq
+  - ethereum-encryption
   - ethereum-rlp
   - evm-solidity
-  - source-tools
   - format
   - generic-arbitrary
   - generic-random

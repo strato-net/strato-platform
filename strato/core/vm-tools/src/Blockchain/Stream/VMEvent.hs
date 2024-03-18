@@ -1,70 +1,46 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.Stream.VMEvent
-  ( VMEvent (..),
+  ( VMEvent(..),
     produceVMEvents,
-    produceVMEventsM,
-    fetchVMEvents,
-    fetchVMEvents',
-    fetchVMEventsIO,
-    fetchVMEventsOneIO,
-    fetchLastVMEvents,
-    fetchVMEventsFromTopic,
-    defaultVMEventsTopicName,
-    HasVMEventsSink (..),
+    fetchVMEvents
   )
 where
 
-import BlockApps.Logging
 import Blockchain.Data.TransactionResult
 import Blockchain.EthConf
 import Blockchain.KafkaTopics
-import Blockchain.MilenaTools
+import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Stream.Action (Action, Delegatecall)
-import Blockchain.Stream.Raw
 import Conduit
-import Control.Exception
-import Control.Monad.Change.Modify (Modifiable)
-import Control.Monad.State
+import Control.Monad.Composable.Kafka
 import qualified Data.Aeson as JSON
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
-import Data.Maybe
+import Data.Binary
+import Data.Map.Strict (Map)
 import Data.Text (Text)
-import qualified Data.Text as T
 import GHC.Generics
-import Network.Kafka
-import Network.Kafka.Producer
 import Network.Kafka.Protocol hiding (Key)
+import SolidVM.Model.CodeCollection
 import Text.Format
 import Text.Tools
 
 data VMEvent
   = NewAction Action
   | CodeCollectionAdded
-      { ccString :: Text,
+      { codeCollection :: CodeCollectionF (),
         codePtr :: CodePtr,
         organization :: Text,
         application :: Text,
         historyList :: [Text],
+        abstracts :: Map (Account, Text) (Text, Text),
         recordMappings :: [Text]
       }
   | DelegatecallMade Delegatecall
   | NewTransactionResult TransactionResult
   deriving (Show, Generic)
-
-instance JSON.ToJSON VMEvent
-
-instance JSON.FromJSON VMEvent
 
 vmType :: CodePtr -> String
 vmType (SolidVMCode _ _) = "SolidVM"
@@ -73,89 +49,22 @@ vmType (CodeAtAccount _ _) = "CodeAtAccount"
 
 instance Format VMEvent where
   format (NewAction a) = "NewAction:\n" ++ tab (format a)
-  format (CodeCollectionAdded c cp o a hl rm) =
+  format (CodeCollectionAdded _ cp o a hl _ rm) =
     "CodeCollectionAdded: (" ++ show o ++ "/" ++ show a ++ ") " ++ vmType cp
       ++ (if (not $ null hl) then " " ++ show hl else "")
       ++ (if (not $ null rm) then " " ++ show rm else "")
-      ++ "\n    "
-      ++ show (shorten 120 (T.unpack c))
   format (DelegatecallMade d) =
     "DelegatecallMade: " ++ format d
   format (NewTransactionResult tr) = "NewTransactionResult:\n" ++ tab (format tr)
 
-class HasVMEventsSink k where
-  getVMEventsSink :: k ([VMEvent] -> k ())
+instance Binary VMEvent
 
-produceVMEventsM :: (Modifiable KafkaState m, MonadLogger m, MonadIO m) => [VMEvent] -> m Offset
-produceVMEventsM vmEvents = do
-  x <-
-    withKafkaRetry1s . produceMessagesAsSingletonSets $
-      map (TopicAndMessage (lookupTopic "vmevents") . makeMessage . BL.toStrict . JSON.encode) vmEvents
+instance JSON.ToJSON VMEvent
 
-  -- let [offset] = concatMap (map (\(_, _, x') ->x') . concatMap snd . _produceResponseFields) x
-  let offset = case concatMap (map (\(_, _, x') -> x') . concatMap snd . _produceResponseFields) x of
-        [theOffset] -> theOffset
-        _ -> error "produceVMEventsM: unexpected response from Kafka"
+instance JSON.FromJSON VMEvent
 
-  return offset
+produceVMEvents :: MonadIO m => [VMEvent] -> m [ProduceResponse]
+produceVMEvents = runKafkaMConfigured "blockapps-data" . produceItems (lookupTopic "vmevents")
 
--- todo: refactor this to consume produceVMEventsM
-produceVMEvents :: (MonadIO m) => [VMEvent] -> m Offset
-produceVMEvents vmEvents = do
-  result <- -- type Either KafkaClientError [ProduceResponse]
-    liftIO $
-      runKafkaConfigured "blockapps-data" $
-        fmap concat $
-          forM vmEvents $ \e -> produceMessagesAsSingletonSets [TopicAndMessage (lookupTopic "vmevents") . makeMessage . BL.toStrict . JSON.encode $ e]
-  case result of
-    Left kce -> liftIO $ throwIO kce
-    Right res -> do
-      -- [ProduceResponse]
-      liftIO $ mapM_ parseKafkaResponse res
-      return offset
-      where
-        -- where [offset] = concatMap (map (\(_, _, x') -> x') . concatMap snd . _produceResponseFields) res
-        offset = case concatMap (map (\(_, _, x') -> x') . concatMap snd . _produceResponseFields) res of
-          [theOffset] -> theOffset
-          _ -> error "produceVMEvents: unexpected response from Kafka"
-
--- parsedResults = map parseKafkaResponse res
-
--- | Reads VMEvents from `defaultVMEventsTopicName`
-fetchVMEvents :: Kafka k => Offset -> k [VMEvent]
-fetchVMEvents = fetchVMEventsFromTopic defaultVMEventsTopicName
-
--- | Same as `fetchVMEvents`, except sets our commonly-used Milena state configurations
-fetchVMEvents' :: Kafka k => Offset -> k [VMEvent]
-fetchVMEvents' ofs = fetchVMEventsFromTopic defaultVMEventsTopicName ofs
-
-fetchVMEventsFromTopic :: Kafka k => TopicName -> Offset -> k [VMEvent]
-fetchVMEventsFromTopic topic offset = map bytestringToVMEvent <$> fetchBytes topic offset
-
-defaultVMEventsTopicName :: TopicName
-defaultVMEventsTopicName = lookupTopic "vmevents"
-
-bytestringToVMEvent :: B.ByteString -> VMEvent
-bytestringToVMEvent x =
-  fromMaybe (error $ "bytestringToVMEvent called on invalid data: " ++ show x) . JSON.decode . BL.fromStrict $ x
-
-fetchVMEventsIO :: Offset -> IO (Maybe [VMEvent])
-fetchVMEventsIO offset =
-  fmap (map bytestringToVMEvent) <$> fetchBytesIO (lookupTopic "vmevents") offset
-
-fetchVMEventsOneIO :: Offset -> IO (Maybe VMEvent)
-fetchVMEventsOneIO offset =
-  fmap bytestringToVMEvent <$> fetchBytesOneIO (lookupTopic "vmevents") offset
-
-fetchLastVMEvents :: Offset -> IO [VMEvent]
-fetchLastVMEvents n = do
-  ret <-
-    runKafkaConfigured "strato-p2p-client" $ do
-      lastOffset <- getLastOffset LatestTime 0 (lookupTopic "vmevents")
-      when (lastOffset == 0) $ error "Block stream is empty, you need to run strato-setup to insert the genesis block."
-      let offset = max (lastOffset - n) 0
-      fetchVMEvents offset
-
-  case ret of
-    Left e -> error $ show e
-    Right v -> return v
+fetchVMEvents :: HasKafka k => Offset -> k [VMEvent]
+fetchVMEvents = fetchItems $ lookupTopic "vmevents"

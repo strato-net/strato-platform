@@ -7,7 +7,9 @@ where
 
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Secp256k1
+import Control.Monad (when)
 import Control.Monad.Except
+import Control.Monad.IO.Class
 import qualified Data.ByteString.Base64 as Base64
 import qualified Data.ByteString.Char8 as BC
 import Data.Either.Extra

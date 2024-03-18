@@ -31,6 +31,22 @@ const reducer = (state, action) => {
         error: action.error,
         isCreateOrderSubmitting: false,
       };
+    case actionDescriptors.cancelSale:
+      return {
+        ...state,
+        isorderDetailsLoading: true,
+      };
+    case actionDescriptors.cancelSaleSuccessful:
+      return {
+        ...state,
+        isorderDetailsLoading: false,
+      };
+    case actionDescriptors.cancelSaleFailed:
+      return {
+        ...state,
+        isorderDetailsLoading: false,
+        error: action.error,
+      };
     case actionDescriptors.createPayment:
       return {
         ...state,
@@ -82,6 +98,53 @@ const reducer = (state, action) => {
         ...state,
         error: action.error,
         isordersLoading: false,
+      };
+    case actionDescriptors.fetchAllOrders:
+      return {
+        ...state,
+        isAllOrdersLoading: true,
+      };
+    case actionDescriptors.fetchAllOrdersSuccessful:
+      return {
+        ...state,
+        allOrders: action.payload,
+        isAllOrdersLoading: false,
+      };
+    case actionDescriptors.fetchAllOrdersFailed:
+      return {
+        ...state,
+        error: action.error,
+        isAllOrdersLoading: false,
+      };
+    case actionDescriptors.fetchSaleQuantity:
+      return {
+        ...state, 
+        saleQuantityLoading: true,
+      };
+      case actionDescriptors.fetchSaleQuantitySuccessful:
+        return {
+          ...state,
+          saleQuantity: action.payload,
+          saleQuantityLoading: false,
+        };
+      case actionDescriptors.fetchSaleQuantityFailed:
+        return {
+          ...state, 
+          error: action.error,
+          saleQuantityLoading: false,
+        };
+    case actionDescriptors.updateOrderStatus:
+      return {
+        ...state,
+      };
+    case actionDescriptors.updateOrderStatusSuccessful:
+      return {
+        ...state,
+      };
+    case actionDescriptors.updateOrderStatusFailed:
+      return {
+        ...state,
+        error: action.error,
       };
     case actionDescriptors.fetchOrderSold:
       return {
@@ -169,6 +232,54 @@ const reducer = (state, action) => {
         error: action.error,
         issellerDetailsUpdating: false,
       };
+    case actionDescriptors.executeSale:
+      return {
+        ...state,
+        isCreateOrderSubmitting: true,
+      }
+    case actionDescriptors.executeSaleSuccessful:
+      return {
+        ...state,
+        isCreateOrderSubmitting: false,
+      }
+    case actionDescriptors.executeSaleFailed:
+      return {
+        ...state,
+        error: action.error,
+        isCreateOrderSubmitting: false,
+      }
+    case actionDescriptors.updateOrderComment:
+      return {
+        ...state,
+        isUpdatingOrderComment: true,
+      }
+    case actionDescriptors.updateOrderCommentSuccessful:
+      return {
+        ...state,
+        isUpdatingOrderComment: false,
+      }
+    case actionDescriptors.updateOrderCommentFailed:
+      return {
+        ...state,
+        error: action.error,
+        isUpdatingOrderComment: false,
+      }
+    case actionDescriptors.createSaleOrder:
+      return {
+        ...state,
+        isCreateOrderSubmitting: true,
+      }
+    case actionDescriptors.createSaleOrderSuccessful:
+      return {
+        ...state,
+        isCreateOrderSubmitting: false,
+      }
+    case actionDescriptors.createSaleOrderFailed:
+      return {
+        ...state,
+        error: action.error,
+        isCreateOrderSubmitting: false,
+      }
     default:
       throw new Error(`Unhandled action: '${action.type}'`);
   }

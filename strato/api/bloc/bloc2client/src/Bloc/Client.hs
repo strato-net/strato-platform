@@ -3,7 +3,6 @@
 module Bloc.Client
   ( getGitInfo,
     postUsersFill,
-    createCertificate,
     getContracts,
     postContractsBatchSeries,
     getContractsData,
@@ -20,7 +19,7 @@ module Bloc.Client
     getBlocTransactionResult,
     postBlocTransactionResults,
     postBlocTransaction,
-    postBlocTransactionExternal,
+    postBlocTransactionParallelExternal,
     postChainInfo,
     getSingleChainInfo,
     postChainInfos,
@@ -33,8 +32,6 @@ module Bloc.Client
 where
 
 import Bloc.API
-import BlockApps.X509.Certificate
--- import BlockApps.Solidity.Xabi
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
@@ -49,10 +46,6 @@ getGitInfo = client (Proxy @GetGitInfo)
 ------------- /users endpoints -------------
 postUsersFill :: JwtToken -> Address -> Bool -> ClientM BlocTransactionResult
 postUsersFill = client (Proxy @PostUsersFill)
-
-------------- /x509 endpoints -------------
-createCertificate :: Text -> CreateCertEndpoint -> ClientM X509Certificate
-createCertificate = client (Proxy @CreateCertificate)
 
 ------------- /contracts endpoints -------------
 getContracts ::
@@ -168,6 +161,16 @@ postBlocTransactionParallel ::
   ClientM [BlocChainOrTransactionResult]
 postBlocTransactionParallel = client (Proxy @PostBlocTransactionParallel)
 
+postBlocTransactionParallelExternal ::
+  Maybe Text ->
+  Maybe ChainId ->
+  Maybe Bool ->
+  Bool ->
+  Bool ->
+  PostBlocTransactionRequest ->
+  ClientM [BlocChainOrTransactionResult]
+postBlocTransactionParallelExternal = client (Proxy @PostBlocTransactionParallelExternal)
+
 postBlocTransactionRaw ::
   Maybe Text ->
   Maybe ChainId ->
@@ -199,12 +202,3 @@ postBlocTransaction ::
   PostBlocTransactionRequest ->
   ClientM [BlocChainOrTransactionResult]
 postBlocTransaction = client (Proxy @PostBlocTransaction)
-
-postBlocTransactionExternal ::
-  Maybe Text ->
-  Maybe ChainId ->
-  Maybe Bool ->
-  Bool ->
-  PostBlocTransactionRequest ->
-  ClientM [BlocChainOrTransactionResult]
-postBlocTransactionExternal = client (Proxy @PostBlocTransactionExternal)

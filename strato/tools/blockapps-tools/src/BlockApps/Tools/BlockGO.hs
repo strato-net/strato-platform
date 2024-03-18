@@ -13,7 +13,6 @@ import Data.Default
 import qualified Database.LevelDB as DB
 import System.FilePath
 import Text.Format
-import Text.PrettyPrint.ANSI.Leijen hiding ((<$>), (</>))
 
 ldbForEach :: FilePath -> (B.ByteString -> B.ByteString -> IO ()) -> IO ()
 ldbForEach dbDir' f = runResourceT $ do
@@ -32,7 +31,7 @@ doit h = ldbForEach (dbDir h) $ \key val ->
   when (B.isPrefixOf "block" key) $
     putStrLn $
       "----------\n"
-        ++ show (pretty key)
+        ++ format key
         ++ ": "
         ++ format val
 

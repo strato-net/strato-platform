@@ -32,7 +32,6 @@ library:
       - split
       - strato-statediff
       - time
-      - unordered-containers
       - vector
       - vm-tools
       - aeson
@@ -41,10 +40,12 @@ library:
       - strato-model
       - text
       - raw-strings-qq
+      - solid-vm-compiler
       - solid-vm-model
       - ethereum-rlp
       - x509-certs
       - lens
+      - ordered-containers
 
 
 executables:
@@ -75,7 +76,6 @@ tests:
     main: Main.hs
     dependencies:
       - aeson
-      - base16-bytestring
       - blockapps-data
       - bytestring
       - hspec

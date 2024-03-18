@@ -31,6 +31,11 @@ const OrdersProvider = ({ children }) => {
     item: null,
     orderLineDetails: null,
     isOrderLineDetailsLoading: false,
+    isUpdatingOrderComment: false,
+    allOrders: {},
+    isAllOrdersLoading: false,
+    saleQuantity: [],
+    saleQuantityLoading: false
   };
 
   const [state, dispatch] = useReducer(reducer, initialState);

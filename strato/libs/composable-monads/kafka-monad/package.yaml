@@ -6,10 +6,17 @@ dependencies:
 
 library:
   source-dirs: src
-  dependencies: 
+  dependencies:
+  - base16-bytestring
+  - binary
+  - bytestring
+  - common-log
+  - composable-monads-base
+  - lens
   - milena
-  - monad-alter
+  - milena-tools
   - mtl
+  - text
   - transformers
   - unliftio-core
   

@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveFunctor #-}
@@ -25,8 +26,6 @@ module Blockchain.Context
     , Stacks(..)
     , MonadP2P
     , TcpPortNumber(..)
-    , Inbound(..)
-    , Outbound(..)
     , IsValidator(..)
     , Context(..)
     , Config(..)
@@ -72,14 +71,11 @@ module Blockchain.Context
     , toMaybe
     ) where
 
-
 import           Conduit
 import           Control.Applicative
 import           Control.Concurrent
-import           Control.Concurrent.Chan.Unagi        as CCCU
 import           Control.Exception                     hiding (bracket)
 import           Control.Lens                          hiding (Context)
--- import           Control.Arrow                         ( (***))
 import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
 import           Control.Monad.Reader
@@ -88,14 +84,12 @@ import qualified Data.ByteString                       as B
 import qualified Data.ByteString.Char8                 as BC
 import           Data.Conduit.Network
 import           Data.Default
-import           Data.Int                              (Int64)
 import qualified Data.Kind                             as DK
 import           Data.Foldable                         (toList)
 import qualified Data.Map.Strict                       as M
 import           Data.Maybe
 import           Data.Proxy
 import           Data.Ranged
-import qualified Data.Set.Ordered                      as S
 import qualified Data.Text                             as T
 import           Data.Time.Clock
 import           GHC.Exts                              (Constraint)
@@ -103,7 +97,6 @@ import           GHC.Exts                              (Constraint)
 import           BlockApps.Logging
 import           BlockApps.X509.Certificate
 
-import           Blockchain.Blockstanbul               (WireMessage)
 import           Blockchain.Data.Block
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
@@ -133,7 +126,8 @@ import           Blockchain.Stream.VMOutput            ( VMOutput(..)
 
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models (RedisBestBlock(..))
-import           Blockchain.TCPClientWithTimeout
+import           Control.Monad                         (void, when)
+import           Control.Monad.Composable.Base
 import qualified Database.Persist.Sql                  as SQL
 import qualified Database.Redis                        as Redis
 import qualified Network.Kafka                         as K
@@ -170,10 +164,6 @@ class Stacks a m where
 
 newtype TcpPortNumber = TcpPortNumber {unTcpPortNumber :: Int}
 
-newtype Inbound a = Inbound {unInbound :: a}
-
-newtype Outbound a = Outbound {unOutbound :: a}
-
 newtype IsValidator = IsValidator {unIsValidator :: Bool}
 
 data Config = Config
@@ -183,7 +173,6 @@ data Config = Config
     configMaxReturnedHeaders :: MaxReturnedHeaders,
     configVaultClient :: ClientEnv,
     configContext :: IORef Context,
-    configBlockstanbulWireMessages :: IORef (S.OSet Keccak256),
     configPubKey :: PublicKey
   }
 
@@ -204,13 +193,11 @@ withPeerAddress :: (Maybe ChainMemberParsedSet -> Maybe ChainMemberParsedSet) ->
 withPeerAddress f = PeerAddress . f . unPeerAddress
 
 data Context = Context
-  { contextKafkaState     :: K.KafkaState
-  , contextKafkaMiddleman :: (InChan (P2pEvent,Int64), OutChan (P2pEvent,Int64))
-  , blockHeaders          :: ([BlockData], UTCTime) -- keep track when last updated global headers cache
-  , remainingBlockHeaders :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
-  , actionTimestamp       :: ActionTimestamp
-  , _blockstanbulPeerAddr :: PeerAddress
-  , _outboundWireMessages :: S.OSet (T.Text, Keccak256)
+  { contextKafkaState        :: K.KafkaState
+  , blockHeaders             :: ([BlockData], UTCTime) -- keep track when last updated global headers cache
+  , remainingBlockHeaders    :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
+  , actionTimestamp          :: ActionTimestamp
+  , _blockstanbulPeerAddr    :: PeerAddress
   }
 
 makeLenses ''Context
@@ -243,11 +230,13 @@ class RunsServer n m where
 instance RunsClient ContextM where
   runClientConnection (IPAsText ip) (TCPPort p) sSource handler = do
     let peerAddress = BC.pack $ T.unpack ip
-    runTCPClientWithConnectTimeout (clientSettings p peerAddress) 5 $ \app -> do
+    runGeneralTCPClient (clientSettings p peerAddress) $ \app -> do
       let pSource = appSource app
           pSink = appSink app
           conduits = P2pConduits pSource pSink sSource
       handler conduits
+
+
 
 instance RunsServer ContextM (LoggingT IO) where
   runServer (TCPPort listenPort) runner handler = do
@@ -366,45 +355,6 @@ instance MonadIO m => A.Selectable ChainMemberParsedSet [ChainMemberParsedSet] (
 instance MonadIO m => A.Selectable ChainMemberParsedSet IsValidator (ReaderT Config m) where
   select _ = fmap (Just . IsValidator) . RBDB.withRedisBlockDB . RBDB.isValidator
 
-instance MonadIO m => (Keccak256 `A.Alters` (Proxy (Inbound WireMessage))) (ReaderT Config m) where
-  lookup _ k = do
-    wms <- readIORef =<< asks configBlockstanbulWireMessages
-    let b = S.member k wms
-    pure $ if b then Just (Proxy @(Inbound WireMessage)) else Nothing
-  insert _ k _ =
-    asks configBlockstanbulWireMessages
-      >>= flip
-        atomicModifyIORef'
-        ( \wms ->
-            let s = S.size wms
-                wms' = if s >= flags_wireMessageCacheSize then S.delete (head $ toList wms) wms else wms
-                wms'' = wms' S.>| k
-             in (wms'', ())
-        )
-  delete _ k =
-    asks configBlockstanbulWireMessages
-      >>= flip
-        atomicModifyIORef'
-        ( \wms ->
-            let wms' = S.delete k wms
-             in (wms', ())
-        )
-
-instance MonadIO m => ((T.Text, Keccak256) `A.Alters` (Proxy (Outbound WireMessage))) (ReaderT Config m) where
-  lookup _ k = do
-    wms <- _outboundWireMessages <$> Mod.get (Mod.Proxy @Context)
-    let b = S.member k wms
-    pure $ if b then Just (Proxy @(Outbound WireMessage)) else Nothing
-  insert _ k _ = Mod.modifyStatefully_ (Mod.Proxy @Context) $ do
-    wms <- use outboundWireMessages
-    let s = S.size wms
-        wms' = if s >= flags_wireMessageCacheSize then S.delete (head $ toList wms) wms else wms
-        wms'' = wms' S.>| k
-    assign outboundWireMessages wms''
-  delete _ k =
-    Mod.modifyStatefully_ (Mod.Proxy @Context) $
-      outboundWireMessages %= S.delete k
-
 instance
   ( MonadUnliftIO m
   ) =>
@@ -488,10 +438,8 @@ instance MonadIO m => Mod.Accessible RBDB.RedisConnection (ReaderT Config m) whe
 instance MonadIO m => Mod.Accessible SQLDB (ReaderT Config m) where
   access _ = asks configSQLDB
 
-instance MonadIO m => ((IPAsText, TCPPort) `A.Alters` ActivityState) (ReaderT Config m) where
-  lookup _ _ = error "lookup ActivityState undefined for ContextM"
-  insert _ (IPAsText i, TCPPort p) = void . liftIO . setPeerActiveState i p
-  delete _ _ = error "lookup ActivityState undefined for ContextM"
+instance {-# OVERLAPPING #-} MonadIO m => AccessibleEnv SQLDB (ReaderT Config m) where
+  accessEnv = asks configSQLDB
 
 instance (MonadIO m, MonadLogger m) => Stacks Block (ReaderT Config m) where
   takeStack _ n = do
@@ -506,12 +454,6 @@ instance MonadUnliftIO m => A.Selectable IPAsText PPeer (ReaderT Config m) where
       lst -> return . Just . SQL.entityVal $ head lst
     where
       actions = SQL.selectList [PPeerIp SQL.==. ip] []
-
-instance Ord Point where
-  (Point it it') `compare` (Point it2 it2') = case (it `compare` it2) of
-    EQ -> (it' `compare` it2')
-    x -> x
-  _ `compare` _ = GT
 
 instance MonadUnliftIO m => A.Selectable Point PPeer (ReaderT Config m) where
   select _ pk =
@@ -539,36 +481,6 @@ instance (MonadIO m, MonadLogger m) => HasVault (ReaderT Config m) where
 
 instance MonadIO m => A.Selectable (IPAsText, UDPPort, B.ByteString) Point (ReaderT Config m) where
   select p = liftIO . A.select p
-
-instance MonadIO m => Mod.Accessible AvailablePeers (ReaderT Config m) where
-  access = liftIO . Mod.access
-
-instance MonadIO m => Mod.Accessible BondedPeersForUDP (ReaderT Config m) where
-  access = liftIO . Mod.access
-
-instance MonadIO m => A.Replaceable PPeer UdpEnableTime (ReaderT Config m) where
-  replace p k = liftIO . A.replace p k
-
-instance MonadIO m => A.Replaceable PPeer TcpEnableTime (ReaderT Config m) where
-  replace p k = liftIO . A.replace p k
-
-instance MonadIO m => Mod.Accessible BondedPeers (ReaderT Config m) where
-  access = liftIO . Mod.access
-
-instance MonadIO m => Mod.Accessible UnbondedPeers (ReaderT Config m) where
-  access = liftIO . Mod.access
-
-instance MonadIO m => A.Replaceable (IPAsText, UDPPort) PeerBondingState (ReaderT Config m) where
-  replace p k = liftIO . A.replace p k
-
-instance MonadIO m => A.Replaceable (IPAsText, TCPPort) PeerBondingState (ReaderT Config m) where
-  replace p k = liftIO . A.replace p k
-
-instance MonadIO m => A.Replaceable PPeer PeerDisable (ReaderT Config m) where
-  replace p k = liftIO . A.replace p k
-
-instance MonadIO m => A.Replaceable PPeer T.Text (ReaderT Config m) where
-  replace p k = liftIO . A.replace p k
 
 waitOnVault :: (MonadLogger m, MonadIO m, Show a) => m (Either a b) -> m b
 waitOnVault action = do
@@ -637,15 +549,13 @@ type MonadP2P m =
          '(PPeer, UdpEnableTime),
          '(PPeer, PeerDisable),
          '(PPeer, T.Text),
-         '((IPAsText, TCPPort), PeerBondingState)
+         '((IPAsText, Point), PeerBondingState)
        ]
       m,
     All2
       '[A.Alters]
       '[ '(Keccak256, BlockData),
          '(Keccak256, OutputBlock),
-         '(Keccak256, Proxy (Inbound WireMessage)),
-         '((T.Text, Keccak256), Proxy (Outbound WireMessage)),
          '((IPAsText, TCPPort), ActivityState)
        ]
       m
@@ -683,8 +593,8 @@ runContextM ::
   m ()
 runContextM r = void . runResourceT . flip runReaderT r
 
-initConfig :: (MonadLogger m, MonadUnliftIO m) => IORef (S.OSet Keccak256) -> Int -> m Config
-initConfig wireMessagesRef maxHeaders = do
+initConfig :: (MonadLogger m, MonadUnliftIO m) => Int -> m Config
+initConfig maxHeaders = do
   dbs <- openDBs
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
   vaultClient <- do
@@ -695,7 +605,7 @@ initConfig wireMessagesRef maxHeaders = do
     $logInfoS "HasVault" "Calling vault-wrapper to get the node's public key"
     fmap VC.unPubKey $ waitOnVault $ liftIO $ runClientM (VC.getKey Nothing Nothing) vaultClient
 
-  initState  <- liftIO $ initContext
+  let initState  = initContext
   initStateF <- newIORef initState
   return $ Config
     { configSQLDB = sqlDB' dbs
@@ -704,21 +614,17 @@ initConfig wireMessagesRef maxHeaders = do
     , configMaxReturnedHeaders = MaxReturnedHeaders maxHeaders
     , configVaultClient = vaultClient
     , configContext = initStateF
-    , configBlockstanbulWireMessages = wireMessagesRef
     , configPubKey = nodePubKey
     }
 
-initContext :: IO Context
-initContext = do
-  initContextKafkaMiddleman <- CCCU.newChan :: IO (InChan (P2pEvent,Int64), OutChan (P2pEvent,Int64))
-  return Context { actionTimestamp = emptyActionTimestamp
-                 , contextKafkaState = mkConfiguredKafkaState "strato-p2p"
-                 , contextKafkaMiddleman = initContextKafkaMiddleman
-                 , blockHeaders = ([], jamshidBirth)
-                 , remainingBlockHeaders = (RemainingBlockHeaders [], jamshidBirth)
-                 , _blockstanbulPeerAddr = PeerAddress Nothing
-                 , _outboundWireMessages = S.empty
-                 }
+initContext :: Context
+initContext =
+  Context { actionTimestamp = emptyActionTimestamp
+          , contextKafkaState = mkConfiguredKafkaState "strato-p2p"
+          , blockHeaders = ([], jamshidBirth)
+          , remainingBlockHeaders = (RemainingBlockHeaders [], jamshidBirth)
+          , _blockstanbulPeerAddr = PeerAddress Nothing
+          }
 
 getPeerByIP ::
   A.Selectable IPAsText PPeer m =>

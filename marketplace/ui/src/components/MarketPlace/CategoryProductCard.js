@@ -18,13 +18,13 @@ import {
 } from "../../contexts/marketplace";
 import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
-
+import image_placeholder from "../../images/resources/image_placeholder.png";
 
 const { Title, Text, Paragraph } = Typography;
 
 
-const CategoryProductCard = ({ product, category }) => {
-  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
+const CategoryProductCard = ({ product }) => {
+  let { user } = useAuthenticateState();
   const marketplaceDispatch = useMarketplaceDispatch();
   const { cartList } = useMarketplaceState();
 
@@ -41,6 +41,7 @@ const CategoryProductCard = ({ product, category }) => {
   const navigate = useNavigate();
   const naviroute = routes.MarketplaceProductDetail.url;
   const [qty, setQty] = useState(1);
+  const availableQuantity = product && product.saleQuantity ? product.saleQuantity : 1;
 
   const subtract = () => {
     if (qty !== 1) {
@@ -50,12 +51,17 @@ const CategoryProductCard = ({ product, category }) => {
   };
 
   const add = () => {
-    if (qty < product.availableQuantity) {
+    if (qty < availableQuantity) {
       let value = qty + 1;
       setQty(value);
     } else {
       openToast("bottom", true, "Cannot add more than available quantity");
     }
+  };
+
+  const getCategory = () => {
+    const parts = product.contract_name.split('-');
+    return parts[parts.length - 1];
   };
 
   const openToast = (placement, isError, msg) => {
@@ -75,6 +81,10 @@ const CategoryProductCard = ({ product, category }) => {
   };
 
   const addItemToCart = () => {
+    if (product.ownerCommonName === user?.commonName) {
+      openToast("bottom", true, "Cannot buy your own item");
+      return false;
+    }
     let found = false;
     for (var i = 0; i < cartList.length; i++) {
       if (cartList[i].product.address === product.address) {
@@ -87,22 +97,25 @@ const CategoryProductCard = ({ product, category }) => {
       items = [...cartList, { product, qty }];
       actions.addItemToCart(marketplaceDispatch, items);
       openToast("bottom", false, "Item added to cart");
+      return true;
     } else {
       items = [...cartList];
       cartList.forEach((element, index) => {
         if (element.product.address === product.address) {
-          if (items[index].qty + qty <= product.availableQuantity) {
+          const availableQuantity = product.saleQuantity ? product.saleQuantity : 1;
+          if (items[index].qty + qty <= availableQuantity) {
             items[index].qty += qty;
             actions.addItemToCart(marketplaceDispatch, items);
             setQty(1);
             openToast("bottom", false, "Item updated in cart");
+            return true;
           } else {
             openToast(
               "bottom",
               true,
               "Cannot add more than available quantity"
             );
-            return;
+            return false;
           }
         }
       });
@@ -121,7 +134,7 @@ const CategoryProductCard = ({ product, category }) => {
         <div className="flex justify-start items-center">
           <div className="m-4">
             <Image
-              src={product.imageUrl}
+              src={product.images && product.images.length > 0 ? product.images[0] : image_placeholder}
               width={200}
               height={180}
               style={{ objectFit: "contain" }}
@@ -143,8 +156,11 @@ const CategoryProductCard = ({ product, category }) => {
               >
                 {decodeURIComponent(product.name)}&nbsp;
               </Text>
-              <Text className="text-secondryB text-sm" id="prod-category">({category})</Text>
+              <Text className="text-secondryB text-sm" id="prod-category">({getCategory()})</Text>
             </div>
+            <Text className="text-secondryB text-sm" id="prod-category">
+              Sold By: {product.ownerCommonName}
+            </Text>
             <Paragraph
               ellipsis={{ rows: 2, expandable: true, symbol: "more" }}
               className="text-primaryC text-xs mt-2"
@@ -158,9 +174,9 @@ const CategoryProductCard = ({ product, category }) => {
               ))}
             </Paragraph>
             <Title level={4} className="!mt-0" id="prod-price">
-              $ {product.pricePerUnit}
+              $ {product.price}
             </Title>
-            {product.availableQuantity !== 0 ?
+            {availableQuantity !== 0 ?
               (
                 <div>
                   <div className="flex items-center my-2" id="prod-quantity">
@@ -168,12 +184,12 @@ const CategoryProductCard = ({ product, category }) => {
                     <div className="ml-5 flex items-center my-2" id="prod-quantity">
                       <div
                         onClick={subtract}
-                        className="h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
-                        <MinusOutlined className="text-xs text-secondryD" />
+                        className="h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer" style={{ borderColor: qty > 1 ? '#1777FF' : '#E3E3E3' }}>
+                        <MinusOutlined className="text-xs text-secondryD" style={{ color: qty > 1 ? '#1777FF' : '#E3E3E3' }} />
                       </div>
                       <InputNumber className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center" min={1} max={product.availableQuantity} value={qty} defaultValue={qty} controls={false}
                         onChange={e => {
-                          if (e < product.availableQuantity) {
+                          if (e < availableQuantity) {
                             setQty(e)
                           } else {
                             openToast(
@@ -181,52 +197,63 @@ const CategoryProductCard = ({ product, category }) => {
                               true,
                               "Cannot add more than available quantity"
                             );
-                            setQty(product.availableQuantity)
+                            setQty(availableQuantity)
                           }
                         }} />
                       <div
                         onClick={add}
-                        className="ml-0.5 h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
-                        <PlusOutlined className="text-xs text-secondryC" />
+                        className="ml-0.5 h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer" style={{ borderColor: availableQuantity > qty ? '#1777FF' : '#E3E3E3' }}>
+                        <PlusOutlined className="text-xs text-secondryC" style={{ color: availableQuantity > qty ? '#1777FF' : '#E3E3E3' }} />
                       </div>
                     </div>
                   </div>
                   <Button
                     className="group w-40 h-9 border border-primary hover:bg-primary"
                     onClick={() => {
-                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                        window.location.href = loginUrl;
-                      } else {
-                        TagManager.dataLayer({
-                          dataLayer: {
-                            event: 'add_to_cart_from_marketplace',
-                            product_name: product.name,
-                            category: product.category,
-                            productId: product.productId
-                          },
-                        });
-                        addItemToCart();
-                      }
+                      window.LOQ.push(['ready', async LO => {
+                        // Track an event
+                        await LO.$internal.ready('events')
+                        LO.events.track('Add to Cart (from marketplace)', {
+                          product: product.name,
+                          category: product.category,
+                          productId: product.productId
+                        })
+                      }])
+                      TagManager.dataLayer({
+                        dataLayer: {
+                          event: 'add_to_cart_from_marketplace',
+                          product_name: product.name,
+                          category: product.category,
+                          productId: product.productId
+                        },
+                      });
+                      addItemToCart();
                     }}>
                     <div className="text-primary group-hover:text-white">Add To Cart</div>
                   </Button>
                   <Button
                     type="primary"
-                    id={`${product.name.replace(/ /g, "_")}-buy-now`}
+                    id={`${product.name}-buy-now`}
                     className="w-40 h-9 m-3 bg-primary !hover:bg-primaryHover"
                     onClick={() => {
-                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                        window.location.href = loginUrl;
-                      } else {
-                        TagManager.dataLayer({
-                          dataLayer: {
-                            event: 'buy_now_from_marketplace',
-                            product_name: product.name,
-                            category: product.category,
-                            productId: product.productId
-                          },
-                        });
-                        addItemToCart();
+                      window.LOQ.push(['ready', async LO => {
+                        // Track an event
+                        await LO.$internal.ready('events')
+                        LO.events.track('Buy Now (from marketplace)', {
+                          product: product.name,
+                          category: product.category,
+                          productId: product.productId
+                        })
+                      }])
+                      TagManager.dataLayer({
+                        dataLayer: {
+                          event: 'buy_now_from_marketplace',
+                          product_name: product.name,
+                          category: product.category,
+                          productId: product.productId
+                        },
+                      });
+                      if (addItemToCart()) {
                         navigate("/checkout");
                       }
                     }}
@@ -242,6 +269,15 @@ const CategoryProductCard = ({ product, category }) => {
                   className="w-40 h-9 m-3 bg-primary !hover:bg-primaryHover"
                   href={`mailto:sales@blockapps.net`}
                   onClick={() => {
+                    window.LOQ.push(['ready', async LO => {
+                      // Track an event
+                      await LO.$internal.ready('events')
+                      LO.events.track('Contact Sales (from category card)', {
+                        product: product.name,
+                        category: product.category,
+                        productId: product.productId
+                      })
+                    }])
                     TagManager.dataLayer({
                       dataLayer: {
                         event: 'contact_sales_from_category_card',

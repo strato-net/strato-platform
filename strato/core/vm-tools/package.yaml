@@ -8,18 +8,7 @@ category:      Data Structures
 
 dependencies:
   - base
-  - blockapps-data
-  - blockapps-datadefs
-  - blockapps-init
-  - blockstanbul
-  - containers
-  - exceptions
   - hflags
-  - milena-tools
-  - strato-conf
-  - strato-model
-  - strato-statediff
-  - vector
 
 library:
   source-dirs: src/
@@ -41,16 +30,22 @@ library:
     - Blockchain.VMOptions
     - Blockchain.VM.VMException
     - Blockchain.VMMetrics
+    - Blockchain.Wiring
     - Executable.EVMFlags
   ghc-options: -Wall -O2
   dependencies:
     - aeson
-    - ansi-wl-pprint
     - binary
+    - binary-instances
+    - blockapps-data
+    - blockapps-datadefs
+    - blockapps-init
     - blockapps-mpdbs
     - bytestring
     - common-log
+    - composable-monads-base
     - conduit
+    - containers
     - cross-monitoring
     - data-default
     - debugger
@@ -63,14 +58,17 @@ library:
     - format
     - generic-arbitrary
     - hedis
+    - kafka-monad
     - lens
     - leveldb-haskell
     - lrucache
     - merkle-patricia-db
     - milena
+    - milena-tools
     - monad-alter
     - mtl
     - nibblestring
+    - ordered-containers
     - persistent-sqlite
     - prometheus-client
     - QuickCheck
@@ -78,12 +76,15 @@ library:
     - resourcet
     - seqevents
     - solid-vm-model
+    - sql-monad
+    - strato-conf
+    - strato-model
     - strato-redis-blockdb
+    - strato-statediff
     - text
     - time
     - transformers
     - unliftio
-    - unordered-containers
     - x509-certs
 
 
@@ -94,9 +95,5 @@ tests:
     main: Spec.hs
     ghc-options: -Wall -O2 -dynamic
     dependencies:
-      - bytestring
-      - common-log
-      - labeled-error
       - hspec
-      - hspec-expectations-lifted
       - vm-tools

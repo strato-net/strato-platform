@@ -74,6 +74,7 @@ import Blockchain.VMContext
 import Blockchain.VMOptions (flags_useSaltedCerts)
 import Control.DeepSeq
 import Control.Lens
+import Control.Monad (join)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.IO.Class
@@ -89,7 +90,6 @@ import qualified Data.Text.Encoding as Text
 import Data.Traversable (for)
 import Debugger
 import GHC.Generics
-import Prometheus
 import SolidVM.Model.Storable
 import Text.Read (readMaybe)
 import UnliftIO
@@ -353,9 +353,6 @@ instance Mod.Accessible (Maybe WorldBestBlock) MemContextM where
 instance Mod.Modifiable GasCap MemContextM where
   get _ = GasCap . _vmGasCap <$> get
   put _ (GasCap g) = contextModify $ vmGasCap .~ g
-
-instance MonadMonitor (LoggingT IO) where
-  doIO = liftIO
 
 runMemContextM ::
   Maybe DebugSettings ->

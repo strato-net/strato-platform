@@ -212,14 +212,31 @@ ShallowWrapper {
           }
         />,
         <div
-          className="row"
+          className="row d-flex align-items-center"
         >
           <div
-            className="col-sm-9 text-left"
+            className="col-sm-6 text-left"
           >
             <h3>
               Node Stats
             </h3>
+          </div>
+          <div
+            className="sys-info-container row col-sm-6 text-right"
+            style={
+              Object {
+                "marginBottom": "10px",
+                "marginLeft": "0px",
+                "marginRight": "0px",
+                "marginTop": "25px",
+              }
+            }
+          >
+            <p
+              className="text-right"
+            >
+              System Metrics Loading...
+            </p>
           </div>
         </div>,
         <div
@@ -235,7 +252,7 @@ ShallowWrapper {
           className="row"
         >
           <div
-            className="col-sm-3"
+            className="col-sm-4"
           >
             <Blueprint.Popover
               arrowSize={30}
@@ -277,7 +294,7 @@ ShallowWrapper {
             </Blueprint.Popover>
           </div>
           <div
-            className="col-sm-3"
+            className="col-sm-4"
           >
             <Link
               replace={false}
@@ -292,7 +309,7 @@ ShallowWrapper {
             </Link>
           </div>
           <div
-            className="col-sm-3"
+            className="col-sm-4"
           >
             <Link
               replace={false}
@@ -303,21 +320,6 @@ ShallowWrapper {
                 description="Contracts"
                 iconClass="fa-file-contract"
                 number={2}
-              />
-            </Link>
-          </div>
-          <div
-            className="col-sm-3"
-          >
-            <Link
-              replace={false}
-              to="/shards"
-            >
-              <withRouter(Connect(NumberCard))
-                className="smd-pointer"
-                description="Shards"
-                iconClass="fa-diagram-project"
-                number={undefined}
               />
             </Link>
           </div>
@@ -335,7 +337,7 @@ ShallowWrapper {
           className="row"
         >
           <div
-            className="col-sm-3"
+            className="col-sm-4"
           >
             <withRouter(Connect(NumberCard))
               className="smd-pointer"
@@ -347,7 +349,7 @@ ShallowWrapper {
             />
           </div>
           <div
-            className="col-sm-6"
+            className="col-sm-8"
           >
             <withRouter(Connect(NodeCard)) />
           </div>
@@ -378,16 +380,33 @@ ShallowWrapper {
           <div
             className="col-sm-3"
           >
-            <Link
-              replace={false}
-              to="/blocks"
+            <div
+              id="networkInfo"
             >
-              <withRouter(Connect(NumberCard))
-                description="Blocks"
-                iconClass="fa-cube"
-                number={9}
-              />
-            </Link>
+              <Link
+                replace={false}
+                to=""
+              >
+                <withRouter(Connect(NumberCard))
+                  className="smd-pointer"
+                  description="Network"
+                  iconClass="fa-exclamation-circle"
+                  mode="danger"
+                  number="UNKNOWN"
+                />
+              </Link>
+              <br />
+              <Link
+                replace={false}
+                to="/blocks"
+              >
+                <withRouter(Connect(NumberCard))
+                  description="Blocks"
+                  iconClass="fa-cube"
+                  number={9}
+                />
+              </Link>
+            </div>
           </div>
           <div
             className="col-sm-3"
@@ -599,40 +618,94 @@ ShallowWrapper {
         "key": undefined,
         "nodeType": "host",
         "props": Object {
-          "children": <div
-            className="col-sm-9 text-left"
-          >
-            <h3>
-              Node Stats
-            </h3>
-          </div>,
-          "className": "row",
+          "children": Array [
+            <div
+              className="col-sm-6 text-left"
+            >
+              <h3>
+                Node Stats
+              </h3>
+            </div>,
+            <div
+              className="sys-info-container row col-sm-6 text-right"
+              style={
+                Object {
+                  "marginBottom": "10px",
+                  "marginLeft": "0px",
+                  "marginRight": "0px",
+                  "marginTop": "25px",
+                }
+              }
+            >
+              <p
+                className="text-right"
+              >
+                System Metrics Loading...
+              </p>
+            </div>,
+          ],
+          "className": "row d-flex align-items-center",
         },
         "ref": null,
-        "rendered": Object {
-          "instance": null,
-          "key": undefined,
-          "nodeType": "host",
-          "props": Object {
-            "children": <h3>
-              Node Stats
-            </h3>,
-            "className": "col-sm-9 text-left",
-          },
-          "ref": null,
-          "rendered": Object {
+        "rendered": Array [
+          Object {
             "instance": null,
             "key": undefined,
             "nodeType": "host",
             "props": Object {
-              "children": "Node Stats",
+              "children": <h3>
+                Node Stats
+              </h3>,
+              "className": "col-sm-6 text-left",
             },
             "ref": null,
-            "rendered": "Node Stats",
-            "type": "h3",
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": "Node Stats",
+              },
+              "ref": null,
+              "rendered": "Node Stats",
+              "type": "h3",
+            },
+            "type": "div",
           },
-          "type": "div",
-        },
+          Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "children": <p
+                className="text-right"
+              >
+                System Metrics Loading...
+              </p>,
+              "className": "sys-info-container row col-sm-6 text-right",
+              "style": Object {
+                "marginBottom": "10px",
+                "marginLeft": "0px",
+                "marginRight": "0px",
+                "marginTop": "25px",
+              },
+            },
+            "ref": null,
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": "System Metrics Loading...",
+                "className": "text-right",
+              },
+              "ref": null,
+              "rendered": "System Metrics Loading...",
+              "type": "p",
+            },
+            "type": "div",
+          },
+        ],
         "type": "div",
       },
       Object {
@@ -677,7 +750,7 @@ ShallowWrapper {
         "props": Object {
           "children": Array [
             <div
-              className="col-sm-3"
+              className="col-sm-4"
             >
               <Blueprint.Popover
                 arrowSize={30}
@@ -719,7 +792,7 @@ ShallowWrapper {
               </Blueprint.Popover>
             </div>,
             <div
-              className="col-sm-3"
+              className="col-sm-4"
             >
               <Link
                 replace={false}
@@ -734,7 +807,7 @@ ShallowWrapper {
               </Link>
             </div>,
             <div
-              className="col-sm-3"
+              className="col-sm-4"
             >
               <Link
                 replace={false}
@@ -745,21 +818,6 @@ ShallowWrapper {
                   description="Contracts"
                   iconClass="fa-file-contract"
                   number={2}
-                />
-              </Link>
-            </div>,
-            <div
-              className="col-sm-3"
-            >
-              <Link
-                replace={false}
-                to="/shards"
-              >
-                <withRouter(Connect(NumberCard))
-                  className="smd-pointer"
-                  description="Shards"
-                  iconClass="fa-diagram-project"
-                  number={undefined}
                 />
               </Link>
             </div>,
@@ -811,7 +869,7 @@ ShallowWrapper {
                   number="DISCONNECTED"
                 />
               </Blueprint.Popover>,
-              "className": "col-sm-3",
+              "className": "col-sm-4",
             },
             "ref": null,
             "rendered": Object {
@@ -888,7 +946,7 @@ ShallowWrapper {
                   number={1}
                 />
               </Link>,
-              "className": "col-sm-3",
+              "className": "col-sm-4",
             },
             "ref": null,
             "rendered": Object {
@@ -940,7 +998,7 @@ ShallowWrapper {
                   number={2}
                 />
               </Link>,
-              "className": "col-sm-3",
+              "className": "col-sm-4",
             },
             "ref": null,
             "rendered": Object {
@@ -967,58 +1025,6 @@ ShallowWrapper {
                   "description": "Contracts",
                   "iconClass": "fa-file-contract",
                   "number": 2,
-                },
-                "ref": null,
-                "rendered": null,
-                "type": [Function],
-              },
-              "type": [Function],
-            },
-            "type": "div",
-          },
-          Object {
-            "instance": null,
-            "key": undefined,
-            "nodeType": "host",
-            "props": Object {
-              "children": <Link
-                replace={false}
-                to="/shards"
-              >
-                <withRouter(Connect(NumberCard))
-                  className="smd-pointer"
-                  description="Shards"
-                  iconClass="fa-diagram-project"
-                  number={undefined}
-                />
-              </Link>,
-              "className": "col-sm-3",
-            },
-            "ref": null,
-            "rendered": Object {
-              "instance": null,
-              "key": undefined,
-              "nodeType": "class",
-              "props": Object {
-                "children": <withRouter(Connect(NumberCard))
-                  className="smd-pointer"
-                  description="Shards"
-                  iconClass="fa-diagram-project"
-                  number={undefined}
-                />,
-                "replace": false,
-                "to": "/shards",
-              },
-              "ref": null,
-              "rendered": Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "function",
-                "props": Object {
-                  "className": "smd-pointer",
-                  "description": "Shards",
-                  "iconClass": "fa-diagram-project",
-                  "number": undefined,
                 },
                 "ref": null,
                 "rendered": null,
@@ -1073,7 +1079,7 @@ ShallowWrapper {
         "props": Object {
           "children": Array [
             <div
-              className="col-sm-3"
+              className="col-sm-4"
             >
               <withRouter(Connect(NumberCard))
                 className="smd-pointer"
@@ -1085,7 +1091,7 @@ ShallowWrapper {
               />
             </div>,
             <div
-              className="col-sm-6"
+              className="col-sm-8"
             >
               <withRouter(Connect(NodeCard)) />
             </div>,
@@ -1107,7 +1113,7 @@ ShallowWrapper {
                 number="No Identity"
                 textSize="h4"
               />,
-              "className": "col-sm-3",
+              "className": "col-sm-4",
             },
             "ref": null,
             "rendered": Object {
@@ -1134,7 +1140,7 @@ ShallowWrapper {
             "nodeType": "host",
             "props": Object {
               "children": <withRouter(Connect(NodeCard)) />,
-              "className": "col-sm-6",
+              "className": "col-sm-8",
             },
             "ref": null,
             "rendered": Object {
@@ -1236,16 +1242,33 @@ ShallowWrapper {
             <div
               className="col-sm-3"
             >
-              <Link
-                replace={false}
-                to="/blocks"
+              <div
+                id="networkInfo"
               >
-                <withRouter(Connect(NumberCard))
-                  description="Blocks"
-                  iconClass="fa-cube"
-                  number={9}
-                />
-              </Link>
+                <Link
+                  replace={false}
+                  to=""
+                >
+                  <withRouter(Connect(NumberCard))
+                    className="smd-pointer"
+                    description="Network"
+                    iconClass="fa-exclamation-circle"
+                    mode="danger"
+                    number="UNKNOWN"
+                  />
+                </Link>
+                <br />
+                <Link
+                  replace={false}
+                  to="/blocks"
+                >
+                  <withRouter(Connect(NumberCard))
+                    description="Blocks"
+                    iconClass="fa-cube"
+                    number={9}
+                  />
+                </Link>
+              </div>
             </div>,
             <div
               className="col-sm-3"
@@ -1267,47 +1290,143 @@ ShallowWrapper {
             "key": undefined,
             "nodeType": "host",
             "props": Object {
-              "children": <Link
-                replace={false}
-                to="/blocks"
+              "children": <div
+                id="networkInfo"
               >
-                <withRouter(Connect(NumberCard))
-                  description="Blocks"
-                  iconClass="fa-cube"
-                  number={9}
-                />
-              </Link>,
+                <Link
+                  replace={false}
+                  to=""
+                >
+                  <withRouter(Connect(NumberCard))
+                    className="smd-pointer"
+                    description="Network"
+                    iconClass="fa-exclamation-circle"
+                    mode="danger"
+                    number="UNKNOWN"
+                  />
+                </Link>
+                <br />
+                <Link
+                  replace={false}
+                  to="/blocks"
+                >
+                  <withRouter(Connect(NumberCard))
+                    description="Blocks"
+                    iconClass="fa-cube"
+                    number={9}
+                  />
+                </Link>
+              </div>,
               "className": "col-sm-3",
             },
             "ref": null,
             "rendered": Object {
               "instance": null,
               "key": undefined,
-              "nodeType": "class",
+              "nodeType": "host",
               "props": Object {
-                "children": <withRouter(Connect(NumberCard))
-                  description="Blocks"
-                  iconClass="fa-cube"
-                  number={9}
-                />,
-                "replace": false,
-                "to": "/blocks",
+                "children": Array [
+                  <Link
+                    replace={false}
+                    to=""
+                  >
+                    <withRouter(Connect(NumberCard))
+                      className="smd-pointer"
+                      description="Network"
+                      iconClass="fa-exclamation-circle"
+                      mode="danger"
+                      number="UNKNOWN"
+                    />
+                  </Link>,
+                  <br />,
+                  <Link
+                    replace={false}
+                    to="/blocks"
+                  >
+                    <withRouter(Connect(NumberCard))
+                      description="Blocks"
+                      iconClass="fa-cube"
+                      number={9}
+                    />
+                  </Link>,
+                ],
+                "id": "networkInfo",
               },
               "ref": null,
-              "rendered": Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "function",
-                "props": Object {
-                  "description": "Blocks",
-                  "iconClass": "fa-cube",
-                  "number": 9,
+              "rendered": Array [
+                Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "class",
+                  "props": Object {
+                    "children": <withRouter(Connect(NumberCard))
+                      className="smd-pointer"
+                      description="Network"
+                      iconClass="fa-exclamation-circle"
+                      mode="danger"
+                      number="UNKNOWN"
+                    />,
+                    "replace": false,
+                    "to": "",
+                  },
+                  "ref": null,
+                  "rendered": Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "function",
+                    "props": Object {
+                      "className": "smd-pointer",
+                      "description": "Network",
+                      "iconClass": "fa-exclamation-circle",
+                      "mode": "danger",
+                      "number": "UNKNOWN",
+                    },
+                    "ref": null,
+                    "rendered": null,
+                    "type": [Function],
+                  },
+                  "type": [Function],
                 },
-                "ref": null,
-                "rendered": null,
-                "type": [Function],
-              },
-              "type": [Function],
+                Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "host",
+                  "props": Object {},
+                  "ref": null,
+                  "rendered": null,
+                  "type": "br",
+                },
+                Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "class",
+                  "props": Object {
+                    "children": <withRouter(Connect(NumberCard))
+                      description="Blocks"
+                      iconClass="fa-cube"
+                      number={9}
+                    />,
+                    "replace": false,
+                    "to": "/blocks",
+                  },
+                  "ref": null,
+                  "rendered": Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "function",
+                    "props": Object {
+                      "description": "Blocks",
+                      "iconClass": "fa-cube",
+                      "number": 9,
+                    },
+                    "ref": null,
+                    "rendered": null,
+                    "type": [Function],
+                  },
+                  "type": [Function],
+                },
+              ],
+              "type": "div",
             },
             "type": "div",
           },
@@ -1901,14 +2020,31 @@ ShallowWrapper {
             }
           />,
           <div
-            className="row"
+            className="row d-flex align-items-center"
           >
             <div
-              className="col-sm-9 text-left"
+              className="col-sm-6 text-left"
             >
               <h3>
                 Node Stats
               </h3>
+            </div>
+            <div
+              className="sys-info-container row col-sm-6 text-right"
+              style={
+                Object {
+                  "marginBottom": "10px",
+                  "marginLeft": "0px",
+                  "marginRight": "0px",
+                  "marginTop": "25px",
+                }
+              }
+            >
+              <p
+                className="text-right"
+              >
+                System Metrics Loading...
+              </p>
             </div>
           </div>,
           <div
@@ -1924,7 +2060,7 @@ ShallowWrapper {
             className="row"
           >
             <div
-              className="col-sm-3"
+              className="col-sm-4"
             >
               <Blueprint.Popover
                 arrowSize={30}
@@ -1966,7 +2102,7 @@ ShallowWrapper {
               </Blueprint.Popover>
             </div>
             <div
-              className="col-sm-3"
+              className="col-sm-4"
             >
               <Link
                 replace={false}
@@ -1981,7 +2117,7 @@ ShallowWrapper {
               </Link>
             </div>
             <div
-              className="col-sm-3"
+              className="col-sm-4"
             >
               <Link
                 replace={false}
@@ -1992,21 +2128,6 @@ ShallowWrapper {
                   description="Contracts"
                   iconClass="fa-file-contract"
                   number={2}
-                />
-              </Link>
-            </div>
-            <div
-              className="col-sm-3"
-            >
-              <Link
-                replace={false}
-                to="/shards"
-              >
-                <withRouter(Connect(NumberCard))
-                  className="smd-pointer"
-                  description="Shards"
-                  iconClass="fa-diagram-project"
-                  number={undefined}
                 />
               </Link>
             </div>
@@ -2024,7 +2145,7 @@ ShallowWrapper {
             className="row"
           >
             <div
-              className="col-sm-3"
+              className="col-sm-4"
             >
               <withRouter(Connect(NumberCard))
                 className="smd-pointer"
@@ -2036,7 +2157,7 @@ ShallowWrapper {
               />
             </div>
             <div
-              className="col-sm-6"
+              className="col-sm-8"
             >
               <withRouter(Connect(NodeCard)) />
             </div>
@@ -2067,16 +2188,33 @@ ShallowWrapper {
             <div
               className="col-sm-3"
             >
-              <Link
-                replace={false}
-                to="/blocks"
+              <div
+                id="networkInfo"
               >
-                <withRouter(Connect(NumberCard))
-                  description="Blocks"
-                  iconClass="fa-cube"
-                  number={9}
-                />
-              </Link>
+                <Link
+                  replace={false}
+                  to=""
+                >
+                  <withRouter(Connect(NumberCard))
+                    className="smd-pointer"
+                    description="Network"
+                    iconClass="fa-exclamation-circle"
+                    mode="danger"
+                    number="UNKNOWN"
+                  />
+                </Link>
+                <br />
+                <Link
+                  replace={false}
+                  to="/blocks"
+                >
+                  <withRouter(Connect(NumberCard))
+                    description="Blocks"
+                    iconClass="fa-cube"
+                    number={9}
+                  />
+                </Link>
+              </div>
             </div>
             <div
               className="col-sm-3"
@@ -2288,40 +2426,94 @@ ShallowWrapper {
           "key": undefined,
           "nodeType": "host",
           "props": Object {
-            "children": <div
-              className="col-sm-9 text-left"
-            >
-              <h3>
-                Node Stats
-              </h3>
-            </div>,
-            "className": "row",
+            "children": Array [
+              <div
+                className="col-sm-6 text-left"
+              >
+                <h3>
+                  Node Stats
+                </h3>
+              </div>,
+              <div
+                className="sys-info-container row col-sm-6 text-right"
+                style={
+                  Object {
+                    "marginBottom": "10px",
+                    "marginLeft": "0px",
+                    "marginRight": "0px",
+                    "marginTop": "25px",
+                  }
+                }
+              >
+                <p
+                  className="text-right"
+                >
+                  System Metrics Loading...
+                </p>
+              </div>,
+            ],
+            "className": "row d-flex align-items-center",
           },
           "ref": null,
-          "rendered": Object {
-            "instance": null,
-            "key": undefined,
-            "nodeType": "host",
-            "props": Object {
-              "children": <h3>
-                Node Stats
-              </h3>,
-              "className": "col-sm-9 text-left",
-            },
-            "ref": null,
-            "rendered": Object {
+          "rendered": Array [
+            Object {
               "instance": null,
               "key": undefined,
               "nodeType": "host",
               "props": Object {
-                "children": "Node Stats",
+                "children": <h3>
+                  Node Stats
+                </h3>,
+                "className": "col-sm-6 text-left",
               },
               "ref": null,
-              "rendered": "Node Stats",
-              "type": "h3",
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "host",
+                "props": Object {
+                  "children": "Node Stats",
+                },
+                "ref": null,
+                "rendered": "Node Stats",
+                "type": "h3",
+              },
+              "type": "div",
             },
-            "type": "div",
-          },
+            Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": <p
+                  className="text-right"
+                >
+                  System Metrics Loading...
+                </p>,
+                "className": "sys-info-container row col-sm-6 text-right",
+                "style": Object {
+                  "marginBottom": "10px",
+                  "marginLeft": "0px",
+                  "marginRight": "0px",
+                  "marginTop": "25px",
+                },
+              },
+              "ref": null,
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "host",
+                "props": Object {
+                  "children": "System Metrics Loading...",
+                  "className": "text-right",
+                },
+                "ref": null,
+                "rendered": "System Metrics Loading...",
+                "type": "p",
+              },
+              "type": "div",
+            },
+          ],
           "type": "div",
         },
         Object {
@@ -2366,7 +2558,7 @@ ShallowWrapper {
           "props": Object {
             "children": Array [
               <div
-                className="col-sm-3"
+                className="col-sm-4"
               >
                 <Blueprint.Popover
                   arrowSize={30}
@@ -2408,7 +2600,7 @@ ShallowWrapper {
                 </Blueprint.Popover>
               </div>,
               <div
-                className="col-sm-3"
+                className="col-sm-4"
               >
                 <Link
                   replace={false}
@@ -2423,7 +2615,7 @@ ShallowWrapper {
                 </Link>
               </div>,
               <div
-                className="col-sm-3"
+                className="col-sm-4"
               >
                 <Link
                   replace={false}
@@ -2434,21 +2626,6 @@ ShallowWrapper {
                     description="Contracts"
                     iconClass="fa-file-contract"
                     number={2}
-                  />
-                </Link>
-              </div>,
-              <div
-                className="col-sm-3"
-              >
-                <Link
-                  replace={false}
-                  to="/shards"
-                >
-                  <withRouter(Connect(NumberCard))
-                    className="smd-pointer"
-                    description="Shards"
-                    iconClass="fa-diagram-project"
-                    number={undefined}
                   />
                 </Link>
               </div>,
@@ -2500,7 +2677,7 @@ ShallowWrapper {
                     number="DISCONNECTED"
                   />
                 </Blueprint.Popover>,
-                "className": "col-sm-3",
+                "className": "col-sm-4",
               },
               "ref": null,
               "rendered": Object {
@@ -2577,7 +2754,7 @@ ShallowWrapper {
                     number={1}
                   />
                 </Link>,
-                "className": "col-sm-3",
+                "className": "col-sm-4",
               },
               "ref": null,
               "rendered": Object {
@@ -2629,7 +2806,7 @@ ShallowWrapper {
                     number={2}
                   />
                 </Link>,
-                "className": "col-sm-3",
+                "className": "col-sm-4",
               },
               "ref": null,
               "rendered": Object {
@@ -2656,58 +2833,6 @@ ShallowWrapper {
                     "description": "Contracts",
                     "iconClass": "fa-file-contract",
                     "number": 2,
-                  },
-                  "ref": null,
-                  "rendered": null,
-                  "type": [Function],
-                },
-                "type": [Function],
-              },
-              "type": "div",
-            },
-            Object {
-              "instance": null,
-              "key": undefined,
-              "nodeType": "host",
-              "props": Object {
-                "children": <Link
-                  replace={false}
-                  to="/shards"
-                >
-                  <withRouter(Connect(NumberCard))
-                    className="smd-pointer"
-                    description="Shards"
-                    iconClass="fa-diagram-project"
-                    number={undefined}
-                  />
-                </Link>,
-                "className": "col-sm-3",
-              },
-              "ref": null,
-              "rendered": Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "class",
-                "props": Object {
-                  "children": <withRouter(Connect(NumberCard))
-                    className="smd-pointer"
-                    description="Shards"
-                    iconClass="fa-diagram-project"
-                    number={undefined}
-                  />,
-                  "replace": false,
-                  "to": "/shards",
-                },
-                "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "function",
-                  "props": Object {
-                    "className": "smd-pointer",
-                    "description": "Shards",
-                    "iconClass": "fa-diagram-project",
-                    "number": undefined,
                   },
                   "ref": null,
                   "rendered": null,
@@ -2762,7 +2887,7 @@ ShallowWrapper {
           "props": Object {
             "children": Array [
               <div
-                className="col-sm-3"
+                className="col-sm-4"
               >
                 <withRouter(Connect(NumberCard))
                   className="smd-pointer"
@@ -2774,7 +2899,7 @@ ShallowWrapper {
                 />
               </div>,
               <div
-                className="col-sm-6"
+                className="col-sm-8"
               >
                 <withRouter(Connect(NodeCard)) />
               </div>,
@@ -2796,7 +2921,7 @@ ShallowWrapper {
                   number="No Identity"
                   textSize="h4"
                 />,
-                "className": "col-sm-3",
+                "className": "col-sm-4",
               },
               "ref": null,
               "rendered": Object {
@@ -2823,7 +2948,7 @@ ShallowWrapper {
               "nodeType": "host",
               "props": Object {
                 "children": <withRouter(Connect(NodeCard)) />,
-                "className": "col-sm-6",
+                "className": "col-sm-8",
               },
               "ref": null,
               "rendered": Object {
@@ -2925,16 +3050,33 @@ ShallowWrapper {
               <div
                 className="col-sm-3"
               >
-                <Link
-                  replace={false}
-                  to="/blocks"
+                <div
+                  id="networkInfo"
                 >
-                  <withRouter(Connect(NumberCard))
-                    description="Blocks"
-                    iconClass="fa-cube"
-                    number={9}
-                  />
-                </Link>
+                  <Link
+                    replace={false}
+                    to=""
+                  >
+                    <withRouter(Connect(NumberCard))
+                      className="smd-pointer"
+                      description="Network"
+                      iconClass="fa-exclamation-circle"
+                      mode="danger"
+                      number="UNKNOWN"
+                    />
+                  </Link>
+                  <br />
+                  <Link
+                    replace={false}
+                    to="/blocks"
+                  >
+                    <withRouter(Connect(NumberCard))
+                      description="Blocks"
+                      iconClass="fa-cube"
+                      number={9}
+                    />
+                  </Link>
+                </div>
               </div>,
               <div
                 className="col-sm-3"
@@ -2956,47 +3098,143 @@ ShallowWrapper {
               "key": undefined,
               "nodeType": "host",
               "props": Object {
-                "children": <Link
-                  replace={false}
-                  to="/blocks"
+                "children": <div
+                  id="networkInfo"
                 >
-                  <withRouter(Connect(NumberCard))
-                    description="Blocks"
-                    iconClass="fa-cube"
-                    number={9}
-                  />
-                </Link>,
+                  <Link
+                    replace={false}
+                    to=""
+                  >
+                    <withRouter(Connect(NumberCard))
+                      className="smd-pointer"
+                      description="Network"
+                      iconClass="fa-exclamation-circle"
+                      mode="danger"
+                      number="UNKNOWN"
+                    />
+                  </Link>
+                  <br />
+                  <Link
+                    replace={false}
+                    to="/blocks"
+                  >
+                    <withRouter(Connect(NumberCard))
+                      description="Blocks"
+                      iconClass="fa-cube"
+                      number={9}
+                    />
+                  </Link>
+                </div>,
                 "className": "col-sm-3",
               },
               "ref": null,
               "rendered": Object {
                 "instance": null,
                 "key": undefined,
-                "nodeType": "class",
+                "nodeType": "host",
                 "props": Object {
-                  "children": <withRouter(Connect(NumberCard))
-                    description="Blocks"
-                    iconClass="fa-cube"
-                    number={9}
-                  />,
-                  "replace": false,
-                  "to": "/blocks",
+                  "children": Array [
+                    <Link
+                      replace={false}
+                      to=""
+                    >
+                      <withRouter(Connect(NumberCard))
+                        className="smd-pointer"
+                        description="Network"
+                        iconClass="fa-exclamation-circle"
+                        mode="danger"
+                        number="UNKNOWN"
+                      />
+                    </Link>,
+                    <br />,
+                    <Link
+                      replace={false}
+                      to="/blocks"
+                    >
+                      <withRouter(Connect(NumberCard))
+                        description="Blocks"
+                        iconClass="fa-cube"
+                        number={9}
+                      />
+                    </Link>,
+                  ],
+                  "id": "networkInfo",
                 },
                 "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "function",
-                  "props": Object {
-                    "description": "Blocks",
-                    "iconClass": "fa-cube",
-                    "number": 9,
+                "rendered": Array [
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "class",
+                    "props": Object {
+                      "children": <withRouter(Connect(NumberCard))
+                        className="smd-pointer"
+                        description="Network"
+                        iconClass="fa-exclamation-circle"
+                        mode="danger"
+                        number="UNKNOWN"
+                      />,
+                      "replace": false,
+                      "to": "",
+                    },
+                    "ref": null,
+                    "rendered": Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "function",
+                      "props": Object {
+                        "className": "smd-pointer",
+                        "description": "Network",
+                        "iconClass": "fa-exclamation-circle",
+                        "mode": "danger",
+                        "number": "UNKNOWN",
+                      },
+                      "ref": null,
+                      "rendered": null,
+                      "type": [Function],
+                    },
+                    "type": [Function],
                   },
-                  "ref": null,
-                  "rendered": null,
-                  "type": [Function],
-                },
-                "type": [Function],
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "host",
+                    "props": Object {},
+                    "ref": null,
+                    "rendered": null,
+                    "type": "br",
+                  },
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "class",
+                    "props": Object {
+                      "children": <withRouter(Connect(NumberCard))
+                        description="Blocks"
+                        iconClass="fa-cube"
+                        number={9}
+                      />,
+                      "replace": false,
+                      "to": "/blocks",
+                    },
+                    "ref": null,
+                    "rendered": Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "function",
+                      "props": Object {
+                        "description": "Blocks",
+                        "iconClass": "fa-cube",
+                        "number": 9,
+                      },
+                      "ref": null,
+                      "rendered": null,
+                      "type": [Function],
+                    },
+                    "type": [Function],
+                  },
+                ],
+                "type": "div",
               },
               "type": "div",
             },
@@ -3944,14 +4182,31 @@ ShallowWrapper {
           }
         />,
         <div
-          className="row"
+          className="row d-flex align-items-center"
         >
           <div
-            className="col-sm-9 text-left"
+            className="col-sm-6 text-left"
           >
             <h3>
               Node Stats
             </h3>
+          </div>
+          <div
+            className="sys-info-container row col-sm-6 text-right"
+            style={
+              Object {
+                "marginBottom": "10px",
+                "marginLeft": "0px",
+                "marginRight": "0px",
+                "marginTop": "25px",
+              }
+            }
+          >
+            <p
+              className="text-right"
+            >
+              System Metrics Loading...
+            </p>
           </div>
         </div>,
         <div
@@ -3967,7 +4222,7 @@ ShallowWrapper {
           className="row"
         >
           <div
-            className="col-sm-3"
+            className="col-sm-4"
           >
             <Blueprint.Popover
               arrowSize={30}
@@ -4009,7 +4264,7 @@ ShallowWrapper {
             </Blueprint.Popover>
           </div>
           <div
-            className="col-sm-3"
+            className="col-sm-4"
           >
             <Link
               replace={false}
@@ -4024,7 +4279,7 @@ ShallowWrapper {
             </Link>
           </div>
           <div
-            className="col-sm-3"
+            className="col-sm-4"
           >
             <Link
               replace={false}
@@ -4035,21 +4290,6 @@ ShallowWrapper {
                 description="Contracts"
                 iconClass="fa-file-contract"
                 number={2}
-              />
-            </Link>
-          </div>
-          <div
-            className="col-sm-3"
-          >
-            <Link
-              replace={false}
-              to="/shards"
-            >
-              <withRouter(Connect(NumberCard))
-                className="smd-pointer"
-                description="Shards"
-                iconClass="fa-diagram-project"
-                number={undefined}
               />
             </Link>
           </div>
@@ -4067,7 +4307,7 @@ ShallowWrapper {
           className="row"
         >
           <div
-            className="col-sm-3"
+            className="col-sm-4"
           >
             <withRouter(Connect(NumberCard))
               className="smd-pointer"
@@ -4079,7 +4319,7 @@ ShallowWrapper {
             />
           </div>
           <div
-            className="col-sm-6"
+            className="col-sm-8"
           >
             <withRouter(Connect(NodeCard)) />
           </div>
@@ -4110,16 +4350,33 @@ ShallowWrapper {
           <div
             className="col-sm-3"
           >
-            <Link
-              replace={false}
-              to="/blocks"
+            <div
+              id="networkInfo"
             >
-              <withRouter(Connect(NumberCard))
-                description="Blocks"
-                iconClass="fa-cube"
-                number={9}
-              />
-            </Link>
+              <Link
+                replace={false}
+                to=""
+              >
+                <withRouter(Connect(NumberCard))
+                  className="smd-pointer"
+                  description="Network"
+                  iconClass="fa-exclamation-circle"
+                  mode="danger"
+                  number="UNKNOWN"
+                />
+              </Link>
+              <br />
+              <Link
+                replace={false}
+                to="/blocks"
+              >
+                <withRouter(Connect(NumberCard))
+                  description="Blocks"
+                  iconClass="fa-cube"
+                  number={9}
+                />
+              </Link>
+            </div>
           </div>
           <div
             className="col-sm-3"
@@ -4331,40 +4588,94 @@ ShallowWrapper {
         "key": undefined,
         "nodeType": "host",
         "props": Object {
-          "children": <div
-            className="col-sm-9 text-left"
-          >
-            <h3>
-              Node Stats
-            </h3>
-          </div>,
-          "className": "row",
+          "children": Array [
+            <div
+              className="col-sm-6 text-left"
+            >
+              <h3>
+                Node Stats
+              </h3>
+            </div>,
+            <div
+              className="sys-info-container row col-sm-6 text-right"
+              style={
+                Object {
+                  "marginBottom": "10px",
+                  "marginLeft": "0px",
+                  "marginRight": "0px",
+                  "marginTop": "25px",
+                }
+              }
+            >
+              <p
+                className="text-right"
+              >
+                System Metrics Loading...
+              </p>
+            </div>,
+          ],
+          "className": "row d-flex align-items-center",
         },
         "ref": null,
-        "rendered": Object {
-          "instance": null,
-          "key": undefined,
-          "nodeType": "host",
-          "props": Object {
-            "children": <h3>
-              Node Stats
-            </h3>,
-            "className": "col-sm-9 text-left",
-          },
-          "ref": null,
-          "rendered": Object {
+        "rendered": Array [
+          Object {
             "instance": null,
             "key": undefined,
             "nodeType": "host",
             "props": Object {
-              "children": "Node Stats",
+              "children": <h3>
+                Node Stats
+              </h3>,
+              "className": "col-sm-6 text-left",
             },
             "ref": null,
-            "rendered": "Node Stats",
-            "type": "h3",
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": "Node Stats",
+              },
+              "ref": null,
+              "rendered": "Node Stats",
+              "type": "h3",
+            },
+            "type": "div",
           },
-          "type": "div",
-        },
+          Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "children": <p
+                className="text-right"
+              >
+                System Metrics Loading...
+              </p>,
+              "className": "sys-info-container row col-sm-6 text-right",
+              "style": Object {
+                "marginBottom": "10px",
+                "marginLeft": "0px",
+                "marginRight": "0px",
+                "marginTop": "25px",
+              },
+            },
+            "ref": null,
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": "System Metrics Loading...",
+                "className": "text-right",
+              },
+              "ref": null,
+              "rendered": "System Metrics Loading...",
+              "type": "p",
+            },
+            "type": "div",
+          },
+        ],
         "type": "div",
       },
       Object {
@@ -4409,7 +4720,7 @@ ShallowWrapper {
         "props": Object {
           "children": Array [
             <div
-              className="col-sm-3"
+              className="col-sm-4"
             >
               <Blueprint.Popover
                 arrowSize={30}
@@ -4451,7 +4762,7 @@ ShallowWrapper {
               </Blueprint.Popover>
             </div>,
             <div
-              className="col-sm-3"
+              className="col-sm-4"
             >
               <Link
                 replace={false}
@@ -4466,7 +4777,7 @@ ShallowWrapper {
               </Link>
             </div>,
             <div
-              className="col-sm-3"
+              className="col-sm-4"
             >
               <Link
                 replace={false}
@@ -4477,21 +4788,6 @@ ShallowWrapper {
                   description="Contracts"
                   iconClass="fa-file-contract"
                   number={2}
-                />
-              </Link>
-            </div>,
-            <div
-              className="col-sm-3"
-            >
-              <Link
-                replace={false}
-                to="/shards"
-              >
-                <withRouter(Connect(NumberCard))
-                  className="smd-pointer"
-                  description="Shards"
-                  iconClass="fa-diagram-project"
-                  number={undefined}
                 />
               </Link>
             </div>,
@@ -4543,7 +4839,7 @@ ShallowWrapper {
                   number="DISCONNECTED"
                 />
               </Blueprint.Popover>,
-              "className": "col-sm-3",
+              "className": "col-sm-4",
             },
             "ref": null,
             "rendered": Object {
@@ -4620,7 +4916,7 @@ ShallowWrapper {
                   number={1}
                 />
               </Link>,
-              "className": "col-sm-3",
+              "className": "col-sm-4",
             },
             "ref": null,
             "rendered": Object {
@@ -4672,7 +4968,7 @@ ShallowWrapper {
                   number={2}
                 />
               </Link>,
-              "className": "col-sm-3",
+              "className": "col-sm-4",
             },
             "ref": null,
             "rendered": Object {
@@ -4699,58 +4995,6 @@ ShallowWrapper {
                   "description": "Contracts",
                   "iconClass": "fa-file-contract",
                   "number": 2,
-                },
-                "ref": null,
-                "rendered": null,
-                "type": [Function],
-              },
-              "type": [Function],
-            },
-            "type": "div",
-          },
-          Object {
-            "instance": null,
-            "key": undefined,
-            "nodeType": "host",
-            "props": Object {
-              "children": <Link
-                replace={false}
-                to="/shards"
-              >
-                <withRouter(Connect(NumberCard))
-                  className="smd-pointer"
-                  description="Shards"
-                  iconClass="fa-diagram-project"
-                  number={undefined}
-                />
-              </Link>,
-              "className": "col-sm-3",
-            },
-            "ref": null,
-            "rendered": Object {
-              "instance": null,
-              "key": undefined,
-              "nodeType": "class",
-              "props": Object {
-                "children": <withRouter(Connect(NumberCard))
-                  className="smd-pointer"
-                  description="Shards"
-                  iconClass="fa-diagram-project"
-                  number={undefined}
-                />,
-                "replace": false,
-                "to": "/shards",
-              },
-              "ref": null,
-              "rendered": Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "function",
-                "props": Object {
-                  "className": "smd-pointer",
-                  "description": "Shards",
-                  "iconClass": "fa-diagram-project",
-                  "number": undefined,
                 },
                 "ref": null,
                 "rendered": null,
@@ -4805,7 +5049,7 @@ ShallowWrapper {
         "props": Object {
           "children": Array [
             <div
-              className="col-sm-3"
+              className="col-sm-4"
             >
               <withRouter(Connect(NumberCard))
                 className="smd-pointer"
@@ -4817,7 +5061,7 @@ ShallowWrapper {
               />
             </div>,
             <div
-              className="col-sm-6"
+              className="col-sm-8"
             >
               <withRouter(Connect(NodeCard)) />
             </div>,
@@ -4839,7 +5083,7 @@ ShallowWrapper {
                 number="No Identity"
                 textSize="h4"
               />,
-              "className": "col-sm-3",
+              "className": "col-sm-4",
             },
             "ref": null,
             "rendered": Object {
@@ -4866,7 +5110,7 @@ ShallowWrapper {
             "nodeType": "host",
             "props": Object {
               "children": <withRouter(Connect(NodeCard)) />,
-              "className": "col-sm-6",
+              "className": "col-sm-8",
             },
             "ref": null,
             "rendered": Object {
@@ -4968,16 +5212,33 @@ ShallowWrapper {
             <div
               className="col-sm-3"
             >
-              <Link
-                replace={false}
-                to="/blocks"
+              <div
+                id="networkInfo"
               >
-                <withRouter(Connect(NumberCard))
-                  description="Blocks"
-                  iconClass="fa-cube"
-                  number={9}
-                />
-              </Link>
+                <Link
+                  replace={false}
+                  to=""
+                >
+                  <withRouter(Connect(NumberCard))
+                    className="smd-pointer"
+                    description="Network"
+                    iconClass="fa-exclamation-circle"
+                    mode="danger"
+                    number="UNKNOWN"
+                  />
+                </Link>
+                <br />
+                <Link
+                  replace={false}
+                  to="/blocks"
+                >
+                  <withRouter(Connect(NumberCard))
+                    description="Blocks"
+                    iconClass="fa-cube"
+                    number={9}
+                  />
+                </Link>
+              </div>
             </div>,
             <div
               className="col-sm-3"
@@ -4999,47 +5260,143 @@ ShallowWrapper {
             "key": undefined,
             "nodeType": "host",
             "props": Object {
-              "children": <Link
-                replace={false}
-                to="/blocks"
+              "children": <div
+                id="networkInfo"
               >
-                <withRouter(Connect(NumberCard))
-                  description="Blocks"
-                  iconClass="fa-cube"
-                  number={9}
-                />
-              </Link>,
+                <Link
+                  replace={false}
+                  to=""
+                >
+                  <withRouter(Connect(NumberCard))
+                    className="smd-pointer"
+                    description="Network"
+                    iconClass="fa-exclamation-circle"
+                    mode="danger"
+                    number="UNKNOWN"
+                  />
+                </Link>
+                <br />
+                <Link
+                  replace={false}
+                  to="/blocks"
+                >
+                  <withRouter(Connect(NumberCard))
+                    description="Blocks"
+                    iconClass="fa-cube"
+                    number={9}
+                  />
+                </Link>
+              </div>,
               "className": "col-sm-3",
             },
             "ref": null,
             "rendered": Object {
               "instance": null,
               "key": undefined,
-              "nodeType": "class",
+              "nodeType": "host",
               "props": Object {
-                "children": <withRouter(Connect(NumberCard))
-                  description="Blocks"
-                  iconClass="fa-cube"
-                  number={9}
-                />,
-                "replace": false,
-                "to": "/blocks",
+                "children": Array [
+                  <Link
+                    replace={false}
+                    to=""
+                  >
+                    <withRouter(Connect(NumberCard))
+                      className="smd-pointer"
+                      description="Network"
+                      iconClass="fa-exclamation-circle"
+                      mode="danger"
+                      number="UNKNOWN"
+                    />
+                  </Link>,
+                  <br />,
+                  <Link
+                    replace={false}
+                    to="/blocks"
+                  >
+                    <withRouter(Connect(NumberCard))
+                      description="Blocks"
+                      iconClass="fa-cube"
+                      number={9}
+                    />
+                  </Link>,
+                ],
+                "id": "networkInfo",
               },
               "ref": null,
-              "rendered": Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "function",
-                "props": Object {
-                  "description": "Blocks",
-                  "iconClass": "fa-cube",
-                  "number": 9,
+              "rendered": Array [
+                Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "class",
+                  "props": Object {
+                    "children": <withRouter(Connect(NumberCard))
+                      className="smd-pointer"
+                      description="Network"
+                      iconClass="fa-exclamation-circle"
+                      mode="danger"
+                      number="UNKNOWN"
+                    />,
+                    "replace": false,
+                    "to": "",
+                  },
+                  "ref": null,
+                  "rendered": Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "function",
+                    "props": Object {
+                      "className": "smd-pointer",
+                      "description": "Network",
+                      "iconClass": "fa-exclamation-circle",
+                      "mode": "danger",
+                      "number": "UNKNOWN",
+                    },
+                    "ref": null,
+                    "rendered": null,
+                    "type": [Function],
+                  },
+                  "type": [Function],
                 },
-                "ref": null,
-                "rendered": null,
-                "type": [Function],
-              },
-              "type": [Function],
+                Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "host",
+                  "props": Object {},
+                  "ref": null,
+                  "rendered": null,
+                  "type": "br",
+                },
+                Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "class",
+                  "props": Object {
+                    "children": <withRouter(Connect(NumberCard))
+                      description="Blocks"
+                      iconClass="fa-cube"
+                      number={9}
+                    />,
+                    "replace": false,
+                    "to": "/blocks",
+                  },
+                  "ref": null,
+                  "rendered": Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "function",
+                    "props": Object {
+                      "description": "Blocks",
+                      "iconClass": "fa-cube",
+                      "number": 9,
+                    },
+                    "ref": null,
+                    "rendered": null,
+                    "type": [Function],
+                  },
+                  "type": [Function],
+                },
+              ],
+              "type": "div",
             },
             "type": "div",
           },
@@ -5633,14 +5990,31 @@ ShallowWrapper {
             }
           />,
           <div
-            className="row"
+            className="row d-flex align-items-center"
           >
             <div
-              className="col-sm-9 text-left"
+              className="col-sm-6 text-left"
             >
               <h3>
                 Node Stats
               </h3>
+            </div>
+            <div
+              className="sys-info-container row col-sm-6 text-right"
+              style={
+                Object {
+                  "marginBottom": "10px",
+                  "marginLeft": "0px",
+                  "marginRight": "0px",
+                  "marginTop": "25px",
+                }
+              }
+            >
+              <p
+                className="text-right"
+              >
+                System Metrics Loading...
+              </p>
             </div>
           </div>,
           <div
@@ -5656,7 +6030,7 @@ ShallowWrapper {
             className="row"
           >
             <div
-              className="col-sm-3"
+              className="col-sm-4"
             >
               <Blueprint.Popover
                 arrowSize={30}
@@ -5698,7 +6072,7 @@ ShallowWrapper {
               </Blueprint.Popover>
             </div>
             <div
-              className="col-sm-3"
+              className="col-sm-4"
             >
               <Link
                 replace={false}
@@ -5713,7 +6087,7 @@ ShallowWrapper {
               </Link>
             </div>
             <div
-              className="col-sm-3"
+              className="col-sm-4"
             >
               <Link
                 replace={false}
@@ -5724,21 +6098,6 @@ ShallowWrapper {
                   description="Contracts"
                   iconClass="fa-file-contract"
                   number={2}
-                />
-              </Link>
-            </div>
-            <div
-              className="col-sm-3"
-            >
-              <Link
-                replace={false}
-                to="/shards"
-              >
-                <withRouter(Connect(NumberCard))
-                  className="smd-pointer"
-                  description="Shards"
-                  iconClass="fa-diagram-project"
-                  number={undefined}
                 />
               </Link>
             </div>
@@ -5756,7 +6115,7 @@ ShallowWrapper {
             className="row"
           >
             <div
-              className="col-sm-3"
+              className="col-sm-4"
             >
               <withRouter(Connect(NumberCard))
                 className="smd-pointer"
@@ -5768,7 +6127,7 @@ ShallowWrapper {
               />
             </div>
             <div
-              className="col-sm-6"
+              className="col-sm-8"
             >
               <withRouter(Connect(NodeCard)) />
             </div>
@@ -5799,16 +6158,33 @@ ShallowWrapper {
             <div
               className="col-sm-3"
             >
-              <Link
-                replace={false}
-                to="/blocks"
+              <div
+                id="networkInfo"
               >
-                <withRouter(Connect(NumberCard))
-                  description="Blocks"
-                  iconClass="fa-cube"
-                  number={9}
-                />
-              </Link>
+                <Link
+                  replace={false}
+                  to=""
+                >
+                  <withRouter(Connect(NumberCard))
+                    className="smd-pointer"
+                    description="Network"
+                    iconClass="fa-exclamation-circle"
+                    mode="danger"
+                    number="UNKNOWN"
+                  />
+                </Link>
+                <br />
+                <Link
+                  replace={false}
+                  to="/blocks"
+                >
+                  <withRouter(Connect(NumberCard))
+                    description="Blocks"
+                    iconClass="fa-cube"
+                    number={9}
+                  />
+                </Link>
+              </div>
             </div>
             <div
               className="col-sm-3"
@@ -6020,40 +6396,94 @@ ShallowWrapper {
           "key": undefined,
           "nodeType": "host",
           "props": Object {
-            "children": <div
-              className="col-sm-9 text-left"
-            >
-              <h3>
-                Node Stats
-              </h3>
-            </div>,
-            "className": "row",
+            "children": Array [
+              <div
+                className="col-sm-6 text-left"
+              >
+                <h3>
+                  Node Stats
+                </h3>
+              </div>,
+              <div
+                className="sys-info-container row col-sm-6 text-right"
+                style={
+                  Object {
+                    "marginBottom": "10px",
+                    "marginLeft": "0px",
+                    "marginRight": "0px",
+                    "marginTop": "25px",
+                  }
+                }
+              >
+                <p
+                  className="text-right"
+                >
+                  System Metrics Loading...
+                </p>
+              </div>,
+            ],
+            "className": "row d-flex align-items-center",
           },
           "ref": null,
-          "rendered": Object {
-            "instance": null,
-            "key": undefined,
-            "nodeType": "host",
-            "props": Object {
-              "children": <h3>
-                Node Stats
-              </h3>,
-              "className": "col-sm-9 text-left",
-            },
-            "ref": null,
-            "rendered": Object {
+          "rendered": Array [
+            Object {
               "instance": null,
               "key": undefined,
               "nodeType": "host",
               "props": Object {
-                "children": "Node Stats",
+                "children": <h3>
+                  Node Stats
+                </h3>,
+                "className": "col-sm-6 text-left",
               },
               "ref": null,
-              "rendered": "Node Stats",
-              "type": "h3",
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "host",
+                "props": Object {
+                  "children": "Node Stats",
+                },
+                "ref": null,
+                "rendered": "Node Stats",
+                "type": "h3",
+              },
+              "type": "div",
             },
-            "type": "div",
-          },
+            Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": <p
+                  className="text-right"
+                >
+                  System Metrics Loading...
+                </p>,
+                "className": "sys-info-container row col-sm-6 text-right",
+                "style": Object {
+                  "marginBottom": "10px",
+                  "marginLeft": "0px",
+                  "marginRight": "0px",
+                  "marginTop": "25px",
+                },
+              },
+              "ref": null,
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "host",
+                "props": Object {
+                  "children": "System Metrics Loading...",
+                  "className": "text-right",
+                },
+                "ref": null,
+                "rendered": "System Metrics Loading...",
+                "type": "p",
+              },
+              "type": "div",
+            },
+          ],
           "type": "div",
         },
         Object {
@@ -6098,7 +6528,7 @@ ShallowWrapper {
           "props": Object {
             "children": Array [
               <div
-                className="col-sm-3"
+                className="col-sm-4"
               >
                 <Blueprint.Popover
                   arrowSize={30}
@@ -6140,7 +6570,7 @@ ShallowWrapper {
                 </Blueprint.Popover>
               </div>,
               <div
-                className="col-sm-3"
+                className="col-sm-4"
               >
                 <Link
                   replace={false}
@@ -6155,7 +6585,7 @@ ShallowWrapper {
                 </Link>
               </div>,
               <div
-                className="col-sm-3"
+                className="col-sm-4"
               >
                 <Link
                   replace={false}
@@ -6166,21 +6596,6 @@ ShallowWrapper {
                     description="Contracts"
                     iconClass="fa-file-contract"
                     number={2}
-                  />
-                </Link>
-              </div>,
-              <div
-                className="col-sm-3"
-              >
-                <Link
-                  replace={false}
-                  to="/shards"
-                >
-                  <withRouter(Connect(NumberCard))
-                    className="smd-pointer"
-                    description="Shards"
-                    iconClass="fa-diagram-project"
-                    number={undefined}
                   />
                 </Link>
               </div>,
@@ -6232,7 +6647,7 @@ ShallowWrapper {
                     number="DISCONNECTED"
                   />
                 </Blueprint.Popover>,
-                "className": "col-sm-3",
+                "className": "col-sm-4",
               },
               "ref": null,
               "rendered": Object {
@@ -6309,7 +6724,7 @@ ShallowWrapper {
                     number={1}
                   />
                 </Link>,
-                "className": "col-sm-3",
+                "className": "col-sm-4",
               },
               "ref": null,
               "rendered": Object {
@@ -6361,7 +6776,7 @@ ShallowWrapper {
                     number={2}
                   />
                 </Link>,
-                "className": "col-sm-3",
+                "className": "col-sm-4",
               },
               "ref": null,
               "rendered": Object {
@@ -6388,58 +6803,6 @@ ShallowWrapper {
                     "description": "Contracts",
                     "iconClass": "fa-file-contract",
                     "number": 2,
-                  },
-                  "ref": null,
-                  "rendered": null,
-                  "type": [Function],
-                },
-                "type": [Function],
-              },
-              "type": "div",
-            },
-            Object {
-              "instance": null,
-              "key": undefined,
-              "nodeType": "host",
-              "props": Object {
-                "children": <Link
-                  replace={false}
-                  to="/shards"
-                >
-                  <withRouter(Connect(NumberCard))
-                    className="smd-pointer"
-                    description="Shards"
-                    iconClass="fa-diagram-project"
-                    number={undefined}
-                  />
-                </Link>,
-                "className": "col-sm-3",
-              },
-              "ref": null,
-              "rendered": Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "class",
-                "props": Object {
-                  "children": <withRouter(Connect(NumberCard))
-                    className="smd-pointer"
-                    description="Shards"
-                    iconClass="fa-diagram-project"
-                    number={undefined}
-                  />,
-                  "replace": false,
-                  "to": "/shards",
-                },
-                "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "function",
-                  "props": Object {
-                    "className": "smd-pointer",
-                    "description": "Shards",
-                    "iconClass": "fa-diagram-project",
-                    "number": undefined,
                   },
                   "ref": null,
                   "rendered": null,
@@ -6494,7 +6857,7 @@ ShallowWrapper {
           "props": Object {
             "children": Array [
               <div
-                className="col-sm-3"
+                className="col-sm-4"
               >
                 <withRouter(Connect(NumberCard))
                   className="smd-pointer"
@@ -6506,7 +6869,7 @@ ShallowWrapper {
                 />
               </div>,
               <div
-                className="col-sm-6"
+                className="col-sm-8"
               >
                 <withRouter(Connect(NodeCard)) />
               </div>,
@@ -6528,7 +6891,7 @@ ShallowWrapper {
                   number="No Identity"
                   textSize="h4"
                 />,
-                "className": "col-sm-3",
+                "className": "col-sm-4",
               },
               "ref": null,
               "rendered": Object {
@@ -6555,7 +6918,7 @@ ShallowWrapper {
               "nodeType": "host",
               "props": Object {
                 "children": <withRouter(Connect(NodeCard)) />,
-                "className": "col-sm-6",
+                "className": "col-sm-8",
               },
               "ref": null,
               "rendered": Object {
@@ -6657,16 +7020,33 @@ ShallowWrapper {
               <div
                 className="col-sm-3"
               >
-                <Link
-                  replace={false}
-                  to="/blocks"
+                <div
+                  id="networkInfo"
                 >
-                  <withRouter(Connect(NumberCard))
-                    description="Blocks"
-                    iconClass="fa-cube"
-                    number={9}
-                  />
-                </Link>
+                  <Link
+                    replace={false}
+                    to=""
+                  >
+                    <withRouter(Connect(NumberCard))
+                      className="smd-pointer"
+                      description="Network"
+                      iconClass="fa-exclamation-circle"
+                      mode="danger"
+                      number="UNKNOWN"
+                    />
+                  </Link>
+                  <br />
+                  <Link
+                    replace={false}
+                    to="/blocks"
+                  >
+                    <withRouter(Connect(NumberCard))
+                      description="Blocks"
+                      iconClass="fa-cube"
+                      number={9}
+                    />
+                  </Link>
+                </div>
               </div>,
               <div
                 className="col-sm-3"
@@ -6688,47 +7068,143 @@ ShallowWrapper {
               "key": undefined,
               "nodeType": "host",
               "props": Object {
-                "children": <Link
-                  replace={false}
-                  to="/blocks"
+                "children": <div
+                  id="networkInfo"
                 >
-                  <withRouter(Connect(NumberCard))
-                    description="Blocks"
-                    iconClass="fa-cube"
-                    number={9}
-                  />
-                </Link>,
+                  <Link
+                    replace={false}
+                    to=""
+                  >
+                    <withRouter(Connect(NumberCard))
+                      className="smd-pointer"
+                      description="Network"
+                      iconClass="fa-exclamation-circle"
+                      mode="danger"
+                      number="UNKNOWN"
+                    />
+                  </Link>
+                  <br />
+                  <Link
+                    replace={false}
+                    to="/blocks"
+                  >
+                    <withRouter(Connect(NumberCard))
+                      description="Blocks"
+                      iconClass="fa-cube"
+                      number={9}
+                    />
+                  </Link>
+                </div>,
                 "className": "col-sm-3",
               },
               "ref": null,
               "rendered": Object {
                 "instance": null,
                 "key": undefined,
-                "nodeType": "class",
+                "nodeType": "host",
                 "props": Object {
-                  "children": <withRouter(Connect(NumberCard))
-                    description="Blocks"
-                    iconClass="fa-cube"
-                    number={9}
-                  />,
-                  "replace": false,
-                  "to": "/blocks",
+                  "children": Array [
+                    <Link
+                      replace={false}
+                      to=""
+                    >
+                      <withRouter(Connect(NumberCard))
+                        className="smd-pointer"
+                        description="Network"
+                        iconClass="fa-exclamation-circle"
+                        mode="danger"
+                        number="UNKNOWN"
+                      />
+                    </Link>,
+                    <br />,
+                    <Link
+                      replace={false}
+                      to="/blocks"
+                    >
+                      <withRouter(Connect(NumberCard))
+                        description="Blocks"
+                        iconClass="fa-cube"
+                        number={9}
+                      />
+                    </Link>,
+                  ],
+                  "id": "networkInfo",
                 },
                 "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "function",
-                  "props": Object {
-                    "description": "Blocks",
-                    "iconClass": "fa-cube",
-                    "number": 9,
+                "rendered": Array [
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "class",
+                    "props": Object {
+                      "children": <withRouter(Connect(NumberCard))
+                        className="smd-pointer"
+                        description="Network"
+                        iconClass="fa-exclamation-circle"
+                        mode="danger"
+                        number="UNKNOWN"
+                      />,
+                      "replace": false,
+                      "to": "",
+                    },
+                    "ref": null,
+                    "rendered": Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "function",
+                      "props": Object {
+                        "className": "smd-pointer",
+                        "description": "Network",
+                        "iconClass": "fa-exclamation-circle",
+                        "mode": "danger",
+                        "number": "UNKNOWN",
+                      },
+                      "ref": null,
+                      "rendered": null,
+                      "type": [Function],
+                    },
+                    "type": [Function],
                   },
-                  "ref": null,
-                  "rendered": null,
-                  "type": [Function],
-                },
-                "type": [Function],
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "host",
+                    "props": Object {},
+                    "ref": null,
+                    "rendered": null,
+                    "type": "br",
+                  },
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "class",
+                    "props": Object {
+                      "children": <withRouter(Connect(NumberCard))
+                        description="Blocks"
+                        iconClass="fa-cube"
+                        number={9}
+                      />,
+                      "replace": false,
+                      "to": "/blocks",
+                    },
+                    "ref": null,
+                    "rendered": Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "function",
+                      "props": Object {
+                        "description": "Blocks",
+                        "iconClass": "fa-cube",
+                        "number": 9,
+                      },
+                      "ref": null,
+                      "rendered": null,
+                      "type": [Function],
+                    },
+                    "type": [Function],
+                  },
+                ],
+                "type": "div",
               },
               "type": "div",
             },
@@ -7371,14 +7847,31 @@ ShallowWrapper {
           }
         />,
         <div
-          className="row"
+          className="row d-flex align-items-center"
         >
           <div
-            className="col-sm-9 text-left"
+            className="col-sm-6 text-left"
           >
             <h3>
               Node Stats
             </h3>
+          </div>
+          <div
+            className="sys-info-container row col-sm-6 text-right"
+            style={
+              Object {
+                "marginBottom": "10px",
+                "marginLeft": "0px",
+                "marginRight": "0px",
+                "marginTop": "25px",
+              }
+            }
+          >
+            <p
+              className="text-right"
+            >
+              System Metrics Loading...
+            </p>
           </div>
         </div>,
         <div
@@ -7394,7 +7887,7 @@ ShallowWrapper {
           className="row"
         >
           <div
-            className="col-sm-3"
+            className="col-sm-4"
           >
             <Blueprint.Popover
               arrowSize={30}
@@ -7436,7 +7929,7 @@ ShallowWrapper {
             </Blueprint.Popover>
           </div>
           <div
-            className="col-sm-3"
+            className="col-sm-4"
           >
             <Link
               replace={false}
@@ -7451,7 +7944,7 @@ ShallowWrapper {
             </Link>
           </div>
           <div
-            className="col-sm-3"
+            className="col-sm-4"
           >
             <Link
               replace={false}
@@ -7461,21 +7954,6 @@ ShallowWrapper {
                 className="smd-pointer"
                 description="Contracts"
                 iconClass="fa-file-contract"
-                number={undefined}
-              />
-            </Link>
-          </div>
-          <div
-            className="col-sm-3"
-          >
-            <Link
-              replace={false}
-              to="/shards"
-            >
-              <withRouter(Connect(NumberCard))
-                className="smd-pointer"
-                description="Shards"
-                iconClass="fa-diagram-project"
                 number={undefined}
               />
             </Link>
@@ -7494,7 +7972,7 @@ ShallowWrapper {
           className="row"
         >
           <div
-            className="col-sm-3"
+            className="col-sm-4"
           >
             <withRouter(Connect(NumberCard))
               className="smd-pointer"
@@ -7506,7 +7984,7 @@ ShallowWrapper {
             />
           </div>
           <div
-            className="col-sm-6"
+            className="col-sm-8"
           >
             <withRouter(Connect(NodeCard)) />
           </div>
@@ -7537,16 +8015,33 @@ ShallowWrapper {
           <div
             className="col-sm-3"
           >
-            <Link
-              replace={false}
-              to="/blocks"
+            <div
+              id="networkInfo"
             >
-              <withRouter(Connect(NumberCard))
-                description="Blocks"
-                iconClass="fa-cube"
-                number={undefined}
-              />
-            </Link>
+              <Link
+                replace={false}
+                to=""
+              >
+                <withRouter(Connect(NumberCard))
+                  className="smd-pointer"
+                  description="Network"
+                  iconClass="fa-exclamation-circle"
+                  mode="danger"
+                  number="UNKNOWN"
+                />
+              </Link>
+              <br />
+              <Link
+                replace={false}
+                to="/blocks"
+              >
+                <withRouter(Connect(NumberCard))
+                  description="Blocks"
+                  iconClass="fa-cube"
+                  number={undefined}
+                />
+              </Link>
+            </div>
           </div>
           <div
             className="col-sm-3"
@@ -7652,40 +8147,94 @@ ShallowWrapper {
         "key": undefined,
         "nodeType": "host",
         "props": Object {
-          "children": <div
-            className="col-sm-9 text-left"
-          >
-            <h3>
-              Node Stats
-            </h3>
-          </div>,
-          "className": "row",
+          "children": Array [
+            <div
+              className="col-sm-6 text-left"
+            >
+              <h3>
+                Node Stats
+              </h3>
+            </div>,
+            <div
+              className="sys-info-container row col-sm-6 text-right"
+              style={
+                Object {
+                  "marginBottom": "10px",
+                  "marginLeft": "0px",
+                  "marginRight": "0px",
+                  "marginTop": "25px",
+                }
+              }
+            >
+              <p
+                className="text-right"
+              >
+                System Metrics Loading...
+              </p>
+            </div>,
+          ],
+          "className": "row d-flex align-items-center",
         },
         "ref": null,
-        "rendered": Object {
-          "instance": null,
-          "key": undefined,
-          "nodeType": "host",
-          "props": Object {
-            "children": <h3>
-              Node Stats
-            </h3>,
-            "className": "col-sm-9 text-left",
-          },
-          "ref": null,
-          "rendered": Object {
+        "rendered": Array [
+          Object {
             "instance": null,
             "key": undefined,
             "nodeType": "host",
             "props": Object {
-              "children": "Node Stats",
+              "children": <h3>
+                Node Stats
+              </h3>,
+              "className": "col-sm-6 text-left",
             },
             "ref": null,
-            "rendered": "Node Stats",
-            "type": "h3",
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": "Node Stats",
+              },
+              "ref": null,
+              "rendered": "Node Stats",
+              "type": "h3",
+            },
+            "type": "div",
           },
-          "type": "div",
-        },
+          Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "children": <p
+                className="text-right"
+              >
+                System Metrics Loading...
+              </p>,
+              "className": "sys-info-container row col-sm-6 text-right",
+              "style": Object {
+                "marginBottom": "10px",
+                "marginLeft": "0px",
+                "marginRight": "0px",
+                "marginTop": "25px",
+              },
+            },
+            "ref": null,
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": "System Metrics Loading...",
+                "className": "text-right",
+              },
+              "ref": null,
+              "rendered": "System Metrics Loading...",
+              "type": "p",
+            },
+            "type": "div",
+          },
+        ],
         "type": "div",
       },
       Object {
@@ -7730,7 +8279,7 @@ ShallowWrapper {
         "props": Object {
           "children": Array [
             <div
-              className="col-sm-3"
+              className="col-sm-4"
             >
               <Blueprint.Popover
                 arrowSize={30}
@@ -7772,7 +8321,7 @@ ShallowWrapper {
               </Blueprint.Popover>
             </div>,
             <div
-              className="col-sm-3"
+              className="col-sm-4"
             >
               <Link
                 replace={false}
@@ -7787,7 +8336,7 @@ ShallowWrapper {
               </Link>
             </div>,
             <div
-              className="col-sm-3"
+              className="col-sm-4"
             >
               <Link
                 replace={false}
@@ -7797,21 +8346,6 @@ ShallowWrapper {
                   className="smd-pointer"
                   description="Contracts"
                   iconClass="fa-file-contract"
-                  number={undefined}
-                />
-              </Link>
-            </div>,
-            <div
-              className="col-sm-3"
-            >
-              <Link
-                replace={false}
-                to="/shards"
-              >
-                <withRouter(Connect(NumberCard))
-                  className="smd-pointer"
-                  description="Shards"
-                  iconClass="fa-diagram-project"
                   number={undefined}
                 />
               </Link>
@@ -7864,7 +8398,7 @@ ShallowWrapper {
                   number="DISCONNECTED"
                 />
               </Blueprint.Popover>,
-              "className": "col-sm-3",
+              "className": "col-sm-4",
             },
             "ref": null,
             "rendered": Object {
@@ -7941,7 +8475,7 @@ ShallowWrapper {
                   number={undefined}
                 />
               </Link>,
-              "className": "col-sm-3",
+              "className": "col-sm-4",
             },
             "ref": null,
             "rendered": Object {
@@ -7993,7 +8527,7 @@ ShallowWrapper {
                   number={undefined}
                 />
               </Link>,
-              "className": "col-sm-3",
+              "className": "col-sm-4",
             },
             "ref": null,
             "rendered": Object {
@@ -8019,58 +8553,6 @@ ShallowWrapper {
                   "className": "smd-pointer",
                   "description": "Contracts",
                   "iconClass": "fa-file-contract",
-                  "number": undefined,
-                },
-                "ref": null,
-                "rendered": null,
-                "type": [Function],
-              },
-              "type": [Function],
-            },
-            "type": "div",
-          },
-          Object {
-            "instance": null,
-            "key": undefined,
-            "nodeType": "host",
-            "props": Object {
-              "children": <Link
-                replace={false}
-                to="/shards"
-              >
-                <withRouter(Connect(NumberCard))
-                  className="smd-pointer"
-                  description="Shards"
-                  iconClass="fa-diagram-project"
-                  number={undefined}
-                />
-              </Link>,
-              "className": "col-sm-3",
-            },
-            "ref": null,
-            "rendered": Object {
-              "instance": null,
-              "key": undefined,
-              "nodeType": "class",
-              "props": Object {
-                "children": <withRouter(Connect(NumberCard))
-                  className="smd-pointer"
-                  description="Shards"
-                  iconClass="fa-diagram-project"
-                  number={undefined}
-                />,
-                "replace": false,
-                "to": "/shards",
-              },
-              "ref": null,
-              "rendered": Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "function",
-                "props": Object {
-                  "className": "smd-pointer",
-                  "description": "Shards",
-                  "iconClass": "fa-diagram-project",
                   "number": undefined,
                 },
                 "ref": null,
@@ -8126,7 +8608,7 @@ ShallowWrapper {
         "props": Object {
           "children": Array [
             <div
-              className="col-sm-3"
+              className="col-sm-4"
             >
               <withRouter(Connect(NumberCard))
                 className="smd-pointer"
@@ -8138,7 +8620,7 @@ ShallowWrapper {
               />
             </div>,
             <div
-              className="col-sm-6"
+              className="col-sm-8"
             >
               <withRouter(Connect(NodeCard)) />
             </div>,
@@ -8160,7 +8642,7 @@ ShallowWrapper {
                 number="No Identity"
                 textSize="h4"
               />,
-              "className": "col-sm-3",
+              "className": "col-sm-4",
             },
             "ref": null,
             "rendered": Object {
@@ -8187,7 +8669,7 @@ ShallowWrapper {
             "nodeType": "host",
             "props": Object {
               "children": <withRouter(Connect(NodeCard)) />,
-              "className": "col-sm-6",
+              "className": "col-sm-8",
             },
             "ref": null,
             "rendered": Object {
@@ -8289,16 +8771,33 @@ ShallowWrapper {
             <div
               className="col-sm-3"
             >
-              <Link
-                replace={false}
-                to="/blocks"
+              <div
+                id="networkInfo"
               >
-                <withRouter(Connect(NumberCard))
-                  description="Blocks"
-                  iconClass="fa-cube"
-                  number={undefined}
-                />
-              </Link>
+                <Link
+                  replace={false}
+                  to=""
+                >
+                  <withRouter(Connect(NumberCard))
+                    className="smd-pointer"
+                    description="Network"
+                    iconClass="fa-exclamation-circle"
+                    mode="danger"
+                    number="UNKNOWN"
+                  />
+                </Link>
+                <br />
+                <Link
+                  replace={false}
+                  to="/blocks"
+                >
+                  <withRouter(Connect(NumberCard))
+                    description="Blocks"
+                    iconClass="fa-cube"
+                    number={undefined}
+                  />
+                </Link>
+              </div>
             </div>,
             <div
               className="col-sm-3"
@@ -8320,47 +8819,143 @@ ShallowWrapper {
             "key": undefined,
             "nodeType": "host",
             "props": Object {
-              "children": <Link
-                replace={false}
-                to="/blocks"
+              "children": <div
+                id="networkInfo"
               >
-                <withRouter(Connect(NumberCard))
-                  description="Blocks"
-                  iconClass="fa-cube"
-                  number={undefined}
-                />
-              </Link>,
+                <Link
+                  replace={false}
+                  to=""
+                >
+                  <withRouter(Connect(NumberCard))
+                    className="smd-pointer"
+                    description="Network"
+                    iconClass="fa-exclamation-circle"
+                    mode="danger"
+                    number="UNKNOWN"
+                  />
+                </Link>
+                <br />
+                <Link
+                  replace={false}
+                  to="/blocks"
+                >
+                  <withRouter(Connect(NumberCard))
+                    description="Blocks"
+                    iconClass="fa-cube"
+                    number={undefined}
+                  />
+                </Link>
+              </div>,
               "className": "col-sm-3",
             },
             "ref": null,
             "rendered": Object {
               "instance": null,
               "key": undefined,
-              "nodeType": "class",
+              "nodeType": "host",
               "props": Object {
-                "children": <withRouter(Connect(NumberCard))
-                  description="Blocks"
-                  iconClass="fa-cube"
-                  number={undefined}
-                />,
-                "replace": false,
-                "to": "/blocks",
+                "children": Array [
+                  <Link
+                    replace={false}
+                    to=""
+                  >
+                    <withRouter(Connect(NumberCard))
+                      className="smd-pointer"
+                      description="Network"
+                      iconClass="fa-exclamation-circle"
+                      mode="danger"
+                      number="UNKNOWN"
+                    />
+                  </Link>,
+                  <br />,
+                  <Link
+                    replace={false}
+                    to="/blocks"
+                  >
+                    <withRouter(Connect(NumberCard))
+                      description="Blocks"
+                      iconClass="fa-cube"
+                      number={undefined}
+                    />
+                  </Link>,
+                ],
+                "id": "networkInfo",
               },
               "ref": null,
-              "rendered": Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "function",
-                "props": Object {
-                  "description": "Blocks",
-                  "iconClass": "fa-cube",
-                  "number": undefined,
+              "rendered": Array [
+                Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "class",
+                  "props": Object {
+                    "children": <withRouter(Connect(NumberCard))
+                      className="smd-pointer"
+                      description="Network"
+                      iconClass="fa-exclamation-circle"
+                      mode="danger"
+                      number="UNKNOWN"
+                    />,
+                    "replace": false,
+                    "to": "",
+                  },
+                  "ref": null,
+                  "rendered": Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "function",
+                    "props": Object {
+                      "className": "smd-pointer",
+                      "description": "Network",
+                      "iconClass": "fa-exclamation-circle",
+                      "mode": "danger",
+                      "number": "UNKNOWN",
+                    },
+                    "ref": null,
+                    "rendered": null,
+                    "type": [Function],
+                  },
+                  "type": [Function],
                 },
-                "ref": null,
-                "rendered": null,
-                "type": [Function],
-              },
-              "type": [Function],
+                Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "host",
+                  "props": Object {},
+                  "ref": null,
+                  "rendered": null,
+                  "type": "br",
+                },
+                Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "class",
+                  "props": Object {
+                    "children": <withRouter(Connect(NumberCard))
+                      description="Blocks"
+                      iconClass="fa-cube"
+                      number={undefined}
+                    />,
+                    "replace": false,
+                    "to": "/blocks",
+                  },
+                  "ref": null,
+                  "rendered": Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "function",
+                    "props": Object {
+                      "description": "Blocks",
+                      "iconClass": "fa-cube",
+                      "number": undefined,
+                    },
+                    "ref": null,
+                    "rendered": null,
+                    "type": [Function],
+                  },
+                  "type": [Function],
+                },
+              ],
+              "type": "div",
             },
             "type": "div",
           },
@@ -8644,14 +9239,31 @@ ShallowWrapper {
             }
           />,
           <div
-            className="row"
+            className="row d-flex align-items-center"
           >
             <div
-              className="col-sm-9 text-left"
+              className="col-sm-6 text-left"
             >
               <h3>
                 Node Stats
               </h3>
+            </div>
+            <div
+              className="sys-info-container row col-sm-6 text-right"
+              style={
+                Object {
+                  "marginBottom": "10px",
+                  "marginLeft": "0px",
+                  "marginRight": "0px",
+                  "marginTop": "25px",
+                }
+              }
+            >
+              <p
+                className="text-right"
+              >
+                System Metrics Loading...
+              </p>
             </div>
           </div>,
           <div
@@ -8667,7 +9279,7 @@ ShallowWrapper {
             className="row"
           >
             <div
-              className="col-sm-3"
+              className="col-sm-4"
             >
               <Blueprint.Popover
                 arrowSize={30}
@@ -8709,7 +9321,7 @@ ShallowWrapper {
               </Blueprint.Popover>
             </div>
             <div
-              className="col-sm-3"
+              className="col-sm-4"
             >
               <Link
                 replace={false}
@@ -8724,7 +9336,7 @@ ShallowWrapper {
               </Link>
             </div>
             <div
-              className="col-sm-3"
+              className="col-sm-4"
             >
               <Link
                 replace={false}
@@ -8734,21 +9346,6 @@ ShallowWrapper {
                   className="smd-pointer"
                   description="Contracts"
                   iconClass="fa-file-contract"
-                  number={undefined}
-                />
-              </Link>
-            </div>
-            <div
-              className="col-sm-3"
-            >
-              <Link
-                replace={false}
-                to="/shards"
-              >
-                <withRouter(Connect(NumberCard))
-                  className="smd-pointer"
-                  description="Shards"
-                  iconClass="fa-diagram-project"
                   number={undefined}
                 />
               </Link>
@@ -8767,7 +9364,7 @@ ShallowWrapper {
             className="row"
           >
             <div
-              className="col-sm-3"
+              className="col-sm-4"
             >
               <withRouter(Connect(NumberCard))
                 className="smd-pointer"
@@ -8779,7 +9376,7 @@ ShallowWrapper {
               />
             </div>
             <div
-              className="col-sm-6"
+              className="col-sm-8"
             >
               <withRouter(Connect(NodeCard)) />
             </div>
@@ -8810,16 +9407,33 @@ ShallowWrapper {
             <div
               className="col-sm-3"
             >
-              <Link
-                replace={false}
-                to="/blocks"
+              <div
+                id="networkInfo"
               >
-                <withRouter(Connect(NumberCard))
-                  description="Blocks"
-                  iconClass="fa-cube"
-                  number={undefined}
-                />
-              </Link>
+                <Link
+                  replace={false}
+                  to=""
+                >
+                  <withRouter(Connect(NumberCard))
+                    className="smd-pointer"
+                    description="Network"
+                    iconClass="fa-exclamation-circle"
+                    mode="danger"
+                    number="UNKNOWN"
+                  />
+                </Link>
+                <br />
+                <Link
+                  replace={false}
+                  to="/blocks"
+                >
+                  <withRouter(Connect(NumberCard))
+                    description="Blocks"
+                    iconClass="fa-cube"
+                    number={undefined}
+                  />
+                </Link>
+              </div>
             </div>
             <div
               className="col-sm-3"
@@ -8925,40 +9539,94 @@ ShallowWrapper {
           "key": undefined,
           "nodeType": "host",
           "props": Object {
-            "children": <div
-              className="col-sm-9 text-left"
-            >
-              <h3>
-                Node Stats
-              </h3>
-            </div>,
-            "className": "row",
+            "children": Array [
+              <div
+                className="col-sm-6 text-left"
+              >
+                <h3>
+                  Node Stats
+                </h3>
+              </div>,
+              <div
+                className="sys-info-container row col-sm-6 text-right"
+                style={
+                  Object {
+                    "marginBottom": "10px",
+                    "marginLeft": "0px",
+                    "marginRight": "0px",
+                    "marginTop": "25px",
+                  }
+                }
+              >
+                <p
+                  className="text-right"
+                >
+                  System Metrics Loading...
+                </p>
+              </div>,
+            ],
+            "className": "row d-flex align-items-center",
           },
           "ref": null,
-          "rendered": Object {
-            "instance": null,
-            "key": undefined,
-            "nodeType": "host",
-            "props": Object {
-              "children": <h3>
-                Node Stats
-              </h3>,
-              "className": "col-sm-9 text-left",
-            },
-            "ref": null,
-            "rendered": Object {
+          "rendered": Array [
+            Object {
               "instance": null,
               "key": undefined,
               "nodeType": "host",
               "props": Object {
-                "children": "Node Stats",
+                "children": <h3>
+                  Node Stats
+                </h3>,
+                "className": "col-sm-6 text-left",
               },
               "ref": null,
-              "rendered": "Node Stats",
-              "type": "h3",
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "host",
+                "props": Object {
+                  "children": "Node Stats",
+                },
+                "ref": null,
+                "rendered": "Node Stats",
+                "type": "h3",
+              },
+              "type": "div",
             },
-            "type": "div",
-          },
+            Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": <p
+                  className="text-right"
+                >
+                  System Metrics Loading...
+                </p>,
+                "className": "sys-info-container row col-sm-6 text-right",
+                "style": Object {
+                  "marginBottom": "10px",
+                  "marginLeft": "0px",
+                  "marginRight": "0px",
+                  "marginTop": "25px",
+                },
+              },
+              "ref": null,
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "host",
+                "props": Object {
+                  "children": "System Metrics Loading...",
+                  "className": "text-right",
+                },
+                "ref": null,
+                "rendered": "System Metrics Loading...",
+                "type": "p",
+              },
+              "type": "div",
+            },
+          ],
           "type": "div",
         },
         Object {
@@ -9003,7 +9671,7 @@ ShallowWrapper {
           "props": Object {
             "children": Array [
               <div
-                className="col-sm-3"
+                className="col-sm-4"
               >
                 <Blueprint.Popover
                   arrowSize={30}
@@ -9045,7 +9713,7 @@ ShallowWrapper {
                 </Blueprint.Popover>
               </div>,
               <div
-                className="col-sm-3"
+                className="col-sm-4"
               >
                 <Link
                   replace={false}
@@ -9060,7 +9728,7 @@ ShallowWrapper {
                 </Link>
               </div>,
               <div
-                className="col-sm-3"
+                className="col-sm-4"
               >
                 <Link
                   replace={false}
@@ -9070,21 +9738,6 @@ ShallowWrapper {
                     className="smd-pointer"
                     description="Contracts"
                     iconClass="fa-file-contract"
-                    number={undefined}
-                  />
-                </Link>
-              </div>,
-              <div
-                className="col-sm-3"
-              >
-                <Link
-                  replace={false}
-                  to="/shards"
-                >
-                  <withRouter(Connect(NumberCard))
-                    className="smd-pointer"
-                    description="Shards"
-                    iconClass="fa-diagram-project"
                     number={undefined}
                   />
                 </Link>
@@ -9137,7 +9790,7 @@ ShallowWrapper {
                     number="DISCONNECTED"
                   />
                 </Blueprint.Popover>,
-                "className": "col-sm-3",
+                "className": "col-sm-4",
               },
               "ref": null,
               "rendered": Object {
@@ -9214,7 +9867,7 @@ ShallowWrapper {
                     number={undefined}
                   />
                 </Link>,
-                "className": "col-sm-3",
+                "className": "col-sm-4",
               },
               "ref": null,
               "rendered": Object {
@@ -9266,7 +9919,7 @@ ShallowWrapper {
                     number={undefined}
                   />
                 </Link>,
-                "className": "col-sm-3",
+                "className": "col-sm-4",
               },
               "ref": null,
               "rendered": Object {
@@ -9292,58 +9945,6 @@ ShallowWrapper {
                     "className": "smd-pointer",
                     "description": "Contracts",
                     "iconClass": "fa-file-contract",
-                    "number": undefined,
-                  },
-                  "ref": null,
-                  "rendered": null,
-                  "type": [Function],
-                },
-                "type": [Function],
-              },
-              "type": "div",
-            },
-            Object {
-              "instance": null,
-              "key": undefined,
-              "nodeType": "host",
-              "props": Object {
-                "children": <Link
-                  replace={false}
-                  to="/shards"
-                >
-                  <withRouter(Connect(NumberCard))
-                    className="smd-pointer"
-                    description="Shards"
-                    iconClass="fa-diagram-project"
-                    number={undefined}
-                  />
-                </Link>,
-                "className": "col-sm-3",
-              },
-              "ref": null,
-              "rendered": Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "class",
-                "props": Object {
-                  "children": <withRouter(Connect(NumberCard))
-                    className="smd-pointer"
-                    description="Shards"
-                    iconClass="fa-diagram-project"
-                    number={undefined}
-                  />,
-                  "replace": false,
-                  "to": "/shards",
-                },
-                "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "function",
-                  "props": Object {
-                    "className": "smd-pointer",
-                    "description": "Shards",
-                    "iconClass": "fa-diagram-project",
                     "number": undefined,
                   },
                   "ref": null,
@@ -9399,7 +10000,7 @@ ShallowWrapper {
           "props": Object {
             "children": Array [
               <div
-                className="col-sm-3"
+                className="col-sm-4"
               >
                 <withRouter(Connect(NumberCard))
                   className="smd-pointer"
@@ -9411,7 +10012,7 @@ ShallowWrapper {
                 />
               </div>,
               <div
-                className="col-sm-6"
+                className="col-sm-8"
               >
                 <withRouter(Connect(NodeCard)) />
               </div>,
@@ -9433,7 +10034,7 @@ ShallowWrapper {
                   number="No Identity"
                   textSize="h4"
                 />,
-                "className": "col-sm-3",
+                "className": "col-sm-4",
               },
               "ref": null,
               "rendered": Object {
@@ -9460,7 +10061,7 @@ ShallowWrapper {
               "nodeType": "host",
               "props": Object {
                 "children": <withRouter(Connect(NodeCard)) />,
-                "className": "col-sm-6",
+                "className": "col-sm-8",
               },
               "ref": null,
               "rendered": Object {
@@ -9562,16 +10163,33 @@ ShallowWrapper {
               <div
                 className="col-sm-3"
               >
-                <Link
-                  replace={false}
-                  to="/blocks"
+                <div
+                  id="networkInfo"
                 >
-                  <withRouter(Connect(NumberCard))
-                    description="Blocks"
-                    iconClass="fa-cube"
-                    number={undefined}
-                  />
-                </Link>
+                  <Link
+                    replace={false}
+                    to=""
+                  >
+                    <withRouter(Connect(NumberCard))
+                      className="smd-pointer"
+                      description="Network"
+                      iconClass="fa-exclamation-circle"
+                      mode="danger"
+                      number="UNKNOWN"
+                    />
+                  </Link>
+                  <br />
+                  <Link
+                    replace={false}
+                    to="/blocks"
+                  >
+                    <withRouter(Connect(NumberCard))
+                      description="Blocks"
+                      iconClass="fa-cube"
+                      number={undefined}
+                    />
+                  </Link>
+                </div>
               </div>,
               <div
                 className="col-sm-3"
@@ -9593,47 +10211,143 @@ ShallowWrapper {
               "key": undefined,
               "nodeType": "host",
               "props": Object {
-                "children": <Link
-                  replace={false}
-                  to="/blocks"
+                "children": <div
+                  id="networkInfo"
                 >
-                  <withRouter(Connect(NumberCard))
-                    description="Blocks"
-                    iconClass="fa-cube"
-                    number={undefined}
-                  />
-                </Link>,
+                  <Link
+                    replace={false}
+                    to=""
+                  >
+                    <withRouter(Connect(NumberCard))
+                      className="smd-pointer"
+                      description="Network"
+                      iconClass="fa-exclamation-circle"
+                      mode="danger"
+                      number="UNKNOWN"
+                    />
+                  </Link>
+                  <br />
+                  <Link
+                    replace={false}
+                    to="/blocks"
+                  >
+                    <withRouter(Connect(NumberCard))
+                      description="Blocks"
+                      iconClass="fa-cube"
+                      number={undefined}
+                    />
+                  </Link>
+                </div>,
                 "className": "col-sm-3",
               },
               "ref": null,
               "rendered": Object {
                 "instance": null,
                 "key": undefined,
-                "nodeType": "class",
+                "nodeType": "host",
                 "props": Object {
-                  "children": <withRouter(Connect(NumberCard))
-                    description="Blocks"
-                    iconClass="fa-cube"
-                    number={undefined}
-                  />,
-                  "replace": false,
-                  "to": "/blocks",
+                  "children": Array [
+                    <Link
+                      replace={false}
+                      to=""
+                    >
+                      <withRouter(Connect(NumberCard))
+                        className="smd-pointer"
+                        description="Network"
+                        iconClass="fa-exclamation-circle"
+                        mode="danger"
+                        number="UNKNOWN"
+                      />
+                    </Link>,
+                    <br />,
+                    <Link
+                      replace={false}
+                      to="/blocks"
+                    >
+                      <withRouter(Connect(NumberCard))
+                        description="Blocks"
+                        iconClass="fa-cube"
+                        number={undefined}
+                      />
+                    </Link>,
+                  ],
+                  "id": "networkInfo",
                 },
                 "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "function",
-                  "props": Object {
-                    "description": "Blocks",
-                    "iconClass": "fa-cube",
-                    "number": undefined,
+                "rendered": Array [
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "class",
+                    "props": Object {
+                      "children": <withRouter(Connect(NumberCard))
+                        className="smd-pointer"
+                        description="Network"
+                        iconClass="fa-exclamation-circle"
+                        mode="danger"
+                        number="UNKNOWN"
+                      />,
+                      "replace": false,
+                      "to": "",
+                    },
+                    "ref": null,
+                    "rendered": Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "function",
+                      "props": Object {
+                        "className": "smd-pointer",
+                        "description": "Network",
+                        "iconClass": "fa-exclamation-circle",
+                        "mode": "danger",
+                        "number": "UNKNOWN",
+                      },
+                      "ref": null,
+                      "rendered": null,
+                      "type": [Function],
+                    },
+                    "type": [Function],
                   },
-                  "ref": null,
-                  "rendered": null,
-                  "type": [Function],
-                },
-                "type": [Function],
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "host",
+                    "props": Object {},
+                    "ref": null,
+                    "rendered": null,
+                    "type": "br",
+                  },
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "class",
+                    "props": Object {
+                      "children": <withRouter(Connect(NumberCard))
+                        description="Blocks"
+                        iconClass="fa-cube"
+                        number={undefined}
+                      />,
+                      "replace": false,
+                      "to": "/blocks",
+                    },
+                    "ref": null,
+                    "rendered": Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "function",
+                      "props": Object {
+                        "description": "Blocks",
+                        "iconClass": "fa-cube",
+                        "number": undefined,
+                      },
+                      "ref": null,
+                      "rendered": null,
+                      "type": [Function],
+                    },
+                    "type": [Function],
+                  },
+                ],
+                "type": "div",
               },
               "type": "div",
             },

@@ -10,7 +10,6 @@ dependencies:
   - base
   - blockstanbul # This dependency doesn't appear to be used at all, except for one symbol that doesn't exist.
                  # To avoid breaking builds, please leave this here: https://blockapps.atlassian.net/browse/OPS-65
-  - x509-certs
 
 library:
   source-dirs: src/
@@ -18,16 +17,16 @@ library:
     - Blockchain.BlockChain
     - Blockchain.Event
     - Executable.EthereumVM
+    - Executable.EthereumVM2
   ghc-options: -Wall -O2
   dependencies:
-  - ansi-wl-pprint
-  - base16-bytestring
   - binary
   - blockapps-data
   - blockapps-datadefs
   - blockapps-mpdbs
   - bytestring
   - common-log
+  - composable-monads-base
   - conduit
   - containers
   - cross-monitoring
@@ -38,6 +37,7 @@ library:
   - extra
   - format
   - lens
+  - kafka-monad
   - merkle-patricia-db
   - milena
   - milena-tools
@@ -46,19 +46,19 @@ library:
   - prometheus-client
   - seqevents
   - solid-vm
+  - sql-monad
   - stm
   - strato-conf
   - strato-genesis
   - strato-index
   - strato-model
   - strato-statediff
-  - strato-redis-blockdb
   - text
   - time
   - transformers
   - unliftio
   - vm-tools
-  - x509-certs
+  - ordered-containers
 
 executables:
   vm-runner:
@@ -68,17 +68,10 @@ executables:
       - async
       - blockapps-init
       - common-log
-      - containers
       - debugger
       - hflags
-      - milena-tools
-      - solid-vm
       - solid-vm-fuzzer
-      - strato-conf
       - strato-model
-      - text
-      - transformers
-      - unliftio
       - vm-runner
       - vm-tools
       - wai-middleware-prometheus
@@ -93,6 +86,7 @@ tests:
       - base16-bytestring
       - blockapps-data
       - blockapps-mpdbs
+      - blockstanbul
       - bytestring
       - common-log
       - containers
@@ -103,7 +97,6 @@ tests:
       - labeled-error
       - merkle-patricia-db
       - monad-alter
-      - strato-conf
       - strato-model
       - vm-runner
       - vm-tools

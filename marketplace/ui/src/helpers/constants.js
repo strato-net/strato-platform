@@ -1,20 +1,16 @@
-import { env } from "../env";
+import { AMEX, Discover, Mastercard, VISA, BANK } from "../images/SVGComponents";
 
 export const apiUrl = process.env.REACT_APP_URL
   ? process.env.REACT_APP_URL + "/api/v1"
   : "/api/v1";
 
+export const fileServerUrl = window.FILE_SERVER_URL === '__FILE_SERVER_URL__'
+  ? 'https://fileserver.mercata-testnet2.blockapps.net/highway' // hardcoding for non-dockerized dev mode
+  : window.FILE_SERVER_URL;
+
 export const cirrusUrl = process.env.REACT_APP_URL
   ? process.env.REACT_APP_URL + "/cirrus/search"
   : "/cirrus/search"
-
-export const assetTableName = env.REACT_APP_ASSET_TABLE_NAME
-  ? env.REACT_APP_ASSET_TABLE_NAME
-  : "Asset"
-
-export const saleTableName = env.REACT_APP_SALE_TABLE_NAME
-  ? env.REACT_APP_SALE_TABLE_NAME
-  : "Sale"
 
 export const HTTP_METHODS = {
   GET: "GET",
@@ -22,6 +18,13 @@ export const HTTP_METHODS = {
   PATCH: "PATCH",
   PUT: "PUT",
 };
+
+export const homeUrl = new URL("/marketplace/", window.location.origin).toString();
+export const soldOrdersBaseUrl = new URL("/marketplace/order/sold", window.location.origin).toString();
+export const boughtOrdersBaseUrl = new URL("/marketplace/order/bought", window.location.origin).toString();
+export const transfersBaseUrl = new URL("/marketplace/order/transfers", window.location.origin).toString();
+export const soldOrderDetailssBaseUrl = new URL("/marketplace/sold-orders", window.location.origin).toString();
+export const boughtOrderDetailssBaseUrl = new URL("/marketplace/bought-orders", window.location.origin).toString();
 
 export const UNIT_OF_MEASUREMENTS = {
   1: "LB",
@@ -45,22 +48,37 @@ export const MAX_PRICE = 100000000;
 export const INVENTORY_STATUS = {
   PUBLISHED: 1,
   UNPUBLISHED: 2,
-  1: "Published",
-  2: "Unpublished",
+  "1": "Published",
+  "2": "Unpublished",
+};
+
+export const getUnitNameByIndex = (index) => {
+  const unit = unitOfMeasures.find((measure) => measure.value === parseInt(index));
+
+  if (unit) {
+    if (unit.name.length > 20) {
+      // Extract abbreviation from inside brackets
+      const matches = unit.name.match(/\((.*?)\)/);
+      if (matches && matches.length > 1) {
+        return matches[1];
+      }
+    }
+    
+    return unit.name;
+  }
+  
+  return null;
 };
 
 export const unitOfMeasures = [
-  { name: "LB", value: 1 },
-  { name: "Ounce", value: 2 },
-  { name: "Ton", value: 3 },
-  { name: "Bag", value: 4 },
-  { name: "Box", value: 5 },
-  { name: "Piece", value: 6 },
-  { name: "Bale", value: 7 },
-  { name: "Gallon", value: 8 },
-  { name: "Pound", value: 9 },
-  { name: "Yard", value: 10 },
-  { name: "Kilogram", value: 11 }
+  { name: "Gram (G)", value: 1 },
+  { name: "Kilogram (KG)", value: 2 },
+  { name: "Troy Ounce (t oz)", value: 3 },
+  { name: "Troy Pound (t lb)", value: 4 },
+  { name: "Avoirdupois Ounce (AVDP Oz)", value: 5 },
+  { name: "Avoirdupois Pound (AVDP Lb)", value: 6 },
+  { name: "Metric Ton (TON)", value: 7 },
+  { name: "Imperial Ton (TONNE)", value: 8 }
 ];
 
 export const CHARGES = {
@@ -101,3 +119,37 @@ export const APPROVAL_STATUS = {
   "Accept": 1,
   "Reject": 2,
 };
+
+export const CATEGORIES = [
+  "Art",
+  "CarbonOffset",
+  "Metals",
+  "Clothing",
+  "Membership",
+  "CarbonDAO",
+  "Collectibles"
+]
+
+export const PAYMENT_TYPE = [
+  { 
+    name: "Credit Card / ACH", 
+    value: 1, 
+    options: [
+      <AMEX width="30px" height="20px"/>,
+      <Discover width="30px" height="20px"/>,
+      <Mastercard width="30px" height="20px"/>,
+      <VISA width="30px" height="20px"/>,
+      <BANK width="30px" height="20px"/>
+    ]
+  }
+]
+
+export const ORDER_STATUS = {
+  "AWAITING_FULFILLMENT": 1,
+  "AWAITING_SHIPMENT": 2,
+  "CLOSED": 3,
+  "CANCELED": 4,
+  "PAYMENT_PENDING": 5
+}
+
+export const PAYMENT_LIST = ['card','us_bank_account']

@@ -9,7 +9,6 @@ description: The client described in the Ethereum Yellowpaper
 
 dependencies:
   - base
-  - x509-certs
 
 
 
@@ -19,7 +18,6 @@ library:
   source-dirs: src/
   default-extensions: TemplateHaskell
   dependencies:
-  - ansi-wl-pprint
   - base16-bytestring
   - binary
   - blockapps-data
@@ -29,7 +27,6 @@ library:
   - data-default
   - deepseq
   - ethereum-rlp
-  - extra
   - fastMP
   - format
   - lens
@@ -37,13 +34,13 @@ library:
   - merkle-patricia-db
   - monad-alter
   - monad-loops
-  - mtl
   - nibblestring
   - solid-vm-model
   - strato-model
   - text
   - transformers
-  - x509-certs
+  - unliftio-core
+  - monad-logger
 
 tests:
   blockapps-mpdbs-test:
@@ -55,7 +52,6 @@ tests:
       - bytestring
       - common-log
       - containers
-      - deepseq
       - directory
       - hspec
       - hspec-expectations-lifted

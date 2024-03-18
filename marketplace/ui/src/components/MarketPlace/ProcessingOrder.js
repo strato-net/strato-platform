@@ -1,9 +1,10 @@
 import { Spin, notification } from "antd";
 import React, { useEffect, useState, useMemo } from "react";
 import RestStatus from "http-status-codes";
-import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
+import { apiUrl, HTTP_METHODS, ORDER_STATUS } from "../../helpers/constants";
 import { useNavigate, useMatch, useLocation } from "react-router-dom";
 import routes from "../../helpers/routes";
+import {generateHtmlContent, generateHtmlContentNickel} from "../../helpers/emailTemplate";
 import { actions as orderActions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import { actions } from "../../contexts/marketplace/actions";
@@ -18,7 +19,7 @@ function useQuery() {
   return useMemo(() => new URLSearchParams(search), [search]);
 }
 
-const ProcessingOrder = () => {
+const ProcessingOrder = ({user}) => {
 
   const navigate = useNavigate();
   const [sessionId, setSessionId] = useState(undefined);
@@ -28,10 +29,15 @@ const ProcessingOrder = () => {
   const [error, seterror] = useState(null)
   const { message, success } = useOrderState();
   const [api, contextHolder] = notification.useNotification();
+  const [called, setCalled] = useState(false);
 
 
   const storedData = useMemo(() => {
     return JSON.parse(window.localStorage.getItem("cartList") ?? []);
+  }, []);
+
+  const storedConfirmList = useMemo(() => {
+    return JSON.parse(window.localStorage.getItem("confirmOrderList") ?? []);
   }, []);
 
   // useEffect(() => {
@@ -50,18 +56,19 @@ const ProcessingOrder = () => {
   }, [routeMatch, query]);
 
   useEffect(() => {
-    // getCartData();
-    if (sessionId !== undefined) {
+    if (sessionId !== undefined && user !== undefined && !called) {
+      setCalled(true);
       getCartData();
     }
 
-  }, [sessionId])
+  }, [sessionId, user])
 
 
   const getCartData = async () => {
     try {
+      const sellersCommonName = storedConfirmList[0].sellersCommonName;
       const response = await fetch(
-        `${apiUrl}/order/payment/session/${sessionId}`,
+        `${apiUrl}/order/payment/session/${sessionId}/${sellersCommonName}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -69,12 +76,27 @@ const ProcessingOrder = () => {
 
       const body = await response.json();
       if (response.status === RestStatus.OK) {
-        if (JSON.parse(body.data.metadata.cart) !== {}) {
-          if (body.data["payment_status"] === "paid") {
-            const cart = JSON.parse(body.data.metadata.cart);
-            let object = { paymentSessionId: sessionId, ...cart };
-            handleOrderConfirm(object);
+        try {
+          const cartObject = JSON.parse(body.data.metadata.cart);
+          if (Object.keys(cartObject).length !== 0) {
+            if (body.data["payment_status"] === "paid") {
+              const customerEmail = user.email;
+              const cart = JSON.parse(body.data.metadata.cart);
+              let object = { paymentSessionId: sessionId, status:ORDER_STATUS.AWAITING_FULFILLMENT, paymentMethod: body.data.payment_method, ...cart };
+              handleOrderConfirm(object, customerEmail);
+            }
+            else if (body.data["payment_method_options"].hasOwnProperty("us_bank_account")) {
+              const customerEmail = user.email;
+              const cart = JSON.parse(body.data.metadata.cart);
+              let object = { paymentSessionId: sessionId, status:ORDER_STATUS.PAYMENT_PENDING, paymentMethod: body.data.payment_method, ...cart };
+              handleOrderConfirm(object, customerEmail);
+            }
           }
+        } catch (error) {
+          seterror(error);
+          setTimeout(function () {
+            navigate(routes.Checkout.url)
+          }, 2000);
         }
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         seterror("Cannot find session ID");
@@ -95,136 +117,82 @@ const ProcessingOrder = () => {
 
 
 
-  const handleOrderConfirm = async (cartData) => {
-
+  const handleOrderConfirm = async (cartData, customerEmail) => {
+    let htmlContents = [];
+    
+    let customerFirstName = cartData.user.split(" ")[0];
+    
     // Construct Email with order details
     let concatenatedOrderString = "";
     let orderTotal = 0; 
-    for (let i = 0; i < cartData.orderList.length; i++) {
-      let orderItem = cartData.orderList[i];
-      let itemName = orderItem.name.replace(/%20/g, ' '); 
+    for (let i = 0; i < storedConfirmList.length; i++) {
+      let orderItem = storedConfirmList[i];
+      let itemName = decodeURIComponent(orderItem.item.name);
       let itemPrice = parseFloat(orderItem.unitPrice).toFixed(2); 
-      let itemQty = orderItem.quantity;
+      let itemQty = orderItem.qty;
       let itemTotal = (itemPrice * itemQty).toFixed(2); 
   
       concatenatedOrderString += `${itemName}:\n`; 
       concatenatedOrderString += `$${itemTotal} <br>`; 
       concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each <br><br>`; 
       orderTotal += parseFloat(itemTotal); 
-      if (i === cartData.orderList.length - 1) {
+      if (i === storedConfirmList.length - 1) {
         concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
         concatenatedOrderString += `Sales Tax: $${parseFloat(cartData.tax).toFixed(2)} <br>`;
         concatenatedOrderString += `Shipping Fee: <i><strong>Free</strong></i><br><br>`;
         concatenatedOrderString += `Order Total: $${orderTotal.toFixed(2)} <br>`;
       }
     }
+    
+    // const allItemsAreNickelReserve = cartData.orderList.every((obj) => obj.subCategory === "Nickel Reserve");
+    // const index = cartData.orderList.findIndex(obj => obj.subCategory === "Nickel Reserve");
+    
+    // if (index !== -1) {
+    //   let nickel = {};
+    //   let orderItem = cartData.orderList[index];
+    //   nickel.orderTotal = orderItem.unitPrice * orderItem.quantity;
+    //   nickel.itemQty = orderItem.quantity;
+    //   nickel.itemName = orderItem.name;
+    //   htmlContents.push(generateHtmlContentNickel(customerFirstName, nickel ));
+    //   // if cartData orderlist has more than one item, use generateHtmlContent to populate htmlContents
+    //   if (cartData.orderList.length > 1) {
+    //     htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
+    //   }
+    // } else {
+    //     htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
+    // }
 
-    let customerFirstName = cartData.user.split(" ")[0];
-
-    const htmlContent = `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Your Order Confirmation</title>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-            }
-            .container {
-                margin: 20px auto;
-                padding: 20px;
-                background-color: #ffffff;
-                border-radius: 10px;
-                border: 1px solid #0A1B71;
-                max-width: 600px;
-            }
-            h2 {
-                color: #0A1B71;
-            }
-            ul {
-                list-style-type: none;
-                padding: 0;
-            }
-            p {
-                margin: 10px 0;
-            }
-            .signature {
-                display: flex;
-                align-items: center;
-            }
-            .logo {
-                margin-right: 10px;
-                width: 60px;
-                height: 60px;
-            }
-            .logo-text {
-                color: #000;
-                font-weight: 100;
-            }
-            .footer {
-                font-size: 10px;
-                margin-top: 20px;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h2>Hello <strong>${customerFirstName},</strong></h2>
-            
-            <p>Thank you for shopping with us. Your recent order on the BlockApps Mercata Marketplace has been successfully processed. Below are the details of your purchase:</p>
-            
-            <ul>
-                ${concatenatedOrderString}
-            </ul>
-            
-            <p>If you have any questions or need assistance with your order, please feel free to contact our customer support team at sales@blockapps.net.</p>
-            
-            <div class="signature">
-            <img class="logo" src="https://blockapps.net/wp-content/uploads/2022/08/blockapps-avatar.jpg" alt="Logo" />
-
-                <h3 class="logo-text">BlockApps Marketplace <a href="https://blockapps.net/products/strato-mercata/" rel="noopener noreferrer"><em>powered by STATO Mercata™</em><a></h3>
-            </div>
-            <p class="footer">This email was sent from a notification-only address and cannot accept incoming email. Please do not reply to this message.</p>
-        </div>
-    </body>
-    </html>
-    `;
+    htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
 
     // Prepare order data to be sent to order controller
-    const orderList = cartData.orderList.map(c => {
-      return {
-        inventoryId: c.inventoryId,
-        quantity: c.quantity,
-      }
+    let assetAddresses = [];
+    const orderList = storedConfirmList.map(o => {
+      assetAddresses.push(o.key);
+      return { saleAddress: o.saleAddress, quantity: o.qty };
     });
     
     const body = {
-      buyerOrganization: cartData.buyerOrganization,
-      orderList: orderList,
-      orderTotal: cartData.orderTotal,
+      status: cartData.status,
+      items: orderList,
+      shippingAddressId: cartData.shippingAddressId,
       paymentSessionId: cartData.paymentSessionId,
-      shippingAddress: cartData.shippingAddress,
-      to: cartData.email,
+      to: customerEmail,
       subject: "Your Order Confirmation",
-      htmlContent: htmlContent,
-    };
+      htmlContents: htmlContents,
+    }
 
-    let isDone = await orderActions.createOrder(orderDispatch, body);
+    let isDone = await orderActions.createSaleOrder(orderDispatch, body);
     if (isDone) {
-      let orderItemAddress = [];
-      cartData.orderList.forEach(c => {
-        orderItemAddress.push(c.inventoryId);
-      });
       let updatedCart = [];
       storedData.forEach(cart => {
-        if (!orderItemAddress.includes(cart.product.address)) {
+        if (!assetAddresses.includes(cart.product.address)) {
           updatedCart.push(cart);
         }
       });
       actions.addItemToCart(marketplaceDispatch, updatedCart);
-      navigate(routes.Orders.url, { state: { defaultKey: "Bought" } });
+      setTimeout(() => {
+        navigate(routes.Orders.url.replace(':type', 'bought'));
+      }, 500);      
     } else {
       setTimeout(function () {
         navigate(routes.Checkout.url)
@@ -267,7 +235,7 @@ const ProcessingOrder = () => {
     {contextHolder}
     <div className="h-96 flex flex-col justify-center items-center">
       <Spin spinning={true} size="large" />
-      <p className="mt-4">Please wait while your order is placed successfully</p>
+      <p className="mt-4">Please wait while your order is being processed</p>
     </div>
     {error && openToastMarketplace("bottom")}
     {message && openToastOrder("bottom")}

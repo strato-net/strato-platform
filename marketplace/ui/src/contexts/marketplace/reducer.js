@@ -22,7 +22,8 @@ const reducer = (state, action) => {
     case actionDescriptors.fetchMarketplaceSuccessful:
       return {
         ...state,
-        marketplaceList: action.payload,
+        marketplaceList: action.payload.productsWithImageUrl,
+        marketplaceListCount: action.payload.inventoryCount,
         isMarketplaceLoading: false,
       };
     case actionDescriptors.fetchMarketplaceFailed:
@@ -31,23 +32,24 @@ const reducer = (state, action) => {
         error: action.error,
         isMarketplaceLoading: false,
       };
-      case actionDescriptors.fetchMarketplaceLoggedIn:
-        return {
-          ...state,
-          isMarketplaceLoading: true,
-        };
-      case actionDescriptors.fetchMarketplaceLoggedInSuccessful:
-        return {
-          ...state,
-          marketplaceList: action.payload,
-          isMarketplaceLoading: false,
-        };
-      case actionDescriptors.fetchMarketplaceLoggedInFailed:
-        return {
-          ...state,
-          error: action.error,
-          isMarketplaceLoading: false,
-        };
+    case actionDescriptors.fetchMarketplaceLoggedIn:
+      return {
+        ...state,
+        isMarketplaceLoading: true,
+      };
+    case actionDescriptors.fetchMarketplaceLoggedInSuccessful:
+      return {
+        ...state,
+        marketplaceList: action.payload.productsWithImageUrl,
+        marketplaceListCount: action.payload.inventoryCount,
+        isMarketplaceLoading: false,
+      };
+    case actionDescriptors.fetchMarketplaceLoggedInFailed:
+      return {
+        ...state,
+        error: action.error,
+        isMarketplaceLoading: false,
+      };
     case actionDescriptors.fetchCartItems:
       return {
         ...state,
@@ -136,23 +138,23 @@ const reducer = (state, action) => {
         error: action.error,
         isTopSellingProductsLoading: false,
       };
-      case actionDescriptors.fetchTopSellingProductsLoggedIn:
-        return {
-          ...state,
-          isTopSellingProductsLoading: true,
-        };
-      case actionDescriptors.fetchTopSellingProductsLoggedInSuccessful:
-        return {
-          ...state,
-          topSellingProducts: action.payload,
-          isTopSellingProductsLoading: false,
-        };
-      case actionDescriptors.fetchTopSellingProductsLoggedInFailed:
-        return {
-          ...state,
-          error: action.error,
-          isTopSellingProductsLoading: false,
-        };
+    case actionDescriptors.fetchTopSellingProductsLoggedIn:
+      return {
+        ...state,
+        isTopSellingProductsLoading: true,
+      };
+    case actionDescriptors.fetchTopSellingProductsLoggedInSuccessful:
+      return {
+        ...state,
+        topSellingProducts: action.payload,
+        isTopSellingProductsLoading: false,
+      };
+    case actionDescriptors.fetchTopSellingProductsLoggedInFailed:
+      return {
+        ...state,
+        error: action.error,
+        isTopSellingProductsLoading: false,
+      };
 
     //shipping address adding
     case actionDescriptors.addShippingAddress:
@@ -205,6 +207,22 @@ const reducer = (state, action) => {
         ...state,
         error: action.error,
         isLoadingUserAddresses: false,
+      };
+    case actionDescriptors.fetchStratsBalance:
+      return {
+        ...state,
+        isFetchingStrats: true,
+      };
+    case actionDescriptors.fetchStratsBalanceSuccessful:
+      return {
+        ...state,
+        isFetchingStrats: false,
+        strats: action.payload,
+      };
+    case actionDescriptors.fetchStratsBalanceFailed:
+      return {
+        ...state,
+        isFetchingStrats: false,
       };
     default:
       throw new Error(`Unhandled action: '${action.type}'`);

@@ -4,11 +4,6 @@ dependencies:
 - base
 - bloc2
 - hflags
-- monad-alter
-- mtl
-- postgresql-simple
-- transformers
-- solid-vm-model
 - source-tools
 
 executables:
@@ -28,23 +23,25 @@ executables:
     - cache
     - clock
     - common-log
+    - containers
     - core-api2
-    - evm-solidity
     - format
     - http-types
     - identity-monad
     - insert-ordered-containers
     - lens
+    - monad-alter
     - regex-compat
     - servant-client-core
     - servant-multipart
     - servant-server
     - servant-swagger
     - servant-swagger-ui
+    - solid-vm-model
     - sql-monad
     - strato-model
     - swagger2
-    - text
+    - transformers
     - unliftio
     - vault-monad
     - wai
@@ -65,7 +62,6 @@ executables:
     - aeson
     - bloc2api
     - blockapps-data
-    - blockapps-datadefs
     - bytestring
     - containers
     - format

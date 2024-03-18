@@ -13,10 +13,16 @@ const actionDescriptors = {
   fetchItemOwnershipHistory: "fetch_item_ownership_history",
   fetchItemOwnershipHistorySuccessful: "fetch_item_ownership_history_successful",
   fetchItemOwnershipHistoryFailed: "fetch_item_ownership_history_failed",
+  fetchItemTransfers: "fetch_item_transfers",
+  fetchItemTransfersSuccessful: "fetch_item_transfers_successful",
+  fetchItemTransfersFailed: "fetch_item_transfers_failed",
   fetchItemRawMaterials: "fetch_item_raw_materials",
   fetchItemRawMaterialsSuccessful: "fetch_item_raw_materials_successful",
   fetchItemRawMaterialsFailed: "fetch_item_raw_materials_failed",
-  setActualRawMaterials: "set_actual_raw_materials"
+  setActualRawMaterials: "set_actual_raw_materials",
+  transferOwnership: "transfer_ownership",
+  transferOwnershipSuccessful: "transfer_ownership_successful",
+  transferOwnershipFailed: "transfer_ownership_failed",
 };
 
 const actions = {
@@ -32,7 +38,7 @@ const actions = {
     dispatch({
       type: actionDescriptors.setActualRawMaterials,
       payload: payload,
-   });  
+    });
   },
 
   fetchSerialNumbers: async (dispatch, id) => {
@@ -84,6 +90,12 @@ const actions = {
         });
 
         return true;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchItemOwnershipHistoryFailed,
+          error: "Unauthorized while fetching ownership history"
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -95,6 +107,52 @@ const actions = {
       dispatch({
         type: actionDescriptors.fetchItemOwnershipHistoryFailed,
         error: "Error while fetching ownership history",
+      });
+      return false;
+    }
+  },
+
+  fetchItemTransfers: async (dispatch, limit, offset, ownerOrg, order, date) => {
+    dispatch({ type: actionDescriptors.fetchItemTransfers });
+
+    let range;
+    const end = date + 86400; // This is the end of the same day, needed for the range filter. 
+    if (date) {
+      range = `&range[]=transferDate,${date},${end}`
+    }
+
+    try {
+      const response = await fetch(`${apiUrl}/item/transfers?limit=${limit}&order=transferDate.${order}&offset=${offset}&or=(oldOwnerOrganization.eq.${ownerOrg},newOwnerOrganization.eq.${ownerOrg})${range}`, {
+        method: HTTP_METHODS.GET,
+
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchItemTransfersSuccessful,
+          payload: body.data,
+        });
+
+        return true;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchItemTransfersFailed,
+          error: "Unauthorized while fetching item transfers"
+        });
+        window.location.href = body.error.loginUrl;
+      }
+
+      dispatch({
+        type: actionDescriptors.fetchItemTransfersFailed,
+        error: "Error while fetching item transfers",
+      });
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.fetchItemTransfersFailed,
+        error: "Error while fetching item transfers",
       });
       return false;
     }
@@ -120,19 +178,19 @@ const actions = {
           payload: body.data,
         });
         return;
-      }else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
-        dispatch({ 
-          type: actionDescriptors.fetchItemRawMaterialsFailed, 
-          error: "Error while fetching item raw materials" 
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({
+          type: actionDescriptors.fetchItemRawMaterialsFailed,
+          error: "Error while fetching item raw materials"
         });
         return;
       }
 
       dispatch({ type: actionDescriptors.fetchItemRawMaterialsFailed, error: body.error });
     } catch (err) {
-      dispatch({ 
-        type: actionDescriptors.fetchItemRawMaterialsFailed, 
-        error: "Error while fetching item raw materials" 
+      dispatch({
+        type: actionDescriptors.fetchItemRawMaterialsFailed,
+        error: "Error while fetching item raw materials"
       });
     }
   },
@@ -163,7 +221,54 @@ const actions = {
     } catch (err) {
       dispatch({ type: actionDescriptors.fetchItemFailed, error: undefined });
     }
-  }
+  },
+
+  transferOwnership: async (dispatch, payload) => {
+    dispatch({ type: actionDescriptors.transferOwnership });
+
+    try {
+      const response = await fetch(`${apiUrl}/item/transferOwnership`, {
+        method: HTTP_METHODS.PUT,
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.transferOwnershipSuccessful,
+          payload: body.data,
+        });
+        actions.setMessage(dispatch, "Items transferred successfully", true);
+        return true;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({
+          type: actionDescriptors.transferOwnershipFailed,
+          error: "Error while transferring Items",
+        });
+        actions.setMessage(dispatch, "Error while transferring Items");
+        return false;;
+      }
+
+      dispatch({
+        type: actionDescriptors.transferOwnershipFailed,
+        error: body.error
+      });
+      actions.setMessage(dispatch, "Error while transferring Items");
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.transferOwnershipFailed,
+        error: "Error while transferring Items",
+      });
+      actions.setMessage(dispatch, "Error while transferring Items");
+    }
+  },
 };
 
 export { actionDescriptors, actions };

@@ -45,11 +45,26 @@ class ItemController {
   static async getOwnershipHistory(req, res, next) {
     try {
       const { dapp, params } = req
+      console.log('#### I am coming here for some reason?');
       ItemController.validateGetItemOwnershipHistoryArgs(params)
       const { address } = params
 
       const items = await dapp.getItemOwnershipHistory({ itemAddress: address })
       rest.response.status200(res, items)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
+  static async getAllItemTransferEvents(req, res, next) {
+    try {
+      const { dapp, query } = req
+
+      const itemTransfers = await dapp.getAllItemTransferEvents(query)
+
+      rest.response.status200(res, itemTransfers)
 
       return next()
     } catch (e) {
@@ -181,9 +196,10 @@ class ItemController {
 
   static validateTransferOwnershipArgs(args) {
     const transferOwnershipItemSchema = Joi.object({
-      address: Joi.string().required(),
-      chainId: Joi.string().required(),
-      newOwner: Joi.string().required()
+      inventoryId: Joi.string().required(),
+      itemsAddress: Joi.array().items(Joi.string()).required(),
+      newOwner: Joi.string().required(),
+      newQuantity: Joi.number().integer().min(1).required(),
     })
 
     const validation = transferOwnershipItemSchema.validate(args);

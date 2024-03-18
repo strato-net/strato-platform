@@ -26,6 +26,8 @@ import Conduit
 import Control.Concurrent
 import Control.Lens.Combinators (uses)
 import Control.Monad
+import Control.Monad.Composable.Redis
+import Control.Monad.Composable.SQL
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State
@@ -41,6 +43,7 @@ import Database.Persist.Postgresql
 import qualified Executable.EthDiscoverySetup as EthDiscovery
 import Network.Kafka as K
 import Network.Kafka.Protocol as K
+import SelectAccessible ()
 import System.Directory
 import System.Exit
 import System.FilePath ((</>))
@@ -62,7 +65,7 @@ runWorker kaddr = do
           .| mapMC (\(o, ev) -> lift . lift $ process tf o ev)
           .| mapM_C commit
     $logInfoS "runWorker" "All events received"
-    runResourceT . runSetupDBM $ do
+    runResourceT . runSetupDBM . runRedisM UEC.lookupRedisBlockDBConfig . runSQLM $ do
       $logInfoS "runWorker" "Adding empty code"
       void $ addCode EVM mempty -- blank code is the default for Accounts, but gets added nowhere else.
       $logInfoS "runWorker" "Processing genesis block"

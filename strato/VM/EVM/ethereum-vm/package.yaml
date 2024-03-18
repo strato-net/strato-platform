@@ -10,7 +10,6 @@ description:
 
 dependencies:
   - base
-  - ansi-wl-pprint
   - base16-bytestring
   - binary
   - blockapps-data
@@ -27,12 +26,12 @@ dependencies:
   - extra
   - format
   - ghc
-  - integer-gmp
   - lens
   - merkle-patricia-db
   - monad-alter
   - mtl
   - nibblestring
+  - ordered-containers
   - primitive
   - secp256k1-haskell
   - strato-model

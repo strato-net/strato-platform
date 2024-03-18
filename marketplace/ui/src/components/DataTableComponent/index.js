@@ -8,6 +8,7 @@ const DataTableComponent = ({
   columns,
   data,
   isLoading,
+  onChange,
   offset,
   limit,
   setOffset,
@@ -26,6 +27,7 @@ const DataTableComponent = ({
       <Table
         columns={columns}
         dataSource={data}
+        className="custom-table "
         sticky={true}
         pagination={
           pagination ?? {
@@ -35,14 +37,14 @@ const DataTableComponent = ({
           }
         }
         scroll={{
-          x: scrollX ? scrollX : 1300,
+          x: scrollX ? scrollX : 1050,
+          
         }}
         size="middle"
-        rowClassName={(record, index) =>
-          index % 2 === 0 ? "bg-white" : "bg-secondry"
-        }
+        rowClassName={"bg-white"}
         rowKey={rowKey}
         rowSelection={rowSelection}
+        onChange={onChange}
         onRow={(record) => {
           return {
             onClick: (e) => {

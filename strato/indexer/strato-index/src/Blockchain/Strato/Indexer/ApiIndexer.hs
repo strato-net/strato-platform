@@ -1,6 +1,5 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -8,7 +7,7 @@
 {-# LANGUAGE TypeOperators #-}
 
 module Blockchain.Strato.Indexer.ApiIndexer
-  ( apiIndexer,
+  ( apiIndexerMainLoop,
     indexAPI,
     kafkaClientIds,
   )
@@ -17,7 +16,6 @@ where
 import BlockApps.Logging
 import Blockchain.Data.ChainInfo
 import Blockchain.EthConf (lookupConsumerGroup)
-import Blockchain.MilenaTools
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Indexer.IContext
 import Blockchain.Strato.Indexer.Kafka
@@ -28,21 +26,21 @@ import Blockchain.Strato.Model.Keccak256
 import Control.Arrow ((&&&))
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
-import qualified Data.ByteString.Char8 as S8
+import Control.Monad.Composable.Kafka
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
-import Network.Kafka
-import Network.Kafka.Protocol
 
-apiIndexer :: LoggingT IO ()
-apiIndexer = runIContextM "strato-api-indexer" $ do
-  forever $ do
-    $logInfoS "apiIndexer" "About to fetch blocks"
-    (offset, idxEvents) <- getUnprocessedIndexEvents
-    $logInfoS "apiIndexer" . T.pack $ "Fetched " ++ show (length idxEvents) ++ " events starting from " ++ show offset
+apiIndexerMainLoop :: ( MonadLogger m,
+                        HasKafka m,
+                        (Keccak256 `A.Alters` API OutputTx) m,
+                        (Word256 `A.Alters` API ChainInfo) m,
+                        (Keccak256 `A.Alters` API OutputBlock) m
+                      ) =>
+                      m ()
+apiIndexerMainLoop = 
+  consume "apiIndexer" (snd kafkaClientIds) targetTopicName $ \() idxEvents -> do
     indexAPI idxEvents
-    let nextOffset' = offset + fromIntegral (length idxEvents)
-    setKafkaCheckpoint nextOffset'
+    return ()
 
 indexAPI ::
   ( MonadLogger m,
@@ -76,29 +74,7 @@ indexAPI idxEvents = do
 kafkaClientIds :: (KafkaClientId, ConsumerGroup)
 kafkaClientIds = ("strato-api-indexer", lookupConsumerGroup "strato-api-indexer")
 
-getKafkaCheckpoint :: IContextM Offset
-getKafkaCheckpoint =
-  withKafkaRetry1s (fetchSingleOffset (snd kafkaClientIds) targetTopicName 0) >>= \case
-    Left UnknownTopicOrPartition -> error "ApiIndexerBestBlock was never initialized in strato-setup!"
-    Left err -> error $ "Unexpected response when fetching offset for " ++ show targetTopicName ++ ": " ++ show err
-    Right r -> pure $ fst r
-
-setKafkaCheckpoint :: Offset -> IContextM ()
-setKafkaCheckpoint ofs = do
-  $logInfoS "setKafkaCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs
-  op <- withKafkaRetry1s (setKafkaCheckpoint' ofs)
-  case op of
-    Left err -> error $ "Client error: " ++ show err
-    Right _ -> return ()
-
+{-
 indexerMetadata :: Metadata
 indexerMetadata = Metadata $ KString S8.empty
-
-setKafkaCheckpoint' :: Kafka k => Offset -> k (Either KafkaError ())
-setKafkaCheckpoint' = commitSingleOffset (snd kafkaClientIds) targetTopicName 0 `flip` indexerMetadata
-
-getUnprocessedIndexEvents :: IContextM (Offset, [IndexEvent])
-getUnprocessedIndexEvents = do
-  ofs <- getKafkaCheckpoint
-  evs <- withKafkaRetry1s (readIndexEvents ofs)
-  return (ofs, evs)
+-}

@@ -27,9 +27,6 @@ def deployStratoWithS3(nodeData, versionTag) {
           OAUTH_CLIENT_SECRET="${nodeData.OAUTH_CLIENT_SECRET}" \\
           VAULT_URL="https://vault.blockapps.net:8093" \\
           certInfo='{"orgName":"BlockApps","orgUnit":"Mercata","commonName":"${nodeData.COMMON_NAME}","access":true}' \\
-          EXT_STORAGE_S3_ACCESS_KEY_ID='${AWS_IAM_USER_KEY_ID}' \\
-          EXT_STORAGE_S3_SECRET_ACCESS_KEY='${AWS_IAM_USER_ACCESS_KEY}' \\
-          EXT_STORAGE_S3_BUCKET='mercata-testnet2' \\
           STRIPE_PUBLISHABLE_KEY='${STRIPE_PUBLISHABLE_KEY}' \\
           STRIPE_SECRET_KEY='${STRIPE_SECRET_KEY}' \\
           CLIENT_URL="https://${nodeData.STRATO_HOSTNAME}" \\
@@ -216,7 +213,7 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
     sh '''#!/bin/bash -le
       check_availability() {
         counter=0
-        until curl --silent --fail --location https://$(</host):8080/health | jq .healthInfo.isHealthy | grep true
+        until curl --silent --fail --location https://$(</host):8080/health | jq .health | grep true
         do
           if [[ "$counter" -gt 120 ]]; then
             echo "STRATO node took longer than 2 minutes to initialize! aborting."
@@ -260,7 +257,8 @@ def runAppBootNode(nodeData, wipeApp = null, refspec = null, postgresViewsPrefix
       usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME'),
       usernamePassword(credentialsId: 'beanstalk-staging-azuread-credentials-integration-server', passwordVariable: 'AZUREAD_INTSERVER_CLIENT_SECRET', usernameVariable: 'AZUREAD_INTSERVER_CLIENT_ID'),
       usernamePassword(credentialsId: 'beanstalk-internal-aws-test-user', passwordVariable: 'AWS_BEANSTALK_INTERNAL_TEST_USER_PASSWORD', usernameVariable: 'AWS_BEANSTALK_INTERNAL_TEST_USER_KEY'),
-      usernamePassword(credentialsId: 'beanstalk-internal-nodes-keycloak-client', passwordVariable: 'BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_SECRET', usernameVariable: 'BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_ID')
+      usernamePassword(credentialsId: 'beanstalk-internal-nodes-keycloak-client', passwordVariable: 'BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_SECRET', usernameVariable: 'BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_ID'),
+      usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
   ]) {
 
     sh 'sudo rm -rf beanstalk'
@@ -351,8 +349,8 @@ export SSL=true
 export SSL_CERT_TYPE=pem
 export INT_SERVER_URL='https://fake-url'
 export INT_SERVER_OAUTH_OPENID_DISCOVERY_URL='https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration'
-export INT_SERVER_OAUTH_CLIENT_ID='dev'
-export INT_SERVER_OAUTH_CLIENT_SECRET='d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f'
+export INT_SERVER_OAUTH_CLIENT_ID='${KEYCLOAK_STRATODEVEL_DEV_ID}'
+export INT_SERVER_OAUTH_CLIENT_SECRET='${KEYCLOAK_STRATODEVEL_DEV_SECRET}'
 export INT_SERVER_OAUTH_SCOPE='openid email'
 export requireCerts=false
 
@@ -574,7 +572,8 @@ def runMonitor(nodeData, nodeConfig) {
   withCredentials([
       usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME'),
       usernamePassword(credentialsId: 'beanstalk-internal-nodes-keycloak-client', passwordVariable: 'BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_SECRET', usernameVariable: 'BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_ID'),
-      usernamePassword(credentialsId: 'trace-harvest-demo-tech-keycloak-client', passwordVariable: 'TRACE_HARVEST_DEMO_KEYCLOAK_CLIENT_SECRET', usernameVariable: 'TRACE_HARVEST_DEMO_KEYCLOAK_CLIENT_ID')
+      usernamePassword(credentialsId: 'trace-harvest-demo-tech-keycloak-client', passwordVariable: 'TRACE_HARVEST_DEMO_KEYCLOAK_CLIENT_SECRET', usernameVariable: 'TRACE_HARVEST_DEMO_KEYCLOAK_CLIENT_ID'),
+      usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
   ]) {
     sh "rm -rf monitor"
     sh " git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/monitor.git"
@@ -861,8 +860,8 @@ def runMonitor(nodeData, nodeConfig) {
               oAuthInfo: {
                 enabled: true,
                 discovery_url: 'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
-                client_id: 'dev',
-                client_secret: 'd5e67b8c-4fbf-42c6-a8d9-29a4dd13575f'
+                client_id: '${KEYCLOAK_STRATODEVEL_DEV_ID}',
+                client_secret: '${KEYCLOAK_STRATODEVEL_DEV_SECRET}'
                 //scope: 'optional'
               }
             },
@@ -889,8 +888,8 @@ def runMonitor(nodeData, nodeConfig) {
               oAuthInfo: {
                 enabled: true,
                 discovery_url: 'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
-                client_id: 'dev',
-                client_secret: 'd5e67b8c-4fbf-42c6-a8d9-29a4dd13575f'
+                client_id: '${KEYCLOAK_STRATODEVEL_DEV_ID}',
+                client_secret: '${KEYCLOAK_STRATODEVEL_DEV_SECRET}'
                 //scope: 'optional'
               }
             },
@@ -903,8 +902,8 @@ def runMonitor(nodeData, nodeConfig) {
               oAuthInfo: {
                 enabled: true,
                 discovery_url: 'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
-                client_id: 'dev',
-                client_secret: 'd5e67b8c-4fbf-42c6-a8d9-29a4dd13575f'
+                client_id: '${KEYCLOAK_STRATODEVEL_DEV_ID}',
+                client_secret: '${KEYCLOAK_STRATODEVEL_DEV_SECRET}'
                 //scope: 'optional'
               }
             },
@@ -917,8 +916,8 @@ def runMonitor(nodeData, nodeConfig) {
               oAuthInfo: {
                 enabled: true,
                 discovery_url: 'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
-                client_id: 'dev',
-                client_secret: 'd5e67b8c-4fbf-42c6-a8d9-29a4dd13575f'
+                client_id: '${KEYCLOAK_STRATODEVEL_DEV_ID}',
+                client_secret: '${KEYCLOAK_STRATODEVEL_DEV_SECRET}'
                 //scope: 'optional'
               }
             },
@@ -935,8 +934,8 @@ def runMonitor(nodeData, nodeConfig) {
               oAuthInfo: {
                 enabled: true,
                 discovery_url: 'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
-                client_id: 'dev',
-                client_secret: 'd5e67b8c-4fbf-42c6-a8d9-29a4dd13575f'
+                client_id: '${KEYCLOAK_STRATODEVEL_DEV_ID}',
+                client_secret: '${KEYCLOAK_STRATODEVEL_DEV_SECRET}'
                 //scope: 'optional'
               }
             },
@@ -1131,6 +1130,8 @@ def generateGenesisBlock(stratoPlatformPath='.', stratoGSPath='strato-getting-st
       cd $(<_stratogs_path_tmp)
       myPub=$(./strato --get-pubkey)
       cd ..
+      sudo docker cp $(<_platform_path_tmp)/.docker-work/usr/local/bin/genesis-builder strato-strato-1:/usr/local/bin/
+      sudo docker cp $(<_platform_path_tmp)/.docker-work/usr/local/bin/x509-generator strato-strato-1:/usr/local/bin/
       sudo docker cp $(<_platform_path_tmp)/strato/tools/genesis-builder strato-strato-1:/
       sudo docker cp $(<_platform_path_tmp)/strato/tools/x509-generator strato-strato-1:/
       sudo docker exec -e pubkey="${myPub}" strato-strato-1 bash -c 'sed "s/<PUBKEY>/$pubkey/g" /x509-generator/subject.tpl.json > /x509-generator/subject.json'
@@ -1284,7 +1285,7 @@ def runSyncTester() {
 
   WAIT_TIME=30
   STALLED_INTERVALS=0
-  MAX_STALLED_INTERVALS=10
+  MAX_STALLED_INTERVALS=15
 
   LAST_VM_BLOCK_NUM=0
   LAST_SEQ_BLOCK_NUM=0
@@ -1293,6 +1294,7 @@ def runSyncTester() {
   IS_SYNCED=$(jq -r .isSynced <<< ${METADATA})
   while [ "$IS_SYNCED" != true ]; do
       echo "**************************************"
+      echo "$(date -u '+%Y-%m-%d %H:%M:%S'):"
       if [[ $(sudo docker ps | grep unhealthy) ]]; then
           echo "Failure: one or more docker containers became unhealthy during sync"
           exit 2

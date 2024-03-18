@@ -11,12 +11,9 @@ description:
 dependencies:
   - base
   - bytestring
-  - containers
-  - data-fix
   - ethereum-rlp
   - leveldb-haskell
   - monad-alter
-  - mtl
   - nibblestring
   - resourcet
   - strato-model
@@ -25,13 +22,15 @@ dependencies:
 library:
   source-dirs: src
   dependencies:
-  - ansi-wl-pprint
   - base16-bytestring
   - binary
   - conduit
+  - containers
   - data-default
+  - data-fix
   - deepseq
   - format
+  - mtl
   - Ranged-sets
 
 

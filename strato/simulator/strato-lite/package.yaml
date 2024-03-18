@@ -11,7 +11,6 @@ description:
 dependencies:
   - base
   - vm-tools
-  - extra
 
 executables:
   strato-lite:
@@ -20,15 +19,11 @@ executables:
     main: Main.hs
     dependencies:
       - aeson
-      - blockapps-init
       - bytestring
       - hflags
-      - lifted-async
-      - ordered-containers
       - strato-lite
       - strato-p2p
       - vm-tools
-      - warp
 
 library:
   source-dirs: src/
@@ -37,23 +32,16 @@ library:
     - Strato.Lite.Options
   ghc-options: -Wall -O2 
   dependencies:
-  - QuickCheck
   - aeson
-  - async
   - containers
   - crypto-pubkey-types
-  - deepseq
+  - extra
   - hflags
   - monad-alter
-  - parsec
-  - QuickCheck
-  - quickcheck-instances
   - servant-server
-  - source-tools
   - text
   - unliftio
   - warp
-  - websockets
   - base16-bytestring
   - blockapps-data
   - blockapps-datadefs
@@ -62,6 +50,7 @@ library:
   - blockstanbul
   - bytestring
   - common-log
+  - composable-monads-base
   - conduit
   - containers
   - data-default
@@ -70,9 +59,6 @@ library:
   - ethereum-encryption
   - ethereum-rlp
   - hflags
-  - hspec
-  - hspec-expectations-lifted
-  - labeled-error
   - lens
   - merkle-patricia-db
   - monad-alter
@@ -82,8 +68,6 @@ library:
   - nibblestring
   - ordered-containers
   - Ranged-sets
-  - raw-strings-qq
-  - secp256k1-haskell
   - seqevents
   - stm-chans
   - stm-conduit
@@ -106,64 +90,32 @@ tests:
     main: Main.hs
     ghc-options: -Wall -Werror -dynamic
     dependencies:
-      - aeson
-      - debugger
-      - hflags
-      - hspec
-      - hspec-expectations-lifted
       - QuickCheck
-      - async
-      - containers
-      - crypto-pubkey-types
-      - deepseq
-      - ethereum-encryption
-      - monad-alter
-      - parsec
-      - QuickCheck
-      - quickcheck-instances
-      - servant-server
-      - source-tools
-      - text
-      - unliftio
-      - warp
-      - websockets
-      - base16-bytestring
       - blockapps-data
       - blockapps-datadefs
       - blockapps-mpdbs
-      - blockapps-privacy
       - blockstanbul
       - bytestring
       - common-log
       - conduit
       - containers
-      - data-default
-      - debugger
-      - ethereum-discovery
-      - ethereum-rlp
+      - ethereum-encryption
       - hflags
+      - ki-unlifted
       - labeled-error
+      - hspec
       - lens
-      - merkle-patricia-db
       - monad-alter
       - mtl
-      - nibblestring
-      - ordered-containers
       - raw-strings-qq
-      - secp256k1-haskell
       - seqevents
+      - solid-vm-model
       - stm-chans
-      - stm-conduit
-      - strato-index
       - strato-lite
       - strato-model
       - strato-p2p
-      - solid-vm-model
       - strato-sequencer
       - text
-      - transformers
       - unliftio
-      - vm-runner
       - vm-tools
       - x509-certs
-

@@ -455,7 +455,7 @@ spec:
         - name: STRATO_PORT_API
           value: ""
         - name: STRATO_PORT_VAULT_PROXY
-          value: ""
+          value: "8013"
       - image: 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/marketplace-backend:<REPLACE_WITH_VERSION>
         name: marketplace-backend
         env:
@@ -471,8 +471,6 @@ spec:
           value: "1234"
         - name: MP_IS_BOOTNODE
           value: "false"
-        - name: MP_DAPP_ADDRESS
-          value: "038b2c5c70dc23ff707bdd92648666863a388a0d"
         - name: MP_API_DEBUG
           value: "false"
         - name: MP_DELAY_DEPLOYMENT
@@ -573,8 +571,6 @@ spec:
           value: ""
         - name: evmDebugMode
           value: ""
-        - name: evmTraceMode
-          value: ""
         - name: faucetEnabled
           value: ""
         - name: gasLimit
@@ -585,8 +581,6 @@ spec:
           value: "true"
         - name: genesis
           value: ""
-        - name: indexEVM
-          value: "false"
         - name: kafkaHost
           value: "localhost"
         - name: kafkaPort
@@ -600,10 +594,6 @@ spec:
         - name: maxTxsPerBlock
           value: ""
         - name: minBlockDifficulty
-          value: ""
-        - name: mineBlocks
-          value: "true"
-        - name: miningAlgorithm
           value: ""
         - name: miningThreads
           value: ""
@@ -636,7 +626,7 @@ spec:
         - name: postgres_user
           value: "postgres"
         - name: PROCESS_MONITORING
-          value: ""
+          value: "true"
         - name: redisHost
           value: "localhost"
         - name: redisPort
@@ -645,8 +635,6 @@ spec:
           value: ""
         - name: requireCerts
           value: "true"
-        - name: seqDebugMode
-          value: ""
         - name: seqEventsBatchSize
           value: ""
         - name: seqEventsCostHeuristic
@@ -681,16 +669,22 @@ spec:
           value: ""
         - name: validatorBehavior
           value: "true"
-        - name: vmDebug
+        - name: VM_DEBUGGER
           value: ""
         - name: vmRunnerRTSOPTs
           value: ""
-        - name: wireMessageCacheSize
-          value: ""
-        - name: wsDebug
-          value: ""
         - name: zkHost
           value: "localhost"
+        - name: API_DEBUG_LOG
+          value: "false"
+        - name: VM_DEBUG_LOG
+          value: "false"
+        - name: SEQUENCER_DEBUG_LOG
+          value: "false"
+        - name: SLIPSTREAM_DEBUG_LOG
+          value: "false"
+        - name: FULL_DEBUG_LOG
+          value: "false"
         volumeMounts:
           - mountPath: /var/lib/strato
             name: strato-data
@@ -786,8 +780,8 @@ spec:
         - name: STRATO_PORT_LOGS
           value: ""
         - name: STRATO_PORT_VAULT_PROXY
-          value: ""
-        - name: vmDebug
+          value: "8013"
+        - name: VM_DEBUGGER
           value: ""
       - image: swaggerapi/swagger-ui:v3.22.1
         name: docs

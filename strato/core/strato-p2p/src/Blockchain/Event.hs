@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -22,7 +23,7 @@ where
 import BlockApps.Crossmon (recordMaxBlockNumber)
 import BlockApps.Logging
 import BlockApps.X509.Certificate as XC
-import Blockchain.Blockstanbul (WireMessage, blockstanbulSender)
+import Blockchain.Blockstanbul (blockstanbulSender)
 import Blockchain.Context
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
@@ -127,7 +128,6 @@ handleEvents peer = awaitForever $ \case
   MsgEvt Hello {} -> error "A hello message appeared after the handshake"
   MsgEvt Status {} -> error "A status message appeared after the handshake"
   -- TODO remove distinction between new status messages and old ones once entire protocol is complete
-  MsgEvt NewStatus {} -> error "A new status message appeared after the handshake"
   MsgEvt Ping -> yieldR Pong
   MsgEvt (Transactions txs) -> do
     $logInfoS "handleEvents/Transactions" . T.pack $ "Got " ++ show (length txs) ++ " transaction(s) from" ++ peerString peer ++ ", they are " ++ (intercalate "\n" (format <$> txs))
@@ -206,49 +206,42 @@ handleEvents peer = awaitForever $ \case
   MsgEvt (BlockHeaders bHeaders) -> do
     let headers = morphBlockHeader <$> bHeaders
     lift stampActionTimestamp
-    alreadyRequestedHeaders <- lift getBlockHeaders -- get already requested headers
-    if null alreadyRequestedHeaders
-      then do
-        -- proceed if we are not already requesting headers
-        -- check if blockheaders we recieved have parents.
-        let parents = map blockDataParentHash headers
-        existingParents <- lift $ lookupMany (Proxy @BlockData) parents
-        let missingParents = S.fromList parents S.\\ M.keysSet existingParents
-        unless (S.null missingParents) $ do
-          bestBlock <- lift $ Mod.get (Proxy @BestBlock)
-          let fetchNumber = numberFromBestBlock bestBlock + 1
-          $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "blockHeaders :: fetchNumber is " ++ show fetchNumber
-          let lastParent =
-                if M.null existingParents
-                  then fetchNumber
-                  else head . sort $ blockHeaderBlockNumber <$> M.elems existingParents
-          $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "missing blocks: " ++ (unlines $ format <$> S.toList missingParents)
-          syncFetch Reverse lastParent
-
-        let headerHashes = map (blockHeaderHash &&& id) headers
-            hashes = map fst headerHashes
-        headersInDB <- fmap M.keysSet . lift $ lookupMany (Proxy @BlockData) hashes
-        let neededHeaders = snd <$> filter (not . flip S.member headersInDB . fst) headerHashes
-            (neededHeaders', remainingHeaders) = splitNeededHeaders neededHeaders
-        -- blockOffsets <- lift $ fmap (map blockOffsetHash) $ getBlockOffsetsForHashes $ S.toList allNeeded
-        -- let neededHeaders = filter (not . (`elem` blockOffsets) . headerHash) headers
-        --     neededHashes = map headerHash neededHeaders
-        --     neededParents = filter (not . (`elem` blockOffsets)) $ map parentHash neededHeaders
-        --     unfoundParents = S.toList $ S.fromList neededParents S.\\ S.fromList neededHashes
-        -- unless (null unfoundParents) $ do
-        --     $logInfoN "handleEvents/BlockHeaders" $ T.pack $ "neededHashes: " ++ unlines (map format neededHashes)
-        --     $logInfoN "handleEvents/BlockHeaders" $ T.pack $ "incoming blocks don't seem to have existing parents: " ++ unlines (map format unfoundParents)
-        --     $logInfoN "handleEvents/BlockHeaders" $ T.pack $ "### calling syncFetch again" >> syncFetch
-
+    -- check if blockheaders we recieved have parents.
+    let parents = map blockDataParentHash headers
+    existingParents <- lift $ lookupMany (Proxy @BlockData) parents
+    let missingParents = S.fromList parents S.\\ M.keysSet existingParents
+    unless (S.null missingParents) $ do
+      bestBlock <- lift $ Mod.get (Proxy @BestBlock)
+      let fetchNumber = numberFromBestBlock bestBlock + 1
+      $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "blockHeaders :: fetchNumber is " ++ show fetchNumber
+      $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "missing blocks: " ++ (unlines $ format <$> S.toList missingParents)
+      if M.null existingParents
+        then syncFetch Forward fetchNumber
+        else syncFetch Reverse (minimum $ blockHeaderBlockNumber <$> M.elems existingParents)
+    
+    alreadyRequestedHeaders <- lift getBlockHeaders -- check what already requested
+    alreadyRequestedRemainingHeaders <- lift getRemainingBHeaders
+    let headerHashes = map (blockHeaderHash &&& id) headers
+        hashes = map fst headerHashes
+    headersInDB <- fmap M.keysSet . lift $ lookupMany (Proxy @BlockData) hashes
+    let neededHeaders = snd <$> filter (not . flip S.member headersInDB . fst) headerHashes
+        (neededHeaders', remainingHeaders) = splitNeededHeaders neededHeaders
+    case (alreadyRequestedHeaders, alreadyRequestedRemainingHeaders) of
+      ([], _) -> do
+        -- proceed if we are not already requesting bodies
         lift $ putBlockHeaders neededHeaders'
         lift $ putRemainingBHeaders remainingHeaders
         $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "putBlockHeaders called with length " ++ show (length neededHeaders')
-        yieldR . GetBlockBodies $ blockHeaderHash <$> neededHeaders'
+        unless (null neededHeaders') $ do 
+          yieldR . GetBlockBodies $ blockHeaderHash <$> neededHeaders'
         lift stampActionTimestamp
-      else
-        $logInfoS "handleEvents/BlockHeaders" $
+      (_, []) -> do
+        lift $ putRemainingBHeaders neededHeaders -- save it to handle later
+        $logInfoS "handleEvents/BlockHeaders" $ 
+          "Not requesting BlockBodies because cache is currently in use, but will request after next batch of BlockBodies arrives."
+      (_, _) -> $logInfoS "handleEvents/BlockHeaders" $
           T.unlines
-            [ "Tried to request more block headers but it seems the block headers cache is currenlty being used.",
+            [ "Tried to request more block bodies but it seems the block headers cache is currenlty being used.",
               "If this message shows up a lot but the node's best block # doesn't increase,",
               "there might be something wrong with the cache."
             ]
@@ -314,7 +307,10 @@ handleEvents peer = awaitForever $ \case
 
   -- todo: support the "best effort" behavior that everyone uses for bodies they dont have (mentioned above
   -- todo:
-  MsgEvt (BlockBodies []) -> return () --clearActionTimestamp
+  MsgEvt (BlockBodies []) -> do 
+    lift stampActionTimestamp
+    lift $ putBlockHeaders [] -- clear cache for other threads
+    lift $ putRemainingBHeaders []
   MsgEvt (BlockBodies bodies) -> do
     lift stampActionTimestamp
     headers <- lift getBlockHeaders
@@ -344,26 +340,7 @@ handleEvents peer = awaitForever $ \case
       setPeerAddrIfUnset $ blockstanbulSender wm
       peerAddr <- unPeerAddress <$> access (Proxy @PeerAddress)
       $logInfoS "handleEvents/Blockstanbul" . T.pack $ "blockstanbulPeerAddr: " ++ show peerAddr
-    let msgHash = rlpHash wm
-    lift $ insert (Proxy @(Proxy (Outbound WireMessage))) (pPeerIp peer, msgHash) Proxy
-    msgExists <- lift $ exists (Proxy @(Proxy (Inbound WireMessage))) msgHash
-    if msgExists
-      then
-        $logInfoS "handleEvents/Blockstanbul" . T.pack $
-          concat
-            [ "Already seen inbound wire message ",
-              format msgHash,
-              ". Not forwarding to Sequencer."
-            ]
-      else do
-        $logInfoS "handleEvents/Blockstanbul" . T.pack $
-          concat
-            [ "First time seeing inbound wire message ",
-              format msgHash,
-              ". Forwarding to Sequencer."
-            ]
-        lift $ insert (Proxy @(Proxy (Inbound WireMessage))) msgHash Proxy
-        yieldL $ ToUnseq [IEBlockstanbul wm]
+    yieldL $ ToUnseq [IEBlockstanbul wm]
 
   -- private chains
   MsgEvt (GetChainDetails cids') -> handleGetChainDetails peer $ S.fromList cids'
@@ -411,7 +388,7 @@ handleEvents peer = awaitForever $ \case
           then
             $logInfoS "handleEvents/P2pTx" $
               T.pack $
-                printf "peer %s is not authorized for chainID %s" (maybe "<nokey>" showEnode $ pPeerEnode peer) (formatChainId mCid)
+                printf "peer is not authorized for chainID %s" (formatChainId mCid)
           else do
             $logInfoS "handleEvents/P2pTx" $ T.pack $ "sending Transaction " ++ format (otHash tx) ++ " for chainID " ++ formatChainId mCid
             $logDebugS "handleEvents/P2pTx" . T.pack $ "the transaction was: " ++ format tx
@@ -428,7 +405,7 @@ handleEvents peer = awaitForever $ \case
           else do
             $logInfoS "handleEvents/P2pGenesis" $
               T.pack $
-                printf "peer %s is not authorized for received chainID %s" (maybe "<nokey>" showEnode $ pPeerEnode peer) (formatChainId $ Just cId)
+                printf "peer is not authorized for received chainID %s" (formatChainId $ Just cId)
             $logDebugLS "handleEvents/P2pGenesis/members" $ (unChainMembers (members uci))
     P2pGetChain chainIds -> yieldR $ GetChainDetails chainIds
     P2pGetTx shas -> yieldR $ GetTransactions shas
@@ -467,28 +444,7 @@ handleEvents peer = awaitForever $ \case
             True -> do
               let outbound = Blockstanbul msg
               $logDebugS "handleEvents/P2pBlockstanbul" . T.pack $ "Outgoing mesage: " ++ show outbound
-              let msgHash = rlpHash msg
-              lift $ insert (Proxy @(Proxy (Inbound WireMessage))) msgHash Proxy
-              msgExists <- lift $ exists (Proxy @(Proxy (Outbound WireMessage))) (pPeerIp peer, msgHash)
-              if msgExists
-                then
-                  $logInfoS "handleEvents/P2pBlockstanbul" $
-                    T.concat
-                      [ "Already seen outbound wire message ",
-                        T.pack (format msgHash),
-                        ". Not forwarding to peer ",
-                        pPeerIp peer
-                      ]
-                else do
-                  $logInfoS "handleEvents/P2pBlockstanbul" $
-                    T.concat
-                      [ "First time seeing outbound wire message ",
-                        T.pack (format msgHash),
-                        ". Forwarding to peer ",
-                        pPeerIp peer
-                      ]
-                  lift $ insert (Proxy @(Proxy (Outbound WireMessage))) (pPeerIp peer, msgHash) Proxy
-                  yieldR outbound
+              yieldR outbound
     P2pAskForBlocks start _ _ -> do
       $logDebugS "handleEvents/P2pAskForBlocks" . T.pack $ "syncFetch: " ++ show start
       syncFetch Forward start
@@ -576,29 +532,18 @@ handleGetChainDetails peer cids' = do
 numberFromBestBlock :: BestBlock -> Integer
 numberFromBestBlock (BestBlock _ n _) = n
 
--- todo: we should take blockNumber as argument here instead of just looking for
--- bestBlock to prevent us from getting stuck
 syncFetch ::
   ( MonadIO m,
-    MonadLogger m,
     Modifiable ActionTimestamp m,
-    Accessible [BlockData] m,
     Accessible MaxReturnedHeaders m
   ) =>
   Direction ->
   Integer ->
   ConduitM Event (Either P2PCNC Message) m ()
 syncFetch d num = do
-    blockHeaders' <- lift getBlockHeaders -- get blockHeaders from Context
-    if null blockHeaders' then do
-        mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
-        yieldR $ GetBlockHeaders (BlockNumber num) mrh 0 d
-        lift stampActionTimestamp
-      else $logInfoS "syncFetch" $ T.unlines [
-        "Tried to request more block headers but it seems the block headers cache is currently being used.",
-        "If this message shows up a lot but the node's best block # doesn't increase,",
-        "there might be something wrong with the cache."
-      ]
+  mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
+  yieldR $ GetBlockHeaders (BlockNumber num) mrh 0 d
+  lift stampActionTimestamp
 
 shouldSend :: PPeer -> Origin.TXOrigin -> Bool
 shouldSend peer txo = case txo of

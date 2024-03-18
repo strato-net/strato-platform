@@ -13,7 +13,9 @@ dependencies:
 library:
   source-dirs: src/
   exposed-modules:
+    - Blockchain.Strato.Discovery.Data.MemPeerDB
     - Blockchain.Strato.Discovery.Data.Peer
+    - Blockchain.Strato.Discovery.Data.PeerIOWiring
     - Blockchain.Strato.Discovery.ContextLite
     - Blockchain.Strato.Discovery.UDP
     - Blockchain.Strato.Discovery.UDPServer
@@ -30,6 +32,9 @@ library:
     - blockapps-vault-wrapper-client
     - bytestring
     - common-log
+    - containers
+    - composable-monads-base
+    - containers
     - cpu
     - crypto-pubkey-types
     - either
@@ -39,9 +44,11 @@ library:
     - ethereum-rlp
     - exceptions
     - format
+    - hedis
     - hflags
     - http-client
     - labeled-error
+    - lens
     - monad-alter
     - mtl
     - network-uri
@@ -49,11 +56,11 @@ library:
     - persistent-postgresql
     - prometheus-client
     - random
-    - resourcet
     - servant-client
     - split
     - strato-conf
     - strato-model
+    - strato-redis-blockdb
     - text
     - time
     - unliftio

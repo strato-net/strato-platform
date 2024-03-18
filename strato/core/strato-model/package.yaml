@@ -28,7 +28,6 @@ library:
     - QuickCheck
     - aeson
     - aeson-casing
-    - ansi-wl-pprint
     - asn1-types
     - base16-bytestring
     - binary
@@ -58,7 +57,6 @@ library:
     - persistent
     - primitive
     - raw-strings-qq
-    - relapse           # remove this
     - secp256k1-haskell
     - servant
     - servant-docs
@@ -79,15 +77,11 @@ tests:
     dependencies:
       - aeson
       - aeson-qq
-      - base16-bytestring
       - binary
-      - cryptonite
       - ethereum-rlp
-      - integer-gmp
       - labeled-error
       - persistent
       - Ranged-sets
-      - secp256k1-haskell
       - strato-model
       - text
       - hspec

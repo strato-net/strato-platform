@@ -1,10 +1,10 @@
 {
 	"name": "strato-vscode",
 	"publisher": "BlockApps",
-	"displayName": "STRATO",
+	"displayName": "STRATO IDE",
 	"description": "VSCode Integration for BlockApps STRATO",
 	"icon": "resources/rebrand-logo.png",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"repository": "https://github.com/blockapps/strato-platform/strato-vscode-images",
 	"engines": {
 		"vscode": "^1.53.0"
@@ -15,14 +15,6 @@
 	"activationEvents": [
 		"onDebugDynamicConfigurations:strato",
 		"onLanguage:solidity",
-		"onCommand:strato-vscode.importProject",
-		"onCommand:strato-vscode.buildProject",
-		"onCommand:strato-vscode.deployProject",
-		"onCommand:strato-vscode.runServer",
-		"onCommand:strato-vscode.testServer",
-		"onCommand:strato-vscode.runUI",
-		"onCommand:strato-vscode.testUI",
-		"onView:project-management",
 		"onView:contracts",
 		"onView:nodes",
 		"onView:cirrus",
@@ -36,46 +28,17 @@
 			}
 		],
 		"configuration": {
-			"title": "STRATO",
+			"title": "STRATO IDE",
 			"properties": {
-				"strato-vscode.autoFuzz": {
-					"type": "boolean",
-					"default": true
-				},
-				"strato-vscode.deployProjectCommand": {
-					"type": "string",
-					"default": "CONFIG=mercata yarn deploy",
-					"description": "Script that deploys the project contracts to a STRATO node"
-				},
-				"strato-vscode.runServerCommand": {
-					"type": "string",
-					"default": "yarn install; yarn start",
-					"description": "Script that runs the project backend server"
-				},
-				"strato-vscode.runUICommand": {
-					"type": "string",
-					"default": "yarn install; yarn develop",
-					"description": "Script that runs the project frontend server"
-				},
-				"strato-vscode.testServerCommand": {
-					"type": "string",
-					"default": "yarn install; yarn test",
-					"description": "Script that runs the backend test suite"
-				},
-				"strato-vscode.testUICommand": {
-					"type": "string",
-					"default": "yarn install; yarn test",
-					"description": "Script that runs the frontend test suite"
-				},
 				"strato-vscode.configPath": {
 					"type": "string",
-					"default": "backend/config",
-					"description": "The default directory for the configuration file(s) location"
-				},
-				"strato-vscode.configFile": {
-					"type": "string",
-					"default": "mercata.config.yaml",
+					"default": "",
 					"description": "The default configuration file containing STRATO node(s) information"
+				},
+				"strato-vscode.activeNode": {
+					"type": "number",
+					"default": 0,
+					"description": "The active node being used in the configuration file."
 				}
 			}
 		},
@@ -86,42 +49,19 @@
 		},
 		"commands": [
 			{
-				"command": "strato-vscode.createProject",
-				"title": "Create STRATO Project"
-			},
-			{
-				"command": "strato-vscode.buildProject",
-				"title": "Build STRATO Project"
-			},
-			{
-				"command": "strato-vscode.deployProject",
-				"title": "Deploy STRATO Project"
-			},
-			{
-				"command": "strato-vscode.runServer",
-				"title": "Run STRATO Project Server"
-			},
-			{
-				"command": "strato-vscode.testServer",
-				"title": "Test STRATO Project Server"
-			},
-			{
-				"command": "strato-vscode.runUI",
-				"title": "Run STRATO Project UI"
-			},
-			{
-				"command": "strato-vscode.testUI",
-				"title": "Test STRATO Project UI"
-			},
-			{
 				"command": "contracts.refreshEntry",
 				"title": "Refresh",
 				"icon": "$(refresh)"
 			},
 			{
+				"command": "contracts.clearContractList",
+				"title": "Clear Contract List",
+				"icon": "$(extensions-clear-search-results)"
+			},
+			{
 				"command": "contracts.uploadContract",
 				"title": "Upload Contract",
-				"icon": "$(add)"
+				"icon": "$(cloud-upload)"
 			},
 			{
 				"command": "contracts.callFunction",
@@ -129,17 +69,37 @@
 				"icon": "$(play)"
 			},
 			{
+				"command": "contracts.addContractToList",
+				"title": "Add Contract Address to List",
+				"icon": "$(search-expand-results)"
+			},
+			{
+				"command": "contracts.removeContractFromList",
+				"title": "Delete from List",
+				"icon": "$(trash)"
+			},
+			{
 				"command": "cirrus.queryCirrus",
 				"title": "Search",
 				"icon": "$(search)"
 			},
 			{
-				"command": "nodes.refreshEntry",
+				"command": "nodes.setActiveNode",
+				"title": "Set Active Node",
+				"icon": "$(star)"
+			},
+			{
+				"command": "nodes.addConfig",
+				"title": "Select Configuration File",
+				"icon": "$(new-file)"
+			},
+			{
+				"command": "nodes.refresh",
 				"title": "Refresh",
 				"icon": "$(refresh)"
 			},
 			{
-				"command": "project-management.settings",
+				"command": "nodes.settings",
 				"title": "Open Settings",
 				"icon": "$(settings-gear)"
 			},
@@ -151,9 +111,19 @@
 				"icon": "$(debug-alt)"
 			},
 			{
-				"command": "extension.copyToClipboard",
+				"command": "extension.copyTooltipToClipboard",
 				"title": "Copy to Clipboard",
 				"icon": "$(clippy)"
+			},
+			{
+				"command": "extension.copyLabelToClipboard",
+				"title": "Copy to Clipboard",
+				"icon": "$(clippy)"
+			},
+			{
+				"command": "extension.oauthLogin",
+				"title": "Login to STRATO Mercata",
+				"icon": "$(log-in)"
 			}
 		],
 		"debuggers": [
@@ -229,45 +199,75 @@
 			],
 			"view/title": [
 				{
+					"command": "contracts.uploadContract",
+					"when": "view == contracts && config.strato-vscode.configPath",
+					"group": "navigation@0"
+				},
+				{
+					"command": "contracts.addContractToList",
+					"when": "view == contracts && config.strato-vscode.configPath",
+					"group": "navigation@1"
+				},
+				{
+					"command": "contracts.clearContractList",
+					"when": "view == contracts",
+					"group": "navigation@2"
+				},
+				{
 					"command": "contracts.refreshEntry",
 					"when": "view == contracts",
-					"group": "navigation"
+					"group": "navigation@3"
 				},
 				{
 					"command": "cirrus.queryCirrus",
-					"when": "view == cirrus",
+					"when": "view == cirrus && config.strato-vscode.configPath",
 					"group": "navigation"
 				},
 				{
-					"command": "nodes.refreshEntry",
+					"command": "extension.oauthLogin",
+					"when": "view == nodes && config.strato-vscode.configPath",
+					"group": "navigation@1"
+				},
+				{
+					"command": "nodes.addConfig",
+					"when": "view == nodes && config.strato-vscode.configPath",
+					"group": "navigation@0"
+				},
+				{
+					"command": "nodes.settings",
 					"when": "view == nodes",
-					"group": "navigation"
+					"group": "navigation@2"
 				},
 				{
-					"command": "project-management.settings",
-					"when": "view == project-management",
-					"group": "navigation"
+					"command": "nodes.refresh",
+					"when": "view == nodes",
+					"group": "navigation@3"
 				}
 			],
 			"view/item/context": [
-				{
-					"command": "contracts.uploadContract",
-					"when": "view == contracts && viewItem == chainId",
-					"group": "inline"
-				},
 				{
 					"command": "contracts.callFunction",
 					"when": "view == contracts && viewItem == function",
 					"group": "inline"
 				},
 				{
-					"command": "extension.copyToClipboard",
+					"command": "extension.copyLabelToClipboard",
 					"when": "view == contracts && (viewItem == address || viewItem == stateItem)",
 					"group": "inline"
 				},
 				{
-					"command": "extension.copyToClipboard",
+					"command": "contracts.removeContractFromList",
+					"when": "view == contracts && viewItem == address",
+					"group": "inline"
+				},
+				{
+					"command": "extension.copyTooltipToClipboard",
 					"when": "view == nodes || view == cirrus",
+					"group": "inline"
+				},
+				{
+					"command": "nodes.setActiveNode",
+					"when": "view == nodes && viewItem == node",
 					"group": "inline"
 				}
 			]
@@ -276,17 +276,13 @@
 			"activitybar": [
 				{
 					"id": "strato-project",
-					"title": "STRATO Project Manager",
+					"title": "STRATO IDE",
 					"icon": "resources/rebrand-logo.png"
 				}
 			]
 		},
 		"views": {
 			"strato-project": [
-				{
-					"id": "project-management",
-					"name": "Project Management"
-				},
 				{
 					"id": "nodes",
 					"name": "Nodes"
@@ -300,7 +296,19 @@
 					"name": "Contracts"
 				}
 			]
-		}
+		},
+		"viewsWelcome": [
+			{
+				"view": "nodes",
+				"contents": "To start using the STRATO IDE, import a valid BlockApps REST configuration file.\n[Import Configuration File](command:nodes.addConfig)\n[Open Sample Configuration](command:extension.provideSampleConfiguration)\nTo learn more about how to configure the STRATO IDE, visit [the docs](https://docs.blockapps.net/blockapps-rest/).",
+				"when": "!config.strato-vscode.configPath"
+			},
+			{
+				"view": "cirrus",
+				"contents": "[Search for contracts](command:cirrus.queryCirrus)",
+				"when": "config.strato-vscode.configPath"
+			}
+		]
 	},
 	"scripts": {
 		"vscode:prepublish": "yarn run compile",

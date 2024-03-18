@@ -1,34 +1,23 @@
-import React, { useEffect, useState } from "react";
-import { useFormik, getIn } from "formik";
-import { DownloadOutlined, PaperClipOutlined } from "@ant-design/icons";
+import React, { useState } from "react";
 import {
   Form,
   Modal,
   Input,
   Select,
-  Radio,
   Button,
-  Spin,
   Upload,
-  notification
+  notification,
 } from "antd";
-import { Link } from "react-router-dom";
-import TextArea from "antd/es/input/TextArea";
-import getSchema from "./InventorySchema";
-import { actions } from "../../contexts/inventory/actions";
 import {
   useInventoryDispatch,
   useInventoryState,
 } from "../../contexts/inventory";
-import {
-  useSubCategoryState,
-} from "../../contexts/subCategory";
-import { actions as productActions } from "../../contexts/product/actions";
-import { useProductDispatch, useProductState } from "../../contexts/product";
-import { usePapaParse } from "react-papaparse";
-import { INVENTORY_STATUS, MAX_RAW_MATERIAL } from "../../helpers/constants";
+import { actions } from "../../contexts/inventory/actions";
+import TextArea from "antd/es/input/TextArea";
 import TagManager from "react-gtm-module";
-
+import { unitOfMeasures } from "../../helpers/constants";
+import { categoricalProperties } from "./CategoryFields";
+import RichEditor from "../RichEditor";
 
 const { Option } = Select;
 
@@ -38,197 +27,140 @@ const CreateInventoryModal = ({
   categorys,
   debouncedSearchTerm,
   resetPage,
-  page
+  page,
+  categoryName,
 }) => {
-  const schema = getSchema();
+  const [form] = Form.useForm();
   const dispatch = useInventoryDispatch();
-  const productDispatch = useProductDispatch();
-  const { readString } = usePapaParse();
   const [api, contextHolder] = notification.useNotification();
   const [uploadErr, setUploadErr] = useState("");
+  const { isCreateInventorySubmitting, isUploadImageSubmitting } =
+    useInventoryState();
+  const [selectedImages, setSelectedImages] = useState(null);
+  const [selectedFiles, setSelectedFiles] = useState(null);
+  const [clothingType, setClothingType] = useState(null);
+  const [sizeOptions, setSizeOptions] = useState([]);
+  const [categoryValue, setCategoryValue] = useState("Art");
+  const [subCategoryValue, setSubCategoryValue] = useState(form.getFieldValue("subCategory"));
 
-  //Sub-categories
-  const { issubCategorysLoading } = useSubCategoryState();
-  const { categoryBasedProducts, isCategoryBasedProductsLoading } = useProductState();
-  const { isCreateInventorySubmitting } = useInventoryState();
-
-  const initialValues = {
-    category: {
-      name: null,
-      address: null,
-    },
-    subCategory: {
-      name: null,
-      address: "",
-    },
-    productName: {
-      name: null,
-      address: "",
-    },
-    quantity: null,
-    pricePerUnit: "",
-    batchId: " ",
-    serialNumber: {
-      serialNumStr: "",
-      serialNumArr: [],
-    },
-    status: true,
-    inventoryType: ""
+  const beforeImageUpload = (file) => {
+    const isJpgOrPng = file.type === "image/jpeg" || file.type === "image/png";
+    if (!isJpgOrPng) {
+      setUploadErr("Image must be of jpeg or png format");
+      return Upload.LIST_IGNORE;
+    }
+    const isLt5M = file.size / 1024 / 1024 < 5;
+    if (!isLt5M) {
+      setUploadErr("Cannot upload image files of total size more than 5mb");
+      return Upload.LIST_IGNORE;
+    }
+    const isNameLengthValid = file.name.length <= 100;
+    if (!isNameLengthValid) {
+      setUploadErr("File name must be less than 100 characters");
+      return Upload.LIST_IGNORE;
+    }
+    setUploadErr("");
+    return false
   };
 
-  const formik = useFormik({
-    initialValues: initialValues,
-    validationSchema: schema,
-    onSubmit: function (values) {
-      if (
-        (values.serialNumber.serialNumArr.length === parseInt(values.quantity)) ||
-        // Serial numbers are optional, we can submit the form if there are none. 
-        (values.serialNumber.serialNumArr.length === 0)
-      ) {
-        handleCreateFormSubmit(values);
-      } else {
-        setUploadErr(
-          "Quantity of items and number of serial numbers should be same"
-        );
-      }
-    },
-    enableReinitialize: true,
-  });
+  const handleImageChange = (info) => {
+    setSelectedImages(info.fileList);
+    form.setFieldValue("images", info.fileList.map((e) => e.originFileObj))
+  };
 
-  useEffect(() => {
-    if (formik.values.subCategory && formik.values.category.name) {
-      productActions.fetchCategoryBasedProduct(
-        productDispatch,
-        formik.values.category.name,
-        formik.values.subCategory.name ?? null
-      );
+  const beforeFileUpload = (file) => {
+    const isPdf = file.type === "application/pdf";
+    if (!isPdf) {
+      setUploadErr("File must be PDF format");
+      return Upload.LIST_IGNORE;
     }
-  }, [
-    productDispatch,
-    formik.values.subCategory,
-    formik.values.subCategory.name
-  ]);
+    const isLt5M = file.size / 1024 / 1024 < 5; // Check if the file size is less than 6 MB
+    if (!isLt5M) {
+      setUploadErr("Cannot upload a PDF of size more than 5 MB");
+      return Upload.LIST_IGNORE;
+    }
+    const isNameLengthValid = file.name.length <= 100;
+    if (!isNameLengthValid) {
+      setUploadErr("File name must be less than 100 characters");
+      return Upload.LIST_IGNORE;
+    }
+    setUploadErr("");
+    return false;
+  };
+
+  const handleFileChange = (info) => {
+    setSelectedFiles(info.fileList);
+    form.setFieldValue("files", info.fileList.map((e) => e.originFileObj))
+  };
 
   const handleCreateFormSubmit = async (values) => {
-    const body = {
-      productAddress: values.productName.address,
-      quantity: parseInt(values.quantity),
-      pricePerUnit: values.pricePerUnit,
-      batchId: values.batchId,
-      status: values.status ? INVENTORY_STATUS['PUBLISHED'] : INVENTORY_STATUS['UNPUBLISHED'],
-      serialNumber: values.serialNumber.serialNumArr,
-      inventoryType: values.inventoryType
+    let imageKeys = []
+    if (values.images && values.images.length > 0) {
+      for (const img of values.images) {
+        const formData = new FormData();
+        formData.append(img.name, img);
+        const imageData = await actions.uploadImage(dispatch, formData);
+        if (imageData) {
+          imageKeys.push(imageData);
+        } else {
+          throw new Error("Image upload failed");
+        }
+      }
+    }
+
+    let fileKeys = []
+    if (values.files && values.files.length > 0) {
+      for (const file of values.files) {
+        const formData = new FormData();
+        formData.append(file.name, file);
+        const fileData = await actions.uploadImage(dispatch, formData);
+        if (fileData) {
+          fileKeys.push(fileData);
+        } else {
+          throw new Error("File upload failed");
+        }
+      }
+    }
+
+    const { category, subCategory, images, files, ...body } = values;
+    const newBody = {
+      itemArgs: {
+        images: imageKeys || [],
+        files: fileKeys || [],
+        ...body
+      },
     };
 
+    window.LOQ = window.LOQ || [];
+    window.LOQ.push([
+      "ready",
+      async (LO) => {
+        // Track an event
+        await LO.$internal.ready("events");
+        LO.events.track("Create Inventory", {
+          category: values.category.name,
+          product: values.productName.name,
+        });
+      },
+    ]);
     TagManager.dataLayer({
       dataLayer: {
-        event: 'create_inventory',
+        event: "create_item",
       },
     });
-    let isDone = await actions.createInventory(dispatch, body);
+
+    let isDone = await actions.createItem(
+      dispatch,
+      newBody,
+      subCategory
+    );
 
     if (isDone) {
       if (page === 1)
-        actions.fetchInventory(dispatch, 10, 0, debouncedSearchTerm);
+        await actions.fetchInventory(dispatch, 10, 0, debouncedSearchTerm, categoryName);
       resetPage(1);
       handleCancel();
     }
-  };
-
-  const uploadCSV = (e) => {
-    const csvFile = e.file.originFileObj;
-
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const contents = readString(reader.result, { header: true });
-
-      if (contents.data.length === 0) {
-        setUploadErr("No records to import");
-        return;
-      }
-
-
-      if (!Object.hasOwn(contents.data[0], "ItemSerialNumber")) {
-        setUploadErr("Missing required column 'ItemSerialNumber'");
-        return;
-      }
-
-      if (!Object.hasOwn(contents.data[0], "RawMaterialProductName")) {
-        setUploadErr("Missing required column 'RawMaterialProductName'");
-        return;
-      }
-
-      if (!Object.hasOwn(contents.data[0], "RawMaterialProductId")) {
-        setUploadErr("Missing required column 'RawMaterialProductId'");
-        return;
-      }
-
-      for (let j = 1; j <= MAX_RAW_MATERIAL; j++) {
-        if (!Object.hasOwn(contents.data[0], `RawMaterialSerialNumber${j}`)) {
-          setUploadErr(`Missing required column 'RawMaterialSerialNumber${j}'`);
-          return;
-        }
-      }
-
-      let serialNumbers = "", serialNumArr = [];
-      for (let i = 0; i < contents.data.length; i++) {
-        const row = contents.data[i];
-        let rawMaterialSerials = [];
-        let isAlreadyPresent = serialNumArr.find(elem => elem.itemSerialNumber === row["ItemSerialNumber"]);
-        if (row["ItemSerialNumber"]) {
-          if (row["RawMaterialProductName"]) {
-            if (!row['RawMaterialProductId']) {
-              setUploadErr("Missing value - 'RawMaterialProductId'");
-              return;
-            }
-
-            for (let j = 1; j <= MAX_RAW_MATERIAL; j++) {
-              if (row[`RawMaterialSerialNumber${j}`]) {
-                rawMaterialSerials.push(row[`RawMaterialSerialNumber${j}`])
-              } else {
-                if (j === 1) {
-                  setUploadErr("Missing value - 'RawMaterialSerialNumber1'");
-                  return;
-                }
-              }
-            }
-          }
-
-          let itemRecord;
-
-          if (isAlreadyPresent) {
-
-
-            itemRecord = {
-              itemSerialNumber: row["ItemSerialNumber"],
-              rawMaterials: row["RawMaterialProductName"] === undefined || row["RawMaterialProductName"] === "" ? [] : [{
-                rawMaterialProductName: encodeURIComponent(row['RawMaterialProductName']),
-                rawMaterialProductId: row["RawMaterialProductId"],
-                rawMaterialSerialNumbers: [...rawMaterialSerials]
-              }, ...isAlreadyPresent["rawMaterials"]]
-            };
-            let actualIndex = serialNumArr.findIndex(e => e.itemSerialNumber === row['ItemSerialNumber']);
-            serialNumArr[actualIndex] = itemRecord;
-          } else {
-            itemRecord = {
-              itemSerialNumber: row["ItemSerialNumber"],
-              rawMaterials: row["RawMaterialProductName"] === undefined || row["RawMaterialProductName"] === "" ? [] : [{
-                rawMaterialProductName: encodeURIComponent(row['RawMaterialProductName']),
-                rawMaterialSerialNumbers: rawMaterialSerials,
-                rawMaterialProductId: row["RawMaterialProductId"],
-              }]
-            };
-            serialNumArr.push(itemRecord);
-            serialNumbers += row["ItemSerialNumber"] + ",";
-          }
-        }
-      }
-
-      serialNumbers = serialNumbers.substring(0, serialNumbers.length - 1);
-      formik.setFieldValue("serialNumber.serialNumStr", serialNumbers);
-      formik.setFieldValue("serialNumber.serialNumArr", serialNumArr);
-    };
-    reader.readAsText(csvFile);
   };
 
   const openToast = (placement) => {
@@ -240,6 +172,34 @@ const CreateInventoryModal = ({
     });
   };
 
+  const handleClothingTypeChange = (value) => {
+    setClothingType(value);
+    form.setFieldValue("clothingType", value);
+    form.setFieldValue("size", null);
+    updateSizeOptions(value);
+  };
+
+  const updateSizeOptions = (type) => {
+    if (type === "Shoes") {
+      setSizeOptions(["3.5", "4", "4.5", "5", "5.5", "6", "6.5", "7", "7.5", "8", "8.5", "9", "9.5", "10", "10.5", "11", "11.5", "12", "12.5", "13", "13.5", "14", "14.5", "15", "16", "17", "18"]);
+    } else {
+      setSizeOptions(["XXS", "XS", "S", "M", "L", "XL", "XXL"]);
+    }
+  };
+
+  const handleCategory = (value) => {
+    form.setFieldValue("category", value);
+    setCategoryValue(value);
+    if (value === 'Carbon') {
+      form.setFieldValue("subCategory", null);
+      setSubCategoryValue(null);
+    } else {
+      const subCat = categorys.find(item => item.name === value).subCategories[0].name
+      form.setFieldValue("subCategory", subCat);
+      setSubCategoryValue(subCat);
+    }
+  }
+
   return (
     <>
       {contextHolder}
@@ -249,288 +209,211 @@ const CreateInventoryModal = ({
         onCancel={handleCancel}
         width={673}
         footer={[
-          <div className="flex justify-center">
+          <div className="flex justify-center mb-5 pt-4">
             <Button
               className="w-40"
-              key="submit"
               type="primary"
-              onClick={formik.handleSubmit}
-              disabled={isCreateInventorySubmitting}
+              onClick={() => {
+                form.validateFields().then((values) => {
+                  handleCreateFormSubmit(values);
+                })
+              }}
+              loading={isCreateInventorySubmitting || isUploadImageSubmitting}
             >
-              {isCreateInventorySubmitting ? <Spin /> : "Create Inventory"}
+              Create Inventory
             </Button>
           </div>,
         ]}
       >
-        <h1 className="text-center font-semibold text-lg text-primaryB">
-          Add Inventory
+        <h1 className=" font-semibold text-lg text-[#202020]">
+          Create Inventory
         </h1>
         <hr className="text-secondryD mt-3" />
-        {issubCategorysLoading ? (
-          <div className="h-44 flex justify-center items-center">
-            <Spin spinning={issubCategorysLoading} size="large" />
-          </div>
-        ) : (
-          <Form
-            layout="vertical"
-            className="mt-5"
-            onSubmit={formik.handleSubmit}
-          >
-            <div className="w-full mb-3">
-              <div className="flex justify-between ">
-                <Form.Item label="Category" name="category" className="w-72">
-                  <Select
-                    placeholder="Select Category"
-                    showSearch
-                    allowClear
-                    id="category"
-                    name="category.name"
-                    disabled={false}
-                    value={formik.values.category.name}
-                    onChange={(value) => {
-                      formik.setFieldValue("category.name", value);
-                      formik.setFieldTouched("category.name", false, false);
+        <Form
+          form={form}
+          layout="vertical"
+          className="mt-5 inventory_modal"
+          initialValues={{
+            name: "",
+            description: "",
+            artist: "",
+            source: "",
+            leastSellableUnits: 1,
+            unitOfMeasurement: 1,
+            purity: "",
+            quantity: 1,
+            expirationPeriodInMonths: 1,
+            clothingType: null,
+            images: [],
+            files: [],
+            category: "Art",
+            subCategory: null,
+            size: null,
+            skuNumber: null,
+            condition: null,
+            brand: null,
+          }}
+        >
+          <div className="w-full mb-3">
+            <div className="flex flex-wrap sm:flex-nowrap justify-between gap-4 mt-4">
+              <Form.Item
+                label="Name"
+                name="name"
+                className="w-full sm:w-[200px] md:w-72"
+                rules={[
+                  {
+                    required: true,
+                    message: 'Please enter a name',
+                  },
+                ]}
+              >
+                <Input placeholder="Enter Name" />
+              </Form.Item>
 
-                      if (formik.values.subCategory.name) {
-                        formik.setFieldValue("subCategory.name", null);
-                      }
-                      if (formik.values.productName.name) {
-                        formik.setFieldValue("productName.name", null);
-                      }
-                    }}
-                  >
-                    {categorys.map((e, index) => (
-                      <Option value={e.name} key={index}>
+              <Form.Item
+                label="Category"
+                name="category"
+                className="w-full sm:w-[200px] md:w-72"
+                rules={[
+                  {
+                    required: true,
+                    message: 'Please select a category',
+                  },
+                ]}
+              >
+                <Select
+                  placeholder="Select Category"
+                  allowClear
+                  value={categoryValue}
+                  onChange={(value) => {
+                    handleCategory(value)
+                  }}
+                >
+                  {categorys.map((e, index) => (
+                    <Option value={e.name} key={index}>
+                      {e.name}
+                    </Option>
+                  ))}
+                </Select>
+              </Form.Item>
+
+              <Form.Item
+                label="Sub Category"
+                name="subCategory"
+                className="w-full sm:w-[200px] md:w-72"
+                rules={[
+                  {
+                    required: true,
+                    message: 'Please select a subcategory',
+                  },
+                ]}
+              >
+                <Select
+                  id="subCategory"
+                  placeholder="Select Sub Category"
+                  allowClear
+                  value={subCategoryValue}
+                  onChange={(value) => {
+                    form.setFieldValue("subCategory", value);
+                    setSubCategoryValue(value);
+                  }}
+                >
+                  {categorys.map((category) =>
+                    category.name === categoryValue ? category.subCategories.map((e, index) => (
+                      <Option value={e.contract} key={index}>
                         {e.name}
                       </Option>
-                    ))}
-                  </Select>
-                  {getIn(formik.touched, "category.name") &&
-                    getIn(formik.errors, "category.name") && (
-                      <span className="text-error text-xs">
-                        {getIn(formik.errors, "category.name")}
-                      </span>
-                    )}
-                </Form.Item>
-                <Form.Item
-                  label="Sub Category"
-                  name="subCategory"
-                  className="w-72"
-                >
-                  <Select
-                    placeholder="Select Sub Category"
-                    allowClear
-                    showSearch
-                    name="subCategory.name"
-                    id="subCategory"
-                    disabled={false}
-                    loading={issubCategorysLoading}
-                    value={formik.values.subCategory.name}
-                    onChange={(value) => {
-                      formik.setFieldValue("subCategory.name", value);
-                      formik.setFieldTouched("subCategory.name", false, false);
-                    }}
-                  >
-                    {categorys.map((category) =>
-                      category.name === formik.values.category.name ? category.subCategories.map((e, index) => (
-                        <Option value={e.name} key={index}>
-                          {e.name}
-                        </Option>
-                      )) : null
-                    )}
-                  </Select>
-                  {getIn(formik.touched, "subCategory.name") &&
-                    getIn(formik.errors, "subCategory.name") && (
-                      <span className="text-error text-xs">
-                        {getIn(formik.errors, "subCategory.name")}
-                      </span>
-                    )}
-                </Form.Item>
-              </div>
-              <div className="flex justify-between mt-4 ">
-                <Form.Item
-                  label="Product Name"
-                  name="productName"
-                  className="w-72"
-                >
-                  <Select
-                    placeholder="Select Product"
-                    allowClear
-                    showSearch
-                    id="product"
-                    value={formik.values.productName.name}
-                    name="productName.name"
-                    loading={isCategoryBasedProductsLoading}
-                    disabled={
-                      !formik.values.category.name ||
-                      !formik.values.subCategory.name || isCategoryBasedProductsLoading
-                    }
-                    onChange={(value) => {
-                      let selectedProduct = { address: "" };
-                      if (value) {
-                        selectedProduct = categoryBasedProducts.productsWithImageUrl.find(
-                          (e) => e.address === value
-                          );
-                        }
-                        formik.setFieldValue("productName.name", selectedProduct.name);
-                        formik.setFieldValue(
-                          "productName.address",
-                          selectedProduct.address
-                        );
-                        formik.setFieldTouched("productName.name", false, false);
-                      }}
-                    >
-                      {categoryBasedProducts.productsWithImageUrl && categoryBasedProducts.productsWithImageUrl.map((e, index) => (
-                        <Option value={e.address} key={index}>
-                          {decodeURIComponent(e.name)}
-                        </Option>
-                      ))}
-                    </Select>
-                  {getIn(formik.touched, "productName.name") &&
-                    getIn(formik.errors, "productName.name") && (
-                      <span className="text-error text-xs">
-                        {getIn(formik.errors, "productName.name")}
-                      </span>
-                    )}
-                </Form.Item>
-                <Form.Item label="Quantity" name="quantity" className="w-72">
-                  <Input
-                    label="quantity"
-                    placeholder="Enter Quantity"
-                    name="quantity"
-                    disabled={false}
-                    value={formik.values.quantity}
-                    onChange={formik.handleChange}
-                  />
-                  {formik.touched.quantity && formik.errors.quantity && (
-                    <span className="text-error text-xs">
-                      {formik.errors.quantity}
-                    </span>
+                    )) : null
                   )}
-                </Form.Item>
-              </div>
-              <div className="flex justify-between mt-4 ">
-                <Form.Item
-                  label="Price Per Unit"
-                  name="pricePerUnit "
-                  className="w-72"
-                >
-                  <Input
-                    label="pricePerUnit"
-                    placeholder="Enter Price"
-                    name="pricePerUnit"
-                    value={formik.values.pricePerUnit}
-                    onChange={formik.handleChange}
-                  />
-                  {formik.touched.pricePerUnit &&
-                    formik.errors.pricePerUnit && (
-                      <span className="text-error text-xs">
-                        {formik.errors.pricePerUnit}
-                      </span>
-                    )}
-                </Form.Item>
-                <Form.Item label="Batch ID" name="batchId" className="w-72">
-                  <Input
-                    label="batchId"
-                    placeholder="Enter Batch ID"
-                    name="batchId"
-                    disabled={true}
-                    value={formik.values.batchId}
-                    onChange={formik.handleChange}
-                  />
-                  {formik.touched.batchId && formik.errors.batchId && (
-                    <span className="text-error text-xs">
-                      {formik.errors.batchId}
-                    </span>
-                  )}
-                </Form.Item>
-              </div>
-              <div className="mt-4 flex justify-between items-center">
-                <div>Serial Numbers</div>
-                <div className="flex items-center">
-                  <Link to="/sample.csv" target="_blank" download>
-                    <div className="flex items-center" >
-                      <DownloadOutlined className="text-primary text-sm font-medium cursor-pointer hover:text-primaryHover" />
-                      <div className="text-primary ml-2 text-xs font-medium cursor-pointer hover:text-primaryHover">
-                        Download Sample CSV
-                      </div>
-                    </div>
-                  </Link>
+                </Select>
+              </Form.Item>
+            </div>
+            {categoricalProperties(form, handleClothingTypeChange, clothingType, sizeOptions, unitOfMeasures)}
+            <div className="flex justify-between mt-4 !list-disc">
+              <Form.Item
+                label="Description"
+                name="description"
+                className="w-full"
+                rules={[
+                  {
+                    required: true,
+                    message: 'Please enter a description',
+                  },
+                ]}
+              >
+                <RichEditor
+                  onChange={(content) => {
+                    form.setFieldsValue({ description: content });
+                  }}
+                  initialValue={form.getFieldValue("description") || ""}
+                />
+              </Form.Item>
+            </div>
+            <div className="mt-4 flex-wrap gap-5 sm:flex-nowrap flex justify-between">
+              <Form.Item
+                label="Upload Images"
+                name="images"
+                className="w-full sm:w-[200px] md:w-72"
+                rules={[
+                  {
+                    required: true,
+                    message: 'Please upload an image',
+                  },
+                ]}
+              >
+                <div className="p-4 border-secondryD border rounded flex flex-col justify-around">
                   <Upload
-                    onChange={uploadCSV}
-                    accept=".csv"
-                    customRequest={() => { }}
-                    showUploadList={false}
+                    onChange={handleImageChange}
+                    fileList={selectedImages}
+                    accept="image/png, image/jpeg"
+                    multiple={true}
+                    maxCount={10}
+                    beforeUpload={beforeImageUpload}
+                    listType="picture"
                   >
-                    <div className="ml-8 flex items-center">
-                      <PaperClipOutlined className="text-primary text-sm font-medium cursor-pointer hover:text-primaryHover" />
-                      <div className="text-primary ml-2 text-xs font-medium cursor-pointer hover:text-primaryHover">
-                        Upload CSV
-                      </div>
+                    <div className="text-primary border border-primary rounded px-4 py-2 text-center hover:text-white hover:bg-primary cursor-pointer">
+                      Browse Images
                     </div>
                   </Upload>
                 </div>
-              </div>
-              <Form.Item>
-                <TextArea
-                  label="serialNumbers"
-                  className="mt-2"
-                  disabled={formik.values.inventoryType === "Batch" ? true : false}
-                  rows={4}
-                  value={formik.values.inventoryType === "Batch" ? "" : formik.values.serialNumber.serialNumStr}
-                  placeholder="Upload serial numbers using upload CSV option"
-                />
-                {getIn(formik.touched, "serialNumber.serialNumStr") &&
-                  getIn(formik.errors, "serialNumber.serialNumStr") && (
-                    <span className="text-error text-xs">
-                      {getIn(formik.errors, "serialNumber.serialNumStr")}
-                    </span>
-                  )}
-                {getIn(formik.touched, "serialNumber.serialNumArr") &&
-                  getIn(formik.errors, "serialNumber.serialNumArr") && (
-                    <span className="text-error text-xs">
-                      {getIn(formik.errors, "serialNumber.serialNumArr")}
-                    </span>
-                  )}
+
+                <div className="flex items-start">
+                  <p className="mt-1 text-xs italic font-medium ">Note:</p>
+                  <p className="mt-1 text-xs italic ml-1 mr-4">
+                    use jpg, png format of size less than 5mb. Limit of 10.
+                  </p>
+                </div>
               </Form.Item>
-
-              <div className="flex justify-between">
-                <Form.Item label="Status" name="status" className="mt-4">
-                  <Radio.Group
-                    value={formik.values.status}
-                    onChange={formik.handleChange}
-                    name="status"
+              <Form.Item
+                label="Upload Files"
+                name="files"
+                className="w-full sm:w-[200px] md:w-72"
+              >
+                <div className="p-4 border-secondryD border rounded flex flex-col justify-around">
+                  <Upload
+                    onChange={handleFileChange}
+                    fileList={selectedFiles}
+                    accept="application/pdf"
+                    multiple={true}
+                    maxCount={10}
+                    beforeUpload={beforeFileUpload}
                   >
-                    <Radio value={true}>Publish</Radio>
-                    <Radio value={false}>Unpublish</Radio>
-                  </Radio.Group>
+                    <div className="text-primary border border-primary rounded px-4 py-2 text-center hover:text-white hover:bg-primary cursor-pointer">
+                      Browse Files
+                    </div>
+                  </Upload>
+                </div>
 
-                  {formik.touched.status && formik.errors.status && (
-                    <span className="text-error text-xs">
-                      {formik.errors.status}
-                    </span>
-                  )}
-                </Form.Item>
-                <Form.Item label="Type" name="inventoryType" className="mt-4">
-                  <Radio.Group
-                    value={formik.values.inventoryType}
-                    onChange={formik.handleChange}
-                    name="inventoryType"
-                  >
-                    <Radio value={"Individual"}>Individual</Radio>
-                    <Radio value={"Batch"}>Batch</Radio>
-                  </Radio.Group>
-
-                  {formik.touched.inventoryType && formik.errors.inventoryType && (
-                    <span className="text-error text-xs">
-                      {formik.errors.inventoryType}
-                    </span>
-                  )}
-                </Form.Item>
-              </div>
+                <div className="flex items-start">
+                  <p className="mt-1 text-xs italic font-medium ">Note:</p>
+                  <p className="mt-1 text-xs italic ml-1 mr-4">
+                    use pdf files with total size of less than 5mb. Limit of 10 files.
+                  </p>
+                </div>
+              </Form.Item>
             </div>
-          </Form>
-        )}
+          </div>
+        </Form>
       </Modal>
       {uploadErr && openToast("bottom")}
     </>

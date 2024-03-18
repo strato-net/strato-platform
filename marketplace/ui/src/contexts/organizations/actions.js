@@ -24,7 +24,7 @@ const actions = {
           payload: body.data,
         });
         return;
-      }
+      } 
       dispatch({ type: actionDescriptors.fetchOrganizationsFailed, payload: 'organization request failed' });
     } catch (err) {
       dispatch({ type: actionDescriptors.fetchOrganizationsFailed, payload: 'organization request failed' });

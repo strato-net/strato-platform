@@ -39,7 +39,10 @@ const actionDescriptors = {
   fetchUserAddressFailed: "fetch_user_address_failed",
   fetchUserAddresses: "fetch_user_addresses",
   fetchUserAddressesSuccessful: "fetch_user_addresses_successful",
-  fetchUserAddressesFailed: "fetch_user_addresses_failed"
+  fetchUserAddressesFailed: "fetch_user_addresses_failed",
+  fetchStratsBalance: "fetch_strats_balance",
+  fetchStratsBalanceSuccessful: "fetch_strats_balance_successful",
+  fetchStratsBalanceFailed: "fetch_strats_balance_failed"
 };
 
 const actions = {
@@ -137,12 +140,11 @@ const actions = {
     dispatch,
     categorys,
     subCategorys,
-    products,
-    manufacturers,
-    minQty,
-    maxQty,
+    // products,
+    // manufacturers,
     minPrice,
-    maxPrice
+    maxPrice,
+    search
   ) => {
     dispatch({ type: actionDescriptors.fetchMarketplace });
 
@@ -152,24 +154,27 @@ const actions = {
       ? `&subCategory[]=${subCategorys}`
       : "";
 
-    const manufacturerQuery = manufacturers
-      ? `&manufacturer[]=${manufacturers}`
-      : "";
+    // const manufacturerQuery = manufacturers
+    //   ? `&manufacturer[]=${manufacturers}`
+    //   : "";
 
-    const productQuery = products ? `&productId[]=${products}` : "";
-    const qtyQuery = `range[]=quantity,${minQty},${maxQty}`;
-    const priceQuery = `&range[]=pricePerUnit,${minPrice},${maxPrice}`;
+    // const productIdQuery = products ? `&name[]=${products}` : "";
+    const searchQuery = search
+      ? `&queryValue=${search}&queryFields=name`
+      : "";
+    const priceQuery = `&range[]=price,${minPrice},${maxPrice}`;
+    // const sortLatest = "&order=createdDate.desc"
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace?${qtyQuery}${priceQuery}${categoryQuery}${subCategoryQuery}${productQuery}${manufacturerQuery}`,
+        `${apiUrl}/marketplace?${priceQuery}${categoryQuery}${subCategoryQuery}${searchQuery}`,
         {
           method: HTTP_METHODS.GET,
         }
       );
 
       const body = await response.json();
-      
+
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchMarketplaceSuccessful,
@@ -199,12 +204,11 @@ const actions = {
     dispatch,
     categorys,
     subCategorys,
-    products,
-    manufacturers,
-    minQty,
-    maxQty,
+    // products,
+    // manufacturers,
     minPrice,
-    maxPrice
+    maxPrice,
+    search
   ) => {
     dispatch({ type: actionDescriptors.fetchMarketplaceLoggedIn });
 
@@ -214,24 +218,27 @@ const actions = {
       ? `&subCategory[]=${subCategorys}`
       : "";
 
-    const manufacturerQuery = manufacturers
-      ? `&manufacturer[]=${manufacturers}`
-      : "";
+    // const manufacturerQuery = manufacturers
+    //   ? `&manufacturer[]=${manufacturers}`
+    //   : "";
 
-    const productIdQuery = products ? `&productId[]=${products}` : "";
-    const qtyQuery = `range[]=quantity,${minQty},${maxQty}`;
-    const priceQuery = `&range[]=pricePerUnit,${minPrice},${maxPrice}`;
+    // const productIdQuery = products ? `&name[]=${products}` : "";
+    const priceQuery = `&range[]=price,${minPrice},${maxPrice}`;
+    // const sortLatest = "&order=createdDate.desc"
+    const searchQuery = search
+      ? `&queryValue=${search}&queryFields=name`
+      : "";
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace/all?${qtyQuery}${priceQuery}${categoryQuery}${subCategoryQuery}${productIdQuery}${manufacturerQuery}`,
+        `${apiUrl}/marketplace/all?${priceQuery}${categoryQuery}${subCategoryQuery}${searchQuery}`,
         {
           method: HTTP_METHODS.GET,
         }
       );
 
       const body = await response.json();
-      
+
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchMarketplaceLoggedInSuccessful,
@@ -244,7 +251,7 @@ const actions = {
           error: "Error while fetching marketplace products",
         });
       }
-      
+
 
       dispatch({
         type: actionDescriptors.fetchMarketplaceLoggedInFailed,
@@ -258,18 +265,18 @@ const actions = {
     }
   },
 
-  fetchTopSellingProducts: async (dispatch, offset) => {
+  fetchTopSellingProducts: async (dispatch, offset, limit) => {
     dispatch({ type: actionDescriptors.fetchTopSellingProducts });
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace/topselling?offset=${offset}`,
+        `${apiUrl}/marketplace/topselling?offset=${offset}&limit=${limit}&gtField=quantity&gtValue=0`,
         {
           method: HTTP_METHODS.GET,
         }
       );
 
-      const body = await response.json();      
+      const body = await response.json();
 
       if (response.status === RestStatus.OK) {
         dispatch({
@@ -277,7 +284,7 @@ const actions = {
           payload: body.data,
         });
         return;
-      }
+      } 
       dispatch({
         type: actionDescriptors.fetchTopSellingProductsFailed,
         error: undefined,
@@ -290,18 +297,18 @@ const actions = {
     }
   },
 
-  fetchTopSellingProductsLoggedIn: async (dispatch, offset) => {
+  fetchTopSellingProductsLoggedIn: async (dispatch, offset, limit) => {
     dispatch({ type: actionDescriptors.fetchTopSellingProductsLoggedIn });
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace/user/topselling?offset=${offset}`,
+        `${apiUrl}/marketplace/user/topselling?offset=${offset}&limit=${limit}&gtField=quantity&gtValue=0`,
         {
           method: HTTP_METHODS.GET,
         }
       );
 
-      const body = await response.json();      
+      const body = await response.json();
 
       if (response.status === RestStatus.OK) {
         dispatch({
@@ -309,7 +316,7 @@ const actions = {
           payload: body.data,
         });
         return;
-      }
+      } 
       dispatch({
         type: actionDescriptors.fetchTopSellingProductsLoggedInFailed,
         error: undefined,
@@ -342,7 +349,7 @@ const actions = {
           type: actionDescriptors.addShippingAddressSuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, "Shipping address added successfully", true);
+        actions.setMessage(dispatch, "Address added successfully", true);
         return body.data;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
@@ -351,6 +358,12 @@ const actions = {
         });
         actions.setMessage(dispatch, "Error while adding Shipping address");
         return null;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.addShippingAddressFailed,
+          error: "Unauthorized while adding Shipping address"
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -368,18 +381,18 @@ const actions = {
     }
   },
 
-  fetchUserAddress: async (dispatch, address) => {
+  fetchUserAddress: async (dispatch, addressId) => {
     dispatch({ type: actionDescriptors.fetchUserAddress });
 
     try {
       const response = await fetch(
-        `${apiUrl}/order/${address}`,
+        `${apiUrl}/order/userAddress/${addressId}`,
         {
           method: HTTP_METHODS.GET,
         }
       );
 
-      const body = await response.json();   
+      const body = await response.json();
 
       if (response.status === RestStatus.OK) {
         dispatch({
@@ -394,7 +407,7 @@ const actions = {
         });
         actions.setMessage(dispatch, "Error while getting Shipping address");
         return false;
-      }
+      } 
       dispatch({
         type: actionDescriptors.fetchUserAddressFailed,
         error: body.error,
@@ -436,7 +449,7 @@ const actions = {
         });
         actions.setMessage(dispatch, "Error while getting Shipping address");
         return false;
-      }
+      } 
       dispatch({
         type: actionDescriptors.fetchUserAddressesFailed,
         error: body.error,
@@ -449,6 +462,33 @@ const actions = {
         error: undefined,
       });
       actions.setMessage(dispatch, "Error while getting Shipping address");
+    }
+  },
+  fetchStratsBalance: async (dispatch) => {
+    dispatch({ type: actionDescriptors.fetchStratsBalance });
+    try {
+      let response = await fetch(`${apiUrl}/marketplace/strats`, {
+        method: HTTP_METHODS.GET,
+        credentials: "same-origin",
+      });
+      const body = await response.json();
+      if (response.status === RestStatus.UNAUTHORIZED || response.status === RestStatus.FORBIDDEN) {
+        dispatch({
+          type: actionDescriptors.fetchStratsBalanceFailed,
+          payload: "Error while fetching STRATS",
+        });
+        return;
+      }
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchStratsBalanceSuccessful,
+          payload: body.data
+        });
+        return;
+      }
+      dispatch({ type: actionDescriptors.fetchStratsBalanceFailed, payload: "Error while fetching STRATS" });
+    } catch (err) {
+      dispatch({ type: actionDescriptors.fetchStratsBalanceFailed, payload: "Error while fetching STRATS" });
     }
   },
 

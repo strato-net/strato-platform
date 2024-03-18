@@ -67,16 +67,19 @@ instance ToParam (QueryFlag "queue") where
   toParam _ =
     DocQueryParam "queue" ["true", "false", ""] "flag for queueing a transaction request" Flag
 
-type PostBlocTransactionParallel =
+type PostBlocTransactionParallelCommon tokenHeaderName = 
   "transaction"
     :> "parallel"
-    :> S.Header "X-USER-ACCESS-TOKEN" Text
+    :> S.Header tokenHeaderName Text
     :> QueryParam "chainid" ChainId
     :> QueryParam "use_wallet" Bool -- Using QueryParam here to distinguish between Nothing and Just False
     :> QueryFlag "resolve"
     :> QueryFlag "queue"
     :> ReqBody '[JSON] PostBlocTransactionRequest
     :> Post '[JSON] [BlocChainOrTransactionResult]
+
+type PostBlocTransactionParallel = PostBlocTransactionParallelCommon "X-USER-ACCESS-TOKEN"
+type PostBlocTransactionParallelExternal = PostBlocTransactionParallelCommon "Authorization"
 
 type PostBlocTransactionRaw =
   "transaction"
@@ -88,22 +91,15 @@ type PostBlocTransactionRaw =
     :> ReqBody '[JSON] PostBlocTransactionRawRequest
     :> Post '[JSON] BlocChainOrTransactionResult
 
-type PostBlocTransactionCommon =
-  QueryParam "chainid" ChainId
+type PostBlocTransaction =
+  "transaction"
+    :> S.Header "X-USER-ACCESS-TOKEN" Text
+    :> QueryParam "chainid" ChainId
     :> QueryParam "use_wallet" Bool -- Using QueryParam here to distinguish between Nothing and Just False
     :> QueryFlag "resolve"
     :> ReqBody '[JSON] PostBlocTransactionRequest
     :> Post '[JSON] [BlocChainOrTransactionResult]
 
-type PostBlocTransaction =
-  "transaction"
-    :> S.Header "X-USER-ACCESS-TOKEN" Text
-    :> PostBlocTransactionCommon
-
-type PostBlocTransactionExternal =
-  "transaction" -- only to be used for external api client bindings
-    :> S.Header "Authorization" Text
-    :> PostBlocTransactionCommon
 
 -- | PostBlocTransactionBody should return a list of signed transaction hashes,
 -- using the caller's JWT, and their respective raw transaction bodies without

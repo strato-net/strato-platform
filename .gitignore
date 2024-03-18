@@ -7,6 +7,10 @@ docker-compose.push.yml
 docker-compose.push.ecr.yml
 /docker-compose.yml
 docker-compose.ecr.yml
+docker-compose.highway.push.yml
+docker-compose.highway.push.ecr.yml
+docker-compose.highway.yml
+docker-compose.highway.ecr.yml
 docker-compose.vault.push.yml
 docker-compose.vault.push.ecr.yml
 docker-compose.vault.yml
@@ -15,6 +19,10 @@ docker-compose.identity.push.yml
 docker-compose.identity.push.ecr.yml
 docker-compose.identity.yml
 docker-compose.identity.ecr.yml
+docker-compose.stripe-ps.yml
+docker-compose.stripe-ps.ecr.yml
+docker-compose.stripe-ps.push.yml
+docker-compose.stripe-ps.push.ecr.yml
 strato-platform-manifest.yaml
 eks-vault-deployment.yaml
 eks-identity-deployment.yaml
@@ -25,5 +33,6 @@ targets.log
 strato/tools/x509-generator/subject.json
 strato/tools/genesis-builder/certs.json
 strato/haddock
+strato/hpc
 *.cabal
 *~

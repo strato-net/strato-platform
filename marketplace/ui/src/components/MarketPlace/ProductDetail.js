@@ -1,20 +1,17 @@
 import React, { useState, useEffect } from "react";
 import {
   Row,
-  Card,
   Breadcrumb,
-  Image,
   Button,
   Typography,
   Tabs,
   Space,
-  Divider,
-  Col,
   Spin,
   notification,
   InputNumber,
+  List,
 } from "antd";
-import { MinusOutlined, PlusOutlined, EyeOutlined } from "@ant-design/icons";
+import { HeartTwoTone, HeartFilled } from '@ant-design/icons';
 import { useMatch } from "react-router-dom";
 import { actions } from "../../contexts/inventory/actions";
 import {
@@ -22,33 +19,32 @@ import {
   useInventoryState,
 } from "../../contexts/inventory";
 import routes from "../../helpers/routes";
-import { UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
 //categories
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { actions as marketPlaceActions } from "../../contexts/marketplace/actions";
-import { actions as eventActions } from "../../contexts/event/actions";
-import {
-  useEventDispatch,
-  useEventState,
-} from "../../contexts/event";
+import { actions as orderActions } from "../../contexts/order/actions"
 import {
   useMarketplaceDispatch,
   useMarketplaceState,
 } from "../../contexts/marketplace";
+import { useOrderDispatch } from "../../contexts/order";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
 import { useNavigate, useLocation } from "react-router-dom";
 //Items - ownership history
-import { actions as itemsActions } from "../../contexts/item/actions";
-import { useItemDispatch, useItemState } from "../../contexts/item";
-import { epochToDate } from "../../helpers/utils";
 import DataTableComponent from "../DataTableComponent";
-import useDebounce from "../UseDebounce";
-import NestedComponent from "./NestedComponent";
 import ClickableCell from "../ClickableCell";
 import "./index.css";
 import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
-
+import { setCookie } from "../../helpers/cookie";
+import image_placeholder from "../../images/resources/image_placeholder.png";
+import "react-responsive-carousel/lib/styles/carousel.min.css"; // requires a loader
+import { Carousel } from "react-responsive-carousel"
+import { Images } from "../../images";
+import ProductItemDetails from "./ProductItemDetails";
+import HelmetComponent from "../Helmet/HelmetComponent";
+import { SEO } from "../../helpers/seoConstant";
+import PreviewMode from "../RichEditor/PreviewMode";
 
 const ProductDetails = ({ user, users }) => {
   const { state, pathname } = useLocation();
@@ -62,58 +58,28 @@ const ProductDetails = ({ user, users }) => {
     isCalledFromInventory = true
   }
 
-  const [eventList, setEventList] = useState([])
-  const [eventDetailList, setEventDetailList] = useState([])
-  const [Id, setId] = useState(undefined);
-  const [isEventSelected, setIsEventSelected] = useState(false);
-  const [isSerialNumberSelected, setIsSerialNumberSelected] = useState(false);
-  const [serialNumber, setSerialNumber] = useState(false);
-  const limit = 10, offset = 0;
-  const debouncedSearchTerm = useDebounce("", 1000);
-  const { inventoryEvents, isInventoryEventsLoading, eventDetails, iseventDetailsLoading } =
-    useEventState();
-  const eventDispatch = useEventDispatch();
-
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
-  useEffect(() => {
-    if (user) {
-      if (Id !== undefined) {
-        eventActions.fetchEventOfInventory(eventDispatch, limit, offset, debouncedSearchTerm, Id);
-      }
-    }
-  }, [limit, offset, debouncedSearchTerm, eventDispatch, Id, user])
+  const { Text, Paragraph } = Typography;
+  const [Id, setId] = useState(undefined);
+  const [itemData, setItemData] = useState({});
 
-
-  useEffect(() => {
-    let events = [];
-    inventoryEvents.forEach(element => {
-      events.push({ "key": element.eventTypeName, "eventName": element, "eventDesc": element.eventTypeDescription },)
-    });
-    setEventList(events);
-  }, [inventoryEvents])
-
-  const [isTransformationSelected, setIsTransformationSelected] =
-    useState(false);
-  const { Text, Paragraph, Title } = Typography;
   const [qty, setQty] = useState(1);
   const dispatch = useInventoryDispatch();
-  const itemDispatch = useItemDispatch();
   const categoryDispatch = useCategoryDispatch();
+  const orderDispatch = useOrderDispatch();
   const [categoryName, setCategoryName] = useState("");
   const [api, contextHolder] = notification.useNotification();
   const { categorys, iscategorysLoading } = useCategoryState();
-  const { inventoryDetails, isInventoryDetailsLoading } = useInventoryState();
+  const {
+    inventoryDetails,
+    isInventoryDetailsLoading,
+    isInventoryOwnershipHistoryLoading,
+    inventoryOwnershipHistory
+  } = useInventoryState();
   const marketplaceDispatch = useMarketplaceDispatch();
   const { cartList } = useMarketplaceState();
   const navigate = useNavigate();
-  const {
-    serialNumbers,
-    isSerialNumbersLoading,
-    ownershipHistory,
-    isOwnershipHistoryLoading,
-    isRawMaterialsLoading
-  } = useItemState();
 
   const routeMatch = useMatch({
     path: routes.MarketplaceProductDetail.url,
@@ -121,9 +87,22 @@ const ProductDetails = ({ user, users }) => {
   });
 
   const routeMatch1 = useMatch({
+
     path: routes.InventoryDetail.url,
     strict: true,
   });
+
+  const ownerSameAsUser = () => {
+    if (user?.commonName === inventoryDetails?.ownerCommonName) {
+      return true;
+    }
+    return false;
+  }
+
+  // For Wishlist Icon Rendering
+  const [isWishlisted, setIsWishlisted] = useState(false);
+  const [availableQuantity, setAvailableQuantity] = useState(1);
+  const shouldShowWishlistIcon = isAuthenticated && user && !ownerSameAsUser();
 
   useEffect(() => {
     if (isCalledFromInventory) setId(routeMatch1?.params?.id);
@@ -137,11 +116,25 @@ const ProductDetails = ({ user, users }) => {
   useEffect(() => {
     if (Id !== undefined) {
       actions.fetchInventoryDetail(dispatch, Id);
-      if (user) {
-        itemsActions.fetchSerialNumbers(itemDispatch, Id);
-      }
+      // TODO: Uncomment this when we have serial numbers working
+      // if (user) {
+      //   itemsActions.fetchSerialNumbers(itemDispatch, Id);
+      // }
     }
-  }, [Id, dispatch, itemDispatch, user]);
+  }, [Id, dispatch]);
+
+  useEffect(() => {
+    if (inventoryDetails) {
+      actions.fetchInventoryOwnershipHistory(
+        dispatch,
+        {
+          originAddress: inventoryDetails.originAddress,
+          minItemNumber: inventoryDetails.itemNumber,
+          maxItemNumber: inventoryDetails.itemNumber + inventoryDetails.quantity - 1
+        }
+      );
+    }
+  }, [inventoryDetails, dispatch]);
 
   useEffect(() => {
     marketPlaceActions.fetchCartItems(marketplaceDispatch, cartList);
@@ -155,8 +148,35 @@ const ProductDetails = ({ user, users }) => {
         (c) => c.name === details.category
       );
       setCategoryName(prodCategory?.name);
+      const detailsData = details.data;
+      setItemData(detailsData);
+      if (details.saleQuantity) {
+        setAvailableQuantity(details.saleQuantity || 1);
+      }
     }
   }, [categorys, details]);
+
+  // This checks to see if an item is in the wishlist. This will help us render the correct icon
+  useEffect(() => {
+    const wishList = JSON.parse(localStorage.getItem('wishList')) || [];
+    const productInWishlist = wishList.some(product => product.address === details?.address);
+    setIsWishlisted(productInWishlist);
+  }, [details]);
+
+  const toggleWishlist = () => {
+    const wishList = JSON.parse(localStorage.getItem('wishList')) || [];
+    if (isWishlisted) {
+      // Remove product from wishlist
+      const updatedWishList = wishList.filter(product => product.address !== details.address);
+      localStorage.setItem('wishList', JSON.stringify(updatedWishList));
+      setIsWishlisted(false);
+    } else {
+      // Add product to wishlist
+      wishList.push(details);
+      localStorage.setItem('wishList', JSON.stringify(wishList));
+      setIsWishlisted(true);
+    }
+  };
 
   const subtract = () => {
     if (qty !== 1) {
@@ -166,11 +186,10 @@ const ProductDetails = ({ user, users }) => {
   };
 
   const add = () => {
-    if (qty < details.availableQuantity) {
+    if (qty < availableQuantity) {
       let value = qty + 1;
       setQty(value);
     } else {
-      openToast("bottom", true, "Cannot add more than available quantity");
     }
   };
 
@@ -189,32 +208,6 @@ const ProductDetails = ({ user, users }) => {
       });
     }
   };
-
-  useEffect(() => {
-    let temp = [];
-    if (eventDetails != null) {
-      temp = eventDetails.events.map(elem => {
-        return {
-          ...elem,
-          key: elem.eventBatchId,
-          date: epochToDate(elem['date']),
-          summary: elem['summary'],
-          certifier: elem['certifierName'],
-          certifiedDate: elem['certifiedDate'] ? epochToDate(elem['certifiedDate']) : '',
-        }
-      });
-    }
-    setEventDetailList(temp);
-  }, [eventDetails])
-
-  const ownerSameAsUser = () => {
-
-    if (user && user.organization === inventoryDetails?.ownerOrganization) {
-      return true;
-    }
-
-    return false;
-  }
 
   const addItemToCart = () => {
     let found = false;
@@ -235,344 +228,260 @@ const ProductDetails = ({ user, users }) => {
       items = [...cartList];
       cartList.forEach((element, index) => {
         if (element.product.address === details.address) {
-          if (items[index].qty + qty <= details.availableQuantity) {
-            items[index].qty += qty;
-            marketPlaceActions.addItemToCart(marketplaceDispatch, items);
-            setQty(1);
-            openToast("bottom", false, "Item updated in cart");
-          } else {
-            openToast(
-              "bottom",
-              true,
-              "Cannot add more than available quantity"
-            );
-            return;
-          }
+          items[index].qty += qty;
+          marketPlaceActions.addItemToCart(marketplaceDispatch, items);
+          setQty(1);
+          openToast("bottom", false, "Item updated in cart");
         }
       });
     }
   };
 
-  const eventColumn = [
-    {
-      title: <Text className="text-primaryC text-[13px]">NAME</Text>,
-      dataIndex: "eventName",
-      key: "eventName",
-      render: (text) => (
-        <Button
-          type="link"
-          className="text-primary text-[17px] whitespace-normal text-left"
-          onClick={() => {
-            if (isEventSelected) {
-              if (text.eventTypeId === eventDetailList[0].eventTypeId) {
-                setIsEventSelected(false);
-                return;
-              }
-            }
-            setIsEventSelected(true);
-            eventActions.fetchEventDetails(eventDispatch, Id, text.eventTypeId)
-          }}
-        >
-          {decodeURIComponent(text.eventTypeName)}
-        </Button>
-      ),
-    },
-    {
-      title: <Text className="text-primaryC text-[13px]">DESCRIPTION</Text>,
-      dataIndex: "eventDesc",
-      key: "eventDesc",
-      render: (text) => <p>{decodeURIComponent(text)}</p>,
-    },
-  ];
-
-  const ownershipColumn = [
-    {
-      title: <Text className="text-primaryC text-[13px]">SERIAL NUMBER</Text>,
-      dataIndex: "serialNumber",
-      // Fixes UI issue of children having the same key
-      key: serialNumbers[0] === "" ? "itemNumber" : "serialNumber",
-      align: "center",
-      onCell: (record) => {
-        return {
-          onClick: (ev) => {
-            setIsSerialNumberSelected(true);
-            setSerialNumber(record.serialNumber);
-            itemsActions.fetchItemOwnershipHistory(
-              itemDispatch,
-              record.address
-            );
-          },
-        };
-      },
-      render: (serialNumber) => (
-        <Button type="link" className="text-primary text-[17px]">
-          {serialNumber}
-        </Button>
-      ),
-    },
-    {
-      title: <Text className="text-primaryC text-[13px]">ITEM NUMBER</Text>,
-      dataIndex: "itemNumber",
-      key: "itemNumber",
-      align: "center",
-      onCell: (record, rowIndex) => {
-        return {
-          onClick: (ev) => {
-            setIsSerialNumberSelected(true);
-            if (isEventSelected) setIsEventSelected(false);
-            setSerialNumber(record.serialNumber);
-            itemsActions.fetchItemOwnershipHistory(
-              itemDispatch,
-              record.address
-            );
-          },
-        };
-      },
-      render: (serialNumber) => (
-        <Button type="link" className="text-primary text-[17px]">
-          {serialNumber}
-        </Button>
-      ),
-    },
-  ];
-
-  const eventDetailColumn = [
-    {
-      title: <Text className="text-primaryC text-[13px]">DATE</Text>,
-      dataIndex: "date",
-      key: "date",
-      render: (text) => <p>{text}</p>,
-    },
-    {
-      title: <Text className="text-primaryC text-[13px]">SUMMARY</Text>,
-      dataIndex: "summary",
-      key: "summary",
-      render: (text) => <p>{decodeURIComponent(text)}</p>,
-    },
-    {
-      title: <Text className="text-primaryC text-[13px]">CERTIFIED BY</Text>,
-      dataIndex: "certifier",
-      key: "certifier",
-      render: (text) => <p>{text}</p>,
-    },
-    {
-      title: <Text className="text-primaryC text-[13px]">CERTIFIED DATE</Text>,
-      dataIndex: "certifiedDate",
-      key: "certifiedDate",
-      render: (text) => <p>{text}</p>,
-    },
-
-    {
-      title: <Text className="text-primaryC text-[13px]">SERIAL NUMBER</Text>,
-      dataIndex: "serialNo",
-      key: "serialNo",
-      render: (text) => (
-        <div className="group flex items-center cursor-pointer" onClick={() => passSerialNumber(text, eventDetails.eventTypeName)}>
-          <EyeOutlined className="mr-2 group-hover:text-primary" />
-          <p className="group-hover:text-primary">View</p>
-        </div>
-      ),
-    },
-  ];
-
-  const passSerialNumber = (serialNumbers, eventTypeName) => {
-    navigate(routes.EventSerialNumberList.url,
-      { state: { serialNumbers: serialNumbers, eventTypeName: eventTypeName } });
-  }
-
   const ownershipDetailColumn = [
     {
-      title: <Text className="text-primaryC text-[13px]">SELLER</Text>,
-      dataIndex: "seller",
-      key: "seller",
+      title: <Text className="text-primaryC text-[13px]">Seller</Text>,
+      dataIndex: "sellerCommonName",
+      key: "sellerCommonName",
       align: "center",
-      render: (text) => <p>{text}</p>,
+      // render: (text) => <p>{text}</p>,
+      render: (text) => (
+        <a
+          href={`${window.location.origin}/marketplace/profile/${encodeURIComponent(text)}`}
+          onClick={(e) => {
+            e.preventDefault();
+            const userProfileUrl = `/marketplace/profile/${encodeURIComponent(text)}`;
+
+            if (e.ctrlKey || e.metaKey) {
+              // Open in a new tab if Ctrl/Cmd is pressed
+              window.open(`${window.location.origin}${userProfileUrl}`, '_blank');
+            } else {
+              // Use navigate for a normal click, without Ctrl/Cmd
+              navigate(routes.MarketplaceUserProfile.url.replace(':commonName', text), { state: { from: pathname } });
+            }
+          }}
+          style={{ textDecoration: 'underline', color: 'black', cursor: 'pointer' }}
+        >
+          {text}
+        </a>
+      ),
     },
     {
-      title: <Text className="text-primaryC text-[13px]">OWNER</Text>,
-      dataIndex: "newOwner",
-      key: "newOwner",
+      title: <Text className="text-primaryC text-[13px]">Owner</Text>,
+      dataIndex: "purchaserCommonName",
+      key: "purchaserCommonName",
       align: "center",
-      render: (text) => <p>{text}</p>,
+      // render: (text) => <p>{text}</p>,
+      render: (text) => (
+        <a
+          href={`${window.location.origin}/marketplace/profile/${encodeURIComponent(text)}`}
+          onClick={(e) => {
+            e.preventDefault();
+            const userProfileUrl = `/marketplace/profile/${encodeURIComponent(text)}`;
+
+            if (e.ctrlKey || e.metaKey) {
+              // Open in a new tab if Ctrl/Cmd is pressed
+              window.open(`${window.location.origin}${userProfileUrl}`, '_blank');
+            } else {
+              // Use navigate for a normal click, without Ctrl/Cmd
+              navigate(routes.MarketplaceUserProfile.url.replace(':commonName', text), { state: { from: pathname } });
+            }
+          }}
+          style={{ textDecoration: 'underline', color: 'black', cursor: 'pointer' }}
+        >
+          {text}
+        </a>
+      ),
     },
     {
       title: (
         <Text className="text-primaryC text-[13px]">
-          OWNERSHIP START DATE
+          Ownership Start Date
         </Text>
       ),
-      dataIndex: "ownershipStartDate",
-      key: "ownershipStartDate",
+      dataIndex: "block_timestamp",
+      key: "block_timestamp",
       align: "center",
-      render: (epoch) => <p>{epochToDate(epoch)}</p>,
+      render: (epoch) => <p>{epoch.split(' ')[0]}</p>,
     },
   ];
 
-  const DescTitle = ({ text }) => {
-    return <Text className="text-primaryC text-[13px] whitespace-pre">{text}</Text>;
+  const getCategory = (data) => {
+    const parts = data.contract_name.split('-');
+    return parts[parts.length - 1];
   };
 
-  const DescriptionComponent = () => {
-    return (
-      <Space direction="vertical">
-        <Space>
-          <DescTitle text="Product Id" />
-          <DescTitle text="                      :" />
-          <Text className="text-[13px]">{details.uniqueProductCode}</Text>
-        </Space>
-
-        <Space>
-          <DescTitle text="Unique Product Code" />
-          <DescTitle text=" :" />
-          <Text className="text-[13px]">{details.userUniqueProductCode ? details.userUniqueProductCode : " "}</Text>
-        </Space>
-        <Space>
-          <DescTitle text="Manufacturer" />
-          <DescTitle text="                :" />
-          <Text className="text-[13px]">{decodeURIComponent(details.manufacturer)}</Text>
-        </Space>
-
-        <Space>
-          <DescTitle text="Unit of Measurement" />
-          <DescTitle text=" :" />
-          <Text className="text-[13px]">
-            {UNIT_OF_MEASUREMENTS[details.unitOfMeasurement]}
-          </Text>
-        </Space>
-
-        <Space>
-          <DescTitle text="Least Sellable Unit" />
-          <DescTitle text="       :" />
-          <Text className="text-[13px]">{details.leastSellableUnit}</Text>
-        </Space>
-      </Space>
-    );
-  };
-
-  const EventDetailsComponent = ({ title, value, id }) => {
-    return (
-      <Col id={id}>
-        <Text className="block text-primaryC text-xs mb-2">{title}</Text>
-        <Text className="block text-primaryB">{value}</Text>
-      </Col>
-    );
-  };
-
-  const onTabChange = (tab) => {
-    if (tab === "1") {
-      if (isEventSelected) setIsEventSelected(false)
-      if (isSerialNumberSelected) setIsSerialNumberSelected(false)
-      if (isTransformationSelected) setIsTransformationSelected(false)
-    } else if (tab === "2") {
-      if (isSerialNumberSelected) setIsSerialNumberSelected(false)
-      if (isTransformationSelected) setIsTransformationSelected(false)
-    } else if (tab === "3") {
-      if (isEventSelected) setIsEventSelected(false)
-      if (isTransformationSelected) setIsTransformationSelected(false)
+  function getCategoryName(str) {
+    const lastIndex = str.lastIndexOf('-');
+    if (lastIndex !== -1) {
+      return str.substring(lastIndex + 1);
     } else {
-      if (isEventSelected) setIsEventSelected(false)
-      if (isSerialNumberSelected) setIsSerialNumberSelected(false)
+      return str;
     }
   }
+
+  const assetName = decodeURIComponent(details?.name)
+  const contractName = getCategoryName(decodeURIComponent(details?.contract_name))
+  const linkUrl = window.location.href;
 
   return (
     <>
       {contextHolder}
       {details === null ||
         isInventoryDetailsLoading ||
-        iscategorysLoading ||
-        isSerialNumbersLoading ? (
+        iscategorysLoading ? (
         <div className="h-screen flex justify-center items-center">
           <Spin spinning={isInventoryDetailsLoading} size="large" />
         </div>
       ) : (
         <div>
+          <HelmetComponent
+            title={`${assetName} | ${contractName} | ${SEO.TITLE_META}`}
+            description={details?.description}
+            link={linkUrl} />
           <Row>
-            <Breadcrumb className="text-xs mt-14 mb-8 ml-16">
+            <Breadcrumb className="text-xs   mb-4 md:mt-5  md:mb-6 lg:mb-[44px] ml-4 lg:ml-16">
               <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
                 <ClickableCell href={routes.Marketplace.url}>
                   <p
-                    className="text-primaryB hover:bg-transparent"
+                    className="text-[#13188A]  text-sm font-semibold "
                   >
                     Home
+                  </p>
+                </ClickableCell>
+              </Breadcrumb.Item> <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+                <ClickableCell href={routes.Marketplace.url}>
+                  <p
+                    className="text-[#13188A]  text-sm font-semibold "
+                  >
+                    Marketplace
                   </p>
                 </ClickableCell>
               </Breadcrumb.Item>
               {
                 isCalledFromInventory ?
                   <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-                    <ClickableCell href={routes.Inventories.url}>
+                    <ClickableCell href={routes.MyStore.url}>
                       <p
-                        className="text-primaryB hover:bg-transparent"
+                        className="text-[#13188A]  text-sm font-semibold "
                       >
-                        Inventory
+                        My Store
                       </p>
                     </ClickableCell>
                   </Breadcrumb.Item> : null
               }
-              <Breadcrumb.Item className="text-primary">
+              <Breadcrumb.Item className="text-[#202020]  text-sm font-semibold ">
                 {decodeURIComponent(details.name)}
               </Breadcrumb.Item>
             </Breadcrumb>
           </Row>
+          <div className="flex w-full flex-col  px-4 sm:px-8 md:px-0  items-center lg:items-start  md:w-[750px] lg:w-[835px] xl:w-[858px]  md:mx-auto ">
+            <div className="flex md:justify-center gap-[15px] lg:gap-6 flex-col lg:flex-row   ">
+              <Carousel showIndicators={
+                details.images.length > 1 ? true : false
+              } className="product_detail w-full  sm:w-[417px]   lg:h-[348px] md:w-[343px] lg:w-[417px]" showStatus={false} showArrows swipeable emulateTouch infiniteLoop >
+                {details.images.length > 0 ? details.images.map((element, index) => {
+                  return (<><div key={index} className="sm:w-[343px ] h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
+                    <img width={"100%"}
+                      alt={`${assetName} | Image ${index}`}
+                      title={`${assetName} | Image ${index}`}
+                      className="object-contain rounded-md h-full " src={element ? element : image_placeholder} />
+                  </div></>)
+                }) : <><div className="sm:w-[343px ] sm:h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
+                  <img width={"100%"}
+                    alt={`${assetName} | Image`}
+                    title={`${assetName} | Image`}
+                    className="object-contain rounded-md h-full " src={image_placeholder} />
+                </div></>}
+              </Carousel>
+              <div className=" w-full lg:w-1/2">
+                {shouldShowWishlistIcon && (
+                  <div className="flex justify-end">
+                    {isWishlisted ? <HeartFilled className="cursor-pointer" onClick={toggleWishlist} style={{ fontSize: "20px", color: "#A15E49" }} /> : <HeartTwoTone className="cursor-pointer" onClick={toggleWishlist} style={{ fontSize: "20px" }} twoToneColor="#A15E49" />}
+                  </div>
+                )}
+                <div className=" lg:border-b lg:border-[#E9E9E9] pb-[6px]">
+                  <Text className="font-semibold text-base lg:text-3xl text-[#202020]">
 
-          <div className="flex mx-16">
-            <div className="w-1/2">
-              <div className="h-96 flex items-center justify-center border border-grayLight">
-                <Image height={"100%"} width={"100%"} style={{ objectFit: "contain" }} src={details.imageUrl} />
-              </div>
-              {details.availableQuantity !== 0 ?
-                <Row className="justify-center my-7">
-                  {ownerSameAsUser() ? <Button
-                    className="group w-1/3 h-9 border border-primary"
-                    disabled={true}
-                    id="addToCart"
-                    onClick={() => {
-                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                        window.location.href = loginUrl;
-                      } else {
-                        TagManager.dataLayer({
-                          dataLayer: {
-                            event: 'add_to_cart_from_product_details',
-                            product_name: details.name,
-                            category: details.category,
-                            productId: details.productId
-                          },
-                        });
-                        addItemToCart();
-                      }
-                    }}
-                  >
-                    Add To Cart
-                  </Button> : <Button
-                    className="group w-1/3 h-9 border border-primary hover:bg-primary"
-                    onClick={() => {
-                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                        window.location.href = loginUrl;
-                      } else {
-                        TagManager.dataLayer({
-                          dataLayer: {
-                            event: 'add_to_cart_from_product_details',
-                            product_name: details.name,
-                            category: details.category,
-                            productId: details.productId
-                          },
-                        });
-                        addItemToCart();
-                      }
-                    }}
-                  >
-                    <div className="text-primary group-hover:text-white">
-                      Add To Cart
+                    {decodeURIComponent(details?.name)}
+                  </Text>
+                  <div className="flex pt-[6px] ">
+                    {/* <Text className="text-[#202020] text-xs  font-medium">Owned By: {details?.ownerCommonName}</Text>
+                     */}
+                    {/* <Text className="text-[#202020] text-xs font-medium">Owned By: </Text> 
+                      */}
+                    <span className="text-xs  self-center">Owned By:&nbsp;</span>
+                    <div
+                      style={{ cursor: details?.ownerCommonName && details.ownerCommonName !== 'N/A' ? 'pointer' : 'default', color: 'black', textDecoration: details?.ownerCommonName && details.ownerCommonName !== 'N/A' ? 'underline' : 'none' }}
+                      onClick={(e) => {
+                        if (details?.ownerCommonName && details.ownerCommonName !== 'N/A') {
+                          e.preventDefault();
+                          const userProfileUrl = `/marketplace/profile/${encodeURIComponent(details.ownerCommonName)}`;
+                          const fullUrl = `${window.location.origin}${userProfileUrl}`;
+
+                          if (e.ctrlKey || e.metaKey) {
+                            // Open in a new tab if Ctrl/Cmd is pressed
+                            window.open(fullUrl, '_blank');
+                          } else {
+                            // Use navigate for a normal click, without Ctrl/Cmd
+                            navigate(routes.MarketplaceUserProfile.url.replace(':commonName', details?.ownerCommonName), { state: { from: pathname } });
+                          }
+                        }
+                      }}
+                    >
+                      <Text className="text-[#202020] text-xs font-medium  self-center">{details?.ownerCommonName || 'N/A'}</Text>
                     </div>
-                  </Button>}
-                  <Button
-                    type="primary"
-                    className="w-1/3 h-9 ml-6 bg-primary !hover:bg-primaryHover"
-                    onClick={() => {
-                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                        window.location.href = loginUrl;
-                      } else {
+
+                    <Text className="text-[#202020] text-xs  font-medium" >{details?.ownerOrganization}</Text>
+                  </div>
+                </div>
+                <div className=" pt-4 lg:pt-[22px]">
+                  <Text level={4} className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold">
+                    {details?.price ? <>${details?.price}</> : "No Price Available"}
+                  </Text>
+                </div>
+
+                {availableQuantity !== 0 ?
+                  <div className="flex justify-between lg:justify-start  w-full gap-3 lg:gap-[15px] pt-6 lg:pt-[18px]" id="quantity" >
+                    <div
+                      onClick={subtract}
+                      className={`h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer ${qty > 1 ? '' : 'cursor-not-allowed opacity-50'}`}>
+                      <p className=" text-2xl md:text-3xl lg:text-4xl font-semibold lg:text-[#202020] text-[#989898]">-</p>
+                    </div>
+                    <InputNumber className="w-full md:w-[280px] h-9 md:h-10 lg:h-[46px] border text-[#6A6A6A] border-[#00000029] text-center flex flex-col justify-center font-semibold !rounded-lg" min={1} max={availableQuantity} value={`${qty}`} defaultValue={`${qty}`} controls={false}
+                      onChange={e => {
+                        if (e < availableQuantity) {
+                          setQty(e)
+                        } else {
+                          setQty(availableQuantity)
+                        }
+                      }} />
+                    <div
+                      onClick={add}
+                      className={`h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer ${qty < availableQuantity ? '' : 'cursor-not-allowed opacity-50'}`}>
+                      <p className="text-2xl md:text-3xl lg:text-4xl font-semibold lg:text-[#202020] text-[#989898]">+</p>
+                    </div>
+                  </div>
+
+                  :
+                  <Paragraph style={{ color: 'red', fontSize: 14 }} className="!mt-0" id="prod-price">
+                    If you are interested in purchasing this item, please contact our sales team at sales@blockapps.net
+                  </Paragraph>
+                }
+                {availableQuantity !== 0 ?
+                  <div className="flex gap-4 justify-between lg:justify-start  pt-4 w-full">
+                    <Button
+                      type="primary"
+                      className="w-[90%] md:w-[365px] h-9  !bg-[#13188A] !hover:bg-primaryHover !text-white"
+                      onClick={async () => {
+                        window.LOQ.push(['ready', async LO => {
+                          // Track an event
+                          await LO.$internal.ready('events')
+                          LO.events.track('Buy Now (from Product Details)', {
+                            product: details.name,
+                            category: details.category,
+                            productId: details.productId
+                          })
+                        }])
                         TagManager.dataLayer({
                           dataLayer: {
                             event: 'buy_now_from_product_details',
@@ -581,195 +490,201 @@ const ProductDetails = ({ user, users }) => {
                             productId: details.productId
                           },
                         });
-                        addItemToCart();
-                        navigate("/checkout");
-                      }
-                    }}
-                    disabled={ownerSameAsUser()}
-                    id="buyNow"
-                  >
-                    Buy Now
-                  </Button>
-                </Row>
-                :
-                <div className="flex justify-center">
-                  <Button
-                    type="primary"
-                    className="w-40 h-9 m-3 mt-10 bg-primary !hover:bg-primaryHover"
-                    href={`mailto:sales@blockapps.net`}
-                    onClick={() => {
-                      TagManager.dataLayer({
-                        dataLayer: {
-                          event: 'contact_sales_from_product_details',
-                          product_name: details.name,
-                          category: details.category,
-                          productId: details.productId
-                        },
-                      });
-                    }}>
-                    Contact to Buy
-                  </Button>
-                </div>
-              }
-            </div>
-            <div className="w-1/2 ml-8  mb-6" id="details">
-              <Row className="items-center">
-                <Text className="font-semibold text-xl text-primaryB">
-                  {decodeURIComponent(details.name)}&nbsp;
-                </Text>
-                <Text className="font-medium text-sm text-secondryB ">
-                  ({categoryName})
-                </Text>
-              </Row>
-              <Paragraph
-                // ellipsis={{ rows: 2, expandable: true, symbol: "more" }}
-                className="text-primaryC text-[13px] mt-2"
-              >
-                {decodeURIComponent(details.description).split('\n').map((line, index) => (
-                  <React.Fragment key={index}>
-                    {line}
-                    <br />
-                  </React.Fragment>
-                ))}
-              </Paragraph>
-              <Title level={4} className="!mt-0">
-                $ {details.pricePerUnit}
-              </Title>
-              {details.availableQuantity !== 0 ?
-                <Space>
-                  <Text className="text-primaryB text-base">Quantity</Text>
-                  <div className="flex items-center my-2 ml-5" id="quantity">
-                    <div
-                      onClick={subtract}
-                      className="h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
-                      <MinusOutlined className="text-xs text-secondryD" />
-                    </div>
-                    <InputNumber className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center" min={1} max={details.availableQuantity} value={qty} defaultValue={qty} controls={false}
-                      onChange={e => {
-                        if (e < details.availableQuantity) {
-                          setQty(e)
+
+                        const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [details.saleAddress], [qty])
+                        if (checkQuantity === true) {
+                          addItemToCart();
+                          navigate("/checkout");
                         } else {
-                          openToast(
-                            "bottom",
-                            true,
-                            "Cannot add more than available quantity"
-                          );
-                          setQty(details.availableQuantity)
+                          if (checkQuantity[0].availableQuantity === 0) {
+                            openToast("bottom", true, `Unfortunately, ${details.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
+                          } else { // Case 2: We are trying to add too much quantity
+                            openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${details.name} are available. Please update your cart quantity accordingly.`);
+                          }
                         }
-                      }} />
-                    <div
-                      onClick={add}
-                      className="ml-0.5 h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
-                      <PlusOutlined className="text-xs text-secondryC" />
-                    </div>
-                  </div>
-                </Space>
-                :
-                <Paragraph style={{color:'red', fontSize:14}} className="!mt-0" id="prod-price">
-                If you are interested in purchasing this item, please contact our sales team at sales@blockapps.net
-              </Paragraph>
-              }
-              <Tabs
-                defaultActiveKey="1"
-                onChange={onTabChange}
-                items={!user ?
-                  [{
-                    label: `Description`,
-                    key: "1",
-                    children: <DescriptionComponent />,
-                  }]
-                  :
-                  [{
-                    label: `Description`,
-                    key: "1",
-                    children: <DescriptionComponent />,
-                  },
-                  {
-                    label: `Ownership History`,
-                    key: "3",
-                    children: (
-                      <DataTableComponent
-                        columns={ownershipColumn}
-                        data={serialNumbers}
-                        scrollX="100%"
-                        isLoading={isSerialNumbersLoading}
-                        pagination={{
-                          defaultPageSize: 5,
-                          showSizeChanger: false,
-                          position: ["bottomCenter"],
+                      }}
+                      disabled={ownerSameAsUser()}
+                      id="buyNow"
+                    >
+                      Buy Now
+                    </Button>
+
+                    {ownerSameAsUser() ?
+                      <Button
+                        icon={<div className="flex justify-center items-center">
+                          <img src={Images.Cart} alt={`${assetName} | Image`} title={`${assetName} | Image`} width={18} height={18} className="object-contain" />
+                        </div>}
+                        className=" !w-9 h-9 border border-primary  !bg-[#13188A] rounded-md"
+                        disabled={true}
+                        id="addToCart"
+                        onClick={async () => {
+                          window.LOQ.push(['ready', async LO => {
+                            // Track an event
+                            await LO.$internal.ready('events')
+                            LO.events.track('Add to Cart (from Product Details)', {
+                              product: details.name,
+                              category: details.category,
+                              productId: details.productId
+                            })
+                          }])
+                          TagManager.dataLayer({
+                            dataLayer: {
+                              event: 'add_to_cart_from_product_details',
+                              product_name: details?.name,
+                              category: details?.category,
+                              productId: details?.productId
+                            },
+                          });
+                          const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [details.saleAddress], [qty])
+                          if (checkQuantity === true) {
+                            addItemToCart();
+                          } else {
+                            if (checkQuantity[0].availableQuantity === 0) {
+                              openToast("bottom", true, `Unfortunately, ${details.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
+                            } else { // Case 2: We are trying to add too much quantity
+                              openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${details.name} are available. Please update your cart quantity accordingly.`);
+                            }
+                          }
                         }}
-                        rowKey={(record) => record.serialNumber}
                       />
-                    ),
-                  },
+                      :
+                      <Button
+                        icon={<div className="flex justify-center items-center">
+                          <img src={Images.Cart} alt={`${assetName} | Image`} title={`${assetName} | Image`} width={18} height={18} className="object-contain" />
+                        </div>}
+                        className=" !w-9 h-9 rounded-md  !bg-[#13188A]"
+                        onClick={async () => {
+                          window.LOQ.push(['ready', async LO => {
+                            // Track an event
+                            await LO.$internal.ready('events')
+                            LO.events.track('Add to Cart (from Product Details)', {
+                              product: details?.name,
+                              category: details?.category,
+                              productId: details?.productId
+                            })
+                          }])
+                          TagManager.dataLayer({
+                            dataLayer: {
+                              event: 'add_to_cart_from_product_details',
+                              product_name: details?.name,
+                              category: details?.category,
+                              productId: details?.productId
+                            },
+                          });
+                          const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [details.saleAddress], [qty])
+                          if (checkQuantity === true) {
+                            addItemToCart();
+                          } else {
+                            if (checkQuantity[0].availableQuantity === 0) {
+                              openToast("bottom", true, `Unfortunately, ${details.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
+                            } else { // Case 2: We are trying to add too much quantity
+                              openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${details.name} are available. Please update your cart quantity accordingly.`);
+                            }
+                          }
+                        }}
+                      />
+
+                    }
+                  </div>
+                  :
+                  <div className="flex ">
+                    <Button
+                      type="primary"
+                      className="w-[80%] md:w-[365px] h-9 m-3 mt-10 !bg-primary !hover:bg-primaryHover"
+                      href={`mailto:sales@blockapps.net`}
+                      onClick={() => {
+
+                        window.LOQ.push(['ready', async LO => {
+                          await LO.$internal.ready('events')
+                          LO.events.track('Contact Sales (from Product Details)', {
+                            product: details?.name,
+                            category: details?.category,
+                            productId: details?.productId
+                          })
+                        }])
+                        TagManager.dataLayer({
+                          dataLayer: {
+                            event: 'contact_sales_from_product_details',
+                            product_name: details?.name,
+                            category: details?.category,
+                            productId: details?.productId
+                          },
+                        });
+                      }}>
+                      Contact to Buy
+                    </Button>
+                  </div>
+
+                }
+              </div>
+            </div>
+            <div className=" mt-9 lg:mt-10 w-full md:w-[750px] sm:px-[10%] md:px-[15%] lg:px-0 pb-5 lg:w-[835px]  ">
+              <Tabs
+                className="product_detail"
+                defaultActiveKey="0"
+                items={
+                  [
+                    {
+                      label: <span className="text-sm md:text-base">Description</span>,
+                      key: "0",
+                      children: (
+                        <PreviewMode content={details?.description} />
+                      ),
+                    }
+                    , {
+                      label: <span className="text-sm md:text-base">Details</span>,
+                      key: "1",
+                      children: (
+                        <div>
+                          <ProductItemDetails
+                            categoryName={getCategory(details)}
+                            itemData={itemData}
+                          />
+                        </div>
+                      ),
+                    },
+                    user && { //if user is logged in then display Ownership History
+                      label: <span className="text-sm md:text-base">Ownership History</span>,
+                      key: "2",
+                      children: (
+                        <div>
+                          <DataTableComponent
+                            columns={ownershipDetailColumn}
+                            scrollX="100%"
+                            data={inventoryOwnershipHistory}
+                            isLoading={isInventoryOwnershipHistoryLoading}
+                            pagination={{
+                              defaultPageSize: 10,
+                              position: ["bottomCenter"],
+                              showSizeChanger: false,
+                            }}
+                          />
+                        </div>
+                      ),
+                    },
+                    {
+                      label: <span className="text-sm md:text-base">Additional Information</span>,
+                      key: "3",
+                      children: (
+                        <div>
+                          <List
+                            size="small"
+                            boardered
+                            dataSource={!details.files ? [] : details.files}
+                            renderItem={(item) =>
+                              <List.Item>
+                                <a href={item} rel="noreferrer" target="_blank" className="hover:underline break-all text-[#1e40af]">
+                                  {item}
+                                </a>
+                              </List.Item>}
+                          />
+                        </div>
+                      )
+                    },
                   ]}
               />
             </div>
           </div>
-
-          {isEventSelected ?
-            iseventDetailsLoading || eventDetails == null ?
-              <div className="h-80 flex justify-center items-center">
-                <Spin
-                  spinning={iseventDetailsLoading}
-                  size="large"
-                />
-              </div> :
-              (
-                <Card className="mb-12 mx-16">
-                  <Text className="font-semibold text-lg">Event Details</Text>
-                  <Row className="my-6">
-                    <EventDetailsComponent title="NAME" value={decodeURIComponent(eventDetails.eventTypeName)} />
-                    <Divider type="vertical" className="h-10 mx-6 bg-grayLight" />
-                    <EventDetailsComponent
-                      title="DESCRIPTION"
-                      value={decodeURIComponent(eventDetails.eventTypeDescription)}
-                    />
-                  </Row>
-                  <DataTableComponent
-                    columns={eventDetailColumn}
-                    data={eventDetailList}
-                    isLoading={iseventDetailsLoading}
-                    scrollX="100%"
-                  />
-                </Card>
-              ) : null}
-
-          {isSerialNumberSelected ? (
-            <Card className="mb-12 mx-16">
-              <Text className="font-semibold text-lg">Ownership History</Text>
-              <Row className="my-6">
-                <EventDetailsComponent
-                  title="SERIAL NUMBER"
-                  value={serialNumber}
-                  id="ownership-serial"
-                />
-              </Row>
-              <DataTableComponent
-                columns={ownershipDetailColumn}
-                scrollX="100%"
-                data={ownershipHistory}
-                isLoading={isOwnershipHistoryLoading}
-                pagination={{
-                  defaultPageSize: 10,
-                  position: ["bottomCenter"],
-                  showSizeChanger: false,
-                }}
-              />
-            </Card>
-          ) : null}
-
-          {isTransformationSelected ? (
-            <Card className="mb-12 mx-16" id="transformation">
-              <Text className="font-semibold text-lg">Transformation</Text>
-              <Row className="my-6">
-                <EventDetailsComponent title="SERIAL NUMBER" value={serialNumber} id="trans-serial" />
-              </Row>
-              <Spin spinning={isRawMaterialsLoading} delay={500} size="large">
-                <NestedComponent clickedSerialNumber={serialNumber} />
-              </Spin>
-            </Card>
-          ) : null}
         </div>
       )}
     </>

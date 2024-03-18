@@ -1,51 +1,44 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MonoLocalBinds #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
-{-# OPTIONS_GHC -fno-warn-missing-fields #-}
+{-# LANGUAGE UndecidableInstances #-}
+
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# OPTIONS_GHC -fno-warn-unused-imports #-}
 
 module SolidVMSpec where
 
 import BlockApps.Logging
--- for HFlags
--- for HFlags
 
 import BlockApps.X509.Certificate
 import BlockApps.X509.Keys as X509
--- import Executable.EthereumVM (writeBlockSummary)
-
 import Blockchain.Bagger (processNewBestBlock)
 import Blockchain.DB.BlockSummaryDB
 import Blockchain.DB.ChainDB
-import Blockchain.DB.CodeDB
-import Blockchain.DB.HashDB
-import qualified Blockchain.DB.MemAddressStateDB as Mem
 import Blockchain.DB.RawStorageDB
 import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.StateDB
-import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
 import Blockchain.Data.BlockSummary
-import Blockchain.Data.ChainInfo
 import Blockchain.Data.DataDefs (BlockData (..))
 import Blockchain.Data.ExecResults
-import Blockchain.Data.GenesisBlock as GB
 import Blockchain.Data.GenesisInfo
 import Blockchain.Data.RLP
 import qualified Blockchain.Data.TXOrigin as TXO
 import Blockchain.Database.MerklePatricia as MP
+import Blockchain.DB.SQLDB
 import Blockchain.GenesisBlock
 import Blockchain.Sequencer.Event
 import qualified Blockchain.SolidVM as SVM
-import Blockchain.SolidVM.CodeCollectionDB as CCDB
 import Blockchain.SolidVM.Exception
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address as MA
@@ -55,57 +48,40 @@ import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.Keccak256 hiding (rlpHash)
 import qualified Blockchain.Stream.Action as Action
 import Blockchain.VMContext
-import Blockchain.VMOptions (flags_useSaltedCerts)
+import Blockchain.VMOptions ()
+import Blockchain.Wiring ()
 import Control.Concurrent
 import Control.Concurrent.Async
-import Control.DeepSeq
 import Control.Exception
-import qualified Control.Exception as Blockchain.SolidVM
-import Control.Lens ((^.))
+import Control.Lens (view, (^.))
 import Control.Monad
 import Control.Monad.Change.Alter
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
+import Control.Monad.Composable.Base
 import Control.Monad.IO.Class
-import qualified Control.Monad.State as State
+import Control.Monad.Trans.Reader
 import Crypto.Util (i2bs_unsized)
 import qualified Data.Aeson as Ae
-import Data.Binary (decode, encode)
-import Data.ByteString (putStr)
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString.Lazy.Char8 as Char8
-import qualified Data.ByteString.Short as SB
 import qualified Data.ByteString.UTF8 as UTF8
 import Data.Char
-import Data.Coerce
-import Data.Either (fromRight)
-import Data.Foldable (for_)
-import qualified Data.JsonStream.Parser as JS
 import qualified Data.List as L
 import qualified Data.Map as M
-import Data.Map.Strict (Map)
 import Data.Maybe
-import qualified Data.Set as S
 import qualified Data.Text as T
+import qualified Data.Map.Ordered as OMap
 import Data.Text.Encoding
-import qualified Data.Text.Encoding as Text
 import Data.Time.Clock.POSIX
-import Debug.Trace
 import Executable.EVMFlags ()
-import GHC.TypeLits (ErrorMessage (Text))
-import HFlags
-import qualified Handlers.AccountInfo
 import qualified LabeledError
 import qualified Numeric (readHex, showHex)
 import SolidVM.Model.SolidString
 import SolidVM.Model.Storable as MS
-import Test.Hspec (Selector, Spec, anyErrorCall, anyException, describe, fit, hspec, it, pendingWith, shouldThrow, xdescribe, xit)
+import Test.Hspec (Selector, Spec, anyException, it, pendingWith, shouldThrow, xdescribe, xit)
 import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
@@ -277,14 +253,6 @@ secondAddress = Account (getNewAddress_unsafe (sender ^. accountAddress) 1) Noth
 recursiveAddr :: Account
 recursiveAddr = Account (getNewAddress_unsafe (uploadAddress ^. accountAddress) 0) Nothing
 
--- makeStrArgs :: [T.Text] -> T.Text
--- makeStrArgs xs =
---   let
---     escp :: T.Text -> T.Text
---     escp s = "\"" <> s <> "\""
---     repl = map escp
---   in "(" <> (T.intercalate (T.pack ", ") (repl xs)) <> ")"
-
 devNull :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
 devNull _ _ _ _ = return ()
 
@@ -334,6 +302,9 @@ writeBlockSummary block =
       td = obTotalDifficulty block
       txCnt = fromIntegral $ length (obReceiptTransactions block)
    in putBSum sha (blockHeaderToBSum header td txCnt)
+
+instance {-# OVERLAPPING #-} Monad m => AccessibleEnv SQLDB (ReaderT Context m) where
+  accessEnv = fmap (view $ dbs . sqldb) accessEnv
 
 runTestWithTimeout :: Int -> ContextM a -> IO ()
 runTestWithTimeout timeout f = do
@@ -505,6 +476,8 @@ runArgsWithSender acc args bs = do
       txHash = unsafeCreateKeccak256FromWord256 0x776622233444
       chainId = Nothing
       metadata = Just $ M.fromList [("name", "qq"), ("args", args)]
+  
+  insert (Proxy @BlockSummary) (unsafeCreateKeccak256FromWord256 0x0) (blockHeaderToBSum blockData 900 1)
 
   newAddress <- getNewAddress acc
   er <-
@@ -2914,7 +2887,7 @@ contract qq {
     let diffs = fmap Action._actionDataStorageDiffs . Action._actionData <$> erAction xr
     diffs
       `shouldBe` Just
-        ( M.fromList
+        ( OMap.fromList
             [ ( uploadAddress,
                 Action.SolidVMDiff $
                   M.singleton
@@ -6123,8 +6096,8 @@ contract qq {
     return keccak256("hello", "world");
   }
 }|]
-      `shouldReturn` Just ("(\"\\250&\\219|\\168^\\173\\&9\\146\\SYN\\231\\198\\&1k\\197\\SO\\210C\\147\\195\\DC2+X'5\\231\\243\\176\\249\\ESC\\147\\240\")")
-  --keccak256ToByteString function implementation wrong
+      `shouldReturn` Just "(\"fa26db7ca85ead399216e7c6316bc50ed24393c3122b582735e7f3b0f91b93f0\")"
+
   it "cant use  a commented pragma" . runTest $ do
     runCall'
       "a"
@@ -8347,6 +8320,8 @@ contract qq {
   it "can use create and create2 built-in function calls" . runTest $ do
     runBS
       [r|
+pragma builtinCreates;
+
 contract qq {
   account a;
   account b;
@@ -8559,3 +8534,60 @@ contract qq {
   }
 }
 |]) `shouldThrow` anyTypeError
+
+  it "can delete arrays and indexes values" $ runTest ( do
+      runBS [r|
+contract qq {
+  uint[] arr = [1,2,3,4];
+  uint[] arr2 = [5,6,7,8];
+  uint res;
+  string xyz = "Hello SolidVM";
+  bool b = true;
+  uint yy = 36;
+  constructor() {
+    delete arr[1];
+    res = arr[1]; // to extract in getFields
+
+    delete arr2;
+    delete xyz;
+    delete b;
+    delete yy;
+  }
+}|]
+      getFields ["res", "arr2"] `shouldReturn` [BDefault, BDefault]) 
+
+  it "can error handle using delete keyword on local variables" $ runTest ( do
+      runBS [r|
+contract qq {
+  constructor() {
+    string xyz = "Hello SolidVM";
+    bool b = true;
+    uint yy = 36;
+
+    delete xyz;
+    delete b;
+    delete yy;
+  }
+}|]) `shouldThrow` anyTODO 
+
+  it "can successfully use the 'blockhash' built-in" $ runTest ( do 
+    runBS [r|
+contract qq {
+  string hsh = blockhash(block.number);
+  constructor() {}
+}|]
+    getFields ["hsh"] `shouldReturn` [BString $ keccak256ToByteString $ unsafeCreateKeccak256FromWord256 0x0])
+
+  it "can error handle the 'blockhash' built-in - less than 0 argument" $ runTest ( do 
+    runBS [r|
+contract qq {
+  string hsh = blockhash(-1);
+  constructor() {}
+}|]) `shouldThrow` anyInvalidArgumentsError
+
+  it "can error handle the 'blockhash' built-in - non-existent block number" $ runTest ( do 
+    runBS [r|
+contract qq {
+  string hsh = blockhash(900000);
+  constructor() {}
+}|]) `shouldThrow` anyInvalidArgumentsError

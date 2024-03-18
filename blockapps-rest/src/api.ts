@@ -170,6 +170,15 @@ async function getContractsContract(user:OAuthUser, name, address, chainId, opti
   return get(url, endpoint, setAuthHeaders(user, options));
 }
 
+async function getContractsDetails(user:OAuthUser, contract, options:Options) {
+  const url = getNodeUrl(options);
+  const urlParams = {
+    address: contract.address
+  };
+  const endpoint = constructEndpoint(Endpoint.CONTRACTS_CONTRACT_DETAILS , options, urlParams);
+  return get(url, endpoint, setAuthHeaders(user, options));
+}
+
 async function getState(user:OAuthUser, contract, options:Options) {
   const url = getNodeUrl(options);
   const urlParams = {
@@ -517,6 +526,7 @@ export default {
   blocResults,
   getContracts,
   getContractsContract,
+  getContractsDetails,
   getState,
   getCallArgs,
   call,

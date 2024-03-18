@@ -1,57 +1,46 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
-  Card,
   Typography,
-  Image,
-  Space,
-  Button,
   Spin,
   notification,
+  Button,
 } from "antd";
-import { LeftArrow, RightArrow } from "../../images/SVGComponents";
-import { Cart } from "../../images/SVGComponents";
 import { actions } from "../../contexts/marketplace/actions";
 import {
   useMarketplaceDispatch,
   useMarketplaceState,
 } from "../../contexts/marketplace";
-import { UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
 import { useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
 import { useAuthenticateState } from "../../contexts/authentication";
-import TagManager from "react-gtm-module";
+import NewTrendingCard from "./NewTrendingCard";
+import { actions as orderActions } from "../../contexts/order/actions"
+import { useOrderDispatch } from "../../contexts/order";
 
-const { Title, Text } = Typography;
+const { Title } = Typography;
 
 const TopSellingProductCard = () => {
+  const containerRef = useRef(null)
   const [offset, setOffset] = useState(0);
+  const limit = 25;
 
   const marketplaceDispatch = useMarketplaceDispatch();
   const { topSellingProducts, isTopSellingProductsLoading, cartList } = useMarketplaceState();
-  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
+  let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
   const [api, contextHolder] = notification.useNotification();
 
+  const orderDispatch = useOrderDispatch();
+
   useEffect(() => {
-    if (hasChecked && !isAuthenticated) {
-      actions.fetchTopSellingProducts(marketplaceDispatch, offset);
+    if (!isAuthenticated) {
+      actions.fetchTopSellingProducts(marketplaceDispatch, offset, limit);
     } else {
-      actions.fetchTopSellingProductsLoggedIn(marketplaceDispatch, offset);
+      actions.fetchTopSellingProductsLoggedIn(marketplaceDispatch, offset, limit);
     }
   }, [marketplaceDispatch, offset, hasChecked, isAuthenticated, loginUrl]);
 
   const naviroute = routes.MarketplaceProductDetail.url;
 
-  const limit = 3;
-
-  const getPrevProds = () => {
-    if (offset > 0) setOffset(offset - limit);
-  };
-
-  const getNextProds = () => {
-    if (offset !== 9) {
-      setOffset(offset + limit);
-    }
-  };
 
   const navigate = useNavigate();
 
@@ -71,157 +60,131 @@ const TopSellingProductCard = () => {
     }
   };
 
-  const addItemToCart = (product) => {
-    let found = false;
-    for (var i = 0; i < cartList.length; i++) {
-      if (cartList[i].product.address === product.address) {
-        found = true;
-        break;
+  const addItemToCart = async (product, quantity) => {
+    if (product.ownerCommonName === user?.commonName) {
+      openToast("bottom", true, "Cannot buy your own item");
+      return false;
+    }
+  
+    // Search for the product in the cart
+    let foundIndex = cartList.findIndex((item) => item.product.address === product.address);
+    let items = [...cartList]; 
+  
+    // Found index returns -1 if nothing is found in the cartlist
+    if (foundIndex === -1) {
+      // Product not found, check quantity before adding
+      const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity]);
+      if (checkQuantity === true) {
+        // Quantity check passed, add new item to the cart
+        items.push({ product, qty: quantity });
+        actions.addItemToCart(marketplaceDispatch, items);
+        openToast("bottom", false, "Item added to cart");
+        return true;
+      } else {
+        // Not enough quantity, inform the user
+        if (checkQuantity[0].availableQuantity === 0) {
+          openToast("bottom", true, `Unfortunately, ${product.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
+        } else { // Case 2: We are trying to add too much quantity
+          openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${product.name} are available. Please update your cart quantity accordingly.`);
+        }
+        return false;
+      }
+    } else {
+      // Product found, prepare to update quantity after check
+      const potentialNewQty = items[foundIndex].qty + quantity;
+      const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity]);
+      if (checkQuantity === true) {
+        // Quantity check passed, update item quantity in the cart
+        items[foundIndex].qty = potentialNewQty;
+        actions.addItemToCart(marketplaceDispatch, items);
+        openToast("bottom", false, "Item updated in cart");
+        return true;
+      } else {
+        // Not enough quantity, inform the user
+        if (checkQuantity[0].availableQuantity === 0) {
+          openToast("bottom", true, `Unfortunately, ${product.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
+        } else { // Case 2: We are trying to add too much quantity
+          openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${product.name} are available. Please update your cart quantity accordingly.`);
+        }
+        return false;
       }
     }
-    let items = [];
-    if (!found) {
-      items = [...cartList, { product, qty: 1 }];
-      actions.addItemToCart(marketplaceDispatch, items);
-
-      openToast("bottom", false, "Item added to cart");
-    } else {
-      items = [...cartList];
-      cartList.forEach((element, index) => {
-        if (element.product.address === product.address) {
-          if (items[index].qty + 1 <= product.availableQuantity) {
-            items[index].qty += 1;
-            actions.addItemToCart(marketplaceDispatch, items);
-
-            openToast("bottom", false, "Item updated in cart");
-          } else {
-            openToast(
-              "bottom",
-              true,
-              "Cannot add more than available quantity"
-            );
-            return;
-          }
-        }
-      });
-    }
   };
+  
+  
+
+  const [prevVisible, setPrevVisible] = useState(false);
+  const [nextVisible, setNextVisible] = useState(true);
+
+  useEffect(() => {
+    const parent = containerRef.current;
+    const handleScroll = (e) => {
+      setPrevVisible(parent.scrollLeft !== 0);
+      setNextVisible(
+        Math.round(parent.offsetWidth + parent.scrollLeft) !==
+          parent.scrollWidth
+      );
+    };
+
+    // Scroll listener to change visibility of left and right arrow button
+    parent?.addEventListener("scroll", handleScroll);
+    return () => {
+      parent?.removeEventListener("scroll", handleScroll);
+    };
+  }, [topSellingProducts]);
+
+  const scroll = (left) => {
+    containerRef.current.scrollBy({
+      top: 0,
+      left,
+      behavior: "smooth",
+    });
+  };
+
 
   return (
     <div>
       {contextHolder}
-      <Card className="w-full mt-14">
-        <div className="flex justify-between mb-5">
-          <Title level={3}>Recently Listed Products</Title>
-          <Space size="large">
-            <div
-              onClick={getPrevProds}
-              className="cursor-pointer w-9 h-9 rounded-full shadow-[0px_0px_2px_0_rgba(0,0,0,0.3)] flex justify-center items-center"
-            >
-              <LeftArrow />
-            </div>
-            <div
-              onClick={getNextProds}
-              className="cursor-pointer w-9 h-9 rounded-full shadow-[0px_0px_2px_0_rgba(0,0,0,0.3)] flex justify-center items-center"
-            >
-              <RightArrow />
-            </div>
-          </Space>
-        </div>
-        <div className="flex justify-evenly px-2" id="topSelling">
-          {isTopSellingProductsLoading ? (
+      <div className="pt-10 md:pt-16 pr-2 md:pr-10 flex justify-between">
+        <Title className="md:px-10 !text-xl md:!text-4xl !text-left">
+          Trending in All Categories
+        </Title>
+        <Button 
+          size="large" 
+          onClick={()=>navigate(routes.MarketplaceProductList.url)}
+          className="text-black hover:!text-black border-grayDark hidden md:flex"
+        >
+            View All
+        </Button>
+        <Button 
+          size="small" 
+          onClick={()=>navigate(routes.MarketplaceProductList.url)}
+          className="text-black hover:!text-black border-grayDark flex md:hidden"
+        >
+            View All
+        </Button>
+      </div>
+      {isTopSellingProductsLoading ? (
             <div className="h-52 flex justify-center items-center">
               <Spin spinning={isTopSellingProductsLoading} size="large" />
             </div>
-          ) : (
-            topSellingProducts
-              .map((topSellingProduct, index) => {
+          ) : 
+        <div className="relative md:pl-10">
+          <div onClick={()=>scroll(-300)}  className={`${!prevVisible ? 'hidden' : 'md:flex hidden'} cursor-pointer absolute  justify-center items-center top-48 left-24 h-16 w-16 text-2xl bg-[#6A6A6A] rounded-full text-white`}>{"<"}</div>
+          <div ref={containerRef} className="overflow-x-auto gap-6 px-1 py-2 flex trending_cards">
+            {topSellingProducts
+              .filter(product => product.saleQuantity > 0)
+              .map((topSellingProduct) => {
                 return (
-                  <div
-                    key={index}
-                    id="topSellingChild"
-                    className="w-[25rem] border border-tertiaryB rounded-md py-8 mx-6"
-                  >
-                    <div className="flex flex-col items-center">
-                      <Image
-                        className="cursor-pointer"
-                        src={topSellingProduct.imageUrl}
-                        height={230}
-                        width={230}
-                        style={{ objectFit: "contain" }}
-                        preview={false}
-                        onClick={() =>
-                          navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
-                        }
-                      />
-                      <Text className="mt-6 text-2xl !text-primaryB font-medium text-center cursor-pointer" onClick={() =>
-                        navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
-                      }>
-                        {decodeURIComponent(topSellingProduct.name)}
-                      </Text>
-                      <Text className="mt-3 text-xl !text-primaryC font-semibold">
-                        ${topSellingProduct.pricePerUnit}
-                      </Text>
-                      <Text className="mt-1 text-sm !text-primaryB">
-                        {topSellingProduct.leastSellableUnit}{" "}
-                        {
-                          UNIT_OF_MEASUREMENTS[
-                          topSellingProduct.unitOfMeasurement
-                          ]
-                        }
-                      </Text>
-                      <div className="flex justify-evenly items-center mt-4 w-full px-3">
-                        <Button
-                          id={`${topSellingProduct.name.replace(/ /g, "_")}-buy-now`}
-                          className="h-11 bg-primary hover:bg-primaryHover !text-white w-9/12"
-                          onClick={() => {
-                            if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                              window.location.href = loginUrl;
-                            } else {
-                              TagManager.dataLayer({
-                                dataLayer: {
-                                  event: 'buy_now_from_top_selling_product',
-                                  product_name: topSellingProduct.name,
-                                  category: topSellingProduct.category,
-                                  productId: topSellingProduct.productId
-                                },
-                              });
-                              addItemToCart(topSellingProduct);
-                              navigate("/checkout");
-                            }
-                          }}
-                        >
-                          Buy now
-                        </Button>
-                        <div
-                          onClick={() => {
-                            if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                              window.location.href = loginUrl;
-                            } else {
-                              TagManager.dataLayer({
-                                dataLayer: {
-                                  event: 'add_to_cart_from_top_selling_product',
-                                  product_name: topSellingProduct.name,
-                                  category: topSellingProduct.category,
-                                  productId: topSellingProduct.productId
-                                },
-                              });
-                              addItemToCart(topSellingProduct);
-                            }
-                          }}
-                          className="w-11 h-10 border border-primary rounded-md flex justify-center items-center cursor-pointer"
-                        >
-                          <Cart style={{ fill: "#181EAC" }} />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-              .splice(0, 3)
-          )}
-        </div>
-      </Card>
+                  <NewTrendingCard
+                  topSellingProduct={topSellingProduct}
+                  addItemToCart={addItemToCart}
+                  parent={"Marketplace"}
+                  />)
+                })}
+          </div>
+          <div onClick={()=>scroll(300)}  className={`${!nextVisible ? 'hidden' : 'md:flex hidden'} cursor-pointer absolute justify-center items-center top-48 right-24 h-16 w-16 text-2xl bg-[#6A6A6A] rounded-full text-white`}>{">"}</div>
+        </div>}
     </div>
   );
 };

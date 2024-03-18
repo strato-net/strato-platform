@@ -1,10 +1,108 @@
 .icon-container {
     padding: 8px;
-    /* Adjust the padding as needed */
-    border-radius: 30%; /* Make the container rounded */
+    border-radius: 30%;
 }
 
 .icon-hover:hover {
     background-color: #f0f0f0;
-    /* Change to the desired gray color */
+}
+
+.ant-picker {
+    padding: 3px;
+    border: 1px solid #6A6A6A;
+    border-radius: 6px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.custom-picker .ant-picker-input input {
+    display: none;
+}
+
+.ant-picker-input {
+    padding: 4px 2px;
+}
+
+.ant-picker-input input {
+    color: #989898;
+    padding: 2px 10px;
+}
+
+.mobile_order_detail_card .ant-picker-input input {
+    display: flex !important;
+}
+
+.ant-picker-suffix {
+    color: #6A6A6A;
+    margin-left: 1px !important;
+}
+
+.order_detail_card .ant-card-body {
+    padding: 0px !important;
+}
+
+.orders .ant-table-wrapper .ant-table-thead>tr>th {
+    font-size: 16px !important;
+}
+
+.orders_page {
+    margin-bottom: 12px;
+    gap: 8px;
+}
+
+.customButton:hover {
+    color: black !important;
+  }
+
+@media (min-width: 768px) {
+    .orders_searchbar input {
+        background-color: #F6F6F6;
+    }
+
+    .ant-picker {
+        padding: 8px 10px;
+        border: none;
+    }
+
+    .ant-picker-input {
+        display: flex !important;
+        justify-content: space-between;
+        gap: 80px;
+    }
+
+    .ant-picker-input input {
+        display: flex !important;
+    }
+
+    .order_detail_date .ant-picker {
+        padding: 0px;
+    }
+}
+
+.sort_conatiner article {
+    cursor: pointer;
+    color: #6A6A6A;
+    padding: 10px 12px;
+}
+
+.sort_conatiner article:hover {
+    background-color: #EEEFFA;
+    color: #13188A;
+    font-weight: 600;
+}
+
+:where(.css-dev-only-do-not-override-9ntgx0).ant-picker .ant-picker-input>input:placeholder-shown {
+    display: none;
+}
+
+:where(.css-dev-only-do-not-override-9ntgx0).ant-picker {
+    height: 32px;
+}
+
+@media (min-width : 770px) {
+    :where(.css-dev-only-do-not-override-9ntgx0).ant-picker {
+        height: 36px;
+    }
+
 }

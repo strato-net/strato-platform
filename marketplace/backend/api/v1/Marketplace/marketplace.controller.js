@@ -1,11 +1,4 @@
 import { rest } from 'blockapps-rest'
-import Joi from '@hapi/joi'
-import RestStatus from 'http-status-codes'
-import config from '../../../load.config'
-import constants from '../../../helpers/constants'
-import { getSignedUrlFromS3 } from '../../../helpers/s3'
-
-const options = { config, cacheNonce: true }
 
 class MarketplaceController {
 
@@ -18,16 +11,10 @@ class MarketplaceController {
       }
       const inventories = await dapp.getMarketplaceInventories({ ...query })
 
-      const productsWithImageUrl = inventories
-        .map(product => (
-          product.imageKey ?
-          {
-          ...product,
-          imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName))
-        }
-        : product
-        ))
-      rest.response.status200(res, productsWithImageUrl)
+      const productsWithImageUrl = inventories?.inventoryResults.sort((a, b) => {
+        return b.saleDate.localeCompare(a.saleDate);
+      });
+      rest.response.status200(res, { productsWithImageUrl: productsWithImageUrl, inventoryCount: inventories?.inventoryCount })
 
       return next()
     } catch (e) {
@@ -38,23 +25,17 @@ class MarketplaceController {
   static async getAllLoggedIn(req, res, next) {
     try {
       const { dapp, query } = req
-      
+
       if (query.manufacturer) {
         const encodedManufacturers = query.manufacturer.map(product => { return encodeURIComponent(product) })
         query.manufacturer = encodedManufacturers
       }
       const inventories = await dapp.getMarketplaceInventoriesLoggedIn({ ...query })
 
-      const productsWithImageUrl = inventories
-        .map(product => (
-          product.imageKey ? 
-          {
-          ...product,
-          imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName))
-          }
-          : product
-        ))
-      rest.response.status200(res, productsWithImageUrl)
+      const productsWithImageUrl = inventories?.inventoryResults.sort((a, b) => {
+        return b.saleDate.localeCompare(a.saleDate);
+      });
+      rest.response.status200(res, { productsWithImageUrl: productsWithImageUrl, inventoryCount: inventories?.inventoryCount })
 
       return next()
     } catch (e) {
@@ -66,15 +47,10 @@ class MarketplaceController {
     try {
       const { dapp, query } = req
       const inventories = await dapp.getTopSellingProducts({ ...query })
-      const productsWithImageUrl = inventories.map(product => (
-        product.imageKey ?
-        {
-        ...product,
-        imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName)
-        )}
-        :
-        product
-      ))
+      const productsWithImageUrl = inventories.sort((a, b) => {
+        return b.saleDate.localeCompare(a.saleDate);
+      });
+
       rest.response.status200(res, productsWithImageUrl)
 
       return next()
@@ -87,17 +63,28 @@ class MarketplaceController {
     try {
       const { dapp, query } = req
       const inventories = await dapp.getTopSellingProductsLoggedIn({ ...query })
-      const productsWithImageUrl = inventories.map(product => (
-        product.imageKey ?
-        {
-        ...product,
-        imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName)
-        )} : product
-      ))
+      const productsWithImageUrl = inventories.sort((a, b) => {
+        return b.saleDate.localeCompare(a.saleDate);
+      });
+
       rest.response.status200(res, productsWithImageUrl)
 
       return next()
     } catch (e) {
+      return next(e)
+    }
+  }
+
+  static async getStratsBalance(req, res, next) {
+    try {
+      const { dapp, address: userAddress } = req
+      let stratsBalance = 0;
+
+      stratsBalance = await dapp.getStratsBalance({ userAddress: userAddress });
+
+      return rest.response.status200(res, stratsBalance)
+    } catch (e) {
+      console.log("Couldn't load STRATS");
       return next(e)
     }
   }

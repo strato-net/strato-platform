@@ -29,9 +29,9 @@ import Blockchain.Strato.Discovery.P2PUtil (DiscoverException (..))
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
-import Blockchain.Strato.Model.Util
 import Control.Error (note)
 import Control.Exception hiding (try)
+import Control.Monad (forM_)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.IO.Class
 import Crypto.Types.PubKey.ECC
@@ -223,21 +223,33 @@ dataToPacket msg = do
     typeToPacket x y = Left $ MalformedUDPException $ "Unsupported case called in typeToPacket: " ++ show x ++ ", " ++ show y
 
 sendPacket ::
-  (HasVault m, MonadLogger m, A.Replaceable SockAddr B.ByteString m) =>
-  SockAddr ->
+  ( HasVault m
+  , MonadLogger m
+  , A.Replaceable SockAddr B.ByteString m
+  , A.Replaceable T.Text PPeer m
+  , A.Selectable (Maybe IPAsText, UDPPort) SockAddr m ) =>
+  PPeer ->
   NodeDiscoveryPacket ->
   m ()
-sendPacket addr packet = do
-  $logInfoS "sendPacket" $ T.pack $ CL.green "sending to" ++ " (" ++ show addr ++ ") " ++ format packet
-  let (theType', theRLP) = ndPacketToRLP packet
-      theData = rlpSerialize theRLP
-      theMsgHash = keccak256ToByteString $ hash $ B.singleton theType' <> theData
+sendPacket thePeer packet = do
+  mPeerAddr <- A.select (A.Proxy @SockAddr) (Just $ IPAsText $ pPeerIp thePeer, UDPPort . fromIntegral $ pPeerUdpPort thePeer)
+  forM_ mPeerAddr $ \addr -> do
+    $logInfoS "sendPacket" $ T.pack $ CL.green "sending to" ++ " (" ++ show addr ++ ") " ++ format packet
+    let (theType', theRLP) = ndPacketToRLP packet
+        theData = rlpSerialize theRLP
+        theMsgHash = keccak256ToByteString $ hash $ B.singleton theType' <> theData
 
-  sig <- sign theMsgHash
-  let sigBS = exportSignature sig
-      theHash = keccak256ToByteString $ hash $ sigBS <> B.singleton theType' <> theData
+    sig <- sign theMsgHash
+    let sigBS = exportSignature sig
+        theHash = keccak256ToByteString $ hash $ sigBS <> B.singleton theType' <> theData
 
-  A.replace (A.Proxy @B.ByteString) addr $ theHash <> sigBS <> B.singleton theType' <> theData
+    A.replace (A.Proxy @B.ByteString) addr $ theHash <> sigBS <> B.singleton theType' <> theData
+  flip updateLastMessage thePeer (case packet of
+    Ping{} -> "Ping"
+    Pong{} -> "Pong"
+    FindNeighbors{} -> "FindNeighbors"
+    Neighbors{} -> "Neighbors"
+    )
 
 processDataStream' :: B.ByteString -> PublicKey
 processDataStream' bs | B.length bs < 98 = error "processDataStream' called with too few bytes"
@@ -258,17 +270,6 @@ processDataStream' bs =
            in if theHash /= keccak256ToWord256 theHash'
                 then error "bad UDP data sent from peer, the hash isn't correct"
                 else fromMaybe (error "malformed signature in call to processDataStream") publicKey
-
-nodeIDToPoint :: NodeID -> Point
-nodeIDToPoint (NodeID nodeID) | B.length nodeID /= 64 = error "NodeID contains a bytestring that is not 64 bytes long"
-nodeIDToPoint (NodeID nodeID) = Point x y
-  where
-    x = byteString2Integer $ B.take 32 nodeID
-    y = byteString2Integer $ B.drop 32 nodeID
-
-pointToNodeID :: Point -> NodeID
-pointToNodeID PointO = error "called pointToNodeID with PointO, we can't handle that yet"
-pointToNodeID (Point x y) = NodeID $ word256ToBytes (fromInteger x) <> word256ToBytes (fromInteger y)
 
 data UDPException = UDPTimeout deriving (Show)
 

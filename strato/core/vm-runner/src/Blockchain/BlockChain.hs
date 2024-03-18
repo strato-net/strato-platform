@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE IncoherentInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -78,6 +79,7 @@ import Control.Lens.Operators
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
+import Control.Monad.Composable.Base ()
 import Control.Monad.Trans.Except
 import qualified Control.Monad.Trans.State.Strict as State
 import Data.Bifunctor (bimap)
@@ -97,7 +99,6 @@ import Data.Time.Clock
 import Prometheus as P
 import qualified Text.Colors as CL
 import Text.Format
-import Text.PrettyPrint.ANSI.Leijen (pretty)
 import Text.Printf
 import Text.ShortDescription
 import Text.Tools
@@ -402,7 +403,7 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
           when flags_debug $ $logDebugS "addTx" . T.pack . CL.red $ show e
           lift $ P.incCounter vmTxsUnsuccessful
         Nothing -> do
-          when flags_debug $ $logDebugS "addTx" . T.pack $ "Removing accounts in suicideList: " ++ intercalate ", " (show . pretty <$> S.toList (erSuicideList execResults))
+          when flags_debug $ $logDebugS "addTx" . T.pack $ "Removing accounts in suicideList: " ++ intercalate ", " (format <$> S.toList (erSuicideList execResults))
           forM_ (S.toList $ erSuicideList execResults) $ \address' -> do
             lift $ purgeStorageMap address'
             lift $ A.delete (Proxy @AddressState) address'
@@ -596,7 +597,7 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
             (fromMaybe "" $ erReturnVal r, unlines $ reverse $ erTrace r, erLogs r, erEvents r)
 
   yieldMany $ OutLog . mkLogEntry ranBlockHash theHash chainId <$> theLogs
-  yieldMany $ OutEvent . mkEventEntry chainId <$> theEvents
+  yield . OutEvent $ mkEventEntry chainId <$> theEvents
   when flags_createTransactionResults $ do
     yield . OutTXR $
       TransactionResult
@@ -647,7 +648,7 @@ printTransactionMessage ot@OutputTx {otSigner = tAddr, otHash = theHash} (Right 
       extra =
         if isMessageTX t
           then ""
-          else fromMaybe "<failed>" $ fmap format $ erNewContractAccount results
+          else fromMaybe (CL.blink "<failed>") $ fmap format $ erNewContractAccount results
 
   multilineLog "printTx/ok" $
     boringBox

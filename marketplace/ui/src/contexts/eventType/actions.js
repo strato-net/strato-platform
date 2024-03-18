@@ -82,7 +82,7 @@ const actions = {
         return;
       } else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({ type: actionDescriptors.fetchEventTypeFailed, error: "Error while fetching Event Type" });
-      }
+      } 
       dispatch({ type: actionDescriptors.fetchEventTypeFailed, error: body.error });
     } catch (err) {
       dispatch({ type: actionDescriptors.fetchEventTypeFailed, error: "Error while fetching Event Type" });

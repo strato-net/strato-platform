@@ -1,40 +1,29 @@
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 
-{-# OPTIONS -fno-warn-unused-imports #-}
--- TODO- We need to formally remove the watchdog, then
-{-# OPTIONS -fno-warn-unused-matches #-}
---       we can remove these "no-warn" options
-
 module Blockchain.CommunicationConduit
   ( handleMsgServerConduit,
     handleMsgClientConduit,
-    mkEthP2PEventSource,
-    mkEthP2PEventConduit,
+    bytesToMessages,
+    debounceTxSendsAndUnseq,
+    messageToBytes
   )
 where
 
 import BlockApps.Logging
-import BlockApps.X509
 import Blockchain.Constants hiding (ethVersion)
-import Blockchain.Context hiding (Inbound, Outbound)
+import Blockchain.Context
 import Blockchain.Data.Block
-import Blockchain.Data.ChainInfo (UnsignedChainInfo (..))
 import Blockchain.Data.Control (P2PCNC (..))
-import Blockchain.Data.Enode
 import Blockchain.Data.RLP
 import Blockchain.Data.Wire as W
-import Blockchain.Display
 import Blockchain.Event
 import Blockchain.EventException
-import Blockchain.ExtMergeSources
 import Blockchain.Frame
 import Blockchain.Metrics
 import Blockchain.Options
@@ -43,37 +32,22 @@ import Blockchain.Sequencer.Event
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Model.Options (computeNetworkID)
 import Blockchain.Strato.Model.Util
-import Blockchain.TimerSource
-import Blockchain.Watchdog
 import Conduit
-import qualified Control.Monad.Change.Alter as A
+import Control.Monad (forever, when)
 import qualified Control.Monad.Change.Modify as Mod
-import Control.Monad.IO.Unlift
-import Control.Monad.State
-import Control.Monad.Trans.Resource
 import Crypto.Types.PubKey.ECC
 import Data.Bits (shiftL)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Conduit.Binary as CB
-import Data.Conduit.Combinators (yieldMany)
-import qualified Data.Conduit.List as CL
 import Data.Conduit.TQueue
 import Data.List.Split
-import qualified Data.Map.Strict as M
 import Data.Maybe
 import qualified Data.Set as S
 import qualified Data.Text as T
-import Data.Text.Encoding (decodeUtf8)
-import Data.Void
 import Text.Printf
-import UnliftIO.Concurrent hiding (yield)
 import UnliftIO.Exception
 import UnliftIO.STM
-
--- This is a placeholder until the root certs can be held in a proper database
-rootCerts' :: S.Set X509Certificate
-rootCerts' = S.fromList [rootCert]
 
 ethVersion :: Int
 ethVersion = 62
@@ -82,66 +56,6 @@ ethVersion = 62
 blockstanbulVersion :: Int
 blockstanbulVersion = 1
 
-mkEthP2PEventSource ::
-  ( MonadResource m,
-    MonadLogger m,
-    MonadUnliftIO m
-  ) =>
-  ConduitM () B.ByteString m () ->
-  ConduitM () P2pEvent m () ->
-  String ->
-  EthCryptState ->
-  m (ConduitM () Event m ())
-mkEthP2PEventSource peerSourceConduit seqEventSource peerStr inCtx = do
-  canarySource <- mkCanarySource
-  tid <- myThreadId
-  recvWatchdog <- mkWatchdog tid $ fromIntegral flags_connectionTimeout
-  merged <-
-    mergeSourcesByForce
-      ( [ peerSourceConduit
-            .| ethDecrypt inCtx
-            .| CL.iterM (recordTraffic Inbound)
-            .| bytesToMessages
-            .| CL.iterM (displayMessage Inbound peerStr)
-            .| CL.map MsgEvt
-            .| CL.iterM (const $ petWatchdog recvWatchdog),
-          seqEventSource
-            .| CL.map NewSeqEvent,
-          canarySource .| CL.map absurd,
-          timerSource
-        ]
-      )
-      4096 -- 🙏
-  return $
-    merged
-      .| CL.iterM recordEvent
-
-mkCanarySource :: (MonadLogger m, MonadUnliftIO m, MonadResource m) => m (ConduitM () Void m ())
-mkCanarySource = do
-  ender <- toIO $ $logInfoS "canary/exit" "" >> killCanary
-  void . register $ ender
-  q <- atomically newTQueue
-  $logInfoS "canary/enter" ""
-  addCanary
-  -- Wait forever on nothing
-  return $ sourceTQueue q
-
-mkEthP2PEventConduit ::
-  (MonadResource m, MonadLogger m, MonadUnliftIO m, m `Mod.Outputs` [IngestEvent]) =>
-  String ->
-  EthCryptState ->
-  m (ConduitM (Either P2PCNC Message) BC.ByteString m ())
-mkEthP2PEventConduit str outCtx = do
-  tid <- myThreadId
-  sendWatchdog <- mkWatchdog tid $ fromIntegral flags_connectionTimeout
-  return $
-    debounceTxSendsAndUnseq
-      .| CL.iterM recordMessage
-      .| CL.iterM (displayMessage Outbound str)
-      .| CL.iterM (const $ petWatchdog sendWatchdog)
-      .| messageToBytes
-      .| CL.iterM (recordTraffic Outbound)
-      .| ethEncrypt outCtx
 
 debounceTxSendsAndUnseq :: (MonadIO m, m `Mod.Outputs` [IngestEvent]) => ConduitT (Either P2PCNC Message) Message m ()
 debounceTxSendsAndUnseq = do
@@ -183,52 +97,26 @@ handleMsgClientConduit myId peer = do
         =<< lift
           ( Mod.get (Mod.Proxy @BestBlock) >>= \(BestBlock bHash _ tdiff) -> do
               (GenesisBlockHash genHash) <- Mod.access (Mod.Proxy @GenesisBlockHash)
-              -- TODO remove distinction between new status messages and old ones once entire protocol is complete
-
-              let s =
-                    if flags_useNodeCerts
-                      then
-                        NewStatus
-                          { protocolVersion = fromIntegral ethVersion,
-                            networkID = computeNetworkID,
-                            totalDifficulty = fromIntegral tdiff,
-                            latestHash = bHash,
-                            genesisHash = genHash,
-                            rootCerts = rootCerts'
-                          }
-                      else
-                        Status
-                          { protocolVersion = fromIntegral ethVersion,
-                            networkID = computeNetworkID,
-                            totalDifficulty = fromIntegral tdiff,
-                            latestHash = bHash,
-                            genesisHash = genHash
-                          }
+              let s = Status
+                      { protocolVersion = fromIntegral ethVersion,
+                        networkID = computeNetworkID,
+                        totalDifficulty = fromIntegral tdiff,
+                        latestHash = bHash,
+                        genesisHash = genHash
+                      }
               return $ Right s
           )
     other -> assertHandshake other
   awaitMsg >>= \case
-    -- TODO remove distinction between new status messages and old ones once entire protocol is complete
-    Just NewStatus {totalDifficulty = peerTD, genesisHash = peerGH, latestHash = peerBestHash, networkID = networkID', rootCerts = rcs} -> do
-      (GenesisBlockHash genHash) <- lift $ Mod.access (Mod.Proxy @GenesisBlockHash)
-      when (peerGH /= genHash) $ throwIO WrongGenesisBlock
-      when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch
-      when (S.difference rcs rootCerts' /= S.empty) $ throwIO RootCertificateMismatch
-      -- we set to 0 cause we dont necessarily know the number yet
-      lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
-      (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
-      mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
-      yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
-      yield . Right $ GetChainDetails []
-      handleGetChainDetails peer S.empty
-      lift stampActionTimestamp
     Just Status {totalDifficulty = peerTD, genesisHash = peerGH, latestHash = peerBestHash, networkID = networkID'} -> do
       (GenesisBlockHash genHash) <- lift $ Mod.access (Mod.Proxy @GenesisBlockHash)
       when (peerGH /= genHash) $ throwIO WrongGenesisBlock
       when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch
       -- we set to 0 cause we dont necessarily know the number yet
       lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
-      (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
+      (BestBlockNumber num) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
+      (BestBlock _ num' _ ) <- lift $ Mod.get (Mod.Proxy @BestBlock)
+      let lastBlockNumber = max num num' -- BestBlockNumber not guaranteed to be > BestBlock (nor vice versa)
       mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
       yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
       yield . Right $ GetChainDetails []
@@ -258,32 +146,6 @@ handleMsgServerConduit myPubkey peer = do
       yield $ Right helloMsg'
     other -> assertHandshake $ other
   awaitMsg >>= \case
-    -- TODO remove distinction between new status messages and old ones once entire protocol is complete
-    Just NewStatus {totalDifficulty = peerTD, genesisHash = peerGH, latestHash = peerBestHash, networkID = networkID', rootCerts = rcs} -> do
-      $logInfoS "serverHandshake/Status{}" "received status"
-      lift (Mod.get (Mod.Proxy @BestBlock)) >>= \(BestBlock bHash _ tdiff) -> do
-        (GenesisBlockHash genHash) <- lift $ Mod.access (Mod.Proxy @GenesisBlockHash)
-        when (genHash /= peerGH) $ throwIO WrongGenesisBlock
-        when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch
-        when (S.difference rcs rootCerts' /= S.empty) $ throwIO RootCertificateMismatch
-        -- we set to 0 cause we dont necessarily know the number yet
-        lift $ Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
-        yield $
-          Right
-            NewStatus
-              { protocolVersion = fromIntegral ethVersion,
-                networkID = computeNetworkID,
-                totalDifficulty = fromIntegral tdiff,
-                latestHash = bHash,
-                genesisHash = genHash,
-                rootCerts = rootCerts'
-              }
-        (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
-        mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
-        yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
-        yield . Right $ GetChainDetails []
-        handleGetChainDetails peer S.empty
-        lift stampActionTimestamp
     Just Status {totalDifficulty = peerTD, genesisHash = peerGH, latestHash = peerBestHash, networkID = networkID'} -> do
       $logInfoS "serverHandshake/Status{}" "received status"
       yield
@@ -302,7 +164,9 @@ handleMsgServerConduit myPubkey peer = do
                       genesisHash = genHash
                     }
           )
-      (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
+      (BestBlockNumber num) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
+      (BestBlock _ num' _ ) <- lift $ Mod.get (Mod.Proxy @BestBlock)
+      let lastBlockNumber = max num num' -- BestBlockNumber not guaranteed to be > BestBlock (nor vice versa)
       mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
       yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
       yield . Right $ GetChainDetails []

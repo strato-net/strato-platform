@@ -24,7 +24,6 @@ import Data.String
 import Database.Persist.Postgresql
 import Database.PostgreSQL.Typed
 import HFlags
-import Network.Kafka hiding (runKafka)
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Prometheus
 -- import Slipstream.Processor
@@ -55,7 +54,6 @@ createBlocEnv = liftIO $ do
     BlocEnv
       { stateFetchLimit = 0,
         gasOn = error ("gasOn shouldn't be needed in slipstream, it is undefined"),
-        evmCompatible = False,
         txSizeLimit = 0,
         accountNonceLimit = 0,
         gasLimit = 0,

@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE IncoherentInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
@@ -32,6 +33,7 @@ where
 import Blockchain.Data.RLP
 import Blockchain.Database.MerklePatricia.StateRoot
 import Blockchain.Strato.Model.Keccak256
+import Control.Monad (liftM)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.State
 import Data.Bifunctor (first)
@@ -47,7 +49,8 @@ import qualified Data.Map.Strict as M
 import qualified Data.NibbleString as N
 import Data.Ranged
 import Numeric
-import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
+import Text.Colors
+import Text.Format
 
 -------------------------
 
@@ -110,21 +113,21 @@ instance Monad m => (StateRoot `A.Alters` NodeData) (StateT (Map StateRoot NodeD
   insert _ k v = modify' $ M.insert k v
   delete _ k = modify' $ M.delete k
 
-formatVal :: Maybe RLPObject -> Doc
-formatVal Nothing = red $ text "NULL"
-formatVal (Just x) = green $ pretty x
+formatVal :: Maybe RLPObject -> String
+formatVal Nothing = red "NULL"
+formatVal (Just x) = green $ format x
 
-instance Pretty a => Pretty (NodeDataF a) where
-  pretty EmptyNodeData = text "    <EMPTY>"
-  pretty (ShortcutNodeData s (Left (Left p))) = text $ "    " ++ show (pretty s) ++ " -> " ++ show (green . text . BC.unpack $ B16.encode p)
-  pretty (ShortcutNodeData s (Left (Right v))) = text $ "    " ++ show (pretty s) ++ " -> " ++ show (pretty v)
-  pretty (ShortcutNodeData s (Right val)) = text $ "    " ++ show (pretty s) ++ " -> " ++ show (green $ pretty val)
-  pretty (FullNodeData cs val) = text "    val: " </> formatVal val </> text "\n        " </> vsep (showChoice <$> zip ([0 ..] :: [Int]) cs)
+instance Format a => Format (NodeDataF a) where
+  format EmptyNodeData = "    <EMPTY>"
+  format (ShortcutNodeData s (Left (Left p))) = "    " ++ format s ++ " -> " ++ (green . BC.unpack $ B16.encode p)
+  format (ShortcutNodeData s (Left (Right v))) = "    " ++ format s ++ " -> " ++ format v
+  format (ShortcutNodeData s (Right val)) = "    " ++ format s ++ " -> " ++ green (format val)
+  format (FullNodeData cs val) = "    val: " ++ formatVal val ++ "\n        " ++ unlines (showChoice <$> zip ([0 ..] :: [Int]) cs)
     where
-      showChoice :: Pretty a => (Int, NodeRefF a) -> Doc
-      showChoice (v, Left "") = blue (text $ showHex v "") </> text ": " </> red (text "NULL")
-      showChoice (v, Left p) = blue (text $ showHex v "") </> text ": " </> green (text . BC.unpack $ B16.encode p)
-      showChoice (v, Right p) = blue (text $ showHex v "") </> text ": " </> green (pretty p)
+      showChoice :: Format a => (Int, NodeRefF a) -> String
+      showChoice (v, Left "") = blue (showHex v "") ++ ": " ++ red "NULL"
+      showChoice (v, Left p) = blue (showHex v "") ++ ": " ++ green (BC.unpack $ B16.encode p)
+      showChoice (v, Right p) = blue (showHex v "") ++ ": " ++ green (format p)
 
 instance RLPSerializable1 NodeDataF where
   liftRlpEncode _ EmptyNodeData = RLPString ""

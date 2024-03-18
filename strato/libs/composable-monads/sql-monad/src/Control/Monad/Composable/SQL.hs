@@ -5,6 +5,7 @@ module Control.Monad.Composable.SQL where
 
 import Blockchain.DB.SQLDB
 import Blockchain.EthConf
+import Control.Monad.Composable.Base
 import Control.Monad.IO.Unlift
 import Control.Monad.Logger
 import Control.Monad.Reader
@@ -12,7 +13,7 @@ import qualified Database.Persist.Postgresql as PSQL
 
 type SQLM = ReaderT SQLDB
 
-type HasSQL m = HasSQLDB m
+type HasSQL m = (MonadIO m, MonadUnliftIO m, AccessibleEnv SQLDB m)
 
 type CirrusM = ReaderT CirrusDB
 

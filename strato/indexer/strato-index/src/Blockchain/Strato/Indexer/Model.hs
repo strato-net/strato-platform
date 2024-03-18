@@ -1,4 +1,4 @@
-{-# OPTIONS -fno-warn-orphans #-}
+
 module Blockchain.Strato.Indexer.Model
   ( IndexEvent (..),
   )
@@ -6,7 +6,7 @@ where
 
 import Blockchain.Data.ChainInfo
 import Blockchain.Data.DataDefs (EventDB, LogDB, TransactionResult)
-import Blockchain.Data.TransactionResultStatus
+import Blockchain.Data.TransactionResult ()
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Model.ExtendedWord (Word256)
 import Blockchain.Strato.Model.Keccak256
@@ -23,16 +23,6 @@ data IndexEvent
   | EventDBEntry EventDB
   | IndexPrivateTx OutputTx
   deriving (Eq, Show)
-
-instance Binary LogDB
-
-instance Binary EventDB
-
-instance Binary TransactionResult
-
-instance Binary TransactionFailureType
-
-instance Binary TransactionResultStatus
 
 instance Binary IndexEvent where
   get = do

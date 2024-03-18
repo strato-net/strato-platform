@@ -32,7 +32,7 @@ import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.Options ()
+import Blockchain.Strato.Model.Options
 import Control.Lens.Operators
 import Control.Monad.Change.Alter
 import Control.Monad.Change.Modify (Accessible)
@@ -48,6 +48,7 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy.Char8 as BLC
 import qualified Data.Cache as Cache
 import qualified Data.HashMap.Strict.InsOrd as H
+import Data.Map (fromList, traverseWithKey)
 import Data.Maybe (fromJust, isJust, listToMaybe, maybeToList)
 import Data.Source.Map
 import Data.Swagger hiding (Http, delete)
@@ -62,6 +63,7 @@ import qualified Handlers.Faucet as Faucet
 import qualified Handlers.IdentityServerCallback as Identity
 import qualified Handlers.Log as Log
 import qualified Handlers.Metadata as Metadata
+import Handlers.Options
 import qualified Handlers.Peers as Peers
 import qualified Handlers.QueuedTransactions as QueuedTransactions
 import qualified Handlers.Stats as Stats
@@ -91,7 +93,7 @@ import Text.Tools
 import UnliftIO hiding (Handler)
 import Prelude hiding (lookup)
 
-instance MonadUnliftIO m => Selectable Account Contract (SQLM m) where
+instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Account Contract (SQLM m) where
   select _ a = runMaybeT $ do
     (AddressStateRef' r _) <-
       MaybeT
@@ -103,59 +105,26 @@ instance MonadUnliftIO m => Selectable Account Contract (SQLM m) where
     codePtr <- MaybeT . pure $ addressStateRefCodePtr r
     MaybeT $ either (const Nothing) (Just . snd) <$> getContractDetailsByCodeHash codePtr
 
-instance Selectable Account Contract m => Selectable Account Contract (CirrusM m) where
+instance Selectable Account Contract m => Selectable Account Contract (ReaderT a m) where
   select p = lift . select p
 
-instance Selectable Account Contract m => Selectable Account Contract (ReaderT BlocEnv m) where
-  select p = lift . select p
-
-instance Selectable Account Contract m => Selectable Account Contract (VaultM m) where
-  select p = lift . select p
-
-instance Selectable Account Contract m => Selectable Account Contract (IdentityM m) where
-  select p = lift . select p
-
-instance MonadUnliftIO m => (Keccak256 `Selectable` SourceMap) (SQLM m) where
+instance {-# OVERLAPPING #-} MonadUnliftIO m => (Keccak256 `Selectable` SourceMap) (SQLM m) where
   select _ = Account.getCodeFromPostgres
 
-instance MonadUnliftIO m => (Keccak256 `Alters` DBCode) (SQLM m) where
+instance (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceMap) (ReaderT a m) where
+  select p = lift . select p
+
+instance {-# OVERLAPPING #-} MonadUnliftIO m => (Keccak256 `Alters` DBCode) (SQLM m) where
   lookup _ k = fmap (SolidVM,) <$> Account.getCodeByteStringFromPostgres k
   insert _ _ _ = error "API: Keccak256 `Alters` DBCode insert"
   delete _ _ = error "API: Keccak256 `Alters` DBCode delete"
 
-instance (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceMap) (VaultM m) where
-  select p = lift . select p
-
-instance (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceMap) (IdentityM m) where
-  select p = lift . select p
-
-instance (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceMap) (CirrusM m) where
-  select p = lift . select p
-
-instance Selectable Keccak256 SourceMap m => Selectable Keccak256 SourceMap (ReaderT BlocEnv m) where
-  select p = lift . select p
-
-instance (Keccak256 `Alters` DBCode) m => (Keccak256 `Alters` DBCode) (VaultM m) where
+instance (Keccak256 `Alters` DBCode) m => (Keccak256 `Alters` DBCode) (ReaderT a m) where
   lookup p = lift . lookup p
   insert p k = lift . insert p k
   delete p = lift . delete p
 
-instance (Keccak256 `Alters` DBCode) m => (Keccak256 `Alters` DBCode) (IdentityM m) where
-  lookup p = lift . lookup p
-  insert p k = lift . insert p k
-  delete p = lift . delete p
-
-instance (Keccak256 `Alters` DBCode) m => (Keccak256 `Alters` DBCode) (ReaderT BlocEnv m) where
-  lookup p = lift . lookup p
-  insert p k = lift . insert p k
-  delete p = lift . delete p
-
-instance (Keccak256 `Alters` DBCode) m => (Keccak256 `Alters` DBCode) (CirrusM m) where
-  lookup p = lift . lookup p
-  insert p k = lift . insert p k
-  delete p = lift . delete p
-
-instance MonadUnliftIO m => Selectable Account AddressState (SQLM m) where
+instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Account AddressState (SQLM m) where
   select _ a = runMaybeT $ do
     (AddressStateRef' r _) <-
       MaybeT
@@ -173,31 +142,13 @@ instance MonadUnliftIO m => Selectable Account AddressState (SQLM m) where
         codePtr
         (toMaybe 0 $ addressStateRefChainId r)
 
-instance MonadUnliftIO m => Selectable Address Certificate (CirrusM m) where
+instance Selectable Account AddressState m => Selectable Account AddressState (ReaderT a m) where
+  select p = lift . select p
+
+instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address Certificate (CirrusM m) where
   select _ = Account.getX509CertForAccount
 
-instance Selectable Address Certificate m => Selectable Address Certificate (VaultM m) where
-  select p = lift . select p
-
-instance Selectable Address Certificate m => Selectable Address Certificate (ReaderT BlocEnv m) where
-  select p = lift . select p
-
-instance Selectable Address Certificate m => Selectable Address Certificate (IdentityM m) where
-  select p = lift . select p
-
-instance Selectable Address Certificate m => Selectable Address Certificate (SQLM m) where
-  select p = lift . select p
-
-instance Selectable Account AddressState m => Selectable Account AddressState (CirrusM m) where
-  select p = lift . select p
-
-instance Selectable Account AddressState m => Selectable Account AddressState (VaultM m) where
-  select p = lift . select p
-
-instance Selectable Account AddressState m => Selectable Account AddressState (IdentityM m) where
-  select p = lift . select p
-
-instance Selectable Account AddressState m => Selectable Account AddressState (ReaderT BlocEnv m) where
+instance Selectable Address Certificate m => Selectable Address Certificate (ReaderT a m) where
   select p = lift . select p
 
 type CoreAPI =
@@ -229,6 +180,7 @@ type FullAPI = CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI
 coreServer ::
   ( MonadLogger m,
     HasSQL m,
+    Accessible Metadata.UrlMap m,
     Accessible IdentityData m,
     Accessible VaultData m,
     Selectable Keccak256 SourceMap m
@@ -262,6 +214,7 @@ fullServer ::
     HasBlocEnv m,
     HasIdentity m,
     HasVault m,
+    Accessible Metadata.UrlMap m,
     Selectable Account Contract m,
     Selectable Account AddressState m,
     Selectable Address Certificate m,
@@ -273,8 +226,8 @@ fullServer = coreServer :<|> bloc
 
 ----------------
 
-hoistCoreServer :: BlocEnv -> Server FullAPI
-hoistCoreServer blocEnv = hoistServer (Proxy :: Proxy FullAPI) (convertErrors runM) fullServer
+hoistCoreServer :: BlocEnv -> Metadata.UrlMap -> Server FullAPI
+hoistCoreServer blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPI) (convertErrors runM) fullServer
   where
     convertErrors r x = Handler $ do
       y <- liftIO . try . r $ x `catch` handleRuntimeError `catch` handleApiError
@@ -286,8 +239,9 @@ hoistCoreServer blocEnv = hoistServer (Proxy :: Proxy FullAPI) (convertErrors ru
         . runSQLM
         . runCirrusM
         . flip runReaderT blocEnv
+        . flip runReaderT urlMap
         . runVaultM ("http://localhost:8013/strato/v2.3")
-        . runIdentitytM flags_identityServerUrl
+        . runIdentitytM getIdentityServerUrl
         $ f
 
 fullAPI :: Proxy FullAPI
@@ -298,12 +252,39 @@ main = do
   _ <- $initHFlags "Core API"
 
   -- check if id server connection is valid; only run if using https (unless using localhost)
-  identityUrl <- parseBaseUrl flags_identityServerUrl
+  identityUrl <- parseBaseUrl getIdentityServerUrl
   let allowedIPAddressRegex = "^172.17.((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){1}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
   let matches = matchRegex (mkRegex allowedIPAddressRegex) (baseUrlHost identityUrl)
   if baseUrlScheme identityUrl == Http && not (isJust matches || baseUrlHost identityUrl == "docker.for.mac.localhost")
-    then error $ "Will not communicate with the identity server over http unless it is with localhost. Update the idServerUrl: " <> flags_identityServerUrl
+    then error $ "Will not communicate with the identity server over http unless it is with localhost. Update the idServerUrl: " <> getIdentityServerUrl
     else putStrLn "Identity server url is valid to connect to"
+
+  -- check that all urls are derivable (or else crash and fail in a flaming disaster)
+  let urlMap = fromList
+        [ ("vault", flags_vaultUrl),
+          ("oauthDiscovery", flags_oauthDiscoveryUrl),
+          ( "fileServer",
+            case (flags_fileServerUrl, computeNetworkID) of
+              ("", 7596898649924658542) -> "https://fileserver.mercata-testnet2.blockapps.net/highway"
+              ("", 6909499098523985262) -> "https://fileserver.mercata.blockapps.net/highway"
+              ("", _) -> error "File server url was not provided and cannot be derived"
+              (fileServer, _) -> fileServer
+          ),
+          ( "paymentServer",
+            case (flags_paymentServerUrl, computeNetworkID) of
+              ("", 7596898649924658542) -> "https://payments.mercata-testnet2.blockapps.net"
+              ("", 6909499098523985262) -> "https://payments.mercata.blockapps.net"
+              ("", _) -> error "Payment server url was not provided and cannot be derived"
+              (paymentServer, _) -> paymentServer
+          ),
+          ( "monitor",
+            case computeNetworkID of
+              7596898649924658542 -> "https://monitor.mercata-testnet2.blockapps.net:18080"
+              6909499098523985262 -> "https://monitor.mercata.blockapps.net:18080"
+              _ -> ""
+          )
+        ]
+  _ <- traverseWithKey (\service url' -> putStrLn $ "The url for " <>  service <> " is " <> url') urlMap
 
   let theDoc =
         toSwagger (Proxy :: Proxy FullAPI)
@@ -313,7 +294,7 @@ main = do
                \ you query the blockchain."
           & info . version .~ "1.2"
 
-  --print theDoc
+  -- print theDoc
   blockappsInit "core-api"
 
   let stateFetchLimit' = 100
@@ -326,7 +307,6 @@ main = do
   let env =
         BlocEnv
           { gasOn = flags_gasOn,
-            evmCompatible = flags_evmCompatible,
             txSizeLimit = flags_txSizeLimit,
             accountNonceLimit = flags_accountNonceLimit,
             gasLimit = flags_gasLimit,
@@ -337,10 +317,10 @@ main = do
             userRegistryCodeHash = if flags_useBuiltinUserRegistry then Nothing else stringKeccak256 flags_userRegistryCodeHash,
             useWalletsByDefault = flags_useWalletsByDefault
           }
-  run 3000 $ app env theDoc
+  run 3000 $ app env theDoc urlMap
 
-app :: BlocEnv -> Swagger -> Application
-app blocEnv theDoc =
+app :: BlocEnv -> Swagger -> Metadata.UrlMap -> Application
+app blocEnv theDoc urlMap =
   prometheus def {prometheusInstrumentApp = False} $
     instrumentApp "core-api" $
       logStdoutDev $
@@ -349,7 +329,7 @@ app blocEnv theDoc =
         $
           addPathsTo404 $
             serve (Proxy :: Proxy (FullAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $
-              hoistCoreServer blocEnv :<|> swaggerSchemaUIServer theDoc
+              hoistCoreServer blocEnv urlMap :<|> swaggerSchemaUIServer theDoc
 
 addPathsTo404 :: Middleware
 addPathsTo404 baseApp req respond' =
@@ -369,7 +349,7 @@ addPathsTo404 baseApp req respond' =
 
 ----------
 
---Temporary location for a couple of instance definitions needed for toSwagger, we need to find a better place
+-- Temporary location for a couple of instance definitions needed for toSwagger, we need to find a better place
 
 instance HasSwagger a => HasSwagger (MultipartForm Mem (MultipartData Mem) :> a) where
   toSwagger _ = toSwagger (Proxy :: Proxy a)

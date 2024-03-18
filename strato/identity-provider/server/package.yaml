@@ -20,7 +20,6 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
 - base
-- common-log
 
 
 library:
@@ -34,21 +33,22 @@ library:
   - blockapps-vault-wrapper-client
   - blockapps-vault-wrapper-api
   - bytestring
+  - common-log
   - containers
-  - core-api2
   - evm-solidity
-  - hflags
   - http-client
   - http-client-tls
   - http-types
+  - lrucache
   - monad-alter
   - mtl
-  - resourcet
   - servant-client
   - servant-server
+  - solid-vm-model
   - split
   - strato-model
   - text
+  - time
   - transformers
   - unliftio
   - utf8-string
@@ -63,14 +63,11 @@ executables:
     ghc-options:
     - -threaded
     dependencies:
-    - aeson
-    - blockapps-identity-provider-api
     - blockapps-identity-provider-server
     - bytestring
+    - common-log
     - containers
     - hflags
-    - http-client
-    - transformers
     - warp
     - x509-certs
     - yaml
@@ -83,5 +80,3 @@ tests:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
-    dependencies:
-    - blockapps-identity-provider-server

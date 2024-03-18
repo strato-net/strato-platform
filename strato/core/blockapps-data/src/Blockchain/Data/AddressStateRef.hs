@@ -13,7 +13,7 @@ import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256
 import Control.Monad
-import Control.Monad.Change.Modify (Accessible (..), Proxy (..))
+import Control.Monad.Composable.Base
 import Data.Maybe
 import qualified Database.Persist.Postgresql as SQL hiding (Update, get)
 
@@ -29,7 +29,7 @@ updateSQLBalanceAndNonce ::
   [(Account, (Integer, Integer))] ->
   m ()
 updateSQLBalanceAndNonce vals = do
-  pool <- unSQLDB <$> access (Proxy @SQLDB)
+  pool <- unSQLDB <$> accessEnv
   flip SQL.runSqlPool pool $ do
     forM_ vals $ \((Account a c), (v, n)) -> do
       let asr =

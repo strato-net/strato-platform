@@ -55,99 +55,14 @@ function marshalOut(_args) {
 }
 
 async function getAll(admin, args = {}, options) {
-    const { quantity, pricePerUnit, productId, range = [], ...restArgs } = args;
-    const products = await productJs.getAll(admin, {
-        isActive: true,
-        isDeleted: false,
-        address: productId,
-        ...restArgs
-    }, options);
-
-    const productIds = products.map(product => product.address);
-    const batchSize = 200; // Set the desired batch size. Can adjust to optimize performance (max 374)
-    const inventoryPromises = [];
-
-    // Break up the productIds into batches, and get the inventory for each batch
-    for (let i = 0; i < productIds.length; i += batchSize) {
-        const batchProductIds = productIds.slice(i, i + batchSize);
-
-        const inventoryPromise = inventoryJs.getAll(admin, {
-            appChainId: args.appChainId,
-            status: inventoryStatus.PUBLISHED,
-            productId: batchProductIds,
-            range,
-            gteField: 'availableQuantity',
-            gteValue: 0
-        }, options);
-
-        inventoryPromises.push(inventoryPromise);
-    }
-
-    // Wait for all inventory promises to resolve
-    const inventoryResults = await Promise.all(inventoryPromises);
-    const inventoriesWithProductInfo = [];
-
-    // Loop through each inventory result and add the product info to the inventory
-    inventoryResults.forEach(inventory => {
-        inventory.forEach(item => {
-            const product = products.find(p => p.address === item.productId);
-            if (product) {
-                const inventoryWithProductInfo = { ...product, ...item };
-                inventoriesWithProductInfo.push(inventoryWithProductInfo);
-            }
-        });
-    });
-
-    return inventoriesWithProductInfo.map(inventory => marshalOut(inventory));
+    const inventoryResults = await inventoryJs.getAll(admin, { ...args, isMarketplaceSearch: true, isTrendingSearch: false }, options);
+    const inventoryCount = await inventoryJs.inventoryCount(admin, { ...args }, options);
+    return {inventoryResults: inventoryResults.map(inventory => marshalOut(inventory)), inventoryCount: inventoryCount};
 }
 
 async function getTopSellingProducts(admin, args = {}, options) {
-    const { quantity, pricePerUnit, range = [], ...restArgs } = args;
-
-    const products = await productJs.getAll(admin, {
-        isActive: true,
-        isDeleted: false,
-        isInventoryAvailable: true,
-        limit: 350,
-        ...restArgs
-    }, options);
-
-    const productIds = products.map(product => product.address);
-    const batchSize = 200; // Set the desired batch size
-    const inventoryPromises = [];
-
-    for (let i = 0; i < productIds.length; i += batchSize) {
-        const batchProductIds = productIds.slice(i, i + batchSize);
-
-        const inventoryPromise = inventoryJs.getAll(admin, {
-            appChainId: args.appChainId,
-            status: inventoryStatus.PUBLISHED,
-            productId: batchProductIds,
-            range,
-            gteField: 'availableQuantity',
-            gteValue: 1,
-            sort: '-createdDate',
-            offset: args.offset,
-            limit: constants.TOP_SELLING_GET_LIMIT
-        }, options);
-
-        inventoryPromises.push(inventoryPromise);
-    }
-
-    const inventoryResults = await Promise.all(inventoryPromises);
-    const inventoriesWithProductInfo = [];
-
-    inventoryResults.forEach(inventory => {
-        inventory.forEach(item => {
-            const product = products.find(p => p.address === item.productId);
-            if (product) {
-                const inventoryWithProductInfo = { ...product, ...item };
-                inventoriesWithProductInfo.push(inventoryWithProductInfo);
-            }
-        });
-    });
-
-    return inventoriesWithProductInfo.map(inventory => marshalOut(inventory));
+    const inventoryResults = await inventoryJs.getAll(admin, { ...args, isMarketplaceSearch: true, isTrendingSearch: true }, options);
+    return inventoryResults.map(inventory => marshalOut(inventory));
 }
 
 

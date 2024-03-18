@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -12,6 +13,7 @@ module Blockchain.Strato.Model.ChainId
   )
 where
 
+import Blockchain.Data.RLP
 import Blockchain.Strato.Model.ExtendedWord
 import Control.DeepSeq (NFData)
 import Control.Lens.Operators
@@ -21,7 +23,6 @@ import qualified Data.Aeson.Key as DAK
 import qualified Data.Binary as Binary
 import Data.Either.Extra (maybeToEither)
 import Data.Hashable
-import Data.RLP
 import Data.Swagger
 import qualified Data.Text as Text
 import Database.Persist.Sql
@@ -49,10 +50,11 @@ instance ToJSONKey ChainId where
 instance PersistField ChainId where
   toPersistValue = PersistText . Text.pack . chainIdString
   fromPersistValue (PersistText t) =
-    maybeToEither "could not decode chainid"
-      . stringChainId
-      . Text.unpack
-      $ t
+    let !eCid = maybeToEither "could not decode chainid"
+              . stringChainId
+              . Text.unpack
+              $ t
+     in eCid
   fromPersistValue x =
     Left . Text.pack $
       "PersistField ChainId: expected PersistText: " ++ show x
@@ -97,9 +99,9 @@ instance ToSample ChainId where
 instance ToCapture (Capture "chainid" ChainId) where
   toCapture _ = DocCapture "chainid" "a private chain Id"
 
-instance RLPEncodable ChainId where
-  rlpEncode (ChainId n) = rlpEncode $ toInteger n
-  rlpDecode obj = ChainId . fromInteger <$> rlpDecode obj
+instance RLPSerializable ChainId where
+  rlpEncode (ChainId n) = rlpEncode n
+  rlpDecode obj = ChainId $ rlpDecode obj
 
 instance ToParam (QueryParam "chainid" ChainId) where
   toParam _ = DocQueryParam "chainid" [] "Blockchain Identifier" Normal

@@ -5,7 +5,7 @@ module Executable.EVMFlags where
 import HFlags
 
 defineFlag "maxTxsPerBlock" (500 :: Integer) "max number of transactions that may be put into a block"
-defineFlag "mempoolLivenessCutoff" (240 :: Integer) "max age of a transaction in seconds that is valid for the mempool"
+defineFlag "mempoolLivenessCutoff" (60 :: Integer) "max age of a transaction in seconds that is valid for the mempool"
 defineFlag "useTestnet" False "Change difficulty computation for ethdev testnet"
 defineFlag "newRBIBBehavior" True "Use new replaceBestIfBetter behavior"
 defineFlag "useSyncMode" False "Whether or not to wait for P2P world state to get filled before buffering transactions"

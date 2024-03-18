@@ -72,6 +72,12 @@ const actions = {
         });
         actions.setMessage(dispatch, "Error while creating Product");
         return false;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.createProductFailed, 
+          error: "Unauthorized while creating Product" 
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -112,7 +118,7 @@ const actions = {
           error: "Error while fetching Product Details",
         });
         return false;
-      }
+      } 
 
       dispatch({
         type: actionDescriptors.fetchProductDetailsFailed,
@@ -193,6 +199,12 @@ const actions = {
         });
         actions.setMessage(dispatch, "Error while uploading Image");
         return false;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.uploadImageFailed, 
+          error: "Unauthorized while Image upload" 
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -240,6 +252,12 @@ const actions = {
         });
         actions.setMessage(dispatch, "Error while updating Product");
         return false;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.updateProductFailed, 
+          error: "Unauthorized while updating Product" 
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -297,6 +315,12 @@ const actions = {
         });
         actions.setMessage(dispatch, "Error while deleting Product");
         return false;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.deleteProductFailed, 
+          error: "Unauthorized while deleting Product" 
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -377,6 +401,12 @@ const actions = {
         });
         actions.setMessage(dispatch, "Error while updating Image");
         return false;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.updateImageFailed, 
+          error: "Unauthorized while Image Update" 
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({

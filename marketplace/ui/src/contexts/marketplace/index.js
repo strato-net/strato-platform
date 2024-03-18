@@ -7,6 +7,7 @@ const MarketplaceDispatchContext = createContext();
 const MarketplaceProvider = ({ children }) => {
   const initialState = {
     marketplaceList: [],
+    marketplaceListCount: 10,
     isMarketplaceLoading: false,
     isTopSellingProductsLoading: false,
     topSellingProducts: [],
@@ -21,6 +22,8 @@ const MarketplaceProvider = ({ children }) => {
     isLoadingUserAddress:false,
     userAddresses:[],
     isLoadingUserAddresses:false,
+    isFetchingStrats: false,
+    strats: 0
   };
 
   const [state, dispatch] = useReducer(reducer, initialState);

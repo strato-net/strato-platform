@@ -6,11 +6,9 @@ module Bloc.API
   ( BlocAPI,
     markdownBloc,
     layoutBloc,
-    --  , mockBloc
     blocApi,
     module Bloc.API.Git,
     module Bloc.API.Users,
-    module Bloc.API.X509,
     module Bloc.API.Contracts,
     module Bloc.API.Chain,
     module Bloc.API.Transaction,
@@ -18,15 +16,12 @@ module Bloc.API
   )
 where
 
---import           Servant.Mock
-
 import Bloc.API.Chain
 import Bloc.API.Contracts
 import Bloc.API.Git
 import Bloc.API.Transaction
 import Bloc.API.Users
 import Bloc.API.Utils
-import Bloc.API.X509
 import Data.Proxy
 import Data.Text
 import Servant
@@ -37,8 +32,6 @@ type BlocAPI =
   GetGitInfo
     -- /users endpoints
     :<|> PostUsersFill
-    -- /x509 endpoints
-    :<|> CreateCertificate
     -- /contracts endpoints
     :<|> GetContracts
     :<|> PostContractsBatchStates
@@ -68,7 +61,7 @@ type BlocAPI =
     :<|> PostBlocTransactionBody
     :<|> PostBlocTransactionUnsigned
     :<|> PostBlocTransaction
-    :<|> PostBlocTransactionExternal
+    :<|> PostBlocTransactionParallelExternal
 
 --Unsure what this will break if anything but remove later
 instance ToSample Text where
@@ -79,9 +72,6 @@ markdownBloc = markdown $ docs blocApi
 
 layoutBloc :: Text
 layoutBloc = layout blocApi
-
---mockBloc :: Server BlocAPI
---mockBloc = mock blocApi (Proxy::Proxy [Int])
 
 blocApi :: Proxy BlocAPI
 blocApi = Proxy

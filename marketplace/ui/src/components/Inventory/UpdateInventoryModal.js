@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useFormik, getIn } from "formik";
-import { Form, Modal, Input, Select, Radio, Button, Spin } from "antd";
+import { Form, Modal, Input, Select, Radio, Button, Spin, Tag } from "antd";
 import getSchema from "./UpdateInventorySchema";
 import { actions } from "../../contexts/inventory/actions";
 import {
@@ -13,8 +13,8 @@ import {
 } from "../../contexts/category";
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { useProductState } from "../../contexts/product";
-import { INVENTORY_STATUS } from "../../helpers/constants";
 import TagManager from "react-gtm-module";
+import { useAuthenticateState } from "../../contexts/authentication";
 
 
 const { Option } = Select;
@@ -24,6 +24,9 @@ const UpdateInventoryModal = ({
   handleCancel,
   debouncedSearchTerm,
   inventoryToUpdate,
+  categoryName,
+  limit,
+  offset
 }) => {
   const schema = getSchema();
   const [formState, setFormState] = useState(null);
@@ -34,8 +37,8 @@ const UpdateInventoryModal = ({
   const { categoryBasedProducts, isCategoryBasedProductsLoading } =
     useProductState();
   
-
-  const { isinventoryUpdating } =
+  const { user } = useAuthenticateState();
+  const { isinventoryUpdating, isReselling } =
     useInventoryState();
 
   const initialValues = {
@@ -43,19 +46,12 @@ const UpdateInventoryModal = ({
       name: null,
       address: null,
     },
-    subCategory: {
-      name: null,
-      address: "",
-    },
     productName: {
       name: null,
       address: "",
     },
-    quantity: null,
-    pricePerUnit: "",
+    availableQuantity: null,
     batchId: "",
-    serialNumber: null,
-    status: true,
   };
 
   const formik = useFormik({
@@ -71,34 +67,24 @@ const UpdateInventoryModal = ({
     categoryActions.fetchCategories(categoryDispatch);
   }, [categoryDispatch]);
 
+  const getCategory = () => {
+    const parts = inventoryToUpdate.inventory.contract_name.split('-');
+    return parts[parts.length - 1];
+  };
+
   useEffect(() => {
     if (inventoryToUpdate) {
-      let subCategory; 
-      categorys.map(
-        (category) => category.subCategories.map(
-          (subCategoryRecord) => {
-            if (subCategoryRecord.name === inventoryToUpdate.inventory.subCategory) {
-              subCategory = subCategoryRecord;
-            } 
-          }
-        )
-      );
+      const data = inventoryToUpdate.inventory.data ? inventoryToUpdate.inventory.data : {};
       let nextState = {
         category: {
-          name: inventoryToUpdate.category.name,
-        },
-        subCategory: {
-          name: subCategory.name ?? "",
+          name: getCategory(),
         },
         productName: {
           name: decodeURIComponent(inventoryToUpdate.inventory.name),
           address: inventoryToUpdate.inventory.productId,
         },
-        quantity: inventoryToUpdate.inventory.quantity,
-        pricePerUnit: inventoryToUpdate.inventory.pricePerUnit,
+        availableQuantity: data?.quantity ?? null,
         batchId: inventoryToUpdate.inventory.batchId,
-        serialNumber: null,
-        status: inventoryToUpdate.inventory.status === 1 ? true : false,
       };
     
       setFormState(nextState);
@@ -107,14 +93,19 @@ const UpdateInventoryModal = ({
 
   const handleUpdateFormSubmit = async (values) => {
     const body = {
-      productAddress: values.productName.address,
-      inventory: inventoryToUpdate.inventory.address,
+      itemContract: values.category.name,
+      itemAddress: inventoryToUpdate.inventory.address,
       updates: {
-        pricePerUnit: values.pricePerUnit,
-        status: values.status ? INVENTORY_STATUS['PUBLISHED'] : INVENTORY_STATUS['UNPUBLISHED'],
       },
     };
-
+  
+    window.LOQ = window.LOQ || []
+    window.LOQ.push(['ready', async LO => {
+        // Track an event
+        await LO.$internal.ready('events')
+        LO.events.track('Update Inventory', {category: values.category.name, product: values.productName.name})
+    }])
+  
     TagManager.dataLayer({
       dataLayer: {
         event: 'update_inventory',
@@ -123,7 +114,9 @@ const UpdateInventoryModal = ({
     let isDone = await actions.updateInventory(dispatch, body);
 
     if (isDone) {
-      actions.fetchInventory(dispatch, 10, 0, debouncedSearchTerm);
+      await actions.fetchInventory(dispatch, limit, offset, debouncedSearchTerm, categoryName);
+      await actions.fetchInventoryForUser(dispatch, limit, offset, user.commonName);
+
       handleCancel();
     }
   };
@@ -143,7 +136,7 @@ const UpdateInventoryModal = ({
             onClick={formik.handleSubmit}
             disabled={isinventoryUpdating}
           >
-            {isinventoryUpdating ? <Spin /> : "Update Inventory"}
+            {isinventoryUpdating || isReselling ? <Spin /> : "Update Inventory"}
           </Button>
         </div>,
       ]}
@@ -159,7 +152,7 @@ const UpdateInventoryModal = ({
       ) : (
         <Form layout="vertical" className="mt-5" onSubmit={formik.handleSubmit}>
           <div className="w-full mb-3">
-            <div className="flex justify-between ">
+            <div className="flex justify-between mt-4 ">
               <Form.Item label="Category" name="category" className="w-72">
                 <Select
                   placeholder="Select Category"
@@ -187,40 +180,6 @@ const UpdateInventoryModal = ({
                     </span>
                   )}
               </Form.Item>
-              <Form.Item
-                label="Sub Category"
-                name="subCategory"
-                className="w-72"
-              >
-                <Select
-                  placeholder="Select Sub Category"
-                  allowClear
-                  showSearch
-                  id="subCategory"
-                  name="subCategory.name"
-                  disabled={true}
-                  value={formik.values.subCategory.name}
-                  onChange={(value) => {
-                    formik.setFieldValue("subCategory.name", value);
-                  }}
-                >
-                  {categorys.map((category) =>
-                    category.name === formik.values.category.name ? category.subCategories.map((e, index) => (
-                      <Option value={e.name} key={index}>
-                        {e.name}
-                      </Option>
-                    )) : null
-                  )}
-                </Select>
-                {getIn(formik.touched, "subCategory.name") &&
-                  getIn(formik.errors, "subCategory.name") && (
-                    <span className="text-error text-xs">
-                      {getIn(formik.errors, "subCategory.name")}
-                    </span>
-                  )}
-              </Form.Item>
-            </div>
-            <div className="flex justify-between mt-4 ">
               <Form.Item
                 label="Product Name"
                 name="productName"
@@ -264,83 +223,24 @@ const UpdateInventoryModal = ({
                     </span>
                   )}
               </Form.Item>
-              <Form.Item label="Quantity" name="quantity" className="w-72">
-                <Input
-                  label="quantity"
-                  placeholder="Enter Quantity"
-                  name="quantity"
-                  disabled={true}
-                  value={formik.values.quantity}
-                  onChange={formik.handleChange}
-                />
-                {formik.touched.quantity && formik.errors.quantity && (
-                  <span className="text-error text-xs">
-                    {formik.errors.quantity}
-                  </span>
-                )}
-              </Form.Item>
             </div>
             <div className="flex justify-between mt-4 ">
-              <Form.Item
-                label="Price Per Unit"
-                name="pricePerUnit "
-                className="w-72"
-              >
+              <Form.Item label="Quantity" name="availableQuantity" className="w-72">
                 <Input
-                  label="pricePerUnit"
-                  placeholder="Enter Price"
-                  name="pricePerUnit"
-                  value={formik.values.pricePerUnit}
-                  onChange={formik.handleChange}
-                />
-                {formik.touched.pricePerUnit && formik.errors.pricePerUnit && (
-                  <span className="text-error text-xs">
-                    {formik.errors.pricePerUnit}
-                  </span>
-                )}
-              </Form.Item>
-              <Form.Item label="Batch ID" name="batchId" className="w-72">
-                <Input
-                  label="batchId"
-                  placeholder="Enter Batch ID"
-                  name="batchId"
+                  label="availableQuantity"
+                  placeholder="Enter Quantity"
+                  name="availableQuantity"
                   disabled={true}
-                  value={formik.values.batchId}
+                  value={formik.values.availableQuantity}
                   onChange={formik.handleChange}
                 />
-                {formik.touched.batchId && formik.errors.batchId && (
+                {formik.touched.availableQuantity && formik.errors.availableQuantity && (
                   <span className="text-error text-xs">
-                    {formik.errors.batchId}
+                    {formik.errors.availableQuantity}
                   </span>
                 )}
               </Form.Item>
             </div>
-            {/* <div className="mt-4 flex justify-between items-center">
-              <div>Enter Serial Numbers</div>
-            </div>
-            <TextArea
-              label="serialNumbers"
-              className="mt-2"
-              disabled={true}
-              // value={formik.values.serialNumber}
-              placeholder="Enter serial numbers as comma separated values 1232WE13W43,1232WE13W434,1232WE13W45"
-            /> */}
-            <Form.Item label="Status" name="status" className="mt-4">
-              <Radio.Group
-                value={formik.values.status}
-                onChange={formik.handleChange}
-                name="status"
-              >
-                <Radio value={true}>Publish</Radio>
-                <Radio value={false}>Unpublish</Radio>
-              </Radio.Group>
-
-              {formik.touched.status && formik.errors.status && (
-                <span className="text-error text-xs">
-                  {formik.errors.status}
-                </span>
-              )}
-            </Form.Item>
           </div>
         </Form>
       )}

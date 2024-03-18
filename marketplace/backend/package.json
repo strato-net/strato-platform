@@ -1,7 +1,6 @@
 {
   "scripts": {
     "mocha-babel": "node_modules/.bin/mocha --require @babel/register --inline-diffs --exit",
-    "token-getter": "babel-node node_modules/blockapps-rest/dist/util/oauth.client.js --flow authorization-code --config config/${CONFIG:-localhost}.config.yaml",
     "start": "babel-node index",
     "start:prod": "NODE_ENV=production babel-node index",
     "deploy": "cp config/${CONFIG:-localhost}.config.yaml ${CONFIG_DIR_PATH:-.}/config.yaml && yarn mocha-babel dapp/dapp/dapp.deploy.js --config ${CONFIG_DIR_PATH:-.}/config.yaml",
@@ -41,11 +40,17 @@
   "license": "MIT",
   "private": true,
   "dependencies": {
+    "@babel/cli": "^7.20.7",
+    "@babel/core": "^7.20.7",
+    "@babel/node": "^7.20.7",
+    "@babel/polyfill": "^7.12.1",
+    "@babel/preset-env": "^7.20.2",
+    "@babel/register": "^7.18.9",
     "@hapi/joi": "^17.1.1",
     "@sendgrid/mail": "^7.7.0",
-    "aws-sdk": "^2.1284.0",
+    "axios": "^1.6.2",
     "babel-plugin-module-resolver": "^4.1.0",
-    "blockapps-rest": "8.1.0",
+    "blockapps-rest": "8.3.1",
     "body-parser": "^1.20.1",
     "chai": "^4.3.7",
     "chai-http": "^4.3.0",
@@ -63,22 +68,13 @@
     "jpeg-js": "^0.4.4",
     "jwt-decode": "^3.1.2",
     "kafkajs": "^2.2.4",
+    "mocha": "^10.2.0",
     "moment": "^2.29.4",
     "multer": "^1.4.5-lts.1",
     "ramda": "^0.28.0",
-    "stripe": "^11.10.0",
     "swagger-jsdoc": "^6.2.7",
     "swagger-ui-express": "^4.6.0",
     "winston": "^3.8.2",
     "ws": "^8.13.0"
-  },
-  "devDependencies": {
-    "@babel/cli": "^7.20.7",
-    "@babel/core": "^7.20.7",
-    "@babel/node": "^7.20.7",
-    "@babel/polyfill": "^7.12.1",
-    "@babel/preset-env": "^7.20.2",
-    "@babel/register": "^7.18.9",
-    "mocha": "^10.2.0"
   }
 }

@@ -11,61 +11,49 @@ ghc-options: -Wall -Werror -rtsopts
 
 dependencies:
   - base
-  - base16-bytestring
   - bytestring
   - containers
   - common-log
   - evm-solidity
   - hflags
-  - kafka-monad
   - raw-strings-qq
-  - utf8-string
   - resourcet
-  - sql-monad
-  - text
-  - transformers
 
 library:
   source-dirs: src/
   dependencies: 
     - aeson
+    - base16-bytestring
     - binary
     - bloc2
     - blockapps-data
-    - blockapps-datadefs
     - blockapps-mpdbs
-    - bloomfilter
     - classy-prelude
     - conduit
     - containers
-    - core-api2
     - cross-monitoring
     - deepseq
-    - ethereum-rlp
     - extra
     - format
     - lens
     - lrucache
+    - kafka-monad
     - milena
-    - milena-tools
     - monad-alter
-    - mtl
-    - path-pieces
     - persistent
     - postgresql-typed
     - prometheus-client
-    - QuickCheck
-    - servant
-    - solid-vm
     - solid-vm-model
     - scientific
-    - source-tools
+    - sql-monad
     - strato-model
+    - text
     - time
+    - transformers
     - unliftio
     - unliftio-core
-    - unordered-containers
     - vm-tools
+    - ordered-containers
 
 executables:
   slipstream:
@@ -75,14 +63,12 @@ executables:
       - base
       - bloc2
       - blockapps-init
-      - blockapps-mpdbs
-      - cache
-      - clock
       - hflags
-      - milena
+      - kafka-monad
       - persistent-postgresql
       - postgresql-typed
       - slipstream
+      - sql-monad
       - transformers
       - wai-middleware-prometheus
       - warp
@@ -96,7 +82,6 @@ tests:
       - base
       - aeson
       - aeson-qq
-      - base16-bytestring
       - bytestring
       - classy-prelude
       - conduit
@@ -105,14 +90,13 @@ tests:
       - hspec
       - hspec-expectations-lifted
       - labeled-error
-      - persistent
       - persistent-sqlite
       - QuickCheck
       - slipstream
-      - solid-vm
       - solid-vm-model
       - strato-model
       - text
       - time
       - unliftio
       - vm-tools
+      - ordered-containers

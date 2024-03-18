@@ -1,72 +1,56 @@
-import { Button, Input, InputNumber, Modal, Table } from "antd";
+import { Button, InputNumber, Modal, Table } from "antd";
 import { useEffect, useState } from "react";
 import { actions } from "../../contexts/inventory/actions";
 import { actions as itemActions } from "../../contexts/item/actions";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
-import { useItemDispatch, useItemState } from "../../contexts/item";
+import { useItemDispatch } from "../../contexts/item";
+import { useAuthenticateState } from "../../contexts/authentication";
 
-
-const ResellModal = ({ open, handleCancel, inventory }) => {
-    const [data, setData] = useState([inventory]);
+const ResellModal = ({ open, handleCancel, inventory, categoryName, limit, offset }) => {
     const [quantity, setQuantity] = useState(1);
-    const [pricePerUnit, setpricePerUnit] = useState(inventory.pricePerUnit);
     const inventoryDispatch = useInventoryDispatch();
     const itemDispatch = useItemDispatch();
     const [canResell, setCanResell] = useState(true);
     const {
         isReselling
     } = useInventoryState();
-    const {
-        items
-    } = useItemState();
+    const { user } = useAuthenticateState();
 
     useEffect(() => {
         itemActions.fetchItem(itemDispatch, "", 0, inventory.address);
     }, [])
 
     useEffect(() => {
-        if (quantity > inventory.availableQuantity || quantity <= 0) {
+        if (quantity <= 0) {
             setCanResell(false);
         }
         else {
             setCanResell(true);
         };
     }, [quantity])
-    const columns = [
-        {
-            title: "Quantity Available",
-            dataIndex: "availableQuantity"
-        },
-        {
-            title: "Set Quantity",
-            render: () => (
-                <InputNumber value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
-            )
-        },
-        {
-            title: "Set Price",
-            render: () => (
-                <InputNumber value={pricePerUnit} controls={false} min={pricePerUnit} onChange={(value) => setpricePerUnit(value)} />
-            )
-        }
-    ];
 
+    const columns = () => {
+        return [
+            {
+                title: "Units",
+                align: "center",
+                render: () => (
+                    <InputNumber value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
+                )
+            },
+        ]
+    };
 
     const handleSubmit = async () => {
-        const itemsAddress = items.map((item) => item.address)
-
-        const body = {
-            inventoryId: inventory.address,
-            quantity: quantity,
-            price: pricePerUnit,
-            itemsAddress: itemsAddress
+        let body = {
+            assetAddress: inventory.address,
+            quantity
         };
-        if (quantity > 0 && quantity <= inventory.availableQuantity) {
-            let isDone = await actions.resellInventory(inventoryDispatch, body);
-            if (isDone) {
-                actions.fetchInventory(inventoryDispatch, 10, 0, "");
-                handleCancel();
-            }
+        let isDone = await actions.resellInventory(inventoryDispatch, body);
+        if (isDone) {
+            await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
+            await actions.fetchInventoryForUser(inventoryDispatch, limit, offset, user.commonName);
+            handleCancel();
         }
     }
 
@@ -74,19 +58,23 @@ const ResellModal = ({ open, handleCancel, inventory }) => {
         <Modal
             open={open}
             onCancel={handleCancel}
-            title={`Resell - ${decodeURIComponent(inventory.name)}`}
+            title={`Mint - ${decodeURIComponent(inventory.name)}`}
             width={650}
             footer={[
-                <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canResell} loading={isReselling}>
-                    Resell
+                <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canResell || inventory.status === "1"} loading={isReselling}>
+                    Mint
                 </Button>
             ]}
         >
+            <div className="head">
+
             <Table
-                columns={columns}
-                dataSource={data}
+            
+                columns={columns()}
+                dataSource={[inventory]}
                 pagination={false}
             />
+            </div>
         </Modal>
     )
 }

@@ -16,7 +16,6 @@ library:
   source-dirs:     src
   dependencies:
     - alarmclock
-    - base16-bytestring
     - binary
     - blockapps-data
     - blockapps-datadefs
@@ -28,6 +27,7 @@ library:
     - bytestring
     - clock
     - common-log
+    - composable-monads-base
     - conduit
     - data-default
     - directory
@@ -35,11 +35,11 @@ library:
     - extra
     - format
     - http-client
+    - kafka-monad
     - labeled-error
     - lens
     - leveldb-haskell
     - lifted-async
-    - milena
     - monad-alter
     - prometheus-client
     - seqevents
@@ -50,9 +50,9 @@ library:
     - servant-client
     - text
     - time
+    - transformers
     - classy-prelude
     - containers
-    - milena-tools
     - mtl
     - partitioner
     - resourcet
@@ -70,8 +70,6 @@ executables:
       - base64
       - blockapps-data
       - blockapps-init
-      - blockapps-vault-wrapper-api
-      - blockapps-vault-wrapper-client
       - blockstanbul
       - bytestring
       - common-log
@@ -88,7 +86,6 @@ executables:
       - strato-conf
       - strato-genesis
       - strato-model
-      - strato-networks
       - strato-sequencer
       - text
       - wai-middleware-prometheus
@@ -145,7 +142,6 @@ tests:
       - strato-sequencer
       - text
       - time
-      - unliftio
       - wai-extra
       - wai-middleware-prometheus
       - warp

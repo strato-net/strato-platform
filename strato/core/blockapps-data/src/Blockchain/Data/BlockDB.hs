@@ -20,7 +20,7 @@ import Blockchain.Data.Transaction
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Keccak256
-import Control.Monad.State
+import Control.Monad (forM, forM_)
 import Data.Maybe
 import qualified Database.Esqueleto.Legacy as E
 import Database.Persist hiding (get)
