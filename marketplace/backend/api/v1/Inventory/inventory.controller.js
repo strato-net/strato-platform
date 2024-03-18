@@ -277,7 +277,7 @@ class InventoryController {
     if (validation.error) {
       console.log('validation error: ', validation.error)
       throw new rest.RestError(RestStatus.BAD_REQUEST, 'List Item Argument Validation Error', {
-          message: `Missing args or bad format: ${validation.error.message}`,
+        message: `Missing args or bad format: ${validation.error.message}`,
       });
     }
   }
@@ -293,17 +293,21 @@ class InventoryController {
     const validation = unlistItemSchema.validate(args);
 
     if (validation.error) {
-        console.log('validation error: ', validation.error)
-        throw new rest.RestError(RestStatus.BAD_REQUEST, 'Unlist Item Argument Validation Error', {
-            message: `Missing args or bad format: ${validation.error.message}`,
-        });
+      console.log('validation error: ', validation.error)
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Unlist Item Argument Validation Error', {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      });
     }
-}
+  }
 
   static validateResellItemArgs(args) {
+    const assetSchema = Joi.object({
+        assetAddress: Joi.string().required(),
+        quantity: Joi.number().integer().greater(0).required(),
+    });
+
     const resellItemSchema = Joi.object({
-      assetAddress: Joi.string().required(),
-      quantity: Joi.number().integer().greater(0).required(),
+        assets: Joi.array().items(assetSchema).min(1).required(), // Expect at least one asset for reselling
     });
 
     const validation = resellItemSchema.validate(args);
@@ -312,7 +316,7 @@ class InventoryController {
       console.log('validation error: ', validation.error)
       throw new rest.RestError(RestStatus.BAD_REQUEST, validation.error.message, {
         message: `Missing args or bad format: ${validation.error.message}`,
-      })
+      });
     }
   }
 

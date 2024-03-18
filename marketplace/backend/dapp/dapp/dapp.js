@@ -296,7 +296,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.listItem = async function (args, options = defaultOptions) {
       const uploadPromises = args.assets.map(asset => {
           const individualArgs = {
-              ...args,
               assetToBeSold: asset.assetToBeSold,
               quantity: asset.quantity,
           };
@@ -339,11 +338,30 @@ contract.unlistItem = async function (args, options = defaultOptions) {
 };
 
 
-  contract.resellItem = async function (args, options = defaultOptions) {
-    const { assetAddress, ...restArgs } = args;
-    const contract = { address: assetAddress };
-    return await inventoryJs.resellItem(rawAdmin, contract, restArgs, options);
-  }
+contract.resellItem = async function (args, options = defaultOptions) {
+  // Create a promise for each asset
+  const resellPromises = args.assets.map(asset => {
+      const individualArgs = {
+          address: asset.assetAddress,
+          quantity: asset.quantity,
+      };
+      return inventoryJs.resellItem(rawAdmin, individualArgs, options);
+  });
+  const results = await Promise.allSettled(resellPromises);
+
+  // Process the results to include whether each asset was successfully resold
+  const processedResults = results.map((result, index) => {
+      const asset = args.assets[index];
+      return {
+          assetAddress: asset.assetAddress,
+          quantity: asset.quantity,
+          status: result.status,
+          ...result.status === 'fulfilled' ? { success: true, result: result.value } : { success: false, error: result.reason },
+      };
+  });
+  return processedResults;
+};
+
 
   contract.transferItem = async function (args, options = defaultOptions) {
     const { assetAddress, ...restArgs } = args;

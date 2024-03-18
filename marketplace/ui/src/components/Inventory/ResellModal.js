@@ -42,46 +42,34 @@ const ResellModal = ({ open, handleCancel, inventory, categoryName, limit, offse
     };
 
     const handleSubmit = async () => {
-        // Check if we are dealing with grouped assets
+        let requestBody = {
+            assets: [], // This will hold the resell information for each asset
+        };
+        let totalListedQuantity = 0; // to track the total quantity resold so far
         if (inventory.groupedAssets && inventory.groupedAssets.length > 0) {
-            let totalListedQuantity = 0; // Track the total quantity resold so far
-    
             for (const asset of inventory.groupedAssets) {
                 const remainingQuantity = quantity - totalListedQuantity;
                 const availableQuantity = asset.quantity - (asset.saleQuantity + asset.totalLockedQuantity);
                 const quantityToSell = Math.min(remainingQuantity, availableQuantity);
     
-                if (quantityToSell > 0) { // Ensure there is something to sell
-                    let body = {
+                if (quantityToSell > 0) {
+                    requestBody.assets.push({
                         assetAddress: asset.address,
                         quantity: quantityToSell,
-                    };
-                    let isDone = await actions.resellInventory(inventoryDispatch, body);
-                    if (isDone) {
-                        totalListedQuantity += quantityToSell;
-                        // Break if we've reached or exceeded the desired quantity
-                        if (totalListedQuantity >= quantity) break;
-                    } 
+                    });
+                    totalListedQuantity += quantityToSell;
+                    // Break if we've reached or exceeded the desired total quantity
+                    if (totalListedQuantity >= quantity) break;
                 }
             }
-    
-            if (totalListedQuantity > 0) {
-                await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
-                await actions.fetchInventoryForUser(inventoryDispatch, limit, offset, user.commonName);
-                handleCancel();
-            }
-        } else {
-            // original behavior if not dealing with grouped assets
-            let body = {
-                assetAddress: inventory.address,
-                quantity,
-            };
-            let isDone = await actions.resellInventory(inventoryDispatch, body);
+            let isDone = await actions.resellInventory(inventoryDispatch, requestBody);
             if (isDone) {
                 await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
                 await actions.fetchInventoryForUser(inventoryDispatch, limit, offset, user.commonName);
                 handleCancel();
             }
+        } else {
+            console.log("Grouped assets data is missing.");
         }
     };
     
