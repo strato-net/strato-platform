@@ -312,7 +312,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     if (selectedCateg && selectedCateg!='all') {
       baseUrl.searchParams.set('c', selectedCateg);
     }
-    if(selectedSubCategory && selectedCateg && selectedCateg!='all'){
+    if(selectedCateg && selectedCateg!='all'){
       const subCat = categorys.find((item)=>item.name===selectedCateg)
       ?.subCategories.map(item=>item.contract).join(',')
       setSelectedSubCategory(subCat)

@@ -209,9 +209,9 @@ const CategoryProductList = ({ user }) => {
   useEffect(()=>{
     const url = generateBaseUrl();
       if(!isLoading){
-        navigate(url, { state: { scroll: scrollPosition } });
+        navigate(url, {replace:true, state: { scroll: scrollPosition } });
     }else{
-      navigate(url, { state: { scroll: state?.scroll || 0 } });
+      navigate(url, {replace:true, state: { scroll: state?.scroll || 0 } });
     }
 
 },[scrollPosition])
