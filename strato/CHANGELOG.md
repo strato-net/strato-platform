@@ -28,7 +28,6 @@ so that they could be properly moved to their respective version's subsection.
 ### Fixed
 - `sendOutEvent` inconsistenly encoding code pointer hash
 - simplified p2p conduit code so that all threads handling a peer live or die together using the `async` library
-- Removed overcomplicated attempts at solving p2p thread issue (watchdogs, canaries, semaphore, threadmap, etc)
 - Fixed bug in BlockApps.X509.Certificate that filled in empty orgUnit fields with a space, rather than the empty string
 - Bugfix for slipstream regarding escaping quotes in contract name
 
