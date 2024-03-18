@@ -424,6 +424,15 @@ handleEvents peer = awaitForever $ \case
         when (isJust cInfo) $ do
           yieldR $ ChainDetails [(cId, fromJust cInfo)]
     P2pBlockstanbul msg ->
+      peerCert <- lift $ getPeerX509 peer
+      let peerCMPS = getChainMemberFromX509 <$> peer
+      $logInfoS "handleEvents/P2pBlockstanbul" . T.pack $ "Peer IP: " ++ show (pPeerIp peer)
+      $logInfoS "handleEvents/P2pBlockstanbul" . T.pack $ "Peer Pubkey: " ++ pointToString (pPeerPubkey peer)
+      $logInfoS "handleEvents/P2pBlockstanbul" . T.pack $ "Peer Cert: " ++ show peerCert
+      $logInfoS "handleEvents/P2pBlockstanbul" . T.pack $ "Peer Org: " ++ fmap orgName peerCert
+      $logInfoS "handleEvents/P2pBlockstanbul" . T.pack $ "Peer OrgUnit: " ++ fmap (fromMaybe "Nothing" . orgUnit) peerCert
+      $logInfoS "handleEvents/P2pBlockstanbul" . T.pack $ "Peer CommonName: " ++ fmap commonName peerCert
+      $logInfoS "handleEvents/P2pBlockstanbul" . T.pack $ "Peer ChainMemberParsedSet: " ++ show peerCMPS
       lift (fmap getChainMemberFromX509 <$> getPeerX509 peer) >>= \case
         Nothing ->
           $logDebugS "handleEvents/P2pBlockstanbul" . T.pack $
@@ -435,7 +444,7 @@ handleEvents peer = awaitForever $ \case
         Just cm ->
           maybe False unIsValidator <$> lift (select (Proxy @IsValidator) cm) >>= \case
             False ->
-              $logDebugS "handleEvents/P2pBlockstanbul" . T.pack $
+              $logInfoS "handleEvents/P2pBlockstanbul" . T.pack $
                 concat
                   [ "Peer ",
                     show (pPeerIp peer),
