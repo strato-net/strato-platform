@@ -150,38 +150,43 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
 
     const handleSubmit = async () => {
         let totalQuantityToBeListed = quantity; // Total desired quantity to list
-        let listedQuantity = 0; // Keep track of the quantity successfully listed
+        let quantityAllocated = 0; 
+    
+        let requestBody = {
+            paymentProviders: paymentProviderAddress ? [paymentProviderAddress] : [],
+            price: pricePerUnit,
+            assets: [],
+        };
     
         for (const asset of inventory.groupedAssets) {
-            if (listedQuantity >= totalQuantityToBeListed) break; // Stop if we've listed the total desired quantity
+            // Calculate how much of the total quantity remains to be allocated
+            let remainingQuantity = totalQuantityToBeListed - quantityAllocated;
+            if (remainingQuantity <= 0) break; // If we've allocated the total desired quantity, stop processing further assets
     
-            const maxAvailableQuantityForThisAsset = asset.quantity - asset.saleQuantity - asset.totalLockedQuantity;
-            const quantityForThisAsset = Math.min(maxAvailableQuantityForThisAsset, totalQuantityToBeListed - listedQuantity);
+            // Determine the quantity to allocate for this asset
+            let maxAvailableQuantity = asset.quantity - asset.saleQuantity - asset.totalLockedQuantity;
+            let quantityForThisAsset = Math.min(remainingQuantity, maxAvailableQuantity);
     
-            if (quantityForThisAsset <= 0) {
-                continue; // Skip this asset if there's no available quantity to list
-            }
-    
-            let body = {
-                assetToBeSold: asset.address,
-                paymentProviders: paymentProviderAddress ? [paymentProviderAddress] : [],
-                price: pricePerUnit,
-                quantity: quantityForThisAsset,
-            };
-    
-            let isDone;
-            isDone = await actions.listInventory(inventoryDispatch, body);
-            
-            if (isDone) {
-                listedQuantity += quantityForThisAsset;
+            // If there's quantity available add it to the request body
+            if (quantityForThisAsset > 0) {
+                requestBody.assets.push({
+                    assetToBeSold: asset.address,
+                    quantity: quantityForThisAsset,
+                });
+                quantityAllocated += quantityForThisAsset; // Update the total quantity allocated so far
             }
         }
     
-        if (listedQuantity > 0) {
-            await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
-            handleCancel();
+        if (requestBody.assets.length > 0) {
+            let isDone = await actions.listInventory(inventoryDispatch, requestBody);
+            if (isDone) {
+                await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
+                handleCancel();
+            } 
         } 
     };
+    
+    
     
     
     

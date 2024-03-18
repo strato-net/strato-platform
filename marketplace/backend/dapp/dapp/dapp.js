@@ -294,8 +294,31 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.listItem = async function (args, options = defaultOptions) {
-    return await inventoryJs.uploadSaleContract(rawAdmin, args, options);
-  }
+    if (args.assets && Array.isArray(args.assets)) {
+        const uploadPromises = args.assets.map(asset => {
+            const individualArgs = {
+                ...args,
+                assetToBeSold: asset.assetToBeSold,
+                quantity: asset.quantity,
+            };
+            return inventoryJs.uploadSaleContract(rawAdmin, individualArgs, options);
+        });
+
+        const results = await Promise.allSettled(uploadPromises);
+
+        const processedResults = results.map(result => {
+            if (result.status === 'fulfilled') {
+                return { success: true, value: result.value };
+            } else {
+                return { success: false, error: result.reason };
+            }
+        });
+
+        return processedResults; // This will be an array of objects with the outcome of each upload
+    } else {
+        throw new Error("Invalid args: Expected args.assets to be an array.");
+    }
+};
 
   contract.unlistItem = async function (args, options = defaultOptions) {
     const { saleAddress, ...restArgs } = args;

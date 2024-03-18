@@ -262,23 +262,26 @@ class InventoryController {
 
   static validateListItemArgs(args) {
     const listItemSchema = Joi.object({
-      assetToBeSold: Joi.string().required(),
-      paymentProviders: Joi.array().min(1).items(
-        Joi.string().min(0).required(),
-      ).required(),
+      paymentProviders: Joi.array().min(1).items(Joi.string().required()).required(),
       price: Joi.number().integer().greater(0).required(),
-      quantity: Joi.number().integer().greater(0).optional(),
+      assets: Joi.array().items(
+        Joi.object({
+          assetToBeSold: Joi.string().required(),
+          quantity: Joi.number().integer().greater(0).required(),
+        }).required()
+      ).min(1).required(), // at least one asset should be listed
     });
-
+  
     const validation = listItemSchema.validate(args);
-
+  
     if (validation.error) {
       console.log('validation error: ', validation.error)
       throw new rest.RestError(RestStatus.BAD_REQUEST, 'List Item Argument Validation Error', {
-        message: `Missing args or bad format: ${validation.error.message}`,
-      })
+          message: `Missing args or bad format: ${validation.error.message}`,
+      });
     }
   }
+  
 
   static validateUnlistItemArgs(args) {
     const unlistItemSchema = Joi.object({
