@@ -46,7 +46,7 @@ const CategoryProductList = ({ user }) => {
 
   const { state } = location;
   const { category } = useParams()
-
+  const categoryParam = category == 'all' ? '' : category 
   const queryParams = new URLSearchParams(location.search);
 
   const searchQueryValue = queryParams.get('s') || '';
@@ -55,7 +55,7 @@ const CategoryProductList = ({ user }) => {
   const selectedSubCat = subCategoryQueryValue.split(",") || [];
   const [api, contextHolder] = notification.useNotification();
   // States
-  const [selectedCategories, setSelectedCategories] = useState(category);
+  const [selectedCategories, setSelectedCategories] = useState(categoryParam);
   const [selectedSubCategories, setSelectedSubCategories] = useState(selectedSubCat);
   const [minPrice, setMinPrice] = useState(0);
   const [maxPrice, setMaxPrice] = useState(MAX_PRICE);
@@ -103,17 +103,17 @@ const CategoryProductList = ({ user }) => {
     categoryActions.fetchCategories(categoryDispatch);
     const selectedSubCat = subCategoryQueryValue.split(",");
     setSelectedSubCategories(selectedSubCat);
-  }, [category]);
+  }, [categoryParam]);
 
 
   useEffect(() => {
-    if(categorys.length > 0 && category!=='all'){
-      let subCat = categorys.find(item=>item.name===category)?.subCategories
+    if(categorys.length > 0 && categoryParam!=='all'){
+      let subCat = categorys.find(item=>item.name===categoryParam)?.subCategories
       setSubCategories(subCat)
     }else{
       setSubCategories([])
     }
-  }, [categorys,category]);
+  }, [categorys,categoryParam]);
 
 
   const onChangeSubCategory = (e) => {
@@ -144,7 +144,7 @@ const CategoryProductList = ({ user }) => {
 
     let baseUrl = new URL(`/c/${category}`, window.location.origin);
     const subCategories = valuesChecked.join(',')
-    if (category && valuesChecked.length > 0) {
+    if (categoryParam && valuesChecked.length > 0) {
       // baseUrl.searchParams.set('c', category);
       baseUrl.searchParams.set('sc', subCategories);
     }
@@ -166,7 +166,7 @@ const CategoryProductList = ({ user }) => {
     if (hasChecked && !isAuthenticated) {
       marketplaceActions.fetchMarketplace(
         marketplaceDispatch,
-        category,
+        categoryParam,
         subCategoryQueryValue,
         minPrice,
         maxPrice,
@@ -175,7 +175,7 @@ const CategoryProductList = ({ user }) => {
     } else if (hasChecked && isAuthenticated) {
       marketplaceActions.fetchMarketplaceLoggedIn(
         marketplaceDispatch,
-        category,
+        categoryParam,
         subCategoryQueryValue,
         minPrice,
         maxPrice,
@@ -337,13 +337,9 @@ const CategoryProductList = ({ user }) => {
           </p>
         </ClickableCell>
       </Breadcrumb.Item>
-      {/* <Breadcrumb.Item href="" onClick={e => setSelectedCategories([])}>
-        <ClickableCell href={routes.MarketplaceProductList.url}>
-          <p href={routes.MarketplaceProductList.url} className={`${selectedCategories.length > 0 ? "text-[#13188A] font-semibold " : "text-[#202020] font-medium"} text-sm hover:bg-transparent`}>
-            Marketplace
-          </p>
-        </ClickableCell>
-      </Breadcrumb.Item> */}
+      <Breadcrumb.Item className="text-[#202020] font-medium text-sm">
+          Category
+        </Breadcrumb.Item>
        {category && <Breadcrumb.Item className="text-[#202020] font-medium text-sm">
           {category}
         </Breadcrumb.Item>}
@@ -435,7 +431,7 @@ const CategoryProductList = ({ user }) => {
     {ClearFilterComponent()}
     <div className="bg-white border border-solid border-[#E9E9E9] my-6 mb-24">
 
-      {subCategories.length > 1 && category === 'Carbon' && (
+      {subCategories?.length > 1 && category === 'Carbon' && (
         <>
           {DesktopCollapseComponent(
             SubCategoryFilterComponent()
@@ -464,7 +460,7 @@ const CategoryProductList = ({ user }) => {
 
         {/* Panel - Sub Category */}
         <>
-          {subCategories.length > 1 && category === 'Carbon' && MobileCollapseComponent(
+          {subCategories?.length > 1 && category === 'Carbon' && MobileCollapseComponent(
             SubCategoryFilterComponent()
           )}
           <Divider className="m-0" />

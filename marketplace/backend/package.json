@@ -2,6 +2,7 @@
   "scripts": {
     "mocha-babel": "node_modules/.bin/mocha --require @babel/register --inline-diffs --exit",
     "start": "babel-node index",
+    "sitemap": "node generateSitemaps.mjs",
     "start:prod": "NODE_ENV=production babel-node index",
     "deploy": "cp config/${CONFIG:-localhost}.config.yaml ${CONFIG_DIR_PATH:-.}/config.yaml && yarn mocha-babel dapp/dapp/dapp.deploy.js --config ${CONFIG_DIR_PATH:-.}/config.yaml",
     "deploy:secondary-org": "cp config/${CONFIG:-localhost}.config.yaml ${CONFIG_DIR_PATH:-.}/config.yaml && yarn mocha-babel dapp/dapp/dapp.deploy-org.js --config ${CONFIG_DIR_PATH:-.}/config.yaml",
@@ -71,6 +72,7 @@
     "mocha": "^10.2.0",
     "moment": "^2.29.4",
     "multer": "^1.4.5-lts.1",
+    "node-fetch": "^3.3.2",
     "ramda": "^0.28.0",
     "sitemap": "^7.1.1",
     "swagger-jsdoc": "^6.2.7",

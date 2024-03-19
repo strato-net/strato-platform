@@ -288,10 +288,13 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
       );
      try {
       fetchFunction.then(res=>res.json().then(res=>{
-        const arr = res.data.productsWithImageUrl.map(item=>item.contract_name)
+        const arr = res.data.productsWithImageUrl.map(item=>{
+          return getCategoryName(item.contract_name)})
         const unique = [...new Set(arr)];
         if(arr.length>0){
-        if(unique.length==1){
+          const isCarbonIncludes = (item) => item.includes('Carbon')
+          const isCarbon = unique.every(isCarbonIncludes)
+        if(unique.length==1 || isCarbon){
           const category = getCategoryName(unique[0])
           if(category.includes('Carbon')){
           handleCategoryChange('Carbon')
@@ -373,12 +376,12 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
           >
             <img src={Images.newLogo} alt={IMG_META} title={IMG_META} className="h-[31px] w-[120px] md:w-[170px] md:h-[44px]" preview={false} />
           </Col>
-          <Col xs={showSearch ? 24 : 4} md={10} className={`lg:ml-28 md:ml-1 bg-[#F6F6F6] shadow-md flex-1 header-search ${showSearch ? '-mt-[6px] fixed top-[13px] left-0 flex w-[100vw] z-50 mb-4' : 'hidden md:flex '}`}>
+          <Col xs={showSearch ? 24 : 4} md={10} className={`lg:ml-28 md:ml-1 bg-[#F6F6F6] shadow-md flex-1 header-search ${showSearch ? ' fixed top-[13px] left-0 flex w-[100vw] z-50 mb-2' : 'hidden md:flex '}`}>
             <Select
               defaultValue="all"
-              className="border-0"
+              className="border-none header-category"
               dropdownStyle={{position:'fixed'}}
-              style={{ width: 150 }}
+              style={{ width: 170 }}
               onChange={handleCategoryChange}
               options={categories}
               value={selectedCategory}
