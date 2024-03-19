@@ -45,14 +45,14 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
       const parts = window.location.pathname.split('/');
       return parts[parts.length - 1];
     }else{
-      return 'all'
+      return 'All'
     }
   };
 
   const categoryQueryValue = getCategoryFromURL()
 
   const queryParams = new URLSearchParams(location.search);
-  // const categoryQueryValue = queryParams.get('c') || 'all';
+  // const categoryQueryValue = queryParams.get('c') || 'All';
   const searchQueryValue = queryParams.get('s') || '';
   const subCategoryQueryValue = queryParams.get('sc');
   const isSearch = searchQueryValue ? true : false;
@@ -151,7 +151,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   }, [window.location.pathname]);
 
   useEffect(() => {
-    const allCat = { label: 'All', value: 'all' }
+    const allCat = { label: 'All', value: 'All' }
     let categories = categorys.map(({ name, subCategories }, index) => {
       const subCat = subCategories.map(item=>item.contract).join(',')
       return { label: name, value: name, subCategory:subCat }
@@ -306,14 +306,14 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
           navigateSearch(category,value)
         }
         }else{
-          setSelectedCategory('all')
+          setSelectedCategory('All')
           setSelectedSubCategory("")
-          navigateSearch("all",value)
+          navigateSearch("All",value)
         }
       }else{
-        setSelectedCategory('all')
+        setSelectedCategory('All')
         setSelectedSubCategory("")
-        navigateSearch("all",value)
+        navigateSearch("All",value)
       }
       }))    
      } catch (error) {
@@ -370,15 +370,15 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     <>
       <Header className={`fixed z-[100] !bg-[#ffffff] !pl-2 w-full !pr-4 md:px-12 flex md:!mb-10 ${showMenu ? '' : 'shadow-header'} items-center justify-between md:justify-start`}>
         <Row className="relative flex-grow-0 md:flex-1 ml-2 md:ml-5">
-          <Col xs={20} md={6}
+          <Col xs={20} md={10} lg={4} 
             className="mt-4 mr-5 md:mt-0 cursor-pointer flex-grow-0 w-max md:w-[170px] h-[44px]"
             onClick={() => { navigate(routes.Marketplace.url) }}
           >
             <img src={Images.newLogo} alt={IMG_META} title={IMG_META} className="h-[31px] w-[120px] md:w-[170px] md:h-[44px]" preview={false} />
           </Col>
-          <Col xs={showSearch ? 24 : 4} md={10} className={`lg:ml-28 md:ml-1 bg-[#F6F6F6] shadow-md flex-1 header-search ${showSearch ? ' fixed top-[13px] left-0 flex w-[100vw] z-50 mb-2' : 'hidden md:flex '}`}>
+          <Col xs={showSearch ? 24 : 4} md={12} lg={18} className={`lg:ml-4 mf:ml-20 md:ml-1 bg-[#F6F6F6] shadow-md flex-1 header-search ${showSearch ? ' fixed top-[13px] left-0 flex w-[100vw] z-50 mb-2' : 'hidden md:flex '}`}>
             <Select
-              defaultValue="all"
+              defaultValue="All"
               className="border-none header-category"
               dropdownStyle={{position:'fixed'}}
               style={{ width: 170 }}

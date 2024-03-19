@@ -348,14 +348,6 @@ const ProductDetails = ({ user, users }) => {
                     Home
                   </p>
                 </ClickableCell>
-              </Breadcrumb.Item> <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-                <ClickableCell href={routes.Marketplace.url}>
-                  <p
-                    className="text-[#13188A]  text-sm font-semibold "
-                  >
-                    Marketplace
-                  </p>
-                </ClickableCell>
               </Breadcrumb.Item>
               {
                 isCalledFromInventory ?
@@ -369,6 +361,9 @@ const ProductDetails = ({ user, users }) => {
                     </ClickableCell>
                   </Breadcrumb.Item> : null
               }
+               <Breadcrumb.Item className="text-[#202020]  text-sm font-semibold ">
+                Product Detail
+              </Breadcrumb.Item>
               <Breadcrumb.Item className="text-[#202020]  text-sm font-semibold ">
                 {decodeURIComponent(details.name)}
               </Breadcrumb.Item>

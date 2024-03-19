@@ -141,7 +141,7 @@ const TopSellingProductCard = () => {
     });
   };
 
-  const navRoute = routes.MarketplaceCategoryProductList.url.replace(':category','all')
+  const navRoute = routes.MarketplaceCategoryProductList.url.replace(':category','All')
   
   return (
     <div>

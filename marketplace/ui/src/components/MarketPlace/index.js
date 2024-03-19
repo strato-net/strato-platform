@@ -62,7 +62,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
 
   const linkUrl = window.location.href;
   const metaImg = SEO.IMAGE_META
-  const navRoute = routes.MarketplaceCategoryProductList.url.replace(':category', 'all');
+  const navRoute = routes.MarketplaceCategoryProductList.url.replace(':category', 'All');
   
   return (
     <>

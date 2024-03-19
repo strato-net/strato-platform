@@ -46,7 +46,7 @@ const CategoryProductList = ({ user }) => {
 
   const { state } = location;
   const { category } = useParams()
-  const categoryParam = category == 'all' ? '' : category 
+  const categoryParam = category == 'All' ? '' : category 
   const queryParams = new URLSearchParams(location.search);
 
   const searchQueryValue = queryParams.get('s') || '';
@@ -105,7 +105,7 @@ const CategoryProductList = ({ user }) => {
 
 
   useEffect(() => {
-    if(categorys.length > 0 && categoryParam!=='all'){
+    if(categorys.length > 0 && categoryParam!=='All'){
       let subCat = categorys.find(item=>item.name===categoryParam)?.subCategories
       setSubCategories(subCat)
     }else{
@@ -127,7 +127,7 @@ const CategoryProductList = ({ user }) => {
     // In this context, if both "CarbonDAO" and "CarbonOffset" 
     // are found within unSelectedSubCat, the "Carbon" category is also deselected.
     if(unSelectedSubCat.includes("CarbonDAO") && unSelectedSubCat.includes("CarbonOffset")){
-      let baseUrl = new URL(`/c/all`, window.location.origin);
+      let baseUrl = new URL(`/c/All`, window.location.origin);
 
       // if (searchQueryValue) {
       //   baseUrl.searchParams.set('s', searchQueryValue);
@@ -228,7 +228,7 @@ const CategoryProductList = ({ user }) => {
     const isFilter = selectedSubCategories.length != 0
       || minPrice !== 0 || maxPrice !== MAX_PRICE
     if (isFilter) {
-      const baseUrl = new URL(`/c/all`, window.location.origin);
+      const baseUrl = new URL(`/c/All`, window.location.origin);
       const url = baseUrl.pathname + baseUrl.search;
       navigate(url)
       clearSelection()
