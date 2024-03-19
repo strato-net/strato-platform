@@ -129,9 +129,9 @@ const CategoryProductList = ({ user }) => {
     if(unSelectedSubCat.includes("CarbonDAO") && unSelectedSubCat.includes("CarbonOffset")){
       let baseUrl = new URL(`/c/all`, window.location.origin);
 
-      if (searchQueryValue) {
-        baseUrl.searchParams.set('s', searchQueryValue);
-      }
+      // if (searchQueryValue) {
+      //   baseUrl.searchParams.set('s', searchQueryValue);
+      // }
 
       const url = baseUrl.pathname + baseUrl.search;
       setUnSelected([])
