@@ -50,12 +50,10 @@ const CategoryProductList = ({ user }) => {
   const queryParams = new URLSearchParams(location.search);
 
   const searchQueryValue = queryParams.get('s') || '';
-  const categoryQueryValue = queryParams.get('c') || '';
   const subCategoryQueryValue = queryParams.get('sc') || '';
   const selectedSubCat = subCategoryQueryValue.split(",") || [];
   const [api, contextHolder] = notification.useNotification();
   // States
-  const [selectedCategories, setSelectedCategories] = useState(categoryParam);
   const [selectedSubCategories, setSelectedSubCategories] = useState(selectedSubCat);
   const [minPrice, setMinPrice] = useState(0);
   const [maxPrice, setMaxPrice] = useState(MAX_PRICE);
@@ -113,12 +111,13 @@ const CategoryProductList = ({ user }) => {
     }else{
       setSubCategories([])
     }
-  }, [categorys,categoryParam]);
+    
+  }, [categorys,categoryParam, subCategoryQueryValue]);
 
 
   const onChangeSubCategory = (e) => {
     let valuesChecked = checkValues(e, selectedSubCategories)
-    const unSelectedSubCat = subCategorys.filter((item) => {
+    const unSelectedSubCat = categorys.find(item=>item.name==categoryParam).subCategories.filter((item) => {
       if(valuesChecked.includes(item.contract)){}
       else{ return item }
     }).map(item => item.contract)
@@ -128,9 +127,7 @@ const CategoryProductList = ({ user }) => {
     // In this context, if both "CarbonDAO" and "CarbonOffset" 
     // are found within unSelectedSubCat, the "Carbon" category is also deselected.
     if(unSelectedSubCat.includes("CarbonDAO") && unSelectedSubCat.includes("CarbonOffset")){
-      let baseUrl = new URL(`/all`, window.location.origin);
-      const categoryData = selectedCategories.filter(item => item !== "Carbon")
-      const selectedCategory = categoryData.join(',')
+      let baseUrl = new URL(`/c/all`, window.location.origin);
 
       if (searchQueryValue) {
         baseUrl.searchParams.set('s', searchQueryValue);
@@ -138,14 +135,12 @@ const CategoryProductList = ({ user }) => {
 
       const url = baseUrl.pathname + baseUrl.search;
       setUnSelected([])
-      setSelectedCategories(categoryData)
-      navigate(url);
-    }
+      navigate(url,{replace:true});
+    } else{
 
     let baseUrl = new URL(`/c/${category}`, window.location.origin);
     const subCategories = valuesChecked.join(',')
     if (categoryParam && valuesChecked.length > 0) {
-      // baseUrl.searchParams.set('c', category);
       baseUrl.searchParams.set('sc', subCategories);
     }
     if(valuesChecked.length == 0){
@@ -156,6 +151,7 @@ const CategoryProductList = ({ user }) => {
     }
     const url = baseUrl.pathname + baseUrl.search;
     navigate(url, { replace: true });
+  }
     
     setUnSelected(unSelectedSubCat)
     setSelectedSubCategories(valuesChecked);
@@ -195,9 +191,6 @@ const CategoryProductList = ({ user }) => {
   const generateBaseUrl = () =>{
     const baseUrl = new URL(`/c/${category}`, window.location.origin);
 
-    // if (categoryQueryValue) {
-    //   baseUrl.searchParams.set('c', categoryQueryValue);
-    // }
     if(subCategoryQueryValue){
       baseUrl.searchParams.set('sc', subCategoryQueryValue);
     }
@@ -221,9 +214,9 @@ const CategoryProductList = ({ user }) => {
 
   //=========================Other functions===============================//
   const linkUrl = window.location.href;
-  const metaTitle = selectedCategories.length === 1 ? `${selectedCategories[0]} | ${SEO.TITLE_META} ` : `${SEO.TITLE_META}`
-  const metaImg = selectedCategories.length === 1 ? `${selectedCategories[0]}` : `${SEO.IMAGE_META}`
-  const metaCategory = selectedCategories.length === 1 ? `?category=${selectedCategories[0]}` : '' 
+  const metaTitle = categoryParam === 1 ? `${categoryParam} | ${SEO.TITLE_META} ` : `${SEO.TITLE_META}`
+  const metaImg = categoryParam === 1 ? `${categoryParam}` : `${SEO.IMAGE_META}`
+  const metaCategory = categoryParam === 1 ? `?category=${categoryParam}` : '' 
   const metaDescription = SEO.DESCRIPTION_META
 
   const clearSelection = () => {
@@ -232,17 +225,13 @@ const CategoryProductList = ({ user }) => {
   };
 
   const handleClearFilter = () => {
-    const isFilter = selectedCategories.length != 0 || selectedSubCategories.length != 0
+    const isFilter = selectedSubCategories.length != 0
       || minPrice !== 0 || maxPrice !== MAX_PRICE
     if (isFilter) {
       const baseUrl = new URL(`/c/all`, window.location.origin);
-      // if (searchQueryValue) {
-      //   baseUrl.searchParams.set('s', searchQueryValue);
-      // }
       const url = baseUrl.pathname + baseUrl.search;
       navigate(url)
       clearSelection()
-      setSelectedCategories([]);
       setMinPrice(0)
       setMaxPrice(MAX_PRICE)
 
