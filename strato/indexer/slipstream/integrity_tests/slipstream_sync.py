@@ -9,7 +9,7 @@ def wait_for_nodes_to_sync(node1_url, node2_url, headers1, headers2):
     while True:
         try:
             response1 = requests.get(node1_url + "/cirrus/search/BlockApps-Mercata-Asset", headers=headers1, params={'order':'block_timestamp.desc', 'limit':1})
-            response2 = requests.get(node2_url + "/cirrus/search/BlockApps-Mercata-Asset", headers=headers1, params={'order':'block_timestamp.desc', 'limit':1})
+            response2 = requests.get(node2_url + "/cirrus/search/BlockApps-Mercata-Asset", headers=headers2, params={'order':'block_timestamp.desc', 'limit':1})
 
             if response1.ok and response2.ok:
                 block_number1 = response1.json()[0]["block_number"]
