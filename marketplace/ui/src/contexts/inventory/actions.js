@@ -224,7 +224,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/inventory/user/inventories?gtField=quantity&gtValue=0&limit=${limit}&offset=${offset}${query}&isMint=true`,
+        `${apiUrl}/inventory/user/inventories?gtField=quantity&gtValue=0${query}&isMint=true`,
         {
           method: HTTP_METHODS.GET,
         }
