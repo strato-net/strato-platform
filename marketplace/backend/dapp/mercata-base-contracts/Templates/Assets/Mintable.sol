@@ -9,7 +9,7 @@ abstract contract Mintable is UTXO {
     uint public mintableMagicNumber = 0x4d696e7461626c65; // 'Mintable'
     // address public minterAddress;
     // string public minterCommonName;
-    // address public mintAddress;
+    address public mintAddress;
     bool public isMint;
     constructor(
         string _name,
