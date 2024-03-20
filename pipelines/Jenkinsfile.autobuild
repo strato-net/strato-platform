@@ -131,7 +131,7 @@ pipeline {
                 EXT_STORAGE_S3_SECRET_ACCESS_KEY='${DEV_EXT_STORAGE_S3_SECRET_ACCESS_KEY}' \\
                 EXT_STORAGE_S3_BUCKET='mercata-dev-tests' \\
                 ssl=true \\
-                HIGHWAY_URL=https://\$(</host):44300" \\
+                HIGHWAY_URL=https://\$(</host):44300 \\
                 ./highway
             """
           }
