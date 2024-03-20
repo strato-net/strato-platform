@@ -66,7 +66,7 @@ abstract contract Asset is Utils {
         files = _files;
         createdDate = _createdDate;
         quantity = _quantity;
-        initiliazeIssuer();
+        initiliazeIssuer(_quantity);
     }
 
     modifier requireOwner(string action) {
@@ -150,7 +150,7 @@ abstract contract Asset is Utils {
         close();
     }
 
-    function initiliazeIssuer() internal virtual{
+    function initiliazeIssuer(uint _quantity) internal virtual{
         try {
             assert(Asset(msg.sender).assetMagicNumber() == assetMagicNumber);
             originAddress = Asset(msg.sender).originAddress();
