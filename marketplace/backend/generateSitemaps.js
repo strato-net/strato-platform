@@ -1,6 +1,6 @@
 import { SitemapStream, streamToPromise } from 'sitemap';
 import { createWriteStream } from 'fs';
-import fetch from 'node-fetch';
+import axios from 'axios';
 
 let urls = [
    { url: "/", changefreq: "weekly", priority: 0.5 },
@@ -11,23 +11,21 @@ let urls = [
    { url: "/c/Collectibles?sc=Collectibles", changefreq: "weekly", priority: 0.5 },
    { url: "/c/Art?sc=Art", changefreq: "weekly", priority: 0.5 },
    { url: "/c/Membership?sc=Membership", changefreq: "weekly", priority: 0.5 },
-  //  { url: "/dp/:address/:name", changefreq: "weekly", priority: 0.5 },
    { url: "/checkout", changefreq: "weekly", priority: 0.5 },
-]
+];
 
-// change hostname
-const hostname = 'https://marketplace.mercata.blockapps.net'
+const hostname = 'https://marketplace.mercata.blockapps.net';
 const stream = new SitemapStream({ hostname });
-const marketplaceUrl = `${hostname}/api/v1/marketplace`
+const marketplaceUrl = `${hostname}/api/v1/marketplace`;
 
 async function fetchInventories() {
     try {
-        const response = await fetch(marketplaceUrl);
-        const res = await response.json();
-        res?.data.productsWithImageUrl?.forEach((item,index)=>{
-          urls.push({ url: `/dp/${item.address}/${item.name}`, changefreq: "weekly", priority: 0.9 })
+        const response = await axios.get(marketplaceUrl);
+        const res = response.data;
+        const data = res?.data.productsWithImageUrl?.map((item,index)=>{
+          return { url: `/dp/${item.address}/${item.name}`, changefreq: "weekly", priority: 0.9 };
         });
-        return res.data;
+        return data;
     } catch (error) {
         console.error("Error fetching inventories:", error);
         throw error; 
@@ -35,21 +33,26 @@ async function fetchInventories() {
 }
 
 async function generateSitemap() {
+  const writeStream = createWriteStream('sitemap.xml',{emitClose:true});
   try {
-    await fetchInventories();
-    urls.forEach(url => {
+    const data = await fetchInventories();
+
+    [...urls, ...data].forEach(url => {
       stream.write(url);
     });
+
+    
+    stream.pipe(writeStream);
+    await streamToPromise(stream);
     stream.end();
 
-    const writeStream = createWriteStream('sitemap.xml');
-    stream.pipe(writeStream);
-
-    await streamToPromise(stream);
+    stream.close();
     console.log('Sitemap generated successfully.');
   } catch (error) {
     console.error('Error generating sitemap:', error);
   }
 }
 
-generateSitemap();
+// Call generateSitemap function
+// generateSitemap();
+export default generateSitemap;
