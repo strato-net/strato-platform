@@ -18,6 +18,13 @@ abstract contract UTXO is Asset {
         _createdDate,
         _quantity
     ) {
+        try {
+            assert(UTXO(msg.sender).utxoMagicNumber() == utxoMagicNumber);
+            issuerAddress = UTXO(msg.sender).issuerAddress();
+        } catch {
+            issuerAddress = msg.sender;
+        }
+        issuerCommonName = getCommonName(issuerAddress);
     }
 
     function mint(uint _quantity) internal virtual returns (UTXO) {

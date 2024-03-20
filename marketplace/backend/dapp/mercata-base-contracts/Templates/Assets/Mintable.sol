@@ -7,9 +7,9 @@ import "../Enums/RestStatus.sol";
 
 abstract contract Mintable is UTXO {
     uint public mintableMagicNumber = 0x4d696e7461626c65; // 'Mintable'
-    address public minterAddress;
-    string public minterCommonName;
-    address public mintAddress;
+    // address public minterAddress;
+    // string public minterCommonName;
+    // address public mintAddress;
     bool public isMint;
     constructor(
         string _name,
@@ -28,15 +28,15 @@ abstract contract Mintable is UTXO {
     ) {
         try {
             assert(Mintable(msg.sender).mintableMagicNumber() == mintableMagicNumber);
-            minterAddress = Mintable(msg.sender).minterAddress();
+            issuerAddress = Mintable(msg.sender).issuerAddress();
             mintAddress = Mintable(msg.sender).mintAddress();
             isMint = false;
         } catch {
-            minterAddress = msg.sender;
+            issuerAddress = msg.sender;
             mintAddress = address(this);
             isMint = true;
         }
-        minterCommonName = getCommonName(minterAddress);
+        issuerCommonName = getCommonName(issuerAddress);
     }
 
     function mint(uint _quantity) internal virtual override returns (UTXO) {
@@ -46,7 +46,7 @@ abstract contract Mintable is UTXO {
 
     function mintNewUnits(uint _quantity) public returns (uint) {
         require(isMint, "Only the mint contract can mint new units");
-        require(getCommonName(msg.sender) == minterCommonName, "Only the minter can mint new units");
+        require(getCommonName(msg.sender) == issuerCommonName, "Only the minter can mint new units");
         emit OwnershipTransfer(
             originAddress,
             address(0),

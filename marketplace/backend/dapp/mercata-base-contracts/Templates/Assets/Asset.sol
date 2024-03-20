@@ -18,6 +18,11 @@ abstract contract Asset is Utils {
     uint public quantity;
     uint public itemNumber;
 
+    //adding issuer
+    address public issuerAddress;
+    string public issuerCommonName;
+    address public issuerAddress;
+
     address public sale;
 
     event OwnershipTransfer(
@@ -64,9 +69,11 @@ abstract contract Asset is Utils {
         try {
             assert(Asset(msg.sender).assetMagicNumber() == assetMagicNumber);
             originAddress = Asset(msg.sender).originAddress();
+            issuerAddress = Asset(msg.sender).issuerAddress();
             itemNumber = Asset(msg.sender).itemNumber();
         } catch {
             originAddress = address(this);
+            issuerAddress = msg.sender;
             itemNumber = 1;
             emit OwnershipTransfer(
                 originAddress,
@@ -78,6 +85,7 @@ abstract contract Asset is Utils {
                 itemNumber + _quantity - 1
             );
         }
+        issuerCommonName = getCommonName(issuerAddress);
     }
 
     modifier requireOwner(string action) {
