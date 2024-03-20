@@ -4,22 +4,26 @@ module Blockchain.Data.Util
   )
 where
 
-import Data.Bits
+import           Data.Bits
 import qualified Data.ByteString as B
-import Data.Word
 
 byteString2Integer :: B.ByteString
                    -> Integer
-byteString2Integer bs =
-  go 0
-     0
-     (B.length bs - 1)
-  where
-    go acc _           (-1) = acc
-    go acc shiftamount n    = go (acc + (fromIntegral (bs `B.index` n) `shiftL` shiftamount))
-                                 (shiftamount + 8)
-                                 (n - 1)
+                   -> Integer
+byteString2Integer bs
+                   acc = do
+  case B.uncons bs of
+    Nothing                 ->
+      acc
+    Just (byte,restofbytes) ->
+      let newacc = acc * 256 + fromIntegral byte
+        in byteString2Integer restofbytes
+                              newacc
 
-integer2Bytes :: Integer -> [Word8]
-integer2Bytes 0 = []
-integer2Bytes x = integer2Bytes (x `shiftR` 8) ++ [fromInteger (x .&. 255)]
+integer2Bytes :: Integer
+              -> B.ByteString
+integer2Bytes = B.pack . go []
+  where
+    go acc 0 = acc
+    go acc x = go (fromInteger (x .&. 255) : acc)
+                  (x `shiftR` 8)

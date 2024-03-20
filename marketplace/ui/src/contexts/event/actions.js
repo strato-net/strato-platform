@@ -66,12 +66,6 @@ const actions = {
         dispatch({ type: actionDescriptors.createEventFailed, error: "Error while creating Event" });
         actions.setMessage(dispatch, "Error while creating Event")
         return false;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.createEventFailed, 
-          error: "Unauthorized while creating Event" 
-        });
-        window.location.href = body.error.loginUrl;
       }
 
       dispatch({ type: actionDescriptors.createEventFailed, error: body.error });
@@ -101,13 +95,7 @@ const actions = {
         });
 
         return true;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchEventDetailsFailed, 
-          error: "Unauthorized while fetching Event" 
-        });
-        window.location.href = body.error.loginUrl;
-      }
+      } 
 
       dispatch({ type: actionDescriptors.fetchEventDetailsFailed, error: 'Error while fetching Event' });
       return false;
@@ -139,13 +127,7 @@ const actions = {
         return;
       } else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({ type: actionDescriptors.fetchEventFailed, error: "Error while fetching Event" });
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchEventFailed, 
-          error: "Unauthorized while fetching Event" 
-        });
-        window.location.href = body.error.loginUrl;
-      }
+      } 
 
       dispatch({ type: actionDescriptors.fetchEventFailed, error: body.error });
     } catch (err) {
@@ -176,13 +158,7 @@ const actions = {
           error: "Error while fetching certify events" 
         });
         actions.setMessage(dispatch, "Error while fetching certify events" )
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchCertifyEventFailed, 
-          error: "Unauthorized while fetching certify event" 
-        });
-        window.location.href = body.error.loginUrl;
-      }
+      } 
       dispatch({ 
         type: actionDescriptors.fetchCertifyEventFailed, 
         error: body.error 
@@ -217,12 +193,6 @@ const actions = {
           payload: body.data,
         });
         return;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchEventOfInventoryFailed, 
-          error: "Unauthorized while fetching event of inventory" 
-        });
-        window.location.href = body.error.loginUrl;
       }
       dispatch({ type: actionDescriptors.fetchEventOfInventoryFailed, error: undefined });
     } catch (err) {
@@ -250,13 +220,7 @@ const actions = {
           payload: body.data,
         });
         return;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchEventOfItemFailed, 
-          error: "Unauthorized while fetching event of item" 
-        });
-        window.location.href = body.error.loginUrl;
-      }
+      } 
       dispatch({ type: actionDescriptors.fetchEventOfItemFailed, error: undefined });
     } catch (err) {
       dispatch({ type: actionDescriptors.fetchEventOfItemFailed, error: undefined });
@@ -289,13 +253,7 @@ const actions = {
       }else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({ type: actionDescriptors.updateEventFailed, error: 'Error while updating certifier comment' });
         return false;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.updateEventFailed, 
-          error: "Unauthorized while updating certifier comment" 
-        });
-        window.location.href = body.error.loginUrl;
-      }
+      } 
 
       dispatch({ type: actionDescriptors.updateEventFailed, error: body.error });
       actions.setMessage(dispatch, body.error)
@@ -323,12 +281,6 @@ const actions = {
         });
 
         return true;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchEventAuditFailed, 
-          error: "Unauthorized while fetching audit" 
-        });
-        window.location.href = body.error.loginUrl;
       }
 
       dispatch({ type: actionDescriptors.fetchEventAuditFailed, error: 'Error while fetching audit' });

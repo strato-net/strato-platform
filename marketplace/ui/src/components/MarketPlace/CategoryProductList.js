@@ -34,6 +34,8 @@ import './index.css'
 import { actions as orderActions } from "../../contexts/order/actions"
 import { useOrderDispatch} from "../../contexts/order";
 import { debounce } from 'lodash';
+import HelmetComponent from "../Helmet/HelmetComponent";
+import { SEO } from "../../helpers/seoConstant";
 
 const { Panel } = Collapse;
 const { Text } = Typography;
@@ -120,10 +122,6 @@ const CategoryProductList = ({ user }) => {
     const url = baseUrl.pathname + baseUrl.search;
     navigate(url);
     setSelectedCategories(checkedValues);
-
-    if (checkedValues.length === 0) {
-      clearSelection();
-    }
   };
 
   useEffect(() => {
@@ -141,13 +139,11 @@ const CategoryProductList = ({ user }) => {
       setSubCategories(subCategorys);
     }
   }, [unSelected, subCategorys, selectedSubCategories, subCategories]);
-  
+
   useEffect(() => {
     let categorys = null;
-    if (selectedCategories.length) {
-      categorys = arrayToStr(selectedCategories);
-      subCategoryActions.fetchSubCategoryList(subCategoryDispatch, categorys);
-    }
+    categorys = arrayToStr(selectedCategories);
+    subCategoryActions.fetchSubCategoryList(subCategoryDispatch, categorys);
   }, [subCategoryDispatch, selectedCategories]);
 
   const onChangeSubCategory = (e) => {
@@ -252,6 +248,11 @@ const CategoryProductList = ({ user }) => {
   },[scrollPosition])
 
   //=========================Other functions===============================//
+  const linkUrl = window.location.href;
+  const metaTitle = selectedCategories.length === 1 ? `${selectedCategories[0]} | ${SEO.TITLE_META} ` : `${SEO.TITLE_META}`
+  const metaImg = selectedCategories.length === 1 ? `${selectedCategories[0]}` : `${SEO.IMAGE_META}`
+  const metaCategory = selectedCategories.length === 1 ? `?category=${selectedCategories[0]}` : '' 
+  const metaDescription = SEO.DESCRIPTION_META
 
   const clearSelection = () => {
     setSelectedSubCategories([]);
@@ -346,8 +347,6 @@ const CategoryProductList = ({ user }) => {
       }
     }
   };
-  
-  
 
   const openToast = (placement, isError, msg) => {
     let msgObj = {
@@ -418,7 +417,15 @@ const CategoryProductList = ({ user }) => {
       ghost="true"
       reverse={false}
       expandIcon={({ isActive }) =>
-        isActive ? <img src={Images.Dropdown} alt="img" style={{ width: "24px", height: "24px", transform: "rotate(180deg)" }} /> : <img src={Images.Dropdown} alt="img" style={{ width: "24px", height: "24px" }} />
+        isActive ? 
+        <img src={Images.Dropdown} 
+        alt={metaImg} 
+        title={metaImg} 
+        style={{ width: "24px", height: "24px", transform: "rotate(180deg)" }} /> : 
+        <img src={Images.Dropdown} 
+        alt={metaImg} 
+        title={metaImg} 
+        style={{ width: "24px", height: "24px" }} />
       }
     >
       {children}
@@ -559,13 +566,21 @@ const CategoryProductList = ({ user }) => {
   }
 
   return (
+    <>
+   <HelmetComponent 
+          title={metaTitle}
+          description={metaDescription} 
+          link={linkUrl} />
     <div className={`${mobileOpenFilter ? 'overflow-y-hidden h-[100vh] w-[100vw] bg-[#00000020] relative mt-0 md:bg-white md:mt-[auto] md:overflow-scroll trending_cards' : ' '}`}>
       <div className="fixed bg-white w-full top-7 z-10 md:static">
         {BreadCrumbComponent()}
 
         <div className="flex items-center justify-center ml-4 md:ml-14 mr-14 mt-6 lg:mt-8 gap-4">
           <div className="border border-solid border-[#6A6A6A] rounded-md cursor-pointer p-1 md:p-2" onClick={handleFilterClick}>
-            <img src={Images.filter} alt="filter" className=" w-5 h-5 md:w-6 md:h-6" />
+            <img src={Images.filter} 
+            alt={metaImg}
+            title={metaImg}
+            className=" w-5 h-5 md:w-6 md:h-6" />
           </div>
 
           <div className={`flex-1`}>
@@ -574,7 +589,11 @@ const CategoryProductList = ({ user }) => {
               onChange={(e) => { handleChangeSearch(e) }}
               onClick={handleSearchFocus}
               placeholder="Search Marketplace"
-              prefix={<img src={Images.Header_Search} alt="search" className="w-[18px] h-[18px]" />}
+              prefix={
+              <img src={Images.Header_Search} 
+              alt={metaImg} 
+              title={metaImg} 
+              className="w-[18px] h-[18px]" />}
               className="bg-[#F6F6F6] border-none rounded-3xl p-[10px]"
             />
           </div>
@@ -637,6 +656,7 @@ const CategoryProductList = ({ user }) => {
 
       {mobileOpenFilter && MobileFilterComponent()}
     </div>
+    </>
   );
 };
 

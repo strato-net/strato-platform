@@ -106,7 +106,7 @@ mockServer.on('connection', server => {
 
   server.on('SUBSCRIBE/GET_HEALTH', (data) => {
     setTimeout(() => {
-      server.emit('PRELOAD_HEALTH', false)
+      server.emit('PRELOAD_HEALTH', {})
     }, 1000);
   })
 
@@ -115,6 +115,13 @@ mockServer.on('connection', server => {
       server.emit('PRELOAD_NODE_UPTIME', 0)
     }, 1000);
   })
+
+  server.on('SUBSCRIBE/GET_NETWORK_HEALTH', (data) => {
+    setTimeout(() => {
+      server.emit('PRELOAD_NETWORK_HEALTH', true)
+    }, 1000);
+  })
+
   server.on('SUBSCRIBE/GET_SHARD_COUNT', (data) => {
     setTimeout(() => {
       server.emit('PRELOAD_GET_SHARD_COUNT', 0)

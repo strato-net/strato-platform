@@ -186,12 +186,6 @@ const actions = {
           type: actionDescriptors.fetchMarketplaceFailed,
           error: "Error while fetching marketplace products",
         });
-      } else if (response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({
-          type: actionDescriptors.fetchMarketplaceFailed,
-          error: "Unauthorized while fetching marketplace products"
-        });
-        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -256,12 +250,6 @@ const actions = {
           type: actionDescriptors.fetchMarketplaceLoggedInFailed,
           error: "Error while fetching marketplace products",
         });
-      } else if (response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({
-          type: actionDescriptors.fetchMarketplaceLoggedInFailed,
-          error: "Unauthorized while fetching marketplace products"
-        });
-        window.location.href = body.error.loginUrl;
       }
 
 
@@ -296,13 +284,7 @@ const actions = {
           payload: body.data,
         });
         return;
-      } else if (response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({
-          type: actionDescriptors.fetchTopSellingProductsFailed,
-          error: "Unauthorized while fetching topselling products"
-        });
-        window.location.href = body.error.loginUrl;
-      }
+      } 
       dispatch({
         type: actionDescriptors.fetchTopSellingProductsFailed,
         error: undefined,
@@ -334,13 +316,7 @@ const actions = {
           payload: body.data,
         });
         return;
-      } else if (response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({
-          type: actionDescriptors.fetchTopSellingProductsLoggedInFailed,
-          error: "Unauthorized while fetching topselling products"
-        });
-        window.location.href = body.error.loginUrl;
-      }
+      } 
       dispatch({
         type: actionDescriptors.fetchTopSellingProductsLoggedInFailed,
         error: undefined,
@@ -431,13 +407,7 @@ const actions = {
         });
         actions.setMessage(dispatch, "Error while getting Shipping address");
         return false;
-      } else if (response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({
-          type: actionDescriptors.fetchUserAddressFailed,
-          error: "Unauthorized while getting Shipping address"
-        });
-        window.location.href = body.error.loginUrl;
-      }
+      } 
       dispatch({
         type: actionDescriptors.fetchUserAddressFailed,
         error: body.error,
@@ -479,13 +449,7 @@ const actions = {
         });
         actions.setMessage(dispatch, "Error while getting Shipping address");
         return false;
-      } else if (response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({
-          type: actionDescriptors.fetchUserAddressesFailed,
-          error: "Unauthorized while getting Shipping address"
-        });
-        window.location.href = body.error.loginUrl;
-      }
+      } 
       dispatch({
         type: actionDescriptors.fetchUserAddressesFailed,
         error: body.error,

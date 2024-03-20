@@ -23,6 +23,7 @@ import { actions } from "../../contexts/marketplace/actions";
 import { actions as userActions } from "../../contexts/authentication/actions";
 import { useAuthenticateDispatch } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
+import { SEO } from "../../helpers/seoConstant";
 
 const { Header } = Layout;
 
@@ -246,6 +247,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     const value = e.target.value;
     navigateSearch(value)
   };
+  const IMG_META = SEO.TITLE_META
 
   return (
     <>
@@ -255,7 +257,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
             className="mt-4 mr-5 md:mt-0 cursor-pointer flex-grow-0 w-max md:w-[170px] h-[44px]"
             onClick={() => { navigate(routes.Marketplace.url) }}
           >
-            <img src={Images.newLogo} className="h-[31px] w-[120px] md:w-[170px] md:h-[44px]" preview={false} />
+            <img src={Images.newLogo} alt={IMG_META} title={IMG_META} className="h-[31px] w-[120px] md:w-[170px] md:h-[44px]" preview={false} />
           </div>
           <div className={`lg:ml-28 md:ml-1 flex-1 ${showSearch ? '-mt-[6px] fixed top-[13px] left-0 flex w-[100vw] z-50 mb-4' : 'hidden md:flex mb-10'}`}>
             <Input
@@ -265,7 +267,9 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
               // defaultValue={searchQueryValue}
               onChange={(e) => { handleChangeSearch(e) }}
               onPressEnter={(e) => { handleEnterSearch(e) }}
-              prefix={showSearch ? <ArrowLeftOutlined onClick={() => handleSearchShow(false)} /> : <img src={Images.Header_Search} className="w-[18px] h-[18px]" />}
+              prefix={showSearch 
+                ? <ArrowLeftOutlined onClick={() => handleSearchShow(false)} /> 
+                : <img src={Images.Header_Search} alt={IMG_META} title={IMG_META} className="w-[18px] h-[18px]" />}
               className="bg-[#F6F6F6] border-none rounded-[100px] md:!w-[35%] lg:w-[40%] absolute p-[10px] "
             />
           </div>
@@ -321,10 +325,10 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
         />
         <Space size="large" className="!gap-0 md:!gap-4 mr-0 -ml-3">
           {<div className="flex md:hidden mx-2" onClick={() => handleSearchShow(true)}>
-            <img src={Images.Responsive_search} className="w-6 h-6" />
+            <img src={Images.Responsive_search} alt={IMG_META} title={IMG_META} className="w-6 h-6" />
           </div>}
-          {roleIndex === undefined || roleIndex === 1 ? null : <Badge
-            className="cursor-pointer"
+          <Badge
+            className="cursor-pointer mr-3 md:mr-1"
             count={cartList.length}
             onClick={() => {
               TagManager.dataLayer({
@@ -337,16 +341,15 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
           >
             <div className="md:hidden">
               <Avatar
-                icon={<img src={Images.Responsive_cart} alt="" className="w-6 h-6" />}
+                icon={<img src={Images.Responsive_cart} alt={IMG_META} title={IMG_META} className="w-6 h-6" />}
               />
             </div>
             <div className="hidden md:inline-block">
               <Avatar
-                icon={<img src={Images.Header_cart} alt="" className="w-6 h-6" />}
+                icon={<img src={Images.Header_cart} alt={IMG_META} title={IMG_META} className="w-6 h-6" />}
               />
             </div>
           </Badge>
-          }
 
           {(roleIndex !== undefined && roleIndex !== 1)
             && <Dropdown menu={{ items: stratsItem }} placement="bottomRight" trigger={["hover","click"]} className="xs:mt-5 md:mt-0" overlayStyle={{ position: 'fixed' }}>
@@ -357,7 +360,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
               count={stratsBalance}
               overflowCount={9999999}
               >
-              <img src={Images.logo} className="w-[30px] h-[30px] " />
+              <img src={Images.logo} alt={IMG_META} title={IMG_META} className="w-[30px] h-[30px] " />
             </Badge>
               </a>
             </Dropdown>
@@ -377,14 +380,14 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
                 <Button size="large" className="flex sm:hidden bg-primary text-white w-[90%] !h-[25%] !text-sm justify-center items-center">Login/Register</Button>
               </a> : null
             ) :
-              <Dropdown menu={{ items }} placement="bottomRight" trigger={["click"]} overlayStyle={{ marginTop: "40px", position:'fixed' }}>
+              <Dropdown menu={{ items }} placement="bottomRight" trigger={["click"]} overlayStyle={{ marginTop: "40px", position: 'fixed' }}>
                 <a onClick={(e) => e.preventDefault()} className="hidden md:flex text-base text-white" id="user-dropdown">
-                  <img src={Images.Setting_icon} className="w-[30px] h-[30px] " />
+                  <img src={Images.Setting_icon} alt={IMG_META} title={IMG_META} className="w-[30px] h-[30px] " />
                 </a>
               </Dropdown>
           }
           {<div className="block md:hidden px-1" onClick={handleSubMenu}>
-            <img src={Images.menu_icon} alt="" className="w-6 h-6" />
+            <img src={Images.menu_icon} alt={IMG_META} title={IMG_META} className="w-6 h-6" />
           </div>}
         </Space>
       </Header>

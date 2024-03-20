@@ -14,9 +14,33 @@ BlockApps engineers - for more context, see [here](https://blockappsdev.slack.co
 All changes merged to `develop` should be documented in "Unreleased" until the version is finalized
 so that they could be properly moved to their respective version's subsection.
 
+## [Unreleased] 
+
+### Added
+- functionality to enumerate threads and their details in `/threads` endpoint of `P2PAPI`
+- `/peers` endpoint in `P2PAPI` to list peer connections and their health
+- POST `/transaction` contract creation calls will now additionally check for address state ref table entry before resolving
+
+### Changed
+- Optimized the byteString2Integer function that lies at the foundation of strato's RLP-related functionality (rlpDecode).
+- Optimized the integer2Bytes function that lies at the foundation of strato's RLP-related functionality (rlpEncode)
+
+### Fixed
+- `sendOutEvent` inconsistenly encoding code pointer hash
+- simplified p2p conduit code so that all threads handling a peer live or die together using the `async` library
+- Bugfix for slipstream regarding escaping quotes in contract name
+- Fixed bug in BlockApps.X509.Certificate that filled in empty orgUnit fields with a space, rather than the empty string
+- Fixed bug in Sequencer.hs that prevented nodes from syncing all the way after changes to the validator pool
+
+### Removed
+- Removed unnecessary stateDiff (and threading) in the vm-runner codebase, fixing numerous sources of persistent memory build-up.
+- Removed overcomplicated attempts at solving p2p thread issue (watchdogs, canaries, semaphore, threadmap, etc)
+- `bloc/v2.2/x509/createCert` is no more
+
+
 ## [11.1.0] - 3/7/2023
 
-#### Added
+### Added
 - Custom `Show` instances for `CodeCollection`, `Function`, `Contract` data types
 - Increase gas consumption for contract creation
 - `VM_DEBUGGER=bool` flag added for connecting to the VM debugger + static analysis websocket
@@ -26,8 +50,6 @@ so that they could be properly moved to their respective version's subsection.
 ### Changed 
 - When a transaction fails, the `<failed>` message blinks :^)
 - `keccak256` built-in function should return hex-encoded value instead of bytestring
-- Optimized the byteString2Integer function that lies at the foundation of strato's RLP-related functionality.
-- Removed unnecessary stateDiff (and threading) in the vm-runner codebase, fixing numerous sources of persistent memory build-up.
 
 ### Fixed
 - Mappings within a struct within a `(type => Struct)` mapping can be accessed
