@@ -66,26 +66,7 @@ abstract contract Asset is Utils {
         files = _files;
         createdDate = _createdDate;
         quantity = _quantity;
-        try {
-            assert(Asset(msg.sender).assetMagicNumber() == assetMagicNumber);
-            originAddress = Asset(msg.sender).originAddress();
-            issuerAddress = Asset(msg.sender).issuerAddress();
-            itemNumber = Asset(msg.sender).itemNumber();
-        } catch {
-            originAddress = address(this);
-            issuerAddress = msg.sender;
-            itemNumber = 1;
-            emit OwnershipTransfer(
-                originAddress,
-                address(0),
-                "",
-                owner,
-                ownerCommonName,
-                itemNumber,
-                itemNumber + _quantity - 1
-            );
-        }
-        issuerCommonName = getCommonName(issuerAddress);
+        initiliazeIssuer();
     }
 
     modifier requireOwner(string action) {
@@ -167,6 +148,29 @@ abstract contract Asset is Utils {
         owner = _newOwner;
         ownerCommonName = newOwnerCommonName;
         close();
+    }
+
+    function initiliazeIssuer() internal virtual{
+        try {
+            assert(Asset(msg.sender).assetMagicNumber() == assetMagicNumber);
+            originAddress = Asset(msg.sender).originAddress();
+            issuerAddress = Asset(msg.sender).issuerAddress();
+            itemNumber = Asset(msg.sender).itemNumber();
+        } catch {
+            originAddress = address(this);
+            issuerAddress = msg.sender;
+            itemNumber = 1;
+            emit OwnershipTransfer(
+                originAddress,
+                address(0),
+                "",
+                owner,
+                ownerCommonName,
+                itemNumber,
+                itemNumber + _quantity - 1
+            );
+        }
+        issuerCommonName = getCommonName(issuerAddress);
     }
     
     function transferOwnership(address _newOwner, uint _quantity, bool _isUserTransfer, uint _transferNumber) public fromSale("transfer ownership") {

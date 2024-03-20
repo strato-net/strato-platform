@@ -26,17 +26,7 @@ abstract contract Mintable is UTXO {
         _createdDate,
         _quantity
     ) {
-        try {
-            assert(Mintable(msg.sender).mintableMagicNumber() == mintableMagicNumber);
-            issuerAddress = Mintable(msg.sender).issuerAddress();
-            mintAddress = Mintable(msg.sender).mintAddress();
-            isMint = false;
-        } catch {
-            issuerAddress = msg.sender;
-            mintAddress = address(this);
-            isMint = true;
-        }
-        issuerCommonName = getCommonName(issuerAddress);
+        initiliazeIssuer();
     }
 
     function mint(uint _quantity) internal virtual override returns (UTXO) {
@@ -68,5 +58,19 @@ abstract contract Mintable is UTXO {
     
     function checkCondition() internal virtual override returns (bool){
         return true;   
+    }
+
+    function initiliazeIssuer() internal override{
+        try {
+            assert(Mintable(msg.sender).mintableMagicNumber() == mintableMagicNumber);
+            issuerAddress = Mintable(msg.sender).issuerAddress();
+            mintAddress = Mintable(msg.sender).mintAddress();
+            isMint = false;
+        } catch {
+            issuerAddress = msg.sender;
+            mintAddress = address(this);
+            isMint = true;
+        }
+        issuerCommonName = getCommonName(issuerAddress);
     }
 }
