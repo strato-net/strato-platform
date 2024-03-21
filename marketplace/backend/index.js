@@ -73,7 +73,7 @@ let server
     swaggerUi.setup(swaggerSpecs)
   );
 
-  cronFunc()
+  // cronFunc()
 })();
 
 export default server;

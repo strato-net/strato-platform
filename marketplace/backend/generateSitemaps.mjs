@@ -3,15 +3,15 @@ import { createWriteStream } from 'fs';
 import axios from 'axios';
 
 let urls = [
-   { url: "/", changefreq: "weekly", priority: 0.5 },
-   { url: "/c/all", changefreq: "weekly", priority: 0.5 },
-   { url: "/c/Carbon?sc=CarbonOffset%2CCarbonDAO", changefreq: "weekly", priority: 0.5 },
-   { url: "/c/Metals?sc=Metals", changefreq: "weekly", priority: 0.5 },
-   { url: "/c/Clothing?sc=Clothing", changefreq: "weekly", priority: 0.5 },
-   { url: "/c/Collectibles?sc=Collectibles", changefreq: "weekly", priority: 0.5 },
-   { url: "/c/Art?sc=Art", changefreq: "weekly", priority: 0.5 },
-   { url: "/c/Membership?sc=Membership", changefreq: "weekly", priority: 0.5 },
-   { url: "/checkout", changefreq: "weekly", priority: 0.5 },
+   { url: "/", changefreq: "daily", priority: 0.5, lastmod:Date.now() },
+   { url: "/c/all", changefreq: "daily", priority: 0.5, lastmod:Date.now() },
+   { url: "/c/Carbon?sc=CarbonOffset%2CCarbonDAO", changefreq: "daily", priority: 0.5, lastmod:Date.now() },
+   { url: "/c/Metals?sc=Metals", changefreq: "daily", priority: 0.5, lastmod:Date.now() },
+   { url: "/c/Clothing?sc=Clothing", changefreq: "daily", priority: 0.5, lastmod:Date.now() },
+   { url: "/c/Collectibles?sc=Collectibles", changefreq: "daily", priority: 0.5, lastmod:Date.now() },
+   { url: "/c/Art?sc=Art", changefreq: "daily", priority: 0.5, lastmod:Date.now() },
+   { url: "/c/Membership?sc=Membership", changefreq: "daily", priority: 0.5, lastmod:Date.now() },
+   { url: "/checkout", changefreq: "daily", priority: 0.5, lastmod:Date.now() },
 ];
 
 const hostname = 'https://marketplace.mercata.blockapps.net';
@@ -23,7 +23,7 @@ async function fetchInventories() {
         const response = await axios.get(marketplaceUrl);
         const res = response.data;
         const data = res?.data.productsWithImageUrl?.map((item,index)=>{
-          return { url: `/dp/${item.address}/${item.name}`, changefreq: "weekly", priority: 0.9 };
+          return { url: `/dp/${item.address}/${item.name}`, changefreq: "daily", priority: 0.5, lastmod: Date.now() };
         });
         return data;
     } catch (error) {
