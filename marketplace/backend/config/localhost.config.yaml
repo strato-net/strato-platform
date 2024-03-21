@@ -8,7 +8,7 @@ serverIP:
 bootMembersFilename: boot_members.yaml
 cacheNonce: true
 dockerized: false
-marketplaceUiUrlPrefix: "/marketplace"
+marketplaceUiUrlPrefix: "/"
 
 nodes:
   - id: 0
