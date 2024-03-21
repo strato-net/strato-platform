@@ -357,11 +357,6 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
       realIG = fromIntegral intrinsicGas'
       maxGas = fromIntegral (maxBound :: Int)
 
-  unless flags_gasOn $ do
-    $logInfoS "addTx" . T.pack $ "gas is off, so I'm giving the account enough balance for this TX"
-    faucetSuccess <- lift $ addToBalance tAcct txCost
-    unless faucetSuccess $ error "failed to give balance to a gasOff account"
-
   (acctBalance, acctNonce) <-
     lift $
       (addressStateBalance &&& addressStateNonce)
@@ -377,6 +372,7 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
   when (txSize >= flags_txSizeLimit)
     . throwE
     $ TFTXSizeLimitExceeded txSize flags_txSizeLimit t
+  when (otHash t `S.member` knownFailedTxs) . throwE $ TFKnownFailedTX t
 
   let availableGas = transactionGasLimit bt - fromIntegral intrinsicGas'
 
@@ -384,7 +380,10 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
 
   success <- lift $ addToBalance tAcct (-transactionGasLimit bt * transactionGasPrice bt)
 
-  when (otHash t `S.member` knownFailedTxs) . throwE $ TFKnownFailedTX t
+  unless flags_gasOn $ do
+    $logInfoS "addTx" . T.pack $ "gas is off, so I'm giving the account enough balance for this TX"
+    faucetSuccess <- lift $ addToBalance tAcct txCost
+    unless faucetSuccess $ error "failed to give balance to a gasOff account"
 
   when flags_debug $ $logDebugS "addTx" "running code"
   let txTypeCounter = if isContractCreationTX bt then vmTxsCreation else vmTxsCall
