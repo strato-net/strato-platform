@@ -270,8 +270,7 @@ blockstanbulSend' msg = do
         bs -> error $ "can send at most 1 block at a time: " ++ show bs
   for_ resp $ \case
     ResetTimer rn -> createNewTimer rn
-    FailedHistoric blk ->
-      for_ (ingestBlockToSequencedBlock $ blockToIngestBlock TO.Blockstanbul blk) appendChildFailure
+    FailedHistoric blk -> A.delete (Proxy @DependentBlockEntry) (blockHash blk) -- First time using `delete`
     _ -> pure ()
   $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ format (map blockHash blocks)
 
