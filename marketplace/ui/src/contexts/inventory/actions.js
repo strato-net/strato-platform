@@ -217,7 +217,7 @@ const actions = {
     }
   },
 
-  fetchInventoryForUser: async (dispatch, limit, offset, queryValue) => {
+  fetchInventoryForUser: async (dispatch, queryValue) => {
     const query = queryValue ? `&ownerCommonName=${encodeURIComponent(queryValue)}` : ``;
 
     dispatch({ type: actionDescriptors.fetchInventoryForUser });
