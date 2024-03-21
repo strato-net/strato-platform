@@ -33,7 +33,7 @@ async function fetchInventories() {
 }
 
 async function generateSitemap() {
-  const writeStream = createWriteStream('sitemap.xml',{emitClose:true});
+  const writeStream = createWriteStream('../ui/public/sitemap.xml');
   try {
     const data = await fetchInventories();
 
@@ -41,12 +41,10 @@ async function generateSitemap() {
       stream.write(url);
     });
 
-    
+    stream.end();
     stream.pipe(writeStream);
     await streamToPromise(stream);
-    stream.end();
 
-    stream.close();
     console.log('Sitemap generated successfully.');
   } catch (error) {
     console.error('Error generating sitemap:', error);

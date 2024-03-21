@@ -27,6 +27,7 @@ const Sitemap = () => {
   useEffect(()=>{
     fetchData(marketplaceUrl)
     .then(data => {
+      console.log("Fetched data:");
     })
     .catch(error => console.error("Error:", error));
   },[])
@@ -37,7 +38,7 @@ const Sitemap = () => {
       <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
         ${[...SEO.SEO_ROUTES, ...data].map(route => (
           `<url>
-            <loc>${route.url}</loc>
+            <loc>${route.url}</loc> 
             <lastmod>${new Date().toISOString()}</lastmod>
             <changefreq>${route.changefreq}</changefreq>
             <priority>${route.priority}</priority>
