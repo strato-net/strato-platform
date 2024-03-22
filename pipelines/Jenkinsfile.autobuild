@@ -132,6 +132,7 @@ pipeline {
                 EXT_STORAGE_S3_BUCKET='mercata-dev-tests' \\
                 ssl=true \\
                 HIGHWAY_URL=https://\$(</host):44300 \\
+                HTTPS_PORT=44300 \\
                 ./highway
             """
           }
@@ -150,6 +151,7 @@ pipeline {
                 STRIPE_PUBLISHABLE_KEY='${STRIPE_PUBLISHABLE_KEY_TESTNET2}' \\
                 STRIPE_SECRET_KEY='${STRIPE_SECRET_KEY_TESTNET2}' \\
                 ssl=true \\
+                HTTPS_PORT=44301 \\
                 ./stripe-ps
             """
           }
@@ -167,6 +169,7 @@ pipeline {
               ssl=true \\
               VAULT_URL=https://\$(</host):8093 \\
               SENDGRID_APIKEY='${SENDGRID_APIKEY_TESTNET2}' \\
+              HTTPS_PORT=8001 \\
               ./identity
           """
           }
