@@ -24,6 +24,7 @@ so that they could be properly moved to their respective version's subsection.
 ### Changed
 - Optimized the byteString2Integer function that lies at the foundation of strato's RLP-related functionality (rlpDecode).
 - Optimized the integer2Bytes function that lies at the foundation of strato's RLP-related functionality (rlpEncode)
+- "DAO Fork" for mercata-hydrogen because buggy block got added to canonical blockchain
 
 ### Fixed
 - `sendOutEvent` inconsistenly encoding code pointer hash

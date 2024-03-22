@@ -64,6 +64,7 @@ import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.Options (computeNetworkID)
 import qualified Blockchain.Strato.StateDiff as SD
 import Blockchain.TheDAOFork
 import Blockchain.Timing
@@ -226,7 +227,8 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
             Just cr -> $logDebugS "addBlock" $ T.pack $ "New chain root after inserting header: " ++ format cr
 
         bSum <- setParentStateRoot b
-        when (False && blockDataNumber bd == 1920000) runTheDAOFork -- TODO: Only run this if connected to Ethereum publicnet (i.e. never)
+        -- TODO: PLEASE REMOVE THIS FORK WHEN MERCATA-HYDROGEN IS OBSOLETE
+        when (computeNetworkID == 7596898649924658542 && blockDataNumber bd == 32624) runTheDAOFork -- Only run this if connected to mercata-hydrogen
         addBlockTransactions b
 
         postRewardSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
