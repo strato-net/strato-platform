@@ -44,15 +44,6 @@ const App = () => {
     delete_cookie("returnUrl");
   }
 
-  // useEffect if path is empty then redirect to home without using navigate
-  // This is needed for non dockerized version to redirect to marketplace after login and anon access
-  // not required now as we are using this route "/" fro home page
-  // useEffect(() => {
-  //   if (window.location.pathname === "/") {
-  //     window.location.href = "/";
-  //   }
-  // }, []);
-
   useEffect(() => {
     const referrer = document.referrer;
     const specificReferralURL = "https://mercatacarbon.com/";

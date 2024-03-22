@@ -14,7 +14,6 @@ import {
 import { CloseOutlined, DeleteOutlined } from "@ant-design/icons";
 // Actions
 import { actions as categoryActions } from "../../contexts/category/actions";
-// import { actions as subCategoryActions } from "../../contexts/subCategory/actions";
 import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
 import { actions as orderActions } from "../../contexts/order/actions"
 // Dispatch and states
@@ -128,10 +127,6 @@ const CategoryProductList = ({ user }) => {
     // are found within unSelectedSubCat, the "Carbon" category is also deselected.
     if(unSelectedSubCat.includes("CarbonDAO") && unSelectedSubCat.includes("CarbonOffset")){
       let baseUrl = new URL(`/c/All`, window.location.origin);
-
-      // if (searchQueryValue) {
-      //   baseUrl.searchParams.set('s', searchQueryValue);
-      // }
 
       const url = baseUrl.pathname + baseUrl.search;
       setUnSelected([])
