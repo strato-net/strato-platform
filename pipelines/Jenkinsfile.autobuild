@@ -196,7 +196,7 @@ pipeline {
                 certInfo='{"orgName":"BlockApps","orgUnit":"Engineering","commonName":"Test"}' \\
                 STRIPE_PAYMENT_SERVER_URL='https://\$(</host):44301' \\
                 FILE_SERVER_URL='https://\$(</host):44300/highway' \\
-                idServerUrl='https://\$(</host):8001' \\                
+                idServerUrl='https://\$(</host):8001' \\
                 GLOBAL_ADMIN_NAME='${GLOBAL_ADMIN_NAME}' \\
                 GLOBAL_ADMIN_PASSWORD='${GLOBAL_ADMIN_PASSWORD}' \\
                 MP_IS_BOOTNODE='true' \\
