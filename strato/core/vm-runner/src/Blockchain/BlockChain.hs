@@ -38,7 +38,6 @@ import Blockchain.DB.ChainDB
 import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
 import Blockchain.DB.MemAddressStateDB
-import Blockchain.DB.ModifyStateDB
 import Blockchain.DB.RawStorageDB
 import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
@@ -353,8 +352,7 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
     $logDebugS "addTx" . T.pack $ "transaction cost: " ++ show gTX
     $logDebugS "addTx" . T.pack $ "intrinsicGas: " ++ show intrinsicGas'
 
-  let txCost = transactionGasLimit bt * transactionGasPrice bt + transactionValue bt
-      realIG = fromIntegral intrinsicGas'
+  let realIG = fromIntegral intrinsicGas'
       maxGas = fromIntegral (maxBound :: Int)
 
   (acctBalance, acctNonce) <-
@@ -363,7 +361,7 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
         <$> A.lookupWithDefault (Proxy @AddressState) tAcct
 
   when (chainId /= txChainId bt) $ throwE $ TFChainIdMismatch chainId (txChainId bt) t
-  when (txCost > acctBalance) $ throwE $ TFInsufficientFunds txCost acctBalance t
+  when (transactionValue bt > acctBalance) $ throwE $ TFInsufficientFunds (transactionValue bt) acctBalance t
   when (realIG > transactionGasLimit bt) $ throwE $ TFIntrinsicGasExceedsTxLimit realIG (transactionGasLimit bt) t
   when (transactionGasLimit bt > min remainingBlockGas maxGas) $ throwE $ TFBlockGasLimitExceeded (transactionGasLimit bt) remainingBlockGas t
   unless nonceValid $ throwE $ TFNonceMismatch (transactionNonce bt) acctNonce t
@@ -374,52 +372,26 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
     $ TFTXSizeLimitExceeded txSize flags_txSizeLimit t
   when (otHash t `S.member` knownFailedTxs) . throwE $ TFKnownFailedTX t
 
-  let availableGas = transactionGasLimit bt - fromIntegral intrinsicGas'
-
   lift $ incrementNonce tAcct
-
-  success <- lift $ addToBalance tAcct (-transactionGasLimit bt * transactionGasPrice bt)
-
-  unless flags_gasOn $ do
-    $logInfoS "addTx" . T.pack $ "gas is off, so I'm giving the account enough balance for this TX"
-    faucetSuccess <- lift $ addToBalance tAcct txCost
-    unless faucetSuccess $ error "failed to give balance to a gasOff account"
 
   when flags_debug $ $logDebugS "addTx" "running code"
   let txTypeCounter = if isContractCreationTX bt then vmTxsCreation else vmTxsCall
-  -- coinbaseAcct = Account (blockDataCoinbase b) chainId
   lift $ P.incCounter txTypeCounter
-  if success --this should handle exceptions,shouldnt it?
-    then do
-      execResults <- runCodeForTransaction isRunningTests' isHomestead b (fromInteger (transactionGasLimit bt) - intrinsicGas') tAcct t
-      -- s1 <- lift $ addToBalance coinbaseAcct (transactionGasLimit bt * transactionGasPrice bt)
-      -- unless s1 $ error "addToBalance failed even after a check in addBlock"
-      lift $ P.incCounter vmTxsProcessed
 
-      -- success' <- lift $ pay "VM refund fees" coinbaseAcct tAcct (calculateReturned bt execResults * transactionGasPrice bt)
-      -- unless success' $ error "oops, refund was too much"
+  execResults <- runCodeForTransaction isRunningTests' isHomestead b (fromInteger (transactionGasLimit bt) - intrinsicGas') tAcct t
+  lift $ P.incCounter vmTxsProcessed
 
-      case erException execResults of
-        Just e -> do
-          when flags_debug $ $logDebugS "addTx" . T.pack . CL.red $ show e
-          lift $ P.incCounter vmTxsUnsuccessful
-        Nothing -> do
-          when flags_debug $ $logDebugS "addTx" . T.pack $ "Removing accounts in suicideList: " ++ intercalate ", " (format <$> S.toList (erSuicideList execResults))
-          forM_ (S.toList $ erSuicideList execResults) $ \address' -> do
-            lift $ purgeStorageMap address'
-            lift $ A.delete (Proxy @AddressState) address'
-          lift $ P.incCounter vmTxsSuccessful
-      return execResults
-    else do
-      -- s1 <- lift $ addToBalance coinbaseAcct (fromIntegral intrinsicGas' * transactionGasPrice bt)
-      -- unless s1 $ error "addToBalance failed even after a check in addTransaction"
-      balance <-
-        lift $
-          addressStateBalance
-            <$> A.lookupWithDefault (Proxy @AddressState) tAcct
-      $logInfoS "addTransaction/success=false" . T.pack $ "Insufficient funds to run the VM: need " ++ show (availableGas * transactionGasPrice bt) ++ ", have " ++ show balance
-      return $
-        evmErrorResults (transactionGasLimit bt) Blockchain.VM.VMException.InsufficientFunds
+  case erException execResults of
+    Just e -> do
+      when flags_debug $ $logDebugS "addTx" . T.pack . CL.red $ show e
+      lift $ P.incCounter vmTxsUnsuccessful
+    Nothing -> do
+      when flags_debug $ $logDebugS "addTx" . T.pack $ "Removing accounts in suicideList: " ++ intercalate ", " (format <$> S.toList (erSuicideList execResults))
+      forM_ (S.toList $ erSuicideList execResults) $ \address' -> do
+        lift $ purgeStorageMap address'
+        lift $ A.delete (Proxy @AddressState) address'
+      lift $ P.incCounter vmTxsSuccessful
+  return execResults
 
 runCodeForTransaction ::
   (VMBase m) =>

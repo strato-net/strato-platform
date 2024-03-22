@@ -2,7 +2,6 @@
 
 module Bloc.Client
   ( getGitInfo,
-    postUsersFill,
     getContracts,
     postContractsBatchSeries,
     getContractsData,
@@ -42,10 +41,6 @@ import SolidVM.Model.CodeCollection.Contract
 
 getGitInfo :: ClientM GitInfo
 getGitInfo = client (Proxy @GetGitInfo)
-
-------------- /users endpoints -------------
-postUsersFill :: JwtToken -> Address -> Bool -> ClientM BlocTransactionResult
-postUsersFill = client (Proxy @PostUsersFill)
 
 ------------- /contracts endpoints -------------
 getContracts ::

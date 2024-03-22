@@ -218,7 +218,6 @@ function newnode {
     --debugWSHost=${debugWSHost:-strato} \
     --debugWSPort=${debugWSPort:-8052} \
     --diffPublish=${diffPublish:-true} \
-    --gasOn=${gasOn:-true} \
     --maxTxsPerBlock=${maxTxsPerBlock:-500} \
     --minLogLevel=${vmMinLogLevel} \
     --networkID=${networkID:--1} \
@@ -238,7 +237,6 @@ function newnode {
   # Leave the +RTS -N1, it is important
   echo "Starting strato-api"
   runBackgroundProcess strato-api \
-    --gasOn=${gasOn:-true} \
     --minLogLevel=$apiDebugMode \
     --networkID=${networkID:--1} \
     --vaultUrl=${VAULT_URL} \
