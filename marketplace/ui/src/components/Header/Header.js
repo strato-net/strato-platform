@@ -288,8 +288,8 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
       );
      try {
       fetchFunction.then(res=>res.json().then(res=>{
-        const arr = res.data.productsWithImageUrl.map(item=>{
-          return getCategoryName(item.contract_name)})
+        const arr = res.data.productsWithImageUrl.map(item=>
+          getCategoryName(item.contract_name))
         const unique = [...new Set(arr)];
         if(arr.length>0){
           const isCarbonIncludes = (item) => item.includes('Carbon')
@@ -498,11 +498,9 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
       {showMenu &&
         <div>
           <div className="bg-white border-t border-[#E9E9E9] absolute w-full z-50 md:hidden top-16">
-            {subMenuItems.map((item) => {
-              return (
+            {subMenuItems.map((item) => 
                 <Typography onClick={() => handleIntMenuTab(item)} className={`text-base py-3 px-4 cursor-pointer ${item ? '' : 'hidden'}`} >{item?.label}</Typography>
-              )
-            })}
+             )}
           </div>
           <div className="h-[100vh] w-full bg-[#00000020] absolute top-0 md:hidden z-40" onClick={handleMenuTab}></div>
         </div>
