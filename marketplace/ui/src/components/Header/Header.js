@@ -321,8 +321,9 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     if(selectedCateg && selectedCateg!=='All'){
       const subCat = categorys.find((item)=>item.name===selectedCateg)
       ?.subCategories.map(item=>item.contract).join(',')
-
-      baseUrl.searchParams.set('sc', subCat);
+      if(subCat){
+        baseUrl.searchParams.set('sc', subCat);
+      }
     }
     if (value.length > 0) {
       baseUrl.searchParams.set('s', value);
