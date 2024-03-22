@@ -25,7 +25,6 @@ import {
 import { actions } from "../../contexts/marketplace/actions";
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { actions as userActions } from "../../contexts/authentication/actions";
-import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
 import { useAuthenticateDispatch, useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
 import { SEO } from "../../helpers/seoConstant";
@@ -37,7 +36,7 @@ const { Header } = Layout;
 const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTab }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  // const { category } = useParams();
+  const IMG_META = SEO.TITLE_META
   const inputRef = useRef(null);
   
   const getCategoryFromURL = () => {
@@ -52,16 +51,15 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const categoryQueryValue = getCategoryFromURL()
 
   const queryParams = new URLSearchParams(location.search);
-  // const categoryQueryValue = queryParams.get('c') || 'All';
   const searchQueryValue = queryParams.get('s') || '';
-  const subCategoryQueryValue = queryParams.get('sc');
-  const isSearch = searchQueryValue ? true : false;
+  //Dispatch
   const marketplaceDispatch = useMarketplaceDispatch();
   const categoryDispatch = useCategoryDispatch();
   const userDispatch = useAuthenticateDispatch();
+  //States
   const { cartList, strats } = useMarketplaceState();
   const { categorys } = useCategoryState();
-  let { hasChecked, isAuthenticated } = useAuthenticateState();
+  let { isAuthenticated } = useAuthenticateState();
 
   const storedData = useMemo(() => {
     return window.localStorage.getItem("cartList") == null ? [] : JSON.parse(window.localStorage.getItem("cartList"));
@@ -83,13 +81,11 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const [showSearch, setShowSearch] = useState(false);
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(categoryQueryValue);
-  const [selectedSubCategory, setSelectedSubCategory] = useState(subCategoryQueryValue);
 
   const stratsBalance = (Object.keys(strats).length > 0) ? strats : 0
 
   useEffect(()=>{
     setSelectedCategory(categoryQueryValue)
-    // setSearchText(searchQueryValue)
   },[categoryQueryValue])
 
   const navItems = [
@@ -110,7 +106,6 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   ];
 
   const navUrls = [
-    // routes.MarketplaceCategoryProductList.url,
     routes.Orders.url.replace(':type', 'sold'),
     routes.MyStore.url,
     routes.Products.url,
@@ -231,7 +226,6 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   }, [user])
 
   const subMenuItems = [
-    // { value: "marketplace", path: routes.MarketplaceCategoryProductList.url, label: "Marketplace" },
     { value: "orders", path: routes.Orders.url.replace(':type', 'sold'), label: "Orders" },
     { value: "mystore", path: "/mystore", label: "My Store" },
     user ? {
@@ -275,6 +269,15 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     }
   }
 
+  const handleNavigateRoute = (category,value) =>{
+   if(category !== 'All'){
+    handleCategoryChange(category)
+   }  
+
+   setSelectedCategory('Carbon')
+   navigateSearch(category, value)
+  }
+
   const checkCategory = (value) => {
     const searchQuery = `&queryValue=${value}&queryFields=name`
     
@@ -294,27 +297,18 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
         if(arr.length>0){
           const isCarbonIncludes = (item) => item.includes('Carbon')
           const isCarbon = unique.every(isCarbonIncludes)
-        if(unique.length==1 || isCarbon){
-          const category = getCategoryName(unique[0])
-          if(category.includes('Carbon')){
-          handleCategoryChange('Carbon')
-          setSelectedCategory('Carbon')
-          navigateSearch('Carbon',value)
+
+          if(unique.length==1 || isCarbon){
+            const category = getCategoryName(unique[0])
+            const cat = isCarbon?'Carbon':category
+            handleNavigateRoute(cat,value)
+          }else{
+              handleNavigateRoute('All',value)
+          }
+          
         }else{
-          handleCategoryChange(category)
-          setSelectedCategory(category)
-          navigateSearch(category,value)
+          handleNavigateRoute('All',value)
         }
-        }else{
-          setSelectedCategory('All')
-          setSelectedSubCategory("")
-          navigateSearch("All",value)
-        }
-      }else{
-        setSelectedCategory('All')
-        setSelectedSubCategory("")
-        navigateSearch("All",value)
-      }
       }))    
      } catch (error) {
       console.log("err",error)
@@ -324,13 +318,10 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const navigateSearch = (selectedCateg, value) => {
     const baseUrl = new URL(`/c/${selectedCateg}`, window.location.origin);
     
-    // if (selectedCateg && selectedCateg!='all') {
-    //   baseUrl.searchParams.set('c', selectedCateg);
-    // }
-    if(selectedCateg && selectedCateg!='all'){
+    if(selectedCateg && selectedCateg!=='All'){
       const subCat = categorys.find((item)=>item.name===selectedCateg)
       ?.subCategories.map(item=>item.contract).join(',')
-      setSelectedSubCategory(subCat)
+
       baseUrl.searchParams.set('sc', subCat);
     }
     if (value.length > 0) {
@@ -350,22 +341,16 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
 
   const handleEnterSearch = (e) => {
     const value = e.target.value;
-    // navigateSearch(value)
     checkCategory(value)
   };
-  const IMG_META = SEO.TITLE_META
 
   const handleCategoryChange = (cat) => {
     setSelectedCategory(cat)
-    const subCat = categorys.find((item)=>item.name===cat)
-    ?.subCategories.map(item=>item.contract).join(',')
-
-    setSelectedSubCategory(subCat)
     navigateSearch(cat,"")
     inputRef.current.focus();
     inputRef.current.select();
   }
-// const baseUrl = new URL('/marketplace', window.location.origin);
+
   return (
     <>
       <Header className={`fixed z-[100] !bg-[#ffffff] !pl-2 w-full !pr-4 md:px-12 flex md:!mb-10 ${showMenu ? '' : 'shadow-header'} items-center justify-between md:justify-start`}>
@@ -398,7 +383,6 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
               suffix={showSearch 
                 ? <ArrowLeftOutlined onClick={() => handleSearchShow(false)} /> 
                 : <img src={Images.Header_Search} alt={IMG_META} title={IMG_META} className="w-[18px] h-[18px]" />}
-              // className="bg-[#F6F6F6] border-none rounded-[100px] md:!w-[35%] lg:w-[40%] absolute p-[10px] "
               className="bg-[#F6F6F6] border-none outline-none"
             />
           </Col>
@@ -412,13 +396,6 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
           onClick={(item) => {
             setSelectedTab(item.key)
             // These pages will be tracked automatically with lucky orange, no need to create an event here unluess we want to include additional metadata
-            // if (item.key === "0") {
-            //   TagManager.dataLayer({
-            //     dataLayer: {
-            //       event: 'view_marketplace_page',
-            //     },
-            //   });
-            // }
             if (item.key === "0") {
               TagManager.dataLayer({
                 dataLayer: {

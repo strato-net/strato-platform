@@ -5,14 +5,14 @@ export const SEO = {
     metals, art, collectibles, and clothing.`,
   IMAGE_META: `STRATO Mercata Marketplace Banner`,
   SEO_ROUTES:[
-    { url: "/", changefreq: "daily", priority: 0.5, lastmod:Date.now() },
-    { url: "/c/all", changefreq: "daily", priority: 0.5, lastmod:Date.now() },
-    { url: "/c/Carbon?sc=CarbonOffset%2CCarbonDAO", changefreq: "daily", priority: 0.5, lastmod:Date.now() },
-    { url: "/c/Metals?sc=Metals", changefreq: "daily", priority: 0.5, lastmod:Date.now() },
-    { url: "/c/Clothing?sc=Clothing", changefreq: "daily", priority: 0.5, lastmod:Date.now() },
-    { url: "/c/Collectibles?sc=Collectibles", changefreq: "daily", priority: 0.5, lastmod:Date.now() },
-    { url: "/c/Art?sc=Art", changefreq: "daily", priority: 0.5, lastmod:Date.now() },
-    { url: "/c/Membership?sc=Membership", changefreq: "daily", priority: 0.5, lastmod:Date.now() },
-    { url: "/checkout", changefreq: "daily", priority: 0.5, lastmod:Date.now() },
+    "/",
+    "/c/all",
+    "/c/Carbon?sc=CarbonOffset%2CCarbonDAO",
+    "/c/Metals?sc=Metals",
+    "/c/Clothing?sc=Clothing",
+    "/c/Collectibles?sc=Collectibles",
+    "/c/Art?sc=Art",
+    "/c/Membership?sc=Membership",
+    "/checkout",
   ]
 }
