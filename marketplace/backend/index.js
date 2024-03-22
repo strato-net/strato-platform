@@ -16,7 +16,6 @@ import swaggerSpecs from "./swaggerspecs";
 import dotenv from "dotenv";
 import websocket from "./websocket";
 import axios from "axios";
-import cronFunc from "./cron";
 
 let server
 (async () => {
@@ -73,7 +72,6 @@ let server
     swaggerUi.setup(swaggerSpecs)
   );
 
-  cronFunc()
 })();
 
 export default server;
