@@ -6,7 +6,7 @@ const myTask = () => {
     generateSitemap()
 };
 
-const cronJob = cron.schedule('0 0 */5 * *', myTask);
+const cronJob = cron.schedule('0 0 * * *', myTask);
 const cronFunc = () =>{
 cronJob.start();
 }
