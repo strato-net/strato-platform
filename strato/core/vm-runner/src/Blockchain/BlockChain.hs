@@ -357,34 +357,31 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
       realIG = fromIntegral intrinsicGas'
       maxGas = fromIntegral (maxBound :: Int)
 
-  unless flags_gasOn $ do
-    $logInfoS "addTx" . T.pack $ "gas is off, so I'm giving the account enough balance for this TX"
-    faucetSuccess <- lift $ addToBalance tAcct txCost
-    unless faucetSuccess $ error "failed to give balance to a gasOff account"
-
   (acctBalance, acctNonce) <-
     lift $
       (addressStateBalance &&& addressStateNonce)
         <$> A.lookupWithDefault (Proxy @AddressState) tAcct
 
   when (chainId /= txChainId bt) $ throwE $ TFChainIdMismatch chainId (txChainId bt) t
-  when (txCost > acctBalance) $ throwE $ TFInsufficientFunds txCost acctBalance t
+  when (flags_gasOn && txCost > acctBalance) $ throwE $ TFInsufficientFunds txCost acctBalance t
   when (realIG > transactionGasLimit bt) $ throwE $ TFIntrinsicGasExceedsTxLimit realIG (transactionGasLimit bt) t
   when (transactionGasLimit bt > min remainingBlockGas maxGas) $ throwE $ TFBlockGasLimitExceeded (transactionGasLimit bt) remainingBlockGas t
   unless nonceValid $ throwE $ TFNonceMismatch (transactionNonce bt) acctNonce t
   when (acctNonce >= flags_accountNonceLimit) $ throwE $ TFNonceLimitExceeded flags_accountNonceLimit acctNonce t
+  when (otHash t `S.member` knownFailedTxs) . throwE $ TFKnownFailedTX t
   let txSize = toInteger $ B.length $ BL.toStrict $ Bin.encode $ otBaseTx t
   when (txSize >= flags_txSizeLimit)
     . throwE
     $ TFTXSizeLimitExceeded txSize flags_txSizeLimit t
 
-  let availableGas = transactionGasLimit bt - fromIntegral intrinsicGas'
+  unless flags_gasOn $ do
+    $logInfoS "addTx" . T.pack $ "gas is off, so I'm giving the account enough balance for this TX"
+    faucetSuccess <- lift $ addToBalance tAcct txCost
+    unless faucetSuccess $ error "failed to give balance to a gasOff account"
 
   lift $ incrementNonce tAcct
 
   success <- lift $ addToBalance tAcct (-transactionGasLimit bt * transactionGasPrice bt)
-
-  when (otHash t `S.member` knownFailedTxs) . throwE $ TFKnownFailedTX t
 
   when flags_debug $ $logDebugS "addTx" "running code"
   let txTypeCounter = if isContractCreationTX bt then vmTxsCreation else vmTxsCall
@@ -418,6 +415,7 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
         lift $
           addressStateBalance
             <$> A.lookupWithDefault (Proxy @AddressState) tAcct
+      let availableGas = transactionGasLimit bt - fromIntegral intrinsicGas'
       $logInfoS "addTransaction/success=false" . T.pack $ "Insufficient funds to run the VM: need " ++ show (availableGas * transactionGasPrice bt) ++ ", have " ++ show balance
       return $
         evmErrorResults (transactionGasLimit bt) Blockchain.VM.VMException.InsufficientFunds
