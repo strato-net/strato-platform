@@ -50,8 +50,6 @@ import Blockchain.Data.Transaction
 import Blockchain.Data.TransactionDef (formatChainId)
 import Blockchain.Data.TransactionResultStatus
 import qualified Blockchain.Database.MerklePatricia as MP
-import qualified Blockchain.EVM as EVM
-import Blockchain.EVM.Code
 import Blockchain.Event
 import Blockchain.Sequencer.Event
 import qualified Blockchain.SolidVM as SolidVM
@@ -439,13 +437,16 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAcct t =
 
           let create =
                 case join $ fmap (M.lookup "VM") $ transactionMetadata ut of
-                  Just "EVM" -> EVM.create
+                  -- Just "EVM" -> EVM.create
                   Just "SolidVM" -> SolidVM.create
-                  Nothing -> EVM.create
+                  -- Nothing -> EVM.create
                   Just vmName ->
                     -- Return a dummy VM that just complains that the requested VM doesn't exist
                     \_ _ _ _ _ _ _ _ _ ag _ _ _ _ _ ->
                       return $ evmErrorResults (toInteger ag) (UnsupportedVM vmName)
+                  _ -> 
+                    \_ _ _ _ _ _ _ _ _ ag _ _ _ _ _ ->
+                      return $ evmErrorResults (toInteger ag) (UnsupportedVM "NO VM")
 
           --TODO- The new address state should be created in the VM itself....  Currently the EVM doesn't do this (and could be cleaned up by doing so), SolidVM does do this.  I will calculate this value here, but then ignore the value in SolidVM (and recalculate it there).  Eventually this should be moved into the EVM also
           nonce <- lift $ addressStateNonce <$> A.lookupWithDefault (Proxy @AddressState) tAcct
@@ -479,10 +480,10 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAcct t =
 
           let eCall =
                 case codeHash of
-                  EVMCode _ -> Right EVM.call
+                  ExternallyOwned _ -> Right SolidVM.call -- IS THIS RIGHT?
                   SolidVMCode _ _ -> Right SolidVM.call
                   CodeAtAccount acct name -> case resolvedCodeHash of
-                    Just (EVMCode _) -> Right EVM.call
+                    Just (ExternallyOwned _) -> Right SolidVM.call -- IS THIS RIGHT?
                     Just (SolidVMCode _ _) -> Right SolidVM.call
                     Just (CodeAtAccount acct' name') -> Left (acct', name')
                     Nothing -> Left (acct, name)
@@ -519,6 +520,10 @@ codeOrDataLength t =
    in if isMessageTX bt
         then B.length $ transactionData bt
         else codeLength $ transactionInit bt --is ContractCreationTX
+
+codeLength :: Code -> Int
+codeLength (Code bytes) = B.length bytes
+codeLength (PtrToCode _) = error "codeLength: called with PtrToCode"
 
 zeroBytesLength :: OutputTx -> Int
 zeroBytesLength t =
@@ -575,14 +580,14 @@ outputTransactionResult ::
   ConduitT a VmOutEvent m ()
 outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHash} result deltaT beforeMap afterMap newAddresses) = do
   let t = fromMaybe (otBaseTx ot) (otPrivatePayload ot)
-      (txrStatus, message, gasRemaining, orgName, appName) =
+      (txrStatus, message, gasRemaining, commonName) =
         case result of
-          Left err -> let fmt = format err in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0, "", "") -- TODO Also include the trace
+          Left err -> let fmt = format err in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0, "") -- TODO Also include the trace
           Right r -> case erException r of
-            Nothing -> (Success, "Success!", erRemainingTxGas r, erOrgName r, erAppName r)
+            Nothing -> (Success, "Success!", erRemainingTxGas r, erCommonName r)
             Just ex ->
               let fmt = either show show ex
-               in (Failure "Execution" Nothing (ExecutionFailure $ show ex) Nothing Nothing (Just fmt), fmt, 0, "", "")
+               in (Failure "Execution" Nothing (ExecutionFailure $ show ex) Nothing Nothing (Just fmt), fmt, 0, "")
       gasUsed = fromInteger $ transactionGasLimit t - gasRemaining
       etherUsed = gasUsed * fromInteger (transactionGasPrice t)
 
@@ -619,8 +624,7 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
           transactionResultStatus = Just txrStatus,
           transactionResultChainId = chainId,
           transactionResultKind = erKind <$> eitherToMaybe result,
-          transactionResultOrgName = orgName,
-          transactionResultAppName = appName
+          transactionResultCommonName = commonName
         }
   when flags_diffPublish $ do
     traverse_ (yield . OutAction) $ either (const Nothing) erAction result
