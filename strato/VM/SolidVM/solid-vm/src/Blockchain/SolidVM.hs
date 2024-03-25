@@ -291,10 +291,10 @@ create' creator newAccount ch cc contractName' argExps createBuiltinCall = do
       maybeUseWallet = M.lookup "useWallet" =<< metadata
       !useWallet = maybe False (const True) maybeUseWallet
 
-  org <- bool (getOrg creator) (getOrg origin') useWallet
-  !abstracts <- M.fromList <$> traverse (resolveNameParts newAccount (T.pack org) (T.pack parentName)) abstracts'
+  cn <- bool (getCommonName creator) (getCommonName origin') useWallet
+  !abstracts <- M.fromList <$> traverse (resolveNameParts newAccount (T.pack cn)) abstracts'
 
-  initializeAction newAccount (labelToString contractName') parentName ch cc abstracts mappings arrays
+  initializeAction newAccount (labelToString contractName') cn ch cc abstracts mappings arrays
 
   A.adjustWithDefault_ (A.Proxy @AddressState) newAccount $ \newAddressState ->
     pure
@@ -329,17 +329,20 @@ create' creator newAccount ch cc contractName' argExps createBuiltinCall = do
     -- set creator again, in case the caller's cert changed during constructor execution
     (\env -> setCreator (Env.origin env) newAccount contract' (blockDataNumber $ Env.blockHeader env)) =<< getEnv
 
-  let parentName' = bool parentName "" (useWallet && parentName == "User")
+  -- let parentName' = bool parentName "" (useWallet && parentName == "User")
   
 
-  Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    Action.actionData %= Action.omapAdjust (Action.actionDataOrganization .~ (T.pack org)) newAccount
+  -- Mod.modifyStatefully_ (Mod.Proxy @Action) $
+  --   Action.actionData %= Action.omapAdjust (Action.actionDataOrganization .~ (T.pack org)) newAccount
 
-  when (useWallet && parentName == "User") $ Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    Action.actionData %= Action.omapAdjust (Action.actionDataApplication .~ (T.pack "")) newAccount
+  Mod.modifyStatefully_ (Mod.Proxy @Action) $
+    Action.actionData %= Action.omapAdjust (Action.actionDataCommonName .~ (T.pack cn)) newAccount
+
+  -- when (useWallet && parentName == "User") $ Mod.modifyStatefully_ (Mod.Proxy @Action) $
+  --   Action.actionData %= Action.omapAdjust (Action.actionDataApplication .~ (T.pack "")) newAccount
 
   -- I'm showing these strings because I like them to be in quotes in the logs :)
-  multilineLog "create'/versioning" $ boringBox ["Contract Name: " ++ (C.yellow contractName'), "App: " ++ (C.yellow parentName), "Org: " ++ (C.yellow org)]
+  multilineLog "create'/versioning" $ boringBox ["Contract Name: " ++ (C.yellow contractName'), "Common Name: " ++ (C.yellow cn)]
 
   solidVMBreakpoint emptySourceAnnotation -- just to force a resume at the end of the transaction
   finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
@@ -358,8 +361,7 @@ create' creator newAccount ch cc contractName' argExps createBuiltinCall = do
         erException = Nothing,
         erKind = SolidVM,
         erPragmas = CC._pragmas cc,
-        erOrgName = org,
-        erAppName = parentName'
+        erCommonName = cn
       }
 
 call ::
@@ -418,7 +420,7 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' 
         maybeArgs = runParser parseArgs (initialParserStateWithLength srcLength)  "" argString
         !args = either (parseError "call arguments") CC.OrderedArgs maybeArgs
 
-    ((orgName, appName), returnVal) <-
+    (commonName, returnVal) <-
       traverse (fmap Just . maybe (return "()") encodeForReturn)
         =<< call' sender' codeAddress CC.DefaultCall Nothing funcName isRCC args
 
@@ -440,8 +442,7 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' 
           erException = Nothing, -- tells me if theres an exception
           erKind = SolidVM,
           erPragmas = [],
-          erOrgName = orgName,
-          erAppName = appName
+          erCommonName = commonName
         }
 
 call' ::
@@ -453,7 +454,7 @@ call' ::
   SolidString ->
   Bool ->
   CC.ArgList ->
-  m ((SolidString, SolidString), Maybe Value)
+  m (SolidString, Maybe Value)
 call' from to' fnCalltype mContract functionName isRCC argExps = do
   let (to, ccToGet) = case fnCalltype of
         CC.DefaultCall -> (to', to')
@@ -485,20 +486,20 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
       !arrays = getArrayNamesFromContract contract
 
   -- grab the org from the senders account and set it to the codeAddress
-  orgAccount <-
+  cnAccount <-
     if isRCC
       then
         addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) to >>= \case
           CodeAtAccount {} -> pure to
           _ -> pure from
       else pure to
-  org <- getOrg orgAccount
-  !abstracts <- M.fromList <$> traverse (resolveNameParts to' (T.pack org) (T.pack parentName')) abstracts'
+  cn <- getCommonName cnAccount
+  !abstracts <- M.fromList <$> traverse (resolveNameParts to' (T.pack cn)) abstracts'
 
-  initializeAction to (labelToString $ CC._contractName contract) (labelToString parentName') hsh cc abstracts mappings arrays
+  initializeAction to (labelToString $ CC._contractName contract) (labelToString cn) hsh cc abstracts mappings arrays
 
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    Action.actionData %= Action.omapAdjust (Action.actionDataOrganization .~ (T.pack org)) to
+    Action.actionData %= Action.omapAdjust (Action.actionDataCommonName .~ (T.pack cn)) to
   when (isRCC) $
     (\env -> setCreator (Env.origin env) to contract (blockDataNumber $ Env.blockHeader env)) =<< getEnv
 
@@ -666,8 +667,8 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
               SVMType.Array _ _ -> return ()
               _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) MS.BDefault
     )
-  when (fnCalltype == CC.DelegateCall) $ addDelegatecall from to' (T.pack org) (T.pack parentName')
-  ((org, parentName'),) <$> logFunctionCall args to contract functionName f
+  when (fnCalltype == CC.DelegateCall) $ addDelegatecall from to' (T.pack cn) (T.pack parentName')
+  (cn,) <$> logFunctionCall args to contract functionName f
   where
     flattenVals (x : xs) = [x] ++ flattenVals xs
     flattenVals x = x
@@ -680,7 +681,7 @@ setCreator :: MonadSM m => Account -> Account -> CC.Contract -> Integer -> m ()
 setCreator creator contract _ _ = do
   let creatorAddress = _accountAddress creator
   maybeCert <- A.select (A.Proxy @X509Certificate) creatorAddress
-  let _org = fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
+  let _cn = fromMaybe "" $ fmap subCommonName $ getCertSubject =<< maybeCert
 
   case maybeCert of
     (Just cert) -> do
@@ -689,44 +690,74 @@ setCreator creator contract _ _ = do
 
   $logDebugS "setCreator/address" . T.pack $ "Setting creatorAddress to: " ++ show creator
   putSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":creatorAddress"]) (MS.BAccount (accountToNamedAccount' creator))
-  let putCreatorField org = do
-        $logDebugS "setCreator/versioning" . T.pack $ "setting the org as " ++ (show org)
-        putSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack org)
+  let putCreatorField cn = do
+        $logDebugS "setCreator/versioning" . T.pack $ "setting the common name as " ++ (show cn)
+        putSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack cn)
 
-  if _org /= ""
-    then putCreatorField _org
+  if _cn /= ""
+    then putCreatorField _cn
     else do
-      $logDebugS "setCreator/versioning" . T.pack . C.red $ "Ignoring creator field for empty org field"
+      $logDebugS "setCreator/versioning" . T.pack . C.red $ "Ignoring creator field for empty common name field"
 
 -- get the org for the Cirrus table name
-getOrg :: MonadSM m => Account -> m (String)
-getOrg caller = do
-  $logDebugS "getOrg/versioning" . T.pack $ "Getting org for the caller " ++ format caller
+-- getOrg :: MonadSM m => Account -> m (String)
+-- getOrg caller = do
+--   $logDebugS "getOrg/versioning" . T.pack $ "Getting org for the caller " ++ format caller
+--   callerCodeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) caller
+
+--   case callerCodeHash of
+--     ExternallyOwned _ -> do
+--       -- caller is a user account, so they are creating the first instance of this app
+--       -- we will look up their cert in the DB and use it to get the org name for this app
+--       maybeCert <- A.select (A.Proxy @X509Certificate) $ caller ^. accountAddress
+--       let org' = fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
+--       $logDebugS "getOrg/versioning" . T.pack $ "They are a user of org " ++ (show org')
+--       return org'
+--     x -> do
+--       -- caller is a contract account, so this app already exists
+--       -- so we need to find the app contract and get its ":creator"
+--       mAppAccount <- getAppAccount (caller ^. accountChainId) caller
+--       case mAppAccount of
+--         Nothing -> internalError "getOrg/versioning --> the app contract didn't have an AddressState, or was on an inaccessible chain" x
+--         Just acct -> do
+--           $logDebugS "getOrg/versioning" . T.pack $ "They are part of app contract " ++ (format acct)
+--           appCreator <- getSolidStorageKeyVal' acct $ MS.StoragePath [MS.Field ":creator"]
+--           case appCreator of
+--             MS.BString org' -> do
+--               $logDebugS "getOrg/versioning" . T.pack $ "Its org is " ++ show org'
+--               return $ BC.unpack org'
+--             _ -> do
+--               $logDebugS "getOrg/versioning" . T.pack $ "Its org is unset. Returning empty string"
+--               return ""
+
+getCommonName :: MonadSM m => Account -> m (String)
+getCommonName caller = do
+  $logDebugS "getCommonName/versioning" . T.pack $ "Getting common name for the caller " ++ format caller
   callerCodeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) caller
 
   case callerCodeHash of
-    EVMCode _ -> do
+    ExternallyOwned _ -> do
       -- caller is a user account, so they are creating the first instance of this app
       -- we will look up their cert in the DB and use it to get the org name for this app
       maybeCert <- A.select (A.Proxy @X509Certificate) $ caller ^. accountAddress
-      let org' = fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
-      $logDebugS "getOrg/versioning" . T.pack $ "They are a user of org " ++ (show org')
-      return org'
+      let cn' = fromMaybe "" $ fmap subCommonName $ getCertSubject =<< maybeCert
+      $logDebugS "getCommonName/versioning" . T.pack $ "Their common name is " ++ (show cn')
+      return cn'
     x -> do
       -- caller is a contract account, so this app already exists
       -- so we need to find the app contract and get its ":creator"
       mAppAccount <- getAppAccount (caller ^. accountChainId) caller
       case mAppAccount of
-        Nothing -> internalError "getOrg/versioning --> the app contract didn't have an AddressState, or was on an inaccessible chain" x
+        Nothing -> internalError "getCommonName/versioning --> the app contract didn't have an AddressState, or was on an inaccessible chain" x
         Just acct -> do
-          $logDebugS "getOrg/versioning" . T.pack $ "They are part of app contract " ++ (format acct)
+          $logDebugS "getCommonName/versioning" . T.pack $ "They are part of app contract " ++ (format acct)
           appCreator <- getSolidStorageKeyVal' acct $ MS.StoragePath [MS.Field ":creator"]
           case appCreator of
-            MS.BString org' -> do
-              $logDebugS "getOrg/versioning" . T.pack $ "Its org is " ++ show org'
-              return $ BC.unpack org'
+            MS.BString cn' -> do
+              $logDebugS "getCommonName/versioning" . T.pack $ "Its common name is " ++ show cn'
+              return $ BC.unpack cn'
             _ -> do
-              $logDebugS "getOrg/versioning" . T.pack $ "Its org is unset. Returning empty string"
+              $logDebugS "getCommonName/versioning" . T.pack $ "Its common name is unset. Returning empty string"
               return ""
 
 logFunctionCall :: MonadSM m => ValList -> Account -> CC.Contract -> SolidString -> m (Maybe Value) -> m (Maybe Value)
@@ -1264,9 +1295,9 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
         then invalidArguments "arguments to statement are inconsistent with those declared" (unparseStatement st)
         else do
           let account = currentAccount curInfo
-          org <- getOrg account
+          -- cn <- getCommonName account
 
-          parentName <-
+          cn <-
             fromMaybeM (return "") $
               runMaybeT $
                 pure account
@@ -1286,12 +1317,11 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
               [ "Emitting event:",
                 "Event: " ++ C.yellow eventName,
                 "Contract: " ++ C.yellow (labelToString $ CC._contractName curCnct),
-                "App: " ++ C.yellow (show parentName),
-                "Org: " ++ C.yellow (show org)
+                "Common Name: " ++ C.yellow (show cn)
               ]
 
           bHash <- blockHeaderHash . Env.blockHeader <$> getEnv
-          addEvent $ Event bHash org parentName (labelToString $ CC._contractName curCnct) account eventName pairs
+          addEvent $  Event bHash cn (labelToString $ CC._contractName curCnct) account eventName pairs
           return Nothing
 runStatement (CC.UncheckedStatement code pos) = do
   solidVMBreakpoint pos
@@ -1550,7 +1580,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
           calldataHash = fromMaybe emptyHash $ stringKeccak256 argString
       return . Constant . SString $ take 8 $ keccak256ToHex calldataHash
     (SBuiltinVariable "tx", "origin") -> (Constant . ((flip SAccount) False) . accountToNamedAccount chainId . Env.origin) <$> getEnv
-    (SBuiltinVariable "tx", "username") -> do
+    (SBuiltinVariable "tx", "commonname") -> do
       env' <- getEnv
       maybeCert <- A.select (A.Proxy @X509Certificate) $ Env.origin env' ^. accountAddress
       return . Constant . SString . fromMaybe "" . fmap subCommonName $ getCertSubject =<< maybeCert
@@ -2673,7 +2703,7 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
     invalidArguments "The contract name and src arguments for the create function should not be empty" args
 
   creator <- getCurrentAccount
-  currentContract <- getCurrentContract
+  -- currentContract <- getCurrentContract
   (_, parentCC) <- getCurrentCodeCollection
 
   -- Because of the current testnet stateroot problem with contracts using an older version of
@@ -2693,17 +2723,17 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
   let origin = Env.origin theEnv
       metadata = Env.metadata theEnv
       isRunningTests = Env.runningTests theEnv
-      maybeUseWallet = M.lookup "useWallet" =<< metadata
-      !useWallet = maybe False (const True) maybeUseWallet
-  org <- getOrg origin
+      -- maybeUseWallet = M.lookup "useWallet" =<< metadata
+      -- !useWallet = maybe False (const True) maybeUseWallet
+  cn <- getCommonName origin --not sure if this should be there instead
   case erNewContractAccount execResults of
     Just nca -> do
       when (not isRunningTests) $ 
         void $ VME.produceVMEvents [ VME.CodeCollectionAdded 
                                      (const () <$> cc)
                                      (SolidVMCode contractName' hsh) 
-                                     (T.pack org) 
-                                     (bool (T.pack $ CC._contractName currentContract) (T.pack contractName') useWallet) 
+                                     (T.pack cn)
+                                    --  (bool (T.pack $ CC._contractName currentContract) (T.pack contractName') useWallet) 
                                      ( case join $ fmap (M.lookup "history") (metadata) of
                                          Nothing -> []
                                          Just v -> (T.splitOn "," v)
@@ -2718,7 +2748,7 @@ callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SS
     invalidArguments "The contract name and src arguments for the create2 function should not be empty" args
 
   creator <- getCurrentAccount
-  currentContract <- getCurrentContract
+  -- currentContract <- getCurrentContract
   (_, parentCC) <- getCurrentCodeCollection
 
   -- Because of the current testnet stateroot problem with contracts using an older version of
@@ -2739,17 +2769,17 @@ callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SS
   let origin = Env.origin theEnv
       metadata = Env.metadata theEnv
       isRunningTests = Env.runningTests theEnv
-      maybeUseWallet = M.lookup "useWallet" =<< metadata
-      !useWallet = maybe False (const True) maybeUseWallet
-  org <- getOrg origin
+      -- maybeUseWallet = M.lookup "useWallet" =<< metadata
+      -- !useWallet = maybe False (const True) maybeUseWallet
+  cn <- getCommonName origin
   case erNewContractAccount execResults of
     Just nca -> do
       when (not isRunningTests) $ 
         void $ VME.produceVMEvents [ VME.CodeCollectionAdded 
                                       (const () <$> cc)
                                       (SolidVMCode contractName' hsh) 
-                                      (T.pack org) 
-                                      (bool (T.pack $ CC._contractName currentContract) (T.pack contractName') useWallet) 
+                                      (T.pack cn) 
+                                      -- (bool (T.pack $ CC._contractName currentContract) (T.pack contractName') useWallet) 
                                       ( case join $ fmap (M.lookup "history") (metadata) of
                                           Nothing -> []
                                           Just v -> (T.splitOn "," v)
@@ -2773,7 +2803,7 @@ certificateMap maybeCert _ =
       M.fromList
         [ (SString "commonName", Constant . SString $ subCommonName sub),
           (SString "country", Constant . SString $ fromMaybe "" $ subCountry sub),
-          (SString "organization", Constant . SString $ subOrg sub),
+          -- (SString "organization", Constant . SString $ subOrg sub),
           (SString "group", Constant . SString $ fromMaybe "" $ subUnit sub),
           (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub),
           (SString "userAddress", Constant . SString $ show $ fromPublicKey $ subPub sub),
@@ -2784,7 +2814,7 @@ certificateMap maybeCert _ =
       M.fromList
         [ (SString "commonName", Constant . SString $ ""),
           (SString "country", Constant . SString $ ""),
-          (SString "organization", Constant . SString $ ""),
+          -- (SString "organization", Constant . SString $ ""),
           (SString "group", Constant . SString $ ""),
           (SString "publicKey", Constant . SString $ ""),
           (SString "userAddress", Constant . SString $ ""),
@@ -2794,14 +2824,14 @@ certificateMap maybeCert _ =
     certMap cert sub =
       let fieldsToUpdate =
             M.fromList
-              [ (SString "organizationalUnit", Constant . SString $ fromMaybe "" $ subUnit sub),
+              [ 
                 (SString "expirationDate", Constant . SString $ fromMaybe "" $ dateTimeToString . snd . getCertValidity <$> rawCert cert)
               ]
        in M.union fieldsToUpdate $ nonEmptyFields cert sub
     emptyCertMap =
       let fieldsToUpdate =
             M.fromList
-              [ (SString "organizationalUnit", Constant . SString $ ""),
+              [ 
                 (SString "expirationDate", Constant . SString $ "")
               ]
        in M.union fieldsToUpdate $ emptyFields
