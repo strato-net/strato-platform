@@ -368,7 +368,6 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
   when (transactionGasLimit bt > min remainingBlockGas maxGas) $ throwE $ TFBlockGasLimitExceeded (transactionGasLimit bt) remainingBlockGas t
   unless nonceValid $ throwE $ TFNonceMismatch (transactionNonce bt) acctNonce t
   when (acctNonce >= flags_accountNonceLimit) $ throwE $ TFNonceLimitExceeded flags_accountNonceLimit acctNonce t
-  when (otHash t `S.member` knownFailedTxs) . throwE $ TFKnownFailedTX t
   let txSize = toInteger $ B.length $ BL.toStrict $ Bin.encode $ otBaseTx t
   when (txSize >= flags_txSizeLimit)
     . throwE
@@ -382,6 +381,8 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
   lift $ incrementNonce tAcct
 
   success <- lift $ addToBalance tAcct (-transactionGasLimit bt * transactionGasPrice bt)
+  
+  when (otHash t `S.member` knownFailedTxs) . throwE $ TFKnownFailedTX t
 
   when flags_debug $ $logDebugS "addTx" "running code"
   let txTypeCounter = if isContractCreationTX bt then vmTxsCreation else vmTxsCall
