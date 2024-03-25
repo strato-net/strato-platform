@@ -199,7 +199,7 @@ insertContracts slotss name src code start gi =
           Right v -> v
           _ -> error ("bytecode not encoded in base16:" ++ show code)
       codeHash = KECCAK256.hash decoded
-      mkContract (addr, slots) = ContractWithStorage addr 0 (EVMCode codeHash) slots
+      mkContract (addr, slots) = ContractWithStorage addr 0 (ExternallyOwned codeHash) slots
       addrs = map (start +) [0 ..]
       addrsAndSlots = zip addrs slotss
    in gi

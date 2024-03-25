@@ -42,7 +42,7 @@ spec = do
               ContractNoStorage
                 (Address 0xe1fd0d4a52b75a694de8b55528ad48e2e2cf7859)
                 1809251394333065553493296640760748560207343510400633813116524750123642650624
-                (EVMCode $ unsafeCreateKeccak256FromWord256 0xed92eeba73797150099ef9035b92e3bc3a3cd3b18da36f51385910726606e1f1)
+                (ExternallyOwned $ unsafeCreateKeccak256FromWord256 0xed92eeba73797150099ef9035b92e3bc3a3cd3b18da36f51385910726606e1f1)
           got = eitherDecode input
        in got `shouldBe` want
 
@@ -60,7 +60,7 @@ spec = do
               ContractWithStorage
                 (Address 0xe1fd0d4a52b75a694de8b55528ad48e2e2cf7859)
                 909090909090909090
-                (EVMCode $ unsafeCreateKeccak256FromWord256 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff)
+                (ExternallyOwned $ unsafeCreateKeccak256FromWord256 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff)
                 [ ( 0x026a54d859003c49ea00384498c11dd9f3ec99d4b56b89b90662e6b16ea12bfbf,
                     0x0a94fd1bcabfd728d386de8b2e1d94f4cbce9b8d0286105239acb929d8a298fd
                   ),
@@ -108,7 +108,7 @@ spec = do
                       ContractNoStorage
                         (Address 0x692a70d2e424a56d2c6c27aa97d1a86395877b3a)
                         9000
-                        (EVMCode $ unsafeCreateKeccak256FromWord256 0xed92eeba73797150099ef9035b92e3bc3a3cd3b18da36f51385910726606e1f1)
+                        (ExternallyOwned $ unsafeCreateKeccak256FromWord256 0xed92eeba73797150099ef9035b92e3bc3a3cd3b18da36f51385910726606e1f1)
                     ],
                   genesisInfoCodeInfo = [],
                   genesisInfoTransactionRoot =
@@ -165,7 +165,7 @@ spec = do
                       ContractNoStorage
                         (Address 0x692a70d2e424a56d2c6c27aa97d1a86395877b3a)
                         9000
-                        (EVMCode $ unsafeCreateKeccak256FromWord256 0xed92eeba73797150099ef9035b92e3bc3a3cd3b18da36f51385910726606e1f1)
+                        (ExternallyOwned $ unsafeCreateKeccak256FromWord256 0xed92eeba73797150099ef9035b92e3bc3a3cd3b18da36f51385910726606e1f1)
                     ],
                   genesisInfoCodeInfo = [],
                   genesisInfoTransactionRoot =
