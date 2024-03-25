@@ -81,7 +81,6 @@ packages:
 - vault-proxy/api
 - vault-proxy/server
 
-- VM/EVM/ethereum-vm
 - VM/EVM/evm-solidity
 - VM/SolidVM/debugger
 - VM/SolidVM/solid-vm
