@@ -53,8 +53,12 @@ data ContentTypeAndBody = ContentTypeAndBody { contentTypeHeader :: DBL.ByteStri
                                              }
   deriving (Eq,Show)
 
-instance MimeRender Web ContentTypeAndBody where --Is this correct?
-  mimeRender _ (ContentTypeAndBody _ b) = b
+--instance MimeRender Web ContentTypeAndBody where --Is this correct?
+--  mimeRender _ (ContentTypeAndBody _ b) = b
+
+instance MimeRender Web (Maybe ContentTypeAndBody) where
+  mimeRender _ (Just (ContentTypeAndBody _ b)) = b
+  mimeRender _ Nothing                         = DBL.empty
 
 instance MimeRender Web T.Text where
   mimeRender _ = DBL.fromStrict . encodeUtf8
@@ -62,7 +66,7 @@ instance MimeRender Web T.Text where
 instance AllCTRender '[Web] ContentTypeAndBody where
   handleAcceptH _ _ (ContentTypeAndBody h c) = Just (h,c)
 
-type HighwayGetS3File = "highway" :> Capture "filename" T.Text :> Get '[Web] ContentTypeAndBody
+type HighwayGetS3File = "highway" :> Capture "filename" T.Text :> Get '[Web] (Maybe ContentTypeAndBody)
 
 type HighwayPutS3File = "highway" :> MultipartForm Mem (MultipartData Mem) :> Post '[Web] T.Text
 

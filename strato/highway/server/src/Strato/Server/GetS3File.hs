@@ -21,13 +21,15 @@ import           Data.ByteString.Char8 as DBC8
 import           Data.Text as T
 import           Network.HTTP.Conduit (responseBody)
 import           System.FilePath (takeExtension)
+import           Text.Regex
 
+import           Blockchain.Strato.Model.Keccak256
 --import           BlockApps.Logging
 import           Strato.API
 import           Strato.Monad
 
 getS3File :: Text
-          -> HighwayM ContentTypeAndBody
+          -> HighwayM (Maybe ContentTypeAndBody)
 getS3File filename = do
   --Set up AWS credentials and the default configuration.
   $logInfoS "highway/getS3File" $ T.pack $ "Setting up AWS credentials and the default AWS configuration."
@@ -50,20 +52,26 @@ getS3File filename = do
       Aws.pureAws cfg s3cfg mgr $
         S3.getObject awss3b filename
     filecontents <- runConduit $ responseBody rsp .| sinkList -- $ DBLC8.unpack $ DBL.fromStrict $ keccak256ToByteString keccakhash
-    let header = case takeExtension $ T.unpack filename of
-          ".jpg" -> "image/jpg"
-          ".jpeg" -> "image/jpeg"
-          ".png" -> "image/png"
-          ".gif" -> "image/gif"
-          ".svg" -> "image/svg+xml"
-          ".pdf" -> "application/pdf"
-          ".html" -> "text/html"
-          ".css" -> "text/css"
-          ".js" -> "text/javascript"
-          ".json" -> "application/json"
-          ".webp" -> "image/webp"
-          _ -> "text/plain"
-    pure $ ContentTypeAndBody
-      { contentTypeHeader = header
-      , contentTypeBody   = DBL.fromStrict $ DBC8.concat filecontents
-      }
+    case ( show $ unsafeCreateKeccak256FromByteString $ DBC8.concat filecontents) ==
+           (subRegex (mkRegex "\\.*") (T.unpack filename) ""
+         ) of
+      True -> do
+        let header = case takeExtension $ T.unpack filename of
+              ".jpg" -> "image/jpg"
+              ".jpeg" -> "image/jpeg"
+              ".png" -> "image/png"
+              ".gif" -> "image/gif"
+              ".svg" -> "image/svg+xml"
+              ".pdf" -> "application/pdf"
+              ".html" -> "text/html"
+              ".css" -> "text/css"
+              ".js" -> "text/javascript"
+              ".json" -> "application/json"
+              ".webp" -> "image/webp"
+              _ -> "text/plain"
+        pure $ Just $ ContentTypeAndBody
+          { contentTypeHeader = header
+          , contentTypeBody   = DBL.fromStrict $ DBC8.concat filecontents
+          }
+      False ->
+        pure Nothing

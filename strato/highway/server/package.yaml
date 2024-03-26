@@ -36,6 +36,7 @@ library:
     - http-conduit
     - monad-logger
     - mtl
+    - regex-compat
     - resourcet
     - servant-multipart
     - strato-model
