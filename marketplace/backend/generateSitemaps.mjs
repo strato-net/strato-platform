@@ -2,19 +2,23 @@ import { createWriteStream } from 'fs';
 import axios from 'axios';
 
 const url = [
-       "/",
-       "/c/all",
-       "/c/Carbon?sc=CarbonOffset%2CCarbonDAO",
-       "/c/Metals?sc=Metals",
-       "/c/Clothing?sc=Clothing",
-       "/c/Collectibles?sc=Collectibles",
-       "/c/Art?sc=Art",
-       "/c/Membership?sc=Membership",
-       "/checkout",
-      ]
+  "/",
+  "/c/all",
+  "/c/Carbon?sc=CarbonOffset%2CCarbonDAO",
+  "/c/Metals?sc=Metals",
+  "/c/Clothing?sc=Clothing",
+  "/c/Collectibles?sc=Collectibles",
+  "/c/Art?sc=Art",
+  "/c/Membership?sc=Membership",
+  "/checkout",
+];
 
 const hostname = 'https://marketplace.mercata.blockapps.net';
 const marketplaceUrl = `${hostname}/api/v1/marketplace`;
+
+const invalidXMLUnicodeRegex =
+  // eslint-disable-next-line no-control-regex
+  /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u0084\u0086-\u009F\uD800-\uDFFF\uFDD0-\uFDDF\u{1FFFE}-\u{1FFFF}\u{2FFFE}-\u{2FFFF}\u{3FFFE}-\u{3FFFF}\u{4FFFE}-\u{4FFFF}\u{5FFFE}-\u{5FFFF}\u{6FFFE}-\u{6FFFF}\u{7FFFE}-\u{7FFFF}\u{8FFFE}-\u{8FFFF}\u{9FFFE}-\u{9FFFF}\u{AFFFE}-\u{AFFFF}\u{BFFFE}-\u{BFFFF}\u{CFFFE}-\u{CFFFF}\u{DFFFE}-\u{DFFFF}\u{EFFFE}-\u{EFFFF}\u{FFFFE}-\u{FFFFF}\u{10FFFE}-\u{10FFFF}]/gu;
 
 async function fetchInventories() {
 
@@ -22,17 +26,25 @@ async function fetchInventories() {
     return { url: item, changefreq: "daily", priority: 0.5, lastmod: new Date().toISOString() };
   })
 
-    try {
-        const response = await axios.get(marketplaceUrl);
-        const res = response.data;
-        const data = res?.data.productsWithImageUrl?.map((item, index) => {
-            return { url: `/dp/${item.address}/${item.name}`, changefreq: "daily", priority: 0.5, lastmod: new Date().toISOString() };
-        });
-        return [...staticUrls, ...data];
-    } catch (error) {
-        console.error("Error fetching inventories:", error);
-        throw error;
+  try {
+    const response = await axios.get(marketplaceUrl);
+    const res = response.data;
+
+    if (!res || !res.data || !res.data.productsWithImageUrl) {
+      throw new Error('Invalid response or missing data fields');
     }
+
+    const data = res.data.productsWithImageUrl.map((item, index) => ({
+      url: `/dp/${item.address}/${item.name}`,
+      changefreq: "daily",
+      priority: 0.5,
+      lastmod: new Date().toISOString(),
+    }));
+    return [...staticUrls, ...data];
+  } catch (error) {
+    console.error("Error fetching inventories:", error);
+    throw error;
+  }
 }
 
 async function generateXML(urls) {
@@ -45,38 +57,49 @@ async function generateXML(urls) {
      ${urls.map(url => `
      <url>
        <loc>${escapeXML(hostname + url.url)}</loc>
-       <lastmod>${url.lastmod}</lastmod>
-       <changefreq>${url.changefreq}</changefreq>
-       <priority>${url.priority}</priority>
+       <lastmod>${escapeXML(url.lastmod)}</lastmod>
+       <changefreq>${escapeXML(url.changefreq)}</changefreq>
+       <priority>${escapeXML(url.priority.toString())}</priority>
      </url>`).join('\n')}
      </urlset>`;
-     
-    return xml;
-  }
+
+  return xml;
+}
 
 function escapeXML(str) {
-  return str.replace(/[<>&'"]/g, function (c) {
-      switch (c) {
-          case '<': return '&lt;';
-          case '>': return '&gt;';
-          case '&': return '&amp;';
-          case '\'': return '&apos;';
-          case '"': return '&quot;';
-      }
-  });
+  return str.replaceAll(/[<>&'"]/g, function (c) {
+    switch (c) {
+      case '<': return '&lt;';
+      case '>': return '&gt;';
+      case '&': return '&amp;';
+      case '\'': return '&apos;';
+      case '"': return '&quot;';
+      case ' ': return '%20';
+    }
+  }).replaceAll(invalidXMLUnicodeRegex, '');
 }
 
 async function generateSitemap() {
-    try {
-        const siteMapArr = await fetchInventories();
-        const xmlContent = await generateXML(siteMapArr);
-        const writeStream = createWriteStream('../ui/public/sitemap.xml');
-        writeStream.write(xmlContent);
-        writeStream.end();
-        console.log('Sitemap generated successfully.');
-    } catch (error) {
-        console.error('Error generating sitemap:', error);
-    }
+  try {
+    const siteMapArr = await fetchInventories();
+    const xmlContent = await generateXML(siteMapArr);
+    const writeStream = createWriteStream('../ui/public/sitemap.xml');
+
+    writeStream.on('error', err => {
+      console.error('Error writing to file:', err);
+      throw err;
+    });
+
+    writeStream.write(xmlContent);
+    writeStream.end();
+
+    writeStream.on('finish', () => {
+      console.log('Sitemap generated successfully.');
+    });
+
+  } catch (error) {
+    console.error('Error generating sitemap:', error);
+  }
 }
 
 export default generateSitemap;
