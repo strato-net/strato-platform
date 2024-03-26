@@ -236,6 +236,7 @@ baseAbstractColumns =
     "block_number",
     "transaction_hash",
     "transaction_sender",
+    "creator",
     "contract_name",
     "data"
   ]
@@ -851,6 +852,7 @@ createAbstractTableQuery contract (cn, n) =
               "block_number text",
               "transaction_hash text",
               "transaction_sender text",
+              "creator text",
               "contract_name text",
               "data jsonb"
             ]
@@ -1002,7 +1004,8 @@ insertAbstractTableQuery cs =
                     tshow . E.blockTimestamp,
                     tshow . E.blockNumber,
                     T.pack . keccak256ToHex . E.transactionHash,
-                    tshow . E.transactionSender
+                    tshow . E.transactionSender,
+                    E.commonName
                   ]
                 vals = flip map contracts $ \((row, contractColumns), _) ->
                   wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ [wrapSingleQuotes $ escapeQuotes (tableNameToText contractTableName)] ++ [wrapSingleQuotes . decodeUtf8 . BL.toStrict $ Aeson.encode $ MapWrapper $ aesonHelper $ Map.filterWithKey (\k _ -> k `notElem` abColumns) contractColumns] ++ (map snd $ Map.toList (Map.filterWithKey (\k _ -> k `elem` abColumns) contractColumns))
