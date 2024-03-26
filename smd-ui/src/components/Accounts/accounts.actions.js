@@ -8,9 +8,6 @@ export const FETCH_USER_ADDRESSES_FAILED = 'FETCH_ACCOUNT_ADDRESS_FAILURE';
 export const FETCH_ACCOUNT_DETAIL_REQUEST = 'FETCH_ACCOUNT_DETAIL_REQUEST';
 export const FETCH_ACCOUNT_DETAIL_SUCCESS = 'FETCH_ACCOUNT_DETAIL_SUCCESS';
 export const FETCH_ACCOUNT_DETAIL_FAILURE = 'FETCH_ACCOUNT_DETAIL_FAILURE';
-export const FAUCET_REQUEST = "FAUCET_REQUEST";
-export const FAUCET_SUCCESS = "FAUCET_SUCCESS";
-export const FAUCET_FAILURE = "FAUCET_FAILURE";
 export const RESET_ACCOUNT_ADDRESS = 'RESET_ACCOUNT_ADDRESS';
 export const GET_BALANCE = 'GET_BALANCE';
 export const BALANCE_SUCCESS = 'BALANCE_SUCCESS';
@@ -109,28 +106,6 @@ export const fetchAccountDetailFailure = function (name, address, error) {
     name: name,
     address: address,
     error: error
-  }
-};
-
-export const faucetRequest = function (address, name, flag) {
-  return {
-    type: FAUCET_REQUEST,
-    address,
-    name,
-    flag
-  }
-};
-
-export const faucetSuccess = function () {
-  return {
-    type: FAUCET_SUCCESS
-  }
-};
-
-export const faucetFailure = function (err) {
-  return {
-    type: FAUCET_FAILURE,
-    error: err
   }
 };
 
