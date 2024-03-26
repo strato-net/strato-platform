@@ -34,6 +34,8 @@ so that they could be properly moved to their respective version's subsection.
 - Fixed bug in BlockApps.X509.Certificate that filled in empty orgUnit fields with a space, rather than the empty string
 - Fixed bug in Sequencer.hs that prevented nodes from syncing all the way after changes to the validator pool
 - Minimal changes to statetree before all tx checks complete to prevent potential stateroot mismatches between when the bagger adds txs vs when the vm does
+- Fixed bug in RedisBlockDB that filled in empty orgUnit fields with the word "Nothing", rather than the empty string
+
 
 ### Removed
 - Removed unnecessary stateDiff (and threading) in the vm-runner codebase, fixing numerous sources of persistent memory build-up.
