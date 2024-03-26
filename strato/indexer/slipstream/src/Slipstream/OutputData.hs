@@ -559,7 +559,7 @@ expandAbstractTable ::
   CodeCollectionF () ->
   ConduitM () Text m [ForeignKeyInfo]
 expandAbstractTable globalsIORef contract (cn, n) abstracts' cc = do
-  let cn' = if n `elem` bccContracts then "" else cn -- Adjust cn based on n being "Asset" or "Sale"
+  let cn' = if n `elem` bccContracts then "BlockApps-Mercata" else cn -- Adjust cn based on n being "Asset" or "Sale"
       tableName = abstractTableName cn' n
   expandAbstractContractTable globalsIORef contract tableName abstracts' cc
 
@@ -843,7 +843,7 @@ createMappingTableQuery (cn, n, m) =
 
 createAbstractTableQuery :: ContractF () -> (Text, Text) -> Text
 createAbstractTableQuery contract (cn, n) =
-  let cn' = if n `elem` bccContracts then "" else cn -- Adjusted cn based on the condition
+  let cn' = if n `elem` bccContracts then "BlockApps-Mercata" else cn -- Adjusted cn based on the condition
       tableName = abstractTableName cn' n
       list = Map.toList $ contract ^. storageDefs
    in T.concat
