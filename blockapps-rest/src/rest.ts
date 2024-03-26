@@ -487,10 +487,6 @@ async function createUser(ouser:OAuthUser, options:Options):Promise<BlockChainUs
   return Object.assign({}, ouser, { address });
 }
 
-async function fill(user, options:Options) {
-  const txResult = await api.fill(user, options);
-  return assertTxResult(txResult);
-}
 
 // =====================================================================
 //   compile contracts
@@ -749,9 +745,6 @@ async function createOrGetKey(user, options:Options) {
     const getKeyResponse = await api.getKey(user, options);
 
     const balance = await api.getBalance(user, getKeyResponse, options);
-    if (balance.isEqualTo(0)) {
-      await fill({ ...user, ...getKeyResponse }, { isAsync: false, ...options });
-    }
 
     if (getKeyResponse.address) return getKeyResponse.address;
   }
@@ -759,7 +752,6 @@ async function createOrGetKey(user, options:Options) {
   
     if (e.response && e.response.status==400) { //user doesn't already exist, create user
       const createKeyResponse = await api.createKey(user, options);
-      await fill({ ...user, ...createKeyResponse }, { isAsync: false, ...options });
       return createKeyResponse.address;
     }
 
@@ -1765,7 +1757,6 @@ async function waitForAddressState(admin, contract, options:Options) {
 }
 
 export default {
-  fill,
   getAccounts,
   getHealth,
   getStatus,
