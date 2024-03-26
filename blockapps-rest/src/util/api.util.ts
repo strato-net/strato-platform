@@ -18,7 +18,6 @@ const Endpoint = {
   ACCOUNT: `${strato12Url}/account`,
   VERSION: `${strato12Url}/version`,
   USER: `${blocUrl}/users/:username`,
-  FILL: `${blocUrl}/users/user/:address/fill`,
   CONTRACTS: `${blocUrl}/contracts`,
   CONTRACTS_CONTRACT: `${blocUrl}/contracts/:name/:address`,
   CONTRACTS_CONTRACT_DETAILS: `${blocUrl}/contracts/contract/:address/details`,

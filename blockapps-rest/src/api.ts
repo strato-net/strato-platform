@@ -37,16 +37,6 @@ async function createUser(user:StratoUser, options:Options) {
   return postue(url, endpoint, data, options);
 }
 
-async function fill(user, options:Options) {
-  const body = {};
-  const url = getNodeUrl(options);
-  const urlParams = {
-    address: user.address
-  };
-  const endpoint = constructEndpoint(Endpoint.FILL, options, urlParams);
-  return postue(url, endpoint, body, setAuthHeaders(user, options));
-}
-
 function getCreateArgs(contract:ContractDefinition, options:Options) {
   const payload = {
     src: contract.source,
@@ -522,7 +512,6 @@ export default {
   postContractsXabi,
   createContract,
   createContractList,
-  fill,
   blocResults,
   getContracts,
   getContractsContract,
