@@ -82,7 +82,7 @@ createInsertsMapping :: OutputM m
 createInsertsMapping globalsIORef mappings = do
   unless (null mappings) $ do
     let mapping = head mappings
-    _ <- createMappingTable globalsIORef (organization mapping, application mapping, contractname mapping) (mapname mapping)
+    _ <- createMappingTable globalsIORef (commonName mapping, contractname mapping) (mapname mapping)
     insertMappingTable mappings
 
 -- createInsertsAbstract :: (OutputM m,
@@ -737,8 +737,7 @@ spec = do
         input = [ProcessedMappingRow {
           address = testAdd,
           codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- $ hash "<CODEHASH>",
-          organization = "",
-          application = "",
+          commonName = "",
           contractname = "SwissArmy",
           mapname = "SwissArmyMapping",
           blockHash = hash "<BLOCKHASH>",
