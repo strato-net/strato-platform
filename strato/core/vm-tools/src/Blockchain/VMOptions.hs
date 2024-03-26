@@ -14,7 +14,6 @@ module Blockchain.VMOptions
     flags_queryBlocks,
     flags_transactionRootVerification,
     flags_startingBlock,
-    flags_gasOn,
     flags_requireCerts,
     flags_accountNonceLimit,
     flags_txSizeLimit,
@@ -49,7 +48,6 @@ defineFlag "startingBlock" (-1 :: Integer) "block in kafka to start running the 
 defineFlag "svmDev" (False :: Bool) "Whether to crash on SolidVM exceptions"
 defineFlag "svmTrace" (True :: Bool) "Whether to have verbose logging in SolidVM"
 defineFlag "cacheTransactionResults" True "Keep transaction results in an LRU cache to avoid reruns"
-defineFlag "gasOn" (True :: Bool) "Whether to charge for transactions or not"
 defineFlag "requireCerts" (True :: Bool) "Flag to enable the requirement of a cert to send transactions"
 defineFlag "txSizeLimit" (150000 :: Integer) "The maximum length of a valid RLP encoded transaction bytestring"
 defineFlag "accountNonceLimit" (1000 :: Integer) "The maximum number of transactions a single account can make"

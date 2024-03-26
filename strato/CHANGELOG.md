@@ -40,7 +40,8 @@ so that they could be properly moved to their respective version's subsection.
 - Removed unnecessary stateDiff (and threading) in the vm-runner codebase, fixing numerous sources of persistent memory build-up.
 - Removed overcomplicated attempts at solving p2p thread issue (watchdogs, canaries, semaphore, threadmap, etc)
 - `bloc/v2.2/x509/createCert` is no more
-
+- Removed `gasOn` flag (always off)
+- `bloc/v2.2/users/user/:address/fill` removed since does nothing with gas off
 
 ## [11.1.0] - 3/7/2023
 
