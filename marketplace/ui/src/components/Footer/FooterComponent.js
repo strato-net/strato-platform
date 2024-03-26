@@ -93,7 +93,7 @@ const navigation = {
     },
     {
       name: "LinkedIn",
-      href: "https://twitter.com/blockapps",
+      href: "https://www.linkedin.com/company/blockapps",
       icon: (props) => (
         <svg
           xmlns="http://www.w3.org/2000/svg"
