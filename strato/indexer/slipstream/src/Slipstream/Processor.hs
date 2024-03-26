@@ -278,23 +278,23 @@ processTheMessages env conn messages = do
         multilineLog "processTheMessages/contracts" $ boringBox $ map show (Map.keys $ cc ^. contracts)
 
         deferredForeignKeys <- fmap concat $
-          forM (Map.toList $ cc ^. contracts) $ \(nameString, c) -> do
-            let cn' =
-                  if cn /= ""
-                    then cn
-                    else case cp of
-                      SolidVMCode n' _ | nameString /= n' -> T.pack n'
-                      _ -> cn
+          forM (Map.toList $ cc ^. contracts) $ \(_, c) -> do
+            -- let cn' =
+            --       if cn /= ""
+            --         then cn
+            --         else case cp of
+            --           SolidVMCode n' _ | nameString /= n' -> T.pack n'
+            --           _ -> cn
 
             -- Here we will get the storageDefs attribute of the contract (c) and iterate through the Map of (Text, VariableDecl) and look for VariableDecls that have the last attribute (isRecord) true and thetype are mappings
             -- We will then create a table for each of these mappings and add a foreign key to the main table
 
             let mapNames = getMapNamesFromContract c
 
-            let historyTableNames = map (historyTableName cn') hl
+            let historyTableNames = map (historyTableName cn) hl
             $logDebugS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames
 
-            let nameParts@(cn'', n'') = (cn', T.pack $ _contractName c)
+            let nameParts@(cn'', n'') = (cn, T.pack $ _contractName c)
             $logInfoS "processTheMessages/Contract Added" $ "common name=" <> cn'' <> ", name=" <> n''
             multilineLog "processTheMessages/fields" $ boringBox $ map (show) $ Map.toList $ fmap _varType $ c ^. storageDefs
 
