@@ -50,9 +50,9 @@ pipeline {
           git clone https://github.com/blockapps/strato-getting-started -b develop
           cp strato-worktree/docker-compose.yml strato-getting-started/
           cp strato-worktree/docker-compose.vault.yml strato-getting-started/
-          cp docker-compose.highway.yml strato-getting-started/
-          cp docker-compose.identity.yml strato-getting-started/
-          cp docker-compose.stripe-ps.yml strato-getting-started/
+          cp strato-worktree/docker-compose.highway.yml strato-getting-started/
+          cp strato-worktree/docker-compose.identity.yml strato-getting-started/
+          cp strato-worktree/docker-compose.stripe-ps.yml strato-getting-started/
         '''
         dir("strato-getting-started") {
           // Copy .pem and .key for SSL
