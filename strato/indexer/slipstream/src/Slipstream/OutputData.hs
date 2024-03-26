@@ -123,6 +123,9 @@ fillEmptyEntries = zipWith go [(1 :: Int) ..]
 fillFirstEmptyEntries :: [(Text, a)] -> [(Text, a)]
 fillFirstEmptyEntries = map unFirst . fillEmptyEntries . map First
 
+bccContracts :: [Text]
+bccContracts = [T.pack "Asset", T.pack "Sale", T.pack "Order",T.pack "BasePaymentProvider"]
+
 tableColumns :: [(Text, SVMType.Type)] -> TableColumns
 tableColumns = mapMaybe go . fillFirstEmptyEntries
   where
@@ -556,7 +559,8 @@ expandAbstractTable ::
   CodeCollectionF () ->
   ConduitM () Text m [ForeignKeyInfo]
 expandAbstractTable globalsIORef contract (cn, n) abstracts' cc = do
-  let tableName = abstractTableName cn n
+  let cn' = if n `elem` bccContracts then "" else cn -- Adjust cn based on n being "Asset" or "Sale"
+      tableName = abstractTableName cn' n
   expandAbstractContractTable globalsIORef contract tableName abstracts' cc
 
 expandHistoryTable ::
@@ -839,7 +843,8 @@ createMappingTableQuery (cn, n, m) =
 
 createAbstractTableQuery :: ContractF () -> (Text, Text) -> Text
 createAbstractTableQuery contract (cn, n) =
-  let tableName = abstractTableName cn n
+  let cn' = if n `elem` bccContracts then "" else cn -- Adjusted cn based on the condition
+      tableName = abstractTableName cn' n
       list = Map.toList $ contract ^. storageDefs
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS ",
@@ -994,7 +999,7 @@ insertAbstractTableQuery cs =
           contracts@(((x, list), (abTableName, abColumns)) : _) ->
             let contractTableName =
                   indexTableName
-                    (E.commonName x)
+                    (if E.contractName x `elem` bccContracts then "BlockApps-Mercata" else E.commonName x) -- Adjusted for both "Asset" and "Sale"
                     (E.contractName x)
                 list' = (map fst $ fillFirstEmptyEntries $ Map.toList (Map.filterWithKey (\k _ -> k `elem` abColumns) list))
                 keySt = wrapAndEscapeDouble . map escapeQuotes $ baseAbstractColumns ++ list'
