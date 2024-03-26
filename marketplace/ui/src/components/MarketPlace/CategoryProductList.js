@@ -14,7 +14,6 @@ import {
 import { CloseOutlined, DeleteOutlined } from "@ant-design/icons";
 // Actions
 import { actions as categoryActions } from "../../contexts/category/actions";
-// import { actions as subCategoryActions } from "../../contexts/subCategory/actions";
 import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
 import { actions as orderActions } from "../../contexts/order/actions"
 // Dispatch and states
