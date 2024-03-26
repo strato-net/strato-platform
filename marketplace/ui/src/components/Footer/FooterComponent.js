@@ -10,7 +10,7 @@ const navigation = {
       href: "/marketplace/category?category=Collectibles",
     },
     { name: "Art", href: "/marketplace/category?category=Art" },
-    { name: "Memberships", href: "/marketplace/category?category=Memberships" },
+    { name: "Membership", href: "/marketplace/category?category=Memberships" },
   ],
   support: [
     // { name: "Documentation", href: "https://docs.blockapps.net/" },
