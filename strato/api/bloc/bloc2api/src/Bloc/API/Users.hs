@@ -18,7 +18,6 @@ module Bloc.API.Users
     BlocTransactionUnsignedResult (..),
     BlocTransactionResult (..),
     BlocTransactionStatus (..),
-    PostUsersFill,
     GetBlocTransactionResult,
     PostBlocTransactionResults,
     TransferParameters (..),
@@ -335,14 +334,6 @@ instance ToParam (QueryParam "use_wallet" Bool) where
     DocQueryParam "use_wallet" [] "flag for overriding default user wallet behavior" Normal
 
 --------------------------------------------------------------------------------
-
-type PostUsersFill =
-  "users"
-    :> Capture "user" JwtToken
-    :> Capture "address" Address
-    :> "fill"
-    :> QueryFlag "resolve"
-    :> Post '[JSON] BlocTransactionResult
 
 data TransferParameters = TransferParameters
   { fromAddress :: Address,

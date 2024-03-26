@@ -14,7 +14,6 @@ import Bloc.Server.Chain
 import Bloc.Server.Contracts
 import Bloc.Server.Transaction
 import Bloc.Server.TransactionResult
-import Bloc.Server.Users
 import Blockchain.DB.CodeDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.CirrusDefs
@@ -47,7 +46,6 @@ bloc ::
   ServerT BlocAPI m
 bloc =
   return gitInfo
-    :<|> postUsersFill
     :<|> getContracts
     :<|> postContractsBatchStates
     :<|> getContractsData
