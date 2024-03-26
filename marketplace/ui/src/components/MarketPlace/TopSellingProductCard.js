@@ -196,42 +196,44 @@ const TopSellingProductCard = () => {
           <Spin spinning={isTopSellingProductsLoading} size="large" />
         </div>
       ) : (
-        <div className="relative md:pl-10">
-          <div
-            onClick={() => scroll(-300)}
-            className={`${
-              !prevVisible ? "hidden" : "md:flex hidden"
-            } cursor-pointer absolute  justify-center items-center top-48 left-24 h-16 w-16 text-2xl bg-[#6A6A6A] rounded-full text-white`}
-          >
-            {"<"}
+        <Fade direction="right" triggerOnce>
+          <div className="relative md:pl-10">
+            <div
+              ref={containerRef}
+              className="overflow-x-auto gap-6 px-1 py-2 flex trending_cards"
+            >
+              {topSellingProducts
+                .filter((product) => product.saleQuantity > 0)
+                .map((topSellingProduct) => {
+                  return (
+                    <NewTrendingCard
+                      topSellingProduct={topSellingProduct}
+                      addItemToCart={addItemToCart}
+                      parent={"Marketplace"}
+                    />
+                  );
+                })}
+            </div>
+            <Button
+              type='primary'
+              onClick={() => scroll(-300)}
+              className={`${
+                !prevVisible ? "hidden" : "md:flex hidden"
+              } cursor-pointer absolute  justify-center items-center top-48 left-24 h-16 w-16 text-2xl bg-[#6A6A6A] rounded-full text-white`}
+            >
+              {"<"}
+            </Button>
+            <Button
+              type='primary'
+              onClick={() => scroll(300)}
+              className={`${
+                !nextVisible ? "hidden" : "md:flex hidden"
+              } cursor-pointer absolute justify-center items-center top-48 right-24 h-16 w-16 text-2xl bg-[#6A6A6A] rounded-full text-white z-20`}
+            >
+              {">"}
+            </Button>
           </div>
-          <Fade direction="right" triggerOnce>
-          <div
-            ref={containerRef}
-            className="overflow-x-auto gap-6 px-1 py-2 flex trending_cards"
-          >
-            {topSellingProducts
-              .filter((product) => product.saleQuantity > 0)
-              .map((topSellingProduct) => {
-                return (
-                  <NewTrendingCard
-                    topSellingProduct={topSellingProduct}
-                    addItemToCart={addItemToCart}
-                    parent={"Marketplace"}
-                  />
-                );
-              })}
-          </div>
-          </Fade>
-          <div
-            onClick={() => scroll(300)}
-            className={`${
-              !nextVisible ? "hidden" : "md:flex hidden"
-            } cursor-pointer absolute justify-center items-center top-48 right-24 h-16 w-16 text-2xl bg-[#6A6A6A] rounded-full text-white`}
-          >
-            {">"}
-          </div>
-        </div>
+        </Fade>
       )}
     </div>
   );
