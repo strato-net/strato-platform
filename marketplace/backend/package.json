@@ -5,6 +5,8 @@
     "sitemap": "node getSitemap.mjs",
     "start:prod": "NODE_ENV=production babel-node index",
     "deploy": "cp config/${CONFIG:-localhost}.config.yaml ${CONFIG_DIR_PATH:-.}/config.yaml && yarn mocha-babel dapp/dapp/dapp.deploy.js --config ${CONFIG_DIR_PATH:-.}/config.yaml",
+    "deploy:develop": "yarn deploy:clean && DEVELOP=true yarn deploy",
+    "deploy:clean": "yarn mocha-babel dapp/dapp/dapp.clean.js",
     "deploy:secondary-org": "cp config/${CONFIG:-localhost}.config.yaml ${CONFIG_DIR_PATH:-.}/config.yaml && yarn mocha-babel dapp/dapp/dapp.deploy-org.js --config ${CONFIG_DIR_PATH:-.}/config.yaml",
     "test": "PORT=3333 yarn mocha-babel dapp/**/*.test.js && PORT=3334 yarn mocha-babel test/v1 -b",
     "test:dapp": "yarn mocha-babel dapp/dapp/test/dapp.test.js -b",
