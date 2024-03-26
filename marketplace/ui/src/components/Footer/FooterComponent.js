@@ -3,7 +3,7 @@ import { Images } from "../../images";
 const navigation = {
   categories: [
     { name: "Carbon", href: "/marketplace/category?category=Carbon" },
-    { name: "Metals", href: "/marketplace/category?category=Metal" },
+    { name: "Metals", href: "/marketplace/category?category=Metals" },
     { name: "Clothing", href: "/marketplace/category?category=Clothing" },
     {
       name: "Collectibles",
