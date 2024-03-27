@@ -70,6 +70,9 @@ pipeline {
           git clone https://github.com/blockapps/strato-getting-started -b develop
           cp docker-compose.yml strato-getting-started/
           cp docker-compose.vault.yml strato-getting-started/
+          cp docker-compose.highway.yml strato-getting-started/
+          cp docker-compose.identity.yml strato-getting-started/
+          cp docker-compose.stripe-ps.yml strato-getting-started/
         '''
 
         dir("strato-getting-started") {
@@ -91,6 +94,90 @@ pipeline {
 
           sh './run-vault.sh'
 
+          writeFile file: "replace_server_ports_docker.sh", text: '''#!/bin/bash
+            if [ -z "$1" ]; then
+              echo "Please provide the path to your docker-compose file as an argument."
+              exit 1
+            fi
+
+            if [ -z "$2" ]; then
+              echo "Please provide the path to your docker-compose file as an argument."
+              exit 1
+            fi
+
+            sed -i "s/-443/-44300/" $1
+            sed -i "s/-80/-8081/" $1
+
+            sed -i "s/-443/-44301/" $2
+            sed -i "s/-80/-8082/" $2
+
+            if [ $? -ne 0 ]; then
+              echo "Error occurred while modifying the file."
+              exit 1
+            fi
+          '''
+
+          sh 'chmod +x replace_server_ports_docker.sh'
+          sh './replace_server_ports_docker.sh docker-compose.highway.yml docker-compose.stripe-ps.yml'
+
+          // Run fileserver
+          withCredentials([
+            string(credentialsId: 'DEV_EXT_STORAGE_S3_ACCESS_KEY_ID', variable:'DEV_EXT_STORAGE_S3_ACCESS_KEY_ID'),
+            string(credentialsId: 'DEV_EXT_STORAGE_S3_SECRET_ACCESS_KEY', variable:'DEV_EXT_STORAGE_S3_SECRET_ACCESS_KEY'),
+          ]) {
+            writeFile file: "run-highway.sh", text: """#!/bin/bash
+              sudo \\
+                EXT_STORAGE_S3_ACCESS_KEY_ID='${DEV_EXT_STORAGE_S3_ACCESS_KEY_ID}' \\
+                EXT_STORAGE_S3_SECRET_ACCESS_KEY='${DEV_EXT_STORAGE_S3_SECRET_ACCESS_KEY}' \\
+                EXT_STORAGE_S3_BUCKET='mercata-dev-tests' \\
+                ssl=true \\
+                HIGHWAY_URL=https://\$(</host):44300 \\
+                HTTPS_PORT=44300 \\
+                ./highway
+            """
+          }
+
+          sh 'chmod +x run-highway.sh'
+          sh './run-highway.sh'
+          sh 'docker ps'
+
+          // Run payment server
+          withCredentials([
+            string(credentialsId: 'STRIPE_PUBLISHABLE_KEY_TESTNET2', variable:'STRIPE_PUBLISHABLE_KEY_TESTNET2'),
+            string(credentialsId: 'STRIPE_SECRET_KEY_TESTNET2', variable:'STRIPE_SECRET_KEY_TESTNET2'),
+          ]) {
+            writeFile file: "run-stripe-ps.sh", text: """#!/bin/bash
+              sudo \\
+                STRIPE_PUBLISHABLE_KEY='${STRIPE_PUBLISHABLE_KEY_TESTNET2}' \\
+                STRIPE_SECRET_KEY='${STRIPE_SECRET_KEY_TESTNET2}' \\
+                ssl=true \\
+                HTTPS_PORT=44301 \\
+                ./stripe-ps
+            """
+          }
+
+          sh 'chmod +x run-stripe-ps.sh'
+          sh './run-stripe-ps.sh'
+          sh 'docker ps'
+
+          // Run identity server
+          withCredentials([
+            string(credentialsId: 'SENDGRID_APIKEY_TESTNET2', variable:'SENDGRID_APIKEY_TESTNET2'),
+          ]) {
+          writeFile file: "run-identity.sh", text: """#!/bin/bash
+            sudo \\
+              ssl=true \\
+              VAULT_URL=https://\$(</host):8093 \\
+              SENDGRID_APIKEY='${SENDGRID_APIKEY_TESTNET2}' \\
+              HTTPS_PORT=8001 \\
+              ./identity
+          """
+          }
+
+          sh 'chmod +x run-identity.sh'
+          sh './run-identity.sh'
+          sh 'docker ps'
+
           // TODO: run node on https (also update check_availability function)
           withCredentials([
             usernamePassword(credentialsId: 'marketplace-global-admin', passwordVariable: 'GLOBAL_ADMIN_PASSWORD', usernameVariable: 'GLOBAL_ADMIN_NAME'),
@@ -107,8 +194,9 @@ pipeline {
                 VAULT_URL=https://\$(</host):8093 \\
                 VAULT_PROXY_DEBUG=true \\
                 certInfo='{"orgName":"BlockApps","orgUnit":"Engineering","commonName":"Test"}' \\
-                STRIPE_PAYMENT_SERVER_URL='https://payments.mercata-testnet2.blockapps.net' \\
-                FILE_SERVER_URL='https://fileserver.mercata-testnet2.blockapps.net/highway' \\
+                STRIPE_PAYMENT_SERVER_URL=https://\$(</host):44301 \\
+                FILE_SERVER_URL=https://\$(</host):44300/highway \\
+                idServerUrl=https://\$(</host):8001 \\
                 GLOBAL_ADMIN_NAME='${GLOBAL_ADMIN_NAME}' \\
                 GLOBAL_ADMIN_PASSWORD='${GLOBAL_ADMIN_PASSWORD}' \\
                 MP_IS_BOOTNODE='true' \\
@@ -242,6 +330,7 @@ pipeline {
                     docker compose -f docker-compose.stripe-ps.push.ecr.yml push 2>&1
                   '''
                   stash includes: 'strato-getting-started/**', name: 'stratoGettingStarted'
+                  stash includes: 'strato/indexer/slipstream/integrity_tests/**', name: 'slipstream_integrity_tests'
                 }
                 
                 // Push docker-compose files to Jenkins artifacts and AWS S3
@@ -303,6 +392,19 @@ pipeline {
                     lib.runSyncTester()
                   }
                 }
+                  unstash 'slipstream_integrity_tests'
+                  // script {
+                    dir('strato/indexer/slipstream/integrity_tests') {
+                       withCredentials([
+                            usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
+                            usernamePassword(credentialsId: 'keycloak-mercata-testnet2-localhost-client', passwordVariable: 'KEYCLOAK_MERCATATESTNET2_LOCALHOST_SECRET', usernameVariable: 'KEYCLOAK_MERCATATESTNET2_LOCALHOST_ID'),
+                                ]) {
+                        // Now CLIENT_ID1, CLIENT_SECRET1, and CLIENT_SECRET2 are available as environment variables
+                        sh "pip3 install -r requirements.txt"
+                        sh "python3 slipstream_sync.py '${KEYCLOAK_STRATODEVEL_DEV_ID}' '${KEYCLOAK_MERCATATESTNET2_LOCALHOST_ID}' '${KEYCLOAK_STRATODEVEL_DEV_SECRET}' '${KEYCLOAK_MERCATATESTNET2_LOCALHOST_SECRET}' 'strato-devel' 'mercata-testnet2'"
+                      }
+                    } 
+                
               }
               post {
                 always {

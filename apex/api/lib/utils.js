@@ -118,7 +118,7 @@ function consolidateHealthData(healthInfo, stallInfo, systemInfo, syncInfo) {
     healthStatus,
     healthIssues,
     uptime: healthStatHealth
-      ? currentTime - healthInfo.lastFailureTimestamp
+      ? (currentTime - healthInfo.lastFailureTimestamp) / 1000
       : 0,
     healthData: {
       healthChecks: {

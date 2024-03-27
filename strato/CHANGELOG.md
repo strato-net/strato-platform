@@ -20,16 +20,21 @@ so that they could be properly moved to their respective version's subsection.
 - functionality to enumerate threads and their details in `/threads` endpoint of `P2PAPI`
 - `/peers` endpoint in `P2PAPI` to list peer connections and their health
 - POST `/transaction` contract creation calls will now additionally check for address state ref table entry before resolving
+- Jenkins test to ensure slipstream post sync is consistent with boot node
 
 ### Changed
 - Optimized the byteString2Integer function that lies at the foundation of strato's RLP-related functionality (rlpDecode).
 - Optimized the integer2Bytes function that lies at the foundation of strato's RLP-related functionality (rlpEncode)
+- "DAO Fork" for mercata-hydrogen because buggy block got added to canonical blockchain
 
 ### Fixed
 - `sendOutEvent` inconsistenly encoding code pointer hash
 - simplified p2p conduit code so that all threads handling a peer live or die together using the `async` library
-- Fixed bug in BlockApps.X509.Certificate that filled in empty orgUnit fields with a space, rather than the empty string
 - Bugfix for slipstream regarding escaping quotes in contract name
+- Fixed bug in BlockApps.X509.Certificate that filled in empty orgUnit fields with a space, rather than the empty string
+- Fixed bug in Sequencer.hs that prevented nodes from syncing all the way after changes to the validator pool
+- Fixed bug in RedisBlockDB that filled in empty orgUnit fields with the word "Nothing", rather than the empty string
+- Minimal changes to statetree before all tx checks complete to prevent potential stateroot mismatches between when the bagger adds txs vs when the vm does
 
 ### Removed
 - Removed unnecessary stateDiff (and threading) in the vm-runner codebase, fixing numerous sources of persistent memory build-up.

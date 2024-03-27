@@ -105,12 +105,12 @@ module.exports = {
 
   healthStatus: async function (req, res, next) {
     try {
-      let health = null;
-      const [healthInfo, stallInfo, systemInfo, syncInfo, _] =
+      let health = null, uptime = null;
+      const [healthInfo, stallInfo, systemInfo, syncInfo] =
         await utils.getLatestHealth();
 
       if (healthInfo && stallInfo && systemInfo && syncInfo) {
-        ({ health } = utils.consolidateHealthData(
+        ({ health, uptime } = utils.consolidateHealthData(
           healthInfo,
           stallInfo,
           systemInfo,
@@ -127,6 +127,7 @@ module.exports = {
         version: process.env.STRATO_VERSION,
         timestamp: new Date().toISOString(),
         health: health,
+        uptime: uptime,
       });
     } catch (error) {
       console.error(error);
