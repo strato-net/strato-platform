@@ -247,7 +247,6 @@ const reducer = (state, action) => {
     case actionDescriptors.onboardSellerToMetamaskSuccessful:
       return {
         ...state,
-        metamaskStatus: true,
         isOnboardingSellerToMetamask: false
       };
     case actionDescriptors.onboardSellerToMetamaskFailed:

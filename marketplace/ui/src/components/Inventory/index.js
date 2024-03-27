@@ -50,8 +50,18 @@ const Inventory = ({ user }) => {
   const categoryDispatch = useCategoryDispatch();
 
   const { categorys } = useCategoryState();
-  const { inventories, isInventoriesLoading, message, success, isLoadingStripeStatus, stripeStatus, inventoriesTotal, isOnboardingSellerToMetamask, metamaskStatus } =
-    useInventoryState();
+  const {
+    inventories,
+    isInventoriesLoading,
+    message,
+    success,
+    isLoadingStripeStatus,
+    stripeStatus,
+    inventoriesTotal,
+    isOnboardingSellerToMetamask,
+    metamaskStatus,
+    isLoadingMetamaskStatus
+  } = useInventoryState();
 
   //items
   const itemDispatch = useItemDispatch();
@@ -71,9 +81,11 @@ const Inventory = ({ user }) => {
   }, [dispatch, limit, offset, debouncedSearchTerm, category]);
 
   useEffect(() => {
-    actions.sellerStripeStatus(dispatch, user?.commonName);
-    actions.sellerMetamaskStatus(dispatch, user?.commonName);
-  }, [dispatch, user]);
+    if(user) {
+      actions.sellerStripeStatus(dispatch, user?.commonName);
+      actions.sellerMetamaskStatus(dispatch, user?.commonName);
+    }
+  }, [dispatch, user, isOnboardingSellerToMetamask]);
 
   useEffect(() => {
     const placement = 'bottom'; // Set placement to 'bottomCenter'
@@ -167,75 +179,63 @@ const Inventory = ({ user }) => {
     navigate(routes.OnboardingSellerToStripe.url)
   }
   
-  const loginAndSwitchToSepolia = async () => {
+  const onboardMetamask = async () => {
+    // Check if MetaMask is available
     if (!window.ethereum) {
-      // displayMessage("Please install MetaMask to use this feature.", "error");
+      notification.error({
+        message: "MetaMask is not installed",
+        description: "Please install MetaMask to connect your wallet.",
+        placement: "bottom",
+      });
       return null;
     }
-  
+
     try {
+      // Request account access
       const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
-      let chainId = await window.ethereum.request({ method: "eth_chainId" });
-  
-      // Check if the current chain is not Sepolia
-      if (chainId !== '0xaa36a7') {
-        try {
-          // Try switching to Sepolia
-          await window.ethereum.request({
-            method: "wallet_switchEthereumChain",
-            params: [{ chainId: '0xaa36a7' }],
-          });
-        } catch (switchError) {
-          if (switchError.code === 4902) {
-            // If Sepolia is not added, try adding it
-            try {
-              await window.ethereum.request({
-                method: "wallet_addEthereumChain",
-                params: [
-                  {
-                    chainId: '0xaa36a7',
-                    chainName: "Sepolia Testnet",
-                    nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-                    rpcUrls: [process.env.REACT_APP_SEPOLIA_URL],
-                    blockExplorerUrls: ["https://sepolia.etherscan.io/"],
-                  },
-                ],
-              });
-            } catch (addError) {
-              console.error("Failed to add Sepolia network:", addError);
-              // displayMessage("Failed to add the Sepolia network. Please add it manually in MetaMask.", "error");
-              return null;
-            }
-          } else {
-            console.error("Failed to switch to the Sepolia network:", switchError);
-            // displayMessage("Please switch to the Sepolia network manually in MetaMask.", "error");
-            return null;
-          }
-        }
-  
-        // Re-fetch the chain ID after successfully switching or adding Sepolia
-        chainId = await window.ethereum.request({ method: "eth_chainId" });
-      }
-  
-      // If we're on the correct network, proceed with login
-      if (chainId === '0xaa36a7') {
-        // setUserAddress(accounts[0]);
-        // displayMessage("Connected with MetaMask on the Sepolia network", "success");
-        return accounts[0];
-      } else {
-        // displayMessage("Failed to switch to the Sepolia network. Please try again.", "error");
+      if (accounts.length === 0) {
+        notification.error({
+          message: "MetaMask is locked",
+          description: "Please unlock MetaMask to connect your wallet.",
+          placement: "bottom",
+        });
         return null;
       }
+      // Return the first account
+      notification.success({
+        message: "MetaMask connected",
+        description: "Your wallet is connected successfully.",
+        placement: "bottom",
+      });
+      return accounts[0];
     } catch (error) {
-      console.error(error);
-      // displayMessage("Could not connect with MetaMask. Please try again.", "error");
+      // Log and notify on error
+      console.error("Failed to connect to MetaMask:", error);
+      notification.error({
+        message: "MetaMask connection failed",
+        description: error.message || "Please try again.",
+        placement: "bottom",
+      });
+      return null;
     }
-  };  
+  };
   
   const onboardSellerOnMetamask = async () => {
-    const walletId = await loginAndSwitchToSepolia();
-    await actions.onboardSellerToMetamask(dispatch, walletId);
-  }
+    const walletId = await onboardMetamask();
+    if (!walletId) return;
+
+    // Perform seller onboarding with the obtained wallet ID
+    try {
+      await actions.onboardSellerToMetamask(dispatch, walletId);
+    } catch (error) {
+      console.error("Failed to onboard seller to MetaMask:", error);
+      notification.error({
+        message: "MetaMask onboarding failed",
+        description: error.message || "Please try again.",
+        placement: "bottom",
+      });
+    }
+  };
 
 const getAllSubcategories = (categories) => {
   let subcategories = [];
@@ -296,7 +296,7 @@ const metaImg = category ? category : SEO.IMAGE_META
               </Button>
             </div>
             <div className="flex gap-3">
-            <Button type="primary" className="w-40 h-9 "
+            <Button type="primary" className="w-40 h-9 flex items-center justify-center"
                 onClick={() => {
                   if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                     window.location.href = loginUrl;
@@ -304,7 +304,7 @@ const metaImg = category ? category : SEO.IMAGE_META
                     onboardSellerOnMetamask()
                   }
                 }}
-                loading={isOnboardingSellerToMetamask}
+                loading={isOnboardingSellerToMetamask || isLoadingMetamaskStatus}
                 disabled={metamaskStatus}
               >
                 {"Connect Metamask"}
