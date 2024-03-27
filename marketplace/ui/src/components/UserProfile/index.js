@@ -306,14 +306,12 @@ const UserProfile = ({user}) => {
           {breadcrumbs.map((breadcrumb, index) => {
             const isLast = index === breadcrumbs.length - 1;
             return (
-              <Breadcrumb.Item key={index} href={breadcrumb.path} onClick={e => isLast && e.preventDefault()}>
+              <Breadcrumb.Item key={index}>
                 {breadcrumb.path && !isLast ? (
                   // If it has a path and it's not the last breadcrumb, it's styled as a clickable link
-                  <ClickableCell href={breadcrumb.path}>
-                    <p className="text-sm text-[#13188A] font-semibold">
+                  <Link to={breadcrumb.path} className="text-sm !text-[#13188A] font-semibold">
                       {breadcrumb.text}
-                    </p>
-                  </ClickableCell>
+                    </Link>
                 ) : (
                   // Last breadcrumb or if it has no path
                   <p className={`text-sm ${isLast ? 'text-black' : 'text-[#13188A]'} ${isLast ? 'font-normal' : 'font-semibold'}`}>
