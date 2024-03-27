@@ -184,6 +184,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                         });
                         if (await addItemToCart(topSellingProduct, quantity) === true) {
                             navigate("/checkout")
+                            window.scrollTo(0, 0);
                         }
                     }}
                 >
