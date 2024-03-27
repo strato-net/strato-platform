@@ -271,19 +271,19 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     handleCategoryChange(category)
    }  
 
-   setSelectedCategory('Carbon')
+   setSelectedCategory(category)
    navigateSearch(category, value)
   }
 
   const checkCategory = (value) => {
-    const searchQuery = `&queryValue=${value}&queryFields=name`
+    const searchQuery = value ? `?queryValue=${value}&queryFields=name` : '';
     
     const fetchFunction = isAuthenticated
       ? fetch(
-        `${apiUrl}/marketplace/all?${searchQuery}`,
+        `${apiUrl}/marketplace/all${searchQuery}`,
         { method: HTTP_METHODS.GET, } )
       : fetch(
-        `${apiUrl}/marketplace?${searchQuery}`,
+        `${apiUrl}/marketplace${searchQuery}`,
         { method: HTTP_METHODS.GET, }
       );
      try {
@@ -333,7 +333,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const handleChangeSearch = (e) => {
     const value = e.target.value;
     if (value.length === 0 && searchQueryValue) {
-      navigateSearch('',value)
+      navigateSearch('All',value)
     }
   }
 
