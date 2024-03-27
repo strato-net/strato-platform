@@ -1,5 +1,5 @@
 import cron from 'node-cron';
-import  generateSitemap from './generateSitemaps.mjs';
+import { default as generateSitemap } from './generateSitemaps.js';
 
 const myTask = () => {
     console.log('Cron job executed!');

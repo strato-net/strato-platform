@@ -1,5 +1,5 @@
-import { createWriteStream } from 'fs';
-import axios from 'axios';
+const { createWriteStream } = require('fs');
+const axios = require('axios');
 
 const url = [
   "/",
@@ -101,4 +101,4 @@ async function generateSitemap() {
   }
 }
 
-export default generateSitemap;
+module.exports = generateSitemap;
