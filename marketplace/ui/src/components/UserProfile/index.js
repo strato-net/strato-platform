@@ -190,11 +190,12 @@ const UserProfile = ({user}) => {
 
       if (referrer.includes('/dp/')) {
         const segments = referrer.split('/'); // Split the referrer by '/'
-        const productID = segments.pop(); // Get the last segment, which should be the address
+        const productID = segments[2];
+        const productName = segments.pop(); // Get the last segment, which should be the address
     
         // productID check before pushing to breadcrumbs
         if (productID) {
-          const productDetailsPath = new URL(`/dp/${productID}`, window.location.origin).toString();
+          const productDetailsPath = new URL(`/dp/${productID}/${productName}`, window.location.origin).toString();
           initialBreadcrumbs.push({ text: 'Product Details', path: productDetailsPath });
         }
       } else if (referrer.includes('/order/bought')) {
