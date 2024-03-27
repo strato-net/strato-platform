@@ -5,6 +5,8 @@ import {
   notification,
   Spin,
   Button,
+  Modal,
+  List
 } from "antd";
 import {
   useMarketplaceState,
@@ -88,11 +90,12 @@ const ConfirmOrder = () => {
   const [shipping, setShipping] = useState(0);
   const [total, setTotal] = useState(0);
   const inventoryDispatch = useInventoryDispatch();
-  const { isLoadingStripeStatus, stripeStatus } = useInventoryState();
+  const { isLoadingStripeStatus, stripeStatus, isLoadingMetamaskStatus, metamaskStatus } = useInventoryState();
   const { success: marketplaceSuccess, message: marketplaceMessage } = useMarketplaceState();
   const [modalAddress, setmodalAddress] = useState(false);
   const [responsiveAddress, setResponsiveAddress] = useState(false);
   const [showAddress, setshowAddress] = useState(false);
+  const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
 
 
   const CloseAddressModel = () => {
@@ -312,48 +315,153 @@ const ConfirmOrder = () => {
     },
   ];
 
-  const handlePaymentConfirm = async () => {
+  const handlePaymentConfirm = async (method) => {
+    setIsPaymentModalVisible(false); // Close the payment modal
     if (userAddresses.length === 0) {
       api.error({
         message: "Please enter an address",
         placement: "bottom",
       });
-    } else {
-      let orderList = [];
-      confirmOrderList.forEach((item) => {
-        orderList.push({
-          quantity: item.qty,
-          assetAddress: item.key,
-          firstSale: item.firstSale,
-          unitPrice: item.unitPrice
-        });
-      });
-      // These additional fields need to be sent to form the request after stripe. 
-      let body = {
-        paymentList: PAYMENT_LIST,
-        buyerOrganization: userOrganization,
-        orderList,
-        orderTotal: total + tax + shipping,
-        shippingAddressId: userAddresses[selectedAddress].address_id,
-        tax: tax,
-        user: user.commonName,
-        email: user.email,
-      };
+      return;
+    }
+    
+    const saleAddresses = data.map(item => item.saleAddress);
+    const quantities = data.map(item => item.qty);
+    const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities);
+    
+    if (checkQuantity !== true) {
+      let insufficientQuantityMessage = "";
+      let outOfStockMessage = "";
 
-      window.LOQ.push(['ready', async LO => {
-        // Track an event
-        await LO.$internal.ready('events')
-        LO.events.track('Buy Now Button')
-      }])
-      TagManager.dataLayer({
-        dataLayer: {
-          event: 'pay_now_button',
-        },
+      checkQuantity.forEach(detail => {
+        if (detail.availableQuantity === 0) {
+          outOfStockMessage += `Product ${detail.assetName}\n`;
+        } else {
+          insufficientQuantityMessage += `Product ${detail.assetName}: ${detail.availableQuantity}\n`;
+        }
       });
 
-      let data = await orderActions.createPayment(orderDispatch, body);
+      let errorMessage = "";
+      if (insufficientQuantityMessage) {
+        errorMessage += `The following item(s) in your cart have limited quantity available and will need to be adjusted. Please reduce the quantity to proceed:\n${insufficientQuantityMessage}`;
+      }
+      if (outOfStockMessage) {
+        if (errorMessage) errorMessage += "\n"; // Add a new line if there's already an error message
+        errorMessage += `The following item(s) are temporarily out of stock and should be removed:\n${outOfStockMessage}`;
+      }
+      openToastOrder("bottom", errorMessage);
+      return;
+    }
+    
+    let orderList = [];
+    confirmOrderList.forEach((item) => {
+      orderList.push({
+        quantity: item.qty,
+        assetAddress: item.key,
+        firstSale: item.firstSale,
+        unitPrice: item.unitPrice
+      });
+    });
+    // These additional fields need to be sent to form the request after stripe. 
+    let body = {
+      paymentList: PAYMENT_LIST,
+      buyerOrganization: userOrganization,
+      orderList,
+      orderTotal: total + tax + shipping,
+      shippingAddressId: userAddresses[selectedAddress].address_id,
+      tax: tax,
+      user: user.commonName,
+      email: user.email,
+    };
+
+    window.LOQ.push(['ready', async LO => {
+      // Track an event
+      await LO.$internal.ready('events')
+      LO.events.track('Buy Now Button')
+    }])
+    TagManager.dataLayer({
+      dataLayer: {
+        event: 'pay_now_button',
+      },
+    });
+    if (method === "stripe") {
+      let data = await orderActions.createOrder(orderDispatch, body);
       if (data != null && data.url !== undefined) {
-        window.location.replace(data.url);
+        window.location.replace
+          (data.url);
+      } 
+    } else if (method === "metamask") {
+      if (!window.ethereum) {
+        notification.error({
+          message: "MetaMask is not installed",
+          description: "Please install MetaMask to connect your wallet.",
+          placement: "bottom",
+        });
+        return null;
+      }
+      try {
+        // Request account access
+        const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+        if (accounts.length === 0) {
+          notification.error({
+            message: "MetaMask is locked",
+            description: "Please unlock MetaMask to connect your wallet.",
+            placement: "bottom",
+          });
+          return null;
+        }
+        
+        await window.ethereum.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: "0x1" }],
+        });
+        
+        const txParams = {
+          from: accounts[0],
+          to: process.env.REACT_APP_CONTRACT_ADDRESS,
+          value: window.ethereum.utils.toHex(window.ethereum.utils.toWei("2", "ether")),
+          chainId: "0x1",
+        };
+        
+        const tx = await window.ethereum.request({
+          method: "eth_sendTransaction",
+          params: [txParams],
+        });
+        await tx.wait();
+        console.log("Transaction tx:", tx);
+        const transaction = await window.ethereum.request({
+          method: 'eth_getTransactionByHash',
+          params: [tx.Hash],
+        });
+        
+        const transactionValueInEther = window.ethereum.utils.fromWei(transaction.value, "ether");
+        
+        if (transactionValueInEther === "2") {
+          notification.success({
+            message: "Transaction Successful",
+            description: `Your payment of 2 ETH has been successfully processed. Transaction Hash: ${tx.Hash}`,
+            placement: "bottom",
+          });
+        } else {
+          console.error("Transaction value mismatch.");
+          notification.error({
+            message: "Transaction Error",
+            description: "There was a mismatch in the transaction value.",
+            placement: "bottom",
+          });
+        } 
+        
+        // Create order and redirect to order details page
+        return;
+      } catch (error) {
+        // Log and notify on error
+        console.error("Failed to connect to MetaMask:", error);
+        notification.error({
+          message: "MetaMask connection failed",
+          description: error.message || "Please try again.",
+          placement: "bottom",
+        });
+        return null;
       }
     }
   };
@@ -361,6 +469,7 @@ const ConfirmOrder = () => {
   useEffect(() => {
     if (data.length !== 0) {
       inventoryAction.sellerStripeStatus(inventoryDispatch, data[0]["sellersCommonName"]);
+      inventoryAction.sellerMetamaskStatus(inventoryDispatch, data[0]["sellersCommonName"]);
     }
   }, [inventoryDispatch, data]);
 
@@ -396,45 +505,14 @@ const ConfirmOrder = () => {
               </Breadcrumb>
               <div className="flex justify-between items-center pt-6 md:pb-2">
                 <Typography className="text-[#202020] text-base md:text-xl lg:text-2xl  font-bold lg:font-semibold">My Cart</Typography>
-                {stripeStatus && <button id="pay-now-button" className={`p-1 md:p-3 h-max rounded-lg border ${stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled ? 'border-primary bg-primary hover:bg-primaryHover text-white' : 'cursor-not-allowed border-[#999999] rounded bg-[#cccccc] text-[#666666]'}`}
-                  onClick={async () => {
-                    if (stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled) {
-                      const saleAddresses = [];
-                      const quantities = [];
-                      data.forEach((item) => {
-                        saleAddresses.push(item.saleAddress)
-                        quantities.push(item.qty)
-                      })
-                      const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities)
-                      if (checkQuantity === true) {
-                        handlePaymentConfirm();
-                      } else {
-                        let insufficientQuantityMessage = "";
-                        let outOfStockMessage = "";
-
-                        checkQuantity.forEach(detail => {
-                          if (detail.availableQuantity === 0) {
-                            outOfStockMessage += `Product ${detail.assetName}\n`;
-                          } else {
-                            insufficientQuantityMessage += `Product ${detail.assetName}: ${detail.availableQuantity}\n`;
-                          }
-                        });
-
-                        let errorMessage = "";
-                        if (insufficientQuantityMessage) {
-                          errorMessage += `The following item(s) in your cart have limited quantity available and will need to be adjusted. Please reduce the quantity to proceed:\n${insufficientQuantityMessage}`;
-                        }
-                        if (outOfStockMessage) {
-                          if (errorMessage) errorMessage += "\n"; // Add a new line if there's already an error message
-                          errorMessage += `The following item(s) are temporarily out of stock and should be removed:\n${outOfStockMessage}`;
-                        }
-                        openToastOrder("bottom", errorMessage);
-                      }
-                    }
-                  }}
+                <button
+                  id="pay-now-button"
+                  className="p-1 md:p-3 h-max rounded-lg border border-primary bg-primary hover:bg-primaryHover text-white"
+                  // Rest of the button props
+                  onClick={() => setIsPaymentModalVisible(true)}
                 >
                   Review and Submit
-                </button>}
+                </button>
               </div>
             </div>
           </div>
@@ -505,6 +583,34 @@ const ConfirmOrder = () => {
                     </>
                   }
                 </Row>
+                {isPaymentModalVisible && (
+                  <Modal
+                    title="Select Payment Method"
+                    open={isPaymentModalVisible}
+                    onCancel={() => setIsPaymentModalVisible(false)}
+                    footer={null} // Remove default buttons
+                  >
+                    <List>
+                      <List.Item>
+                        <Button
+                          disabled={!stripeStatus || !stripeStatus?.chargesEnabled || !stripeStatus?.detailsSubmitted || !stripeStatus?.payoutsEnabled}
+                          onClick={() => handlePaymentConfirm('stripe')}
+                        >
+                          Pay with Stripe
+                        </Button>
+                      </List.Item>
+                      <List.Item>
+                        <Button
+                          disabled={!metamaskStatus} // Adjust based on how metamaskStatus indicates availability
+                          onClick={() => handlePaymentConfirm('metamask')}
+                        >
+                          Pay with MetaMask
+                        </Button>
+                      </List.Item>
+                    </List>
+                  </Modal>
+                )}
+
                 {modalAddress && <AddAddressModal open={modalAddress} close={CloseAddressModel} />}
                 <div>
                   <div className="mt-4">
