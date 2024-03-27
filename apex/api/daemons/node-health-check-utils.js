@@ -187,7 +187,17 @@ async function getStratoMetadata() {
   return await rp(options);
 }
 
-function reformatPrometheusMetrics(obj) {
+// TODO rewrite this guy!
+// Should return an object like: 
+// {
+//   'core-api': true,
+//   slipstream: true,
+//   'strato-p2p': true,
+//   'strato-sequencer': true,
+//   'vm-runner': true
+// }
+// but the logic must be simpler and prevent issues when no results are returned.
+  function reformatPrometheusMetrics(obj) {
   if (!(obj && obj.data && obj.data.result)) {
     winston.warn(
       `Not Found results while querying health status: prometheus path might be incorrect`
@@ -224,7 +234,7 @@ function reformatPrometheusMetrics(obj) {
           ? true
           : false;
     } else {
-      winston.info(`Metric format is updated; need to update its handling`);
+      winston.error(`Unexpected Prometheus response format`);
     }
   });
 
@@ -237,6 +247,16 @@ function reformatPrometheusMetrics(obj) {
 
   winston.info("Create entry for latest health status:", ret);
 
+  // TODO: Quick dirty fix for cases with empty metrics array returned from Prometheus - REWRITE the whole thing!
+  if (!Array.isArray(res) || res.length === 0) {
+    winston.error('Unexpected format of Prometheus metrics, or the metrics are empty!')
+    let newReturn = {};
+    for (let key in neededJobs) {
+      newReturn[neededJobs[key]] = false;
+    }
+    return newReturn;
+  }
+  
   return ret;
 }
 

@@ -148,15 +148,13 @@ strato: build_common
 
 develop: build_common_fast
 	@echo Now building core-strato using --fast...
-	cp -fr strato/licenses ${STRATODIR}
-	cp strato/doit.sh ${STRATODIR}
+	cp -fr strato/extraFiles/* ${STRATODIR}
 	docker build --target strato --tag ${REPO_URL}strato:${VERSION} --file Dockerfile.multi ${FAKEROOT}
 	docker tag ${REPO_URL}strato:${VERSION} ${REPO_AWS_ECR_URL}strato:${VERSION}
 
 profile: build_common_profiled
 	@echo Now building core-strato using --profile...
-	cp -fr strato/licenses ${STRATODIR}
-	cp strato/doit.sh ${STRATODIR}
+	cp -fr strato/extraFiles/* ${STRATODIR}
 	docker build --target strato --tag ${REPO_URL}strato:${VERSION} --file Dockerfile.multi ${FAKEROOT}
 	docker tag ${REPO_URL}strato:${VERSION} ${REPO_AWS_ECR_URL}strato:${VERSION}
 
@@ -207,8 +205,7 @@ docker-compose:
 	awk '/build: ./{getline} 1' docker-compose.stripe-ps.push.ecr.yml > docker-compose.stripe-ps.ecr.yml
 
 docker-build:
-	cp -fr strato/licenses ${STRATODIR}
-	cp strato/doit.sh ${STRATODIR}
+	cp -fr strato/extraFiles/* ${STRATODIR}
 	docker build --target strato --tag ${REPO_URL}strato:${VERSION} --file Dockerfile.multi ${FAKEROOT}
 
 test:

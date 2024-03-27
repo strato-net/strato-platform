@@ -1,4 +1,50 @@
 import { Extension } from "@tiptap/react";
+import { Node } from '@tiptap/core';
+
+export class BlockquoteNode extends Node {
+  get name() {
+    return 'blockquote';
+  }
+
+  get schema() {
+    return {
+      content: 'block+',
+      defining: true,
+      parseDOM: [{ tag: 'blockquote' }],
+      toDOM: () => ['blockquote', 0],
+    };
+  }
+}
+
+export class UnorderedListNode extends Node {
+  get name() {
+    return 'bulletList';
+  }
+
+  get schema() {
+    return {
+      content: 'listItem+',
+      group: 'block',
+      parseDOM: [{ tag: 'ul' }],
+      toDOM: () => ['ul', 0],
+    };
+  }
+}
+
+export class OrderedListNode extends Node {
+  get name() {
+    return 'orderedList';
+  }
+
+  get schema() {
+    return {
+      content: 'listItem+',
+      group: 'block',
+      parseDOM: [{ tag: 'ol' }],
+      toDOM: () => ['ol', 0],
+    };
+  }
+}
 
 export const FontSize = Extension.create({
     name: "fontSize",

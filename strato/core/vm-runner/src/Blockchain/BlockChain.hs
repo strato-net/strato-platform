@@ -64,6 +64,7 @@ import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.Options (computeNetworkID)
 import qualified Blockchain.Strato.StateDiff as SD
 import Blockchain.TheDAOFork
 import Blockchain.Timing
@@ -226,7 +227,8 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
             Just cr -> $logDebugS "addBlock" $ T.pack $ "New chain root after inserting header: " ++ format cr
 
         bSum <- setParentStateRoot b
-        when (False && blockDataNumber bd == 1920000) runTheDAOFork -- TODO: Only run this if connected to Ethereum publicnet (i.e. never)
+        -- TODO: PLEASE REMOVE THIS FORK WHEN MERCATA-HYDROGEN IS OBSOLETE
+        when (computeNetworkID == 7596898649924658542 && blockDataNumber bd == 32624) runTheDAOFork -- Only run this if connected to mercata-hydrogen
         addBlockTransactions b
 
         postRewardSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
@@ -355,18 +357,13 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
       realIG = fromIntegral intrinsicGas'
       maxGas = fromIntegral (maxBound :: Int)
 
-  unless flags_gasOn $ do
-    $logInfoS "addTx" . T.pack $ "gas is off, so I'm giving the account enough balance for this TX"
-    faucetSuccess <- lift $ addToBalance tAcct txCost
-    unless faucetSuccess $ error "failed to give balance to a gasOff account"
-
   (acctBalance, acctNonce) <-
     lift $
       (addressStateBalance &&& addressStateNonce)
         <$> A.lookupWithDefault (Proxy @AddressState) tAcct
 
   when (chainId /= txChainId bt) $ throwE $ TFChainIdMismatch chainId (txChainId bt) t
-  when (txCost > acctBalance) $ throwE $ TFInsufficientFunds txCost acctBalance t
+  when (flags_gasOn && txCost > acctBalance) $ throwE $ TFInsufficientFunds txCost acctBalance t
   when (realIG > transactionGasLimit bt) $ throwE $ TFIntrinsicGasExceedsTxLimit realIG (transactionGasLimit bt) t
   when (transactionGasLimit bt > min remainingBlockGas maxGas) $ throwE $ TFBlockGasLimitExceeded (transactionGasLimit bt) remainingBlockGas t
   unless nonceValid $ throwE $ TFNonceMismatch (transactionNonce bt) acctNonce t
@@ -376,12 +373,15 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
     . throwE
     $ TFTXSizeLimitExceeded txSize flags_txSizeLimit t
 
-  let availableGas = transactionGasLimit bt - fromIntegral intrinsicGas'
+  unless flags_gasOn $ do
+    $logInfoS "addTx" . T.pack $ "gas is off, so I'm giving the account enough balance for this TX"
+    faucetSuccess <- lift $ addToBalance tAcct txCost
+    unless faucetSuccess $ error "failed to give balance to a gasOff account"
 
   lift $ incrementNonce tAcct
 
   success <- lift $ addToBalance tAcct (-transactionGasLimit bt * transactionGasPrice bt)
-
+  
   when (otHash t `S.member` knownFailedTxs) . throwE $ TFKnownFailedTX t
 
   when flags_debug $ $logDebugS "addTx" "running code"
@@ -416,6 +416,7 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
         lift $
           addressStateBalance
             <$> A.lookupWithDefault (Proxy @AddressState) tAcct
+      let availableGas = transactionGasLimit bt - fromIntegral intrinsicGas'
       $logInfoS "addTransaction/success=false" . T.pack $ "Insufficient funds to run the VM: need " ++ show (availableGas * transactionGasPrice bt) ++ ", have " ++ show balance
       return $
         evmErrorResults (transactionGasLimit bt) Blockchain.VM.VMException.InsufficientFunds
