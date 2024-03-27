@@ -259,6 +259,7 @@ const ResponsiveCart = ({
                       });
 
                       navigate("/confirmOrder");
+                      window.scrollTo(0, 0);
 
                   } else {
                       let insufficientQuantityMessage = "";
