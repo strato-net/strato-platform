@@ -646,9 +646,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       if (sellerMetaMaskDetails.length == 0 || Object.keys(sellerMetaMaskDetails[0]).length == 0) {
         await paymentProviderJs.uploadContract(rawAdmin, {name: `METAMASK`, accountId: walletId}, options);
-        return { status: 201, success: true, message: "MetaMask account successfully linked with wallet." };
-      } else {
-        return { status: 200, success: true, message: "MetaMask account already exists." };
       }
     } catch (error) {
       console.error(`${error}`)

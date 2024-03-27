@@ -8,16 +8,7 @@ class PaymentServiceController {
     try {
       const { params, dapp } = req;
       const result = await dapp.metamaskOnboarding(params)
-      
-      if (result.status === 201) {
-        rest.response.status201(res, result);
-      } else if (result.status === 200) {
-          rest.response.status200(res, result);
-      } else {
-          // If for some reason a different status code is returned, handle it appropriately
-          console.error(`Unhandled status code: ${result.status}`);
-          rest.response.status500(res, { message: "Internal Server Error" });
-      }
+      rest.response.status200(res, result)
 
       return next();
     } catch (e) {
@@ -28,11 +19,8 @@ class PaymentServiceController {
   static async metamaskOnboardingStatus(req, res, next) {
     try {
       const { dapp, params } = req
-      console.log("here1")
       PaymentServiceController.validateGetStripeOnboardingStatusArgs(params)
-      console.log("here2")
       const result = await dapp.getMetamaskOnboardingStatus(params)
-      console.log("here3: ", result)
       rest.response.status200(res, result)
 
       return next()
