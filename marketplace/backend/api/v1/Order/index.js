@@ -127,7 +127,7 @@ router.put(
 
 router.post(
   Order.checkSaleQuantity,
-  authHandler.authorizeRequest(),
+  authHandler.authorizeRequest(true),
   loadDapp,
   OrderController.checkSaleQuantity
 )

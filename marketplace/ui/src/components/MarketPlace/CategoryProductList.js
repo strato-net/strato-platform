@@ -34,6 +34,8 @@ import './index.css'
 import { actions as orderActions } from "../../contexts/order/actions"
 import { useOrderDispatch} from "../../contexts/order";
 import { debounce } from 'lodash';
+import HelmetComponent from "../Helmet/HelmetComponent";
+import { SEO } from "../../helpers/seoConstant";
 
 const { Panel } = Collapse;
 const { Text } = Typography;
@@ -42,6 +44,9 @@ const CategoryProductList = ({ user }) => {
 
   const location = useLocation();
   const navigate = useNavigate();
+
+  const { state } = location;
+
   const queryParams = new URLSearchParams(location.search);
 
   const searchQueryValue = queryParams.get('search');
@@ -58,8 +63,9 @@ const CategoryProductList = ({ user }) => {
   const [uniqueProductNames, setUniqueProductNames] = useState([]);
   const [desktopOpenFilter, setDesktopOpenFilter] = useState(true);
   const [mobileOpenFilter, setMobileOpenFilter] = useState(false);
-  const [search, setSearch] = useState(searchQueryValue)
-  const [unSelected, setUnSelected] = useState([])
+  const [search, setSearch] = useState(searchQueryValue);
+  const [unSelected, setUnSelected] = useState([]);
+  const [scrollPosition, setScrollPosition] = useState(state?.scroll || 0);
 
   //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
@@ -68,7 +74,7 @@ const CategoryProductList = ({ user }) => {
   const orderDispatch = useOrderDispatch();
   // states
   const { marketplaceList, isMarketplaceLoading } = useMarketplaceState();
-  const { categorys } = useCategoryState();
+  const { categorys, iscategorysLoading } = useCategoryState();
   let { hasChecked, isAuthenticated } = useAuthenticateState();
   const { subCategorys } = useSubCategoryState();
   const { cartList } = useMarketplaceState();
@@ -76,6 +82,28 @@ const CategoryProductList = ({ user }) => {
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
   }, []);
+
+  const isLoading = isMarketplaceLoading;
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrollPosition(window.scrollY);
+    };
+  
+   if(!isLoading && !iscategorysLoading){
+     window.addEventListener('scroll', handleScroll);
+   }
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
+  useEffect(() => {
+    if(!isLoading){
+      window.scrollTo(0, state?.scroll);
+    }
+  }, [isLoading]);
 
   const onChangeCategory = (checkedValues) => {
     const categoryStr = checkedValues.join(",");
@@ -94,10 +122,6 @@ const CategoryProductList = ({ user }) => {
     const url = baseUrl.pathname + baseUrl.search;
     navigate(url);
     setSelectedCategories(checkedValues);
-
-    if (checkedValues.length === 0) {
-      clearSelection();
-    }
   };
 
   useEffect(() => {
@@ -115,13 +139,11 @@ const CategoryProductList = ({ user }) => {
       setSubCategories(subCategorys);
     }
   }, [unSelected, subCategorys, selectedSubCategories, subCategories]);
-  
+
   useEffect(() => {
     let categorys = null;
-    if (selectedCategories.length) {
-      categorys = arrayToStr(selectedCategories);
-      subCategoryActions.fetchSubCategoryList(subCategoryDispatch, categorys);
-    }
+    categorys = arrayToStr(selectedCategories);
+    subCategoryActions.fetchSubCategoryList(subCategoryDispatch, categorys);
   }, [subCategoryDispatch, selectedCategories]);
 
   const onChangeSubCategory = (e) => {
@@ -150,7 +172,7 @@ const CategoryProductList = ({ user }) => {
       const url = baseUrl.pathname + baseUrl.search;
       setUnSelected([])
       setSelectedCategories(categoryData)
-      navigate(url, { replace: true });
+      navigate(url);
     }
 
     setUnSelected(unSelectedSubCat)
@@ -188,27 +210,49 @@ const CategoryProductList = ({ user }) => {
     searchQueryValue
   ]);
 
+  const generateBaseUrl = () =>{
+    const baseUrl = new URL('/category', window.location.origin);
+
+    if (categoryQueryValue) {
+      baseUrl.searchParams.set('category', categoryQueryValue);
+    }
+    if (search) {
+      baseUrl.searchParams.set('search', search);
+    }
+
+    const url = baseUrl.pathname + baseUrl.search;
+    return url;
+  }
+
   useEffect(() => {
     const timeOut = setTimeout(() => {
-      const baseUrl = new URL('/category', window.location.origin);
-
-      if (categoryQueryValue) {
-        baseUrl.searchParams.set('category', categoryQueryValue);
-      }
-      if (search) {
-        baseUrl.searchParams.set('search', search);
-      }
-
-      const url = baseUrl.pathname + baseUrl.search;
-      navigate(url, { replace: true });
-    }, 1000);
+     const url = generateBaseUrl();
+      navigate(url, { state: { scroll: scrollPosition }});
+    }, 500);
 
     return () => {
       clearTimeout(timeOut);
     };
   }, [search, minPrice, maxPrice]);
 
+  useEffect(()=>{
+      
+
+      const url = generateBaseUrl();
+        if(!isLoading){
+          navigate(url, { state: { scroll: scrollPosition } });
+      }else{
+        navigate(url, { state: { scroll: state?.scroll || 0 } });
+      }
+      
+  },[scrollPosition])
+
   //=========================Other functions===============================//
+  const linkUrl = window.location.href;
+  const metaTitle = selectedCategories.length === 1 ? `${selectedCategories[0]} | ${SEO.TITLE_META} ` : `${SEO.TITLE_META}`
+  const metaImg = selectedCategories.length === 1 ? `${selectedCategories[0]}` : `${SEO.IMAGE_META}`
+  const metaCategory = selectedCategories.length === 1 ? `?category=${selectedCategories[0]}` : '' 
+  const metaDescription = SEO.DESCRIPTION_META
 
   const clearSelection = () => {
     setSelectedSubCategories([]);
@@ -265,7 +309,7 @@ const CategoryProductList = ({ user }) => {
     if (foundIndex === -1) {
       // Product not found, check quantity before adding
       const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity]);
-      console.log("checkQuantity", checkQuantity)
+
       if (checkQuantity === true) {
         // Quantity check passed, add new item to the cart
         items.push({ product, qty: quantity });
@@ -303,8 +347,6 @@ const CategoryProductList = ({ user }) => {
       }
     }
   };
-  
-  
 
   const openToast = (placement, isError, msg) => {
     let msgObj = {
@@ -320,7 +362,6 @@ const CategoryProductList = ({ user }) => {
     setSearch(value)
   }
 
-  const isLoading = isMarketplaceLoading;
 
   const BreadCrumbComponent = () =>
     <Breadcrumb className="text-xs ml-4 md:ml-14 mt-14 lg:mt-5">
@@ -376,7 +417,15 @@ const CategoryProductList = ({ user }) => {
       ghost="true"
       reverse={false}
       expandIcon={({ isActive }) =>
-        isActive ? <img src={Images.Dropdown} alt="img" style={{ width: "24px", height: "24px", transform: "rotate(180deg)" }} /> : <img src={Images.Dropdown} alt="img" style={{ width: "24px", height: "24px" }} />
+        isActive ? 
+        <img src={Images.Dropdown} 
+        alt={metaImg} 
+        title={metaImg} 
+        style={{ width: "24px", height: "24px", transform: "rotate(180deg)" }} /> : 
+        <img src={Images.Dropdown} 
+        alt={metaImg} 
+        title={metaImg} 
+        style={{ width: "24px", height: "24px" }} />
       }
     >
       {children}
@@ -510,22 +559,41 @@ const CategoryProductList = ({ user }) => {
     <div className="h-full w-full bg-[#00000020] absolute top-0 md:hidden"></div>
   </div>
 
+  const handleSearchFocus = () =>{
+    const url = generateBaseUrl();
+    navigate(url, { state: { scroll: 0 }});
+    window.scrollTo(0, 0);
+  }
+
   return (
+    <>
+   <HelmetComponent 
+          title={metaTitle}
+          description={metaDescription} 
+          link={linkUrl} />
     <div className={`${mobileOpenFilter ? 'overflow-y-hidden h-[100vh] w-[100vw] bg-[#00000020] relative mt-0 md:bg-white md:mt-[auto] md:overflow-scroll trending_cards' : ' '}`}>
       <div className="fixed bg-white w-full top-7 z-10 md:static">
         {BreadCrumbComponent()}
 
         <div className="flex items-center justify-center ml-4 md:ml-14 mr-14 mt-6 lg:mt-8 gap-4">
           <div className="border border-solid border-[#6A6A6A] rounded-md cursor-pointer p-1 md:p-2" onClick={handleFilterClick}>
-            <img src={Images.filter} alt="filter" className=" w-5 h-5 md:w-6 md:h-6" />
+            <img src={Images.filter} 
+            alt={metaImg}
+            title={metaImg}
+            className=" w-5 h-5 md:w-6 md:h-6" />
           </div>
 
           <div className={`flex-1`}>
             <Input
               size="large"
               onChange={(e) => { handleChangeSearch(e) }}
+              onClick={handleSearchFocus}
               placeholder="Search Marketplace"
-              prefix={<img src={Images.Header_Search} alt="search" className="w-[18px] h-[18px]" />}
+              prefix={
+              <img src={Images.Header_Search} 
+              alt={metaImg} 
+              title={metaImg} 
+              className="w-[18px] h-[18px]" />}
               className="bg-[#F6F6F6] border-none rounded-3xl p-[10px]"
             />
           </div>
@@ -588,6 +656,7 @@ const CategoryProductList = ({ user }) => {
 
       {mobileOpenFilter && MobileFilterComponent()}
     </div>
+    </>
   );
 };
 

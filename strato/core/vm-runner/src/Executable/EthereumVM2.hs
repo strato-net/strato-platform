@@ -148,16 +148,11 @@ handleVmEvents useSyncMode = awaitForever $ \InBatch {..} -> do
 groupEithers :: [Either a b] -> [Either [a] [b]]
 groupEithers = foldr f []
   where
-    f (Left l) b =
-      let ~(ls, es) = case b of
-            (Left ls') : es' -> (ls', es')
-            es' -> ([], es')
-       in (Left $ l : ls) : es
-    f (Right r) b =
-      let ~(rs, es) = case b of
-            (Right rs') : es' -> (rs', es')
-            es' -> ([], es')
-       in (Right $ r : rs) : es
+    f :: Either a b -> [Either [a] [b]] -> [Either [a] [b]]
+    f (Left l) ((Left ls):es) = (Left (l:ls)) : es
+    f (Right r) ((Right rs):es) = (Right (r:rs)) : es
+    f (Left l) es = (Left [l]) : es
+    f (Right r) es = (Right [r]) : es
 
 processBlocksAndNewChains ::
   (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) =>
