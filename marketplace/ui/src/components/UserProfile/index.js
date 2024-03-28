@@ -161,7 +161,7 @@ const UserProfile = ({user}) => {
     // Inventories For Sale fetch
     useEffect(() => {
       if(commonName){
-          inventoryActions.fetchInventoryForUser(dispatch, 10, 0, commonName);
+          inventoryActions.fetchInventoryForUser(dispatch, commonName);
         }
       }, [dispatch, hasChecked, isAuthenticated, loginUrl, commonName]);
   
