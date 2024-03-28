@@ -77,6 +77,7 @@ const CategoryProductList = ({ user }) => {
   let { hasChecked, isAuthenticated } = useAuthenticateState();
   const { subCategorys } = useSubCategoryState();
   const { cartList } = useMarketplaceState();
+  const [scrollPosition, setScrollPosition] = useState(0);
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
@@ -213,7 +214,7 @@ const CategoryProductList = ({ user }) => {
 
   useEffect(() => {
     const handleScroll = () => {
-      saveScrollPosition(window.scrollY);
+      setScrollPosition(window.scrollY);
     };
 
     window.addEventListener('scroll', handleScroll);
@@ -238,7 +239,7 @@ const CategoryProductList = ({ user }) => {
     if (!isLoading) {
       window.scrollTo(0, state?.scroll);
     }
-  }, [isLoading]);
+  }, [isLoading, state]);
 
   //=========================Other functions===============================//
   const linkUrl = window.location.href;
@@ -632,6 +633,8 @@ const CategoryProductList = ({ user }) => {
                             parent={"Marketplace"}
                             api={api}
                             contextHolder={contextHolder}
+                            scrollPosition={scrollPosition}
+                            saveScrollPosition={saveScrollPosition}
                           />
                         );
                       })}
