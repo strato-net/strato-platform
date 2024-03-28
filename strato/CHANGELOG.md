@@ -21,6 +21,7 @@ so that they could be properly moved to their respective version's subsection.
 - `/peers` endpoint in `P2PAPI` to list peer connections and their health
 - POST `/transaction` contract creation calls will now additionally check for address state ref table entry before resolving
 - Jenkins test to ensure slipstream post sync is consistent with boot node
+- POST `/transaction` allows users to create contracts by providing an address through the `codePtr` field
 
 ### Changed
 - Optimized the byteString2Integer function that lies at the foundation of strato's RLP-related functionality (rlpDecode).
