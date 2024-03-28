@@ -204,11 +204,11 @@ const CategoryProductList = ({ user }) => {
   }
 
   const getSavedScrollPosition = () => {
-    return parseInt(localStorage.getItem('scrollPosition')) || 0;
+    return parseInt(sessionStorage.getItem('scrollPosition')) || 0;
   }
 
   const saveScrollPosition = (position) => {
-    localStorage.setItem('scrollPosition', position);
+    sessionStorage.setItem('scrollPosition', position);
   }
 
   useEffect(() => {
