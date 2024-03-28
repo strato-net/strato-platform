@@ -66,50 +66,62 @@ const ProcessingOrder = ({user}) => {
 
   const getCartData = async () => {
     try {
-      const sellersCommonName = storedConfirmList[0].sellersCommonName;
-      const response = await fetch(
-        `${apiUrl}/order/payment/session/${sessionId}/${sellersCommonName}`,
-        {
-          method: HTTP_METHODS.GET,
-        }
-      );
-
-      const body = await response.json();
-      if (response.status === RestStatus.OK) {
+      if (sessionId.startsWith("0x")) {
         try {
-          const cartObject = JSON.parse(body.data.metadata.cart);
-          if (Object.keys(cartObject).length !== 0) {
-            if (body.data["payment_status"] === "paid") {
-              const customerEmail = user.email;
-              const cart = JSON.parse(body.data.metadata.cart);
-              let object = { paymentSessionId: sessionId, status:ORDER_STATUS.AWAITING_FULFILLMENT, paymentMethod: body.data.payment_method, ...cart };
-              handleOrderConfirm(object, customerEmail);
-            }
-            else if (body.data["payment_method_options"].hasOwnProperty("us_bank_account")) {
-              const customerEmail = user.email;
-              const cart = JSON.parse(body.data.metadata.cart);
-              let object = { paymentSessionId: sessionId, status:ORDER_STATUS.PAYMENT_PENDING, paymentMethod: body.data.payment_method, ...cart };
-              handleOrderConfirm(object, customerEmail);
-            }
-          }
+          const customerEmail = user.email;
+          let object = { paymentSessionId: sessionId, status:ORDER_STATUS.AWAITING_FULFILLMENT, shippingAddressId: 14};
+          handleOrderConfirm(object, customerEmail);
         } catch (error) {
           seterror(error);
           setTimeout(function () {
             navigate(routes.Checkout.url)
           }, 2000);
         }
-      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
-        seterror("Cannot find session ID");
-        setTimeout(function () {
-          navigate(routes.Checkout.url)
-        }, 2000);
       } else {
-        seterror(body.error);
-        setTimeout(function () {
-          navigate(routes.Checkout.url)
-        }, 2000);
-      }
+        const sellersCommonName = storedConfirmList[0].sellersCommonName;
+        const response = await fetch(
+          `${apiUrl}/order/payment/session/${sessionId}/${sellersCommonName}`,
+          {
+            method: HTTP_METHODS.GET,
+          }
+        );
 
+        const body = await response.json();
+        if (response.status === RestStatus.OK) {
+          try {
+            const cartObject = JSON.parse(body.data.metadata.cart);
+            if (Object.keys(cartObject).length !== 0) {
+              if (body.data["payment_status"] === "paid") {
+                const customerEmail = user.email;
+                const cart = JSON.parse(body.data.metadata.cart);
+                let object = { paymentSessionId: sessionId, status:ORDER_STATUS.AWAITING_FULFILLMENT, paymentMethod: body.data.payment_method, ...cart };
+                // handleOrderConfirm(object, customerEmail);
+              }
+              else if (body.data["payment_method_options"].hasOwnProperty("us_bank_account")) {
+                const customerEmail = user.email;
+                const cart = JSON.parse(body.data.metadata.cart);
+                let object = { paymentSessionId: sessionId, status:ORDER_STATUS.PAYMENT_PENDING, paymentMethod: body.data.payment_method, ...cart };
+                handleOrderConfirm(object, customerEmail);
+              }
+            }
+          } catch (error) {
+            seterror(error);
+            setTimeout(function () {
+              navigate(routes.Checkout.url)
+            }, 2000);
+          }
+        } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+          seterror("Cannot find session ID");
+          setTimeout(function () {
+            navigate(routes.Checkout.url)
+          }, 2000);
+        } else {
+          seterror(body.error);
+          setTimeout(function () {
+            navigate(routes.Checkout.url)
+          }, 2000);
+        }
+      }
     } catch (err) {
       seterror(err);
     }
@@ -119,8 +131,7 @@ const ProcessingOrder = ({user}) => {
 
   const handleOrderConfirm = async (cartData, customerEmail) => {
     let htmlContents = [];
-    
-    let customerFirstName = cartData.user.split(" ")[0];
+    let customerFirstName = user.commonName
     
     // Construct Email with order details
     let concatenatedOrderString = "";
@@ -143,24 +154,6 @@ const ProcessingOrder = ({user}) => {
         concatenatedOrderString += `Order Total: $${orderTotal.toFixed(2)} <br>`;
       }
     }
-    
-    // const allItemsAreNickelReserve = cartData.orderList.every((obj) => obj.subCategory === "Nickel Reserve");
-    // const index = cartData.orderList.findIndex(obj => obj.subCategory === "Nickel Reserve");
-    
-    // if (index !== -1) {
-    //   let nickel = {};
-    //   let orderItem = cartData.orderList[index];
-    //   nickel.orderTotal = orderItem.unitPrice * orderItem.quantity;
-    //   nickel.itemQty = orderItem.quantity;
-    //   nickel.itemName = orderItem.name;
-    //   htmlContents.push(generateHtmlContentNickel(customerFirstName, nickel ));
-    //   // if cartData orderlist has more than one item, use generateHtmlContent to populate htmlContents
-    //   if (cartData.orderList.length > 1) {
-    //     htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
-    //   }
-    // } else {
-    //     htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
-    // }
 
     htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
 

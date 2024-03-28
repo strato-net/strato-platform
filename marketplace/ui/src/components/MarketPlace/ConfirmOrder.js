@@ -41,6 +41,8 @@ import ResponsiveCart from "./ResponsiveCart";
 import { Images } from "../../images";
 import AddAddressModal from "./AddAddressModal";
 import ResponsiveAddAddress from "./ResponsiveAddAddress";
+const ethers = require('ethers')
+
 const ShippingDetailsSchema = () => {
   return yup.object().shape({
     name: yup.string().required("Name is required"),
@@ -385,7 +387,7 @@ const ConfirmOrder = () => {
       },
     });
     if (method === "stripe") {
-      let data = await orderActions.createOrder(orderDispatch, body);
+      let data = await orderActions.createPayment(orderDispatch, body);
       if (data != null && data.url !== undefined) {
         window.location.replace
           (data.url);
@@ -413,35 +415,54 @@ const ConfirmOrder = () => {
         
         await window.ethereum.request({
           method: "wallet_switchEthereumChain",
-          params: [{ chainId: "0x1" }],
+          params: [{ chainId: "0xaa36a7" }],
         });
         
+        const weiValue = ethers.utils.parseEther("0.001", "ether");
+
+        let hexValue = ethers.BigNumber.from(weiValue).toHexString();
+
         const txParams = {
           from: accounts[0],
-          to: process.env.REACT_APP_CONTRACT_ADDRESS,
-          value: window.ethereum.utils.toHex(window.ethereum.utils.toWei("2", "ether")),
-          chainId: "0x1",
+          to: `0x08791eD418eFA7c001FBF63E88B37fBdb5165C6f`,
+          value: hexValue,
+          chainId: `0xaa36a7`,
         };
         
         const tx = await window.ethereum.request({
           method: "eth_sendTransaction",
           params: [txParams],
         });
-        await tx.wait();
-        console.log("Transaction tx:", tx);
+
+        const waitForTransactionReceipt = async (hash) => {
+          let receipt = null;
+          while (receipt === null) { // Polling for the receipt
+            receipt = await window.ethereum.request({
+              method: 'eth_getTransactionReceipt',
+              params: [hash],
+            });
+            if (receipt !== null) {
+              return receipt;
+            }
+            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for 2 seconds before retrying
+          }
+        };
+        
+        // Wait for the transaction to be confirmed
+        await waitForTransactionReceipt(tx);
+        
         const transaction = await window.ethereum.request({
           method: 'eth_getTransactionByHash',
-          params: [tx.Hash],
+          params: [tx],
         });
-        
-        const transactionValueInEther = window.ethereum.utils.fromWei(transaction.value, "ether");
-        
-        if (transactionValueInEther === "2") {
+
+        if (transaction.value === hexValue) {
           notification.success({
             message: "Transaction Successful",
-            description: `Your payment of 2 ETH has been successfully processed. Transaction Hash: ${tx.Hash}`,
+            description: `Your payment has been successfully processed. Transaction Hash: ${tx}`,
             placement: "bottom",
           });
+          window.location.replace(`http://localhost/marketplace/order/status?session_id=${tx}`);
         } else {
           console.error("Transaction value mismatch.");
           notification.error({
@@ -449,10 +470,8 @@ const ConfirmOrder = () => {
             description: "There was a mismatch in the transaction value.",
             placement: "bottom",
           });
+          return null;
         } 
-        
-        // Create order and redirect to order details page
-        return;
       } catch (error) {
         // Log and notify on error
         console.error("Failed to connect to MetaMask:", error);
