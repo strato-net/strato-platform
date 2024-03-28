@@ -6,31 +6,40 @@ import time
 import sys
 
 def wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time):
+    attempts = int(attempts)
+    sleep_time = int(sleep_time)
     attempt = 0
     while True:
         attempt += 1
         try:
             response1 = requests.get(node1_url + "/cirrus/search/BlockApps-Mercata-Asset", headers=headers1, params={'order':'block_timestamp.desc', 'limit':1})
             response2 = requests.get(node2_url + "/cirrus/search/BlockApps-Mercata-Asset", headers=headers2, params={'order':'block_timestamp.desc', 'limit':1})
-            if response1.ok and response2.ok:
-                block_number1 = response1.json()[0]["block_number"]
-                block_number2 = response2.json()[0]["block_number"]
-                if block_number1 == block_number2:
-                    print(f"Nodes are in sync with block number: {block_number1}")
-                    break
+            if response1.ok and response2.ok and response1:
+                response1_json = response1.json()
+                response2_json = response2.json()
+                if len(response1_json) < 1:
+                    print(f"Cirrus response from Node1 is empty: `{response1_json}` (attempt #{attempt} of {attempts})")
+                elif len(response2_json) < 1:
+                    print(f"Cirrus response from Node2 is empty: `{response2_json}` (attempt #{attempt} of {attempts})")
                 else:
-                    print(f"Slipstream of node1 is at block {block_number1}, but Node2 is at block {block_number2} (attempt #{attempt})")
+                    block_number1 = response1.json()[0]["block_number"]
+                    block_number2 = response2.json()[0]["block_number"]
+                    if block_number1 == block_number2:
+                        print(f"Nodes are in sync with block number: {block_number1}")
+                        break
+                    else:
+                        print(f"Slipstream of node1 is at block {block_number1}, but Node2 is at block {block_number2} (attempt #{attempt} of {attempts})")
             else:
-                print(f"Failed to fetch data for one of the nodes (attempt #{attempt})")
+                print(f"Failed to fetch data for one of the nodes (attempt #{attempt} of {attempts})")
         except Exception as e:
             print(f"Slipstream sync test exception occurred: {e}")
             sys.exit(1)
         if attempts != 0 and attempt == attempts:
-            print(f"Failed to find the slipstream being in sync for the nodes. Made {attempts} attempts with sleep time {sleep_time}sec")
-            sys.exit(1) 
+            print(f"Failed to find the cirrus data to be in sync for the nodes. Made {attempts} attempts with sleep time {sleep_time} seconds.")
+            sys.exit(1)
         else:
-          print(f"Retrying in {sleep_time} seconds...")
-          time.sleep(sleep_time)
+            print(f"Retrying in {sleep_time} seconds...")
+            time.sleep(sleep_time)
 
 def get_auth_token(client_id, client_secret, realm_name):
     basic_token = base64.b64encode(bytes('%s:%s' % (client_id, client_secret), 'utf-8')).decode('utf-8')
@@ -123,8 +132,8 @@ if __name__ == "__main__":
     discrepancies_asset, count_asset_discrepancy = check_table("BlockApps-Mercata-Asset")
     discrepancies_sale, count_sale_discrepancy = check_table("BlockApps-Mercata-Order")
     discrepancies_order, count_order_discrepancy = check_table("BlockApps-Mercata-Sale")
-    
-        # Print the results
+
+    # Print the results
     print("\nFinal check summary:")
     print(f"Asset Discrepancies: {'Yes' if discrepancies_asset else 'No'}")
     print(f"Order Discrepancies: {'Yes' if discrepancies_order else 'No'}")
@@ -132,6 +141,6 @@ if __name__ == "__main__":
     print(f"Asset Count Match Discrepancies: {'Yes' if count_asset_discrepancy else 'No'}")
     print(f"Order Count Match Discrepancies: {'Yes' if count_order_discrepancy else 'No'}")
     print(f"Sale Count Match Discrepancies: {'Yes' if  count_sale_discrepancy else 'No'}")
-        
+
     if discrepancies_asset or discrepancies_sale or discrepancies_order or count_asset_discrepancy or count_sale_discrepancy or count_order_discrepancy:
         sys.exit(1)
