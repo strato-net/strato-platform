@@ -152,6 +152,7 @@ const CartComponent = ({ columns, data, openToastOrder }) => {
                                             countDown();
                                         } else {
                                             navigate("/confirmOrder");
+                                            window.scrollTo(0, 0);
                                         }
 
                                     } else {

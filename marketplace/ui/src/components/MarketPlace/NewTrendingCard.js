@@ -86,6 +86,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                     } else {
                         e.preventDefault();
                         navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } });
+                        window.scrollTo(0, 0);
                     }
                 }}
             >
@@ -184,6 +185,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                         });
                         if (await addItemToCart(topSellingProduct, quantity) === true) {
                             navigate("/checkout")
+                            window.scrollTo(0, 0);
                         }
                     }}
                 >
