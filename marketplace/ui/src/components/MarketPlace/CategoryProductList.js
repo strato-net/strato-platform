@@ -214,7 +214,8 @@ const CategoryProductList = ({ user }) => {
 
   useEffect(() => {
     const handleScroll = () => {
-      setScrollPosition(window.scrollY);
+      saveScrollPosition(window.scrollY);
+      setScrollPosition(window.scrollY)
     };
 
     window.addEventListener('scroll', handleScroll);
@@ -222,17 +223,11 @@ const CategoryProductList = ({ user }) => {
     return () => {
       window.removeEventListener('scroll', handleScroll);
     };
-  }, []);
+  }, [scrollPosition]);
 
   useEffect(() => {
-    const timeOut = setTimeout(() => {
-     const url = generateBaseUrl();
-      navigate(url, { state: { scroll: getSavedScrollPosition() }});
-    }, 500);
-
-    return () => {
-      clearTimeout(timeOut);
-    };
+    const url = generateBaseUrl();
+    navigate(url, { state: { scroll: getSavedScrollPosition() } });
   }, []);
 
   useEffect(() => {
