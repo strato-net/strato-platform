@@ -171,7 +171,10 @@ const TopSellingProductCard = () => {
             </div>
           ) : 
         <div className="relative md:pl-10">
-          <div onClick={()=>scroll(-300)}  className={`${!prevVisible ? 'hidden' : 'md:flex hidden'} cursor-pointer absolute  justify-center items-center top-48 left-24 h-16 w-16 text-2xl bg-[#6A6A6A] rounded-full text-white`}>{"<"}</div>
+          <div onClick={()=>scroll(-300)} 
+            className={`${!prevVisible ? 'hidden' : 'md:flex hidden'} cursor-pointer absolute z-10 justify-center items-center top-48 left-24 h-16 w-16 text-2xl bg-[#6A6A6A] rounded-full text-white`}>
+            {"<"}
+          </div>
           <div ref={containerRef} className="overflow-x-auto gap-6 px-1 py-2 flex trending_cards">
             {topSellingProducts
               .filter(product => product.saleQuantity > 0)
@@ -184,7 +187,11 @@ const TopSellingProductCard = () => {
                   />)
                 })}
           </div>
-          <div onClick={()=>scroll(300)}  className={`${!nextVisible ? 'hidden' : 'md:flex hidden'} cursor-pointer absolute justify-center items-center top-48 right-24 h-16 w-16 text-2xl bg-[#6A6A6A] rounded-full text-white`}>{">"}</div>
+          <div onClick={()=>scroll(300)} 
+            className={`${!nextVisible ? 'hidden' : 'md:flex hidden'} cursor-pointer absolute z-10 justify-center items-center top-48 right-24 h-16 w-16 text-2xl bg-[#6A6A6A] rounded-full text-white`}>
+            {">"}
+          </div>
+
         </div>}
     </div>
   );
