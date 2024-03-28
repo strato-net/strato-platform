@@ -67,9 +67,9 @@ pipeline {
           git clone https://github.com/blockapps/strato-getting-started
           cp strato-worktree/docker-compose.yml strato-getting-started/
           cp strato-worktree/docker-compose.vault.yml strato-getting-started/
-          cp docker-compose.highway.yml strato-getting-started/
-          cp docker-compose.identity.yml strato-getting-started/
-          cp docker-compose.stripe-ps.yml strato-getting-started/
+          cp strato-worktree/docker-compose.highway.yml strato-getting-started/
+          cp strato-worktree/docker-compose.identity.yml strato-getting-started/
+          cp strato-worktree/docker-compose.stripe-ps.yml strato-getting-started/
         '''
         dir("strato-getting-started") {
           // Copy .pem and .key for SSL
@@ -213,7 +213,7 @@ pipeline {
           writeFile file: "check_availability.sh", text: '''#!/bin/bash -le
             check_availability() {
               counter=0
-              until curl --silent --fail --location $(</host)/health | jq .healthInfo.isHealthy | grep true
+              until curl --silent --fail --location $(</host)/health | jq .health | grep true
               do
                 if [[ "$counter" -gt 120 ]]; then
                   echo "STRATO node took longer than 2 minutes to initialize! aborting."

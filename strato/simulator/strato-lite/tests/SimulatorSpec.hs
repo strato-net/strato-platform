@@ -27,6 +27,7 @@ import Blockchain.Data.AddressStateDB
 import qualified Blockchain.Data.AlternateTransaction as U
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.Block hiding (bestBlockNumber)
+import qualified Blockchain.Data.Block as Block (bestBlockNumber)
 import Blockchain.Data.BlockDB ()
 import Blockchain.Data.ChainInfo
 import qualified Blockchain.Data.TXOrigin as Origin
@@ -60,6 +61,7 @@ import qualified Data.Map.Strict as M
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import Data.Text.Encoding
+import Data.Traversable (for)
 import SolidVM.Model.Storable
 import Strato.Lite
 import Test.Hspec
@@ -867,7 +869,34 @@ spec = do
         void . timeout (3 * 1000 * 1000) $ runConnection connection
         clientExcept <- readTVarIO $ connection ^. clientException
         clientExcept `shouldBe` Just (toException $ HandshakeException "handshake timed out")
+    it "will not get a stateroot mismatch if an exception occurs in the bagger" $ do
+        privKey <- newPrivateKey
+        let validatorAddress = fromPrivateKey privKey
+            validatorInfo = CommonName "BlockApps" "Engineering" "Admin" True
+        cert <- selfSignCert privKey validatorInfo 
+        validator <- createPeer' privKey validatorInfo [(validatorAddress, validatorInfo)] [cert] "node1" "1.1.1.1"
+        ts <- liftIO getCurrentMicrotime
+        let toIetx = IETx ts . IngestTx Origin.API
+            args = "(\"123\")" --dummy address
+            txMd = M.fromList [("funcName", "getUserCert"), ("args", args)]
+            tx n =
+              U.UnsignedTransaction
+                { U.unsignedTransactionNonce = Nonce n,
+                  U.unsignedTransactionGasPrice = Wei 1,
+                  U.unsignedTransactionGasLimit = Gas 1000000000,
+                  U.unsignedTransactionTo = Just $ Address 0x509,
+                  U.unsignedTransactionValue = Wei 0,
+                  U.unsignedTransactionInitOrData = Code "",
+                  U.unsignedTransactionChainId = Nothing
+                }
+            signedTx n = mkSignedTx privKey (tx n) txMd
 
+            reachNonceLim = do
+              for [0..10] (\n -> flip postEvent validator . UnseqEvent . toIetx $ signedTx n) --nonce limit is 10; will trigger
+
+        void . timeout 10000000 $ concurrently_ (runNode validator) reachNonceLim
+        ctx <- atomically $ readTVar . _p2pTestContext $ validator
+        Block.bestBlockNumber (_bestBlock ctx) `shouldNotBe` 0 --create at least 1 block
   describe "X.509 Private Chain exchange" $ do
     it "can add an organization to a private chain" $ do
         privKeys <- traverse (const newPrivateKey) [(1 :: Integer) .. 3]

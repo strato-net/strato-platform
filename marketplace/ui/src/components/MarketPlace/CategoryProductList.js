@@ -224,8 +224,14 @@ const CategoryProductList = ({ user }) => {
   }, []);
 
   useEffect(() => {
-    const url = generateBaseUrl();
-    navigate(url, { state: { scroll: getSavedScrollPosition() } });
+    const timeOut = setTimeout(() => {
+     const url = generateBaseUrl();
+      navigate(url, { state: { scroll: getSavedScrollPosition() }});
+    }, 500);
+
+    return () => {
+      clearTimeout(timeOut);
+    };
   }, []);
 
   useEffect(() => {
