@@ -219,7 +219,7 @@ const TopSellingProductCard = () => {
               onClick={() => scroll(-300)}
               className={`${
                 !prevVisible ? "hidden" : "md:flex hidden"
-              } cursor-pointer absolute  justify-center items-center top-48 left-24 h-12 w-12 text-2xl bg-[#6A6A6A] rounded-full text-white`}
+              } cursor-pointer absolute z-10 justify-center items-center top-48 left-24 h-12 w-12 text-2xl bg-[#6A6A6A] rounded-full text-white`}
             >
               {"<"}
             </Button>
