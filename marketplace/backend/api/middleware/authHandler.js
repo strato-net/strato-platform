@@ -20,9 +20,9 @@ const getTokenFromCookie = async (req, res) => {
 }
 
 const getTokenFromHeader = async (req) => {
-  if(req.headers['x-user-access-token']) 
+  if (req.headers['x-user-access-token'])
     return req.headers['x-user-access-token']
-    
+
   if (req.headers['authorization']) {
     const [bearer, token] = req.headers['authorization'].split(' ')
     if (bearer !== 'Bearer') return null
@@ -34,7 +34,7 @@ const getTokenFromHeader = async (req) => {
 const getLoginUrl = (req) => config.dockerized ? '/marketplace/login/' : req.app.oauth.getSigninURL();
 
 class AuthHandler {
-  static authorizeRequest(allowAnonAccess = false) {
+  static authorizeRequest(allowAnonAccess = false, checkStratoAPI = false) {
     return async function (req, res, next) {
       try {
         let token = await getTokenFromCookie(req, res)
@@ -62,6 +62,7 @@ class AuthHandler {
             return next(err)
           }
           try {
+            // return rest.response.status(RestStatus.INTERNAL_SERVER_ERROR, res, "Internal Server Error 101")
             address = await rest.createOrGetKey({ username: decodedToken.preferred_username, token }, { config })
           } catch (e) {
             console.error('STRATO API is unreachable or unhealthy. Error: ', e)
@@ -77,11 +78,15 @@ class AuthHandler {
       } catch (err) {
         return next(err)
       }
-      
+
       res.clearCookie(req.app.oauth.getCookieNameAccessToken())
       res.clearCookie(req.app.oauth.getCookieNameAccessTokenExpiry())
       res.clearCookie(req.app.oauth.getCookieNameRefreshToken())
-      
+
+      if (checkStratoAPI) {
+        console.log("STRATO API Checked HERERERE", someFetch)
+      }
+
       rest.response.status(RestStatus.UNAUTHORIZED, res, {
         loginUrl: getLoginUrl(req),
       })

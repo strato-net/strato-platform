@@ -20,7 +20,7 @@ const App = () => {
 
   TagManager.initialize(tagManagerArgs);
 
-  const { user, loginUrl, users, isAuthenticated } = useAuthenticateState();
+  const { user, loginUrl, users, isAuthenticated, error } = useAuthenticateState();
 
   window.LOQ = window.LOQ || [];
   window.LOQ.push([
@@ -74,22 +74,29 @@ const App = () => {
 
   return (
     <BrowserRouter basename="/marketplace">
-      <Layout className="overflow-auto">
-        <UsersProvider>
-          <HeaderComponent
-            isOauth={isAuthenticated}
-            user={user}
-            users={users}
-            loginUrl={loginUrl}
-            showMenu={showMenu}
-            handleSubMenu={handleSubMenu}
-            handleMenuTab={handleMenuTab}
-          />
-        </UsersProvider>
-        <Content className={`${showMenu ? 'overflow-y-hidden md:overflow-auto h-[100vh] md:h-auto w-[100vw] md:w-auto bg-[#00000020] md:bg-white relative mt-0 md:mt-28' : 'mt-[89px] md:mt-[98px] '}`}>
-          <AuthenticatedRoutes user={user} users={users} isAuthenticated={isAuthenticated} />
-        </Content>
-      </Layout>
+      {error === "Internal Server Error 101" ?
+        <div className="flex flex-col items-center justify-center h-screen">
+          <h1 className="text-4xl font-bold mb-4">500 Internal Server Error</h1>
+          <p className="text-lg">Oops! Something went wrong on our end. Please try again later.</p>
+        </div>
+        :
+        <Layout className="overflow-auto">
+          <UsersProvider>
+            <HeaderComponent
+              isOauth={isAuthenticated}
+              user={user}
+              users={users}
+              loginUrl={loginUrl}
+              showMenu={showMenu}
+              handleSubMenu={handleSubMenu}
+              handleMenuTab={handleMenuTab}
+            />
+          </UsersProvider>
+          <Content className={`${showMenu ? 'overflow-y-hidden md:overflow-auto h-[100vh] md:h-auto w-[100vw] md:w-auto bg-[#00000020] md:bg-white relative mt-0 md:mt-28' : 'mt-[89px] md:mt-[98px] '}`}>
+            <AuthenticatedRoutes user={user} users={users} isAuthenticated={isAuthenticated} />
+          </Content>
+        </Layout>
+      }
     </BrowserRouter>
   );
 };
