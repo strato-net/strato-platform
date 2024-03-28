@@ -383,7 +383,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
               suffix={showSearch 
                 ? <ArrowLeftOutlined onClick={() => handleSearchShow(false)} /> 
                 : <img src={Images.Header_Search} alt={IMG_META} title={IMG_META} className="w-[18px] h-[18px]" />}
-              className="bg-[#F6F6F6] border-none outline-none"
+              className="bg-[#F6F6F6] outline-none"
             />
           </Col>
         </Row>
