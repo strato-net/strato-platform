@@ -80,7 +80,10 @@ const MarketPlace = ({ user, isAuthenticated }) => {
             </Typography.Text>
             <Button
               id="viewMore"
-              onClick={() => navigate(routes.MarketplaceProductList.url)}
+              onClick={() => {
+                navigate(routes.MarketplaceProductList.url);
+                sessionStorage.setItem('scrollPosition', 0);
+              }}
               className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
               <div className="text-primary font-semibold md:text-lg">
                 View More
@@ -103,7 +106,10 @@ const MarketPlace = ({ user, isAuthenticated }) => {
             </Typography.Text>
             <Button
               id="viewMore"
-              onClick={() => navigate(routes.MarketplaceProductList.url)}
+              onClick={() => {
+                navigate(routes.MarketplaceProductList.url);
+                sessionStorage.setItem('scrollPosition', 0);              
+              }}
               className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
               <div className="text-primary font-semibold md:text-lg">
                 View More
@@ -125,7 +131,10 @@ const MarketPlace = ({ user, isAuthenticated }) => {
             </Typography.Text>
             <Button
               id="viewMore"
-              onClick={() => navigate(routes.MarketplaceProductList.url)}
+              onClick={() => {
+                navigate(routes.MarketplaceProductList.url);
+                sessionStorage.setItem('scrollPosition', 0);              
+              }}
               className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
               <div className="text-primary font-semibold md:text-lg">
                 View More
@@ -147,7 +156,10 @@ const MarketPlace = ({ user, isAuthenticated }) => {
             </Typography.Text>
             <Button
               id="viewMore"
-              onClick={() => navigate(routes.MarketplaceProductList.url)}
+              onClick={() => {
+                navigate(routes.MarketplaceProductList.url);
+                sessionStorage.setItem('scrollPosition', 0);              
+              }}
               className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
               <div className="text-primary font-semibold md:text-lg">
                 View More
@@ -169,7 +181,10 @@ const MarketPlace = ({ user, isAuthenticated }) => {
             </Typography.Text>
             <Button
               id="viewMore"
-              onClick={() => navigate(routes.MarketplaceProductList.url)}
+              onClick={() => {
+                navigate(routes.MarketplaceProductList.url);
+                sessionStorage.setItem('scrollPosition', 0);              
+              }}
               className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
               <div className="text-primary font-semibold md:text-lg">
                 View More

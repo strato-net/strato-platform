@@ -363,7 +363,11 @@ const CategoryProductList = ({ user }) => {
       </Breadcrumb.Item>
       <Breadcrumb.Item href="" onClick={e => setSelectedCategories([])}>
         <ClickableCell href={routes.MarketplaceProductList.url}>
-          <p href={routes.MarketplaceProductList.url} className={`${selectedCategories.length > 0 ? "text-[#13188A] font-semibold " : "text-[#202020] font-medium"} text-sm hover:bg-transparent`}>
+          <p 
+          href={routes.MarketplaceProductList.url} 
+          className={`${selectedCategories.length > 0 ? "text-[#13188A] font-semibold " : "text-[#202020] font-medium"} text-sm hover:bg-transparent`}
+          onClick={() => sessionStorage.setItem('scrollPosition', 0)}
+          >
             Marketplace
           </p>
         </ClickableCell>
