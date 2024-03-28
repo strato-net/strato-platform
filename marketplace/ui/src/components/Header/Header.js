@@ -339,7 +339,9 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
 
   const handleEnterSearch = (e) => {
     const value = e.target.value;
-    checkCategory(value)
+    if(value){
+      checkCategory(value)
+    }
   };
 
   const handleCategoryChange = (cat) => {

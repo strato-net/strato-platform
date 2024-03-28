@@ -17,7 +17,7 @@ const UnlistModal = ({ open, handleCancel, inventory, saleAddress, categoryName,
         let isDone = await actions.unlistInventory(inventoryDispatch, body);
         if (isDone) {
             await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
-            await actions.fetchInventoryForUser(inventoryDispatch, limit, offset, user.commonName);
+            await actions.fetchInventoryForUser(inventoryDispatch, user.commonName);
             handleCancel();
         }
     }
