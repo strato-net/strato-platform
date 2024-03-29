@@ -26,7 +26,7 @@ so that they could be properly moved to their respective version's subsection.
 ### Removed
 
 
-## [11.1.0] - 3/7/2023
+## [11.1.0] - 3/28/2023
 
 ### Added
 - Custom `Show` instances for `CodeCollection`, `Function`, `Contract` data types
