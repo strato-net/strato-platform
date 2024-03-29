@@ -712,6 +712,7 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
               False -> do
                 src'' <- case contractpayloadCodePtr p of 
                   Nothing -> return $ getSrc p
+                  Just _ | getSrc p /= mempty -> throwIO $ UserError "Can only provide one of either `src` or `codePtr`."
                   Just p' -> getSourceMapFromAddress p'
                 let bcp =
                       ContractParameters
@@ -772,6 +773,7 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                           let cn = fromMaybe "unnamed_contract" c
                           src'' <- case contractpayloadCodePtr p of 
                             Nothing -> return $ getSrc p
+                            Just _ | getSrc p /= mempty -> throwIO $ UserError "Can only provide one of either `src` or `codePtr`."
                             Just p' -> getSourceMapFromAddress p'
                           return $
                             UploadListContract
