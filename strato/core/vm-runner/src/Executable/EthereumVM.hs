@@ -171,7 +171,7 @@ sendOutEvent (OutAction act) = do
                   Nothing -> ExternallyOwned $ Keccak256.hash $ BC.pack $ T.unpack c
                 cn = fromMaybe "" . listToMaybe . catMaybes . flip map actionDatas $ \(_, Action.ActionData {..}) ->
                   if _actionDataCodeHash == cp
-                    then Just _actionDataCommonName
+                    then Just _actionDataCreator
                     else Nothing
                 cc = foldr (\ad b -> Action._actionDataCodeCollection ad <> b) mempty $ snd <$> actionDatas
                 abstracts' = foldr (\ad b -> Action._actionDataAbstracts ad <> b) mempty $ snd <$> actionDatas

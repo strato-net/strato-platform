@@ -224,7 +224,7 @@ parseDiffSolidVM x = typeMismatch "SolidVMDiff" x
 data ActionData = ActionData
   { _actionDataCodeHash :: CodePtr,
     _actionDataCodeCollection :: CodeCollection,
-    _actionDataCommonName :: Text,
+    _actionDataCreator :: Text,
     _actionDataCodeKind :: CodeKind,
     _actionDataStorageDiffs :: DataDiff,
     _actionDataAbstracts :: Map (Account, Text) Text, -- (import address, contract name) -> (cn)
@@ -239,8 +239,8 @@ makeLenses ''ActionData
 instance Format ActionData where
   format ActionData {..} =
     "actionDataCodeHash: " ++ format _actionDataCodeHash ++ "\n"
-      ++ "actionDataCommonName: "
-      ++ T.unpack _actionDataCommonName
+      ++ "actionDataCreator: "
+      ++ T.unpack _actionDataCreator
       ++ "\n"
       ++ "actionDataCodeKind: "
       ++ show _actionDataCodeKind
@@ -264,14 +264,14 @@ mergeActionData newData oldData =
       abstracts = _actionDataAbstracts oldData <> _actionDataAbstracts newData
       mappings = nub $ _actionDataMappings oldData ++ _actionDataMappings newData
       arrays = nub $ _actionDataArrays oldData ++ _actionDataArrays newData
-   in ActionData (_actionDataCodeHash oldData) cc (_actionDataCommonName newData) (_actionDataCodeKind oldData) diffs abstracts mappings arrays calls
+   in ActionData (_actionDataCodeHash oldData) cc (_actionDataCreator newData) (_actionDataCodeKind oldData) diffs abstracts mappings arrays calls
 
 instance ToJSON ActionData where
   toJSON ActionData {..} =
     object
       [ "codeHash" .= _actionDataCodeHash,
         "codeCollection" .= _actionDataCodeCollection,
-        "commonName" .= _actionDataCommonName,
+        "commonName" .= _actionDataCreator,
         "diff" .= _actionDataStorageDiffs,
         "abstracts" .= _actionDataAbstracts,
         "mappings" .= _actionDataMappings,

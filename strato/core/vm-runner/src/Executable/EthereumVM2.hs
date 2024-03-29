@@ -205,7 +205,7 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis {..} -> do
             yield . OutEvent . concat $! map (mkEventEntry (Just cId)) . erEvents <$> mExecResults
             let commonName = case mExecResults of
                   [] -> ""
-                  x : _ -> erCommonName x
+                  x : _ -> erCreator x
             when flags_createTransactionResults $
               yield . OutTXR $
                 TransactionResult
@@ -264,7 +264,7 @@ outputNewChains = traverse_ $ \(cId, cInfo, bHash, execr) -> do
         e <- listToMaybe execr
         a <- erAction e
         d <- listToMaybe . OMap.assocs $ a ^. Action.actionData
-        pure $ d ^. _2 . Action.actionDataCommonName
+        pure $ d ^. _2 . Action.actionDataCreator
   yield $ OutToStateDiff cId cInfo bHash cn
   for_ (catMaybes $ erAction <$> execr) $ yield . OutAction
   yield . OutEvent $ flip map (concatMap erEvents execr) $ mkEventEntry (Just cId)

@@ -41,7 +41,7 @@ data ExecResults = ExecResults
     erException :: Maybe (Either SolidException VMException),
     erKind :: CodeKind,
     erPragmas :: [(String, String)],
-    erCommonName :: String
+    erCreator :: String
   }
   deriving (Eq, Show, Generic)
 
@@ -78,5 +78,5 @@ errorResults ck remainingGas e =
       erKind = ck,
       -- , erNewX509Certs = M.empty
       erPragmas = [],
-      erCommonName = ""
+      erCreator = ""
     }

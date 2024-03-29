@@ -584,7 +584,7 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
         case result of
           Left err -> let fmt = format err in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0, "") -- TODO Also include the trace
           Right r -> case erException r of
-            Nothing -> (Success, "Success!", erRemainingTxGas r, erCommonName r)
+            Nothing -> (Success, "Success!", erRemainingTxGas r, erCreator r)
             Just ex ->
               let fmt = either show show ex
                in (Failure "Execution" Nothing (ExecutionFailure $ show ex) Nothing Nothing (Just fmt), fmt, 0, "")
