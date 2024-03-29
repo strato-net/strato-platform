@@ -25,6 +25,8 @@ so that they could be properly moved to their respective version's subsection.
 
 ### Removed
 
+- Removed `gasOn` flag (always off)
+
 
 ## [11.1.0] - 3/28/2023
 
@@ -64,6 +66,29 @@ so that they could be properly moved to their respective version's subsection.
 - Removed unnecessary stateDiff (and threading) in the vm-runner codebase, fixing numerous sources of persistent memory build-up.
 - Removed overcomplicated attempts at solving p2p thread issue (watchdogs, canaries, semaphore, threadmap, etc)
 - `bloc/v2.2/x509/createCert` is no more
+
+
+## [11.1.0] - 3/7/2023
+
+### Added
+- Custom `Show` instances for `CodeCollection`, `Function`, `Contract` data types
+- Increase gas consumption for contract creation
+- `VM_DEBUGGER=bool` flag added for connecting to the VM debugger + static analysis websocket
+- Derive service provider URLs from node's network ID for testnet and production nodes
+- Update foreign keys for `BlockApps-Mercata-Asset` + `Sale` contracts whenever there is a table expansion
+
+### Changed 
+- When a transaction fails, the `<failed>` message blinks :^)
+- `keccak256` built-in function should return hex-encoded value instead of bytestring
+
+### Fixed
+- Mappings within a struct within a `(type => Struct)` mapping can be accessed
+- Constructor arguments are passed by value instead of reference 
+- Escaped quotes for slipstream values
+- Properly escape `"` and `\` string arguments in `strato-api`
+
+### Removed
+- Removed slipstream's dependency on `eth` database for code collection data
 
 ## [11.0.0] - 1/22/2024
 

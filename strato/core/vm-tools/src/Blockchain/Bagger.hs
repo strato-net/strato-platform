@@ -41,7 +41,6 @@ import Blockchain.VMContext hiding (state)
 import Blockchain.VMMetrics
 import Blockchain.VMOptions
 import qualified Blockchain.Verification as V
-import Control.Arrow ((&&&))
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
@@ -105,7 +104,6 @@ runFromStateRoot mineTransactions remainingGas theBlockHeader txs = do
   return $ case res of -- currently only get GasLimit errors out of mineTransactions'
     Nothing -> Right (newStateRoot, ranTxs, newGas)
     Just TFBlockGasLimitExceeded {} -> Left (GasLimitReached ranTxs unranTxs newStateRoot newGas)
-    Just f@TFInsufficientFunds {} -> recoverable f
     Just f@TFIntrinsicGasExceedsTxLimit {} -> recoverable f
     Just f@TFChainIdMismatch {} -> recoverable f
     Just f@TFNonceMismatch {} -> error $ "mineTransactions' we messed up: " ++ format f
@@ -544,12 +542,8 @@ removeFromSeen t = updateBaggerState (B.removeFromSeen t)
 
 getAddressNonceAndBalance :: MonadBagger m => Address -> m (Integer, Integer)
 getAddressNonceAndBalance addr = do
-  (nonce, balance) <-
-    (DD.addressStateNonce &&& DD.addressStateBalance)
-      <$> A.lookupWithDefault (A.Proxy @DD.AddressState) (Account addr Nothing)
-  if flags_gasOn
-    then return (nonce, balance)
-    else return (nonce, 9999999999999999999999999999) -- fake a high balance, so all TXs are accepted
+  nonce <- DD.addressStateNonce <$> A.lookupWithDefault (A.Proxy @DD.AddressState) (Account addr Nothing)
+  return (nonce, 9999999999999999999999999999) -- gas off; fake a high balance, so all TXs are accepted
 
 addToPromotionCache :: MonadBagger m => OutputTx -> m ()
 addToPromotionCache tx = updateBaggerState (B.addToPromotionCache tx)
