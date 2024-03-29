@@ -25,7 +25,7 @@ const CategoryCard = () => {
 
   return (
     <>
-      <Fade>
+      <Fade triggerOnce>
       <Title className="md:px-10 !text-xl md:!text-4xl !text-left py-2">
         Shop by Category
       </Title>
