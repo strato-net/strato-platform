@@ -294,101 +294,235 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.listItem = async function (args, options = defaultOptions) {
-      const uploadPromises = args.assets.map(asset => {
-          const individualArgs = {
-              assetToBeSold: asset.assetToBeSold,
-              quantity: asset.quantity,
-          };
-          return inventoryJs.uploadSaleContract(rawAdmin, individualArgs, options)
-                  .then(result => ({ success: true, result, assetToBeSold: asset.assetToBeSold }))
-                  .catch(error => ({ success: false, error, assetToBeSold: asset.assetToBeSold }));
-      });
-
-      const results = await Promise.allSettled(uploadPromises);
-
-      const processedResults = results.map(result => {
-          if (result.status === 'fulfilled') {
-              return result.value;
-          } else {
-              return { success: false, error: result.reason, assetToBeSold: result.assetToBeSold };
-          }
-      });
-
-      return processedResults;
-}
-
-contract.unlistItem = async function (args, options = defaultOptions) {
-  // Prepare a promise for each unlist operation
-  const unlistPromises = args.saleAddresses.map(saleAddress => {
-      const contractDetails = { address: saleAddress };
-      return inventoryJs.unlistItem(rawAdmin, contractDetails, options);
-  });
-
-  const results = await Promise.allSettled(unlistPromises);
-
-  // Process results
-  const outcomes = results.map((result, index) => {
-      if (result.status === 'fulfilled') {
-          return { success: true, address: args.saleAddresses[index], result: result.value };
-      } else {
-          return { success: false, address: args.saleAddresses[index], reason: result.reason };
+    options.cacheNonce = true;
+    const listPromises = args.assets.map(asset => {
+      let callArgs = {
+        paymentProviders: args.paymentProviders,
+        price: args.price,
+        assetToBeSold: asset.assetToBeSold,
+        quantity: asset.quantity,
+      };
+      return inventoryJs.uploadSaleContract(rawAdmin, callArgs, options);
+    });
+  
+    const results = await Promise.allSettled(listPromises);
+  
+    // Process successful transactions
+    const successfulTransactions = results.filter(result => result.status === 'fulfilled').map((result, index) => ({
+      assetToBeSold: args.assets[index].assetToBeSold,
+      quantity: args.assets[index].quantity,
+      success: true,
+      result: result.value
+    }));
+  
+    // Process failed transactions
+    const failedTransactions = results.filter(result => result.status === 'rejected').map((result, index) => {
+      const failedAsset = args.assets[index];
+      let statusCode = "unknown";
+      let errorMessage = "Unknown error occurred";
+  
+      if (result.reason && result.reason.response) {
+        statusCode = result.reason.response.status;
+        errorMessage = result.reason.response.data || "Error with no additional information";
+      } else if (result.reason instanceof Error) {
+        errorMessage = result.reason.message;
       }
-  });
-  return outcomes;
-};
-
-
-contract.resellItem = async function (args, options = defaultOptions) {
-  // Create a promise for each asset
-  const resellPromises = args.assets.map(asset => {
-      const individualArgs = {
-          address: asset.assetAddress,
-          quantity: asset.quantity,
-      };
-      return inventoryJs.resellItem(rawAdmin, individualArgs, options);
-  });
-  const results = await Promise.allSettled(resellPromises);
-
-  // Process the results to include whether each asset was successfully resold
-  const processedResults = results.map((result, index) => {
-      const asset = args.assets[index];
+  
       return {
-          assetAddress: asset.assetAddress,
-          quantity: asset.quantity,
-          status: result.status,
-          ...result.status === 'fulfilled' ? { success: true, result: result.value } : { success: false, error: result.reason },
+        assetToBeSold: failedAsset.assetToBeSold,
+        quantity: failedAsset.quantity,
+        success: false,
+        statusCode: statusCode,
+        errorMessage: errorMessage
       };
-  });
-  return processedResults;
-};
+    });
+  
+    // If there are any failed transactions, return both failed and successful transactions
+    if (failedTransactions.length > 0) {
+      return {
+        success: false,
+        failedTransactions: failedTransactions,
+        successfulTransactions: successfulTransactions
+      };
+    }
+  
+    // If all transactions were successful
+    return {
+      success: true,
+      transactions: successfulTransactions
+    };
+  };
 
+  contract.unlistItem = async function (args, options = defaultOptions) {
+    options.cacheNonce = true;
+    const unlistPromises = args.saleAddresses.map(saleAddress => {
+      const contract = { address: saleAddress };
+      return inventoryJs.unlistItem(rawAdmin, contract, {}, options);
+    });
+  
+    const results = await Promise.allSettled(unlistPromises);
+  
+    // Process successful transactions
+    const successfulTransactions = results.filter(result => result.status === 'fulfilled').map((result, index) => ({
+      success: true,
+      address: args.saleAddresses[index],
+      result: result.value
+    }));
+  
+    // Process failed transactions
+    const failedTransactions = results.filter(result => result.status === 'rejected').map((result, index) => {
+      const failureAddress = args.saleAddresses[index];
+      let statusCode = "unknown";
+      let errorMessage = "Unknown error occurred";
+  
+      if (result.reason && result.reason.response) {
+        statusCode = result.reason.response.status;
+        errorMessage = result.reason.response.data || "Error with no additional information";
+      } else if (result.reason instanceof Error) {
+        errorMessage = result.reason.message;
+      }
+  
+      return {
+        success: false,
+        address: failureAddress,
+        statusCode: statusCode,
+        errorMessage: errorMessage
+      };
+    });
+  
+    // If there are any failed transactions, return both failed and successful transactions
+    if (failedTransactions.length > 0) {
+      return {
+        success: false,
+        failedTransactions: failedTransactions,
+        successfulTransactions: successfulTransactions
+      };
+    }
+  
+    // If all transactions were successful
+    return {
+      success: true,
+      transactions: successfulTransactions
+    };
+  };
+  
+  contract.resellItem = async function (args, options = defaultOptions) {
+    options.cacheNonce = true;
+    const resellPromises = args.assets.map(asset => {
+      const contract = { address: asset.address };
+      const callArgs = {
+        quantity: asset.quantity,
+      };
+      return inventoryJs.resellItem(rawAdmin, contract, callArgs, options);
+    });
 
-contract.transferItem = async function (args, options = defaultOptions) {
-  const transferPromises = args.transfers.map(transfer => {
+    const results = await Promise.allSettled(resellPromises);
+
+    // Process successful transactions
+    const successfulTransactions = results.filter(result => result.status === 'fulfilled').map((result, index) => ({
+      assetAddress: args.assets[index].address,
+      quantity: args.assets[index].quantity,
+      success: true,
+      result: result.value
+    }));
+
+    // Process failed transactions
+    const failedTransactions = results.filter(result => result.status === 'rejected').map((result, index) => {
+      const failedAsset = args.assets[index];
+      let statusCode = "unknown";
+      let errorMessage = "Unknown error occurred";
+
+      if (result.reason && result.reason.response) {
+        statusCode = result.reason.response.status;
+        errorMessage = result.reason.response.data || "Error with no additional information";
+      } else if (result.reason instanceof Error) {
+        errorMessage = result.reason.message;
+      }
+
+      return {
+        assetAddress: failedAsset.address,
+        quantity: failedAsset.quantity,
+        success: false,
+        statusCode: statusCode,
+        errorMessage: errorMessage
+      };
+    });
+
+    // If there are any failed transactions, return both failed and successful transactions
+    if (failedTransactions.length > 0) {
+      return {
+        success: false,
+        failedTransactions: failedTransactions,
+        successfulTransactions: successfulTransactions
+      };
+    }
+
+    // If all transactions were successful
+    return {
+      success: true,
+      transactions: successfulTransactions
+    };
+  };
+
+  contract.transferItem = async function (args, options = defaultOptions) {
+    options.cacheNonce = true;
+    const transferPromises = args.transfers.map(transfer => {
       const transferNumber = parseInt(util.uid(), 10);
       const individualArgs = {
-          transferNumber: transferNumber,
-          newOwner: args.newOwner,
+        transferNumber: transferNumber,
+        newOwner: args.newOwner,
+        quantity: transfer.quantity
       };
       const contractDetails = { address: transfer.assetAddress };
       return inventoryJs.transferItem(rawAdmin, contractDetails, individualArgs, options);
-  });
+    });
 
-  const results = await Promise.allSettled(transferPromises);
+    const results = await Promise.allSettled(transferPromises);
 
-  // Process the results to include the outcome of each transfer operation
-  const processedResults = results.map((result, index) => {
-      const transfer = args.transfers[index];
+    // Separating successful and failed transactions for comprehensive processing
+    const successfulTransactions = results.filter(result => result.status === 'fulfilled').map((result, index) => ({
+      assetAddress: args.transfers[index].assetAddress,
+      quantity: args.transfers[index].quantity,
+      success: true,
+      result: result.value
+    }));
+
+    const failedTransactions = results.filter(result => result.status === 'rejected').map((result, index) => {
+      const failedTransfer = args.transfers[index];
+      let statusCode = "unknown";
+      let errorMessage = "Unknown error occurred";
+
+      if (result.reason && result.reason.response) {
+        statusCode = result.reason.response.status;
+        errorMessage = result.reason.response.data || "Error with no additional information";
+      } else if (result.reason instanceof Error) {
+        errorMessage = result.reason.message;
+      }
+
       return {
-          assetAddress: transfer.assetAddress,
-          transferNumber: individualArgs.transferNumber,
-          status: result.status,
-          ...result.status === 'fulfilled' ? { success: true, result: result.value } : { success: false, error: result.reason },
+        assetAddress: failedTransfer.assetAddress,
+        quantity: failedTransfer.quantity,
+        success: false,
+        statusCode: statusCode,
+        errorMessage: errorMessage
       };
-  });
-  
-  return processedResults;
-};
+    });
+
+    // If there are any failed transactions, return both failed and successful transactions
+    if (failedTransactions.length > 0) {
+      return {
+        success: false,
+        failedTransactions: failedTransactions,
+        successfulTransactions: successfulTransactions
+      };
+    }
+
+    // If all transactions were successful
+    return {
+      success: true,
+      transactions: successfulTransactions
+    };
+  };
 
 
   contract.getAllItemTransferEvents = function (args, options = defaultOptions) {
