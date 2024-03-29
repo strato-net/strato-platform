@@ -234,7 +234,7 @@ const CategoryProductList = ({ user }) => {
     if (!isLoading) {
       window.scrollTo(0, state?.scroll);
     }
-  }, [isLoading, state]);
+  }, [isLoading, state?.scroll]);
 
   //=========================Other functions===============================//
   const linkUrl = window.location.href;
