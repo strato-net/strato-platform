@@ -25,10 +25,10 @@ const CategoryCard = () => {
 
   return (
     <>
-      <Fade>
-        <Title className="md:px-10 !text-xl md:!text-4xl !text-left py-2">
-          Shop by Category
-        </Title>
+      <Fade triggerOnce>
+      <Title className="md:px-10 !text-xl md:!text-4xl !text-left py-2">
+        Shop by Category
+      </Title>
       </Fade>
       <Fade direction="left" triggerOnce>
         <div className="flex justify-start sm:justify-center md:justify-start gap-3 lg:gap-[15px] flex-wrap px-0 md:px-10 xl:grid xl:grid-cols-6">
