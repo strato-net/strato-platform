@@ -1,5 +1,3 @@
-
-
 // eslint-disable-next-line import/no-anonymous-default-export
 export default {
   Certifier: { label: "Certifier", url: "/certifier" },
@@ -64,4 +62,6 @@ export default {
   Invoice: { label: "Invoice", url: "/orders/invoice/:id" },
   OnboardingSellerToStripe: { label: "Onboarding Seller to Stripe", url: "/inventories/stripe/onboarding" },
   OnboardingSellerToMetamask: { label: "Onboarding Seller to Metamask", url: "/inventories/metamask/onboarding" },
+  Error: { label: "Error", url: "/404" },
+  FAQ: { label: "FAQ", url: "/frequently-asked-questions" },
 };
