@@ -316,7 +316,12 @@ const ConfirmOrder = () => {
 
     },
   ];
-
+  async function fetchEthPrice() {
+    const response = await fetch('https://api.coinbase.com/v2/prices/ETH-USD/spot');
+    const data = await response.json();
+    return parseFloat(data.data.amount);
+  }
+  
   const handlePaymentConfirm = async (method) => {
     setIsPaymentModalVisible(false); // Close the payment modal
     if (userAddresses.length === 0) {
@@ -418,9 +423,11 @@ const ConfirmOrder = () => {
           params: [{ chainId: "0xaa36a7" }],
         });
         
-        const weiValue = ethers.utils.parseEther("0.001", "ether");
-
-        let hexValue = ethers.BigNumber.from(weiValue).toHexString();
+        const ethPriceUSD = await fetchEthPrice();
+        const orderTotalETH = body.orderTotal / ethPriceUSD;
+        const truncatedETH = parseFloat(orderTotalETH.toFixed(18));
+        const weiValue = ethers.utils.parseUnits(truncatedETH.toString(), 'ether');
+        const hexValue = ethers.BigNumber.from(weiValue).toHexString();
 
         const txParams = {
           from: accounts[0],
