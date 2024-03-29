@@ -6,6 +6,7 @@ import { BrowserRouter } from "react-router-dom";
 import "./styles/app.css";
 import { Layout } from "antd";
 import HeaderComponent from "./components/Header/Header";
+import FooterComponent from "./components/Footer/FooterComponent";
 import TagManager from "react-gtm-module";
 import { UsersProvider } from "./contexts/users";
 import { getCookie, delete_cookie } from "./helpers/cookie";
@@ -95,9 +96,10 @@ const App = () => {
           <Content className={`${showMenu ? 'overflow-y-hidden md:overflow-auto h-[100vh] md:h-auto w-[100vw] md:w-auto bg-[#00000020] md:bg-white relative mt-0 md:mt-28' : 'mt-[89px] md:mt-[98px] '}`}>
             <AuthenticatedRoutes user={user} users={users} isAuthenticated={isAuthenticated} />
           </Content>
+          <FooterComponent />
         </Layout>
       }
-    </BrowserRouter>
+    </BrowserRouter >
   );
 };
 export default App;
