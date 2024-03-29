@@ -357,7 +357,10 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
         <Row className="relative flex-grow-0 md:flex-1 ml-2 md:ml-5">
           <Col xs={20} md={10} lg={4} 
             className="mt-4 mr-5 md:mt-0 cursor-pointer flex-grow-0 w-max md:w-[170px] h-[44px]"
-            onClick={() => { navigate(routes.Marketplace.url) }}
+            onClick={() => { 
+              navigate(routes.Marketplace.url) 
+              window.scrollTo(0, 0);
+            }}
           >
             <img src={Images.newLogo} alt={IMG_META} title={IMG_META} className="h-[31px] w-[120px] md:w-[170px] md:h-[44px]" preview={false} />
           </Col>
@@ -383,7 +386,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
               suffix={showSearch 
                 ? <ArrowLeftOutlined onClick={() => handleSearchShow(false)} /> 
                 : <img src={Images.Header_Search} alt={IMG_META} title={IMG_META} className="w-[18px] h-[18px]" />}
-              className="bg-[#F6F6F6] border-none outline-none"
+              className="bg-[#F6F6F6] outline-none"
             />
           </Col>
         </Row>
@@ -443,6 +446,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
                 },
               });
               navigate("/checkout");
+              window.scrollTo(0, 0);
             }}
           >
             <div className="md:hidden">
