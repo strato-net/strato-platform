@@ -232,7 +232,7 @@ class Dashboard extends Component {
         <div className="row">
           <div className="col-sm-4">
             <Popover
-              isDisabled={synced && health}
+              isDisabled={synced && health && systemHealth}
               interactionKind={PopoverInteractionKind.HOVER}
               position={Position.BOTTOM}
               className={"full-width"}
@@ -241,7 +241,7 @@ class Dashboard extends Component {
                   className={`pt-dark pt-callout smd-pad-8 pt-icon-info-sign pt-intent-${
                     !metadata
                       ? "danger"
-                      : !health || !synced
+                      : !health || !systemHealth || !synced
                       ? "warning"
                       : "success"
                   }`}
@@ -251,7 +251,7 @@ class Dashboard extends Component {
                   </h5>
                   {!metadata
                     ? "Cannot connect to the Node's API"
-                    : !health
+                    : !health || !systemHealth
                     ? `Health issues: ${
                         healthIssues.length > 0
                           ? healthIssues.join(". ")
@@ -267,14 +267,14 @@ class Dashboard extends Component {
                 mode={
                   !metadata
                     ? "danger"
-                    : !health || !synced
+                    : !health || !systemWarnings || !synced
                     ? "warning"
                     : "success"
                 }
                 iconClass={
                   !metadata
                     ? "fa-triangle-exclamation"
-                    : !health
+                    : !health || !systemHealth
                     ? "fa-exclamation-circle"
                     : !synced
                     ? "fa-rotate"
