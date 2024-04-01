@@ -124,6 +124,13 @@ const navigation = {
 };
 
 export default function FooterComponent() {
+
+  const handleNavigate = (e, category) =>{
+    e.preventDefault();
+    sessionStorage.setItem('scrollPosition', 0);
+    window.location.href = `/c/${category}`
+  }
+
   return (
     <footer className="bg-[#131889]" aria-labelledby="footer-heading">
       <h2 id="footer-heading" className="sr-only">
@@ -165,7 +172,8 @@ export default function FooterComponent() {
                   {navigation.categories.map((item) => (
                     <li key={item.name}>
                       <a
-                        href={item.href}
+                        href={''}
+                        onClick={(e)=>{handleNavigate(e, item.name)}}
                         className="text-sm leading-6 text-white hover:text-white"
                       >
                         {item.name}

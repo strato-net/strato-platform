@@ -63,23 +63,16 @@ const CategoryProductList = ({ user }) => {
 
   //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
-  const subCategoryDispatch = useSubCategoryDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
   const orderDispatch = useOrderDispatch();
   // states
   const { marketplaceList, isMarketplaceLoading } = useMarketplaceState();
-  const { categorys, iscategorysLoading } = useCategoryState();
+  const { categorys } = useCategoryState();
   let { hasChecked, isAuthenticated } = useAuthenticateState();
-  const { subCategorys } = useSubCategoryState();
   const { cartList } = useMarketplaceState();
   const [scrollPosition, setScrollPosition] = useState(0);
 
   const isLoading = isMarketplaceLoading;
-
-  const onChangeCategory = (checkedValues) => {
-    const categoryStr = checkedValues.join(",");
-    const baseUrl = new URL('/category', window.location.origin);
-  }
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
