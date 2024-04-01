@@ -45,6 +45,7 @@ import ProductItemDetails from "./ProductItemDetails";
 import HelmetComponent from "../Helmet/HelmetComponent";
 import { SEO } from "../../helpers/seoConstant";
 import PreviewMode from "../RichEditor/PreviewMode";
+import OwnershipHistoryTable from "./OwnershipHistoryTable.js";
 
 const ProductDetails = ({ user, users }) => {
   const { state, pathname } = useLocation();
@@ -134,6 +135,8 @@ const ProductDetails = ({ user, users }) => {
   }, [marketplaceDispatch, cartList]);
 
   const details = inventoryDetails;
+  console.log("details", details)
+  console.log("inventory Ownership", inventoryOwnershipHistory)
 
   useEffect(() => {
     if (categorys.length && details) {
@@ -648,21 +651,7 @@ const ProductDetails = ({ user, users }) => {
                     user && { //if user is logged in then display Ownership History
                       label: <span className="text-sm md:text-base">Ownership History</span>,
                       key: "2",
-                      children: (
-                        <div>
-                          <DataTableComponent
-                            columns={ownershipDetailColumn}
-                            scrollX="100%"
-                            data={inventoryOwnershipHistory}
-                            isLoading={isInventoryOwnershipHistoryLoading}
-                            pagination={{
-                              defaultPageSize: 10,
-                              position: ["bottomCenter"],
-                              showSizeChanger: false,
-                            }}
-                          />
-                        </div>
-                      ),
+                      children: (<OwnershipHistoryTable tableData={inventoryOwnershipHistory} columns={ownershipDetailColumn}/>),
                     },
                     {
                       label: <span className="text-sm md:text-base">Additional Information</span>,
