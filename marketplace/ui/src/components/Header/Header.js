@@ -257,60 +257,6 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     setShowSearch(status)
   }
 
-  function getCategoryName(str) {
-    const lastIndex = str.lastIndexOf('-');
-    if (lastIndex !== -1) {
-      return str.substring(lastIndex + 1);
-    } else {
-      return str;
-    }
-  }
-
-  const handleNavigateRoute = (category,value) =>{
-   if(category !== 'All'){
-    handleCategoryChange(category)
-   }  
-
-   setSelectedCategory(category)
-   navigateSearch(category, value)
-  }
-
-  const checkCategory = (value) => {
-    const searchQuery = value ? `?queryValue=${value}&queryFields=name` : '';
-    
-    const fetchFunction = isAuthenticated
-      ? fetch(
-        `${apiUrl}/marketplace/all${searchQuery}`,
-        { method: HTTP_METHODS.GET, } )
-      : fetch(
-        `${apiUrl}/marketplace${searchQuery}`,
-        { method: HTTP_METHODS.GET, }
-      );
-     try {
-      fetchFunction.then(res=>res.json().then(res=>{
-        const arr = res.data.productsWithImageUrl.map(item=>
-          getCategoryName(item.contract_name))
-        const unique = [...new Set(arr)];
-        if(arr.length>0){
-          const isCarbonIncludes = (item) => item.includes('Carbon')
-          const isCarbon = unique.every(isCarbonIncludes)
-
-          if(unique.length==1 || isCarbon){
-            const category = getCategoryName(unique[0])
-            const cat = isCarbon?'Carbon':category
-            handleNavigateRoute(cat,value)
-          }else{
-              handleNavigateRoute('All',value)
-          }
-          
-        }else{
-          handleNavigateRoute('All',value)
-        }
-      }))    
-     } catch (error) {
-      console.log("err",error)
-     }
-  };
 
   const navigateSearch = (selectedCateg, value) => {
     const baseUrl = new URL(`/c/${selectedCateg}`, window.location.origin);
@@ -339,8 +285,11 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
 
   const handleEnterSearch = (e) => {
     const value = e.target.value;
+    const baseUrl = new URL(`/c/All`, window.location.origin);
     if(value){
-      checkCategory(value)
+      baseUrl.searchParams.set('s', value);
+      const url = baseUrl.pathname + baseUrl.search;
+      navigate(url, { replace: true });
     }
   };
 
@@ -375,7 +324,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
               value={selectedCategory}
             />
             <Input
-              key={searchQueryValue}
+              key={searchQueryValue || categoryQueryValue}
               ref={inputRef}
               size="large"
               type="search"
