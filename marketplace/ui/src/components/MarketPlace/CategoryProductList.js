@@ -151,6 +151,7 @@ const CategoryProductList = ({ user }) => {
       );
     }
   }, [
+    categoryParam,
     subCategoryQueryValue,
     minPrice,
     maxPrice,
