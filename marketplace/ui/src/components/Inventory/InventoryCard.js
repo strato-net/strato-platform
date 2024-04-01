@@ -257,7 +257,16 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
             {/* {inventory?.name || "N/A"} */}
             <Tooltip title={inventory?.name.length > 20 ? inventory?.name : null}>
               <span className=" whitespace-nowrap max-w-[160px] inline-block">
-                {inventory?.name.length > 20 ? `${inventory?.name.slice(0, 20)}...` : `${inventory?.name}`}
+                {
+                  inventory?.groupedAssets.length > 1 ? 
+                  // TODO: Add in the proper link here for the new gropued asset table. This should redirect to this new page if there are grouped assets. 
+                  ( 
+                    <a>
+                      {inventory?.name.length > 20 ? `${inventory?.name.slice(0, 20)}... (${inventory.groupedAssets.length})` : `${inventory?.name} (${inventory.groupedAssets.length})`}
+                    </a>
+                  ) : inventory?.name.length > 20 ? `${inventory?.name.slice(0, 20)}...` : `${inventory?.name}`
+                }
+                
               </span>
             </Tooltip>
           </p>
