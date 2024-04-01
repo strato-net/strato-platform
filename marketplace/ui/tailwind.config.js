@@ -43,6 +43,7 @@ module.exports = {
     fontFamily: {
       sans: ["Montserrat", "sans-serif"],
       serif: ["Montserrat", "serif"],
+      arial: ["Arial", "sans-serif"],
     },
 
     extend: {

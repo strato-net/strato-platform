@@ -217,14 +217,14 @@ const actions = {
     }
   },
 
-  fetchInventoryForUser: async (dispatch, limit, offset, queryValue) => {
+  fetchInventoryForUser: async (dispatch, queryValue) => {
     const query = queryValue ? `&ownerCommonName=${encodeURIComponent(queryValue)}` : ``;
 
     dispatch({ type: actionDescriptors.fetchInventoryForUser });
 
     try {
       const response = await fetch(
-        `${apiUrl}/inventory/user/inventories?gtField=quantity&gtValue=0&limit=${limit}&offset=${offset}${query}&isMint=true`,
+        `${apiUrl}/inventory/user/inventories?gtField=quantity&gtValue=0${query}&isMint=true`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -604,7 +604,7 @@ const actions = {
         }
       }
       let url = `${apiUrl}/inventory/transfers/items?limit=${limit}&order=transferDate.${order}&offset=${offset}&or=(oldOwnerCommonName.eq.${ownerCommonName},newOwnerCommonName.eq.${ownerCommonName})${search ? searchQuery : ''}${date ? range : ''}`
-     
+
       const response = await fetch(url, {
         method: HTTP_METHODS.GET,
 
@@ -658,12 +658,6 @@ const actions = {
         });
 
         return true;
-      } else if (response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({
-          type: actionDescriptors.fetchInventoryDetailFailed,
-          error: "Unauthorized while fetching Inventory"
-        });
-        window.location.href = body.error.loginUrl;
       }
 
       dispatch({

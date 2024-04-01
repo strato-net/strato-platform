@@ -2,6 +2,8 @@ import {
     Button,
     Row,
     Col,
+    Modal,
+    Spin
 } from "antd";
 import DataTableComponent from "../DataTableComponent";
 import "./index.css";
@@ -15,11 +17,10 @@ import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
 import { actions as orderActions } from "../../contexts/order/actions"
 import { useOrderDispatch } from "../../contexts/order";
+import { setCookie } from "../../helpers/cookie";
 
 
 const CartComponent = ({ columns, data, openToastOrder }) => {
-
-
     const navigate = useNavigate();
     const [tax, setTax] = useState(0);
     const [shipping, setShipping] = useState(0);
@@ -27,6 +28,29 @@ const CartComponent = ({ columns, data, openToastOrder }) => {
     const [total, setTotal] = useState(0);
     const marketplaceDispatch = useMarketplaceDispatch();
     const orderDispatch = useOrderDispatch();
+    const [modal, contextHolder] = Modal.useModal();
+
+    const countDown = () => {
+        modal.info({
+            okButtonProps: { hidden: true },
+            content: (
+                <>
+                    <p className="font-medium">
+                        In order to proceed with your purchase, you will first need to log in or register an account with Mercata.
+                    </p>
+                    <br />
+                    <p>
+                        You will be redirected to the sign-in page shortly.
+                    </p>
+                    <Spin className="flex justify-center mt-2" />
+                </>
+            ),
+        });
+        setTimeout(() => {
+            setCookie("returnUrl", `/marketplace/confirmOrder`, 10);
+            window.location.href = loginUrl;
+        }, 4000);
+    };
 
     let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
@@ -61,6 +85,7 @@ const CartComponent = ({ columns, data, openToastOrder }) => {
 
     return (
         <>
+            {contextHolder}
             <div className="pt-2  ">
                 <div>
                     <div className=" cart">
@@ -102,56 +127,57 @@ const CartComponent = ({ columns, data, openToastOrder }) => {
                                 id="submit-order-button"
                                 className="flex items-center px-4 py-5 bg-primary !hover:bg-primaryHover"
                                 onClick={async () => {
-                                    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                                        window.location.href = loginUrl;
-                                    } else {
-                                        const saleAddresses = [];
-                                        const quantities = [];
-                                        data.forEach((item) => {
-                                            saleAddresses.push(item.saleAddress)
-                                            quantities.push(item.qty)
-                                        })
-                                        const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities)
-                                        if (checkQuantity === true ) {
-                                            // Proceed with order submission
-                                            actions.addItemToConfirmOrder(marketplaceDispatch, data);
-                                            window.LOQ.push(['ready', async LO => {
-                                                // Track an event
-                                                await LO.$internal.ready('events')
-                                                LO.events.track('Submit Order (from cart)')
-                                            }])
-                                            TagManager.dataLayer({
-                                                dataLayer: {
-                                                    event: 'submit_order_from_cart',
-                                                },
-                                            });
+                                    const saleAddresses = [];
+                                    const quantities = [];
+                                    data.forEach((item) => {
+                                        saleAddresses.push(item.saleAddress)
+                                        quantities.push(item.qty)
+                                    })
+                                    const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities)
+                                    if (checkQuantity === true) {
+                                        // Proceed with order submission
+                                        actions.addItemToConfirmOrder(marketplaceDispatch, data);
+                                        window.LOQ.push(['ready', async LO => {
+                                            // Track an event
+                                            await LO.$internal.ready('events')
+                                            LO.events.track('Submit Order (from cart)')
+                                        }])
+                                        TagManager.dataLayer({
+                                            dataLayer: {
+                                                event: 'submit_order_from_cart',
+                                            },
+                                        });
 
-                                            navigate("/confirmOrder");
-
+                                        if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                                            countDown();
                                         } else {
-                                            let insufficientQuantityMessage = "";
-                                            let outOfStockMessage = "";
-
-                                            // Generate the messages of products with too little or no quantity
-                                            checkQuantity.forEach(detail => {
-                                                if (detail.availableQuantity === 0) {
-                                                    outOfStockMessage += `Product ${detail.assetName}\n`;
-                                                } else {
-                                                    insufficientQuantityMessage += `Product ${detail.assetName}: ${detail.availableQuantity}\n`;
-                                                }
-                                            });
-                                            
-                                            // Throw the appropriate error messages. Throw both if applicable. 
-                                            let errorMessage = "";
-                                            if (insufficientQuantityMessage) {
-                                                errorMessage += `The following item(s) in your cart have limited quantity available and will need to be adjusted. Please reduce the quantity to proceed:\n${insufficientQuantityMessage}`;
-                                            }
-                                            if (outOfStockMessage) {
-                                                if (errorMessage) errorMessage += "\n"; // Add a new line if there's already an error message
-                                                errorMessage += `The following item(s) are temporarily out of stock and should be removed:\n${outOfStockMessage}`;
-                                            }
-                                            openToastOrder("bottom", errorMessage);
+                                            navigate("/confirmOrder");
+                                            window.scrollTo(0, 0);
                                         }
+
+                                    } else {
+                                        let insufficientQuantityMessage = "";
+                                        let outOfStockMessage = "";
+
+                                        // Generate the messages of products with too little or no quantity
+                                        checkQuantity.forEach(detail => {
+                                            if (detail.availableQuantity === 0) {
+                                                outOfStockMessage += `Product ${detail.assetName}\n`;
+                                            } else {
+                                                insufficientQuantityMessage += `Product ${detail.assetName}: ${detail.availableQuantity}\n`;
+                                            }
+                                        });
+
+                                        // Throw the appropriate error messages. Throw both if applicable. 
+                                        let errorMessage = "";
+                                        if (insufficientQuantityMessage) {
+                                            errorMessage += `The following item(s) in your cart have limited quantity available and will need to be adjusted. Please reduce the quantity to proceed:\n${insufficientQuantityMessage}`;
+                                        }
+                                        if (outOfStockMessage) {
+                                            if (errorMessage) errorMessage += "\n"; // Add a new line if there's already an error message
+                                            errorMessage += `The following item(s) are temporarily out of stock and should be removed:\n${outOfStockMessage}`;
+                                        }
+                                        openToastOrder("bottom", errorMessage);
                                     }
                                 }}
                                 disabled={data.length === 0}

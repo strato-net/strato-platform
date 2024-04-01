@@ -10,6 +10,9 @@ import { useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
 import "react-responsive-carousel/lib/styles/carousel.min.css";
 import { Carousel } from "react-responsive-carousel";
+import { Fade } from "react-awesome-reveal";
+import HelmetComponent from "../Helmet/HelmetComponent";
+import { SEO } from "../../helpers/seoConstant";
 
 const MarketPlace = ({ user, isAuthenticated }) => {
   const limit = 10, offset = 0;
@@ -58,8 +61,16 @@ const MarketPlace = ({ user, isAuthenticated }) => {
     actions.fetchCategories(dispatch, limit, offset, debouncedSearchTerm);
   }, [dispatch, limit, offset, debouncedSearchTerm]);
 
+  const linkUrl = window.location.href;
+  const metaImg = SEO.IMAGE_META
+  
   return (
     <>
+    <HelmetComponent 
+          title={SEO.TITLE_META}
+          description={SEO.DESCRIPTION_META} 
+          link={linkUrl} />
+    <Fade triggerOnce>
       <Carousel autoPlay centerSlidePercentage={95} showArrows={false} infiniteLoop showStatus={false} swipeable emulateTouch autoFocus centerMode>
         <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2 md:mt-6 lg:mx-3">
           <div  className="flex flex-col gap-3 backdrop-blur-2xl text-left p-4 px-3 md:px-8 h-[67%] sm:h-32 md:h-40 w-[92%] sm:w-[70%] md:w-[500px] rounded-md md:rounded-2xl absolute left-2 md:left-10 top-10 sm:top-20 md:top-44 bg-[rgba(256,256,256,0.17)] z-50">
@@ -71,14 +82,21 @@ const MarketPlace = ({ user, isAuthenticated }) => {
             </Typography.Text>
             <Button
               id="viewMore"
-              onClick={() => navigate(routes.MarketplaceProductList.url)}
+              onClick={() => {
+                navigate(routes.MarketplaceProductList.url);
+                sessionStorage.setItem('scrollPosition', 0);
+              }}
               className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
               <div className="text-primary font-semibold md:text-lg">
                 View More
               </div>
             </Button>
           </div>
-          <img className="absolute inset-0 z-10 h-[222px] md:h-[380px] md:w-[90%] rounded-md md:rounded-[14px]" height={380} width="100%" src={Images.art_card} preview={false} />
+          <img 
+          alt={metaImg}
+          title={metaImg}
+          className="absolute inset-0 z-10 h-[222px] md:h-[380px] md:w-[90%] rounded-md md:rounded-[14px]" 
+          height={380} width="100%" src={Images.art_card} preview={false} />
         </div>
         <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2  md:mt-6 lg:mx-3">
           <div  className="flex flex-col gap-3 backdrop-blur-2xl text-left p-4 px-3 md:px-8 h-[67%] sm:h-32 md:h-40 w-[92%] sm:w-[70%] md:w-[500px] rounded-md md:rounded-2xl absolute left-2 md:left-10 top-10 sm:top-20 md:top-44 bg-[rgba(256,256,256,0.17)] z-50">
@@ -90,14 +108,20 @@ const MarketPlace = ({ user, isAuthenticated }) => {
             </Typography.Text>
             <Button
               id="viewMore"
-              onClick={() => navigate(routes.MarketplaceProductList.url)}
+              onClick={() => {
+                navigate(routes.MarketplaceProductList.url);
+                sessionStorage.setItem('scrollPosition', 0);              
+              }}
               className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
               <div className="text-primary font-semibold md:text-lg">
                 View More
               </div>
             </Button>
           </div>
-          <img className="absolute inset-0 z-10 h-[222px] md:h-[380px] md:w-[90%] rounded-md md:rounded-[14px]" height={380} width="100%" src={Images.carousel_first} preview={false} />
+          <img 
+          alt={metaImg}
+          title={metaImg}
+          className="absolute inset-0 z-10 h-[222px] md:h-[380px] md:w-[90%] rounded-md md:rounded-[14px]" height={380} width="100%" src={Images.carousel_first} preview={false} />
         </div>
         <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2  md:mt-6 lg:mx-3">
           <div  className="flex flex-col gap-3 backdrop-blur-2xl text-left p-4 px-3 md:px-8 h-[67%] sm:h-32 md:h-40 w-[92%] sm:w-[70%] md:w-[500px] rounded-md md:rounded-2xl absolute left-2 md:left-10 top-10 sm:top-20 md:top-44 bg-[rgba(256,256,256,0.17)] z-50">
@@ -109,14 +133,20 @@ const MarketPlace = ({ user, isAuthenticated }) => {
             </Typography.Text>
             <Button
               id="viewMore"
-              onClick={() => navigate(routes.MarketplaceProductList.url)}
+              onClick={() => {
+                navigate(routes.MarketplaceProductList.url);
+                sessionStorage.setItem('scrollPosition', 0);              
+              }}
               className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
               <div className="text-primary font-semibold md:text-lg">
                 View More
               </div>
             </Button>
           </div>
-          <img className="absolute inset-0 z-10 h-[222px] md:h-[380px] md:w-[90%] rounded-md md:rounded-[14px]" height={380} width="100%" src={Images.carbon_card} preview={false} />
+          <img 
+          alt={metaImg}
+          title={metaImg}
+          className="absolute inset-0 z-10 h-[222px] md:h-[380px] md:w-[90%] rounded-md md:rounded-[14px]" height={380} width="100%" src={Images.carbon_card} preview={false} />
         </div>
         <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2  md:mt-6 lg:mx-3">
           <div  className="flex flex-col gap-3 backdrop-blur-2xl text-left p-4 px-3 md:px-8 h-[67%] sm:h-32 md:h-40 w-[92%] sm:w-[70%] md:w-[500px] rounded-md md:rounded-2xl absolute left-2 md:left-10 top-10 sm:top-20 md:top-44 bg-[rgba(256,256,256,0.17)] z-50">
@@ -128,14 +158,20 @@ const MarketPlace = ({ user, isAuthenticated }) => {
             </Typography.Text>
             <Button
               id="viewMore"
-              onClick={() => navigate(routes.MarketplaceProductList.url)}
+              onClick={() => {
+                navigate(routes.MarketplaceProductList.url);
+                sessionStorage.setItem('scrollPosition', 0);              
+              }}
               className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
               <div className="text-primary font-semibold md:text-lg">
                 View More
               </div>
             </Button>
           </div>
-          <img className="absolute inset-0 object-cover z-10 h-[222px] md:h-[380px] md:w-[90%] rounded-md md:rounded-[14px]" height={380} width="100%" src={Images.Metal_card} preview={false} />
+          <img 
+          alt={metaImg}
+          title={metaImg}
+          className="absolute inset-0 object-cover z-10 h-[222px] md:h-[380px] md:w-[90%] rounded-md md:rounded-[14px]" height={380} width="100%" src={Images.Metal_card} preview={false} />
         </div>
         <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2  md:mt-6 lg:mx-3">
           <div  className="flex flex-col gap-3 backdrop-blur-2xl text-left p-4 px-3 md:px-8 h-[67%] sm:h-32 md:h-40 w-[92%] sm:w-[70%] md:w-[500px] rounded-md md:rounded-2xl absolute left-2 md:left-10 top-10 sm:top-20 md:top-44 bg-[rgba(256,256,256,0.17)] z-50">
@@ -147,16 +183,23 @@ const MarketPlace = ({ user, isAuthenticated }) => {
             </Typography.Text>
             <Button
               id="viewMore"
-              onClick={() => navigate(routes.MarketplaceProductList.url)}
+              onClick={() => {
+                navigate(routes.MarketplaceProductList.url);
+                sessionStorage.setItem('scrollPosition', 0);              
+              }}
               className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
               <div className="text-primary font-semibold md:text-lg">
                 View More
               </div>
             </Button>
           </div>
-          <img className="absolute inset-0 object-cover z-10 h-[222px] md:h-[380px] md:w-[90%] rounded-md md:rounded-[14px]" height={380} width="100%" src={Images.collectibles} preview={false} />
+          <img 
+          alt={metaImg}
+          title={metaImg}
+          className="absolute inset-0 object-cover z-10 h-[222px] md:h-[380px] md:w-[90%] rounded-md md:rounded-[14px]" height={380} width="100%" src={Images.collectibles} preview={false} />
         </div>
       </Carousel>
+      </Fade>
       {iscategorysLoading ? (
         <div className="h-96 flex justify-center items-center">
           <Spin spinning={iscategorysLoading} size="large" />
