@@ -1,7 +1,5 @@
 import { rest } from 'blockapps-rest'
 
-const usersArr = ['blockapps_carbon', 'blockapps_metals', 'blockapps_clothing',
-'blockapps_collectibles', 'blockapps_memberships', 'blockapps_art']
 
 class MarketplaceController {
 
@@ -13,7 +11,7 @@ class MarketplaceController {
         const encodedManufacturers = query.manufacturer.map(product => { return encodeURIComponent(product) })
         query.manufacturer = encodedManufacturers
       }
-      const inventories = await dapp.getMarketplaceInventories({ ...restQuery, ownerCommonName: usersArr })
+      const inventories = await dapp.getMarketplaceInventories({ ...restQuery })
       let unlisted = [];
       let listed = inventories?.inventoryResults?.filter((item,index)=>{
         if(item.saleQuantity && item.saleQuantity!==0){
@@ -54,7 +52,7 @@ class MarketplaceController {
         const encodedManufacturers = query.manufacturer.map(product => { return encodeURIComponent(product) })
         query.manufacturer = encodedManufacturers
       }
-      const inventories = await dapp.getMarketplaceInventoriesLoggedIn({ ...restQuery, ownerCommonName: usersArr })
+      const inventories = await dapp.getMarketplaceInventoriesLoggedIn({ ...restQuery })
 
       let unlisted = [];
       let listed = inventories?.inventoryResults?.filter((item,index)=>{
@@ -91,7 +89,7 @@ class MarketplaceController {
   static async getTopSellingProducts(req, res, next) {
     try {
       const { dapp, query } = req
-      const inventories = await dapp.getTopSellingProducts({ ...query, ownerCommonName: usersArr })
+      const inventories = await dapp.getTopSellingProducts({ ...query })
       const productsWithImageUrl = inventories.sort((a, b) => {
         return b.saleDate.localeCompare(a.saleDate);
       });
@@ -107,7 +105,7 @@ class MarketplaceController {
   static async getTopSellingProductsLoggedIn(req, res, next) {
     try {
       const { dapp, query } = req
-      const inventories = await dapp.getTopSellingProductsLoggedIn({ ...query,ownerCommonName: usersArr })
+      const inventories = await dapp.getTopSellingProductsLoggedIn({ ...query })
       const productsWithImageUrl = inventories.sort((a, b) => {
         return b.saleDate.localeCompare(a.saleDate);
       });

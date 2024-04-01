@@ -274,24 +274,28 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
-    const newArgs = { ...args }
-    return marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
+    const newArgs = { ...args, ownerCommonName: constants.baUserNames }
+    const all =  await marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
+
+    const newArgs1 = { ...args, notEqualsField: ['ownerCommonName', 'sale'], notEqualsValue: [constants.baUserNames, '0000000000000000000000000000000000000000'] }
+    const all2 =  await marketplaceJs.getAll(rawAdmin, newArgs1, getOptions);
+    return {inventoryResults: all.inventoryResults.concat(all2.inventoryResults), inventoryCount: all.inventoryCount + all2.inventoryCount};
   };
 
   contract.getMarketplaceInventoriesLoggedIn = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
-    const newArgs = {
-      ...args, notEqualsField: 'ownerCommonName',
-      notEqualsValue: userCommonName
-    }
-    return marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
+    let usersArr = constants.baUserNames.filter(user => user !== userCommonName)
+    const newArgs = { ...args, ownerCommonName: usersArr }
+    const all = marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
+
+    const newArgs1 = { ...args, notEqualsField: ['ownerCommonName', 'sale'], notEqualsValue: [usersArr, '0000000000000000000000000000000000000000`'] }
+    const all2 = marketplaceJs.getAll(rawAdmin, newArgs1, getOptions);
+    return {inventoryResults: all.inventoryResults.concat(all2.inventoryResults), inventoryCount: all.inventoryCount + all2.inventoryCount};
   };
 
   contract.getTopSellingProducts = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName }
-    const users = ['blockapps_carbon', 'blockapps_metals', 'blockapps_clothing',
-      'blockapps_collectibles', 'blockapps_memberships', 'blockapps_art']
-    const newArgs = { ...args, notEqualsField: 'sale', notEqualsValue: '0000000000000000000000000000000000000000', ownerCommonName: users }
+    const newArgs = { ...args, notEqualsField: 'sale', notEqualsValue: '0000000000000000000000000000000000000000', ownerCommonName: constants.baUserNames }
     return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions)
   }
 
@@ -299,7 +303,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const getOptions = { ...options, app: contractName }
     const newArgs = {
       ...args, notEqualsField: ['sale', 'ownerCommonName'],
-      notEqualsValue: ['0000000000000000000000000000000000000000', userCommonName]
+      notEqualsValue: ['0000000000000000000000000000000000000000', userCommonName] , ownerCommonName: constants.baUserNames
     }
     return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions)
   }
