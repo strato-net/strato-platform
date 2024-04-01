@@ -1413,7 +1413,7 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAs
         runConduit $
           sourceTQueue seqVmSource
             .| (awaitForever $ yield . foldr VMEvent.insertInBatch VMEvent.newInBatch)
-            .| handleVmEvents False
+            .| handleVmEvents
             .| (awaitForever $ yield . flip VMEvent.insertOutBatch VMEvent.newOutBatch)
             .| ( awaitForever $ \b -> do
                    $logInfoS (name <> "/vm") . T.pack $ show $ toList (VMEvent.outEvents b)

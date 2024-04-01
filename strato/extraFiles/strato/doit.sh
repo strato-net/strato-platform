@@ -227,7 +227,6 @@ function newnode {
     --svmDev=${svmDev:-false} \
     --svmTrace=${svmTrace:-false} \
     --requireCerts=${requireCerts:-true} \
-    --useSyncMode=${useSyncMode:-false} \
     ${networkFlag} \
     "${aclFlag}" \
     "${txsFlag}" \

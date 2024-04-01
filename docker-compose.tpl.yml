@@ -192,7 +192,6 @@ services:
     - sqlDiff=${sqlDiff}
     - svmDev=${svmDev}
     - txSizeLimit=${txSizeLimit}
-    - useSyncMode=${useSyncMode}
     - userRegistryAddress=${userRegistryAddress}
     - userRegistryCodeHash=${userRegistryCodeHash}
     - useBuiltinUserRegistry=${useBuiltinUserRegistry}
