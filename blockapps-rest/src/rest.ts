@@ -449,18 +449,6 @@ async function getStatus(user:OAuthUser, options:Options) {
   }
 }
 
-async function getVersion(user:OAuthUser, options:Options) {
-  try {
-    return await api.getVersion(user, { ...options, isAsync: true });
-  } catch (err) {
-    throw new RestError(
-      RestStatus.BAD_REQUEST,
-      err.response.statusText || err.response || err,
-      err.response.data || err.response || err
-    );
-  }
-}
-
 // =====================================================================
 //   user
 // =====================================================================
@@ -1757,7 +1745,6 @@ export default {
   getAccounts,
   getHealth,
   getStatus,
-  getVersion,
   compileContracts,
   postContractsXabi,
   createContract,

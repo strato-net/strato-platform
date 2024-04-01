@@ -101,12 +101,6 @@ async function getStatus(user:OAuthUser, options:Options) {
   return get(url, endpoint, setAuthHeaders(user, options));
 }
 
-async function getVersion(user:OAuthUser, options:Options) {
-  const url = getNodeUrl(options);
-  const endpoint = constructEndpoint(Endpoint.VERSION, options);
-  return get(url, endpoint, setAuthHeaders(user, options));
-}
-
 async function getBalance(user:OAuthUser, bcuser:BlockChainUser | null, options:Options) {
   let address;
   if (!bcuser) {
@@ -491,7 +485,6 @@ export default {
   getAccounts,
   getHealth,
   getStatus,
-  getVersion,
   getBalance,
   getCreateArgs,
   compileContracts,
