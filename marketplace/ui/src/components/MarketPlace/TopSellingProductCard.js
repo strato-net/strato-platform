@@ -148,7 +148,7 @@ const TopSellingProductCard = () => {
       setPrevVisible(parent.scrollLeft !== 0);
       setNextVisible(
         Math.round(parent.offsetWidth + parent.scrollLeft) !==
-          parent.scrollWidth
+        parent.scrollWidth
       );
     };
 
@@ -172,23 +172,29 @@ const TopSellingProductCard = () => {
   return (
     <div>
       {contextHolder}
-      <Fade>
-      <div className="pt-10 md:pt-16 pr-2 md:pr-10 flex justify-between">
-        <Title className="md:px-10 !text-xl md:!text-4xl !text-left">
-          Trending in All Categories
-        </Title>
-        <Button 
-          size="large" 
-          onClick={()=>navigate(navRoute)}
-          className="text-black hover:!text-black border-grayDark hidden md:flex"
-        >
+      <Fade triggerOnce>
+        <div className="pt-10 md:pt-16 pr-2 md:pr-10 flex justify-between">
+          <Title className="md:px-10 !text-xl md:!text-4xl !text-left">
+            Trending in All Categories
+          </Title>
+          <Button
+            size="large"
+            onClick={() => {
+              navigate(navRoute);
+              sessionStorage.setItem('scrollPosition', 0);
+            }}
+            className="text-black hover:!text-black border-grayDark hidden md:flex"
+          >
             View All
-        </Button>
-        <Button 
-          size="small" 
-          onClick={()=>navigate(navRoute)}
-          className="text-black hover:!text-black border-grayDark flex md:hidden"
-        >
+          </Button>
+          <Button
+            size="small"
+            onClick={() => {
+              navigate(navRoute);
+              sessionStorage.setItem('scrollPosition', 0);
+            }}
+            className="text-black hover:!text-black border-grayDark flex md:hidden"
+          >
             View All
           </Button>
         </div>
@@ -219,18 +225,16 @@ const TopSellingProductCard = () => {
             <Button
               type='primary'
               onClick={() => scroll(-300)}
-              className={`${
-                !prevVisible ? "hidden" : "md:flex hidden"
-              } cursor-pointer absolute z-10 justify-center items-center top-48 left-24 h-12 w-12 text-2xl bg-[#6A6A6A] rounded-full text-white`}
+              className={`${!prevVisible ? "hidden" : "md:flex hidden"
+                } cursor-pointer absolute z-10 justify-center items-center top-48 left-24 h-12 w-12 text-2xl bg-[#6A6A6A] rounded-full text-white`}
             >
               {"<"}
             </Button>
             <Button
               type='primary'
               onClick={() => scroll(300)}
-              className={`${
-                !nextVisible ? "hidden" : "md:flex hidden"
-              } cursor-pointer absolute justify-center items-center top-48 right-24 h-12 w-12 text-2xl bg-[#6A6A6A] rounded-full text-white z-20`}
+              className={`${!nextVisible ? "hidden" : "md:flex hidden"
+                } cursor-pointer absolute justify-center items-center top-48 right-24 h-12 w-12 text-2xl bg-[#6A6A6A] rounded-full text-white z-20`}
             >
               {">"}
             </Button>
