@@ -75,14 +75,6 @@ library:
   - ordered-containers
 
 executables:
-  strato-setup:
-    source-dirs: exec_src/
-    main: Main.hs
-    dependencies:
-      - common-log
-      - hflags
-      - strato-init
-    other-modules: []
 
   tabula-rasa:
     source-dirs: exec_src/
@@ -92,11 +84,6 @@ executables:
       - strato-init
       - strato-model
 
-    other-modules: []
-
-  from-restore:
-    source-dirs: exec_src/
-    main: FromRestore.hs
     other-modules: []
 
   init-worker:

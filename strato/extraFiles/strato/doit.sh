@@ -353,32 +353,19 @@ function doInit {
   ${networkFlag} \
   ${stratoBootnode}"
 
-  if ${splitinit:-false} ; then
-    #TODO(https://blockapps.atlassian.net/browse/STRATO-1421): Populate strato-init-events with from-restore from S3
-    cmd="tabula-rasa $args"
+  cmd="tabula-rasa $args"
 
-    echo "init event source: $cmd"
-    # logging to stdout and log file:
-    $cmd 2>&1 | tee logs/strato-setup
-    if [ ${PIPESTATUS[0]} -ne 0 ]; then
-      echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
-      tail -f /dev/null
-    fi
-    init-worker --kafkahost=$kafkaHost 2>&1 | tee --append logs/strato-setup
-    if [ ${PIPESTATUS[0]} -ne 0 ]; then
-      echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
-      tail -f /dev/null
-    fi
-  else
-    cmd="strato-setup $args"
-
-    echo "strato-setup command: $cmd"
-    # logging to stdout and log file:
-    $cmd 2>&1 | tee logs/strato-setup
-    if [ ${PIPESTATUS[0]} -ne 0 ]; then
-      echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
-      tail -f /dev/null
-    fi
+  echo "init event source: $cmd"
+  # logging to stdout and log file:
+  $cmd 2>&1 | tee logs/strato-setup
+  if [ ${PIPESTATUS[0]} -ne 0 ]; then
+    echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
+    tail -f /dev/null
+  fi
+  init-worker --kafkahost=$kafkaHost 2>&1 | tee --append logs/strato-setup
+  if [ ${PIPESTATUS[0]} -ne 0 ]; then
+    echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
+    tail -f /dev/null
   fi
 
   #we need to create the private key for the faucet

@@ -25,7 +25,7 @@ so that they could be properly moved to their respective version's subsection.
 
 ### Removed
 
-- Removed `gasOn` flag (always off)
+- Removed unused flags, such as `gasOn` and `splitinit`
 
 
 ## [11.1.0] - 3/28/2023
