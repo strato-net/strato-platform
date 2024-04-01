@@ -1,9 +1,8 @@
-import rest from "../rest";
 import util from "../util/util";
 import fsUtil from "../util/fsUtil";
 import assert from "../util/assert";
 import BigNumber from "bignumber.js";
-import { Chain, Options, SendTx } from "../types"
+import { Chain, SendTx } from "../types"
 
 import * as ip from "ip";
 
@@ -34,9 +33,9 @@ function getTestFixtures() {
 /*
   users
  */
-async function createAdmin(_args, options:Options) {
-  return rest.createUser(_args, options);
-}
+  async function createAdmin(_args, options:Options) {
+    return rest.createUser(_args, options);
+  }
 
 function createCompileContractsArgs(count) {
   const uid = util.uid();
@@ -146,7 +145,6 @@ const createChainArgs = (uid, members) => {
 };
 
 export default {
-  createAdmin,
   createContractArgs,
   createContractListArgs,
   createContractSyntaxErrorArgs,
@@ -157,6 +155,7 @@ export default {
   createCallArgs,
   createCallListArgs,
   createChainArgs,
+  createAdmin,
   createCompileContractsArgs,
   getTestConfig,
   getTestFixtures

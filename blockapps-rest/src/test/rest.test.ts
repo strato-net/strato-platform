@@ -27,7 +27,7 @@ describe("rest_7", function () {
     const oauth:oauthUtil = await oauthUtil.init(config.nodes[0].oauth);
     let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
     const userArgs:OAuthUser = {token: accessToken.token.access_token};
-    admin = await factory.createAdmin(userArgs, options);
+    admin = await factory.createAdmin(userArgs, options);;
   });
 
   describe("oauthPing", function () {
@@ -334,7 +334,7 @@ describe("rest_7", function () {
 
     before(async () => {
       const user2Args = { token: process.env.USER2_TOKEN };
-      user2 = await factory.createAdmin(user2Args, options);
+      user2 = {user2Args, address: 0};
     });
 
     it("send - sync", async () => {
@@ -423,7 +423,7 @@ describe("search until", function () {
     const oauth:oauthUtil = await oauthUtil.init(config.nodes[0].oauth);
     let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
     const userArgs:OAuthUser = {token: accessToken.token.access_token};
-    admin = await factory.createAdmin(userArgs, options);
+    admin = await factory.createAdmin(userArgs, options);;
   });
 
   beforeEach(async () => {
@@ -496,7 +496,7 @@ describe("search query", function () {
     const oauth:oauthUtil = await oauthUtil.init(config.nodes[0].oauth);
     let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
     const userArgs:OAuthUser = {token: accessToken.token.access_token};
-    admin = await factory.createAdmin(userArgs, options);
+    admin = await factory.createAdmin(userArgs, options);;
   });
 
   it("search multiple", async () => {
@@ -746,7 +746,7 @@ describe("chain", function () {
     const oauth:oauthUtil = await oauthUtil.init(config.nodes[0].oauth);
     let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
     const userArgs:OAuthUser = {token: accessToken.token.access_token};
-    admin = await factory.createAdmin(userArgs, options);
+    admin = await factory.createAdmin(userArgs, options);;
   });
 
   beforeEach(async () => {

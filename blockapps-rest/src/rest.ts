@@ -1,14 +1,11 @@
-import { BigNumber } from "bignumber.js";
 import * as RestStatus from "http-status-codes";
 import api from "./api";
 import { TxResultStatus } from "./constants";
 import util from "./util/util";
 import { constructMetadata, setAuthHeaders } from "./util/api.util";
 import { RestError, response } from "./util/rest.util";
-import jwt from "jsonwebtoken";
 import {
   Options,
-  StratoUser,
   OAuthUser,
   BlockChainUser,
   Contract,
@@ -463,6 +460,7 @@ async function getVersion(user:OAuthUser, options:Options) {
     );
   }
 }
+
 // =====================================================================
 //   user
 // =====================================================================
@@ -486,7 +484,6 @@ async function createUser(ouser:OAuthUser, options:Options):Promise<BlockChainUs
   const address = await createOrGetKey(ouser, options);
   return Object.assign({}, ouser, { address });
 }
-
 
 // =====================================================================
 //   compile contracts
@@ -1761,7 +1758,6 @@ export default {
   getHealth,
   getStatus,
   getVersion,
-  createUser,
   compileContracts,
   postContractsXabi,
   createContract,
@@ -1802,6 +1798,8 @@ export default {
   listExtStorage,
   //
   pingOauth,
+  //
+  createUser,
   //
   debugStatus,
   debugPause,

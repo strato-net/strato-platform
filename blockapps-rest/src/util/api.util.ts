@@ -17,7 +17,6 @@ const Endpoint = {
   STATUS: `${apexUrl}/status`,
   ACCOUNT: `${strato12Url}/account`,
   VERSION: `${strato12Url}/version`,
-  USER: `${blocUrl}/users/:username`,
   CONTRACTS: `${blocUrl}/contracts`,
   CONTRACTS_CONTRACT: `${blocUrl}/contracts/:name/:address`,
   CONTRACTS_CONTRACT_DETAILS: `${blocUrl}/contracts/contract/:address/details`,

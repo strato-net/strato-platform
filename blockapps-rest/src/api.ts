@@ -15,7 +15,6 @@ import {
 import { TxPayloadType } from "./constants";
 import {
   Options,
-  StratoUser,
   OAuthUser,
   BlockChainUser,
   Contract,
@@ -24,18 +23,6 @@ import {
   SendTx
 } from "./types";
 
-
-async function createUser(user:StratoUser, options:Options) {
-  const url = getNodeUrl(options);
-  const data = {
-    password: user.password
-  };
-  const urlParams = {
-    username: user.username
-  };
-  const endpoint = constructEndpoint(Endpoint.USER, options, urlParams);
-  return postue(url, endpoint, data, options);
-}
 
 function getCreateArgs(contract:ContractDefinition, options:Options) {
   const payload = {
@@ -506,7 +493,6 @@ export default {
   getStatus,
   getVersion,
   getBalance,
-  createUser,
   getCreateArgs,
   compileContracts,
   postContractsXabi,

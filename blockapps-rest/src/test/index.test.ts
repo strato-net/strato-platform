@@ -110,7 +110,7 @@ describe("state", function() {
     const oauth:oauthUtil = await oauthUtil.init(config.nodes[0].oauth);
     let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
     const userArgs = { token: accessToken.token.access_token };
-    admin = await factory.createAdmin(userArgs, options);
+    admin = await factory.createAdmin(userArgs, options);;
   });
 
   it("get state", async () => {
@@ -209,7 +209,7 @@ describe("call", function() {
     const oauth:oauthUtil = await oauthUtil.init(config.nodes[0].oauth);
     let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
     const userArgs = { token: accessToken.token.access_token };
-    admin = await factory.createAdmin(userArgs, options);
+    admin = await factory.createAdmin(userArgs, options);;
   });
 
   async function createContract(uid, admin, constructorArgs, options:Options) {
@@ -355,7 +355,7 @@ describe("history", function() {
     const oauth:oauthUtil = await oauthUtil.init(config.nodes[0].oauth);
     let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
     const userArgs = { token: accessToken.token.access_token };
-    admin = await factory.createAdmin(userArgs, options);
+    admin = await factory.createAdmin(userArgs, options);;
   });
 
   it("test history", async () => {
