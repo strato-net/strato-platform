@@ -448,10 +448,6 @@ async function getOwnershipHistory(user, args, options) {
     const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
     const searchArgs = {
         originAddress,
-        gteField: 'maxItemNumber',
-        gteValue: minItemNumber,
-        lteField: 'minItemNumber',
-        lteValue: maxItemNumber,
         sort: '+block_timestamp'
     };
 

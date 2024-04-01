@@ -289,8 +289,25 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getOwnershipHistory = async function (args, options = optionsNoChainIds) {
+    const groupByAddress = (results) => {
+      const grouped = {};
+      results.forEach(item => {
+          // Check if the group already has the key for the item's address
+          if (!grouped[item.address]) {
+              // If not, initialize an array for that address
+              grouped[item.address] = [];
+          }
+          // Push the current item into the array for its address
+          grouped[item.address].push(item);
+      });
+  
+      return grouped;
+    };
+
     console.log('#### GET OWNERSHIP HISTORY ARGS', JSON.stringify(args))
-    return await inventoryJs.getOwnershipHistory(rawAdmin, args, options);
+    const results = await inventoryJs.getOwnershipHistory(rawAdmin, args, options);
+    const groupedResults = groupByAddress(results);
+    return groupedResults
   };
 
   contract.listItem = async function (args, options = defaultOptions) {
