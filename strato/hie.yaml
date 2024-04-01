@@ -1,5 +1,8 @@
 cradle:
   stack:
+    - path: "VM/EVM/ethereum-vm/src/"
+      component: "ethereum-vm:lib"
+
     - path: "VM/EVM/evm-solidity/src/"
       component: "evm-solidity:lib"
 
@@ -353,6 +356,9 @@ cradle:
 
     - path: "core/vm-runner/exec_src/Paths_vm_runner.hs"
       component: "vm-runner:exe:vm-runner"
+
+    - path: "core/vm-runner/test/"
+      component: "vm-runner:test:ethereum-vm-test"
 
     - path: "core/vm-runner/bench/ExtractBench.hs"
       component: "vm-runner:bench:extractbench"

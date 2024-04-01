@@ -70,6 +70,8 @@ import Blockchain.VM.VMException
 import Blockchain.VMConstants
 import Blockchain.VMContext
 import Blockchain.VMMetrics
+import qualified Blockchain.EVM as EVM
+-- import qualified Blockchain.EVM.Code as EVC
 import Blockchain.VMOptions
 import Blockchain.Verifier
 import Conduit
@@ -437,16 +439,13 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAcct t =
 
           let create =
                 case join $ fmap (M.lookup "VM") $ transactionMetadata ut of
-                  -- Just "EVM" -> EVM.create
+                  Just "EVM" -> EVM.create
                   Just "SolidVM" -> SolidVM.create
-                  -- Nothing -> EVM.create
+                  Nothing -> EVM.create
                   Just vmName ->
                     -- Return a dummy VM that just complains that the requested VM doesn't exist
                     \_ _ _ _ _ _ _ _ _ ag _ _ _ _ _ ->
                       return $ evmErrorResults (toInteger ag) (UnsupportedVM vmName)
-                  _ -> 
-                    \_ _ _ _ _ _ _ _ _ ag _ _ _ _ _ ->
-                      return $ evmErrorResults (toInteger ag) (UnsupportedVM "NO VM")
 
           --TODO- The new address state should be created in the VM itself....  Currently the EVM doesn't do this (and could be cleaned up by doing so), SolidVM does do this.  I will calculate this value here, but then ignore the value in SolidVM (and recalculate it there).  Eventually this should be moved into the EVM also
           nonce <- lift $ addressStateNonce <$> A.lookupWithDefault (Proxy @AddressState) tAcct
@@ -480,10 +479,10 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAcct t =
 
           let eCall =
                 case codeHash of
-                  ExternallyOwned _ -> Right SolidVM.call -- IS THIS RIGHT?
+                  ExternallyOwned _ -> Right EVM.call
                   SolidVMCode _ _ -> Right SolidVM.call
                   CodeAtAccount acct name -> case resolvedCodeHash of
-                    Just (ExternallyOwned _) -> Right SolidVM.call -- IS THIS RIGHT?
+                    Just (ExternallyOwned _) -> Right EVM.call
                     Just (SolidVMCode _ _) -> Right SolidVM.call
                     Just (CodeAtAccount acct' name') -> Left (acct', name')
                     Nothing -> Left (acct, name)
