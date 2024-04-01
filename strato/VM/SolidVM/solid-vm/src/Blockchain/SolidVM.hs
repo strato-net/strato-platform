@@ -2778,7 +2778,7 @@ certificateMap maybeCert _ =
       M.fromList
         [ (SString "commonName", Constant . SString $ subCommonName sub),
           (SString "country", Constant . SString $ fromMaybe "" $ subCountry sub),
-          -- (SString "organization", Constant . SString $ subOrg sub),
+          (SString "organization", Constant . SString $ subOrg sub),
           (SString "group", Constant . SString $ fromMaybe "" $ subUnit sub),
           (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub),
           (SString "userAddress", Constant . SString $ show $ fromPublicKey $ subPub sub),
@@ -2789,7 +2789,7 @@ certificateMap maybeCert _ =
       M.fromList
         [ (SString "commonName", Constant . SString $ ""),
           (SString "country", Constant . SString $ ""),
-          -- (SString "organization", Constant . SString $ ""),
+          (SString "organization", Constant . SString $ ""),
           (SString "group", Constant . SString $ ""),
           (SString "publicKey", Constant . SString $ ""),
           (SString "userAddress", Constant . SString $ ""),
@@ -2799,14 +2799,14 @@ certificateMap maybeCert _ =
     certMap cert sub =
       let fieldsToUpdate =
             M.fromList
-              [ 
+              [ (SString "organizationalUnit", Constant . SString $ fromMaybe "" $ subUnit sub),
                 (SString "expirationDate", Constant . SString $ fromMaybe "" $ dateTimeToString . snd . getCertValidity <$> rawCert cert)
               ]
        in M.union fieldsToUpdate $ nonEmptyFields cert sub
     emptyCertMap =
       let fieldsToUpdate =
             M.fromList
-              [ 
+              [ (SString "organizationalUnit", Constant . SString $ ""),
                 (SString "expirationDate", Constant . SString $ "")
               ]
        in M.union fieldsToUpdate $ emptyFields
