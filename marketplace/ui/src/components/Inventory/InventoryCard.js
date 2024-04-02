@@ -23,7 +23,7 @@ import image_placeholder from "../../images/resources/image_placeholder.png";
 import { getUnitNameByIndex } from "../../helpers/constants";
 import "react-responsive-carousel/lib/styles/carousel.min.css";
 import { SEO } from "../../helpers/seoConstant";
-import GroupedAssetDetails from "./GroupedAssetDetails"
+// import GroupedAssetDetails from "./GroupedAssetDetails"
 
 const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentProviderAddress, allSubcategories, limit, offset }) => {
   const [openPop, setOpenPop] = useState(false);
@@ -266,11 +266,20 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
             {/* {inventory?.name || "N/A"} */}
             <Tooltip title={inventory?.name.length > 20 ? inventory?.name : null}>
               <span className=" whitespace-nowrap max-w-[160px] inline-block">
-                <GroupedAssetDetails 
+                {/* TODO: figure out how we want to display grouped asset information */}
+                {/* <GroupedAssetDetails 
                    assets={inventory.groupedAssets}
                   title={dynamicTitle}
-                />
-                
+                /> */}
+                {inventory?.groupedAssets.length > 1 ? 
+                  (
+                    inventory?.name.length > 20 ? `${inventory?.name.slice(0, 20)}... (${inventory.groupedAssets.length})` : `${inventory?.name} (${inventory.groupedAssets.length})`
+                  ) : 
+                  (
+                    inventory?.name.length > 20 ? `${inventory?.name.slice(0, 20)}...` : `${inventory?.name}`
+
+                  )
+                }   
               </span>
             </Tooltip>
           </p>
