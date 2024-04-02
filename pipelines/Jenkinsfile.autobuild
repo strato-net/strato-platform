@@ -141,6 +141,27 @@ pipeline {
           sh './run-highway.sh'
           sh 'docker ps'
 
+          writeFile file: "check_availability_highway.sh", text: '''#!/bin/bash -le
+            check_availability_highway() {
+              counter=0
+              until curl --silent --fail --location $(</host):44300/ping | jq . | grep 1
+              do
+                if [[ "$counter" -gt 120 ]]; then
+                  echo "Highway server took longer than 2 minutes to initialize! aborting."
+                  exit 73
+                fi
+                echo "waiting for Highway server health endpoint to be available through nginx"
+                counter=$((counter+1))
+                sleep 1
+              done
+              echo "Highway server health endpoint is available through nginx - node is running"
+            }
+
+            check_availability_highway
+          '''
+          sh 'chmod +x check_availability_highway.sh'
+          sh './check_availability_highway.sh'
+
           // Run payment server
           withCredentials([
             string(credentialsId: 'STRIPE_PUBLISHABLE_KEY_TESTNET2', variable:'STRIPE_PUBLISHABLE_KEY_TESTNET2'),
@@ -159,6 +180,27 @@ pipeline {
           sh 'chmod +x run-stripe-ps.sh'
           sh './run-stripe-ps.sh'
           sh 'docker ps'
+
+          writeFile file: "check_availability_payment.sh", text: '''#!/bin/bash -le
+            check_availability_payment() {
+              counter=0
+              until curl --silent --fail --location $(</host):44301/ping | jq .success | grep true
+              do
+                if [[ "$counter" -gt 120 ]]; then
+                  echo "Payment server took longer than 2 minutes to initialize! aborting."
+                  exit 73
+                fi
+                echo "waiting for Payment server health endpoint to be available through nginx"
+                counter=$((counter+1))
+                sleep 1
+              done
+              echo "Payment server health endpoint is available through nginx - node is running"
+            }
+
+            check_availability_payment
+          '''
+          sh 'chmod +x check_availability_payment.sh'
+          sh './check_availability_payment.sh'
 
           // Run identity server
           withCredentials([
