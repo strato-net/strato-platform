@@ -149,48 +149,63 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
     };
 
     const handleSubmit = async () => {
-        let totalQuantityToBeListed = quantity; // Total desired quantity to list
-        let quantityAllocated = 0; 
+        let totalQuantityToBeListed = quantity;
+        let quantityAllocated = 0;
+        // Check if it's an update scenario based on presence of saleAddress in inventory
+        let assetsToUpdate = inventory.groupedAssets.filter(asset => asset.saleAddress);
+        if (assetsToUpdate.length > 0) {
+            // If there are assets with a saleAddress, prepare the body for update
+            let body = {
+                paymentProviders: paymentProviderAddress ? [paymentProviderAddress] : [],
+                price: pricePerUnit,
+                assets: assetsToUpdate.map(asset => ({
+                    saleAddress: asset.saleAddress,
+                    quantity: asset.saleQuantity, 
+                })),
+            };
     
-        let requestBody = {
-            paymentProviders: paymentProviderAddress ? [paymentProviderAddress] : [],
-            price: pricePerUnit,
-            assets: [],
-        };
-    
-        for (const asset of inventory.groupedAssets) {
-            // Calculate how much of the total quantity remains to be allocated
-            let remainingQuantity = totalQuantityToBeListed - quantityAllocated;
-            if (remainingQuantity <= 0) break; // If we've allocated the total desired quantity, stop processing further assets
-    
-            // Determine the quantity to allocate for this asset
-            let maxAvailableQuantity = asset.quantity - asset.saleQuantity - asset.totalLockedQuantity;
-            let quantityForThisAsset = Math.min(remainingQuantity, maxAvailableQuantity);
-    
-            // If there's quantity available add it to the request body
-            if (quantityForThisAsset > 0) {
-                requestBody.assets.push({
-                    assetToBeSold: asset.address,
-                    quantity: quantityForThisAsset,
-                });
-                quantityAllocated += quantityForThisAsset; // Update the total quantity allocated so far
-            }
-        }
-    
-        if (requestBody.assets.length > 0) {
-            let isDone = await actions.listInventory(inventoryDispatch, requestBody);
+            // Call updateSale with the constructed body
+            const isDone = await actions.updateSale(inventoryDispatch, body);
             if (isDone) {
+                // Handle successful update
                 await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
                 handleCancel();
-            } 
-        } 
+            }
+        } else {
+            // Listing scenario: Handle listing each asset until reaching the desired total quantity
+            let assetsToList = inventory.groupedAssets.reduce((acc, asset) => {
+                if (quantityAllocated < totalQuantityToBeListed) {
+                    let quantityForThisAsset = Math.min(asset.quantity, totalQuantityToBeListed - quantityAllocated);
+                    quantityAllocated += quantityForThisAsset;
+    
+                    acc.push({
+                        assetToBeSold: asset.address,
+                        quantity: quantityForThisAsset,
+                    });
+                }
+                return acc;
+            }, []);
+    
+            if (assetsToList.length > 0) {
+                let body = {
+                    paymentProviders: paymentProviderAddress ? [paymentProviderAddress] : [],
+                    price: pricePerUnit,
+                    assets: assetsToList,
+                };
+    
+                // Call listInventory with the constructed body
+                const isDone = await actions.listInventory(inventoryDispatch, body);
+                if (isDone) {
+                    // Handle successful listing
+                    await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
+                    handleCancel();
+                }
+            }
+        }
     };
     
     
     
-    
-    
-
     return (
         <Modal
             open={open}

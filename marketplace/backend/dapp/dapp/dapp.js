@@ -548,10 +548,67 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.updateSale = async function (args, options = defaultOptions) {
-    const { saleAddress, ...restArgs } = args;
-    const contract = { address: saleAddress };
-    return await inventoryJs.updateSale(rawAdmin, contract, restArgs, options);
-  }
+    // Assuming args.assets is an array of { saleAddress, quantity } objects
+    options.cacheNonce = true; // Useful if interacting with blockchain to optimize nonce management
+  
+    const updatePromises = args.assets.map(asset => {
+      const { saleAddress, quantity } = asset;
+      const restArgs = {
+        ...args, 
+        quantity, 
+      };
+      const contract = { address: saleAddress };
+  
+      // Perform the update for this specific asset
+      return inventoryJs.updateSale(rawAdmin, contract, restArgs, options);
+    });
+  
+    const results = await Promise.allSettled(updatePromises);
+  
+    // Process successful transactions
+    const successfulTransactions = results.filter(result => result.status === 'fulfilled').map((result, index) => ({
+      success: true,
+      address: args.assets[index].saleAddress,
+      result: result.value
+    }));
+  
+    // Process failed transactions
+    const failedTransactions = results.filter(result => result.status === 'rejected').map((result, index) => {
+      const failureAddress = args.assets[index].saleAddress;
+      let statusCode = "unknown";
+      let errorMessage = "Unknown error occurred";
+  
+      if (result.reason && result.reason.response) {
+        statusCode = result.reason.response.status;
+        errorMessage = result.reason.response.data || "Error with no additional information";
+      } else if (result.reason instanceof Error) {
+        errorMessage = result.reason.message;
+      }
+  
+      return {
+        success: false,
+        address: failureAddress,
+        statusCode: statusCode,
+        errorMessage: errorMessage
+      };
+    });
+  
+    // Return detailed information about successful and failed transactions
+    if (failedTransactions.length > 0) {
+      return {
+        success: false,
+        failedTransactions: failedTransactions,
+        successfulTransactions: successfulTransactions
+      };
+    }
+  
+    // If all transactions were successful
+    return {
+      success: true,
+      transactions: successfulTransactions
+    };
+  };
+  
 
   contract.updateInventory = async function (args, options = defaultOptions) {
     const { itemContract, itemAddress, ...restArgs } = args;
