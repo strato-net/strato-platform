@@ -274,11 +274,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
+    //for ba sellers, get all assets - display For Sale and Sold Out
     const newArgs = { ...args, ownerCommonName: constants.baUserNames }
     const all =  await marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
 
+    // for non-ba sellers, get assets with valid sale & saleQty > 0 - display only For Sale records
     const newArgs1 = { ...args, notEqualsField: ['ownerCommonName', 'sale'], notEqualsValue: [constants.baUserNames, constants.zeroAddress] }
     const all2 =  await marketplaceJs.getAll(rawAdmin, newArgs1, getOptions);
+        
     return {inventoryResults: all.inventoryResults.concat(all2.inventoryResults), inventoryCount: all.inventoryCount + all2.inventoryCount};
   };
 

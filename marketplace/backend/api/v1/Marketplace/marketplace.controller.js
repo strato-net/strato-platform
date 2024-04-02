@@ -1,4 +1,5 @@
 import { rest } from 'blockapps-rest'
+import constants from '../../../helpers/constants'
 
 
 class MarketplaceController {
@@ -12,31 +13,9 @@ class MarketplaceController {
         query.manufacturer = encodedManufacturers
       }
       const inventories = await dapp.getMarketplaceInventories({ ...restQuery })
-      let unlisted = [];
-      let listed = inventories?.inventoryResults?.filter((item,index)=>{
-        if(item.saleQuantity && item.saleQuantity!==0){
-          return item
-        } else if (item.totalLockedQuantity && item.totalLockedQuantity===0) {
-          unlisted.push(item)
-        }
-      });
-      
-      listed = listed.sort((a, b) => {
-          return b?.saleDate?.localeCompare(a?.saleDate);
-      });
+      let finalInventory = MarketplaceController.getFinalInventory(inventories, forSale, soldOut)
 
-      let finalInventory;
-      if(forSale === 'true' && soldOut === 'true'){
-        finalInventory = [...listed, ...unlisted];
-       }else if(forSale === 'true' && soldOut === 'false'){
-         finalInventory = [...listed];
-        }else if(forSale === 'false' && soldOut === 'true'){
-         finalInventory = [...unlisted];
-        }else {
-         finalInventory = [];
-        }
-
-      rest.response.status200(res, { productsWithImageUrl: finalInventory, inventoryCount: inventories?.inventoryCount })
+      rest.response.status200(res, { productsWithImageUrl: finalInventory, inventoryCount: finalInventory?.length })
 
       return next()
     } catch (e) {
@@ -54,31 +33,8 @@ class MarketplaceController {
       }
       const inventories = await dapp.getMarketplaceInventoriesLoggedIn({ ...restQuery })
 
-      let unlisted = [];
-      let listed = inventories?.inventoryResults?.filter((item,index)=>{
-        if(item.saleQuantity && item.saleQuantity!==0){
-          return item
-        }else{
-          unlisted.push(item)
-        }
-      });
-      
-      listed = listed.sort((a, b) => {
-          return b?.saleDate?.localeCompare(a?.saleDate);
-      });
-
-      let finalInventory;
-      if(forSale === 'true' && soldOut === 'true'){
-       finalInventory = [...listed, ...unlisted];
-      }else if(forSale === 'true' && soldOut === 'false'){
-        finalInventory = [...listed];
-       }else if(forSale === 'false' && soldOut === 'true'){
-        finalInventory = [...unlisted];
-       }else {
-        finalInventory = [];
-       } 
-
-      rest.response.status200(res, { productsWithImageUrl: finalInventory, inventoryCount: inventories?.inventoryCount })
+      let finalInventory = MarketplaceController.getFinalInventory(inventories, forSale, soldOut)
+      rest.response.status200(res, { productsWithImageUrl: finalInventory, inventoryCount: finalInventory?.length })
 
       return next()
     } catch (e) {
@@ -130,6 +86,43 @@ class MarketplaceController {
       console.log("Couldn't load STRATS");
       return next(e)
     }
+  }
+
+  static getFinalInventory(inventories, forSale, soldOut) {
+    let unlisted = []
+    let listed = inventories?.inventoryResults?.filter((item, index) => {
+
+      //for ba sellers, get all assets - display For Sale and Sold Out
+      if (constants.baUserNames.includes(item.ownerCommonName)) //
+      {
+        if (item.saleQuantity && item.saleQuantity !== 0) {
+          return item
+        } else {
+          unlisted.push(item)
+        }
+      }
+      else { // for non-ba sellers, get assets with valid sale & saleQty > 0 - display only For Sale records
+        if (item.saleQuantity && item.saleQuantity !== 0) {
+          return item
+        }
+      }
+    })
+
+    listed = listed.sort((a, b) => {
+      return b?.saleDate?.localeCompare(a?.saleDate)
+    })
+
+    let finalInventory
+    if (forSale === 'true' && soldOut === 'true') {
+      finalInventory = [...listed, ...unlisted]
+    } else if (forSale === 'true' && soldOut === 'false') {
+      finalInventory = [...listed]
+    } else if (forSale === 'false' && soldOut === 'true') {
+      finalInventory = [...unlisted]
+    } else {
+      finalInventory = []
+    }
+    return finalInventory
   }
 }
 
