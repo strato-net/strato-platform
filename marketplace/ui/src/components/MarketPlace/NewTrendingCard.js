@@ -100,8 +100,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                 <div className='flex justify-between items-center'>
                     <Typography
                         className='font-semibold overflow-hidden cursor-pointer w-[180px] md:w-[220px] whitespace-nowrap text-ellipsis'
-                    >
-                        {console.log("topSellingProduct", topSellingProduct)}
+                    >                        
                         <Tooltip title={topSellingProduct?.name?.length > 20 ? topSellingProduct?.name : null}>
                             <span className=" whitespace-nowrap max-w-[160px] inline-block">
                                 {topSellingProduct?.name?.length > 20 ? `${topSellingProduct?.name.slice(0, 20)}...` : `${topSellingProduct?.name}`}
