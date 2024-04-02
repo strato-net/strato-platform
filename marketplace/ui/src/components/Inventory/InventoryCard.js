@@ -23,6 +23,7 @@ import image_placeholder from "../../images/resources/image_placeholder.png";
 import { getUnitNameByIndex } from "../../helpers/constants";
 import "react-responsive-carousel/lib/styles/carousel.min.css";
 import { SEO } from "../../helpers/seoConstant";
+import GroupedAssetDetails from "./GroupedAssetDetails"
 
 const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentProviderAddress, allSubcategories, limit, offset }) => {
   const [openPop, setOpenPop] = useState(false);
@@ -247,25 +248,28 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
                         <p className="ml-3">Edit Inventory</p>
                       </div>
   */
-
+  const dynamicTitle = inventory?.groupedAssets.length > 1 
+  ? (
+      inventory?.name.length > 20 
+        ? `${inventory?.name.slice(0, 20)}... (${inventory.groupedAssets.length})` 
+        : `${inventory?.name} (${inventory.groupedAssets.length})`
+    ) 
+  : inventory?.name.length > 20 
+    ? `${inventory?.name.slice(0, 20)}...` 
+    : inventory?.name;
 
   return (
     <div className=" p-3 md:p-[18px] border border-[#BABABA] md:border-[#E9E9E9] rounded-lg sm:w-[343px] md:w-full  ">
       <div className="bg-[#F2F2F9] rounded-md px-[14px] flex justify-between items-center pb-[13px] pt-2 w-full">
         <div>
-          <p className="text-lg lg:text-xl font-semibold text-[#202020] cursor-default" onClick={callDetailPage}>
+          <p className="text-lg lg:text-xl font-semibold text-[#202020] cursor-default">
             {/* {inventory?.name || "N/A"} */}
             <Tooltip title={inventory?.name.length > 20 ? inventory?.name : null}>
               <span className=" whitespace-nowrap max-w-[160px] inline-block">
-                {
-                  inventory?.groupedAssets.length > 1 ? 
-                  // TODO: Add in the proper link here for the new gropued asset table. This should redirect to this new page if there are grouped assets. 
-                  ( 
-                    <a>
-                      {inventory?.name.length > 20 ? `${inventory?.name.slice(0, 20)}... (${inventory.groupedAssets.length})` : `${inventory?.name} (${inventory.groupedAssets.length})`}
-                    </a>
-                  ) : inventory?.name.length > 20 ? `${inventory?.name.slice(0, 20)}...` : `${inventory?.name}`
-                }
+                <GroupedAssetDetails 
+                   assets={inventory.groupedAssets}
+                  title={dynamicTitle}
+                />
                 
               </span>
             </Tooltip>
