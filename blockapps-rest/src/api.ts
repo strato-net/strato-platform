@@ -302,52 +302,6 @@ async function createChains(body, options:Options) {
   return await post(url, endpoint, body, options);
 }
 
-//#deprecate-7.5
-async function uploadExtStorage(body, options:Options) {
-  const url = getNodeUrl(options);
-  const endpoint = constructEndpoint(Endpoint.EXT_UPLOAD, options);
-  return await post(url, endpoint, body, options);
-}
-
-//#deprecate-7.5
-async function attestExtStorage(body, options:Options) {
-  const url = getNodeUrl(options);
-  const endpoint = constructEndpoint(Endpoint.EXT_ATTEST, options);
-  return await post(url, endpoint, body, options);
-}
-
-//#deprecate-7.5
-async function verifyExtStorage(user:OAuthUser, contract, options:Options) {
-  const url = getNodeUrl(options);
-  const params = {
-    contractAddress: contract.address
-  };
-  const endpoint = constructEndpoint(Endpoint.EXT_VERIFY, options, params);
-  return get(url, endpoint, setAuthHeaders(user, options));
-}
-
-//#deprecate-7.5
-async function downloadExtStorage(user:OAuthUser, contract, options:Options) {
-  const url = getNodeUrl(options);
-  const params = {
-    contractAddress: contract.address
-  };
-  const endpoint = constructEndpoint(Endpoint.EXT_DOWNLOAD, options, params);
-  return get(url, endpoint, setAuthHeaders(user, options));
-}
-
-//#deprecate-7.5
-async function listExtStorage(user:OAuthUser, args, options:Options) {
-  const url = getNodeUrl(options);
-  const { limit, offset } = args;
-  const params = {
-    limit,
-    offset
-  };
-  const endpoint = constructEndpoint(Endpoint.EXT_LIST, options, params);
-  return get(url, endpoint, setAuthHeaders(user, options));
-}
-
 async function pingOauth(user:OAuthUser, options:Options) {
   const url = getNodeUrl(options);
   const endpoint = constructEndpoint(Endpoint.KEY, options);
@@ -509,11 +463,6 @@ export default {
   getChains,
   createChain,
   createChains,
-  uploadExtStorage,
-  attestExtStorage,
-  verifyExtStorage,
-  downloadExtStorage,
-  listExtStorage,
   pingOauth,
   debugStatus,
   debugPause,

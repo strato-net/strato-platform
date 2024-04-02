@@ -1489,42 +1489,6 @@ async function createChains(user, chains, options:Options) {
 }
 
 // =====================================================================
-//   External Storage
-//   Deprecated in STRATO 7.5 (#deprecate-7.5)
-// =====================================================================
-
-async function uploadExtStorage(user, args, options:Options) {
-  const result = await api.uploadExtStorage(
-    args,
-    setAuthHeaders(user, options)
-  );
-  return result;
-}
-
-async function attestExtStorage(user, args, options:Options) {
-  const result = await api.attestExtStorage(
-    args,
-    setAuthHeaders(user, options)
-  );
-  return result;
-}
-
-async function verifyExtStorage(user, contract, options:Options) {
-  const result = await api.verifyExtStorage(user, contract, options);
-  return result;
-}
-
-async function downloadExtStorage(user, contract, options:Options) {
-  const result = await api.downloadExtStorage(user, contract, options);
-  return result;
-}
-
-async function listExtStorage(user, args, options:Options) {
-  const result = await api.listExtStorage(user, args, options);
-  return result;
-}
-
-// =====================================================================
 //   OAuth
 // =====================================================================
 
@@ -1777,12 +1741,6 @@ export default {
   createChains,
   getChain,
   getChains,
-  //
-  uploadExtStorage,
-  attestExtStorage,
-  verifyExtStorage,
-  downloadExtStorage,
-  listExtStorage,
   //
   pingOauth,
   //
