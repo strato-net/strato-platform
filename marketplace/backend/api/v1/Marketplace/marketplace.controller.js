@@ -16,7 +16,7 @@ class MarketplaceController {
       let listed = inventories?.inventoryResults?.filter((item,index)=>{
         if(item.saleQuantity && item.saleQuantity!==0){
           return item
-        }else{
+        } else if (item.totalLockedQuantity && item.totalLockedQuantity===0) {
           unlisted.push(item)
         }
       });
