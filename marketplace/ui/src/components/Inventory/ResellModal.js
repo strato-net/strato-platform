@@ -42,37 +42,18 @@ const ResellModal = ({ open, handleCancel, inventory, categoryName, limit, offse
     };
 
     const handleSubmit = async () => {
-        let requestBody = {
-            assets: [], // This will hold the resell information for each asset
+        let body = {
+            assetAddress: inventory.address,
+            quantity
         };
-        let totalListedQuantity = 0; // to track the total quantity resold so far
-        if (inventory.groupedAssets && inventory.groupedAssets.length > 0) {
-            for (const asset of inventory.groupedAssets) {
-                const remainingQuantity = quantity - totalListedQuantity;
-                const availableQuantity = asset.quantity - (asset.saleQuantity + asset.totalLockedQuantity);
-                const quantityToSell = Math.min(remainingQuantity, availableQuantity);
-    
-                if (quantityToSell > 0) {
-                    requestBody.assets.push({
-                        assetAddress: asset.address,
-                        quantity: quantityToSell,
-                    });
-                    totalListedQuantity += quantityToSell;
-                    // Break if we've reached or exceeded the desired total quantity
-                    if (totalListedQuantity >= quantity) break;
-                }
-            }
-            let isDone = await actions.resellInventory(inventoryDispatch, requestBody);
-            if (isDone) {
-                await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
-                await actions.fetchInventoryForUser(inventoryDispatch, limit, offset, user.commonName);
-                handleCancel();
-            }
-        } else {
-            console.log("Grouped assets data is missing.");
+        let isDone = await actions.resellInventory(inventoryDispatch, body);
+        if (isDone) {
+            await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
+            await actions.fetchInventoryForUser(inventoryDispatch, user.commonName);
+            handleCancel();
         }
-    };
-    
+    }
+
     return (
         <Modal
             open={open}

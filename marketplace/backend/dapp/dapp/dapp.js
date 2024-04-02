@@ -424,62 +424,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
   
   contract.resellItem = async function (args, options = defaultOptions) {
-    options.cacheNonce = true;
-    const resellPromises = args.assets.map(asset => {
-      const contract = { address: asset.address };
-      const callArgs = {
-        quantity: asset.quantity,
-      };
-      return inventoryJs.resellItem(rawAdmin, contract, callArgs, options);
-    });
-
-    const results = await Promise.allSettled(resellPromises);
-
-    // Process successful transactions
-    const successfulTransactions = results.filter(result => result.status === 'fulfilled').map((result, index) => ({
-      assetAddress: args.assets[index].address,
-      quantity: args.assets[index].quantity,
-      success: true,
-      result: result.value
-    }));
-
-    // Process failed transactions
-    const failedTransactions = results.filter(result => result.status === 'rejected').map((result, index) => {
-      const failedAsset = args.assets[index];
-      let statusCode = "unknown";
-      let errorMessage = "Unknown error occurred";
-
-      if (result.reason && result.reason.response) {
-        statusCode = result.reason.response.status;
-        errorMessage = result.reason.response.data || "Error with no additional information";
-      } else if (result.reason instanceof Error) {
-        errorMessage = result.reason.message;
-      }
-
-      return {
-        assetAddress: failedAsset.address,
-        quantity: failedAsset.quantity,
-        success: false,
-        statusCode: statusCode,
-        errorMessage: errorMessage
-      };
-    });
-
-    // If there are any failed transactions, return both failed and successful transactions
-    if (failedTransactions.length > 0) {
-      return {
-        success: false,
-        failedTransactions: failedTransactions,
-        successfulTransactions: successfulTransactions
-      };
-    }
-
-    // If all transactions were successful
-    return {
-      success: true,
-      transactions: successfulTransactions
-    };
-  };
+    const { assetAddress, ...restArgs } = args;
+    const contract = { address: assetAddress };
+    return await inventoryJs.resellItem(rawAdmin, contract, restArgs, options);
+  }
 
   contract.transferItem = async function (args, options = defaultOptions) {
     options.cacheNonce = true;
