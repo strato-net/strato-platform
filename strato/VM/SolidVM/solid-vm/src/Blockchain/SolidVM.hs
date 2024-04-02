@@ -54,6 +54,7 @@ import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.Options (computeNetworkID)
 import qualified Blockchain.Strato.Model.Secp256k1 as SEC
 import Blockchain.Stream.Action (Action)
 import qualified Blockchain.Stream.Action as Action
@@ -682,7 +683,7 @@ setCreator creator contract _ _ = do
   let creatorAddress = _accountAddress creator
   maybeCert <- A.select (A.Proxy @X509Certificate) creatorAddress
   blockNumber <- blockHeaderBlockNumber . Env.blockHeader <$> getEnv
-  let _cn = if blockNumber <= 40000
+  let _cn = if (computeNetworkID == 7596898649924658542 && blockNumber <= 35000)|| (computeNetworkID == 6909499098523985262 && blockNumber <= 6000)
                  then fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
                  else fromMaybe "" $ fmap subCommonName $ getCertSubject =<< maybeCert
 
