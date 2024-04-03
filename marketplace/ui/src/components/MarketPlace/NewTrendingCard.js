@@ -7,24 +7,39 @@ import {
     InputNumber,
     Tooltip
 } from "antd";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
 import TagManager from "react-gtm-module";
 import { Images } from '../../images';
 import images_placeholder from "../../images/resources/image_placeholder.png"
+import { SEO } from '../../helpers/seoConstant';
 import DOMPurify from 'dompurify';
 
 const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, contextHolder, isUserProfile = false }) => {
+    const {Text} = Typography;
     const [quantity, setQuantity] = useState(1)
 
     let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
+    const ownerSameAsUser = () => {
+        if (user?.commonName === topSellingProduct?.ownerCommonName) {
+            return true;
+        }
+        return false;
+    }
 
     // For Wishlist Icon Rendering
     const [isWishlisted, setIsWishlisted] = useState(false);
-    const shouldShowWishlistIcon = isAuthenticated && user;
+    const shouldShowWishlistIcon = isAuthenticated && user && !ownerSameAsUser();
 
     const naviroute = routes.MarketplaceProductDetail.url;
+    const isAvailableForSale = (!topSellingProduct.price || topSellingProduct.saleQuantity===0)
     const navigate = useNavigate();
+    const location = useLocation();
+
+    const queryParams = new URLSearchParams(location.search);
+    const categoryQueryValue = queryParams.get('category');
+    const categoryQueryValueArr = categoryQueryValue ? categoryQueryValue.split(',') : []
+    const imgMeta = categoryQueryValueArr.length === 1 ? categoryQueryValueArr[0] : SEO.IMAGE_META
 
     const sanitizedDescription = DOMPurify.sanitize(topSellingProduct?.description || "N/A");
     const customStyle = {
@@ -57,7 +72,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
     };
 
     return (
-        <div className={`relative trending_cards_container_card bg-white p-3 ${parent == 'Marketplace' ? 'min-w-[300px] w-auto' : 'min-w-[230px]'} min-w-[230px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}>
+        <div className={`relative trending_cards_container_card bg-white p-3 ${parent == 'Marketplace' ? 'min-w-[300px] w-auto' : 'min-w-[230px]'}  min-w-[320px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}>
             {contextHolder}
             {shouldShowWishlistIcon && (
                 <div onClick={toggleWishlist} className="absolute top-2 right-2 cursor-pointer hover:scale-110 transition-transform duration-200">
@@ -73,32 +88,34 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                     } else {
                         e.preventDefault();
                         navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } });
+                        window.scrollTo(0, 0);
                     }
                 }}
             >
                 <img
                     className='md:h-[200px] md:w-[40vw] h-[150px] w-full object-contain rounded-md cursor-pointer mb-2'
                     src={topSellingProduct.images ? topSellingProduct?.images[0] : images_placeholder}
-                    alt={topSellingProduct?.name || "N/A"}
+                    alt={imgMeta} title={imgMeta}
                 />
                 <div className='flex justify-between items-center'>
                     <Typography
                         className='font-semibold overflow-hidden cursor-pointer w-[180px] md:w-[220px] whitespace-nowrap text-ellipsis'
-                    >
-                        <Tooltip title={topSellingProduct?.name.length > 20 ? topSellingProduct?.name : null}>
+                    >                        
+                        <Tooltip title={topSellingProduct?.name?.length > 20 ? topSellingProduct?.name : null}>
                             <span className=" whitespace-nowrap max-w-[160px] inline-block">
-                                {topSellingProduct?.name.length > 20 ? `${topSellingProduct?.name.slice(0, 20)}...` : `${topSellingProduct?.name}`}
+                                {topSellingProduct?.name?.length > 20 ? `${topSellingProduct?.name.slice(0, 20)}...` : `${topSellingProduct?.name}`}
                             </span>
                         </Tooltip>
                         {/* {topSellingProduct?.name || "N/A"} */}
                     </Typography>
-                    <img className='w-4 h-4' src={Images.Verified} alt='verified' />
+                    <img alt={imgMeta} title={imgMeta} className='w-4 h-4' src={Images.Verified} />
                 </div>
             </a>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography className='font-normal text-black'>{'$' + topSellingProduct?.price || "N/A"}</Typography>
-                {topSellingProduct?.contract_name.toLowerCase().includes("clothing") && (
-                    <Typography className='font-normal text-black'>{'Size: ' + topSellingProduct?.data?.size || "N/A"}</Typography>
+            {topSellingProduct?.price && <Typography className='font-normal text-black'>{ `$ ${topSellingProduct?.price}`}</Typography>}
+            {isAvailableForSale && <Text type="danger" strong> Sold Out </Text>}
+                 {topSellingProduct?.contract_name.toLowerCase().includes("clothing") && (
+                    <Typography className='font-normal text-black'>Size: { topSellingProduct?.data?.size ? topSellingProduct?.data?.size : "N/A"}</Typography>
                 )}
             </div>
             <div style={customStyle} className="custom-typography">
@@ -144,11 +161,12 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                     </Typography>
                 </div>
             </div>
-            <div className='flex gap-4 mt-1'>
+            <div className={`flex gap-4 mt-1`}>
                 <Button
-                    id={`${topSellingProduct.name.replace(/ /g, "_")}-buy-now`}
+                    id={`${topSellingProduct?.name?.replace(/ /g, "_")}-buy-now`}
+                    disabled={isAvailableForSale || ownerSameAsUser()}
                     type='primary'
-                    className='flex-1 h-9 !bg-[#13188A] !text-white'
+                    className={`flex-1 h-9 ${isAvailableForSale? '!bg-[#808080]': '!bg-[#13188A]'} !text-white ${ownerSameAsUser() ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                     onClick={async () => {
                         const dataLayerEventName = isUserProfile ? 'buy_now_from_user_profile' : 'buy_now_from_top_selling_product';
                         window.LOQ.push(['ready', async LO => {
@@ -170,13 +188,15 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                         });
                         if (await addItemToCart(topSellingProduct, quantity) === true) {
                             navigate("/checkout")
+                            window.scrollTo(0, 0);
                         }
                     }}
                 >
                     Buy Now
                 </Button>
                 <Button
-                    className='h-9 w-9 flex items-center justify-center !bg-[#13188A] '
+                    className={`h-9 w-9 flex items-center justify-center ${isAvailableForSale? '!bg-[#808080]':'!bg-[#13188A]'} ${ownerSameAsUser() ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                    disabled={isAvailableForSale || ownerSameAsUser()}
                     onClick={() => {
                         window.LOQ.push(['ready', async LO => {
                             await LO.$internal.ready('events')
@@ -199,7 +219,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                     type='primary'
                 >
 
-                    <img src={Images.Cart} alt='Cart' width={18} height={18} className='max-w-[18px]' />
+                    <img alt={imgMeta} title={imgMeta} src={Images.Cart} width={18} height={18} className='max-w-[18px]' />
 
                     {/* <ShoppingCartOutlined style={{ color: '#EEEFFA' , width:'18px' ,  height:'18px' }} /> */}
                 </Button>
