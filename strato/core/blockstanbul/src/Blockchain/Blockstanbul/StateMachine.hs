@@ -12,6 +12,7 @@ import BlockApps.Logging
 import Blockchain.Blockstanbul.Messages
 import Blockchain.Data.Block
 import Blockchain.Data.DataDefs
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
@@ -63,7 +64,8 @@ data BlockstanbulContext = BlockstanbulContext
     -- Which peers have we received a notice for a round-change
     _roundChanged :: M.Map RoundNumber (S.Set ChainMemberParsedSet),
     -- The identity of this node
-    _selfAddr :: ChainMemberParsedSet,
+    _selfAddr :: Address,
+    _selfCert :: Maybe ChainMemberParsedSet,
     -- Block locking: a safety mechanism to prevent partial commits
     _blockLock :: Maybe Block,
     _lockSender :: Maybe ChainMemberParsedSet,
@@ -94,8 +96,8 @@ debugShowCtx = do
   debugLog "showctx/hasPrepared" hasPrepared show
   debugLog "showctx/roundChanged" roundChanged show
 
-newContext :: Checkpoint -> ChainMemberParsedSet -> Bool -> BlockstanbulContext
-newContext (Checkpoint v as) chainm valB =
+newContext :: Checkpoint -> Address -> Bool -> BlockstanbulContext
+newContext (Checkpoint v as) addr valB =
   let valSet = S.fromList as
       prop = fromMaybe emptyChainMember . S.lookupMin $ valSet
    in BlockstanbulContext
@@ -111,7 +113,34 @@ newContext (Checkpoint v as) chainm valB =
           _hasCommitted = False,
           _pendingRound = Nothing,
           _roundChanged = M.empty,
-          _selfAddr = chainm,
+          _selfAddr = addr,
+          _selfCert = Nothing,
+          _blockLock = Nothing,
+          _lockSender = Nothing,
+          _lastParent = Nothing,
+          _validatorBehavior = valB,
+          _isValidator = False
+        }
+
+newTestContext :: Checkpoint -> ChainMemberParsedSet -> Bool -> BlockstanbulContext
+newTestContext (Checkpoint v as) chainm valB =
+  let valSet = S.fromList as
+      prop = fromMaybe emptyChainMember . S.lookupMin $ valSet
+   in BlockstanbulContext
+        { _view = v,
+          _productionAuth = True,
+          _proposal = Nothing,
+          _proposer = prop,
+          _validators = ChainMembers valSet,
+          _prepared = M.empty,
+          _committed = M.empty,
+          _hasPreprepared = False,
+          _hasPrepared = False,
+          _hasCommitted = False,
+          _pendingRound = Nothing,
+          _roundChanged = M.empty,
+          _selfAddr = 0x0,
+          _selfCert = Just chainm,
           _blockLock = Nothing,
           _lockSender = Nothing,
           _lastParent = Nothing,

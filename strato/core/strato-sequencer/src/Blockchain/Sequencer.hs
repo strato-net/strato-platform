@@ -640,7 +640,14 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
           transformGenesis $ map (\(IEGenesis og) -> og) events
         IETNewCertRegistered -> do
           record "inevent_type_new_cert_registered" "IngestNewCertRegistered"
-          traverse_ (\(IENewCertRegistered a e) -> A.insert (A.Proxy @X509CertInfoState) a e) events --this is where we submit to ldb
+          ctx <- fromJust <$> getBlockstanbulContext
+          traverse_ (\(IENewCertRegistered a e) -> do
+              let chainm = getChainMemberFromX509 e
+              when ((_selfAddr ctx) == a) $ do
+                putBlockstanbulContext $ ctx { _selfCert = Just chainm }
+                $logInfoS "sequencer" . T.pack $ "Node identity verified: " ++ show e
+              A.insert (A.Proxy @X509CertInfoState) a e
+            ) events --this is where we submit to ldb
         IETCertRevoked -> do
           record "inevent_type_cert_revoked" "IngestCertRevoked"
           traverse_ (\(IECertRevoked a) -> A.delete (A.Proxy @X509CertInfoState) a) events

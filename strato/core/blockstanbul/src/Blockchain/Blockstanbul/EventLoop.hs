@@ -137,7 +137,8 @@ roundChange = do
   pendingRound .= Just (_round nextView)
   rawMsg <- createRoundChangeMessage nextView
   valB <- use validatorBehavior
-  when (valB) $ do
+  self <- use selfCert
+  when (isJust self && valB) $ do
     msg <- signMessage rawMsg
     yieldR msg
 
@@ -156,15 +157,15 @@ nextRound nt = do
   let leader = (fromIntegral thisR `mod` S.size vals) `S.elemAt` vals
   proposer .= leader
   proposal .= Nothing
-  self <- use selfAddr
-  when (leader == self) $ do
+  self <- use selfCert
+  when (isJust self && leader == fromJust self) $ do
     lock <- use blockLock
     case lock of
       Nothing -> yieldR MakeBlockCommand
       Just lb -> do
         v <- use view
         valB <- use validatorBehavior
-        when (valB) $ do
+        when (isJust self && valB) $ do
           msg <- signMessage (Preprepare v lb)
           yieldR msg
 
@@ -177,7 +178,7 @@ nextRound nt = do
   hasPrepared .= False
   pendingRound .= Nothing
 
-  isValidator .= (self `elem` vals)
+  when (isJust self) $ isValidator .= ((fromJust self) `elem` vals)
 
   yieldR . NewCheckpoint
     =<< liftA2
@@ -256,8 +257,8 @@ eventLoop ctx = execStateC ctx $
           let blk = truncateExtra blk'
           ppl <- use proposal
           leader <- use proposer
-          self <- use selfAddr
-          when (isNothing ppl && leader == self) $ do
+          self <- use selfCert
+          when (isJust self && isNothing ppl && leader == (fromJust self)) $ do
             vs <- use validators
             let blockWithVs = addValidators vs blk
             pseal <- proposerSeal blockWithVs
@@ -279,7 +280,7 @@ eventLoop ctx = execStateC ctx $
                 hasPreprepared .= True
                 proposal .= Just realSealed
                 valB <- use validatorBehavior
-                when (valB) $ do
+                when (isJust self && valB) $ do
                   msg <- signMessage (Preprepare v realSealed)
                   yieldR msg
         IMsg auth ppp@(Preprepare v' pp) -> do
@@ -316,8 +317,9 @@ eventLoop ctx = execStateC ctx $
                     wasProposed <- isJust <$> use proposal
                     unless wasProposed . yieldL $ OMsg auth ppp
                     proposal .= Just pp
+                    self <- use selfCert
                     valB <- use validatorBehavior
-                    when (valB) $ do
+                    when (isJust self && valB) $ do
                       msg <- signMessage (Prepare v (blockHash pp))
                       yieldR msg
         IMsg auth ppp@(Prepare v' di) -> when (v <= v') $ do
@@ -332,8 +334,9 @@ eventLoop ctx = execStateC ctx $
             hasPrepared .= True
             setLock
             seal <- commitmentSeal di
+            self <- use selfCert
             valB <- use validatorBehavior
-            when (valB) $ do
+            when (isJust self && valB) $ do
               msg <- signMessage (Commit v di seal)
               yieldR msg
         IMsg auth ccc@(Commit v' di seal) -> when (v <= v') $ do
@@ -370,7 +373,8 @@ eventLoop ctx = execStateC ctx $
                 pendingRound .= Just rn
                 $logInfoS "blockstanbul/roundchange" "agreed change"
                 valB <- use validatorBehavior
-                when (valB) $ do
+                self <- use selfCert
+                when (isJust self && valB) $ do
                   msg <- signMessage rawMsg
                   yieldR msg
               when (3 * sameRNCount > 2 * total) $ do

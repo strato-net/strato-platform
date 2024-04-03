@@ -40,7 +40,7 @@ import Data.Binary
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.Either.Extra
-import Data.Maybe (catMaybes, mapMaybe)
+import Data.Maybe (catMaybes, mapMaybe, fromJust)
 import qualified Data.Set as S
 import Test.QuickCheck
 import Text.Printf
@@ -155,9 +155,9 @@ verifyBenfInfo bnf sig =
 signMessage :: (StateMachineM m) => TrustedMessage -> m (OutEvent)
 signMessage tm = do
   let mesg = getHash tm
-  addr <- use selfAddr
+  addr <- use selfCert
   sig <- sign mesg
-  return $ OMsg (MsgAuth addr sig) $ tm
+  return $ OMsg (MsgAuth (fromJust addr) sig) $ tm
 
 authenticate :: (A.Selectable Address X509CertInfoState m) => InEvent -> m Bool
 authenticate (IMsg (MsgAuth cm sig) tm) = do
