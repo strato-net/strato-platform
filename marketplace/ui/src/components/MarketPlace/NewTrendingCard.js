@@ -71,6 +71,8 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
         }
     };
 
+    console.log("top selling", topSellingProduct)
+
     return (
         <div className={`relative trending_cards_container_card bg-white p-3 ${parent == 'Marketplace' ? 'min-w-[300px] w-auto' : 'min-w-[230px]'}  min-w-[320px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}>
             {contextHolder}
@@ -114,7 +116,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             {topSellingProduct?.price && <Typography className='font-normal text-black'>{ `$ ${topSellingProduct?.price}`}</Typography>}
             {isAvailableForSale && <Text type="danger" strong> Sold Out </Text>}
-                 {topSellingProduct?.contract_name.toLowerCase().includes("clothing") && (
+                 {topSellingProduct?.contract_name?.includes("clothing") && (
                     <Typography className='font-normal text-black'>Size: { topSellingProduct?.data?.size ? topSellingProduct?.data?.size : "N/A"}</Typography>
                 )}
             </div>
