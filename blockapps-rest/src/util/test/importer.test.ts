@@ -15,7 +15,7 @@ describe("imports", function() {
 
   before(async () => {
     const userArgs = { token: process.env.USER_TOKEN };
-    admin = await factory.createAdmin(userArgs, options);;
+    admin = await factory.createAdmin(userArgs, options);
   });
 
   it("combines to array", async () => {
