@@ -1,8 +1,9 @@
+import rest from "../rest";
 import util from "../util/util";
 import fsUtil from "../util/fsUtil";
 import assert from "../util/assert";
 import BigNumber from "bignumber.js";
-import { Chain, SendTx } from "../types"
+import { Chain, Options, SendTx } from "../types"
 
 import * as ip from "ip";
 

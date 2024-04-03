@@ -334,7 +334,7 @@ describe("rest_7", function () {
 
     before(async () => {
       const user2Args = { token: process.env.USER2_TOKEN };
-      user2 = {user2Args, address: 0};
+      user2 = await factory.createAdmin(user2Args, options);
     });
 
     it("send - sync", async () => {
