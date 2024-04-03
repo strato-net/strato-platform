@@ -7,6 +7,7 @@ function consolidateHealthData(healthInfo, stallInfo, systemInfo, syncInfo) {
   const healthStatHealth = healthInfo.latestHealthStatus;
   const stallStatHealth = stallInfo.latestHealthStatus;
   const systemStatHealth = systemInfo.latestHealthStatus;
+  const nodeHealthWarnings = healthInfo.additionalInfo;
   const isSynced = syncInfo.latestHealthStatus;
   const isSyncStalled = JSON.parse(syncInfo.additionalInfo)?.isStalled;
   const systemWarnings = JSON.parse(systemInfo.additionalInfo).Alerts;
@@ -24,7 +25,7 @@ function consolidateHealthData(healthInfo, stallInfo, systemInfo, syncInfo) {
 
   if (!healthStatHealth) {
     healthIssues.push(
-      `Node is unhealthy. ${systemWarnings || "Reason currently unknown."}`
+      `Node is unhealthy. Reasons: ${nodeHealthWarnings || "Reason currently unknown."}`
     );
   }
 
@@ -37,7 +38,7 @@ function consolidateHealthData(healthInfo, stallInfo, systemInfo, syncInfo) {
   }
 
   if (!systemStatHealth) {
-    healthIssues.push(`Node's host is unhealthy. ${systemWarnings}`);
+    healthIssues.push(`Node's host is unhealthy. Reasons: ${systemWarnings || "Reason currently unknown."}`);
   }
 
   return {
