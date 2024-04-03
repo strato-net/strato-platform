@@ -3,6 +3,7 @@ import oauthHelper from '/helpers/oauthHelper'
 import { oauthUtil, rest } from 'blockapps-rest'
 import jwtDecode from 'jwt-decode'
 import config from '/load.config'
+import axios from 'axios';
 
 const getTokenFromCookie = async (req, res) => {
   const tokenName = req.app.oauth.getCookieNameAccessToken()
@@ -62,7 +63,7 @@ class AuthHandler {
             return next(err)
           }
           try {
-            // return rest.response.status(RestStatus.INTERNAL_SERVER_ERROR, res, "Internal Server Error 101")
+            return rest.response.status(RestStatus.INTERNAL_SERVER_ERROR, res, "Internal Server Error 101")
             address = await rest.createOrGetKey({ username: decodedToken.preferred_username, token }, { config })
           } catch (e) {
             console.error('STRATO API is unreachable or unhealthy. Error: ', e)
@@ -83,14 +84,23 @@ class AuthHandler {
       res.clearCookie(req.app.oauth.getCookieNameAccessTokenExpiry())
       res.clearCookie(req.app.oauth.getCookieNameRefreshToken())
 
-      if (checkStratoAPI) {
-        console.log("STRATO API Checked HERERERE", someFetch)
-      }
+      const response = await axios.get(`${config.serverHost}/health`);
+      const health = response.data.health;
+      console.log();
+      // config.serverHost
 
-      rest.response.status(RestStatus.UNAUTHORIZED, res, {
-        loginUrl: getLoginUrl(req),
-      })
-      return next(new Error('Authorization required'))
+      // if (checkStratoAPI) {
+      //   console.log("STRATO API Checked HERERERE")
+      // }
+      if (health) {
+        rest.response.status(RestStatus.UNAUTHORIZED, res, {
+          loginUrl: getLoginUrl(req),
+          health: response.data
+        })
+        return next(new Error('Authorization required'))
+      } else {
+        return rest.response.status(RestStatus.INTERNAL_SERVER_ERROR, res, "Internal Server Error 101")
+      }
     }
   }
 
@@ -104,7 +114,6 @@ class AuthHandler {
     }
     return oauth
   }
-
 
   static getDeployersTokenForWebhook() {
     return async function (req, res, next) {
