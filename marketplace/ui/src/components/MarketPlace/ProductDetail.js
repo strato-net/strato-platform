@@ -310,6 +310,7 @@ const ProductDetails = ({ user, users }) => {
     return parts[parts.length - 1];
   };
 
+  const isAvailableForSale = (!details?.saleQuantity || details?.saleQuantity==0) 
   function getCategoryName(str) {
     const lastIndex = str.lastIndexOf('-');
     if (lastIndex !== -1) {
@@ -374,12 +375,12 @@ const ProductDetails = ({ user, users }) => {
               </Breadcrumb.Item>
             </Breadcrumb>
           </Row>
-          <div className="flex w-full flex-col  px-4 sm:px-8 md:px-0  items-center lg:items-start  md:w-[750px] lg:w-[835px] xl:w-[858px]  md:mx-auto ">
+          <div className="flex w-full flex-col lg:leading-12 px-4 sm:px-8 md:px-0  items-center lg:items-start  md:w-[750px] lg:w-[835px] xl:w-[858px]  md:mx-auto ">
             <div className="flex md:justify-center gap-[15px] lg:gap-6 flex-col lg:flex-row   ">
               <Carousel showIndicators={
-                details.images.length > 1 ? true : false
+                details?.images?.length > 1 ? true : false
               } className="product_detail w-full  sm:w-[417px]   lg:h-[348px] md:w-[343px] lg:w-[417px]" showStatus={false} showArrows swipeable emulateTouch infiniteLoop >
-                {details.images.length > 0 ? details.images.map((element, index) => {
+                {details?.images?.length > 0 ? details?.images?.map((element, index) => {
                   return (<><div key={index} className="sm:w-[343px ] h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
                     <img width={"100%"}
                       alt={`${assetName} | Image ${index}`}
@@ -435,9 +436,11 @@ const ProductDetails = ({ user, users }) => {
                   </div>
                 </div>
                 <div className=" pt-4 lg:pt-[22px]">
-                  <Text level={4} className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold">
+
+                  <Paragraph level={4} className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold">
                     {details?.price ? <>${details?.price}</> : "No Price Available"}
-                  </Text>
+                  </Paragraph>
+                  {isAvailableForSale && <Text type="danger" strong> Sold Out </Text>}
                 </div>
 
                 {availableQuantity !== 0 ?
@@ -471,7 +474,7 @@ const ProductDetails = ({ user, users }) => {
                   <div className="flex gap-4 justify-between lg:justify-start  pt-4 w-full">
                     <Button
                       type="primary"
-                      className="w-[90%] md:w-[365px] h-9  !bg-[#13188A] !hover:bg-primaryHover !text-white"
+                      className={`w-[90%] md:w-[365px] h-9  ${isAvailableForSale? '!bg-[#808080]':'!bg-[#13188A]'} !hover:bg-primaryHover !text-white`}
                       onClick={async () => {
                         window.LOQ.push(['ready', async LO => {
                           // Track an event
@@ -503,7 +506,7 @@ const ProductDetails = ({ user, users }) => {
                           }
                         }
                       }}
-                      disabled={ownerSameAsUser()}
+                      disabled={ownerSameAsUser() || isAvailableForSale}
                       id="buyNow"
                     >
                       Buy Now
@@ -514,7 +517,7 @@ const ProductDetails = ({ user, users }) => {
                         icon={<div className="flex justify-center items-center">
                           <img src={Images.Cart} alt={`${assetName} | Image`} title={`${assetName} | Image`} width={18} height={18} className="object-contain" />
                         </div>}
-                        className=" !w-9 h-9 border border-primary  !bg-[#13188A] rounded-md"
+                        className={`!w-9 h-9 border border-primary ${isAvailableForSale? '!bg-[#808080]':'!bg-[#13188A]'} rounded-md`}
                         disabled={true}
                         id="addToCart"
                         onClick={async () => {
@@ -552,7 +555,8 @@ const ProductDetails = ({ user, users }) => {
                         icon={<div className="flex justify-center items-center">
                           <img src={Images.Cart} alt={`${assetName} | Image`} title={`${assetName} | Image`} width={18} height={18} className="object-contain" />
                         </div>}
-                        className=" !w-9 h-9 rounded-md  !bg-[#13188A]"
+                        className={`!w-9 h-9 rounded-md  ${isAvailableForSale? '!bg-[#808080]':'!bg-[#13188A]'}  `}
+                        disabled={isAvailableForSale}
                         onClick={async () => {
                           window.LOQ.push(['ready', async LO => {
                             // Track an event

@@ -32,6 +32,7 @@ import Bloc.API.Utils
 import Bloc.Database.Queries (getContractDetailsForContract)
 import Bloc.Monad
 import Bloc.Server.Chain
+import Bloc.Server.Contracts (getSourceMapFromAddress)
 import Bloc.Server.TransactionResult hiding (constructArgValuesAndSource)
 import Bloc.Server.Utils
 import BlockApps.Logging
@@ -293,7 +294,7 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
           getSrc p = fromMaybe mempty $ src' p <|> srcMap p
           mapUploadList =
             map
-              ( \p@(ContractPayload _ c a v x cid' m) -> do
+              ( \p@(ContractPayload _ c a v x cid' _ m) -> do
                   let cn = fromMaybe "unnamed_contract" c
                   UploadListContract
                     (fromJust c)
@@ -438,7 +439,7 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
               else Just $ contractpayloadSrc p
           getSrc p = fromMaybe mempty $ src' p <|> srcMap p
           upload =
-            ( \p@(ContractPayload _ c a v x cid' m) -> do
+            ( \p@(ContractPayload _ c a v x cid' _ m) -> do
                 let cn = fromMaybe "unnamed_contract" c
                 UploadListContract
                   (fromJust c)
@@ -709,10 +710,14 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                         resolve
                 fmap ((:[]) . BlocTxResult) $ postUsersContractMethod' cacheNonce bcp jwtToken
               False -> do
+                src'' <- case contractpayloadCodePtr p of 
+                  Nothing -> return $ getSrc p
+                  Just _ | getSrc p /= mempty -> throwIO $ UserError "Can only provide one of either `src` or `codePtr`."
+                  Just p' -> getSourceMapFromAddress p'
                 let bcp =
                       ContractParameters
                         addr
-                        (getSrc p)
+                        src''
                         (contractpayloadContract p)
                         (contractpayloadArgs p)
                         (contractpayloadValue p)
@@ -731,7 +736,7 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
             ps <- mapM fromContract xs
             case useWallet of
               True -> do
-                methodList <- mapM (\p@(ContractPayload _ c a v x cid m) -> do
+                methodList <- mapM (\p@(ContractPayload _ c a v x cid _ m) -> do
                                   let contractSrc = getSrc p
                                       contractSrcText = sourceBlob $ contractSrc
                                       srcLength = Text.length contractSrcText
@@ -762,26 +767,32 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                         resolve
                 fmap BlocTxResult <$> postUsersContractMethodList' cacheNonce bcp jwtToken
               False -> do
+                payloadList <-
+                  mapM
+                      ( \p@(ContractPayload _ c a v x cid _ m) -> do
+                          let cn = fromMaybe "unnamed_contract" c
+                          src'' <- case contractpayloadCodePtr p of 
+                            Nothing -> return $ getSrc p
+                            Just _ | getSrc p /= mempty -> throwIO $ UserError "Can only provide one of either `src` or `codePtr`."
+                            Just p' -> getSourceMapFromAddress p'
+                          return $
+                            UploadListContract
+                              (fromJust c)
+                              src''
+                              (fromMaybe Map.empty a)
+                              (mergeTxParams x txParams)
+                              v
+                              cid
+                              ( case m of
+                                  Nothing -> Just $ Map.singleton "history" cn
+                                  Just h -> Just $ Map.insert "history" cn h
+                              )
+                      )
+                      ps
                 let bclp = 
                       ContractListParameters
                         addr
-                        ( map
-                            ( \p@(ContractPayload _ c a v x cid m) -> do
-                                let cn = fromMaybe "unnamed_contract" c
-                                UploadListContract
-                                  (fromJust c)
-                                  (getSrc p)
-                                  (fromMaybe Map.empty a)
-                                  (mergeTxParams x txParams)
-                                  v
-                                  cid
-                                  ( case m of
-                                      Nothing -> Just $ Map.singleton "history" cn
-                                      Just h -> Just $ Map.insert "history" cn h
-                                  )
-                            )
-                            ps
-                        )
+                        payloadList
                         chainId
                         resolve
                     poster = postUsersUploadListSolidVM'

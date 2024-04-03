@@ -255,7 +255,10 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
         <Space className="relative flex-grow-0 md:flex-1 ml-2 md:ml-5">
           <div
             className="mt-4 mr-5 md:mt-0 cursor-pointer flex-grow-0 w-max md:w-[170px] h-[44px]"
-            onClick={() => { navigate(routes.Marketplace.url) }}
+            onClick={() => { 
+              navigate(routes.Marketplace.url) 
+              window.scrollTo(0, 0);
+            }}
           >
             <img src={Images.newLogo} alt={IMG_META} title={IMG_META} className="h-[31px] w-[120px] md:w-[170px] md:h-[44px]" preview={false} />
           </div>
@@ -337,6 +340,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
                 },
               });
               navigate("/checkout");
+              window.scrollTo(0, 0);
             }}
           >
             <div className="md:hidden">
