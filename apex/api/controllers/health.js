@@ -128,7 +128,7 @@ module.exports = {
         apiVersion: API_VERSION,
         version: process.env.STRATO_VERSION,
         timestamp: new Date().toISOString(),
-        health: health,
+        health: false,
         uptime: uptime,
       });
     } catch (error) {
