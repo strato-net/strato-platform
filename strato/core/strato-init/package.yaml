@@ -76,9 +76,9 @@ library:
 
 executables:
 
-  tabula-rasa:
+  strato-setup:
     source-dirs: exec_src/
-    main: TabulaRasa.hs
+    main: Main.hs
     dependencies:
       - hflags
       - strato-init

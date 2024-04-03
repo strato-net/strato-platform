@@ -352,7 +352,7 @@ function doInit {
   ${networkFlag} \
   ${stratoBootnode}"
 
-  cmd="tabula-rasa $args"
+  cmd="strato-setup $args"
 
   echo "init event source: $cmd"
   # logging to stdout and log file:

@@ -9,7 +9,7 @@ import HFlags
 
 main :: IO ()
 main = do
-  _ <- $initHFlags "tabula-rasa"
+  _ <- $initHFlags "strato-setup"
   let kaddr = case flags_kafkahost of
         "" -> ("kafka", 9092)
         _ -> (fromString flags_kafkahost, 9092)
