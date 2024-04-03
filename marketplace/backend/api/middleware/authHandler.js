@@ -89,8 +89,7 @@ class AuthHandler {
 
       if (health) {
         rest.response.status(RestStatus.UNAUTHORIZED, res, {
-          loginUrl: getLoginUrl(req),
-          health: response.data
+          loginUrl: getLoginUrl(req)
         })
         return next(new Error('Authorization required'))
       } else {
