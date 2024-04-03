@@ -26,7 +26,7 @@ function consolidateHealthData(healthInfo, stallInfo, systemInfo, syncInfo) {
 
   if (!healthStatHealth) {
     healthIssues.push(
-      `Node is unhealthy. ${nodeHealthWarnings || "Reason currently unknown."}`
+      `Node is unhealthy. Reasons: ${nodeHealthWarnings || "Reason currently unknown."}`
     );
   }
 
@@ -39,7 +39,7 @@ function consolidateHealthData(healthInfo, stallInfo, systemInfo, syncInfo) {
   }
 
   if (!systemStatHealth) {
-    healthIssues.push(`Node's host is unhealthy. ${systemWarnings} || "Reason currently unknown."`);
+    healthIssues.push(`Node's host is unhealthy. Reasons: ${systemWarnings || "Reason currently unknown."}`);
   }
 
   return {

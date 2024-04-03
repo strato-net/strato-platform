@@ -259,7 +259,7 @@ async function calcNodeHealthAndSaveVitalStats(prometheusHealthMetrics) {
 
   Object.keys(prometheusHealthMetrics).forEach(async (keyProcess) => {
     if (!prometheusHealthMetrics[keyProcess]) {
-      failedChecks.push(keyProcess);
+      failedChecks.push(`${keyProcess} is unavailable`);
     }
     isNodeHealthy = prometheusHealthMetrics[keyProcess] && isNodeHealthy;
     await models.HealthStat.create({
