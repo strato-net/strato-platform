@@ -298,7 +298,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getTopSellingProducts = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName }
-    const newArgs = { ...args, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, ownerCommonName: constants.baUserNames }
+    const newArgs = { ...args, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress }
     return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions)
   }
 
