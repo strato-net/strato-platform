@@ -63,7 +63,7 @@ class AuthHandler {
             return next(err)
           }
           try {
-            return rest.response.status(RestStatus.INTERNAL_SERVER_ERROR, res, "Internal Server Error 101")
+            // return rest.response.status(RestStatus.INTERNAL_SERVER_ERROR, res, "Internal Server Error 101")
             address = await rest.createOrGetKey({ username: decodedToken.preferred_username, token }, { config })
           } catch (e) {
             console.error('STRATO API is unreachable or unhealthy. Error: ', e)
@@ -86,12 +86,7 @@ class AuthHandler {
 
       const response = await axios.get(`${config.serverHost}/health`);
       const health = response.data.health;
-      console.log();
-      // config.serverHost
 
-      // if (checkStratoAPI) {
-      //   console.log("STRATO API Checked HERERERE")
-      // }
       if (health) {
         rest.response.status(RestStatus.UNAUTHORIZED, res, {
           loginUrl: getLoginUrl(req),
