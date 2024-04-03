@@ -1,18 +1,5 @@
 
 .tiptap {
-    > * + * {
-      margin-top: 0.75em;
-    }
-  
-    ul {
-      padding: 0 1rem;
-      list-style: disc;
-    }
-    ol {
-      padding: 0 1rem;
-      list-style: decimal;
-    }
-
     /* This helps the links appear as they should. They are being overwritten in the editor without this */
     a {
         color: #1677ff !important;
@@ -53,37 +40,12 @@
       height: auto;
     }
   
-    blockquote {
-      padding-left: 1rem;
-      border-left: 2px solid rgba(13, 13, 13, 0.1);
-    }
-  
     hr {
       border: none;
       border-top: 2px solid rgba(13, 13, 13, 0.1);
       margin: 2rem 0;
     }
   
-    button {
-      padding: 0.5rem 1rem;
-      margin: 0.25rem;
-      background-color: white;
-      color: #616161;
-      border: 1px solid rgba(97, 97, 97, 0.5);
-      border-radius: 4px;
-      cursor: pointer;
-      font-family: 'Arial', sans-serif;
-      font-size: 0.875rem;
-  
-      &:hover {
-        background-color: rgba(97, 97, 97, 0.1);
-      }
-  
-      &.is-active {
-        background-color: #0D0D0D;
-        color: white;
-      }
-    }
   }
   
   .editor-container {

@@ -6,7 +6,8 @@ This project is meant to help with the registration flow on STRATO. The identity
 2. creates, signs, and registers a certificate on-chain for a user if they don't already have one
 3. registers a user wallet on-chain for a user if they don't already have one
 
-To utilize this functionality, you call the PUT /identity endpoint. You must also provide an Authorization header with the user's bearer token, and you can optionally specify the `company` as a query parameter. Whenever possible, the bearer token will be used as the source of truth for information about the user. The common name for the cert will either come from the token's `preferred_username` claim, if one exists, or the `name` claim. Similarly, if there is a `company` claim within the token, that will be used for the cert's organization field. If no claim `company` is found, the identity server will use the `company` query param value instead.
+To utilize this functionality, you call the PUT /identity endpoint. You must also provide an Authorization header with the user's bearer token, and you can optionally specify the `company` as a query parameter. Whenever possible, the bearer token will be used as the source of truth for information about the user. The common name for the cert will either come from the token's `preferred_username` claim, if one exists, or the `name` claim. Similarly, if there is a `company` claim within the token, that will be used for the cert's organization field. If no claim `company` is found, the identity server will use the `company` query param value instead. Note that if both the `company` claim and query param are empty, the identity server will NOT issue a cert with an empty organization name. Instead, it will use the default naming behavior for Mercata users with no org:
+`Mercata Acount <first initial><last name><first 8 chars of uuid>`
 
 ### Notes to the server admin
 

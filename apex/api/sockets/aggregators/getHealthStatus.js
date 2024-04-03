@@ -146,7 +146,7 @@ async function getHealthStatus() {
     emitter.emit(
       ON_SOCKET_PUBLISH_EVENTS,
       GET_NODE_UPTIME,
-      healthBody.uptime / 1000
+      healthBody.uptime
     );
     emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_SYSTEM_INFO, {
       status: healthBody.healthData.systemHealth.health,
@@ -175,7 +175,7 @@ function initialHydrateHealthStatus(socket) {
 }
 
 function initialHydrateUptime(socket) {
-  socket.emit(`PRELOAD_${GET_NODE_UPTIME}`, healthBody.uptime / 1000);
+  socket.emit(`PRELOAD_${GET_NODE_UPTIME}`, healthBody.uptime);
 }
 
 function initialHydrateSystemInfo(socket) {

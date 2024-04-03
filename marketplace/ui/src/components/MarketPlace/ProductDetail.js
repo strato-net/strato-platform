@@ -59,16 +59,11 @@ const ProductDetails = ({ user, users }) => {
     isCalledFromInventory = true
   }
 
-
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
   const { Text, Paragraph } = Typography;
   const [Id, setId] = useState(undefined);
   const [itemData, setItemData] = useState({});
-  // For Wishlist Icon Rendering
-  const [isWishlisted, setIsWishlisted] = useState(false);
-  const [availableQuantity, setAvailableQuantity] = useState(1);
-  const shouldShowWishlistIcon = isAuthenticated && user;
 
   const [qty, setQty] = useState(1);
   const dispatch = useInventoryDispatch();
@@ -98,6 +93,18 @@ const ProductDetails = ({ user, users }) => {
     strict: true,
   });
 
+  const ownerSameAsUser = () => {
+    if (user?.commonName === inventoryDetails?.ownerCommonName) {
+      return true;
+    }
+    return false;
+  }
+
+  // For Wishlist Icon Rendering
+  const [isWishlisted, setIsWishlisted] = useState(false);
+  const [availableQuantity, setAvailableQuantity] = useState(1);
+  const shouldShowWishlistIcon = isAuthenticated && user && !ownerSameAsUser();
+
   useEffect(() => {
     if (isCalledFromInventory) setId(routeMatch1?.params?.id);
     else setId(routeMatch?.params?.address);
@@ -115,7 +122,7 @@ const ProductDetails = ({ user, users }) => {
       //   itemsActions.fetchSerialNumbers(itemDispatch, Id);
       // }
     }
-  }, [Id, dispatch, user]);
+  }, [Id, dispatch]);
 
   useEffect(() => {
     if (inventoryDetails) {
@@ -204,15 +211,6 @@ const ProductDetails = ({ user, users }) => {
       });
     }
   };
-
-  const ownerSameAsUser = () => {
-
-    if (user?.commonName === inventoryDetails?.ownerCommonName) {
-      return true;
-    }
-
-    return false;
-  }
 
   const addItemToCart = () => {
     let found = false;
@@ -315,6 +313,7 @@ const ProductDetails = ({ user, users }) => {
     return parts[parts.length - 1];
   };
 
+  const isAvailableForSale = (!details?.saleQuantity || details?.saleQuantity==0) 
   function getCategoryName(str) {
     const lastIndex = str.lastIndexOf('-');
     if (lastIndex !== -1) {
@@ -323,7 +322,7 @@ const ProductDetails = ({ user, users }) => {
       return str;
     }
   }
-  
+
   const assetName = decodeURIComponent(details?.name)
   const contractName = getCategoryName(decodeURIComponent(details?.contract_name))
   const linkUrl = window.location.href;
@@ -339,10 +338,10 @@ const ProductDetails = ({ user, users }) => {
         </div>
       ) : (
         <div>
-          <HelmetComponent 
-          title={`${assetName} | ${contractName} | ${SEO.TITLE_META}`}
-          description={details?.description} 
-          link={linkUrl} />
+          <HelmetComponent
+            title={`${assetName} | ${contractName} | ${SEO.TITLE_META}`}
+            description={details?.description}
+            link={linkUrl} />
           <Row>
             <Breadcrumb className="text-xs   mb-4 md:mt-5  md:mb-6 lg:mb-[44px] ml-4 lg:ml-16">
               <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
@@ -379,23 +378,23 @@ const ProductDetails = ({ user, users }) => {
               </Breadcrumb.Item>
             </Breadcrumb>
           </Row>
-          <div className="flex w-full flex-col  px-4 sm:px-8 md:px-0  items-center lg:items-start  md:w-[750px] lg:w-[835px] xl:w-[858px]  md:mx-auto ">
+          <div className="flex w-full flex-col lg:leading-12 px-4 sm:px-8 md:px-0  items-center lg:items-start  md:w-[750px] lg:w-[835px] xl:w-[858px]  md:mx-auto ">
             <div className="flex md:justify-center gap-[15px] lg:gap-6 flex-col lg:flex-row   ">
               <Carousel showIndicators={
-                details.images.length > 1 ? true : false
+                details?.images?.length > 1 ? true : false
               } className="product_detail w-full  sm:w-[417px]   lg:h-[348px] md:w-[343px] lg:w-[417px]" showStatus={false} showArrows swipeable emulateTouch infiniteLoop >
-                {details.images.length > 0 ? details.images.map((element, index) => {
+                {details?.images?.length > 0 ? details?.images?.map((element, index) => {
                   return (<><div key={index} className="sm:w-[343px ] h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
-                    <img width={"100%"} 
-                    alt={`${assetName} | Image ${index}`}
-                    title={`${assetName} | Image ${index}`}
-                    className="object-contain rounded-md h-full " src={element ? element : image_placeholder} />
+                    <img width={"100%"}
+                      alt={`${assetName} | Image ${index}`}
+                      title={`${assetName} | Image ${index}`}
+                      className="object-contain rounded-md h-full " src={element ? element : image_placeholder} />
                   </div></>)
                 }) : <><div className="sm:w-[343px ] sm:h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
                   <img width={"100%"}
-                  alt={`${assetName} | Image`}
-                  title={`${assetName} | Image`}
-                  className="object-contain rounded-md h-full " src={image_placeholder} />
+                    alt={`${assetName} | Image`}
+                    title={`${assetName} | Image`}
+                    className="object-contain rounded-md h-full " src={image_placeholder} />
                 </div></>}
               </Carousel>
               <div className=" w-full lg:w-1/2">
@@ -440,9 +439,11 @@ const ProductDetails = ({ user, users }) => {
                   </div>
                 </div>
                 <div className=" pt-4 lg:pt-[22px]">
-                  <Text level={4} className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold">
+
+                  <Paragraph level={4} className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold">
                     {details?.price ? <>${details?.price}</> : "No Price Available"}
-                  </Text>
+                  </Paragraph>
+                  {isAvailableForSale && <Text type="danger" strong> Sold Out </Text>}
                 </div>
 
                 {availableQuantity !== 0 ?
@@ -476,7 +477,7 @@ const ProductDetails = ({ user, users }) => {
                   <div className="flex gap-4 justify-between lg:justify-start  pt-4 w-full">
                     <Button
                       type="primary"
-                      className="w-[90%] md:w-[365px] h-9  !bg-[#13188A] !hover:bg-primaryHover !text-white"
+                      className={`w-[90%] md:w-[365px] h-9  ${isAvailableForSale? '!bg-[#808080]':'!bg-[#13188A]'} !hover:bg-primaryHover !text-white`}
                       onClick={async () => {
                         window.LOQ.push(['ready', async LO => {
                           // Track an event
@@ -508,7 +509,7 @@ const ProductDetails = ({ user, users }) => {
                           }
                         }
                       }}
-                      disabled={ownerSameAsUser()}
+                      disabled={ownerSameAsUser() || isAvailableForSale}
                       id="buyNow"
                     >
                       Buy Now
@@ -519,7 +520,7 @@ const ProductDetails = ({ user, users }) => {
                         icon={<div className="flex justify-center items-center">
                           <img src={Images.Cart} alt={`${assetName} | Image`} title={`${assetName} | Image`} width={18} height={18} className="object-contain" />
                         </div>}
-                        className=" !w-9 h-9 border border-primary  !bg-[#13188A] rounded-md"
+                        className={`!w-9 h-9 border border-primary ${isAvailableForSale? '!bg-[#808080]':'!bg-[#13188A]'} rounded-md`}
                         disabled={true}
                         id="addToCart"
                         onClick={async () => {
@@ -557,7 +558,8 @@ const ProductDetails = ({ user, users }) => {
                         icon={<div className="flex justify-center items-center">
                           <img src={Images.Cart} alt={`${assetName} | Image`} title={`${assetName} | Image`} width={18} height={18} className="object-contain" />
                         </div>}
-                        className=" !w-9 h-9 rounded-md  !bg-[#13188A]"
+                        className={`!w-9 h-9 rounded-md  ${isAvailableForSale? '!bg-[#808080]':'!bg-[#13188A]'}  `}
+                        disabled={isAvailableForSale}
                         onClick={async () => {
                           window.LOQ.push(['ready', async LO => {
                             // Track an event

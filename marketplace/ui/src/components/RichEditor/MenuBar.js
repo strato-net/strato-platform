@@ -63,13 +63,19 @@ const MenuBar = ({ editor, addLink }) => {
     label: family,
   }));
 
+  const buttonStyling = (type) => {
+    return `py-[2.5px] px-[5px] m-1 border border-gray rounded cursor-pointer font-arial font-extralight text-sm transition duration-300 ease-in-out hover:bg-tertiary ${editor.isActive(type) ? "bg-primaryB text-white" : "bg-white text-[#616161]"}`
+  }
+
+  const nonActiveButtonStyling = "py-[2.5px] px-[5px] mx-1 border border-gray rounded cursor-pointer font-arial font-extralight bg-white text-[#616161] text-sm transition duration-300 ease-in-out hover:bg-tertiary";
+
   return (
     <>
       {/* Bold */}
       <button
         onClick={() => editor.chain().focus().toggleBold().run()}
         disabled={!editor.can().chain().focus().toggleBold().run()}
-        className={editor.isActive("bold") ? "is-active" : ""}
+        className={buttonStyling("bold")}
       >
         Bold
       </button>
@@ -78,7 +84,7 @@ const MenuBar = ({ editor, addLink }) => {
       <button
         onClick={() => editor.chain().focus().toggleItalic().run()}
         disabled={!editor.can().chain().focus().toggleItalic().run()}
-        className={editor.isActive("italic") ? "is-active" : ""}
+        className={buttonStyling("italic")}
       >
         Italic
       </button>
@@ -86,7 +92,7 @@ const MenuBar = ({ editor, addLink }) => {
       {/* Underline Button */}
       <button
         onClick={() => editor.chain().focus().toggleUnderline().run()}
-        className={editor.isActive("underline") ? "is-active" : ""}
+        className={buttonStyling("underline")}
       >
         Underline
       </button>
@@ -94,7 +100,7 @@ const MenuBar = ({ editor, addLink }) => {
       <button
         onClick={() => editor.chain().focus().toggleStrike().run()}
         disabled={!editor.can().chain().focus().toggleStrike().run()}
-        className={editor.isActive("strike") ? "is-active" : ""}
+        className={buttonStyling("strike")}
       >
         Strike
       </button>
@@ -102,54 +108,58 @@ const MenuBar = ({ editor, addLink }) => {
       {/* Text Alignment */}
       <button
         onClick={() => editor.chain().focus().setTextAlign("left").run()}
-        className={editor.isActive({ textAlign: "left" }) ? "is-active" : ""}
+        className={buttonStyling({ textAlign: "left" })}
       >
         Left
       </button>
       <button
         onClick={() => editor.chain().focus().setTextAlign("center").run()}
-        className={editor.isActive({ textAlign: "center" }) ? "is-active" : ""}
+        className={buttonStyling({ textAlign: "center" })}
       >
         Center
       </button>
       <button
         onClick={() => editor.chain().focus().setTextAlign("right").run()}
-        className={editor.isActive({ textAlign: "right" }) ? "is-active" : ""}
+        className={buttonStyling({ textAlign: "right" })}
       >
         Right
       </button>
 
       <Dropdown
-          className="ant-dropdown-link"
-          menu={{
-            items: fontSizeMenuItems,
-            onClick: ({ key }) => handleFontSizeClick(key),
-          }}
-          trigger={["click"]}
+        menu={{
+          items: fontSizeMenuItems,
+          onClick: ({ key }) => handleFontSizeClick(key),
+        }}
+        trigger={["click"]}
+      >
+        <button
+          onClick={(e) => e.preventDefault()}
+          className={nonActiveButtonStyling}
         >
-          <button onClick={(e) => e.preventDefault()}>
-            {selectedFontSize || "12px"} <DownOutlined />
-          </button>
-        </Dropdown>
+          {selectedFontSize || "12px"} <DownOutlined />
+        </button>
+      </Dropdown>
 
-        <Dropdown
-          className="ant-dropdown-link"
-          menu={{
-            items: fontFamilyMenuItems,
-            onClick: ({ key }) => handleFontFamilyClick(key),
-          }}
-          trigger={["click"]}
+      <Dropdown
+        menu={{
+          items: fontFamilyMenuItems,
+          onClick: ({ key }) => handleFontFamilyClick(key),
+        }}
+        trigger={["click"]}
+      >
+        <button
+          onClick={(e) => e.preventDefault()}
+          className={nonActiveButtonStyling}
         >
-          <button onClick={(e) => e.preventDefault()}>
-            {selectedFontFamily ? selectedFontFamily.split(",")[0] : "Arial"}{" "}
-            <DownOutlined />
-          </button>
-        </Dropdown>
+          {selectedFontFamily ? selectedFontFamily.split(",")[0] : "Arial"}{" "}
+          <DownOutlined />
+        </button>
+      </Dropdown>
 
       {/* Bullet List */}
       <button
         onClick={() => editor.chain().focus().toggleBulletList().run()}
-        className={editor.isActive("bulletList") ? "is-active" : ""}
+        className={buttonStyling("bulletList")}
       >
         Bullet List
       </button>
@@ -157,7 +167,7 @@ const MenuBar = ({ editor, addLink }) => {
       {/* Ordered List */}
       <button
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
-        className={editor.isActive("orderedList") ? "is-active" : ""}
+        className={buttonStyling("orderedList")}
       >
         Ordered List
       </button>
@@ -165,21 +175,32 @@ const MenuBar = ({ editor, addLink }) => {
       {/* Blockquote */}
       <button
         onClick={() => editor.chain().focus().toggleBlockquote().run()}
-        className={editor.isActive("blockquote") ? "is-active" : ""}
+        className={buttonStyling("blockquote")}
       >
         Blockquote
       </button>
 
       {/* Button for inserting links */}
-      <button onClick={addLink}>Insert Link</button>
+      <button
+        onClick={addLink}
+        className={nonActiveButtonStyling}
+      >
+        Insert Link
+      </button>
 
       {/* Horizontal Rule */}
-      <button onClick={() => editor.chain().focus().setHorizontalRule().run()}>
+      <button
+        onClick={() => editor.chain().focus().setHorizontalRule().run()}
+        className={nonActiveButtonStyling}
+      >
         Divider
       </button>
 
       {/* Hard Break */}
-      <button onClick={() => editor.chain().focus().setHardBreak().run()}>
+      <button
+        onClick={() => editor.chain().focus().setHardBreak().run()}
+        className={nonActiveButtonStyling}
+      >
         New Line
       </button>
 
@@ -187,6 +208,7 @@ const MenuBar = ({ editor, addLink }) => {
       <button
         onClick={() => editor.chain().focus().undo().run()}
         disabled={!editor.can().chain().focus().undo().run()}
+        className={nonActiveButtonStyling}
       >
         Undo
       </button>
@@ -195,21 +217,28 @@ const MenuBar = ({ editor, addLink }) => {
       <button
         onClick={() => editor.chain().focus().redo().run()}
         disabled={!editor.can().chain().focus().redo().run()}
+        className={nonActiveButtonStyling}
       >
         Redo
       </button>
       {/* Clear Marks */}
-      <button onClick={() => editor.chain().focus().unsetAllMarks().run()}>
+      <button
+        onClick={() => editor.chain().focus().unsetAllMarks().run()}
+        className={nonActiveButtonStyling}
+      >
         Clear Marks
       </button>
 
       {/* Clear Nodes */}
-      <button onClick={() => editor.chain().focus().clearNodes().run()}>
+      <button
+        onClick={() => editor.chain().focus().clearNodes().run()}
+        className={nonActiveButtonStyling}
+      >
         Clear Formatting
       </button>
 
       {/* Custom color picker */}
-      <button>
+      <button className={nonActiveButtonStyling}>
         <input
           type="color"
           onInput={event => editor.chain().focus().setColor(event.target.value).run()}

@@ -64,11 +64,8 @@ class AuthHandler {
           try {
             address = await rest.createOrGetKey({ username: decodedToken.preferred_username, token }, { config })
           } catch (e) {
-            // user isn't created in STRATO
-            if (e.response && e.response.status === RestStatus.BAD_REQUEST) {
-              console.log('User not created in STRATO!')
-              return next(e)
-            }
+            console.error('STRATO API is unreachable or unhealthy. Error: ', e)
+            return rest.response.status(RestStatus.INTERNAL_SERVER_ERROR, res, "Internal Server Error 101")
           }
           req.address = address
           req.accessToken = { token }
@@ -78,7 +75,6 @@ class AuthHandler {
           return next()
         }
       } catch (err) {
-        rest.response.status(RestStatus.INTERNAL_SERVER_ERROR, res, "Internal Server Error")
         return next(err)
       }
       
