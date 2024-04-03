@@ -126,9 +126,9 @@ class InventoryController {
   static async resell(req, res, next) {
     try {
       const { dapp, body } = req
-      InventoryController.validateResellItemArgs(body.assets[0])
+      InventoryController.validateResellItemArgs(body)
 
-      const result = await dapp.resellItem(body.assets[0])
+      const result = await dapp.resellItem(body)
       rest.response.status200(res, result)
 
       return next()
