@@ -73,7 +73,7 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Char8 as C8
 import Data.Functor.Identity
 import qualified Data.Map as Map
-import Data.Map.Strict (Map, elems)
+import Data.Map.Strict (Map)
 import qualified Data.Map.Ordered as OMap
 import Data.Maybe
 import qualified Data.Sequence as S
@@ -128,7 +128,7 @@ getGenesisBlockAndPopulateInitialMPs ::
 getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
   genesisInfo <- getGenesisInfoFromFile genesisBlockName
   let certs = readCertsFromGenesisInfo genesisInfo
-      validators = elems $ readValidatorsFromGenesisInfo genesisInfo
+      validators = readValidatorsFromGenesisInfo genesisInfo
   extraAccounts <- liftIO . readSupplementaryAccounts $ genesisBlockName
 
   -- Need to insert the X509 certificates INTO Redis
