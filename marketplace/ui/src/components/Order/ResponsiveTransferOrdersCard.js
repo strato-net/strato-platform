@@ -24,7 +24,7 @@ export const ResponsiveTransferOrderCard = ({ data, isLoading}) => {
                             onClick={(e) => {
                                 if (item?.oldOwnerCommonName && item.oldOwnerCommonName !== 'N/A') {
                                 e.preventDefault();
-                                const userProfileUrl = `/marketplace/profile/${encodeURIComponent(item.oldOwnerCommonName)}`;
+                                const userProfileUrl = `/profile/${encodeURIComponent(item.oldOwnerCommonName)}`;
                                 const fullUrl = `${window.location.origin}${userProfileUrl}`;
 
                                 if (e.ctrlKey || e.metaKey) {
@@ -50,7 +50,7 @@ export const ResponsiveTransferOrderCard = ({ data, isLoading}) => {
                                 onClick={(e) => {
                                     if (item?.newOwnerCommonName && item.newOwnerCommonName !== 'N/A') {
                                     e.preventDefault();
-                                    const userProfileUrl = `/marketplace/profile/${encodeURIComponent(item.newOwnerCommonName)}`;
+                                    const userProfileUrl = `/profile/${encodeURIComponent(item.newOwnerCommonName)}`;
                                     const fullUrl = `${window.location.origin}${userProfileUrl}`;
 
                                     if (e.ctrlKey || e.metaKey) {
