@@ -134,19 +134,21 @@ type MonadSequencer m =
 sequencer :: [ChainMemberParsedSet] -> SequencerM ()
 sequencer validators = do
   let logF = logFF "sequencer"
-  ctx <- fromJust <$> getBlockstanbulContext
-  maybeCert <- A.lookup (A.Proxy @X509CertInfoState) (fromJust $ _selfAddr ctx)
-  case maybeCert of
-    Just cert -> do
-      let chainm = getChainMemberFromX509 cert
-      logF $ "Node identity verified: " ++ show chainm
-      case chainm `elem` validators of
-        True -> do
-          putBlockstanbulContext $ ctx { _selfCert = Just chainm, _isValidator = True }
-          logF "You are a validator in this network!"
-        False -> do
-          putBlockstanbulContext $ ctx { _selfCert = Just chainm }
-    Nothing -> logF "Awaiting node identity verification..."
+  hasPBFT <- isJust <$> getBlockstanbulContext
+  when (hasPBFT) $ do
+    ctx <- fromJust <$> getBlockstanbulContext
+    maybeCert <- A.lookup (A.Proxy @X509CertInfoState) (fromJust $ _selfAddr ctx)
+    case maybeCert of
+      Just cert -> do
+        let chainm = getChainMemberFromX509 cert
+        logF $ "Node identity verified: " ++ show chainm
+        case chainm `elem` validators of
+          True -> do
+            putBlockstanbulContext $ ctx { _selfCert = Just chainm, _isValidator = True }
+            logF "You are a validator in this network!"
+          False -> do
+            putBlockstanbulContext $ ctx { _selfCert = Just chainm }
+      Nothing -> logF "Awaiting node identity verification..."
   logF "Sequencer startup"
   source <- sealConduitT <$> fuseChannels
   bootstrapBlockstanbul
@@ -654,14 +656,18 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
           transformGenesis $ map (\(IEGenesis og) -> og) events
         IETNewCertRegistered -> do
           record "inevent_type_new_cert_registered" "IngestNewCertRegistered"
-          ctx <- fromJust <$> getBlockstanbulContext
-          traverse_ (\(IENewCertRegistered a e) -> do
-              when ((_selfAddr ctx) == Just a) $ do
-                let chainm = getChainMemberFromX509 e
-                putBlockstanbulContext $ ctx { _selfCert = Just chainm }
-                $logInfoS "sequencer" . T.pack $ "Node identity verified: " ++ show chainm
-              A.insert (A.Proxy @X509CertInfoState) a e
-            ) events --this is where we submit to ldb
+          hasPBFT <- isJust <$> getBlockstanbulContext
+          case hasPBFT of
+            True -> do
+              ctx <- fromJust <$> getBlockstanbulContext
+              traverse_ (\(IENewCertRegistered a e) -> do
+                  when ((_selfAddr ctx) == Just a) $ do
+                    let chainm = getChainMemberFromX509 e
+                    putBlockstanbulContext $ ctx { _selfCert = Just chainm }
+                    $logInfoS "sequencer" . T.pack $ "Node identity verified: " ++ show chainm
+                  A.insert (A.Proxy @X509CertInfoState) a e
+                ) events --this is where we submit to ldb
+            False -> traverse_ (\(IENewCertRegistered a e) -> A.insert (A.Proxy @X509CertInfoState) a e) events
         IETCertRevoked -> do
           record "inevent_type_cert_revoked" "IngestCertRevoked"
           traverse_ (\(IECertRevoked a) -> A.delete (A.Proxy @X509CertInfoState) a) events
