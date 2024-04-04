@@ -352,6 +352,10 @@ async function get(user, args, options) {
 
 async function getAll(admin, args = {}, defaultOptions) {
     const { range, ownerCommonName, assetAddresses, status, isMarketplaceSearch, isTrendingSearch, userProfile, userProfileGtField, userProfileGtValue, ...restArgs } = args;
+    let isNullPriceRange = false; //TODO: find a better way to identify/handle this
+    if (range !== undefined) {
+        isNullPriceRange = range ? range[0].split(",")[1] == 0 : true;
+    }
     let inventories;
     let sales;
     let finalInventory = [];
@@ -419,8 +423,17 @@ async function getAll(admin, args = {}, defaultOptions) {
                 });
             }
             else if (isMarketplaceSearch) {
-                //skip
-            } else {
+                if(isNullPriceRange){
+                    finalInventory.push({
+                        ...inventory,
+                        price: null,
+                        saleAddress: null,
+                        saleQuantity: null,
+                        saleDate: null,
+                        totalLockedQuantity: null
+                    })}
+                }
+             else {
                 finalInventory.push(inventory);
             }
         });

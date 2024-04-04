@@ -16,6 +16,7 @@ import { SEO } from '../../helpers/seoConstant';
 import DOMPurify from 'dompurify';
 
 const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, contextHolder, isUserProfile = false }) => {
+    const {Text} = Typography;
     const [quantity, setQuantity] = useState(1)
 
     let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
@@ -31,6 +32,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
     const shouldShowWishlistIcon = isAuthenticated && user && !ownerSameAsUser();
 
     const naviroute = routes.MarketplaceProductDetail.url;
+    const isAvailableForSale = (!topSellingProduct.price || topSellingProduct.saleQuantity===0)
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -98,10 +100,10 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                 <div className='flex justify-between items-center'>
                     <Typography
                         className='font-semibold overflow-hidden cursor-pointer w-[180px] md:w-[220px] whitespace-nowrap text-ellipsis'
-                    >
-                        <Tooltip title={topSellingProduct?.name.length > 20 ? topSellingProduct?.name : null}>
+                    >                        
+                        <Tooltip title={topSellingProduct?.name?.length > 20 ? topSellingProduct?.name : null}>
                             <span className=" whitespace-nowrap max-w-[160px] inline-block">
-                                {topSellingProduct?.name.length > 20 ? `${topSellingProduct?.name.slice(0, 20)}...` : `${topSellingProduct?.name}`}
+                                {topSellingProduct?.name?.length > 20 ? `${topSellingProduct?.name.slice(0, 20)}...` : `${topSellingProduct?.name}`}
                             </span>
                         </Tooltip>
                         {/* {topSellingProduct?.name || "N/A"} */}
@@ -110,9 +112,10 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                 </div>
             </a>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography className='font-normal text-black'>{'$' + topSellingProduct?.price || "N/A"}</Typography>
-                {topSellingProduct?.contract_name.toLowerCase().includes("clothing") && (
-                    <Typography className='font-normal text-black'>{'Size: ' + topSellingProduct?.data?.size || "N/A"}</Typography>
+            {topSellingProduct?.price && <Typography className='font-normal text-black'>{ `$ ${topSellingProduct?.price}`}</Typography>}
+            {isAvailableForSale && <Text type="danger" strong> Sold Out </Text>}
+                 {topSellingProduct?.contract_name.toLowerCase().includes("clothing") && (
+                    <Typography className='font-normal text-black'>Size: { topSellingProduct?.data?.size ? topSellingProduct?.data?.size : "N/A"}</Typography>
                 )}
             </div>
             <div style={customStyle} className="custom-typography">
@@ -158,12 +161,12 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                     </Typography>
                 </div>
             </div>
-            <div className='flex gap-4 mt-1'>
+            <div className={`flex gap-4 mt-1`}>
                 <Button
-                    id={`${topSellingProduct.name.replace(/ /g, "_")}-buy-now`}
-                    disabled={ownerSameAsUser()}
+                    id={`${topSellingProduct?.name?.replace(/ /g, "_")}-buy-now`}
+                    disabled={isAvailableForSale || ownerSameAsUser()}
                     type='primary'
-                    className={`flex-1 h-9 !bg-[#13188A] !text-white ${ownerSameAsUser() ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                    className={`flex-1 h-9 ${isAvailableForSale? '!bg-[#808080]': '!bg-[#13188A]'} !text-white ${ownerSameAsUser() ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                     onClick={async () => {
                         const dataLayerEventName = isUserProfile ? 'buy_now_from_user_profile' : 'buy_now_from_top_selling_product';
                         window.LOQ.push(['ready', async LO => {
@@ -192,8 +195,8 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                     Buy Now
                 </Button>
                 <Button
-                    className={`h-9 w-9 flex items-center justify-center !bg-[#13188A] ${ownerSameAsUser() ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-                    disabled={ownerSameAsUser()}
+                    className={`h-9 w-9 flex items-center justify-center ${isAvailableForSale? '!bg-[#808080]':'!bg-[#13188A]'} ${ownerSameAsUser() ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                    disabled={isAvailableForSale || ownerSameAsUser()}
                     onClick={() => {
                         window.LOQ.push(['ready', async LO => {
                             await LO.$internal.ready('events')
