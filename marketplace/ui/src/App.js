@@ -11,6 +11,7 @@ import TagManager from "react-gtm-module";
 import { UsersProvider } from "./contexts/users";
 import { useMarketplaceState } from "./contexts/marketplace";
 import { getCookie, delete_cookie } from "./helpers/cookie";
+import InternalError from "./components/500";
 
 const { Content } = Layout;
 
@@ -77,13 +78,9 @@ const App = () => {
 
   return (
     <BrowserRouter basename="/marketplace">
-      {error === "Internal Server Error 101" ?
-        <div className="flex flex-col items-center justify-center h-screen">
-          <h1 className="text-4xl font-bold mb-4">500 Internal Server Error</h1>
-          <p className="text-lg">Oops! Something went wrong on our end. Please try again later.</p>
-        </div>
-        :
-        <Layout className="overflow-auto">
+      {error === "Internal Server Error 101" 
+      ? <InternalError/>
+      : <Layout className="overflow-auto">
           <UsersProvider>
             <HeaderComponent
               isOauth={isAuthenticated}

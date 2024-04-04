@@ -35,7 +35,7 @@ const getTokenFromHeader = async (req) => {
 const getLoginUrl = (req) => config.dockerized ? '/marketplace/login/' : req.app.oauth.getSigninURL();
 
 class AuthHandler {
-  static authorizeRequest(allowAnonAccess = false, checkStratoAPI = false) {
+  static authorizeRequest(allowAnonAccess = false) {
     return async function (req, res, next) {
       try {
         let token = await getTokenFromCookie(req, res)
@@ -63,7 +63,6 @@ class AuthHandler {
             return next(err)
           }
           try {
-            // return rest.response.status(RestStatus.INTERNAL_SERVER_ERROR, res, "Internal Server Error 101")
             address = await rest.createOrGetKey({ username: decodedToken.preferred_username, token }, { config })
           } catch (e) {
             console.error('STRATO API is unreachable or unhealthy. Error: ', e)
@@ -86,6 +85,8 @@ class AuthHandler {
 
       const response = await axios.get(`${config.serverHost}/health`);
       const health = response.data.health;
+      // Here, we're checking the server's health. If it's determined to be false,
+      // we'll throw an Internal Server Error along with a message to indicate the issue.
 
       if (health) {
         rest.response.status(RestStatus.UNAUTHORIZED, res, {
