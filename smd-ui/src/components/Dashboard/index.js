@@ -267,7 +267,7 @@ class Dashboard extends Component {
                 mode={
                   !metadata
                     ? "danger"
-                    : !health || !systemWarnings || !synced
+                    : !health || !systemHealth || !synced
                     ? "warning"
                     : "success"
                 }
