@@ -32,45 +32,70 @@
 
 
 // module.exports = db;
-
+// import fs from 'fs';
+const fs = require('fs');
 const { Client } = require('pg');
+const { cli } = require('winston/lib/winston/config');
 
+// psql --host=payments-dev.cbx3kn52dupr.us-east-1.rds.amazonaws.com --port=5432 --username=postgres  --password --dbname=postgres
 const client = new Client({
-    host: 'https://payments-dev.cbx3kn52dupr.us-east-1.rds.amazonaws.com',
+    host: 'payments-dev.cbx3kn52dupr.us-east-1.rds.amazonaws.com',
     port: 5432,
     user: 'postgres',
     password: '}fa9t4+JJ*3wme?Wp]t1tHT{kzP0',
-    database: 'postgres'
+    dbname: 'postgres',
+    // ssl: true,
+    // dialect: 'postgres',
+    ssl: { 
+        require: true,
+        rejectUnauthorized: true,
+        ca: fs.readFileSync('./dbCert/us-east-1-bundle.cer').toString(), 
+      } 
+    
+
 });
 
-client.connect()
-    .then(() => {
-        console.log('Connected to the PostgreSQL database.');
+client.connect().catch(error => 
+    console.error(error)
+)
+    const query = 'SELECT * FROM customer_address';
+    // const values = [req.params.commonName];
 
-        const query = `
-            CREATE TABLE IF NOT EXISTS customer_address (
-            address_id SERIAL PRIMARY KEY,
-            commonName TEXT,
-            name TEXT,
-            zipcode TEXT,
-            state TEXT,
-            city TEXT,
-            addressLine1 TEXT,
-            addressLine2 TEXT,
-            country TEXT,
-            createdDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP);`;
+    const result =  client.query(query).then(result =>
+    console.log('Query Result',  result)
+    
+    )
 
-        return client.query(query);
-    })
-    .then(() => {
-        console.log('Table created or already exists.');
-    })
-    .catch(error => {
-        console.error('Error creating table:', error);
-    })
-    .finally(() => {
-        client.end();
-    });
+
+
+// client.connect()
+//     .then(() => {
+//         console.log('Connected to the PostgreSQL database.');
+
+//         const query = `
+//             CREATE TABLE IF NOT EXISTS customer_address (
+//             address_id SERIAL PRIMARY KEY,
+//             commonName TEXT,
+//             name TEXT,
+//             zipcode TEXT,
+//             state TEXT,
+//             city TEXT,
+//             addressLine1 TEXT,
+//             addressLine2 TEXT,
+//             country TEXT,
+//             createdDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP);`;
+
+//         return client.query(query);
+//     })
+//     .then(() => {
+//         console.log('Table created or already exists.');
+//     })
+//     .catch(error => {
+//         console.error('Error creating table:', error);
+//     })
+//     .finally(() => {
+//         client.end();
+//     });
 
 module.exports = client;
 
