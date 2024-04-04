@@ -936,7 +936,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.createUserAddress = async function (args, options = defaultOptions) {
     try {
-      await axios.post(new URL(`/customer/address`, STRIPE_PAYMENT_SERVER_URL).href, { commonName: userCert.commonName, ...args })
+      await axios.post(new URL(`${STRIPE_PAYMENT_SERVER_URL}/customer/address`).href, { commonName: userCert.commonName, ...args })
         .then(function (res) {
           if (res.status === 200) {
             console.log(res.data);
@@ -955,7 +955,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getAllUserAddress = async function (args, options = optionsNoChainIds) {
     try {
-      const userAddresses = await axios.get(new URL(`/customer/address/${userCert.commonName}`, STRIPE_PAYMENT_SERVER_URL).href).then(function (res) {
+      const userAddresses = await axios.get(new URL(`${STRIPE_PAYMENT_SERVER_URL}/customer/address/${userCert.commonName}`).href).then(function (res) {
         if (res.status === 200) {
           return res.data.data;
         } else {
@@ -967,7 +967,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
       }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching addresses: ${JSON.stringify(err)} `);
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching addresses: ${JSON.stringify(error)} `);
     }
   };
 

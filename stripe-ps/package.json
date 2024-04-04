@@ -19,6 +19,7 @@
     "express": "^4.18.2",
     "express-winston": "^4.2.0",
     "helmet": "^6.0.1",
+    "pg": "^8.11.5",
     "sqlite3": "^5.1.6",
     "stripe": "^11.10.0",
     "winston": "^3.8.2"
