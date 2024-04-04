@@ -16,6 +16,8 @@ RUN REACT_APP_IN_DOCKER=true REACT_APP_UI_VERSION=$(node -e "console.log(require
 
 ### Prod
 FROM base as prod
+ARG STRATO_VERSION
+ENV STRATO_VERSION=${STRATO_VERSION}
 ENV NODE_ENV=production
 COPY docker-run.sh /usr/src/ui/
 COPY --from=builder /usr/src/ui/build build/

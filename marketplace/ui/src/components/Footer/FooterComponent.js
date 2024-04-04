@@ -245,9 +245,12 @@ export default function FooterComponent() {
             </div>
           </div>
         </div>
-        <div className="mt-16 border-t border-white/10 pt-8 sm:mt-20 lg:mt-24">
+        <div className="mt-16 border-t border-white/10 pt-8 sm:mt-20 lg:mt-24 flex justify-between items-center">
           <p className="text-xs leading-5 text-white">
             &copy; 2024 BlockApps, Inc. All rights reserved.
+          </p>
+          <p className="text-xs leading-5 text-white">
+            STRATO VERSION: {window.STRATO_VERSION && window.STRATO_VERSION !== '__STRATO_VERSION__' ? window.STRATO_VERSION : 'N/A'}
           </p>
         </div>
       </div>
