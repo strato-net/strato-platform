@@ -24,7 +24,7 @@ so that they could be properly moved to their respective version's subsection.
 ### Fixed
 
 ### Removed
-- Removed `brokenRefundRenable`, `cacheTransactionResults` flags
+- Removed `brokenRefundRenable`, `cacheTransactionResults`, `faucetEnabled` flags
 
 
 ## [11.1.0] - 3/28/2023

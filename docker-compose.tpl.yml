@@ -145,7 +145,6 @@ services:
     - debugWSPort=${debugWSPort}
     - validatorBehavior=${validatorBehavior:-true}
     - evmDebugMode=${evmDebugMode}
-    - faucetEnabled=${faucetEnabled}
     - FILE_SERVER_URL=${FILE_SERVER_URL}
     - FULL_DEBUG_LOG=${FULL_DEBUG_LOG:-false}
     - gasLimit=${gasLimit}
