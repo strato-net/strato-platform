@@ -250,7 +250,7 @@ export default function FooterComponent() {
             &copy; 2024 BlockApps, Inc. All rights reserved.
           </p>
           <p className="text-xs leading-5 text-white">
-            STRATO VERSION: {window.STRATO_VERSION && window.STRATO_VERSION !== '__STRATO_VERSION__' ? window.STRATO_VERSION : 'N/A'}
+            Version: {window.STRATO_VERSION && window.STRATO_VERSION !== '__STRATO_VERSION__' ? window.STRATO_VERSION : 'N/A'}
           </p>
         </div>
       </div>
