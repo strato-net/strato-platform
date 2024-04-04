@@ -6,7 +6,6 @@ module Blockchain.VMOptions
     flags_svmTrace,
     flags_svmDev,
     flags_altGenBlock,
-    flags_brokenRefundReenable,
     flags_cacheTransactionResults,
     flags_createTransactionResults,
     flags_sqlDiff,
@@ -35,11 +34,6 @@ defineFlag
   \ evmProfile -> Profile runtimes labeled by opcode, emitted to the log \n\
   \ evmMetrics -> Profile runtimes labeled by opcode, collected by prometheus"
 defineFlag "altGenBlock" False "use the alternate stablenet genesis block"
-defineFlag
-  "brokenRefundReenable"
-  (False :: Bool)
-  "Whether to turn on spec incompatible refunds\
-  \ See STRATO-1411 or strato-platform/pull/745 for details"
 defineFlag "createTransactionResults" False "stores transaction results in the SQL DB"
 defineFlag "sqlDiff" True "runs sqlDiff and updates account state and storage in SQL DB"
 defineFlag "diffPublish" False "publishes all state changes to kafka"

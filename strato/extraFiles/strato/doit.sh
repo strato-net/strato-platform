@@ -209,7 +209,6 @@ function newnode {
   echo "Starting vm-runner"
   runBackgroundProcess vm-runner \
     --blockstanbul=true \
-    --brokenRefundReenable=${brokenRefundReenable:-false} \
     --cacheTransactionResults=${cacheTransactionResults:-true} \
     --createTransactionResults=true \
     --debug=${evmDebugMode:-false} \

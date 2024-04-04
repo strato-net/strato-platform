@@ -555,8 +555,6 @@ spec:
           value: ""
         - name: bootnode
           value: "52.7.26.21"
-        - name: brokenRefundReenable
-          value: ""
         - name: cacheTransactionResults
           value: ""
         - name: certInfo
