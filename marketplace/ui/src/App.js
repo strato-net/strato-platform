@@ -78,26 +78,25 @@ const App = () => {
 
   return (
     <BrowserRouter basename="/marketplace">
-      {error === "Internal Server Error 101" 
-      ? <InternalError/>
-      : <Layout className="overflow-auto">
-          <UsersProvider>
-            <HeaderComponent
-              isOauth={isAuthenticated}
-              user={user}
-              users={users}
-              loginUrl={loginUrl}
-              showMenu={showMenu}
-              handleSubMenu={handleSubMenu}
-              handleMenuTab={handleMenuTab}
-            />
-          </UsersProvider>
-          <Content className={`${showMenu ? 'overflow-y-hidden md:overflow-auto h-[100vh] md:h-auto w-[100vw] md:w-auto bg-[#00000020] md:bg-white relative mt-0 md:mt-28' : 'mt-[89px] md:mt-[98px] '}`}>
+      <Layout className="overflow-auto">
+        <UsersProvider>
+          <HeaderComponent
+            isOauth={isAuthenticated}
+            user={user}
+            users={users}
+            loginUrl={loginUrl}
+            showMenu={showMenu}
+            handleSubMenu={handleSubMenu}
+            handleMenuTab={handleMenuTab}
+          />
+        </UsersProvider>
+        {error === "Internal Server Error 101"
+          ? <InternalError />
+          : <Content className={`${showMenu ? 'overflow-y-hidden md:overflow-auto h-[100vh] md:h-auto w-[100vw] md:w-auto bg-[#00000020] md:bg-white relative mt-0 md:mt-28' : 'mt-[89px] md:mt-[98px] '}`}>
             <AuthenticatedRoutes user={user} users={users} isAuthenticated={isAuthenticated} />
-          </Content>
-          {!isMarketplaceLoading && <FooterComponent />}
-        </Layout>
-      }
+          </Content>}
+        {!isMarketplaceLoading && <FooterComponent />}
+      </Layout>
     </BrowserRouter >
   );
 };

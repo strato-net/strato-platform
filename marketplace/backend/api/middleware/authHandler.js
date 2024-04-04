@@ -83,11 +83,16 @@ class AuthHandler {
       res.clearCookie(req.app.oauth.getCookieNameAccessTokenExpiry())
       res.clearCookie(req.app.oauth.getCookieNameRefreshToken())
 
-      const response = await axios.get(`${config.serverHost}/health`);
-      const health = response.data.health;
+      let health = true;
+      try {
+        const response = await axios.get(`${config.serverHost}/health`);
+        health = response.data.health;
+      } catch (error) {
+         console.log("error", error);
+      }
+
       // Here, we're checking the server's health. If it's determined to be false,
       // we'll throw an Internal Server Error along with a message to indicate the issue.
-
       if (health) {
         rest.response.status(RestStatus.UNAUTHORIZED, res, {
           loginUrl: getLoginUrl(req)
