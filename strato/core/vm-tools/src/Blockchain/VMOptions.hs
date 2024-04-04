@@ -6,7 +6,6 @@ module Blockchain.VMOptions
     flags_svmTrace,
     flags_svmDev,
     flags_altGenBlock,
-    flags_createTransactionResults,
     flags_sqlDiff,
     flags_diffPublish,
     flags_queryBlocks,
@@ -33,7 +32,6 @@ defineFlag
   \ evmProfile -> Profile runtimes labeled by opcode, emitted to the log \n\
   \ evmMetrics -> Profile runtimes labeled by opcode, collected by prometheus"
 defineFlag "altGenBlock" False "use the alternate stablenet genesis block"
-defineFlag "createTransactionResults" False "stores transaction results in the SQL DB"
 defineFlag "sqlDiff" True "runs sqlDiff and updates account state and storage in SQL DB"
 defineFlag "diffPublish" False "publishes all state changes to kafka"
 defineFlag "queryBlocks" (10000 :: Int) "Number of blocks to query from SQL to process in one batch"

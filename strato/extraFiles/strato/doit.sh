@@ -209,7 +209,6 @@ function newnode {
   echo "Starting vm-runner"
   runBackgroundProcess vm-runner \
     --blockstanbul=true \
-    --createTransactionResults=true \
     --debug=${evmDebugMode:-false} \
     --debugEnabled=${VM_DEBUGGER:-false} \
     --debugPort=${debugPort:-8051} \

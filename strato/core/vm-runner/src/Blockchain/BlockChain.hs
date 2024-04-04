@@ -599,28 +599,27 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
 
   yieldMany $ OutLog . mkLogEntry ranBlockHash theHash chainId <$> theLogs
   yield . OutEvent $ mkEventEntry chainId <$> theEvents
-  when flags_createTransactionResults $ do
-    yield . OutTXR $
-      TransactionResult
-        { transactionResultBlockHash = ranBlockHash,
-          transactionResultTransactionHash = theHash,
-          transactionResultMessage = message,
-          transactionResultResponse = response,
-          transactionResultTrace = theTrace',
-          transactionResultGasUsed = gasUsed,
-          transactionResultEtherUsed = etherUsed,
-          transactionResultContractsCreated = intercalate "," $ map (show . _accountAddress) newAddresses,
-          transactionResultContractsDeleted = intercalate "," $ map (show . _accountAddress) $ S.toList $ (beforeAddresses S.\\ afterAddresses) `S.union` (afterDeletes S.\\ beforeDeletes),
-          transactionResultStateDiff = "",
-          transactionResultTime = realToFrac deltaT,
-          transactionResultNewStorage = "",
-          transactionResultDeletedStorage = "",
-          transactionResultStatus = Just txrStatus,
-          transactionResultChainId = chainId,
-          transactionResultKind = erKind <$> eitherToMaybe result,
-          transactionResultOrgName = orgName,
-          transactionResultAppName = appName
-        }
+  yield . OutTXR $
+    TransactionResult
+      { transactionResultBlockHash = ranBlockHash,
+        transactionResultTransactionHash = theHash,
+        transactionResultMessage = message,
+        transactionResultResponse = response,
+        transactionResultTrace = theTrace',
+        transactionResultGasUsed = gasUsed,
+        transactionResultEtherUsed = etherUsed,
+        transactionResultContractsCreated = intercalate "," $ map (show . _accountAddress) newAddresses,
+        transactionResultContractsDeleted = intercalate "," $ map (show . _accountAddress) $ S.toList $ (beforeAddresses S.\\ afterAddresses) `S.union` (afterDeletes S.\\ beforeDeletes),
+        transactionResultStateDiff = "",
+        transactionResultTime = realToFrac deltaT,
+        transactionResultNewStorage = "",
+        transactionResultDeletedStorage = "",
+        transactionResultStatus = Just txrStatus,
+        transactionResultChainId = chainId,
+        transactionResultKind = erKind <$> eitherToMaybe result,
+        transactionResultOrgName = orgName,
+        transactionResultAppName = appName
+      }
   when flags_diffPublish $ do
     traverse_ (yield . OutAction) $ either (const Nothing) erAction result
 

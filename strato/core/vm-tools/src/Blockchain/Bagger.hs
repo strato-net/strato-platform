@@ -133,7 +133,7 @@ txsDroppedCallback rejections bestBlockShas = forM_ rejections $ \rejection -> d
   -- if a tx is dropped from Queued during demotion, it means it was likely culled during the demotion as the
   -- new best block we just mined came in
   let isRecentlyRan = theHash `elem` bestBlockShas
-  when (flags_createTransactionResults && not isRecentlyRan) $ do
+  when (not isRecentlyRan) $ do
     $logInfoS "txsDroppedCallback" . T.pack $ "Transaction rejection :: " ++ format theHash
     $logInfoS "txsDroppedCallback" . T.pack $ "Reason: " ++ message
     Mod.yield
