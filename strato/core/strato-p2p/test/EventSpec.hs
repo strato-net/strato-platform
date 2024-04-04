@@ -1031,9 +1031,9 @@ startingCheckpoint :: [ChainMemberParsedSet] -> Checkpoint
 startingCheckpoint as = def {checkpointValidators = as}
 
 newBlockstanbulContext :: ChainMemberParsedSet -> [ChainMemberParsedSet] -> BlockstanbulContext
-newBlockstanbulContext paddr as =
+newBlockstanbulContext chainm as =
   let ckpt = startingCheckpoint as
-   in newTestContext ckpt paddr True
+   in newContext ckpt Nothing True (Just chainm)
 
 emptyBlockstanbulContext :: BlockstanbulContext
 emptyBlockstanbulContext = newBlockstanbulContext emptyChainMember []

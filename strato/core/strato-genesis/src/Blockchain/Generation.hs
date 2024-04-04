@@ -218,9 +218,9 @@ readCertsFromGenesisInfo gi = catMaybes . flip map (genesisInfoAccountInfo gi) $
       _ -> Nothing
   _ -> Nothing
 
-readValidatorsFromGenesisInfo :: GenesisInfo -> [ChainMemberParsedSet]
-readValidatorsFromGenesisInfo gi = catMaybes . flip map (genesisInfoAccountInfo gi) $ \case
-  SolidVMContractWithStorage _ _ (SolidVMCode "MercataValidator" _) storage -> do
+readValidatorsFromGenesisInfo :: GenesisInfo -> M.Map Address ChainMemberParsedSet
+readValidatorsFromGenesisInfo gi = M.fromList $ catMaybes . flip map (genesisInfoAccountInfo gi) $ \case
+  SolidVMContractWithStorage addr _ (SolidVMCode "MercataValidator" _) storage -> do
     let storageMap = M.fromList storage
         rlpUnwrap = rlpDecode . rlpDeserialize
     o <- rlpUnwrap <$> M.lookup ".org" storageMap
@@ -231,7 +231,7 @@ readValidatorsFromGenesisInfo gi = catMaybes . flip map (genesisInfoAccountInfo 
         let o'' = decodeUtf8 o'
             u'' = decodeUtf8 u'
             c'' = decodeUtf8 c'
-        pure $ CommonName o'' u'' c'' True
+        pure $ (addr, CommonName o'' u'' c'' True)
       _ -> Nothing
   _ -> Nothing
 

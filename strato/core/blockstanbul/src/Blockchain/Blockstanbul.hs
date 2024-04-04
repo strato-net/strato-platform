@@ -2,7 +2,6 @@ module Blockchain.Blockstanbul
   ( BlockstanbulContext (..),
     HasBlockstanbulContext (..),
     newContext,
-    newTestContext,
     sendMessages,
     sendAllMessages,
     RoundNumber,

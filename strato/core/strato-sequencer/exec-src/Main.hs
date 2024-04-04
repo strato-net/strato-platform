@@ -22,6 +22,7 @@ import Control.Concurrent.STM
 import Control.Concurrent.STM.TMChan
 import Control.Monad
 import qualified Data.ByteString.Char8 as C8
+import qualified Data.Map.Strict as M
 import Flags
 import HFlags
 import Network.HTTP.Client (defaultManagerSettings, newManager)
@@ -48,7 +49,8 @@ main :: IO ()
 main = do
   blockappsInit "seq_main"
   s <- $initHFlags "Block/Txn sequencer for the Haskell EVM"
-  validators <- readValidatorsFromGenesisInfo <$> getGenesisInfoFromFile flags_genesisBlockName
+  validatorMap <- readValidatorsFromGenesisInfo <$> getGenesisInfoFromFile flags_genesisBlockName
+  let validators = M.elems validatorMap
   exportFlagsAsMetrics
   putStrLn $ "strato-sequencer ignoring unknown flags: " ++ show s
   putStrLn $ "strato-sequencer network: " ++ show flags_network
@@ -81,6 +83,8 @@ main = do
   selfAddress <- do
     addrAndKey <- waitOnVault $ runClientM (VC.getKey Nothing Nothing) clientEnv
     return $ VC.unAddress addrAndKey
+  
+  let isValidator = M.lookup selfAddress validatorMap
 
   putStrLn $ "strato-sequencer nodeAddress: " ++ show selfAddress 
 
@@ -98,7 +102,11 @@ main = do
         ckpt <- runGregorM gregorCfg $ initializeCheckpoint validators
         putStrLn $ "Checkpoint: " ++ show ckpt
 
-        return $ Just $ newContext ckpt selfAddress flags_validatorBehavior
+        case isValidator of
+          Just certInfo -> do
+            putStrLn $ "<You are running a genesis validator>"
+            return $ Just $ newContext ckpt (Just selfAddress) flags_validatorBehavior (Just certInfo)
+          Nothing -> return $ Just $ newContext ckpt (Just selfAddress) flags_validatorBehavior Nothing
 
   cht <- atomically newTMChan
 

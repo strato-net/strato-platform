@@ -51,7 +51,7 @@ myPriv :: PrivateKey
 myPriv = fromMaybe (error "could not import private key") (importPrivateKey (LabeledError.b16Decode "myPriv" $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"))
 
 testContext :: BlockstanbulContext
-testContext = newContext (Checkpoint (View 20 18) M.empty [] []) (fromPrivateKey myPriv) True
+testContext = newContext (Checkpoint (View 20 18) M.empty [] []) Nothing True (Just $ fromPrivateKey myPriv)
 
 runTest :: StateT BlockstanbulContext (LoggingT IO) () -> IO ()
 runTest = runAuthTest . (disableAuth >>)

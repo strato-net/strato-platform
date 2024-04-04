@@ -643,7 +643,7 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
           ctx <- fromJust <$> getBlockstanbulContext
           traverse_ (\(IENewCertRegistered a e) -> do
               let chainm = getChainMemberFromX509 e
-              when ((_selfAddr ctx) == a) $ do
+              when ((_selfAddr ctx) == Just a) $ do
                 putBlockstanbulContext $ ctx { _selfCert = Just chainm }
                 $logInfoS "sequencer" . T.pack $ "Node identity verified: " ++ show e
               A.insert (A.Proxy @X509CertInfoState) a e

@@ -64,7 +64,7 @@ data BlockstanbulContext = BlockstanbulContext
     -- Which peers have we received a notice for a round-change
     _roundChanged :: M.Map RoundNumber (S.Set ChainMemberParsedSet),
     -- The identity of this node
-    _selfAddr :: Address,
+    _selfAddr :: Maybe Address,
     _selfCert :: Maybe ChainMemberParsedSet,
     -- Block locking: a safety mechanism to prevent partial commits
     _blockLock :: Maybe Block,
@@ -96,8 +96,8 @@ debugShowCtx = do
   debugLog "showctx/hasPrepared" hasPrepared show
   debugLog "showctx/roundChanged" roundChanged show
 
-newContext :: Checkpoint -> Address -> Bool -> BlockstanbulContext
-newContext (Checkpoint v as) addr valB =
+newContext :: Checkpoint -> Maybe Address -> Bool -> Maybe ChainMemberParsedSet -> BlockstanbulContext
+newContext (Checkpoint v as) addr valB chainm =
   let valSet = S.fromList as
       prop = fromMaybe emptyChainMember . S.lookupMin $ valSet
    in BlockstanbulContext
@@ -114,33 +114,7 @@ newContext (Checkpoint v as) addr valB =
           _pendingRound = Nothing,
           _roundChanged = M.empty,
           _selfAddr = addr,
-          _selfCert = Nothing,
-          _blockLock = Nothing,
-          _lockSender = Nothing,
-          _lastParent = Nothing,
-          _validatorBehavior = valB,
-          _isValidator = False
-        }
-
-newTestContext :: Checkpoint -> ChainMemberParsedSet -> Bool -> BlockstanbulContext
-newTestContext (Checkpoint v as) chainm valB =
-  let valSet = S.fromList as
-      prop = fromMaybe emptyChainMember . S.lookupMin $ valSet
-   in BlockstanbulContext
-        { _view = v,
-          _productionAuth = True,
-          _proposal = Nothing,
-          _proposer = prop,
-          _validators = ChainMembers valSet,
-          _prepared = M.empty,
-          _committed = M.empty,
-          _hasPreprepared = False,
-          _hasPrepared = False,
-          _hasCommitted = False,
-          _pendingRound = Nothing,
-          _roundChanged = M.empty,
-          _selfAddr = 0x0,
-          _selfCert = Just chainm,
+          _selfCert = chainm,
           _blockLock = Nothing,
           _lockSender = Nothing,
           _lastParent = Nothing,

@@ -75,6 +75,7 @@ executables:
       - blockstanbul
       - bytestring
       - common-log
+      - containers
       - extra
       - hflags
       - http-client
