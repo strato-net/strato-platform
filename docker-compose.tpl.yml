@@ -137,7 +137,6 @@ services:
     - blockstanbulRoundPeriodS=${blockstanbulRoundPeriodS}
     - blockTime=${blockTime}
     - bootnode=${bootnode}
-    - cacheTransactionResults=${cacheTransactionResults}
     - certInfo=${certInfo}
     - connectionTimeout=${connectionTimeout}
     - debugFail=${debugFail}
