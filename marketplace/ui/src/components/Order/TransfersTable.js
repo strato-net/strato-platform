@@ -86,10 +86,10 @@ const TransfersTable = ({ user, selectedDate, download, isAllOrdersLoading }) =>
       key: "oldOwnerCommonName",
       render: (text, record) => (
         <a 
-          href={`${window.location.origin}/marketplace/profile/${encodeURIComponent(record.oldOwnerCommonName)}`}
+          href={`${window.location.origin}/profile/${encodeURIComponent(record.oldOwnerCommonName)}`}
           onClick={(e) => {
             e.preventDefault();
-            const userProfileUrl = `/marketplace/profile/${encodeURIComponent(record.oldOwnerCommonName)}`;
+            const userProfileUrl = `/profile/${encodeURIComponent(record.oldOwnerCommonName)}`;
       
             if (e.ctrlKey || e.metaKey) {
               // Open in a new tab if Ctrl/Cmd is pressed
@@ -110,10 +110,10 @@ const TransfersTable = ({ user, selectedDate, download, isAllOrdersLoading }) =>
       key: "newOwnerCommonName",
       render: (text, record) => (
         <a 
-          href={`${window.location.origin}/marketplace/profile/${encodeURIComponent(record.newOwnerCommonName)}`}
+          href={`${window.location.origin}/profile/${encodeURIComponent(record.newOwnerCommonName)}`}
           onClick={(e) => {
             e.preventDefault();
-            const userProfileUrl = `/marketplace/profile/${encodeURIComponent(record.newOwnerCommonName)}`;
+            const userProfileUrl = `/profile/${encodeURIComponent(record.newOwnerCommonName)}`;
       
             if (e.ctrlKey || e.metaKey) {
               // Open in a new tab if Ctrl/Cmd is pressed

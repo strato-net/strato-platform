@@ -841,7 +841,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         }
         stripePaymentSession = await axios.post(new URL('/stripe/checkout', STRIPE_PAYMENT_SERVER_URL).href, checkoutBody, {
           headers: {
-            'referer': `${originUrl}${options.config.marketplaceUiUrlPrefix}`
+            'referer': `${originUrl}`
           }
         })
           .then(function (res) {
