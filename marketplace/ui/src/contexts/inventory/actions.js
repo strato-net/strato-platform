@@ -46,6 +46,12 @@ const actionDescriptors = {
   sellerStripeStatus: "seller_stripe_status",
   sellerStripeStatusSuccessful: "seller_stripe_status_successful",
   sellerStripeStatusFailed: "seller_stripe_status_failed",
+  onboardSellerToMetamask: "onboard_seller_to_metamask",
+  onboardSellerToMetamaskSuccessful: "onboard_seller_to_metamask_successful",
+  onboardSellerToMetamaskFailed: "onboard_seller_to_metamask_failed",
+  sellerMetamaskStatus: "seller_metamask_status",
+  sellerMetamaskStatusSuccessful: "seller_metamask_status_successful",
+  sellerMetamaskStatusFailed: "seller_metamask_status_failed",
   uploadImage: "upload_image",
   uploadImageSuccessful: "upload_image_successful",
   uploadImageFailed: "upload_image_failed",
@@ -714,6 +720,87 @@ const actions = {
         error: "Error while fetching ownership history",
       });
       return false;
+    }
+  },
+
+  onboardSellerToMetamask: async (dispatch, walletId) => {
+    dispatch({ type: actionDescriptors.onboardSellerToMetamask });
+
+    try {
+      const response = await fetch(`${apiUrl}/payment/metamask/account/${walletId}`, {
+        method: HTTP_METHODS.GET,
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.onboardSellerToMetamaskSuccessful,
+        });
+        return body.data;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({
+          type: actionDescriptors.onboardSellerToMetamaskFailed,
+          error: "Error while trying to onboard to Metamask",
+        });
+        actions.setMessage(dispatch, "Error while trying to onboard to Metamask");
+        return null;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.onboardSellerToMetamaskFailed,
+          error: "Unauthorized while trying to onboard to Metamask"
+        });
+        window.location.href = body.error.loginUrl;
+      }
+
+      dispatch({
+        type: actionDescriptors.onboardSellerToMetamaskFailed,
+        error: body.error,
+      });
+      actions.setMessage(dispatch, body.error);
+      return null;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.onboardSellerToMetamaskFailed,
+        error: "Error while trying to onboard to Metamask",
+      });
+    }
+  },
+
+  sellerMetamaskStatus: async (dispatch, username) => {
+    dispatch({ type: actionDescriptors.sellerMetamaskStatus });
+
+    try {
+      const response = await fetch(`${apiUrl}/payment/metamask/account/status/${username}`, {
+        method: HTTP_METHODS.GET,
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.sellerMetamaskStatusSuccessful,
+          payload: body.data,
+        });
+        return body.data;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.sellerMetamaskStatusFailed,
+          error: "Unauthorized while trying to get Metamask status"
+        });
+        window.location.href = body.error.loginUrl;
+      }
+
+      dispatch({
+        type: actionDescriptors.sellerMetamaskStatusFailed,
+        error: "Error while trying to get Metamask status",
+      });
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.sellerMetamaskStatusFailed,
+        error: "Error while trying to get Metamask status",
+      });
     }
   },
 

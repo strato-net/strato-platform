@@ -5,6 +5,8 @@ import {
   notification,
   Spin,
   Button,
+  Modal,
+  List
 } from "antd";
 import {
   useMarketplaceState,
@@ -39,6 +41,7 @@ import ResponsiveCart from "./ResponsiveCart";
 import { Images } from "../../images";
 import AddAddressModal from "./AddAddressModal";
 import ResponsiveAddAddress from "./ResponsiveAddAddress";
+const ethers = require('ethers')
 const ShippingDetailsSchema = () => {
   return yup.object().shape({
     name: yup.string().required("Name is required"),
@@ -88,11 +91,12 @@ const ConfirmOrder = () => {
   const [shipping, setShipping] = useState(0);
   const [total, setTotal] = useState(0);
   const inventoryDispatch = useInventoryDispatch();
-  const { isLoadingStripeStatus, stripeStatus } = useInventoryState();
+  const { isLoadingStripeStatus, stripeStatus, isLoadingMetamaskStatus, metamaskStatus } = useInventoryState();
   const { success: marketplaceSuccess, message: marketplaceMessage } = useMarketplaceState();
   const [modalAddress, setmodalAddress] = useState(false);
   const [responsiveAddress, setResponsiveAddress] = useState(false);
   const [showAddress, setshowAddress] = useState(false);
+  const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
 
 
   const CloseAddressModel = () => {
@@ -311,49 +315,177 @@ const ConfirmOrder = () => {
 
     },
   ];
+  async function fetchEthPrice() {
+    const response = await fetch('https://api.coinbase.com/v2/prices/ETH-USD/spot');
+    const data = await response.json();
+    return parseFloat(data.data.amount);
+  }
 
-  const handlePaymentConfirm = async () => {
+  const handlePaymentConfirm = async (method) => {
+    setIsPaymentModalVisible(false); // Close the payment modal
     if (userAddresses.length === 0) {
       api.error({
         message: "Please enter an address",
         placement: "bottom",
       });
-    } else {
-      let orderList = [];
-      confirmOrderList.forEach((item) => {
-        orderList.push({
-          quantity: item.qty,
-          assetAddress: item.key,
-          firstSale: item.firstSale,
-          unitPrice: item.unitPrice
-        });
-      });
-      // These additional fields need to be sent to form the request after stripe. 
-      let body = {
-        paymentList: PAYMENT_LIST,
-        buyerOrganization: userOrganization,
-        orderList,
-        orderTotal: total + tax + shipping,
-        shippingAddressId: userAddresses[selectedAddress].address_id,
-        tax: tax,
-        user: user.commonName,
-        email: user.email,
-      };
+      return;
+    }
 
-      window.LOQ.push(['ready', async LO => {
-        // Track an event
-        await LO.$internal.ready('events')
-        LO.events.track('Buy Now Button')
-      }])
-      TagManager.dataLayer({
-        dataLayer: {
-          event: 'pay_now_button',
-        },
-      });
+    const saleAddresses = data.map(item => item.saleAddress);
+    const quantities = data.map(item => item.qty);
+    const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities);
 
+    if (checkQuantity !== true) {
+      let insufficientQuantityMessage = "";
+      let outOfStockMessage = "";
+
+      checkQuantity.forEach(detail => {
+        if (detail.availableQuantity === 0) {
+          outOfStockMessage += `Product ${detail.assetName}\n`;
+        } else {
+          insufficientQuantityMessage += `Product ${detail.assetName}: ${detail.availableQuantity}\n`;
+        }
+      });
+      let errorMessage = "";
+      if (insufficientQuantityMessage) {
+        errorMessage += `The following item(s) in your cart have limited quantity available and will need to be adjusted. Please reduce the quantity to proceed:\n${insufficientQuantityMessage}`;
+      }
+      if (outOfStockMessage) {
+        if (errorMessage) errorMessage += "\n"; // Add a new line if there's already an error message
+        errorMessage += `The following item(s) are temporarily out of stock and should be removed:\n${outOfStockMessage}`;
+      }
+      openToastOrder("bottom", errorMessage);
+      return;
+    }
+
+    let orderList = [];
+    confirmOrderList.forEach((item) => {
+      orderList.push({
+        quantity: item.qty,
+        assetAddress: item.key,
+        firstSale: item.firstSale,
+        unitPrice: item.unitPrice
+      });
+    });
+    // These additional fields need to be sent to form the request after stripe. 
+    let body = {
+      paymentList: PAYMENT_LIST,
+      buyerOrganization: userOrganization,
+      orderList,
+      orderTotal: total + tax + shipping,
+      shippingAddressId: userAddresses[selectedAddress].address_id,
+      tax: tax,
+      user: user.commonName,
+      email: user.email,
+    };
+
+    window.LOQ.push(['ready', async LO => {
+      // Track an event
+      await LO.$internal.ready('events')
+      LO.events.track('Buy Now Button')
+    }])
+    TagManager.dataLayer({
+      dataLayer: {
+        event: 'pay_now_button',
+      },
+    });
+    if (method === "stripe") {
       let data = await orderActions.createPayment(orderDispatch, body);
       if (data != null && data.url !== undefined) {
-        window.location.replace(data.url);
+        window.location.replace
+          (data.url);
+      } 
+    } else if (method === "metamask") {
+      if (!window.ethereum) {
+        notification.error({
+          message: "MetaMask is not installed",
+          description: "Please install MetaMask to connect your wallet.",
+          placement: "bottom",
+        });
+        return null;
+      }
+      try {
+        // Request account access
+        const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+        if (accounts.length === 0) {
+          notification.error({
+            message: "MetaMask is locked",
+            description: "Please unlock MetaMask to connect your wallet.",
+            placement: "bottom",
+          });
+          return null;
+        }
+
+        await window.ethereum.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: "0xaa36a7" }],
+        });
+
+        const ethPriceUSD = await fetchEthPrice();
+        const orderTotalETH = body.orderTotal / ethPriceUSD;
+        const truncatedETH = parseFloat(orderTotalETH.toFixed(18));
+        const weiValue = ethers.utils.parseUnits(truncatedETH.toString(), 'ether');
+        const hexValue = ethers.BigNumber.from(weiValue).toHexString();
+
+        const txParams = {
+          from: accounts[0],
+          to: `0x08791eD418eFA7c001FBF63E88B37fBdb5165C6f`,
+          value: hexValue,
+          chainId: `0xaa36a7`,
+        };
+
+        const tx = await window.ethereum.request({
+          method: "eth_sendTransaction",
+          params: [txParams],
+        });
+
+        const waitForTransactionReceipt = async (hash) => {
+          let receipt = null;
+          while (receipt === null) { // Polling for the receipt
+            receipt = await window.ethereum.request({
+              method: 'eth_getTransactionReceipt',
+              params: [hash],
+            });
+            if (receipt !== null) {
+              return receipt;
+            }
+            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for 2 seconds before retrying
+          }
+        };
+
+        // Wait for the transaction to be confirmed
+        await waitForTransactionReceipt(tx);
+
+        const transaction = await window.ethereum.request({
+          method: 'eth_getTransactionByHash',
+          params: [tx],
+        });
+
+        if (transaction.value === hexValue) {
+          notification.success({
+            message: "Transaction Successful",
+            description: `Your payment has been successfully processed. Transaction Hash: ${tx}`,
+            placement: "bottom",
+          });
+          window.location.replace(`http://localhost/marketplace/order/status?session_id=${tx}`);
+        } else {
+          console.error("Transaction value mismatch.");
+          notification.error({
+            message: "Transaction Error",
+            description: "There was a mismatch in the transaction value.",
+            placement: "bottom",
+          });
+          return null;
+        } 
+      } catch (error) {
+        // Log and notify on error
+        console.error("Failed to connect to MetaMask:", error);
+        notification.error({
+          message: "MetaMask connection failed",
+          description: error.message || "Please try again.",
+          placement: "bottom",
+        });
+        return null;
       }
     }
   };
@@ -361,6 +493,7 @@ const ConfirmOrder = () => {
   useEffect(() => {
     if (data.length !== 0) {
       inventoryAction.sellerStripeStatus(inventoryDispatch, data[0]["sellersCommonName"]);
+      inventoryAction.sellerMetamaskStatus(inventoryDispatch, data[0]["sellersCommonName"]);
     }
   }, [inventoryDispatch, data]);
 
@@ -396,45 +529,14 @@ const ConfirmOrder = () => {
               </Breadcrumb>
               <div className="flex justify-between items-center pt-6 md:pb-2">
                 <Typography className="text-[#202020] text-base md:text-xl lg:text-2xl  font-bold lg:font-semibold">My Cart</Typography>
-                {stripeStatus && <button id="pay-now-button" className={`p-1 md:p-3 h-max rounded-lg border ${stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled ? 'border-primary bg-primary hover:bg-primaryHover text-white' : 'cursor-not-allowed border-[#999999] rounded bg-[#cccccc] text-[#666666]'}`}
-                  onClick={async () => {
-                    if (stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled) {
-                      const saleAddresses = [];
-                      const quantities = [];
-                      data.forEach((item) => {
-                        saleAddresses.push(item.saleAddress)
-                        quantities.push(item.qty)
-                      })
-                      const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities)
-                      if (checkQuantity === true) {
-                        handlePaymentConfirm();
-                      } else {
-                        let insufficientQuantityMessage = "";
-                        let outOfStockMessage = "";
-
-                        checkQuantity.forEach(detail => {
-                          if (detail.availableQuantity === 0) {
-                            outOfStockMessage += `Product ${detail.assetName}\n`;
-                          } else {
-                            insufficientQuantityMessage += `Product ${detail.assetName}: ${detail.availableQuantity}\n`;
-                          }
-                        });
-
-                        let errorMessage = "";
-                        if (insufficientQuantityMessage) {
-                          errorMessage += `The following item(s) in your cart have limited quantity available and will need to be adjusted. Please reduce the quantity to proceed:\n${insufficientQuantityMessage}`;
-                        }
-                        if (outOfStockMessage) {
-                          if (errorMessage) errorMessage += "\n"; // Add a new line if there's already an error message
-                          errorMessage += `The following item(s) are temporarily out of stock and should be removed:\n${outOfStockMessage}`;
-                        }
-                        openToastOrder("bottom", errorMessage);
-                      }
-                    }
-                  }}
+                <button
+                  id="pay-now-button"
+                  className="p-1 md:p-3 h-max rounded-lg border border-primary bg-primary hover:bg-primaryHover text-white"
+                  // Rest of the button props
+                  onClick={() => setIsPaymentModalVisible(true)}
                 >
                   Review and Submit
-                </button>}
+                </button>
               </div>
             </div>
           </div>
@@ -505,6 +607,33 @@ const ConfirmOrder = () => {
                     </>
                   }
                 </Row>
+                {isPaymentModalVisible && (
+                  <Modal
+                    title="Select Payment Method"
+                    open={isPaymentModalVisible}
+                    onCancel={() => setIsPaymentModalVisible(false)}
+                    footer={null} // Remove default buttons
+                  >
+                    <List>
+                      <List.Item>
+                        <Button
+                          disabled={!stripeStatus || !stripeStatus?.chargesEnabled || !stripeStatus?.detailsSubmitted || !stripeStatus?.payoutsEnabled}
+                          onClick={() => handlePaymentConfirm('stripe')}
+                        >
+                          Pay with Stripe
+                        </Button>
+                      </List.Item>
+                      <List.Item>
+                        <Button
+                          disabled={!metamaskStatus} // Adjust based on how metamaskStatus indicates availability
+                          onClick={() => handlePaymentConfirm('metamask')}
+                        >
+                          Pay with MetaMask
+                        </Button>
+                      </List.Item>
+                    </List>
+                  </Modal>
+                )}
                 {modalAddress && <AddAddressModal open={modalAddress} close={CloseAddressModel} />}
                 <div>
                   <div className="mt-4">

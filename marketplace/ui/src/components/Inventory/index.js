@@ -43,6 +43,7 @@ const Inventory = ({ user }) => {
   const [api, contextHolder] = notification.useNotification();
   const [isSearch, setIsSearch] = useState(false);
   const [category, setCategory] = useState(undefined);
+  const [isOnboardingModalVisible, setIsOnboardingModalVisible] = useState(false);
   const linkUrl = window.location.href;
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
@@ -50,8 +51,18 @@ const Inventory = ({ user }) => {
   const categoryDispatch = useCategoryDispatch();
 
   const { categorys } = useCategoryState();
-  const { inventories, isInventoriesLoading, message, success, isLoadingStripeStatus, stripeStatus, inventoriesTotal } =
-    useInventoryState();
+  const {
+    inventories,
+    isInventoriesLoading,
+    message,
+    success,
+    isLoadingStripeStatus,
+    stripeStatus,
+    inventoriesTotal,
+    isOnboardingSellerToMetamask,
+    metamaskStatus,
+    isLoadingMetamaskStatus
+  } = useInventoryState();
 
   //items
   const itemDispatch = useItemDispatch();
@@ -59,6 +70,14 @@ const Inventory = ({ user }) => {
     message: itemMsg,
     success: itemSuccess
   } = useItemState();
+
+  const showOnboardingModal = () => {
+    setIsOnboardingModalVisible(true);
+  };
+
+  const hideOnboardingModal = () => {
+    setIsOnboardingModalVisible(false);
+  };
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
@@ -71,8 +90,11 @@ const Inventory = ({ user }) => {
   }, [dispatch, limit, offset, debouncedSearchTerm, category]);
 
   useEffect(() => {
-    actions.sellerStripeStatus(dispatch, user?.commonName);
-  }, [dispatch, user]);
+    if(user) {
+      actions.sellerStripeStatus(dispatch, user?.commonName);
+      actions.sellerMetamaskStatus(dispatch, user?.commonName);
+    }
+  }, [dispatch, user, isOnboardingSellerToMetamask]);
 
   useEffect(() => {
     const placement = 'bottom'; // Set placement to 'bottomCenter'
@@ -166,6 +188,64 @@ const Inventory = ({ user }) => {
     navigate(routes.OnboardingSellerToStripe.url)
   }
 
+  const onboardMetamask = async () => {
+    // Check if MetaMask is available
+    if (!window.ethereum) {
+      notification.error({
+        message: "MetaMask is not installed",
+        description: "Please install MetaMask to connect your wallet.",
+        placement: "bottom",
+      });
+      return null;
+    }
+
+    try {
+      // Request account access
+      const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+      if (accounts.length === 0) {
+        notification.error({
+          message: "MetaMask is locked",
+          description: "Please unlock MetaMask to connect your wallet.",
+          placement: "bottom",
+        });
+        return null;
+      }
+      // Return the first account
+      notification.success({
+        message: "MetaMask connected",
+        description: "Your wallet is connected successfully.",
+        placement: "bottom",
+      });
+      return accounts[0];
+    } catch (error) {
+      // Log and notify on error
+      console.error("Failed to connect to MetaMask:", error);
+      notification.error({
+        message: "MetaMask connection failed",
+        description: error.message || "Please try again.",
+        placement: "bottom",
+      });
+      return null;
+    }
+  };
+
+  const onboardSellerOnMetamask = async () => {
+    const walletId = await onboardMetamask();
+    if (!walletId) return;
+
+    // Perform seller onboarding with the obtained wallet ID
+    try {
+      await actions.onboardSellerToMetamask(dispatch, walletId);
+    } catch (error) {
+      console.error("Failed to onboard seller to MetaMask:", error);
+      notification.error({
+        message: "MetaMask onboarding failed",
+        description: error.message || "Please try again.",
+        placement: "bottom",
+      });
+    }
+  };
+
 const getAllSubcategories = (categories) => {
   let subcategories = [];
   categories.forEach(category => {
@@ -225,18 +305,50 @@ const metaImg = category ? category : SEO.IMAGE_META
               </Button>
             </div>
             <div className="flex gap-3">
-              <Button type="primary" className="w-40 h-9 "
-                onClick={() => {
-                  if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                    window.location.href = loginUrl;
-                  } else {
-                    onboardSeller()
-                  }
-                }}
-                disabled={stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled}
+              <Button
+                type="primary"
+                className="w-40 h-9 flex items-center justify-center"
+                onClick={showModal}
+                disabled={metamaskStatus && (stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled)}
               >
-                {"Connect Stripe"}
+                {"Set up Payment Provider"}
               </Button>
+
+              <Modal title="Connect Your Wallets" visible={isModalVisible} onCancel={hideModal} footer={null}>
+                <div className="flex flex-col space-y-4">
+                  <Button
+                    type="primary"
+                    className="w-full"
+                    onClick={() => {
+                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                        window.location.href = loginUrl;
+                      } else {
+                        onboardSellerOnMetamask();
+                        hideModal();
+                      }
+                    }}
+                    loading={isOnboardingSellerToMetamask || isLoadingMetamaskStatus}
+                    disabled={metamaskStatus}
+                  >
+                    {"Connect Metamask"}
+                  </Button>
+                  <Button
+                    type="primary"
+                    className="w-full"
+                    onClick={() => {
+                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                        window.location.href = loginUrl;
+                      } else {
+                        onboardSeller();
+                        hideModal();
+                      }
+                    }}
+                    disabled={stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled}
+                  >
+                    {"Connect Stripe"}
+                  </Button>
+                </div>
+              </Modal>
               <Tooltip
                 title={
                   stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled
@@ -290,9 +402,10 @@ const metaImg = category ? category : SEO.IMAGE_META
                             category={category}
                             key={index}
                             debouncedSearchTerm={debouncedSearchTerm}
-                            paymentProviderAddress={
-                              stripeStatus ? stripeStatus.paymentProviderAddress : undefined
-                            }
+                            paymentProviderAddress={[
+                              ...(stripeStatus ? [stripeStatus.paymentProviderAddress] : []),
+                              ...(metamaskStatus ? [metamaskStatus.address] : [])
+                            ]}
                             allSubcategories={allSubcategories}
                           />
                         );

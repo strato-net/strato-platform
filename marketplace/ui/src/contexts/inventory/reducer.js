@@ -239,6 +239,39 @@ const reducer = (state, action) => {
         error: action.error,
         isInventoryDetailsLoading: false
       };
+    case actionDescriptors.onboardSellerToMetamask:
+      return {
+        ...state,
+        isOnboardingSellerToMetamask: true
+      };
+    case actionDescriptors.onboardSellerToMetamaskSuccessful:
+      return {
+        ...state,
+        isOnboardingSellerToMetamask: false
+      };
+    case actionDescriptors.onboardSellerToMetamaskFailed:
+      return {
+        ...state,
+        error: action.error,
+        isOnboardingSellerToMetamask: false
+      };
+    case actionDescriptors.sellerMetamaskStatus:
+      return {
+        ...state,
+        isLoadingMetamaskStatus: true
+      };
+    case actionDescriptors.sellerMetamaskStatusSuccessful:
+      return {
+        ...state,
+        metamaskStatus: action.payload,
+        isLoadingMetamaskStatus: false
+      };
+    case actionDescriptors.sellerMetamaskStatusFailed:
+      return {
+        ...state,
+        error: action.error,
+        isLoadingMetamaskStatus: false
+      };
     case actionDescriptors.onboardSellerToStripe:
       return {
         ...state,

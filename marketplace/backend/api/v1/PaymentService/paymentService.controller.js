@@ -4,6 +4,35 @@ import RestStatus from 'http-status-codes'
 
 class PaymentServiceController {
 
+  static async metaMaskOnboarding(req, res, next) {
+    try {
+      const { params, dapp } = req;
+      // TODO: call payment server
+      const result = await dapp.metaMaskOnboarding(params)
+
+      rest.response.status200(res, result)
+
+      return next();
+    } catch (e) {
+      return next(e)
+    }
+  }
+
+  static async metaMaskOnboardingStatus(req, res, next) {
+    try {
+      const { dapp, params } = req
+
+      PaymentServiceController.validateGetStripeOnboardingStatusArgs(params)
+      // TODO: call payment server
+      const result = await dapp.getMetaMaskOnboardingStatus(params)
+      rest.response.status200(res, result)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
   static async stripeOnboarding(req, res, next) {
     try {
       const { dapp } = req
