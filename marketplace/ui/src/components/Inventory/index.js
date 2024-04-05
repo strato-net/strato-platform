@@ -6,7 +6,8 @@ import {
   notification,
   Spin,
   Tooltip, 
-  Tabs
+  Tabs,
+  Modal
 } from "antd";
 import InventoryCard from "./InventoryCard";
 import CreateInventoryModal from "./CreateInventoryModal";
@@ -308,13 +309,13 @@ const metaImg = category ? category : SEO.IMAGE_META
               <Button
                 type="primary"
                 className="w-40 h-9 flex items-center justify-center"
-                onClick={showModal}
+                onClick={showOnboardingModal}
                 disabled={metamaskStatus && (stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled)}
               >
-                {"Set up Payment Provider"}
+                {"Set Up"}
               </Button>
 
-              <Modal title="Connect Your Wallets" visible={isModalVisible} onCancel={hideModal} footer={null}>
+              <Modal title="Set up Payment Provider" open={isOnboardingModalVisible} onCancel={hideOnboardingModal} footer={null}>
                 <div className="flex flex-col space-y-4">
                   <Button
                     type="primary"
@@ -324,7 +325,7 @@ const metaImg = category ? category : SEO.IMAGE_META
                         window.location.href = loginUrl;
                       } else {
                         onboardSellerOnMetamask();
-                        hideModal();
+                        hideOnboardingModal();
                       }
                     }}
                     loading={isOnboardingSellerToMetamask || isLoadingMetamaskStatus}
@@ -340,7 +341,7 @@ const metaImg = category ? category : SEO.IMAGE_META
                         window.location.href = loginUrl;
                       } else {
                         onboardSeller();
-                        hideModal();
+                        hideOnboardingModal();
                       }
                     }}
                     disabled={stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled}
