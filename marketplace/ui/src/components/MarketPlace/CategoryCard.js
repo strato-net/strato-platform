@@ -25,7 +25,7 @@ const CategoryCard = () => {
 
   return (
     <>
-      <Fade>
+      <Fade triggerOnce>
       <Title className="md:px-10 !text-xl md:!text-4xl !text-left py-2">
         Shop by Category
       </Title>
@@ -42,6 +42,7 @@ const CategoryCard = () => {
                 const subCat = category.subCategories.map((item)=>item.contract).join(",")
                 const url = `${naviroute.replace(':category', category.name)}?sc=${subCat}`
                 navigate(url)
+                sessionStorage.setItem('scrollPosition', 0);
                 window.LOQ.push(['ready', async LO => {
                   // Track an event
                   await LO.$internal.ready('events')
@@ -63,19 +64,19 @@ const CategoryCard = () => {
                   preview={false}
                 />
 
-                <div className="py-2 xl:py-3 flex justify-center md:justify-start ">
-                  <Text
-                    type="secondary"
-                    className="text-lg md:text-xl lg:text-2xl !text-primaryB font-semibold"
-                  >
-                    <span className="p-3 font-sans">{category.name}</span>
-                  </Text>
+                  <div className="py-2 xl:py-3 flex justify-center md:justify-start ">
+                    <Text
+                      type="secondary"
+                      className="text-lg md:text-xl lg:text-2xl !text-primaryB font-semibold"
+                    >
+                      <span className="p-3 font-sans">{category.name}</span>
+                    </Text>
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
       </Fade>
     </>
   );

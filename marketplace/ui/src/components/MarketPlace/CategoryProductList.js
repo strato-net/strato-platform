@@ -38,6 +38,9 @@ import { SEO } from "../../helpers/seoConstant";
 const { Panel } = Collapse;
 const { Text } = Typography;
 
+const availabilityOptions = [{label:'For Sale', value:'forSale'},
+                             {label:'Sold Out', value:'soldOut'}]
+
 const CategoryProductList = ({ user }) => {
 
   const location = useLocation();
@@ -54,54 +57,32 @@ const CategoryProductList = ({ user }) => {
   const [api, contextHolder] = notification.useNotification();
   // States
   const [selectedSubCategories, setSelectedSubCategories] = useState(selectedSubCat);
+  const [selectedAvailability, setSelectedAvailability] = useState(['forSale', 'soldOut'])
   const [minPrice, setMinPrice] = useState(0);
   const [maxPrice, setMaxPrice] = useState(MAX_PRICE);
   const [subCategories, setSubCategories] = useState([]);
   const [desktopOpenFilter, setDesktopOpenFilter] = useState(true);
   const [mobileOpenFilter, setMobileOpenFilter] = useState(false);
   const [unSelected, setUnSelected] = useState([]);
-  const [scrollPosition, setScrollPosition] = useState(state?.scroll || 0);
 
   //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
-  const subCategoryDispatch = useSubCategoryDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
   const orderDispatch = useOrderDispatch();
   // states
   const { marketplaceList, isMarketplaceLoading } = useMarketplaceState();
-  const { categorys, iscategorysLoading } = useCategoryState();
+  const { categorys } = useCategoryState();
   let { hasChecked, isAuthenticated } = useAuthenticateState();
-  const { subCategorys } = useSubCategoryState();
   const { cartList } = useMarketplaceState();
+  const [scrollPosition, setScrollPosition] = useState(0);
 
   const isLoading = isMarketplaceLoading;
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setScrollPosition(window.scrollY);
-    };
-  
-   if(!isLoading && !iscategorysLoading){
-     window.addEventListener('scroll', handleScroll);
-   }
-
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-    };
-  }, []);
-
-  useEffect(() => {
-    if(!isLoading){
-      window.scrollTo(0, state?.scroll);
-    }
-  }, [isLoading]);
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
     const selectedSubCat = subCategoryQueryValue.split(",");
     setSelectedSubCategories(selectedSubCat);
   }, [categoryParam]);
-
 
   useEffect(() => {
     if(categorys.length > 0 && categoryParam!=='All'){
@@ -152,7 +133,7 @@ const CategoryProductList = ({ user }) => {
     setSelectedSubCategories(valuesChecked);
   };
 
-
+  const availabilityFilter = `&forSale=${selectedAvailability.includes('forSale')}&soldOut=${selectedAvailability.includes('soldOut')}`;
   useEffect(() => {
     if (hasChecked && !isAuthenticated) {
       marketplaceActions.fetchMarketplace(
@@ -161,7 +142,8 @@ const CategoryProductList = ({ user }) => {
         subCategoryQueryValue,
         minPrice,
         maxPrice,
-        searchQueryValue
+        searchQueryValue,
+        availabilityFilter
       );
     } else if (hasChecked && isAuthenticated) {
       marketplaceActions.fetchMarketplaceLoggedIn(
@@ -170,16 +152,19 @@ const CategoryProductList = ({ user }) => {
         subCategoryQueryValue,
         minPrice,
         maxPrice,
-        searchQueryValue
+        searchQueryValue,
+        availabilityFilter
       );
     }
   }, [
+    categoryParam,
     subCategoryQueryValue,
     minPrice,
     maxPrice,
     hasChecked,
     isAuthenticated,
-    searchQueryValue
+    searchQueryValue,
+    selectedAvailability
   ]);
 
 
@@ -197,15 +182,37 @@ const CategoryProductList = ({ user }) => {
     return url;
   }
 
-  useEffect(()=>{
-    const url = generateBaseUrl();
-      if(!isLoading){
-        navigate(url, {replace:true, state: { scroll: scrollPosition } });
-    }else{
-      navigate(url, {replace:true, state: { scroll: state?.scroll || 0 } });
-    }
+  const getSavedScrollPosition = () => {
+    return parseInt(sessionStorage.getItem('scrollPosition')) || 0;
+  }
 
-},[scrollPosition])
+  const saveScrollPosition = (position) => {
+    sessionStorage.setItem('scrollPosition', position);
+  }
+
+  useEffect(() => {
+    const handleScroll = () => {
+      saveScrollPosition(window.scrollY);
+      setScrollPosition(window.scrollY)
+    };
+
+    window.addEventListener('scroll', handleScroll);
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, [scrollPosition]);
+
+  useEffect(() => {
+    const url = generateBaseUrl();
+    navigate(url, { state: { scroll: getSavedScrollPosition() } });
+  }, []);
+
+  useEffect(() => { 
+    if (!isLoading) {
+      window.scrollTo(0, state?.scroll);
+    }
+  }, [isLoading, state?.scroll]);
 
   //=========================Other functions===============================//
   const linkUrl = window.location.href;
@@ -221,7 +228,7 @@ const CategoryProductList = ({ user }) => {
 
   const handleClearFilter = () => {
     const isFilter = selectedSubCategories.length != 0
-      || minPrice !== 0 || maxPrice !== MAX_PRICE
+      || minPrice !== 0 || maxPrice !== MAX_PRICE || selectedAvailability.length !== 2
     if (isFilter) {
       const baseUrl = new URL(`/c/All`, window.location.origin);
       const url = baseUrl.pathname + baseUrl.search;
@@ -229,7 +236,7 @@ const CategoryProductList = ({ user }) => {
       clearSelection()
       setMinPrice(0)
       setMaxPrice(MAX_PRICE)
-
+      setSelectedAvailability(['forSale', 'soldOut'])
     }
   }
 
@@ -251,16 +258,20 @@ const CategoryProductList = ({ user }) => {
     setMobileOpenFilter(!mobileOpenFilter);
   };
 
+  const onChangeAvailability = (checkedValues) =>{
+    setSelectedAvailability(checkedValues);
+  }
+
   const addItemToCart = async (product, quantity) => {
     if (product.ownerCommonName === user?.commonName) {
       openToast("bottom", true, "Cannot buy your own item");
       return false;
     }
-  
+
     // Search for the product in the cart
     let foundIndex = cartList.findIndex((item) => item.product.address === product.address);
     let items = [...cartList];
-  
+
     // Found index will be -1 if it's not in the cart list
     if (foundIndex === -1) {
       // Product not found, check quantity before adding
@@ -283,11 +294,11 @@ const CategoryProductList = ({ user }) => {
       }
     } else {
       // Product found, prepare to update quantity after check
-      const potentialNewQty = items[foundIndex].qty + quantity; 
+      const potentialNewQty = items[foundIndex].qty + quantity;
       const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity]);
       if (checkQuantity === true) {
         // Quantity check passed, update item quantity in the cart
-        items[foundIndex].qty = potentialNewQty; 
+        items[foundIndex].qty = potentialNewQty;
         marketplaceActions.addItemToCart(marketplaceDispatch, items);
         openToast("bottom", false, "Item updated in cart");
         return true;
@@ -297,7 +308,7 @@ const CategoryProductList = ({ user }) => {
           openToast("bottom", true, `Unfortunately, ${product.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
         } else { // Case 2: We are trying to add too much quantity
           openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${product.name} are available. Please update your cart quantity accordingly.`);
-        }        
+        }
         return false;
       }
     }
@@ -360,15 +371,15 @@ const CategoryProductList = ({ user }) => {
       ghost="true"
       reverse={false}
       expandIcon={({ isActive }) =>
-        isActive ? 
-        <img src={Images.Dropdown} 
-        alt={metaImg} 
-        title={metaImg} 
-        style={{ width: "24px", height: "24px", transform: "rotate(180deg)" }} /> : 
-        <img src={Images.Dropdown} 
-        alt={metaImg} 
-        title={metaImg} 
-        style={{ width: "24px", height: "24px" }} />
+        isActive ?
+          <img src={Images.Dropdown}
+            alt={metaImg}
+            title={metaImg}
+            style={{ width: "24px", height: "24px", transform: "rotate(180deg)" }} /> :
+          <img src={Images.Dropdown}
+            alt={metaImg}
+            title={metaImg}
+            style={{ width: "24px", height: "24px" }} />
       }
     >
       {children}
@@ -388,13 +399,33 @@ const CategoryProductList = ({ user }) => {
   const PriceFilterComponent = () =>
     <Panel header={<Text strong className="text-base">Price ($)</Text>} key="1">
       <Space>
-        <InputNumber size="large" min={0} className="w-full" controls={false} prefix='$' value={minPrice} placeholder="min" 
-         onChange={(value) => debouncedSetMinPrice(value)} />
+        <InputNumber size="large" min={0} className="w-full" controls={false} prefix='$' value={minPrice} placeholder="min"
+          onChange={(value) => debouncedSetMinPrice(value)} />
         -
-        <InputNumber size="large" controls={false} className="w-full" min={minPrice} prefix='$' value={maxPriceValue} placeholder="max" 
-        onChange={(value) => debouncedSetMaxPrice(value)} />
+        <InputNumber size="large" controls={false} className="w-full" min={minPrice} prefix='$' value={maxPriceValue} placeholder="max"
+          onChange={(value) => debouncedSetMaxPrice(value)} />
       </Space>
     </Panel>
+
+
+const AvailabilityFilter = () =>
+<>
+<Panel header={<Text strong className="text-base">Availability</Text>} key="1">
+<Checkbox.Group
+  onChange={onChangeAvailability}
+  value={selectedAvailability}
+>
+  <div className="flex flex-col gap-3">
+    {availabilityOptions.map((category, index) => (
+      <Checkbox value={category.value} key={index} className="m-0">
+        {category.label}
+      </Checkbox>
+    ))}
+  </div>
+</Checkbox.Group>
+</Panel>
+<Divider className="m-auto w-[94%] min-w-[80%]" />
+</>
 
   const SubCategoryFilterComponent = () =>
     <Panel header={<Text strong className="text-base">Sub Categories</Text>} key="1">
@@ -429,6 +460,7 @@ const CategoryProductList = ({ user }) => {
         PriceFilterComponent()
       )}
 
+      {DesktopCollapseComponent(AvailabilityFilter())}
     </div>
   </div>
 
@@ -454,6 +486,7 @@ const CategoryProductList = ({ user }) => {
           PriceFilterComponent()
         )}
 
+       {MobileCollapseComponent(AvailabilityFilter())}
       </div>
     </div>
     <div className="h-full w-full bg-[#00000020] absolute top-0 md:hidden"></div>
@@ -476,61 +509,64 @@ const CategoryProductList = ({ user }) => {
           </Text>
           </div>
           <div className="border border-solid border-[#6A6A6A] rounded-md cursor-pointer p-1 md:p-2" onClick={handleFilterClick}>
-            <img src={Images.filter} alt="filter" className=" w-5 h-5 md:w-6 md:h-6" />
+            <img src={Images.filter} alt={metaImg}
+                title={metaImg} className=" w-5 h-5 md:w-6 md:h-6" />
           </div>
         </div>
       </div>
 
-      <div className="flex pt-4 mx-14 mt-[60px] md:mt-4 ">
-        {/* Filter section */}
-        {desktopOpenFilter && DesktopFilterComponent()}
+        <div className="flex pt-4 mx-14 mt-[60px] md:mt-4 ">
+          {/* Filter section */}
+          {desktopOpenFilter && DesktopFilterComponent()}
 
-        {/* Product list section */}
-        <div className="mb-12 w-full">
-          <div className="hidden md:flex mt-4 items-center">
-          <div className="border mx-2 border-solid border-[#6A6A6A] rounded-md cursor-pointer p-1 md:p-2" 
-            onClick={handleFilterClick}>
-            <img src={Images.filter} alt="filter" className=" w-5 h-5 md:w-6 md:h-6" />
-          </div>
-            <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
-            <Text className="text-gray-800 ml-1 text-xl font-semibold">
-              {isLoading ? <Spin spinning={isLoading} size="small" /> : marketplaceList?.length} Results
-            </Text>
-          </div>
-          {isLoading ?
-            <div className="h-96 w-full flex justify-center items-center">
-              <Spin spinning={isLoading} size="large" />
+          {/* Product list section */}
+          <div className="mb-12 w-full">
+            <div className="hidden md:flex mt-4 items-center">
+              <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
+              <Text className="text-gray-800 ml-1 text-xl font-semibold">
+                {isLoading ? <Spin spinning={isLoading} size="small" /> : marketplaceList?.length} Results
+              </Text>
             </div>
-            :
-            <div>
-              {marketplaceList?.length > 0 ? (
-                <div className={`mt-[61px] md:mt-4 mb-8 flex w-full md:grid flex-col items-center ${desktopOpenFilter ? "grid-cols-1 gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 4xl:grid-cols-5 lg:gap-14 xl:gap-x-10 2xl:gap-x-20" : " sm:grid-cols-1 gap-4 md:grid-cols-2 md:gap-14 lg:grid-cols-3 lg:gap-16 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 5xl:grid-cols-7"}`} id="product-list">
-                  {marketplaceList
-                    // .filter(product => product.saleQuantity > 0)
-                    .map((product, index) => 
-                        <NewTrendingCard
-                          topSellingProduct={product}
-                          key={index}
-                          addItemToCart={addItemToCart}
-                          parent={"Marketplace"}
-                          api={api}
-                          contextHolder={contextHolder}
-                        />
-                     )}
+            {isLoading ?
+              <div className="h-96 w-full flex justify-center items-center">
+                <Spin spinning={isLoading} size="large" />
+              </div>
+              :
+              <div>
+                {marketplaceList?.length > 0 ? (
 
-                </div>
-              ) : (
-                <div className="h-96 flex justify-center items-center" id="product-list">
-                  No data found
-                </div>
-              )}
-            </div>
-          }
+                  <div className={`mt-[61px] md:mt-4 mb-8 flex w-full md:grid flex-col items-center ${desktopOpenFilter ? "grid-cols-1 gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 4xl:grid-cols-5 lg:gap-14 xl:gap-x-10 2xl:gap-x-20" : " sm:grid-cols-1 gap-4 md:grid-cols-2 md:gap-14 lg:grid-cols-3 lg:gap-16 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 5xl:grid-cols-7"}`} id="product-list">
+                    {marketplaceList
+                      // .filter(product => product.saleQuantity > 0)
+                      .map((product, index) => {
+                        return (
+                          <NewTrendingCard
+                            topSellingProduct={product}
+                            key={index}
+                            addItemToCart={addItemToCart}
+                            parent={"Marketplace"}
+                            api={api}
+                            contextHolder={contextHolder}
+                            scrollPosition={scrollPosition}
+                            saveScrollPosition={saveScrollPosition}
+                          />
+                        );
+                      })}
+
+                  </div>
+                ) : (
+                  <div className="h-96 flex justify-center items-center" id="product-list">
+                    No data found
+                  </div>
+                )}
+              </div>
+            }
+          </div>
         </div>
-      </div>
 
-      {mobileOpenFilter && MobileFilterComponent()}
-    </div>
+        {mobileOpenFilter && MobileFilterComponent()}
+      </div>
+      
     </>
   );
 };

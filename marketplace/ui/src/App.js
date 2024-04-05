@@ -9,6 +9,7 @@ import HeaderComponent from "./components/Header/Header";
 import FooterComponent from "./components/Footer/FooterComponent";
 import TagManager from "react-gtm-module";
 import { UsersProvider } from "./contexts/users";
+import { useMarketplaceState } from "./contexts/marketplace";
 import { getCookie, delete_cookie } from "./helpers/cookie";
 import { CategorysProvider } from "./contexts/category";
 
@@ -16,6 +17,7 @@ const { Content } = Layout;
 
 const App = () => {
   const [showMenu, setShowMenu] = useState(false)
+  const { isMarketplaceLoading } = useMarketplaceState();
   const tagManagerArgs = {
     gtmId: "GTM-NHBZ2BX",
   };
@@ -85,7 +87,7 @@ const App = () => {
         <Content className={`${showMenu ? 'overflow-y-hidden md:overflow-auto h-[100vh] md:h-auto w-[100vw] md:w-auto bg-[#00000020] md:bg-white relative mt-0 md:mt-28' : 'mt-[89px] md:mt-[98px] '}`}>
           <AuthenticatedRoutes user={user} users={users} isAuthenticated={isAuthenticated} />
         </Content>
-        <FooterComponent />
+        {!isMarketplaceLoading && <FooterComponent />}
       </Layout>
     </BrowserRouter>
   );
