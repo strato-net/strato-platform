@@ -332,7 +332,7 @@ const BoughtOrderDetails = ({ user, users }) => {
         <p
           // href={routes.BoughtOrderDetails.url}
           className="text-primary text-[17px] cursor-pointer"
-          onClick={() => {navigate(`${routes.MarketplaceProductDetail.url.replace(":address", text.address)}`) }}
+          onClick={() => {navigate(`${routes.MarketplaceProductDetail.url.replace(":address", text.address).replace(":name", text.name)}`) }}
         >
           {decodeURIComponent(text.name)}
         </p>

@@ -2,21 +2,21 @@ import { Images } from "../../images";
 
 const navigation = {
   categories: [
-    { name: "Carbon", href: "/marketplace/category?category=Carbon" },
-    { name: "Metals", href: "/marketplace/category?category=Metals" },
-    { name: "Clothing", href: "/marketplace/category?category=Clothing" },
+    { name: "Carbon", href: "/c/Carbon" },
+    { name: "Metals", href: "/c/Metals" },
+    { name: "Clothing", href: "/c/Clothing" },
     {
       name: "Collectibles",
-      href: "/marketplace/category?category=Collectibles",
+      href: "/c/Collectibles",
     },
-    { name: "Art", href: "/marketplace/category?category=Art" },
-    { name: "Membership", href: "/marketplace/category?category=Membership" },
+    { name: "Art", href: "/c/Art" },
+    { name: "Membership", href: "/c/Membership" },
   ],
   support: [
     // { name: "Documentation", href: "https://docs.blockapps.net/" },
     // { name: "Guides", href: "https://docs.blockapps.net/api-basics/" },
     // { name: "API Status", href: "https://docs.blockapps.net/api/" },
-    { name: "FAQ", href: "/marketplace/frequently-asked-questions" },
+    { name: "FAQ", href: "/frequently-asked-questions" },
     {
       name: "Contact Support",
       href: "https://blockapps.net/company/connect/contact-us/",
@@ -124,6 +124,13 @@ const navigation = {
 };
 
 export default function FooterComponent() {
+
+  const handleNavigate = (e, category) =>{
+    e.preventDefault();
+    sessionStorage.setItem('scrollPosition', 0);
+    window.location.href = `/c/${category}`
+  }
+
   return (
     <footer className="bg-[#131889]" aria-labelledby="footer-heading">
       <h2 id="footer-heading" className="sr-only">
@@ -165,7 +172,8 @@ export default function FooterComponent() {
                   {navigation.categories.map((item) => (
                     <li key={item.name}>
                       <a
-                        href={item.href}
+                        href={''}
+                        onClick={(e)=>{handleNavigate(e, item.name)}}
                         className="text-sm leading-6 text-white hover:text-white"
                       >
                         {item.name}

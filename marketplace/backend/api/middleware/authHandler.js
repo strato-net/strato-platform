@@ -32,7 +32,7 @@ const getTokenFromHeader = async (req) => {
   return null
 }
 
-const getLoginUrl = (req) => config.dockerized ? '/marketplace/login/' : req.app.oauth.getSigninURL();
+const getLoginUrl = (req) => config.dockerized ? '/login/' : req.app.oauth.getSigninURL();
 
 class AuthHandler {
   static authorizeRequest(allowAnonAccess = false) {

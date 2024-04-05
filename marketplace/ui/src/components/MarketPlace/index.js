@@ -63,6 +63,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
 
   const linkUrl = window.location.href;
   const metaImg = SEO.IMAGE_META
+  const navRoute = routes.MarketplaceCategoryProductList.url.replace(':category', 'All');
   
   return (
     <>
@@ -83,7 +84,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
             <Button
               id="viewMore"
               onClick={() => {
-                navigate(routes.MarketplaceProductList.url);
+                navigate(navRoute);
                 sessionStorage.setItem('scrollPosition', 0);
               }}
               className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
@@ -109,7 +110,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
             <Button
               id="viewMore"
               onClick={() => {
-                navigate(routes.MarketplaceProductList.url);
+                navigate(navRoute);
                 sessionStorage.setItem('scrollPosition', 0);              
               }}
               className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
@@ -134,7 +135,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
             <Button
               id="viewMore"
               onClick={() => {
-                navigate(routes.MarketplaceProductList.url);
+                navigate(navRoute);
                 sessionStorage.setItem('scrollPosition', 0);              
               }}
               className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
@@ -159,7 +160,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
             <Button
               id="viewMore"
               onClick={() => {
-                navigate(routes.MarketplaceProductList.url);
+                navigate(navRoute);
                 sessionStorage.setItem('scrollPosition', 0);              
               }}
               className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
@@ -184,7 +185,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
             <Button
               id="viewMore"
               onClick={() => {
-                navigate(routes.MarketplaceProductList.url);
+                navigate(navRoute);
                 sessionStorage.setItem('scrollPosition', 0);              
               }}
               className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
