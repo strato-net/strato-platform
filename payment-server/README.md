@@ -89,5 +89,5 @@ The server requires the following environmental variables to run:
 ```
 
 If running non-dockerized, use `npm run start` or `npm run dev`.  
-If running dockerized, provide a `docker-compose.stripe-ps.yml` file and use `docker-compose -f docker-compose.stripe-ps.yml up -d --remove-orphans`.
+If running dockerized, provide a `docker-compose.payment-server.yml` file and use `docker-compose -f docker-compose.payment-server.yml up -d --remove-orphans`.
 

@@ -69,7 +69,7 @@ pipeline {
           cp strato-worktree/docker-compose.vault.yml strato-getting-started/
           cp strato-worktree/docker-compose.highway.yml strato-getting-started/
           cp strato-worktree/docker-compose.identity.yml strato-getting-started/
-          cp strato-worktree/docker-compose.stripe-ps.yml strato-getting-started/
+          cp strato-worktree/docker-compose.payment-server.yml strato-getting-started/
         '''
         dir("strato-getting-started") {
           // Copy .pem and .key for SSL
@@ -114,7 +114,7 @@ pipeline {
           '''
 
           sh 'chmod +x replace_server_ports_docker.sh'
-          sh './replace_server_ports_docker.sh docker-compose.highway.yml docker-compose.stripe-ps.yml'
+          sh './replace_server_ports_docker.sh docker-compose.highway.yml docker-compose.payment-server.yml'
 
           // Run fileserver
           withCredentials([
@@ -142,18 +142,18 @@ pipeline {
             string(credentialsId: 'STRIPE_PUBLISHABLE_KEY_TESTNET2', variable:'STRIPE_PUBLISHABLE_KEY_TESTNET2'),
             string(credentialsId: 'STRIPE_SECRET_KEY_TESTNET2', variable:'STRIPE_SECRET_KEY_TESTNET2'),
           ]) {
-            writeFile file: "run-stripe-ps.sh", text: """#!/bin/bash
+            writeFile file: "run-payment-server.sh", text: """#!/bin/bash
               sudo \\
                 STRIPE_PUBLISHABLE_KEY='${STRIPE_PUBLISHABLE_KEY_TESTNET2}' \\
                 STRIPE_SECRET_KEY='${STRIPE_SECRET_KEY_TESTNET2}' \\
                 ssl=true \\
                 HTTPS_PORT=44301 \\
-                ./stripe-ps
+                ./payment-server
             """
           }
 
-          sh 'chmod +x run-stripe-ps.sh'
-          sh './run-stripe-ps.sh'
+          sh 'chmod +x run-payment-server.sh'
+          sh './run-payment-server.sh'
           sh 'docker ps'
 
           // Run identity server
@@ -305,13 +305,13 @@ pipeline {
               docker compose -f docker-compose.vault.push.yml push 2>&1
               docker compose -f docker-compose.identity.push.yml push 2>&1
               docker compose -f docker-compose.highway.push.yml push 2>&1
-              docker compose -f docker-compose.stripe-ps.push.yml push 2>&1
+              docker compose -f docker-compose.payment-server.push.yml push 2>&1
               AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1" aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 406773134706.dkr.ecr.us-east-1.amazonaws.com
               docker compose -f docker-compose.push.ecr.yml push 2>&1
               docker compose -f docker-compose.vault.push.ecr.yml push 2>&1
               docker compose -f docker-compose.identity.push.ecr.yml push 2>&1
               docker compose -f docker-compose.highway.push.ecr.yml push 2>&1
-              docker compose -f docker-compose.stripe-ps.push.ecr.yml push 2>&1
+              docker compose -f docker-compose.payment-server.push.ecr.yml push 2>&1
             '''
 
             // Release to blockapps/strato-getting-started
@@ -326,12 +326,12 @@ pipeline {
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.vault.yml" --file ./docker-compose.vault.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.identity.yml" --file ./docker-compose.identity.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.highway.yml" --file ./docker-compose.highway.yml
-              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.stripe-ps.yml" --file ./docker-compose.stripe-ps.yml
+              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.payment-server.yml" --file ./docker-compose.payment-server.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.ecr.yml" --file ./docker-compose.ecr.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.vault.ecr.yml" --file ./docker-compose.vault.ecr.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.identity.ecr.yml" --file ./docker-compose.identity.ecr.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.highway.ecr.yml" --file ./docker-compose.highway.ecr.yml
-              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.stripe-ps.ecr.yml" --file ./docker-compose.stripe-ps.ecr.yml
+              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.payment-server.ecr.yml" --file ./docker-compose.payment-server.ecr.yml
             '''
 
             // Merge release code to master
