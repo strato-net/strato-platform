@@ -3,8 +3,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -Wall #-}
 
-import BlockApps.Tools.Block as Block
-import BlockApps.Tools.BlockGO as BlockGO
 import BlockApps.Tools.CanonRedis
 import BlockApps.Tools.ChainHash
 import BlockApps.Tools.Checkpoints
@@ -34,17 +32,19 @@ import Blockchain.Participation
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Keccak256 hiding (hash)
+import Control.Monad
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import Data.Int
 import qualified Data.Text as T
 import qualified LabeledError
 import System.Console.CmdArgs
+import System.Directory
+import System.FilePath
+import System.IO
 
 data Options
   = State {root :: String, db :: String}
-  | Block {hash :: String, db :: String}
-  | BlockGO {hash :: String, db :: String}
   | Hash {hash :: String, db :: String}
   | Code {hash :: String, db :: String}
   | RawMP {stateRoot :: String, filename :: String}
@@ -90,8 +90,9 @@ stateOptions :: Annotate Ann
 stateOptions =
   record
     State {root = undefined, db = undefined}
-    [ root := def += typ "StateRoot" += argPos 1,
-      db := def += typ "DBSTRING" += argPos 0
+    [ 
+      db := def += typ "DBSTRING" += argPos 0,
+      root := def += typ "StateRoot" += argPos 1
     ]
 
 canonRedisOptions :: Annotate Ann
@@ -110,21 +111,6 @@ dumpRedisOptions =
     [ databaseNumber := 0 += typ "INT"
     ]
 
-blockOptions :: Annotate Ann
-blockOptions =
-  record
-    Block {hash = undefined, db = undefined}
-    [ hash := def += typ "FILENAME" += argPos 1 += opt ("-" :: String),
-      db := def += typ "DBSTRING" += argPos 0
-    ]
-
-blockGoOptions :: Annotate Ann
-blockGoOptions =
-  record
-    BlockGO {hash = undefined, db = undefined}
-    [ hash := def += typ "FILENAME" += argPos 1 += opt ("-" :: String),
-      db := def += typ "DBSTRING" += argPos 0
-    ]
 
 hashOptions :: Annotate Ann
 hashOptions =
@@ -401,8 +387,7 @@ putPrivacyOptions =
 options :: Annotate Ann
 options =
   modes_
-    [ blockGoOptions,
-      blockOptions,
+    [
       canonRedisOptions,
       checkpointOptions,
       codeOptions,
@@ -445,27 +430,49 @@ options =
       putPrivacyOptions
     ]
 
---      += summary "Apply shims, reorganize, and generate to the input"
+
+-- Function to copy a file
+copyFile' :: FilePath -> FilePath -> IO ()
+copyFile' src dest = do
+    handle <- openFile src ReadMode
+    hSetEncoding handle latin1
+    contents <- hGetContents handle
+    writeFile dest contents
+
+-- Function to copy a directory recursively
+copyDirectory :: FilePath -> FilePath -> IO ()
+copyDirectory src dest = do
+    createDirectoryIfMissing True dest
+    contents <- listDirectory src
+    forM_ contents $ \n -> do
+        let srcPath = src </> n
+            destPath = dest </> n
+        isFile <- doesFileExist srcPath
+        if isFile
+            then copyFile' srcPath destPath
+            else copyDirectory srcPath destPath
 
 main :: IO ()
 main = do
   opts <- cmdArgs_ options
-  run opts
+  run' opts
 
 -------------------
+run' :: Options -> IO ()
+run' o = do
+  copyDirectory ".ethereumH/" "/tmp/.ethereumH/" 
+  run o
 
 run :: Options -> IO ()
 run State {..} = let sr = MP.StateRoot $ LabeledError.b16Decode "queryStrato/run" $ BC.pack root in State.doit db sr
 run DumpRedis {..} = dumpRedis databaseNumber
 run CanonRedis {..} = canonRedis ipAddress start range
-run Block {..} = Block.doit db hash
-run BlockGO {..} = BlockGO.doit hash
 run Hash {..} = Hash.doit db hash
 run Code {..} = Code.doit db hash
 run Raw {..} = Raw.doit filename
 run RLP {..} = RLP.doit filename
-run RawMP {..} = RawMP.doit filename (MP.StateRoot . LabeledError.b16Decode "queryStrato/run" $ BC.pack stateRoot)
-run FRawMP {..} = FRawMP.doit filename (MP.StateRoot . LabeledError.b16Decode "queryStrato/run" $ BC.pack stateRoot)
+run RawMP {..} = RawMP.doit filename (MP.StateRoot . LabeledError.b16Decode "queryStrato/RawMP" $ BC.pack stateRoot)
+run FRawMP {..} = FRawMP.doit filename (MP.StateRoot . LabeledError.b16Decode "queryStrato/FRawMP" $ BC.pack stateRoot)
 run DumpKafkaSequencer {..} = dumpKafkaSequencer (fromIntegral startingBlock)
 run DumpKafkaSequencerVM {..} = dumpKafkaSequencerVM (fromIntegral startingBlock)
 run DumpKafkaSequencerP2P {..} = dumpKafkaSequencerP2P (fromIntegral startingBlock)
