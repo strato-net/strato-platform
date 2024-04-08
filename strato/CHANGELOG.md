@@ -25,6 +25,7 @@ so that they could be properly moved to their respective version's subsection.
 
 ### Removed
 - Removed `brokenRefundRenable`, `cacheTransactionResults`, `faucetEnabled`, `createTransactionResults` flags
+- Removed `certInfo` flag from strato-sequencer (cert is now derived from genesis block or during sync)
 
 
 ## [11.1.0] - 3/28/2023

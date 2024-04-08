@@ -31,20 +31,33 @@ pipeline {
       steps {
         withCredentials([
           usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
-          usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')
+          usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME'),
+          usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
         ]) {
             sh '''#!/bin/bash -le
               set -x
               rm -rf strato-getting-started
               git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-getting-started
               cd strato-getting-started
-              ./strato --compose
-              ./strato --pull
-              OAUTH_CLIENT_ID=localhost-80-infinite \
-                OAUTH_CLIENT_SECRET=adac9a89-ee8b-4683-b043-084ae14ef776 \
+              ./vault --compose && ./vault --pull
+              HTTP_PORT=8093 \
+                INITIAL_OAUTH_DISCOVERY_URL='https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration' \
+                INITIAL_OAUTH_ISSUER='https://keycloak.blockapps.net/auth/realms/strato-devel' \
+                INITIAL_OAUTH_JWT_USERNAME_CLAIM='sub' \
+                PASSWORD=123 \
+                ./vault
+
+              ./strato --compose && ./strato --pull
+            
+              # payment, file, and id server urls are all dummy vals and unused (just needed to prevent node crash)
+              OAUTH_CLIENT_ID='${KEYCLOAK_STRATODEVEL_DEV_ID}' \
+                OAUTH_CLIENT_SECRET='${KEYCLOAK_STRATODEVEL_DEV_SECRET}' \
                 OAUTH_JWT_USERNAME_PROPERTY=email \
                 OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \
-                PASSWORD=123 \
+                VAULT_URL=http://\$(</host):8093 \
+                STRIPE_PAYMENT_SERVER_URL='dummy' \
+                FILE_SERVER_URL='dummy' \
+                idServerUrl='dummy' \
                 ./strato --single
               docker ps
               counter=0

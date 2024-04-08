@@ -71,6 +71,7 @@ let server
     swaggerUi.serve,
     swaggerUi.setup(swaggerSpecs)
   );
+
 })();
 
 export default server;
