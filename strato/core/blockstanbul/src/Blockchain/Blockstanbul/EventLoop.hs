@@ -158,7 +158,7 @@ nextRound nt = do
   proposer .= leader
   proposal .= Nothing
   self <- use selfCert
-  when (isJust self && leader == fromJust self) $ do
+  when (Just leader == self) $ do
     lock <- use blockLock
     case lock of
       Nothing -> yieldR MakeBlockCommand
@@ -258,7 +258,7 @@ eventLoop ctx = execStateC ctx $
           ppl <- use proposal
           leader <- use proposer
           self <- use selfCert
-          when (isJust self && isNothing ppl && leader == (fromJust self)) $ do
+          when (isNothing ppl && Just leader == self) $ do
             vs <- use validators
             let blockWithVs = addValidators vs blk
             pseal <- proposerSeal blockWithVs
