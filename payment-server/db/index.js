@@ -38,7 +38,20 @@ client.connect()
         return client.query(query);
     })
     .then(() => {
-        console.log('Table created or already exists.');
+        console.log('customer_address Table created or already exists.');
+
+        const createMetamaskWalletTable = `
+            CREATE TABLE IF NOT EXISTS metamask_wallet (
+                id SERIAL PRIMARY KEY,
+                commonName TEXT,
+                walletAddress TEXT,
+                createdDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );`;
+
+        return client.query(createMetamaskWalletTable);
+    })
+    .then(() => {
+        console.log('metamask_wallet Table created or already exists.');
     })
     .catch(error => {
         console.error('Error creating table:', error);
