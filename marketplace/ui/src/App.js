@@ -11,6 +11,7 @@ import TagManager from "react-gtm-module";
 import { UsersProvider } from "./contexts/users";
 import { useMarketplaceState } from "./contexts/marketplace";
 import { getCookie, delete_cookie } from "./helpers/cookie";
+import InternalError from "./components/500";
 import { CategorysProvider } from "./contexts/category";
 
 const { Content } = Layout;
@@ -24,7 +25,7 @@ const App = () => {
 
   TagManager.initialize(tagManagerArgs);
 
-  const { user, loginUrl, users, isAuthenticated } = useAuthenticateState();
+  const { user, loginUrl, users, isAuthenticated, error } = useAuthenticateState();
 
   window.LOQ = window.LOQ || [];
   window.LOQ.push([
@@ -84,12 +85,14 @@ const App = () => {
             />
           </CategorysProvider>
         </UsersProvider>
-        <Content className={`${showMenu ? 'overflow-y-hidden md:overflow-auto h-[100vh] md:h-auto w-[100vw] md:w-auto bg-[#00000020] md:bg-white relative mt-0 md:mt-28' : 'mt-[89px] md:mt-[98px] '}`}>
-          <AuthenticatedRoutes user={user} users={users} isAuthenticated={isAuthenticated} />
-        </Content>
+        {error === "Internal Server Error 101"
+          ? <InternalError />
+          : <Content className={`${showMenu ? 'overflow-y-hidden md:overflow-auto h-[100vh] md:h-auto w-[100vw] md:w-auto bg-[#00000020] md:bg-white relative mt-0 md:mt-28' : 'mt-[89px] md:mt-[98px] '}`}>
+            <AuthenticatedRoutes user={user} users={users} isAuthenticated={isAuthenticated} />
+          </Content>}
         {!isMarketplaceLoading && <FooterComponent />}
       </Layout>
-    </BrowserRouter>
+    </BrowserRouter >
   );
 };
 export default App;
