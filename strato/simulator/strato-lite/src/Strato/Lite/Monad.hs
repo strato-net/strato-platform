@@ -1082,9 +1082,9 @@ startingCheckpoint :: [ChainMemberParsedSet] -> Checkpoint
 startingCheckpoint as = def {checkpointValidators = as}
 
 newBlockstanbulContext :: ChainMemberParsedSet -> [ChainMemberParsedSet] -> Bool -> BlockstanbulContext
-newBlockstanbulContext paddr as valBehav =
+newBlockstanbulContext chainm as valBehav =
   let ckpt = startingCheckpoint as
-   in newContext ckpt paddr valBehav
+   in newContext ckpt Nothing valBehav (Just chainm)
 
 emptyBlockstanbulContext :: BlockstanbulContext
 emptyBlockstanbulContext = newBlockstanbulContext undefined [] True
@@ -1413,7 +1413,7 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAs
         runConduit $
           sourceTQueue seqVmSource
             .| (awaitForever $ yield . foldr VMEvent.insertInBatch VMEvent.newInBatch)
-            .| handleVmEvents False
+            .| handleVmEvents
             .| (awaitForever $ yield . flip VMEvent.insertOutBatch VMEvent.newOutBatch)
             .| ( awaitForever $ \b -> do
                    $logInfoS (name <> "/vm") . T.pack $ show $ toList (VMEvent.outEvents b)
