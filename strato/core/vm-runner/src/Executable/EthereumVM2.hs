@@ -28,7 +28,6 @@ import Blockchain.DB.CodeDB (CodeKind (..), getCode)
 import qualified Blockchain.DB.MemAddressStateDB as Mem
 import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
-import Blockchain.Data.Block (BestBlock (..), WorldBestBlock (..))
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.ChainInfo
 import Blockchain.Data.DataDefs (BlockData (..), TransactionResult (..), blockDataNumber)
@@ -85,9 +84,8 @@ microtimeCutoff = secondsToMicrotime flags_mempoolLivenessCutoff
 
 handleVmEvents ::
   (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) =>
-  Bool ->
   ConduitT VmInEventBatch VmOutEvent m ()
-handleVmEvents useSyncMode = awaitForever $ \InBatch {..} -> do
+handleVmEvents = awaitForever $ \InBatch {..} -> do
   rpcResps <- lift $ do
     bbHash <- maybe Keccak256.zeroHash fst <$> getChainBestBlock Nothing
     resps <- withCurrentBlockHash bbHash $ traverse runJsonRpcCommand' rpcCommands
@@ -103,7 +101,6 @@ handleVmEvents useSyncMode = awaitForever $ \InBatch {..} -> do
     Mod.modify_ (Mod.Proxy @ContextState) $ pure . (blockRequested ||~ createBlock)
     -- todo: perhaps we shouldnt even add TXs to the mempool, it might make for a VERY large checkpoint
     -- todo: which may fail
-    isCaughtUp <- shouldProcessNewTransactions useSyncMode
     bState <- Bagger.getBaggerState
     pbft <- _hasBlockstanbul <$> Mod.get (Mod.Proxy @ContextState)
     reqd <- _blockRequested <$> Mod.get (Mod.Proxy @ContextState)
@@ -112,11 +109,9 @@ handleVmEvents useSyncMode = awaitForever $ \InBatch {..} -> do
         priv = toList . B.privateHashes $ B.miningCache bState
         hasTxs = (numPoolable > 0) || not (M.null pending) || not (null priv)
         shouldOutputBlocks =
-          isCaughtUp
-            && ( if pbft
-                   then reqd && hasTxs
-                   else not makeLazyBlocks || hasTxs
-               )
+          if pbft
+            then reqd && hasTxs
+            else not makeLazyBlocks || hasTxs
     $logInfoS "evm/loop/newBlock" . T.pack $
       printf
         "Num poolable: %d, num pending: %d"
@@ -125,7 +120,6 @@ handleVmEvents useSyncMode = awaitForever $ \InBatch {..} -> do
     multilineLog "evm/loop/newBlock" $
       boringBox
         [ CL.yellow "Decision making for block creation:",
-          "isCaughtUp: " ++ formatBool isCaughtUp,
           "pbft: " ++ formatBool pbft,
           "reqd: " ++ formatBool reqd,
           "hasTxs: " ++ formatBool hasTxs,
@@ -206,57 +200,55 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis {..} -> do
             let (orgName, appName) = case mExecResults of
                   [] -> ("", "")
                   x : _ -> (erOrgName x, erAppName x)
-            when flags_createTransactionResults $
-              yield . OutTXR $
-                TransactionResult
-                  { transactionResultBlockHash = cBlock,
-                    transactionResultTransactionHash = tHash,
-                    transactionResultMessage = "Success!",
-                    transactionResultResponse = case kind of
-                      EVM -> ""
-                      SolidVM -> "()",
-                    transactionResultTrace = unlines $ unlines . reverse . erTrace <$> mExecResults,
-                    transactionResultGasUsed = 0,
-                    transactionResultEtherUsed = 0,
-                    transactionResultContractsCreated = intercalate "," $ map show addrsCreated,
-                    transactionResultContractsDeleted = "",
-                    transactionResultStateDiff = "",
-                    transactionResultTime = 0.0,
-                    transactionResultNewStorage = "",
-                    transactionResultDeletedStorage = "",
-                    transactionResultStatus = Just Success,
-                    transactionResultChainId = Just cId,
-                    transactionResultKind = Just kind,
-                    transactionResultOrgName = orgName,
-                    transactionResultAppName = appName
-                  }
+            yield . OutTXR $
+              TransactionResult
+                { transactionResultBlockHash = cBlock,
+                  transactionResultTransactionHash = tHash,
+                  transactionResultMessage = "Success!",
+                  transactionResultResponse = case kind of
+                    EVM -> ""
+                    SolidVM -> "()",
+                  transactionResultTrace = unlines $ unlines . reverse . erTrace <$> mExecResults,
+                  transactionResultGasUsed = 0,
+                  transactionResultEtherUsed = 0,
+                  transactionResultContractsCreated = intercalate "," $ map show addrsCreated,
+                  transactionResultContractsDeleted = "",
+                  transactionResultStateDiff = "",
+                  transactionResultTime = 0.0,
+                  transactionResultNewStorage = "",
+                  transactionResultDeletedStorage = "",
+                  transactionResultStatus = Just Success,
+                  transactionResultChainId = Just cId,
+                  transactionResultKind = Just kind,
+                  transactionResultOrgName = orgName,
+                  transactionResultAppName = appName
+                }
             Just (cId, cInfo, bHash, mExecResults) <$ putChainGenesisInfo (Just cId) cBlock sr pChains
           x : _ -> do
             let fmt = either show show x
-            when flags_createTransactionResults $
-              yield . OutTXR $
-                TransactionResult
-                  { transactionResultBlockHash = cBlock,
-                    transactionResultTransactionHash = tHash,
-                    transactionResultMessage = fmt,
-                    transactionResultResponse = case kind of
-                      EVM -> ""
-                      SolidVM -> "()",
-                    transactionResultTrace = unlines $ unlines . reverse . erTrace <$> mExecResults,
-                    transactionResultGasUsed = 0,
-                    transactionResultEtherUsed = 0,
-                    transactionResultContractsCreated = "",
-                    transactionResultContractsDeleted = "",
-                    transactionResultStateDiff = "",
-                    transactionResultTime = 0.0,
-                    transactionResultNewStorage = "",
-                    transactionResultDeletedStorage = "",
-                    transactionResultStatus = Just $ Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt),
-                    transactionResultChainId = Just cId,
-                    transactionResultKind = Just kind,
-                    transactionResultOrgName = "",
-                    transactionResultAppName = ""
-                  }
+            yield . OutTXR $
+              TransactionResult
+                { transactionResultBlockHash = cBlock,
+                  transactionResultTransactionHash = tHash,
+                  transactionResultMessage = fmt,
+                  transactionResultResponse = case kind of
+                    EVM -> ""
+                    SolidVM -> "()",
+                  transactionResultTrace = unlines $ unlines . reverse . erTrace <$> mExecResults,
+                  transactionResultGasUsed = 0,
+                  transactionResultEtherUsed = 0,
+                  transactionResultContractsCreated = "",
+                  transactionResultContractsDeleted = "",
+                  transactionResultStateDiff = "",
+                  transactionResultTime = 0.0,
+                  transactionResultNewStorage = "",
+                  transactionResultDeletedStorage = "",
+                  transactionResultStatus = Just $ Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt),
+                  transactionResultChainId = Just cId,
+                  transactionResultKind = Just kind,
+                  transactionResultOrgName = "",
+                  transactionResultAppName = ""
+                }
             return Nothing
 
 outputNewChains :: VMBase m => [(Word256, ChainInfo, Keccak256, [ExecResults])] -> ConduitT a VmOutEvent m ()
@@ -433,29 +425,3 @@ writeBlockSummary block =
       txCnt = fromIntegral $ length (obReceiptTransactions block)
    in putBSum sha (blockHeaderToBSum header td txCnt)
 
-shouldProcessNewTransactions ::
-  ( MonadLogger m,
-    Mod.Accessible (Maybe WorldBestBlock) m,
-    HasBlockSummaryDB m
-  ) =>
-  Bool ->
-  m Bool -- todo: probably shouldn't do it by number, but tdiff.
-shouldProcessNewTransactions useSyncMode =
-  if useSyncMode
-    then do
-      worldBestBlock <- fmap unWorldBestBlock <$> Mod.access (Mod.Proxy @(Maybe WorldBestBlock))
-      case worldBestBlock of
-        Nothing -> do
-          $logInfoS "shouldProcessNewTransactions" "got Nothing from worldBestBlockInfo, playing it safe and not mining Txs"
-          return False -- we either had no peers or some other error, lets play it safe
-        Just (BestBlock worldBestSha _ _) -> do
-          didRunBest <- hasBSum worldBestSha
-          let msg =
-                if didRunBest
-                  then "found blockSummary for worldBestSha " ++ format worldBestSha ++ ", will mine"
-                  else "A peer has claimed that block hash " ++ format worldBestSha ++ " is the best block, but we don't have this block yet. We are behind, mining is futile, bagger is shutting down (until we are caught up)."
-          $logInfoS "shouldProcessNewTransactions" (T.pack msg)
-          return didRunBest -- todo, verify TDiff etc.
-    else do
-      $logInfoS "shouldProcessNewTransactions" "useSyncMode == false, will process all new TXs"
-      return True
