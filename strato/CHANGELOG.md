@@ -24,6 +24,7 @@ so that they could be properly moved to their respective version's subsection.
 ### Fixed
 
 ### Removed
+- Removed `certInfo` flag from strato-sequencer
 
 
 ## [11.1.0] - 3/28/2023
