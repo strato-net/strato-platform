@@ -17,5 +17,5 @@ predicate _ = False
 
 main :: IO ()
 main = do
-  void $ $initHFlagsDependentDefaults "solid vm spec" (const $ const $ const $ [("requireCerts", "True")])
+  void $ $initHFlagsDependentDefaults "solid vm spec" (const $ const $ const $ [("requireCerts", "False"), ("minLogLevel", "LevelDebug"), ("accountNonceLimit", "10"), ("gasOn", "False"), ("networkID", "1234442341"), ("network", "mercata-test")])
   hspecWith (configAddFilter predicate defaultConfig) Spec.spec
