@@ -236,7 +236,7 @@ const Inventory = ({ user }) => {
 
     // Perform seller onboarding with the obtained wallet ID
     try {
-      await actions.onboardSellerToMetamask(dispatch, walletId);
+      await actions.onboardSellerToMetamask(dispatch, {walletId});
     } catch (error) {
       console.error("Failed to onboard seller to MetaMask:", error);
       notification.error({

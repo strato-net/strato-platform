@@ -6,9 +6,9 @@ class PaymentServiceController {
 
   static async metaMaskOnboarding(req, res, next) {
     try {
-      const { params, dapp } = req;
-      // TODO: call payment server
-      const result = await dapp.metaMaskOnboarding(params)
+      const { dapp, body } = req;
+
+      const result = await dapp.metaMaskOnboarding(body)
 
       rest.response.status200(res, result)
 
@@ -22,8 +22,6 @@ class PaymentServiceController {
     try {
       const { dapp, params } = req
 
-      PaymentServiceController.validateGetStripeOnboardingStatusArgs(params)
-      // TODO: call payment server
       const result = await dapp.getMetaMaskOnboardingStatus(params)
       rest.response.status200(res, result)
 

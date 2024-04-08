@@ -723,12 +723,18 @@ const actions = {
     }
   },
 
-  onboardSellerToMetamask: async (dispatch, walletId) => {
+  onboardSellerToMetamask: async (dispatch, payload) => {
     dispatch({ type: actionDescriptors.onboardSellerToMetamask });
 
     try {
-      const response = await fetch(`${apiUrl}/payment/metamask/account/${walletId}`, {
-        method: HTTP_METHODS.GET,
+      const response = await fetch(`${apiUrl}/payment/metamask/account`, {
+        method: HTTP_METHODS.POST,
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
       });
 
       const body = await response.json();
@@ -767,21 +773,18 @@ const actions = {
     }
   },
 
-  sellerMetamaskStatus: async (dispatch, username) => {
+  sellerMetamaskStatus: async (dispatch, commonName) => {
     dispatch({ type: actionDescriptors.sellerMetamaskStatus });
 
     try {
-      const response = await fetch(`${apiUrl}/payment/metamask/account/status/${username}`, {
+      const response = await fetch(`${apiUrl}/payment/metamask/account/status/${commonName}`, {
         method: HTTP_METHODS.GET,
       });
 
       const body = await response.json();
 
       if (response.status === RestStatus.OK) {
-        dispatch({
-          type: actionDescriptors.sellerMetamaskStatusSuccessful,
-          payload: body.data,
-        });
+        dispatch({type: actionDescriptors.sellerMetamaskStatusSuccessful});
         return body.data;
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({

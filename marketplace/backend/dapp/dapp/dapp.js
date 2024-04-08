@@ -643,7 +643,54 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   /* ------------------------ User Activity Ends------------------------ */
-
+  
+  /* ------------------------ MetaMask account connect starts here ------------------------ */
+  contract.metaMaskOnboarding = async function (args, options = defaultOptions) {
+    try {
+      await axios
+        .post(new URL(`/metamask/onboard`, POSTGRES_SERVER_URL).href, {
+          commonName: userCert.commonName,
+          ...args
+        })
+        .then(function (res) {
+          if (res.status === 200) {
+            console.log(res.data);
+          } else {
+            throw new rest.RestError(
+              RestStatus.BAD_REQUEST,
+              `Payment server call failed: ${res.statusText}`
+            );
+          }
+        });
+      return {};
+    } catch (error) {
+      if (error.response) {
+        throw new rest.RestError(error.response.status, error.response.statusText);
+      }
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while onboarding user to MetaMask: ${JSON.stringify(error)} `);
+    }
+  };
+  
+  contract.getMetaMaskOnboardingStatus = async function (args, options = defaultOptions) {
+    try {
+      const { commonName } = args;
+      const userAddress = await axios.get(new URL(`/metamask/status/${commonName}`, POSTGRES_SERVER_URL).href).then(function (res) {
+        if (res.status === 200) {
+          return res.data.data;
+        } else {
+          throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+        }
+      });
+      return userAddress;
+    } catch (error) {
+      if (error.response) {
+        throw new rest.RestError(error.response.status, error.response.statusText);
+      }
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching seller MetaMask status: ${JSON.stringify(error)} `);
+    }
+  };
+      
+  /* ------------------------ MetaMask account connect ends here ------------------------ */
 
   /* ------------------------ Stripe account connect starts here ------------------------ */
   contract.stripeOnboarding = async function (args, options = defaultOptions) {

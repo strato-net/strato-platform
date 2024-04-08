@@ -263,7 +263,7 @@ const reducer = (state, action) => {
     case actionDescriptors.sellerMetamaskStatusSuccessful:
       return {
         ...state,
-        metamaskStatus: action.payload,
+        metamaskStatus: true,
         isLoadingMetamaskStatus: false
       };
     case actionDescriptors.sellerMetamaskStatusFailed:
