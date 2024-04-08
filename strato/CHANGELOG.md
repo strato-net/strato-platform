@@ -24,8 +24,8 @@ so that they could be properly moved to their respective version's subsection.
 ### Fixed
 
 ### Removed
-
-- Removed unused flags, such as `gasOn`, `splitinit`, and `useSyncMode`
+- Removed `certInfo` flag from strato-sequencer (cert is now derived from genesis block or during sync)
+- Removed unused flags, such as `brokenRefundRenable`, `cacheTransactionResults`, `faucetEnabled`, `createTransactionResults`, `gasOn`, `splitinit`, and `useSyncMode`
 
 
 ## [11.1.0] - 3/28/2023

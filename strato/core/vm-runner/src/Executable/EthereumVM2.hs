@@ -200,57 +200,55 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis {..} -> do
             let (orgName, appName) = case mExecResults of
                   [] -> ("", "")
                   x : _ -> (erOrgName x, erAppName x)
-            when flags_createTransactionResults $
-              yield . OutTXR $
-                TransactionResult
-                  { transactionResultBlockHash = cBlock,
-                    transactionResultTransactionHash = tHash,
-                    transactionResultMessage = "Success!",
-                    transactionResultResponse = case kind of
-                      EVM -> ""
-                      SolidVM -> "()",
-                    transactionResultTrace = unlines $ unlines . reverse . erTrace <$> mExecResults,
-                    transactionResultGasUsed = 0,
-                    transactionResultEtherUsed = 0,
-                    transactionResultContractsCreated = intercalate "," $ map show addrsCreated,
-                    transactionResultContractsDeleted = "",
-                    transactionResultStateDiff = "",
-                    transactionResultTime = 0.0,
-                    transactionResultNewStorage = "",
-                    transactionResultDeletedStorage = "",
-                    transactionResultStatus = Just Success,
-                    transactionResultChainId = Just cId,
-                    transactionResultKind = Just kind,
-                    transactionResultOrgName = orgName,
-                    transactionResultAppName = appName
-                  }
+            yield . OutTXR $
+              TransactionResult
+                { transactionResultBlockHash = cBlock,
+                  transactionResultTransactionHash = tHash,
+                  transactionResultMessage = "Success!",
+                  transactionResultResponse = case kind of
+                    EVM -> ""
+                    SolidVM -> "()",
+                  transactionResultTrace = unlines $ unlines . reverse . erTrace <$> mExecResults,
+                  transactionResultGasUsed = 0,
+                  transactionResultEtherUsed = 0,
+                  transactionResultContractsCreated = intercalate "," $ map show addrsCreated,
+                  transactionResultContractsDeleted = "",
+                  transactionResultStateDiff = "",
+                  transactionResultTime = 0.0,
+                  transactionResultNewStorage = "",
+                  transactionResultDeletedStorage = "",
+                  transactionResultStatus = Just Success,
+                  transactionResultChainId = Just cId,
+                  transactionResultKind = Just kind,
+                  transactionResultOrgName = orgName,
+                  transactionResultAppName = appName
+                }
             Just (cId, cInfo, bHash, mExecResults) <$ putChainGenesisInfo (Just cId) cBlock sr pChains
           x : _ -> do
             let fmt = either show show x
-            when flags_createTransactionResults $
-              yield . OutTXR $
-                TransactionResult
-                  { transactionResultBlockHash = cBlock,
-                    transactionResultTransactionHash = tHash,
-                    transactionResultMessage = fmt,
-                    transactionResultResponse = case kind of
-                      EVM -> ""
-                      SolidVM -> "()",
-                    transactionResultTrace = unlines $ unlines . reverse . erTrace <$> mExecResults,
-                    transactionResultGasUsed = 0,
-                    transactionResultEtherUsed = 0,
-                    transactionResultContractsCreated = "",
-                    transactionResultContractsDeleted = "",
-                    transactionResultStateDiff = "",
-                    transactionResultTime = 0.0,
-                    transactionResultNewStorage = "",
-                    transactionResultDeletedStorage = "",
-                    transactionResultStatus = Just $ Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt),
-                    transactionResultChainId = Just cId,
-                    transactionResultKind = Just kind,
-                    transactionResultOrgName = "",
-                    transactionResultAppName = ""
-                  }
+            yield . OutTXR $
+              TransactionResult
+                { transactionResultBlockHash = cBlock,
+                  transactionResultTransactionHash = tHash,
+                  transactionResultMessage = fmt,
+                  transactionResultResponse = case kind of
+                    EVM -> ""
+                    SolidVM -> "()",
+                  transactionResultTrace = unlines $ unlines . reverse . erTrace <$> mExecResults,
+                  transactionResultGasUsed = 0,
+                  transactionResultEtherUsed = 0,
+                  transactionResultContractsCreated = "",
+                  transactionResultContractsDeleted = "",
+                  transactionResultStateDiff = "",
+                  transactionResultTime = 0.0,
+                  transactionResultNewStorage = "",
+                  transactionResultDeletedStorage = "",
+                  transactionResultStatus = Just $ Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt),
+                  transactionResultChainId = Just cId,
+                  transactionResultKind = Just kind,
+                  transactionResultOrgName = "",
+                  transactionResultAppName = ""
+                }
             return Nothing
 
 outputNewChains :: VMBase m => [(Word256, ChainInfo, Keccak256, [ExecResults])] -> ConduitT a VmOutEvent m ()

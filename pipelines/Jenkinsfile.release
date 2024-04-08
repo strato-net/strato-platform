@@ -176,13 +176,10 @@ pipeline {
 
           // TODO: run node on https (also update check_availability function)
           withCredentials([
-              usernamePassword(credentialsId: 'stripe-key', passwordVariable: 'STRIPE_SECRET_KEY', usernameVariable: 'STRIPE_PUBLISHABLE_KEY'),
               usernamePassword(credentialsId: 'marketplace-global-admin', passwordVariable: 'GLOBAL_ADMIN_PASSWORD', usernameVariable: 'GLOBAL_ADMIN_NAME'),
               usernamePassword(credentialsId: 'marketplace-dev-aws-iam-user', passwordVariable: 'AWS_IAM_USER_ACCESS_KEY', usernameVariable: 'AWS_IAM_USER_KEY_ID'),
               usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
-              usernamePassword(credentialsId: 'keycloak-strato-devel-dev-testing2-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEVTESTING2_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEVTESTING2_ID'),
           ]) {
-            // TODO: run the temporary stripe payment server instead
             writeFile file: "run.sh", text: """#!/bin/bash
               sudo \\
                 NODE_HOST=\$(</host) \\
@@ -192,7 +189,6 @@ pipeline {
                 OAUTH_CLIENT_SECRET='${KEYCLOAK_STRATODEVEL_DEV_SECRET}' \\
                 VAULT_URL=https://\$(</host):8093 \\
                 VAULT_PROXY_DEBUG=true \\
-                certInfo='{"orgName":"BlockApps","orgUnit":"Engineering","commonName":"Test"}' \\
                 STRIPE_PAYMENT_SERVER_URL=https://\$(</host):44301 \\
                 FILE_SERVER_URL=https://\$(</host):44300/highway \\
                 idServerUrl=https://\$(</host):8001 \\
@@ -256,6 +252,7 @@ pipeline {
         }
         withCredentials([
           usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
+          usernamePassword(credentialsId: 'keycloak-strato-devel-dev-testing2-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEVTESTING2_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEVTESTING2_ID'),
         ]) {
           script {
             lib.registerTestUserCert(
