@@ -1,6 +1,6 @@
 import { rest, util, importer } from "blockapps-rest";
 const { createContract } = rest;
-import constants, { STRIPE_PAYMENT_SERVER_URL } from "/helpers/constants";
+import constants, { STRIPE_PAYMENT_SERVER_URL, POSTGRESQL_API_URL } from "/helpers/constants";
 import { yamlWrite, yamlSafeDumpSync, getYamlFile } from "/helpers/config";
 import { pollingHelper } from "/helpers/utils";
 
@@ -936,7 +936,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.createUserAddress = async function (args, options = defaultOptions) {
     try {
-      await axios.post(new URL(`/customer/address`, STRIPE_PAYMENT_SERVER_URL).href, { commonName: userCert.commonName, ...args })
+      await axios.post(new URL(`/customer/address`, POSTGRESQL_API_URL).href, { commonName: userCert.commonName, ...args })
         .then(function (res) {
           if (res.status === 200) {
             console.log(res.data);
@@ -955,7 +955,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getAllUserAddress = async function (args, options = optionsNoChainIds) {
     try {
-      const userAddresses = await axios.get(new URL(`/customer/address/${userCert.commonName}`, STRIPE_PAYMENT_SERVER_URL).href).then(function (res) {
+      const userAddresses = await axios.get(new URL(`/customer/address/${userCert.commonName}`, POSTGRESQL_API_URL).href).then(function (res) {
         if (res.status === 200) {
           return res.data.data;
         } else {
@@ -974,7 +974,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getAddressFromId = async function (args, options = defaultOptions) {
     try {
       const { id } = args;
-      const userAddress = await axios.get(new URL(`/customer/address/id/${id}`, STRIPE_PAYMENT_SERVER_URL).href).then(function (res) {
+      const userAddress = await axios.get(new URL(`/customer/address/id/${id}`, POSTGRESQL_API_URL).href).then(function (res) {
         if (res.status === 200) {
           return res.data.data;
         } else {

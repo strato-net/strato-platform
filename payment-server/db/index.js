@@ -2,11 +2,11 @@ const fs = require('fs');
 const { Client } = require('pg');
 
 const client = new Client({
-    host: 'payments-dev.cbx3kn52dupr.us-east-1.rds.amazonaws.com',
-    port: 5432,
-    user: 'postgres',
-    password: '}fa9t4+JJ*3wme?Wp]t1tHT{kzP0',
-    dbname: 'postgres',
+    host: process.env.POSTGRESQL_SERVER_URL,
+    port: process.env.POSTGRESQL_PORT,
+    user: process.env.POSTGRESQL_USER,
+    password: process.env.POSTGRESQL_PASSWORD,
+    dbname: process.env.POSTGRESQL_DBNAME,
     // ssl: true,
     // dialect: 'postgres',
     ssl: { 
@@ -14,8 +14,6 @@ const client = new Client({
         rejectUnauthorized: true,
         ca: fs.readFileSync('./dbCert/us-east-1-bundle.cer').toString(), 
       } 
-    
-
 });
 
 client.connect()
