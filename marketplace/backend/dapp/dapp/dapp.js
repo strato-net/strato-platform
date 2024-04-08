@@ -647,7 +647,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   /* ------------------------ MetaMask account connect starts here ------------------------ */
   contract.metaMaskOnboarding = async function (args, options = defaultOptions) {
     try {
-      await axios
+      const { walletAddress } = args;
+      const getOptions = { ...options, app: contractName };
+      
+      // get user paymentProvider details from cirrus
+      const sellerMetaMaskDetails = await paymentProviderJs.get(rawAdmin, { name: 'METAMASK', accountDeauthorized: false, ownerCommonName: userCert.commonName }, getOptions)
+      
+      if (sellerMetaMaskDetails.length == 0 || Object.keys(sellerMetaMaskDetails[0]).length == 0) {
+        await paymentProviderJs.uploadContract(rawAdmin, {name: `METAMASK`, accountId: walletAddress}, options);
+        await axios
         .post(new URL(`/metamask/onboard`, POSTGRESQL_API_URL).href, {
           commonName: userCert.commonName,
           ...args
@@ -662,6 +670,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             );
           }
         });
+      }
       return {};
     } catch (error) {
       if (error.response) {
@@ -673,15 +682,26 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   
   contract.getMetaMaskOnboardingStatus = async function (args, options = defaultOptions) {
     try {
+      const getOptions = { ...options, app: contractName };
       const { commonName } = args;
-      const userAddress = await axios.get(new URL(`/metamask/status/${commonName}`, POSTGRESQL_API_URL).href).then(function (res) {
+      // get user paymentProvider details from cirrus
+      const paymentProviders = await paymentProviderJs.get(rawAdmin, { name: 'METAMASK', accountDeauthorized: false, ownerCommonName: commonName }, getOptions);
+      /* TODO check if the provider contract exists on then initiate a update */
+      if (paymentProviders.length == 0 || Object.keys(paymentProviders[0]).length == 0) {
+        // throw new rest.RestError(RestStatus.NOT_FOUND, "User hasn't started their stripe setup.")
+        throw new rest.RestError(RestStatus.BAD_REQUEST, `no account found for ${args.ownerCommonName}`)
+      }
+      const result = await axios.get(new URL(`/metamask/status/${commonName}`, POSTGRESQL_API_URL).href).then(function (res) {
         if (res.status === 200) {
           return res.data.data;
         } else {
           throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
         }
       });
-      return {userAddress: userAddress};
+      return {...result, providerAddress: paymentProviders[0].address};
+      
+      
+      return result;
     } catch (error) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);

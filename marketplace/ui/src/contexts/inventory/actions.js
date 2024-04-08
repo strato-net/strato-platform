@@ -786,7 +786,7 @@ const actions = {
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.sellerMetamaskStatusSuccessful,
-          payload: body.data.userAddress,
+          payload: body.data,
         });
         return body.data;
       } else if (response.status === RestStatus.UNAUTHORIZED) {
