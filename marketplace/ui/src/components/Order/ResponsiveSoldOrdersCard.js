@@ -57,7 +57,7 @@ export const ResponsiveSoldOrderCard = ({ data, isLoading }) => {
                                 onClick={(e) => {
                                     if (item?.buyersCommonName && item.buyersCommonName !== 'N/A') {
                                     e.preventDefault();
-                                    const userProfileUrl = `/marketplace/profile/${encodeURIComponent(item.buyersCommonName)}`;
+                                    const userProfileUrl = `/profile/${encodeURIComponent(item.buyersCommonName)}`;
                                     const fullUrl = `${window.location.origin}${userProfileUrl}`;
 
                                     if (e.ctrlKey || e.metaKey) {

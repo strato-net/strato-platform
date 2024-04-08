@@ -12,8 +12,7 @@ function consolidateHealthData(healthInfo, stallInfo, systemInfo, syncInfo) {
   const isSyncStalled = JSON.parse(syncInfo.additionalInfo)?.isStalled;
   const systemWarnings = JSON.parse(systemInfo.additionalInfo).Alerts;
 
-  const health =
-    healthStatHealth && stallStatHealth && !isSyncStalled && systemStatHealth;
+  const health = healthStatHealth && stallStatHealth && !isSyncStalled;
   const healthStatus = isSyncStalled
     ? "SYNC STALLED"
     : !health

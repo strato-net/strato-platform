@@ -82,14 +82,14 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                 </div>
             )}
             <a
-                href={`/marketplace${naviroute.replace(":address", topSellingProduct.address)}`}
+                href={`${naviroute.replace(":address", topSellingProduct.address).replace(":name",topSellingProduct.name)}`}
                 onClick={(e) => {
                     // Check if Command (metaKey) or Ctrl (ctrlKey) is pressed
                     if (e.metaKey || e.ctrlKey) {
                         // Let the browser handle it natively to open in a new tab
                     } else {
                         e.preventDefault();
-                        navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } });
+                        navigate(`${naviroute.replace(":address", topSellingProduct.address).replace(":name",topSellingProduct.name)}`, { state: { isCalledFromInventory: false } });
                         window.scrollTo(0, 0);
                     }
                 }}

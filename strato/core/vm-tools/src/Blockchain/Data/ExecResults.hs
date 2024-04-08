@@ -9,10 +9,6 @@ module Blockchain.Data.ExecResults
   )
 where
 
--- import           Data.Map                as M
-
--- import           Blockchain.Strato.Model.Address
-
 import Blockchain.Data.Log
 import Blockchain.Data.Transaction
 import Blockchain.SolidVM.Model
@@ -21,12 +17,9 @@ import Blockchain.Strato.Model.Event
 import Blockchain.Stream.Action (Action)
 import Blockchain.VM.SolidException
 import Blockchain.VM.VMException
-import Blockchain.VMOptions
 import Control.DeepSeq
 import qualified Data.Set as S
 import GHC.Generics
-
--- import           BlockApps.X509.Certificate
 
 data ExecResults = ExecResults
   { erRemainingTxGas :: Integer,
@@ -50,11 +43,7 @@ instance NFData ExecResults
 calculateReturned :: Transaction -> ExecResults -> Integer
 calculateReturned t er =
   let realRefund = min (erRefund er) ((transactionGasLimit t - erRemainingTxGas er) `div` 2)
-      addend =
-        if flags_brokenRefundReenable
-          then erRefund er
-          else erRemainingTxGas er
-   in realRefund + addend
+   in realRefund + erRemainingTxGas er
 
 evmErrorResults :: Integer -> VMException -> ExecResults
 evmErrorResults remainingGas e = errorResults EVM remainingGas (Right e)

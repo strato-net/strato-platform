@@ -65,11 +65,6 @@ util.getApplicationCredentials = async () => {
   return { name: decodedToken.preferred_username, token }
 }
 
-util.createApplicationUser = async (options) => {
-  const applicationCredentials = await util.getApplicationCredentials()
-  return rest.createUser(applicationCredentials, options)
-}
-
 export {
   rest,
   util,

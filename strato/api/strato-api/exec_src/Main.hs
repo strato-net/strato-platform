@@ -18,7 +18,6 @@ import Bloc.API
 import Bloc.Database.Queries
 import Bloc.Monad
 import Bloc.Server
-import Bloc.Server.BlocOptions ()
 import Bloc.Server.Utils (toMaybe)
 import BlockApps.Init
 import BlockApps.Logging
@@ -306,8 +305,7 @@ main = do
 
   let env =
         BlocEnv
-          { gasOn = flags_gasOn,
-            txSizeLimit = flags_txSizeLimit,
+          { txSizeLimit = flags_txSizeLimit,
             accountNonceLimit = flags_accountNonceLimit,
             gasLimit = flags_gasLimit,
             stateFetchLimit = stateFetchLimit',
