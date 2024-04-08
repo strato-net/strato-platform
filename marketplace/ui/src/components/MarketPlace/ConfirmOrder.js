@@ -467,7 +467,7 @@ const ConfirmOrder = () => {
             description: `Your payment has been successfully processed. Transaction Hash: ${tx}`,
             placement: "bottom",
           });
-          window.location.replace(`http://localhost/marketplace/order/status?session_id=${tx}`);
+          window.location.replace(`http://localhost/order/status?session_id=${tx}`);
         } else {
           console.error("Transaction value mismatch.");
           notification.error({

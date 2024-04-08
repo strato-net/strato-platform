@@ -165,6 +165,10 @@ const BoughtOrderDetails = ({ user, users }) => {
 
     setisLoadingPaymentStatus(true);
     try {
+      if (paymentSessionId.startsWith("0x")){
+        setPaid("Paid");
+        return
+      }
       const response = await fetch(
         `${apiUrl}/order/payment/session/${paymentSessionId}/${sellersCommonName}`,
         { method: HTTP_METHODS.GET }
