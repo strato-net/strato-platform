@@ -555,10 +555,6 @@ spec:
           value: ""
         - name: bootnode
           value: "52.7.26.21"
-        - name: brokenRefundReenable
-          value: ""
-        - name: cacheTransactionResults
-          value: ""
         - name: certInfo
           value: ""
         - name: connectionTimeout
@@ -570,8 +566,6 @@ spec:
         - name: debugWSPort
           value: ""
         - name: evmDebugMode
-          value: ""
-        - name: faucetEnabled
           value: ""
         - name: gasLimit
           value: ""

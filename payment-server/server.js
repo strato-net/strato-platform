@@ -1,6 +1,5 @@
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const dayjs = require('dayjs');
 const express = require('express');
 const expressWinston = require('express-winston');
 const helmet = require('helmet');
@@ -11,7 +10,7 @@ const routes = require('./routes');
 
 const config = {
     name: 'Payment Server (Stripe)',
-    port: process.env.PORT || 8018,
+    port: 5432,
 };
 
 const app = express();

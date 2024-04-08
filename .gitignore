@@ -19,10 +19,10 @@ docker-compose.identity.push.yml
 docker-compose.identity.push.ecr.yml
 docker-compose.identity.yml
 docker-compose.identity.ecr.yml
-docker-compose.stripe-ps.yml
-docker-compose.stripe-ps.ecr.yml
-docker-compose.stripe-ps.push.yml
-docker-compose.stripe-ps.push.ecr.yml
+docker-compose.payment-server.yml
+docker-compose.payment-server.ecr.yml
+docker-compose.payment-server.push.yml
+docker-compose.payment-server.push.ecr.yml
 strato-platform-manifest.yaml
 eks-vault-deployment.yaml
 eks-identity-deployment.yaml
