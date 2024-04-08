@@ -426,10 +426,10 @@ const ConfirmOrder = () => {
         const truncatedETH = parseFloat(orderTotalETH.toFixed(18));
         const weiValue = ethers.utils.parseUnits(truncatedETH.toString(), 'ether');
         const hexValue = ethers.BigNumber.from(weiValue).toHexString();
-
+        
         const txParams = {
           from: accounts[0],
-          to: `0x08791eD418eFA7c001FBF63E88B37fBdb5165C6f`,
+          to: metamaskStatus.walletaddress,
           value: hexValue,
           chainId: `0xaa36a7`,
         };
