@@ -61,7 +61,7 @@ library:
     - vm-tools
 
 executables:
-  queryStrato:
+  strato-cli:
     source-dirs: exec_src/
     main: Main.hs
     other-modules: []
@@ -69,6 +69,8 @@ executables:
       - blockapps-tools
       - bytestring
       - cmdargs
+      - directory
+      - filepath
       - labeled-error
       - merkle-patricia-db
       - seqevents
