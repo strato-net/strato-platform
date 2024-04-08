@@ -20,10 +20,12 @@ so that they could be properly moved to their respective version's subsection.
 - POST `/transaction` allows users to create contracts by providing an address through the `codePtr` field
 
 ### Changed
+- `queryStrato` is now `strato-cli`
 
 ### Fixed
 
 ### Removed
+- Removed 'block', 'blockGO' commands from blockapps-tools
 
 
 ## [11.1.0] - 3/28/2023
@@ -34,7 +36,7 @@ so that they could be properly moved to their respective version's subsection.
 - `VM_DEBUGGER=bool` flag added for connecting to the VM debugger + static analysis websocket
 - Derive service provider URLs from node's network ID for testnet and production nodes
 - Update foreign keys for `BlockApps-Mercata-Asset` + `Sale` contracts whenever there is a table expansion
-- functionality to enumerate threads and their details in `/threads` endpoint of `P2PAPI`
+- Functionality to enumerate threads and their details in `/threads` endpoint of `P2PAPI`
 - `/peers` endpoint in `P2PAPI` to list peer connections and their health
 - POST `/transaction` contract creation calls will now additionally check for address state ref table entry before resolving
 - Jenkins test to ensure slipstream post sync is consistent with boot node
