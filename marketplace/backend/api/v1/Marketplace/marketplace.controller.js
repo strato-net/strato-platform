@@ -124,6 +124,20 @@ class MarketplaceController {
     }
     return finalInventory
   }
+
+  static async getPriceHistory(req, res, next) {
+    try {
+      const { dapp, query } = req
+      const { assetToBeSold, limit, offset } = query;
+
+      const priceHistoryData = await dapp.getPriceHistory({ assetAddress: assetToBeSold, limit: limit, offset: offset });
+
+      return rest.response.status200(res, priceHistoryData)
+    } catch (e) {
+      console.log("Couldn't fetch price history");
+      return next(e)
+    }
+  }
 }
 
 

@@ -311,6 +311,69 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions)
   }
 
+  contract.getPriceHistory = async function(args, options = defaultOptions) {
+    try {
+      const { assetAddress } = args;
+      const salesPromise = await saleJs.getAll(rawAdmin, { assetToBeSold: assetAddress, order: "block_timestamp.asc" }, options);
+      const assetWithoutQuantityPromise = await inventoryJs.get(rawAdmin, { address: assetAddress }, options);
+  
+      const [sales, assetWithoutQuantity] = await Promise.all([salesPromise, assetWithoutQuantityPromise]);
+      const originAddress = await assetWithoutQuantity.originAddress;
+  
+      const originSalesPromise = await saleJs.getAll(rawAdmin, { assetToBeSold: originAddress, order: "block_timestamp.asc" }, options);
+      const originSales = await originSalesPromise;
+
+  
+      const processSalesHistory = async (sales, assetToBeSold) => {
+        const historyPromises = sales.map(sale => {
+          return saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, assetToBeSold, order: "block_timestamp.asc" }, options);
+        });
+        const histories = await Promise.all(historyPromises);
+        console.log("Histories fetched, checking for block_timestamp...");
+        histories.flat().forEach((record, index) => {
+          if (!record.block_timestamp) {
+            console.log(`Record at index ${index} is missing block_timestamp:`, record);
+          }
+        });
+
+        return histories.flat().reduce((acc, recordContainer) => {
+          // Iterate over each key in the record container (e.g., '0', '1', ...)
+          Object.values(recordContainer).forEach(record => {
+            const date = record.block_timestamp?.split(' ')[0];
+            if (!date) return; // Skip this record if date is undefined
+        
+            // Now checking against the date extracted from the block_timestamp of the record
+            if (!acc[date] || acc[date].block_timestamp < record.block_timestamp) {
+              acc[date] = record;
+            }
+          });
+          return acc;
+        }, {});
+        
+        
+      };
+      
+  
+      // Process sales and origin sales histories in parallel
+      const [processedSalesResult, processedOriginSalesResult] = await Promise.allSettled([
+        processSalesHistory(sales, assetAddress),
+        processSalesHistory(originSales, originAddress)
+      ]);
+      
+      // Convert processed records back to arrays and sort them
+      const records = Object.values(processedSalesResult.value).sort((a, b) => a.block_timestamp.localeCompare(b.block_timestamp));
+      const originRecords = Object.values(processedOriginSalesResult.value).sort((a, b) => a.block_timestamp.localeCompare(b.block_timestamp));
+  
+      return { records, originRecords };
+    } catch (error) {
+      if (error.response) {
+        throw new rest.RestError(error.response.status, error.response.statusText);
+      }
+      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while fetching the price history");
+    }
+  };
+  
+
   // ------------------------------ ART STARTS ------------------------------
 
   contract.createArt = async function (args, options = defaultOptions) {

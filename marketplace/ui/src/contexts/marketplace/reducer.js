@@ -224,6 +224,22 @@ const reducer = (state, action) => {
         ...state,
         isFetchingStrats: false,
       };
+    case actionDescriptors.fetchPriceHistory:
+      return {
+        ...state,
+        isFetchingPriceHistory: true,
+      };
+    case actionDescriptors.fetchPriceHistorySuccessful:
+      return {
+        ...state,
+        isFetchingPriceHistory: false,
+        priceHistory: action.payload,
+      };
+    case actionDescriptors.fetchPriceHistoryFailed:
+      return {
+        ...state,
+        isFetchingPriceHistory: false,
+      };      
     default:
       throw new Error(`Unhandled action: '${action.type}'`);
   }

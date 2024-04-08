@@ -45,6 +45,8 @@ import ProductItemDetails from "./ProductItemDetails";
 import HelmetComponent from "../Helmet/HelmetComponent";
 import { SEO } from "../../helpers/seoConstant";
 import PreviewMode from "../RichEditor/PreviewMode";
+import PriceChartAndStats from "./PriceChartAndStats";
+import Statistics from "./Statistics";
 
 const ProductDetails = ({ user, users }) => {
   const { state, pathname } = useLocation();
@@ -78,7 +80,7 @@ const ProductDetails = ({ user, users }) => {
     inventoryOwnershipHistory
   } = useInventoryState();
   const marketplaceDispatch = useMarketplaceDispatch();
-  const { cartList } = useMarketplaceState();
+  const { cartList, priceHistory, isFetchingPriceHistory } = useMarketplaceState();
   const navigate = useNavigate();
 
   const routeMatch = useMatch({
@@ -116,6 +118,7 @@ const ProductDetails = ({ user, users }) => {
   useEffect(() => {
     if (Id !== undefined) {
       actions.fetchInventoryDetail(dispatch, Id);
+      marketPlaceActions.fetchPriceHistory(marketplaceDispatch,Id,10,0);
       // TODO: Uncomment this when we have serial numbers working
       // if (user) {
       //   itemsActions.fetchSerialNumbers(itemDispatch, Id);
@@ -335,10 +338,10 @@ const ProductDetails = ({ user, users }) => {
         </div>
       ) : (
         <div>
-          <HelmetComponent
-            title={`${assetName} | ${contractName} | ${SEO.TITLE_META}`}
-            description={details?.description}
-            link={linkUrl} />
+          <HelmetComponent 
+          title={`${assetName} | ${contractName} | ${SEO.TITLE_META}`}
+          description={details?.description} 
+          link={linkUrl} />
           <Row>
             <Breadcrumb className="text-xs   mb-4 md:mt-5  md:mb-6 lg:mb-[44px] ml-4 lg:ml-16">
               <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
@@ -682,6 +685,20 @@ const ProductDetails = ({ user, users }) => {
                     },
                   ]}
               />
+            </div>
+            <div className="w-full h-full">
+            {(priceHistory?.records?.length > 1 || priceHistory?.originRecords?.length >1) && (
+              <>
+              <PriceChartAndStats isFetchingPriceHistory= {isFetchingPriceHistory} priceHistory = {priceHistory} /> 
+              </>
+              )}
+            </div>
+            <div>
+            {(priceHistory?.records?.length > 1 || priceHistory?.originRecords?.length >1) && (
+              <>
+              <Statistics priceHistory={priceHistory}/>
+              </>
+              )}
             </div>
           </div>
         </div>

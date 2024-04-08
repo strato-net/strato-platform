@@ -42,7 +42,10 @@ const actionDescriptors = {
   fetchUserAddressesFailed: "fetch_user_addresses_failed",
   fetchStratsBalance: "fetch_strats_balance",
   fetchStratsBalanceSuccessful: "fetch_strats_balance_successful",
-  fetchStratsBalanceFailed: "fetch_strats_balance_failed"
+  fetchStratsBalanceFailed: "fetch_strats_balance_failed",
+  fetchPriceHistory: "fetch_price_history",
+  fetchPriceHistorySuccessful: "fetch_price_history_successful",
+  fetchPriceHistoryFailed: "fetch_price_history_failed"  
 };
 
 const actions = {
@@ -493,6 +496,35 @@ const actions = {
       dispatch({ type: actionDescriptors.fetchStratsBalanceFailed, payload: "Error while fetching STRATS" });
     }
   },
+
+  fetchPriceHistory: async (dispatch, assetAddress, limit, offset) => {
+    dispatch({ type: actionDescriptors.fetchPriceHistory });
+    try {
+      const query = assetAddress ? `&assetToBeSold=${encodeURIComponent(assetAddress)}` : ``;
+      let response = await fetch(`${apiUrl}/marketplace/price/history?${query}&offset=${offset}&limit=${limit}`, {
+        method: HTTP_METHODS.GET,
+        credentials: "same-origin",
+      });
+      const body = await response.json();
+      if (response.status === RestStatus.UNAUTHORIZED || response.status === RestStatus.FORBIDDEN) {
+        dispatch({
+          type: actionDescriptors.fetchPriceHistoryFailed,
+          payload: "Error while fetching price history",
+        });
+        return;
+      }
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchPriceHistorySuccessful,
+          payload: body.data
+        });
+        return;
+      }
+      dispatch({ type: actionDescriptors.fetchPriceHistoryFailed, payload: "Error while fetching price history" });
+    } catch (err) {
+      dispatch({ type: actionDescriptors.fetchPriceHistoryFailed, payload: "Error while fetching price history" });
+    }
+  }
 
 
 };
