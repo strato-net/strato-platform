@@ -231,12 +231,12 @@ const Inventory = ({ user }) => {
   };
 
   const onboardSellerOnMetamask = async () => {
-    const walletId = await onboardMetamask();
-    if (!walletId) return;
+    const walletAddress = await onboardMetamask();
+    if (!walletAddress) return;
 
     // Perform seller onboarding with the obtained wallet ID
     try {
-      await actions.onboardSellerToMetamask(dispatch, {walletId});
+      await actions.onboardSellerToMetamask(dispatch, {walletAddress});
     } catch (error) {
       console.error("Failed to onboard seller to MetaMask:", error);
       notification.error({

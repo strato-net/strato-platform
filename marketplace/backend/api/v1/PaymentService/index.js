@@ -6,7 +6,7 @@ import loadDapp from "../../middleware/loadDappHandler";
 
 const router = express.Router();
 
-router.get(
+router.post(
     PaymentService.metaMaskOnboarding,
     authHandler.authorizeRequest(),
     loadDapp,

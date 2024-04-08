@@ -1,3 +1,5 @@
+const client = require('../db');
+
 class MetamaskServiceController {
   static async metamaskOnboarding(req, res, next) {
     try {
@@ -49,7 +51,7 @@ class MetamaskServiceController {
       const result = await client.query(query, values);
       res.status(200).json({
         message: "success",
-        data: result.rows[0] || {},
+        data: result.rows[0],
       });
       return next();
     } catch (e) {

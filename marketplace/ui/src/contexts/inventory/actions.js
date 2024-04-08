@@ -727,7 +727,7 @@ const actions = {
     dispatch({ type: actionDescriptors.onboardSellerToMetamask });
 
     try {
-      const response = await fetch(`${apiUrl}/payment/metamask/account`, {
+      const response = await fetch(`${apiUrl}/payment/metaMask/account`, {
         method: HTTP_METHODS.POST,
         credentials: "same-origin",
         headers: {
@@ -777,14 +777,17 @@ const actions = {
     dispatch({ type: actionDescriptors.sellerMetamaskStatus });
 
     try {
-      const response = await fetch(`${apiUrl}/payment/metamask/account/status/${commonName}`, {
+      const response = await fetch(`${apiUrl}/payment/metaMask/account/status/${commonName}`, {
         method: HTTP_METHODS.GET,
       });
 
       const body = await response.json();
 
       if (response.status === RestStatus.OK) {
-        dispatch({type: actionDescriptors.sellerMetamaskStatusSuccessful});
+        dispatch({
+          type: actionDescriptors.sellerMetamaskStatusSuccessful,
+          payload: body.data.userAddress,
+        });
         return body.data;
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({

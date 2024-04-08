@@ -648,7 +648,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.metaMaskOnboarding = async function (args, options = defaultOptions) {
     try {
       await axios
-        .post(new URL(`/metamask/onboard`, POSTGRES_SERVER_URL).href, {
+        .post(new URL(`/metamask/onboard`, POSTGRESQL_API_URL).href, {
           commonName: userCert.commonName,
           ...args
         })
@@ -674,14 +674,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getMetaMaskOnboardingStatus = async function (args, options = defaultOptions) {
     try {
       const { commonName } = args;
-      const userAddress = await axios.get(new URL(`/metamask/status/${commonName}`, POSTGRES_SERVER_URL).href).then(function (res) {
+      const userAddress = await axios.get(new URL(`/metamask/status/${commonName}`, POSTGRESQL_API_URL).href).then(function (res) {
         if (res.status === 200) {
           return res.data.data;
         } else {
           throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
         }
       });
-      return userAddress;
+      return {userAddress: userAddress};
     } catch (error) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
