@@ -89,6 +89,7 @@ ethereumVM d = runResourceT $ do
     Bagger.processNewBestBlock cpHash cpHead [] -- bootstrap Bagger with genesis block
 
     consume "evm/loop" consumerGroup seqVmEventsTopicName $ \_ seqEvents -> do
+        recordBaggerMetrics =<< contextGets _baggerState
         logEventSummaries seqEvents
 
         let !vmInEventBatch = foldr insertInBatch newInBatch seqEvents
