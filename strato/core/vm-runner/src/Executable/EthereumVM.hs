@@ -95,7 +95,7 @@ ethereumVM d = runResourceT $ do
         let !vmInEventBatch = foldr insertInBatch newInBatch seqEvents
         void . runConduit $
           yield vmInEventBatch
-            .| handleVmEvents flags_useSyncMode
+            .| handleVmEvents
             .| mapM_C sendOutEvent
 
         loopTimeit "compactContextM" $ compactContextM

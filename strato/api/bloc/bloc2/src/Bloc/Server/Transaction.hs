@@ -1424,11 +1424,7 @@ getAccountNonce addr chainIds = do
   $logInfoLS "getAccountNonce lookup" (chainIds'', addr)
   $logInfoLS "getAccountNonce results" mAccts
   case mAccts of
-    [] -> do
-      requireBalance <- fmap gasOn getBlocEnv
-      if requireBalance
-        then throwIO . UserError $ "User does not have a balance"
-        else return $ Map.fromList [(Nothing, Nonce $ fromInteger 0)]
+    [] -> return $ Map.fromList [(Nothing, Nonce $ fromInteger 0)]
     accts -> do
       let acts = map E.entityVal accts
       let mkCid AddressStateRef {..} = ChainId <$> toMaybe 0 addressStateRefChainId
