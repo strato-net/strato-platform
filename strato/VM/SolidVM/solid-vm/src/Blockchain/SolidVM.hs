@@ -714,7 +714,7 @@ getCreator caller = do
       -- we will look up their cert in the DB and use it to get the org name for this app
       maybeCert <- A.select (A.Proxy @X509Certificate) $ caller ^. accountAddress
       blockNumber <- blockHeaderBlockNumber . Env.blockHeader <$> getEnv
-      let creator' = if blockNumber <= 40000
+      let creator' = if (computeNetworkID == 7596898649924658542 && blockNumber <= 35000)|| (computeNetworkID == 6909499098523985262 && blockNumber <= 6000)
                  then fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
                  else fromMaybe "" $ fmap subCommonName $ getCertSubject =<< maybeCert
       $logDebugS "getCreator/versioning" . T.pack $ "The creator is " ++ (show creator')
