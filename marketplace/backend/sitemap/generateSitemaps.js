@@ -81,7 +81,8 @@ async function generateSitemap() {
   try {
     const siteMapArr = await fetchInventories();
     const xmlContent = await generateXML(siteMapArr);
-    const writeStream = createWriteStream('../ui/public/sitemap.xml');
+    // const writeStream = createWriteStream('../ui/public/sitemap.xml');
+    const writeStream = createWriteStream('./public/sitemap.xml');
 
     writeStream.on('error', err => {
       console.error('Error writing to file:', err);

@@ -17,6 +17,7 @@ import dotenv from "dotenv";
 import websocket from "./websocket";
 import axios from "axios";
 import cronFunc from "./cron";
+import path from 'path';
 
 let server
 (async () => {
@@ -36,6 +37,7 @@ let server
   app.set(deployParamName, deploy);
   
   // Setup middleware
+  app.use('/', express.static(path.join(__dirname, 'public')));
   app.use(helmet());
   app.use(cors());
   app.use(bodyParser.json());
