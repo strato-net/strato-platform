@@ -37,10 +37,7 @@ let server
   app.set(deployParamName, deploy);
   
   // Setup middleware
-  // app.use('/', express.static(path.join(__dirname, 'public')));
   app.use('/', express.static('./public'));
-  
-  console.log("static path -------------", path.join(__dirname, 'public'));
   app.use(helmet());
   app.use(cors());
   app.use(bodyParser.json());
