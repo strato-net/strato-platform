@@ -55,7 +55,7 @@ async function generateXML(urls) {
      xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
      ${urls.map(url => `
      <url>
-       <loc>${escapeXML(hostname + url.url.replaceAll(' ', '%20'))}</loc>
+       <loc>${escapeXML(hostname + url.url.replaceAll(' ', '-'))}</loc>
        <lastmod>${escapeXML(url.lastmod)}</lastmod>
        <changefreq>${escapeXML(url.changefreq)}</changefreq>
        <priority>${escapeXML(url.priority.toString())}</priority>
