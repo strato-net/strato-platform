@@ -12,7 +12,7 @@ describe('Test Offline Transactions', async function () {
   let nonceCounter
 
   const getSimpleStorageCountFromCirrus = async function () {
-    const cirrusResp = await exec(dockerPrefix + 'docker exec strato-postgrest-1 curl localhost:3001/BlockApps-SimpleStorageTest')
+    const cirrusResp = await exec(dockerPrefix + 'docker exec strato-postgrest-1 curl localhost:3001/Admin-SimpleStorageTest')
     return cirrusResp.stdout.split('transaction_hash').length - 1
   }
 
