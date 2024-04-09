@@ -8,7 +8,7 @@ OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-NULL}
 OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-NULL}
 OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
 OAUTH_SCOPE=${OAUTH_SCOPE:-openid email profile}
-STRIPE_PS_HOST=payment-server:8018
+STRIPE_PS_HOST=stripe-ps:8018
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then

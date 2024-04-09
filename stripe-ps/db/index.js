@@ -7,8 +7,6 @@ const client = new Client({
     user: process.env.POSTGRESQL_USER,
     password: process.env.POSTGRESQL_PASSWORD,
     dbname: process.env.POSTGRESQL_DBNAME,
-    // ssl: true,
-    // dialect: 'postgres',
     ssl: { 
         require: true,
         rejectUnauthorized: true,
