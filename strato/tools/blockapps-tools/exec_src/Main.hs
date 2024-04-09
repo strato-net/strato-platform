@@ -3,7 +3,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -Wall #-}
 
-import BlockApps.Tools.CanonRedis
 import BlockApps.Tools.ChainHash
 import BlockApps.Tools.Checkpoints
 import BlockApps.Tools.Code as Code
@@ -32,16 +31,13 @@ import Blockchain.Participation
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Keccak256 hiding (hash)
-import Control.Monad
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import Data.Int
 import qualified Data.Text as T
 import qualified LabeledError
 import System.Console.CmdArgs
-import System.Directory
-import System.FilePath
-import System.IO
+import System.Process
 
 data Options
   = State {root :: String, db :: String}
@@ -61,7 +57,6 @@ data Options
   | DumpKafkaRaw {streamName :: String, startingBlock :: Int}
   | DumpKafkaStateDiff {startingBlock :: Int}
   | DumpRedis {databaseNumber :: Integer}
-  | CanonRedis {ipAddress :: String, start :: Int, range :: Int}
   | Psql {}
   | InsertTX {}
   | AskForBlocks {startBlock :: Integer, endBlock :: Integer, qOrg :: String, qOrgUnit :: String, qCommonName :: String}
@@ -79,7 +74,6 @@ data Options
   | VerifyKafkaFile {filename :: String}
   | SetParticipationMode {mode :: ParticipationMode}
   | ChainHash
-  | CompressRoundChanges {infilename :: String, outfilename :: String}
   | GetPrivacy {registry :: String, key :: String}
   | PutPrivacy {registry :: String, key :: String, value :: String}
   | ValidatorBehavior {valB :: Bool}
@@ -95,22 +89,12 @@ stateOptions =
       root := def += typ "StateRoot" += argPos 1
     ]
 
-canonRedisOptions :: Annotate Ann
-canonRedisOptions =
-  record
-    CanonRedis {ipAddress = undefined, start = undefined, range = undefined}
-    [ ipAddress := def += typ "IPADDRESS" += argPos 0,
-      start := def += typ "STARTINGBLOCK" += argPos 1,
-      range := def += typ "RANGE" += argPos 2
-    ]
-
 dumpRedisOptions :: Annotate Ann
 dumpRedisOptions =
   record
     DumpRedis {databaseNumber = undefined}
     [ databaseNumber := 0 += typ "INT"
     ]
-
 
 hashOptions :: Annotate Ann
 hashOptions =
@@ -359,14 +343,6 @@ setParticipationModeOptions =
 chainHashOptions :: Annotate Ann
 chainHashOptions = record ChainHash []
 
-compressRoundChangesOptions :: Annotate Ann
-compressRoundChangesOptions =
-  record
-    CompressRoundChanges {infilename = error "unused infilename", outfilename = error "unused outfilename"}
-    [ infilename := error "compressroundchanges --infilename=<file>" += typ "PATH" += explicit += name "infilename",
-      outfilename := error "compressroundchanges --outfilename=<file>" += typ "PATH" += explicit += name "outfilename"
-    ]
-
 getPrivacyOptions :: Annotate Ann
 getPrivacyOptions =
   record
@@ -388,7 +364,12 @@ options :: Annotate Ann
 options =
   modes_
     [
-      canonRedisOptions,
+      addBlocksFromFileOptions,
+      addGenesisFromFileOptions,
+      addTxsFromFileOptions,
+      addTxOptions,
+      askOptions,
+      chainHashOptions,
       checkpointOptions,
       codeOptions,
       dumpKafkaBlocksOptions,
@@ -403,70 +384,44 @@ options =
       fRawMPOptions,
       hashOptions,
       insertTXOptions,
-      psqlOptions,
       rawMPOptions,
       rawOptions,
-      rlpOptions,
-      stateOptions,
-      askOptions,
-      pushOptions,
-      txOptions,
       redisOptions,
       redisMatchOptions,
+      rlpOptions,
       migrateOptions,
-      addTxOptions,
-      addBlocksFromFileOptions,
-      addGenesisFromFileOptions,
-      addTxsFromFileOptions,
+      psqlOptions,
+      pushOptions,
+      stateOptions,
+      txOptions,
       validatorBehaviorOptions,
       deleteDepBlockOptions,
       saveKafkaOptions,
       loadKafkaOptions,
       verifyKafkaFileOptions,
       setParticipationModeOptions,
-      chainHashOptions,
-      compressRoundChangesOptions,
       getPrivacyOptions,
       putPrivacyOptions
     ]
 
 
--- Function to copy a file
-copyFile' :: FilePath -> FilePath -> IO ()
-copyFile' src dest = do
-    handle <- openFile src ReadMode
-    hSetEncoding handle latin1
-    contents <- hGetContents handle
-    writeFile dest contents
-
--- Function to copy a directory recursively
-copyDirectory :: FilePath -> FilePath -> IO ()
-copyDirectory src dest = do
-    createDirectoryIfMissing True dest
-    contents <- listDirectory src
-    forM_ contents $ \n -> do
-        let srcPath = src </> n
-            destPath = dest </> n
-        isFile <- doesFileExist srcPath
-        if isFile
-            then copyFile' srcPath destPath
-            else copyDirectory srcPath destPath
-
 main :: IO ()
 main = do
+  
   opts <- cmdArgs_ options
   run' opts
 
 -------------------
 run' :: Options -> IO ()
 run' o = do
-  copyDirectory ".ethereumH/" "/tmp/.ethereumH/" 
+  let (cmd, args') = ("cp", ["-r", "/var/lib/strato/.ethereumH/", "/tmp/.ethereumH/"])
+  (_, _, _, processHandle) <- createProcess (proc cmd args')
+  _ <- waitForProcess processHandle
   run o
 
 run :: Options -> IO ()
 run State {..} = let sr = MP.StateRoot $ LabeledError.b16Decode "queryStrato/run" $ BC.pack root in State.doit db sr
 run DumpRedis {..} = dumpRedis databaseNumber
-run CanonRedis {..} = canonRedis ipAddress start range
 run Hash {..} = Hash.doit db hash
 run Code {..} = Code.doit db hash
 run Raw {..} = Raw.doit filename
@@ -513,6 +468,5 @@ run LoadKafka {..} = loadKafka topic filename
 run VerifyKafkaFile {..} = verifyKafkaFile filename
 run SetParticipationMode {..} = remoteSetParticipationMode mode
 run ChainHash = chainHash
-run CompressRoundChanges {..} = compressRoundChanges infilename outfilename
 run GetPrivacy {..} = putStrLn =<< getPrivacy registry key True
 run PutPrivacy {..} = putStrLn =<< putPrivacy registry key value True
