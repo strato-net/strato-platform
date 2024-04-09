@@ -446,7 +446,8 @@ describe("search until", function () {
     function predicate(data) {
       return data.length > 0;
     }
-    const result = await rest.searchUntil(admin, contract, predicate, options);
+    const { name, ...restArgs } = contract;
+    const result = await rest.searchUntil(admin, { name: "Test-" + name, ...restArgs }, predicate, options);
     assert.isArray(result, "should be array");
     assert.lengthOf(result, 1, "array has length of 1");
     assert.equal(result[0].address, contract.address, "address");
@@ -457,7 +458,8 @@ describe("search until", function () {
     function predicate() { }
 
     try {
-      await rest.searchUntil(admin, contract, predicate, options);
+      const { name, ...restArgs } = contract;
+      await rest.searchUntil(admin, { name: "Test-" + name, ...restArgs }, predicate, options);
     } catch (err) {
       assert.equal(
         err.message,
@@ -479,7 +481,8 @@ describe("search until", function () {
       return false;
     }
 
-    const result = await rest.searchUntil(admin, contract, predicate, options);
+    const { name, ...restArgs } = contract;
+    const result = await rest.searchUntil(admin, { name: "Test-" + name, ...restArgs }, predicate, options);
     assert.isArray(result, "should be array");
     assert.lengthOf(result, 1, "array has length of 1");
     assert.equal(result[0].address, contract.address, "address");
@@ -513,9 +516,10 @@ describe("search query", function () {
       return data.length >= count;
     }
 
+    const { name, ...restArgs } = contracts[0];
     const results = await rest.searchUntil(
       admin,
-      contracts[0],
+      { name: "Test-" + name, ...restArgs },
       predicate,
       options
     );
@@ -543,9 +547,10 @@ describe("search query", function () {
       return response.data.length >= count;
     }
 
+    const { name, ...restArgs } = contracts[0];
     const results = await rest.searchWithContentRangeUntil(
       admin,
-      contracts[0],
+      { name: "Test-" + name, ...restArgs },
       predicate,
       options
     );
@@ -580,9 +585,10 @@ describe("search query", function () {
 
     const query = { stringValue: 'eq.ThIs Is NoT a ReAl VaLuE' }
     const dummySearchOptions:Options = { ...options, query }
+    const { name, ...restArgs } = contracts[0];
     const results = await rest.searchWithContentRangeUntil(
       admin,
-      contracts[0],
+      { name: "Test-" + name, ...restArgs },
       predicate,
       dummySearchOptions
     );
@@ -609,12 +615,14 @@ describe("search query", function () {
       return data.length >= count;
     }
 
-    await rest.searchUntil(admin, contracts[0], predicate, options);
+    const { name, ...restArgs } = contracts[0];
+    await rest.searchUntil(admin, { name: "Test-" + name, ...restArgs }, predicate, options);
 
     // search by address
     for (let i = 0; i < count; i++) {
       const contract = contracts[i];
-      const result = await rest.waitForAddress(admin, contract, options);
+      const { name, ...restArgs2 } = contract;
+      const result = await rest.waitForAddress(admin, { name: "Test-" + name, ...restArgs2 }, options);
       assert.isDefined(result, "Result should be defined");
       assert.isDefined(result.address, "Result.address should be defined");
       assert.equal(result.address, contract.address, "address");
@@ -627,7 +635,8 @@ describe("search query", function () {
       const query = {
         intValue: `eq.${intValue(uid, i)}`
       };
-      const results = await rest.search(admin, contract, { query, ...options });
+      const { name, ...restArgs2 } = contract;
+      const results = await rest.search(admin, { name: "Test-" + name, ...restArgs2 }, { query, ...options });
       assert.lengthOf(results, 1, "one result");
       const result = results[0];
       assert.equal(result.address, contract.address, "address");
@@ -640,7 +649,8 @@ describe("search query", function () {
       const query = {
         stringValue: `eq.${stringValue(uid, i)}`
       };
-      const results = await rest.search(admin, contract, { query, ...options });
+      const { name, ...restArgs2 } = contract;
+      const results = await rest.search(admin, { name: "Test-" + name, ...restArgs2 }, { query, ...options });
       assert.lengthOf(results, 1, "one result");
       const result = results[0];
       assert.equal(result.address, contract.address, "address");
@@ -655,7 +665,8 @@ describe("search query", function () {
         stringValue: `eq.${stringValue(uid, i)}`,
         address: `eq.${contract.address}`
       };
-      const results = await rest.search(admin, contract, { query, ...options });
+      const { name, ...restArgs2 } = contract;
+      const results = await rest.search(admin, { name: "Test-" + name, ...restArgs2 }, { query, ...options });
       assert.lengthOf(results, 1, "one result");
       const result = results[0];
       assert.equal(result.address, contract.address, "address");
@@ -669,14 +680,15 @@ describe("search query", function () {
         intValue: `eq.666`,
         address: `eq.${contract.address}`
       };
-      const results = await rest.search(admin, contract, { query, ...options });
+      const { name, ...restArgs2 } = contract;
+      const results = await rest.search(admin, { name: "Test-" + name, ...restArgs2 }, { query, ...options });
       assert.lengthOf(results, 0, "no results");
     }
     // search by like
     const query = {
       stringValue: `like._${uid}*`
     };
-    const results = await rest.search(admin, contracts[0], {
+    const results = await rest.search(admin, { name: "Test-" + name, ...restArgs }, {
       query,
       ...options
     });
@@ -704,7 +716,8 @@ describe("search query", function () {
       return data.length >= count;
     }
 
-    await rest.searchUntil(admin, contracts[0], predicate, options);
+    const { name, ...restArgs } = contracts[0];
+    await rest.searchUntil(admin, { name: "Test-" + name, ...restArgs }, predicate, options);
 
     // search by address
     for (let i = 0; i < count; i++) {
@@ -712,7 +725,8 @@ describe("search query", function () {
       const query = {
         stringValue: `eq.${stringValue(uid, i) + specialCharacters}`
       };
-      const results = await rest.search(admin, contract, { query, ...options });
+      const { name, ...restArgs2 } = contract;
+      const results = await rest.search(admin, { name: "Test-" + name, ...restArgs2 }, { query, ...options });
       assert.lengthOf(results, 1, "one result");
       const result = results[0];
       assert.equal(result.address, contract.address, "address");
