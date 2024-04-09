@@ -14,7 +14,7 @@ const url = [
 ];
 
 const hostname = 'https://marketplace.mercata.blockapps.net';
-const marketplaceUrl = `${hostname}/api/v1/marketplace`;
+const marketplaceUrl = `${hostname}/api/v1/marketplace?forSale=true&soldOut=true`;
 
 const invalidXMLUnicodeRegex =
   // eslint-disable-next-line no-control-regex
@@ -22,14 +22,13 @@ const invalidXMLUnicodeRegex =
 
 async function fetchInventories() {
 
-  const staticUrls = url.map((item,index)=>{
+  const staticUrls = url.map((item, index) => {
     return { url: item, changefreq: "daily", priority: 0.5, lastmod: new Date().toISOString() };
   })
 
   try {
     const response = await axios.get(marketplaceUrl);
     const res = response.data;
-
     if (!res || !res.data || !res.data.productsWithImageUrl) {
       throw new Error('Invalid response or missing data fields');
     }

@@ -1,12 +1,12 @@
 import cron from 'node-cron';
-import { default as generateSitemap } from './generateSitemaps.js';
+import { default as generateSitemap } from './sitemap/generateSitemaps.js';
 
 const myTask = () => {
     console.log('Cron job executed!');
     generateSitemap()
 };
 
-const cronJob = cron.schedule('0 */3 * * *', myTask);
+const cronJob = cron.schedule('*/2 * * * *', myTask);
 const cronFunc = () => {
     cronJob.start();
 }

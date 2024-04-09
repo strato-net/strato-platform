@@ -172,7 +172,7 @@ export default function FooterComponent() {
                   {navigation.categories.map((item) => (
                     <li key={item.name}>
                       <a
-                        href={''}
+                        href={`/c/${item.name}`}
                         onClick={(e)=>{handleNavigate(e, item.name)}}
                         className="text-sm leading-6 text-white hover:text-white"
                       >
