@@ -73,6 +73,7 @@ executables:
       - filepath
       - labeled-error
       - merkle-patricia-db
+      - process
       - seqevents
       - strato-model
       - strato-p2p
@@ -87,14 +88,6 @@ executables:
       - labeled-error
     other-modules: []
 
-  modifyDate:
-    source-dirs: exec_src/
-    main: ModifyDate.hs
-    dependencies:
-      - base
-      - hflags
-      - time
-    other-modules: []
 
 tests:
   blockapps-tools-test:
