@@ -36,7 +36,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
   const imgMeta = category ? category : SEO.TITLE_META
-  
+
   const itemData = inventory.data;
   const showModalEdit = () => {
     hide();
@@ -272,7 +272,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
           
           <div className="flex  items-center">
           <Button type="link" className="text-[#13188A] font-semibold text-base h-6 mb-2" onClick={callDetailPage}>Preview</Button>
-
+          { console.log("inventory", inventory," asd: ", getCategory())}
+        
         {((itemData.isMint === "True" && inventory.quantity === 0) || inventory.quantity > 0) &&
            <Popover
             placement="bottomLeft"
@@ -297,7 +298,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
                     <StopOutlined />
                     <p className="ml-3">Unlist</p>
                   </div>
-                </div>) : paymentProviderAddress ? (<div
+                </div>) : paymentProviderAddress && !(getCategory() == "Carbon Offset" && !(itemData.isMint && itemData.isMint == "True")) ? (<div
                   className="flex items-center mt-2 cursor-pointer"
                   onClick={showListModal}
                 >
