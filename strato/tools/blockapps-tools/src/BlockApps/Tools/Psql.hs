@@ -11,7 +11,7 @@ import Database.Persist.Postgresql
 import HFlags
 
 psql :: IO ()
-psql = putStrLn $ "psql " ++ database (sqlConfig ethConf)
+psql = putStrLn $ database (sqlConfig ethConf)
 
 migrate :: String -> IO ()
 migrate tables = do
