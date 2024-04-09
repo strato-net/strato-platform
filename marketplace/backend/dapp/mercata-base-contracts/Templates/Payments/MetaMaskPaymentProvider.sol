@@ -1,7 +1,7 @@
 pragma es6;
 pragma strict;
 
-import <61df30774ab26fcc9c74c569af5a288d180aae24>;
+import <BASE_CODE_COLLECTION>;
 
 /// @title A representation of Carbon assets
 contract MetamaskPaymentProvider is BasePaymentProvider {
