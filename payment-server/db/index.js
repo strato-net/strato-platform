@@ -22,23 +22,17 @@ client.connect()
 
         const query = `
             CREATE TABLE IF NOT EXISTS customer_address (
-            address_id SERIAL PRIMARY KEY,
-            commonName TEXT,
-            name TEXT,
-            zipcode TEXT,
-            state TEXT,
-            city TEXT,
-            addressLine1 TEXT,
-            addressLine2 TEXT,
-            country TEXT,
-            createdDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP);`;
-
-        return client.query(query);
-    })
-    .then(() => {
-        console.log('customer_address Table created or already exists.');
-
-        const createMetamaskWalletTable = `
+                address_id SERIAL PRIMARY KEY,
+                commonName TEXT,
+                name TEXT,
+                zipcode TEXT,
+                state TEXT,
+                city TEXT,
+                addressLine1 TEXT,
+                addressLine2 TEXT,
+                country TEXT,
+                createdDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
             CREATE TABLE IF NOT EXISTS metamask_wallet (
                 id SERIAL PRIMARY KEY,
                 commonName TEXT,
@@ -46,14 +40,17 @@ client.connect()
                 createdDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );`;
 
-        return client.query(createMetamaskWalletTable);
+        return client.query(query);
     })
     .then(() => {
-        console.log('metamask_wallet Table created or already exists.');
+        console.log('Tables created or already exist.');
     })
     .catch(error => {
-        console.error('Error creating table:', error);
+        console.error('Error creating tables:', error);
     })
+    .finally(() => {
+        client.end();
+    });
 
 module.exports = client;
 
