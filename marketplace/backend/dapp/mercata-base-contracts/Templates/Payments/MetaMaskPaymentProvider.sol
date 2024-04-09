@@ -5,14 +5,6 @@ import <61df30774ab26fcc9c74c569af5a288d180aae24>;
 
 /// @title A representation of Carbon assets
 contract MetamaskPaymentProvider is BasePaymentProvider {
-    /* struct MetamaskPaymentInfo {
-        address[] saleAddresses;
-        string paymentStatus;
-        string sessionStatus;
-        string amount;
-        uint paymentCreatedDate;
-        uint expiresAt;
-    } */
 
     // These mappings are hacks because SolidVM doesn't like mappings of structs
     mapping (string => address[]) saleAddresses;
@@ -22,8 +14,6 @@ contract MetamaskPaymentProvider is BasePaymentProvider {
     mapping (string => uint) paymentCreatedDate;
     mapping (string => uint) expiresAt;
 
-    // "id": "cs_test_a1jIRGPJra3H8e001xRh73mOu7XwppoKEVxcrgB8fijVuP5lAi2e1pHuMr",
-    //"payment_intent": "pi_1Dt0s32eZvKYlo2CV1tCo99t",  ==>update
     event MetamaskPaymentInitialized (
         string sellerAccountId,
         string paymentSessionId,

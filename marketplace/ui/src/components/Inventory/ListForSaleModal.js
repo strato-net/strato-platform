@@ -9,7 +9,7 @@ const { Option } = Select;
 const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddress, categoryName, limit, offset }) => {
     const [data, setData] = useState([inventory]);
     const [quantity, setQuantity] = useState(inventory.saleAddress ? inventory.saleQuantity : inventory.quantity);
-    const [paymentTypes, setPaymentTypes] = useState([PAYMENT_TYPE[0].value]);
+    const [paymentTypes, setPaymentTypes] = useState([]);
     const [pricePerUnit, setpricePerUnit] = useState(inventory.price ? inventory.price : inventory.pricePerUnit);
     const inventoryDispatch = useInventoryDispatch();
     const [canList, setCanList] = useState(true);
@@ -33,6 +33,11 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
             event.preventDefault();
             event.stopPropagation();
         };
+        // Find the payment type object that matches the value of the selected option
+        const paymentType = PAYMENT_TYPE.find(type => type.value === value);
+
+        // Use the name from the found paymentType object or default to an empty string if not found
+        const displayName = paymentType ? paymentType.name : '';
         return (
             <Tag
                 onMouseDown={onPreventMouseDown}
@@ -40,7 +45,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
                 onClose={onClose}
                 className="flex items-center mr-1"
             >
-                {PAYMENT_TYPE[0].name}
+                {displayName}
                 {/* {renderIcon(value)} */}
                 {/* (...) Indicates More options in addition to available icons */}
                 {/* <p className="ml-1">...</p> */}
@@ -61,10 +66,8 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
         }
     };
 
-    const handleSelectAll = () => {
-        const allValues = PAYMENT_TYPE.filter(type => type.value !== 0).map(type => type.value);
-        setPaymentTypes(allValues);
-        return allValues;
+    const handlePaymentTypeChange = (selectedValues) => {
+        setPaymentTypes(selectedValues);
     };
 
     const columns = () => {
@@ -81,11 +84,13 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
                         name="paymentTypes"
                         maxTagCount="responsive"
                         value={paymentTypes}
-                        onChange={handleSelectAll}
+                        onChange={handlePaymentTypeChange}
                         showSearch={false}
                         className="w-64"
                     >
-                        {PAYMENT_TYPE.map((e, index) => (
+                        {PAYMENT_TYPE.filter(type => 
+                            paymentProviderAddress.some(provider => provider.value === type.value)
+                        ).map((e, index) => (
                             <Option value={e.value} key={index}>
                                 {e.name}
                             </Option>
@@ -149,8 +154,13 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
     };
 
     const handleSubmit = async () => {
+        const paymentProviderAddresses = paymentTypes.map((type) => {
+            return paymentProviderAddress.find((e) => e.value === type);
+        }
+        ).filter((e) => e !== undefined).map((e) => e.address);
+
         let body = {
-            paymentProviders: paymentProviderAddress.length !== 0 ? paymentProviderAddress : [],
+            paymentProviders: paymentProviderAddresses,
             price: pricePerUnit,
         };
         if (inventory.saleAddress) {
@@ -208,11 +218,13 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
                         name="paymentTypes"
                         maxTagCount="responsive"
                         value={paymentTypes}
-                        onChange={handleSelectAll}
+                        onChange={handlePaymentTypeChange}
                         showSearch={false}
                         className="w-full"
                     >
-                        {PAYMENT_TYPE.map((e, index) => (
+                        {PAYMENT_TYPE.filter(type => 
+                            paymentProviderAddress.some(provider => provider.value === type.value)
+                        ).map((e, index) => (
                             <Option value={e.value} key={index}>
                                 {e.name}
                             </Option>

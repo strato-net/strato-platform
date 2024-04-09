@@ -141,6 +141,10 @@ export const PAYMENT_TYPE = [
       <VISA width="30px" height="20px"/>,
       <BANK width="30px" height="20px"/>
     ]
+  },
+  { 
+    name: "Metamask / ETH", 
+    value: 2
   }
 ]
 

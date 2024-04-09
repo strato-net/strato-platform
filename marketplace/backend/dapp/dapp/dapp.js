@@ -655,22 +655,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       
       if (sellerMetaMaskDetails.length == 0 || Object.keys(sellerMetaMaskDetails[0]).length == 0) {
         await paymentProviderJs.uploadContract(rawAdmin, {name: `METAMASK`, accountId: walletAddress}, options);
-        await axios
-        .post(new URL(`/metamask/onboard`, POSTGRESQL_API_URL).href, {
-          commonName: userCert.commonName,
-          ...args
-        })
-        .then(function (res) {
-          if (res.status === 200) {
-            console.log(res.data);
-          } else {
-            throw new rest.RestError(
-              RestStatus.BAD_REQUEST,
-              `Payment server call failed: ${res.statusText}`
-            );
-          }
-        });
       }
+
       return {};
     } catch (error) {
       if (error.response) {
@@ -691,17 +677,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         // throw new rest.RestError(RestStatus.NOT_FOUND, "User hasn't started their stripe setup.")
         throw new rest.RestError(RestStatus.BAD_REQUEST, `no account found for ${args.ownerCommonName}`)
       }
-      const result = await axios.get(new URL(`/metamask/status/${commonName}`, POSTGRESQL_API_URL).href).then(function (res) {
-        if (res.status === 200) {
-          return res.data.data;
-        } else {
-          throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
-        }
-      });
-      return {...result, providerAddress: paymentProviders[0].address};
       
-      
-      return result;
+      return paymentProviders[0];
     } catch (error) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);

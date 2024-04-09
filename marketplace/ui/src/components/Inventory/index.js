@@ -404,9 +404,9 @@ const metaImg = category ? category : SEO.IMAGE_META
                             key={index}
                             debouncedSearchTerm={debouncedSearchTerm}
                             paymentProviderAddress={[
-                              ...(stripeStatus ? [stripeStatus.paymentProviderAddress] : []),
-                              ...(metamaskStatus ? [metamaskStatus.providerAddress] : [])
-                            ]}
+                              ...(stripeStatus ? [{ address: stripeStatus.paymentProviderAddress, value: 1 }] : []),
+                              ...(metamaskStatus ? [{ address: metamaskStatus.address, value: 2 }] : [])
+                            ]}                          
                             allSubcategories={allSubcategories}
                           />
                         );
