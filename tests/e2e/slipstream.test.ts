@@ -64,7 +64,7 @@ contract Y {
 }
 `;
   it("can index contracts recursively constructed", async () => {
-    const [user, contract] = await upload("Y", newContract, options);
+    const [user, contract] = await upload("Test-Y", newContract, options);
     await sleep(2000);
     console.log("hi");
     console.log(user);
