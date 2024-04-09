@@ -1793,7 +1793,9 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   creator <- getCurrentAccount
   real_creator <- getAppAccount Nothing creator
   (hsh, cc) <- getCurrentCodeCollection
-  newAddress <- getNewAddress real_creator
+  newAddress <- case real_creator of 
+    Nothing -> internalError "the creator of this contract could not be derived" $ creator
+    Just c -> getNewAddress c
   execResults <- create' creator newAddress hsh cc contractName' args False
   return $
     Constant $
@@ -1805,15 +1807,17 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   ro <- readOnly <$> getCurrentCallInfo
   when ro $ invalidWrite "Invalid contract creation during read-only access" $ "contractName: " ++ show contractName' ++ ", args: " ++ show args
   creator <- getCurrentAccount
-  real_creator <- getAppAccount Nothing creator
+  real_creator <- getAppAccount Nothing creator >>= \case
+    Just c -> return c
+    Nothing -> internalError "creator could not be derived from contract" $ creator
   (hsh, cc) <- getCurrentCodeCollection
   salt <- saltTextToValue saltExpressionText
   args' <- case args of
     (CC.OrderedArgs oa) -> OrderedVals <$> mapM (getVar <=< expToVar) oa
     (CC.NamedArgs na) -> NamedVals <$> mapM (mapM $ getVar <=< expToVar) na
-  newAddress <- getNewAddressWithSalt creator salt hsh $ show args'
+  newAddress <- getNewAddressWithSalt real_creator salt hsh $ show args'
   $logDebugS "DEBUG" $ T.pack $ (show hsh) ++ "  " ++ show newAddress
-  execResults <- create' creator newAddress hsh cc contractName' args False
+  execResults <- create' real_creator newAddress hsh cc contractName' args False
   onTraced $ do
     liftIO $
       putStrLn $
@@ -2724,7 +2728,9 @@ callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SS
     invalidArguments "The contract name and src arguments for the create2 function should not be empty" args
 
   creator <- getCurrentAccount
-  real_creator <- getAppAccount Nothing creator
+  real_creator <- getAppAccount Nothing creator >>= \case 
+    Just c -> return c
+    Nothing -> internalError "creator of this contract could not be derived" $ creator
   -- currentContract <- getCurrentContract
   (_, parentCC) <- getCurrentCodeCollection
 
@@ -2740,8 +2746,8 @@ callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SS
         Right parsedArgs -> parsedArgs
         _ -> internalError "Failed to parse constructor args in a create builtin call" argString
   constructorArgVals <- OrderedVals <$> mapM (getVar <=< expToVar) constructorArgs
-  newAddress <- getNewAddressWithSalt creator salt hsh $ show constructorArgVals
-  execResults <- create' creator newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) pragmaCheck
+  newAddress <- getNewAddressWithSalt real_creator salt hsh $ show constructorArgVals
+  execResults <- create' real_creator newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) pragmaCheck
   theEnv <- getEnv
   let origin = Env.origin theEnv
       metadata = Env.metadata theEnv
