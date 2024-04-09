@@ -13,9 +13,22 @@ class CustomerAddressController {
 
       const result = await client.query(query, values);
 
+      // fix casing in columns
+      const formattedRows = result.rows.map(row => {
+        const newRow = {
+          ...row,
+          commonName: row["commonname"],
+          createdDate: row["createddate"],
+          addressLine1: row["addressline1"],
+          addressLine2: row["addressline2"]
+        }
+        const { commonname, createddate, addressline1, addressline2, ...rest } = newRow;
+        return rest;
+      });
+
       res.status(200).json({
         message: 'success',
-        data: result.rows || [],
+        data: formattedRows || [],
       });
 
       return next();
@@ -36,9 +49,22 @@ class CustomerAddressController {
 
       const result = await client.query(query, values);
 
+      // fix casing in columns
+      const formattedRows = result.rows.map(row => {
+        const newRow = {
+          ...row,
+          commonName: row["commonname"],
+          createdDate: row["createddate"],
+          addressLine1: row["addressline1"],
+          addressLine2: row["addressline2"]
+        }
+        const { commonname, createddate, addressline1, addressline2, ...rest } = newRow;
+        return rest;
+      });
+
       res.status(200).json({
         message: 'success',
-        data: result.rows[0] || {},
+        data: formattedRows[0] || {},
       });
 
       return next();
@@ -99,7 +125,7 @@ class CustomerAddressController {
 
       res.status(200).json({
         message: 'deleted',
-        changes: result.rowCount, 
+        changes: result.rowCount,
       });
 
       return next();
