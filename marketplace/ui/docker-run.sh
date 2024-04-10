@@ -20,7 +20,6 @@ fi
 
 sed -i "s|__SITE_ID__|$SITE_ID|g" build/index.html
 sed -i "s|__FILE_SERVER_URL__|$FILE_SERVER_URL|g" build/index.html
-sed -i "s|__STRATO_VERSION__|$STRATO_VERSION|g" build/index.html
 
 echo 'Starting ui server...'
 
