@@ -1,54 +1,34 @@
-const fs = require('fs');
-const { Client } = require('pg');
+const sqlite3 = require('sqlite3').verbose();
+const path = require('path');
 
-const client = new Client({
-    host: process.env.POSTGRESQL_SERVER_URL,
-    port: process.env.POSTGRESQL_PORT,
-    user: process.env.POSTGRESQL_USER,
-    password: process.env.POSTGRESQL_PASSWORD,
-    dbname: process.env.POSTGRESQL_DBNAME,
-    ssl: { 
-        require: true,
-        rejectUnauthorized: true,
-        ca: fs.readFileSync('./dbCert/us-east-1-bundle.cer').toString(), 
-      } 
+const DBSOURCE = process.env.DOCKERIZED === "true" ? "/sqlitedb/db.sqlite" : "db.sqlite";
+
+const db = new sqlite3.Database(path.resolve(__dirname, DBSOURCE), (err) => {
+    if (err) {
+      // Cannot open database
+      console.error(err.message)
+      throw err
+    }else{
+        console.log('Connected to the SQLite database.')
+        db.run(`CREATE TABLE IF NOT EXISTS customer_address (
+            address_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            commonName text, 
+            name text, 
+            zipcode text,
+            state text,
+            city text,
+            addressLine1 text,
+            addressLine2 text,
+            country text,
+            createdDate DATETIME DEFAULT CURRENT_TIMESTAMP
+            )`,
+        (err) => {
+            if (err) {
+                // Table already created
+            }
+        });  
+    }
 });
 
-client.connect()
-    .then(() => {
-        console.log('Connected to the PostgreSQL database.');
 
-        const query = `
-            CREATE TABLE IF NOT EXISTS customer_address (
-                address_id SERIAL PRIMARY KEY,
-                commonName TEXT,
-                name TEXT,
-                zipcode TEXT,
-                state TEXT,
-                city TEXT,
-                addressLine1 TEXT,
-                addressLine2 TEXT,
-                country TEXT,
-                createdDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-            CREATE TABLE IF NOT EXISTS metamask_wallet (
-                id SERIAL PRIMARY KEY,
-                commonName TEXT,
-                walletAddress TEXT,
-                createdDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );`;
-
-        return client.query(query);
-    })
-    .then(() => {
-        console.log('Tables created or already exist.');
-    })
-    .catch(error => {
-        console.error('Error creating tables:', error);
-    })
-    .finally(() => {
-        client.end();
-    });
-
-module.exports = client;
-
+module.exports = db;
