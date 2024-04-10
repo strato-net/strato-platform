@@ -297,7 +297,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
                     <StopOutlined />
                     <p className="ml-3">Unlist</p>
                   </div>
-                </div>) : paymentProviderAddress ? (<div
+                </div>) : paymentProviderAddress && !(getCategory() == "Carbon Offset" && !(itemData.isMint && itemData.isMint == "True")) ? (<div
                   className="flex items-center mt-2 cursor-pointer"
                   onClick={showListModal}
                 >
