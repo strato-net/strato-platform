@@ -3,22 +3,23 @@ const { Client } = require('pg');
 
 const client = new Client({
     host: process.env.POSTGRESQL_SERVER_URL,
-    port: process.env.POSTGRESQL_PORT,
-    user: process.env.POSTGRESQL_USER,
+    port: process.env.POSTGRESQL_PORT || '5432',
+    user: process.env.POSTGRESQL_USER || 'postgres',
     password: process.env.POSTGRESQL_PASSWORD,
-    dbname: process.env.POSTGRESQL_DBNAME,
-    ssl: { 
+    dbname: process.env.POSTGRESQL_DBNAME || 'postgres',
+    ssl: {
         require: true,
         rejectUnauthorized: true,
-        ca: fs.readFileSync('./dbCert/us-east-1-bundle.cer').toString(), 
-      } 
+        ca: fs.readFileSync('./dbCert/us-east-1-bundle.cer').toString(),
+    }
 });
 
-client.connect()
-    .then(() => {
-        console.log('Connected to the PostgreSQL database.');
+if (process.env.POSTGRESQL_SERVER_URL && process.env.POSTGRESQL_PASSWORD) {
+    client.connect()
+        .then(() => {
+            console.log('Connected to the PostgreSQL database.');
 
-        const query = `
+            const query = `
             CREATE TABLE IF NOT EXISTS customer_address (
             address_id SERIAL PRIMARY KEY,
             commonName TEXT,
@@ -31,14 +32,17 @@ client.connect()
             country TEXT,
             createdDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP);`;
 
-        return client.query(query);
-    })
-    .then(() => {
-        console.log('Table created or already exists.');
-    })
-    .catch(error => {
-        console.error('Error creating table:', error);
-    })
+            return client.query(query);
+        })
+        .then(() => {
+            console.log('Table created or already exists.');
+        })
+        .catch(error => {
+            console.error('Error creating table:', error);
+        })
+} else {
+    console.error('Missing server URL or password');
+}
 
 module.exports = client;
 
