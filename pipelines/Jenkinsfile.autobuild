@@ -79,8 +79,9 @@ pipeline {
           // Copy .pem and .key for SSL
           sh 'cp /home/ubuntu/letsencrypt-ssl/server.pem ssl/certs/'
           sh 'cp /home/ubuntu/letsencrypt-ssl/server.key ssl/private/'
-
-         lib.spinUpVault()
+          script {
+            lib.spinUpVault()
+          }
 
           writeFile file: "replace_server_ports_docker.sh", text: '''#!/bin/bash
             if [ -z "$1" ]; then
