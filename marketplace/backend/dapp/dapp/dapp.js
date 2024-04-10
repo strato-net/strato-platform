@@ -686,6 +686,32 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching seller MetaMask status: ${JSON.stringify(error)} `);
     }
   };
+
+  contract.confirmMetaMaskTransaction = async function (args, options = defaultOptions) {
+    try {
+      const { transactionHash, ...restArgs } = args;
+      const getOptions = { ...options, app: contractName };
+      const paymentProviders = await paymentProviderJs.get(rawAdmin, { name: 'METAMASK', accountDeauthorized: false, ownerCommonName: userCert.commonName }, getOptions)
+      if (paymentProviders.length == 0 || Object.keys(paymentProviders[0]).length == 0) {
+        throw new rest.RestError(RestStatus.BAD_REQUEST, `no account found for ${userCert.commonName}`)
+      }
+      
+      const paymentProvider = paymentProviders[0];
+      const { accountId } = paymentProvider;
+      const confirmTransactionUrl = new URL(`/metamask/confirm-transaction/${accountId}/${transactionHash}`, STRIPE_PAYMENT_SERVER_URL).href;
+      await axios.get(confirmTransactionUrl)
+        .then(function (res) {
+          if (res.status !== 200) {
+            throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+          }
+        });
+    } catch (error) {
+      if (error.response) {
+        throw new rest.RestError(error.response.status, error.response.statusText);
+      }
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while confirming transaction: ${JSON.stringify(error)} `);
+    }
+  };
       
   /* ------------------------ MetaMask account connect ends here ------------------------ */
 

@@ -31,6 +31,19 @@ class PaymentServiceController {
     }
   }
 
+  static async confirmMetaMaskTransaction(req, res, next) {
+    try {
+      const { dapp, query } = req
+
+      const result = await dapp.confirmMetaMaskTransaction(query)
+      rest.response.status200(res, result)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
   static async stripeOnboarding(req, res, next) {
     try {
       const { dapp } = req

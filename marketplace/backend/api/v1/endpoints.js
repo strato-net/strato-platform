@@ -182,6 +182,7 @@ export const PaymentService = {
   stripeConnectStatus: '/stripe/account/status/:ownerCommonName',
   metaMaskOnboarding: '/metaMask/account',
   metaMaskOnboardingStatus: '/metaMask/account/status/:commonName',
+  confirmMetaMaskTransaction: '/metaMask/confirmTransaction',
   stripeWebhook: '/stripe/webhook',
   stripeWebhookConnect: '/stripe/webhook/connect',
 }

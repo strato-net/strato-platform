@@ -30,7 +30,8 @@ import DataTableComponent from "../DataTableComponent";
 import { useFormik } from "formik";
 import * as yup from "yup";
 import "./index.css";
-import { PAYMENT_LIST } from "../../helpers/constants";
+import RestStatus from "http-status-codes";
+import { PAYMENT_LIST, apiUrl, HTTP_METHODS } from "../../helpers/constants";
 import ConfirmOrderModel from "./ConfirmOrderModel";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
@@ -440,29 +441,42 @@ const ConfirmOrder = () => {
           params: [txParams],
         });
 
-        const waitForTransactionReceipt = async (hash) => {
-          let receipt = null;
-          while (receipt === null) { // Polling for the receipt
-            receipt = await window.ethereum.request({
-              method: 'eth_getTransactionReceipt',
-              params: [hash],
-            });
-            if (receipt !== null) {
-              return receipt;
-            }
-            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for 2 seconds before retrying
-          }
-        };
+        // const waitForTransactionReceipt = async (hash) => {
+        //   let receipt = null;
+        //   while (receipt === null) { // Polling for the receipt
+        //     receipt = await window.ethereum.request({
+        //       method: 'eth_getTransactionReceipt',
+        //       params: [hash],
+        //     });
+        //     if (receipt !== null) {
+        //       return receipt;
+        //     }
+        //     await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for 2 seconds before retrying
+        //   }
+        // };
 
-        // Wait for the transaction to be confirmed
-        await waitForTransactionReceipt(tx);
+        // // Wait for the transaction to be confirmed
+        // await waitForTransactionReceipt(tx);
 
-        const transaction = await window.ethereum.request({
-          method: 'eth_getTransactionByHash',
-          params: [tx],
+        // const transaction = await window.ethereum.request({
+        //   method: 'eth_getTransactionByHash',
+        //   params: [tx],
+        // });
+        // TODO: instead of waiting for the transaction for confirmation here,
+        // we can do it in the payment-server side.
+        // We should check the transaction value, recipient and the transaction hash.
+        const params = new URLSearchParams({
+          ...txParams,
+          tx: tx // Assuming tx is a string or a value that can be stringified
+        }).toString();
+        console.log("Transaction params:", params);
+        const response = await fetch(`${apiUrl}/payment/metaMask/confirmTransaction?${params}`, {
+          method: HTTP_METHODS.GET,
         });
-
-        if (transaction.value === hexValue) {
+  
+        const responseBody = await response.json();
+        console.log("Transaction confirmation response:", responseBody);
+        if (response.status === RestStatus.OK && responseBody.data.confirmation === true) {
           notification.success({
             message: "Transaction Successful",
             description: `Your payment has been successfully processed. Transaction Hash: ${tx}`,

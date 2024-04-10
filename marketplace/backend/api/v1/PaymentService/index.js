@@ -21,6 +21,13 @@ router.get(
 );
 
 router.get(
+    PaymentService.confirmMetaMaskTransaction,
+    authHandler.authorizeRequest(),
+    loadDapp,
+    PaymentServiceController.confirmMetaMaskTransaction
+);
+
+router.get(
     PaymentService.stripeOnboarding,
     authHandler.authorizeRequest(),
     loadDapp,
