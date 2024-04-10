@@ -107,7 +107,7 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
 
   return (
     <div>
-      <h2 className='w-full text-center font-bold text-xl'>Price History</h2>
+      <h2 className='w-full text-center font-bold text-2xl'>Price History</h2>
 
     <div className="flex justify-center w-full h-full">
       <div className="w-full h-full lg:h-[500px] xl:h-[600px]">

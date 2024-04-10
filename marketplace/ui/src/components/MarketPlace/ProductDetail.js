@@ -712,7 +712,11 @@ const ProductDetails = ({ user, users }) => {
                 )}
                 <div>
                   {(priceHistory?.originRecords?.length > 1 || priceHistory?.records?.length > 1) && (
+                    <>
+                  <h2 className='w-full text-center font-bold text-2xl'>12-Month Historical Data</h2>
+
                     <Statistics priceHistory={priceHistory} />
+                    </>
                   )}
                 </div>
               </>

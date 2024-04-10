@@ -318,13 +318,16 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   
       const assetWithoutQuantity = await inventoryJs.get(rawAdmin, { address: assetAddress }, options);
       const originAddress = assetWithoutQuantity.originAddress;
-  
-      // Fetch sales
+
+      // Fetch sales (12 months)
+      const oneY = dayjs().utc().subtract(1, 'year').format('YYYY-MM-DD HH:mm:ss') + ' UTC';
       const originSales = await saleJs.getAll(rawAdmin, {
         assetToBeSold: originAddress,
         order: "block_timestamp.asc",
+        gtField: "block_timestamp",
+        gtValue: oneY
       }, options);
-      console.log("Fetched origin yearly sales:", originSales.length, "sales",originSales);
+      console.log("Fetched origin yearly sales:", originSales.length, "sales");
   
       let salesFilter = { assetToBeSold: originAddress, order: "block_timestamp.asc" };
   
@@ -345,10 +348,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         console.log('Invalid timeFilter');
         return;
       }
+      // Fetch sales based on filter
+      const originTimeRangeSales = await saleJs.getAll(rawAdmin, {
+        ...salesFilter
+      }, options);
   
-   
-      console.log("Fetched origin sales based on timeFilter:", originSales.length, "sales");
-      console.log("Fetched saleFilter based on timeFilter:", salesFilter);
 
   
       // Process records such that for a given date the most recent sale price is fetched
@@ -385,8 +389,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   
       // Get the histories
       const processedSalesResults = await Promise.allSettled([
-        processSalesHistory(originSales, salesFilter),
-        processSalesHistory(originSales)
+        processSalesHistory(originTimeRangeSales, salesFilter),// for data points to be plotted
+        processSalesHistory(originSales) // for 12-month historical data
       ]);
   
       // Handling Promise.allSettled results
@@ -397,16 +401,16 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           console.error(`Result ${index} rejected with reason:`, result.reason);
         }
       });
-  
-      //12 month historical data
-      const records = processedSalesResults[0].status === 'fulfilled' ? 
+
+      //Time Filter Records  
+      const originRecords = processedSalesResults[0].status === 'fulfilled' ? 
         Object.values(processedSalesResults[0].value).sort((a, b) => new Date(a.block_timestamp) - new Date(b.block_timestamp)) : [];
       
-      //Time Filter Records
-      const originRecords = processedSalesResults[1].status === 'fulfilled' ? 
+        
+      //12 month historical data
+      const records = processedSalesResults[1].status === 'fulfilled' ? 
         Object.values(processedSalesResults[1].value).sort((a, b) => new Date(a.block_timestamp) - new Date(b.block_timestamp)) : [];
   
-      console.log("Processed and sorted records:", { records, originRecords });
   
       return { records, originRecords };
     } catch (error) {
