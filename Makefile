@@ -65,7 +65,7 @@ marketplace-backend:
 
 marketplace-ui:
 	@echo Now building marketplace-ui...
-	BASIL_DOCKER_TAG=${REPO_URL}marketplace-ui:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}marketplace-ui:${VERSION} STRATO_VERSION=${VERSION} make --directory=marketplace/ui/
+	BASIL_DOCKER_TAG=${REPO_URL}marketplace-ui:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}marketplace-ui:${VERSION} make --directory=marketplace/ui/
 
 payment-server:
 	@echo Now building payment-server...
