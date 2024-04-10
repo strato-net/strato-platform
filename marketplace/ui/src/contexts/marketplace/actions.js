@@ -497,11 +497,11 @@ const actions = {
     }
   },
 
-  fetchPriceHistory: async (dispatch, assetAddress, limit, offset) => {
+  fetchPriceHistory: async (dispatch, assetAddress, limit, offset, timeFilter) => {
     dispatch({ type: actionDescriptors.fetchPriceHistory });
     try {
       const query = assetAddress ? `&assetToBeSold=${encodeURIComponent(assetAddress)}` : ``;
-      let response = await fetch(`${apiUrl}/marketplace/price/history?${query}&offset=${offset}&limit=${limit}`, {
+      let response = await fetch(`${apiUrl}/marketplace/price/history?${query}&offset=${offset}&limit=${limit}&timeFilter=${timeFilter}`, {
         method: HTTP_METHODS.GET,
         credentials: "same-origin",
       });

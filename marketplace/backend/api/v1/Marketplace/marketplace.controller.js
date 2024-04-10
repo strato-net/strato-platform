@@ -128,9 +128,9 @@ class MarketplaceController {
   static async getPriceHistory(req, res, next) {
     try {
       const { dapp, query } = req
-      const { assetToBeSold, limit, offset } = query;
+      const { assetToBeSold, limit, offset, timeFilter } = query;
 
-      const priceHistoryData = await dapp.getPriceHistory({ assetAddress: assetToBeSold, limit: limit, offset: offset });
+      const priceHistoryData = await dapp.getPriceHistory({ assetAddress: assetToBeSold, limit: limit, offset: offset, timeFilter: timeFilter });
 
       return rest.response.status200(res, priceHistoryData)
     } catch (e) {

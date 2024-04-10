@@ -1,29 +1,44 @@
 import React from 'react';
 import ReactApexChart from 'react-apexcharts';
-import { format } from 'date-fns';
 
 const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
-  if (isFetchingPriceHistory || !priceHistory || !priceHistory.records || priceHistory.records.length === 0 || !priceHistory.originRecords || priceHistory.originRecords.length === 0) {
+  if (isFetchingPriceHistory || !priceHistory || !priceHistory.originRecords || priceHistory.originRecords.length === 0) {
     return <div className="h-full bg-gray-200 animate-pulse"></div>;
   }
 
 
-  
   const series = [
-  {
-    name: 'Origin Price',
-    data: priceHistory.originRecords.map(record => ({
-      x: new Date(record.block_timestamp).getTime(), // Convert to timestamp
-      y: record.price,
-    }))
-  }
-];
+    {
+      name: 'Origin Price',
+      data: priceHistory.originRecords.map(record => {
+        try {
+          // Replace spaces with 'T' and ' UTC' with 'Z' (ISO 8601)
+          const isoDate = record.block_timestamp.replace(' ', 'T').replace(' UTC', 'Z');
+          const parsedDate = new Date(isoDate);
+          const timestamp = parsedDate.getTime();
+  
+          if (isNaN(timestamp)) {
+            throw new Error('Invalid date');
+          }
+  
+          return {
+            x: timestamp,
+            y: record.price,
+          };
+        } catch (error) {
+          console.error('Error parsing date:', record.block_timestamp, error);
+          return null;
+        }
+      }).filter(point => point !== null), // Filter out any invalid points
+    },
+  ];
+  
 
   const options = {
     chart: {
       type: 'area',
       toolbar: {
-        show: false
+        show: true
       },
       height: 'auto', // Responsive height
       zoom: {
@@ -57,17 +72,13 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
       range: undefined,
       tickPlacement: 'on',
       labels: {
-        formatter: function(value) {
-          // Format the date to a more readable form like 'March 12'
-          // return format(new Date(value), 'MMMM d');
-          return format(new Date(value), 'MMMM d');
-        }
+        format: 'MMMM d', 
       },
       axisBorder: {
         show: false
       },
       axisTicks: {
-        show: false
+        show: true
       }
     },
     

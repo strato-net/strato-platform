@@ -6,18 +6,20 @@
   
   .tileWrapper {
     padding: 0.5rem;
-    width: 100%;
+    flex: 1; /* Allow flex items to grow and shrink */
+    min-width: 300px; /* Minimum width for a tile */
+    max-width: 100%; /* Full width on mobile screens */
   }
   
   @media (min-width: 768px) {
     .tileWrapper {
-      width: 50%;
+      max-width: 50%; /* Two tiles per row on medium screens */
     }
   }
   
   @media (min-width: 1024px) {
     .tileWrapper {
-      width: 33.333333%;
+      max-width: 33.333333%; /* Three tiles per row on large screens */
     }
   }
   
@@ -27,7 +29,7 @@
     border-radius: 0.5rem;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     text-align: center;
-    margin-bottom: 1rem;
+    margin: auto;
   }
   
   .title {

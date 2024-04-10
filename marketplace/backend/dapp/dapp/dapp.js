@@ -6,6 +6,7 @@ import { pollingHelper } from "/helpers/utils";
 
 import axios from 'axios';
 import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
 import RestStatus from 'http-status-codes';
 import certificateJs from "/dapp/certificates/certificate";
 
@@ -27,7 +28,7 @@ import paymentProviderJs from '/dapp/payments/paymentProvider';
 import strats from "../strats/strats";
 
 const allAssetNames = [];
-
+dayjs.extend(utc);
 const contractName = "Mercata";
 const contractFileName = `dapp/mercata-base-contracts/BaseCodeCollection.sol`;
 
@@ -313,20 +314,54 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getPriceHistory = async function(args, options = defaultOptions) {
     try {
-      const { assetAddress } = args;
-      const salesPromise = await saleJs.getAll(rawAdmin, { assetToBeSold: assetAddress, order: "block_timestamp.asc" }, options);
-      const assetWithoutQuantityPromise = await inventoryJs.get(rawAdmin, { address: assetAddress }, options);
+      const { assetAddress, timeFilter } = args;
   
-      const [sales, assetWithoutQuantity] = await Promise.all([salesPromise, assetWithoutQuantityPromise]);
-      const originAddress = await assetWithoutQuantity.originAddress;
+      const assetWithoutQuantity = await inventoryJs.get(rawAdmin, { address: assetAddress }, options);
+      const originAddress = assetWithoutQuantity.originAddress;
   
-      const originSalesPromise = await saleJs.getAll(rawAdmin, { assetToBeSold: originAddress, order: "block_timestamp.asc" }, options);
-      const originSales = await originSalesPromise;
+      // Fetch sales
+      const originSales = await saleJs.getAll(rawAdmin, {
+        assetToBeSold: originAddress,
+        order: "block_timestamp.asc",
+      }, options);
+      console.log("Fetched origin yearly sales:", originSales.length, "sales",originSales);
+  
+      let salesFilter = { assetToBeSold: originAddress, order: "block_timestamp.asc" };
+  
+      // Sales Filter modification based on timeFilter
+      if (timeFilter === '1') { 
+        // Applying 6-month filter
+        const sixMonthsAgo = dayjs().utc().subtract(6, 'months').format('YYYY-MM-DD HH:mm:ss') + ' UTC';
+        salesFilter.gtField = "block_timestamp";
+        salesFilter.gtValue = sixMonthsAgo;
+      } else if (timeFilter === '2') { 
+        //Applying 1-year filter
+        const oneYearAgo = dayjs().utc().subtract(1, 'year').format('YYYY-MM-DD HH:mm:ss') + ' UTC';
+        salesFilter.gtField = "block_timestamp";
+        salesFilter.gtValue = oneYearAgo;
+      } else if (timeFilter === '3') {
+        // For 'All', no changes to salesFilter required
+      } else {
+        console.log('Invalid timeFilter');
+        return;
+      }
+  
+   
+      console.log("Fetched origin sales based on timeFilter:", originSales.length, "sales");
+      console.log("Fetched saleFilter based on timeFilter:", salesFilter);
 
   
-      const processSalesHistory = async (sales, assetToBeSold) => {
+      // Process records such that for a given date the most recent sale price is fetched
+      const processSalesHistory = async (sales, filter = {}) => {
         const historyPromises = sales.map(sale => {
-          return saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, assetToBeSold, order: "block_timestamp.asc" }, options);
+          if(filter.assetToBeSold) 
+          {
+            return saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, ...filter  }, options);
+          }else{
+            const oneYearAgoTime = dayjs().utc().subtract(1, 'year').format('YYYY-MM-DD HH:mm:ss') + ' UTC';
+
+            return saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, assetToBeSold: originAddress, order: "block_timestamp.asc", gtField: "block_timestamp", gtValue: oneYearAgoTime  }, options); 
+          }
         });
         const histories = await Promise.all(historyPromises);
         console.log("Histories fetched, checking for block_timestamp...");
@@ -335,41 +370,47 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             console.log(`Record at index ${index} is missing block_timestamp:`, record);
           }
         });
-
+  
         return histories.flat().reduce((acc, recordContainer) => {
-          // Iterate over each key in the record container (e.g., '0', '1', ...)
           Object.values(recordContainer).forEach(record => {
             const date = record.block_timestamp?.split(' ')[0];
-            if (!date) return; // Skip this record if date is undefined
-        
-            // Now checking against the date extracted from the block_timestamp of the record
+            if (!date) return;
             if (!acc[date] || acc[date].block_timestamp < record.block_timestamp) {
               acc[date] = record;
             }
           });
           return acc;
         }, {});
-        
-        
       };
-      
   
-      // Process sales and origin sales histories in parallel
-      const [processedSalesResult, processedOriginSalesResult] = await Promise.allSettled([
-        processSalesHistory(sales, assetAddress),
-        processSalesHistory(originSales, originAddress)
+      // Get the histories
+      const processedSalesResults = await Promise.allSettled([
+        processSalesHistory(originSales, salesFilter),
+        processSalesHistory(originSales)
       ]);
+  
+      // Handling Promise.allSettled results
+      processedSalesResults.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          console.log(`Result ${index} fulfilled with value:`, result.value);
+        } else {
+          console.error(`Result ${index} rejected with reason:`, result.reason);
+        }
+      });
+  
+      //12 month historical data
+      const records = processedSalesResults[0].status === 'fulfilled' ? 
+        Object.values(processedSalesResults[0].value).sort((a, b) => new Date(a.block_timestamp) - new Date(b.block_timestamp)) : [];
       
-      // Convert processed records back to arrays and sort them
-      const records = Object.values(processedSalesResult.value).sort((a, b) => a.block_timestamp.localeCompare(b.block_timestamp));
-      const originRecords = Object.values(processedOriginSalesResult.value).sort((a, b) => a.block_timestamp.localeCompare(b.block_timestamp));
+      //Time Filter Records
+      const originRecords = processedSalesResults[1].status === 'fulfilled' ? 
+        Object.values(processedSalesResults[1].value).sort((a, b) => new Date(a.block_timestamp) - new Date(b.block_timestamp)) : [];
+  
+      console.log("Processed and sorted records:", { records, originRecords });
   
       return { records, originRecords };
     } catch (error) {
-      if (error.response) {
-        throw new rest.RestError(error.response.status, error.response.statusText);
-      }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while fetching the price history");
+      console.error("Error fetching price history:", error);
     }
   };
   
@@ -673,11 +714,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const getOptions = { ...options, app: contractName };
     const { sellersCommonName, purchasersCommonName, newOwnerCommonName } = args
 
-    const currentDate = new Date();
-    // Subtract 10 days from the current date
-    const tenDaysAgoDate = new Date(currentDate.getTime() - (10 * 24 * 60 * 60 * 1000));
-    // Format the date as 'YYYY-MM-DD HH:MM:SS UTC'
-    const tenDaysAgoTimestamp = tenDaysAgoDate.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
+    const currentDate = dayjs(); // Get the current date with dayjs
+    const tenDaysAgoDate = currentDate.subtract(10, 'day'); // Subtract 10 days
+    const tenDaysAgoTimestamp = tenDaysAgoDate.utc().format('YYYY-MM-DD HH:mm:ss') + ' UTC'; // Format the date
 
     // Need to fetch purchases, closed orders, transfers for the user.
     // New Purchases of User's Products---Fetch Orders with filters of sellersCommonName, block_timestamp and Order Status = AWAITING_FULFILLMENT (1) 

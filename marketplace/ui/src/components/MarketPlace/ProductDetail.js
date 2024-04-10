@@ -47,6 +47,7 @@ import { SEO } from "../../helpers/seoConstant";
 import PreviewMode from "../RichEditor/PreviewMode";
 import PriceChartAndStats from "./PriceChartAndStats";
 import Statistics from "./Statistics";
+import TimeRangeTabs from "./TimeRangeTabs";
 
 const ProductDetails = ({ user, users }) => {
   const { state, pathname } = useLocation();
@@ -65,6 +66,7 @@ const ProductDetails = ({ user, users }) => {
   const { Text, Paragraph } = Typography;
   const [Id, setId] = useState(undefined);
   const [itemData, setItemData] = useState({});
+  const [timeFilter, setTimeFilter] = useState('1');
 
   const [qty, setQty] = useState(1);
   const dispatch = useInventoryDispatch();
@@ -118,13 +120,22 @@ const ProductDetails = ({ user, users }) => {
   useEffect(() => {
     if (Id !== undefined) {
       actions.fetchInventoryDetail(dispatch, Id);
-      marketPlaceActions.fetchPriceHistory(marketplaceDispatch,Id,10,0);
       // TODO: Uncomment this when we have serial numbers working
       // if (user) {
       //   itemsActions.fetchSerialNumbers(itemDispatch, Id);
       // }
     }
   }, [Id, dispatch]);
+
+  useEffect(() => {
+    if (Id !== undefined) {
+      marketPlaceActions.fetchPriceHistory(marketplaceDispatch,Id,10,0,timeFilter);
+    }
+  }, [Id, marketplaceDispatch, timeFilter]);
+
+  const handleTimeFilterChange = (key) => {
+    setTimeFilter(key);
+  };
 
   useEffect(() => {
     if (inventoryDetails) {
@@ -686,20 +697,30 @@ const ProductDetails = ({ user, users }) => {
                   ]}
               />
             </div>
-            <div className="w-full h-full">
-            {(priceHistory?.records?.length > 1 || priceHistory?.originRecords?.length >1) && (
-              <>
-              <PriceChartAndStats isFetchingPriceHistory= {isFetchingPriceHistory} priceHistory = {priceHistory} /> 
-              </>
-              )}
-            </div>
-            <div>
-            {(priceHistory?.records?.length > 1 || priceHistory?.originRecords?.length >1) && (
-              <>
-              <Statistics priceHistory={priceHistory}/>
-              </>
-              )}
-            </div>
+            {
+  isFetchingPriceHistory ? (
+    <div className="flex justify-center items-center h-full w-full">
+      {/* Assuming isInventoryDetailsLoading is a separate loading state you want to account for */}
+      <Spin spinning={true} size="large" /> 
+    </div>
+  ) : (
+    <>
+      {(priceHistory?.originRecords?.length > 1 || priceHistory?.records?.length > 1) && (
+        <div className="w-full h-full">
+          <TimeRangeTabs onChange={handleTimeFilterChange} activeKey={timeFilter} />
+          <PriceChartAndStats priceHistory={priceHistory} />
+        </div>
+      )}
+      <div>
+        {(priceHistory?.originRecords?.length > 1 || priceHistory?.records?.length > 1) && (
+          <Statistics priceHistory={priceHistory} />
+        )}
+      </div>
+    </>
+  )
+}
+
+
           </div>
         </div>
       )}
