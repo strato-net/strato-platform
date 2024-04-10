@@ -94,7 +94,7 @@ describe('Test Offline Transactions', async function () {
     const startTimestamp2 = +new Date()
     let ssVarVal
     do {
-      const ssCirrusResp = await exec(dockerPrefix + 'docker exec strato-postgrest-1 curl localhost:3001/BlockApps-SimpleStorageTest')
+      const ssCirrusResp = await exec(dockerPrefix + 'docker exec strato-postgrest-1 curl localhost:3001/Admin-SimpleStorageTest')
       const ssCirrusRespSplit = ssCirrusResp.stdout.split('"storedData":')
       ssVarVal = ssCirrusRespSplit[ssCirrusRespSplit.length - 1].split(',')[0]
       console.log('ssVarVal=' + ssVarVal)
