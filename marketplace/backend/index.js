@@ -31,7 +31,7 @@ let server
     throw new Error(`Deploy file '${config.configDirPath}/${config.deployFilename}' not found`);
   }
 
-  const marketplaceUrl = `${config.serverHost}/marketplace`
+  const marketplaceUrl = `${config.serverHost}`
   axios.defaults.headers.common['Referer'] = marketplaceUrl;
 
   app.set(deployParamName, deploy);
