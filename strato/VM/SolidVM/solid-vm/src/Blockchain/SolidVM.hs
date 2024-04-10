@@ -1271,19 +1271,19 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
         then invalidArguments "arguments to statement are inconsistent with those declared" (unparseStatement st)
         else do
           let account = currentAccount curInfo
-          -- ctr <- getCreator account
+          ctr <- getCreator account
 
-          ctr <-
-            fromMaybeM (return "") $
-              runMaybeT $
-                pure account
-                  >>= MaybeT . A.lookup (A.Proxy @AddressState)
-                  >>= pure . addressStateCodeHash
-                  >>= MaybeT . resolveCodePtrParent (account ^. accountChainId)
-                  >>= ( \case
-                          SolidVMCode name _ | name /= (labelToString $ CC._contractName curCnct) -> pure name
-                          _ -> pure ""
-                      )
+          -- ctr <-
+          --   fromMaybeM (return "") $
+          --     runMaybeT $
+          --       pure account
+          --         >>= MaybeT . A.lookup (A.Proxy @AddressState)
+          --         >>= pure . addressStateCodeHash
+          --         >>= MaybeT . resolveCodePtrParent (account ^. accountChainId)
+          --         >>= ( \case
+          --                 SolidVMCode name _ | name /= (labelToString $ CC._contractName curCnct) -> pure name
+          --                 _ -> pure ""
+          --             )
 
           -- pair up field names with values one-by-one (no type checking tho, lol)
           let pairs = zip (map (T.unpack . fst) $ CC._eventLogs ev) expStrs
