@@ -698,29 +698,26 @@ const ProductDetails = ({ user, users }) => {
               />
             </div>
             {
-  isFetchingPriceHistory ? (
-    <div className="flex justify-center items-center h-full w-full">
-      {/* Assuming isInventoryDetailsLoading is a separate loading state you want to account for */}
-      <Spin spinning={true} size="large" /> 
-    </div>
-  ) : (
-    <>
-      {(priceHistory?.originRecords?.length > 1 || priceHistory?.records?.length > 1) && (
-        <div className="w-full h-full">
-          <TimeRangeTabs onChange={handleTimeFilterChange} activeKey={timeFilter} />
-          <PriceChartAndStats priceHistory={priceHistory} />
-        </div>
-      )}
-      <div>
-        {(priceHistory?.originRecords?.length > 1 || priceHistory?.records?.length > 1) && (
-          <Statistics priceHistory={priceHistory} />
-        )}
-      </div>
-    </>
-  )
-}
-
-
+            isFetchingPriceHistory ? (
+              <div className="flex justify-center items-center h-full w-full">
+                <Spin spinning={true} size="large" /> 
+              </div>
+            ) : (
+              <>
+                {(priceHistory?.originRecords?.length > 1 || priceHistory?.records?.length > 1) && (
+                  <div className="w-full h-full">
+                    <TimeRangeTabs onChange={handleTimeFilterChange} activeKey={timeFilter} />
+                    <PriceChartAndStats priceHistory={priceHistory} />
+                  </div>
+                )}
+                <div>
+                  {(priceHistory?.originRecords?.length > 1 || priceHistory?.records?.length > 1) && (
+                    <Statistics priceHistory={priceHistory} />
+                  )}
+                </div>
+              </>
+            )
+          }
           </div>
         </div>
       )}
