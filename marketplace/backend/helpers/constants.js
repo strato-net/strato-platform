@@ -33,7 +33,6 @@ export default {
 
 require('dotenv').config();
 export const STRIPE_PAYMENT_SERVER_URL = process.env.STRIPE_PAYMENT_SERVER_URL;
-export const POSTGRESQL_API_URL = process.env.POSTGRESQL_API_URL;
 
 export const unitOfMeasurement = {}
 unitOfMeasurement[unitOfMeasurement['LB'] = 1] = 'LB';

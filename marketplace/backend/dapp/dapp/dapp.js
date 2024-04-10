@@ -1,6 +1,6 @@
 import { rest, util, importer } from "blockapps-rest";
 const { createContract } = rest;
-import constants, { STRIPE_PAYMENT_SERVER_URL, POSTGRESQL_API_URL } from "/helpers/constants";
+import constants, { STRIPE_PAYMENT_SERVER_URL } from "/helpers/constants";
 import { yamlWrite, yamlSafeDumpSync, getYamlFile } from "/helpers/config";
 import { pollingHelper } from "/helpers/utils";
 
