@@ -272,8 +272,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
           
           <div className="flex  items-center">
           <Button type="link" className="text-[#13188A] font-semibold text-base h-6 mb-2" onClick={callDetailPage}>Preview</Button>
-          { console.log("inventory", inventory," asd: ", getCategory())}
-        
+
         {((itemData.isMint === "True" && inventory.quantity === 0) || inventory.quantity > 0) &&
            <Popover
             placement="bottomLeft"
