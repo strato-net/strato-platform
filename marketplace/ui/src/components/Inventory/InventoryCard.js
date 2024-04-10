@@ -36,7 +36,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
   const imgMeta = category ? category : SEO.TITLE_META
-
+  
   const itemData = inventory.data;
   const showModalEdit = () => {
     hide();
