@@ -1,5 +1,5 @@
 {
-  "name": "payment-server",
+  "name": "stripe-ps",
   "version": "1.0.0",
   "description": "Payment Server (Stripe)",
   "main": "index.js",

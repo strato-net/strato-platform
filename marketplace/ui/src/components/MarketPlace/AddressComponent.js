@@ -8,7 +8,7 @@ const AddressComponent = ({ userAddress }) => {
             </div> 
             <div className="flex justify-between">
                 <p className="text-[#000000] text-sm">Address</p>
-                    <p className="text-left text-[#000000] text-sm font-semibold"> { userAddress.addressLine2 ?
+                    <p className="text-right text-[#000000] text-sm font-semibold"> { userAddress.addressLine2 ?
                                     decodeURIComponent(userAddress.addressLine1)+", "+decodeURIComponent(userAddress.addressLine2) 
                                     : decodeURIComponent(userAddress.addressLine1)
                                 }</p>

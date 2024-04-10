@@ -10,7 +10,7 @@ const routes = require('./routes');
 
 const config = {
     name: 'Payment Server (Stripe)',
-    port: 5432,
+    port: process.env.PORT || 8018,
 };
 
 const app = express();
