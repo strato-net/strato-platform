@@ -97,6 +97,7 @@ const ConfirmOrder = () => {
   const [responsiveAddress, setResponsiveAddress] = useState(false);
   const [showAddress, setshowAddress] = useState(false);
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
+  const [metamaskPaymentLoading, setMetamaskPaymentLoading] = useState(false);
 
 
   const CloseAddressModel = () => {
@@ -322,7 +323,7 @@ const ConfirmOrder = () => {
   }
 
   const handlePaymentConfirm = async (method) => {
-    setIsPaymentModalVisible(false); // Close the payment modal
+    setMetamaskPaymentLoading(true);
     if (userAddresses.length === 0) {
       api.error({
         message: "Please enter an address",
@@ -429,7 +430,7 @@ const ConfirmOrder = () => {
         
         const txParams = {
           from: accounts[0],
-          to: metamaskStatus.walletaddress,
+          to: metamaskStatus.accountId,
           value: hexValue,
           chainId: `0xaa36a7`,
         };
@@ -486,6 +487,9 @@ const ConfirmOrder = () => {
           placement: "bottom",
         });
         return null;
+      } finally {
+        setMetamaskPaymentLoading(false);
+        setIsPaymentModalVisible(false); // Close the payment modal
       }
     }
   };
@@ -617,7 +621,7 @@ const ConfirmOrder = () => {
                     <List>
                       <List.Item>
                         <Button
-                          disabled={!stripeStatus || !stripeStatus?.chargesEnabled || !stripeStatus?.detailsSubmitted || !stripeStatus?.payoutsEnabled}
+                          disabled={!stripeStatus || !stripeStatus?.chargesEnabled || !stripeStatus?.detailsSubmitted || !stripeStatus?.payoutsEnabled || metamaskPaymentLoading}
                           onClick={() => handlePaymentConfirm('stripe')}
                         >
                           Pay with Stripe
@@ -625,6 +629,7 @@ const ConfirmOrder = () => {
                       </List.Item>
                       <List.Item>
                         <Button
+                          loading={metamaskPaymentLoading}
                           disabled={!metamaskStatus} // Adjust based on how metamaskStatus indicates availability
                           onClick={() => handlePaymentConfirm('metamask')}
                         >
@@ -637,9 +642,9 @@ const ConfirmOrder = () => {
                 {modalAddress && <AddAddressModal open={modalAddress} close={CloseAddressModel} />}
                 <div>
                   <div className="mt-4">
-                    {isAddingShippingAddress || isLoadingUserAddresses || isLoadingStripeStatus ?
+                    {isAddingShippingAddress || isLoadingUserAddresses || isLoadingStripeStatus || isLoadingMetamaskStatus ?
                       <div className="h-80 flex justify-center items-center">
-                        <Spin spinning={isAddingShippingAddress || isLoadingUserAddresses || isLoadingStripeStatus} size="large" />
+                        <Spin spinning={isAddingShippingAddress || isLoadingUserAddresses || isLoadingStripeStatus || isLoadingMetamaskStatus} size="large" />
                       </div>
                       :
                       userAddresses.length !== 0 ?
