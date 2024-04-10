@@ -68,14 +68,9 @@ contract Y {
   it("can index contracts recursively constructed", async () => {
     const [user, contract] = await upload("Y", newContract, options);
     await sleep(2000);
-    console.log("hi");
-    console.log(user);
-    console.log(contract);
     const indexY = await rest.search(user, {...contract, name: toTableName("Y")}, {...options, query: {address: `eq.${contract.address}`}});
-    console.log(indexY);
     assert.equal(indexY.length, 1, JSON.stringify(indexY, null, 2));
     const indexX = await rest.search(user, {...contract, name: toTableName("X")}, options);
-    console.log(indexX);
     console.log(`indexX returned ${JSON.stringify(indexX, null, 2)}`);
     assert.equal(indexX[0].z, "7624", "z");
   });
