@@ -1,13 +1,13 @@
-const bodyParser = require('body-parser');
-const cors = require('cors');
-const dayjs = require('dayjs');
-const express = require('express');
-const expressWinston = require('express-winston');
-const helmet = require('helmet');
-const winston = require('winston');
+import bodyParser from 'body-parser';
+import cors from 'cors';
+import dayjs from 'dayjs';
+import express from 'express';
+import expressWinston from 'express-winston';
+import helmet from 'helmet';
+import winston from 'winston';
 
-const { clientErrorHandler, commonErrorHandler } = require('./helpers/utils');
-const routes = require('./routes');
+import { clientErrorHandler, commonErrorHandler } from './helpers/utils.js';
+import routes from './routes.js';
 
 const config = {
     name: 'Payment Server (Stripe)',

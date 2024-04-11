@@ -1,5 +1,5 @@
-const express = require('express');
-const StripeServiceController = require('./stripeService.controller');
+import express from 'express';
+import StripeServiceController from './stripeService.controller.js';
 
 const router = express.Router();
 
@@ -38,4 +38,4 @@ router.post(
   StripeServiceController.stripeWebhookConnect
 );
 
-module.exports = router;
+export default router;

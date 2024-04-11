@@ -8,4 +8,4 @@ const STRIPE_ENV = {
   }
 }
 
-module.exports.STRIPE_ENV = STRIPE_ENV;
+export { STRIPE_ENV }

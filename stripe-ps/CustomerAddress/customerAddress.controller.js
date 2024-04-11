@@ -1,5 +1,5 @@
-const db = require('../db');
-const Joi = require('@hapi/joi');
+import db from '../db/index.js';
+import Joi from '@hapi/joi';
 class CustomerAddressController {
 
   static async getAddresses(req, res, next) {
@@ -145,4 +145,4 @@ class CustomerAddressController {
 
 }
 
-module.exports = CustomerAddressController;
+export default CustomerAddressController;

@@ -1,5 +1,6 @@
-const dotenv = require('dotenv');
-const { get } = require('lodash');
+import dotenv from 'dotenv';
+import lodash from 'lodash';
+const { get } = lodash;
 dotenv.config();
 
 const clientErrorHandler = (err, req, res, next) => {
@@ -23,7 +24,7 @@ const commonErrorHandler = (err, req, res, next) => {
   return next(err);
 }
 
-module.exports = {
+export {
   clientErrorHandler,
   commonErrorHandler,
 }

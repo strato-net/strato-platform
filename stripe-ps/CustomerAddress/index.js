@@ -1,5 +1,5 @@
-const express = require('express');
-const CustomerAddressController = require('./customerAddress.controller');
+import express from 'express';
+import CustomerAddressController from './customerAddress.controller.js';
 
 const router = express.Router();
 
@@ -23,4 +23,4 @@ router.delete(
   CustomerAddressController.deleteAddress
 );
 
-module.exports = router;
+export default router;

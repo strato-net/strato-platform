@@ -1,5 +1,5 @@
-const { STRIPE_ENV } = require('../helpers/constants');
-const Stripe = require('stripe');
+import { STRIPE_ENV } from '../helpers/constants.js';
+import Stripe from 'stripe';
 const stripe = Stripe(STRIPE_ENV.CREDENTIALS.STRIPE_SECRET_KEY);
 
 class StripeService {
@@ -112,4 +112,4 @@ class StripeService {
     }
 }
 
-module.exports = StripeService;
+export default StripeService;
