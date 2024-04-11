@@ -9,7 +9,6 @@
 module Main where
 
 import           API
---import           Blockchain.Strato.Model.Keccak256
 import           Options
 import           Strato.Monad
 import           Strato.Server
@@ -22,9 +21,7 @@ import qualified Aws.S3 as S3
 import           Control.Concurrent
 import           Control.Exception
 import           Control.Monad.IO.Class
---import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Resource
---import           Data.ByteString as DB
 import           Data.ByteString.Char8 as DBC8
 import           Data.ByteString.Lazy as DBL
 import           Data.Proxy
@@ -90,12 +87,10 @@ fourMBBasicTest :: String
                 -> S3.Bucket
                 -> Text
                 -> Spec
---fourMBBasicTest :: Spec
 fourMBBasicTest highwaytestnetaccesskeyid
                 highwaytestnetsecretaccesskey
                 highwaytestnets3bucket
                 highwaytestneturl = do
-                -- = do
   it "Can push a pseudo randomly-generated 4MB text file to AWS S3 via putS3File,\
      \ and retrieve that same file via getS3FileTesting,\
      \ (cleaning up afterward with DeleteObject)." $ do
@@ -106,15 +101,15 @@ fourMBBasicTest highwaytestnetaccesskeyid
                                { highwaytesting_inputiname  = "highway-testing" :: Text
                                , highwaytesting_inputivalue = "4MB Tests" :: Text
                                , highwaytesting_inputname   = "4MBTest" :: Text
-                               , highwaytesting_filename    = "4mbtest.txt" :: Text --file 
+                               , highwaytesting_filename    = "4mbtest.txt" :: Text
                                , highwaytesting_filetype    = "text/plain" :: Text
                                , highwaytesting_data        = fourmbtestdata
                                } 
     let multipart          = toMultipart fourmbtestdatatype 
     mgr                    <- newManager tlsManagerSettings
     boundary               <- genBoundary
-    cr                     <- Aws.makeCredentials (DBC8.pack highwaytestnetaccesskeyid)--(DBC8.pack flags_awsaccesskeyid)--(DBC8.pack highwaytestnetaccesskeyid)--(DBC8.pack flags_awsaccesskeyid)
-                                                  (DBC8.pack highwaytestnetsecretaccesskey)--(DBC8.pack flags_awssecretaccesskey)--(DBC8.pack highwaytestnetsecretaccesskey)--(DBC8.pack flags_awssecretaccesskey)
+    cr                     <- Aws.makeCredentials (DBC8.pack highwaytestnetaccesskeyid)
+                                                  (DBC8.pack highwaytestnetsecretaccesskey)
     let cfg                = Aws.Configuration { Aws.timeInfo    = Aws.Timestamp
                                                , Aws.credentials = cr 
                                                , Aws.logger      = Aws.defaultLog Aws.Warning
@@ -125,8 +120,8 @@ fourMBBasicTest highwaytestnetaccesskeyid
                                mgr
                                cr
                                boundary
-                               highwaytestnets3bucket--(T.pack flags_awss3bucket) --highwaytestnets3bucket --(T.pack flags_awss3bucket)
-                               highwaytestneturl--(T.pack flags_highwayUrl) --highwaytestneturl --(T.pack flags_highwayUrl)
+                               highwaytestnets3bucket
+                               highwaytestneturl
     hash <-
       runHighwayWithEnv env
                         (putS3File multipart)
@@ -136,7 +131,7 @@ fourMBBasicTest highwaytestnetaccesskeyid
     _ <-
       runResourceT $
         Aws.pureAws cfg s3cfg mgr $
-          S3.DeleteObject hash highwaytestnets3bucket--(T.pack flags_awss3bucket)--highwaytestnets3bucket
+          S3.DeleteObject hash highwaytestnets3bucket
     (responseStatus rsp) `shouldBe` status200
 
 fiveMBBasicTest :: String
@@ -158,15 +153,15 @@ fiveMBBasicTest highwaytestnetaccesskeyid
                                { highwaytesting_inputiname  = "highway-testing" :: Text
                                , highwaytesting_inputivalue = "5MB Tests" :: Text
                                , highwaytesting_inputname   = "5MBTest" :: Text
-                               , highwaytesting_filename    = "5mbtest.txt" :: Text --file 
+                               , highwaytesting_filename    = "5mbtest.txt" :: Text
                                , highwaytesting_filetype    = "text/plain" :: Text
                                , highwaytesting_data        = fivembtestdata
                                } 
     let multipart          = toMultipart fivembtestdatatype 
     mgr                    <- newManager tlsManagerSettings
     boundary               <- genBoundary
-    cr                     <- Aws.makeCredentials (DBC8.pack highwaytestnetaccesskeyid)--(DBC8.pack flags_awsaccesskeyid)--(DBC8.pack highwaytestnetaccesskeyid)--(DBC8.pack flags_awsaccesskeyid)
-                                                  (DBC8.pack highwaytestnetsecretaccesskey)--(DBC8.pack flags_awssecretaccesskey)--(DBC8.pack highwaytestnetsecretaccesskey)--(DBC8.pack flags_awssecretaccesskey)
+    cr                     <- Aws.makeCredentials (DBC8.pack highwaytestnetaccesskeyid)
+                                                  (DBC8.pack highwaytestnetsecretaccesskey)
     let cfg                = Aws.Configuration { Aws.timeInfo    = Aws.Timestamp
                                                , Aws.credentials = cr 
                                                , Aws.logger      = Aws.defaultLog Aws.Warning
@@ -177,8 +172,8 @@ fiveMBBasicTest highwaytestnetaccesskeyid
                                mgr
                                cr
                                boundary
-                               highwaytestnets3bucket--(T.pack flags_awss3bucket) --highwaytestnets3bucket --(T.pack flags_awss3bucket)
-                               highwaytestneturl--(T.pack flags_highwayUrl) --highwaytestneturl --(T.pack flags_highwayUrl)
+                               highwaytestnets3bucket
+                               highwaytestneturl
     hash <-
       runHighwayWithEnv env
                         (putS3File multipart)
@@ -188,51 +183,8 @@ fiveMBBasicTest highwaytestnetaccesskeyid
     _ <-
       runResourceT $
         Aws.pureAws cfg s3cfg mgr $
-          S3.DeleteObject hash highwaytestnets3bucket--(T.pack flags_awss3bucket)--highwaytestnets3bucket
+          S3.DeleteObject hash highwaytestnets3bucket
     (responseStatus rsp) `shouldBe` status200
-  {-
-  it "Can push a pseudo randomly-generated 5MB text file to AWS S3 via PutObject,\
-     \ and retrieve that same file via GetObject (cleaning up afterward with DeleteObject)." $ do
-    g                      <- getStdGen
-    let fivembtestdata     = randomByteString 5000000
-                                              g
-    let file               = "5mbtest.txt" :: Text
-    let fivembtestdatatype = HighwayTesting
-                               { highwaytesting_inputiname  = "highway-testing" :: Text
-                               , highwaytesting_inputivalue = "5MB Tests" :: Text
-                               , highwaytesting_inputname   = "4MBTest" :: Text
-                               , highwaytesting_filename    = file 
-                               , highwaytesting_filetype    = "text/plain" :: Text
-                               , highwaytesting_data        = fivembtestdata
-                               } 
-    let multipart          = toMultipart fivembtestdatatype
-    mgr                    <- newManager tlsManagerSettings
-    cr                     <- Aws.makeCredentials (DBC8.pack highwaytestnetaccesskeyid)--(DBC8.pack flags_awsaccesskeyid)
-                                                  (DBC8.pack highwaytestnetsecretaccesskey)--(DBC8.pack flags_awssecretaccesskey)
-    let cfg                = Aws.Configuration { Aws.timeInfo    = Aws.Timestamp
-                                               , Aws.credentials = cr 
-                                               , Aws.logger      = Aws.defaultLog Aws.Warning
-                                               , Aws.proxy       = Nothing
-                                               }
-    let s3cfg              = Aws.defServiceConfig :: S3.S3Configuration Aws.NormalQuery
-    let awss3b             = highwaytestnets3bucket
-    rsp'               <-
-      runResourceT $ do
-        --let body = RequestBodyBS fivembtestdata
-        --_ <-
-        --  Aws.pureAws cfg s3cfg mgr $
-        --    S3.putObject awss3b file body
-        _ <-
-          return $ putS3File multipart
-        S3.GetObjectResponse { S3.gorResponse = rsp } <-
-          Aws.pureAws cfg s3cfg mgr $
-            S3.getObject awss3b file
-        _ <-
-          Aws.pureAws cfg s3cfg mgr $
-            S3.DeleteObject file awss3b
-        return rsp
-    (responseStatus rsp') `shouldBe` status200
-  -}
 
 sixMBBasicTest :: String
                -> String
@@ -253,15 +205,15 @@ sixMBBasicTest highwaytestnetaccesskeyid
                                { highwaytesting_inputiname  = "highway-testing" :: Text
                                , highwaytesting_inputivalue = "6MB Tests" :: Text
                                , highwaytesting_inputname   = "6MBTest" :: Text
-                               , highwaytesting_filename    = "6mbtest.txt" :: Text --file 
+                               , highwaytesting_filename    = "6mbtest.txt" :: Text
                                , highwaytesting_filetype    = "text/plain" :: Text
                                , highwaytesting_data        = sixmbtestdata
                                } 
     let multipart          = toMultipart sixmbtestdatatype 
     mgr                    <- newManager tlsManagerSettings
     boundary               <- genBoundary
-    cr                     <- Aws.makeCredentials (DBC8.pack highwaytestnetaccesskeyid)--(DBC8.pack flags_awsaccesskeyid)--(DBC8.pack highwaytestnetaccesskeyid)--(DBC8.pack flags_awsaccesskeyid)
-                                                  (DBC8.pack highwaytestnetsecretaccesskey)--(DBC8.pack flags_awssecretaccesskey)--(DBC8.pack highwaytestnetsecretaccesskey)--(DBC8.pack flags_awssecretaccesskey)
+    cr                     <- Aws.makeCredentials (DBC8.pack highwaytestnetaccesskeyid)
+                                                  (DBC8.pack highwaytestnetsecretaccesskey)
     let cfg                = Aws.Configuration { Aws.timeInfo    = Aws.Timestamp
                                                , Aws.credentials = cr 
                                                , Aws.logger      = Aws.defaultLog Aws.Warning
@@ -272,8 +224,8 @@ sixMBBasicTest highwaytestnetaccesskeyid
                                mgr
                                cr
                                boundary
-                               highwaytestnets3bucket--(T.pack flags_awss3bucket) --highwaytestnets3bucket --(T.pack flags_awss3bucket)
-                               highwaytestneturl--(T.pack flags_highwayUrl) --highwaytestneturl --(T.pack flags_highwayUrl)
+                               highwaytestnets3bucket
+                               highwaytestneturl
     hash <-
       runHighwayWithEnv env
                         (putS3File multipart)
@@ -283,51 +235,8 @@ sixMBBasicTest highwaytestnetaccesskeyid
     _ <-
       runResourceT $
         Aws.pureAws cfg s3cfg mgr $
-          S3.DeleteObject hash highwaytestnets3bucket--(T.pack flags_awss3bucket)--highwaytestnets3bucket
+          S3.DeleteObject hash highwaytestnets3bucket
     (responseStatus rsp) `shouldNotBe` status200
-  {-
-  it "Cannot push a pseudo randomly-generated 6MB text file to AWS S3 via PutObject,\
-     \ and retrieve that same file via GetObject (cleaning up afterward with DeleteObject)." $ do
-    g                 <- getStdGen
-    let sixmbtestdata = randomByteString 6000000
-                                         g
-    let file           = "6mbtest.txt" :: Text
-    let sixmbtestdatatype = HighwayTesting
-                               { highwaytesting_inputiname  = "highway-testing" :: Text
-                               , highwaytesting_inputivalue = "4MB Tests" :: Text
-                               , highwaytesting_inputname   = "4MBTest" :: Text
-                               , highwaytesting_filename    = file 
-                               , highwaytesting_filetype    = "text/plain" :: Text
-                               , highwaytesting_data        = sixmbtestdata
-                               } 
-    let multipart      = toMultipart sixmbtestdatatype
-    mgr                <- newManager tlsManagerSettings
-    cr                 <- Aws.makeCredentials (DBC8.pack highwaytestnetaccesskeyid)--(DBC8.pack flags_awsaccesskeyid)
-                                              (DBC8.pack highwaytestnetsecretaccesskey)--(DBC8.pack flags_awssecretaccesskey)
-    let cfg            = Aws.Configuration { Aws.timeInfo    = Aws.Timestamp
-                                           , Aws.credentials = cr 
-                                           , Aws.logger      = Aws.defaultLog Aws.Warning
-                                           , Aws.proxy       = Nothing
-                                           }
-    let s3cfg          = Aws.defServiceConfig :: S3.S3Configuration Aws.NormalQuery
-    let awss3b         = highwaytestnets3bucket
-    rsp'               <-
-      runResourceT $ do
-        --let body = RequestBodyBS sixmbtestdata
-        --_ <-
-        --  Aws.pureAws cfg s3cfg mgr $
-        --    S3.putObject awss3b file body
-        _ <-
-          return $ putS3File multipart
-        S3.GetObjectResponse { S3.gorResponse = rsp } <-
-          Aws.pureAws cfg s3cfg mgr $
-            S3.getObject awss3b file
-        _ <-
-          Aws.pureAws cfg s3cfg mgr $
-            S3.DeleteObject file awss3b
-        return rsp
-    (responseStatus rsp') `shouldNotBe` status200
-  -}
 
 main :: IO ()
 main = do
@@ -355,34 +264,33 @@ main = do
                   describe "highway" $ do
                     describe "base tests" $ do
                       describe "4MB testing" $ do
-                        fourMBBasicTest flags_awsaccesskeyid--highwaytestnetaccesskeyid
-                                        flags_awssecretaccesskey--highwaytestnetsecretaccesskey
-                                        (T.pack flags_awss3bucket)--highwaytestnets3bucket
+                        fourMBBasicTest flags_awsaccesskeyid
+                                        flags_awssecretaccesskey
+                                        (T.pack flags_awss3bucket)
                                         highwaytestneturl
                       describe "5MB testing" $ do
-                        fiveMBBasicTest flags_awsaccesskeyid--highwaytestnetaccesskeyid
-                                        flags_awssecretaccesskey--highwaytestnetsecretaccesskey
-                                        (T.pack flags_awss3bucket)--highwaytestnets3bucket
+                        fiveMBBasicTest flags_awsaccesskeyid
+                                        flags_awssecretaccesskey
+                                        (T.pack flags_awss3bucket)
                                         highwaytestneturl
                       describe "6MB testing" $ do
-                        sixMBBasicTest flags_awsaccesskeyid--highwaytestnetaccesskeyid
-                                       flags_awssecretaccesskey--highwaytestnetsecretaccesskey
-                                       (T.pack flags_awss3bucket)--highwaytestnets3bucket
+                        sixMBBasicTest flags_awsaccesskeyid
+                                       flags_awssecretaccesskey
+                                       (T.pack flags_awss3bucket)
                                        highwaytestneturl
   where
     highwaytestneturl = "localhost" :: Text --"https://fileserver.mercata-testnet2.blockapps.net" :: Text
     highwayTestingSetup action = do
       mgr      <- newManager tlsManagerSettings
       boundary <- genBoundary
-      cr       <- Aws.makeCredentials (DBC8.pack flags_awsaccesskeyid)--(DBC8.pack highwaytestnetaccesskeyid)--(DBC8.pack flags_awsaccesskeyid)
-                                      (DBC8.pack flags_awssecretaccesskey)--(DBC8.pack highwaytestnetsecretaccesskey)--(DBC8.pack flags_awssecretaccesskey)
+      cr       <- Aws.makeCredentials (DBC8.pack flags_awsaccesskeyid)
+                                      (DBC8.pack flags_awssecretaccesskey)
       let env = HighwayWrapperEnv
                   mgr
                   cr
                   boundary
-                  (T.pack flags_awss3bucket)--highwaytestnets3bucket
-                  --(T.pack highwaytestnets3bucket)--(T.pack flags_awss3bucket)
-                  highwaytestneturl--(T.pack highwaytestneturl)--(T.pack flags_highwayUrl)
+                  (T.pack flags_awss3bucket)
+                  highwaytestneturl
       bracket (liftIO $ forkIO $ Warp.run 8080 (appHighwayWrapper env))
               killThread
               (const action)
