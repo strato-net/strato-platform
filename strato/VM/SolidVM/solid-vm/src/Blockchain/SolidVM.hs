@@ -1791,9 +1791,8 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   ro <- readOnly <$> getCurrentCallInfo
   when ro $ invalidWrite "Invalid contract creation during read-only access" $ "contractName: " ++ show contractName' ++ ", args: " ++ show args
   creator <- getCurrentAccount
-  real_creator <- getAppAccount Nothing creator
   (hsh, cc) <- getCurrentCodeCollection
-  newAddress <- getNewAddress real_creator
+  newAddress <- getNewAddress creator
   execResults <- create' creator newAddress hsh cc contractName' args False
   return $
     Constant $
@@ -1805,7 +1804,6 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   ro <- readOnly <$> getCurrentCallInfo
   when ro $ invalidWrite "Invalid contract creation during read-only access" $ "contractName: " ++ show contractName' ++ ", args: " ++ show args
   creator <- getCurrentAccount
-  real_creator <- getAppAccount Nothing creator
   (hsh, cc) <- getCurrentCodeCollection
   salt <- saltTextToValue saltExpressionText
   args' <- case args of
@@ -2680,10 +2678,8 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
   when (contractName' == "" || contractSrc == "") $
     invalidArguments "The contract name and src arguments for the create function should not be empty" args
 
-  theEnv <- getEnv
-  let origin = Env.origin theEnv
-      metadata = Env.metadata theEnv
-      isRunningTests = Env.runningTests theEnv
+  creator <- getCurrentAccount
+  -- currentContract <- getCurrentContract
   (_, parentCC) <- getCurrentCodeCollection
 
   -- Because of the current testnet stateroot problem with contracts using an older version of
@@ -2694,11 +2690,15 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
   -- testnet won't exist anymore and the stateroot mismatches will be fixed.
   let pragmaCheck = isJust $ find ((== "builtinCreates") . fst) $ CC._pragmas parentCC
   (hsh, cc) <- codeCollectionFromSource True $ BC.pack contractSrc
-  newAddress <- getNewAddress origin 
+  newAddress <- getNewAddress creator
   let constructorArgs = case runParser parseArgs initialParserState "" argString of
         Right parsedArgs -> parsedArgs
         _ -> internalError "Failed to parse constructor args in a create builtin call" argString
-  execResults <- create' origin newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) pragmaCheck
+  execResults <- create' creator newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) pragmaCheck
+  theEnv <- getEnv
+  let origin = Env.origin theEnv
+      metadata = Env.metadata theEnv
+      isRunningTests = Env.runningTests theEnv
       -- maybeUseWallet = M.lookup "useWallet" =<< metadata
       -- !useWallet = maybe False (const True) maybeUseWallet
   ctr <- getCreator origin --not sure if this should be there instead
@@ -2724,7 +2724,6 @@ callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SS
     invalidArguments "The contract name and src arguments for the create2 function should not be empty" args
 
   creator <- getCurrentAccount
-  real_creator <- getAppAccount Nothing creator
   -- currentContract <- getCurrentContract
   (_, parentCC) <- getCurrentCodeCollection
 
