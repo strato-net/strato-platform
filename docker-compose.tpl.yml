@@ -138,6 +138,7 @@ services:
     - blockTime=${blockTime}
     - bootnode=${bootnode}
     - connectionTimeout=${connectionTimeout}
+    - creatorForkBlockNumber=${creatorForkBlockNumber}
     - debugFail=${debugFail}
     - debugPort=${debugPort}
     - debugWSHost=${debugWSHost}

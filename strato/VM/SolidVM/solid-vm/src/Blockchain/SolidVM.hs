@@ -677,9 +677,9 @@ setCreator creator contract _ _ = do
   let creatorAddress = _accountAddress creator
   maybeCert <- A.select (A.Proxy @X509Certificate) creatorAddress
   blockNumber <- blockHeaderBlockNumber . Env.blockHeader <$> getEnv
-  let _cn = if (computeNetworkID == 7596898649924658542 && blockNumber <= 35000)|| (computeNetworkID == 6909499098523985262 && blockNumber <= 6000) || (computeNetworkID == 04102024 && blockNumber <= 7)
-                 then fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
-                 else fromMaybe "" $ fmap subCommonName $ getCertSubject =<< maybeCert
+  let _cn = if shouldDoCreatorFork blockNumber
+                then fromMaybe "" $ fmap subCommonName $ getCertSubject =<< maybeCert
+                else fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
 
   case maybeCert of
     (Just cert) -> do
@@ -708,9 +708,9 @@ getCreator caller = do
       -- we will look up their cert in the DB and use it to get the org name for this app
       maybeCert <- A.select (A.Proxy @X509Certificate) $ caller ^. accountAddress
       blockNumber <- blockHeaderBlockNumber . Env.blockHeader <$> getEnv
-      let creator' = if (computeNetworkID == 7596898649924658542 && blockNumber <= 35000)|| (computeNetworkID == 6909499098523985262 && blockNumber <= 6000) || (computeNetworkID == 04102024 && blockNumber <= 7)
-                        then fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
-                        else fromMaybe "" $ fmap subCommonName $ getCertSubject =<< maybeCert
+      let creator' = if shouldDoCreatorFork blockNumber
+                        then fromMaybe "" $ fmap subCommonName $ getCertSubject =<< maybeCert
+                        else fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
       $logDebugS "getCreator/versioning" . T.pack $ "The creator is " ++ (show creator')
       return creator'
     x -> do
@@ -729,6 +729,14 @@ getCreator caller = do
             _ -> do
               $logDebugS "getCreator/versioning" . T.pack $ "Its creator is unset. Returning empty string"
               return ""
+  
+-- helper function for getCreator and setCreator
+-- once mercata-hydrogen and mercata networks dismantled, this function and flag will be obsolete
+shouldDoCreatorFork :: Integer -> Bool
+shouldDoCreatorFork curBlockNo = case (flags_creatorForkBlockNumber, computeNetworkID) of 
+  (-1, 7596898649924658542) -> curBlockNo >= 35000 -- on mercata-hydrogen, switch at block 35,000
+  (-1, 6909499098523985262) -> curBlockNo >= 6000 -- on mercata, switch at block 6,000
+  (b, _) -> curBlockNo >= b -- do whatever the flag says
 
 logFunctionCall :: MonadSM m => ValList -> Account -> CC.Contract -> SolidString -> m (Maybe Value) -> m (Maybe Value)
 logFunctionCall args address contract functionName f = do
