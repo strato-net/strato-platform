@@ -182,7 +182,7 @@ const CartComponent = ({ columns, data, openToastOrder }) => {
                                 }}
                                 disabled={data.length === 0}
                             >
-                                Submit & Checkout1
+                                Submit & Checkout
                             </Button>
 
                         </Row>
