@@ -265,10 +265,11 @@ create _ _ _ blockData _ sender' origin' _ _ availableGas newAddress code txHash
         !args = either (parseError "create arguments") CC.OrderedArgs maybeArgs
 
     (hsh, cc) <- codeCollectionFromSource True initCode
-    create' sender' newAddress hsh cc contractName' args False
+    issuer <- getCreator origin'
+    create' sender' issuer newAddress hsh cc contractName' args False
 
-create' :: MonadSM m => Account -> Account -> Keccak256 -> CC.CodeCollection -> SolidString -> CC.ArgList -> Bool -> m ExecResults
-create' creator newAccount ch cc contractName' argExps createBuiltinCall = do
+create' :: MonadSM m => Account -> String -> Account -> Keccak256 -> CC.CodeCollection -> SolidString -> CC.ArgList -> Bool -> m ExecResults
+create' creator issuer newAccount ch cc contractName' argExps createBuiltinCall = do
   parentName <-
     fromMaybeM (return "") $
       runMaybeT $
@@ -286,16 +287,9 @@ create' creator newAccount ch cc contractName' argExps createBuiltinCall = do
       !mappings = getMapNamesFromContract contract'
       !arrays = getArrayNamesFromContract contract'
 
-  env' <- getEnv
-  let origin' = Env.origin env'
-      metadata = Env.metadata env'
-      maybeUseWallet = M.lookup "useWallet" =<< metadata
-      !useWallet = maybe False (const True) maybeUseWallet
+  !abstracts <- M.fromList <$> traverse (resolveNameParts newAccount (T.pack issuer)) abstracts'
 
-  ctr <- bool (getCreator creator) (getCreator origin') useWallet
-  !abstracts <- M.fromList <$> traverse (resolveNameParts newAccount (T.pack ctr)) abstracts'
-
-  initializeAction newAccount (labelToString contractName') ctr ch cc abstracts mappings arrays
+  initializeAction newAccount (labelToString contractName') issuer ch cc abstracts mappings arrays
 
   A.adjustWithDefault_ (A.Proxy @AddressState) newAccount $ \newAddressState ->
     pure
@@ -337,13 +331,13 @@ create' creator newAccount ch cc contractName' argExps createBuiltinCall = do
   --   Action.actionData %= Action.omapAdjust (Action.actionDataOrganization .~ (T.pack org)) newAccount
 
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    Action.actionData %= Action.omapAdjust (Action.actionDataCreator .~ (T.pack ctr)) newAccount
+    Action.actionData %= Action.omapAdjust (Action.actionDataCreator .~ (T.pack issuer)) newAccount
 
   -- when (useWallet && parentName == "User") $ Mod.modifyStatefully_ (Mod.Proxy @Action) $
   --   Action.actionData %= Action.omapAdjust (Action.actionDataApplication .~ (T.pack "")) newAccount
 
   -- I'm showing these strings because I like them to be in quotes in the logs :)
-  multilineLog "create'/versioning" $ boringBox ["Contract Name: " ++ (C.yellow contractName'), "Creator: " ++ (C.yellow ctr)]
+  multilineLog "create'/versioning" $ boringBox ["Contract Name: " ++ (C.yellow contractName'), "Creator: " ++ (C.yellow issuer)]
 
   solidVMBreakpoint emptySourceAnnotation -- just to force a resume at the end of the transaction
   finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
@@ -362,7 +356,7 @@ create' creator newAccount ch cc contractName' argExps createBuiltinCall = do
         erException = Nothing,
         erKind = SolidVM,
         erPragmas = CC._pragmas cc,
-        erCreator = ctr
+        erCreator = issuer
       }
 
 call ::
@@ -1793,7 +1787,8 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   creator <- getCurrentAccount
   (hsh, cc) <- getCurrentCodeCollection
   newAddress <- getNewAddress creator
-  execResults <- create' creator newAddress hsh cc contractName' args False
+  issuer <- getCreator creator
+  execResults <- create' creator issuer newAddress hsh cc contractName' args False
   return $
     Constant $
       SContract contractName' $
@@ -1811,7 +1806,8 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
     (CC.NamedArgs na) -> NamedVals <$> mapM (mapM $ getVar <=< expToVar) na
   newAddress <- getNewAddressWithSalt creator salt hsh $ show args'
   $logDebugS "DEBUG" $ T.pack $ (show hsh) ++ "  " ++ show newAddress
-  execResults <- create' creator newAddress hsh cc contractName' args False
+  issuer <- getCreator creator
+  execResults <- create' creator issuer newAddress hsh cc contractName' args False
   onTraced $ do
     liftIO $
       putStrLn $
@@ -2694,7 +2690,6 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
   let constructorArgs = case runParser parseArgs initialParserState "" argString of
         Right parsedArgs -> parsedArgs
         _ -> internalError "Failed to parse constructor args in a create builtin call" argString
-  execResults <- create' creator newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) pragmaCheck
   theEnv <- getEnv
   let origin = Env.origin theEnv
       metadata = Env.metadata theEnv
@@ -2702,6 +2697,7 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
       -- maybeUseWallet = M.lookup "useWallet" =<< metadata
       -- !useWallet = maybe False (const True) maybeUseWallet
   ctr <- getCreator origin --not sure if this should be there instead
+  execResults <- create' creator ctr newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) pragmaCheck
   case erNewContractAccount execResults of
     Just nca -> do
       when (not isRunningTests) $ 
@@ -2740,14 +2736,13 @@ callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SS
         _ -> internalError "Failed to parse constructor args in a create builtin call" argString
   constructorArgVals <- OrderedVals <$> mapM (getVar <=< expToVar) constructorArgs
   newAddress <- getNewAddressWithSalt creator salt hsh $ show constructorArgVals
-  execResults <- create' creator newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) pragmaCheck
   theEnv <- getEnv
-  let origin = Env.origin theEnv
-      metadata = Env.metadata theEnv
+  let metadata = Env.metadata theEnv
       isRunningTests = Env.runningTests theEnv
       -- maybeUseWallet = M.lookup "useWallet" =<< metadata
       -- !useWallet = maybe False (const True) maybeUseWallet
-  ctr <- getCreator origin
+  ctr <- getCreator creator
+  execResults <- create' creator ctr newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) pragmaCheck
   case erNewContractAccount execResults of
     Just nca -> do
       when (not isRunningTests) $ 
