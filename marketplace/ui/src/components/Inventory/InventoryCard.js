@@ -334,44 +334,45 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
           </div>
         </div>
       </div>
-      <div className="pt-[14px] flex lg:flex-row  flex-col items-center gap-y-4 md:gap-[18px]">
-        <div>
-          <img
-            className="rounded-md  w-[161px] h-[161px] md:object-contain"
-            alt={imgMeta}
-            title={imgMeta}
-            src={
-              inventory.images && inventory.images.length > 0
-                ? inventory.images[0]
-                : image_placeholder}
-                
-          />
-        </div>
+      <div className="pt-[14px] flex lg:flex-row flex-col items-center lg:items-stretch gap-y-4 md:gap-[18px]">
+        <div className="inline-block text-center">
+          <div>
+            <img
+              className="rounded-md  w-[161px] h-[161px] md:object-contain"
+              alt={imgMeta}
+              title={imgMeta}
+              src={
+                inventory.images && inventory.images.length > 0
+                  ? inventory.images[0]
+                  : image_placeholder}
+                  
+            />
+          </div>
 
 
-        <div className="pt-[7px] lg:hidden flex items-center gap-[5px]">
-        {inventory.price ?
-          <div className="flex items-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
-            <div className="w-[7px] h-[7px] rounded-full bg-[#119B2D]"></div>
-            <p className="text-[#4D4D4D] text-[8px]">Published</p>
-          </div>
-          :
-          (inventory.data.isMint && inventory.data.isMint === "False" && inventory.quantity === 0) || (!inventory.data.isMint && inventory.quantity === 0)?
-          <div className="flex items-center gap-2 bg-[#FFA50029] p-[6px] rounded-md">
-            <div className="w-[7px] h-[7px] rounded-full bg-[#FFA500]"></div>
-            <p className="text-[#4D4D4D] text-[8px]">Sold Out</p>
-          </div>
-            :  
-            <div className="flex items-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
-              <div className="w-[7px] h-[7px] rounded-full bg-[#ff4d4f]"></div>
-              <p className="text-[#4D4D4D] text-[8px]">Unpublished</p>
+          <div className="pt-[7px] lg:pt-0 items-center gap-[5px]">
+            {inventory.price ?
+            <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
+              <div className="w-[7px] h-[7px] rounded-full bg-[#119B2D]"></div>
+              <p className="text-[#4D4D4D] text-[8px]">Published</p>
             </div>
-          }
+            :
+            (inventory.data.isMint && inventory.data.isMint === "False" && inventory.quantity === 0) || (!inventory.data.isMint && inventory.quantity === 0)?
+            <div className="flex items-center justify-center gap-2 bg-[#FFA50029] p-[6px] rounded-md">
+              <div className="w-[7px] h-[7px] rounded-full bg-[#FFA500]"></div>
+              <p className="text-[#4D4D4D] text-[8px]">Sold Out</p>
+            </div>
+              :  
+              <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
+                <div className="w-[7px] h-[7px] rounded-full bg-[#ff4d4f]"></div>
+                <p className="text-[#4D4D4D] text-[8px]">Unpublished</p>
+              </div>
+            }
+          </div>
         </div>
-
 
        
-        <div className="flex flex-col gap-4 px-[18px] py-4 border border-[#E9E9E9] rounded-md w-full ">
+        <div className="flex flex-col justify-between gap-4 px-[18px] py-4 border border-[#E9E9E9] rounded-md w-full ">
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity Owned</p>
             <p className="text-[#202020] font-semibold">{inventory.quantity || "N/A"}</p>
@@ -390,170 +391,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
         </div>
 
       </div>
-      <div className="flex justify-between">
-        {inventory.price ?
-          <div className="pt-[7px] hidden lg:flex items-center gap-[5px] bg-[#1548C329] p-[6px] rounded-md">
-            <div className="w-[10px] h-[10px] rounded-full bg-[#119B2D]"></div>
-            <p className="text-[#4D4D4D] text-xs"> Published </p>
-          </div>
-          :
-          (inventory.data.isMint && inventory.data.isMint === "False" && inventory.quantity === 0) || (!inventory.data.isMint && inventory.quantity === 0)?
-          <div className="pt-[7px] hidden lg:flex items-center gap-[5px] bg-[#FFA50029] p-[6px] rounded-md">
-            <div className="w-[10px] h-[10px] rounded-full bg-[#FFA500]"></div>
-            <p className="text-[#4D4D4D] text-xs"> Sold Out </p>
-          </div>
-            :
-            <div className="pt-[7px] hidden lg:flex items-center gap-[5px] bg-[#1548C329] p-[6px] rounded-md">
-              <div className="w-[10px] h-[10px] rounded-full bg-[#ff4d4f]"></div>
-              <p className="text-[#4D4D4D] text-xs"> Unpublished </p>
-            </div>
-        }
-
-       
-      </div>
-
-      {/* <div className="flex" id={id}>
-        <img
-          className="w-52 object-contain"
-          alt=""
-          src={
-            inventory.images && inventory.images.length > 0
-              ? inventory.images[0]
-              : image_placeholder }
-        />
-        <div className="ml-12 w-full">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center">
-              <h3 className="font-semibold text-primaryB text-xl">
-                {decodeURIComponent(inventory.name)}
-              </h3>
-              <p className="font-medium text-secondryB text-base ml-2">
-                ({getCategory()})
-              </p>
-              {itemData.isMint && itemData.isMint == 'True' ? (<div className="flex ml-2">
-                <div className="text-primary bg-[#EBFFF7] text-center py-1 rounded w-25 text-s">
-                  <p>Original Issuer</p>
-                </div>
-              </div>) : (<div></div>)}
-            </div>
-            <div className="flex items-center">
-              <Button
-                type="text"
-                className="text-primary text-sm cursor-pointer"
-                onClick={callDetailPage}
-              >
-                Preview
-              </Button>
-              <Popover
-                placement="bottomLeft"
-                open={openPop}
-                className="ml-2"
-                id="sideMenu"
-                onOpenChange={handleOpenChange}
-                title={
-                  <div className="font-medium">
-                    {inventory.price ? (<div>
-                      <div
-                        className="flex items-center mt-2 cursor-pointer"
-                        onClick={showListModal}
-                      >
-                        <EditOutlined />
-                        <p className="ml-3">Edit Listing</p>
-                      </div>
-                      <div
-                        className="flex items-center mt-2 cursor-pointer"
-                        onClick={showUnlistModal}
-                      >
-                        <StopOutlined />
-                        <p className="ml-3">Unlist</p>
-                      </div>
-                    </div>) : paymentProviderAddress ? (<div
-                      className="flex items-center mt-2 cursor-pointer"
-                      onClick={showListModal}
-                    >
-                      <DollarOutlined />
-                      <p className="ml-3">List for Sale</p>
-                    </div>) : (<div></div>)}
-                    {itemData.isMint && itemData.isMint == 'True' ? (<div
-                      className="flex items-center mt-2 cursor-pointer"
-                      onClick={showResellModal}
-                    >
-                      <PieChartOutlined />
-                      <p className="ml-3">Mint</p>
-                    </div>) : (<div></div>)}
-                    <div
-                      className="flex items-center mt-2 cursor-pointer"
-                      onClick={showTransferModal}
-                    >
-                      <SwapOutlined />
-                      <p className="ml-3">Transfer</p>
-                    </div>
-                  </div>
-                }
-                trigger="click"
-              >
-                <MoreOutlined />
-              </Popover>
-            </div>
-          </div>
-          {categoricalProperties()}
-          { inventory.price ? 
-            <div className="flex mt-1 items-center">
-              <p className="text-primaryC text-sm w-40">Price</p>
-              <p className="text-secondryB text-sm">
-                :
-              </p>
-              <p className="text-secondryB text-sm ml-3">
-                ${inventory.price}
-              </p>
-            </div> : <></>
-          }
-          { inventory.saleQuantity ? 
-            <div className="flex mt-1 items-center">
-              <p className="text-primaryC text-sm w-40">Quantity for Sale</p>
-              <p text-secondryB text-sm>
-                :
-              </p>
-              <p className="text-secondryB text-sm ml-3">
-                {inventory.saleQuantity}
-              </p>
-            </div> : <></>
-          }
-          { inventory.quantity ? 
-            <div className="flex mt-1 items-center">
-              <p className="text-primaryC text-sm w-40">Quantity Owned</p>
-              <p text-secondryB text-sm>
-                :
-              </p>
-              <p className="text-secondryB text-sm ml-3">
-                {inventory.quantity}
-              </p>
-            </div> : <></>
-          }
-          <div className="flex mt-1 items-center">
-            <p className="text-primaryC text-sm w-40">Description</p>
-            <p className="text-secondryB text-sm">
-              :
-            </p>
-            <p className="text-secondryB text-sm ml-3">
-              {inventory.description}
-            </p>
-          </div>
-          { inventory.price ?
-            (<div className="flex mt-2.5">
-              <div className="text-primary bg-[#EBF7FF] text-center py-1 rounded w-28 text-sm">
-                <p>PUBLISHED</p>
-              </div>
-            </div>)
-            :
-            (<div className="flex mt-2.5">
-              <div className="text-error bg-[#FFF0F0] text-center py-1 rounded w-28 text-sm">
-                <p>UNPUBLISHED</p>
-              </div>
-            </div>
-          )}
-        </div>
-      </div> */}
       {open && (
         <PreviewInventoryModal
           open={open}
