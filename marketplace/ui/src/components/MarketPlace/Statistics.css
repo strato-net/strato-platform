@@ -11,17 +11,6 @@
     max-width: 100%; /* Full width on mobile screens */
   }
   
-  @media (min-width: 768px) {
-    .tileWrapper {
-      max-width: 50%; /* Two tiles per row on medium screens */
-    }
-  }
-  
-  @media (min-width: 1024px) {
-    .tileWrapper {
-      max-width: 33.333333%; /* Three tiles per row on large screens */
-    }
-  }
   
   .tile {
     background-color: #E2E8F0;

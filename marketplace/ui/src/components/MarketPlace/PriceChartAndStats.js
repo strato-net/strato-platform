@@ -50,6 +50,15 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
         autoSelected: 'zoom' // Default tool selected in the toolbar ('zoom', 'selection', 'pan', or 'none')
       }
     },
+    tools: {
+      download: true, // Show the download icon
+      selection: true, // Show the selection icon for zooming in
+      zoom: false, // Hide the default zoom in icon
+      zoomin: true, // Show the zoom in icon
+      zoomout: false, // Hide the zoom out icon
+      pan: true, // Optionally, set to true if you want to allow panning
+      reset: true // Show the home icon for resetting the zoom
+    },
     colors: ['#181EAC', '#FF4560'],
     dataLabels: {
       enabled: false
@@ -109,8 +118,8 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
     <div>
       <h2 className='w-full text-center font-bold text-2xl'>Price History</h2>
 
-    <div className="flex justify-center w-full h-full">
-      <div className="w-full h-full lg:h-[500px] xl:h-[600px]">
+      <div className="flex justify-center w-full">
+        <div className="w-full lg:h-[375px] xl:h-[475px]">
         <ReactApexChart options={options} series={series} type="area" height="400" />
       </div>
     </div>

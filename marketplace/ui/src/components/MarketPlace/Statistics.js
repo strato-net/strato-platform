@@ -33,35 +33,36 @@ const originFluctuation = calculatePriceFluctuation(priceHistory.records);
 const originVolume = calculateVolumeTraded(priceHistory.records);
 const originAveragePrice = calculateAveragePrice(priceHistory.records);
 
-// const priceAppreciation = calculatePriceAppreciation(priceHistory.records, priceHistory.originRecords);
 return (
-    <div className="container">
-      <div className="flex flex-wrap justify-center -mx-2">
-        {/* Tile for Current Trade Price Range */}
-        <div className="tileWrapper p-2 lg:w-1/3 md:w-1/2 w-full">
-          <div className="tile bg-gray-200 p-4 rounded-lg shadow-md text-center">
-            <p className="title text-2xl font-semibold">${originFluctuation.min} - ${originFluctuation.max}</p>
-            <p className="subtitle text-gray-600">12-Month Price Range</p>
-          </div>
-        </div>
-        
-        {/* Tile for Volume of Current Trades */}
-        <div className="tileWrapper p-2 lg:w-1/3 md:w-1/2 w-full">
-          <div className="tile bg-gray-200 p-4 rounded-lg shadow-md text-center">
-            <p className="title text-2xl font-semibold">{originVolume}</p>
-            <p className="subtitle text-gray-600">Number Of Units Sold</p>
-          </div>
-        </div>
-
-        {/* Tile for Average Current Trade Price */}
-        <div className="tileWrapper p-2 lg:w-1/3 md:w-1/2 w-full">
-          <div className="tile bg-gray-200 p-4 rounded-lg shadow-md text-center">
-            <p className="title text-2xl font-semibold">${originAveragePrice.toFixed(2)}</p>
-            <p className="subtitle text-gray-600">Average Sale Price</p>
-          </div>
-        </div>
+  <div className="container">
+  <div className="flex justify-center mx-2 md:flex-nowrap flex-wrap">
+    {/* Tile for Price Range */}
+    <div className="tileWrapper p-2 flex-auto md:max-w-[calc(33.333%-1rem)] w-full">
+      <div className="tile bg-gray-200 p-4 rounded-lg shadow-md text-center">
+        <p className="title text-2xl font-semibold">${originFluctuation.min} - ${originFluctuation.max}</p>
+        <p className="subtitle text-gray-600">12-Month Price Range</p>
       </div>
     </div>
+    
+    {/* Tile for Number of Units Sold */}
+    <div className="tileWrapper p-2 flex-auto md:max-w-[calc(33.333%-1rem)] w-full">
+      <div className="tile bg-gray-200 p-4 rounded-lg shadow-md text-center">
+        <p className="title text-2xl font-semibold">{originVolume}</p>
+        <p className="subtitle text-gray-600">Number Of Units Sold</p>
+      </div>
+    </div>
+
+    {/* Tile for Average Price */}
+    <div className="tileWrapper p-2 flex-auto md:max-w-[calc(33.333%-1rem)] w-full">
+      <div className="tile bg-gray-200 p-4 rounded-lg shadow-md text-center">
+        <p className="title text-2xl font-semibold">${originAveragePrice.toFixed(2)}</p>
+        <p className="subtitle text-gray-600">Average Sale Price</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+
   );
 };
 
