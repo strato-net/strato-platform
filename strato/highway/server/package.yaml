@@ -76,3 +76,28 @@ tests:
   highway-spec:
     source-dirs: test/
     main: Spec.hs
+    dependencies:
+      - aws
+      - blockapps-highway-api
+      - blockapps-highway-client
+      - blockapps-highway-server
+      - bytestring 
+      - hflags
+      - hspec
+      - http-client
+      - http-client-tls
+      - http-types
+      - network
+      - random
+      - resourcet
+      - servant-multipart
+      - servant-multipart-api
+      - servant-multipart-client
+      - servant-server
+      - strato-model
+      - text
+      - transformers
+      - wai-cors
+      - wai-extra
+      - warp
+      - word8

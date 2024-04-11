@@ -13,10 +13,13 @@ module Strato.API
   )
 where
 
+import           Conduit
+import           Data.ByteString.Char8              as DBC8
 import qualified Data.ByteString.Lazy               as DBL
 import qualified Data.List.NonEmpty                 as NE
 import qualified Data.Text                          as T
 import           Data.Text.Encoding                 (encodeUtf8)
+import           Network.HTTP.Conduit
 import           Network.HTTP.Media ((//), (/:))
 import           Servant.API
 import           Servant.API.ContentTypes
@@ -63,6 +66,8 @@ instance AllCTRender '[Web] ContentTypeAndBody where
   handleAcceptH _ _ (ContentTypeAndBody h c) = Just (h,c)
 
 type HighwayGetS3File = "highway" :> Capture "filename" T.Text :> Get '[Web] ContentTypeAndBody
+
+type HighwayGetS3FileTesting = "highwaytesting" :> Capture "filename" T.Text :> Get '[Web] (Response (ConduitM () DBC8.ByteString (ResourceT IO) ()),ContentTypeAndBody)
 
 type HighwayPutS3File = "highway" :> MultipartForm Mem (MultipartData Mem) :> Post '[Web] T.Text
 

@@ -25,7 +25,10 @@ library:
   source-dirs: src
   dependencies:
   - bytestring
+  - conduit
+  - http-conduit
   - http-media
+  - resourcet
   - servant
   - servant-multipart
   - servant-server

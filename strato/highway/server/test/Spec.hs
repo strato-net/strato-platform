@@ -1,105 +1,408 @@
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE BangPatterns          #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE RecordWildCards       #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeApplications      #-}
 
 module Main where
 
---import qualified Blockchain.Data.AlternateTransaction as E
---import Blockchain.Strato.Model.Address
---import Blockchain.Strato.Model.Secp256k1
---import Clockwork
---import Crypto.Random.Entropy
---import qualified Crypto.Secp256k1 as SEC
---import qualified Data.ByteString as B
---import qualified Data.ByteString.Char8 as C8
---import Data.Maybe
---import qualified LabeledError
---import System.IO.Unsafe
---import Test.Hspec
+import           API
+--import           Blockchain.Strato.Model.Keccak256
+import           Options
+import           Strato.Monad
+import           Strato.Server
+import           Strato.Server.GetS3File
+import           Strato.Server.PutS3File
 
-{-
--- some dummy test values
-testPriv :: B.ByteString
-testPriv = LabeledError.b16Decode "testPriv" $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"
+import qualified Aws as Aws
+import qualified Aws.S3 as S3
 
-ent :: B.ByteString
-ent = unsafePerformIO $ getEntropy 32
+import           Control.Concurrent
+import           Control.Exception
+import           Control.Monad.IO.Class
+--import           Control.Monad.Trans.Reader
+import           Control.Monad.Trans.Resource
+--import           Data.ByteString as DB
+import           Data.ByteString.Char8 as DBC8
+import           Data.ByteString.Lazy as DBL
+import           Data.Proxy
+import           Data.Text as T
+import           Data.Word8
+import           HFlags
+import           Network.HTTP.Client hiding (Proxy)
+import           Network.HTTP.Client.TLS (tlsManagerSettings)
+import           Network.HTTP.Types.Status (status200)
+import qualified Network.Wai.Handler.Warp as Warp
+import           Network.Wai.Middleware.Cors
+import           Network.Wai.Parse
+import           Servant
+import           Servant.Multipart
+import           Servant.Multipart.API
+import           Servant.Multipart.Client
+import           System.Random
+import           Test.Hspec
 
-newPriv :: SEC.SecKey
-newPriv = fromMaybe (error "couldn't get secp-haskell key") (SEC.secKey ent)
--}
+randomBytes :: Int
+            -> StdGen
+            -> [Word8]
+randomBytes 0 _      = []
+randomBytes count' g =
+  fromIntegral value :
+    randomBytes (count' - 1) nextG
+  where
+    (value,nextG) = genWord8 g
 
-main :: IO ()
-main = return ()
+randomByteString :: Int
+                 -> StdGen
+                 -> DBL.ByteString
+randomByteString count' g =
+  DBL.pack $
+    randomBytes count' g
+
+data HighwayTesting = HighwayTesting
+  { highwaytesting_inputiname  :: Text
+  , highwaytesting_inputivalue :: Text
+  , highwaytesting_inputname   :: Text
+  , highwaytesting_filename    :: Text
+  , highwaytesting_filetype    :: Text
+  , highwaytesting_data        :: DBL.ByteString
+  }
+
+instance ToMultipart Mem HighwayTesting where
+  toMultipart highwaytesting =
+    MultipartData
+      { inputs =
+          [ Input (highwaytesting_inputiname  highwaytesting)
+                  (highwaytesting_inputivalue highwaytesting)
+          ]
+      , files =
+          [ FileData (highwaytesting_inputname highwaytesting)
+                     (highwaytesting_filename  highwaytesting)
+                     (highwaytesting_filetype  highwaytesting)
+                     (highwaytesting_data      highwaytesting)
+          ]
+      }
+
+fourMBBasicTest :: String
+                -> String
+                -> S3.Bucket
+                -> Text
+                -> Spec
+--fourMBBasicTest :: Spec
+fourMBBasicTest highwaytestnetaccesskeyid
+                highwaytestnetsecretaccesskey
+                highwaytestnets3bucket
+                highwaytestneturl = do
+                -- = do
+  it "Can push a pseudo randomly-generated 4MB text file to AWS S3 via putS3File,\
+     \ and retrieve that same file via getS3FileTesting,\
+     \ (cleaning up afterward with DeleteObject)." $ do
+    g                      <- getStdGen
+    let fourmbtestdata     = randomByteString 4000000
+                                              g
+    let fourmbtestdatatype = HighwayTesting
+                               { highwaytesting_inputiname  = "highway-testing" :: Text
+                               , highwaytesting_inputivalue = "4MB Tests" :: Text
+                               , highwaytesting_inputname   = "4MBTest" :: Text
+                               , highwaytesting_filename    = "4mbtest.txt" :: Text --file 
+                               , highwaytesting_filetype    = "text/plain" :: Text
+                               , highwaytesting_data        = fourmbtestdata
+                               } 
+    let multipart          = toMultipart fourmbtestdatatype 
+    mgr                    <- newManager tlsManagerSettings
+    boundary               <- genBoundary
+    cr                     <- Aws.makeCredentials (DBC8.pack highwaytestnetaccesskeyid)--(DBC8.pack flags_awsaccesskeyid)--(DBC8.pack highwaytestnetaccesskeyid)--(DBC8.pack flags_awsaccesskeyid)
+                                                  (DBC8.pack highwaytestnetsecretaccesskey)--(DBC8.pack flags_awssecretaccesskey)--(DBC8.pack highwaytestnetsecretaccesskey)--(DBC8.pack flags_awssecretaccesskey)
+    let cfg                = Aws.Configuration { Aws.timeInfo    = Aws.Timestamp
+                                               , Aws.credentials = cr 
+                                               , Aws.logger      = Aws.defaultLog Aws.Warning
+                                               , Aws.proxy       = Nothing
+                                               }
+    let s3cfg              = Aws.defServiceConfig :: S3.S3Configuration Aws.NormalQuery
+    let env                = HighwayWrapperEnv
+                               mgr
+                               cr
+                               boundary
+                               highwaytestnets3bucket--(T.pack flags_awss3bucket) --highwaytestnets3bucket --(T.pack flags_awss3bucket)
+                               highwaytestneturl--(T.pack flags_highwayUrl) --highwaytestneturl --(T.pack flags_highwayUrl)
+    hash <-
+      runHighwayWithEnv env
+                        (putS3File multipart)
+    (rsp,_) <-
+      runHighwayWithEnv env
+                        (getS3FileTesting hash)
+    _ <-
+      runResourceT $
+        Aws.pureAws cfg s3cfg mgr $
+          S3.DeleteObject hash highwaytestnets3bucket--(T.pack flags_awss3bucket)--highwaytestnets3bucket
+    (responseStatus rsp) `shouldBe` status200
+
+fiveMBBasicTest :: String
+                -> String
+                -> S3.Bucket
+                -> Text
+                -> Spec
+fiveMBBasicTest highwaytestnetaccesskeyid
+                highwaytestnetsecretaccesskey
+                highwaytestnets3bucket
+                highwaytestneturl = do
+  it "Can push a pseudo randomly-generated 5MB text file to AWS S3 via putS3File,\
+     \ and retrieve that same file via getS3FileTesting,\
+     \ (cleaning up afterward with DeleteObject)." $ do
+    g                      <- getStdGen
+    let fivembtestdata     = randomByteString 5000000
+                                              g
+    let fivembtestdatatype = HighwayTesting
+                               { highwaytesting_inputiname  = "highway-testing" :: Text
+                               , highwaytesting_inputivalue = "5MB Tests" :: Text
+                               , highwaytesting_inputname   = "5MBTest" :: Text
+                               , highwaytesting_filename    = "5mbtest.txt" :: Text --file 
+                               , highwaytesting_filetype    = "text/plain" :: Text
+                               , highwaytesting_data        = fivembtestdata
+                               } 
+    let multipart          = toMultipart fivembtestdatatype 
+    mgr                    <- newManager tlsManagerSettings
+    boundary               <- genBoundary
+    cr                     <- Aws.makeCredentials (DBC8.pack highwaytestnetaccesskeyid)--(DBC8.pack flags_awsaccesskeyid)--(DBC8.pack highwaytestnetaccesskeyid)--(DBC8.pack flags_awsaccesskeyid)
+                                                  (DBC8.pack highwaytestnetsecretaccesskey)--(DBC8.pack flags_awssecretaccesskey)--(DBC8.pack highwaytestnetsecretaccesskey)--(DBC8.pack flags_awssecretaccesskey)
+    let cfg                = Aws.Configuration { Aws.timeInfo    = Aws.Timestamp
+                                               , Aws.credentials = cr 
+                                               , Aws.logger      = Aws.defaultLog Aws.Warning
+                                               , Aws.proxy       = Nothing
+                                               }
+    let s3cfg              = Aws.defServiceConfig :: S3.S3Configuration Aws.NormalQuery
+    let env                = HighwayWrapperEnv
+                               mgr
+                               cr
+                               boundary
+                               highwaytestnets3bucket--(T.pack flags_awss3bucket) --highwaytestnets3bucket --(T.pack flags_awss3bucket)
+                               highwaytestneturl--(T.pack flags_highwayUrl) --highwaytestneturl --(T.pack flags_highwayUrl)
+    hash <-
+      runHighwayWithEnv env
+                        (putS3File multipart)
+    (rsp,_) <-
+      runHighwayWithEnv env
+                        (getS3FileTesting hash)
+    _ <-
+      runResourceT $
+        Aws.pureAws cfg s3cfg mgr $
+          S3.DeleteObject hash highwaytestnets3bucket--(T.pack flags_awss3bucket)--highwaytestnets3bucket
+    (responseStatus rsp) `shouldBe` status200
   {-
-  hspec secp256k1_haskell_spec
-  timingTests
+  it "Can push a pseudo randomly-generated 5MB text file to AWS S3 via PutObject,\
+     \ and retrieve that same file via GetObject (cleaning up afterward with DeleteObject)." $ do
+    g                      <- getStdGen
+    let fivembtestdata     = randomByteString 5000000
+                                              g
+    let file               = "5mbtest.txt" :: Text
+    let fivembtestdatatype = HighwayTesting
+                               { highwaytesting_inputiname  = "highway-testing" :: Text
+                               , highwaytesting_inputivalue = "5MB Tests" :: Text
+                               , highwaytesting_inputname   = "4MBTest" :: Text
+                               , highwaytesting_filename    = file 
+                               , highwaytesting_filetype    = "text/plain" :: Text
+                               , highwaytesting_data        = fivembtestdata
+                               } 
+    let multipart          = toMultipart fivembtestdatatype
+    mgr                    <- newManager tlsManagerSettings
+    cr                     <- Aws.makeCredentials (DBC8.pack highwaytestnetaccesskeyid)--(DBC8.pack flags_awsaccesskeyid)
+                                                  (DBC8.pack highwaytestnetsecretaccesskey)--(DBC8.pack flags_awssecretaccesskey)
+    let cfg                = Aws.Configuration { Aws.timeInfo    = Aws.Timestamp
+                                               , Aws.credentials = cr 
+                                               , Aws.logger      = Aws.defaultLog Aws.Warning
+                                               , Aws.proxy       = Nothing
+                                               }
+    let s3cfg              = Aws.defServiceConfig :: S3.S3Configuration Aws.NormalQuery
+    let awss3b             = highwaytestnets3bucket
+    rsp'               <-
+      runResourceT $ do
+        --let body = RequestBodyBS fivembtestdata
+        --_ <-
+        --  Aws.pureAws cfg s3cfg mgr $
+        --    S3.putObject awss3b file body
+        _ <-
+          return $ putS3File multipart
+        S3.GetObjectResponse { S3.gorResponse = rsp } <-
+          Aws.pureAws cfg s3cfg mgr $
+            S3.getObject awss3b file
+        _ <-
+          Aws.pureAws cfg s3cfg mgr $
+            S3.DeleteObject file awss3b
+        return rsp
+    (responseStatus rsp') `shouldBe` status200
   -}
 
-{-
--- TODO: maybe this should be somewhere else, like in strato-model
-secp256k1_haskell_spec :: Spec
-secp256k1_haskell_spec =
-  describe "secp256k1-haskell can do crypto operations just like haskoin" $ do
-    it "verify signatures" $ do
-      let mesg = E.rlpHash ("STRATO is a permissioned blockchain" :: String)
-          newMsg = fromMaybe (error "couldn't get new messsage") (SEC.msg mesg)
-          newSig = SEC.signRecMsg newPriv newMsg
+sixMBBasicTest :: String
+               -> String
+               -> S3.Bucket
+               -> Text
+               -> Spec
+sixMBBasicTest highwaytestnetaccesskeyid
+               highwaytestnetsecretaccesskey
+               highwaytestnets3bucket
+               highwaytestneturl = do
+  it "Cannot push a pseudo randomly-generated 6MB text file to AWS S3 via putS3File,\
+     \ and retrieve that same file via getS3FileTesting,\
+     \ (cleaning up afterward with DeleteObject)." $ do
+    g                     <- getStdGen
+    let sixmbtestdata     = randomByteString 6000000
+                                             g
+    let sixmbtestdatatype = HighwayTesting
+                               { highwaytesting_inputiname  = "highway-testing" :: Text
+                               , highwaytesting_inputivalue = "6MB Tests" :: Text
+                               , highwaytesting_inputname   = "6MBTest" :: Text
+                               , highwaytesting_filename    = "6mbtest.txt" :: Text --file 
+                               , highwaytesting_filetype    = "text/plain" :: Text
+                               , highwaytesting_data        = sixmbtestdata
+                               } 
+    let multipart          = toMultipart sixmbtestdatatype 
+    mgr                    <- newManager tlsManagerSettings
+    boundary               <- genBoundary
+    cr                     <- Aws.makeCredentials (DBC8.pack highwaytestnetaccesskeyid)--(DBC8.pack flags_awsaccesskeyid)--(DBC8.pack highwaytestnetaccesskeyid)--(DBC8.pack flags_awsaccesskeyid)
+                                                  (DBC8.pack highwaytestnetsecretaccesskey)--(DBC8.pack flags_awssecretaccesskey)--(DBC8.pack highwaytestnetsecretaccesskey)--(DBC8.pack flags_awssecretaccesskey)
+    let cfg                = Aws.Configuration { Aws.timeInfo    = Aws.Timestamp
+                                               , Aws.credentials = cr 
+                                               , Aws.logger      = Aws.defaultLog Aws.Warning
+                                               , Aws.proxy       = Nothing
+                                               }
+    let s3cfg              = Aws.defServiceConfig :: S3.S3Configuration Aws.NormalQuery
+    let env                = HighwayWrapperEnv
+                               mgr
+                               cr
+                               boundary
+                               highwaytestnets3bucket--(T.pack flags_awss3bucket) --highwaytestnets3bucket --(T.pack flags_awss3bucket)
+                               highwaytestneturl--(T.pack flags_highwayUrl) --highwaytestneturl --(T.pack flags_highwayUrl)
+    hash <-
+      runHighwayWithEnv env
+                        (putS3File multipart)
+    (rsp,_) <-
+      runHighwayWithEnv env
+                        (getS3FileTesting hash)
+    _ <-
+      runResourceT $
+        Aws.pureAws cfg s3cfg mgr $
+          S3.DeleteObject hash highwaytestnets3bucket--(T.pack flags_awss3bucket)--highwaytestnets3bucket
+    (responseStatus rsp) `shouldNotBe` status200
+  {-
+  it "Cannot push a pseudo randomly-generated 6MB text file to AWS S3 via PutObject,\
+     \ and retrieve that same file via GetObject (cleaning up afterward with DeleteObject)." $ do
+    g                 <- getStdGen
+    let sixmbtestdata = randomByteString 6000000
+                                         g
+    let file           = "6mbtest.txt" :: Text
+    let sixmbtestdatatype = HighwayTesting
+                               { highwaytesting_inputiname  = "highway-testing" :: Text
+                               , highwaytesting_inputivalue = "4MB Tests" :: Text
+                               , highwaytesting_inputname   = "4MBTest" :: Text
+                               , highwaytesting_filename    = file 
+                               , highwaytesting_filetype    = "text/plain" :: Text
+                               , highwaytesting_data        = sixmbtestdata
+                               } 
+    let multipart      = toMultipart sixmbtestdatatype
+    mgr                <- newManager tlsManagerSettings
+    cr                 <- Aws.makeCredentials (DBC8.pack highwaytestnetaccesskeyid)--(DBC8.pack flags_awsaccesskeyid)
+                                              (DBC8.pack highwaytestnetsecretaccesskey)--(DBC8.pack flags_awssecretaccesskey)
+    let cfg            = Aws.Configuration { Aws.timeInfo    = Aws.Timestamp
+                                           , Aws.credentials = cr 
+                                           , Aws.logger      = Aws.defaultLog Aws.Warning
+                                           , Aws.proxy       = Nothing
+                                           }
+    let s3cfg          = Aws.defServiceConfig :: S3.S3Configuration Aws.NormalQuery
+    let awss3b         = highwaytestnets3bucket
+    rsp'               <-
+      runResourceT $ do
+        --let body = RequestBodyBS sixmbtestdata
+        --_ <-
+        --  Aws.pureAws cfg s3cfg mgr $
+        --    S3.putObject awss3b file body
+        _ <-
+          return $ putS3File multipart
+        S3.GetObjectResponse { S3.gorResponse = rsp } <-
+          Aws.pureAws cfg s3cfg mgr $
+            S3.getObject awss3b file
+        _ <-
+          Aws.pureAws cfg s3cfg mgr $
+            S3.DeleteObject file awss3b
+        return rsp
+    (responseStatus rsp') `shouldNotBe` status200
+  -}
 
-          newValid = SEC.verifySig (SEC.derivePubKey newPriv) (SEC.convertRecSig newSig) newMsg
-      newValid `shouldBe` True
-
--- be warned, ye who enter here: you must time your pure functions the way it's done below
--- (with strict !let bindings in the cwPrintTime block), otherwise the value is thunked
--- and evaluated later (outside the cwPrintTIme block), or discarded entirely (if you wildcard it)
-timingTests :: IO ()
-timingTests = do
-  e <- getEntropy 32
-
-  putStrLn "\nLET'S TIME IT! comparing secp256k1-haskell and haskoin for all things EC"
-
-  putStrLn "\nPrivate Key import (from the same pre-pulled entropy):"
-  putStrLn "secp256k1-haskell: "
-  _ <- cwPrintTime $ do
-    let !pk = SEC.secKey e
-    return pk
-
-  putStrLn "\nPublic Key derivation:"
-  putStrLn "secp256k1-haskell: "
-  _ <- cwPrintTime $ do
-    let !pub = SEC.derivePubKey newPriv
-    return pub
-
-  putStrLn "\nAddress derivation:"
-  putStrLn "secp256k1-haskell: "
-  _ <- cwPrintTime $ do
-    let !addr = fromPrivateKey (PrivateKey newPriv)
-    return addr
-
-  -- message hashes for signatures
-  let mesg = E.rlpHash ("A monad is like a burrito, or so the Glaswegians would have us believe" :: String)
-      sMesg = fromMaybe (error "couldnt get secp256k1 message hash") (SEC.msg mesg)
-
-  putStrLn "\nECDSA Signatures:"
-  putStrLn "secp256k1-haskell: "
-  _ <- cwPrintTime $ do
-    let !sig = SEC.signRecMsg newPriv sMesg
-    return sig
-
-  -- signatures to use for recovery
-  let sSig = SEC.signRecMsg newPriv sMesg
-
-  putStrLn "\nPublic Key Signature Recovery:"
-  putStrLn "secp256k1-haskell"
-  _ <- cwPrintTime $ do
-    let !pub = fromMaybe (error "couldnt recover secp256k1 pubkey") (SEC.recover sSig sMesg)
-    return pub
-
-  putStrLn "\nSignature Verification:"
-  putStrLn "secp256k1-haskell:"
-  _ <- cwPrintTime $ do
-    let !bl = SEC.verifySig (SEC.derivePubKey newPriv) (SEC.convertRecSig sSig) sMesg
-    return bl
-
-  putStrLn "\nDone"
--}
+main :: IO ()
+main = do
+  _ <- $initHFlags "Setup Highway Wrapper AWS settings - Testing"
+  --_ <- $initHFlagsDependentDefaults "Setup Highway Wrapper AWS settings - Testing"
+  --                                  (const $ const $ const $ [("awsaccesskeyid", "AKIAV5NMROVZHQSMZSCL"), ("awssecretaccesskey", "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"), ("awss3bucket", "mercata-testnet2")])
+  _ <- mapM_ Prelude.putStrLn arguments
+  case Prelude.null flags_awsaccesskeyid of
+    True  -> do
+      _ <- Prelude.putStrLn "Prelude.null flags_awsaccesskeyid"
+      return ()
+    False ->
+      case Prelude.null flags_awssecretaccesskey of
+        True  -> do
+          _ <- Prelude.putStrLn "Prelude.null flags_awssecretaccesskey"
+          return ()
+        False ->
+          case Prelude.null flags_awss3bucket of
+            True  -> do
+              _ <- Prelude.putStrLn "Prelude.null flags_awss3bucket"
+              return ()
+            False ->
+              hspec $ do
+                aroundAll_ highwayTestingSetup $ do
+                  describe "highway" $ do
+                    describe "base tests" $ do
+                      describe "4MB testing" $ do
+                        fourMBBasicTest flags_awsaccesskeyid--highwaytestnetaccesskeyid
+                                        flags_awssecretaccesskey--highwaytestnetsecretaccesskey
+                                        (T.pack flags_awss3bucket)--highwaytestnets3bucket
+                                        highwaytestneturl
+                      describe "5MB testing" $ do
+                        fiveMBBasicTest flags_awsaccesskeyid--highwaytestnetaccesskeyid
+                                        flags_awssecretaccesskey--highwaytestnetsecretaccesskey
+                                        (T.pack flags_awss3bucket)--highwaytestnets3bucket
+                                        highwaytestneturl
+                      describe "6MB testing" $ do
+                        sixMBBasicTest flags_awsaccesskeyid--highwaytestnetaccesskeyid
+                                       flags_awssecretaccesskey--highwaytestnetsecretaccesskey
+                                       (T.pack flags_awss3bucket)--highwaytestnets3bucket
+                                       highwaytestneturl
+  where
+    highwaytestneturl = "localhost" :: Text --"https://fileserver.mercata-testnet2.blockapps.net" :: Text
+    --highwaytestnetaccesskeyid = "AKIAV5NMROVZHQSMZSCL"
+    --highwaytestnetsecretaccesskey = "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"
+    --highwaytestnets3bucket = "mercata-testnet2" :: Text
+    highwayTestingSetup action = do
+      mgr      <- newManager tlsManagerSettings
+      boundary <- genBoundary
+      cr       <- Aws.makeCredentials (DBC8.pack flags_awsaccesskeyid)--(DBC8.pack highwaytestnetaccesskeyid)--(DBC8.pack flags_awsaccesskeyid)
+                                      (DBC8.pack flags_awssecretaccesskey)--(DBC8.pack highwaytestnetsecretaccesskey)--(DBC8.pack flags_awssecretaccesskey)
+      let env = HighwayWrapperEnv
+                  mgr
+                  cr
+                  boundary
+                  (T.pack flags_awss3bucket)--highwaytestnets3bucket
+                  --(T.pack highwaytestnets3bucket)--(T.pack flags_awss3bucket)
+                  highwaytestneturl--(T.pack highwaytestneturl)--(T.pack flags_highwayUrl)
+      bracket (liftIO $ forkIO $ Warp.run 8080 (appHighwayWrapper env))
+              killThread
+              (const action)
+      where
+        appHighwayWrapper :: HighwayWrapperEnv
+                          -> Application
+        appHighwayWrapper env =
+          cors (const $ Just policy) 
+          . serveWithContext
+              ( Proxy
+                  @( HighwayWrapperAPI
+                   )
+              ) ctx''
+          $ serveHighwayWrapper env
+          where
+            ctx    = setMaxRequestKeyLength 100 defaultParseRequestBodyOptions
+            ctx'   = setMaxRequestFileSize 5000000 ctx
+            ctx''  :: Context '[MultipartOptions Mem]
+            ctx''  = (MultipartOptions ctx' ()) :. EmptyContext
+            policy = simpleCorsResourcePolicy {corsRequestHeaders = ["Content-Type"]}
