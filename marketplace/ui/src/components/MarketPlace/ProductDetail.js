@@ -353,11 +353,11 @@ const ProductDetails = ({ user, users }) => {
               {
                 isCalledFromInventory ?
                   <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-                    <ClickableCell href={routes.MyStore.url}>
+                    <ClickableCell href={routes.MyItems.url}>
                       <p
                         className="text-[#13188A]  text-sm font-semibold "
                       >
-                        My Store
+                        My Items
                       </p>
                     </ClickableCell>
                   </Breadcrumb.Item> : null
