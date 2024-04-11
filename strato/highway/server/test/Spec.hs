@@ -371,9 +371,6 @@ main = do
                                        highwaytestneturl
   where
     highwaytestneturl = "localhost" :: Text --"https://fileserver.mercata-testnet2.blockapps.net" :: Text
-    --highwaytestnetaccesskeyid = "AKIAV5NMROVZHQSMZSCL"
-    --highwaytestnetsecretaccesskey = "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"
-    --highwaytestnets3bucket = "mercata-testnet2" :: Text
     highwayTestingSetup action = do
       mgr      <- newManager tlsManagerSettings
       boundary <- genBoundary
