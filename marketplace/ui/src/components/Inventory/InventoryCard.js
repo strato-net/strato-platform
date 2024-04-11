@@ -270,67 +270,73 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
         </div>
         <div className=" pt-[5px]  flex">
           
-          <div className="flex  items-center">
-          <Button type="link" className="text-[#13188A] font-semibold text-base h-6 mb-2" onClick={callDetailPage}>Preview</Button>
+          <div className="flex flex-col">
+            <div>
+              <Button type="link" className="text-[#13188A] font-semibold text-base h-6" onClick={callDetailPage}>
+                Preview
+              </Button>
 
-        {((itemData.isMint === "True" && inventory.quantity === 0) || inventory.quantity > 0) &&
-           <Popover
-            placement="bottomLeft"
-            open={openPop}
-            className=""
-            id="sideMenu"
-            onOpenChange={handleOpenChange}
-            title={
-              <div className="font-medium">
-                {inventory.price ? (<div>
-                  <div
-                    className="flex items-center mt-2 cursor-pointer"
-                    onClick={showListModal}
-                  >
-                    <EditOutlined />
-                    <p className="ml-3">Edit Listing</p>
-                  </div>
-                  <div
-                    className="flex items-center mt-2 cursor-pointer"
-                    onClick={showUnlistModal}
-                  >
-                    <StopOutlined />
-                    <p className="ml-3">Unlist</p>
-                  </div>
-                </div>) : paymentProviderAddress && !(getCategory() == "Carbon Offset" && !(itemData.isMint && itemData.isMint == "True")) ? (<div
-                  className="flex items-center mt-2 cursor-pointer"
-                  onClick={showListModal}
+
+              {((itemData.isMint === "True" && inventory.quantity === 0) || inventory.quantity > 0) &&
+                <Popover
+                  placement="bottomLeft"
+                  open={openPop}
+                  className=""
+                  id="sideMenu"
+                  onOpenChange={handleOpenChange}
+                  title={
+                    <div className="font-medium">
+                      {inventory.price ? (<div>
+                        <div
+                          className="flex items-center mt-2 cursor-pointer"
+                          onClick={showListModal}
+                        >
+                          <EditOutlined />
+                          <p className="ml-3">Edit Listing</p>
+                        </div>
+                        <div
+                          className="flex items-center mt-2 cursor-pointer"
+                          onClick={showUnlistModal}
+                        >
+                          <StopOutlined />
+                          <p className="ml-3">Unlist</p>
+                        </div>
+                      </div>) : (<div></div>)}
+                      {itemData.isMint && itemData.isMint == "True" ? (<div
+                        className="flex items-center mt-2 cursor-pointer"
+                        onClick={showResellModal}
+                      >
+                        <PieChartOutlined />
+                        <p className="ml-3">Mint</p>
+                      </div>) : (<div></div>)}
+
+                      {inventory.quantity && parseInt(inventory.quantity) > 0 && (!inventory.saleAddress || (inventory.saleAddress && parseInt(inventory.saleQuantity) > 0)) ? (
+                        <div
+                          className="flex items-center mt-2 cursor-pointer"
+                          onClick={showTransferModal}
+                        >
+                          <SwapOutlined />
+                          <p className="ml-3">Transfer</p>
+                        </div>
+                      ) : (
+                        <div></div>
+                      )}
+
+                    </div>
+                  }
+                  trigger="click"
                 >
-                  <DollarOutlined />
-                  <p className="ml-3">List for Sale</p>
-                </div>) : (<div></div>)}
-                {itemData.isMint && itemData.isMint == "True" ? (<div
-                  className="flex items-center mt-2 cursor-pointer"
-                  onClick={showResellModal}
-                >
-                  <PieChartOutlined />
-                  <p className="ml-3">Mint</p>
-                </div>) : (<div></div>)}
-
-                {inventory.quantity && parseInt(inventory.quantity) > 0 && (!inventory.saleAddress || (inventory.saleAddress && parseInt(inventory.saleQuantity) > 0)) ? (
-                  <div
-                      className="flex items-center mt-2 cursor-pointer"
-                      onClick={showTransferModal}
-                  >
-                      <SwapOutlined />
-                      <p className="ml-3">Transfer</p>
-                  </div>
-                ) : (
-                  <div></div>
-              )}
-
-              </div>
-            }
-            trigger="click"
-          >
-            <MoreOutlined />
-          </Popover>
-          }
+                  <MoreOutlined />
+                </Popover>
+              }
+            </div>
+            <div className="flex">
+              {paymentProviderAddress ? (
+                <Button type="link" className="text-[#13188A] font-semibold text-base h-6" onClick={showListModal} disabled={(getCategory() == "Carbon Offset" && !(itemData.isMint && itemData.isMint == "True"))}>
+                  List for Sale
+                </Button>
+              ) : (<div></div>)}
+            </div>
           </div>
         </div>
       </div>
