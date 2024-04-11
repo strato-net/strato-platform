@@ -35,9 +35,9 @@ const originAveragePrice = calculateAveragePrice(priceHistory.records);
 
 return (
   <div className="container">
-  <div className="flex justify-center mx-2 md:flex-nowrap flex-wrap">
+  <div className="flex justify-center -mx-9 md:flex-nowrap flex-wrap">
     {/* Tile for Price Range */}
-    <div className="tileWrapper p-2 flex-auto md:max-w-[calc(33.333%-1rem)] w-full">
+    <div className="tileWrapper p-2 flex-auto md:max-w-[calc(33.333%-1.5rem)] w-full">
       <div className="tile bg-gray-200 p-4 rounded-lg shadow-md text-center">
         <p className="title text-2xl font-semibold">${originFluctuation.min} - ${originFluctuation.max}</p>
         <p className="subtitle text-gray-600">12-Month Price Range</p>
@@ -45,7 +45,7 @@ return (
     </div>
     
     {/* Tile for Number of Units Sold */}
-    <div className="tileWrapper p-2 flex-auto md:max-w-[calc(33.333%-1rem)] w-full">
+    <div className="tileWrapper p-2 flex-auto md:max-w-[calc(33.333%-1.5rem)] w-full">
       <div className="tile bg-gray-200 p-4 rounded-lg shadow-md text-center">
         <p className="title text-2xl font-semibold">{originVolume}</p>
         <p className="subtitle text-gray-600">Number Of Units Sold</p>
@@ -53,7 +53,7 @@ return (
     </div>
 
     {/* Tile for Average Price */}
-    <div className="tileWrapper p-2 flex-auto md:max-w-[calc(33.333%-1rem)] w-full">
+    <div className="tileWrapper p-2 flex-auto md:max-w-[calc(33.333%-1.5rem)] w-full">
       <div className="tile bg-gray-200 p-4 rounded-lg shadow-md text-center">
         <p className="title text-2xl font-semibold">${originAveragePrice.toFixed(2)}</p>
         <p className="subtitle text-gray-600">Average Sale Price</p>

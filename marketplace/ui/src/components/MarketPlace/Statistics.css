@@ -8,7 +8,7 @@
     padding: 0.5rem;
     flex: 1; /* Allow flex items to grow and shrink */
     min-width: 300px; /* Minimum width for a tile */
-    max-width: 100%; /* Full width on mobile screens */
+    max-width: 90%; /* Full width on mobile screens */
   }
   
   

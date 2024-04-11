@@ -43,20 +43,25 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
       height: 'auto', // Responsive height
       zoom: {
         enabled: true, // Enable zooming
-        type: 'x', // Specify the type of zoom (x, y, xy)
+        type: 'x', // Specify the type of zoom (x - horizontal, y - vertical, xy - both)
+        autoScaleXaxis: true // Automatically scale the Y axis as the chart zooms in and out
       },
-      autoSelected: 'selection',
+      pan: {
+        enabled: true, // Enable panning
+        type: 'x', // Allow panning in horizontal direction
+        dragType: 'pan'
+      },
       toolbar: {
-        autoSelected: 'zoom' // Default tool selected in the toolbar ('zoom', 'selection', 'pan', or 'none')
+        autoSelected: 'pan' // Default tool selected in the toolbar ('zoom', 'selection', 'pan', or 'none')
       }
     },
     tools: {
       download: true, // Show the download icon
       selection: true, // Show the selection icon for zooming in
-      zoom: false, // Hide the default zoom in icon
-      zoomin: true, // Show the zoom in icon
-      zoomout: false, // Hide the zoom out icon
-      pan: true, // Optionally, set to true if you want to allow panning
+      zoom: true, // zoom in icon
+      zoomin: false, // zoom in icon
+      zoomout: false, //  zoom out icon
+      pan: true, // allow panning
       reset: true // Show the home icon for resetting the zoom
     },
     colors: ['#181EAC', '#FF4560'],
@@ -114,12 +119,14 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
     }
   };
 
+  
+
   return (
     <div>
       <h2 className='w-full text-center font-bold text-2xl'>Price History</h2>
 
       <div className="flex justify-center w-full">
-        <div className="w-full lg:h-[375px] xl:h-[475px]">
+        <div className="w-full lg:h-[400px] xl:h-[475px]">
         <ReactApexChart options={options} series={series} type="area" height="400" />
       </div>
     </div>
