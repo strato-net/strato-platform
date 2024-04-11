@@ -642,10 +642,10 @@ const ProductDetails = ({ user, users }) => {
                         </div>
                       ),
                     },
-                    user && { //if user is logged in then display Ownership History
+                    {
                       label: <span className="text-sm md:text-base">Ownership History</span>,
                       key: "2",
-                      children: (
+                      children: user ? (
                         <div>
                           <DataTableComponent
                             columns={ownershipDetailColumn}
@@ -658,6 +658,21 @@ const ProductDetails = ({ user, users }) => {
                               showSizeChanger: false,
                             }}
                           />
+                        </div>
+                      ) : (
+                        <div className="text-center p-4">
+                          <p>Please{' '}
+                            <span 
+                              className="text-blue hover:text-blue cursor-pointer hover:underline"
+                              onClick={() => {
+                                setCookie("returnUrl", window.location.pathname, 10);
+                                window.location.href = loginUrl;
+                              }}
+                            >
+                              login
+                            </span> 
+                            {' '}to view ownership history.
+                          </p>
                         </div>
                       ),
                     },
