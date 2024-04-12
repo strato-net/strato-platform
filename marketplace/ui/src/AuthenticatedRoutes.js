@@ -28,7 +28,7 @@ import InventoryEventDetails from "./components/Inventory/EventDetail";
 import Certifier from "./components/Certifier";
 import OnboardingIntermediate from "./components/Inventory/OnboardingIntermediate";
 import ProductDetails from "./components/MarketPlace/ProductDetail";
-import Checkout from "./components/MarketPlace/AddCart";
+import Checkout from "./components/MarketPlace/Checkout";
 import ConfirmOrder from "./components/MarketPlace/ConfirmOrder";
 import EventSerialNumberList from "./components/Event/EventSerialNumberList";
 import ProcessingOrder from "./components/MarketPlace/ProcessingOrder";
@@ -71,7 +71,9 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
           <UsersProvider>
             <CategorysProvider>
               <OrdersProvider>
-                <Checkout user={user} users={users} />
+                <InventoriesProvider>
+                  <Checkout />
+                </InventoriesProvider>
               </OrdersProvider>
             </CategorysProvider>
           </UsersProvider>

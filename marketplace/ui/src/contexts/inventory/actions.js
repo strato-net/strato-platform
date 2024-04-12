@@ -779,13 +779,7 @@ const actions = {
           payload: body.data,
         });
         return body.data;
-      } else if (response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({
-          type: actionDescriptors.sellerStripeStatusFailed,
-          error: "Unauthorized while trying to get Stripe status"
-        });
-        window.location.href = body.error.loginUrl;
-      }
+      } 
 
       dispatch({
         type: actionDescriptors.sellerStripeStatusFailed,

@@ -461,6 +461,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       quantities,
       orderId: util.uid(),
       createdDate: createdDate,
+      shippingAddressId: 1   // placeholder
     }
     return saleOrderJs.uploadContract(rawAdmin, newArgs, options);
   }
@@ -832,10 +833,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       }
       let stripePaymentSession;
       const { paymentList, ...restArgs } = args;
+      const newArgs = { shippingAddressId: 1, ...restArgs };  // placeholder
+      
       try {
         const checkoutBody = {
           paymentTypes: paymentList,
-          cartData: restArgs,
+          cartData: newArgs,
           orderDetail: invoices,
           accountId: sellerStripeDetails[0].accountId,
         }

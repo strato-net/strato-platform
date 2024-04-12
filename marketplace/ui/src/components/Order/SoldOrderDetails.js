@@ -85,7 +85,6 @@ const SoldOrderDetails = ({ user, users }) => {
           name: prod.name,
           unitPrice: prod.price,
           quantity: parseInt(orderDetails.order.quantities[index]),
-          shippingCharges: prod.shippingCharges ? prod.shippingCharges : 0,
           amount: prod.price * parseInt(orderDetails.order.quantities[index]),
           serialNumber: prod,
           tax: prod.tax ? prod.tax : 0,
@@ -348,15 +347,6 @@ const SoldOrderDetails = ({ user, users }) => {
       title: <Text className="text-primaryC text-[13px]">Quantity</Text>,
       dataIndex: "quantity",
       key: "quantity",
-      align: "center",
-      render: (text) => <p>{text}</p>,
-    },
-    {
-      title: (
-        <Text className="text-primaryC text-[13px]">Shipping Charges($)</Text>
-      ),
-      dataIndex: "shippingCharges",
-      key: "shippingCharges",
       align: "center",
       render: (text) => <p>{text}</p>,
     },
