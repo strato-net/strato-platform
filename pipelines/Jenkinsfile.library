@@ -1423,7 +1423,9 @@ def spinUpPaymentServer() {
   sh './check_availability_payment.sh'
 }
 
-def spinUpIdentityServer() {
+def spinUpIdentityServer(rootCert, rootPriv) {
+  sh "cp ${rootCert} identity-provider/certs/."
+  sh "cp ${rootPriv} identity-provider/certs/."
   withCredentials([
     string(credentialsId: 'SENDGRID_APIKEY_TESTNET2', variable:'SENDGRID_APIKEY_TESTNET2'),
     usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID')
