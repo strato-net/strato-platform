@@ -706,7 +706,7 @@ const ProductDetails = ({ user, users }) => {
               </div>
             ) : (
               <>
-                {(priceHistory?.originRecords?.length > 1 || priceHistory?.records) && (
+                {(priceHistory?.originRecords?.length > 1 && priceHistory?.records) && (
                   <div className="w-full h-full">
                     <TimeRangeTabs onChange={handleTimeFilterChange} activeKey={timeFilter} />
                     <PriceChartAndStats priceHistory={priceHistory} />
