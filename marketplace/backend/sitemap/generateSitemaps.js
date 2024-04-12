@@ -1,5 +1,7 @@
 const { createWriteStream } = require('fs');
 const axios = require('axios');
+const { default: config } = require('../load.config');
+const { default: constants } = require('../helpers/constants');
 
 const url = [
   "/",
@@ -13,7 +15,8 @@ const url = [
   "/checkout",
 ];
 
-const hostname = 'https://marketplace.mercata.blockapps.net';
+const serverHost = config.serverHost;
+const hostname = `${serverHost === constants.localHost ? `${serverHost}:3030` : serverHost}`;
 const marketplaceUrl = `${hostname}/api/v1/marketplace?forSale=true&soldOut=true`;
 
 const invalidXMLUnicodeRegex =
@@ -55,7 +58,7 @@ async function generateXML(urls) {
      xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
      ${urls.map(url => `
      <url>
-       <loc>${escapeXML(hostname + url.url)}</loc>
+       <loc>${escapeXML(serverHost + url.url)}</loc>
        <lastmod>${escapeXML(url.lastmod)}</lastmod>
        <changefreq>${escapeXML(url.changefreq)}</changefreq>
        <priority>${escapeXML(url.priority.toString())}</priority>
@@ -74,7 +77,7 @@ function escapeXML(str) {
       case '\'': return '&apos;';
       case '"': return '&quot;';
     }
-  }).replaceAll(invalidXMLUnicodeRegex, '');
+  }).replaceAll(invalidXMLUnicodeRegex, '').replace(/ /g, '%20');
 }
 
 async function generateSitemap() {
