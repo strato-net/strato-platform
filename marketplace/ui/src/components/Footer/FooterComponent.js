@@ -144,9 +144,6 @@ export default function FooterComponent() {
               className="h-[48px] md:h-[60px]"
               preview={false}
             />
-            <p className="text-sm font-bold leading-6 text-white">
-              Team buys, individual wins!
-            </p>
             <div className="flex space-x-6">
               {navigation.social.map((item) => (
                 <a
@@ -253,12 +250,9 @@ export default function FooterComponent() {
             </div>
           </div>
         </div>
-        <div className="mt-16 border-t border-white/10 pt-8 sm:mt-20 lg:mt-24 flex justify-between items-center">
+        <div className="mt-16 border-t border-white/10 pt-8 sm:mt-20 lg:mt-24">
           <p className="text-xs leading-5 text-white">
             &copy; 2024 BlockApps, Inc. All rights reserved.
-          </p>
-          <p className="text-xs leading-5 text-white">
-            Version: {window.STRATO_VERSION && window.STRATO_VERSION !== '__STRATO_VERSION__' ? window.STRATO_VERSION : 'N/A'}
           </p>
         </div>
       </div>
