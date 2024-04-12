@@ -102,7 +102,6 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
     },
     
     yaxis: {
-      min: 0,
       labels: {
         formatter: function(value) {
           return `$${value}`
