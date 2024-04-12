@@ -7,7 +7,7 @@ import constants from "./helpers/constants";
 import routes from "./api/v1/routes";
 import cors from "cors";
 import cookieParser from 'cookie-parser'
-import { fsUtil,assert} from "blockapps-rest";
+import { fsUtil, assert } from "blockapps-rest";
 import ErrorHandlers from './api/middleware/errorHandler';
 import config from "./load.config";
 import authHandler from './api/middleware/authHandler'
@@ -16,8 +16,9 @@ import swaggerSpecs from "./swaggerspecs";
 import dotenv from "dotenv";
 import websocket from "./websocket";
 import axios from "axios";
+import { syncStatus } from "./helpers/syncStatus";
 import cronFunc from "./cron";
-import path from 'path';
+const isLocalHost = config.serverHost === constants.localHost;
 
 let server
 (async () => {
@@ -75,7 +76,11 @@ let server
     swaggerUi.setup(swaggerSpecs)
   );
 
-  cronFunc();
+  if (isLocalHost) {
+    cronFunc();
+ } else {
+    syncStatus();
+ }
 
 })();
 
