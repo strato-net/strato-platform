@@ -122,9 +122,8 @@ pipeline {
           // Run identity server
           // sh 'cp ../strato/tools/x509-generator/rootCert.pem identity-provider/certs/.'
           // sh 'cp ../strato/tools/x509-generator/rootPriv.pem identity-provider/certs/.'
-          relativePath='../strato/tools/x509-generator'
-          ROOT_CERT=$(sh -c "pwd/$relativePath/rootCert.pem")
-          ROOT_PRIV=$(sh -c "pwd/$relativePath/rootPriv.pem")
+          ROOT_CERT="${env.WORKSPACE}/strato/tools/x509-generator/rootCert.pem"
+          ROOT_PRIV="${env.WORKSPACE}/strato/tools/x509-generator/rootPriv.pem"
           script {
             lib.spinUpIdentityServer(ROOT_CERT, ROOT_PRIV)
           }
