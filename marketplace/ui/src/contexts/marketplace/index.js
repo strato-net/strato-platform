@@ -23,9 +23,7 @@ const MarketplaceProvider = ({ children }) => {
     userAddresses:[],
     isLoadingUserAddresses:false,
     isFetchingStrats: false,
-    strats: 0,
-    isFetchingPriceHistory: false,
-    priceHistory: []
+    strats: 0
   };
 
   const [state, dispatch] = useReducer(reducer, initialState);

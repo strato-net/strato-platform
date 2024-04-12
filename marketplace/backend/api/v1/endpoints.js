@@ -55,6 +55,7 @@ export const Inventory = {
   resell: '/resell',
   transfer: '/transfer',
   updateSale: '/updateSale',
+  getPriceHistory: '/price/history',
   // audit: '/:address/:chainId/audit',
 }
 
@@ -173,8 +174,7 @@ export const Marketplace = {
   getAllLoggedIn: '/all',
   getTopSellingProducts: '/topselling',
   getTopSellingProductsLoggedIn: '/user/topselling',
-  getStratsBalance: '/strats',
-  getPriceHistory: '/price/history'
+  getStratsBalance: '/strats'
 }
 
 export const PaymentService = {

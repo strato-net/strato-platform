@@ -1,5 +1,10 @@
 import React from 'react';
 import ReactApexChart from 'react-apexcharts';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+
+dayjs.extend(utc);
+
 
 const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
   if (isFetchingPriceHistory || !priceHistory || !priceHistory.originRecords || priceHistory.originRecords.length === 0) {
@@ -13,9 +18,9 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
       data: priceHistory.originRecords.map(record => {
         try {
           // Replace spaces with 'T' and ' UTC' with 'Z' (ISO 8601)
-          const isoDate = record.block_timestamp.replace(' ', 'T').replace(' UTC', 'Z');
-          const parsedDate = new Date(isoDate);
-          const timestamp = parsedDate.getTime();
+          const isoDate = record.block_timestamp.replace(' UTC', 'Z');
+          const parsedDate = dayjs(isoDate);
+          const timestamp = parsedDate.valueOf();
   
           if (isNaN(timestamp)) {
             throw new Error('Invalid date');

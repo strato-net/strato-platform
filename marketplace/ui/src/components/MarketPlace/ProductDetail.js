@@ -79,10 +79,12 @@ const ProductDetails = ({ user, users }) => {
     inventoryDetails,
     isInventoryDetailsLoading,
     isInventoryOwnershipHistoryLoading,
-    inventoryOwnershipHistory
+    inventoryOwnershipHistory,
+    priceHistory,
+    isFetchingPriceHistory
   } = useInventoryState();
   const marketplaceDispatch = useMarketplaceDispatch();
-  const { cartList, priceHistory, isFetchingPriceHistory } = useMarketplaceState();
+  const { cartList } = useMarketplaceState();
   const navigate = useNavigate();
 
   const routeMatch = useMatch({
@@ -129,9 +131,9 @@ const ProductDetails = ({ user, users }) => {
 
   useEffect(() => {
     if (Id !== undefined) {
-      marketPlaceActions.fetchPriceHistory(marketplaceDispatch,Id,10,0,timeFilter);
+      actions.fetchPriceHistory(dispatch,Id,10,0,timeFilter);
     }
-  }, [Id, marketplaceDispatch, timeFilter]);
+  }, [Id, dispatch, timeFilter]);
 
   const handleTimeFilterChange = (key) => {
     setTimeFilter(key);
@@ -704,14 +706,14 @@ const ProductDetails = ({ user, users }) => {
               </div>
             ) : (
               <>
-                {(priceHistory?.originRecords?.length > 1 || priceHistory?.records?.length > 1) && (
+                {(priceHistory?.originRecords?.length > 1 || priceHistory?.records) && (
                   <div className="w-full h-full">
                     <TimeRangeTabs onChange={handleTimeFilterChange} activeKey={timeFilter} />
                     <PriceChartAndStats priceHistory={priceHistory} />
                   </div>
                 )}
                 <div>
-                  {(priceHistory?.originRecords?.length > 1 || priceHistory?.records?.length > 1) && (
+                  {(priceHistory?.originRecords?.length > 1 || priceHistory?.records > 1) && (
                     <>
                   <h2 className='w-full text-center font-bold text-2xl'>12-Month Historical Data</h2>
 

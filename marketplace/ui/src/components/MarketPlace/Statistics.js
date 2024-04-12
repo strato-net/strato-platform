@@ -2,36 +2,10 @@ import React from 'react';
 import './Statistics.css';
 const Statistics = ({ priceHistory }) => {
 
-const calculateAveragePrice = (records) => records.reduce((sum, record) => sum + record.price, 0) / records.length;
-
-const calculatePriceFluctuation = (records) => {
-  const prices = records.map(record => record.price);
-  return { min: Math.min(...prices), max: Math.max(...prices) };
-};
-
-const calculateVolumeTraded = (records) => {
-  
-    // Use reduce to accumulate the total volume traded
-    return records.reduce((acc, record, index, array) => {
-      // Skip the first element since it has no previous to compare with
-      if (index === 0) return acc;
-  
-      // Compare the current record with the previous one
-      const quantityDecrease = array[index - 1].quantity - record.quantity;
-  
-      // If the quantity has decreased, add it to the accumulator
-      if (quantityDecrease > 0) {
-        acc += quantityDecrease;
-      }
-      
-      return acc; 
-    }, 0); 
-}
-
 // Origin Asset Statistics
-const originFluctuation = calculatePriceFluctuation(priceHistory.records);
-const originVolume = calculateVolumeTraded(priceHistory.records);
-const originAveragePrice = calculateAveragePrice(priceHistory.records);
+const originFluctuation = priceHistory.records.originFluctuation;
+const originVolume = priceHistory.records.originVolume;
+const originAveragePrice = priceHistory.records.originAveragePrice;
 
 return (
   <div className="container">
