@@ -131,3 +131,14 @@ export const getDate = (record) =>{
   const date = dayjs(record.block_timestamp).format('YYYY-MM-DD');
   return date;
 }
+
+//Helpers for timeFilter
+export const timeFilterForSixMonths = () =>{
+  return '1';
+}
+export const timeFilterForOneYear = () =>{
+  return '2';
+}
+export const timeFilterForAll = () =>{
+  return '3';
+}

@@ -1,6 +1,17 @@
 import { rest, util, importer } from "blockapps-rest";
 const { createContract } = rest;
-import constants, { STRIPE_PAYMENT_SERVER_URL, calculatePriceFluctuation, calculateAveragePrice, calculateVolumeTraded, getOneYearAgoTime, getSixMonthsAgoTime, getDate } from "/helpers/constants";
+import constants, { 
+  STRIPE_PAYMENT_SERVER_URL, 
+  calculatePriceFluctuation, 
+  calculateAveragePrice, 
+  calculateVolumeTraded, 
+  getOneYearAgoTime, 
+  getSixMonthsAgoTime, 
+  getDate,
+  timeFilterForAll, 
+  timeFilterForOneYear, 
+  timeFilterForSixMonths 
+} from "/helpers/constants";
 import { yamlWrite, yamlSafeDumpSync, getYamlFile } from "/helpers/config";
 import { pollingHelper } from "/helpers/utils";
 
@@ -331,15 +342,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       let salesFilter = { assetToBeSold: originAddress, order: "block_timestamp.asc" };
   
       // Sales Filter modification based on timeFilter
-      if (timeFilter === '1') { 
+      if (timeFilter === timeFilterForSixMonths()) { 
         // Applying 6-month filter
         salesFilter.gtField = "block_timestamp";
         salesFilter.gtValue = getSixMonthsAgoTime();
-      } else if (timeFilter === '2') { 
+      } else if (timeFilter === timeFilterForOneYear()) { 
         //Applying 1-year filter
         salesFilter.gtField = "block_timestamp";
         salesFilter.gtValue = getOneYearAgoTime();
-      } else if (timeFilter === '3') {
+      } else if (timeFilter === timeFilterForAll()) {
         // For 'All', no changes to salesFilter required
       } else {
         console.log('Invalid timeFilter');
