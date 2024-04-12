@@ -133,7 +133,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   // includes the org+app for cirrus namespacing (helpers/utils.js will prepend to cirrus queries)
-  const defaultOptions = { ..._defaultOptions, app: contractName, chainIds: [], };
+  const defaultOptions = { ..._defaultOptions, app: contractName, chainIds: [], cacheNonce: true };
   // for querying data not on the dapp shard
   const optionsNoChainIds = {
     ...defaultOptions,
