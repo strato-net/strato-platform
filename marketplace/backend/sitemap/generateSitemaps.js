@@ -69,15 +69,16 @@ async function generateXML(urls) {
 }
 
 function escapeXML(str) {
-  return str.replaceAll(/[<>&'"]/g, function (c) {
+  return str.replace(/[<>&'"]/g, function (c) {
     switch (c) {
       case '<': return '&lt;';
       case '>': return '&gt;';
       case '&': return '&amp;';
       case '\'': return '&apos;';
       case '"': return '&quot;';
+      default: return c;
     }
-  }).replaceAll(invalidXMLUnicodeRegex, '').replace(/ /g, '%20');
+  }).replace(invalidXMLUnicodeRegex, '').replace(/ /g, '%20');
 }
 
 async function generateSitemap() {
