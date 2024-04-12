@@ -271,6 +271,13 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
         <div className=" pt-[5px]  flex">
           
           <div className="flex flex-col">
+            <div className="flex">
+              {paymentProviderAddress ? (
+                <Button type="link" className="text-[#13188A] font-semibold text-base h-6" onClick={showListModal} disabled={(getCategory() == "Carbon Offset" && !(itemData.isMint && itemData.isMint == "True"))}>
+                  {inventory.price ? 'Edit Listing' : 'List for Sale'}
+                </Button>
+              ) : (<div></div>)}
+            </div>
             <div>
               <Button type="link" className="text-[#13188A] font-semibold text-base h-6" onClick={callDetailPage}>
                 Preview
@@ -287,13 +294,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
                   title={
                     <div className="font-medium">
                       {inventory.price ? (<div>
-                        <div
-                          className="flex items-center mt-2 cursor-pointer"
-                          onClick={showListModal}
-                        >
-                          <EditOutlined />
-                          <p className="ml-3">Edit Listing</p>
-                        </div>
                         <div
                           className="flex items-center mt-2 cursor-pointer"
                           onClick={showUnlistModal}
@@ -330,13 +330,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
                 </Popover>
               }
             </div>
-            <div className="flex">
-              {paymentProviderAddress ? (
-                <Button type="link" className="text-[#13188A] font-semibold text-base h-6" onClick={showListModal} disabled={(getCategory() == "Carbon Offset" && !(itemData.isMint && itemData.isMint == "True"))}>
-                  List for Sale
-                </Button>
-              ) : (<div></div>)}
-            </div>
           </div>
         </div>
       </div>
@@ -360,18 +353,18 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
             {inventory.price ?
             <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
               <div className="w-[7px] h-[7px] rounded-full bg-[#119B2D]"></div>
-              <p className="text-[#4D4D4D] text-[8px]">Published</p>
+              <p className="text-[#4D4D4D] text-[13px]">Published</p>
             </div>
             :
             (inventory.data.isMint && inventory.data.isMint === "False" && inventory.quantity === 0) || (!inventory.data.isMint && inventory.quantity === 0)?
             <div className="flex items-center justify-center gap-2 bg-[#FFA50029] p-[6px] rounded-md">
               <div className="w-[7px] h-[7px] rounded-full bg-[#FFA500]"></div>
-              <p className="text-[#4D4D4D] text-[8px]">Sold Out</p>
+              <p className="text-[#4D4D4D] text-[13px]">Sold Out</p>
             </div>
               :  
               <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
                 <div className="w-[7px] h-[7px] rounded-full bg-[#ff4d4f]"></div>
-                <p className="text-[#4D4D4D] text-[8px]">Unpublished</p>
+                <p className="text-[#4D4D4D] text-[13px]">Unpublished</p>
               </div>
             }
           </div>
