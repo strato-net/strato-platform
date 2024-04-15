@@ -367,13 +367,17 @@ async function getAll(admin, args = {}, defaultOptions) {
 
         // added greater than query to make sure we only take the sales with quantity thats available to sell. 
         // If the sale has 0 quantity it will throw an error when checking out, we will not show thee items for the trending search.
-        sales = await saleJs.getAll(admin, { range, isOpen: true, order: 'block_timestamp.desc', limit: '25', offset: '0', gtField: args.gtField, gtValue: args.gtValue}, options);
+        sales = await saleJs.getAll(admin, { range, isOpen: true, order: 'block_timestamp.desc', offset: '0', gtField: args.gtField, gtValue: args.gtValue}, options);
         const trendingAssetAddresses = sales.map(sale => sale.assetToBeSold);
 
         // Match the inventory with the sales
         inventories = await searchAllWithQueryArgs(contractName,
             {
                 address: trendingAssetAddresses,
+                notEqualsField: ['ownerCommonName'],
+                notEqualsValue: [ownerCommonName],
+                order: 'block_timestamp.desc',
+                limit: '25',
             }, options, admin);
     } 
     else {
