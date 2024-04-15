@@ -317,7 +317,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         paymentProviders: args.paymentProviders,
         price: args.price,
         assetToBeSold: asset.assetToBeSold,
-        quantity: asset.quantity,
+        quantity: asset.saleQuantity,
       };
       return inventoryJs.uploadSaleContract(rawAdmin, callArgs, options);
     });
@@ -496,21 +496,32 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.updateSale = async function (args, options = defaultOptions) {
-    // Assuming args.assets is an array of { saleAddress, quantity } objects
-    options.cacheNonce = true; // Useful if interacting with blockchain to optimize nonce management
-  
-    const updatePromises = args.assets.map(asset => {
-      const { saleAddress, quantity } = asset;
+    options.cacheNonce = true;
+    let totalListedQuantity = 0;
+    const targetQuantity = parseInt(args.quantity, 10) // Had issues with these returning NaN in quantityToBeListed if we didn't parseInt
+    const updatePromises = [];
+
+    for (const asset of args.assets) {
+      if (totalListedQuantity >= targetQuantity) break; // Stop if we've listed enough items
+
+      const assetQuantity = parseInt(asset.saleQuantity, 10); // Had issues with these returning NaN in quantityToBeListed if we didn't parseInt
+
+      // Determine how many more items need to be listed to reach the target quantity
+      const remainingQuantity = targetQuantity - totalListedQuantity;
+      const quantityToBeListed = Math.min(assetQuantity, remainingQuantity);
+      
+      totalListedQuantity += quantityToBeListed;  // Update the total listed quantity
+
       const restArgs = {
-        ...args, 
-        quantity, 
+        ...args,
+        quantity: quantityToBeListed,
       };
-      const contract = { address: saleAddress };
-  
+      const contract = { address: asset.saleAddress };
+
       // Perform the update for this specific asset
-      return inventoryJs.updateSale(rawAdmin, contract, restArgs, options);
-    });
-  
+      updatePromises.push(inventoryJs.updateSale(rawAdmin, contract, restArgs, options));
+    }
+
     const results = await Promise.allSettled(updatePromises);
   
     // Process successful transactions

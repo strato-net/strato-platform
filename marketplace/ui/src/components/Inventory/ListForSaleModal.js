@@ -158,9 +158,10 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
             let body = {
                 paymentProviders: paymentProviderAddress ? [paymentProviderAddress] : [],
                 price: pricePerUnit,
+                quantity: quantity,
                 assets: assetsToUpdate.map(asset => ({
                     saleAddress: asset.saleAddress,
-                    quantity: asset.saleQuantity, 
+                    saleQuantity: asset.saleQuantity, 
                 })),
             };
     

@@ -340,10 +340,11 @@ class InventoryController {
     const updateSaleItemSchema = Joi.object({
       paymentProviders: Joi.array().min(1).items(Joi.string().required()).optional(),
       price: Joi.number().integer().greater(0).optional(),
+      quantity:  Joi.number().integer().greater(0),
       assets: Joi.array().items(
         Joi.object({
           saleAddress: Joi.string().required(),
-          quantity: Joi.number().integer().greater(0).required(),
+          saleQuantity: Joi.number().integer().greater(0).required(),
         }).required()
       ).min(1).required(),
     });
