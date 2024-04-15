@@ -5,6 +5,7 @@ import {
   MoreOutlined,
   EditOutlined,
   FormOutlined,
+  SendOutlined,
   PieChartOutlined,
   StopOutlined,
   SwapOutlined
@@ -251,85 +252,45 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
 
   return (
     <div className=" p-3 md:p-[18px] border border-[#BABABA] md:border-[#E9E9E9] rounded-lg sm:w-[343px] md:w-full  ">
-      <div className="bg-[#F2F2F9] rounded-md px-[14px] flex justify-between items-center pb-[13px] pt-2 w-full">
-        <div>
-          <p className="text-lg lg:text-xl font-semibold text-[#202020] cursor-default" onClick={callDetailPage}>
-            {/* {inventory?.name || "N/A"} */}
-            <Tooltip title={inventory?.name.length > 20 ? inventory?.name : null}>
-              <span className=" whitespace-nowrap max-w-[160px] inline-block">
-                {inventory?.name.length > 20 ? `${inventory?.name.slice(0, 20)}...` : `${inventory?.name}`}
-              </span>
-            </Tooltip>
-          </p>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Typography className="pt-1">{`(${getCategory()})`}</Typography>
-            {inventory?.contract_name.toLowerCase().includes("clothing") && (
-              <Typography className='pt-1'>{'Size: ' + inventory?.data?.size || "N/A"}</Typography>
-            )}
-          </div>
-        </div>
-        <div className=" pt-[5px]  flex">
-          
-          <div className="flex flex-col">
-            <div className="flex">
-              {paymentProviderAddress ? (
-                <Button type="link" className="text-[#13188A] font-semibold text-base h-6" onClick={showListModal} disabled={(getCategory() == "Carbon Offset" && !(itemData.isMint && itemData.isMint == "True"))}>
-                  {inventory.price ? 'Edit Listing' : 'List for Sale'}
-                </Button>
-              ) : (<div></div>)}
-            </div>
+      <div className="bg-[#F2F2F9] rounded-md px-[14px] flex flex-col justify-between items-center pb-[13px] pt-2 w-full">
+        <div className="flex justify-between w-full">
+          <div className="flex flex-col justify-between w-full">
+            <p className="text-lg lg:text-xl font-semibold text-[#202020] cursor-default" onClick={callDetailPage}>
+              <Tooltip title={inventory?.name.length > 20 ? inventory?.name : null}>
+                <span className=" whitespace-nowrap max-w-[160px] inline-block">
+                  {inventory?.name.length > 20 ? `${inventory?.name.slice(0, 15)}...` : `${inventory?.name}`}
+                </span>
+              </Tooltip>
+            </p>
             <div>
-              <Button type="link" className="text-[#13188A] font-semibold text-base h-6" onClick={callDetailPage}>
-                Preview
-              </Button>
-
-
-              {((itemData.isMint === "True" && inventory.quantity === 0) || inventory.quantity > 0) &&
-                <Popover
-                  placement="bottomLeft"
-                  open={openPop}
-                  className=""
-                  id="sideMenu"
-                  onOpenChange={handleOpenChange}
-                  title={
-                    <div className="font-medium">
-                      {inventory.price ? (<div>
-                        <div
-                          className="flex items-center mt-2 cursor-pointer"
-                          onClick={showUnlistModal}
-                        >
-                          <StopOutlined />
-                          <p className="ml-3">Unlist</p>
-                        </div>
-                      </div>) : (<div></div>)}
-                      {itemData.isMint && itemData.isMint == "True" ? (<div
-                        className="flex items-center mt-2 cursor-pointer"
-                        onClick={showResellModal}
-                      >
-                        <PieChartOutlined />
-                        <p className="ml-3">Mint</p>
-                      </div>) : (<div></div>)}
-
-                      {inventory.quantity && parseInt(inventory.quantity) > 0 && (!inventory.saleAddress || (inventory.saleAddress && parseInt(inventory.saleQuantity) > 0)) ? (
-                        <div
-                          className="flex items-center mt-2 cursor-pointer"
-                          onClick={showTransferModal}
-                        >
-                          <SwapOutlined />
-                          <p className="ml-3">Transfer</p>
-                        </div>
-                      ) : (
-                        <div></div>
-                      )}
-
-                    </div>
-                  }
-                  trigger="click"
-                >
-                  <MoreOutlined />
-                </Popover>
-              }
+              <Typography className="pt-1">{`(${getCategory()})`}</Typography>
+              {inventory?.contract_name.toLowerCase().includes("clothing") && (
+                <Typography className='pt-1'>{'Size: ' + inventory?.data?.size || "N/A"}</Typography>
+              )}
             </div>
+            {paymentProviderAddress ? (
+              <Button type="link" className="text-[#13188A] font-semibold text-base h-6 pl-0 text-left" onClick={showListModal} disabled={(getCategory() == "Carbon Offset" && !(itemData.isMint && itemData.isMint == "True"))}>
+                {inventory.price ? <><EditOutlined /> Edit Listing</> : <><DollarOutlined /> List for Sale</>}
+              </Button>
+            ) : (<div></div>)}
+          </div>
+          <div>
+            {((itemData.isMint === "True" && inventory.quantity === 0) || inventory.quantity > 0) &&
+              <div className="flex flex-col space-y-1">
+                <Button type="link" className="text-[#13188A] text-left font-semibold text-base h-6" onClick={showUnlistModal} disabled={!inventory.price}>
+                  <StopOutlined /> Unlist
+                </Button>
+                <Button type="link" className="text-[#13188A] text-left font-semibold text-base h-6" onClick={showResellModal} disabled={!(itemData.isMint && itemData.isMint == "True")}>
+                  <PieChartOutlined /> Mint
+                </Button>
+                <Button type="link" className="text-[#13188A] text-left font-semibold text-base h-6" onClick={showTransferModal} disabled={!(inventory.quantity && parseInt(inventory.quantity) > 0 && (!inventory.saleAddress || (inventory.saleAddress && parseInt(inventory.saleQuantity) > 0)))}>
+                  <SwapOutlined /> Transfer
+                </Button>
+                <Button type="link" className="text-[#13188A] text-left font-semibold text-base h-6" disabled={true}>
+                  <SendOutlined /> Redeem
+                </Button>
+              </div>
+            }
           </div>
         </div>
       </div>
