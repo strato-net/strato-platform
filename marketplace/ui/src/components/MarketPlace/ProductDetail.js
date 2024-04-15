@@ -45,6 +45,9 @@ import ProductItemDetails from "./ProductItemDetails";
 import HelmetComponent from "../Helmet/HelmetComponent";
 import { SEO } from "../../helpers/seoConstant";
 import PreviewMode from "../RichEditor/PreviewMode";
+import PriceChartAndStats from "./PriceChartAndStats";
+import Statistics from "./Statistics";
+import TimeRangeTabs from "./TimeRangeTabs";
 
 const ProductDetails = ({ user, users }) => {
   const { state, pathname } = useLocation();
@@ -63,6 +66,7 @@ const ProductDetails = ({ user, users }) => {
   const { Text, Paragraph } = Typography;
   const [Id, setId] = useState(undefined);
   const [itemData, setItemData] = useState({});
+  const [timeFilter, setTimeFilter] = useState('1');
 
   const [qty, setQty] = useState(1);
   const dispatch = useInventoryDispatch();
@@ -75,7 +79,9 @@ const ProductDetails = ({ user, users }) => {
     inventoryDetails,
     isInventoryDetailsLoading,
     isInventoryOwnershipHistoryLoading,
-    inventoryOwnershipHistory
+    inventoryOwnershipHistory,
+    priceHistory,
+    isFetchingPriceHistory
   } = useInventoryState();
   const marketplaceDispatch = useMarketplaceDispatch();
   const { cartList } = useMarketplaceState();
@@ -122,6 +128,16 @@ const ProductDetails = ({ user, users }) => {
       // }
     }
   }, [Id, dispatch]);
+
+  useEffect(() => {
+    if (Id !== undefined) {
+      actions.fetchPriceHistory(dispatch,Id,10,0,timeFilter);
+    }
+  }, [Id, dispatch, timeFilter]);
+
+  const handleTimeFilterChange = (key) => {
+    setTimeFilter(key);
+  };
 
   useEffect(() => {
     if (inventoryDetails) {
@@ -335,10 +351,10 @@ const ProductDetails = ({ user, users }) => {
         </div>
       ) : (
         <div>
-          <HelmetComponent
-            title={`${assetName} | ${contractName} | ${SEO.TITLE_META}`}
-            description={details?.description}
-            link={linkUrl} />
+          <HelmetComponent 
+          title={`${assetName} | ${contractName} | ${SEO.TITLE_META}`}
+          description={details?.description} 
+          link={linkUrl} />
           <Row>
             <Breadcrumb className="text-xs   mb-4 md:mt-5  md:mb-6 lg:mb-[44px] ml-4 lg:ml-16">
               <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
@@ -698,6 +714,31 @@ const ProductDetails = ({ user, users }) => {
                   ]}
               />
             </div>
+            {
+            isFetchingPriceHistory ? (
+              <div className="flex justify-center items-center h-full w-full">
+                <Spin spinning={true} size="large" /> 
+              </div>
+            ) : (
+              <>
+                {(priceHistory?.originRecords?.length > 1 && priceHistory?.records) && (
+                  <div className="w-full h-full">
+                    <TimeRangeTabs onChange={handleTimeFilterChange} activeKey={timeFilter} />
+                    <PriceChartAndStats priceHistory={priceHistory} />
+                  </div>
+                )}
+                <div>
+                  {(priceHistory?.originRecords?.length > 1 || priceHistory?.records > 1) && (
+                    <>
+                  <h2 className='w-full text-center font-bold text-2xl'>12-Month Historical Data</h2>
+
+                    <Statistics priceHistory={priceHistory} />
+                    </>
+                  )}
+                </div>
+              </>
+            )
+          }
           </div>
         </div>
       )}

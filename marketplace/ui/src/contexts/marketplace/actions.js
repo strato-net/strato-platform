@@ -480,7 +480,6 @@ const actions = {
     }
   },
 
-
 };
 
 export { actionDescriptors, actions };

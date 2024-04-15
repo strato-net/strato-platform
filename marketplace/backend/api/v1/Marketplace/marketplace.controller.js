@@ -118,6 +118,7 @@ class MarketplaceController {
     }
     return finalInventory
   }
+
 }
 
 
