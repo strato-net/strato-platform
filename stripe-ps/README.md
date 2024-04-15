@@ -91,3 +91,17 @@ The server requires the following environmental variables to run:
 If running non-dockerized, use `npm run start` or `npm run dev`.  
 If running dockerized, provide a `docker-compose.stripe-ps.yml` file and use `docker-compose -f docker-compose.stripe-ps.yml up -d --remove-orphans`.
 
+### Testing
+
+The payment server uses `jest` as its testing framework. In order to run the tests, the following environment variables are required:
+```
+`MARKETPLACE_URL` for Stripe API callback
+`STRIPE_PUBLISHABLE_KEY` for Stripe API
+`STRIPE_SECRET_KEY` for Stripe API
+`TEST_ACCT_ID` for Stripe API
+`TEST_DB` should be set to true
+`TEST_SESSION_ID` is optional for testing the session and intent endpoints
+```
+
+Afterwards, simply run `npm run test`.
+
