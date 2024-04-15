@@ -70,9 +70,12 @@ executables:
       - base64
       - blockapps-data
       - blockapps-init
+      - blockapps-vault-wrapper-api
+      - blockapps-vault-wrapper-client
       - blockstanbul
       - bytestring
       - common-log
+      - containers
       - extra
       - hflags
       - http-client

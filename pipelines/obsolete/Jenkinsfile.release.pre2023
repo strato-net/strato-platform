@@ -102,7 +102,6 @@ pipeline {
               OAUTH_CLIENT_SECRET='${KEYCLOAK_STRATODEVEL_DEV_SECRET}' \\
               VAULT_URL=https://\$(</host):8093 \\
               VAULT_PROXY_DEBUG=true \\
-              certInfo='{"orgName":"BlockApps","orgUnit":"Engineering","commonName":"Test"}' \\
               ./strato --single
           """
           }

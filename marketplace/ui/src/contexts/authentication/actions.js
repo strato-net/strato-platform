@@ -5,6 +5,7 @@ const actionDescriptors = {
   check: "auth/check",
   checkSuccessful: "auth/check_successful",
   checkFailed: "auth/check_failed",
+  checkFailedInternalServerError: "auth/check_failed_internal_server_error",
   fetchUsers: "FETCH_USERS",
   fetchUsersSuccessful: "FETCH_USERS_SUCCESSFUL",
   fetchUsersFailed: "FETCH_USERS_FAILED",
@@ -22,14 +23,21 @@ const actions = {
         credentials: "same-origin",
       });
       const body = await response.json();
-      if (response.status === RestStatus.UNAUTHORIZED || response.status === RestStatus.FORBIDDEN) {
+      if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {{
+        dispatch({
+          type: actionDescriptors.checkFailedInternalServerError,
+          error: body.error,
+        });
+        return;
+      }}
+      else if (response.status === RestStatus.UNAUTHORIZED || response.status === RestStatus.FORBIDDEN) {
         dispatch({
           type: actionDescriptors.checkFailed,
           payload: body.error.loginUrl,
         });
         return;
       }
-      if (response.status === RestStatus.OK) {
+      else if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.checkSuccessful,
           payload: {...body.data}

@@ -8,7 +8,7 @@ export default {
   },
   MarketplaceCategoryProductList: {
     label: "Marketplace Product List",
-    url: "/category/:category",
+    url: "/c/:category",
   },
   MarketplaceUserProfile: {
     label: "Marketplace User Profile",
@@ -16,15 +16,15 @@ export default {
   },
   MarketplaceProductDetail: {
     label: "Marketplace Product Detail",
-    url: "/productList/:address",
+    url: "/dp/:address/:name",
   },
   LoginRedirect: { label: "LoginRedirect", url: "/login" },
   Checkout: { label: "Checkout", url: "/checkout" },
   ConfirmOrder: { label: "Confirm Order", url: "/confirmOrder" },
   Products: { label: "Product", url: "/products" },
   ProductDetail: { label: "Product Detail", url: "/products/:id" },
-  MyStore: { label: "Inventory", url: "/mystore" },
-  InventoryDetail: { label: "Inventory Detail", url: "/inventories/:id" },
+  MyItems: { label: "Inventory", url: "/myitems" },
+  InventoryDetail: { label: "Inventory Detail", url: "/inventories/:id/:name" },
   InventoryEventSerialNumberList: { label: "Inventory Event Serial Numbers", url: "/inventories/events/serialNumbers" },
   Items: { label: "Item", url: "/items" },
   Orders: { label: "Order", url: "/order/:type" },

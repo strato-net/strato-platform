@@ -2,6 +2,7 @@ const winston = require('winston-color');
 const models = require('../models');
 const config = require('../config/app.config');
 const moment = require('moment');
+const { Op } = require('sequelize');
 
 (async () => {
   await cleanOnce();
@@ -13,14 +14,14 @@ async function cleanOnce() {
   // Unused code notice. Node stats disabled, to be deprecated  #node-stats-deprecation
   // const mDateApiCallCounter = moment().subtract(config.statistics.apiCallCounterRetentionHours, "hours");
 
-  winston.info('Cleaning the historical DB Data (HealthStats, StallStats, ApiCallCounts...');
+  winston.info('Cleaning the historical DB Data (HealthStats, StallStats');
   
   // We could use Promise.allSettled but do we really want to destroy data in multiple tables in parallel?
   try {
     const destroyedCount = await models.HealthStat.destroy({
       where: {
         createdAt: {
-          $lt: mDateHealth
+          [Op.lt]: mDateHealth
         }
       }
     })
@@ -33,7 +34,7 @@ async function cleanOnce() {
     const destroyedCount = await models.StallStat.destroy({
       where: {
         createdAt: {
-          $lt: mDateHealth
+          [Op.lt]: mDateHealth
         }
       }
     })
@@ -47,7 +48,7 @@ async function cleanOnce() {
   //   const destroyedCount = await models.ApiCallCount.destroy({
   //     where: {
   //       createdAt: {
-  //         $lt: mDateApiCallCounter
+  //         [Op.lt]: mDateApiCallCounter
   //       }
   //     }
   //   })
