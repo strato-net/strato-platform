@@ -45,7 +45,6 @@ COPY \
   ./usr/local/bin/ghc-debug \
   ./usr/local/bin/global-db \
   ./usr/local/bin/init-worker \
-  ./usr/local/bin/logserver \
   ./usr/local/bin/post-raw-transaction \
   ./usr/local/bin/queryStrato \
   ./usr/local/bin/slipstream \

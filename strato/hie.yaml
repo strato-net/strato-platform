@@ -501,12 +501,6 @@ cradle:
     - path: "libs/labeled-error/src"
       component: "labeled-error:lib"
 
-    - path: "libs/logserver/exec_src/LogServer.hs"
-      component: "logserver:exe:logserver"
-
-    - path: "libs/logserver/exec_src/Paths_logserver.hs"
-      component: "logserver:exe:logserver"
-
     - path: "libs/monad-alter/src"
       component: "monad-alter:lib"
 

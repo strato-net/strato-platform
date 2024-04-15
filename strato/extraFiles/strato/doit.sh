@@ -110,7 +110,6 @@ function newnode {
   fi
 
   echo "Starting Strato processes. All output is logged to $PWD/logs."
-  runBackgroundProcess logserver --directory "${PWD}/logs" --uri_root=/logs/strato/ &>> logs/logserver
 
   # DEBUG LOGGING FLAGS
   apiDebugMode=LevelInfo
