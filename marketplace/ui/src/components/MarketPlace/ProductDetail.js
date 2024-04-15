@@ -45,7 +45,9 @@ import ProductItemDetails from "./ProductItemDetails";
 import HelmetComponent from "../Helmet/HelmetComponent";
 import { SEO } from "../../helpers/seoConstant";
 import PreviewMode from "../RichEditor/PreviewMode";
-import OwnershipHistoryTable from "./OwnershipHistoryTable.js";
+import PriceChartAndStats from "./PriceChartAndStats";
+import Statistics from "./Statistics";
+import TimeRangeTabs from "./TimeRangeTabs";
 
 const ProductDetails = ({ user, users }) => {
   const { state, pathname } = useLocation();
@@ -64,6 +66,7 @@ const ProductDetails = ({ user, users }) => {
   const { Text, Paragraph } = Typography;
   const [Id, setId] = useState(undefined);
   const [itemData, setItemData] = useState({});
+  const [timeFilter, setTimeFilter] = useState('1');
 
   const [qty, setQty] = useState(1);
   const dispatch = useInventoryDispatch();
@@ -76,7 +79,9 @@ const ProductDetails = ({ user, users }) => {
     inventoryDetails,
     isInventoryDetailsLoading,
     isInventoryOwnershipHistoryLoading,
-    inventoryOwnershipHistory
+    inventoryOwnershipHistory,
+    priceHistory,
+    isFetchingPriceHistory
   } = useInventoryState();
   const marketplaceDispatch = useMarketplaceDispatch();
   const { cartList } = useMarketplaceState();
@@ -123,6 +128,16 @@ const ProductDetails = ({ user, users }) => {
       // }
     }
   }, [Id, dispatch]);
+
+  useEffect(() => {
+    if (Id !== undefined) {
+      actions.fetchPriceHistory(dispatch,Id,10,0,timeFilter);
+    }
+  }, [Id, dispatch, timeFilter]);
+
+  const handleTimeFilterChange = (key) => {
+    setTimeFilter(key);
+  };
 
   useEffect(() => {
     if (inventoryDetails) {
@@ -246,12 +261,12 @@ const ProductDetails = ({ user, users }) => {
       align: "center",
       // render: (text) => <p>{text}</p>,
       render: (text) => (
-        <a
-          href={`${window.location.origin}/marketplace/profile/${encodeURIComponent(text)}`}
+        <a 
+          href={`${window.location.origin}/profile/${encodeURIComponent(text)}`}
           onClick={(e) => {
             e.preventDefault();
-            const userProfileUrl = `/marketplace/profile/${encodeURIComponent(text)}`;
-
+            const userProfileUrl = `/profile/${encodeURIComponent(text)}`;
+      
             if (e.ctrlKey || e.metaKey) {
               // Open in a new tab if Ctrl/Cmd is pressed
               window.open(`${window.location.origin}${userProfileUrl}`, '_blank');
@@ -273,12 +288,12 @@ const ProductDetails = ({ user, users }) => {
       align: "center",
       // render: (text) => <p>{text}</p>,
       render: (text) => (
-        <a
-          href={`${window.location.origin}/marketplace/profile/${encodeURIComponent(text)}`}
+        <a 
+          href={`${window.location.origin}/profile/${encodeURIComponent(text)}`}
           onClick={(e) => {
             e.preventDefault();
-            const userProfileUrl = `/marketplace/profile/${encodeURIComponent(text)}`;
-
+            const userProfileUrl = `/profile/${encodeURIComponent(text)}`;
+      
             if (e.ctrlKey || e.metaKey) {
               // Open in a new tab if Ctrl/Cmd is pressed
               window.open(`${window.location.origin}${userProfileUrl}`, '_blank');
@@ -336,10 +351,10 @@ const ProductDetails = ({ user, users }) => {
         </div>
       ) : (
         <div>
-          <HelmetComponent
-            title={`${assetName} | ${contractName} | ${SEO.TITLE_META}`}
-            description={details?.description}
-            link={linkUrl} />
+          <HelmetComponent 
+          title={`${assetName} | ${contractName} | ${SEO.TITLE_META}`}
+          description={details?.description} 
+          link={linkUrl} />
           <Row>
             <Breadcrumb className="text-xs   mb-4 md:mt-5  md:mb-6 lg:mb-[44px] ml-4 lg:ml-16">
               <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
@@ -350,27 +365,22 @@ const ProductDetails = ({ user, users }) => {
                     Home
                   </p>
                 </ClickableCell>
-              </Breadcrumb.Item> <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-                <ClickableCell href={routes.Marketplace.url}>
-                  <p
-                    className="text-[#13188A]  text-sm font-semibold "
-                  >
-                    Marketplace
-                  </p>
-                </ClickableCell>
               </Breadcrumb.Item>
               {
                 isCalledFromInventory ?
                   <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-                    <ClickableCell href={routes.MyStore.url}>
+                    <ClickableCell href={routes.MyItems.url}>
                       <p
                         className="text-[#13188A]  text-sm font-semibold "
                       >
-                        My Store
+                        My Items
                       </p>
                     </ClickableCell>
                   </Breadcrumb.Item> : null
               }
+               <Breadcrumb.Item className="text-[#202020]  text-sm font-semibold ">
+                Product Detail
+              </Breadcrumb.Item>
               <Breadcrumb.Item className="text-[#202020]  text-sm font-semibold ">
                 {decodeURIComponent(details.name)}
               </Breadcrumb.Item>
@@ -417,7 +427,7 @@ const ProductDetails = ({ user, users }) => {
                       onClick={(e) => {
                         if (details?.ownerCommonName && details.ownerCommonName !== 'N/A') {
                           e.preventDefault();
-                          const userProfileUrl = `/marketplace/profile/${encodeURIComponent(details.ownerCommonName)}`;
+                          const userProfileUrl = `/profile/${encodeURIComponent(details.ownerCommonName)}`;
                           const fullUrl = `${window.location.origin}${userProfileUrl}`;
 
                           if (e.ctrlKey || e.metaKey) {
@@ -648,10 +658,39 @@ const ProductDetails = ({ user, users }) => {
                         </div>
                       ),
                     },
-                    user && { //if user is logged in then display Ownership History
+                    {
                       label: <span className="text-sm md:text-base">Ownership History</span>,
                       key: "2",
-                      children: (<OwnershipHistoryTable tableData={inventoryOwnershipHistory} columns={ownershipDetailColumn}/>),
+                      children: user ? (
+                        <div>
+                          <DataTableComponent
+                            columns={ownershipDetailColumn}
+                            scrollX="100%"
+                            data={inventoryOwnershipHistory}
+                            isLoading={isInventoryOwnershipHistoryLoading}
+                            pagination={{
+                              defaultPageSize: 10,
+                              position: ["bottomCenter"],
+                              showSizeChanger: false,
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="text-center p-4">
+                          <p>Please{' '}
+                            <span 
+                              className="text-blue hover:text-blue cursor-pointer hover:underline"
+                              onClick={() => {
+                                setCookie("returnUrl", window.location.pathname, 10);
+                                window.location.href = loginUrl;
+                              }}
+                            >
+                              login
+                            </span> 
+                            {' '}to view ownership history.
+                          </p>
+                        </div>
+                      ),
                     },
                     {
                       label: <span className="text-sm md:text-base">Additional Information</span>,
@@ -675,6 +714,31 @@ const ProductDetails = ({ user, users }) => {
                   ]}
               />
             </div>
+            {
+            isFetchingPriceHistory ? (
+              <div className="flex justify-center items-center h-full w-full">
+                <Spin spinning={true} size="large" /> 
+              </div>
+            ) : (
+              <>
+                {(priceHistory?.originRecords?.length > 1 && priceHistory?.records) && (
+                  <div className="w-full h-full">
+                    <TimeRangeTabs onChange={handleTimeFilterChange} activeKey={timeFilter} />
+                    <PriceChartAndStats priceHistory={priceHistory} />
+                  </div>
+                )}
+                <div>
+                  {(priceHistory?.originRecords?.length > 1 || priceHistory?.records > 1) && (
+                    <>
+                  <h2 className='w-full text-center font-bold text-2xl'>12-Month Historical Data</h2>
+
+                    <Statistics priceHistory={priceHistory} />
+                    </>
+                  )}
+                </div>
+              </>
+            )
+          }
           </div>
         </div>
       )}

@@ -231,7 +231,7 @@ readValidatorsFromGenesisInfo gi = catMaybes . flip map (genesisInfoAccountInfo 
         let o'' = decodeUtf8 o'
             u'' = decodeUtf8 u'
             c'' = decodeUtf8 c'
-        pure $ CommonName o'' u'' c'' True
+        pure $ (CommonName o'' u'' c'' True)
       _ -> Nothing
   _ -> Nothing
 

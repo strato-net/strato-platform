@@ -54,7 +54,10 @@ const actionDescriptors = {
   createItemFailed: "create_item_failed",
   fetchInventoryForUser: "fetch_inventory_user_profile",
   fetchInventoryForUserSuccessful: "fetch_inventory_user_profile_success",
-  fetchInventoryForUserFailed: "fetch_inventory_user_profile_failed"
+  fetchInventoryForUserFailed: "fetch_inventory_user_profile_failed",
+  fetchPriceHistory: "fetch_price_history",
+  fetchPriceHistorySuccessful: "fetch_price_history_successful",
+  fetchPriceHistoryFailed: "fetch_price_history_failed"  
 
 };
 
@@ -88,20 +91,20 @@ const actions = {
           type: actionDescriptors.createInventorySuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, "Inventory created successfully", true);
+        actions.setMessage(dispatch, "Item created successfully", true);
         return true;
       } else if (response.status === RestStatus.CONFLICT) {
         dispatch({ type: actionDescriptors.createInventoryFailed, error: body.error.message });
         actions.setMessage(dispatch, body.error.message)
         return false;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
-        dispatch({ type: actionDescriptors.createInventoryFailed, error: "Error while creating Inventory" });
-        actions.setMessage(dispatch, "Error while creating Inventory")
+        dispatch({ type: actionDescriptors.createInventoryFailed, error: "Error while creating Item" });
+        actions.setMessage(dispatch, "Error while creating Item")
         return false;
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
           type: actionDescriptors.createInventoryFailed,
-          error: "Unauthorized while creating Inventory"
+          error: "Unauthorized while creating Item"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -115,9 +118,9 @@ const actions = {
     } catch (err) {
       dispatch({
         type: actionDescriptors.createInventoryFailed,
-        error: "Error while creating Inventory",
+        error: "Error while creating Item",
       });
-      actions.setMessage(dispatch, "Error while creating Inventory");
+      actions.setMessage(dispatch, "Error while creating Item");
     }
   },
 
@@ -146,12 +149,12 @@ const actions = {
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.fetchInventorySearchFailed,
-          error: "Error while fetching Inventory",
+          error: "Error while fetching Item",
         });
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
           type: actionDescriptors.fetchInventorySearchFailed,
-          error: "Unauthorized while fetching Inventory"
+          error: "Unauthorized while fetching Item"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -162,7 +165,7 @@ const actions = {
     } catch (err) {
       dispatch({
         type: actionDescriptors.fetchInventorySearchFailed,
-        error: "Error while fetching Inventory",
+        error: "Error while fetching Item",
       });
     }
   },
@@ -196,12 +199,12 @@ const actions = {
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.fetchInventoryFailed,
-          error: "Error while fetching Inventory",
+          error: "Error while fetching Item",
         });
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
           type: actionDescriptors.fetchInventoryFailed,
-          error: "Unauthorized while fetching Inventory"
+          error: "Unauthorized while fetching Item"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -212,7 +215,7 @@ const actions = {
     } catch (err) {
       dispatch({
         type: actionDescriptors.fetchInventoryFailed,
-        error: "Error while fetching Inventory",
+        error: "Error while fetching Item",
       });
     }
   },
@@ -241,12 +244,12 @@ const actions = {
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.fetchInventoryForUserFailed,
-          error: "Error while fetching Inventory",
+          error: "Error while fetching Item",
         });
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
           type: actionDescriptors.fetchInventoryForUserFailed,
-          error: "Unauthorized while fetching Inventory"
+          error: "Unauthorized while fetching Item"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -257,7 +260,7 @@ const actions = {
     } catch (err) {
       dispatch({
         type: actionDescriptors.fetchInventoryForUserFailed,
-        error: "Error while fetching Inventory",
+        error: "Error while fetching Item",
       });
     }
   },
@@ -283,19 +286,19 @@ const actions = {
           type: actionDescriptors.updateInventorySuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, "Inventory has been updated", true);
+        actions.setMessage(dispatch, "Item has been updated", true);
         return true;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.updateInventoryFailed,
-          error: "Error while updating Inventory",
+          error: "Error while updating Item",
         });
-        actions.setMessage(dispatch, "Error while updating Inventory");
+        actions.setMessage(dispatch, "Error while updating Item");
         return false;;
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
           type: actionDescriptors.updateInventoryFailed,
-          error: "Unauthorized while updating Inventory"
+          error: "Unauthorized while updating Item"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -304,14 +307,14 @@ const actions = {
         type: actionDescriptors.updateInventoryFailed,
         error: body.error
       });
-      actions.setMessage(dispatch, "Error while updating Inventory");
+      actions.setMessage(dispatch, "Error while updating Item");
       return false;
     } catch (err) {
       dispatch({
         type: actionDescriptors.updateInventoryFailed,
-        error: "Error while updating Inventory",
+        error: "Error while updating Item",
       });
-      actions.setMessage(dispatch, "Error while updating Inventory");
+      actions.setMessage(dispatch, "Error while updating Item");
     }
   },
 
@@ -389,20 +392,20 @@ const actions = {
           type: actionDescriptors.listInventorySuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, "Inventory listed successfully", true);
+        actions.setMessage(dispatch, "Item listed successfully", true);
         return true;
       } else if (response.status === RestStatus.CONFLICT) {
         dispatch({ type: actionDescriptors.listInventoryFailed, error: body.error.message });
         actions.setMessage(dispatch, body.error.message)
         return false;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
-        dispatch({ type: actionDescriptors.listInventoryFailed, error: "Error while listing inventory" });
-        actions.setMessage(dispatch, "Error while listing inventory")
+        dispatch({ type: actionDescriptors.listInventoryFailed, error: "Error while listing Item" });
+        actions.setMessage(dispatch, "Error while listing Item")
         return false;
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
           type: actionDescriptors.listInventoryFailed,
-          error: "Unauthorized while listing Inventory"
+          error: "Unauthorized while listing Item"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -416,9 +419,9 @@ const actions = {
     } catch (err) {
       dispatch({
         type: actionDescriptors.listInventoryFailed,
-        error: "Error while listing inventory",
+        error: "Error while listing Item",
       });
-      actions.setMessage(dispatch, "Error while listing inventory");
+      actions.setMessage(dispatch, "Error while listing Item");
     }
   },
 
@@ -443,20 +446,20 @@ const actions = {
           type: actionDescriptors.unlistInventorySuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, "Inventory unlisted successfully", true);
+        actions.setMessage(dispatch, "Item unlisted successfully", true);
         return true;
       } else if (response.status === RestStatus.CONFLICT) {
         dispatch({ type: actionDescriptors.unlistInventoryFailed, error: body.error.message });
         actions.setMessage(dispatch, body.error.message)
         return false;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
-        dispatch({ type: actionDescriptors.unlistInventoryFailed, error: "Error while unlisting inventory" });
-        actions.setMessage(dispatch, "Error while unlisting inventory")
+        dispatch({ type: actionDescriptors.unlistInventoryFailed, error: "Error while unlisting Item" });
+        actions.setMessage(dispatch, "Error while unlisting Item")
         return false;
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
           type: actionDescriptors.unlistInventoryFailed,
-          error: "Unauthorized while unlisting Inventory"
+          error: "Unauthorized while unlisting Item"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -470,9 +473,9 @@ const actions = {
     } catch (err) {
       dispatch({
         type: actionDescriptors.unlistInventoryFailed,
-        error: "Error while unlisting inventory",
+        error: "Error while unlisting Item",
       });
-      actions.setMessage(dispatch, "Error while unlisting inventory");
+      actions.setMessage(dispatch, "Error while unlisting Item");
     }
   },
 
@@ -497,7 +500,7 @@ const actions = {
           type: actionDescriptors.resellInventorySuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, "Inventory has been updated", true);
+        actions.setMessage(dispatch, "Item has been updated", true);
         return true;
       } else if (response.status === RestStatus.CONFLICT) {
         dispatch({ type: actionDescriptors.resellInventoryFailed, error: body.error.message });
@@ -510,7 +513,7 @@ const actions = {
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
           type: actionDescriptors.resellInventoryFailed,
-          error: "Unauthorized while publishing Inventory"
+          error: "Unauthorized while publishing Item"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -551,7 +554,7 @@ const actions = {
           type: actionDescriptors.transferInventorySuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, "Inventory has been transferred", true);
+        actions.setMessage(dispatch, "Item has been transferred", true);
         return true;
       } else if (response.status === RestStatus.CONFLICT) {
         dispatch({ type: actionDescriptors.transferInventoryFailed, error: body.error.message });
@@ -564,7 +567,7 @@ const actions = {
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
           type: actionDescriptors.transferInventoryFailed,
-          error: "Unauthorized while transferring Inventory"
+          error: "Unauthorized while transferring Item"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -622,20 +625,20 @@ const actions = {
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
           type: actionDescriptors.fetchItemTransfersFailed,
-          error: "Unauthorized while fetching item transfers"
+          error: "Unauthorized while fetching Item transfers"
         });
         window.location.href = body.error.loginUrl;
       }
 
       dispatch({
         type: actionDescriptors.fetchItemTransfersFailed,
-        error: "Error while fetching item transfers",
+        error: "Error while fetching Item transfers",
       });
       return false;
     } catch (err) {
       dispatch({
         type: actionDescriptors.fetchItemTransfersFailed,
-        error: "Error while fetching item transfers",
+        error: "Error while fetching Item transfers",
       });
       return false;
     }
@@ -662,13 +665,13 @@ const actions = {
 
       dispatch({
         type: actionDescriptors.fetchInventoryDetailFailed,
-        error: "Error while fetching Inventory",
+        error: "Error while fetching Item",
       });
       return false;
     } catch (err) {
       dispatch({
         type: actionDescriptors.fetchInventoryDetailFailed,
-        error: "Error while fetching Inventory",
+        error: "Error while fetching Item",
       });
     }
   },
@@ -893,7 +896,37 @@ const actions = {
       });
       actions.setMessage(dispatch, "Error while creating Item");
     }
+  },
+
+  fetchPriceHistory: async (dispatch, assetAddress, limit, offset, timeFilter) => {
+    dispatch({ type: actionDescriptors.fetchPriceHistory });
+    try {
+      const query = assetAddress ? `&assetToBeSold=${encodeURIComponent(assetAddress)}` : ``;
+      let response = await fetch(`${apiUrl}/inventory/price/history?${query}&offset=${offset}&limit=${limit}&timeFilter=${timeFilter}`, {
+        method: HTTP_METHODS.GET,
+        credentials: "same-origin",
+      });
+      const body = await response.json();
+      if (response.status === RestStatus.UNAUTHORIZED || response.status === RestStatus.FORBIDDEN) {
+        dispatch({
+          type: actionDescriptors.fetchPriceHistoryFailed,
+          payload: "Error while fetching price history",
+        });
+        return;
+      }
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchPriceHistorySuccessful,
+          payload: body.data
+        });
+        return;
+      }
+      dispatch({ type: actionDescriptors.fetchPriceHistoryFailed, payload: "Error while fetching price history" });
+    } catch (err) {
+      dispatch({ type: actionDescriptors.fetchPriceHistoryFailed, payload: "Error while fetching price history" });
+    }
   }
+
 
 };
 

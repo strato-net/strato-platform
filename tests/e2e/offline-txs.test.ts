@@ -32,10 +32,6 @@ describe('Test Offline Transactions', async function () {
       dockerPrefix = 'sudo ';
     }
     
-    const gasOn = await exec(dockerPrefix + 'docker exec strato-strato-1 env | grep gasOn');
-    if (gasOn.stdout.split('=')[1] === 'true') {
-      await exec(dockerPrefix + `docker exec strato-strato-1 bash -c "curl -s -X POST 'http://localhost:3000/bloc/v2.2/users/user/${x509UserData.address}/fill?resolve=true'"`)
-    }
     // use admin creds
     await exec(dockerPrefix + 'docker cp ../strato/tools/x509-generator/rootPriv.pem strato-strato-1:/var/lib/strato/');
     // Create SimpleStorageN.sol files inside container

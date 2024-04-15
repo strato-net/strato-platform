@@ -194,6 +194,20 @@ class InventoryController {
     }
   }
 
+  static async getPriceHistory(req, res, next) {
+    try {
+      const { dapp, query } = req
+      const { assetToBeSold, limit, offset, timeFilter } = query;
+
+      const priceHistoryData = await dapp.getPriceHistory({ assetAddress: assetToBeSold, limit: limit, offset: offset, timeFilter: timeFilter });
+
+      return rest.response.status200(res, priceHistoryData)
+    } catch (e) {
+      console.log("Couldn't fetch price history");
+      return next(e)
+    }
+  }
+
   // static async audit(req, res, next) {
   //   try {
   //     const { dapp, params } = req

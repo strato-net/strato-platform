@@ -29,9 +29,9 @@ const TopSellingProductCard = () => {
   const orderDispatch = useOrderDispatch();
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (hasChecked && !isAuthenticated) {
       actions.fetchTopSellingProducts(marketplaceDispatch, offset, limit);
-    } else {
+    } else if (hasChecked && isAuthenticated) {
       actions.fetchTopSellingProductsLoggedIn(
         marketplaceDispatch,
         offset,
@@ -167,6 +167,8 @@ const TopSellingProductCard = () => {
     });
   };
 
+  const navRoute = routes.MarketplaceCategoryProductList.url.replace(':category','All')
+  
   return (
     <div>
       {contextHolder}
@@ -178,7 +180,7 @@ const TopSellingProductCard = () => {
           <Button
             size="large"
             onClick={() => {
-              navigate(routes.MarketplaceProductList.url);
+              navigate(navRoute);
               sessionStorage.setItem('scrollPosition', 0);
             }}
             className="text-black hover:!text-black border-grayDark hidden md:flex"
@@ -188,7 +190,7 @@ const TopSellingProductCard = () => {
           <Button
             size="small"
             onClick={() => {
-              navigate(routes.MarketplaceProductList.url);
+              navigate(navRoute);
               sessionStorage.setItem('scrollPosition', 0);
             }}
             className="text-black hover:!text-black border-grayDark flex md:hidden"
