@@ -27,6 +27,8 @@ so that they could be properly moved to their respective version's subsection.
 
 ### Removed
 - Removed 'block', 'blockGO', 'canonRedis', 'compressRoundChanges' commands from blockapps-tools
+- Removed `certInfo` flag from strato-sequencer (cert is now derived from genesis block or during sync)
+- Removed unused flags, such as `brokenRefundRenable`, `cacheTransactionResults`, `faucetEnabled`, `createTransactionResults`, `gasOn`, `splitinit`, and `useSyncMode`
 
 
 ## [11.1.0] - 3/28/2023
@@ -67,6 +69,7 @@ so that they could be properly moved to their respective version's subsection.
 - Removed unnecessary stateDiff (and threading) in the vm-runner codebase, fixing numerous sources of persistent memory build-up.
 - Removed overcomplicated attempts at solving p2p thread issue (watchdogs, canaries, semaphore, threadmap, etc)
 - `bloc/v2.2/x509/createCert` is no more
+
 
 ## [11.0.0] - 1/22/2024
 

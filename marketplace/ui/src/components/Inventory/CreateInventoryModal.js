@@ -220,13 +220,13 @@ const CreateInventoryModal = ({
               }}
               loading={isCreateInventorySubmitting || isUploadImageSubmitting}
             >
-              Create Inventory
+              Create Item
             </Button>
           </div>,
         ]}
       >
         <h1 className=" font-semibold text-lg text-[#202020]">
-          Create Inventory
+          Create Item
         </h1>
         <hr className="text-secondryD mt-3" />
         <Form

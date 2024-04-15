@@ -26,7 +26,6 @@ def deployStratoWithS3(nodeData, versionTag) {
           OAUTH_CLIENT_ID="${nodeData.OAUTH_CLIENT_ID}" \\
           OAUTH_CLIENT_SECRET="${nodeData.OAUTH_CLIENT_SECRET}" \\
           VAULT_URL="https://vault.blockapps.net:8093" \\
-          certInfo='{"orgName":"BlockApps","orgUnit":"Mercata","commonName":"${nodeData.COMMON_NAME}","access":true}' \\
           STRIPE_PUBLISHABLE_KEY='${STRIPE_PUBLISHABLE_KEY}' \\
           STRIPE_SECRET_KEY='${STRIPE_SECRET_KEY}' \\
           CLIENT_URL="https://${nodeData.STRATO_HOSTNAME}" \\
@@ -200,7 +199,6 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
           VAULT_URL=https://${nodeData.BOOT_HOST}:8093  \\
           VAULT_PROXY_DEBUG=true \\
           requireCerts=false \\
-          certInfo='${nodeData.CERT_INFO}' \\
           ./strato
       """
       sh 'chmod +x run.sh'
@@ -1323,6 +1321,153 @@ def runSyncTester() {
   echo "Sync successful!"
   exit 0
 '''
+}
+
+def spinUpVault() {
+  writeFile file: "run-vault.sh", text: """#!/bin/bash
+  sudo \\
+    ssl=true \\
+    HTTPS_PORT=8093 \\
+    INITIAL_OAUTH_DISCOVERY_URL='https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration' \\
+    INITIAL_OAUTH_ISSUER='https://keycloak.blockapps.net/auth/realms/strato-devel' \\
+    INITIAL_OAUTH_JWT_USERNAME_CLAIM='sub' \\
+    PASSWORD=123 \\
+    ./vault
+  """
+  sh 'chmod +x run-vault.sh'
+
+  sh './run-vault.sh'
+}
+
+def spinUpFileServer() {
+  withCredentials([
+    string(credentialsId: 'DEV_EXT_STORAGE_S3_ACCESS_KEY_ID', variable:'DEV_EXT_STORAGE_S3_ACCESS_KEY_ID'),
+    string(credentialsId: 'DEV_EXT_STORAGE_S3_SECRET_ACCESS_KEY', variable:'DEV_EXT_STORAGE_S3_SECRET_ACCESS_KEY'),
+  ]) {
+    writeFile file: "run-highway.sh", text: """#!/bin/bash
+      sudo \\
+        EXT_STORAGE_S3_ACCESS_KEY_ID='${DEV_EXT_STORAGE_S3_ACCESS_KEY_ID}' \\
+        EXT_STORAGE_S3_SECRET_ACCESS_KEY='${DEV_EXT_STORAGE_S3_SECRET_ACCESS_KEY}' \\
+        EXT_STORAGE_S3_BUCKET='mercata-dev-tests' \\
+        ssl=true \\
+        HIGHWAY_URL=https://\$(</host):44300 \\
+        HTTPS_PORT=44300 \\
+        ./highway
+    """
+  }
+
+  sh 'chmod +x run-highway.sh'
+  sh './run-highway.sh'
+  sh 'docker ps'
+
+  writeFile file: "check_availability_highway.sh", text: '''#!/bin/bash -le
+    check_availability_highway() {
+      counter=0
+      until curl --silent --fail --location https://$(</host):44300/ping | jq . | grep 1
+      do
+        if [[ "$counter" -gt 120 ]]; then
+          echo "Highway server took longer than 2 minutes to initialize! aborting."
+          exit 73
+        fi
+        echo "waiting for Highway server health endpoint to be available through nginx"
+        counter=$((counter+1))
+        sleep 1
+      done
+      echo "Highway server health endpoint is available through nginx - node is running"
+    }
+
+    check_availability_highway
+  '''
+  sh 'chmod +x check_availability_highway.sh'
+  sh './check_availability_highway.sh'
+}
+
+def spinUpPaymentServer() {
+  withCredentials([
+    string(credentialsId: 'STRIPE_PUBLISHABLE_KEY_TESTNET2', variable:'STRIPE_PUBLISHABLE_KEY_TESTNET2'),
+    string(credentialsId: 'STRIPE_SECRET_KEY_TESTNET2', variable:'STRIPE_SECRET_KEY_TESTNET2'),
+  ]) {
+    writeFile file: "run-stripe-ps.sh", text: """#!/bin/bash
+      sudo \\
+        STRIPE_PUBLISHABLE_KEY='${STRIPE_PUBLISHABLE_KEY_TESTNET2}' \\
+        STRIPE_SECRET_KEY='${STRIPE_SECRET_KEY_TESTNET2}' \\
+        ssl=true \\
+        HTTPS_PORT=44301 \\
+        ./stripe-ps
+    """
+  }
+
+  sh 'chmod +x run-stripe-ps.sh'
+  sh './run-stripe-ps.sh'
+  sh 'docker ps'
+
+  writeFile file: "check_availability_payment.sh", text: '''#!/bin/bash -le
+    check_availability_payment() {
+      counter=0
+      until curl --silent --fail --location https://$(</host):44301/ping | jq .success | grep true
+      do
+        if [[ "$counter" -gt 120 ]]; then
+          echo "Payment server took longer than 2 minutes to initialize! aborting."
+          exit 73
+        fi
+        echo "waiting for Payment server health endpoint to be available through nginx"
+        counter=$((counter+1))
+        sleep 1
+      done
+      echo "Payment server health endpoint is available through nginx - node is running"
+    }
+
+    check_availability_payment
+  '''
+  sh 'chmod +x check_availability_payment.sh'
+  sh './check_availability_payment.sh'
+}
+
+def spinUpIdentityServer() {
+  withCredentials([
+    string(credentialsId: 'SENDGRID_APIKEY_TESTNET2', variable:'SENDGRID_APIKEY_TESTNET2'),
+    usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID')
+  ]) {
+  writeFile file: "identity-provider/idconf.yaml", text: """
+    - realmName: strato-devel
+      discoveryUrl: https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration
+      clientId: ${KEYCLOAK_STRATODEVEL_DEV_ID}
+      clientSecret: ${KEYCLOAK_STRATODEVEL_DEV_SECRET}
+      nodeUrl: https://\$(</host)
+  """
+  writeFile file: "run-identity.sh", text: """#!/bin/bash
+    sudo \\
+      ssl=true \\
+      VAULT_URL=https://\$(</host):8093 \\
+      SENDGRID_APIKEY='${SENDGRID_APIKEY_TESTNET2}' \\
+      HTTPS_PORT=8001 \\
+      ./identity
+  """
+  }
+
+  sh 'chmod +x run-identity.sh'
+  sh './run-identity.sh'
+  sh 'docker ps'
+  writeFile file: "check_availability_identity.sh", text: '''#!/bin/bash -le
+    check_availability_identity() {
+      counter=0
+      until curl --silent --fail --location https://$(</host):8001/_ping | grep pong
+      do
+        if [[ "$counter" -gt 120 ]]; then
+          echo "Identity server took longer than 2 minutes to initialize! aborting."
+          exit 73
+        fi
+        echo "waiting for identity server health endpoint to be available through nginx"
+        counter=$((counter+1))
+        sleep 1
+      done
+      echo "Identity server health endpoint is available through nginx - node is running"
+    }
+
+    check_availability_identity
+  '''
+  sh 'chmod +x check_availability_identity.sh'
+  sh './check_availability_identity.sh'
 }
 
 return this

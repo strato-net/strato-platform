@@ -172,7 +172,7 @@ const reducer = function (state = initialState, action) {
       return {
         ...state,
         systemStatus: action.data.status,
-        warnings: action.data.warnings,
+        systemWarnings: action.data.warnings,
         systemInfo: action.data.systemInfo,
       };
 
@@ -180,7 +180,7 @@ const reducer = function (state = initialState, action) {
       return {
         ...state,
         systemStatus: action.data.status,
-        warnings: action.data.warnings,
+        systemWarnings: action.data.warnings,
         systemInfo: action.data.systemInfo,
       };
 

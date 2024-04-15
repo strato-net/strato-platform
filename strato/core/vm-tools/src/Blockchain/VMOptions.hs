@@ -5,16 +5,11 @@ module Blockchain.VMOptions
     flags_trace,
     flags_svmTrace,
     flags_svmDev,
-    flags_altGenBlock,
-    flags_brokenRefundReenable,
-    flags_cacheTransactionResults,
-    flags_createTransactionResults,
     flags_sqlDiff,
     flags_diffPublish,
     flags_queryBlocks,
     flags_transactionRootVerification,
     flags_startingBlock,
-    flags_gasOn,
     flags_requireCerts,
     flags_accountNonceLimit,
     flags_txSizeLimit,
@@ -34,13 +29,6 @@ defineFlag
   \ sqlTrace -> Tracing as pipe separated values to be dumped into SQL \n\
   \ evmProfile -> Profile runtimes labeled by opcode, emitted to the log \n\
   \ evmMetrics -> Profile runtimes labeled by opcode, collected by prometheus"
-defineFlag "altGenBlock" False "use the alternate stablenet genesis block"
-defineFlag
-  "brokenRefundReenable"
-  (False :: Bool)
-  "Whether to turn on spec incompatible refunds\
-  \ See STRATO-1411 or strato-platform/pull/745 for details"
-defineFlag "createTransactionResults" False "stores transaction results in the SQL DB"
 defineFlag "sqlDiff" True "runs sqlDiff and updates account state and storage in SQL DB"
 defineFlag "diffPublish" False "publishes all state changes to kafka"
 defineFlag "queryBlocks" (10000 :: Int) "Number of blocks to query from SQL to process in one batch"
@@ -48,8 +36,6 @@ defineFlag "transactionRootVerification" False "Flag to turn transaction root ve
 defineFlag "startingBlock" (-1 :: Integer) "block in kafka to start running the VM on"
 defineFlag "svmDev" (False :: Bool) "Whether to crash on SolidVM exceptions"
 defineFlag "svmTrace" (True :: Bool) "Whether to have verbose logging in SolidVM"
-defineFlag "cacheTransactionResults" True "Keep transaction results in an LRU cache to avoid reruns"
-defineFlag "gasOn" (True :: Bool) "Whether to charge for transactions or not"
 defineFlag "requireCerts" (True :: Bool) "Flag to enable the requirement of a cert to send transactions"
 defineFlag "txSizeLimit" (150000 :: Integer) "The maximum length of a valid RLP encoded transaction bytestring"
 defineFlag "accountNonceLimit" (1000 :: Integer) "The maximum number of transactions a single account can make"
