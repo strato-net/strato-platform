@@ -254,15 +254,15 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
     <div className=" p-3 md:p-[18px] border border-[#BABABA] md:border-[#E9E9E9] rounded-lg sm:w-[343px] md:w-full  ">
       <div className="bg-[#F2F2F9] rounded-md px-[14px] flex flex-col justify-between items-center pb-[13px] pt-2 w-full">
         <div className="w-full">
-          <div className="flex space-x-2">
+          <div className="flex justify-between w-full space-x-8">
             <p className="text-lg lg:text-xl font-semibold text-[#202020] cursor-default" onClick={callDetailPage}>
               <Tooltip title={inventory?.name.length > 20 ? inventory?.name : null}>
                 <span className=" whitespace-nowrap max-w-[160px] inline-block">
-                  {inventory?.name.length > 20 ? `${inventory?.name.slice(0, 20)}...` : `${inventory?.name}`}
+                  {inventory?.name.length > 20 ? `${inventory?.name.slice(0, 15)}...` : `${inventory?.name}`}
                 </span>
               </Tooltip>
             </p>
-            <div>
+            <div className="flex space-x-2">
               <Typography className="pt-1">{`(${getCategory()})`}</Typography>
               {inventory?.contract_name.toLowerCase().includes("clothing") && (
                 <Typography className='pt-1'>{'Size: ' + inventory?.data?.size || "N/A"}</Typography>
@@ -271,20 +271,20 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
           </div>
           <div>
             {((itemData.isMint === "True" && inventory.quantity === 0) || inventory.quantity > 0) &&
-              <div className="grid grid-cols-3 gap-1">
-                <Button type="link" className="text-[#13188A] text-left pl-0 font-semibold text-base h-6" onClick={showListModal} disabled={paymentProviderAddress && (getCategory() == "Carbon Offset" && !(itemData.isMint && itemData.isMint == "True"))}>
+              <div className="grid grid-cols-3 gap-1 w-full">
+                <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showListModal} disabled={paymentProviderAddress && (getCategory() == "Carbon Offset" && !(itemData.isMint && itemData.isMint == "True"))}>
                   {inventory.price ? <><EditOutlined /> Edit</> : <><DollarOutlined /> Sell</>}
                 </Button>
-                <Button type="link" className="text-[#13188A] text-left pl-0 font-semibold text-base h-6" onClick={showUnlistModal} disabled={!inventory.price}>
+                <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showUnlistModal} disabled={!inventory.price}>
                   <><StopOutlined /> Unlist</>
                 </Button>
-                <Button type="link" className="text-[#13188A] text-left pl-0 font-semibold text-base h-6" onClick={showResellModal} disabled={!(itemData.isMint && itemData.isMint == "True")}>
+                <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showResellModal} disabled={!(itemData.isMint && itemData.isMint == "True")}>
                   <><PieChartOutlined /> Mint</>
                 </Button>
-                <Button type="link" className="text-[#13188A] text-left pl-0 font-semibold text-base h-6" onClick={showTransferModal} disabled={!(inventory.quantity && parseInt(inventory.quantity) > 0 && (!inventory.saleAddress || (inventory.saleAddress && parseInt(inventory.saleQuantity) > 0)))}>
+                <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showTransferModal} disabled={!(inventory.quantity && parseInt(inventory.quantity) > 0 && (!inventory.saleAddress || (inventory.saleAddress && parseInt(inventory.saleQuantity) > 0)))}>
                   <><SwapOutlined /> Transfer</>
                 </Button>
-                <Button type="link" className="text-[#13188A] text-left pl-0 font-semibold text-base h-6" disabled={true}>
+                <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" disabled={true}>
                   <><SendOutlined /> Redeem</>
                 </Button>
               </div>
