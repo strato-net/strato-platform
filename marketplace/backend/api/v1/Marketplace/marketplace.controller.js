@@ -8,10 +8,7 @@ class MarketplaceController {
     try {
       const { dapp, query } = req
       const {soldOut, forSale , ...restQuery} =  query  
-      if (query.manufacturer) {
-        const encodedManufacturers = query.manufacturer.map(product => { return encodeURIComponent(product) })
-        query.manufacturer = encodedManufacturers
-      }
+
       const inventories = await dapp.getMarketplaceInventories({ ...restQuery })
       let finalInventory = MarketplaceController.getFinalInventory(inventories, forSale, soldOut)
 
@@ -27,13 +24,10 @@ class MarketplaceController {
     try {
       const { dapp, query } = req
       const {soldOut, forSale , ...restQuery} =  query  
-      if (query.manufacturer) {
-        const encodedManufacturers = query.manufacturer.map(product => { return encodeURIComponent(product) })
-        query.manufacturer = encodedManufacturers
-      }
-      const inventories = await dapp.getMarketplaceInventoriesLoggedIn({ ...restQuery })
 
+      const inventories = await dapp.getMarketplaceInventoriesLoggedIn({ ...restQuery })
       let finalInventory = MarketplaceController.getFinalInventory(inventories, forSale, soldOut)
+      
       rest.response.status200(res, { productsWithImageUrl: finalInventory, inventoryCount: finalInventory?.length })
 
       return next()
