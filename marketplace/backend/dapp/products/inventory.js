@@ -373,9 +373,8 @@ async function getAll(admin, args = {}, defaultOptions) {
         // Match the inventory with the sales
         inventories = await searchAllWithQueryArgs(contractName,
             {
+                ...restArgs,
                 address: trendingAssetAddresses,
-                notEqualsField: ['ownerCommonName'],
-                notEqualsValue: [ownerCommonName],
                 order: 'block_timestamp.desc',
                 limit: '25',
             }, options, admin);
