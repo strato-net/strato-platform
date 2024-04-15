@@ -89,9 +89,6 @@ type API =
     :<|> "transaction"
     :> ReqBody '[JSON] RawTransaction'
     :> Post '[JSON, PlainText] Keccak256
-    :<|> "transactionList"
-    :> ReqBody '[JSON] [RawTransaction']
-    :> Post '[JSON] [Keccak256]
 
 data TxsFilterParams = TxsFilterParams
   { qtAddress :: Maybe Address,
@@ -135,8 +132,8 @@ txsFilterParams =
     []
     Nothing
 
-server :: (MonadLogger m, HasSQL m) => ServerT API m
-server = getTransaction :<|> postTransaction Nothing :<|> postTransactionList Nothing
+server :: (MonadLogger m, HasSQL m) => Int -> ServerT API m
+server txSizeLimit = getTransaction :<|> postTransaction (Just txSizeLimit)
 
 ---------------------------
 
