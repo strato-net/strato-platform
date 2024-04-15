@@ -68,7 +68,6 @@ import qualified Handlers.Storage as Storage
 import qualified Handlers.Transaction as Transaction
 import qualified Handlers.TransactionResult as TransactionResult
 import qualified Handlers.TxLast as TxLast
-import qualified Handlers.UUID as UUID
 import Network.HTTP.Types.Status
 import Network.Wai
 import Network.Wai.Handler.Warp
@@ -165,7 +164,6 @@ type CoreAPI =
            :<|> Transaction.API
            :<|> TransactionResult.API
            :<|> TxLast.API
-           :<|> UUID.API
        )
 
 type FullAPI = CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI
@@ -196,7 +194,6 @@ coreServer =
     :<|> Transaction.server flags_txSizeLimit
     :<|> TransactionResult.server
     :<|> TxLast.server
-    :<|> UUID.server
 
 fullServer ::
   ( MonadLogger m,

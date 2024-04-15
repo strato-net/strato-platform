@@ -14,7 +14,6 @@ module Blockchain.Init.Worker (runWorker) where
 
 import BlockApps.Logging
 import Blockchain.DB.CodeDB
-import qualified Blockchain.Data.Blockchain as Blockchain
 import qualified Blockchain.Data.DataDefs as DataDefs
 import qualified Blockchain.EthConf as UEC
 import qualified Blockchain.EthConf.Model as EC
@@ -105,12 +104,8 @@ process pathRoot off =
       liftIO $ makeReadOnly $ dir </> "ethconf.yaml"
       let pgconf = EC.sqlConfig ec
           rawConn = EC.postgreSQLConnectionString pgconf {EC.database = ""}
-          globalConn = EC.postgreSQLConnectionString pgconf {EC.database = "blockchain"}
           localConn = EC.postgreSQLConnectionString pgconf
           db = EC.database pgconf
-      Blockchain.migrateDB globalConn
-      currPath <- liftIO $ getCurrentDirectory
-      void $ Blockchain.insertBlockchain globalConn currPath . EC.peerId . EC.ethUniqueId $ ec
       $logInfoS "ethconf/Create Database" . T.pack $ CL.yellow db
       $logInfoLS "ethconf/Create Database" rawConn
       let query = T.pack $ "CREATE DATABASE " ++ show db ++ ";"

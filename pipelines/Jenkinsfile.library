@@ -1267,17 +1267,15 @@ def runSyncTester() {
   sh '''#!/usr/bin/env bash
   counter=0
   # make sure started syncing (have 1+ active connections to peers)
-  ETH_DB_NAME=$(sudo docker exec strato-postgres-1 psql -U postgres -t -c "select datname from pg_database where datname like '%eth_%';" | tr -d "[:space:]")
-  NUM_ACTIVE_PEERS=$(sudo docker exec strato-postgres-1 psql -U postgres -t -d $ETH_DB_NAME -c "select count(ip) from p_peer where active_state > 0;" | tr -d "[:space:]")
-  until [[ -n $ETH_DB_NAME && $NUM_ACTIVE_PEERS -gt 0 ]]
+  NUM_ACTIVE_PEERS=$(sudo docker exec strato-postgres-1 psql -U postgres -t -d eth -c "select count(ip) from p_peer where active_state > 0;" | tr -d "[:space:]")
+  until [[ $NUM_ACTIVE_PEERS -gt 0 ]]
   do
       if (( $counter >= 120 )) ; then
           echo "Failure: STRATO node did not connect to any peers in 2 minutes. Something is preventing sync from starting"
           exit 3
       fi
       sleep 1
-      ETH_DB_NAME=$(sudo docker exec strato-postgres-1 psql -U postgres -t -c "select datname from pg_database where datname like '%eth_%';" | tr -d "[:space:]")
-      NUM_ACTIVE_PEERS=$(sudo docker exec strato-postgres-1 psql -U postgres -t -d $ETH_DB_NAME -c "select count(ip) from p_peer where active_state > 0;" | tr -d "[:space:]")
+      NUM_ACTIVE_PEERS=$(sudo docker exec strato-postgres-1 psql -U postgres -t -d eth -c "select count(ip) from p_peer where active_state > 0;" | tr -d "[:space:]")
       counter=$((++counter))
   done
 

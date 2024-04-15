@@ -120,12 +120,6 @@ cradle:
     - path: "core/blockapps-data/src/"
       component: "blockapps-data:lib"
 
-    - path: "core/blockapps-data/exec_src/GlobalDB.hs"
-      component: "blockapps-data:exe:global-db"
-
-    - path: "core/blockapps-data/exec_src/Paths_blockapps_data.hs"
-      component: "blockapps-data:exe:global-db"
-
     - path: "core/blockapps-data/test/"
       component: "blockapps-data:test:blockapps-data-test"
 
