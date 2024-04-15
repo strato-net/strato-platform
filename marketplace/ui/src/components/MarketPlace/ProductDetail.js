@@ -142,8 +142,6 @@ const ProductDetails = ({ user, users }) => {
   }, [marketplaceDispatch, cartList]);
 
   const details = inventoryDetails;
-  console.log("details", details)
-  console.log("inventory Ownership", inventoryOwnershipHistory)
 
   useEffect(() => {
     if (categorys.length && details) {
