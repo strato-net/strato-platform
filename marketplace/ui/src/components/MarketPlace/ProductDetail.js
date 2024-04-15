@@ -48,6 +48,7 @@ import PreviewMode from "../RichEditor/PreviewMode";
 import PriceChartAndStats from "./PriceChartAndStats";
 import Statistics from "./Statistics";
 import TimeRangeTabs from "./TimeRangeTabs";
+import OwnershipHistoryTable from "./OwnershipHistoryTable";
 
 const ProductDetails = ({ user, users }) => {
   const { state, pathname } = useLocation();
@@ -663,16 +664,9 @@ const ProductDetails = ({ user, users }) => {
                       key: "2",
                       children: user ? (
                         <div>
-                          <DataTableComponent
+                          <OwnershipHistoryTable
                             columns={ownershipDetailColumn}
-                            scrollX="100%"
-                            data={inventoryOwnershipHistory}
-                            isLoading={isInventoryOwnershipHistoryLoading}
-                            pagination={{
-                              defaultPageSize: 10,
-                              position: ["bottomCenter"],
-                              showSizeChanger: false,
-                            }}
+                            tableData={inventoryOwnershipHistory}
                           />
                         </div>
                       ) : (

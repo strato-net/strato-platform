@@ -6,7 +6,7 @@ const OwnershipHistoryTable = ({ tableData, columns }) => {
 
   const tabItems = Object.keys(tableData).map((address, index) => ({
     key: String(index + 1), // Ensure the key is a string
-    label: `Asset ${index + 1}`, // You can replace this with any label you prefer
+    label: `Item ${index + 1}`, // You can replace this with any label you prefer
     children: (
       <div>
         <DataTableComponent
