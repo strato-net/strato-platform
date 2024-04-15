@@ -155,13 +155,14 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
         let assetsToUpdate = inventory.groupedAssets.filter(asset => asset.saleAddress);
         if (assetsToUpdate.length > 0) {
             // If there are assets with a saleAddress, prepare the body for update
+            
             let body = {
                 paymentProviders: paymentProviderAddress ? [paymentProviderAddress] : [],
                 price: pricePerUnit,
                 quantity: quantity,
                 assets: assetsToUpdate.map(asset => ({
                     saleAddress: asset.saleAddress,
-                    saleQuantity: asset.saleQuantity, 
+                    saleQuantity: asset.quantity, 
                 })),
             };
     
