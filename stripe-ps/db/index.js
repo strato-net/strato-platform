@@ -5,7 +5,9 @@ import {fileURLToPath} from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const DBSOURCE = process.env.DOCKERIZED === "true" ? "/sqlitedb/db.sqlite" : "db.sqlite";
+const DBSOURCE = process.env.TEST_DB && process.env.TEST_DB === "false" ?
+    (process.env.DOCKERIZED === "true" ? "/sqlitedb/db.sqlite" : "db.sqlite")
+    : "test_db.sqlite";
 
 const db = new sqlite3.Database(path.resolve(__dirname, DBSOURCE), (err) => {
     if (err) {
@@ -28,7 +30,7 @@ const db = new sqlite3.Database(path.resolve(__dirname, DBSOURCE), (err) => {
             )`,
         (err) => {
             if (err) {
-                // Table already created
+                console.log('Customer address table already exists. Skipping table creation...')
             }
         });  
     }
