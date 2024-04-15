@@ -30,10 +30,23 @@ describe('Stripe Endpoint Tests', function() {
     expect(res.statusCode).toBe(200);
   });
 
+  it('Should not be able to onboard with invalid accountId', async () => {
+    const res = await request(app)
+      .get('/stripe/onboard/fake_account')
+      .set('referer', marketplaceUrl);
+    expect(res.statusCode).toBe(400);
+  });
+
   it('Check the status of a Stripe account', async () => {
     const res = await request(app)
       .get(`/stripe/status/${testAccountId}`);
     expect(res.statusCode).toBe(200);
+  });
+
+  it('Should not be able to check the status of an invalid accountId', async () => {
+    const res = await request(app)
+      .get('/stripe/status/fake_account');
+    expect(res.statusCode).toBe(403);
   });
 
   it('Checkout endpoint should return checkout url', async () => {
@@ -64,6 +77,28 @@ describe('Stripe Endpoint Tests', function() {
         accountId: testAccountId 
       });
     expect(res.statusCode).toBe(200);
+  });
+
+  it('Should return an error when trying to checkout with malformed data', async () => {
+    const res = await request(app)
+      .post('/stripe/checkout')
+      .set('referer', marketplaceUrl)
+      .send({ 
+        paymentTypes: ['card', 'us_bank_account']
+      });
+    expect(res.statusCode).toBe(500);
+  });
+
+  it('Should return an error when requesting session with invalid info', async () => {
+    const res = await request(app)
+      .get('/stripe/session/fake_session/fake_account');
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('Should return an error when requesting intent with invalid info', async () => {
+    const res = await request(app)
+      .get('/stripe/intent/fake_session/fake_account');
+    expect(res.statusCode).toBe(403);
   });
 
   if (testSellerId && testSessionId) {

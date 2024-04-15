@@ -25,30 +25,62 @@ describe('Customer Address Database Tests', function () {
         addressLine2: '',
         country: 'USA'
       });
-    console.log(res.body);
     expect(res.statusCode).toBe(200);
+    expect(res.body).toStrictEqual({ message: 'success', id: 1 });
   });
 
-  it('Able to retrieve all address for a given common name', async () => {
+  it('Should not add an address that is malformed', async () => {
     const res = await request(app)
-      .get(`/customer/address/Test`);
-    console.log(res.body);
-    expect(res.statusCode).toBe(200);
+      .post('/customer/address')
+      .send({
+        name: 'BlockApps',
+        zipcode: '11206',
+        state: 'NY',
+        city: 'Brooklyn'
+      });
+    expect(res.statusCode).toBe(500);
   });
 
   it('Able to retrieve an address given the addressId', async () => {
     const res = await request(app)
       .get('/customer/address/id/1');
-    console.log(res.body);
     expect(res.statusCode).toBe(200);
+    expect(res.body.data).not.toBeNull();
+  });
+
+  it('Should return no address given an addressId that does not exist', async () => {
+    const res = await request(app)
+      .get('/customer/address/id/100');
+    expect(res.statusCode).toBe(200);
+    expect(res.body.data).toBeNull();
+  });
+
+  it('Able to retrieve all address for a given common name', async () => {
+    const res = await request(app)
+      .get(`/customer/address/Test`);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+  });
+
+  it('Should return an empty list for a user with no addresses', async () => {
+    const res = await request(app)
+      .get(`/customer/address/Homeless`);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.data).toHaveLength(0);
   });
   
   it('Able to delete created addresses given an addressId', async () => {
     const res = await request(app)
       .delete('/customer/address/id/1');
-    console.log(res.body);
     expect(res.statusCode).toBe(200);
+    expect(res.body.changes).toBe(1);
+  });
 
+  it('Cannot delete an address for which its addressId does not exist', async () => {
+    const res = await request(app)
+      .delete('/customer/address/id/100');
+    expect(res.statusCode).toBe(200);
+    expect(res.body.changes).toBe(0);
   });
 
   afterAll(() => {

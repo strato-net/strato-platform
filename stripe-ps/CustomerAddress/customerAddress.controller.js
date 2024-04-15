@@ -39,7 +39,7 @@ class CustomerAddressController {
         }
         res.status(200).json({
           'message': 'success',
-          'data': row ? row : [],
+          'data': row ? row : null,
         });
         return next();
       });
