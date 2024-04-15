@@ -105,12 +105,6 @@ cradle:
     - path: "api/ethereum-jsonrpc/src/Paths_ethereum_jsonrpc.hs"
       component: "ethereum-jsonrpc:exe:ethereum-jsonrpc"
 
-    - path: "api/strato-api/exec_src/PostRawTransaction.hs"
-      component: "strato-api:exe:post-raw-transaction"
-
-    - path: "api/strato-api/exec_src/Options.hs"
-      component: "strato-api:exe:post-raw-transaction"
-
     - path: "api/strato-api/exec_src/Main.hs"
       component: "strato-api:exe:strato-api"
 
