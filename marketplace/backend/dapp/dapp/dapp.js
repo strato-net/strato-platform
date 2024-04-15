@@ -224,8 +224,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getInventories = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
-    const inventories = await inventoryJs.getAll(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
-    const inventoryCount = await inventoryJs.inventoryCount(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
+    const inventories = await inventoryJs.getAll(rawAdmin, { ...args, ownerCommonName: userCommonName, sort: '-createdDate' }, getOptions);
+    const inventoryCount = await inventoryJs.inventoryCount(rawAdmin, { ...args, ownerCommonName: userCommonName, sort: '-createdDate' }, getOptions);
     return { inventories: inventories, inventoryCount: inventoryCount }
   };
 
@@ -299,11 +299,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getMarketplaceInventoriesLoggedIn = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
-    let usersArr = constants.baUserNames.filter(user => user !== userCert.commonName)
+    let usersArr = constants.baUserNames.filter(user => user !== userCommonName)
     const newArgs = { ...args, ownerCommonName: usersArr }
     const all = await marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
 
-    const newArgs1 = { ...args, notEqualsField: ['ownerCommonName', 'sale'], notEqualsValue: [[userCert.commonName, ...constants.baUserNames], constants.zeroAddress] }
+    const newArgs1 = { ...args, notEqualsField: ['ownerCommonName', 'sale'], notEqualsValue: [[userCommonName, ...constants.baUserNames], constants.zeroAddress] }
     const all2 = await marketplaceJs.getAll(rawAdmin, newArgs1, getOptions);
     return {inventoryResults: all.inventoryResults.concat(all2.inventoryResults), inventoryCount: all.inventoryCount + all2.inventoryCount};
   };
@@ -318,7 +318,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const getOptions = { ...options, app: contractName }
     const newArgs = {
       ...args, notEqualsField: ['sale', 'ownerCommonName'],
-      notEqualsValue: [constants.zeroAddress, userCert.commonName], 
+      notEqualsValue: [constants.zeroAddress, userCommonName], 
     }
     return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions)
   }
@@ -780,7 +780,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const getOptions = { ...options, app: contractName };
       let userStripeAccount, connectLink;
       // get user paymentProvider details from cirrus
-      const sellerStripeDetails = await paymentProviderJs.get(rawAdmin, { name: 'STRIPE', accountDeauthorized: false, ownerCommonName: userCert.commonName }, getOptions)
+      const sellerStripeDetails = await paymentProviderJs.get(rawAdmin, { name: 'STRIPE', accountDeauthorized: false, ownerCommonName: userCommonName }, getOptions)
       if (sellerStripeDetails.length == 0 || Object.keys(sellerStripeDetails[0]).length == 0) {
         await axios.get(new URL('/stripe/onboard', STRIPE_PAYMENT_SERVER_URL).href)
           .then(async function (res) {
@@ -924,7 +924,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const sellerName = assets[0].ownerCommonName;
       for (const currInventory of assets) {
 
-        if (currInventory.ownerCommonName == userCert.commonName) {
+        if (currInventory.ownerCommonName == userCommonName) {
           throw new rest.RestError(RestStatus.BAD_REQUEST, "Seller cannot buy his own product",);
         }
 
@@ -1065,7 +1065,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.createUserAddress = async function (args, options = defaultOptions) {
     try {
-      await axios.post(new URL(`/customer/address`, STRIPE_PAYMENT_SERVER_URL).href, { commonName: userCert.commonName, ...args })
+      await axios.post(new URL(`/customer/address`, STRIPE_PAYMENT_SERVER_URL).href, { commonName: userCommonName, ...args })
         .then(function (res) {
           if (res.status === 200) {
             console.log(res.data);
@@ -1084,7 +1084,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getAllUserAddress = async function (args, options = optionsNoChainIds) {
     try {
-      const userAddresses = await axios.get(new URL(`/customer/address/${userCert.commonName}`, STRIPE_PAYMENT_SERVER_URL).href).then(function (res) {
+      const userAddresses = await axios.get(new URL(`/customer/address/${userCommonName}`, STRIPE_PAYMENT_SERVER_URL).href).then(function (res) {
         if (res.status === 200) {
           return res.data.data;
         } else {
