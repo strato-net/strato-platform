@@ -63,7 +63,6 @@ data Options
   | Hash {hash :: String}
   | InsertTX {}
   | Migrate {tables :: String}
-  | Psql {}
   | PushBlocks {startBlock :: Integer, endBlock :: Integer, qOrg :: String, qOrgUnit :: String, qCommonName :: String}
   | Raw {filename :: String}
   | RawMP {stateRoot :: String, filename :: String}
@@ -84,9 +83,7 @@ stateOptions :: Annotate Ann
 stateOptions =
   record
     State {root = undefined}
-    [ 
-      root := def += typ "StateRoot" += argPos 0
-    ]
+    [ root := def += typ "StateRoot" += argPos 0 ]
 
 dumpRedisOptions :: Annotate Ann
 dumpRedisOptions =
@@ -195,10 +192,6 @@ dumpKafkaStateDiffOptions =
     DumpKafkaStateDiff {startingBlock = undefined}
     [ startingBlock := 0 += typ "INT"
     ]
-
-psqlOptions :: Annotate Ann
-psqlOptions =
-  record Psql {} []
 
 insertTXOptions :: Annotate Ann
 insertTXOptions =
@@ -387,7 +380,6 @@ options =
       redisMatchOptions,
       rlpOptions,
       migrateOptions,
-      psqlOptions,
       pushOptions,
       stateOptions,
       txOptions,
@@ -451,7 +443,6 @@ run RedisMatch {..} = redisMatch $ BC.pack pattern
 run RLP {..} = RLP.doit filename
 run RawMP {..} = RawMP.doit filename (MP.StateRoot . LabeledError.b16Decode "strato-cli/RawMP" $ BC.pack stateRoot)
 run FRawMP {..} = FRawMP.doit filename (MP.StateRoot . LabeledError.b16Decode "strato-cli/FRawMP" $ BC.pack stateRoot)
-run Psql {} = psql
 run PushBlocks {..} =
   let i = CommonName (T.pack qOrg) (T.pack qOrgUnit) (T.pack qCommonName) True
    in insertP2P (P2pPushBlocks startBlock endBlock i)
