@@ -299,9 +299,9 @@ const UserProfile = ({user}) => {
 
   return (
     
-    <div className="container mx-auto p-6">
+    <div className="container mx-auto">
         {/* Bread Crumb Navigation */}
-      <div className="px-0 md:px-5 lg:py-1 lg:mt-3 orders">
+      <div className="px-6 md:px-5 lg:py-1 lg:mt-3 orders">
         <Breadcrumb>
           {breadcrumbs.map((breadcrumb, index) => {
             const isLast = index === breadcrumbs.length - 1;
@@ -328,7 +328,7 @@ const UserProfile = ({user}) => {
 
       
       {/* User Cover */}
-      <div className="relative mb-6">
+      <div className="relative mb-6 px-6">
         <img 
           className="w-full h-36 sm:h-52 md:h-60 lg:h-68 object-cover rounded-lg" 
           src={Images.blockapps_cover} 

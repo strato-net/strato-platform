@@ -254,18 +254,18 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
     <div className=" p-3 md:p-[18px] border border-[#BABABA] md:border-[#E9E9E9] rounded-lg sm:w-[343px] md:w-full  ">
       <div className="bg-[#F2F2F9] rounded-md px-[14px] flex flex-col justify-between items-center pb-[13px] pt-2 w-full">
         <div className="w-full">
-          <div className="flex justify-between w-full space-x-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 w-full auto-cols-max">
             <p className="text-lg lg:text-xl font-semibold text-[#202020] cursor-default" onClick={callDetailPage}>
               <Tooltip title={inventory?.name.length > 20 ? inventory?.name : null}>
                 <span className=" whitespace-nowrap max-w-[160px] inline-block">
-                  {inventory?.name.length > 20 ? `${inventory?.name.slice(0, 15)}...` : `${inventory?.name}`}
+                  {inventory?.name.length > 20 ? `${inventory?.name.slice(0, 17)}...` : `${inventory?.name}`}
                 </span>
               </Tooltip>
             </p>
-            <div className="flex space-x-2">
-              <Typography className="pt-1">{`(${getCategory()})`}</Typography>
+            <div className="flex space-x-2 lg:justify-self-end">
+              <Typography className="lg:pt-1">{`(${getCategory()})`}</Typography>
               {inventory?.contract_name.toLowerCase().includes("clothing") && (
-                <Typography className='pt-1'>{'Size: ' + inventory?.data?.size || "N/A"}</Typography>
+                <Typography className='lg:pt-1'>{'Size: ' + inventory?.data?.size || "N/A"}</Typography>
               )}
             </div>
           </div>
