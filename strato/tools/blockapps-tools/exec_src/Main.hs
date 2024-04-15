@@ -40,14 +40,16 @@ import System.Console.CmdArgs
 import System.Process
 
 data Options
-  = State {root :: String, db :: String}
-  | Hash {hash :: String, db :: String}
-  | Code {hash :: String, db :: String}
-  | RawMP {stateRoot :: String, filename :: String}
-  | FRawMP {stateRoot :: String, filename :: String}
-  | Raw {filename :: String}
-  | RLP {filename :: String}
+  = AddTx {txJson :: String}
+  | AddBlocksFromFile {fileName :: String}
+  | AddGenesisFromFile {fileName :: String}
+  | AddTxsFromFile {fileName :: String}
+  | AskForBlocks {startBlock :: Integer, endBlock :: Integer, qOrg :: String, qOrgUnit :: String, qCommonName :: String}
+  | AskForTxs
+  | ChainHash
   | Checkpoints {service :: CheckpointService, operation :: CheckpointOperation, offset :: Maybe Int64, cp :: Maybe String}
+  | Code {hash :: String}
+  | DeleteDepBlock {valK :: String}
   | DumpKafkaBlocks {startingBlock :: Int}
   | DumpKafkaVMEvents {startingBlock :: Int}
   | DumpKafkaSequencer {startingBlock :: Int}
@@ -57,36 +59,33 @@ data Options
   | DumpKafkaRaw {streamName :: String, startingBlock :: Int}
   | DumpKafkaStateDiff {startingBlock :: Int}
   | DumpRedis {databaseNumber :: Integer}
-  | Psql {}
+  | FRawMP {stateRoot :: String, filename :: String}
+  | Hash {hash :: String}
   | InsertTX {}
-  | AskForBlocks {startBlock :: Integer, endBlock :: Integer, qOrg :: String, qOrgUnit :: String, qCommonName :: String}
+  | Migrate {tables :: String}
+  | Psql {}
   | PushBlocks {startBlock :: Integer, endBlock :: Integer, qOrg :: String, qOrgUnit :: String, qCommonName :: String}
-  | AskForTxs
+  | Raw {filename :: String}
+  | RawMP {stateRoot :: String, filename :: String}
+  | RLP {filename :: String}
   | Redis {key :: String}
   | RedisMatch {pattern :: String}
-  | Migrate {tables :: String}
-  | AddTx {txJson :: String}
-  | AddBlocksFromFile {fileName :: String}
-  | AddGenesisFromFile {fileName :: String}
-  | AddTxsFromFile {fileName :: String}
+  | SetParticipationMode {mode :: ParticipationMode}
+  | State {root :: String}
+  | ValidatorBehavior {valB :: Bool}
+  | GetPrivacy {registry :: String, key :: String}
+  | PutPrivacy {registry :: String, key :: String, value :: String}
   | SaveKafka {topic :: String, filename :: String}
   | LoadKafka {topic :: String, filename :: String}
   | VerifyKafkaFile {filename :: String}
-  | SetParticipationMode {mode :: ParticipationMode}
-  | ChainHash
-  | GetPrivacy {registry :: String, key :: String}
-  | PutPrivacy {registry :: String, key :: String, value :: String}
-  | ValidatorBehavior {valB :: Bool}
-  | DeleteDepBlock {valK :: String}
   deriving (Show, Data, Typeable)
 
 stateOptions :: Annotate Ann
 stateOptions =
   record
-    State {root = undefined, db = undefined}
+    State {root = undefined}
     [ 
-      db := def += typ "DBSTRING" += argPos 0,
-      root := def += typ "StateRoot" += argPos 1
+      root := def += typ "StateRoot" += argPos 0
     ]
 
 dumpRedisOptions :: Annotate Ann
@@ -99,17 +98,15 @@ dumpRedisOptions =
 hashOptions :: Annotate Ann
 hashOptions =
   record
-    Hash {hash = undefined, db = undefined}
-    [ hash := def += typ "FILENAME" += argPos 1 += opt ("-" :: String),
-      db := def += typ "DBSTRING" += argPos 0
+    Hash {hash = undefined}
+    [ hash := def += typ "FILENAME" += argPos 0 += opt ("-" :: String)
     ]
 
 codeOptions :: Annotate Ann
 codeOptions =
   record
-    Code {hash = undefined, db = undefined}
-    [ hash := def += typ "USERAGENT" += argPos 1,
-      db := def += typ "DBSTRING" += argPos 0
+    Code {hash = undefined}
+    [ hash := def += typ "USERAGENT" += argPos 0
     ]
 
 rawOptions :: Annotate Ann
@@ -407,27 +404,36 @@ options =
 
 main :: IO ()
 main = do
-  
-  opts <- cmdArgs_ options
-  run' opts
-
--------------------
-run' :: Options -> IO ()
-run' o = do
+  -- the tools should use /tmp/.ethereumH/ to access levelDB data 
+  -- while avoiding the LOCK while the node is running
   let (cmd, args') = ("cp", ["-r", "/var/lib/strato/.ethereumH/", "/tmp/.ethereumH/"])
   (_, _, _, processHandle) <- createProcess (proc cmd args')
   _ <- waitForProcess processHandle
-  run o
+  opts <- cmdArgs_ options
+  run opts
+
 
 run :: Options -> IO ()
-run State {..} = let sr = MP.StateRoot $ LabeledError.b16Decode "queryStrato/run" $ BC.pack root in State.doit db sr
-run DumpRedis {..} = dumpRedis databaseNumber
-run Hash {..} = Hash.doit db hash
-run Code {..} = Code.doit db hash
-run Raw {..} = Raw.doit filename
-run RLP {..} = RLP.doit filename
-run RawMP {..} = RawMP.doit filename (MP.StateRoot . LabeledError.b16Decode "queryStrato/RawMP" $ BC.pack stateRoot)
-run FRawMP {..} = FRawMP.doit filename (MP.StateRoot . LabeledError.b16Decode "queryStrato/FRawMP" $ BC.pack stateRoot)
+run AddTx {..} = addTx txJson
+run AddBlocksFromFile {..} = addBlocksFromFile fileName
+run AddGenesisFromFile {..} = addGenesisFromFile fileName
+run AddTxsFromFile {..} = addTxsFromFile fileName
+run AskForBlocks {..} =
+  let i = CommonName (T.pack qOrg) (T.pack qOrgUnit) (T.pack qCommonName) True
+   in insertP2P (P2pAskForBlocks startBlock endBlock i)
+run AskForTxs =
+  insertP2P . P2pGetTx
+    . map (unsafeCreateKeccak256FromByteString . LabeledError.b16Decode "strato-cli/askForTxs")
+    . filter (not . B.null)
+    . BC.split '\n'
+    =<< B.getContents
+run ChainHash = chainHash
+run Checkpoints {..} = case operation of
+  Get -> doCheckpointGet service
+  Put -> doCheckpointPut service (fromIntegral <$> offset) cp
+  NullOperation -> doCheckpointUsage
+run Code {..} = Code.doit hash
+run DeleteDepBlock {..} = deleteDepBlock valK
 run DumpKafkaSequencer {..} = dumpKafkaSequencer (fromIntegral startingBlock)
 run DumpKafkaSequencerVM {..} = dumpKafkaSequencerVM (fromIntegral startingBlock)
 run DumpKafkaSequencerP2P {..} = dumpKafkaSequencerP2P (fromIntegral startingBlock)
@@ -436,37 +442,25 @@ run DumpKafkaBlocks {..} = dumpKafkaBlocks (fromIntegral startingBlock)
 run DumpKafkaVMEvents {..} = dumpKafkaVMEvents (fromIntegral startingBlock)
 run DumpKafkaRaw {..} = dumpKafkaRaw streamName (fromIntegral startingBlock)
 run DumpKafkaStateDiff {..} = dumpKafkaStateDiff $ fromIntegral startingBlock
-run Psql {} = psql
+run DumpRedis {..} = dumpRedis databaseNumber
 run InsertTX {} = insertTX
-run ValidatorBehavior {..} = validatorBehavior valB
-run DeleteDepBlock {..} = deleteDepBlock valK
-run Checkpoints {..} = case operation of
-  Get -> doCheckpointGet service
-  Put -> doCheckpointPut service (fromIntegral <$> offset) cp
-  NullOperation -> doCheckpointUsage
-run AskForBlocks {..} =
-  let i = CommonName (T.pack qOrg) (T.pack qOrgUnit) (T.pack qCommonName) True
-   in insertP2P (P2pAskForBlocks startBlock endBlock i)
+run Hash {..} = Hash.doit hash
+run Raw {..} = Raw.doit filename
+run Redis {..} = redis $ BC.pack key
+run RedisMatch {..} = redisMatch $ BC.pack pattern
+run RLP {..} = RLP.doit filename
+run RawMP {..} = RawMP.doit filename (MP.StateRoot . LabeledError.b16Decode "strato-cli/RawMP" $ BC.pack stateRoot)
+run FRawMP {..} = FRawMP.doit filename (MP.StateRoot . LabeledError.b16Decode "strato-cli/FRawMP" $ BC.pack stateRoot)
+run Psql {} = psql
 run PushBlocks {..} =
   let i = CommonName (T.pack qOrg) (T.pack qOrgUnit) (T.pack qCommonName) True
    in insertP2P (P2pPushBlocks startBlock endBlock i)
-run AskForTxs =
-  insertP2P . P2pGetTx
-    . map (unsafeCreateKeccak256FromByteString . LabeledError.b16Decode "queryStrato/run")
-    . filter (not . B.null)
-    . BC.split '\n'
-    =<< B.getContents
-run Redis {..} = redis $ BC.pack key
-run RedisMatch {..} = redisMatch $ BC.pack pattern
+run SetParticipationMode {..} = remoteSetParticipationMode mode
+run State {..} = let sr = MP.StateRoot $ LabeledError.b16Decode "strato-cli/state" $ BC.pack root in State.doit sr
+run ValidatorBehavior {..} = validatorBehavior valB
 run Migrate {..} = migrate tables
-run AddTx {..} = addTx txJson
-run AddBlocksFromFile {..} = addBlocksFromFile fileName
-run AddGenesisFromFile {..} = addGenesisFromFile fileName
-run AddTxsFromFile {..} = addTxsFromFile fileName
 run SaveKafka {..} = saveKafka topic filename
 run LoadKafka {..} = loadKafka topic filename
 run VerifyKafkaFile {..} = verifyKafkaFile filename
-run SetParticipationMode {..} = remoteSetParticipationMode mode
-run ChainHash = chainHash
 run GetPrivacy {..} = putStrLn =<< getPrivacy registry key True
 run PutPrivacy {..} = putStrLn =<< putPrivacy registry key value True

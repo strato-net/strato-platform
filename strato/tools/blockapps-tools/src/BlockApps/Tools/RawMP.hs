@@ -3,7 +3,6 @@
 module BlockApps.Tools.RawMP (doit) where
 
 import Blockchain.Data.RLP
-import Blockchain.Data.AddressStateDB (AddressState(..))
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import Control.Monad.IO.Class
@@ -14,7 +13,7 @@ import Text.Format
 
 formatKV :: (N.NibbleString, RLPObject) -> String
 formatKV (key, val) =
-  format key ++ ":\n  " ++ format ((rlpDecode :: RLPObject -> AddressState) $ rlpDeserialize $ rlpDecode val)
+  format key ++ ":\n  " ++ format (rlpDeserialize $ rlpDecode val)
 
 showVals :: MonadIO m => DB.DB -> MP.StateRoot -> m ()
 showVals sdb sr = do
@@ -26,6 +25,6 @@ doit :: String -> MP.StateRoot -> IO ()
 doit filename sr = DB.runResourceT $ do
   sdb <-
     DB.open
-      filename
+      ("/tmp/.ethereumH/" ++ filename) 
       DB.defaultOptions {DB.cacheSize = 1024}
   showVals sdb sr
