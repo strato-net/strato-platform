@@ -1472,4 +1472,32 @@ def spinUpIdentityServer(rootCert, rootPriv) {
   sh './check_availability_identity.sh'
 }
 
+def replaceServerPortsDocker() {
+  writeFile file: "replace_server_ports_docker.sh", text: '''#!/bin/bash
+    if [ -z "$1" ]; then
+      echo "Please provide the path to your docker-compose file as an argument."
+      exit 1
+    fi
+
+    if [ -z "$2" ]; then
+      echo "Please provide the path to your docker-compose file as an argument."
+      exit 1
+    fi
+
+    sed -i "s/-443/-44300/" $1
+    sed -i "s/-80/-8081/" $1
+
+    sed -i "s/-443/-44301/" $2
+    sed -i "s/-80/-8082/" $2
+
+    if [ $? -ne 0 ]; then
+      echo "Error occurred while modifying the file."
+      exit 1
+    fi
+  '''
+
+  sh 'chmod +x replace_server_ports_docker.sh'
+  sh './replace_server_ports_docker.sh docker-compose.highway.yml docker-compose.stripe-ps.yml'
+}
+
 return this

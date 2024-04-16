@@ -81,48 +81,9 @@ pipeline {
           sh 'cp /home/ubuntu/letsencrypt-ssl/server.key ssl/private/'
           script {
             lib.spinUpVault()
-          }
-
-          writeFile file: "replace_server_ports_docker.sh", text: '''#!/bin/bash
-            if [ -z "$1" ]; then
-              echo "Please provide the path to your docker-compose file as an argument."
-              exit 1
-            fi
-
-            if [ -z "$2" ]; then
-              echo "Please provide the path to your docker-compose file as an argument."
-              exit 1
-            fi
-
-            sed -i "s/-443/-44300/" $1
-            sed -i "s/-80/-8081/" $1
-
-            sed -i "s/-443/-44301/" $2
-            sed -i "s/-80/-8082/" $2
-
-            if [ $? -ne 0 ]; then
-              echo "Error occurred while modifying the file."
-              exit 1
-            fi
-          '''
-
-          sh 'chmod +x replace_server_ports_docker.sh'
-          sh './replace_server_ports_docker.sh docker-compose.highway.yml docker-compose.stripe-ps.yml'
-
-          // Run fileserver
-          script {
+            lib.replace_server_ports_docker()
             lib.spinUpFileServer()
-          }
-
-          // Run payment server
-          script {
             lib.spinUpPaymentServer()
-          }
-
-          // Run identity server
-          // sh 'cp ../strato/tools/x509-generator/rootCert.pem identity-provider/certs/.'
-          // sh 'cp ../strato/tools/x509-generator/rootPriv.pem identity-provider/certs/.'
-          script {
             lib.spinUpIdentityServer("${env.WORKSPACE}/strato/tools/x509-generator/rootCert.pem", "${env.WORKSPACE}/strato/tools/x509-generator/rootPriv.pem")
           }
 
