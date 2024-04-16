@@ -140,8 +140,6 @@ const actions = {
     dispatch,
     categorys,
     subCategorys,
-    // products,
-    // manufacturers,
     minPrice,
     maxPrice,
     search,
@@ -155,11 +153,6 @@ const actions = {
       ? `&subCategory[]=${subCategorys}`
       : "";
 
-    // const manufacturerQuery = manufacturers
-    //   ? `&manufacturer[]=${manufacturers}`
-    //   : "";
-
-    // const productIdQuery = products ? `&name[]=${products}` : "";
     const searchQuery = search
       ? `&queryValue=${search}&queryFields=name`
       : "";
@@ -205,8 +198,6 @@ const actions = {
     dispatch,
     categorys,
     subCategorys,
-    // products,
-    // manufacturers,
     minPrice,
     maxPrice,
     search,
@@ -220,11 +211,6 @@ const actions = {
       ? `&subCategory[]=${subCategorys}`
       : "";
 
-    // const manufacturerQuery = manufacturers
-    //   ? `&manufacturer[]=${manufacturers}`
-    //   : "";
-
-    // const productIdQuery = products ? `&name[]=${products}` : "";
     const priceQuery = `&range[]=price,${minPrice},${maxPrice}`;
     // const sortLatest = "&order=createdDate.desc"
     const searchQuery = search
@@ -493,7 +479,6 @@ const actions = {
       dispatch({ type: actionDescriptors.fetchStratsBalanceFailed, payload: "Error while fetching STRATS" });
     }
   },
-
 
 };
 

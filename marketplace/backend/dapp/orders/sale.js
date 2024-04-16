@@ -168,7 +168,6 @@ async function getAll(admin, args = {}, defaultOptions) {
     const options = { ...defaultOptions, org: 'BlockApps' }
     let sales;
     if (assetAddresses) {
-        // console.log("")
         sales = await searchAllWithQueryArgs(contractName, {
             assetToBeSold: assetAddresses,
             gtField: saleGtField,

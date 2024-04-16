@@ -93,7 +93,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
       role: 0,
       items: [
         { label: <div id="Orders">Orders</div>, key: '0' },
-        { label: <div id="Inventory">My Store</div>, key: '1' }
+        { label: <div id="Inventory">My Items</div>, key: '1' }
       ]
     },
     {
@@ -104,7 +104,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
 
   const navUrls = [
     routes.Orders.url.replace(':type', 'sold'),
-    routes.MyStore.url,
+    routes.MyItems.url,
     routes.Products.url,
     routes.Events.url,
   ];
@@ -128,7 +128,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     let pathName = window.location.pathname;
     if (pathName.includes("/order") || pathName.includes("/orders") || pathName.includes('sold-orders') || pathName.includes('bought-orders')) {
       setSelectedTab("1");
-    } else if (pathName.includes("/mystore")) {
+    } else if (pathName.includes("/myitems")) {
       setSelectedTab("2");
     } else if (pathName.includes("/products")) {
       setSelectedTab("3");
@@ -224,7 +224,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
 
   const subMenuItems = [
     { value: "orders", path: routes.Orders.url.replace(':type', 'sold'), label: "Orders" },
-    { value: "mystore", path: "/mystore", label: "My Store" },
+    { value: "myitems", path: "/myitems", label: "My Items" },
     user ? {
       value: "my-profile",
       path: routes.MarketplaceUserProfile.url.replace(':commonName', user.commonName),
@@ -455,7 +455,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
           <div className="bg-white border-t border-[#E9E9E9] absolute w-full z-50 md:hidden top-16">
             {subMenuItems.map((item) => 
                 <Typography onClick={() => handleIntMenuTab(item)} className={`text-base py-3 px-4 cursor-pointer ${item ? '' : 'hidden'}`} >{item?.label}</Typography>
-             )}
+            )}
           </div>
           <div className="h-[100vh] w-full bg-[#00000020] absolute top-0 md:hidden z-40" onClick={handleMenuTab}></div>
         </div>
