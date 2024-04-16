@@ -388,7 +388,7 @@ const UserProfile = ({user}) => {
      <Tabs
         defaultActiveKey={activeTab}
         onChange={handleTabSelect}
-        className="p-3 ml-6 mr-6 mb-6"
+        className="p-3 mx-1 lg:mx-6 mb-6"
       >
 
 
