@@ -329,7 +329,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         paymentProviders: args.paymentProviders,
         price: args.price,
         assetToBeSold: asset.assetToBeSold,
-        quantity: asset.saleQuantity,
+        quantity: asset.quantity,
       };
       return inventoryJs.uploadSaleContract(rawAdmin, callArgs, options);
     });
