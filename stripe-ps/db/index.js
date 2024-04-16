@@ -41,7 +41,8 @@ if (process.env.POSTGRESQL_SERVER_URL && process.env.POSTGRESQL_PASSWORD) {
             console.error('Error creating table:', error);
         })
 } else {
-    console.error('Missing server URL or password');
+    console.error('CRITICAL ERROR: Missing Postgres URL and/or password');
+    process.exit(1)
 }
 
 module.exports = client;
