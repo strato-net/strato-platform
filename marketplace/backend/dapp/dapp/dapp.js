@@ -1104,7 +1104,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
       }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching addresses: ${JSON.stringify(err)} `);
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching addresses: ${JSON.stringify(error)} `);
     }
   };
 
