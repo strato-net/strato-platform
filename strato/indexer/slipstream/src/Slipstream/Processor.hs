@@ -51,7 +51,7 @@ import Data.Foldable (toList)
 import Data.Function
 import Data.IORef
 import qualified Data.Map.Ordered as OMap
-import Data.List (foldl', sortOn)
+import Data.List (foldl', sortOn, sortBy)
 import qualified Data.Map as Map
 import Data.Maybe
 import Data.Ord (Down (..))
@@ -251,6 +251,13 @@ getMapNamesFromContract c =
       listOfMappingsWithRecords = filter (\(_, vd) -> _isRecord vd) listOfMappings
    in T.pack . fst <$> listOfMappingsWithRecords
 
+compareSpecial :: (ProcessedContract, T.Text, TableColumns) -> (ProcessedContract, T.Text, TableColumns) -> Ordering
+compareSpecial (_, t1, _) (_, t2, _) 
+    | t1 == specialText && t2 /= specialText = LT
+    | t2 == specialText && t1 /= specialText = GT
+    | otherwise = EQ
+    where specialText = T.pack "BlockApps-Mercata-Sale"
+
 processTheMessages ::
   ( MonadLogger m,
     HasSQL m,
@@ -309,9 +316,8 @@ processTheMessages env conn messages = do
 
             deferredForeignKeys <- case (_contractType c) of
               AbstractType -> do
-                _ <- outputData conn $ createExpandAbstractTable g c nameParts abstracts' cc
+                outputData conn $ createExpandAbstractTable g c nameParts abstracts' cc
                 -- $logInfoS "processTheMessages/deferredForeignKeys/abstractfkeys" $ T.pack $ show abstractfkeys
-                return []
               _ -> do
                 indexfkeys <- outputData conn $ createExpandIndexTable g c nameParts
                 $logInfoS "processTheMessages/deferredForeignKeys/indexfkeys" $ T.pack $ show indexfkeys
@@ -407,11 +413,19 @@ processTheMessages env conn messages = do
 
   forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
 
+  outputData conn $ insertBegin
+  
   forM_ insertsByCodeHash $ \ins -> do
     outputData conn $ insertIndexTable $ indexInsert ins
     outputData conn $ insertHistoryTable $ historyInserts ins
     unless ((length (mappingInserts ins) < 1)) $ outputData conn $ insertMappingTable $ mappingInserts ins
-    outputData conn $ insertAbstractTable $ abstractInsert ins
+
+  unless (null insertsByCodeHash) $ do
+    let allAbstractInserts = concatMap abstractInsert insertsByCodeHash
+        sortedAbstractInserts = sortBy compareSpecial allAbstractInserts
+    outputData conn $ insertBegin
+    outputData conn $ insertAbstractTable $ sortedAbstractInserts
+    outputData conn $ insertCommit
 
   forM_ insertsByCodeHash $ \ins -> do
     insertForeignKeys conn $ indexInsert ins
