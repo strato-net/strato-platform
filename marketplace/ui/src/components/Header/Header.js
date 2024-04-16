@@ -243,8 +243,14 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
 
 
   const handleIntMenuTab = (data) => {
-    data.value == 'logout' ? logout() : data.value == 'orders' ? navigate(routes.Orders.url.replace(':type', 'sold'), { state: { defaultKey: "Sold" } }) : navigate(data.path)
-    handleMenuTab(data)
+    if (roleIndex === 1) {
+      // User is not logged in
+      data.value == 'orders' ? setSelectedTab(0) : setSelectedTab(1)
+      setIsModalVisible(true);
+    } else {
+      data.value == 'logout' ? logout() : data.value == 'orders' ? navigate(routes.Orders.url.replace(':type', 'sold'), { state: { defaultKey: "Sold" } }) : navigate(data.path)
+      handleMenuTab(data)
+    }
   }
 
   const handleSearchShow = (status) => {
@@ -356,7 +362,6 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
             setSelectedTab(item.key)
             if (roleIndex === 1) {
               // User is not logged in
-              console.log(navUrls[selectedTab])
               setIsModalVisible(true);
             } else {
               // These pages will be tracked automatically with lucky orange, no need to create an event here unluess we want to include additional metadata
