@@ -210,7 +210,7 @@ const metaImg = category ? category : SEO.IMAGE_META
             </Breadcrumb.Item>
             <Breadcrumb.Item>
               <p className="text-sm text-[#202020] font-medium">
-                My Store
+                My Items
               </p>
             </Breadcrumb.Item>
           </Breadcrumb>
@@ -221,7 +221,7 @@ const metaImg = category ? category : SEO.IMAGE_META
               icon={<img src={Images.ForwardIcon} 
               alt={metaImg} 
               title={metaImg}
-              className="hidden md:block w-6 h-6" />}> Inventory
+              className="hidden md:block w-6 h-6" />}> My Items
               </Button>
             </div>
             <div className="flex gap-3">
@@ -262,7 +262,7 @@ const metaImg = category ? category : SEO.IMAGE_META
                     alt={metaImg}
                     title={metaImg}
                     className="w-[18px] h-[18px]" />
-                    Create Inventory
+                    Create Item
                   </div>
                 </Button>
               </Tooltip>
@@ -271,7 +271,7 @@ const metaImg = category ? category : SEO.IMAGE_META
           <div className="pt-6 mx-6 md:mx-5 md:px-10 mb-5 ">
           <Tabs
             defaultActiveKey={category ? category : "All"}
-            className="store"
+            className="items"
             onChange={(key) => handleTabSelect(key)}
             items={[
               {
