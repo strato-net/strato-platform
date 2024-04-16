@@ -9,7 +9,7 @@ class MarketplaceController {
       const { dapp, query } = req
       const {soldOut, forSale , ...restQuery} =  query  
       const limit = parseInt(req.headers['limit']) || 10; 
-      const offset = parseInt(req.headers['offset']) || 0;
+      const offset = (parseInt(req.headers['offset']) - 1 || 0) * limit;
 
       const inventories = await dapp.getMarketplaceInventories({ ...restQuery })
       let finalInventory = MarketplaceController.getFinalInventory(inventories, forSale, soldOut)
@@ -31,7 +31,7 @@ class MarketplaceController {
       const { dapp, query } = req
       const {soldOut, forSale , ...restQuery} =  query 
       const limit = parseInt(req.headers['limit']) || 10; 
-      const offset = parseInt(req.headers['offset']) || 0;
+      const offset = (parseInt(req.headers['offset']) - 1 || 0) * limit;
       const inventories = await dapp.getMarketplaceInventoriesLoggedIn({ ...restQuery })
       let finalInventory = MarketplaceController.getFinalInventory(inventories, forSale, soldOut)
       
