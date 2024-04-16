@@ -76,7 +76,7 @@ const CategoryProductList = ({ user }) => {
   let { hasChecked, isAuthenticated } = useAuthenticateState();
   const { cartList } = useMarketplaceState();
   const [scrollPosition, setScrollPosition] = useState(0);
-  const [offset, setOffset] = useState(0);
+  const [offset, setOffset] = useState(1);
   const [limit, setLimit] = useState(10)
   const isLoading = isMarketplaceLoading;
 
@@ -248,6 +248,7 @@ const CategoryProductList = ({ user }) => {
     }
   }
 
+  console.log("offset", offset)
   const checkValues = (e, arr) => {
     let tempValues = [...arr];
     const existingIndex = tempValues.indexOf(e.target.value);
