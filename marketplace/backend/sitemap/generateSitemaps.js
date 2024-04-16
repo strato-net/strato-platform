@@ -36,8 +36,8 @@ async function fetchInventories() {
       throw new Error('Invalid response or missing data fields');
     }
 
-    const data = res.data.productsWithImageUrl.map((item, index) => ({
-      url: `/dp/${item.address}/${item.name}`,
+    const data = res.data.productsWithImageUrl.map(({address,name}, index) => ({
+      url: `/dp/${address}/${name.replace(/[%,\/\\]/g, '-')}`,
       changefreq: "daily",
       priority: 0.5,
       lastmod: new Date().toISOString(),
@@ -56,12 +56,12 @@ async function generateXML(urls) {
      xmlns:xhtml="http://www.w3.org/1999/xhtml"
      xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
      xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
-     ${urls.map(url => `
+     ${urls.map(({url, lastmod, changefreq, priority}) => `
      <url>
-       <loc>${escapeXML(serverHost + url.url)}</loc>
-       <lastmod>${escapeXML(url.lastmod)}</lastmod>
-       <changefreq>${escapeXML(url.changefreq)}</changefreq>
-       <priority>${escapeXML(url.priority.toString())}</priority>
+       <loc>${escapeXML(serverHost + url)}</loc>
+       <lastmod>${escapeXML(lastmod)}</lastmod>
+       <changefreq>${escapeXML(changefreq)}</changefreq>
+       <priority>${escapeXML(priority.toString())}</priority>
      </url>`).join('\n')}
      </urlset>`;
 
@@ -85,7 +85,6 @@ async function generateSitemap() {
   try {
     const siteMapArr = await fetchInventories();
     const xmlContent = await generateXML(siteMapArr);
-    // const writeStream = createWriteStream('../ui/public/sitemap.xml');
     const writeStream = createWriteStream('./public/sitemap.xml');
 
     writeStream.on('error', err => {

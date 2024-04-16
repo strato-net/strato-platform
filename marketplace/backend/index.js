@@ -16,7 +16,7 @@ import swaggerSpecs from "./swaggerspecs";
 import dotenv from "dotenv";
 import websocket from "./websocket";
 import axios from "axios";
-import { syncStatus } from "./helpers/syncStatus";
+import { cronSyncCall } from "./helpers/cronSyncCall";
 import cronFunc from "./cron";
 const isLocalHost = config.serverHost === constants.localHost;
 
@@ -79,7 +79,7 @@ let server
   if (isLocalHost) {
     cronFunc();
  } else {
-    syncStatus();
+    cronSyncCall();
  }
 
 })();

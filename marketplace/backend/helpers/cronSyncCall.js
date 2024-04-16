@@ -3,7 +3,7 @@ import config from "../load.config";
 import oauthHelper from "./oauthHelper";
 import axios from "axios";
 
-export const syncStatus = async () => {
+export const cronSyncCall = async () => {
   try {
     const token = await oauthHelper.getServiceToken();
     const url = config.serverHost;
@@ -15,7 +15,7 @@ export const syncStatus = async () => {
     });
 
     if (!syncResponse.data.isSynced) {
-      setTimeout(syncStatus, 30 * 60 * 1000);
+      setTimeout(cronSyncCall, 5 * 60 * 1000);
     }else{
       cronFunc()
     }
