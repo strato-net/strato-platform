@@ -2355,6 +2355,18 @@ evaluateAccountMember a _ "balance" = do
   case bal of
     Just as -> return $ Constant $ SInteger $ addressStateBalance as
     _ -> return $ Constant $ SInteger 0
+evaluateAccountMember a _ "issuer" = do
+  cid <- case (a ^. namedAccountChainId) of
+    UnspecifiedChain -> do
+      cid1 <- view accountChainId <$> getCurrentAccount
+      case cid1 of
+        Nothing -> return Nothing
+        Just cid2 -> return $ Just cid2
+    MainChain -> return Nothing
+    ExplicitChain cid -> return $ Just cid
+  let realAccount = namedAccountToAccount cid a
+  issuer <- getCreator realAccount
+  return $ Constant $ SString $ issuer
 evaluateAccountMember a _ "chainId" = do
   case (a ^. namedAccountChainId) of
     UnspecifiedChain -> do
