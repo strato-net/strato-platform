@@ -10,57 +10,65 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
     return <div className="h-full bg-gray-200 animate-pulse"></div>;
   }
 
-  // Helper function to fill gaps in the data
   const fillDataGaps = (records) => {
     const filledData = [];
     let lastKnownPrice = null;
-
-    records.forEach((record, index) => {
-      // Parse the date and price
-      const isoDate = record.block_timestamp.replace(' UTC', 'Z');
+  
+    for (let i = 0; i < records.length; i++) {
+      const currentRecord = records[i];
+      const isoDate = currentRecord.block_timestamp.replace(' UTC', 'Z');
       const date = dayjs(isoDate).utc();
-      const price = record.price;
-
-      // If this is the first record, set the last known price
-      if (index === 0) {
+      const price = currentRecord.price;
+  
+      // Set the last known price if it's null (first iteration) or update it to the current record's price
+      if (lastKnownPrice === null || price !== lastKnownPrice) {
         lastKnownPrice = price;
       }
-
-      // Push the current record
+  
+      // Push the current record with the last known price
       filledData.push({
         x: date.valueOf(),
-        y: price,
+        y: lastKnownPrice,
       });
-
-      // If there's a next record, fill the gap between the current and the next record
-      if (index < records.length - 1) {
-        const nextIsoDate = records[index + 1].block_timestamp.replace(' UTC', 'Z');
+  
+      // If this is not the last record, fill the gap until the next record's date
+      if (i < records.length - 1) {
+        const nextIsoDate = records[i + 1].block_timestamp.replace(' UTC', 'Z');
         const nextDate = dayjs(nextIsoDate).utc();
         let currentDate = date.add(1, 'day');
-
-        // Fill in the gaps
+  
+        // Fill in the gaps with the last known price
         while (currentDate.isBefore(nextDate, 'day')) {
           filledData.push({
             x: currentDate.valueOf(),
-            y: lastKnownPrice,
+            y: lastKnownPrice, // Use the last known price instead of resetting it to the first record's price
           });
           currentDate = currentDate.add(1, 'day');
         }
       }
-
-      // Update the last known price
-      lastKnownPrice = price;
-    });
-
+    }
+  
+    // Fill the gap until the current date with the last known price
+    let currentDate = dayjs(filledData[filledData.length - 1].x).add(1, 'day');
+    const today = dayjs().utc().endOf('day');
+    while (currentDate.isBefore(today, 'day')) {
+      filledData.push({
+        x: currentDate.valueOf(),
+        y: lastKnownPrice,
+      });
+      currentDate = currentDate.add(1, 'day');
+    }
+  
     return filledData;
   };
+  
 
   // Fill in the gaps in the original records
   const filledSeriesData = fillDataGaps(priceHistory.originRecords);
 
   const series = [
     {
-      name: 'Origin Price',
+      name: 'Sale Price',
       data: filledSeriesData,
     },
   ];
