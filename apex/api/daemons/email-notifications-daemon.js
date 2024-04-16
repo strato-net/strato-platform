@@ -18,12 +18,11 @@ if (!process.env['ADMIN_EMAIL']) {
   emailer = require('../lib/emailer')
 }
 
-let ACTIVE_EMAIL_WARNING_FLAG = false
-
-// DAEMON - query network-health-check every N sec
-winston.info('Starting email-notifications-daemon with a delay of', config.emailNotifications.nodeHealthGracePeriod);
+let ACTIVE_EMAIL_WARNING_FLAG = false;
 
 (async () => {
+  winston.info(`Starting email-notifications-daemon with a delay ${config.emailNotifications.nodeHealthGracePeriod}ms and poll frequency ${config.emailNotifications.pollFrequency}ms`);
+  await new Promise(r => setTimeout(r, config.emailNotifications.nodeHealthGracePeriod));
   await singleCheck()
   setInterval(async () => {
     await singleCheck()
@@ -40,7 +39,7 @@ async function singleCheck() {
   }
 }
 async function executeCheck() {
-  let health = null;
+  let health = true;
   try {
     const [healthInfo, stallInfo, systemInfo, syncInfo] =
         await utils.getLatestHealth();
@@ -53,22 +52,21 @@ async function executeCheck() {
           syncInfo
       ));
     } else {
-      winston.warn(`Health table has no entries; Health endpoint is called too soon`);
+      winston.warn(`Health table has no entries yet; Health endpoint is called too early. Wait until the next iteration.`);
     }
   } catch (error) {
     winston.error(`Error occurred while trying to collect health info: ` + error.message ? error.message : error)
   }
-  
-  winston.warn('No logic implemented here yet. Health is: ', health)
   if (!health) {
     if (!ACTIVE_EMAIL_WARNING_FLAG) {
+      // There will only be 1 attempt to send an email because we raise the flag here. This is to avoid spamming the SMTP server with new failing attempts.
       ACTIVE_EMAIL_WARNING_FLAG = true
-      winston.warn(`Active email warning flag raised. Attempting to send an email...`);
+      winston.warn(`Node appears to require admin's attention. Active email warning flag raised. Attempting to send an email...`);
       const _ = await emailer.sendEmail(
           to=process.env['ADMIN_EMAIL'], 
-          subject="STRATO Mercata node is unhealthy",
-          text=`Your STRATO Mercata node is unhealthy or has warnings: [${healthIssues}]. Please visit Dashboard at '/dashboard' and '/apex-api/status' endpoint (requires the dashboard authentication first) for more information.`,
-          html=`<p>Your STRATO Mercata node is unhealthy or has warnings:<br/>[${healthIssues}]<br/>Please visit Dashboard at '/dashboard' and '/apex-api/status' endpoint (requires the dashboard authentication first) for more information.</p>`
+          subject="STRATO Mercata node requires attention",
+          text=`Your STRATO Mercata node is unhealthy or has warnings. ${healthIssues}. Please visit Dashboard at '/dashboard' and '/apex-api/status' endpoint (requires the dashboard authentication first) for more information.`,
+          html=`<p>Your STRATO Mercata node is unhealthy or has warnings.<br/>${healthIssues}.<br/>Please visit Dashboard at '/dashboard' and '/apex-api/status' endpoint (requires the dashboard authentication first) for more information.</p>`
       )
       winston.warn(`Email notification about node health was successfully sent to ${process.env['ADMIN_EMAIL']}`)
       // 

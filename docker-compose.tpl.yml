@@ -41,12 +41,14 @@ services:
     - prometheus
     - strato
     environment:
+    - ADMIN_EMAIL=${ADMIN_EMAIL}
     - NODE_HOST=${NODE_HOST}
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
     - postgres_user=postgres
     - PROMETHEUS_HOST=${PROMETHEUS_HOST}
+    - SENDGRID_API_KEY=${SENDGRID_API_KEY}
     - STRATO_HOSTNAME=${STRATO_HOSTNAME}
     - STRATO_PORT_API=${STRATO_PORT_API}
     - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
