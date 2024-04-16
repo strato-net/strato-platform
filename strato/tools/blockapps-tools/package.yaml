@@ -61,7 +61,7 @@ library:
     - vm-tools
 
 executables:
-  strato-cli:
+  strato-barometer:
     source-dirs: exec_src/
     main: Main.hs
     other-modules: []

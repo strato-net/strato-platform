@@ -231,8 +231,8 @@ pushOptions =
       qCommonName := "" += typ "STRING" += explicit += name "commonName"
     ]
 
-txOptions :: Annotate Ann
-txOptions = record AskForTxs []
+askForTxOptions :: Annotate Ann
+askForTxOptions = record AskForTxs []
 
 redisOptions :: Annotate Ann
 redisOptions =
@@ -359,6 +359,7 @@ options =
       addTxsFromFileOptions,
       addTxOptions,
       askOptions,
+      askForTxOptions,
       chainHashOptions,
       checkpointOptions,
       codeOptions,
@@ -382,7 +383,6 @@ options =
       migrateOptions,
       pushOptions,
       stateOptions,
-      txOptions,
       validatorBehaviorOptions,
       deleteDepBlockOptions,
       saveKafkaOptions,
@@ -415,7 +415,7 @@ run AskForBlocks {..} =
    in insertP2P (P2pAskForBlocks startBlock endBlock i)
 run AskForTxs =
   insertP2P . P2pGetTx
-    . map (unsafeCreateKeccak256FromByteString . LabeledError.b16Decode "strato-cli/askForTxs")
+    . map (unsafeCreateKeccak256FromByteString . LabeledError.b16Decode "strato-barometer/askForTxs")
     . filter (not . B.null)
     . BC.split '\n'
     =<< B.getContents
@@ -441,13 +441,13 @@ run Raw {..} = Raw.doit filename
 run Redis {..} = redis $ BC.pack key
 run RedisMatch {..} = redisMatch $ BC.pack pattern
 run RLP {..} = RLP.doit filename
-run RawMP {..} = RawMP.doit filename (MP.StateRoot . LabeledError.b16Decode "strato-cli/RawMP" $ BC.pack stateRoot)
-run FRawMP {..} = FRawMP.doit filename (MP.StateRoot . LabeledError.b16Decode "strato-cli/FRawMP" $ BC.pack stateRoot)
+run RawMP {..} = RawMP.doit filename (MP.StateRoot . LabeledError.b16Decode "strato-barometer/RawMP" $ BC.pack stateRoot)
+run FRawMP {..} = FRawMP.doit filename (MP.StateRoot . LabeledError.b16Decode "strato-barometer/FRawMP" $ BC.pack stateRoot)
 run PushBlocks {..} =
   let i = CommonName (T.pack qOrg) (T.pack qOrgUnit) (T.pack qCommonName) True
    in insertP2P (P2pPushBlocks startBlock endBlock i)
 run SetParticipationMode {..} = remoteSetParticipationMode mode
-run State {..} = let sr = MP.StateRoot $ LabeledError.b16Decode "strato-cli/state" $ BC.pack root in State.doit sr
+run State {..} = let sr = MP.StateRoot $ LabeledError.b16Decode "strato-barometer/state" $ BC.pack root in State.doit sr
 run ValidatorBehavior {..} = validatorBehavior valB
 run Migrate {..} = migrate tables
 run SaveKafka {..} = saveKafka topic filename

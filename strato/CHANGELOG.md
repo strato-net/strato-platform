@@ -20,8 +20,8 @@ so that they could be properly moved to their respective version's subsection.
 - POST `/transaction` allows users to create contracts by providing an address through the `codePtr` field
 
 ### Changed
-- `queryStrato` is now `strato-cli`
-- `strato-cli` commands point to a copy of `./ethereumH` to access LevelDB data
+- `queryStrato` is now `strato-barometer`
+- `strato-barometer` commands point to a copy of `./ethereumH` to access LevelDB data
 
 ### Fixed
 
