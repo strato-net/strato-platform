@@ -1386,8 +1386,8 @@ def spinUpPaymentServer() {
   withCredentials([
     string(credentialsId: 'STRIPE_PUBLISHABLE_KEY_TESTNET2', variable:'STRIPE_PUBLISHABLE_KEY_TESTNET2'),
     string(credentialsId: 'STRIPE_SECRET_KEY_TESTNET2', variable:'STRIPE_SECRET_KEY_TESTNET2'),
-    usernamePassword(credentialsId: 'postgresql-user', passwordVariable: 'POSTGRES_PASSWORD', usernameVariable: 'POSTGRES_USER'),
-    string(credentialsId: 'PAYMENT_SERVER_URL', variable:'PAYMENT_SERVER_URL'),
+    usernamePassword(credentialsId: 'AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV', passwordVariable: 'AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV_PASSWORD', usernameVariable: 'AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV_USER'),
+    string(credentialsId: 'AWS_RDS_PAYMENT_SERVER_URL_DEV', variable:'AWS_RDS_PAYMENT_SERVER_URL_DEV'),
   ]) {
     writeFile file: "run-stripe-ps.sh", text: """#!/bin/bash
       sudo \\
@@ -1395,10 +1395,10 @@ def spinUpPaymentServer() {
         STRIPE_SECRET_KEY='${STRIPE_SECRET_KEY_TESTNET2}' \\
         ssl=true \\
         HTTPS_PORT=44301 \\
-        POSTGRESQL_SERVER_URL='${PAYMENT_SERVER_URL}' \\
+        POSTGRESQL_SERVER_URL='${AWS_RDS_PAYMENT_SERVER_URL_DEV}' \\
         POSTGRESQL_PORT=5432 \\
-        POSTGRESQL_USER='${POSTGRES_USER}' \\
-        POSTGRESQL_PASSWORD='${POSTGRES_PASSWORD}' \\
+        POSTGRESQL_USER='${AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV_USER}' \\
+        POSTGRESQL_PASSWORD='${AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV_PASSWORD}' \\
         POSTGRESQL_DBNAME=postgres \\
         ./stripe-ps
     """
