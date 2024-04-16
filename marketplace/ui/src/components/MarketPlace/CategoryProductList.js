@@ -511,10 +511,7 @@ const AvailabilityFilter = () =>
         {BreadCrumbComponent()}
         <div className="flex justify-between items-center ml-4 px-2 mt-2 md:ml-14 md:hidden">
           <div className="flex items-center">
-          <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
-          <Text className="text-gray-800 ml-1 text-sm font-normal">
-            {marketplaceListCount} Results
-          </Text>
+
           </div>
           <div className="border border-solid border-[#6A6A6A] rounded-md cursor-pointer p-1 md:p-2" onClick={handleFilterClick}>
             <img src={Images.filter} alt={metaImg}
@@ -529,12 +526,6 @@ const AvailabilityFilter = () =>
 
           {/* Product list section */}
           <div className="mb-12 w-full">
-            <div className="hidden md:flex mt-4 items-center">
-              <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
-              <Text className="text-gray-800 ml-1 text-xl font-semibold">
-                {isLoading ? <Spin spinning={isLoading} size="small" /> : marketplaceListCount} Results
-              </Text>
-            </div>
             {isLoading ?
               <div className="h-96 w-full flex justify-center items-center">
                 <Spin spinning={isLoading} size="large" />
