@@ -1796,6 +1796,9 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   (hsh, cc) <- getCurrentCodeCollection
   newAddress <- getNewAddress creator
   issuer <- getCreator creator
+  $logDebugS "DEBUG:expToVar'/creator" $ T.pack $ (show creator)
+  $logDebugS "DEBUG:expToVar'/issuer" $ T.pack $ (show issuer)
+  $logDebugS "DEBUG:expToVar'/ro" $ T.pack $ (show ro)
   execResults <- create' creator issuer newAddress hsh cc contractName' args False
   return $
     Constant $
