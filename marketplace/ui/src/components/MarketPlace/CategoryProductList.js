@@ -9,6 +9,7 @@ import {
   InputNumber,
   Space,
   Avatar,
+  Pagination,
   notification,
 } from "antd";
 import { CloseOutlined, DeleteOutlined } from "@ant-design/icons";
@@ -70,12 +71,13 @@ const CategoryProductList = ({ user }) => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const orderDispatch = useOrderDispatch();
   // states
-  const { marketplaceList, isMarketplaceLoading } = useMarketplaceState();
+  const { marketplaceList, marketplaceListCount, isMarketplaceLoading } = useMarketplaceState();
   const { categorys } = useCategoryState();
   let { hasChecked, isAuthenticated } = useAuthenticateState();
   const { cartList } = useMarketplaceState();
   const [scrollPosition, setScrollPosition] = useState(0);
-
+  const [offset, setOffset] = useState(0);
+  const [limit, setLimit] = useState(10)
   const isLoading = isMarketplaceLoading;
 
   useEffect(() => {
@@ -143,7 +145,9 @@ const CategoryProductList = ({ user }) => {
         minPrice,
         maxPrice,
         searchQueryValue,
-        availabilityFilter
+        availabilityFilter,
+        offset, 
+        limit
       );
     } else if (hasChecked && isAuthenticated) {
       marketplaceActions.fetchMarketplaceLoggedIn(
@@ -153,7 +157,9 @@ const CategoryProductList = ({ user }) => {
         minPrice,
         maxPrice,
         searchQueryValue,
-        availabilityFilter
+        availabilityFilter,
+        offset,
+        limit
       );
     }
   }, [
@@ -164,7 +170,9 @@ const CategoryProductList = ({ user }) => {
     hasChecked,
     isAuthenticated,
     searchQueryValue,
-    selectedAvailability
+    selectedAvailability,
+    offset,
+    limit
   ]);
 
 
@@ -261,7 +269,7 @@ const CategoryProductList = ({ user }) => {
   const onChangeAvailability = (checkedValues) =>{
     setSelectedAvailability(checkedValues);
   }
-
+  console.log("offset", offset)
   const addItemToCart = async (product, quantity) => {
     if (product.ownerCommonName === user?.commonName) {
       openToast("bottom", true, "Cannot buy your own item");
@@ -505,7 +513,7 @@ const AvailabilityFilter = () =>
           <div className="flex items-center">
           <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
           <Text className="text-gray-800 ml-1 text-sm font-normal">
-            {marketplaceList?.length} Results
+            {marketplaceListCount} Results
           </Text>
           </div>
           <div className="border border-solid border-[#6A6A6A] rounded-md cursor-pointer p-1 md:p-2" onClick={handleFilterClick}>
@@ -524,7 +532,7 @@ const AvailabilityFilter = () =>
             <div className="hidden md:flex mt-4 items-center">
               <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
               <Text className="text-gray-800 ml-1 text-xl font-semibold">
-                {isLoading ? <Spin spinning={isLoading} size="small" /> : marketplaceList?.length} Results
+                {isLoading ? <Spin spinning={isLoading} size="small" /> : marketplaceListCount} Results
               </Text>
             </div>
             {isLoading ?
@@ -533,7 +541,7 @@ const AvailabilityFilter = () =>
               </div>
               :
               <div>
-                {marketplaceList?.length > 0 ? (
+                {marketplaceListCount > 0 ? (
 
                   <div className={`mt-[61px] md:mt-4 mb-8 flex w-full md:grid flex-col items-center ${desktopOpenFilter ? "grid-cols-1 gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 4xl:grid-cols-5 lg:gap-14 xl:gap-x-10 2xl:gap-x-20" : " sm:grid-cols-1 gap-4 md:grid-cols-2 md:gap-14 lg:grid-cols-3 lg:gap-16 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 5xl:grid-cols-7"}`} id="product-list">
                     {marketplaceList
@@ -561,6 +569,7 @@ const AvailabilityFilter = () =>
                 )}
               </div>
             }
+            <Pagination onChange={(page, pageSize)=> setOffset(page) & setLimit(pageSize)} total={marketplaceListCount} size="default" />
           </div>
         </div>
 
