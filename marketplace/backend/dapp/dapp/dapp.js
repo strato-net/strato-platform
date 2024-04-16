@@ -427,8 +427,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         const lastKnownRecord = originRecords[originRecords.length - 1];
         const currentDateTime = dayjs().utc().format('YYYY-MM-DD HH:mm:ss') + ' UTC';
         originRecords.push({
-          block_timestamp: currentDateTime,
-          price: lastKnownRecord.price
+          price: lastKnownRecord.price,
+          block_timestamp: currentDateTime
         });
       }          
       
