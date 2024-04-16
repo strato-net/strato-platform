@@ -560,7 +560,12 @@ const AvailabilityFilter = () =>
                 )}
               </div>
             }
-            <Pagination onChange={(page, pageSize)=> setOffset(page) & setLimit(pageSize)} total={marketplaceListCount} size="default" />
+            <Pagination 
+              onChange={(page, pageSize)=> setOffset(page) & setLimit(pageSize)} 
+              total={marketplaceListCount} 
+              size="default" 
+              showTotal={(total) => `Total ${total} items`}
+            />
           </div>
         </div>
 
