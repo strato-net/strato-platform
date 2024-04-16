@@ -1423,7 +1423,9 @@ def spinUpPaymentServer() {
   sh './check_availability_payment.sh'
 }
 
-def spinUpIdentityServer() {
+def spinUpIdentityServer(rootCert, rootPriv) {
+  sh "cp ${rootCert} identity-provider/certs/."
+  sh "cp ${rootPriv} identity-provider/certs/."
   withCredentials([
     string(credentialsId: 'SENDGRID_APIKEY_TESTNET2', variable:'SENDGRID_APIKEY_TESTNET2'),
     usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID')
@@ -1468,6 +1470,34 @@ def spinUpIdentityServer() {
   '''
   sh 'chmod +x check_availability_identity.sh'
   sh './check_availability_identity.sh'
+}
+
+def replaceServerPortsDocker() {
+  writeFile file: "replace_server_ports_docker.sh", text: '''#!/bin/bash
+    if [ -z "$1" ]; then
+      echo "Please provide the path to your docker-compose file as an argument."
+      exit 1
+    fi
+
+    if [ -z "$2" ]; then
+      echo "Please provide the path to your docker-compose file as an argument."
+      exit 1
+    fi
+
+    sed -i "s/-443/-44300/" $1
+    sed -i "s/-80/-8081/" $1
+
+    sed -i "s/-443/-44301/" $2
+    sed -i "s/-80/-8082/" $2
+
+    if [ $? -ne 0 ]; then
+      echo "Error occurred while modifying the file."
+      exit 1
+    fi
+  '''
+
+  sh 'chmod +x replace_server_ports_docker.sh'
+  sh './replace_server_ports_docker.sh docker-compose.highway.yml docker-compose.stripe-ps.yml'
 }
 
 return this
