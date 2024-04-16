@@ -178,7 +178,7 @@ async function checkNodeSyncStallStatus(syncStat) {
 async function getStratoMetadata() {
   const options = {
     method: "GET",
-    url: `http://strato:3000/eth/v1.2/metadata`,
+    url: `http://${process.env['STRATO_HOSTNAME']}:${process.env['STRATO_PORT_API']}/eth/v1.2/metadata`,
     followRedirects: false,
     timeout: config.healthCheck.requestTimeout - 100,
     json: true,
