@@ -61,7 +61,7 @@ pipeline {
 
           script {
             lib.spinUpVault()
-            lib.replace_server_ports_docker()
+            lib.replaceServerPortsDocker()
             lib.spinUpFileServer()
             lib.spinUpPaymentServer()
             lib.spinUpIdentityServer("${env.WORKSPACE}/strato/tools/x509-generator/rootCert.pem", "${env.WORKSPACE}/strato/tools/x509-generator/rootPriv.pem")
