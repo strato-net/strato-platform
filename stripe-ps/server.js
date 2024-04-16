@@ -1,6 +1,5 @@
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const dayjs = require('dayjs');
 const express = require('express');
 const expressWinston = require('express-winston');
 const helmet = require('helmet');
