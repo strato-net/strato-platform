@@ -327,7 +327,13 @@ const ProductDetails = ({ user, users }) => {
     return parts[parts.length - 1];
   };
 
-  const isAvailableForSale = (!details?.saleQuantity || details?.saleQuantity==0) 
+  let isAvailableForSale = (!details?.saleQuantity && details?.saleQuantity === 0) 
+  if (state.isCalledFromInventory) {
+    let assets = state.groupedAssets;
+    let isGroupSoldOut = assets.some((asset)=> asset.saleQuantity > 0)
+    if (isGroupSoldOut) isAvailableForSale = false
+    else isAvailableForSale = true
+  }
   function getCategoryName(str) {
     const lastIndex = str.lastIndexOf('-');
     if (lastIndex !== -1) {
