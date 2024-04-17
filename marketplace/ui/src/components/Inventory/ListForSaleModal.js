@@ -148,63 +148,78 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
         return parts[parts.length - 1];
     };
 
-    const handleSubmit = async () => {
+    async function handleSubmit() {
         let totalQuantityToBeListed = quantity;
         let quantityAllocated = 0;
-        // Check if it's an update scenario based on presence of saleAddress in inventory
+    
+        // Filter assets that have a saleAddress
         let assetsToUpdate = inventory.groupedAssets.filter(asset => asset.saleAddress);
+    
+        // Calculate quantity from assets with a saleAddress
+        quantityAllocated = assetsToUpdate.reduce((sum, asset) => sum + asset.quantity, 0);
+        let promises = [];
+
+        // If there are assets with saleAddress, prepare update and potential listing
         if (assetsToUpdate.length > 0) {
-            // If there are assets with a saleAddress, prepare the body for update
-            
-            let body = {
+            let updateBody = {
                 paymentProviders: paymentProviderAddress ? [paymentProviderAddress] : [],
                 price: pricePerUnit,
-                quantity: quantity,
+                quantity: totalQuantityToBeListed,
                 assets: assetsToUpdate.map(asset => ({
                     saleAddress: asset.saleAddress,
-                    saleQuantity: asset.quantity, 
+                    saleQuantity: asset.quantity,
                 })),
             };
     
-            // Call updateSale with the constructed body
-            const isDone = await actions.updateSale(inventoryDispatch, body);
-            if (isDone) {
-                // Handle successful update
-                await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
-                handleCancel();
-            }
-        } else {
-            // Listing scenario: Handle listing each asset until reaching the desired total quantity
+            // Store the promise for updating sales
+            promises.push(actions.updateSale(inventoryDispatch, updateBody));
+        }
+    
+        // Calculate remaining quantity to be listed
+        let remainingQuantity = totalQuantityToBeListed - quantityAllocated;
+    
+        // If we still have more we need to list of if there are no saleAddresses we can call the listInventory function
+        if (remainingQuantity > 0 || assetsToUpdate.length === 0) {
             let assetsToList = inventory.groupedAssets.reduce((acc, asset) => {
-                if (quantityAllocated < totalQuantityToBeListed) {
+                if (quantityAllocated < totalQuantityToBeListed && (!asset.saleAddress || assetsToUpdate.length === 0)) {
                     let quantityForThisAsset = Math.min(asset.quantity, totalQuantityToBeListed - quantityAllocated);
                     quantityAllocated += quantityForThisAsset;
     
-                    acc.push({
-                        assetToBeSold: asset.address,
-                        quantity: quantityForThisAsset,
-                    });
+                    if (quantityForThisAsset > 0) {
+                        acc.push({
+                            assetToBeSold: asset.address,
+                            quantity: quantityForThisAsset,
+                        });
+                    }
                 }
                 return acc;
             }, []);
     
             if (assetsToList.length > 0) {
-                let body = {
+                let listBody = {
                     paymentProviders: paymentProviderAddress ? [paymentProviderAddress] : [],
                     price: pricePerUnit,
                     assets: assetsToList,
                 };
     
-                // Call listInventory with the constructed body
-                const isDone = await actions.listInventory(inventoryDispatch, body);
-                if (isDone) {
-                    // Handle successful listing
-                    await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
-                    handleCancel();
-                }
+                // Store the promise for listing inventory
+                promises.push(actions.listInventory(inventoryDispatch, listBody));
             }
         }
-    };
+    
+        // Wait for all promises to complete before fetching inventory
+        Promise.all(promises).then(results => {
+            if (results.some(result => result === true)) {
+                actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName).then(() => {
+                    handleCancel();
+                }, error => {
+                    console.error("Failed to fetch inventory:", error);
+                });
+            } else {
+                handleCancel();
+            }
+        });
+    }
     
     
     
