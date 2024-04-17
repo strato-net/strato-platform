@@ -239,15 +239,34 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
     }
   };
 
-  /*
-                      <div
-                        className="flex items-center mt-2 cursor-pointer"
-                        onClick={showEditModal}
-                      >
-                        <FormOutlined />
-                        <p className="ml-3">Edit Inventory</p>
-                      </div>
-  */
+  /**
+   * Determines if the Edit or Sell button should be disabled.
+   * 
+   * The button is disabled if:
+   * - No payment provider address is set, meaning no transactions can be processed.
+   * - The item is categorized as "Carbon Offset" and either:
+   *   - isMint is not set to "True", or
+   *   - isMint is missing, which means the item isn't allowed to be minted.
+   * 
+   * @returns {boolean} True if the button should be disabled, false otherwise.
+   */
+  function isEditSellDisabled() {
+    return !paymentProviderAddress || (getCategory() === "Carbon Offset" && !(itemData.isMint && itemData.isMint === "True"));
+  }
+
+  /**
+   * Determines if the Transfer button should be disabled.
+   * 
+   * The button is disabled if any of the following conditions are true:
+   * - inventory.quantity is not set or is zero, meaning there is nothing to transfer.
+   * - inventory.saleAddress is set but inventory.saleQuantity is not greater than zero, indicating
+   *   there are no available items left to transfer that are not already committed to a sale.
+   * 
+   * @returns {boolean} True if the button should be disabled, false otherwise.
+   */
+  function isTransferDisabled() {
+    return !(inventory.quantity && parseInt(inventory.quantity) > 0 && (!inventory.saleAddress || (inventory.saleAddress && parseInt(inventory.saleQuantity) > 0)));
+  }
 
 
   return (
@@ -272,13 +291,13 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
           <div className="mt-3">
             {((itemData.isMint === "True" && inventory.quantity === 0) || inventory.quantity > 0) &&
               <div className="grid grid-cols-3 gap-1 w-full">
-                <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showListModal} disabled={!paymentProviderAddress || (getCategory() == "Carbon Offset" && !(itemData.isMint && itemData.isMint == "True"))}>
+                <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showListModal} disabled={isEditSellDisabled()}>
                   {inventory.price ? <><EditOutlined /> Edit</> : <><DollarOutlined /> Sell</>}
                 </Button>
                 <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showUnlistModal} disabled={!inventory.price}>
                   <><StopOutlined /> Unlist</>
                 </Button>
-                <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showResellModal} disabled={!(itemData.isMint && itemData.isMint == "True")}>
+                <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showResellModal} disabled={isTransferDisabled()}>
                   <><PieChartOutlined /> Mint</>
                 </Button>
                 <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showTransferModal} disabled={!(inventory.quantity && parseInt(inventory.quantity) > 0 && (!inventory.saleAddress || (inventory.saleAddress && parseInt(inventory.saleQuantity) > 0)))}>
