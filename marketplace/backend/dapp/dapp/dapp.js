@@ -299,11 +299,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getMarketplaceInventoriesLoggedIn = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
-    let usersArr = constants.baUserNames.filter(user => user !== userCert.commonName)
+    let usersArr = constants.baUserNames.filter(user => user !== userCommonName)
     const newArgs = { ...args, ownerCommonName: usersArr }
     const all = await marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
 
-    const newArgs1 = { ...args, notEqualsField: ['ownerCommonName', 'sale'], notEqualsValue: [[userCert.commonName, ...constants.baUserNames], constants.zeroAddress] }
+    const newArgs1 = { ...args, notEqualsField: ['ownerCommonName', 'sale'], notEqualsValue: [[userCommonName, ...constants.baUserNames], constants.zeroAddress] }
     const all2 = await marketplaceJs.getAll(rawAdmin, newArgs1, getOptions);
     return {inventoryResults: all.inventoryResults.concat(all2.inventoryResults), inventoryCount: all.inventoryCount + all2.inventoryCount};
   };
@@ -318,7 +318,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const getOptions = { ...options, app: contractName }
     const newArgs = {
       ...args, notEqualsField: ['sale', 'ownerCommonName'],
-      notEqualsValue: [constants.zeroAddress, userCert.commonName] , ownerCommonName: [userCert.commonName]
+      notEqualsValue: [constants.zeroAddress, userCommonName], 
     }
     return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions)
   }
@@ -422,7 +422,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         Object.values(processedSalesResults[0].value).sort((a, b) => new Date(a.block_timestamp) - new Date(b.block_timestamp)) : [];
       // Only send price, timestamp as a part of the record
       const originRecords = originRecordsSorted? Object.values(originRecordsSorted).map(({price, block_timestamp}) => ({price, block_timestamp})) : [];
-          
+      // Append a record for the current date with the last known price
+      if (originRecords.length > 0) {
+        const lastKnownRecord = originRecords[originRecords.length - 1];
+        const currentDateTime = dayjs().utc().format('YYYY-MM-DD HH:mm:ss') + ' UTC';
+        originRecords.push({
+          price: lastKnownRecord.price,
+          block_timestamp: currentDateTime
+        });
+      }          
       
         
       // 12 month historical data
@@ -1096,7 +1104,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
       }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching addresses: ${JSON.stringify(err)} `);
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching addresses: ${JSON.stringify(error)} `);
     }
   };
 

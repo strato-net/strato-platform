@@ -473,7 +473,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
           <div className="bg-white border-t border-[#E9E9E9] absolute w-full z-50 md:hidden top-16">
             {subMenuItems.map((item) => 
                 <Typography onClick={() => handleIntMenuTab(item)} className={`text-base py-3 px-4 cursor-pointer ${item ? '' : 'hidden'}`} >{item?.label}</Typography>
-             )}
+            )}
           </div>
           <div className="h-[100vh] w-full bg-[#00000020] absolute top-0 md:hidden z-40" onClick={handleMenuTab}></div>
         </div>
