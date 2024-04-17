@@ -408,7 +408,7 @@ main = do
 run :: Options -> IO ()
 run AddTx {..} = addTx txJson
 run AddBlocksFromFile {..} = addBlocksFromFile fileName
-run AddGenesisFromFile {..} = addGenesisFromFile fileName
+run AddGenesisFromFile {..} = error "strato-barometer: the addGenesisFromFile tool has been deprecated."
 run AddTxsFromFile {..} = addTxsFromFile fileName
 run AskForBlocks {..} =
   let i = CommonName (T.pack qOrg) (T.pack qOrgUnit) (T.pack qCommonName) True
@@ -419,7 +419,7 @@ run AskForTxs =
     . filter (not . B.null)
     . BC.split '\n'
     =<< B.getContents
-run ChainHash = chainHash
+run ChainHash = error "strato-barometer: the chainhash tool has been deprecated."
 run Checkpoints {..} = case operation of
   Get -> doCheckpointGet service
   Put -> doCheckpointPut service (fromIntegral <$> offset) cp
@@ -435,7 +435,7 @@ run DumpKafkaVMEvents {..} = dumpKafkaVMEvents (fromIntegral startingBlock)
 run DumpKafkaRaw {..} = dumpKafkaRaw streamName (fromIntegral startingBlock)
 run DumpKafkaStateDiff {..} = dumpKafkaStateDiff $ fromIntegral startingBlock
 run DumpRedis {..} = dumpRedis databaseNumber
-run InsertTX {} = insertTX
+run InsertTX {} = error "strato-barometer: the insertTx tool has been deprecated."
 run Hash {..} = Hash.doit hash
 run Raw {..} = Raw.doit filename
 run Redis {..} = redis $ BC.pack key
@@ -453,5 +453,5 @@ run Migrate {..} = migrate tables
 run SaveKafka {..} = saveKafka topic filename
 run LoadKafka {..} = loadKafka topic filename
 run VerifyKafkaFile {..} = verifyKafkaFile filename
-run GetPrivacy {..} = putStrLn =<< getPrivacy registry key True
-run PutPrivacy {..} = putStrLn =<< putPrivacy registry key value True
+run GetPrivacy {..} = error "strato-barometer: the getPrivacy tool has been deprecated."
+run PutPrivacy {..} = error "strato-barometer: the putPrivacy tool has been deprecated."
