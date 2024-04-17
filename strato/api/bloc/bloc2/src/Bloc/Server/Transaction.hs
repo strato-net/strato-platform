@@ -726,8 +726,8 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                         -- always return a name but in the case that it doesn't it will go in the
                         -- history table unnamed.
                         ( case md of
-                            Nothing -> Just $ Map.singleton "history" cn
-                            Just m -> Just $ Map.insert "history" cn m
+                            Nothing -> Just $ Map.insert "VM" "SolidVM" (Map.singleton "history" cn)
+                            Just m -> Just $ Map.insert "VM" "SolidVM" (Map.insert "history" cn m)
                         )
                         (contractpayloadChainid p <|> chainId)
                         resolve
@@ -784,8 +784,8 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                               v
                               cid
                               ( case m of
-                                  Nothing -> Just $ Map.singleton "history" cn
-                                  Just h -> Just $ Map.insert "history" cn h
+                                  Nothing -> Just $ Map.insert "VM" "SolidVM" (Map.singleton "history" cn)
+                                  Just h -> Just $ Map.insert "VM" "SolidVM" (Map.insert "history" cn h)
                               )
                       )
                       ps
