@@ -62,15 +62,6 @@ library:
   - unliftio-core
   - vector
 
-executables:
-  global-db:
-    source-dirs: exec_src/
-    main: GlobalDB.hs
-    dependencies:
-      - blockapps-data
-      - strato-conf
-      - hflags
-
 tests:
   blockapps-data-test:
     source-dirs: test/
