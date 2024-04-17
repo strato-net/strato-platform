@@ -169,7 +169,7 @@ sendOutEvent (OutAction act) = do
                   Just "SolidVM" -> SolidVMCode (T.unpack n) $ Keccak256.hash $ UTF8.encodeUtf8 c
                   Just "EVM" -> EVMCode $ Keccak256.hash $ BC.pack $ T.unpack c
                   Just v -> error $ "Unknown VM: " ++ show v
-                  Nothing -> EVMCode $ Keccak256.hash $ BC.pack $ T.unpack c
+                  Nothing -> SolidVMCode (T.unpack n) (Keccak256.hash $ UTF8.encodeUtf8 c)
                 org = fromMaybe "" . listToMaybe . catMaybes . flip map actionDatas $ \(_, Action.ActionData {..}) ->
                   if _actionDataCodeHash == cp
                     then Just _actionDataOrganization

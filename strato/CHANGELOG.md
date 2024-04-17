@@ -24,6 +24,7 @@ so that they could be properly moved to their respective version's subsection.
 - `strato-barometer` commands point to a copy of `./ethereumH` to access LevelDB data
 
 ### Fixed
+- The `VM` metadata field defaults to `SolidVM` instead of `EVM` if empty
 
 ### Removed
 - Removed 'block', 'blockGO', 'canonRedis', 'compressRoundChanges' commands from blockapps-tools
