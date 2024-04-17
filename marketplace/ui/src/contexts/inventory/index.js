@@ -38,7 +38,10 @@ const InventoriesProvider = ({ children }) => {
     totalItemsTransfered: 0,
     isFetchingItemTransfers: false,
     isFetchingPriceHistory: false,
-    priceHistory: []    
+    priceHistory: [],
+    isRequestingRedemption: false,
+    isFetchingRedemptions: false,
+    redemptions: []    
   };
 
   const [state, dispatch] = useReducer(reducer, initialState);

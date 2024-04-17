@@ -1,47 +1,40 @@
 import React, { useState } from "react";
-import { Card, Popover, Button, Typography, Tooltip } from "antd";
+import { Popover, Button, Typography, Tooltip } from "antd";
 import {
   DollarOutlined,
   MoreOutlined,
   EditOutlined,
-  FormOutlined,
   PieChartOutlined,
   StopOutlined,
   SwapOutlined
 } from "@ant-design/icons";
 import PreviewInventoryModal from "./PreviewInventoryModal";
 import AddEventModal from "./AddEventModal";
-import { Navigate, useNavigate } from "react-router-dom";
-import UpdateInventoryModal from "./UpdateInventoryModal";
+import { useNavigate } from "react-router-dom";
 import ListForSaleModal from "./ListForSaleModal";
 import UnlistModal from "./UnlistModal";
 import ResellModal from "./ResellModal";
 import TransferModal from "./TransferModal";
+import RedeemModal from "./RedeemModal";
 import routes from "../../helpers/routes";
-import { Carousel } from "react-responsive-carousel";
 import image_placeholder from "../../images/resources/image_placeholder.png";
-import { getUnitNameByIndex } from "../../helpers/constants";
 import "react-responsive-carousel/lib/styles/carousel.min.css";
 import { SEO } from "../../helpers/seoConstant";
 
 const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentProviderAddress, allSubcategories, limit, offset }) => {
   const [openPop, setOpenPop] = useState(false);
   const [open, setOpen] = useState(false);
-  const [editModalOpen, setEditModalOpen] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
   const [listModalOpen, setListModalOpen] = useState(false);
   const [unlistModalOpen, setUnlistModalOpen] = useState(false);
   const [resellModalOpen, setResellModalOpen] = useState(false);
   const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [redeemModalOpen, setRedeemModalOpen] = useState(false);
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
   const imgMeta = category ? category : SEO.TITLE_META
 
   const itemData = inventory.data;
-  const showModalEdit = () => {
-    hide();
-    setOpenEdit(true);
-  };
 
   const handleCancel = () => {
     setOpen(false);
@@ -56,15 +49,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
   };
   const handleOpenChange = (newOpen) => {
     setOpenPop(newOpen);
-  };
-
-  const showEditModal = () => {
-    hide();
-    setEditModalOpen(true);
-  };
-
-  const handleEditModalClose = () => {
-    setEditModalOpen(false);
   };
 
   const showListModal = () => {
@@ -103,6 +87,15 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
     setTransferModalOpen(false);
   };
 
+  const showRedeemModal = () => {
+    hide();
+    setRedeemModalOpen(true);
+  };
+
+  const handleRedeemModalClose = () => {
+    setRedeemModalOpen(false);
+  };
+
   const callDetailPage = () => {
     navigate(`${naviroute.replace(":id", inventory.address).replace(":name", inventory.name)}`, {
       state: { isCalledFromInventory: true },
@@ -121,7 +114,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
       <div className="bg-[#F2F2F9] rounded-md px-[14px] flex justify-between items-center pb-[13px] pt-2 w-full">
         <div>
           <p className="text-lg lg:text-xl font-semibold text-[#202020] cursor-default" onClick={callDetailPage}>
-            {/* {inventory?.name || "N/A"} */}
             <Tooltip title={inventory?.name.length > 20 ? inventory?.name : null}>
               <span className=" whitespace-nowrap max-w-[160px] inline-block">
                 {inventory?.name.length > 20 ? `${inventory?.name.slice(0, 20)}...` : `${inventory?.name}`}
@@ -190,6 +182,16 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
                     ) : (
                       <div></div>
                     )}
+
+                    {!inventory.price && inventory.address !== inventory.originAddress &&
+                      <div
+                        className="flex items-center mt-2 cursor-pointer"
+                        onClick={showRedeemModal}
+                      >
+                        <DollarOutlined />
+                        <p className="ml-3">Redeem</p>
+                      </div>
+                    }
 
                   </div>
                 }
@@ -290,20 +292,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
           productId={inventory.productId}
         />
       )}
-      {editModalOpen && (
-        <UpdateInventoryModal
-          open={editModalOpen}
-          handleCancel={handleEditModalClose}
-          limit={limit}
-          offset={offset}
-          debouncedSearchTerm={debouncedSearchTerm}
-          inventoryToUpdate={{
-            inventory: inventory,
-            category: category,
-          }}
-          categoryName={category}
-        />
-      )}
       {listModalOpen && (
         <ListForSaleModal
           open={listModalOpen}
@@ -341,6 +329,16 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
         <TransferModal
           open={transferModalOpen}
           handleCancel={handleTransferModalClose}
+          limit={limit}
+          offset={offset}
+          inventory={inventory}
+          categoryName={category}
+        />
+      )}
+      {redeemModalOpen && (
+        <RedeemModal
+          open={redeemModalOpen}
+          handleCancel={handleRedeemModalClose}
           limit={limit}
           offset={offset}
           inventory={inventory}

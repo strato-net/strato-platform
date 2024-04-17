@@ -53,6 +53,8 @@ export const Inventory = {
   list: '/list',
   unlist: '/unlist',
   resell: '/resell',
+  redeem: '/redeem',
+  getRedemptions: '/redemptions',
   transfer: '/transfer',
   updateSale: '/updateSale',
   getPriceHistory: '/price/history',

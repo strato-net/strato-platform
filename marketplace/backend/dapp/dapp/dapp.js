@@ -1,16 +1,16 @@
 import { rest, util, importer } from "blockapps-rest";
 const { createContract } = rest;
-import constants, { 
-  STRIPE_PAYMENT_SERVER_URL, 
-  calculatePriceFluctuation, 
-  calculateAveragePrice, 
-  calculateVolumeTraded, 
-  getOneYearAgoTime, 
-  getSixMonthsAgoTime, 
+import constants, {
+  STRIPE_PAYMENT_SERVER_URL,
+  calculatePriceFluctuation,
+  calculateAveragePrice,
+  calculateVolumeTraded,
+  getOneYearAgoTime,
+  getSixMonthsAgoTime,
   getDate,
-  timeFilterForAll, 
-  timeFilterForOneYear, 
-  timeFilterForSixMonths 
+  timeFilterForAll,
+  timeFilterForOneYear,
+  timeFilterForSixMonths
 } from "/helpers/constants";
 import { yamlWrite, yamlSafeDumpSync, getYamlFile } from "/helpers/config";
 import { pollingHelper } from "/helpers/utils";
@@ -231,8 +231,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getInventoriesForUser = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
-    const {ownerCommonName, ...restArgs} = args;
-    const newArgs = { ...restArgs, ownerCommonName:ownerCommonName, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, userProfile:true }//'0000000000000000000000000000000000000000'
+    const { ownerCommonName, ...restArgs } = args;
+    const newArgs = { ...restArgs, ownerCommonName: ownerCommonName, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, userProfile: true }//'0000000000000000000000000000000000000000'
     return marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
   };
 
@@ -282,19 +282,63 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return await inventoryJs.updateInventory(rawAdmin, contract, restArgs, options);
   }
 
+  contract.requestRedemption = async function (args, options = defaultOptions) {
+    const getOptions = { ...options, app: contractName, };
+    const { originAssetAddress, ...restArgs } = args;
+
+    const originAsset = await inventoryJs.get(rawAdmin, { address: originAssetAddress }, getOptions);
+    const issuerCommonName = originAsset.ownerCommonName;
+    const finalArgs = { issuerCommonName, ...restArgs }
+
+    try {
+      await axios.post(new URL(`/redemption/create`, STRIPE_PAYMENT_SERVER_URL).href, { ...finalArgs })
+        .then(function (res) {
+          if (res.status === 200) {
+            console.log(res.data);
+          } else {
+            throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+          }
+        });
+      return {}
+    } catch (error) {
+      if (error.response) {
+        throw new rest.RestError(error.response.status, error.response.statusText);
+      }
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while creating redemption record: ${JSON.stringify(error)} `);
+    }
+  }
+
+  contract.getRedemptions = async function (args, options = optionsNoChainIds) {
+    try {
+      const redemptions = await axios.get(new URL(`/redemption/${userCert.commonName}`, STRIPE_PAYMENT_SERVER_URL).href).then(function (res) {
+        if (res.status === 200) {
+          return res.data.data;
+        } else {
+          throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+        }
+      });
+      return redemptions;
+    } catch (error) {
+      if (error.response) {
+        throw new rest.RestError(error.response.status, error.response.statusText);
+      }
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching redemptions: ${JSON.stringify(error)} `);
+    }
+  };
+
   // ------------------------------ INVENTORY ENDS--------------------------------
 
   contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
     //for ba sellers, get all assets - display For Sale and Sold Out
     const newArgs = { ...args, ownerCommonName: constants.baUserNames }
-    const all =  await marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
+    const all = await marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
 
     // for non-ba sellers, get assets with valid sale & saleQty > 0 - display only For Sale records
     const newArgs1 = { ...args, notEqualsField: ['ownerCommonName', 'sale'], notEqualsValue: [constants.baUserNames, constants.zeroAddress] }
-    const all2 =  await marketplaceJs.getAll(rawAdmin, newArgs1, getOptions);
-        
-    return {inventoryResults: all.inventoryResults.concat(all2.inventoryResults), inventoryCount: all.inventoryCount + all2.inventoryCount};
+    const all2 = await marketplaceJs.getAll(rawAdmin, newArgs1, getOptions);
+
+    return { inventoryResults: all.inventoryResults.concat(all2.inventoryResults), inventoryCount: all.inventoryCount + all2.inventoryCount };
   };
 
   contract.getMarketplaceInventoriesLoggedIn = async function (args = {}, options = optionsNoChainIds) {
@@ -305,7 +349,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
     const newArgs1 = { ...args, notEqualsField: ['ownerCommonName', 'sale'], notEqualsValue: [[userCommonName, ...constants.baUserNames], constants.zeroAddress] }
     const all2 = await marketplaceJs.getAll(rawAdmin, newArgs1, getOptions);
-    return {inventoryResults: all.inventoryResults.concat(all2.inventoryResults), inventoryCount: all.inventoryCount + all2.inventoryCount};
+    return { inventoryResults: all.inventoryResults.concat(all2.inventoryResults), inventoryCount: all.inventoryCount + all2.inventoryCount };
   };
 
   contract.getTopSellingProducts = async function (args = {}, options = optionsNoChainIds) {
@@ -318,15 +362,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const getOptions = { ...options, app: contractName }
     const newArgs = {
       ...args, notEqualsField: ['sale', 'ownerCommonName'],
-      notEqualsValue: [constants.zeroAddress, userCommonName], 
+      notEqualsValue: [constants.zeroAddress, userCommonName],
     }
     return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions)
   }
 
-  contract.getPriceHistory = async function(args, options = defaultOptions) {
+  contract.getPriceHistory = async function (args, options = defaultOptions) {
     try {
       const { assetAddress, timeFilter } = args;
-  
+
       const assetWithoutQuantity = await inventoryJs.get(rawAdmin, { address: assetAddress }, options);
       const originAddress = assetWithoutQuantity.originAddress;
 
@@ -338,15 +382,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         gtValue: getOneYearAgoTime()
       }, options);
       console.log("Fetched origin yearly sales:", originSalesForStats.length, "sales");
-  
+
       let salesFilter = { assetToBeSold: originAddress, order: "block_timestamp.asc" };
-  
+
       // Sales Filter modification based on timeFilter
-      if (timeFilter === timeFilterForSixMonths()) { 
+      if (timeFilter === timeFilterForSixMonths()) {
         // Applying 6-month filter
         salesFilter.gtField = "block_timestamp";
         salesFilter.gtValue = getSixMonthsAgoTime();
-      } else if (timeFilter === timeFilterForOneYear()) { 
+      } else if (timeFilter === timeFilterForOneYear()) {
         //Applying 1-year filter
         salesFilter.gtField = "block_timestamp";
         salesFilter.gtValue = getOneYearAgoTime();
@@ -360,9 +404,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const originTimeRangeSales = await saleJs.getAll(rawAdmin, {
         ...salesFilter
       }, options);
-  
 
-  
+
+
       // Process records such that for a given date the most recent sale price is fetched
       // This method processes sales passed, drills down into history table for each sale
       // This needs to be done as a 2 step process, i.e. a single query to fetch sale & saleHistory can't be done because the contract name is dependent on the sale
@@ -370,14 +414,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         //Fetch histories for each sale
         const historyPromises = sales.map(sale => {
           //Fetch saleHistory
-          if(filter.assetToBeSold) 
-          {
+          if (filter.assetToBeSold) {
             //if timeFilter is applied, also add those filters
-            return saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, ...filter  }, options);
-          }else{
+            return saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, ...filter }, options);
+          } else {
             //If historical data is fetched, apply 12 month timeFilter
 
-            return saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, assetToBeSold: originAddress, order: "block_timestamp.asc", gtField: "block_timestamp", gtValue: getOneYearAgoTime()  }, options); 
+            return saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, assetToBeSold: originAddress, order: "block_timestamp.asc", gtField: "block_timestamp", gtValue: getOneYearAgoTime() }, options);
           }
         });
         const histories = await Promise.all(historyPromises);
@@ -387,7 +430,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             console.log(`Record at index ${index} is missing block_timestamp:`, record);
           }
         });
-        
+
         // Faltten records, process them using accumulator hash map such that for a given date we fetch latest timestamp's sale record from history table
         return histories.flat().reduce((acc, recordContainer) => {
           Object.values(recordContainer).forEach(record => {
@@ -400,14 +443,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           return acc;
         }, {});
       };
-  
+
       // Get the histories
       // Driver to fetch history sales for- plotting data points, stats
       const processedSalesResults = await Promise.allSettled([
         processSalesHistory(originTimeRangeSales, salesFilter),// for data points to be plotted
         processSalesHistory(originSalesForStats) // for 12-month historical data
       ]);
-  
+
       // Handling Promise.allSettled results (Logging purposes)
       processedSalesResults.forEach((result, index) => {
         if (result.status === 'fulfilled') {
@@ -418,10 +461,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       });
 
       // Time Filter Records  
-      const originRecordsSorted = processedSalesResults[0].status === 'fulfilled' ? 
+      const originRecordsSorted = processedSalesResults[0].status === 'fulfilled' ?
         Object.values(processedSalesResults[0].value).sort((a, b) => new Date(a.block_timestamp) - new Date(b.block_timestamp)) : [];
       // Only send price, timestamp as a part of the record
-      const originRecords = originRecordsSorted? Object.values(originRecordsSorted).map(({price, block_timestamp}) => ({price, block_timestamp})) : [];
+      const originRecords = originRecordsSorted ? Object.values(originRecordsSorted).map(({ price, block_timestamp }) => ({ price, block_timestamp })) : [];
       // Append a record for the current date with the last known price
       if (originRecords.length > 0) {
         const lastKnownRecord = originRecords[originRecords.length - 1];
@@ -430,25 +473,25 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           price: lastKnownRecord.price,
           block_timestamp: currentDateTime
         });
-      }          
-      
-        
+      }
+
+
       // 12 month historical data
-      const twelveMonthHistoryRecords = processedSalesResults[1].status === 'fulfilled' ? 
+      const twelveMonthHistoryRecords = processedSalesResults[1].status === 'fulfilled' ?
         Object.values(processedSalesResults[1].value).sort((a, b) => new Date(a.block_timestamp) - new Date(b.block_timestamp)) : [];
       // Only send Range, Units Sold, Average Price as the stats record
       const records = {
-          originFluctuation: calculatePriceFluctuation(Object.values(twelveMonthHistoryRecords)),
-          originVolume: calculateVolumeTraded(Object.values(twelveMonthHistoryRecords)),
-          originAveragePrice: calculateAveragePrice(Object.values(twelveMonthHistoryRecords))
-        };
+        originFluctuation: calculatePriceFluctuation(Object.values(twelveMonthHistoryRecords)),
+        originVolume: calculateVolumeTraded(Object.values(twelveMonthHistoryRecords)),
+        originAveragePrice: calculateAveragePrice(Object.values(twelveMonthHistoryRecords))
+      };
 
-    return { records, originRecords };
+      return { records, originRecords };
     } catch (error) {
       console.error("Error fetching price history:", error);
     }
   };
-  
+
 
   // ------------------------------ ART STARTS ------------------------------
 
@@ -632,14 +675,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const order = await saleOrderJs.get(rawAdmin, args, options);
       const sales = await saleJs.getAll(rawAdmin, { saleAddresses: order.saleAddresses }, options);
       let assets = [];
-      
+
       for (const sale of sales) {
         const history = await saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, transaction_hash: order.transaction_hash, assetToBeSold: sale.assetToBeSold }, options);
         const price = history['0'] ? history['0'].price : null;
-        
+
         const assetAddress = sale.assetToBeSold;
         const assetWithoutQuantity = await inventoryJs.get(rawAdmin, { address: assetAddress }, options);
-        
+
         assets.push({
           ...assetWithoutQuantity,
           price: price,
@@ -648,7 +691,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           amount: sale.quantity * price,
         });
       }
-      
+
       const result = { userContactAddress: order.shippingAddress, order, assets };
 
       return result;
@@ -675,10 +718,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const contract = { name: saleOrderJs.contractName, address: saleOrderAddress }
     return saleOrderJs.updateOrderComment(rawAdmin, contract, options, comments);
   };
-  
+
   contract.export = async function (options = defaultOptions) {
     const getOptions = { ...options, app: contractName };
-    
+
     const processOrders = async (orderArg) => {
       const orders = await saleOrderJs.getAll(rawAdmin, orderArg, getOptions);
       if (orders.orders.length === 0) {
@@ -686,11 +729,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       }
       const saleAddresses = orders.orders.flatMap(order => order.saleAddresses);
       const sales = await saleJs.getAll(rawAdmin, { saleAddresses }, options);
-      
+
       const uniqueAssetAddresses = [...new Set(sales.map(sale => sale.assetToBeSold))];
       const assets = await inventoryJs.getAll(rawAdmin, { assetAddresses: uniqueAssetAddresses }, options);
       const assetLookup = new Map(assets.map(asset => [asset.address, asset]));
-      
+
       for (const order of orders.orders) {
         const assetsPromises = order.saleAddresses.map(async (saleAddress) => {
           const sale = sales.find(sale => sale.address === saleAddress);
@@ -711,7 +754,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       return orders.orders;
     };
-    
+
     const getItemTransferEventsWithAssetInfo = async (orderArg) => {
       const itemTransferEvents = await inventoryJs.getAllItemTransferEvents(rawAdmin, orderArg, getOptions);
       if (itemTransferEvents.transfers.length === 0) {
@@ -726,19 +769,19 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         return { ...event, contract_name: assetInfoMap.get(event.assetAddress)?.contract_name };
       });
     };
-    
+
     let soldOrderArgs = { limit: 2000, offset: 0, order: 'createdDate.desc', sellersCommonName: userCommonName };
     const soldOrders = await processOrders(soldOrderArgs);
-    
+
     let boughtOrderArgs = { limit: 2000, offset: 0, order: 'createdDate.desc', purchasersCommonName: userCommonName };
     const boughtOrders = await processOrders(boughtOrderArgs);
-    
+
     let transferArgs = { limit: 2000, offset: 0, order: 'transferDate.desc', or: `(oldOwnerCommonName.eq.${userCommonName},newOwnerCommonName.eq.${userCommonName})` };
     const itemTransferEvents = await getItemTransferEventsWithAssetInfo(transferArgs);
-    
-    return { 
-      soldOrders: soldOrders ? soldOrders : [], 
-      boughtOrders: boughtOrders ? boughtOrders : [], 
+
+    return {
+      soldOrders: soldOrders ? soldOrders : [],
+      boughtOrders: boughtOrders ? boughtOrders : [],
       transfers: itemTransferEvents ? itemTransferEvents : []
     };
   };
@@ -756,15 +799,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
     // Need to fetch purchases, closed orders, transfers for the user.
     // New Purchases of User's Products---Fetch Orders with filters of sellersCommonName, block_timestamp and Order Status = AWAITING_FULFILLMENT (1) 
-    const purchaseArgs = { sellersCommonName, status: 1, gtField: "block_timestamp", gtValue: tenDaysAgoTimestamp}
+    const purchaseArgs = { sellersCommonName, status: 1, gtField: "block_timestamp", gtValue: tenDaysAgoTimestamp }
     const purchases = await saleOrderJs.getAll(rawAdmin, purchaseArgs, getOptions);
 
     // These are my orders that ave been closed by a seller
-    const orderArgs = { purchasersCommonName, status: 3, gtField: "block_timestamp", gtValue: tenDaysAgoTimestamp}
+    const orderArgs = { purchasersCommonName, status: 3, gtField: "block_timestamp", gtValue: tenDaysAgoTimestamp }
     const orders = await saleOrderJs.getAll(rawAdmin, orderArgs, getOptions);
 
     // These are transfers the usre has recieved
-    const transferArgs = {newOwnerCommonName, gtField: "block_timestamp", gtValue: tenDaysAgoTimestamp};
+    const transferArgs = { newOwnerCommonName, gtField: "block_timestamp", gtValue: tenDaysAgoTimestamp };
     const transfers = await inventoryJs.getAllItemTransferEvents(rawAdmin, transferArgs, getOptions);
 
     // Fetch activities and add type to each item
@@ -971,7 +1014,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       let stripePaymentSession;
       const { paymentList, ...restArgs } = args;
       const newArgs = { shippingAddressId: 1, ...restArgs };  // placeholder
-      
+
       try {
         const checkoutBody = {
           paymentTypes: paymentList,

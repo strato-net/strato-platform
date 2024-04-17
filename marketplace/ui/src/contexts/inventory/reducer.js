@@ -49,24 +49,24 @@ const reducer = (state, action) => {
         error: action.error,
         isInventoriesLoading: false
       };
-      case actionDescriptors.fetchInventoryForUser:
-        return {
-          ...state,
-          isUserInventoriesLoading: true
-        };
-      case actionDescriptors.fetchInventoryForUserSuccessful:
-        return {
-          ...state,
-          userInventories: action.payload.data,
-          userInventoriesTotal: action.payload.count,
-          isUserInventoriesLoading: false
-        };
-      case actionDescriptors.fetchInventoryForUserFailed:
-        return {
-          ...state,
-          error: action.error,
-          isUserInventoriesLoading: false
-        };
+    case actionDescriptors.fetchInventoryForUser:
+      return {
+        ...state,
+        isUserInventoriesLoading: true
+      };
+    case actionDescriptors.fetchInventoryForUserSuccessful:
+      return {
+        ...state,
+        userInventories: action.payload.data,
+        userInventoriesTotal: action.payload.count,
+        isUserInventoriesLoading: false
+      };
+    case actionDescriptors.fetchInventoryForUserFailed:
+      return {
+        ...state,
+        error: action.error,
+        isUserInventoriesLoading: false
+      };
     case actionDescriptors.fetchInventorySearch:
       return {
         ...state,
@@ -169,6 +169,40 @@ const reducer = (state, action) => {
         ...state,
         error: action.error,
         isReselling: false
+      };
+    case actionDescriptors.requestRedemption:
+      return {
+        ...state,
+        isRequestingRedemption: true
+      };
+    case actionDescriptors.requestRedemptionSuccessful:
+      return {
+        ...state,
+        inventory: action.payload,
+        isRequestingRedemption: false
+      };
+    case actionDescriptors.requestRedemptionFailed:
+      return {
+        ...state,
+        error: action.error,
+        isRequestingRedemption: false
+      };
+    case actionDescriptors.fetchRedemptions:
+      return {
+        ...state,
+        isFetchingRedemptions: true
+      };
+    case actionDescriptors.fetchRedemptionsSuccessful:
+      return {
+        ...state,
+        redemptions: action.payload,
+        isFetchingRedemptions: false
+      };
+    case actionDescriptors.fetchRedemptionsFailed:
+      return {
+        ...state,
+        error: action.error,
+        isFetchingRedemptions: false
       };
     case actionDescriptors.transferInventory:
       return {
@@ -321,7 +355,7 @@ const reducer = (state, action) => {
       return {
         ...state,
         isFetchingPriceHistory: false,
-      }; 
+      };
     default:
       throw new Error(`Unhandled action: '${action.type}'`);
   }

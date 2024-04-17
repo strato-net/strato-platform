@@ -35,7 +35,7 @@ class InventoryController {
 
       const inventories = await dapp.getInventories({ ...query })
       const inventoriesWithImageUrl = inventories?.inventories
-      rest.response.status200(res, {inventoriesWithImageUrl:inventoriesWithImageUrl, count: inventories.inventoryCount})
+      rest.response.status200(res, { inventoriesWithImageUrl: inventoriesWithImageUrl, count: inventories.inventoryCount })
 
       return next()
     } catch (e) {
@@ -46,9 +46,9 @@ class InventoryController {
   static async getAllUserInventories(req, res, next) {
     try {
       const { dapp, query } = req
-      const {gtField, gtValue, ...restQuery} = query;
+      const { gtField, gtValue, ...restQuery } = query;
 
-      const inventories = await dapp.getInventoriesForUser({ userProfileGtField: gtField, userProfileGtValue: gtValue, ...restQuery});
+      const inventories = await dapp.getInventoriesForUser({ userProfileGtField: gtField, userProfileGtValue: gtValue, ...restQuery });
       const productsWithImageUrl = inventories?.inventoryResults.sort((a, b) => {
         return b.saleDate.localeCompare(a.saleDate);
       });
@@ -131,6 +131,34 @@ class InventoryController {
 
       const result = await dapp.resellItem(body)
       rest.response.status200(res, result)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
+  static async requestRedemption(req, res, next) {
+    try {
+      const { dapp, body } = req
+
+      InventoryController.validateRequestRedemptionArgs(body)
+
+      const result = await dapp.requestRedemption(body)
+      rest.response.status200(res, result)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
+  static async getRedemptions(req, res, next) {
+    try {
+      const { dapp } = req
+
+      const redemptions = await dapp.getRedemptions()
+      rest.response.status200(res, redemptions)
 
       return next()
     } catch (e) {
@@ -316,6 +344,26 @@ class InventoryController {
     });
 
     const validation = resellItemSchema.validate(args);
+
+    if (validation.error) {
+      console.log('validation error: ', validation.error)
+      throw new rest.RestError(RestStatus.BAD_REQUEST, validation.error.message, {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      })
+    }
+  }
+
+  static validateRequestRedemptionArgs(args) {
+    const requestRedemptionSchema = Joi.object({
+      assetAddresses: Joi.array().items(Joi.string()),
+      originAssetAddress: Joi.string().required(),
+      quantity: Joi.number().integer().greater(0).required(),
+      shippingAddressId: Joi.number().integer().required(),
+      ownerCommonName: Joi.string().required(),
+      ownerComments: Joi.string().allow("")
+    });
+
+    const validation = requestRedemptionSchema.validate(args);
 
     if (validation.error) {
       console.log('validation error: ', validation.error)

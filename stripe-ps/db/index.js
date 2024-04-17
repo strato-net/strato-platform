@@ -30,7 +30,19 @@ if (process.env.POSTGRESQL_SERVER_URL && process.env.POSTGRESQL_PASSWORD) {
             addressLine1 TEXT,
             addressLine2 TEXT,
             country TEXT,
-            createdDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP);`;
+            createdDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+            
+            CREATE TABLE IF NOT EXISTS redemptions (
+            redemption_id SERIAL PRIMARY KEY,
+            quantity INTEGER,
+            ownerComments TEXT,
+            issuerComments TEXT,
+            ownerCommonName TEXT,
+            issuerCommonName TEXT,
+            assetAddresses TEXT[],
+            shippingAddressId INT REFERENCES customer_address(address_id),
+            createdDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+            `;
 
             return client.query(query);
         })

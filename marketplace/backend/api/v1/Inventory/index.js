@@ -63,6 +63,20 @@ router.post(
 );
 
 router.post(
+  Inventory.redeem,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  InventoryController.requestRedemption
+);
+
+router.get(
+  Inventory.getRedemptions,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  InventoryController.getRedemptions
+);
+
+router.post(
   Inventory.transfer,
   authHandler.authorizeRequest(),
   loadDapp,
