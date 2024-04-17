@@ -3,7 +3,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -Wall #-}
 
-import BlockApps.Tools.ChainHash
 import BlockApps.Tools.Checkpoints
 import BlockApps.Tools.Code as Code
 import BlockApps.Tools.DumpKafkaBlocks
@@ -17,9 +16,7 @@ import BlockApps.Tools.FRawMP as FRawMP
 import BlockApps.Tools.Hash as Hash
 import BlockApps.Tools.InsertP2P
 import BlockApps.Tools.InsertSeq
-import BlockApps.Tools.InsertTX
 import BlockApps.Tools.Kafka
-import BlockApps.Tools.Privacy
 import BlockApps.Tools.Psql
 import BlockApps.Tools.RLP as RLP
 import BlockApps.Tools.Raw as Raw
@@ -408,7 +405,7 @@ main = do
 run :: Options -> IO ()
 run AddTx {..} = addTx txJson
 run AddBlocksFromFile {..} = addBlocksFromFile fileName
-run AddGenesisFromFile {..} = error "strato-barometer: the addGenesisFromFile tool has been deprecated."
+run AddGenesisFromFile {} = error "strato-barometer: the addGenesisFromFile tool has been deprecated."
 run AddTxsFromFile {..} = addTxsFromFile fileName
 run AskForBlocks {..} =
   let i = CommonName (T.pack qOrg) (T.pack qOrgUnit) (T.pack qCommonName) True
@@ -453,5 +450,5 @@ run Migrate {..} = migrate tables
 run SaveKafka {..} = saveKafka topic filename
 run LoadKafka {..} = loadKafka topic filename
 run VerifyKafkaFile {..} = verifyKafkaFile filename
-run GetPrivacy {..} = error "strato-barometer: the getPrivacy tool has been deprecated."
-run PutPrivacy {..} = error "strato-barometer: the putPrivacy tool has been deprecated."
+run GetPrivacy {} = error "strato-barometer: the getPrivacy tool has been deprecated."
+run PutPrivacy {} = error "strato-barometer: the putPrivacy tool has been deprecated."
