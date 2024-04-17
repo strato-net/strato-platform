@@ -272,7 +272,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
           <div className="mt-3">
             {((itemData.isMint === "True" && inventory.quantity === 0) || inventory.quantity > 0) &&
               <div className="grid grid-cols-3 gap-1 w-full">
-                <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showListModal} disabled={paymentProviderAddress && (getCategory() == "Carbon Offset" && !(itemData.isMint && itemData.isMint == "True"))}>
+                <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showListModal} disabled={!paymentProviderAddress || (getCategory() == "Carbon Offset" && !(itemData.isMint && itemData.isMint == "True"))}>
                   {inventory.price ? <><EditOutlined /> Edit</> : <><DollarOutlined /> Sell</>}
                 </Button>
                 <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showUnlistModal} disabled={!inventory.price}>
