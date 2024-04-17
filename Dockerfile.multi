@@ -46,7 +46,7 @@ COPY \
   ./usr/local/bin/init-worker \
   ./usr/local/bin/logserver \
   ./usr/local/bin/post-raw-transaction \
-  ./usr/local/bin/strato-cli \
+  ./usr/local/bin/strato-barometer \
   ./usr/local/bin/slipstream \
   ./usr/local/bin/strato-api \
   ./usr/local/bin/strato-api-indexer \
