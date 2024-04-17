@@ -285,9 +285,6 @@ cradle:
     - path: "core/strato-init/exec_src/Main.hs"
       component: "strato-init:exe:strato-setup"
 
-    - path: "core/strato-init/exec_src/TabulaRasa.hs"
-      component: "strato-init:exe:tabula-rasa"
-
     - path: "core/strato-init/test/"
       component: "strato-init:test:strato-init-test"
 

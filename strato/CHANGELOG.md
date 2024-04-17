@@ -17,17 +17,18 @@ so that they could be properly moved to their respective version's subsection.
 ## [Unreleased] 
 
 ### Added
+- POST `/transaction` allows users to create contracts by providing an address through the `codePtr` field
 
 ### Changed
 
 ### Fixed
-- `sendOutEvent` inconsistenly encoding code pointer hash
 
 ### Removed
-- `bloc/v2.2/x509/createCert` is no more
+- Removed `certInfo` flag from strato-sequencer (cert is now derived from genesis block or during sync)
+- Removed unused flags, such as `brokenRefundRenable`, `cacheTransactionResults`, `faucetEnabled`, `createTransactionResults`, `gasOn`, `splitinit`, and `useSyncMode`
 
 
-## [11.1.0] - 3/7/2023
+## [11.1.0] - 3/28/2023
 
 ### Added
 - Custom `Show` instances for `CodeCollection`, `Function`, `Contract` data types
@@ -38,24 +39,34 @@ so that they could be properly moved to their respective version's subsection.
 - functionality to enumerate threads and their details in `/threads` endpoint of `P2PAPI`
 - `/peers` endpoint in `P2PAPI` to list peer connections and their health
 - POST `/transaction` contract creation calls will now additionally check for address state ref table entry before resolving
+- Jenkins test to ensure slipstream post sync is consistent with boot node
 
 ### Changed 
 - When a transaction fails, the `<failed>` message blinks :^)
 - `keccak256` built-in function should return hex-encoded value instead of bytestring
 - Optimized the byteString2Integer function that lies at the foundation of strato's RLP-related functionality (rlpDecode).
 - Optimized the integer2Bytes function that lies at the foundation of strato's RLP-related functionality (rlpEncode)
-- Removed unnecessary stateDiff (and threading) in the vm-runner codebase, fixing numerous sources of persistent memory build-up.
+- "DAO Fork" for mercata-hydrogen because buggy block got added to canonical blockchain
 
 ### Fixed
 - Mappings within a struct within a `(type => Struct)` mapping can be accessed
 - Constructor arguments are passed by value instead of reference 
 - Escaped quotes for slipstream values
 - Properly escape `"` and `\` string arguments in `strato-api`
+- `sendOutEvent` inconsistenly encoding code pointer hash
 - simplified p2p conduit code so that all threads handling a peer live or die together using the `async` library
+- Bugfix for slipstream regarding escaping quotes in contract name
+- Fixed bug in BlockApps.X509.Certificate that filled in empty orgUnit fields with a space, rather than the empty string
+- Fixed bug in Sequencer.hs that prevented nodes from syncing all the way after changes to the validator pool
+- Fixed bug in RedisBlockDB that filled in empty orgUnit fields with the word "Nothing", rather than the empty string
+- Minimal changes to statetree before all tx checks complete to prevent potential stateroot mismatches between when the bagger adds txs vs when the vm does
 
 ### Removed
 - Removed slipstream's dependency on `eth` database for code collection data
+- Removed unnecessary stateDiff (and threading) in the vm-runner codebase, fixing numerous sources of persistent memory build-up.
 - Removed overcomplicated attempts at solving p2p thread issue (watchdogs, canaries, semaphore, threadmap, etc)
+- `bloc/v2.2/x509/createCert` is no more
+
 
 ## [11.0.0] - 1/22/2024
 

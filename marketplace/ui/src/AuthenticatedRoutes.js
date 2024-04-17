@@ -26,7 +26,7 @@ import { UserActivityProvider } from "./contexts/userActivity";
 import EventList from "./components/Inventory/EventList";
 import InventoryEventDetails from "./components/Inventory/EventDetail";
 import Certifier from "./components/Certifier";
-import OnboardingIntermediate from "./components/Inventory/OnboardingIntermediate"
+import OnboardingIntermediate from "./components/Inventory/OnboardingIntermediate";
 import ProductDetails from "./components/MarketPlace/ProductDetail";
 import Checkout from "./components/MarketPlace/AddCart";
 import ConfirmOrder from "./components/MarketPlace/ConfirmOrder";
@@ -36,6 +36,8 @@ import Invoice from "./components/Order/Invoice";
 import { CertifiersProvider } from "./contexts/certifier";
 import LoginRedirect from "./components/LoginRedirect";
 import UserProfile from "./components/UserProfile";
+import Error from "./components/404";
+import FAQ from "./components/FAQ/index";
 
 const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
   return (
@@ -47,7 +49,11 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
           <UsersProvider>
             <CategorysProvider>
               <OrdersProvider>
-                <MarketPlace user={user} users={users} isAuthenticated={isAuthenticated} />
+                <MarketPlace
+                  user={user}
+                  users={users}
+                  isAuthenticated={isAuthenticated}
+                />
               </OrdersProvider>
             </CategorysProvider>
           </UsersProvider>
@@ -56,9 +62,7 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
       <Route
         exact
         path={routes.LoginRedirect.url}
-        element={
-          <LoginRedirect />
-        }
+        element={<LoginRedirect />}
       />
       <Route
         exact
@@ -129,7 +133,7 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
       />
       <Route
         exact
-        path={routes.MarketplaceProductList.url}
+        path={routes.MarketplaceCategoryProductList.url}
         element={
           <UsersProvider>
             <CategorysProvider>
@@ -144,7 +148,7 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
           </UsersProvider>
         }
       />
-      <Route
+      {/* <Route
         exact
         path={routes.MarketplaceCategoryProductList.url}
         element={
@@ -158,7 +162,7 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
             </CategorysProvider>
           </UsersProvider>
         }
-      />
+      /> */}
       <Route
         exact
         path={routes.MarketplaceProductDetail.url}
@@ -197,7 +201,7 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
       />
       <Route
         exact
-        path={routes.MyStore.url}
+        path={routes.MyItems.url}
         element={
           <UsersProvider>
             <CertifiersProvider>
@@ -251,10 +255,10 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
                 <SubCategorysProvider>
                   <InventoriesProvider>
                     <ItemsProvider>
-                    <OrdersProvider>
-                      <UserActivityProvider>
-                        <UserProfile user={user} users={users} />
-                      </UserActivityProvider>
+                      <OrdersProvider>
+                        <UserActivityProvider>
+                          <UserProfile user={user} users={users} />
+                        </UserActivityProvider>
                       </OrdersProvider>
                     </ItemsProvider>
                   </InventoriesProvider>
@@ -438,18 +442,9 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
           </UsersProvider>
         }
       />
-      <Route
-        path="/"
-        element={<Navigate
-          to={"/marketplace"}
-          replace />}
-      />
-      <Route
-        path="*"
-        element={<Navigate
-          to={"/"}
-          replace />}
-      />
+      <Route exact path={routes.FAQ.url} element={<FAQ />} />
+      <Route path="/" element={<Navigate to={"/marketplace"} replace />} />
+      <Route path="*" element={<Error />} />
     </Routes>
   );
 };

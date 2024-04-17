@@ -55,6 +55,7 @@ export const Inventory = {
   resell: '/resell',
   transfer: '/transfer',
   updateSale: '/updateSale',
+  getPriceHistory: '/price/history',
   // audit: '/:address/:chainId/audit',
 }
 

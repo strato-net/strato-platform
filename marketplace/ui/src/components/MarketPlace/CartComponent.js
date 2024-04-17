@@ -47,7 +47,7 @@ const CartComponent = ({ columns, data, openToastOrder }) => {
             ),
         });
         setTimeout(() => {
-            setCookie("returnUrl", `/marketplace/confirmOrder`, 10);
+            setCookie("returnUrl", `/confirmOrder`, 10);
             window.location.href = loginUrl;
         }, 4000);
     };
@@ -152,6 +152,7 @@ const CartComponent = ({ columns, data, openToastOrder }) => {
                                             countDown();
                                         } else {
                                             navigate("/confirmOrder");
+                                            window.scrollTo(0, 0);
                                         }
 
                                     } else {

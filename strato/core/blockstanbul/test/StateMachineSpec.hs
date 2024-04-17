@@ -51,7 +51,7 @@ myPriv :: PrivateKey
 myPriv = fromMaybe (error "could not import private key") (importPrivateKey (LabeledError.b16Decode "myPriv" $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"))
 
 testContext :: BlockstanbulContext
-testContext = newContext (Checkpoint (View 20 18) M.empty [] []) (fromPrivateKey myPriv) True
+testContext = newContext (Checkpoint (View 20 18) M.empty [] []) Nothing True (Just $ fromPrivateKey myPriv)
 
 runTest :: StateT BlockstanbulContext (LoggingT IO) () -> IO ()
 runTest = runAuthTest . (disableAuth >>)
@@ -131,7 +131,7 @@ spec = parallel $ do
         omsgs2 <- sendMessages preps
         let [(v', hsh', seal')] = [(k, l, m) | Commit k l m <- map oMessage omsgs2]
         ( v', hsh') `shouldBe` (v, hsh)
-        me <- use selfAddr
+        me <- use selfCert
         seal' `shouldSatisfy` (== Just me) . verifyCommitmentSeal hsh
         let coms = map (\a -> IMsg a $ Commit v hsh seal) as
         xsp <- sendMessages coms
@@ -267,7 +267,7 @@ spec = parallel $ do
   describe "A prepare message" $ do
     it "sets the prepared state of a validator" $ property $ \auth blk ->
       runTest $ do
-        me <- use selfAddr
+        me <- use selfCert
         (curView, di) <- setupRound blk [sender auth]
         -- Only one validator, so that should be a majority
         omsgs <- sendMessages [IMsg auth $ Prepare curView di]
@@ -296,7 +296,7 @@ spec = parallel $ do
         let [oa, Commit v d s] = map oMessage omsgs
         oa `shouldBe` oMessage (io $ upgrade a3)
         (v, d) `shouldBe` (curView, di)
-        me <- use selfAddr
+        me <- use selfCert
         s `shouldSatisfy` (== Just me) . verifyCommitmentSeal di
         use prepared `shouldReturn` M.fromList [(a1, di), (a2, di), (a3, di)]
 
@@ -438,7 +438,7 @@ spec = parallel $ do
 
   describe "An UnannouncedBlock message" $ do
     let selfElected = do
-          me <- use selfAddr
+          me <- use selfCert
           proposer .= me
           validators .= S.singleton me
 
@@ -479,7 +479,7 @@ spec = parallel $ do
         let parsedExtra = cookRawExtra . L.view extraLens $ blk'
         L.view vanity parsedExtra `vanityCompare` initData
         let Just ist = _istanbul parsedExtra
-        me <- use selfAddr
+        me <- use selfCert
         L.view validatorList ist `shouldBe` [me]
         L.view commitment ist `shouldBe` []
         L.view proposedSig ist `shouldSatisfy`
@@ -489,7 +489,7 @@ spec = parallel $ do
     it "takes priority over UnannouncedBlocks" $ property $ \lock' blk ->
       runTest $ do
         let lock = setBlockNo 19 lock'
-        me <- use selfAddr
+        me <- use selfCert
         validators .= S.singleton me
         proposer .= me
         blockLock .= Just lock
@@ -511,7 +511,7 @@ spec = parallel $ do
 
     it "Resets the lock after a commit result -- positive or negative" $ property $ \blk as ->
       runTest $ do
-        me <- use selfAddr
+        me <- use selfCert
         validators .= S.fromList (me:as)
         blockLock .= Just blk
         _ <- sendMessages [CommitResult (Left "oops")]
@@ -529,7 +529,7 @@ spec = parallel $ do
         use blockLock `shouldReturn` Just blk
 
     let setBlock blk = do
-          me <- use selfAddr
+          me <- use selfCert
           validators .= S.singleton me
           proposal .= Just blk
           blockLock .= Just blk
@@ -537,7 +537,7 @@ spec = parallel $ do
     it "requests a new block after success" $ property $ \blk ->
       runTest $ do
         setBlock blk
-        me <- use selfAddr
+        me <- use selfCert
         sendMessages [CommitResult (Right (blockHash blk))] `shouldReturn`
           [MakeBlockCommand
           , NewCheckpoint (Checkpoint (View 20 19) M.empty [me] [])]
@@ -545,7 +545,7 @@ spec = parallel $ do
     it "re-issues the lock after round change" $ property $ \blk sig ->
       runTest $ do
         setBlock blk
-        me <- use selfAddr
+        me <- use selfCert
         roundPlus1 <- uses view (over round (+1))
         let roundAndSequencePlus1 = over sequence (+1) roundPlus1
         resp <- sendMessages [IMsg (MsgAuth me sig) $ mkRoundChange roundAndSequencePlus1]
@@ -563,7 +563,7 @@ spec = parallel $ do
                    -> StateT BlockstanbulContext (LoggingT IO) (Block, [OutEvent])
         resendLock blk theirPK = do
           v <- use view
-          me <- use selfAddr
+          me <- use selfCert
           let them = fromPrivateKey theirPK
               vals = S.fromList [me, them]
               blk' = addValidators vals . truncateExtra . setBlockNo 19 $ blk
@@ -629,13 +629,13 @@ spec = parallel $ do
           void $ sendMessages [CommitResult . Right $ blockHash blk]
 
     it "will accept a previous block with the current sequence number" $ runTest $ do
-      me <- use selfAddr
+      me <- use selfCert
       validators .= S.singleton me
       checkedSend =<< selfSignBlock 19 myPriv [myPriv]
       use validators `shouldReturn` S.singleton me
 
     it "will reject a previous block in the future" $ runTest $ do
-      me <- use selfAddr
+      me <- use selfCert
       validators .= S.singleton me
       blk <- selfSignBlock 20 myPriv [myPriv]
       sendMessages [PreviousBlock blk] `shouldReturn` []

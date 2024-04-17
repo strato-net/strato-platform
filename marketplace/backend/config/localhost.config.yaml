@@ -8,12 +8,12 @@ serverIP:
 bootMembersFilename: boot_members.yaml
 cacheNonce: true
 dockerized: false
-marketplaceUiUrlPrefix: "/marketplace"
+marketplaceUiUrlPrefix: "/"
 
 nodes:
   - id: 0
     label: localhost
-    url: https://art.mercata-testnet2.blockapps.net
+    url: https://marketplace.mercata-testnet2.blockapps.net/
     oauth:
       appTokenCookieName: asset_framework_session
       appTokenCookieMaxAge: 7776000000

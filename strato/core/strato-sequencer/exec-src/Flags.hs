@@ -26,7 +26,6 @@ defineFlag "kafkaaddress" ("" :: String) "Alternate kafka instance to connect to
 -- blockstanbul related flags
 -- TODO(tim): We may need to specify a starting view, or catch up from the network
 defineFlag "blockstanbul" (False :: Bool) "Whether to run blockstanbul"
-defineFlag "certInfo" ("{\"access\":false}" :: String) "JSON encoded ChainMemberParsedSet representing this node's identity"
 defineFlag "genesisBlockName" ("livenet" :: String) "use the alternate stablenet genesis block"
 defineFlag "blockstanbul_block_period_ms" (1000 :: Int) "Minimum delay between block creations"
 defineFlag

@@ -255,6 +255,7 @@ const CategoryProductCard = ({ product }) => {
                       });
                       if (addItemToCart()) {
                         navigate("/checkout");
+                        window.scrollTo(0, 0);
                       }
                     }}
                   >

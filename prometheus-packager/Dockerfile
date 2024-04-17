@@ -1,4 +1,4 @@
-FROM prom/prometheus:latest
+FROM prom/prometheus:v2.49.1
 
 COPY strato_prometheus.yml /etc/prometheus/strato_prometheus.yml
 
