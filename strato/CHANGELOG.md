@@ -21,10 +21,13 @@ so that they could be properly moved to their respective version's subsection.
 
 ### Changed
 - `eth_<random 20 bytes>` database is now just named `eth`
+- `queryStrato` is now `strato-barometer`
+- `strato-barometer` commands point to a copy of `./ethereumH` to access LevelDB data
 
 ### Fixed
 
 ### Removed
+- Removed 'block', 'blockGO', 'canonRedis', 'compressRoundChanges' commands from blockapps-tools
 - Removed `certInfo` flag from strato-sequencer (cert is now derived from genesis block or during sync)
 - Removed unused flags, such as `brokenRefundRenable`, `cacheTransactionResults`, `faucetEnabled`, `createTransactionResults`, `gasOn`, `splitinit`, and `useSyncMode`
 - unused api endpoints: `/version`, `/coinbase`, `/log`, `transactionList`, `/uuid`, `/transaction/raw`, and `/fill`
@@ -39,7 +42,7 @@ so that they could be properly moved to their respective version's subsection.
 - `VM_DEBUGGER=bool` flag added for connecting to the VM debugger + static analysis websocket
 - Derive service provider URLs from node's network ID for testnet and production nodes
 - Update foreign keys for `BlockApps-Mercata-Asset` + `Sale` contracts whenever there is a table expansion
-- functionality to enumerate threads and their details in `/threads` endpoint of `P2PAPI`
+- Functionality to enumerate threads and their details in `/threads` endpoint of `P2PAPI`
 - `/peers` endpoint in `P2PAPI` to list peer connections and their health
 - POST `/transaction` contract creation calls will now additionally check for address state ref table entry before resolving
 - Jenkins test to ensure slipstream post sync is consistent with boot node

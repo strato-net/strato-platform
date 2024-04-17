@@ -3,7 +3,6 @@ packages:
 - api/bloc/bloc2api
 - api/bloc/bloc2client
 - api/core
-- api/ethereum-jsonrpc
 - api/strato-api
 
 - core/blockapps-data

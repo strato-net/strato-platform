@@ -40,11 +40,10 @@ FROM base as strato
 COPY \
   ./usr/local/bin/blockapps-vault-proxy-server \
   ./usr/local/bin/ethereum-discover \
-  ./usr/local/bin/ethereum-jsonrpc \
   ./usr/local/bin/forced-config-change \
   ./usr/local/bin/ghc-debug \
   ./usr/local/bin/init-worker \
-  ./usr/local/bin/queryStrato \
+  ./usr/local/bin/strato-barometer \
   ./usr/local/bin/slipstream \
   ./usr/local/bin/strato-api \
   ./usr/local/bin/strato-api-indexer \

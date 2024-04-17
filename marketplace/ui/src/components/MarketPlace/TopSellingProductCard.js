@@ -29,9 +29,9 @@ const TopSellingProductCard = () => {
   const orderDispatch = useOrderDispatch();
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (hasChecked && !isAuthenticated) {
       actions.fetchTopSellingProducts(marketplaceDispatch, offset, limit);
-    } else {
+    } else if (hasChecked && isAuthenticated) {
       actions.fetchTopSellingProductsLoggedIn(
         marketplaceDispatch,
         offset,

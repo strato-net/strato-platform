@@ -9,9 +9,6 @@ import qualified Blockchain.Strato.Discovery.Data.Peer as DataPeer
 import Database.Persist.Postgresql
 import HFlags
 
-psql :: IO ()
-psql = putStrLn $ "psql " ++ database (sqlConfig ethConf)
-
 migrate :: String -> IO ()
 migrate tables = do
   _ <- $initHFlags "migrate" -- I'm not sure that this makes sense to interleave with Ann, but we need minLogLevel
