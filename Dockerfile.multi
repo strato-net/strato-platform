@@ -40,14 +40,13 @@ FROM base as strato
 COPY \
   ./usr/local/bin/blockapps-vault-proxy-server \
   ./usr/local/bin/ethereum-discover \
-  ./usr/local/bin/ethereum-jsonrpc \
   ./usr/local/bin/forced-config-change \
   ./usr/local/bin/ghc-debug \
   ./usr/local/bin/global-db \
   ./usr/local/bin/init-worker \
   ./usr/local/bin/logserver \
   ./usr/local/bin/post-raw-transaction \
-  ./usr/local/bin/queryStrato \
+  ./usr/local/bin/strato-barometer \
   ./usr/local/bin/slipstream \
   ./usr/local/bin/strato-api \
   ./usr/local/bin/strato-api-indexer \
@@ -56,7 +55,6 @@ COPY \
   ./usr/local/bin/strato-sequencer \
   ./usr/local/bin/strato-setup \
   ./usr/local/bin/strato-txr-indexer \
-  ./usr/local/bin/tabula-rasa \
   ./usr/local/bin/vm-runner \
   ./usr/local/bin/x509-generator \
   ./usr/local/bin/x509-keygen \

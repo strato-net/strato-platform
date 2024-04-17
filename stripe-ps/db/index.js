@@ -1,40 +1,49 @@
-import sqlite3 from 'sqlite3';
-import path from 'path';
-import {fileURLToPath} from 'url';
+import fs from 'fs';
+import { Client } from 'pg';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const DBSOURCE = process.env.TEST_DB && process.env.TEST_DB === "false" ?
-    (process.env.DOCKERIZED === "true" ? "/sqlitedb/db.sqlite" : "db.sqlite")
-    : "test_db.sqlite";
-
-const db = new sqlite3.Database(path.resolve(__dirname, DBSOURCE), (err) => {
-    if (err) {
-      // Cannot open database
-      console.error(err.message)
-      throw err
-    }else{
-        console.log('Connected to the SQLite database.')
-        db.run(`CREATE TABLE IF NOT EXISTS customer_address (
-            address_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            commonName text, 
-            name text, 
-            zipcode text,
-            state text,
-            city text,
-            addressLine1 text,
-            addressLine2 text,
-            country text,
-            createdDate DATETIME DEFAULT CURRENT_TIMESTAMP
-            )`,
-        (err) => {
-            if (err) {
-                console.log('Customer address table already exists. Skipping table creation...')
-            }
-        });  
+const client = new Client({
+    host: process.env.POSTGRESQL_SERVER_URL,
+    port: process.env.POSTGRESQL_PORT || '5432',
+    user: process.env.POSTGRESQL_USER || 'postgres',
+    password: process.env.POSTGRESQL_PASSWORD,
+    dbname: process.env.POSTGRESQL_DBNAME || 'postgres',
+    ssl: {
+        require: true,
+        rejectUnauthorized: true,
+        ca: fs.readFileSync('./dbCert/us-east-1-bundle.cer').toString(),
     }
 });
 
+if (process.env.POSTGRESQL_SERVER_URL && process.env.POSTGRESQL_PASSWORD) {
+    client.connect()
+        .then(() => {
+            console.log('Connected to the PostgreSQL database.');
 
-export default db;
+            const query = `
+            CREATE TABLE IF NOT EXISTS customer_address (
+            address_id SERIAL PRIMARY KEY,
+            commonName TEXT,
+            name TEXT,
+            zipcode TEXT,
+            state TEXT,
+            city TEXT,
+            addressLine1 TEXT,
+            addressLine2 TEXT,
+            country TEXT,
+            createdDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP);`;
+
+            return client.query(query);
+        })
+        .then(() => {
+            console.log('Table created or already exists.');
+        })
+        .catch(error => {
+            console.error('Error creating table:', error);
+        })
+} else {
+    console.error('CRITICAL ERROR: Missing Postgres URL and/or password');
+    process.exit(1)
+}
+
+export default client;
+

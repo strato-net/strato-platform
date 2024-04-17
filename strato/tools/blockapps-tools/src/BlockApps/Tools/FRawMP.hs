@@ -17,7 +17,7 @@ import Text.Format
 
 doit :: String -> MP.StateRoot -> IO ()
 doit filename sr = void . DB.runResourceT $ do
-  sdb <- DB.open filename DB.defaultOptions {DB.cacheSize = 1024}
+  sdb <- DB.open ("/tmp/.ethereumH/" ++ filename) DB.defaultOptions {DB.cacheSize = 1024}
   runReaderT (MP.map f sr) sdb
   where
     --f k v = liftIO $ putStrLn $ displayS (renderPretty 1.0 200 $ formatKV k v) ""
