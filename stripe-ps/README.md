@@ -98,9 +98,9 @@ The payment server uses `jest` as its testing framework. In order to run the tes
 `MARKETPLACE_URL` for Stripe API callback
 `STRIPE_PUBLISHABLE_KEY` for Stripe API
 `STRIPE_SECRET_KEY` for Stripe API
-`TEST_ACCT_ID` for Stripe API
+`TEST_ACCT_ID` for Stripe API Tests
 `TEST_DB` should be set to true
-`TEST_SESSION_ID` is optional for testing the session and intent endpoints
+`TEST_SESSION_ID` is optional for testing the Stripe session and intent endpoints
 ```
 
 Afterwards, simply run `npm run test`.

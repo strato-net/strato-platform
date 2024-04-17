@@ -12,7 +12,6 @@ app.use('/stripe', stripService);
 const testAccountId = process.env.TEST_ACCT_ID;
 const marketplaceUrl = process.env.MARKETPLACE_URL;
 const testSessionId = process.env.TEST_SESSION_ID;
-const testSellerId = process.env.TEST_SELLER_ID;
 
 describe('Stripe Endpoint Tests', function() {
 
@@ -106,13 +105,13 @@ describe('Stripe Endpoint Tests', function() {
 
     it('Retrieve the Stripe session given sessionId', async () => {
       const res = await request(app)
-        .get(`/stripe/session/${testSessionId}/${testSellerId}`);
+        .get(`/stripe/session/${testSessionId}/${testAccountId}`);
       expect(res.statusCode).toBe(200);
     });
 
     it('Retrieve the Stripe intent given sessionId', async () => {
       const res = await request(app)
-        .get(`/stripe/intent/${testSessionId}/${testSellerId}`);
+        .get(`/stripe/intent/${testSessionId}/${testAccountId}`);
       expect(res.statusCode).toBe(200);
     });
   }

@@ -2,7 +2,7 @@ import bodyParser from 'body-parser';
 import request from 'supertest';
 import express from 'express';
 import customerAddress from '../CustomerAddress/index';
-import db from '../db/index.js';
+import client from '../db/index.js';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -84,10 +84,7 @@ describe('Customer Address Database Tests', function () {
   });
 
   afterAll(() => {
-    db.run(`DROP TABLE IF EXISTS customer_address`, 
-      (err) => {
-        if (err) throw err;
-    });
+    // Delete test table here
   })
 
 })
