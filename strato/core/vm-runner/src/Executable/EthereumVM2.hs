@@ -185,7 +185,7 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis {..} -> do
 
       withCurrentBlockHash bHash $ do
         $logInfoS "insertNewChains" $ T.pack $ "This is a new chain!"
-        let theVM = T.unpack $ fromMaybe "SolidVM" $ M.lookup "VM" $ chainMetadata (chainInfo cInfo)
+        let theVM = T.unpack $ fromMaybe "EVM" $ M.lookup "VM" $ chainMetadata (chainInfo cInfo)
             tHash = Keccak256.unsafeCreateKeccak256FromWord256 cId
         sr' <- chainInfoToGenesisState theVM (Just cId) cInfo
         void $ putChainGenesisInfo (Just cId) cBlock sr' pChains
