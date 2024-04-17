@@ -54,7 +54,10 @@ const actionDescriptors = {
   createItemFailed: "create_item_failed",
   fetchInventoryForUser: "fetch_inventory_user_profile",
   fetchInventoryForUserSuccessful: "fetch_inventory_user_profile_success",
-  fetchInventoryForUserFailed: "fetch_inventory_user_profile_failed"
+  fetchInventoryForUserFailed: "fetch_inventory_user_profile_failed",
+  fetchPriceHistory: "fetch_price_history",
+  fetchPriceHistorySuccessful: "fetch_price_history_successful",
+  fetchPriceHistoryFailed: "fetch_price_history_failed"  
 
 };
 
@@ -893,7 +896,37 @@ const actions = {
       });
       actions.setMessage(dispatch, "Error while creating Item");
     }
+  },
+
+  fetchPriceHistory: async (dispatch, assetAddress, limit, offset, timeFilter) => {
+    dispatch({ type: actionDescriptors.fetchPriceHistory });
+    try {
+      const query = assetAddress ? `&assetToBeSold=${encodeURIComponent(assetAddress)}` : ``;
+      let response = await fetch(`${apiUrl}/inventory/price/history?${query}&offset=${offset}&limit=${limit}&timeFilter=${timeFilter}`, {
+        method: HTTP_METHODS.GET,
+        credentials: "same-origin",
+      });
+      const body = await response.json();
+      if (response.status === RestStatus.UNAUTHORIZED || response.status === RestStatus.FORBIDDEN) {
+        dispatch({
+          type: actionDescriptors.fetchPriceHistoryFailed,
+          payload: "Error while fetching price history",
+        });
+        return;
+      }
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchPriceHistorySuccessful,
+          payload: body.data
+        });
+        return;
+      }
+      dispatch({ type: actionDescriptors.fetchPriceHistoryFailed, payload: "Error while fetching price history" });
+    } catch (err) {
+      dispatch({ type: actionDescriptors.fetchPriceHistoryFailed, payload: "Error while fetching price history" });
+    }
   }
+
 
 };
 

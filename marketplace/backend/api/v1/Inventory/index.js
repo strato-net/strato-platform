@@ -90,4 +90,11 @@ router.put(
   InventoryController.updateSale
 )
 
+router.get(
+  Inventory.getPriceHistory,
+  authHandler.authorizeRequest(true),
+  loadDapp,
+  InventoryController.getPriceHistory
+);
+
 export default router;
