@@ -255,7 +255,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
       <div className="bg-[#F2F2F9] rounded-md px-[14px] flex flex-col justify-between items-center pb-[13px] pt-2 w-full">
         <div className="w-full">
           <div className="grid grid-cols-1 lg:grid-cols-2 w-full auto-cols-max">
-            <p className="text-lg lg:text-xl font-semibold text-[#202020] cursor-default" onClick={callDetailPage}>
+            <p className="text-lg lg:text-xl font-semibold text-[#202020] hover:text-[#4285F4] cursor-pointer" onClick={callDetailPage}>
               <Tooltip title={inventory?.name.length > 20 ? inventory?.name : null}>
                 <span className=" whitespace-nowrap max-w-[160px] inline-block">
                   {inventory?.name.length > 20 ? `${inventory?.name.slice(0, 17)}...` : `${inventory?.name}`}
