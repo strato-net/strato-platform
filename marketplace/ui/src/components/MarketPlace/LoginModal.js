@@ -16,7 +16,7 @@ const LoginModal = ({ visible, onCancel, onLogin }) => {
                 </Button>,
             ]}
         >
-            <p>You need to log in to continue. Would you like to log in now?</p>
+            <p>You need to login to continue. Would you like to login now?</p>
         </Modal>
     );
 };
