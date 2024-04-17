@@ -311,8 +311,9 @@ create' creator issuerAcct issuerName newAccount ch cc contractName' argExps cre
 
   void . withCallInfo newAccount contract' (stringToLabel $ labelToString contractName' ++ " constructor") ch cc M.empty False False $ pure ()
 
+  let issuer = (\env -> if shouldDoCreatorFork (blockHeaderBlockNumber $ Env.blockHeader env) then issuerAcct else Env.origin env) =<< getEnv
   -- set creator
-  (\env -> setCreator issuerAcct newAccount contract' (blockDataNumber $ Env.blockHeader env)) =<< getEnv
+  (\env -> setCreator issuer newAccount contract' (blockDataNumber $ Env.blockHeader env)) =<< getEnv
 
   -- Run the constructor
   runTheConstructors creator newAccount ch cc contractName' argExps
@@ -322,7 +323,7 @@ create' creator issuerAcct issuerName newAccount ch cc contractName' argExps cre
   void . withCallInfo newAccount contract' (stringToLabel $ labelToString contractName' ++ " constructor") ch cc M.empty False False $ do
     -- blockdataNumber $ BlockHeader . Env
     -- set creator again, in case the caller's cert changed during constructor execution
-    (\env -> setCreator issuerAcct newAccount contract' (blockDataNumber $ Env.blockHeader env)) =<< getEnv
+    (\env -> setCreator issuer newAccount contract' (blockDataNumber $ Env.blockHeader env)) =<< getEnv
 
   -- let parentName' = bool parentName "" (useWallet && parentName == "User")
   
