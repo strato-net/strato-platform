@@ -18,9 +18,6 @@ import {
   fetchAccountDetail,
   fetchAccountDetailSuccess,
   fetchAccountDetailFailure,
-  FAUCET_REQUEST,
-  faucetSuccess,
-  faucetFailure,
   fetchBalanceSuccess,
   fetchBalanceFailure,
   fetchCurrentAccountDetailSuccess,
@@ -32,7 +29,6 @@ import {
 } from './accounts.actions';
 import { env } from '../../env';
 import { hideLoading } from 'react-redux-loading-bar';
-import { delay } from 'redux-saga';
 import { handleErrors } from '../../lib/handleErrors';
 import { createUrl } from '../../lib/url';
 
@@ -103,29 +99,6 @@ export function getAccountDetailApi(address, chainid) {
     .catch(function (error) {
       throw error;
     });
-}
-
-export function postFaucet(username, address) {
-  const options = { params: { user: username, address }, query: { resolve: true } };
-  const url = env.BLOC_URL + createUrl("/users/::user/::address/fill", options);
-
-  return fetch(
-    url,
-    {
-      method: 'POST',
-      credentials: "include",
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      }
-    }
-  )
-    .then(handleErrors)
-    .then(function (response) {
-      return;
-    })
-    .catch(function (error) {
-      throw error;
-    })
 }
 
 export function getOauthAccountsApi() {
@@ -217,8 +190,6 @@ export function* getAccountDetail(action) {
     const response = yield call(getAccountDetailApi, action.address, action.chainId);
     // don't ask about response['0'].
     yield put(fetchAccountDetailSuccess(action.name, action.address, response['0']));
-    if (action.flag)
-      yield put(faucetSuccess());
   }
   catch (err) {
     yield put(fetchAccountDetailFailure(action.name, action.address, err));
@@ -233,19 +204,6 @@ export function* getCurrentAccountDetail(action) {
   }
   catch (err) {
     yield put(fetchCurrentAccountDetailFailure(action.address, err));
-  }
-}
-
-export function* faucetAccount(action) {
-  try {
-    yield call(postFaucet, action.name, action.address);
-    yield call(delay, 100)
-    yield put(fetchAccountDetail(action.name, action.address, action.chainId, action.flag));
-    if (!action.flag)
-      yield put(faucetSuccess());
-  }
-  catch (err) {
-    yield put(faucetFailure(err))
   }
 }
 
@@ -275,7 +233,6 @@ export default function* watcAccountActions() {
     takeEvery(FETCH_ACCOUNT_ADDRESS_REQUEST, getUserAddresses),
     takeEvery(FETCH_ACCOUNT_DETAIL_REQUEST, getAccountDetail),
     takeEvery(FETCH_CURRENT_ACCOUNT_DETAIL_REQUEST, getCurrentAccountDetail),
-    takeLatest(FAUCET_REQUEST, faucetAccount),
     takeEvery(GET_BALANCE, getBalance),
     takeEvery(FETCH_OAUTH_ACCOUNTS_REQUEST, getOauthAccounts)
   ];
