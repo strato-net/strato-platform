@@ -16,7 +16,7 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
     const [comments, setComments] = useState("");
     const inventoryDispatch = useInventoryDispatch();
     const marketplaceDispatch = useMarketplaceDispatch();
-    const [canTransfer, setCanTransfer] = useState(true);
+    const [canRedeem, setCanRedeem] = useState(true);
     const [selectedAddress, setSelectedAddress] = useState(0);
     const [modalAddress, setmodalAddress] = useState(false);
     const [showAddress, setshowAddress] = useState(false);
@@ -34,14 +34,14 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
         marketplaceActions.fetchUserAddresses(marketplaceDispatch);
     }, [marketplaceDispatch])
 
-    // useEffect(() => {
-    //     if (quantity > inventory.quantity || quantity <= 0 || !userAddress) {
-    //         setCanTransfer(false);
-    //     }
-    //     else {
-    //         setCanTransfer(true);
-    //     };
-    // }, [quantity, userAddress])
+    useEffect(() => {
+        if (quantity > inventory.quantity || quantity <= 0) {
+            setCanRedeem(false);
+        }
+        else {
+            setCanRedeem(true);
+        };
+    }, [quantity])
 
     const columns = [
         {
@@ -98,7 +98,7 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
             centered
             footer={[
                 <div className="flex justify-center md:block">
-                    <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canTransfer} loading={isRequestingRedemption}>
+                    <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canRedeem} loading={isRequestingRedemption}>
                         Redeem
                     </Button>
                 </div>
