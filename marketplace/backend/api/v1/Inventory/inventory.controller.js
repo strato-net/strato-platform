@@ -355,6 +355,7 @@ class InventoryController {
       paymentProviders: Joi.array().min(1).items(Joi.string().required()).optional(),
       price: Joi.number().integer().greater(0).optional(),
       quantity:  Joi.number().integer().greater(0),
+      isIncrease: Joi.bool().required(),
       assets: Joi.array().items(
         Joi.object({
           saleAddress: Joi.string().required(),

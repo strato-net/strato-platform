@@ -509,76 +509,103 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.updateSale = async function (args, options = defaultOptions) {
     options.cacheNonce = true;
-    let totalListedQuantity = 0;
-    const targetQuantity = parseInt(args.quantity, 10) // Had issues with these returning NaN in quantityToBeListed if we didn't parseInt
+    const targetQuantity = parseInt(args.quantity, 10);
     const updatePromises = [];
 
-    for (const asset of args.assets) {
-      if (totalListedQuantity >= targetQuantity) break; // Stop if we've listed enough items
+    // Calculate total listed quantity
+    let totalListedQuantity = args.assets.reduce((acc, asset) => acc + parseInt(asset.saleQuantity, 10), 0);
 
-      const assetQuantity = parseInt(asset.saleQuantity, 10); // Had issues with these returning NaN in quantityToBeListed if we didn't parseInt
+    if (args.isIncrease) {
+        // Handle increasing the quantity
+        for (const asset of args.assets) {
+            if (totalListedQuantity >= targetQuantity) break; // Stop if we've listed enough items
 
-      // Determine how many more items need to be listed to reach the target quantity
-      const remainingQuantity = targetQuantity - totalListedQuantity;
-      const quantityToBeListed = Math.min(assetQuantity, remainingQuantity);
-      
-      totalListedQuantity += quantityToBeListed;  // Update the total listed quantity
+            const assetQuantity = parseInt(asset.saleQuantity, 10);
+            const remainingQuantity = targetQuantity - totalListedQuantity;
+            const quantityToBeListed = Math.min(assetQuantity, remainingQuantity);
+            
+            totalListedQuantity += quantityToBeListed; // Update the total listed quantity
 
-      const restArgs = {
-        ...args,
-        quantity: quantityToBeListed,
-      };
-      const contract = { address: asset.saleAddress };
+            const restArgs = {
+                ...args,
+                quantity: quantityToBeListed,
+            };
+            const contract = { address: asset.saleAddress };
+            updatePromises.push(inventoryJs.updateSale(rawAdmin, contract, restArgs, options));
+        }
+    } else {
+        // Handle decreasing the quantity
+        let remainingToDecrease = totalListedQuantity - targetQuantity;
 
-      // Perform the update for this specific asset
-      updatePromises.push(inventoryJs.updateSale(rawAdmin, contract, restArgs, options));
+        for (const asset of args.assets) {
+            if (remainingToDecrease <= 0) break; // If we deached desired quantity
+
+            const assetQuantity = parseInt(asset.saleQuantity, 10);
+
+            if (assetQuantity > remainingToDecrease) {
+                // If the asset's quantity is more than we need to decrease we can update the sale
+                const quantityToBeListed = assetQuantity - remainingToDecrease;
+                const restArgs = {
+                    ...args,
+                    quantity: quantityToBeListed,
+                };
+                const contract = { address: asset.saleAddress };
+                updatePromises.push(inventoryJs.updateSale(rawAdmin, contract, restArgs, options));
+                remainingToDecrease = 0; 
+            } else {
+                // If the asset's quantity is less or equal, unlist the asset
+                const contract = { address: asset.saleAddress };
+                updatePromises.push(inventoryJs.unlistItem(rawAdmin, contract, {}, options));
+                remainingToDecrease -= assetQuantity; // Update remaining to decrease
+            }
+        }
     }
 
     const results = await Promise.allSettled(updatePromises);
-  
-    // Process successful transactions
+
+    // Process successful and failed transactions
     const successfulTransactions = results.filter(result => result.status === 'fulfilled').map((result, index) => ({
-      success: true,
-      address: args.assets[index].saleAddress,
-      result: result.value
+        success: true,
+        address: args.assets[index].saleAddress,
+        result: result.value
     }));
-  
-    // Process failed transactions
+
     const failedTransactions = results.filter(result => result.status === 'rejected').map((result, index) => {
-      const failureAddress = args.assets[index].saleAddress;
-      let statusCode = "unknown";
-      let errorMessage = "Unknown error occurred";
-  
-      if (result.reason && result.reason.response) {
-        statusCode = result.reason.response.status;
-        errorMessage = result.reason.response.data || "Error with no additional information";
-      } else if (result.reason instanceof Error) {
-        errorMessage = result.reason.message;
-      }
-  
-      return {
-        success: false,
-        address: failureAddress,
-        statusCode: statusCode,
-        errorMessage: errorMessage
-      };
+        const failureAddress = args.assets[index].saleAddress;
+        let statusCode = "unknown";
+        let errorMessage = "Unknown error occurred";
+
+        if (result.reason && result.reason.response) {
+            statusCode = result.reason.response.status;
+            errorMessage = result.reason.response.data || "Error with no additional information";
+        } else if (result.reason instanceof Error) {
+            errorMessage = result.reason.message;
+        }
+
+        return {
+            success: false,
+            address: failureAddress,
+            statusCode: statusCode,
+            errorMessage: errorMessage
+        };
     });
-  
+
     // Return detailed information about successful and failed transactions
     if (failedTransactions.length > 0) {
-      return {
-        success: false,
-        failedTransactions: failedTransactions,
-        successfulTransactions: successfulTransactions
-      };
+        return {
+            success: false,
+            failedTransactions: failedTransactions,
+            successfulTransactions: successfulTransactions
+        };
     }
-  
+
     // If all transactions were successful
     return {
-      success: true,
-      transactions: successfulTransactions
+        success: true,
+        transactions: successfulTransactions
     };
-  };
+};
+
   
 
   contract.updateInventory = async function (args, options = defaultOptions) {

@@ -157,6 +157,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
     
         // Calculate quantity from assets with a saleAddress
         quantityAllocated = assetsToUpdate.reduce((sum, asset) => sum + asset.quantity, 0);
+        let isIncrease = totalQuantityToBeListed > quantityAllocated;
         let promises = [];
 
         // If there are assets with saleAddress, prepare update and potential listing
@@ -165,6 +166,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
                 paymentProviders: paymentProviderAddress ? [paymentProviderAddress] : [],
                 price: pricePerUnit,
                 quantity: totalQuantityToBeListed,
+                isIncrease: isIncrease,
                 assets: assetsToUpdate.map(asset => ({
                     saleAddress: asset.saleAddress,
                     saleQuantity: asset.quantity,
