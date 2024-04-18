@@ -78,7 +78,7 @@ abstract contract Asset is Utils {
                 ownerCommonName,
                 itemNumber,
                 itemNumber + _quantity - 1,
-                0
+                0 // Here 0 is price
             );
         }
     }
@@ -173,7 +173,7 @@ abstract contract Asset is Utils {
         _transfer(_newOwner, _quantity, _isUserTransfer, _transferNumber, _price);
     }
 
-    function automaticTransfer(address _newOwner, uint _quantity, uint _transferNumber, uint _price) public requireOwner("automatic transfer") returns (uint) {
+    function automaticTransfer(address _newOwner, uint _price, uint _quantity, uint _transferNumber) public requireOwner("automatic transfer") returns (uint) {
         require(_quantity <= quantity, "Cannot transfer more than available quantity.");
         if (sale == address(0)) {
             // transfer feature - isUserTransfer: true, transferNumber: >0
@@ -181,7 +181,7 @@ abstract contract Asset is Utils {
             return RestStatus.OK;
         } else {
             // transfer feature - isUserTransfer: true, transferNumber: >0
-            return Sale(sale).automaticTransfer(_newOwner, _quantity, _transferNumber, _price);
+            return Sale(sale).automaticTransfer(_newOwner, _price, _quantity, _transferNumber);
         }
     }
 
