@@ -491,13 +491,14 @@ const ConfirmOrder = () => {
                     />
                     :
                     <>
-                      <div className=" hidden md:block"><Button type="link" icon={<img src={Images.AddBlack} className=" w-4 h-4 lg:w-6 lg:h-6 " alt="add" />}
+                      <div id="add-Address" className="hidden md:block">
+                        <Button type="link" icon={<img src={Images.AddBlack} className=" w-4 h-4 lg:w-6 lg:h-6 " alt="add" />}
                         onClick={() => {
                           setshowAddress(true);
                           setmodalAddress(true);
                         }}
                       /></div>
-                      <div className="  md:hidden"><Button type="link" icon={<img src={Images.AddBlack} className=" w-4 h-4 lg:w-6 lg:h-6 " alt="add" />}
+                      <div className="md:hidden"><Button type="link" icon={<img src={Images.AddBlack} className=" w-4 h-4 lg:w-6 lg:h-6 " alt="add" />}
                         onClick={() => {
                           setResponsiveAddress(true);
                         }}
@@ -514,10 +515,10 @@ const ConfirmOrder = () => {
                       </div>
                       :
                       userAddresses.length !== 0 ?
-                        <div className="grid grid-rows-2 sm:grid-rows-1 grid-flow-col gap-4 lg:flex  lg:flex-wrap overflow-x-auto lg:overflow-y-auto hide-Scroll lg:gap-x-6 lg:gap-y-[20px] pt-4 h-[50%] lg:h-[44vh]">
+                        <div id="address-list" className="grid grid-rows-2 sm:grid-rows-1 grid-flow-col gap-4 lg:flex  lg:flex-wrap overflow-x-auto lg:overflow-y-auto hide-Scroll lg:gap-x-6 lg:gap-y-[20px] pt-4 h-[50%] lg:h-[44vh]">
                           {
                             userAddresses.map((add, index) =>
-                              <div key={index}>
+                              <div id={`address-${index}`} key={index}>
                                 <div className={`w-[307px] h-[200px] overflow-x-auto hide-Scroll py-3 px-[14px] rounded-[4px] ${index !== selectedAddress ? " cursor-pointer border border-[#0000002E] " : " border border-primary cursor-pointer"}`} onClick={() => { setSelectedAddress(index) }}>
                                   <AddressComponent userAddress={add} />
                                 </div>

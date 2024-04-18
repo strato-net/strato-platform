@@ -66,6 +66,80 @@ describe('Create a new Asset', () => {
           expect(totalPrice).to.equal(productPrice);
         });
       });
+
+      cy.get('#submit-order-button')
+      cy.get('#submit-order-button').click();
+      cy.url('/confirmOrder')
+
+      cy.get('#add-Address')
+      cy.get('#add-Address').click();
+      // Fill Address Fields--------
+      cy.get('input[name=name]')
+      cy.get('input[name=name]').type('user-01').should('have.value', 'user-01')
+
+      cy.get('input[name=addressLine1]')
+      cy.get('input[name=addressLine1]').type('Address-line-01').should('have.value', 'Address-line-01')
+
+      cy.get('input[name=addressLine2]')
+      cy.get('input[name=addressLine2]').type('Address-line-02').should('have.value', 'Address-line-02')
+
+      cy.get('input[name=city]')
+      cy.get('input[name=city]').type('Dallas').should('have.value', 'Dallas')
+
+      cy.get('input[name=state]')
+      cy.get('input[name=state]').type('Dallas').should('have.value', 'Dallas')
+
+      cy.get('input[name=zipcode]')
+      cy.get('input[name=zipcode]').type('12345').should('have.value', '12345')
+
+      cy.get('input[name=country]')
+      cy.get('input[name=country]').type('United States').should('have.value', 'United States')
+      // Fill Address Fields--------
+      cy.get('#add-Address-Btn')
+      cy.get('#add-Address-Btn').click()
+
+      cy.get('#address-list')
+      cy.get('#address-0')
+      cy.get('#address-0').click();
+
+      cy.get('#pay-now-button')
+      cy.get('#pay-now-button').click();
+
+      cy.url('checkout.stripe.com')
+      
+
+      cy.get('input[name=email]')
+      cy.get('input[name=email]').type('tanuj@blockapps.net').should('have.value', 'tanuj@blockapps.net')
+
+      cy.get('#card-tab')
+      cy.get('#card-tab').click()
+
+      cy.get('input[name=cardNumber]')
+      cy.get('input[name=cardNumber]').type('4000 0035 6000 0008').should('have.value', '4000 0035 6000 0008')
+
+      cy.get('input[name=cardExpiry]')
+      cy.get('input[name=cardExpiry]').type('0325').should('have.value', '0325')
+
+      cy.get('input[name=cardCvc]')
+      cy.get('input[name=cardCvc]').type('007').should('have.value', '007')
+
+      cy.get('input[name=billingName]') 
+      cy.get('input[name=billingName]').type('Tanuj Soni').should('have.value', 'Tanuj Soni')
+
+      cy.get('#country-fieldset')
+      cy.get('#country-fieldset').click()
+
+      cy.get('select option[value="IN"]').should('be.selected');
+
+      cy.get('button[type="submit"]').click();
+
+      cy.get('#Orders')
+      cy.get('#Orders').click();
+
+      cy.get('#bought-tab')
+      cy.get('#bought-tab').click()
+
+
     });
     // cy.get("#Art")
     // cy.get("#Art").click()
