@@ -9,8 +9,7 @@ const app = new express();
 app.use(bodyParser.json());
 app.use('/stripe', stripService);
 
-const testAccountId = process.env.TEST_ACCT_ID;
-const marketplaceUrl = process.env.MARKETPLACE_URL;
+const testAccountId = process.env.TEST_ACCOUNT_ID;
 const testSessionId = process.env.TEST_SESSION_ID;
 
 describe('Stripe Endpoint Tests', function() {
@@ -18,21 +17,21 @@ describe('Stripe Endpoint Tests', function() {
   it('Onboard without accountId', async () => {
     const res = await request(app)
       .get('/stripe/onboard')
-      .set('referer', marketplaceUrl);
+      .set('referer', 'http://0.0.0.0');
     expect(res.statusCode).toBe(200);
   });
 
   it('Onboard with accountId', async () => {
     const res = await request(app)
       .get(`/stripe/onboard/${testAccountId}`)
-      .set('referer', marketplaceUrl);
+      .set('referer', 'http://0.0.0.0');
     expect(res.statusCode).toBe(200);
   });
 
   it('Should not be able to onboard with invalid accountId', async () => {
     const res = await request(app)
       .get('/stripe/onboard/fake_account')
-      .set('referer', marketplaceUrl);
+      .set('referer', 'http://0.0.0.0');
     expect(res.statusCode).toBe(400);
   });
 
@@ -51,7 +50,7 @@ describe('Stripe Endpoint Tests', function() {
   it('Checkout endpoint should return checkout url', async () => {
     const res = await request(app)
       .post('/stripe/checkout')
-      .set('referer', marketplaceUrl)
+      .set('referer', 'http://0.0.0.0')
       .send({ 
         paymentTypes: ['card', 'us_bank_account'], 
         cartData: {
@@ -81,7 +80,7 @@ describe('Stripe Endpoint Tests', function() {
   it('Should return an error when trying to checkout with malformed data', async () => {
     const res = await request(app)
       .post('/stripe/checkout')
-      .set('referer', marketplaceUrl)
+      .set('referer', 'http://0.0.0.0')
       .send({ 
         paymentTypes: ['card', 'us_bank_account']
       });
@@ -100,8 +99,7 @@ describe('Stripe Endpoint Tests', function() {
     expect(res.statusCode).toBe(403);
   });
 
-  if (testSellerId && testSessionId) {
-    console.log('Running optional session and intent tests');
+  if (testAccountId && testSessionId) {
 
     it('Retrieve the Stripe session given sessionId', async () => {
       const res = await request(app)

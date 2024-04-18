@@ -1,5 +1,6 @@
 import fs from 'fs';
-import { Client } from 'pg';
+import pg from 'pg';
+const { Client } = pg;
 
 const client = new Client({
     host: process.env.POSTGRESQL_SERVER_URL,

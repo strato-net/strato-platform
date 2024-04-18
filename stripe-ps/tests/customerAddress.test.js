@@ -2,7 +2,6 @@ import bodyParser from 'body-parser';
 import request from 'supertest';
 import express from 'express';
 import customerAddress from '../CustomerAddress/index';
-import client from '../db/index.js';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -11,6 +10,7 @@ app.use(bodyParser.json());
 app.use('/customer', customerAddress);
 
 describe('Customer Address Database Tests', function () {
+  let testId;
 
   it('Able to add an address for a user', async () => {
     const res = await request(app)
@@ -25,8 +25,10 @@ describe('Customer Address Database Tests', function () {
         addressLine2: '',
         country: 'USA'
       });
+    console.log(res);
     expect(res.statusCode).toBe(200);
-    expect(res.body).toStrictEqual({ message: 'success', id: 1 });
+    expect(res.body.id).not.toBeNull();
+    testId = res.body.id;
   });
 
   it('Should not add an address that is malformed', async () => {
@@ -43,7 +45,7 @@ describe('Customer Address Database Tests', function () {
 
   it('Able to retrieve an address given the addressId', async () => {
     const res = await request(app)
-      .get('/customer/address/id/1');
+      .get(`/customer/address/id/${testId}`);
     expect(res.statusCode).toBe(200);
     expect(res.body.data).not.toBeNull();
   });
@@ -71,20 +73,16 @@ describe('Customer Address Database Tests', function () {
   
   it('Able to delete created addresses given an addressId', async () => {
     const res = await request(app)
-      .delete('/customer/address/id/1');
+      .delete(`/customer/address/id/${testId}`);
     expect(res.statusCode).toBe(200);
     expect(res.body.changes).toBe(1);
   });
 
   it('Cannot delete an address for which its addressId does not exist', async () => {
     const res = await request(app)
-      .delete('/customer/address/id/100');
+      .delete(`/customer/address/id/${testId}`);
     expect(res.statusCode).toBe(200);
     expect(res.body.changes).toBe(0);
   });
-
-  afterAll(() => {
-    // Delete test table here
-  })
 
 })

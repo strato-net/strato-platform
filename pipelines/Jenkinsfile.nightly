@@ -375,6 +375,28 @@ pipeline {
           }
         }
 
+        stage('Payment Server Tests') {
+          steps {
+            sh '''#!/bin/bash -le
+              set -x
+              echo "Running payment server tests"
+              cd stripe-ps
+              POSTGRESQL_SERVER_URL=${PS_POSTGRESQL_SERVER_URL}
+              POSTGRESQL_PORT=5432
+              POSTGRESQL_USER=postgres
+              POSTGRESQL_PASSWORD=${PS_POSTGRESQL_PASSWORD}
+              POSTGRESQL_DBNAME=postgres
+              STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
+              STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+              TEST_ACCOUNT_ID=${PS_TEST_ACCOUNT_ID}
+              TEST_SESSION_ID=${PS_TEST_SESSION_ID} # tests optional
+              rm -rf node_modules
+              npm install
+              npm run test
+            '''
+          }
+        }
+
         stage('Integration tests') {
           steps{
             dir ('strato-worktree/tests') {

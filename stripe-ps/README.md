@@ -1,6 +1,6 @@
 # Payment Server (Stripe)
 
-The payment server is created using ExpressJS. This version of the payment server uses the Stripe API for payments. It also features a lightweight SQL database (sqlite) to store customer addresses.
+The payment server is created using ExpressJS. This version of the payment server uses the Stripe API for payments. It also features a PostgreSQL connection to store customer addresses.
 
 ### Endpoints
 
@@ -95,11 +95,14 @@ If running dockerized, provide a `docker-compose.stripe-ps.yml` file and use `do
 
 The payment server uses `jest` as its testing framework. In order to run the tests, the following environment variables are required:
 ```
-`MARKETPLACE_URL` for Stripe API callback
+`POSTGRESQL_SERVER_URL`
+`POSTGRESQL_PORT` Default: 5432
+`POSTGRESQL_USER` Default: postgres
+`POSTGRESQL_PASSWORD`
+`POSTGRESQL_DBNAME` Default: postgres
 `STRIPE_PUBLISHABLE_KEY` for Stripe API
 `STRIPE_SECRET_KEY` for Stripe API
-`TEST_ACCT_ID` for Stripe API Tests
-`TEST_DB` should be set to true
+`TEST_ACCOUNT_ID` for Stripe API Tests
 `TEST_SESSION_ID` is optional for testing the Stripe session and intent endpoints
 ```
 

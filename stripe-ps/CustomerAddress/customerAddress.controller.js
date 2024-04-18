@@ -1,4 +1,4 @@
-import db from '../db/index.js';
+import client from '../db/index.js';
 import Joi from '@hapi/joi';
 class CustomerAddressController {
 
