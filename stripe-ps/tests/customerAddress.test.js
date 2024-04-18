@@ -25,7 +25,6 @@ describe('Customer Address Database Tests', function () {
         addressLine2: '',
         country: 'USA'
       });
-    console.log(res);
     expect(res.statusCode).toBe(200);
     expect(res.body.id).not.toBeNull();
     testId = res.body.id;
@@ -50,13 +49,6 @@ describe('Customer Address Database Tests', function () {
     expect(res.body.data).not.toBeNull();
   });
 
-  it('Should return no address given an addressId that does not exist', async () => {
-    const res = await request(app)
-      .get('/customer/address/id/100');
-    expect(res.statusCode).toBe(200);
-    expect(res.body.data).toBeNull();
-  });
-
   it('Able to retrieve all address for a given common name', async () => {
     const res = await request(app)
       .get(`/customer/address/Test`);
@@ -76,6 +68,13 @@ describe('Customer Address Database Tests', function () {
       .delete(`/customer/address/id/${testId}`);
     expect(res.statusCode).toBe(200);
     expect(res.body.changes).toBe(1);
+  });
+
+  it('Should return no address given an addressId that does not exist', async () => {
+    const res = await request(app)
+      .get(`/customer/address/id/${testId}`);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.data).toStrictEqual({});
   });
 
   it('Cannot delete an address for which its addressId does not exist', async () => {
