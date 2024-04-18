@@ -81,16 +81,6 @@ type PostBlocTransactionParallelCommon tokenHeaderName =
 type PostBlocTransactionParallel = PostBlocTransactionParallelCommon "X-USER-ACCESS-TOKEN"
 type PostBlocTransactionParallelExternal = PostBlocTransactionParallelCommon "Authorization"
 
-type PostBlocTransactionRaw =
-  "transaction"
-    :> "raw"
-    :> S.Header "X-USER-ACCESS-TOKEN" Text
-    :> QueryParam "chainid" ChainId
-    :> QueryFlag "hash"
-    :> QueryFlag "resolve"
-    :> ReqBody '[JSON] PostBlocTransactionRawRequest
-    :> Post '[JSON] BlocChainOrTransactionResult
-
 type PostBlocTransaction =
   "transaction"
     :> S.Header "X-USER-ACCESS-TOKEN" Text
