@@ -3,7 +3,6 @@ import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import HexText from '../HexText';
 import './accountDetail.css';
-import { oauthFaucetRequest } from '../Accounts/components/OauthAccounts/oauthAccounts.actions';
 import { isOauthEnabled } from '../../lib/checkMode';
 
 // Public mode is depricated now this component is used for OAUTH
@@ -12,7 +11,6 @@ class AccountDetail extends Component {
 
     const isModeOauth = isOauthEnabled();
     const account = isModeOauth ? this.props.oauthAccount : this.props.account;
-    const faucetStatus = (this.props.faucet.accountAddress === account.address) && this.props.faucet.status;
 
     return (
       <div className="pt-card address-margin-bottom">
@@ -21,19 +19,6 @@ class AccountDetail extends Component {
             <h4>
               Address: &nbsp;&nbsp; <HexText value={account ? account.address : ''} classes="smd-pad-2" />
             </h4>
-          </div>
-          <div className="col-sm-2 text-right">
-            <button
-              className={`pt-button ${faucetStatus ? 'pt-intent-warning' : 'pt-intent-primary'} pt-small`}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                this.props.oauthFaucetRequest(this.props.name, account.address, this.props.selectedChain);
-              }}
-              disabled={faucetStatus}
-            >
-              {faucetStatus ? 'Pending' : 'Faucet'}
-            </button>
           </div>
         </div>
 
@@ -70,15 +55,11 @@ export function mapStateToProps(state) {
     oauthAccount: state.oauthAccounts.account,
     name: state.oauthAccounts.name,
     selectedChain: state.chains.selectedChain,
-    faucet: state.oauthAccounts.faucet,
   };
 }
 
 export default withRouter(
   connect(
     mapStateToProps,
-    {
-      oauthFaucetRequest
-    }
   )(AccountDetail)
 );
