@@ -489,8 +489,7 @@ async function getAllItemTransferEvents(admin, args = {}, defaultOptions) {
 
     // Updating itemTransferEvent data to include price fetched
     itemTransferEvents = itemTransferEvents.map((item, index) => ({
-        ...item, 
-        price: salePrices[index]
+        ...item, //price logic should be removed
     }));
 
     const total = await searchAllWithQueryArgs(`${contractName}.${contractEvents.ITEM_TRANSFER}`, 
