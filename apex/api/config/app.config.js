@@ -25,6 +25,10 @@ module.exports = {
     requestTimeout: 3 * 1000,
     pollFrequency: 15 * 1000,
   },
+  emailNotifications: {
+    nodeHealthGracePeriod: 60 * 1000, // Grace period for node health after the node's start
+    pollFrequency: 15 * 1000,
+  }
   // Unused code notice. Node stats disabled, to be deprecated  #node-stats-deprecation
   // statistics: {
   //   apiCallCounterDbSaveTimer: 60 * 1000,
