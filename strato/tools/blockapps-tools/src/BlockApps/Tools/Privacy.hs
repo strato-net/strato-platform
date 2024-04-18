@@ -185,7 +185,7 @@ doit :: ReaderT DB.DB (ResourceT IO) a -> IO a
 doit f = DB.runResourceT $ do
   sdb <-
     DB.open
-      (".ethereumH/" ++ sequencerDependentBlockDBPath)
+      ("/tmp/.ethereumH/" ++ sequencerDependentBlockDBPath)
       DB.defaultOptions {DB.cacheSize = 1024}
   runReaderT f sdb
 

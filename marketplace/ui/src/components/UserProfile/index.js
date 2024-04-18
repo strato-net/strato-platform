@@ -59,6 +59,9 @@ const UserProfile = ({user}) => {
   const [wishlistData, setWishlistData] = useState([]);
   const routeMatch = useMatch({ path: routes.MarketplaceUserProfile.url, strict: true });
 
+  const soldOrdersBaseUrl = new URL("/order/sold", window.location.origin).toString();
+  const boughtOrdersBaseUrl = new URL("/order/bought", window.location.origin).toString();
+  const transfersBaseUrl = new URL("/order/transfers", window.location.origin).toString();
   const [breadcrumbs, setBreadcrumbs] = useState([{ text: 'Home', path: homeUrl }]);
   
   const params = useParams();
@@ -143,7 +146,7 @@ const UserProfile = ({user}) => {
       setPage(page);
     };
 
-    // Tab Selection for MyStore tab
+    // Tab Selection for MyItems tab
     const handleTabSelectForOwner = (key) => {
       setCategory(key);
       setOffset(0);
@@ -161,7 +164,7 @@ const UserProfile = ({user}) => {
     // Inventories For Sale fetch
     useEffect(() => {
       if(commonName){
-          inventoryActions.fetchInventoryForUser(dispatch, 10, 0, commonName);
+          inventoryActions.fetchInventoryForUser(dispatch, commonName);
         }
       }, [dispatch, hasChecked, isAuthenticated, loginUrl, commonName]);
   
@@ -185,13 +188,14 @@ const UserProfile = ({user}) => {
       let initialBreadcrumbs = [{ text: 'Home', path: homeUrl }];
       const referrer = location.state?.from || location.pathname;
 
-      if (referrer.includes('/productList/')) {
+      if (referrer.includes('/dp/')) {
         const segments = referrer.split('/'); // Split the referrer by '/'
-        const productID = segments.pop(); // Get the last segment, which should be the address
+        const productID = segments[2];
+        const productName = segments.pop(); // Get the last segment, which should be the address
     
         // productID check before pushing to breadcrumbs
         if (productID) {
-          const productDetailsPath = new URL(`/marketplace/productList/${productID}`, window.location.origin).toString();
+          const productDetailsPath = new URL(`/dp/${productID}/${productName}`, window.location.origin).toString();
           initialBreadcrumbs.push({ text: 'Product Details', path: productDetailsPath });
         }
       } else if (referrer.includes('/order/bought')) {
@@ -295,21 +299,19 @@ const UserProfile = ({user}) => {
 
   return (
     
-    <div className="container mx-auto p-6">
+    <div className="container mx-auto">
         {/* Bread Crumb Navigation */}
-      <div className="px-0 md:px-5 lg:py-1 lg:mt-3 orders">
+      <div className="px-6 md:px-5 lg:py-1 lg:mt-3 orders">
         <Breadcrumb>
           {breadcrumbs.map((breadcrumb, index) => {
             const isLast = index === breadcrumbs.length - 1;
             return (
-              <Breadcrumb.Item key={index} href={breadcrumb.path} onClick={e => isLast && e.preventDefault()}>
+              <Breadcrumb.Item key={index}>
                 {breadcrumb.path && !isLast ? (
                   // If it has a path and it's not the last breadcrumb, it's styled as a clickable link
-                  <ClickableCell href={breadcrumb.path}>
-                    <p className="text-sm text-[#13188A] font-semibold">
+                  <Link to={breadcrumb.path} className="text-sm !text-[#13188A] font-semibold">
                       {breadcrumb.text}
-                    </p>
-                  </ClickableCell>
+                    </Link>
                 ) : (
                   // Last breadcrumb or if it has no path
                   <p className={`text-sm ${isLast ? 'text-black' : 'text-[#13188A]'} ${isLast ? 'font-normal' : 'font-semibold'}`}>
@@ -326,7 +328,7 @@ const UserProfile = ({user}) => {
 
       
       {/* User Cover */}
-      <div className="relative mb-6">
+      <div className="relative mb-6 px-6">
         <img 
           className="w-full h-36 sm:h-52 md:h-60 lg:h-68 object-cover rounded-lg" 
           src={Images.blockapps_cover} 
@@ -386,20 +388,20 @@ const UserProfile = ({user}) => {
      <Tabs
         defaultActiveKey={activeTab}
         onChange={handleTabSelect}
-        className="p-3 ml-6 mr-6 mb-6"
+        className="p-3 mx-1 lg:mx-6 mb-6"
       >
 
 
-              {/* MyStore Section- For Owners */}
+              {/* MyItems Section- For Owners */}
 
     {isOwner && (
-      <TabPane tab="My Store" key="0">
+      <TabPane tab="My Items" key="0">
             
-            {/* MyStore Assets of the Owner Profile */}
+            {/* MyItems Assets of the Owner Profile */}
 
           <Tabs
             defaultActiveKey={category ? category : "All"}
-            className="store"
+            className="items"
             onChange={(key) => handleTabSelectForOwner(key)}
             items={[
               {

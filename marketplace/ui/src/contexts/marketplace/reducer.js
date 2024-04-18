@@ -223,7 +223,7 @@ const reducer = (state, action) => {
       return {
         ...state,
         isFetchingStrats: false,
-      };
+      };     
     default:
       throw new Error(`Unhandled action: '${action.type}'`);
   }

@@ -3,6 +3,7 @@ import oauthHelper from '/helpers/oauthHelper'
 import { oauthUtil, rest } from 'blockapps-rest'
 import jwtDecode from 'jwt-decode'
 import config from '/load.config'
+import axios from 'axios';
 
 const getTokenFromCookie = async (req, res) => {
   const tokenName = req.app.oauth.getCookieNameAccessToken()
@@ -20,9 +21,9 @@ const getTokenFromCookie = async (req, res) => {
 }
 
 const getTokenFromHeader = async (req) => {
-  if(req.headers['x-user-access-token']) 
+  if (req.headers['x-user-access-token'])
     return req.headers['x-user-access-token']
-    
+
   if (req.headers['authorization']) {
     const [bearer, token] = req.headers['authorization'].split(' ')
     if (bearer !== 'Bearer') return null
@@ -31,7 +32,7 @@ const getTokenFromHeader = async (req) => {
   return null
 }
 
-const getLoginUrl = (req) => config.dockerized ? '/marketplace/login/' : req.app.oauth.getSigninURL();
+const getLoginUrl = (req) => config.dockerized ? '/login/' : req.app.oauth.getSigninURL();
 
 class AuthHandler {
   static authorizeRequest(allowAnonAccess = false) {
@@ -64,11 +65,8 @@ class AuthHandler {
           try {
             address = await rest.createOrGetKey({ username: decodedToken.preferred_username, token }, { config })
           } catch (e) {
-            // user isn't created in STRATO
-            if (e.response && e.response.status === RestStatus.BAD_REQUEST) {
-              console.log('User not created in STRATO!')
-              return next(e)
-            }
+            console.error('STRATO API is unreachable or unhealthy. Error: ', e)
+            return rest.response.status(RestStatus.INTERNAL_SERVER_ERROR, res, "Internal Server Error 101")
           }
           req.address = address
           req.accessToken = { token }
@@ -78,18 +76,31 @@ class AuthHandler {
           return next()
         }
       } catch (err) {
-        rest.response.status(RestStatus.INTERNAL_SERVER_ERROR, res, "Internal Server Error")
         return next(err)
       }
-      
+
       res.clearCookie(req.app.oauth.getCookieNameAccessToken())
       res.clearCookie(req.app.oauth.getCookieNameAccessTokenExpiry())
       res.clearCookie(req.app.oauth.getCookieNameRefreshToken())
-      
-      rest.response.status(RestStatus.UNAUTHORIZED, res, {
-        loginUrl: getLoginUrl(req),
-      })
-      return next(new Error('Authorization required'))
+
+      let health = true;
+      try {
+        const response = await axios.get(`${config.serverHost}/health`);
+        health = response.data.health;
+      } catch (error) {
+         console.log("error", error);
+      }
+
+      // Here, we're checking the server's health. If it's determined to be false,
+      // we'll throw an Internal Server Error along with a message to indicate the issue.
+      if (health) {
+        rest.response.status(RestStatus.UNAUTHORIZED, res, {
+          loginUrl: getLoginUrl(req)
+        })
+        return next(new Error('Authorization required'))
+      } else {
+        return rest.response.status(RestStatus.INTERNAL_SERVER_ERROR, res, "Internal Server Error 101")
+      }
     }
   }
 
@@ -103,7 +114,6 @@ class AuthHandler {
     }
     return oauth
   }
-
 
   static getDeployersTokenForWebhook() {
     return async function (req, res, next) {

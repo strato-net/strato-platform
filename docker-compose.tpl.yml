@@ -41,11 +41,13 @@ services:
     - prometheus
     - strato
     environment:
+    - ADMIN_EMAIL=${ADMIN_EMAIL}
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
     - postgres_user=postgres
     - PROMETHEUS_HOST=${PROMETHEUS_HOST}
+    - SENDGRID_API_KEY=${SENDGRID_API_KEY}
     - STRATO_HOSTNAME=${STRATO_HOSTNAME}
     - STRATO_PORT_API=${STRATO_PORT_API}
     - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
@@ -136,9 +138,6 @@ services:
     - blockstanbulRoundPeriodS=${blockstanbulRoundPeriodS}
     - blockTime=${blockTime}
     - bootnode=${bootnode}
-    - brokenRefundReenable=${brokenRefundReenable}
-    - cacheTransactionResults=${cacheTransactionResults}
-    - certInfo=${certInfo}
     - connectionTimeout=${connectionTimeout}
     - debugFail=${debugFail}
     - debugPort=${debugPort}
@@ -146,11 +145,9 @@ services:
     - debugWSPort=${debugWSPort}
     - validatorBehavior=${validatorBehavior:-true}
     - evmDebugMode=${evmDebugMode}
-    - faucetEnabled=${faucetEnabled}
     - FILE_SERVER_URL=${FILE_SERVER_URL}
     - FULL_DEBUG_LOG=${FULL_DEBUG_LOG:-false}
     - gasLimit=${gasLimit}
-    - gasOn=${gasOn:-false}
     - generateKey=${generateKey:-true}
     - genesis=${genesis}
     - idServerUrl=${idServerUrl}
@@ -161,7 +158,6 @@ services:
     - maxReturnedHeaders=${maxReturnedHeaders}
     - maxTxsPerBlock=${maxTxsPerBlock}
     - minBlockDifficulty=${minBlockDifficulty}
-    - miningThreads=${miningThreads}
     - network=${network}
     - networkID=${networkID}
     - numMinPeers=${numMinPeers}
@@ -189,14 +185,11 @@ services:
     - SEQUENCER_DEBUG_LOG=${SEQUENCER_DEBUG_LOG:-false}
     - SLIPSTREAM_DEBUG_LOG=${SLIPSTREAM_DEBUG_LOG:-false}
     - SLIPSTREAM_OPTIONAL=${SLIPSTREAM_OPTIONAL}
-    - splitinit=true
-    - stratoHost=strato:3000
     - STRIPE_PAYMENT_SERVER_URL=${STRIPE_PAYMENT_SERVER_URL}
     - svmTrace=${svmTrace}
     - sqlDiff=${sqlDiff}
     - svmDev=${svmDev}
     - txSizeLimit=${txSizeLimit}
-    - useSyncMode=${useSyncMode}
     - userRegistryAddress=${userRegistryAddress}
     - userRegistryCodeHash=${userRegistryCodeHash}
     - useBuiltinUserRegistry=${useBuiltinUserRegistry}
@@ -290,7 +283,6 @@ services:
     - STRATO_HOSTNAME=${STRATO_HOSTNAME}
     - STRATO_PORT_API=${STRATO_PORT_API}
     - STRATO_PORT_API2=${STRATO_PORT_API2}
-    - STRATO_PORT_BLOCKSTANBUL_VOTE=${STRATO_PORT_BLOCKSTANBUL_VOTE}
     - STRATO_PORT_LOGS=${STRATO_PORT_LOGS}
     - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
     - VM_DEBUGGER=${VM_DEBUGGER}

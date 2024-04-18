@@ -110,7 +110,6 @@ function newnode {
   fi
 
   echo "Starting Strato processes. All output is logged to $PWD/logs."
-  runBackgroundProcess logserver --directory "${PWD}/logs" --uri_root=/logs/strato/ &>> logs/logserver
 
   # DEBUG LOGGING FLAGS
   apiDebugMode=LevelInfo
@@ -154,7 +153,6 @@ function newnode {
     --blockstanbul=true \
     --blockstanbul_block_period_ms=${blockstanbulBlockPeriodMs:-1000} \
     --blockstanbul_round_period_s=${blockstanbulRoundPeriodS:-10} \
-    --certInfo=${certInfo:-"{}"} \
     --genesisBlockName=${genesis:-gettingStarted} \
     --minLogLevel=$seqMinLogLevel \
     --seq_max_events_per_iter=${seqMaxEventsPerIter:-500} \
@@ -209,16 +207,12 @@ function newnode {
   echo "Starting vm-runner"
   runBackgroundProcess vm-runner \
     --blockstanbul=true \
-    --brokenRefundReenable=${brokenRefundReenable:-false} \
-    --cacheTransactionResults=${cacheTransactionResults:-true} \
-    --createTransactionResults=true \
     --debug=${evmDebugMode:-false} \
     --debugEnabled=${VM_DEBUGGER:-false} \
     --debugPort=${debugPort:-8051} \
     --debugWSHost=${debugWSHost:-strato} \
     --debugWSPort=${debugWSPort:-8052} \
     --diffPublish=${diffPublish:-true} \
-    --gasOn=${gasOn:-true} \
     --maxTxsPerBlock=${maxTxsPerBlock:-500} \
     --minLogLevel=${vmMinLogLevel} \
     --networkID=${networkID:--1} \
@@ -228,7 +222,6 @@ function newnode {
     --svmDev=${svmDev:-false} \
     --svmTrace=${svmTrace:-false} \
     --requireCerts=${requireCerts:-true} \
-    --useSyncMode=${useSyncMode:-false} \
     ${networkFlag} \
     "${aclFlag}" \
     "${txsFlag}" \
@@ -238,7 +231,6 @@ function newnode {
   # Leave the +RTS -N1, it is important
   echo "Starting strato-api"
   runBackgroundProcess strato-api \
-    --gasOn=${gasOn:-true} \
     --minLogLevel=$apiDebugMode \
     --networkID=${networkID:--1} \
     --vaultUrl=${VAULT_URL} \
@@ -355,32 +347,19 @@ function doInit {
   ${networkFlag} \
   ${stratoBootnode}"
 
-  if ${splitinit:-false} ; then
-    #TODO(https://blockapps.atlassian.net/browse/STRATO-1421): Populate strato-init-events with from-restore from S3
-    cmd="tabula-rasa $args"
+  cmd="strato-setup $args"
 
-    echo "init event source: $cmd"
-    # logging to stdout and log file:
-    $cmd 2>&1 | tee logs/strato-setup
-    if [ ${PIPESTATUS[0]} -ne 0 ]; then
-      echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
-      tail -f /dev/null
-    fi
-    init-worker --kafkahost=$kafkaHost 2>&1 | tee --append logs/strato-setup
-    if [ ${PIPESTATUS[0]} -ne 0 ]; then
-      echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
-      tail -f /dev/null
-    fi
-  else
-    cmd="strato-setup $args"
-
-    echo "strato-setup command: $cmd"
-    # logging to stdout and log file:
-    $cmd 2>&1 | tee logs/strato-setup
-    if [ ${PIPESTATUS[0]} -ne 0 ]; then
-      echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
-      tail -f /dev/null
-    fi
+  echo "init event source: $cmd"
+  # logging to stdout and log file:
+  $cmd 2>&1 | tee logs/strato-setup
+  if [ ${PIPESTATUS[0]} -ne 0 ]; then
+    echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
+    tail -f /dev/null
+  fi
+  init-worker --kafkahost=$kafkaHost 2>&1 | tee --append logs/strato-setup
+  if [ ${PIPESTATUS[0]} -ne 0 ]; then
+    echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
+    tail -f /dev/null
   fi
 
   #we need to create the private key for the faucet
@@ -468,5 +447,4 @@ until PGPASSWORD=$pgPass psql -h "$pgHost" -U "$pgUser" -c '\l'; do
 done
 
 # Main entry point
-global-db --pghost $pgHost || { echo "Ignoring."; true; } # If it fails, it just means we already created the global db
 newnode

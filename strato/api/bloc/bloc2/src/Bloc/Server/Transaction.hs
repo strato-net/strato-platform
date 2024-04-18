@@ -16,7 +16,6 @@
 
 module Bloc.Server.Transaction
   ( postBlocTransaction,
-    postBlocTransactionRaw,
     postBlocTransactionBody,
     postBlocTransactionUnsigned,
     postBlocTransactionParallel,
@@ -32,6 +31,7 @@ import Bloc.API.Utils
 import Bloc.Database.Queries (getContractDetailsForContract)
 import Bloc.Monad
 import Bloc.Server.Chain
+import Bloc.Server.Contracts (getSourceMapFromAddress)
 import Bloc.Server.TransactionResult hiding (constructArgValuesAndSource)
 import Bloc.Server.Utils
 import BlockApps.Logging
@@ -56,11 +56,9 @@ import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address hiding (unAddress)
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Code
-import Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256 hiding (rlpHash)
 import Blockchain.Strato.Model.Nonce
-import Blockchain.Strato.Model.Secp256k1 hiding (HasVault)
 import Blockchain.Strato.Model.Wei
 import Blockchain.Strato.RedisBlockDB (getBestBlockInfo, getSyncStatus, getWorldBestBlockInfo, runStratoRedisIO)
 import Blockchain.Strato.RedisBlockDB.Models (RedisBestBlock (..))
@@ -74,11 +72,9 @@ import Control.Monad.Composable.Vault
 import Control.Monad.Extra
 import Control.Monad.Reader
 import Control.Monad.Trans.State.Lazy
-import qualified Crypto.Secp256k1 as S
 import Data.Bool
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
-import qualified Data.ByteString.Short as BSS
 import qualified Data.Cache as Cache
 import qualified Data.Cache.Internal as Cache
 import Data.Conduit
@@ -100,7 +96,6 @@ import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Data.Time.Clock
 import qualified Data.Vector as V
-import Data.Word
 import qualified Database.Esqueleto.Legacy as E
 import Handlers.AccountInfo ()
 import Handlers.Transaction
@@ -145,96 +140,6 @@ txWorker = forever $ do
       lift . void $ postBlocTransaction' (Do CacheNonce) a b w r c
 
 --------------------------------- RAW (PRE-SIGNED) TRANSACTIONS ------------------------------------
-
-postBlocTransactionRaw ::
-  (MonadLogger m, HasSQL m, HasBlocEnv m) =>
-  Maybe Text -> -- username (unused)
-  Maybe ChainId ->
-  Bool -> -- hash
-  Bool -> -- resolve
-  PostBlocTransactionRawRequest ->
-  m BlocChainOrTransactionResult
-postBlocTransactionRaw _ _ h resolve PostBlocTransactionRawRequest {..} = do
-  checkIsSynced
-  txSizeLimit <- fmap txSizeLimit getBlocEnv
-  -- as a requirement for Pepsi, we have to be able to accept non-rec sigs
-  -- so, if 'v' is not provided, we have to figure out what 'v' is here
-
-  v <- case postbloctransactionrawrequestV of
-    Just v' -> return v'
-    Nothing -> do
-      let makeSigFromVals :: (Word256, Word256, Word8) -> Signature
-          makeSigFromVals (r', s', v') =
-            Signature
-              ( S.CompactRecSig
-                  (BSS.toShort $ word256ToBytes r')
-                  (BSS.toShort $ word256ToBytes s')
-                  (v' - 0x1b)
-              )
-          unsignedTX =
-            UnsignedTransaction
-              postbloctransactionrawrequestNonce
-              postbloctransactionrawrequestGasPrice
-              postbloctransactionrawrequestGasLimit
-              postbloctransactionrawrequestTo
-              postbloctransactionrawrequestValue
-              postbloctransactionrawrequestInitOrData
-              postbloctransactionrawrequestChainId
-          txHash = rlpHash unsignedTX
-
-          -- try both 27 and 28, see what matches
-          sig1 = makeSigFromVals (postbloctransactionrawrequestR, postbloctransactionrawrequestS, 27)
-          address1 = fromMaybe (Address 0x0) $ fmap fromPublicKey $ recoverPub sig1 txHash
-          sig2 = makeSigFromVals (postbloctransactionrawrequestR, postbloctransactionrawrequestS, 28)
-          address2 = fromMaybe (Address 0x0) $ fmap fromPublicKey $ recoverPub sig2 txHash
-      if address1 == postbloctransactionrawrequestAddress
-        then return 27
-        else
-          if address2 == postbloctransactionrawrequestAddress
-            then return 28
-            else throwIO $ UserError $ Text.pack "Couldn't calculate 'v' for transaction signature - must be a bad signature"
-
-  -- construct the Transaction
-  time <- liftIO getCurrentTime
-  let tx =
-        Transaction
-          postbloctransactionrawrequestNonce
-          postbloctransactionrawrequestGasPrice
-          postbloctransactionrawrequestGasLimit
-          postbloctransactionrawrequestTo
-          postbloctransactionrawrequestValue
-          postbloctransactionrawrequestInitOrData
-          postbloctransactionrawrequestChainId
-          v
-          postbloctransactionrawrequestR
-          postbloctransactionrawrequestS
-          postbloctransactionrawrequestMetadata
-      rawTx@(RawTransaction' raw _) = preparePostTx time postbloctransactionrawrequestAddress tx
-
-  if h
-    then
-      return . BlocTxResult $
-        BlocTransactionResult
-          { blocTransactionStatus = Success,
-            blocTransactionHash = transactionHash . rawTX2TX $ raw,
-            blocTransactionTxResult = Nothing,
-            blocTransactionData = Nothing
-          }
-    else do
-      txHash <- postTransaction (Just txSizeLimit) rawTx
-      trds <- recurseTRDs resolve [txHash]
-      case trds of
-        [] -> throwIO $ AnError $ Text.pack "empty TRD response, which shouldn't happen"
-        [x] ->
-          return $
-            BlocTxResult $
-              BlocTransactionResult
-                { blocTransactionStatus = trdStatus x,
-                  blocTransactionHash = txHash,
-                  blocTransactionTxResult = snd <$> trdResult x,
-                  blocTransactionData = Nothing -- can we get this without the txHash table query?
-                }
-        _ -> throwIO $ UserError $ Text.pack "found multiple tx results for a single tx"
 
 -- | postBlocTransactionBody(jwt, chain ID, [Transactions])
 postBlocTransactionBody ::
@@ -293,7 +198,7 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
           getSrc p = fromMaybe mempty $ src' p <|> srcMap p
           mapUploadList =
             map
-              ( \p@(ContractPayload _ c a v x cid' m) -> do
+              ( \p@(ContractPayload _ c a v x cid' _ m) -> do
                   let cn = fromMaybe "unnamed_contract" c
                   UploadListContract
                     (fromJust c)
@@ -438,7 +343,7 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
               else Just $ contractpayloadSrc p
           getSrc p = fromMaybe mempty $ src' p <|> srcMap p
           upload =
-            ( \p@(ContractPayload _ c a v x cid' m) -> do
+            ( \p@(ContractPayload _ c a v x cid' _ m) -> do
                 let cn = fromMaybe "unnamed_contract" c
                 UploadListContract
                   (fromJust c)
@@ -709,10 +614,14 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                         resolve
                 fmap ((:[]) . BlocTxResult) $ postUsersContractMethod' cacheNonce bcp jwtToken
               False -> do
+                src'' <- case contractpayloadCodePtr p of 
+                  Nothing -> return $ getSrc p
+                  Just _ | getSrc p /= mempty -> throwIO $ UserError "Can only provide one of either `src` or `codePtr`."
+                  Just p' -> getSourceMapFromAddress p'
                 let bcp =
                       ContractParameters
                         addr
-                        (getSrc p)
+                        src''
                         (contractpayloadContract p)
                         (contractpayloadArgs p)
                         (contractpayloadValue p)
@@ -731,7 +640,7 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
             ps <- mapM fromContract xs
             case useWallet of
               True -> do
-                methodList <- mapM (\p@(ContractPayload _ c a v x cid m) -> do
+                methodList <- mapM (\p@(ContractPayload _ c a v x cid _ m) -> do
                                   let contractSrc = getSrc p
                                       contractSrcText = sourceBlob $ contractSrc
                                       srcLength = Text.length contractSrcText
@@ -762,26 +671,32 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                         resolve
                 fmap BlocTxResult <$> postUsersContractMethodList' cacheNonce bcp jwtToken
               False -> do
+                payloadList <-
+                  mapM
+                      ( \p@(ContractPayload _ c a v x cid _ m) -> do
+                          let cn = fromMaybe "unnamed_contract" c
+                          src'' <- case contractpayloadCodePtr p of 
+                            Nothing -> return $ getSrc p
+                            Just _ | getSrc p /= mempty -> throwIO $ UserError "Can only provide one of either `src` or `codePtr`."
+                            Just p' -> getSourceMapFromAddress p'
+                          return $
+                            UploadListContract
+                              (fromJust c)
+                              src''
+                              (fromMaybe Map.empty a)
+                              (mergeTxParams x txParams)
+                              v
+                              cid
+                              ( case m of
+                                  Nothing -> Just $ Map.singleton "history" cn
+                                  Just h -> Just $ Map.insert "history" cn h
+                              )
+                      )
+                      ps
                 let bclp = 
                       ContractListParameters
                         addr
-                        ( map
-                            ( \p@(ContractPayload _ c a v x cid m) -> do
-                                let cn = fromMaybe "unnamed_contract" c
-                                UploadListContract
-                                  (fromJust c)
-                                  (getSrc p)
-                                  (fromMaybe Map.empty a)
-                                  (mergeTxParams x txParams)
-                                  v
-                                  cid
-                                  ( case m of
-                                      Nothing -> Just $ Map.singleton "history" cn
-                                      Just h -> Just $ Map.insert "history" cn h
-                                  )
-                            )
-                            ps
-                        )
+                        payloadList
                         chainId
                         resolve
                     poster = postUsersUploadListSolidVM'
@@ -1413,11 +1328,7 @@ getAccountNonce addr chainIds = do
   $logInfoLS "getAccountNonce lookup" (chainIds'', addr)
   $logInfoLS "getAccountNonce results" mAccts
   case mAccts of
-    [] -> do
-      requireBalance <- fmap gasOn getBlocEnv
-      if requireBalance
-        then throwIO . UserError $ "User does not have a balance"
-        else return $ Map.fromList [(Nothing, Nonce $ fromInteger 0)]
+    [] -> return $ Map.fromList [(Nothing, Nonce $ fromInteger 0)]
     accts -> do
       let acts = map E.entityVal accts
       let mkCid AddressStateRef {..} = ChainId <$> toMaybe 0 addressStateRefChainId

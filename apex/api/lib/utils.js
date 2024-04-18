@@ -1,18 +1,90 @@
 const models = require("../models");
 const winston = require("winston-color");
-const config = "../config/app.config";
+
+
+async function getLatestHealth() {
+  const [healthInfo, stallInfo, systemInfo, syncInfo, networkInfo] = await Promise.all([
+    models.CurrentHealth.findOne({
+      where: {
+        processName: "HealthStat",
+      },
+      attributes: [
+        "latestHealthStatus",
+        "latestCheckTimestamp",
+        "lastFailureTimestamp",
+        "additionalInfo",
+      ],
+      raw: true,
+    }),
+    
+    models.CurrentHealth.findOne({
+      where: {
+        processName: "StallStat",
+      },
+      attributes: [
+        "latestHealthStatus",
+        "latestCheckTimestamp",
+        "lastFailureTimestamp",
+        "validBlocksIncreased",
+        "hasPendingTxs",
+      ],
+      raw: true,
+    }),
+    
+    models.CurrentHealth.findOne({
+      where: {
+        processName: "SystemInfoStat",
+      },
+      attributes: [
+        "latestHealthStatus",
+        "latestCheckTimestamp",
+        "lastFailureTimestamp",
+        "additionalInfo",
+      ],
+      raw: true,
+    }),
+    
+    models.CurrentHealth.findOne({
+      where: {
+        processName: "SyncStat",
+      },
+      attributes: [
+        "latestHealthStatus",
+        "latestCheckTimestamp",
+        "lastFailureTimestamp",
+        "additionalInfo",
+      ],
+      raw: true,
+    }),
+    
+    models.CurrentHealth.findOne({
+      where: {
+        processName: "NetworkHealthStat",
+      },
+      attributes: [
+        "latestHealthStatus",
+        "latestCheckTimestamp",
+        "lastFailureTimestamp",
+        "additionalInfo",
+      ],
+      raw: true,
+    })
+  ]);
+  
+  return [healthInfo, stallInfo, systemInfo, syncInfo, networkInfo];
+}
 
 function consolidateHealthData(healthInfo, stallInfo, systemInfo, syncInfo) {
   const currentTime = Date.now();
   const healthStatHealth = healthInfo.latestHealthStatus;
   const stallStatHealth = stallInfo.latestHealthStatus;
   const systemStatHealth = systemInfo.latestHealthStatus;
+  const nodeHealthWarnings = healthInfo.additionalInfo;
   const isSynced = syncInfo.latestHealthStatus;
   const isSyncStalled = JSON.parse(syncInfo.additionalInfo)?.isStalled;
   const systemWarnings = JSON.parse(systemInfo.additionalInfo).Alerts;
 
-  const health =
-    healthStatHealth && stallStatHealth && !isSyncStalled && systemStatHealth;
+  const health = healthStatHealth && stallStatHealth && !isSyncStalled;
   const healthStatus = isSyncStalled
     ? "SYNC STALLED"
     : !health
@@ -25,7 +97,7 @@ function consolidateHealthData(healthInfo, stallInfo, systemInfo, syncInfo) {
 
   if (!healthStatHealth) {
     healthIssues.push(
-      `Node is unhealthy. ${systemWarnings || "Reason currently unknown."}`
+      `Node is unhealthy. Reasons: ${nodeHealthWarnings || "Reason currently unknown."}`
     );
   }
 
@@ -38,7 +110,7 @@ function consolidateHealthData(healthInfo, stallInfo, systemInfo, syncInfo) {
   }
 
   if (!systemStatHealth) {
-    healthIssues.push(`Node's host is unhealthy. ${systemWarnings}`);
+    healthIssues.push(`Node's host is unhealthy. Reasons: ${systemWarnings || "Reason currently unknown."}`);
   }
 
   return {
@@ -46,7 +118,7 @@ function consolidateHealthData(healthInfo, stallInfo, systemInfo, syncInfo) {
     healthStatus,
     healthIssues,
     uptime: healthStatHealth
-      ? currentTime - healthInfo.lastFailureTimestamp
+      ? (currentTime - healthInfo.lastFailureTimestamp) / 1000
       : 0,
     healthData: {
       healthChecks: {
@@ -79,5 +151,6 @@ function consolidateHealthData(healthInfo, stallInfo, systemInfo, syncInfo) {
 }
 
 module.exports = {
+  getLatestHealth,
   consolidateHealthData,
 };

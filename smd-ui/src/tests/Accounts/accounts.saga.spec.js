@@ -2,11 +2,9 @@ import watchFetchContracts, {
   getAccounts,
   getUserAddresses,
   getAccountDetail,
-  faucetAccount,
   getAccountsApi,
   getUserAddressesApi,
   getAccountDetailApi,
-  postFaucet,
   getBalance,
   getCurrentAccountDetail,
   getOauthAccounts,
@@ -23,26 +21,19 @@ import {
   fetchAccountsSuccess,
   fetchUserAddresses,
   fetchUserAddressesSuccess,
-  fetchUserAddressesFailure,
   fetchAccountsFailure,
   fetchAccountDetailSuccess,
   fetchAccountDetailFailure,
-  faucetRequest,
-  faucetSuccess,
   fetchAccountDetail,
-  faucetFailure,
   FETCH_ACCOUNTS,
   FETCH_ACCOUNT_ADDRESS,
   FETCH_ACCOUNT_DETAIL,
-  FAUCET_REQUEST,
   FETCH_ACCOUNTS_SUCCESSFULL,
   FETCH_ACCOUNTS_FAILED,
   FETCH_USER_ADDRESSES_SUCCESSFUL,
   FETCH_USER_ADDRESSES_FAILED,
   FETCH_ACCOUNT_DETAIL_SUCCESS,
   FETCH_ACCOUNT_DETAIL_FAILURE,
-  FAUCET_SUCCESS,
-  FAUCET_FAILURE,
   FETCH_ACCOUNT_ADDRESS_REQUEST,
   FETCH_ACCOUNT_DETAIL_REQUEST,
   GET_BALANCE,
@@ -54,7 +45,6 @@ import {
   FETCH_CURRENT_ACCOUNT_DETAIL_SUCCESS,
   FETCH_CURRENT_ACCOUNT_DETAIL_FAILURE,
   FETCH_OAUTH_ACCOUNTS_REQUEST,
-  fetchOauthAccounts,
   fetchOauthAccountsSuccess,
   fetchOauthAccountsFailure,
   FETCH_OAUTH_ACCOUNTS_SUCCESS,
@@ -63,7 +53,6 @@ import {
 import { expectSaga } from 'redux-saga-test-plan';
 import { accountsMock, userAddresses, error, accountDetail, getBalanceMock, oauthAccounts, oauthAccountsOld } from './accountsMock';
 import { hideLoading } from 'react-redux-loading-bar';
-import { delay } from 'redux-saga';
 
 describe('Accounts: saga', () => {
 
@@ -74,7 +63,6 @@ describe('Accounts: saga', () => {
       takeEvery(FETCH_ACCOUNT_ADDRESS_REQUEST, getUserAddresses),
       takeEvery(FETCH_ACCOUNT_DETAIL_REQUEST, getAccountDetail),
       takeEvery(FETCH_CURRENT_ACCOUNT_DETAIL_REQUEST, getCurrentAccountDetail),
-      takeLatest(FAUCET_REQUEST, faucetAccount),
       takeEvery(GET_BALANCE, getBalance),
       takeEvery(FETCH_OAUTH_ACCOUNTS_REQUEST, getOauthAccounts)
     ]
@@ -180,7 +168,6 @@ describe('Accounts: saga', () => {
       address: "d2263b71c14010ff03d8f786670aba691b22b158",
       name: "tanuj",
       chainId: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9",
-      flag: "faucet",
       type: FETCH_ACCOUNT_DETAIL
     };
 
@@ -188,7 +175,6 @@ describe('Accounts: saga', () => {
       const gen = getAccountDetail(action);
       expect(gen.next().value).toEqual(call(getAccountDetailApi, action.address, action.chainId));
       expect(gen.next([accountDetail]).value).toEqual(put(fetchAccountDetailSuccess(action.name, action.address, accountDetail)));
-      expect(gen.next().value).toEqual(put(faucetSuccess()));
       expect(gen.throw(error).value).toEqual(put(fetchAccountDetailFailure(action.name, action.address, error)));
       expect(gen.next().done).toBe(true);
     });
@@ -242,57 +228,6 @@ describe('Accounts: saga', () => {
         fetch.mockReject(error);
         expectSaga(getCurrentAccountDetail, action)
           .call.fn(getAccountDetailApi).put.like({ action: { type: FETCH_CURRENT_ACCOUNT_DETAIL_FAILURE } })
-          .run().then((result) => { done() });
-      });
-
-    })
-
-  });
-
-  describe('faucetAccount generator', () => {
-
-    const action = {
-      name: "tanuj",
-      address: "d2263b71c14010ff03d8f786670aba691b22b158",
-      flag: 'faucet',
-      type: FAUCET_REQUEST
-    }
-
-    test('inspection', () => {
-      const gen = faucetAccount(action);
-      expect(gen.next().value).toEqual(call(postFaucet, action.name, action.address));
-      expect(gen.next().value).toEqual(call(delay, 100));
-      expect(gen.next().value).toEqual(put(fetchAccountDetail(action.name, action.address, undefined, action.flag)));
-      expect(gen.throw(error).value).toEqual(put(faucetFailure(error)));
-      expect(gen.next().done).toBe(true);
-    });
-
-    describe('post faucet', () => {
-
-      test('success (with flag)', (done) => {
-        fetch.mockResponse(JSON.stringify([accountDetail]));
-        expectSaga(faucetAccount, action)
-          .call.fn(postFaucet).put.like({ action: { type: FETCH_ACCOUNT_DETAIL_REQUEST } })
-          .run().then((result) => { done() });
-      });
-
-      test('success (without flag)', (done) => {
-        fetch.mockResponse(JSON.stringify([accountDetail]));
-        const action = {
-          name: "tanuj",
-          address: "d2263b71c14010ff03d8f786670aba691b22b158",
-          type: FAUCET_REQUEST
-        };
-
-        expectSaga(faucetAccount, action)
-          .call.fn(postFaucet).put.like({ action: { type: FAUCET_SUCCESS } })
-          .run().then((result) => { done() });
-      });
-
-      test('failure', (done) => {
-        fetch.mockReject(error);
-        expectSaga(faucetAccount, action)
-          .call.fn(postFaucet).put.like({ action: { type: FAUCET_FAILURE } })
           .run().then((result) => { done() });
       });
 

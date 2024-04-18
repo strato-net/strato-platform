@@ -140,11 +140,10 @@ const actions = {
     dispatch,
     categorys,
     subCategorys,
-    // products,
-    // manufacturers,
     minPrice,
     maxPrice,
-    search
+    search,
+    availabilityQuery
   ) => {
     dispatch({ type: actionDescriptors.fetchMarketplace });
 
@@ -154,11 +153,6 @@ const actions = {
       ? `&subCategory[]=${subCategorys}`
       : "";
 
-    // const manufacturerQuery = manufacturers
-    //   ? `&manufacturer[]=${manufacturers}`
-    //   : "";
-
-    // const productIdQuery = products ? `&name[]=${products}` : "";
     const searchQuery = search
       ? `&queryValue=${search}&queryFields=name`
       : "";
@@ -167,7 +161,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace?${priceQuery}${categoryQuery}${subCategoryQuery}${searchQuery}`,
+        `${apiUrl}/marketplace?${priceQuery}${categoryQuery}${subCategoryQuery}${searchQuery}${availabilityQuery}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -204,11 +198,10 @@ const actions = {
     dispatch,
     categorys,
     subCategorys,
-    // products,
-    // manufacturers,
     minPrice,
     maxPrice,
-    search
+    search,
+    availabilityQuery
   ) => {
     dispatch({ type: actionDescriptors.fetchMarketplaceLoggedIn });
 
@@ -218,11 +211,6 @@ const actions = {
       ? `&subCategory[]=${subCategorys}`
       : "";
 
-    // const manufacturerQuery = manufacturers
-    //   ? `&manufacturer[]=${manufacturers}`
-    //   : "";
-
-    // const productIdQuery = products ? `&name[]=${products}` : "";
     const priceQuery = `&range[]=price,${minPrice},${maxPrice}`;
     // const sortLatest = "&order=createdDate.desc"
     const searchQuery = search
@@ -231,7 +219,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace/all?${priceQuery}${categoryQuery}${subCategoryQuery}${searchQuery}`,
+        `${apiUrl}/marketplace/all?${priceQuery}${categoryQuery}${subCategoryQuery}${searchQuery}${availabilityQuery}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -491,7 +479,6 @@ const actions = {
       dispatch({ type: actionDescriptors.fetchStratsBalanceFailed, payload: "Error while fetching STRATS" });
     }
   },
-
 
 };
 

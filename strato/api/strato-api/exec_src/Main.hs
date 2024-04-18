@@ -18,7 +18,6 @@ import Bloc.API
 import Bloc.Database.Queries
 import Bloc.Monad
 import Bloc.Server
-import Bloc.Server.BlocOptions ()
 import Bloc.Server.Utils (toMaybe)
 import BlockApps.Init
 import BlockApps.Logging
@@ -58,10 +57,8 @@ import qualified Handlers.BatchTransactionResult as BatchTransactionResult
 import qualified Handlers.BlkLast as BlkLast
 import qualified Handlers.Block as Block
 import qualified Handlers.Chain as Chain
-import qualified Handlers.Coinbase as Coinbase
 import qualified Handlers.Faucet as Faucet
 import qualified Handlers.IdentityServerCallback as Identity
-import qualified Handlers.Log as Log
 import qualified Handlers.Metadata as Metadata
 import Handlers.Options
 import qualified Handlers.Peers as Peers
@@ -71,8 +68,6 @@ import qualified Handlers.Storage as Storage
 import qualified Handlers.Transaction as Transaction
 import qualified Handlers.TransactionResult as TransactionResult
 import qualified Handlers.TxLast as TxLast
-import qualified Handlers.UUID as UUID
-import qualified Handlers.Version as Version
 import Network.HTTP.Types.Status
 import Network.Wai
 import Network.Wai.Handler.Warp
@@ -159,10 +154,8 @@ type CoreAPI =
            :<|> BlkLast.API
            :<|> Block.API
            :<|> Chain.API
-           :<|> Coinbase.API
            :<|> Faucet.API
            :<|> Identity.API
-           :<|> Log.API
            :<|> Metadata.API
            :<|> Peers.API
            :<|> QueuedTransactions.API
@@ -171,8 +164,6 @@ type CoreAPI =
            :<|> Transaction.API
            :<|> TransactionResult.API
            :<|> TxLast.API
-           :<|> UUID.API
-           :<|> Version.API
        )
 
 type FullAPI = CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI
@@ -193,20 +184,16 @@ coreServer =
     :<|> BlkLast.server
     :<|> Block.server
     :<|> Chain.server
-    :<|> Coinbase.server
     :<|> Faucet.server
     :<|> Identity.server
-    :<|> Log.server
     :<|> Metadata.server
     :<|> Peers.server
     :<|> QueuedTransactions.server
     :<|> Stats.server
     :<|> Storage.server
-    :<|> Transaction.server
+    :<|> Transaction.server flags_txSizeLimit
     :<|> TransactionResult.server
     :<|> TxLast.server
-    :<|> UUID.server
-    :<|> Version.server
 
 fullServer ::
   ( MonadLogger m,
@@ -306,8 +293,7 @@ main = do
 
   let env =
         BlocEnv
-          { gasOn = flags_gasOn,
-            txSizeLimit = flags_txSizeLimit,
+          { txSizeLimit = flags_txSizeLimit,
             accountNonceLimit = flags_accountNonceLimit,
             gasLimit = flags_gasLimit,
             stateFetchLimit = stateFetchLimit',

@@ -70,26 +70,22 @@ pipeline {
           git clone https://github.com/blockapps/strato-getting-started -b develop
           cp docker-compose.yml strato-getting-started/
           cp docker-compose.vault.yml strato-getting-started/
+          cp docker-compose.highway.yml strato-getting-started/
+          cp docker-compose.identity.yml strato-getting-started/
+          cp docker-compose.stripe-ps.yml strato-getting-started/
         '''
 
         dir("strato-getting-started") {
           // Copy .pem and .key for SSL
           sh 'cp /home/ubuntu/letsencrypt-ssl/server.pem ssl/certs/'
           sh 'cp /home/ubuntu/letsencrypt-ssl/server.key ssl/private/'
-
-          writeFile file: "run-vault.sh", text: """#!/bin/bash
-            sudo \\
-              ssl=true \\
-              HTTPS_PORT=8093 \\
-              INITIAL_OAUTH_DISCOVERY_URL='https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration' \\
-              INITIAL_OAUTH_ISSUER='https://keycloak.blockapps.net/auth/realms/strato-devel' \\
-              INITIAL_OAUTH_JWT_USERNAME_CLAIM='sub' \\
-              PASSWORD=123 \\
-              ./vault
-          """
-          sh 'chmod +x run-vault.sh'
-
-          sh './run-vault.sh'
+          script {
+            lib.spinUpVault()
+            lib.replaceServerPortsDocker()
+            lib.spinUpFileServer()
+            lib.spinUpPaymentServer()
+            lib.spinUpIdentityServer("${env.WORKSPACE}/strato/tools/x509-generator/rootCert.pem", "${env.WORKSPACE}/strato/tools/x509-generator/rootPriv.pem")
+          }
 
           // TODO: run node on https (also update check_availability function)
           withCredentials([
@@ -106,9 +102,9 @@ pipeline {
                 OAUTH_CLIENT_SECRET='${KEYCLOAK_STRATODEVEL_DEV_SECRET}' \\
                 VAULT_URL=https://\$(</host):8093 \\
                 VAULT_PROXY_DEBUG=true \\
-                certInfo='{"orgName":"BlockApps","orgUnit":"Engineering","commonName":"Test"}' \\
-                STRIPE_PAYMENT_SERVER_URL='https://payments.mercata-testnet2.blockapps.net' \\
-                FILE_SERVER_URL='https://fileserver.mercata-testnet2.blockapps.net/highway' \\
+                STRIPE_PAYMENT_SERVER_URL=https://\$(</host):44301 \\
+                FILE_SERVER_URL=https://\$(</host):44300/highway \\
+                idServerUrl=https://\$(</host):8001 \\
                 GLOBAL_ADMIN_NAME='${GLOBAL_ADMIN_NAME}' \\
                 GLOBAL_ADMIN_PASSWORD='${GLOBAL_ADMIN_PASSWORD}' \\
                 MP_IS_BOOTNODE='true' \\
@@ -242,6 +238,7 @@ pipeline {
                     docker compose -f docker-compose.stripe-ps.push.ecr.yml push 2>&1
                   '''
                   stash includes: 'strato-getting-started/**', name: 'stratoGettingStarted'
+                  stash includes: 'strato/indexer/slipstream/integrity_tests/**', name: 'slipstream_integrity_tests'
                 }
                 
                 // Push docker-compose files to Jenkins artifacts and AWS S3
@@ -303,6 +300,19 @@ pipeline {
                     lib.runSyncTester()
                   }
                 }
+                  unstash 'slipstream_integrity_tests'
+                  // script {
+                    dir('strato/indexer/slipstream/integrity_tests') {
+                       withCredentials([
+                            usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
+                            usernamePassword(credentialsId: 'keycloak-mercata-testnet2-localhost-client', passwordVariable: 'KEYCLOAK_MERCATATESTNET2_LOCALHOST_SECRET', usernameVariable: 'KEYCLOAK_MERCATATESTNET2_LOCALHOST_ID'),
+                                ]) {
+                        // Now CLIENT_ID1, CLIENT_SECRET1, and CLIENT_SECRET2 are available as environment variables
+                        sh "pip3 install -r requirements.txt"
+                        sh "python3 slipstream_sync.py '${KEYCLOAK_STRATODEVEL_DEV_ID}' '${KEYCLOAK_MERCATATESTNET2_LOCALHOST_ID}' '${KEYCLOAK_STRATODEVEL_DEV_SECRET}' '${KEYCLOAK_MERCATATESTNET2_LOCALHOST_SECRET}' 'strato-devel' 'mercata-testnet2' 5 30"
+                      }
+                    } 
+                
               }
               post {
                 always {

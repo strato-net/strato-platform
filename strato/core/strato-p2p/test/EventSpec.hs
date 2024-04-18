@@ -1031,9 +1031,9 @@ startingCheckpoint :: [ChainMemberParsedSet] -> Checkpoint
 startingCheckpoint as = def {checkpointValidators = as}
 
 newBlockstanbulContext :: ChainMemberParsedSet -> [ChainMemberParsedSet] -> BlockstanbulContext
-newBlockstanbulContext paddr as =
+newBlockstanbulContext chainm as =
   let ckpt = startingCheckpoint as
-   in newContext ckpt paddr True
+   in newContext ckpt Nothing True (Just chainm)
 
 emptyBlockstanbulContext :: BlockstanbulContext
 emptyBlockstanbulContext = newBlockstanbulContext emptyChainMember []
@@ -1284,7 +1284,7 @@ createPeer privKey selfId initialValidators' inet name ipAsText@(IPAsText ipAddr
         runConduit $
           sourceTQueue seqVmSource
             .| (awaitForever $ yield . foldr VMEvent.insertInBatch VMEvent.newInBatch)
-            .| handleVmEvents False
+            .| handleVmEvents
             .| (awaitForever $ yield . flip VMEvent.insertOutBatch VMEvent.newOutBatch)
             .| ( awaitForever $ \b -> do
                    $logInfoS (name <> "/vm") . T.pack $ show $ toList (VMEvent.outEvents b)

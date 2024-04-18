@@ -16,7 +16,7 @@ echo 'STRATO is available via nginx'
 # confirm strato api is up, then query the /eth/v1.2/metadata for urls of payment server and oauth discovery
 ETH_ENDPOINT=${STRATO_NODE_PROTOCOL}://${STRATO_HOSTNAME}:${STRATO_PORT_API}/eth/v1.2
 echo 'Waiting for STRATO API to be available...'
-until curl --silent --output /dev/null --fail --location ${ETH_ENDPOINT}/uuid ; do sleep 1; done
+until curl --silent --output /dev/null --fail --location ${ETH_ENDPOINT}/stats/totaltx ; do sleep 1; done
 echo 'STRATO API is available'
 METADATA=$(curl --silent --fail ${ETH_ENDPOINT}/metadata)
 
