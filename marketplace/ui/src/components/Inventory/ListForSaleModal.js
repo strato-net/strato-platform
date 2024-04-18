@@ -150,42 +150,71 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
 
     async function handleSubmit() {
         let totalQuantityToBeListed = quantity;
-        let quantityAllocated = 0;
     
         // Filter assets that have a saleAddress
         let assetsToUpdate = inventory.groupedAssets.filter(asset => asset.saleAddress);
     
         // Calculate quantity from assets with a saleAddress
-        quantityAllocated = assetsToUpdate.reduce((sum, asset) => sum + asset.quantity, 0);
-        let isIncrease = totalQuantityToBeListed > quantityAllocated;
+        let quantityListedForSale = assetsToUpdate.reduce((sum, asset) => sum + asset.saleQuantity, 0);
+        let isIncrease = totalQuantityToBeListed > quantityListedForSale;
         let promises = [];
 
-        // If there are assets with saleAddress, prepare update and potential listing
-        if (assetsToUpdate.length > 0) {
-            let updateBody = {
+        // Check if the current listing have available quantity to update
+
+        if (isIncrease) {
+
+            let updateSaleBody = {
                 paymentProviders: paymentProviderAddress ? [paymentProviderAddress] : [],
                 price: pricePerUnit,
-                quantity: totalQuantityToBeListed,
+                quantity: 0,
                 isIncrease: isIncrease,
-                assets: assetsToUpdate.map(asset => ({
-                    saleAddress: asset.saleAddress,
-                    saleQuantity: asset.quantity,
-                })),
+                assets: []
             };
-    
-            // Store the promise for updating sales
-            promises.push(actions.updateSale(inventoryDispatch, updateBody));
+            for(let asset of assetsToUpdate) {
+                // If there is extra quantity to update
+                if (asset.saleQuantity < asset.quantity) {
+                    let extraListedForAsset = Math.min(asset.quantity, totalQuantityToBeListed)
+                    
+                    updateSaleBody.assets.push({
+                        saleAddress: asset.saleAddress,
+                        saleQuantity: extraListedForAsset 
+                    })
+                    updateSaleBody.quantity += extraListedForAsset
+
+                    quantityListedForSale += extraListedForAsset
+                }
+            }
+            if (updateSaleBody.assets.length) {
+                promises.push(actions.updateSale(inventoryDispatch, updateSaleBody));
+            }
+        } else {
+            if (assetsToUpdate.length > 0) {
+                let updateBody = {
+                    paymentProviders: paymentProviderAddress ? [paymentProviderAddress] : [],
+                    price: pricePerUnit,
+                    quantity: totalQuantityToBeListed,
+                    isIncrease: isIncrease,
+                    assets: assetsToUpdate.map(asset => ({
+                        saleAddress: asset.saleAddress,
+                        saleQuantity: asset.quantity,
+                    })),
+                };
+        
+                // Store the promise for updating sales
+                promises.push(actions.updateSale(inventoryDispatch, updateBody));
+            }
         }
+
     
         // Calculate remaining quantity to be listed
-        let remainingQuantity = totalQuantityToBeListed - quantityAllocated;
+        let remainingQuantity = totalQuantityToBeListed - quantityListedForSale;
     
-        // If we still have more we need to list of if there are no saleAddresses we can call the listInventory function
+        // There are no more sale addresses, so if we have more to list we call the listInventory function on the asset
         if (remainingQuantity > 0 || assetsToUpdate.length === 0) {
             let assetsToList = inventory.groupedAssets.reduce((acc, asset) => {
-                if (quantityAllocated < totalQuantityToBeListed && (!asset.saleAddress || assetsToUpdate.length === 0)) {
-                    let quantityForThisAsset = Math.min(asset.quantity, totalQuantityToBeListed - quantityAllocated);
-                    quantityAllocated += quantityForThisAsset;
+                if (quantityListedForSale < totalQuantityToBeListed && (!asset.saleAddress || assetsToUpdate.length === 0)) {
+                    let quantityForThisAsset = Math.min(asset.quantity, totalQuantityToBeListed - quantityListedForSale);
+                    quantityListedForSale += quantityForThisAsset;
     
                     if (quantityForThisAsset > 0) {
                         acc.push({

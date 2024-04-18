@@ -512,53 +512,51 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const targetQuantity = parseInt(args.quantity, 10);
     const updatePromises = [];
 
-    // Calculate total listed quantity
-    let totalListedQuantity = args.assets.reduce((acc, asset) => acc + parseInt(asset.saleQuantity, 10), 0);
-
-    if (args.isIncrease) {
-        // Handle increasing the quantity
+    if (args.isIncrease) { // Handle increasing the quantity
+      let increasedQuantity = 0;
         for (const asset of args.assets) {
-            if (totalListedQuantity >= targetQuantity) break; // Stop if we've listed enough items
-
-            const assetQuantity = parseInt(asset.saleQuantity, 10);
-            const remainingQuantity = targetQuantity - totalListedQuantity;
-            const quantityToBeListed = Math.min(assetQuantity, remainingQuantity);
-            
-            totalListedQuantity += quantityToBeListed; // Update the total listed quantity
-
+            if (increasedQuantity >= targetQuantity) break; // Stop if we've listed enough items    
             const restArgs = {
-                ...args,
-                quantity: quantityToBeListed,
+              paymentProviders: args.paymentProviders, 
+              price: args.price, 
+              quantity: asset.saleQuantity
             };
             const contract = { address: asset.saleAddress };
             updatePromises.push(inventoryJs.updateSale(rawAdmin, contract, restArgs, options));
+            increasedQuantity += asset.saleQuantity
         }
-    } else {
-        // Handle decreasing the quantity
-        let remainingToDecrease = totalListedQuantity - targetQuantity;
+    } else {  
+      
+      // Having issues with this portion. Seems when running these with the parallel route (/strato/v2.3/transaction/parallel?resolve=true",)
+      // Strato is searching for the closed sale's address and gets stuck in a loop. 
+      // I tried sending the requests separately, but they still end up in the parallel path. 
+      
+      
+      // Handle decreasing the quantity
+      let totalListedQuantity = args.assets.reduce((acc, asset) => acc + parseInt(asset.saleQuantity, 10), 0);
+      let remainingToDecrease = totalListedQuantity - targetQuantity;
 
-        for (const asset of args.assets) {
-            if (remainingToDecrease <= 0) break; // If we deached desired quantity
+      for (const asset of args.assets) {
+          if (remainingToDecrease <= 0) break; // If we reached desired quantity
 
-            const assetQuantity = parseInt(asset.saleQuantity, 10);
+          const assetQuantity = parseInt(asset.saleQuantity, 10);
+          if (assetQuantity > remainingToDecrease) {
+              // If the asset's quantity is more than we need to decrease we can update the sale
+              const quantityToBeListed = assetQuantity - remainingToDecrease;
+              const restArgs = {
+                  quantity: quantityToBeListed,
+              };
+              const contract = { address: asset.saleAddress };
+              let update = await inventoryJs.updateSale(rawAdmin, contract, restArgs, options);
+              remainingToDecrease -= quantityToBeListed; 
+          } else {
+              // If the asset's quantity is less or equal, unlist the asset
+              const contract = { address: asset.saleAddress };
+              let unlist = await inventoryJs.unlistItem(rawAdmin, contract, {}, options)
 
-            if (assetQuantity > remainingToDecrease) {
-                // If the asset's quantity is more than we need to decrease we can update the sale
-                const quantityToBeListed = assetQuantity - remainingToDecrease;
-                const restArgs = {
-                    ...args,
-                    quantity: quantityToBeListed,
-                };
-                const contract = { address: asset.saleAddress };
-                updatePromises.push(inventoryJs.updateSale(rawAdmin, contract, restArgs, options));
-                remainingToDecrease = 0; 
-            } else {
-                // If the asset's quantity is less or equal, unlist the asset
-                const contract = { address: asset.saleAddress };
-                updatePromises.push(inventoryJs.unlistItem(rawAdmin, contract, {}, options));
-                remainingToDecrease -= assetQuantity; // Update remaining to decrease
-            }
-        }
+              remainingToDecrease -= assetQuantity; // Update remaining to decrease
+          }
+      }
     }
 
     const results = await Promise.allSettled(updatePromises);
