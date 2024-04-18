@@ -10,6 +10,7 @@ import { SearchOutlined } from '@ant-design/icons';
 const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, offset }) => {
     const [data, setData] = useState([inventory]);
     const [quantity, setQuantity] = useState(1);
+    const [price, setPrice] = useState(0);
     const [userAddress, setUserAddress] = useState("");
     const inventoryDispatch = useInventoryDispatch();
     const userDispatch = useUsersDispatch();
@@ -76,6 +77,13 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
             align: "center",
             render: () => (
                 <InputNumber value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
+            )
+        },
+        {
+            title: "Set Price",
+            align: "center",
+            render: () => (
+                <InputNumber value={price} controls={false} min={1} onChange={(value) => setPrice(value)} />
             )
         },
         {
