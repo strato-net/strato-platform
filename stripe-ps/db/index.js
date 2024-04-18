@@ -6,7 +6,7 @@ const client = new Client({
     port: process.env.POSTGRESQL_PORT || '5432',
     user: process.env.POSTGRESQL_USER || 'postgres',
     password: process.env.POSTGRESQL_PASSWORD,
-    dbname: process.env.POSTGRESQL_DBNAME || 'postgres',
+    database: process.env.POSTGRESQL_DBNAME || 'postgres',
     ssl: {
         require: true,
         rejectUnauthorized: true,
@@ -17,7 +17,7 @@ const client = new Client({
 if (process.env.POSTGRESQL_SERVER_URL && process.env.POSTGRESQL_PASSWORD) {
     client.connect()
         .then(() => {
-            console.log('Connected to the PostgreSQL database.');
+            console.log(`Connected to the PostgreSQL database. Database name: ${client.database}`);
 
             const query = `
             CREATE TABLE IF NOT EXISTS customer_address (

@@ -20,6 +20,7 @@ so that they could be properly moved to their respective version's subsection.
 - POST `/transaction` allows users to create contracts by providing an address through the `codePtr` field
 
 ### Changed
+- `eth_<random 20 bytes>` database is now just named `eth`
 - `queryStrato` is now `strato-barometer`
 - `strato-barometer` commands point to a copy of `./ethereumH` to access LevelDB data
 
@@ -29,7 +30,9 @@ so that they could be properly moved to their respective version's subsection.
 - Removed 'block', 'blockGO', 'canonRedis', 'compressRoundChanges' commands from blockapps-tools
 - Removed `certInfo` flag from strato-sequencer (cert is now derived from genesis block or during sync)
 - Removed unused flags, such as `brokenRefundRenable`, `cacheTransactionResults`, `faucetEnabled`, `createTransactionResults`, `gasOn`, `splitinit`, and `useSyncMode`
-
+- unused api endpoints: `/version`, `/coinbase`, `/log`, `transactionList`, `/uuid`, `/transaction/raw`, and `/fill`
+- `logserver` package (fileserver for strato logs)
+- `blockchain` database in postgres (unused)
 
 ## [11.1.0] - 3/28/2023
 
