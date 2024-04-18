@@ -102,7 +102,7 @@ const CartComponent = ({ columns, data, openToastOrder }) => {
                             <Col>
                                 <Row className="justify-end ">
                                     <p className="text-base font-medium text-[#6A6A6A] w-36 ">Sub Total:</p>
-                                    <p className="text-[18px]  text-[#202020] ml-2 w-20 text-right">${total}</p>
+                                    <p id="totalPrice" className="text-[18px]  text-[#202020] ml-2 w-20 text-right">${total}</p>
                                 </Row>
                                 <Row className="justify-end mt-2">
                                     <p className="text-base font-medium w-36 text-[#6A6A6A]">Tax:</p>
