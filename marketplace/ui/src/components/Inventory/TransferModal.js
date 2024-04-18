@@ -115,7 +115,8 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
         const body = {
             assetAddress: inventory.address,
             newOwner: userAddress,
-            quantity
+            quantity,
+            price
         };
 
         if (quantity > 0 && quantity <= inventory.quantity && userAddress) {
