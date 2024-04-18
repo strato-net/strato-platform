@@ -316,7 +316,7 @@ class CodeEditor extends Component {
           </div>
           <div className="text-right col-md-10">
             <div className='smd-pad-16 ' style={{display: "inline-block"}}>
-              <Popover
+              {/* <Popover
                 position={Position.BOTTOM}
                 content={
                   <div>
@@ -328,14 +328,15 @@ class CodeEditor extends Component {
                     onClick={() => {this.compileCode("EVM")}}/>
                   </div>
                 }
-                >
+                > */}
                 <Button
                   className="pt-intent-primary"
                   disabled={false}
+                  onClick={() => {this.compileCode("SolidVM")}}
                   text="Compile">
-                    <Icon style={{margin: 0, padding: 0}} iconName="caret-down"/>
+                    {/* <Icon style={{margin: 0, padding: 0}} iconName="caret-down"/> */}
                 </Button>
-              </Popover>
+              {/* </Popover> */}
             </div>
           
             <DeployDapp

@@ -2,7 +2,6 @@
 
 module Bloc.Client
   ( getGitInfo,
-    postUsersFill,
     getContracts,
     postContractsBatchSeries,
     getContractsData,
@@ -25,7 +24,6 @@ module Bloc.Client
     postChainInfos,
     getChainInfo,
     postBlocTransactionParallel,
-    postBlocTransactionRaw,
     postBlocTransactionBody,
     postBlocTransactionUnsigned,
   )
@@ -42,10 +40,6 @@ import SolidVM.Model.CodeCollection.Contract
 
 getGitInfo :: ClientM GitInfo
 getGitInfo = client (Proxy @GetGitInfo)
-
-------------- /users endpoints -------------
-postUsersFill :: JwtToken -> Address -> Bool -> ClientM BlocTransactionResult
-postUsersFill = client (Proxy @PostUsersFill)
 
 ------------- /contracts endpoints -------------
 getContracts ::
@@ -170,15 +164,6 @@ postBlocTransactionParallelExternal ::
   PostBlocTransactionRequest ->
   ClientM [BlocChainOrTransactionResult]
 postBlocTransactionParallelExternal = client (Proxy @PostBlocTransactionParallelExternal)
-
-postBlocTransactionRaw ::
-  Maybe Text ->
-  Maybe ChainId ->
-  Bool ->
-  Bool ->
-  PostBlocTransactionRawRequest ->
-  ClientM BlocChainOrTransactionResult
-postBlocTransactionRaw = client (Proxy @PostBlocTransactionRaw)
 
 postBlocTransactionBody ::
   Maybe Text ->

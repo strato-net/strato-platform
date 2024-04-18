@@ -118,5 +118,5 @@ main = do
           }
   race_ (runTheGregor gregorCfg)
     . race_ (runLoggingT (runSequencerM seqCfg mCtx (sequencer validators)))
-    . run flags_blockstanbul_port
+    . run 8050
     $ metricsApp

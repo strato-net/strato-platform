@@ -129,10 +129,6 @@ Object {
       },
     },
   },
-  "faucet": Object {
-    "address": "d2263b71c14010ff03d8f786670aba691b22b158",
-    "status": false,
-  },
   "filter": "Search accounts",
   "selectedChain": "airline cartel 1",
 }
