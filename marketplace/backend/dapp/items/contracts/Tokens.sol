@@ -16,7 +16,7 @@ contract Tokens is Mintable {
     ) public Mintable(_name, _description, _images, _files, _createdDate, _quantity) {}
 
     function mint(uint _quantity) internal override returns (UTXO) {
-        Token newToken = new Tokens(name, description, images, files, createdDate, _quantity);
+        Tokens newToken = new Tokens(name, description, images, files, createdDate, _quantity);
         return UTXO(address(newToken)); 
     }
 }
