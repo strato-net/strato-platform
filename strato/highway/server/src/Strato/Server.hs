@@ -19,6 +19,7 @@ import Strato.Server.PutS3File
 highwayWrapper :: ServerT HighwayWrapperAPI HighwayM
 highwayWrapper =
   getS3File
+    :<|> getS3FileTesting
     :<|> putS3File
     :<|> ping
 

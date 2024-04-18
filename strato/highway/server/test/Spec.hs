@@ -12,7 +12,7 @@ import           API
 import           Options
 import           Strato.Monad
 import           Strato.Server
-import           Strato.Server.GetS3File
+import           Strato.Server.GetS3File (getS3FileTesting)
 import           Strato.Server.PutS3File
 
 import qualified Aws as Aws
@@ -38,6 +38,7 @@ import           Servant
 import           Servant.Multipart
 import           Servant.Multipart.API
 import           Servant.Multipart.Client
+import           System.Environment
 import           System.Random
 import           Test.Hspec
 
@@ -132,7 +133,7 @@ fourMBBasicTest highwaytestnetaccesskeyid
       runResourceT $
         Aws.pureAws cfg s3cfg mgr $
           S3.DeleteObject hash highwaytestnets3bucket
-    (responseStatus rsp) `shouldBe` status200
+    rsp `shouldBe` status200
 
 fiveMBBasicTest :: String
                 -> String
@@ -184,7 +185,7 @@ fiveMBBasicTest highwaytestnetaccesskeyid
       runResourceT $
         Aws.pureAws cfg s3cfg mgr $
           S3.DeleteObject hash highwaytestnets3bucket
-    (responseStatus rsp) `shouldBe` status200
+    rsp `shouldBe` status200
 
 sixMBBasicTest :: String
                -> String
@@ -236,60 +237,64 @@ sixMBBasicTest highwaytestnetaccesskeyid
       runResourceT $
         Aws.pureAws cfg s3cfg mgr $
           S3.DeleteObject hash highwaytestnets3bucket
-    (responseStatus rsp) `shouldNotBe` status200
+    rsp `shouldNotBe` status200
 
 main :: IO ()
 main = do
   _ <- $initHFlags "Setup Highway Wrapper AWS settings - Testing"
-  --_ <- $initHFlagsDependentDefaults "Setup Highway Wrapper AWS settings - Testing"
-  --                                  (const $ const $ const $ [("awsaccesskeyid", "AKIAV5NMROVZHQSMZSCL"), ("awssecretaccesskey", "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"), ("awss3bucket", "mercata-testnet2")])
-  _ <- mapM_ Prelude.putStrLn arguments
   case Prelude.null flags_awsaccesskeyid of
-    True  -> do
-      _ <- Prelude.putStrLn "Prelude.null flags_awsaccesskeyid"
+    True  ->
       return ()
     False ->
       case Prelude.null flags_awssecretaccesskey of
-        True  -> do
-          _ <- Prelude.putStrLn "Prelude.null flags_awssecretaccesskey"
+        True  ->
           return ()
         False ->
           case Prelude.null flags_awss3bucket of
-            True  -> do
-              _ <- Prelude.putStrLn "Prelude.null flags_awss3bucket"
+            True  ->
               return ()
-            False ->
-              hspec $ do
-                aroundAll_ highwayTestingSetup $ do
-                  describe "highway" $ do
-                    describe "base tests" $ do
-                      describe "4MB testing" $ do
-                        fourMBBasicTest flags_awsaccesskeyid
-                                        flags_awssecretaccesskey
-                                        (T.pack flags_awss3bucket)
-                                        highwaytestneturl
-                      describe "5MB testing" $ do
-                        fiveMBBasicTest flags_awsaccesskeyid
-                                        flags_awssecretaccesskey
-                                        (T.pack flags_awss3bucket)
-                                        highwaytestneturl
-                      describe "6MB testing" $ do
-                        sixMBBasicTest flags_awsaccesskeyid
-                                       flags_awssecretaccesskey
-                                       (T.pack flags_awss3bucket)
-                                       highwaytestneturl
+            False -> do
+              let highwayawsaccesskeyid = flags_awsaccesskeyid
+              let highwayawssecretaccesskey = flags_awssecretaccesskey
+              let highwayawss3bucket = flags_awss3bucket
+              withArgs [] $
+                hspec     $ do
+                  aroundAll_ ( highwayTestingSetup highwayawsaccesskeyid
+                                                   highwayawssecretaccesskey
+                                                   highwayawss3bucket
+                             ) $ do
+                    describe "highway" $ do
+                      describe "base tests" $ do
+                        describe "4MB testing" $ do
+                          fourMBBasicTest highwayawsaccesskeyid
+                                          highwayawssecretaccesskey
+                                          (T.pack highwayawss3bucket)
+                                          highwaytestneturl
+                        describe "5MB testing" $ do
+                          fiveMBBasicTest highwayawsaccesskeyid
+                                          highwayawssecretaccesskey
+                                          (T.pack highwayawss3bucket)
+                                          highwaytestneturl
+                        describe "6MB testing" $ do
+                          sixMBBasicTest highwayawsaccesskeyid
+                                         highwayawssecretaccesskey
+                                         (T.pack highwayawss3bucket)
+                                         highwaytestneturl
   where
     highwaytestneturl = "localhost" :: Text --"https://fileserver.mercata-testnet2.blockapps.net" :: Text
-    highwayTestingSetup action = do
+    highwayTestingSetup highwayawsaccesskeyid
+                        highwayawssecretaccesskey
+                        highwaytestnets3bucket
+                        action = do
       mgr      <- newManager tlsManagerSettings
       boundary <- genBoundary
-      cr       <- Aws.makeCredentials (DBC8.pack flags_awsaccesskeyid)
-                                      (DBC8.pack flags_awssecretaccesskey)
+      cr       <- Aws.makeCredentials (DBC8.pack highwayawsaccesskeyid)
+                                      (DBC8.pack highwayawssecretaccesskey)
       let env = HighwayWrapperEnv
                   mgr
                   cr
                   boundary
-                  (T.pack flags_awss3bucket)
+                  (T.pack highwaytestnets3bucket)
                   highwaytestneturl
       bracket (liftIO $ forkIO $ Warp.run 8080 (appHighwayWrapper env))
               killThread

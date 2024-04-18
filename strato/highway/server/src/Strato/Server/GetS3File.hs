@@ -16,11 +16,11 @@ import           Conduit
 
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Reader
---import           Control.Monad.Logger
 import           Data.ByteString.Lazy as DBL
 import           Data.ByteString.Char8 as DBC8
 import           Data.Text as T
 import           Network.HTTP.Conduit (Response(..),responseBody)
+import           Network.HTTP.Types.Status (Status(..))
 import           System.FilePath (takeExtension)
 
 import           BlockApps.Logging
@@ -69,15 +69,11 @@ getS3File filename = do
              , contentTypeBody   = DBL.fromStrict $ DBC8.concat filecontents
              }
 
-getS3FileTesting :: ( MonadLogger m
-                    , MonadReader HighwayWrapperEnv m
-                    , MonadUnliftIO m
-                    )
-                 => Text
-                 -> m (Response (ConduitM () DBC8.ByteString (ResourceT IO) ()),ContentTypeAndBody)
+getS3FileTesting :: Text
+                 -> HighwayM (Status,ContentTypeAndBody)
 getS3FileTesting filename = do
   --Set up AWS credentials and the default configuration.
-  $logInfoS "highway/getS3File" $ T.pack $ "Setting up AWS credentials and the default AWS configuration."
+  $logInfoS "highway/getS3FileTesting" $ T.pack $ "Setting up AWS credentials and the default AWS configuration."
   mgr    <- asks httpManager
   cr     <- asks awsCredentials
   awss3b <- asks awss3bucket
@@ -88,11 +84,11 @@ getS3FileTesting filename = do
                               }
   let s3cfg = Aws.defServiceConfig :: S3.S3Configuration Aws.NormalQuery
   --Set up a ResourceT region with an available HTTP manager.
-  $logInfoS "highway/getS3File" $ T.pack $ "Setting up a ResourceT region with an available HTTP manager."
+  $logInfoS "highway/getS3FileTesting" $ T.pack $ "Setting up a ResourceT region with an available HTTP manager."
   st     <- askUnliftIO
   liftIO $ runResourceT $ do
     --Create a request object with S3.getObject and run the request with pureAws.
-    liftIO $ unliftIO st $ $logInfoS "highway/getS3File" $ T.pack $ "Creating a request object with getObject and running the request via pureAws."
+    liftIO $ unliftIO st $ $logInfoS "highway/getS3FileTesting" $ T.pack $ "Creating a request object with getObject and running the request via pureAws."
     S3.GetObjectResponse { S3.gorResponse = rsp } <-
       Aws.pureAws cfg s3cfg mgr $
         S3.getObject awss3b filename
@@ -114,6 +110,6 @@ getS3FileTesting filename = do
                            { contentTypeHeader = header
                            , contentTypeBody   = DBL.fromStrict $ DBC8.concat filecontents
                            }
-    pure $ ( rsp
+    pure $ ( responseStatus rsp
            , contentandbody
            )

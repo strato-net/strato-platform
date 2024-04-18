@@ -6,6 +6,5 @@ import Data.Proxy
 
 import API
 
-
 highwayWrapperClientAPI :: Proxy HighwayWrapperAPI
 highwayWrapperClientAPI = Proxy

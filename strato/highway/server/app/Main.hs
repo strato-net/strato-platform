@@ -92,7 +92,7 @@ initHighway = do
               return ()
             False -> do
               $logInfoS "highway/initHighway" $ T.pack $ "Preparing environment for highway."
-              mgr <- liftIO $ newManager tlsManagerSettings
+              mgr      <- liftIO $ newManager tlsManagerSettings
               boundary <- liftIO genBoundary
               cr       <- liftIO $ Aws.makeCredentials (DBC8.pack flags_awsaccesskeyid)
                                                        (DBC8.pack flags_awssecretaccesskey)              
