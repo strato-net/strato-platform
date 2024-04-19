@@ -116,7 +116,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
     
             for (const asset of inventory.groupedAssets) {
                 const remainingQuantity = desiredQuantity - totalTransferredQuantity;
-                const availableQuantity = asset.quantity - (asset.saleQuantity + asset.totalLockedQuantity);
+                const availableQuantity = asset.quantity
                 const quantityToTransfer = Math.min(remainingQuantity, availableQuantity);
     
                 if (quantityToTransfer > 0) {

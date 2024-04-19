@@ -156,9 +156,9 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
     
         // Calculate quantity from assets with a saleAddress
         let quantityListedForSale = assetsToUpdate.reduce((sum, asset) => sum + asset.saleQuantity, 0);
+        let updateCount = 0;
         let isIncrease = totalQuantityToBeListed > quantityListedForSale;
         let promises = [];
-
         // Check if the current listing have available quantity to update
 
         if (isIncrease) {
@@ -173,18 +173,18 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
             for(let asset of assetsToUpdate) {
                 // If there is extra quantity to update
                 if (asset.saleQuantity < asset.quantity) {
-                    let extraListedForAsset = Math.min(asset.quantity, totalQuantityToBeListed)
+                    let quantityNeededForUpdate = Math.min(asset.quantity, totalQuantityToBeListed)
                     
                     updateSaleBody.assets.push({
                         saleAddress: asset.saleAddress,
-                        saleQuantity: extraListedForAsset 
+                        saleQuantity: quantityNeededForUpdate 
                     })
-                    updateSaleBody.quantity += extraListedForAsset
+                    updateSaleBody.quantity += quantityNeededForUpdate
 
-                    quantityListedForSale += extraListedForAsset
+                    updateCount += quantityNeededForUpdate
                 }
             }
-            if (updateSaleBody.assets.length) {
+            if (updateSaleBody.assets.length > 0) {
                 promises.push(actions.updateSale(inventoryDispatch, updateSaleBody));
             }
         } else {
@@ -207,8 +207,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
 
     
         // Calculate remaining quantity to be listed
-        let remainingQuantity = totalQuantityToBeListed - quantityListedForSale;
-    
+        let remainingQuantity = totalQuantityToBeListed - updateCount  
         // There are no more sale addresses, so if we have more to list we call the listInventory function on the asset
         if (remainingQuantity > 0 || assetsToUpdate.length === 0) {
             let assetsToList = inventory.groupedAssets.reduce((acc, asset) => {

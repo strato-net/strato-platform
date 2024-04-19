@@ -508,7 +508,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.updateSale = async function (args, options = defaultOptions) {
-    options.cacheNonce = true;
+    const getOptions = { ...options, app: contractName, cacheNonce: true}
     const targetQuantity = parseInt(args.quantity, 10);
     const updatePromises = [];
 
@@ -522,16 +522,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
               quantity: asset.saleQuantity
             };
             const contract = { address: asset.saleAddress };
-            updatePromises.push(inventoryJs.updateSale(rawAdmin, contract, restArgs, options));
+            updatePromises.push(inventoryJs.updateSale(rawAdmin, contract, restArgs, getOptions));
             increasedQuantity += asset.saleQuantity
         }
     } else {  
-      
-      // Having issues with this portion. Seems when running these with the parallel route (/strato/v2.3/transaction/parallel?resolve=true",)
-      // Strato is searching for the closed sale's address and gets stuck in a loop. 
-      // I tried sending the requests separately, but they still end up in the parallel path. 
-      
-      
       // Handle decreasing the quantity
       let totalListedQuantity = args.assets.reduce((acc, asset) => acc + parseInt(asset.saleQuantity, 10), 0);
       let remainingToDecrease = totalListedQuantity - targetQuantity;
@@ -544,21 +538,23 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
               // If the asset's quantity is more than we need to decrease we can update the sale
               const quantityToBeListed = assetQuantity - remainingToDecrease;
               const restArgs = {
-                  quantity: quantityToBeListed,
+                paymentProviders: args.paymentProviders, 
+                price: args.price, 
+                quantity: quantityToBeListed,
               };
               const contract = { address: asset.saleAddress };
-              let update = await inventoryJs.updateSale(rawAdmin, contract, restArgs, options);
+              let update = await inventoryJs.updateSale(rawAdmin, contract, restArgs, getOptions);
+              updatePromises.push(update)
               remainingToDecrease -= quantityToBeListed; 
           } else {
               // If the asset's quantity is less or equal, unlist the asset
               const contract = { address: asset.saleAddress };
-              let unlist = await inventoryJs.unlistItem(rawAdmin, contract, {}, options)
-
+              let unlist = await inventoryJs.unlistItem(rawAdmin, contract, {}, getOptions)
+              updatePromises.push(unlist)
               remainingToDecrease -= assetQuantity; // Update remaining to decrease
           }
       }
     }
-
     const results = await Promise.allSettled(updatePromises);
 
     // Process successful and failed transactions
