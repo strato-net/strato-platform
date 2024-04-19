@@ -42,4 +42,4 @@ do
 done
 echo 'postgres is available'
 
-NODE_HOST=${NODE_HOST} npm run start:prod
+npm run start:prod

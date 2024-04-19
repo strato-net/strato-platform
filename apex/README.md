@@ -15,7 +15,6 @@
         PROMETHEUS_HOST=localhost:9090 \
         stratoRoot=http://localhost:3333/eth/v1.2 \  # note the stratoRoot, not STRATO_HOST \
         vaultProxyUrl=http://localhost:8484 \
-        NODE_HOST=localhost:8080 \ # not called, just used as node unique id \
         STRATO_VERSION=8.0.0 \
         npm run start:dev
    ```
@@ -32,7 +31,6 @@
         STRATO_PORT_API=3333 \
         STRATO_PORT_VAULT_PROXY=8484 \
         VAULT_PROXY_HOST=http://localhost:8484 \
-        NODE_HOST=localhost:8080 \ # not called, just used as node unique id \
         STRATO_VERSION=8.0.0 \
         ./run-tests.sh`
    ```
