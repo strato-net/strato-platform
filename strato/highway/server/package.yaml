@@ -90,11 +90,13 @@ tests:
       - http-types
       - network
       - random
+      - regex-compat
       - resourcet
       - servant-multipart
       - servant-multipart-api
       - servant-multipart-client
       - servant-server
+      - stm
       - strato-model
       - text
       - transformers
