@@ -737,7 +737,7 @@ getCreator caller = do
 -- once mercata-hydrogen and mercata networks dismantled, this function and flag will be obsolete
 shouldDoCreatorFork :: Integer -> Bool
 shouldDoCreatorFork curBlockNo = case (flags_creatorForkBlockNumber, computeNetworkID) of 
-  (-1, 7596898649924658542) -> curBlockNo >= 35000 -- on mercata-hydrogen, switch at block 35,000
+  (-1, 7596898649924658542) -> curBlockNo >= 36000 -- on mercata-hydrogen, switch at block 35,000
   (-1, 6909499098523985262) -> curBlockNo >= 6000 -- on mercata, switch at block 6,000
   (b, _) -> curBlockNo >= b -- do whatever the flag says
 
