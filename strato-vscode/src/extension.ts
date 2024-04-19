@@ -140,10 +140,8 @@ export async function activate(context: vscode.ExtensionContext) {
 							});
 							if (!argInput && constr.args[argNames[i]].tag != 'Array') return;
 							args = { 
-								...args, 
-								[argNames[i]]: constr.args[argNames[i]].tag === 'Array' ? 
-								argInput?.split(',').map(c => c.trim()).filter(d => d != "") : 
-								argInput
+								...args,
+								[argNames[i]]: coerceType(constr.args[argNames[i]], argInput || "")
 							}
 						}
 					}
@@ -192,10 +190,7 @@ export async function activate(context: vscode.ExtensionContext) {
 							`Enter a value for ${argNames[i][0]}.`
 				});
 				if (!argInput && argNames[i][1].type.tag != 'Array') return;
-				args[argNames[i][0]] = 
-					argNames[i][1].type.tag === 'Array' ? 
-					argInput?.split(',').map(c => c.trim()).filter(d => d != '') : 
-					argInput 
+				args[argNames[i][0]] = coerceType(argNames[i][1].type, argInput || '')
 			}
 			try {
 				const contract = { name: contractName, address: contractAddress }
@@ -360,6 +355,17 @@ function runCommand(cmd: string) {
 	terminal.sendText(cmd, true)
 }
 
+function coerceType(argument: any, input: string) {
+	switch(argument.tag) {
+		case "Array": return input.split(',').map(c => {return coerceType(argument.entry, c)}) 
+		case "Int": return parseInt(input)
+		case "Contract": return parseInt(input)
+		case "UnknownLabel": return parseInt(input) // Enums are accessed through one-based indexing
+		case "Address": return input
+		case "String": return input
+		default: return input
+	}
+}
 
 // Helper function for copying data to user clipboard
 export function copyToClipboard(t: string) {
