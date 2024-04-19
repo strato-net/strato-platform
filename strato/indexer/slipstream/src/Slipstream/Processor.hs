@@ -38,7 +38,6 @@ import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Stream.Action as Action
 import Blockchain.Stream.VMEvent
--- import Control.Arrow ((&&&))
 import Control.Lens ((^.))
 import Control.Monad (forM, forM_, unless, when)
 import qualified Control.Monad.Change.Modify as Mod
@@ -51,7 +50,7 @@ import Data.Foldable (toList)
 import Data.Function
 import Data.IORef
 import qualified Data.Map.Ordered as OMap
-import Data.List (foldl', sortOn, sortBy)
+import Data.List (foldl', sortOn)
 import qualified Data.Map as Map
 import Data.Maybe
 import Data.Ord (Down (..))
@@ -63,7 +62,6 @@ import Database.PostgreSQL.Typed (PGConnection)
 import SelectAccessible ()
 import Slipstream.Data.Action
 import Slipstream.Events
--- import qualified Slipstream.Events as SE
 import Slipstream.Globals
 import Slipstream.Metrics
 import Slipstream.OutputData
@@ -251,12 +249,6 @@ getMapNamesFromContract c =
       listOfMappingsWithRecords = filter (\(_, vd) -> _isRecord vd) listOfMappings
    in T.pack . fst <$> listOfMappingsWithRecords
 
-compareSpecial :: (ProcessedContract, T.Text, TableColumns) -> (ProcessedContract, T.Text, TableColumns) -> Ordering
-compareSpecial (_, t1, _) (_, t2, _) 
-    | t1 == specialText && t2 /= specialText = LT
-    | t2 == specialText && t1 /= specialText = GT
-    | otherwise = EQ
-    where specialText = T.pack "BlockApps-Mercata-Sale"
 
 processTheMessages ::
   ( MonadLogger m,
@@ -364,6 +356,10 @@ processTheMessages env conn messages = do
   --       pure $ Right deferredForeignKeys
 
   let fkeys = rights $ fkeys' -- ++ dfkeys'
+      concatFkeys = concat fkeys
+
+  forM_ concatFkeys $ \deferredForeignKey -> do
+    outputData conn $ dropFkeysBetween deferredForeignKey
 
   inserts <- enterBloc2 env $ do
     forM changes $ \(acct, actions) -> do
@@ -412,25 +408,16 @@ processTheMessages env conn messages = do
   let insertsByCodeHash = rights inserts
 
   forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
-
-  outputData conn $ insertBegin
   
   forM_ insertsByCodeHash $ \ins -> do
     outputData conn $ insertIndexTable $ indexInsert ins
     outputData conn $ insertHistoryTable $ historyInserts ins
     unless ((length (mappingInserts ins) < 1)) $ outputData conn $ insertMappingTable $ mappingInserts ins
-
-  unless (null insertsByCodeHash) $ do
-    let allAbstractInserts = concatMap abstractInsert insertsByCodeHash
-        sortedAbstractInserts = sortBy compareSpecial allAbstractInserts
-    outputData conn $ insertBegin
-    outputData conn $ insertAbstractTable $ sortedAbstractInserts
-    outputData conn $ insertCommit
+    outputData conn $ insertAbstractTable $ abstractInsert ins
 
   forM_ insertsByCodeHash $ \ins -> do
     insertForeignKeys conn $ indexInsert ins
 
-  let concatFkeys = concat fkeys
   forM_ concatFkeys $ \deferredForeignKey -> do
     outputData conn $ createForeignIndexesForJoins deferredForeignKey
 
