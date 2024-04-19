@@ -27,8 +27,7 @@ abstract contract Asset is Utils {
         address purchaserAddress,
         string purchaserCommonName,
         uint minItemNumber,
-        uint maxItemNumber,
-        uint price
+        uint maxItemNumber
     );
 
     event ItemTransfers(
@@ -77,8 +76,7 @@ abstract contract Asset is Utils {
                 owner,
                 ownerCommonName,
                 itemNumber,
-                itemNumber + _quantity - 1,
-                0 // Here 0 is price
+                itemNumber + _quantity - 1
             );
         }
     }
@@ -158,8 +156,7 @@ abstract contract Asset is Utils {
             _newOwner,
             newOwnerCommonName,
             itemNumber,
-            itemNumber + _quantity - 1,
-            _price
+            itemNumber + _quantity - 1
         );
         owner = _newOwner;
         ownerCommonName = newOwnerCommonName;

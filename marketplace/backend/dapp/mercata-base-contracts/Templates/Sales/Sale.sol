@@ -102,8 +102,8 @@ abstract contract Sale is Utils {
         Order order = Order(msg.sender);
         address purchaser = order.purchasersAddress();
         uint orderQuantity = takeLockedQuantity(msg.sender);
-        // regular transfer - isUserTransfer: false, transferNumber: 0
-        assetToBeSold.transferOwnership(purchaser, orderQuantity, false, 0, 0);//Need to pass _price here
+        // regular transfer - isUserTransfer: false, transferNumber: 0, transferPrice: 0
+        assetToBeSold.transferOwnership(purchaser, orderQuantity, false, 0, 0);
         closeSaleIfEmpty();
         return RestStatus.OK;
     }
@@ -117,7 +117,7 @@ abstract contract Sale is Utils {
         } else {
             quantity -= _quantity;
         }
-        // transfer feature - isUserTransfer: true, transferNumber: _transferNumber
+        // transfer feature - isUserTransfer: true, transferNumber: _transferNumber, transferPrice: _price
         assetToBeSold.transferOwnership(_newOwner, _quantity, true, _transferNumber, _price);
         closeSaleIfEmpty();
         return RestStatus.OK;
