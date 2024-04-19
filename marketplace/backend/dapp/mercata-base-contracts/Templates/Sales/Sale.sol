@@ -108,7 +108,7 @@ abstract contract Sale is Utils {
         return RestStatus.OK;
     }
 
-    function automaticTransfer(address _newOwner, uint _quantity, uint _transferNumber, uint _price) public returns (uint) {
+    function automaticTransfer(address _newOwner, uint _price, uint _quantity, uint _transferNumber) public returns (uint) {
         require(msg.sender == address(assetToBeSold), "Only the underlying Asset can call automaticTransfer.");
         uint assetQuantity = assetToBeSold.quantity();
         require(_quantity <= assetQuantity - totalLockedQuantity, "Cannot transfer more units than are available.");
