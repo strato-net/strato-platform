@@ -152,4 +152,10 @@ export const ORDER_STATUS = {
   "PAYMENT_PENDING": 5
 }
 
+export const REDEMPTION_STATUS = {
+  "PENDING": 1,
+  "FULFILLED": 2,
+  "REJECTED": 3
+}
+
 export const PAYMENT_LIST = ['card','us_bank_account']

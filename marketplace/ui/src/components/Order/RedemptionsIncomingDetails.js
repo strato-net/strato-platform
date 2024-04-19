@@ -14,11 +14,14 @@ import {
     Tabs,
 } from "antd";
 import { useLocation, useMatch } from "react-router-dom";
-import { actions } from "../../contexts/order/actions";
-import { actions as redemptionActions } from "../../contexts/redemption/actions";
+import { actions } from "../../contexts/redemption/actions";
+import { actions as orderActions } from "../../contexts/order/actions";
+import { actions as inventoryActions } from "../../contexts/inventory/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
+import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import routes from "../../helpers/routes";
+import { REDEMPTION_STATUS } from "../../helpers/constants";
 import classNames from "classnames";
 import { useNavigate } from "react-router-dom";
 import DataTableComponent from "../DataTableComponent";
@@ -34,16 +37,19 @@ import { ResponsiveOrderDetailCard } from "./ResponsiveOrderDetailCard";
 const RedemptionsIncomingDetails = ({ user }) => {
     const [id, setId] = useState(undefined);
     const [data, setdata] = useState([]);
-    const dispatch = useOrderDispatch();
-    const redemptionDispatch = useRedemptionDispatch();
+    const dispatch = useRedemptionDispatch();
+    const orderDispatch = useOrderDispatch();
+    const inventoryDispatch = useInventoryDispatch();
     const { Text } = Typography;
     const [selectedDate, setSelectedDate] = useState("");
     const [status, setStatus] = useState(getStatus(1));
-    const [comment, setComment] = useState("");
+    const navigate = useNavigate();
+    const [comments, setComments] = useState("");
     const { TextArea } = Input;
     const [api, contextHolder] = notification.useNotification();
     const state = useLocation()
-    const { redemption, isFetchingRedemptionDetails } = useRedemptionState();
+    const { redemption, isFetchingRedemptionDetails, isClosingRedemption } = useRedemptionState();
+    const { inventoryDetails, isInventoryDetailsLoading } = useInventoryState();
 
     const {
         message,
@@ -61,11 +67,20 @@ const RedemptionsIncomingDetails = ({ user }) => {
     useEffect(() => {
         if (id !== undefined) {
             const getData = async () => {
-                await redemptionActions.fetchRedemptionDetail(redemptionDispatch, id)
+                await actions.fetchRedemptionDetail(dispatch, id)
             };
             getData();
         }
-    }, [id, redemptionDispatch]);
+    }, [id, dispatch]);
+
+    useEffect(() => {
+        if (redemption) {
+            const fetchAsset = async () => {
+                await inventoryActions.fetchInventoryDetail(inventoryDispatch, redemption.assetAddresses[0])
+            };
+            fetchAsset();
+        }
+    }, [redemption])
 
     const OrderData = ({ title, value }) => {
         return (
@@ -146,41 +161,39 @@ const RedemptionsIncomingDetails = ({ user }) => {
         );
     };
 
-
     const onChange = (key) => {
         navigate(routes.Orders.url.replace(':type', key))
     };
 
-    const navigate = useNavigate();
 
     let column = [
         {
             title: "",
-            dataIndex: "productImage",
-            key: "productImage",
+            dataIndex: "images",
+            key: "images",
             render: (text) => <img className="w-[75px] h-[60px] object-contain" alt="" src={text} />,
         },
         {
             title: <Text className="text-primaryC text-[13px]">Product Name</Text>,
-            dataIndex: "productName",
-            key: "productName",
-            render: (text) => (
+            dataIndex: "name",
+            key: "name",
+            render: (text, record) => (
                 <p
                     // href={routes.BoughtOrderDetails.url}
                     className="text-primary text-[17px] cursor-pointer"
-                    onClick={() => { navigate(`${routes.MarketplaceProductDetail.url.replace(":address", text.address).replace(":name", text.name)}`) }}
+                    onClick={() => { navigate(`${routes.MarketplaceProductDetail.url.replace(":address", record.address).replace(":name", record.name)}`) }}
                 >
-                    {decodeURIComponent(text.name)}
+                    {decodeURIComponent(record?.name)}
                 </p>
             ),
         },
-        {
-            title: <Text className="text-primaryC text-[13px]">Unit Price($)</Text>,
-            dataIndex: "unitPrice",
-            key: "unitPrice",
-            align: "center",
-            render: (text) => <p>{text}</p>,
-        },
+        // {
+        //     title: <Text className="text-primaryC text-[13px]">Unit Price($)</Text>,
+        //     dataIndex: "unitPrice",
+        //     key: "unitPrice",
+        //     align: "center",
+        //     render: (text) => <p>{text}</p>,
+        // },
         {
             title: <Text className="text-primaryC text-[13px]">Quantity</Text>,
             dataIndex: "quantity",
@@ -188,39 +201,50 @@ const RedemptionsIncomingDetails = ({ user }) => {
             align: "center",
             render: (text) => <p>{text}</p>,
         },
-        {
-            title: <Text className="text-primaryC text-[13px]">Tax($)</Text>,
-            dataIndex: "tax",
-            key: "tax",
-            align: "center",
-            render: (text) => <p>{text}</p>,
-        },
-        {
-            title: <Text className="text-primaryC text-[13px]">Amount($)</Text>,
-            dataIndex: "amount",
-            key: "amount",
-            align: "center",
-            render: (text) => <p>{text}</p>,
-        },
+        // {
+        //     title: <Text className="text-primaryC text-[13px]">Tax($)</Text>,
+        //     dataIndex: "tax",
+        //     key: "tax",
+        //     align: "center",
+        //     render: (text) => <p>{text}</p>,
+        // },
+        // {
+        //     title: <Text className="text-primaryC text-[13px]">Amount($)</Text>,
+        //     dataIndex: "amount",
+        //     key: "amount",
+        //     align: "center",
+        //     render: (text) => <p>{text}</p>,
+        // },
     ];
 
     const openToastOrder = (placement) => {
         if (success) {
             api.success({
                 message: message,
-                onClose: actions.resetMessage(dispatch),
+                onClose: orderActions.resetMessage(orderDispatch),
                 placement,
                 key: 1,
             });
         } else {
             api.error({
                 message: message,
-                onClose: actions.resetMessage(dispatch),
+                onClose: orderActions.resetMessage(orderDispatch),
                 placement,
                 key: 2,
             });
         }
     };
+
+    const handleSubmit = async (status, comments) => {
+        const body = {
+            status, 
+            issuerComments: comments,
+            id: redemption.redemption_id,
+            assetAddresses: redemption.assetAddresses
+        }
+
+        const isDone = await actions.closeRedemption(dispatch, body);
+    }
 
     return (
         <div>
@@ -241,8 +265,8 @@ const RedemptionsIncomingDetails = ({ user }) => {
                             </ClickableCell>
                         </Breadcrumb.Item>
                         <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-                            <div onClick={() => { navigate(routes.Orders.url.replace(':type', 'redemptions-outgoing')); }}>
-                                <p className="text-sm text-primary font-semibold">Redemptions (outgoing)</p>
+                            <div onClick={() => { navigate(routes.Orders.url.replace(':type', 'redemptions-incoming')); }}>
+                                <p className="text-sm text-primary font-semibold">Redemptions (incoming)</p>
                             </div>
                         </Breadcrumb.Item>
                         <Breadcrumb.Item className="text-sm text-[#202020] font-medium">
@@ -287,13 +311,25 @@ const RedemptionsIncomingDetails = ({ user }) => {
                                                         <Text className="bg-[#E9E9E9] md:bg-white py-2 px-3 w-full md:bg-none font-semibold text-sm md:text-lg text-primaryB flex gap-4 items-center">Redemption Details</Text>
                                                     </div>
                                                 </div>
-                                                <Button
-                                                    id="save-button"
-                                                    type="primary"
-                                                    className="min-w-max w-max h-9 px-[3%] ml-2 bg-primary !hover:bg-primaryHover"
-                                                >
-                                                    Save
-                                                </Button>
+                                                <div className="flex gap-4 mr-4 mt-2">
+                                                    <Button
+                                                        type="primary"
+                                                        loading={isClosingRedemption}
+                                                        danger
+                                                        className="h-9"
+                                                        onClick={() => handleSubmit(REDEMPTION_STATUS.REJECTED, comments)}
+                                                    >
+                                                        Reject
+                                                    </Button>
+                                                    <Button
+                                                        type="primary"
+                                                        loading={isClosingRedemption}
+                                                        className="h-9"
+                                                        onClick={() => handleSubmit(REDEMPTION_STATUS.FULFILLED, comments)}
+                                                    >
+                                                        Fulfill
+                                                    </Button>
+                                                </div>
                                             </div>
                                             <Row className="hidden md:flex my-6 justify-between bg-[#F6F6F6] p-4 pb-2 rounded">
                                                 <OrderData
@@ -422,9 +458,9 @@ const RedemptionsIncomingDetails = ({ user }) => {
                                                     <TextArea
                                                         rows={2}
                                                         placeholder="Enter Comments"
-                                                        value={decodeURIComponent(comment)}
+                                                        value={comments}
                                                         onChange={(event) => {
-                                                            setComment(encodeURIComponent(event.target.value));
+                                                            setComments(event.target.value);
                                                         }}
                                                     />
                                                 </div>
@@ -432,9 +468,9 @@ const RedemptionsIncomingDetails = ({ user }) => {
                                             <div className="md:block hidden">
                                                 <DataTableComponent
                                                     columns={column}
-                                                    data={data}
+                                                    data={[inventoryDetails]}
                                                     scrollX="100%"
-                                                    isLoading={false}
+                                                    isLoading={isInventoryDetailsLoading}
                                                 />
                                             </div>
                                         </Card>

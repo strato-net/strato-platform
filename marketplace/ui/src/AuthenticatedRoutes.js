@@ -324,7 +324,9 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
           <UsersProvider>
             <OrdersProvider>
               <RedemptionsProvider>
-                <RedemptionsOutgoingDetails user={user} />
+                <InventoriesProvider>
+                  <RedemptionsOutgoingDetails user={user} />
+                </InventoriesProvider>
               </RedemptionsProvider>
             </OrdersProvider>
           </UsersProvider>
@@ -337,7 +339,9 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
           <UsersProvider>
             <OrdersProvider>
               <RedemptionsProvider>
-                <RedemptionsIncomingDetails user={user} />
+                <InventoriesProvider>
+                  <RedemptionsIncomingDetails user={user} />
+                </InventoriesProvider>
               </RedemptionsProvider>
             </OrdersProvider>
           </UsersProvider>

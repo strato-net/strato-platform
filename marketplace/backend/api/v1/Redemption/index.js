@@ -34,4 +34,11 @@ router.post(
   RedemptionController.requestRedemption
 );
 
+router.put(
+  Redemption.close,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  RedemptionController.closeRedemption
+);
+
 export default router;

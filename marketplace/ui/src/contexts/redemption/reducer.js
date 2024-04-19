@@ -82,6 +82,22 @@ const reducer = (state, action) => {
                 error: action.error,
                 isFetchingRedemptionDetails: false
             };
+        case actionDescriptors.closeRedemption:
+            return {
+                ...state,
+                isClosingRedemption: true
+            };
+        case actionDescriptors.closeRedemptionSuccessful:
+            return {
+                ...state,
+                isClosingRedemption: false
+            };
+        case actionDescriptors.closeRedemptionFailed:
+            return {
+                ...state,
+                error: action.error,
+                isClosingRedemption: false
+            };
         default:
             throw new Error(`Unhandled action: '${action.type}'`);
     }

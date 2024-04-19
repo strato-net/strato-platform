@@ -15,7 +15,8 @@ const RedemptionsProvider = ({ children }) => {
         outgoingRedemptions: [],
         incomingRedemptions: [],
         isFetchingRedemptionDetails: false,
-        redemption: undefined
+        redemption: undefined,
+        isClosingRedemption: false
     };
 
     const [state, dispatch] = useReducer(reducer, initialState);

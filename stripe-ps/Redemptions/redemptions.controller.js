@@ -22,10 +22,11 @@ class RedemptionsController {
                     ownerCommonName: row["ownercommonname"],
                     issuerCommonName: row["issuercommonname"],
                     assetAddresses: row["assetaddresses"],
+                    assetName: row["assetname"],
                     shippingAddressId: row["shippingaddressid"],
                     createdDate: row["createddate"]
                 }
-                const { ownercomments, issuercomments, ownercommonname, issuercommonname, assetaddresses, shippingaddressid, createddate, ...rest } = newRow;
+                const { ownercomments, issuercomments, ownercommonname, issuercommonname, assetaddresses, assetname, shippingaddressid, createddate, ...rest } = newRow;
                 return rest;
             });
 
@@ -61,10 +62,11 @@ class RedemptionsController {
                     ownerCommonName: row["ownercommonname"],
                     issuerCommonName: row["issuercommonname"],
                     assetAddresses: row["assetaddresses"],
+                    assetName: row["assetname"],
                     shippingAddressId: row["shippingaddressid"],
                     createdDate: row["createddate"]
                 }
-                const { ownercomments, issuercomments, ownercommonname, issuercommonname, assetaddresses, shippingaddressid, createddate, ...rest } = newRow;
+                const { ownercomments, issuercomments, ownercommonname, issuercommonname, assetaddresses, assetname, shippingaddressid, createddate, ...rest } = newRow;
                 return rest;
             });
 
@@ -100,10 +102,11 @@ class RedemptionsController {
                     ownerCommonName: row["ownercommonname"],
                     issuerCommonName: row["issuercommonname"],
                     assetAddresses: row["assetaddresses"],
+                    assetName: row["assetname"],
                     shippingAddressId: row["shippingaddressid"],
                     createdDate: row["createddate"]
                 }
-                const { ownercomments, issuercomments, ownercommonname, issuercommonname, assetaddresses, shippingaddressid, createddate, ...rest } = newRow;
+                const { ownercomments, issuercomments, ownercommonname, issuercommonname, assetaddresses, assetname, shippingaddressid, createddate, ...rest } = newRow;
                 return rest;
             });
 
@@ -123,7 +126,7 @@ class RedemptionsController {
         try {
             RedemptionsController.validateCreateRedemptionArgs(req.body);
 
-            const { quantity, ownerComments, issuerComments, ownerCommonName, issuerCommonName, assetAddresses, shippingAddressId } = req.body;
+            const { quantity, ownerComments, issuerComments, ownerCommonName, issuerCommonName, assetAddresses, assetName, status, shippingAddressId } = req.body;
 
             const query = `
             INSERT INTO redemptions (
@@ -133,12 +136,14 @@ class RedemptionsController {
             ownerCommonName, 
             issuerCommonName, 
             assetAddresses, 
+            assetName,
+            status,
             shippingAddressId 
             ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7
+            $1, $2, $3, $4, $5, $6, $7, $8, $9
             ) RETURNING redemption_id;`;
 
-            const values = [quantity, ownerComments, issuerComments, ownerCommonName, issuerCommonName, assetAddresses, shippingAddressId];
+            const values = [quantity, ownerComments, issuerComments, ownerCommonName, issuerCommonName, assetAddresses, assetName, status, shippingAddressId];
 
             const result = await client.query(query, values);
 
@@ -179,6 +184,37 @@ class RedemptionsController {
         }
     }
 
+    static async closeRedemption(req, res, next) {
+        try {
+            RedemptionsController.validateCloseRedemptionArgs(req.body);
+
+            if (!req.params.id) {
+                throw new Error('Missing redemption ID in PUT request /close/:id');
+            }
+
+            const { issuerComments, status } = req.body;
+
+            const query = `
+                UPDATE redemptions SET issuerComments = $1, status = $2 WHERE redemption_id = $3
+            `;
+
+            const values = [issuerComments, status, req.params.id];
+
+            const result = await client.query(query, values);
+
+            res.status(200).json({
+                message: 'updated',
+                changes: result.rowCount,
+            });
+
+            return next();
+        } catch (error) {
+            console.error('DB Error:', error.message);
+            next(error);
+        }
+    }
+
+
     // ********* VALIDATION ***********
     static validateCreateRedemptionArgs(args) {
         const createRedemptionSchema = Joi.object({
@@ -188,6 +224,8 @@ class RedemptionsController {
             ownerCommonName: Joi.string().required(),
             issuerCommonName: Joi.string().required(),
             assetAddresses: Joi.array().items(Joi.string()),
+            assetName: Joi.string().required(),
+            status: Joi.number().integer().min(1).max(1).required(),
             shippingAddressId: Joi.number().integer().required(),
         });
 
@@ -195,6 +233,19 @@ class RedemptionsController {
 
         if (validation.error) {
             throw new Error(`Missing args or bad format in POST request: ${validation.error.message}`);
+        }
+    }
+
+    static validateCloseRedemptionArgs(args) {
+        const closeRedemptionSchema = Joi.object({
+            issuerComments: Joi.string().allow(""),
+            status: Joi.number().integer().min(2).max(3).required()
+        });
+
+        const validation = closeRedemptionSchema.validate(args);
+
+        if (validation.error) {
+            throw new Error(`Missing args or bad format in PUT request: ${validation.error.message}`);
         }
     }
 

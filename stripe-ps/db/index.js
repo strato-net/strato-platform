@@ -40,6 +40,8 @@ if (process.env.POSTGRESQL_SERVER_URL && process.env.POSTGRESQL_PASSWORD) {
             ownerCommonName TEXT,
             issuerCommonName TEXT,
             assetAddresses TEXT[],
+            assetName TEXT,
+            status INTEGER,
             shippingAddressId INT REFERENCES customer_address(address_id),
             createdDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
             `;

@@ -278,6 +278,26 @@ async function transferItem(user, contract, args, options) {
     return transferStatus;
 }
 
+async function updateAssetStatus(user, contract, args, options) {
+    const callArgs = {
+        contract,
+        method: "updateStatus",
+        args: util.usc({ ...args }),
+    };
+
+    const [updateStatus] = await rest.call(user, callArgs, options);
+
+    if (parseInt(updateStatus, 10) !== RestStatus.OK) {
+        throw new rest.RestError(
+            updateStatus,
+            "Error while updating Asset Status",
+            { callArgs }
+        );
+    }
+
+    return [updateStatus];
+}
+
 async function updateInventory(user, contract, args, options) {
     const callArgs = {
         contract,
@@ -616,6 +636,7 @@ export default {
     resellItem,
     requestRedemption,
     transferItem,
+    updateAssetStatus,
     updateInventory,
     updateSale,
     checkSaleQuantity,

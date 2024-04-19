@@ -28,4 +28,9 @@ router.delete(
   RedemptionsController.deleteRedemptions
 );
 
+router.put(
+  '/close/:id',
+  RedemptionsController.closeRedemption
+);
+
 module.exports = router;

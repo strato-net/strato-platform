@@ -11,6 +11,7 @@ import { MinusCircleOutlined } from '@ant-design/icons';
 import AddressComponent from "../MarketPlace/AddressComponent";
 import AddAddressModal from "../MarketPlace/AddAddressModal";
 import { Images } from "../../images";
+import { REDEMPTION_STATUS } from "../../helpers/constants";
 
 const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offset }) => {
     const [data, setData] = useState([inventory]);
@@ -72,6 +73,8 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
         const body = {
             assetAddresses: [inventory.address],
             originAssetAddress: inventory.originAddress,
+            assetName: inventory.name,
+            status: REDEMPTION_STATUS.PENDING,
             quantity: quantity,
             shippingAddressId: userAddresses[selectedAddress].address_id,
             ownerCommonName: user.commonName,

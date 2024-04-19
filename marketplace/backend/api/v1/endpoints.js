@@ -64,6 +64,7 @@ export const Redemption = {
   create: '/',
   getOutgoingRedemptionRequests: '/outgoing',
   getIncomingRedemptionRequests: '/incoming',
+  close: '/close'
 }
 
 export const Item = {

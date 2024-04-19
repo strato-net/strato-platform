@@ -14,8 +14,8 @@ import {
     Tabs,
 } from "antd";
 import { useLocation, useMatch } from "react-router-dom";
-import { actions } from "../../contexts/order/actions";
-import { actions as redemptionActions } from "../../contexts/redemption/actions";
+import { actions as orderActions } from "../../contexts/order/actions";
+import { actions } from "../../contexts/redemption/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
 import routes from "../../helpers/routes";
@@ -34,8 +34,8 @@ import { ResponsiveOrderDetailCard } from "./ResponsiveOrderDetailCard";
 const RedemptionsOutgoingDetails = ({ user }) => {
     const [id, setId] = useState(undefined);
     const [data, setdata] = useState([]);
-    const dispatch = useOrderDispatch();
-    const redemptionDispatch = useRedemptionDispatch();
+    const dispatch = useRedemptionDispatch();
+    const orderDispatch = useOrderDispatch();
     const { Text } = Typography;
     const [selectedDate, setSelectedDate] = useState("");
     const [status, setStatus] = useState(getStatus(1));
@@ -61,11 +61,11 @@ const RedemptionsOutgoingDetails = ({ user }) => {
     useEffect(() => {
         if (id !== undefined) {
             const getData = async () => {
-                await redemptionActions.fetchRedemptionDetail(redemptionDispatch, id)
+                await actions.fetchRedemptionDetail(dispatch, id)
             };
             getData();
         }
-    }, [id, redemptionDispatch]);
+    }, [id, dispatch]);
 
     const OrderData = ({ title, value }) => {
         return (
@@ -208,14 +208,14 @@ const RedemptionsOutgoingDetails = ({ user }) => {
         if (success) {
             api.success({
                 message: message,
-                onClose: actions.resetMessage(dispatch),
+                onClose: orderActions.resetMessage(orderDispatch),
                 placement,
                 key: 1,
             });
         } else {
             api.error({
                 message: message,
-                onClose: actions.resetMessage(dispatch),
+                onClose: orderActions.resetMessage(orderDispatch),
                 placement,
                 key: 2,
             });

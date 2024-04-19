@@ -2,6 +2,8 @@ import RestStatus from "http-status-codes";
 import { apiUrl, fileServerUrl, HTTP_METHODS } from "../../helpers/constants";
 
 const actionDescriptors = {
+    resetMessage: "reset_message",
+    setMessage: "set_message",
     requestRedemption: "request_redemption",
     requestRedemptionSuccessful: "request_redemption_successful",
     requestRedemptionFailed: "request_redemption_failed",
@@ -14,9 +16,20 @@ const actionDescriptors = {
     fetchRedemptionDetails: "fetch_redemption_details",
     fetchRedemptionDetailsSuccessful: "fetch_redemption_details_successful",
     fetchRedemptionDetailsFailed: "fetch_redemption_details_failed",
+    closeRedemption: "close_redemption",
+    closeRedemptionSuccessful: "close_redemption_successful",
+    closeRedemptionFailed: "close_redemption_failed",
 };
 
 const actions = {
+    resetMessage: (dispatch) => {
+        dispatch({ type: actionDescriptors.resetMessage });
+    },
+
+    setMessage: (dispatch, message, success = false) => {
+        dispatch({ type: actionDescriptors.setMessage, message, success });
+    },
+
     requestRedemption: async (dispatch, payload) => {
         dispatch({ type: actionDescriptors.requestRedemption });
 
@@ -200,6 +213,60 @@ const actions = {
                 type: actionDescriptors.fetchRedemptionDetailsFailed,
                 error: "Error while fetching Redemption details",
             });
+        }
+    },
+
+    closeRedemption: async (dispatch, payload) => {
+        dispatch({ type: actionDescriptors.closeRedemption });
+
+        try {
+            const response = await fetch(`${apiUrl}/redemption/close`, {
+                method: HTTP_METHODS.PUT,
+                credentials: "same-origin",
+                headers: {
+                    Accept: "application/json",
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(payload),
+            });
+
+            const body = await response.json();
+
+            if (response.status === RestStatus.OK) {
+                dispatch({
+                    type: actionDescriptors.closeRedemptionSuccessful,
+                    payload: body.data,
+                });
+                actions.setMessage(dispatch, "Closed redemption successfully", true);
+                return true;
+            } else if (response.status === RestStatus.CONFLICT) {
+                dispatch({ type: actionDescriptors.closeRedemptionFailed, error: body.error.message });
+                actions.setMessage(dispatch, body.error.message)
+                return false;
+            } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+                dispatch({ type: actionDescriptors.closeRedemptionFailed, error: "Error while closing Redemption" });
+                actions.setMessage(dispatch, "Error while closing Redemption")
+                return false;
+            } else if (response.status === RestStatus.UNAUTHORIZED) {
+                dispatch({
+                    type: actionDescriptors.closeRedemptionFailed,
+                    error: "Unauthorized while closing Redemption"
+                });
+                window.location.href = body.error.loginUrl;
+            }
+
+            dispatch({
+                type: actionDescriptors.closeRedemptionFailed,
+                error: body.error
+            });
+            actions.setMessage(dispatch, body.error);
+            return false;
+        } catch (err) {
+            dispatch({
+                type: actionDescriptors.closeRedemptionFailed,
+                error: "Error while closing Redemption",
+            });
+            actions.setMessage(dispatch, "Error while closing Redemption");
         }
     },
 };

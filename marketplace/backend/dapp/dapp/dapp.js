@@ -11,7 +11,8 @@ import constants, {
   timeFilterForAll,
   timeFilterForOneYear,
   timeFilterForSixMonths,
-  ASSET_STATUS
+  ASSET_STATUS,
+  REDEMPTION_STATUS
 } from "/helpers/constants";
 import { yamlWrite, yamlSafeDumpSync, getYamlFile } from "/helpers/config";
 import { pollingHelper } from "/helpers/utils";
@@ -367,6 +368,43 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         throw new rest.RestError(error.response.status, error.response.statusText);
       }
       throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching redemption details: ${JSON.stringify(error)} `);
+    }
+  };
+
+  contract.closeRedemption = async function (args, options = optionsNoChainIds) {
+    const { id, assetAddresses, status, ...restArgs } = args;
+
+    let assetStatus;
+    if (status === REDEMPTION_STATUS.FULFILLED) {
+      assetStatus = ASSET_STATUS.RETIRED;
+    } else if (status === REDEMPTION_STATUS.REJECTED) {
+      assetStatus = ASSET_STATUS.ACTIVE;
+    }
+
+    const contract = { address: assetAddresses[0] };
+    const [updateStatus] = await inventoryJs.updateAssetStatus(rawAdmin, contract, { status: assetStatus }, options);
+
+    const finalArgs = { status, ...restArgs }
+
+    if (updateStatus) {
+      try {
+        const redemption = await axios.put(new URL(`/redemption/close/${id}`, STRIPE_PAYMENT_SERVER_URL).href, { ...finalArgs })
+          .then(function (res) {
+            if (res.status === 200) {
+              return res.data.data;
+            } else {
+              throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+            }
+          });
+        return redemption;
+      } catch (error) {
+        if (error.response) {
+          throw new rest.RestError(error.response.status, error.response.statusText);
+        }
+        throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while closing redemption: ${JSON.stringify(error)} `);
+      }
+    } else {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while updating Asset Status");
     }
   };
 

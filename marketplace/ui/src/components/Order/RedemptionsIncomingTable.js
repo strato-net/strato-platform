@@ -57,13 +57,13 @@ const RedemptionsIncomingTable = ({ user, selectedDate, download, isAllOrdersLoa
                 items.push({
                     key: redemption.redemption_id,
                     assetAddress: redemption.assetAddresses[0],
-                    // assetName: decodeURIComponent(redemption.asset.assetName),
+                    assetName: redemption.assetName,
                     requestor: redemption.ownerCommonName,
                     issuer: redemption.issuerCommonName,
                     quantity: redemption.quantity,
                     redemptionDate: redemption.createdDate,
                     redemptionNumber: redemption.redemption_id,
-                    // status: redemption.asset.status
+                    status: redemption.status
                 });
             });
         }
@@ -135,7 +135,7 @@ const RedemptionsIncomingTable = ({ user, selectedDate, download, isAllOrdersLoa
             title: "Asset Name",
             dataIndex: "assetName",
             key: "assetName",
-            render: (text) => <p>{text}</p>,
+            render: (text) => <p>{text}</p> ,
         },
         {
             title: "Quantity",
