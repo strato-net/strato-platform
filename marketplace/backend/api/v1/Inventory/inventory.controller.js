@@ -153,11 +153,24 @@ class InventoryController {
     }
   }
 
-  static async getRedemptions(req, res, next) {
+  static async getOutgoingRedemptionRequests(req, res, next) {
     try {
       const { dapp } = req
 
-      const redemptions = await dapp.getRedemptions()
+      const redemptions = await dapp.getOutgoingRedemptionRequests()
+      rest.response.status200(res, redemptions)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
+  static async getIncomingRedemptionRequests(req, res, next) {
+    try {
+      const { dapp } = req
+
+      const redemptions = await dapp.getIncomingRedemptionRequests()
       rest.response.status200(res, redemptions)
 
       return next()

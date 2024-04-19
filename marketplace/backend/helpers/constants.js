@@ -60,6 +60,12 @@ export const CHARGES = {
   "TAX": 0
 }
 
+export const ASSET_STATUS = {
+  "ACTIVE": 1,
+  "PENDING_REDEMPTION": 2,
+  "RETIRED": 3,
+}
+
 export const ORDER_STATUS = {
   "AWAITING_FULFILLMENT": 1,
   "AWAITING_SHIPMENT": 2,

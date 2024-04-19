@@ -10,7 +10,8 @@ import constants, {
   getDate,
   timeFilterForAll,
   timeFilterForOneYear,
-  timeFilterForSixMonths
+  timeFilterForSixMonths,
+  ASSET_STATUS
 } from "/helpers/constants";
 import { yamlWrite, yamlSafeDumpSync, getYamlFile } from "/helpers/config";
 import { pollingHelper } from "/helpers/utils";
@@ -284,33 +285,40 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.requestRedemption = async function (args, options = defaultOptions) {
     const getOptions = { ...options, app: contractName, };
-    const { originAssetAddress, ...restArgs } = args;
+    const { originAssetAddress, assetAddresses, quantity, ...restArgs } = args;
+
+    const contract = { address: assetAddresses[0] };
+    const [requestRedemptionStatus, assetAddress] = await inventoryJs.requestRedemption(rawAdmin, contract, { quantity: quantity }, options);
 
     const originAsset = await inventoryJs.get(rawAdmin, { address: originAssetAddress }, getOptions);
     const issuerCommonName = originAsset.ownerCommonName;
-    const finalArgs = { issuerCommonName, ...restArgs }
+    const finalArgs = { issuerCommonName, assetAddresses: [assetAddress], quantity, ...restArgs }
 
-    try {
-      await axios.post(new URL(`/redemption/create`, STRIPE_PAYMENT_SERVER_URL).href, { ...finalArgs })
-        .then(function (res) {
-          if (res.status === 200) {
-            console.log(res.data);
-          } else {
-            throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
-          }
-        });
-      return {}
-    } catch (error) {
-      if (error.response) {
-        throw new rest.RestError(error.response.status, error.response.statusText);
+    if (requestRedemptionStatus) {
+      try {
+        await axios.post(new URL(`/redemption/create`, STRIPE_PAYMENT_SERVER_URL).href, { ...finalArgs })
+          .then(function (res) {
+            if (res.status === 200) {
+              console.log(res.data);
+            } else {
+              throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+            }
+          });
+        return {}
+      } catch (error) {
+        if (error.response) {
+          throw new rest.RestError(error.response.status, error.response.statusText);
+        }
+        throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while creating redemption record: ${JSON.stringify(error)} `);
       }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while creating redemption record: ${JSON.stringify(error)} `);
+    } else {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while requesting redemption");
     }
   }
 
-  contract.getRedemptions = async function (args, options = optionsNoChainIds) {
+  contract.getOutgoingRedemptionRequests = async function (args, options = optionsNoChainIds) {
     try {
-      const redemptions = await axios.get(new URL(`/redemption/${userCert.commonName}`, STRIPE_PAYMENT_SERVER_URL).href).then(function (res) {
+      const redemptions = await axios.get(new URL(`/redemption/outgoing/${userCert.commonName}`, STRIPE_PAYMENT_SERVER_URL).href).then(function (res) {
         if (res.status === 200) {
           return res.data.data;
         } else {
@@ -322,7 +330,25 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
       }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching redemptions: ${JSON.stringify(error)} `);
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching outgoing redemptions: ${JSON.stringify(error)} `);
+    }
+  };
+
+  contract.getIncomingRedemptionRequests = async function (args, options = optionsNoChainIds) {
+    try {
+      const redemptions = await axios.get(new URL(`/redemption/incoming/${userCert.commonName}`, STRIPE_PAYMENT_SERVER_URL).href).then(function (res) {
+        if (res.status === 200) {
+          return res.data.data;
+        } else {
+          throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+        }
+      });
+      return redemptions;
+    } catch (error) {
+      if (error.response) {
+        throw new rest.RestError(error.response.status, error.response.statusText);
+      }
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching incoming redemptions: ${JSON.stringify(error)} `);
     }
   };
 
@@ -501,6 +527,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       ...args.itemArgs,
       createdDate,
       owner: rawAdmin.address,
+      status: ASSET_STATUS.ACTIVE
     };
     return artJs.uploadContract(rawAdmin, newArgs, options);
   };
@@ -519,6 +546,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const newArgs = {
       ...args.itemArgs,
       createdDate,
+      status: ASSET_STATUS.ACTIVE
     };
     return carbonOffsetJs.uploadContract(rawAdmin, newArgs, options);
   };
@@ -538,6 +566,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       ...args.itemArgs,
       createdDate,
       owner: rawAdmin.address,
+      status: ASSET_STATUS.ACTIVE
     };
     return metalsJs.uploadContract(rawAdmin, newArgs, options);
   };
@@ -556,6 +585,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const newArgs = {
       ...args.itemArgs,
       createdDate,
+      status: ASSET_STATUS.ACTIVE
     };
     return clothingJs.uploadContract(rawAdmin, newArgs, options);
   };
@@ -575,7 +605,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       ...args.itemArgs,
       createdDate,
       owner: rawAdmin.address,
-      status: 1,
+      status: ASSET_STATUS.ACTIVE
     };
     console.log("newArgs", newArgs);
     return membershipJs.uploadContract(rawAdmin, newArgs, options);
@@ -594,7 +624,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const createdDate = Math.floor(Date.now() / 1000);
     const newArgs = {
       ...args.itemArgs,
-      createdDate
+      createdDate,
+      status: ASSET_STATUS.ACTIVE
     };
     console.log("newArgs", newArgs);
     return carbonDAOJs.uploadContract(rawAdmin, newArgs, options);
@@ -614,6 +645,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const newArgs = {
       ...args.itemArgs,
       createdDate,
+      status: ASSET_STATUS.ACTIVE
     };
     return collectibleJs.uploadContract(rawAdmin, newArgs, options);
   };

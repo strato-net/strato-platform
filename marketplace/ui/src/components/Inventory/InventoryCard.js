@@ -209,16 +209,28 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
                 <p className="text-[#4D4D4D] text-[13px]">Published</p>
               </div>
               :
-              (inventory.data.isMint && inventory.data.isMint === "False" && inventory.quantity === 0) || (!inventory.data.isMint && inventory.quantity === 0) ?
+              (inventory.status === "2") ?
                 <div className="flex items-center justify-center gap-2 bg-[#FFA50029] p-[6px] rounded-md">
                   <div className="w-[7px] h-[7px] rounded-full bg-[#FFA500]"></div>
-                  <p className="text-[#4D4D4D] text-[13px]">Sold Out</p>
+                  <p className="text-[#4D4D4D] text-[13px]">Pending Redemption</p>
                 </div>
                 :
-                <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
-                  <div className="w-[7px] h-[7px] rounded-full bg-[#ff4d4f]"></div>
-                  <p className="text-[#4D4D4D] text-[13px]">Unpublished</p>
-                </div>
+                (inventory.status === "3") ?
+                  <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
+                    <div className="w-[7px] h-[7px] rounded-full bg-[#ff4d4f]"></div>
+                    <p className="text-[#4D4D4D] text-[13px]">Retired</p>
+                  </div>
+                  :
+                  (inventory.data.isMint && inventory.data.isMint === "False" && inventory.quantity === 0) || (!inventory.data.isMint && inventory.quantity === 0) ?
+                    <div className="flex items-center justify-center gap-2 bg-[#FFA50029] p-[6px] rounded-md">
+                      <div className="w-[7px] h-[7px] rounded-full bg-[#FFA500]"></div>
+                      <p className="text-[#4D4D4D] text-[13px]">Sold Out</p>
+                    </div>
+                    :
+                    <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
+                      <div className="w-[7px] h-[7px] rounded-full bg-[#ff4d4f]"></div>
+                      <p className="text-[#4D4D4D] text-[13px]">Unpublished</p>
+                    </div>
             }
           </div>
         </div>

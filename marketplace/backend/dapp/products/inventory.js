@@ -67,17 +67,17 @@ async function uploadSaleContract(user, _constructorArgs, options) {
 
     const contract = await rest.createContract(user, contractArgs, copyOfOptions);
     contract.src = 'removed';
-    
+
     const searchOptions = {
         ...options,
         org: constants.blockAppsOrg,
         query: {
             address: `eq.${contract.address}`
         }
-      }
-      
-    await waitForAddress(user, {name: saleContract}, searchOptions);
-    
+    }
+
+    await waitForAddress(user, { name: saleContract }, searchOptions);
+
     return contract;
 }
 
@@ -194,7 +194,7 @@ async function unlistItem(user, _contract, args, options) {
             { callArgs }
         );
     }
-    
+
     const searchOptions = {
         ...options,
         org: constants.blockAppsOrg,
@@ -202,10 +202,10 @@ async function unlistItem(user, _contract, args, options) {
             address: `eq.${callArgs.contract.address}`,
             isOpen: `eq.false`
         }
-      }
-      
-    await waitForAddress(user, {name: saleContract}, searchOptions);
-    
+    }
+
+    await waitForAddress(user, { name: saleContract }, searchOptions);
+
     return unlistStatus;
 }
 
@@ -215,7 +215,7 @@ async function resellItem(user, contract, args, options) {
         method: "mintNewUnits",
         args: util.usc({ ...args }),
     };
-    
+
     const resellStatus = await rest.call(user, callArgs, options);
 
     if (parseInt(resellStatus, 10) !== RestStatus.OK) {
@@ -225,8 +225,28 @@ async function resellItem(user, contract, args, options) {
             { callArgs }
         );
     }
-    
+
     return resellStatus;
+}
+
+async function requestRedemption(user, contract, args, options) {
+    const callArgs = {
+        contract,
+        method: "requestRedemption",
+        args: util.usc({ ...args }),
+    };
+
+    const [requestRedemptionStatus, assetAddress] = await rest.call(user, callArgs, options);
+
+    if (parseInt(requestRedemptionStatus, 10) !== RestStatus.OK) {
+        throw new rest.RestError(
+            requestRedemptionStatus,
+            "Error while requesting redemption",
+            { callArgs }
+        );
+    }
+
+    return [requestRedemptionStatus, assetAddress];
 }
 
 async function transferItem(user, contract, args, options) {
@@ -244,16 +264,16 @@ async function transferItem(user, contract, args, options) {
             { callArgs }
         );
     }
-    
+
     const searchOptions = {
         ...options,
         org: constants.blockAppsOrg,
         query: {
             address: `eq.${callArgs.contract.address}`
         }
-      }
-      
-    await waitForAddress(user, {name: transferContractName}, searchOptions);
+    }
+
+    await waitForAddress(user, { name: transferContractName }, searchOptions);
 
     return transferStatus;
 }
@@ -367,7 +387,7 @@ async function getAll(admin, args = {}, defaultOptions) {
 
         // added greater than query to make sure we only take the sales with quantity thats available to sell. 
         // If the sale has 0 quantity it will throw an error when checking out, we will not show thee items for the trending search.
-        sales = await saleJs.getAll(admin, { range, isOpen: true, order: 'block_timestamp.desc', offset: '0', gtField: args.gtField, gtValue: args.gtValue}, options);
+        sales = await saleJs.getAll(admin, { range, isOpen: true, order: 'block_timestamp.desc', offset: '0', gtField: args.gtField, gtValue: args.gtValue }, options);
         const trendingAssetAddresses = sales.map(sale => sale.assetToBeSold);
 
         // Match the inventory with the sales
@@ -378,7 +398,7 @@ async function getAll(admin, args = {}, defaultOptions) {
                 order: 'block_timestamp.desc',
                 limit: '25',
             }, options, admin);
-    } 
+    }
     else {
         // Original logic
         if (ownerCommonName) {
@@ -404,7 +424,7 @@ async function getAll(admin, args = {}, defaultOptions) {
         if (inventories && userProfile) {
             const assetAddresses = inventories.map((inventory) => inventory.address);
             // (sale.js): `getAll` method needs to be refactored as it has logic specific to passing `assetAddresses`
-            sales = await saleJs.getAll(admin, {  assetAddresses, range, saleGtField: userProfileGtField, saleGtValue: userProfileGtValue, isOpen: true, order: 'block_timestamp.desc' }, options);
+            sales = await saleJs.getAll(admin, { assetAddresses, range, saleGtField: userProfileGtField, saleGtValue: userProfileGtValue, isOpen: true, order: 'block_timestamp.desc' }, options);
         }
         else if (inventories) {
             const assetAddresses = inventories.map((inventory) => inventory.address);
@@ -426,7 +446,7 @@ async function getAll(admin, args = {}, defaultOptions) {
                 });
             }
             else if (isMarketplaceSearch) {
-                if(isNullPriceRange){
+                if (isNullPriceRange) {
                     finalInventory.push({
                         ...inventory,
                         price: null,
@@ -434,9 +454,10 @@ async function getAll(admin, args = {}, defaultOptions) {
                         saleQuantity: null,
                         saleDate: null,
                         totalLockedQuantity: null
-                    })}
+                    })
                 }
-             else {
+            }
+            else {
                 finalInventory.push(inventory);
             }
         });
@@ -468,14 +489,14 @@ async function getAllItemTransferEvents(admin, args = {}, defaultOptions) {
             return matchingSale.price;
         } else {
             // Fetch histories in parallel and filter out non-matching or missing histories
-            const potentialHistories = await Promise.all(sales.map(sale => 
-                saleJs.getSaleHistory(admin, { 
-                    contract: sale.contract_name, 
-                    assetToBeSold: item.address, 
-                    transaction_hash: item.transaction_hash 
+            const potentialHistories = await Promise.all(sales.map(sale =>
+                saleJs.getSaleHistory(admin, {
+                    contract: sale.contract_name,
+                    assetToBeSold: item.address,
+                    transaction_hash: item.transaction_hash
                 }, options)
-                .then(historyObject => Object.values(historyObject))
-                .catch(() => []) // In case of error, return an empty array to keep the structure
+                    .then(historyObject => Object.values(historyObject))
+                    .catch(() => []) // In case of error, return an empty array to keep the structure
             ));
 
             // Flatten and find the first matching history record
@@ -489,11 +510,11 @@ async function getAllItemTransferEvents(admin, args = {}, defaultOptions) {
 
     // Updating itemTransferEvent data to include price fetched
     itemTransferEvents = itemTransferEvents.map((item, index) => ({
-        ...item, 
+        ...item,
         price: salePrices[index]
     }));
 
-    const total = await searchAllWithQueryArgs(`${contractName}.${contractEvents.ITEM_TRANSFER}`, 
+    const total = await searchAllWithQueryArgs(`${contractName}.${contractEvents.ITEM_TRANSFER}`,
         { ...args, limit: undefined, offset: 0, order: undefined, queryOptions: { select: "count" } }, options, admin);
 
     return { transfers: itemTransferEvents.map(marshalOut), total: total[0]?.count };
@@ -550,14 +571,14 @@ async function checkSaleQuantity(admin, args, defaultOptions) {
     let insufficientDetails = [];
 
     sales.forEach((sale, index) => {
-        const actualAvailableQuantity = sale.quantity; 
+        const actualAvailableQuantity = sale.quantity;
         const requestedQuantity = orderQuantity[index]; // Accessing requested quantity via sale address
 
         if (actualAvailableQuantity < requestedQuantity) {
             const asset = assets.find(asset => asset.sale === sale.address);
             if (asset) {
                 insufficientDetails.push({
-                    assetName: asset.name, 
+                    assetName: asset.name,
                     assetAddress: sale.assetToBeSold,
                     availableQuantity: actualAvailableQuantity,
                 });
@@ -593,6 +614,7 @@ export default {
     bindAddress,
     unlistItem,
     resellItem,
+    requestRedemption,
     transferItem,
     updateInventory,
     updateSale,

@@ -17,14 +17,16 @@ abstract contract Mintable is UTXO {
         string[] _images,
         string[] _files,
         uint _createdDate,
-        uint _quantity
+        uint _quantity,
+        AssetStatus _status
     ) UTXO(
         _name,
         _description,
         _images,
         _files,
         _createdDate,
-        _quantity
+        _quantity,
+        _status
     ) {
         try {
             assert(Mintable(msg.sender).mintableMagicNumber() == mintableMagicNumber);
@@ -40,7 +42,7 @@ abstract contract Mintable is UTXO {
     }
 
     function mint(uint _quantity) internal virtual override returns (UTXO) {
-        Mintable m = new Mintable(name, description, images, files, createdDate, _quantity);
+        Mintable m = new Mintable(name, description, images, files, createdDate, _quantity, status);
         return UTXO(m);
     }
 

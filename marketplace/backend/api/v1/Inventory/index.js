@@ -7,10 +7,17 @@ import loadDapp from "../../middleware/loadDappHandler";
 const router = express.Router();
 
 router.get(
-  Inventory.getRedemptions,
+  Inventory.getOutgoingRedemptionRequests,
   authHandler.authorizeRequest(),
   loadDapp,
-  InventoryController.getRedemptions
+  InventoryController.getOutgoingRedemptionRequests
+);
+
+router.get(
+  Inventory.getIncomingRedemptionRequests,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  InventoryController.getIncomingRedemptionRequests
 );
 
 router.get(

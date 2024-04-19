@@ -35,9 +35,12 @@ const actionDescriptors = {
   requestRedemption: "request_redemption",
   requestRedemptionSuccessful: "request_redemption_successful",
   requestRedemptionFailed: "request_redemption_failed",
-  fetchRedemptions: "fetch_redemptions",
-  fetchRedemptionsSuccessful: "fetch_redemptions_successful",
-  fetchRedemptionsFailed: "fetch_redemptions_failed",
+  fetchOutgoingRedemptionRequests: "fetch_outgoing_redemption_requests",
+  fetchOutgoingRedemptionRequestsSuccessful: "fetch_outgoing_redemption_requests_successful",
+  fetchOutgoingRedemptionRequestsFailed: "fetch_outgoing_redemption_requests_failed",
+  fetchIncomingRedemptionRequests: "fetch_incoming_redemption_requests",
+  fetchIncomingRedemptionRequestsSuccessful: "fetch_incoming_redemption_requests_successful",
+  fetchIncomingRedemptionRequestsFailed: "fetch_incoming_redemption_requests_failed",
   transferInventory: "transfer_inventory",
   transferInventorySuccessful: "transfer_inventory_successful",
   transferInventoryFailed: "transfer_inventory_failed",
@@ -593,11 +596,11 @@ const actions = {
     }
   },
 
-  fetchRedemptions: async (dispatch) => {
-    dispatch({ type: actionDescriptors.fetchRedemptions });
+  fetchOutgoingRedemptionRequests: async (dispatch) => {
+    dispatch({ type: actionDescriptors.fetchOutgoingRedemptionRequests });
 
     try {
-      const response = await fetch(`${apiUrl}/inventory/redemptions`, {
+      const response = await fetch(`${apiUrl}/inventory/redemptions/outgoing`, {
         method: HTTP_METHODS.GET,
       });
 
@@ -605,38 +608,85 @@ const actions = {
 
       if (response.status === RestStatus.OK) {
         dispatch({
-          type: actionDescriptors.fetchRedemptionsSuccessful,
+          type: actionDescriptors.fetchOutgoingRedemptionRequestsSuccessful,
           payload: body.data,
         });
         return true;
       } else if (response.status === RestStatus.CONFLICT) {
-        dispatch({ type: actionDescriptors.fetchRedemptionsFailed, error: body.error.message });
+        dispatch({ type: actionDescriptors.fetchOutgoingRedemptionRequestsFailed, error: body.error.message });
         actions.setMessage(dispatch, body.error.message)
         return false;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
-        dispatch({ type: actionDescriptors.fetchRedemptionsFailed, error: "Error while fetching Redemptions" });
-        actions.setMessage(dispatch, "Error while fetching Redemptions")
+        dispatch({ type: actionDescriptors.fetchOutgoingRedemptionRequestsFailed, error: "Error while fetching outgoing Redemption Requests" });
+        actions.setMessage(dispatch, "Error while fetching outgoing Redemption Requests")
         return false;
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
-          type: actionDescriptors.fetchRedemptionsFailed,
-          error: "Unauthorized while fetching Redemptions"
+          type: actionDescriptors.fetchOutgoingRedemptionRequestsFailed,
+          error: "Unauthorized while fetching outgoing Redemption Requests"
         });
         window.location.href = body.error.loginUrl;
       }
 
       dispatch({
-        type: actionDescriptors.fetchRedemptionsFailed,
+        type: actionDescriptors.fetchOutgoingRedemptionRequestsFailed,
         error: body.error
       });
       actions.setMessage(dispatch, body.error);
       return false;
     } catch (err) {
       dispatch({
-        type: actionDescriptors.fetchRedemptionsFailed,
-        error: "Error while fetching Redemptions",
+        type: actionDescriptors.fetchOutgoingRedemptionRequestsFailed,
+        error: "Error while fetching outgoing Redemption Requests",
       });
-      actions.setMessage(dispatch, "Error while fetching Redemptions");
+      actions.setMessage(dispatch, "Error while fetching outgoing Redemption Requests");
+    }
+  },
+
+  fetchIncomingRedemptionRequests: async (dispatch) => {
+    dispatch({ type: actionDescriptors.fetchIncomingRedemptionRequests });
+
+    try {
+      const response = await fetch(`${apiUrl}/inventory/redemptions/incoming`, {
+        method: HTTP_METHODS.GET,
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchIncomingRedemptionRequestsSuccessful,
+          payload: body.data,
+        });
+        return true;
+      } else if (response.status === RestStatus.CONFLICT) {
+        dispatch({ type: actionDescriptors.fetchIncomingRedemptionRequestsFailed, error: body.error.message });
+        actions.setMessage(dispatch, body.error.message)
+        return false;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({ type: actionDescriptors.fetchIncomingRedemptionRequestsFailed, error: "Error while fetching incoming Redemptions Requests" });
+        actions.setMessage(dispatch, "Error while fetching incoming Redemptions Requests")
+        return false;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchIncomingRedemptionRequestsFailed,
+          error: "Unauthorized while fetching incoming Redemptions Requests"
+        });
+        window.location.href = body.error.loginUrl;
+      }
+
+      dispatch({
+        type: actionDescriptors.fetchIncomingRedemptionRequestsFailed,
+        error: body.error
+      });
+      actions.setMessage(dispatch, body.error);
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.fetchIncomingRedemptionRequestsFailed,
+        error: "Error while fetching incoming Redemptions Requests",
+      });
+      actions.setMessage(dispatch, "Error while fetching incoming Redemptions Requests");
     }
   },
 

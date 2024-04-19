@@ -2,13 +2,52 @@ const client = require('../db');
 const Joi = require('@hapi/joi');
 class RedemptionsController {
 
-    static async getRedemptions(req, res, next) {
+    static async getOutgoingRedemptionRequests(req, res, next) {
         try {
             if (!req.params.commonName) {
                 throw new Error('Missing common name in GET request /:commonName');
             }
 
             const query = 'SELECT * FROM redemptions WHERE ownerCommonName = $1 ORDER BY createdDate DESC';
+            const values = [req.params.commonName];
+
+            const result = await client.query(query, values);
+
+            // fix casing in columns
+            const formattedRows = result.rows.map(row => {
+                const newRow = {
+                    ...row,
+                    ownerComments: row["ownercomments"],
+                    issuerComments: row["issuercomments"],
+                    ownerCommonName: row["ownercommonname"],
+                    issuerCommonName: row["issuercommonname"],
+                    assetAddresses: row["assetaddresses"],
+                    shippingAddressId: row["shippingaddressid"],
+                    createdDate: row["createddate"]
+                }
+                const { ownercomments, issuercomments, ownercommonname, issuercommonname, assetaddresses, shippingaddressid, createddate, ...rest } = newRow;
+                return rest;
+            });
+
+            res.status(200).json({
+                message: 'success',
+                data: formattedRows || [],
+            });
+
+            return next();
+        } catch (error) {
+            console.error('DB Error:', error.message);
+            next(error);
+        }
+    }
+
+    static async getIncomingRedemptionRequests(req, res, next) {
+        try {
+            if (!req.params.commonName) {
+                throw new Error('Missing common name in GET request /:commonName');
+            }
+
+            const query = 'SELECT * FROM redemptions WHERE issuerCommonName = $1 ORDER BY createdDate DESC';
             const values = [req.params.commonName];
 
             const result = await client.query(query, values);

@@ -4,8 +4,13 @@ const RedemptionsController = require('./redemptions.controller');
 const router = express.Router();
 
 router.get(
-  '/:commonName', 
-  RedemptionsController.getRedemptions
+  '/outgoing/:commonName', 
+  RedemptionsController.getOutgoingRedemptionRequests
+);
+
+router.get(
+  '/incoming/:commonName', 
+  RedemptionsController.getIncomingRedemptionRequests
 );
 
 router.post(

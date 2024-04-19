@@ -9,19 +9,21 @@ abstract contract UTXO is Asset {
         string[] _images,
         string[] _files,
         uint _createdDate,
-        uint _quantity
+        uint _quantity,
+        AssetStatus _status
     ) Asset(
         _name,
         _description,
         _images,
         _files,
         _createdDate,
-        _quantity
+        _quantity,
+        _status
     ) {
     }
 
     function mint(uint _quantity) internal virtual returns (UTXO) {
-        return new UTXO(name, description, images, files, createdDate, _quantity);
+        return new UTXO(name, description, images, files, createdDate, _quantity, status);
     }
 
     // Quantity is already checked by transferOwnership function
@@ -74,5 +76,16 @@ abstract contract UTXO is Asset {
 
     function checkCondition() internal virtual returns (bool){
         return true;
+    }
+
+    function requestRedemption(uint _quantity) public returns (uint, address) {
+        require(getCommonName(msg.sender) == ownerCommonName, "Only the owner of the Asset can request for redemption");
+
+        UTXO newAsset = mint(_quantity);
+        Asset(newAsset).transferOwnership(owner, _quantity, false, 0);
+        Asset(newAsset).updateStatus(AssetStatus.PENDING_REDEMPTION);
+        quantity -= _quantity;
+
+        return (RestStatus.OK, address(newAsset));
     }
 }

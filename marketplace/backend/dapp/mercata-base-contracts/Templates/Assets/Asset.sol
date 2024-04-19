@@ -6,6 +6,14 @@ import "../Enums/RestStatus.sol";
 import "../Utils/Utils.sol";
 
 abstract contract Asset is Utils {
+    enum AssetStatus {
+        NULL,
+        ACTIVE,
+        PENDING_REDEMPTION,
+        RETIRED,
+        MAX
+    }
+
     uint public assetMagicNumber = 0x4173736574; // 'Asset'
     address public owner;
     string public ownerCommonName;
@@ -17,6 +25,7 @@ abstract contract Asset is Utils {
     uint public createdDate;
     uint public quantity;
     uint public itemNumber;
+    AssetStatus public status;
 
     address public sale;
 
@@ -50,7 +59,8 @@ abstract contract Asset is Utils {
         string[] _images,
         string[] _files,
         uint _createdDate,
-        uint _quantity
+        uint _quantity,
+        AssetStatus _status
     ) {
         // TODO: Get ownerCommonName by getting commonName field from on-chain wallet at that address
         owner  = msg.sender;
@@ -61,6 +71,7 @@ abstract contract Asset is Utils {
         files = _files;
         createdDate = _createdDate;
         quantity = _quantity;
+        status = _status;
         try {
             assert(Asset(msg.sender).assetMagicNumber() == assetMagicNumber);
             originAddress = Asset(msg.sender).originAddress();
@@ -186,6 +197,11 @@ abstract contract Asset is Utils {
     ) public requireOwner("update asset") returns (uint) {
         images = _images;
         files = _files;
+        return RestStatus.OK;
+    }
+
+    function updateStatus(AssetStatus _status) public returns (uint) {
+        status = _status;
         return RestStatus.OK;
     }
 }

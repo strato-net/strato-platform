@@ -65,10 +65,6 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
         }
     ];
 
-    useEffect(() => {
-        actions.fetchRedemptions(inventoryDispatch);
-    }, [])
-
     const handleSubmit = async () => {
         const body = {
             assetAddresses: [inventory.address],
