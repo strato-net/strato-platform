@@ -14,10 +14,13 @@ import { Images } from '../../images';
 import images_placeholder from "../../images/resources/image_placeholder.png"
 import { SEO } from '../../helpers/seoConstant';
 import DOMPurify from 'dompurify';
+import { setCookie } from "../../helpers/cookie";
+import LoginModal from './LoginModal';
 
 const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, contextHolder, isUserProfile = false }) => {
     const {Text} = Typography;
     const [quantity, setQuantity] = useState(1)
+    const [isModalVisible, setIsModalVisible] = useState(false);
 
     let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
     const ownerSameAsUser = () => {
@@ -57,30 +60,43 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
     }, [topSellingProduct]);
 
     const toggleWishlist = () => {
-        const wishList = JSON.parse(localStorage.getItem('wishList')) || [];
-        if (isWishlisted) {
-            // Remove product from wishlist
-            const updatedWishList = wishList.filter(product => product.address !== topSellingProduct.address);
-            localStorage.setItem('wishList', JSON.stringify(updatedWishList));
-            setIsWishlisted(false);
+        if (!shouldShowWishlistIcon) {
+            setIsModalVisible(true);
         } else {
-            // Add product to wishlist
-            wishList.push(topSellingProduct);
-            localStorage.setItem('wishList', JSON.stringify(wishList));
-            setIsWishlisted(true);
+            const wishList = JSON.parse(localStorage.getItem('wishList')) || [];
+            if (isWishlisted) {
+                // Remove product from wishlist
+                const updatedWishList = wishList.filter(product => product.address !== topSellingProduct.address);
+                localStorage.setItem('wishList', JSON.stringify(updatedWishList));
+                setIsWishlisted(false);
+            } else {
+                // Add product to wishlist
+                wishList.push(topSellingProduct);
+                localStorage.setItem('wishList', JSON.stringify(wishList));
+                setIsWishlisted(true);
+            }
         }
     };
 
-    console.log("top selling", topSellingProduct)
+    const handleCancel = () => {
+        setIsModalVisible(false);
+    };
+
+    const handleLogin = () => {
+        if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+            setCookie("returnUrl", window.location.pathname, 10);
+            window.location.href = loginUrl;
+        }
+        setIsModalVisible(false);
+    };
 
     return (
+        <>
         <div className={`relative trending_cards_container_card bg-white p-3 ${parent == 'Marketplace' ? 'min-w-[300px] w-auto' : 'min-w-[230px]'}  min-w-[320px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}>
             {contextHolder}
-            {shouldShowWishlistIcon && (
-                <div onClick={toggleWishlist} className="absolute top-2 right-2 cursor-pointer hover:scale-110 transition-transform duration-200">
-                    {isWishlisted ? <HeartFilled style={{ fontSize: "20px", color: "#A15E49" }} /> : <HeartTwoTone style={{ fontSize: "20px" }} twoToneColor="#A15E49" />}
-                </div>
-            )}
+            <div onClick={toggleWishlist} className="absolute top-2 right-2 cursor-pointer hover:scale-110 transition-transform duration-200">
+                {isWishlisted ? <HeartFilled style={{ fontSize: "20px", color: "#A15E49" }} /> : <HeartTwoTone style={{ fontSize: "20px" }} twoToneColor="#A15E49" />}
+            </div>
             <a
                 href={`${naviroute.replace(":address", topSellingProduct.address).replace(":name",topSellingProduct.name)}`}
                 onClick={(e) => {
@@ -227,6 +243,12 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                 </Button>
             </div>
         </div>
+        <LoginModal
+        visible={isModalVisible}
+        onCancel={handleCancel}
+        onLogin={handleLogin}
+        />
+        </>
     )
 }
 

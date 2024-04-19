@@ -23,6 +23,7 @@ so that they could be properly moved to their respective version's subsection.
 ### Changed
 - Cirrus table namespacing is of format `creator-contractName` now
 - :creator field refers to user's common name, not org (can be customized to occur after particular block number for backwards compatibility)
+- `eth_<random 20 bytes>` database is now just named `eth`
 - `queryStrato` is now `strato-barometer`
 - `strato-barometer` commands point to a copy of `./ethereumH` to access LevelDB data
 
@@ -33,7 +34,9 @@ so that they could be properly moved to their respective version's subsection.
 - Removed 'block', 'blockGO', 'canonRedis', 'compressRoundChanges' commands from blockapps-tools
 - Removed `certInfo` flag from strato-sequencer (cert is now derived from genesis block or during sync)
 - Removed unused flags, such as `brokenRefundRenable`, `cacheTransactionResults`, `faucetEnabled`, `createTransactionResults`, `gasOn`, `splitinit`, and `useSyncMode`
-
+- unused api endpoints: `/version`, `/coinbase`, `/log`, `transactionList`, `/uuid`, `/transaction/raw`, and `/fill`
+- `logserver` package (fileserver for strato logs)
+- `blockchain` database in postgres (unused)
 
 ## [11.1.0] - 3/28/2023
 

@@ -110,7 +110,6 @@ function newnode {
   fi
 
   echo "Starting Strato processes. All output is logged to $PWD/logs."
-  runBackgroundProcess logserver --directory "${PWD}/logs" --uri_root=/logs/strato/ &>> logs/logserver
 
   # DEBUG LOGGING FLAGS
   apiDebugMode=LevelInfo
@@ -452,5 +451,4 @@ until PGPASSWORD=$pgPass psql -h "$pgHost" -U "$pgUser" -c '\l'; do
 done
 
 # Main entry point
-global-db --pghost $pgHost || { echo "Ignoring."; true; } # If it fails, it just means we already created the global db
 newnode
