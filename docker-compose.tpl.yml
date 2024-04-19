@@ -42,7 +42,6 @@ services:
     - strato
     environment:
     - ADMIN_EMAIL=${ADMIN_EMAIL}
-    - NODE_HOST=${NODE_HOST}
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
