@@ -32,6 +32,8 @@ import TagManager from "react-gtm-module";
 import image_placeholder from "../../images/resources/image_placeholder.png";
 import BoughtOrdersTable from "./BoughtOrdersTable";
 import TransfersTable from "./TransfersTable";
+import RedemptionsOutgoingTable from "./RedemptionsOutgoingTable";
+import RedemptionsIncomingTable from "./RedemptionsIncomingTable";
 import { ResponsiveOrderDetailCard } from "./ResponsiveOrderDetailCard";
 import { LeftArrow } from "../../images/SVGComponents";
 
@@ -310,7 +312,7 @@ const SoldOrderDetails = ({ user, users }) => {
 
 
   const onChange = (key) => {
-    navigate(routes.Orders.url.replace(':type', 'sold'))
+    navigate(routes.Orders.url.replace(':type', key))
   };
 
   const navigate = useNavigate();
@@ -414,12 +416,12 @@ const SoldOrderDetails = ({ user, users }) => {
 
           <Tabs
             className="mx-4 md:mx-20 mt-0 md:mt-5"
-            defaultActiveKey={state == null ? "Sold" : state.defaultKey}
+            defaultActiveKey={"sold"}
             onChange={onChange}
             items={[
               {
                 label: <p id="sold-tab" className="font-semibold text-sm md:text-base">Orders (Sold)</p>,
-                key: "Sold",
+                key: "sold",
                 children:
                   <div className="mb-10">
                     <Button type="ghost" onClick={() => onChange('Sold')} className="cursor-pointer px-2 flex md:hidden items-center gap-2 text-xs font-semibold"><LeftArrow /> Back</Button>
@@ -611,13 +613,23 @@ const SoldOrderDetails = ({ user, users }) => {
               },
               {
                 label: <p id="bought-tab" className="font-semibold text-sm md:text-base">Orders (Bought)</p>,
-                key: "Bought",
+                key: "bought",
                 children: <BoughtOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
               },
               {
                 label: <p id="transfers-tab" className="font-semibold text-sm md:text-base">Transfers</p>,
-                key: "Transfers",
+                key: "transfers",
                 children: <TransfersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
+              },
+              {
+                label: <p id="redemptions-outgoing-tab" className="font-semibold text-sm md:text-base">Redemptions (Outgoing)</p>,
+                key: "redemptions-outgoing",
+                children: <RedemptionsOutgoingTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
+              },
+              {
+                label: <p id="redemptions-incoming-tab" className="font-semibold text-sm md:text-base">Redemptions (Incoming)</p>,
+                key: "redemptions-incoming",
+                children: <RedemptionsIncomingTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
               }
             ]}
           />

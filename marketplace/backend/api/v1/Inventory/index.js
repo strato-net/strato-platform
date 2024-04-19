@@ -7,20 +7,6 @@ import loadDapp from "../../middleware/loadDappHandler";
 const router = express.Router();
 
 router.get(
-  Inventory.getOutgoingRedemptionRequests,
-  authHandler.authorizeRequest(),
-  loadDapp,
-  InventoryController.getOutgoingRedemptionRequests
-);
-
-router.get(
-  Inventory.getIncomingRedemptionRequests,
-  authHandler.authorizeRequest(),
-  loadDapp,
-  InventoryController.getIncomingRedemptionRequests
-);
-
-router.get(
   Inventory.get,
   authHandler.authorizeRequest(true),
   loadDapp,
@@ -74,13 +60,6 @@ router.post(
   authHandler.authorizeRequest(),
   loadDapp,
   InventoryController.resell
-);
-
-router.post(
-  Inventory.redeem,
-  authHandler.authorizeRequest(),
-  loadDapp,
-  InventoryController.requestRedemption
 );
 
 router.post(

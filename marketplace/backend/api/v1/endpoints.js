@@ -53,13 +53,17 @@ export const Inventory = {
   list: '/list',
   unlist: '/unlist',
   resell: '/resell',
-  redeem: '/redeem',
-  getOutgoingRedemptionRequests: '/redemptions/outgoing',
-  getIncomingRedemptionRequests: '/redemptions/incoming',
   transfer: '/transfer',
   updateSale: '/updateSale',
   getPriceHistory: '/price/history',
-  // audit: '/:address/:chainId/audit',
+}
+
+export const Redemption = {
+  prefix: '/redemption',
+  get: '/:id',
+  create: '/',
+  getOutgoingRedemptionRequests: '/outgoing',
+  getIncomingRedemptionRequests: '/incoming',
 }
 
 export const Item = {

@@ -1,7 +1,9 @@
 import { Button, InputNumber, Modal, Table, Input, Spin } from "antd";
 import { useEffect, useState } from "react";
 import { actions } from "../../contexts/inventory/actions";
-import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
+import { useInventoryDispatch } from "../../contexts/inventory";
+import { actions as redemptionActions } from "../../contexts/redemption/actions";
+import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
 import { useAuthenticateState } from "../../contexts/authentication";
 import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
 import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/marketplace";
@@ -15,13 +17,14 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
     const [quantity, setQuantity] = useState(1);
     const [comments, setComments] = useState("");
     const inventoryDispatch = useInventoryDispatch();
+    const redemptionDispatch = useRedemptionDispatch();
     const marketplaceDispatch = useMarketplaceDispatch();
     const [canRedeem, setCanRedeem] = useState(true);
     const [selectedAddress, setSelectedAddress] = useState(0);
     const [modalAddress, setmodalAddress] = useState(false);
     const [showAddress, setshowAddress] = useState(false);
     const { user } = useAuthenticateState();
-    const { isRequestingRedemption } = useInventoryState();
+    const { isRequestingRedemption } = useRedemptionState();
     const { userAddresses, isLoadingUserAddresses } = useMarketplaceState();
     const { TextArea } = Input;
 
@@ -76,7 +79,7 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
         };
 
         if (quantity > 0 && quantity <= inventory.quantity) {
-            let isDone = await actions.requestRedemption(inventoryDispatch, body);
+            let isDone = await redemptionActions.requestRedemption(redemptionDispatch, body);
             if (isDone) {
                 await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
                 await actions.fetchInventoryForUser(inventoryDispatch, user.commonName);

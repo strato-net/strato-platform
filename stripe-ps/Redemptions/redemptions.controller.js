@@ -83,7 +83,7 @@ class RedemptionsController {
     static async getRedemption(req, res, next) {
         try {
             if (!req.params.id) {
-                throw new Error('Missing redemption ID in GET request /id/:id');
+                throw new Error('Missing redemption ID in GET request /:id');
             }
 
             const query = 'SELECT * FROM redemptions WHERE redemption_id = $1';

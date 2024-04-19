@@ -170,57 +170,6 @@ const reducer = (state, action) => {
         error: action.error,
         isReselling: false
       };
-    case actionDescriptors.requestRedemption:
-      return {
-        ...state,
-        isRequestingRedemption: true
-      };
-    case actionDescriptors.requestRedemptionSuccessful:
-      return {
-        ...state,
-        inventory: action.payload,
-        isRequestingRedemption: false
-      };
-    case actionDescriptors.requestRedemptionFailed:
-      return {
-        ...state,
-        error: action.error,
-        isRequestingRedemption: false
-      };
-    case actionDescriptors.fetchOutgoingRedemptionRequests:
-      return {
-        ...state,
-        isFetchingOutgoingRedemptions: true
-      };
-    case actionDescriptors.fetchOutgoingRedemptionRequestsSuccessful:
-      return {
-        ...state,
-        outgoingRedemptions: action.payload,
-        isFetchingOutgoingRedemptions: false
-      };
-    case actionDescriptors.fetchOutgoingRedemptionRequestsFailed:
-      return {
-        ...state,
-        error: action.error,
-        isFetchingOutgoingRedemptions: false
-      };
-    case actionDescriptors.fetchIncomingRedemptionRequests:
-      return {
-        ...state,
-        isFetchingIncomingRedemptions: true
-      };
-    case actionDescriptors.fetchIncomingRedemptionRequestsSuccessful:
-      return {
-        ...state,
-        incomingRedemptions: action.payload,
-        isFetchingIncomingRedemptions: false
-      };
-    case actionDescriptors.fetchIncomingRedemptionRequestsFailed:
-      return {
-        ...state,
-        error: action.error,
-        isFetchingIncomingRedemptions: false
-      };
     case actionDescriptors.transferInventory:
       return {
         ...state,

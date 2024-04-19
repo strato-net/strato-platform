@@ -138,47 +138,6 @@ class InventoryController {
     }
   }
 
-  static async requestRedemption(req, res, next) {
-    try {
-      const { dapp, body } = req
-
-      InventoryController.validateRequestRedemptionArgs(body)
-
-      const result = await dapp.requestRedemption(body)
-      rest.response.status200(res, result)
-
-      return next()
-    } catch (e) {
-      return next(e)
-    }
-  }
-
-  static async getOutgoingRedemptionRequests(req, res, next) {
-    try {
-      const { dapp } = req
-
-      const redemptions = await dapp.getOutgoingRedemptionRequests()
-      rest.response.status200(res, redemptions)
-
-      return next()
-    } catch (e) {
-      return next(e)
-    }
-  }
-
-  static async getIncomingRedemptionRequests(req, res, next) {
-    try {
-      const { dapp } = req
-
-      const redemptions = await dapp.getIncomingRedemptionRequests()
-      rest.response.status200(res, redemptions)
-
-      return next()
-    } catch (e) {
-      return next(e)
-    }
-  }
-
   static async transfer(req, res, next) {
     try {
       const { dapp, body } = req

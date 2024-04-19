@@ -19,7 +19,7 @@ router.post(
 );
 
 router.get(
-  '/id/:id',
+  '/:id',
   RedemptionsController.getRedemption
 );
 

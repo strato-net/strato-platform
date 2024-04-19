@@ -352,6 +352,24 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     }
   };
 
+  contract.getRedemption = async function (args, options = optionsNoChainIds) {
+    try {
+      const redemption = await axios.get(new URL(`/redemption/${args.id}`, STRIPE_PAYMENT_SERVER_URL).href).then(function (res) {
+        if (res.status === 200) {
+          return res.data.data;
+        } else {
+          throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+        }
+      });
+      return redemption;
+    } catch (error) {
+      if (error.response) {
+        throw new rest.RestError(error.response.status, error.response.statusText);
+      }
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching redemption details: ${JSON.stringify(error)} `);
+    }
+  };
+
   // ------------------------------ INVENTORY ENDS--------------------------------
 
   contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
