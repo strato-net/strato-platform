@@ -279,13 +279,6 @@ processTheMessages env conn messages = do
 
         deferredForeignKeys <- fmap concat $
           forM (Map.toList $ cc ^. contracts) $ \(_, c) -> do
-            -- let cn' =
-            --       if cn /= ""
-            --         then cn
-            --         else case cp of
-            --           SolidVMCode n' _ | nameString /= n' -> T.pack n'
-            --           _ -> cn
-
             -- Here we will get the storageDefs attribute of the contract (c) and iterate through the Map of (Text, VariableDecl) and look for VariableDecls that have the last attribute (isRecord) true and thetype are mappings
             -- We will then create a table for each of these mappings and add a foreign key to the main table
 

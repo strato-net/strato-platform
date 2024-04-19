@@ -5,6 +5,7 @@
 import Blockchain.VMOptions ()
 import Control.Monad
 -- for HFlags
+import Blockchain.Strato.Model.Options ()
 import Executable.EVMFlags ()
 import HFlags
 -- for HFlags
@@ -17,5 +18,5 @@ predicate _ = False
 
 main :: IO ()
 main = do
-  void $ $initHFlagsDependentDefaults "solid vm spec" (const $ const $ const $ [("requireCerts", "False"), ("minLogLevel", "LevelDebug"), ("accountNonceLimit", "10"), ("gasOn", "False"), ("networkID", "1234442341"), ("network", "mercata-test")])
+  void $ $initHFlagsDependentDefaults "solid vm spec" (const $ const $ const $ [("requireCerts", "True")])
   hspecWith (configAddFilter predicate defaultConfig) Spec.spec

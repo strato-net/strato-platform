@@ -322,21 +322,11 @@ create' creator issuerAcct issuerName newAccount ch cc contractName' argExps cre
   onTraced $ liftIO $ putStrLn $ C.green $ "Done Creating Contract: " ++ show newAccount ++ " of type " ++ labelToString contractName'
 
   void . withCallInfo newAccount contract' (stringToLabel $ labelToString contractName' ++ " constructor") ch cc M.empty False False $ do
-    -- blockdataNumber $ BlockHeader . Env
     -- set creator again, in case the caller's cert changed during constructor execution
     setCreator issuer newAccount contract' (blockDataNumber $ Env.blockHeader env)
 
-  -- let parentName' = bool parentName "" (useWallet && parentName == "User")
-  
-
-  -- Mod.modifyStatefully_ (Mod.Proxy @Action) $
-  --   Action.actionData %= Action.omapAdjust (Action.actionDataOrganization .~ (T.pack org)) newAccount
-
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapAdjust (Action.actionDataCreator .~ (T.pack issuerName)) newAccount
-
-  -- when (useWallet && parentName == "User") $ Mod.modifyStatefully_ (Mod.Proxy @Action) $
-  --   Action.actionData %= Action.omapAdjust (Action.actionDataApplication .~ (T.pack "")) newAccount
 
   -- I'm showing these strings because I like them to be in quotes in the logs :)
   multilineLog "create'/versioning" $ boringBox ["Contract Name: " ++ (C.yellow contractName'), "Creator: " ++ (C.yellow issuerName)]
@@ -683,10 +673,10 @@ setCreator creator contract _ _ = do
                 then fromMaybe "" $ fmap subCommonName $ getCertSubject =<< maybeCert
                 else fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
 
-  -- case maybeCert of
-  --   (Just cert) -> do
-  --     onTraced $ $logDebugS "setCreator/versioning" . T.pack . C.green $ "Found cert for " ++ (format creator) ++ ":\n\t" ++ (format $ getCertSubject cert)
-  --   Nothing -> $logDebugS "setCreator/versioning" . T.pack . C.red $ "No cert found for " ++ (format creator)
+  case maybeCert of
+    (Just cert) -> do
+      onTraced $ $logDebugS "setCreator/versioning" . T.pack . C.green $ "Found cert for " ++ (format creator) ++ ":\n\t" ++ (format $ getCertSubject cert)
+    Nothing -> $logDebugS "setCreator/versioning" . T.pack . C.red $ "No cert found for " ++ (format creator)
 
   $logDebugS "setCreator/address" . T.pack $ "Setting creatorAddress to: " ++ show creator
   putSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":creatorAddress"]) (MS.BAccount (accountToNamedAccount' creator))
@@ -737,7 +727,7 @@ getCreator caller = do
 -- once mercata-hydrogen and mercata networks dismantled, this function and flag will be obsolete
 shouldDoCreatorFork :: Integer -> Bool
 shouldDoCreatorFork curBlockNo = case (flags_creatorForkBlockNumber, computeNetworkID) of 
-  (-1, 7596898649924658542) -> curBlockNo >= 36000 -- on mercata-hydrogen, switch at block 35,000
+  (-1, 7596898649924658542) -> curBlockNo >= 37000 -- on mercata-hydrogen, switch at block 37,000
   (-1, 6909499098523985262) -> curBlockNo >= 6000 -- on mercata, switch at block 6,000
   (b, _) -> curBlockNo >= b -- do whatever the flag says
 
@@ -1278,18 +1268,6 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
           let account = currentAccount curInfo
           (_, ctrName) <- getCreator account
 
-          -- ctr <-
-          --   fromMaybeM (return "") $
-          --     runMaybeT $
-          --       pure account
-          --         >>= MaybeT . A.lookup (A.Proxy @AddressState)
-          --         >>= pure . addressStateCodeHash
-          --         >>= MaybeT . resolveCodePtrParent (account ^. accountChainId)
-          --         >>= ( \case
-          --                 SolidVMCode name _ | name /= (labelToString $ CC._contractName curCnct) -> pure name
-          --                 _ -> pure ""
-          --             )
-
           -- pair up field names with values one-by-one (no type checking tho, lol)
           let pairs = zip (map (T.unpack . fst) $ CC._eventLogs ev) expStrs
 
@@ -1561,7 +1539,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
           calldataHash = fromMaybe emptyHash $ stringKeccak256 argString
       return . Constant . SString $ take 8 $ keccak256ToHex calldataHash
     (SBuiltinVariable "tx", "origin") -> (Constant . ((flip SAccount) False) . accountToNamedAccount chainId . Env.origin) <$> getEnv
-    (SBuiltinVariable "tx", "commonname") -> do
+    (SBuiltinVariable "tx", "username") -> do
       env' <- getEnv
       maybeCert <- A.select (A.Proxy @X509Certificate) $ Env.origin env' ^. accountAddress
       return . Constant . SString . fromMaybe "" . fmap subCommonName $ getCertSubject =<< maybeCert
@@ -1799,9 +1777,6 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   (hsh, cc) <- getCurrentCodeCollection
   newAddress <- getNewAddress creator
   (issuerAcct, issuerName) <- getCreator creator
-  $logDebugS "DEBUG:expToVar'/creator" $ T.pack $ (show creator)
-  $logDebugS "DEBUG:expToVar'/issuer" $ T.pack $ (show issuerName)
-  $logDebugS "DEBUG:expToVar'/ro" $ T.pack $ (show ro)
   execResults <- create' creator issuerAcct issuerName newAddress hsh cc contractName' args False
   return $
     Constant $
@@ -2304,14 +2279,7 @@ evaluateAccountMember ::
   m Variable
 evaluateAccountMember a _ "codehash" = do
   -- Get the chainId for the account
-  cid <- case (a ^. namedAccountChainId) of
-    UnspecifiedChain -> do
-      cid1 <- view accountChainId <$> getCurrentAccount
-      case cid1 of
-        Nothing -> return Nothing
-        Just cid2 -> return $ Just cid2
-    MainChain -> return Nothing
-    ExplicitChain cid -> return $ Just cid
+  cid <- _accountChainId <$> getCurrentAccount
   let realAccount = namedAccountToAccount cid a
   -- Retreive and resolve the codehash
   codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) realAccount
@@ -2323,14 +2291,7 @@ evaluateAccountMember a _ "codehash" = do
 --Get the whole code collection when nothing is supplied to the code function
 evaluateAccountMember a _ "code" = do
   -- Get the code at the address
-  cid <- case (a ^. namedAccountChainId) of
-    UnspecifiedChain -> do
-      cid1 <- view accountChainId <$> getCurrentAccount
-      case cid1 of
-        Nothing -> return Nothing
-        Just cid2 -> return $ Just cid2
-    MainChain -> return Nothing
-    ExplicitChain cid -> return $ Just cid
+  cid <- _accountChainId <$> getCurrentAccount
   let realAccount = namedAccountToAccount cid a
   -- Retreive and resolve the codehash
   codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) realAccount
@@ -2348,28 +2309,14 @@ evaluateAccountMember a _ "code" = do
   -- Format the result
   return $ Constant $ SString $ T.unpack decodeCD
 evaluateAccountMember a _ "balance" = do
-  cid <- case (a ^. namedAccountChainId) of
-    UnspecifiedChain -> do
-      cid1 <- view accountChainId <$> getCurrentAccount
-      case cid1 of
-        Nothing -> return Nothing
-        Just cid2 -> return $ Just cid2
-    MainChain -> return Nothing
-    ExplicitChain cid -> return $ Just cid
+  cid <- _accountChainId <$> getCurrentAccount
   let realAccount = namedAccountToAccount cid a
   bal <- A.lookup (A.Proxy @AddressState) realAccount
   case bal of
     Just as -> return $ Constant $ SInteger $ addressStateBalance as
     _ -> return $ Constant $ SInteger 0
-evaluateAccountMember a _ "issuer" = do
-  cid <- case (a ^. namedAccountChainId) of
-    UnspecifiedChain -> do
-      cid1 <- view accountChainId <$> getCurrentAccount
-      case cid1 of
-        Nothing -> return Nothing
-        Just cid2 -> return $ Just cid2
-    MainChain -> return Nothing
-    ExplicitChain cid -> return $ Just cid
+evaluateAccountMember a _ "creator" = do
+  cid <- _accountChainId <$> getCurrentAccount
   let realAccount = namedAccountToAccount cid a
   (_, issuerName) <- getCreator realAccount
   return $ Constant $ SString $ issuerName
@@ -2701,7 +2648,6 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
     invalidArguments "The contract name and src arguments for the create function should not be empty" args
 
   creator <- getCurrentAccount
-  -- currentContract <- getCurrentContract
   (_, parentCC) <- getCurrentCodeCollection
 
   -- Because of the current testnet stateroot problem with contracts using an older version of
@@ -2720,8 +2666,6 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
   let origin = Env.origin theEnv
       metadata = Env.metadata theEnv
       isRunningTests = Env.runningTests theEnv
-      -- maybeUseWallet = M.lookup "useWallet" =<< metadata
-      -- !useWallet = maybe False (const True) maybeUseWallet
   (ctr, ctrName) <- getCreator origin --not sure if this should be there instead
   execResults <- create' creator ctr ctrName newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) pragmaCheck
   case erNewContractAccount execResults of
@@ -2731,7 +2675,6 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
                                      (const () <$> cc)
                                      (SolidVMCode contractName' hsh) 
                                      (T.pack ctrName)
-                                    --  (bool (T.pack $ CC._contractName currentContract) (T.pack contractName') useWallet) 
                                      ( case join $ fmap (M.lookup "history") (metadata) of
                                          Nothing -> []
                                          Just v -> (T.splitOn "," v)
@@ -2746,7 +2689,6 @@ callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SS
     invalidArguments "The contract name and src arguments for the create2 function should not be empty" args
 
   creator <- getCurrentAccount
-  -- currentContract <- getCurrentContract
   (_, parentCC) <- getCurrentCodeCollection
 
   -- Because of the current testnet stateroot problem with contracts using an older version of
@@ -2765,8 +2707,6 @@ callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SS
   theEnv <- getEnv
   let metadata = Env.metadata theEnv
       isRunningTests = Env.runningTests theEnv
-      -- maybeUseWallet = M.lookup "useWallet" =<< metadata
-      -- !useWallet = maybe False (const True) maybeUseWallet
   (ctr, ctrName) <- getCreator creator
   execResults <- create' creator ctr ctrName newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) pragmaCheck
   case erNewContractAccount execResults of
@@ -2776,7 +2716,6 @@ callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SS
                                       (const () <$> cc)
                                       (SolidVMCode contractName' hsh) 
                                       (T.pack ctrName) 
-                                      -- (bool (T.pack $ CC._contractName currentContract) (T.pack contractName') useWallet) 
                                       ( case join $ fmap (M.lookup "history") (metadata) of
                                           Nothing -> []
                                           Just v -> (T.splitOn "," v)
