@@ -53,7 +53,6 @@ library:
   - servant-client
   - solid-vm-compiler
   - solid-vm-model
-  - solid-vm
   - sql-monad
   - strato-conf
   - strato-genesis
@@ -73,29 +72,18 @@ library:
   - vm-tools
   - x509-certs
   - yaml
+  - ordered-containers
 
 executables:
+
   strato-setup:
     source-dirs: exec_src/
     main: Main.hs
     dependencies:
-      - common-log
       - hflags
       - strato-init
-    other-modules: []
+      - strato-model
 
-  tabula-rasa:
-    source-dirs: exec_src/
-    main: TabulaRasa.hs
-    dependencies:
-      - hflags
-      - strato-init
-
-    other-modules: []
-
-  from-restore:
-    source-dirs: exec_src/
-    main: FromRestore.hs
     other-modules: []
 
   init-worker:

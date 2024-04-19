@@ -39,10 +39,12 @@ library:
   - http-client
   - http-client-tls
   - http-types
+  - lrucache
   - monad-alter
   - mtl
   - servant-client
   - servant-server
+  - solid-vm-model
   - split
   - strato-model
   - text

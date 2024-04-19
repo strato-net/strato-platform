@@ -1,34 +1,49 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
+const fs = require('fs');
+const { Client } = require('pg');
 
-const DBSOURCE = process.env.DOCKERIZED === "true" ? "/sqlitedb/db.sqlite" : "db.sqlite";
-
-const db = new sqlite3.Database(path.resolve(__dirname, DBSOURCE), (err) => {
-    if (err) {
-      // Cannot open database
-      console.error(err.message)
-      throw err
-    }else{
-        console.log('Connected to the SQLite database.')
-        db.run(`CREATE TABLE IF NOT EXISTS customer_address (
-            address_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            commonName text, 
-            name text, 
-            zipcode text,
-            state text,
-            city text,
-            addressLine1 text,
-            addressLine2 text,
-            country text,
-            createdDate DATETIME DEFAULT CURRENT_TIMESTAMP
-            )`,
-        (err) => {
-            if (err) {
-                // Table already created
-            }
-        });  
+const client = new Client({
+    host: process.env.POSTGRESQL_SERVER_URL,
+    port: process.env.POSTGRESQL_PORT || '5432',
+    user: process.env.POSTGRESQL_USER || 'postgres',
+    password: process.env.POSTGRESQL_PASSWORD,
+    database: process.env.POSTGRESQL_DBNAME || 'postgres',
+    ssl: {
+        require: true,
+        rejectUnauthorized: true,
+        ca: fs.readFileSync('./dbCert/us-east-1-bundle.cer').toString(),
     }
 });
 
+if (process.env.POSTGRESQL_SERVER_URL && process.env.POSTGRESQL_PASSWORD) {
+    client.connect()
+        .then(() => {
+            console.log(`Connected to the PostgreSQL database. Database name: ${client.database}`);
 
-module.exports = db;
+            const query = `
+            CREATE TABLE IF NOT EXISTS customer_address (
+            address_id SERIAL PRIMARY KEY,
+            commonName TEXT,
+            name TEXT,
+            zipcode TEXT,
+            state TEXT,
+            city TEXT,
+            addressLine1 TEXT,
+            addressLine2 TEXT,
+            country TEXT,
+            createdDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP);`;
+
+            return client.query(query);
+        })
+        .then(() => {
+            console.log('Table created or already exists.');
+        })
+        .catch(error => {
+            console.error('Error creating table:', error);
+        })
+} else {
+    console.error('CRITICAL ERROR: Missing Postgres URL and/or password');
+    process.exit(1)
+}
+
+module.exports = client;
+

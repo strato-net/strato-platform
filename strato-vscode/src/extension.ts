@@ -287,7 +287,6 @@ export async function activate(context: vscode.ExtensionContext) {
  */
 `# STRATO VS Code Extension Node Configuration
 
-VM: SolidVM
 nodes:
   - id: 0
     label: node1 # Call this node whatever you like

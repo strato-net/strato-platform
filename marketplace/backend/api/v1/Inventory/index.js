@@ -21,6 +21,13 @@ router.get(
 );
 
 router.get(
+  Inventory.getAllUserInventories,
+  authHandler.authorizeRequest(true),
+  loadDapp,
+  InventoryController.getAllUserInventories
+);
+
+router.get(
   Inventory.getOwnershipHistory,
   authHandler.authorizeRequest(true),
   loadDapp,
@@ -82,5 +89,12 @@ router.put(
   loadDapp,
   InventoryController.updateSale
 )
+
+router.get(
+  Inventory.getPriceHistory,
+  authHandler.authorizeRequest(true),
+  loadDapp,
+  InventoryController.getPriceHistory
+);
 
 export default router;

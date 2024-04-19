@@ -118,13 +118,7 @@ const actions = {
           error: "Error while fetching Product Details",
         });
         return false;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchProductDetailsFailed, 
-          error: "Unauthorized while fetching Product Details" 
-        });
-        window.location.href = body.error.loginUrl;
-      }
+      } 
 
       dispatch({
         type: actionDescriptors.fetchProductDetailsFailed,
@@ -167,12 +161,6 @@ const actions = {
           type: actionDescriptors.fetchProductFailed,
           error: "Error while fetching product list",
         });
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchProductFailed, 
-          error: "Unauthorized while fetching product list" 
-        });
-        window.location.href = body.error.loginUrl;
       }
       dispatch({
         type: actionDescriptors.fetchProductFailed,
@@ -374,12 +362,6 @@ const actions = {
           type: actionDescriptors.fetchCategoryBasedProductFailed,
           error: "Error while fetching products",
         });
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchCategoryBasedProductFailed, 
-          error: "Unauthorized while fetching products" 
-        });
-        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -471,12 +453,6 @@ const actions = {
           type: actionDescriptors.fetchProductsForFilterFailed,
           error: "Error while fetching products",
         });
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchProductsForFilterFailed, 
-          error: "Unauthorized while fetching products" 
-        });
-        window.location.href = body.error.loginUrl;
       }
 
       dispatch({

@@ -74,6 +74,7 @@ import qualified Data.ByteString.Char8 as C8
 import Data.Functor.Identity
 import qualified Data.Map as Map
 import Data.Map.Strict (Map)
+import qualified Data.Map.Ordered as OMap
 import Data.Maybe
 import qualified Data.Sequence as S
 import Data.Text (Text)
@@ -252,7 +253,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
               A._transactionChainId = genesisChainId,
               A._transactionSender = Ac.Account (Ad.Address 0) genesisChainId,
               A._actionData =
-                Map.singleton a $
+                OMap.singleton (a,
                   A.ActionData
                     (codeHash d)
                     emptyCodeCollection
@@ -268,7 +269,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
                         EVMDiff m -> A.EVMDiff $ Map.map fromDiff m
                     )
                     Map.empty [] []
-                    [A.Create],
+                    [A.Create]),
               A._metadata =
                 getMetadata
                   ( case codeHash d of

@@ -8,6 +8,7 @@ export const Images = {
   'realEstate': require("./resources/categories/real_estate.png"),
   'metals': require("./resources/categories/metals.png"),
   'collectibles': require("./resources/categories/collectibles.jpg"),
+  'blockapps_cover': require("./resources/categories/blockapps_cover.png"),
   'membership': require("./resources/categories/membership.jpg"),
   'category1': require("./resources/categories/category1.png"),
   'category2': require("./resources/categories/category2.png"),
@@ -54,5 +55,7 @@ export const Images = {
   'Header_Search' :  require("./resources/Search.png"),
   'Setting_icon' :  require("./resources/Setting.png"),
   'filter' : require('./resources/Filter.png'),
+  'Remove_filter' : require('./resources/remove-filter.png'),
   'calender' : require('./resources/Calendar.png'),
+  'logo_white' : require('./resources/logo_white.png'),
 };

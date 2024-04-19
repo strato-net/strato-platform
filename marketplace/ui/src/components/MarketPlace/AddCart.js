@@ -105,6 +105,7 @@ const Checkout = ({ user }) => {
             status: "Active",
           },
           category: parts[parts.length - 1],
+          firstSale: item.product.address === item.product.originAddress? true: false,
           sellersCommonName: item.product.ownerCommonName,
           unitOfMeasure: item.product.unitOfMeasurement,
           unitPrice: item.product.price,
@@ -234,7 +235,7 @@ const Checkout = ({ user }) => {
   //   }
   // };
 
-  const openToastOrder = (placement) => {
+  const openToastOrder = (placement, message) => {
     if (success) {
       api.success({
         message: message,
@@ -417,16 +418,16 @@ const Checkout = ({ user }) => {
     if (isDone) {
       actions.addItemToCart(marketplaceDispatch, []);
       setTimeout(function () {
-        navigate(`/marketplace`);
+        navigate(`/`);
       }, 2000);
     }
   };
 
   return (
-    <div className="h-screen  mx-4 my-2 lg:mx-8 xl:mx-14   ">
+    <div className="mx-4 my-2 lg:mx-8 xl:mx-14">
       {contextHolder}
       {isCreateOrderSubmitting ? (
-        <div className="h-screen flex justify-center items-center">
+        <div className="flex justify-center items-center min-h-screen">
           <Spin spinning={isCreateOrderSubmitting} size="large" />
         </div>
       ) : (
@@ -441,15 +442,15 @@ const Checkout = ({ user }) => {
               <p className="text-sm text-[#202020] font-medium">My Cart</p>
             </Breadcrumb.Item>
           </Breadcrumb>
-
-          <div className=" pt-[18px] lg:pt-6 ">
-            <p className=" text-base md:text-xl lg:text-2xl font-bold lg:font-semibold leading-9">
+  
+          <div className="pt-[18px] lg:pt-6">
+            <p className="text-base md:text-xl lg:text-2xl font-bold lg:font-semibold leading-9">
               My Cart
             </p>
           </div>
-          <div className="grid grid-cols-1 sm:place-items-center   gap-3 lg:block ">
+          <div className="grid grid-cols-1 sm:place-items-center gap-3 lg:block">
             {mapData.length === 0 ? (
-              <div className="h-screen justify-center flex flex-col  items-center">
+              <div className="flex flex-col items-center">
                 <Image src={Images.noProductSymbol} preview={false} />
                 <Title level={3} className="mt-2">
                   No item found
@@ -458,11 +459,9 @@ const Checkout = ({ user }) => {
             ) : (
               mapData.map((e, index) => (
                 <React.Fragment key={e.key}>
-                  <div
-                    className={`hidden  lg:block ${index === 0 ? "" : "mt-10"}`}
-                  >
-                    <CartComponent columns={columns} data={e.value} />{" "}
-                  </div>{" "}
+                  <div className={`hidden lg:block ${index === 0 ? "" : "mt-10"}`}>
+                    <CartComponent columns={columns} data={e.value} openToastOrder={openToastOrder}/> 
+                  </div> 
                   <div className="lg:hidden">
                     <ResponsiveCart
                       data={e.value}
@@ -470,6 +469,7 @@ const Checkout = ({ user }) => {
                       MinusQty={MinusQty}
                       ValueQty={ValueQty}
                       removeCartList={removeCartList}
+                      openToastOrder={openToastOrder}
                     />
                   </div>
                 </React.Fragment>
@@ -483,7 +483,7 @@ const Checkout = ({ user }) => {
         handleCancel={handleCancel}
         handleConfirm={handleOrderConfirm}
       />
-      {message && openToastOrder("bottom")}
+      {message && openToastOrder("bottom", message)}
     </div>
   );
 };

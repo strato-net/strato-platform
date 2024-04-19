@@ -14,13 +14,13 @@ class UsersController {
       let user = null
       if (Object.hasOwn(dapp, 'hasCert')) user = dapp.hasCert;
       if (user === null || user === undefined) {
-        user = await pollingHelper( dapp.getCertificate, [{ userAddress}]);
+        user = await pollingHelper(dapp.getCertificate, [{ userAddress }]);
         // user = await dapp.getCertificate({ userAddress })
         if (user === null || user === undefined) console.log('user not found in after multiple attempts');
       }
       console.debug('me USER ', user);
       if (!user || Object.keys(user).length == 0) {
-        rest.response.status400(res, { username }) 
+        rest.response.status400(res, { username })
       }
       else {
         rest.response.status200(res, {

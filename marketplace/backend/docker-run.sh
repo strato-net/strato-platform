@@ -5,11 +5,34 @@ export CONFIG_DIR_PATH=/config
 export DEPLOY_FILE_NAME=marketplace.deploy.yaml
 export STRATO_NODE_PROTOCOL=${STRATO_NODE_PROTOCOL:-http}
 export STRATO_NODE_HOST=${STRATO_NODE_HOST:-nginx}
-export BASE_CODE_COLLECTION=${BASE_CODE_COLLECTION:-8f8d4cef7232db7001bae657db85eb4325ee2f3d} # Current deployment address on testnet2
+export BASE_CODE_COLLECTION=${BASE_CODE_COLLECTION:-9ed8a49bbd72fc4ca3ee7dcce9bc25be23014a7f} # Current deployment address on testnet2
+export STRATO_HOSTNAME=${STRATO_HOSTNAME:-strato}
+export STRATO_PORT_API=${STRATO_PORT_API:-3000}
 
 echo "Waiting for STRATO to become available at ${STRATO_NODE_PROTOCOL}://${STRATO_NODE_HOST}/health ..."
 until curl --silent --output /dev/null --fail --location ${STRATO_NODE_PROTOCOL}://${STRATO_NODE_HOST}/health ; do sleep 0.5 ; done
 echo 'STRATO is available via nginx'
+
+# confirm strato api is up, then query the /eth/v1.2/metadata for urls of payment server and oauth discovery
+ETH_ENDPOINT=${STRATO_NODE_PROTOCOL}://${STRATO_HOSTNAME}:${STRATO_PORT_API}/eth/v1.2
+echo 'Waiting for STRATO API to be available...'
+until curl --silent --output /dev/null --fail --location ${ETH_ENDPOINT}/stats/totaltx ; do sleep 1; done
+echo 'STRATO API is available'
+METADATA=$(curl --silent --fail ${ETH_ENDPOINT}/metadata)
+
+# Set env vars with values from metadata (exporting and declaring separately - see https://github.com/koalaman/shellcheck/wiki/SC2155)
+networkID=$(echo ${METADATA} | jq -r .networkID)
+export networkID
+STRIPE_PAYMENT_SERVER_URL=$(echo ${METADATA} | jq -r .urls.paymentServer)
+export STRIPE_PAYMENT_SERVER_URL
+if [ -z "${networkID}" ]; then
+  echo "Could not get networkID from strato api, but it is a required value"
+  exit 19
+fi
+if [ -z "${STRIPE_PAYMENT_SERVER_URL}" ]; then
+  echo "Could not get payment server url from strato api, but it is a required value"
+  exit 20
+fi
 
 # Validate configuration
 if [ "${MP_IS_BOOTNODE}" = "false" ]; then
@@ -67,11 +90,6 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
     exit 18
   fi
   
-  if [ -z "${OAUTH_OPENID_DISCOVERY_URL}" ]; then
-    echo "OAUTH_OPENID_DISCOVERY_URL is empty but is a required value"
-    exit 14
-  fi
-  
   if [ -z "${OAUTH_CLIENT_ID}" ]; then
     echo "OAUTH_CLIENT_ID is empty but is a required value"
     exit 15
@@ -82,11 +100,6 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
     exit 16
   fi
   
-  if [ -z "${STRIPE_PAYMENT_SERVER_URL}" ]; then
-    echo "STRIPE_PAYMENT_SERVER_URL is empty, but is a required value"
-    exit 17
-  fi
-
   # Create /etc/hosts record to resolve STRATO_HOST to STRATO_LOCAL_IP
   if [ -n "${STRATO_LOCAL_IP}" ]; then
     _STRATO_NODE_HOSTNAME=$(echo "${STRATO_NODE_HOST}" | cut -d ":" -f 1)
@@ -98,14 +111,18 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
   [[ "${MP_SERVER_SSL}" = "true" ]] && SERVER_PROTOCOL="https" || SERVER_PROTOCOL="http"
   SERVER_URL="${SERVER_PROTOCOL}://${MP_SERVER_HOST}"
 
+  OAUTH_OPENID_DISCOVERY_URL=$(echo ${METADATA} | jq -r .urls.oauthDiscovery)
+  if [ -z "${OAUTH_OPENID_DISCOVERY_URL}" ]; then
+    echo "Could not get OAuth discovery url from strato api, but it is a required value"
+    exit 21
+  fi
+
   sed -i 's*<apiDebug_value>*'"${MP_API_DEBUG}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<configDirPath_value>*'"${CONFIG_DIR_PATH}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<deployFilename_value>*'"${DEPLOY_FILE_NAME}"'*g' /tmp/tmp.config.yaml
-  sed -i 's*<orgDeployFilename_value>*'"${ORG_DEPLOY_FILE_NAME}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<serverHost_value>*'"${SERVER_URL}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<node_label_value>*'"${NODE_LABEL}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<node_url_value>*'"${STRATO_NODE_PROTOCOL}://${STRATO_NODE_HOST}"'*g' /tmp/tmp.config.yaml
-  sed -i 's*<node_publicKey_value>*'"${NODE_PUBLIC_KEY}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<oauth_appTokenCookieName_value>*'"${OAUTH_APP_TOKEN_COOKIE_NAME}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<oauth_openIdDiscoveryUrl_value>*'"${OAUTH_OPENID_DISCOVERY_URL}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<oauth_clientId_value>*'"${OAUTH_CLIENT_ID}"'*g' /tmp/tmp.config.yaml
@@ -117,19 +134,11 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
   sed -i 's*<oauth_tokenField_value>*'"${OAUTH_TOKEN_FIELD}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<oauth_tokenUsernameProperty_value>*'"${OAUTH_TOKEN_USERNAME_PROPERTY}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<oauth_tokenUsernamePropertyServiceFlow_value>*'"${OAUTH_TOKEN_USERNAME_PROPERTY_SERVICE_FLOW}"'*g' /tmp/tmp.config.yaml
-  sed -i 's*<orgName_value>*'"${ORG_NAME}"'*g' /tmp/tmp.config.yaml
-  sed -i 's*<adminName_value>*'"${ADMIN_NAME}"'*g' /tmp/tmp.config.yaml
-  sed -i 's*<adminPassword_value>*'"${ADMIN_PASSWORD}"'*g' /tmp/tmp.config.yaml
-  find . -type f -name '*.sol' -exec sed -i 's*BASE_CODE_COLLECTION*'"${BASE_CODE_COLLECTION}"'*g' {} +
 
   mv /tmp/tmp.config.yaml ./config/generated.config.yaml
   
-  touch .env
-  
   if test -f "${CONFIG_DIR_PATH}/${DEPLOY_FILE_NAME}"; then
     echo "deploy file exists - secondary node - nothing to deploy"
-    # TODO: replace with `yarn addToDapp params` once all nodes have certs
-    #CONFIG=generated yarn deploy:secondary-org  # Obsolete?
     cp ./config/generated.config.yaml ${CONFIG_DIR_PATH}/config.yaml
   else
     echo "deploy file does not exist - bootnode - running 'deploy'"
@@ -146,7 +155,6 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
 else
   # This container was already running before
   if test -f "${CONFIG_DIR_PATH}/${DEPLOY_FILE_NAME}"; then
-    touch .env
     echo "Config and deploy files exist - skipping deploy and running the app"
     if [ ! -f "${CONFIG_DIR_PATH}/.deployed" ]; then
       echo "ERROR: Config and deploy files exist but the deploy was not successfully finished: if running the secondary node, most probably there was an error in deployment when the container was started for the first time"
@@ -157,6 +165,13 @@ else
     exit 51
   fi  
 fi
+
+# Replace Base code collection address in Solidity contracts
+find . -type f -name '*.sol' -exec sed -i 's*BASE_CODE_COLLECTION*'"${BASE_CODE_COLLECTION}"'*g' {} +
+
+# Create or empty (if was modified manually) the .env
+# .env is NOT used in containerized deployment (use exported env vars instead), but the file is still required for dotenv lib to not crash
+echo '' > .env
 
 touch ${CONFIG_DIR_PATH}/.deployed
 

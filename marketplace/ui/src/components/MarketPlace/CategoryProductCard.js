@@ -18,14 +18,13 @@ import {
 } from "../../contexts/marketplace";
 import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
-import { setCookie } from "../../helpers/cookie";
 import image_placeholder from "../../images/resources/image_placeholder.png";
 
 const { Title, Text, Paragraph } = Typography;
 
 
-const CategoryProductCard = ({ product, category }) => {
-  let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
+const CategoryProductCard = ({ product }) => {
+  let { user } = useAuthenticateState();
   const marketplaceDispatch = useMarketplaceDispatch();
   const { cartList } = useMarketplaceState();
 
@@ -186,7 +185,7 @@ const CategoryProductCard = ({ product, category }) => {
                       <div
                         onClick={subtract}
                         className="h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer" style={{ borderColor: qty > 1 ? '#1777FF' : '#E3E3E3' }}>
-                        <MinusOutlined className="text-xs text-secondryD" style={{ color: qty > 1 ? '#1777FF' : '#E3E3E3' }}/>
+                        <MinusOutlined className="text-xs text-secondryD" style={{ color: qty > 1 ? '#1777FF' : '#E3E3E3' }} />
                       </div>
                       <InputNumber className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center" min={1} max={product.availableQuantity} value={qty} defaultValue={qty} controls={false}
                         onChange={e => {
@@ -204,36 +203,31 @@ const CategoryProductCard = ({ product, category }) => {
                       <div
                         onClick={add}
                         className="ml-0.5 h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer" style={{ borderColor: availableQuantity > qty ? '#1777FF' : '#E3E3E3' }}>
-                        <PlusOutlined className="text-xs text-secondryC" style={{ color: availableQuantity > qty ? '#1777FF' : '#E3E3E3' }}/>
+                        <PlusOutlined className="text-xs text-secondryC" style={{ color: availableQuantity > qty ? '#1777FF' : '#E3E3E3' }} />
                       </div>
                     </div>
                   </div>
                   <Button
                     className="group w-40 h-9 border border-primary hover:bg-primary"
                     onClick={() => {
-                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                        setCookie("returnUrl", `/marketplace/productList/${product.address}`, 10);
-                        window.location.href = loginUrl;
-                      } else {
-                        window.LOQ.push(['ready', async LO => {
-                          // Track an event
-                          await LO.$internal.ready('events')
-                          LO.events.track('Add to Cart (from marketplace)', {
-                            product: product.name,
-                            category: product.category,
-                            productId: product.productId
-                          })
-                        }])
-                        TagManager.dataLayer({
-                          dataLayer: {
-                            event: 'add_to_cart_from_marketplace',
-                            product_name: product.name,
-                            category: product.category,
-                            productId: product.productId
-                          },
-                        });
-                        addItemToCart();
-                      }
+                      window.LOQ.push(['ready', async LO => {
+                        // Track an event
+                        await LO.$internal.ready('events')
+                        LO.events.track('Add to Cart (from marketplace)', {
+                          product: product.name,
+                          category: product.category,
+                          productId: product.productId
+                        })
+                      }])
+                      TagManager.dataLayer({
+                        dataLayer: {
+                          event: 'add_to_cart_from_marketplace',
+                          product_name: product.name,
+                          category: product.category,
+                          productId: product.productId
+                        },
+                      });
+                      addItemToCart();
                     }}>
                     <div className="text-primary group-hover:text-white">Add To Cart</div>
                   </Button>
@@ -242,30 +236,26 @@ const CategoryProductCard = ({ product, category }) => {
                     id={`${product.name}-buy-now`}
                     className="w-40 h-9 m-3 bg-primary !hover:bg-primaryHover"
                     onClick={() => {
-                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                        setCookie("returnUrl", `/marketplace/productList/${product.address}`, 10);
-                        window.location.href = loginUrl;
-                      } else {
-                        window.LOQ.push(['ready', async LO => {
-                          // Track an event
-                          await LO.$internal.ready('events')
-                          LO.events.track('Buy Now (from marketplace)', {
-                            product: product.name,
-                            category: product.category,
-                            productId: product.productId
-                          })
-                        }])
-                        TagManager.dataLayer({
-                          dataLayer: {
-                            event: 'buy_now_from_marketplace',
-                            product_name: product.name,
-                            category: product.category,
-                            productId: product.productId
-                          },
-                        });
-                        if (addItemToCart()) {
-                          navigate("/checkout");
-                        }
+                      window.LOQ.push(['ready', async LO => {
+                        // Track an event
+                        await LO.$internal.ready('events')
+                        LO.events.track('Buy Now (from marketplace)', {
+                          product: product.name,
+                          category: product.category,
+                          productId: product.productId
+                        })
+                      }])
+                      TagManager.dataLayer({
+                        dataLayer: {
+                          event: 'buy_now_from_marketplace',
+                          product_name: product.name,
+                          category: product.category,
+                          productId: product.productId
+                        },
+                      });
+                      if (addItemToCart()) {
+                        navigate("/checkout");
+                        window.scrollTo(0, 0);
                       }
                     }}
                   >

@@ -12,7 +12,8 @@ const {
   GET_HEALTH,
   GET_NODE_UPTIME,
   GET_SYSTEM_INFO,
-  GET_SHARD_COUNT
+  GET_SHARD_COUNT,
+  GET_NETWORK_HEALTH
 } = require('./rooms')
 
 const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('./eventBroker')
@@ -68,6 +69,9 @@ function init(server) {
 
     // register request for node uptime duration
     registerRoomAllocation(socket, GET_SYSTEM_INFO, getHealthAggregator.initialHydrateSystemInfo)
+
+    // register request for network health check
+    registerRoomAllocation(socket, GET_NETWORK_HEALTH, getHealthAggregator.initialHydrateNetworkHealthInfo)
 
     // register request for chains count
     registerRoomAllocation(socket, GET_SHARD_COUNT, getShardCountAggregator.initialHydrateShardCount)

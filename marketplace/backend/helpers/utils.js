@@ -285,10 +285,18 @@ export const setSearchQueryOptionsPrime = (args) => {
       const { notEqualsField, notEqualsValue } = args
       if (Array.isArray(args[key])) {
         notEqualsField.map((field, i) => {
-          result.push({ key: field, value: notEqualsValue[i], predicate: 'neq' })
+          if (Array.isArray(notEqualsValue[i])) {
+            result.push({ key: field, value: `(${notEqualsValue[i].join(',')})`, predicate: 'not.in' })
+          } else {
+            result.push({ key: field, value: notEqualsValue[i], predicate: 'neq' })
+          }
         })
       } else {
-        result.push({ key: notEqualsField, value: notEqualsValue, predicate: 'neq' })
+        if (Array.isArray(notEqualsField)) {
+          result.push({ key: notEqualsField, value: `(${notEqualsValue.join(',')})`, predicate: 'not.in' })
+        } else {
+          result.push({ key: notEqualsField, value: notEqualsValue, predicate: 'neq' })
+        }
       }
     }
     // Added to remove the unusable inventories when (isMint==true && quantity==0) OR  (quantity>0)
@@ -364,7 +372,7 @@ export const setSearchQueryOptionsLike = (args = {}, _queryOptionsArray) => {
 }
 
 export const searchAllWithQueryArgs = async (contractName, args, options, user) => {
-  const nonQueryOptions = ['queryValue', 'queryFields', 'queryOptions', 'limit', 'offset', 'sort', 'range', 'gteField', 'gteValue', 'lteField', 'lteValue', 'notEqualsField', 'notEqualsValue']
+  const nonQueryOptions = ['queryValue', 'queryFields', 'queryOptions', 'limit', 'offset', 'sort', 'range', 'gtField', 'gtValue', 'gteField', 'gteValue', 'ltField', 'ltValue', 'lteField', 'lteValue', 'notEqualsField', 'notEqualsValue']
   const queryArgs = setSearchQueryOptions(args, Object.keys(args).reduce((result, key) => {
     if (!nonQueryOptions.includes(key) && key != 'category' && key != 'subCategory' && key != 'isMint') {
       if (Array.isArray(args[key])) {
@@ -401,6 +409,16 @@ export const searchAllWithQueryArgs = async (contractName, args, options, user) 
       }
     }
 
+    if (key === 'gtValue') {
+      const { gtField, gtValue } = args
+       result.push({ key: gtField, value: gtValue, predicate: 'gt' });
+    }
+
+    if (key === 'ltValue') {
+      const { ltField, ltValue } = args
+      result.push({ key: ltField, value: ltValue, predicate: 'lt' });
+    }
+
     if (key === 'gteValue') {
       const { gteField, gteValue } = args
       result.push({ key: gteField, value: gteValue, predicate: 'gte' })
@@ -415,10 +433,18 @@ export const searchAllWithQueryArgs = async (contractName, args, options, user) 
       const { notEqualsField, notEqualsValue } = args
       if (Array.isArray(args[key])) {
         notEqualsField.map((field, i) => {
-          result.push({ key: field, value: notEqualsValue[i], predicate: 'neq' })
+          if (Array.isArray(notEqualsValue[i])) {
+            result.push({ key: field, value: `(${notEqualsValue[i].join(',')})`, predicate: 'not.in' })
+          } else {
+            result.push({ key: field, value: notEqualsValue[i], predicate: 'neq' })
+          }
         })
       } else {
-        result.push({ key: notEqualsField, value: notEqualsValue, predicate: 'neq' })
+        if (Array.isArray(notEqualsField)) {
+          result.push({ key: notEqualsField, value: `(${notEqualsValue.join(',')})`, predicate: 'not.in' })
+        } else {
+          result.push({ key: notEqualsField, value: notEqualsValue, predicate: 'neq' })
+        }
       }
     }
 
@@ -462,17 +488,6 @@ export const setSearchColumns = (args, _columns) => {
     },
   }
   return searchArgs
-}
-
-/**
- * @param {string} name of the variable to be fetched from env
- * @returns {string} variable value
- */
-
-export function getEnvVariable(name) {
-  const value = process.env[name] || ''
-  if (value == '') throw new Error("missing env var for " + name);
-  return value
 }
 
 export const pollingHelper = async (func, argsToFunc, attemptNumber = 0, attemptsAllowed = 8, milliseconds = 1000) => {

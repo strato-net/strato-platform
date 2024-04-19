@@ -7,7 +7,7 @@ import { useUsersDispatch, useUsersState } from "../../contexts/users";
 import { useAuthenticateState } from "../../contexts/authentication";
 import { SearchOutlined } from '@ant-design/icons';
 
-const TransferModal = ({ open, handleCancel, inventory, categoryName }) => {
+const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, offset }) => {
     const [data, setData] = useState([inventory]);
     const [quantity, setQuantity] = useState(1);
     const [userAddress, setUserAddress] = useState("");
@@ -113,7 +113,8 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName }) => {
         if (quantity > 0 && quantity <= inventory.quantity && userAddress) {
             let isDone = await actions.transferInventory(inventoryDispatch, body);
             if (isDone) {
-                await actions.fetchInventory(inventoryDispatch, 10, 0, "", categoryName);
+                await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
+                await actions.fetchInventoryForUser(inventoryDispatch, user.commonName);
                 handleCancel();
             }
         }

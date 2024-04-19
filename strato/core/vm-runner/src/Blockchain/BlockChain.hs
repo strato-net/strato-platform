@@ -64,6 +64,7 @@ import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.Options (computeNetworkID)
 import qualified Blockchain.Strato.StateDiff as SD
 import Blockchain.TheDAOFork
 import Blockchain.Timing
@@ -74,7 +75,6 @@ import Blockchain.VMMetrics
 import Blockchain.VMOptions
 import Blockchain.Verifier
 import Conduit
-import Control.Arrow ((&&&))
 import Control.Lens.Operators
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
@@ -226,7 +226,8 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
             Just cr -> $logDebugS "addBlock" $ T.pack $ "New chain root after inserting header: " ++ format cr
 
         bSum <- setParentStateRoot b
-        when (False && blockDataNumber bd == 1920000) runTheDAOFork -- TODO: Only run this if connected to Ethereum publicnet (i.e. never)
+        -- TODO: PLEASE REMOVE THIS FORK WHEN MERCATA-HYDROGEN IS OBSOLETE
+        when (computeNetworkID == 7596898649924658542 && blockDataNumber bd == 32624) runTheDAOFork -- Only run this if connected to mercata-hydrogen
         addBlockTransactions b
 
         postRewardSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
@@ -351,22 +352,13 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
     $logDebugS "addTx" . T.pack $ "transaction cost: " ++ show gTX
     $logDebugS "addTx" . T.pack $ "intrinsicGas: " ++ show intrinsicGas'
 
-  let txCost = transactionGasLimit bt * transactionGasPrice bt + transactionValue bt
+  let txCost = transactionValue bt
       realIG = fromIntegral intrinsicGas'
       maxGas = fromIntegral (maxBound :: Int)
 
-  unless flags_gasOn $ do
-    $logInfoS "addTx" . T.pack $ "gas is off, so I'm giving the account enough balance for this TX"
-    faucetSuccess <- lift $ addToBalance tAcct txCost
-    unless faucetSuccess $ error "failed to give balance to a gasOff account"
-
-  (acctBalance, acctNonce) <-
-    lift $
-      (addressStateBalance &&& addressStateNonce)
-        <$> A.lookupWithDefault (Proxy @AddressState) tAcct
+  acctNonce <- lift $ addressStateNonce <$> A.lookupWithDefault (Proxy @AddressState) tAcct
 
   when (chainId /= txChainId bt) $ throwE $ TFChainIdMismatch chainId (txChainId bt) t
-  when (txCost > acctBalance) $ throwE $ TFInsufficientFunds txCost acctBalance t
   when (realIG > transactionGasLimit bt) $ throwE $ TFIntrinsicGasExceedsTxLimit realIG (transactionGasLimit bt) t
   when (transactionGasLimit bt > min remainingBlockGas maxGas) $ throwE $ TFBlockGasLimitExceeded (transactionGasLimit bt) remainingBlockGas t
   unless nonceValid $ throwE $ TFNonceMismatch (transactionNonce bt) acctNonce t
@@ -376,49 +368,31 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
     . throwE
     $ TFTXSizeLimitExceeded txSize flags_txSizeLimit t
 
-  let availableGas = transactionGasLimit bt - fromIntegral intrinsicGas'
-
   lift $ incrementNonce tAcct
-
-  success <- lift $ addToBalance tAcct (-transactionGasLimit bt * transactionGasPrice bt)
 
   when (otHash t `S.member` knownFailedTxs) . throwE $ TFKnownFailedTX t
 
+  $logInfoS "addTx" . T.pack $ "gas is always off, so I'm giving the account enough balance for this TX"
+  faucetSuccess <- lift $ addToBalance tAcct txCost
+  unless faucetSuccess $ error "failed to give balance to a gasOff account"
+
   when flags_debug $ $logDebugS "addTx" "running code"
   let txTypeCounter = if isContractCreationTX bt then vmTxsCreation else vmTxsCall
-  -- coinbaseAcct = Account (blockDataCoinbase b) chainId
   lift $ P.incCounter txTypeCounter
-  if success --this should handle exceptions,shouldnt it?
-    then do
-      execResults <- runCodeForTransaction isRunningTests' isHomestead b (fromInteger (transactionGasLimit bt) - intrinsicGas') tAcct t
-      -- s1 <- lift $ addToBalance coinbaseAcct (transactionGasLimit bt * transactionGasPrice bt)
-      -- unless s1 $ error "addToBalance failed even after a check in addBlock"
-      lift $ P.incCounter vmTxsProcessed
+  execResults <- runCodeForTransaction isRunningTests' isHomestead b (fromInteger (transactionGasLimit bt) - intrinsicGas') tAcct t
+  lift $ P.incCounter vmTxsProcessed
 
-      -- success' <- lift $ pay "VM refund fees" coinbaseAcct tAcct (calculateReturned bt execResults * transactionGasPrice bt)
-      -- unless success' $ error "oops, refund was too much"
-
-      case erException execResults of
-        Just e -> do
-          when flags_debug $ $logDebugS "addTx" . T.pack . CL.red $ show e
-          lift $ P.incCounter vmTxsUnsuccessful
-        Nothing -> do
-          when flags_debug $ $logDebugS "addTx" . T.pack $ "Removing accounts in suicideList: " ++ intercalate ", " (format <$> S.toList (erSuicideList execResults))
-          forM_ (S.toList $ erSuicideList execResults) $ \address' -> do
-            lift $ purgeStorageMap address'
-            lift $ A.delete (Proxy @AddressState) address'
-          lift $ P.incCounter vmTxsSuccessful
-      return execResults
-    else do
-      -- s1 <- lift $ addToBalance coinbaseAcct (fromIntegral intrinsicGas' * transactionGasPrice bt)
-      -- unless s1 $ error "addToBalance failed even after a check in addTransaction"
-      balance <-
-        lift $
-          addressStateBalance
-            <$> A.lookupWithDefault (Proxy @AddressState) tAcct
-      $logInfoS "addTransaction/success=false" . T.pack $ "Insufficient funds to run the VM: need " ++ show (availableGas * transactionGasPrice bt) ++ ", have " ++ show balance
-      return $
-        evmErrorResults (transactionGasLimit bt) Blockchain.VM.VMException.InsufficientFunds
+  case erException execResults of
+    Just e -> do
+      when flags_debug $ $logDebugS "addTx" . T.pack . CL.red $ show e
+      lift $ P.incCounter vmTxsUnsuccessful
+    Nothing -> do
+      when flags_debug $ $logDebugS "addTx" . T.pack $ "Removing accounts in suicideList: " ++ intercalate ", " (format <$> S.toList (erSuicideList execResults))
+      forM_ (S.toList $ erSuicideList execResults) $ \address' -> do
+        lift $ purgeStorageMap address'
+        lift $ A.delete (Proxy @AddressState) address'
+      lift $ P.incCounter vmTxsSuccessful
+  return execResults
 
 runCodeForTransaction ::
   (VMBase m) =>
@@ -598,28 +572,27 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
 
   yieldMany $ OutLog . mkLogEntry ranBlockHash theHash chainId <$> theLogs
   yield . OutEvent $ mkEventEntry chainId <$> theEvents
-  when flags_createTransactionResults $ do
-    yield . OutTXR $
-      TransactionResult
-        { transactionResultBlockHash = ranBlockHash,
-          transactionResultTransactionHash = theHash,
-          transactionResultMessage = message,
-          transactionResultResponse = response,
-          transactionResultTrace = theTrace',
-          transactionResultGasUsed = gasUsed,
-          transactionResultEtherUsed = etherUsed,
-          transactionResultContractsCreated = intercalate "," $ map (show . _accountAddress) newAddresses,
-          transactionResultContractsDeleted = intercalate "," $ map (show . _accountAddress) $ S.toList $ (beforeAddresses S.\\ afterAddresses) `S.union` (afterDeletes S.\\ beforeDeletes),
-          transactionResultStateDiff = "",
-          transactionResultTime = realToFrac deltaT,
-          transactionResultNewStorage = "",
-          transactionResultDeletedStorage = "",
-          transactionResultStatus = Just txrStatus,
-          transactionResultChainId = chainId,
-          transactionResultKind = erKind <$> eitherToMaybe result,
-          transactionResultOrgName = orgName,
-          transactionResultAppName = appName
-        }
+  yield . OutTXR $
+    TransactionResult
+      { transactionResultBlockHash = ranBlockHash,
+        transactionResultTransactionHash = theHash,
+        transactionResultMessage = message,
+        transactionResultResponse = response,
+        transactionResultTrace = theTrace',
+        transactionResultGasUsed = gasUsed,
+        transactionResultEtherUsed = etherUsed,
+        transactionResultContractsCreated = intercalate "," $ map (show . _accountAddress) newAddresses,
+        transactionResultContractsDeleted = intercalate "," $ map (show . _accountAddress) $ S.toList $ (beforeAddresses S.\\ afterAddresses) `S.union` (afterDeletes S.\\ beforeDeletes),
+        transactionResultStateDiff = "",
+        transactionResultTime = realToFrac deltaT,
+        transactionResultNewStorage = "",
+        transactionResultDeletedStorage = "",
+        transactionResultStatus = Just txrStatus,
+        transactionResultChainId = chainId,
+        transactionResultKind = erKind <$> eitherToMaybe result,
+        transactionResultOrgName = orgName,
+        transactionResultAppName = appName
+      }
   when flags_diffPublish $ do
     traverse_ (yield . OutAction) $ either (const Nothing) erAction result
 
@@ -648,7 +621,7 @@ printTransactionMessage ot@OutputTx {otSigner = tAddr, otHash = theHash} (Right 
       extra =
         if isMessageTX t
           then ""
-          else fromMaybe "<failed>" $ fmap format $ erNewContractAccount results
+          else fromMaybe (CL.blink "<failed>") $ fmap format $ erNewContractAccount results
 
   multilineLog "printTx/ok" $
     boringBox

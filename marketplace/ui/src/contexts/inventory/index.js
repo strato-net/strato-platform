@@ -16,6 +16,9 @@ const InventoriesProvider = ({ children }) => {
     isListing: false,
     isUnlisting: false,
     isReselling: false,
+    userInventories: [],
+    userInventoriesTotal: 0,
+    isUserInventoriesLoading: false,
     isTransferring: false,
     inventoryDetails: null,
     inventoryOwnershipHistory: [],
@@ -33,7 +36,9 @@ const InventoriesProvider = ({ children }) => {
     isTransferringItems: false,
     itemTransfers: [],
     totalItemsTransfered: 0,
-    isFetchingItemTransfers: false    
+    isFetchingItemTransfers: false,
+    isFetchingPriceHistory: false,
+    priceHistory: []    
   };
 
   const [state, dispatch] = useReducer(reducer, initialState);

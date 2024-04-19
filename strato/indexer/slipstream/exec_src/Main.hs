@@ -53,7 +53,6 @@ createBlocEnv = liftIO $ do
   return
     BlocEnv
       { stateFetchLimit = 0,
-        gasOn = error ("gasOn shouldn't be needed in slipstream, it is undefined"),
         txSizeLimit = 0,
         accountNonceLimit = 0,
         gasLimit = 0,

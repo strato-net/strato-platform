@@ -270,6 +270,8 @@ const SoldOrderDetails = ({ user, users }) => {
       bgClass = "bg-[#FF8C00]"
     } else if (status === "Closed") {
       bgClass = "bg-[#119B2D]";
+    } else if (status === "Paid") {
+      textClass = "bg-[#119B2D]";
     } else if (status === "Canceled") {
       bgClass = "bg-[#FF0000]";
     }
@@ -329,7 +331,7 @@ const SoldOrderDetails = ({ user, users }) => {
         <p
           // href={routes.BoughtOrderDetails.url}
           className="text-primary text-[17px] cursor-pointer"
-          onClick={() => { navigate(`${routes.MarketplaceProductDetail.url.replace(":address", text.address)}`) }}
+          onClick={() => { navigate(`${routes.MarketplaceProductDetail.url.replace(":address", text.address).replace(":name", text.name)}`) }}
         >
           {decodeURIComponent(text.name)}
         </p>

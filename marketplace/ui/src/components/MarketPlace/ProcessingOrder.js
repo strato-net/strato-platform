@@ -29,6 +29,7 @@ const ProcessingOrder = ({user}) => {
   const [error, seterror] = useState(null)
   const { message, success } = useOrderState();
   const [api, contextHolder] = notification.useNotification();
+  const [called, setCalled] = useState(false);
 
 
   const storedData = useMemo(() => {
@@ -55,8 +56,8 @@ const ProcessingOrder = ({user}) => {
   }, [routeMatch, query]);
 
   useEffect(() => {
-    // getCartData();
-    if (sessionId !== undefined && user !== undefined) {
+    if (sessionId !== undefined && user !== undefined && !called) {
+      setCalled(true);
       getCartData();
     }
 
@@ -74,7 +75,6 @@ const ProcessingOrder = ({user}) => {
       );
 
       const body = await response.json();
-      console.log(body);
       if (response.status === RestStatus.OK) {
         try {
           const cartObject = JSON.parse(body.data.metadata.cart);
@@ -190,7 +190,9 @@ const ProcessingOrder = ({user}) => {
         }
       });
       actions.addItemToCart(marketplaceDispatch, updatedCart);
-      navigate(routes.Orders.url.replace(':type', 'bought'));
+      setTimeout(() => {
+        navigate(routes.Orders.url.replace(':type', 'bought'));
+      }, 500);      
     } else {
       setTimeout(function () {
         navigate(routes.Checkout.url)
@@ -233,7 +235,7 @@ const ProcessingOrder = ({user}) => {
     {contextHolder}
     <div className="h-96 flex flex-col justify-center items-center">
       <Spin spinning={true} size="large" />
-      <p className="mt-4">Please wait while your order is placed successfully</p>
+      <p className="mt-4">Please wait while your order is being processed</p>
     </div>
     {error && openToastMarketplace("bottom")}
     {message && openToastOrder("bottom")}

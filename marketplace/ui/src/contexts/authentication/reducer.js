@@ -16,6 +16,15 @@ const reducer = (state, action) => {
         hasChecked: true,
         loginUrl: action.payload,
       };
+    case actionDescriptors.checkFailedInternalServerError:
+      return {
+        ...state,
+        user: undefined,
+        isAuthenticated: false,
+        isCheckingAuthentication: false,
+        hasChecked: true,
+        error: action.error
+      };
     case actionDescriptors.checkSuccessful:
       return {
         ...state,
