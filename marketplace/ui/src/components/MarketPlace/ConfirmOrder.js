@@ -475,7 +475,7 @@ const ConfirmOrder = () => {
                     </Row>
                     <Row className="justify-between">
                       <p className="text-base text-[#6A6A6A] ">Total:</p>
-                      <p className="text-xl text-[#202020]   text-right">
+                      <p id="productPrice" className="text-xl text-[#202020] text-right">
                         ${total + tax + shipping}
                       </p>
                     </Row>
