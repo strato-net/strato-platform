@@ -53,7 +53,6 @@ const TransfersTable = ({ user, selectedDate, download, isAllOrdersLoading }) =>
   useEffect(() => {
     let items = [];
     if (itemTransfers) {
-    console.log(itemTransfers)
       itemTransfers.forEach((transfer) => {
         items.push({
           address: transfer.address,
