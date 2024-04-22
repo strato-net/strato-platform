@@ -1534,26 +1534,20 @@ def checkMemAndCPULevels(accessToken) {
   # Set memory usage threshold in Gigabytes (GB)
   threshold=6
 
-  # Get total memory in Megabytes (MB)
-  total_mem=$(curl $(</host)/apex-api/status | grep .healthData.systemHealth.systemInfo.memory.total)
+  # Get used memory in Bytes
+  used_mem=$(curl $(</host)/apex-api/status | grep .healthData.systemHealth.systemInfo.memory.active)
 
-  # Convert total memory to Gigabytes (GB)
-  total_mem_gb=$(bc <<< "scale=2; $total_mem / 1000000000") 
-
-  # Get used memory in Megabytes (MB)
-  used_mem=$(free -m | awk '/Mem:/{print $3}')
-
-  echo "${used_mem} MB"
+  echo "${used_mem} bytes"
 
   # Check if used memory exceeds threshold in GB
-  if [[ $(bc <<< "$used_mem > ($threshold * 1024)") -eq 1 ]]; then
+  if [[ $(bc <<< "$used_mem > ($threshold * 1000000000)") -eq 1 ]]; then
     echo "WARNING: Memory usage is at $(free -m | awk '/Mem:/{print $3} MiB'), exceeding the threshold of $threshold GB!"
   fi
 
   exit 0
   '''
   sh 'chmod +x check_mem_usage.sh'
-  sh './check_mem_usage'
+  sh './check_mem_usage.sh'
 }
 
 return this
