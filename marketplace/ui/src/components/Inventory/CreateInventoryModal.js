@@ -322,7 +322,7 @@ const CreateInventoryModal = ({
                 >
                   {categorys.map((category) =>
                     category.name === categoryValue ? category.subCategories.map((e, index) => (
-                      <Option value={e.contract} key={index}>
+                      <Option id="subCategory-options" value={e.contract} key={index}>
                         {e.name}
                       </Option>
                     )) : null
@@ -344,6 +344,7 @@ const CreateInventoryModal = ({
                 ]}
               >
                 <RichEditor
+                  id="description"
                   onChange={(content) => {
                     form.setFieldsValue({ description: content });
                   }}

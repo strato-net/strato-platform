@@ -416,12 +416,12 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
               window.scrollTo(0, 0);
             }}
           >
-            <div className="md:hidden">
+            <div id='avatar' className="md:hidden">
               <Avatar
                 icon={<img src={Images.Responsive_cart} alt={IMG_META} title={IMG_META} className="w-6 h-6" />}
               />
             </div>
-            <div className="hidden md:inline-block">
+            <div id='avatar' className="hidden md:inline-block">
               <Avatar
                 icon={<img src={Images.Header_cart} alt={IMG_META} title={IMG_META} className="w-6 h-6" />}
               />

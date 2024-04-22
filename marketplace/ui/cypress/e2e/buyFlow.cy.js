@@ -1,5 +1,4 @@
 
-
 describe('Create a new Asset', () => {
   beforeEach(function () {
     cy.visit('/')
@@ -7,9 +6,11 @@ describe('Create a new Asset', () => {
     cy.login()
   });
 
-  it('Add a product', () => {
-    cy.url().should("exist");
-    cy.get('#myItems').should("exist").click();
+  it.only('Add a product', () => {
+    cy.wait(10000)
+    cy.get('#avatar')
+    cy.url('').should("exist");
+    cy.get('#Inventory').should("exist").click();
     cy.url().should("exist", "myitems");
     // cy.get('#connectStripe').contains('Connect Stripe')
     // cy.get('#connectStripe').contains('Connect Stripe').should('have.attr', 'disabled', 'disabled'); //should be disabled
@@ -26,26 +27,29 @@ describe('Create a new Asset', () => {
     cy.get('[title="Art"]').should('have.attr', 'title', 'Art').first()
     cy.get('[title="Art"]').should('have.attr', 'title', 'Art').first().click();
 
-    // cy.get('#subCategory');
-    // cy.get('#subCategory').click();
+    cy.get('#subCategory');
+    cy.get('#subCategory').click();
+    cy.wait(3000)
+    cy.get('#subCategory-options')
+    cy.get('#subCategory-options').should('have.attr', 'title', 'Art')
+    cy.get('#subCategory-options').should('have.attr', 'title', 'Art').click()
 
-    // cy.get('[title="Art"]').should('have.attr', 'title', 'Art').eq(1)
-    // cy.get('[title="Art"]').should('have.attr', 'title', 'Art').eq(1).click();
+    cy.get('#artist')
+    cy.get('#artist').type('user-01').should('have.value', 'user-01')
 
-    // cy.get('#imageUpload')
-    // cy.get('#imageUpload').click();
+    cy.get('.tiptap')
+    cy.get('.tiptap').eq(1).click();
+    cy.get('.ProseMirror-focused').first().type('user-01')
 
     cy.get("input[type=file]").first()
     cy.get("input[type=file]").first().attachFile("cottonSeeds.jpg")
     cy.get("#createItem")
     cy.get("#createItem").click()
     cy.wait(7000)
-
-
   })
 
 
-  it.only('Buy a product', () => {
+  it('Buy a product', () => {
     cy.visit('/')
     cy.get("#viewAll")
     cy.get("#viewAll").click()
