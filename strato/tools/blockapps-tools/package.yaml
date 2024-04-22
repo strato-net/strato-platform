@@ -79,6 +79,12 @@ executables:
       - strato-p2p
       - text
 
+  modifyDate:
+    source-dirs: exec_src/
+    main: ModifyDate.hs
+    dependencies:
+      - base
+
   b16decode:
     source-dirs: exec_src/
     main: B16Decode.hs
