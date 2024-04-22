@@ -321,7 +321,7 @@ async function updateSale(admin, contract, _args, options) {
 
 async function get(user, args, options) {
     const { address, ...restArgs } = args;
-    const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
+    const newOptions = { ...options, org: 'BlockApps' }
     let inventory;
 
     const searchArgs = setSearchQueryOptions(restArgs, {
@@ -359,7 +359,7 @@ async function getAll(admin, args = {}, defaultOptions) {
     let inventories;
     let sales;
     let finalInventory = [];
-    const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' };
+    const options = { ...defaultOptions, org: 'BlockApps' };
 
     if (isTrendingSearch) {
         // If it's a trending search, first search the sales
@@ -447,8 +447,7 @@ async function getAll(admin, args = {}, defaultOptions) {
 
 
 async function getAllItemTransferEvents(admin, args = {}, defaultOptions) {
-    const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' };
-
+    const options = { ...defaultOptions, org: 'BlockApps' }
     let itemTransferEvents = await searchAllWithQueryArgs(`${contractName}.${contractEvents.ITEM_TRANSFER}`, args, options, admin);
 
     //Extract sale prices such that:
@@ -501,7 +500,7 @@ async function getAllItemTransferEvents(admin, args = {}, defaultOptions) {
 
 async function getOwnershipHistory(user, args, options) {
     const { originAddress, minItemNumber, maxItemNumber } = args;
-    const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
+    const newOptions = { ...options, org: 'BlockApps' }
     const searchArgs = {
         originAddress,
         gteField: 'maxItemNumber',
@@ -516,7 +515,7 @@ async function getOwnershipHistory(user, args, options) {
 }
 
 async function inventoryCount(admin, args = {}, defaultOptions) {
-    const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
+    const options = { ...defaultOptions, org: 'BlockApps' }
     const { range, userProfile, userProfileGtField, userProfileGtValue, ...newArgs } = args;
     const queryArgs = setSearchQueryOptionsPrime({
         ...newArgs,
@@ -542,7 +541,7 @@ async function inventoryCount(admin, args = {}, defaultOptions) {
 
 async function checkSaleQuantity(admin, args, defaultOptions) {
     const { saleAddresses, orderQuantity } = args; // Assuming orderQuantity here is used differently now
-    const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' };
+    const options = { ...defaultOptions, org: 'BlockApps' };
 
     // Fetch sales and assets data
     const sales = await saleJs.getAll(admin, { address: saleAddresses }, options);
