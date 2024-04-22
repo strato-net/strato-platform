@@ -251,7 +251,7 @@
 					"group": "inline"
 				},
 				{
-					"command": "extension.copyLabelToClipboard",
+					"command": "extension.copyTooltipToClipboard",
 					"when": "view == contracts && (viewItem == address || viewItem == stateItem)",
 					"group": "inline"
 				},
