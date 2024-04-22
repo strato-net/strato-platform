@@ -13,11 +13,9 @@ import {
     notification,
     Tabs,
 } from "antd";
-import { useLocation, useMatch } from "react-router-dom";
+import { useMatch } from "react-router-dom";
 import { actions } from "../../contexts/redemption/actions";
-import { actions as orderActions } from "../../contexts/order/actions";
 import { actions as inventoryActions } from "../../contexts/inventory/actions";
-import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import routes from "../../helpers/routes";
@@ -25,7 +23,6 @@ import { REDEMPTION_STATUS } from "../../helpers/constants";
 import classNames from "classnames";
 import { useNavigate } from "react-router-dom";
 import DataTableComponent from "../DataTableComponent";
-import { getStatus } from "./constant";
 import dayjs from "dayjs";
 import ClickableCell from "../ClickableCell";
 import BoughtOrdersTable from "./BoughtOrdersTable";
@@ -38,23 +35,18 @@ const RedemptionsIncomingDetails = ({ user }) => {
     const [id, setId] = useState(undefined);
     const [data, setdata] = useState([]);
     const dispatch = useRedemptionDispatch();
-    const orderDispatch = useOrderDispatch();
     const inventoryDispatch = useInventoryDispatch();
     const { Text } = Typography;
     const [selectedDate, setSelectedDate] = useState("");
-    const [status, setStatus] = useState(getStatus(1));
     const navigate = useNavigate();
     const [comments, setComments] = useState("");
     const { TextArea } = Input;
     const [api, contextHolder] = notification.useNotification();
-    const state = useLocation()
-    const { redemption, isFetchingRedemptionDetails, isClosingRedemption } = useRedemptionState();
+    const { redemption, isFetchingRedemptionDetails, isClosingRedemption, message, success, } = useRedemptionState();
     const { inventoryDetails, isInventoryDetailsLoading } = useInventoryState();
 
-    const {
-        message,
-        success,
-    } = useOrderState();
+    console.log(inventoryDetails)
+
     const routeMatch = useMatch({
         path: routes.RedemptionsIncomingDetails.url,
         strict: true,
@@ -85,8 +77,8 @@ const RedemptionsIncomingDetails = ({ user }) => {
     const OrderData = ({ title, value }) => {
         return (
             <Col>
-                <Text className="block text-[#6A6A6A] text-[13px] mb-2">{title}</Text>
-                <Text className="block text-[#202020] text-[17px] font-semibold">{value}</Text>
+                <Text className="flex flex-col items-center text-[#6A6A6A] text-[13px] mb-2">{title}</Text>
+                <Text className="flex flex-col items-center text-[#202020] text-[17px] font-semibold">{value}</Text>
             </Col>
         );
     };
@@ -185,14 +177,14 @@ const RedemptionsIncomingDetails = ({ user }) => {
         if (success) {
             api.success({
                 message: message,
-                onClose: orderActions.resetMessage(orderDispatch),
+                onClose: actions.resetMessage(dispatch),
                 placement,
                 key: 1,
             });
         } else {
             api.error({
                 message: message,
-                onClose: orderActions.resetMessage(orderDispatch),
+                onClose: actions.resetMessage(dispatch),
                 placement,
                 key: 2,
             });
@@ -275,27 +267,28 @@ const RedemptionsIncomingDetails = ({ user }) => {
                                                         <Text className="bg-[#E9E9E9] md:bg-white py-2 px-3 w-full md:bg-none font-semibold text-sm md:text-lg text-primaryB flex gap-4 items-center">Redemption Details</Text>
                                                     </div>
                                                 </div>
-                                                <div className="flex gap-4 mr-4 mt-2">
-                                                    <Button
-                                                        type="primary"
-                                                        loading={isClosingRedemption}
-                                                        danger
-                                                        className="h-9"
-                                                        onClick={() => handleSubmit(REDEMPTION_STATUS.REJECTED, comments)}
-                                                    >
-                                                        Reject
-                                                    </Button>
-                                                    <Button
-                                                        type="primary"
-                                                        loading={isClosingRedemption}
-                                                        className="h-9"
-                                                        onClick={() => handleSubmit(REDEMPTION_STATUS.FULFILLED, comments)}
-                                                    >
-                                                        Fulfill
-                                                    </Button>
-                                                </div>
+                                                {redemption.status == REDEMPTION_STATUS.PENDING &&
+                                                    <div className="flex gap-4 mr-4 mt-2">
+                                                        <Button
+                                                            type="primary"
+                                                            loading={isClosingRedemption}
+                                                            danger
+                                                            className="h-9"
+                                                            onClick={() => handleSubmit(REDEMPTION_STATUS.REJECTED, comments)}
+                                                        >
+                                                            Reject
+                                                        </Button>
+                                                        <Button
+                                                            type="primary"
+                                                            loading={isClosingRedemption}
+                                                            className="h-9"
+                                                            onClick={() => handleSubmit(REDEMPTION_STATUS.FULFILLED, comments)}
+                                                        >
+                                                            Fulfill
+                                                        </Button>
+                                                    </div>}
                                             </div>
-                                            <Row className="hidden md:flex my-6 justify-between bg-[#F6F6F6] p-4 pb-2 rounded">
+                                            <Row className="hidden md:flex my-6 justify-between bg-[#F6F6F6] py-4 px-12 rounded">
                                                 <OrderData
                                                     title="Redemption Number"
                                                     value={`#${redemption.redemption_id}`}
@@ -421,8 +414,18 @@ const RedemptionsIncomingDetails = ({ user }) => {
                                                     </Text>
                                                     <TextArea
                                                         rows={2}
-                                                        placeholder="Enter Comments"
-                                                        value={comments}
+                                                        placeholder={
+                                                            (redemption.status == REDEMPTION_STATUS.FULFILLED ||
+                                                                redemption.status == REDEMPTION_STATUS.REJECTED) ?
+                                                                redemption.issuerComments : "Enter Comments"}
+                                                        value={
+                                                            (redemption.status == REDEMPTION_STATUS.FULFILLED ||
+                                                                redemption.status == REDEMPTION_STATUS.REJECTED) ?
+                                                                redemption.issuerComments : comments}
+                                                        disabled={
+                                                            redemption.status == REDEMPTION_STATUS.FULFILLED ||
+                                                            redemption.status == REDEMPTION_STATUS.REJECTED
+                                                        }
                                                         onChange={(event) => {
                                                             setComments(event.target.value);
                                                         }}

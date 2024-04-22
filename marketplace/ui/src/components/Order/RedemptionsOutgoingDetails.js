@@ -13,17 +13,14 @@ import {
     notification,
     Tabs,
 } from "antd";
-import { useLocation, useMatch } from "react-router-dom";
-import { actions as orderActions } from "../../contexts/order/actions";
+import { useMatch } from "react-router-dom";
 import { actions } from "../../contexts/redemption/actions";
-import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
 import routes from "../../helpers/routes";
 import { REDEMPTION_STATUS } from "../../helpers/constants";
 import classNames from "classnames";
 import { useNavigate } from "react-router-dom";
 import DataTableComponent from "../DataTableComponent";
-import { getStatus, getStatusByName } from "./constant";
 import dayjs from "dayjs";
 import ClickableCell from "../ClickableCell";
 import BoughtOrdersTable from "./BoughtOrdersTable";
@@ -37,20 +34,12 @@ const RedemptionsOutgoingDetails = ({ user }) => {
     const [id, setId] = useState(undefined);
     const [data, setdata] = useState([]);
     const dispatch = useRedemptionDispatch();
-    const orderDispatch = useOrderDispatch();
     const { Text } = Typography;
     const [selectedDate, setSelectedDate] = useState("");
-    const [status, setStatus] = useState(getStatus(1));
-    const [comment, setComment] = useState("");
     const { TextArea } = Input;
     const [api, contextHolder] = notification.useNotification();
-    const state = useLocation()
     const { redemption, isFetchingRedemptionDetails } = useRedemptionState();
 
-    const {
-        message,
-        success,
-    } = useOrderState();
     const routeMatch = useMatch({
         path: routes.RedemptionsOutgoingDetails.url,
         strict: true,
@@ -72,8 +61,8 @@ const RedemptionsOutgoingDetails = ({ user }) => {
     const OrderData = ({ title, value }) => {
         return (
             <Col>
-                <Text className="block text-[#6A6A6A] text-[13px] mb-2">{title}</Text>
-                <Text className="block text-[#202020] text-[17px] font-semibold">{value}</Text>
+                <Text className="flex flex-col items-center text-[#6A6A6A] text-[13px] mb-2">{title}</Text>
+                <Text className="flex flex-col items-center text-[#202020] text-[17px] font-semibold">{value}</Text>
             </Col>
         );
     };
@@ -169,24 +158,6 @@ const RedemptionsOutgoingDetails = ({ user }) => {
         },
     ];
 
-    const openToastOrder = (placement) => {
-        if (success) {
-            api.success({
-                message: message,
-                onClose: orderActions.resetMessage(orderDispatch),
-                placement,
-                key: 1,
-            });
-        } else {
-            api.error({
-                message: message,
-                onClose: orderActions.resetMessage(orderDispatch),
-                placement,
-                key: 2,
-            });
-        }
-    };
-
     return (
         <div>
             {contextHolder}
@@ -247,15 +218,15 @@ const RedemptionsOutgoingDetails = ({ user }) => {
                                                         <Text className="bg-[#E9E9E9] md:bg-white py-2 px-3 w-full md:bg-none font-semibold text-sm md:text-lg text-primaryB flex gap-4 items-center">Redemption Details</Text>
                                                     </div>
                                                 </div>
-                                                <Button
+                                                {/* <Button
                                                     id="save-button"
                                                     type="primary"
                                                     className="min-w-max w-max h-9 px-[3%] ml-2 bg-primary !hover:bg-primaryHover"
                                                 >
                                                     Save
-                                                </Button>
+                                                </Button> */}
                                             </div>
-                                            <Row className="hidden md:flex my-6 justify-between bg-[#F6F6F6] p-4 pb-2 rounded">
+                                            <Row className="hidden md:flex my-6 justify-between bg-[#F6F6F6] py-4 px-12 rounded">
                                                 <OrderData
                                                     title="Redemption Number"
                                                     value={`#${redemption.redemption_id}`}
@@ -381,11 +352,8 @@ const RedemptionsOutgoingDetails = ({ user }) => {
                                                     </Text>
                                                     <TextArea
                                                         rows={2}
-                                                        placeholder="Enter Comments"
-                                                        value={decodeURIComponent(comment)}
-                                                        onChange={(event) => {
-                                                            setComment(encodeURIComponent(event.target.value));
-                                                        }}
+                                                        value={redemption.ownerComments}
+                                                        disabled
                                                     />
                                                 </div>
                                             </Row>
@@ -414,7 +382,6 @@ const RedemptionsOutgoingDetails = ({ user }) => {
 
                 </div>
             )}
-            {message && openToastOrder("bottom")}
         </div>
     );
 };

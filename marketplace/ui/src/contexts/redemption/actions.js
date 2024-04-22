@@ -51,20 +51,20 @@ const actions = {
                     type: actionDescriptors.requestRedemptionSuccessful,
                     payload: body.data,
                 });
-                actions.setMessage(dispatch, "Request for redemption sent", true);
+                actions.setMessage(dispatch, "Request for Redemption sent", true);
                 return true;
             } else if (response.status === RestStatus.CONFLICT) {
                 dispatch({ type: actionDescriptors.requestRedemptionFailed, error: body.error.message });
                 actions.setMessage(dispatch, body.error.message)
                 return false;
             } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
-                dispatch({ type: actionDescriptors.requestRedemptionFailed, error: "Error while redeeming Item" });
-                actions.setMessage(dispatch, "Error while redeeming Item")
+                dispatch({ type: actionDescriptors.requestRedemptionFailed, error: "Error while requesting Redemption" });
+                actions.setMessage(dispatch, "Error while requesting Redemption")
                 return false;
             } else if (response.status === RestStatus.UNAUTHORIZED) {
                 dispatch({
                     type: actionDescriptors.requestRedemptionFailed,
-                    error: "Unauthorized while redeeming Item"
+                    error: "Unauthorized while requesting Redemption"
                 });
                 window.location.href = body.error.loginUrl;
             }
@@ -78,9 +78,9 @@ const actions = {
         } catch (err) {
             dispatch({
                 type: actionDescriptors.requestRedemptionFailed,
-                error: "Error while redeeming Item",
+                error: "Error while requesting Redemption",
             });
-            actions.setMessage(dispatch, "Error while redeeming Item");
+            actions.setMessage(dispatch, "Error while requesting Redemption");
         }
     },
 
@@ -237,7 +237,7 @@ const actions = {
                     type: actionDescriptors.closeRedemptionSuccessful,
                     payload: body.data,
                 });
-                actions.setMessage(dispatch, "Closed redemption successfully", true);
+                actions.setMessage(dispatch, "Closed Redemption successfully", true);
                 return true;
             } else if (response.status === RestStatus.CONFLICT) {
                 dispatch({ type: actionDescriptors.closeRedemptionFailed, error: body.error.message });
