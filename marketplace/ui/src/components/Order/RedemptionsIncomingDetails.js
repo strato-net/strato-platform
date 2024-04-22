@@ -25,7 +25,7 @@ import { REDEMPTION_STATUS } from "../../helpers/constants";
 import classNames from "classnames";
 import { useNavigate } from "react-router-dom";
 import DataTableComponent from "../DataTableComponent";
-import { getStatus, getStatusByName } from "./constant";
+import { getStatus } from "./constant";
 import dayjs from "dayjs";
 import ClickableCell from "../ClickableCell";
 import BoughtOrdersTable from "./BoughtOrdersTable";
@@ -102,61 +102,25 @@ const RedemptionsIncomingDetails = ({ user }) => {
 
     const statusComponent = (status) => {
         let textClass = "bg-[#FFF6EC]";
-        if (status === "Awaiting Shipment") {
-            textClass = "bg-[#EBF7FF]";
-        } else if (status === "Awaiting Fulfillment") {
+        if (status === REDEMPTION_STATUS.PENDING) {
             textClass = "bg-[#FF8C0033]"
-        } else if (status === "Payment Pending") {
-            textClass = "bg-[#FF8C0033]"
-        } else if (status === "Closed") {
-            textClass = "bg-[#119B2D33]";
-        } else if (status === "Canceled") {
+        } else if (status === REDEMPTION_STATUS.REJECTED) {
             textClass = "bg-[#FFF0F0]";
+        } else if (status === REDEMPTION_STATUS.FULFILLED) {
+            textClass = "bg-[#119B2D33]";
         }
         let bgClass = "bg-[#119B2D]";
-        if (status === "Awaiting Shipment") {
-            bgClass = "bg-[#13188A]";
-        } else if (status === "Payment Pending") {
+        if (status === REDEMPTION_STATUS.PENDING) {
             bgClass = "bg-[#FF8C00]"
-        } else if (status === "Awaiting Fulfillment") {
-            bgClass = "bg-[#FF8C00]"
-        } else if (status === "Closed") {
-            bgClass = "bg-[#119B2D]";
-        } else if (status === "Paid") {
-            textClass = "bg-[#119B2D]";
-        } else if (status === "Canceled") {
+        } else if (status === REDEMPTION_STATUS.REJECTED) {
             bgClass = "bg-[#FF0000]";
+        } else if (status === REDEMPTION_STATUS.FULFILLED) {
+            bgClass = "bg-[#119B2D]";
         }
         return (
             <div className={classNames(textClass, "status_contain w-max text-center py-1 px-2 rounded-md md:rounded-xl flex justify-start items-center gap-1 p-1")}>
                 <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
-                <p className="!mb-0 text-[11px] md:text-sm">{status}</p>
-            </div>
-        );
-    };
-
-    const statusComponentForPayment = (status) => {
-        let textClass = "bg-[#FFF6EC]";
-        if (status === "Processing") {
-            textClass = "bg-[#FF8C0033]"
-        } else if (status === "Paid") {
-            textClass = "bg-[#119B2D33]";
-        } else if (status === "Payment Failed") {
-            textClass = "bg-[#FFF0F0]";
-        }
-        let bgClass = "bg-[#119B2D]";
-        if (status === "Processing") {
-            bgClass = "bg-[#FF8C00]"
-        } else if (status === "Paid") {
-            bgClass = "bg-[#119B2D]";
-        } else if (status === "Payment Failed") {
-            bgClass = "bg-[#FF0000]";
-        }
-
-        return (
-            <div className={classNames(textClass, "status_contain w-max h-max text-center py-1 px-2 rounded-md md:rounded-xl flex justify-start items-center gap-1 p-1")}>
-                <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
-                <p className="!mb-0 text-[11px] md:text-sm">{status}</p>
+                <p className="!mb-0 text-[11px] md:text-sm">{REDEMPTION_STATUS[status]}</p>
             </div>
         );
     };
@@ -237,7 +201,7 @@ const RedemptionsIncomingDetails = ({ user }) => {
 
     const handleSubmit = async (status, comments) => {
         const body = {
-            status, 
+            status,
             issuerComments: comments,
             id: redemption.redemption_id,
             assetAddresses: redemption.assetAddresses
@@ -354,7 +318,7 @@ const RedemptionsIncomingDetails = ({ user }) => {
                                                 <Divider type="vertical" className="h-14 bg-secondryD" />
                                                 <OrderData
                                                     title="Status"
-                                                    value="Stuff"
+                                                    value={statusComponent(redemption.status)}
                                                 />
                                                 {/* {
                                                     status !== getStatus(1) || details.paymentSessionId !== "" ? <Col>

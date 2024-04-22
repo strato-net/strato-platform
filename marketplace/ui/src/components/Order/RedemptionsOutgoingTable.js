@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import DataTableComponent from "../DataTableComponent";
 import { getStringDate } from "../../helpers/utils";
 import { actions } from "../../contexts/redemption/actions";
-import { US_DATE_FORMAT } from "../../helpers/constants";
+import { US_DATE_FORMAT, REDEMPTION_STATUS } from "../../helpers/constants";
 import { Input, Pagination, Dropdown, Button, Space } from "antd";
 import "./ordersTable.css"
 import { DownOutlined, SearchOutlined, UpOutlined, DownloadOutlined } from "@ant-design/icons";
@@ -11,6 +11,7 @@ import { ResponsiveTransferOrderCard } from "./ResponsiveTransferOrdersCard";
 import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import routes from "../../helpers/routes";
+import classNames from "classnames";
 
 
 const RedemptionsOutgoingTable = ({ user, selectedDate, download, isAllOrdersLoading }) => {
@@ -70,6 +71,32 @@ const RedemptionsOutgoingTable = ({ user, selectedDate, download, isAllOrdersLoa
         setData(items);
     }, [outgoingRedemptions]);
 
+    const statusComponent = (status) => {
+        let textClass = "bg-[#FFF6EC]";
+        if (status === REDEMPTION_STATUS.PENDING) {
+            textClass = "bg-[#FF8C0033]"
+        } else if (status === REDEMPTION_STATUS.REJECTED) {
+            textClass = "bg-[#FFF0F0]";
+        } else if (status === REDEMPTION_STATUS.FULFILLED) {
+            textClass = "bg-[#119B2D33]";
+        }
+        let bgClass = "bg-[#119B2D]";
+        if (status === REDEMPTION_STATUS.PENDING) {
+            bgClass = "bg-[#FF8C00]"
+        } else if (status === REDEMPTION_STATUS.REJECTED) {
+            bgClass = "bg-[#FF0000]";
+        } else if (status === REDEMPTION_STATUS.FULFILLED) {
+            bgClass = "bg-[#119B2D]";
+        }
+        return (
+            <div className="flex justify-center">
+                <div className={classNames(textClass, "w-max py-1 rounded-xl flex items-center gap-1 p-3")}>
+                    <div className={classNames(bgClass, "flex justify-center h-3 w-3 rounded-sm")}></div>
+                    <p>{REDEMPTION_STATUS[status]}</p>
+                </div>
+            </div>
+        );
+    };
 
     const column = [
         {
@@ -78,17 +105,17 @@ const RedemptionsOutgoingTable = ({ user, selectedDate, download, isAllOrdersLoa
             key: "redemptionNumber",
             render: (record) => (
                 <p
-                  id={record}
-                  onClick={() => {
-                    navigate(
-                      `${routes.RedemptionsOutgoingDetails.url.replace(":id", record)}`
-                    );
-                  }}
-                  className="text-[#13188A] hover:text-primaryHover cursor-pointer"
+                    id={record}
+                    onClick={() => {
+                        navigate(
+                            `${routes.RedemptionsOutgoingDetails.url.replace(":id", record)}`
+                        );
+                    }}
+                    className="text-[#13188A] hover:text-primaryHover cursor-pointer"
                 >
-                  {`#${record}`}
+                    {`#${record}`}
                 </p>
-              ),
+            ),
         },
         {
             title: "Issuer",
@@ -149,9 +176,8 @@ const RedemptionsOutgoingTable = ({ user, selectedDate, download, isAllOrdersLoa
             title: "Status",
             dataIndex: "status",
             key: "status",
-            align: "right",
-            render: (text) => <p className="text-right">{text ? `$ ${text}` : '--'}</p>,
-            width: "10%",
+            align: "center",
+            render: (text) => (statusComponent(text)),
         },
     ];
 

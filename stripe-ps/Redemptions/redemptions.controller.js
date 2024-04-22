@@ -15,6 +15,13 @@ class RedemptionsController {
 
             // fix casing in columns
             const formattedRows = result.rows.map(row => {
+                const date = new Date(row["createddate"]);
+                const formattedDate = date.toLocaleDateString('en-US', {
+                    month: '2-digit',
+                    day: '2-digit',
+                    year: 'numeric'
+                });
+
                 const newRow = {
                     ...row,
                     ownerComments: row["ownercomments"],
@@ -24,7 +31,7 @@ class RedemptionsController {
                     assetAddresses: row["assetaddresses"],
                     assetName: row["assetname"],
                     shippingAddressId: row["shippingaddressid"],
-                    createdDate: row["createddate"]
+                    createdDate: formattedDate
                 }
                 const { ownercomments, issuercomments, ownercommonname, issuercommonname, assetaddresses, assetname, shippingaddressid, createddate, ...rest } = newRow;
                 return rest;
@@ -55,6 +62,13 @@ class RedemptionsController {
 
             // fix casing in columns
             const formattedRows = result.rows.map(row => {
+                const date = new Date(row["createddate"]);
+                const formattedDate = date.toLocaleDateString('en-US', {
+                    month: '2-digit',
+                    day: '2-digit',
+                    year: 'numeric'
+                });
+
                 const newRow = {
                     ...row,
                     ownerComments: row["ownercomments"],
@@ -64,7 +78,7 @@ class RedemptionsController {
                     assetAddresses: row["assetaddresses"],
                     assetName: row["assetname"],
                     shippingAddressId: row["shippingaddressid"],
-                    createdDate: row["createddate"]
+                    createdDate: formattedDate
                 }
                 const { ownercomments, issuercomments, ownercommonname, issuercommonname, assetaddresses, assetname, shippingaddressid, createddate, ...rest } = newRow;
                 return rest;
@@ -95,6 +109,13 @@ class RedemptionsController {
 
             // fix casing in columns
             const formattedRows = result.rows.map(row => {
+                const date = new Date(row["createddate"]);
+                const formattedDate = date.toLocaleDateString('en-US', {
+                    month: '2-digit',
+                    day: '2-digit',
+                    year: 'numeric'
+                });
+
                 const newRow = {
                     ...row,
                     ownerComments: row["ownercomments"],
@@ -104,7 +125,7 @@ class RedemptionsController {
                     assetAddresses: row["assetaddresses"],
                     assetName: row["assetname"],
                     shippingAddressId: row["shippingaddressid"],
-                    createdDate: row["createddate"]
+                    createdDate: formattedDate
                 }
                 const { ownercomments, issuercomments, ownercommonname, issuercommonname, assetaddresses, assetname, shippingaddressid, createddate, ...rest } = newRow;
                 return rest;

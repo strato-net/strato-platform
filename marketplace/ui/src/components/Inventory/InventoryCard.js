@@ -19,6 +19,7 @@ import ResellModal from "./ResellModal";
 import TransferModal from "./TransferModal";
 import RedeemModal from "./RedeemModal";
 import routes from "../../helpers/routes";
+import { ASSET_STATUS } from "../../helpers/constants";
 import image_placeholder from "../../images/resources/image_placeholder.png";
 import "react-responsive-carousel/lib/styles/carousel.min.css";
 import { SEO } from "../../helpers/seoConstant";
@@ -142,7 +143,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
 
 
   return (
-    <div className=" p-3 md:p-[18px] border border-[#BABABA] md:border-[#E9E9E9] rounded-lg sm:w-[343px] md:w-full  ">
+    <div className=" p-3 md:p-[18px] border border-[#BABABA] md:border-[#E9E9E9] rounded-lg sm:w-[343px] md:w-full">
       <div className="bg-[#F2F2F9] rounded-md px-[14px] flex flex-col justify-between items-center pb-[13px] pt-2 w-full">
         <div className="w-full">
           <div className="grid grid-cols-1 lg:grid-cols-2 w-full auto-cols-max">
@@ -190,7 +191,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
         <div className="inline-block text-center">
           <div>
             <img
-              className="rounded-md  w-[161px] h-[161px] md:object-contain"
+              className={`rounded-md w-[161px] ${inventory.status == ASSET_STATUS.PENDING_REDEMPTION ? "h-[140px]" : "h-[161px]"}  md:object-contain`}
               alt={imgMeta}
               title={imgMeta}
               src={
@@ -209,14 +210,14 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
                 <p className="text-[#4D4D4D] text-[13px]">Published</p>
               </div>
               :
-              (inventory.status === "2") ?
+              (inventory.status == ASSET_STATUS.PENDING_REDEMPTION) ?
                 <div className="flex items-center justify-center gap-2 bg-[#FFA50029] p-[6px] rounded-md">
-                  <div className="w-[7px] h-[7px] rounded-full bg-[#FFA500]"></div>
+                  <div className="w-[12px] h-[7px] rounded-full bg-[#FFA500]"></div>
                   <p className="text-[#4D4D4D] text-[13px]">Pending Redemption</p>
                 </div>
                 :
-                (inventory.status === "3") ?
-                  <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
+                (inventory.status == ASSET_STATUS.RETIRED) ?
+                  <div className="flex items-center justify-center gap-2 bg-[#c3152129] p-[6px] rounded-md">
                     <div className="w-[7px] h-[7px] rounded-full bg-[#ff4d4f]"></div>
                     <p className="text-[#4D4D4D] text-[13px]">Retired</p>
                   </div>

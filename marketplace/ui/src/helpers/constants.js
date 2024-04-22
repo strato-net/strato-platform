@@ -152,10 +152,19 @@ export const ORDER_STATUS = {
   "PAYMENT_PENDING": 5
 }
 
+export const ASSET_STATUS = {
+  "ACTIVE": 1,
+  "PENDING_REDEMPTION": 2,
+  "RETIRED": 3
+}
+
 export const REDEMPTION_STATUS = {
   "PENDING": 1,
   "FULFILLED": 2,
-  "REJECTED": 3
+  "REJECTED": 3,
+  "1": "Pending",
+  "2": "Fulfilled",
+  "3": "Rejected"
 }
 
 export const PAYMENT_LIST = ['card','us_bank_account']
