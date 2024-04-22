@@ -1,4 +1,5 @@
 import { Typography } from "antd";
+import Slider from "react-slick";
 import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
 import { useCategoryState } from "../../contexts/category";
@@ -24,6 +25,39 @@ const CategoryCard = () => {
     Images["membership_card"],
   ];
 
+  const settings = {
+    dots: true,
+    infinite: true,
+    speed: 500,
+    slidesToShow: 5,
+    slidesToScroll: 5,
+    responsive: [
+      {
+        breakpoint: 1024,
+        settings: {
+          slidesToShow: 3,
+          slidesToScroll: 3,
+          infinite: true,
+          dots: true
+        }
+      },
+      {
+        breakpoint: 600,
+        settings: {
+          slidesToShow: 2,
+          slidesToScroll: 2
+        }
+      },
+      {
+        breakpoint: 480,
+        settings: {
+          slidesToShow: 1,
+          slidesToScroll: 1
+        }
+      }
+    ]
+  };
+  
   return (
     <>
       <Fade triggerOnce>
@@ -32,7 +66,7 @@ const CategoryCard = () => {
       </Title>
       </Fade>
       <Fade direction="left" triggerOnce>
-      <div className="flex justify-start sm:justify-center md:justify-start gap-3 lg:gap-[15px] flex-wrap px-0 md:px-10 xl:grid xl:grid-cols-6">
+      <Slider {...settings}>
         {categorys.map((category, index) => {
           return (
             <div
@@ -77,7 +111,7 @@ const CategoryCard = () => {
               </div>
             );
           })}
-        </div>
+        </Slider>
       </Fade>
     </>
   );

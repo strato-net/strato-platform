@@ -1,3 +1,40 @@
+@import "~slick-carousel/slick/slick.css"; 
+@import "~slick-carousel/slick/slick-theme.css";
+
+.slick-next {
+  right: 10px !important;  /* Use !important to ensure it overrides any default or other styles */
+}
+
+.slick-prev {
+  left: 10px !important;  /* Ensure it is positioned away from the edge */
+  z-index: 50 !important;  /* High z-index to bring it to the front */
+  position: absolute;  /* Ensure position is absolute for correct placement */
+}
+
+/* Hide arrows on mobile and tablet */
+@media screen and (max-width: 768px) {
+  .slick-prev:before,
+  .slick-next:before {
+    display: none; /* Hide arrows */
+  }
+}
+
+/* Override carousel buttons and their icons style */
+.slick-prev:before,
+.slick-next:before {
+  color: #181EAC; /* Change color to blue */
+}
+
+/* Custom styles for slick slider items */
+.slick-slide > div {
+  margin: 0 10px; /* Adjust the horizontal margin */
+}
+
+/* This is to offset the additional outer margin on the first and last items */
+.slick-list {
+  margin: 0 10px; /* This should be the negative value of the margin added to .slick-slide > div */
+}
+
 :where(.css-dev-only-do-not-override-9ntgx0).ant-table-wrapper .ant-table-thead>tr>th,
 :where(.css-dev-only-do-not-override-9ntgx0).ant-table-wrapper .ant-table-thead>tr>td {
   padding: 14px;
