@@ -673,7 +673,7 @@ popCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
   (_ : rest) -> pure rest
 
 withLocalVars :: MonadSM m => m a -> m a
-withLocalVars = bracket pushLocalVars (const popLocalVars) . const
+withLocalVars = bracket_ pushLocalVars popLocalVars
 
 pushLocalVars :: MonadSM m => m ()
 pushLocalVars = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
