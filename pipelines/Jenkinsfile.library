@@ -1505,29 +1505,52 @@ def replaceServerPortsDocker() {
   sh './replace_server_ports_docker.sh docker-compose.highway.yml docker-compose.stripe-ps.yml'
 }
 
-def checkMemAndCPULevels() {
+def checkMemAndCPULevels(accessToken) {
   // Check memory usage levels
+  // writeFile file: "check_mem_usage.sh", text: '''#!/bin/bash
+  //   # Set memory usage threshold in Gigabytes (GB)
+  //   threshold=6
+
+  //   # Get total memory in Megabytes (MB)
+  //   total_mem=$(free -m | awk '/Mem:/{print $2}')
+
+  //   # Convert total memory to Gigabytes (GB)
+  //   total_mem_gb=$(bc <<< "scale=2; $total_mem / 1024") 
+
+  //   # Get used memory in Megabytes (MB)
+  //   used_mem=$(free -m | awk '/Mem:/{print $3}')
+
+  //   echo "${used_mem} MB"
+
+  //   # Check if used memory exceeds threshold in GB
+  //   if [[ $(bc <<< "$used_mem > ($threshold * 1024)") -eq 1 ]]; then
+  //     echo "WARNING: Memory usage is at $(free -m | awk '/Mem:/{print $3} MiB'), exceeding the threshold of $threshold GB!"
+  //   fi
+
+  //   exit 0
+  // '''
+
   writeFile file: "check_mem_usage.sh", text: '''#!/bin/bash
-    # Set memory usage threshold in Gigabytes (GB)
-    threshold=6
+  # Set memory usage threshold in Gigabytes (GB)
+  threshold=6
 
-    # Get total memory in Megabytes (MB)
-    total_mem=$(free -m | awk '/Mem:/{print $2}')
+  # Get total memory in Megabytes (MB)
+  total_mem=$(curl $(</host)/apex-api/status | grep .healthData.systemHealth.systemInfo.memory.total)
 
-    # Convert total memory to Gigabytes (GB)
-    total_mem_gb=$(bc <<< "scale=2; $total_mem / 1024") 
+  # Convert total memory to Gigabytes (GB)
+  total_mem_gb=$(bc <<< "scale=2; $total_mem / 1000000000") 
 
-    # Get used memory in Megabytes (MB)
-    used_mem=$(free -m | awk '/Mem:/{print $3}')
+  # Get used memory in Megabytes (MB)
+  used_mem=$(free -m | awk '/Mem:/{print $3}')
 
-    echo "${used_mem} MB"
+  echo "${used_mem} MB"
 
-    # Check if used memory exceeds threshold in GB
-    if [[ $(bc <<< "$used_mem > ($threshold * 1024)") -eq 1 ]]; then
-      echo "WARNING: Memory usage is at $(free -m | awk '/Mem:/{print $3} MiB'), exceeding the threshold of $threshold GB!"
-    fi
+  # Check if used memory exceeds threshold in GB
+  if [[ $(bc <<< "$used_mem > ($threshold * 1024)") -eq 1 ]]; then
+    echo "WARNING: Memory usage is at $(free -m | awk '/Mem:/{print $3} MiB'), exceeding the threshold of $threshold GB!"
+  fi
 
-    exit 0
+  exit 0
   '''
   sh 'chmod +x check_mem_usage.sh'
   sh './check_mem_usage'
