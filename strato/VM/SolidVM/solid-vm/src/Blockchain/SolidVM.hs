@@ -925,18 +925,10 @@ validVariadicSignature a =
     && maybe False ((==) SVMType.Variadic . fst) (Data.List.uncons . reverse $ a)
 
 runStatementBlock :: MonadSM m => [CC.Statement] -> m (Maybe Value)
-runStatementBlock stmts = do
-  pushLocalVars
-  ret <- runStatements stmts
-  popLocalVars
-  return ret
+runStatementBlock = withLocalVars . runStatements
 
 runStatementBlock' :: MonadSM m => [CC.Statement] -> m (Maybe Value)
-runStatementBlock' stmts = do
-  pushLocalVars
-  ret <- runStatements' stmts
-  popLocalVars
-  return ret
+runStatementBlock' = withLocalVars . runStatements'
 
 runStatements' :: MonadSM m => [CC.Statement] -> m (Maybe Value)
 runStatements' [] = return Nothing
