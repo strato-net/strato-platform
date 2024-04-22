@@ -32,7 +32,6 @@ defineFlag
   "blockstanbul_round_period_s"
   (10 :: Int)
   "Maximum seconds that one validator will remain the proposer"
-defineFlag "blockstanbul_port" (8050 :: Int) "The port serving blockstanbul's admin server"
 defineFlag "vaultWrapperUrl" ("http://localhost:8013/strato/v2.3" :: String) "The Vault-Wrapper URL"
 defineFlag "validatorBehavior" (True :: Bool) "Whether to disable validator behavior if enabled"
 
@@ -60,7 +59,6 @@ exportFlagsAsMetrics = do
   set "genesisBlockName" flags_genesisBlockName
   set "blockstanbul_block_period_ms" $ show flags_blockstanbul_block_period_ms
   set "blockstanbul_round_period_s" $ show flags_blockstanbul_round_period_s
-  set "blockstanbul_port" $ show flags_blockstanbul_port
   set "vaultWrapperUrl" $ flags_vaultWrapperUrl
   set "validatorBehavior" $ show flags_validatorBehavior
   set "seq_debug_mode" $ show flags_seq_debug_mode

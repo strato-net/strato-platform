@@ -1267,17 +1267,15 @@ def runSyncTester() {
   sh '''#!/usr/bin/env bash
   counter=0
   # make sure started syncing (have 1+ active connections to peers)
-  ETH_DB_NAME=$(sudo docker exec strato-postgres-1 psql -U postgres -t -c "select datname from pg_database where datname like '%eth_%';" | tr -d "[:space:]")
-  NUM_ACTIVE_PEERS=$(sudo docker exec strato-postgres-1 psql -U postgres -t -d $ETH_DB_NAME -c "select count(ip) from p_peer where active_state > 0;" | tr -d "[:space:]")
-  until [[ -n $ETH_DB_NAME && $NUM_ACTIVE_PEERS -gt 0 ]]
+  NUM_ACTIVE_PEERS=$(sudo docker exec strato-postgres-1 psql -U postgres -t -d eth -c "select count(ip) from p_peer where active_state > 0;" | tr -d "[:space:]")
+  until [[ $NUM_ACTIVE_PEERS -gt 0 ]]
   do
       if (( $counter >= 120 )) ; then
           echo "Failure: STRATO node did not connect to any peers in 2 minutes. Something is preventing sync from starting"
           exit 3
       fi
       sleep 1
-      ETH_DB_NAME=$(sudo docker exec strato-postgres-1 psql -U postgres -t -c "select datname from pg_database where datname like '%eth_%';" | tr -d "[:space:]")
-      NUM_ACTIVE_PEERS=$(sudo docker exec strato-postgres-1 psql -U postgres -t -d $ETH_DB_NAME -c "select count(ip) from p_peer where active_state > 0;" | tr -d "[:space:]")
+      NUM_ACTIVE_PEERS=$(sudo docker exec strato-postgres-1 psql -U postgres -t -d eth -c "select count(ip) from p_peer where active_state > 0;" | tr -d "[:space:]")
       counter=$((++counter))
   done
 
@@ -1386,6 +1384,8 @@ def spinUpPaymentServer() {
   withCredentials([
     string(credentialsId: 'STRIPE_PUBLISHABLE_KEY_TESTNET2', variable:'STRIPE_PUBLISHABLE_KEY_TESTNET2'),
     string(credentialsId: 'STRIPE_SECRET_KEY_TESTNET2', variable:'STRIPE_SECRET_KEY_TESTNET2'),
+    usernamePassword(credentialsId: 'AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV', passwordVariable: 'AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV_PASSWORD', usernameVariable: 'AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV_USER'),
+    string(credentialsId: 'AWS_RDS_PAYMENT_SERVER_URL_DEV', variable:'AWS_RDS_PAYMENT_SERVER_URL_DEV'),
   ]) {
     writeFile file: "run-stripe-ps.sh", text: """#!/bin/bash
       sudo \\
@@ -1393,6 +1393,11 @@ def spinUpPaymentServer() {
         STRIPE_SECRET_KEY='${STRIPE_SECRET_KEY_TESTNET2}' \\
         ssl=true \\
         HTTPS_PORT=44301 \\
+        POSTGRESQL_SERVER_URL='${AWS_RDS_PAYMENT_SERVER_URL_DEV}' \\
+        POSTGRESQL_PORT=5432 \\
+        POSTGRESQL_USER='${AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV_USER}' \\
+        POSTGRESQL_PASSWORD='${AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV_PASSWORD}' \\
+        POSTGRESQL_DBNAME=postgres \\
         ./stripe-ps
     """
   }
@@ -1423,7 +1428,9 @@ def spinUpPaymentServer() {
   sh './check_availability_payment.sh'
 }
 
-def spinUpIdentityServer() {
+def spinUpIdentityServer(rootCert, rootPriv) {
+  sh "cp ${rootCert} identity-provider/certs/."
+  sh "cp ${rootPriv} identity-provider/certs/."
   withCredentials([
     string(credentialsId: 'SENDGRID_APIKEY_TESTNET2', variable:'SENDGRID_APIKEY_TESTNET2'),
     usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID')
@@ -1468,6 +1475,34 @@ def spinUpIdentityServer() {
   '''
   sh 'chmod +x check_availability_identity.sh'
   sh './check_availability_identity.sh'
+}
+
+def replaceServerPortsDocker() {
+  writeFile file: "replace_server_ports_docker.sh", text: '''#!/bin/bash
+    if [ -z "$1" ]; then
+      echo "Please provide the path to your docker-compose file as an argument."
+      exit 1
+    fi
+
+    if [ -z "$2" ]; then
+      echo "Please provide the path to your docker-compose file as an argument."
+      exit 1
+    fi
+
+    sed -i "s/-443/-44300/" $1
+    sed -i "s/-80/-8081/" $1
+
+    sed -i "s/-443/-44301/" $2
+    sed -i "s/-80/-8082/" $2
+
+    if [ $? -ne 0 ]; then
+      echo "Error occurred while modifying the file."
+      exit 1
+    fi
+  '''
+
+  sh 'chmod +x replace_server_ports_docker.sh'
+  sh './replace_server_ports_docker.sh docker-compose.highway.yml docker-compose.stripe-ps.yml'
 }
 
 def checkMemAndCPULevels() {

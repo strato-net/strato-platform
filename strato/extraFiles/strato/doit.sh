@@ -110,7 +110,6 @@ function newnode {
   fi
 
   echo "Starting Strato processes. All output is logged to $PWD/logs."
-  runBackgroundProcess logserver --directory "${PWD}/logs" --uri_root=/logs/strato/ &>> logs/logserver
 
   # DEBUG LOGGING FLAGS
   apiDebugMode=LevelInfo
@@ -183,6 +182,9 @@ function newnode {
   if [ -n "${gasLimit}" ]; then
       gasFlag="--gasLimit=${gasLimit}"
   fi
+  if [ -n "${creatorForkBlockNumber}" ]; then
+      creatorFlag="--creatorForkBlockNumber=${creatorForkBlockNumber}"
+  fi
   if [ -n "${idServerUrl}" ]; then
       idServer="--identityServerUrl=${idServerUrl}"
   fi
@@ -227,6 +229,7 @@ function newnode {
     "${aclFlag}" \
     "${txsFlag}" \
     "${gasFlag}" \
+    "${creatorFlag}" \
     +RTS "${vmRunnerRTSOPTs:-}" -I2 -N1 &>> logs/vm-runner
 
   # Leave the +RTS -N1, it is important
@@ -448,5 +451,4 @@ until PGPASSWORD=$pgPass psql -h "$pgHost" -U "$pgUser" -c '\l'; do
 done
 
 # Main entry point
-global-db --pghost $pgHost || { echo "Ignoring."; true; } # If it fails, it just means we already created the global db
 newnode

@@ -5,36 +5,71 @@ import utc from 'dayjs/plugin/utc';
 
 dayjs.extend(utc);
 
-
 const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
   if (isFetchingPriceHistory || !priceHistory || !priceHistory.originRecords || priceHistory.originRecords.length === 0) {
     return <div className="h-full bg-gray-200 animate-pulse"></div>;
   }
 
+  const fillDataGaps = (records) => {
+    const filledData = [];
+    let lastKnownPrice = null;
+  
+    for (let i = 0; i < records.length; i++) {
+      const currentRecord = records[i];
+      const isoDate = currentRecord.block_timestamp.replace(' UTC', 'Z');
+      const date = dayjs(isoDate).utc();
+      const price = currentRecord.price;
+  
+      // Set the last known price if it's null (first iteration) or update it to the current record's price
+      if (lastKnownPrice === null || price !== lastKnownPrice) {
+        lastKnownPrice = price;
+      }
+  
+      // Push the current record with the last known price
+      filledData.push({
+        x: date.valueOf(),
+        y: lastKnownPrice,
+      });
+  
+      // If this is not the last record, fill the gap until the next record's date
+      if (i < records.length - 1) {
+        const nextIsoDate = records[i + 1].block_timestamp.replace(' UTC', 'Z');
+        const nextDate = dayjs(nextIsoDate).utc();
+        let currentDate = date.add(1, 'day');
+  
+        // Fill in the gaps with the last known price
+        while (currentDate.isBefore(nextDate, 'day')) {
+          filledData.push({
+            x: currentDate.valueOf(),
+            y: lastKnownPrice, // Use the last known price instead of resetting it to the first record's price
+          });
+          currentDate = currentDate.add(1, 'day');
+        }
+      }
+    }
+  
+    // Fill the gap until the current date with the last known price
+    let currentDate = dayjs(filledData[filledData.length - 1].x).add(1, 'day');
+    const today = dayjs().utc().endOf('day');
+    while (currentDate.isBefore(today, 'day')) {
+      filledData.push({
+        x: currentDate.valueOf(),
+        y: lastKnownPrice,
+      });
+      currentDate = currentDate.add(1, 'day');
+    }
+  
+    return filledData;
+  };
+  
+
+  // Fill in the gaps in the original records
+  const filledSeriesData = fillDataGaps(priceHistory.originRecords);
 
   const series = [
     {
-      name: 'Origin Price',
-      data: priceHistory.originRecords.map(record => {
-        try {
-          // Replace spaces with 'T' and ' UTC' with 'Z' (ISO 8601)
-          const isoDate = record.block_timestamp.replace(' UTC', 'Z');
-          const parsedDate = dayjs(isoDate);
-          const timestamp = parsedDate.valueOf();
-  
-          if (isNaN(timestamp)) {
-            throw new Error('Invalid date');
-          }
-  
-          return {
-            x: timestamp,
-            y: record.price,
-          };
-        } catch (error) {
-          console.error('Error parsing date:', record.block_timestamp, error);
-          return null;
-        }
-      }).filter(point => point !== null), // Filter out any invalid points
+      name: 'Sale Price',
+      data: filledSeriesData,
     },
   ];
   
@@ -128,8 +163,6 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
 
   return (
     <div>
-      <h2 className='w-full text-center font-bold text-2xl'>Price History</h2>
-
       <div className="flex justify-center w-full">
         <div className="w-full lg:h-[400px] xl:h-[475px]">
         <ReactApexChart options={options} series={series} type="area" height="400" />

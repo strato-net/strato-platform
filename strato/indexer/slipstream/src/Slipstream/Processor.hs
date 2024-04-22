@@ -128,8 +128,7 @@ processedContract ABIID {..} state AggregateAction {..} =
   ProcessedContract
     { address = actionAccount ^. accountAddress,
       codehash = actionCodeHash,
-      organization = actionOrganization,
-      application = actionApplication,
+      commonName = actionCommonName,
       contractName = aiName,
       chain = aiChain,
       contractData = state,
@@ -201,8 +200,7 @@ processedMappingRow mapping AggregateAction {..} ABIID {..} k v =
   ProcessedMappingRow
     { address = actionAccount ^. accountAddress,
       codehash = actionCodeHash,
-      organization = actionOrganization,
-      application = actionApplication,
+      commonName = actionCommonName,
       contractname = aiName,
       mapname = mapping,
       blockHash = actionBlockHash,
@@ -271,33 +269,26 @@ processTheMessages env conn messages = do
   let changes = parseActions messages
       events' = parseEvents messages
       -- TODO (Dan) : would be nice if we didn't just rip events out at the top level like this
-      creates = [(cc, cp, o, a, hl, abs', rm) | CodeCollectionAdded cc cp o a hl abs' rm <- messages]
+      creates = [(cc, cp, cn, hl, abs', rm) | CodeCollectionAdded cc cp cn hl abs' rm <- messages]
       -- delegates = [d | DelegatecallMade d <- messages]
       transactionResults = [tr | NewTransactionResult tr <- messages]
 
-  fkeys' <- forM creates $ \(cc, cp, o, a, hl, abstracts', _) -> do
+  fkeys' <- forM creates $ \(cc, cp, cn, hl, abstracts', _) -> do
         $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (format cp) 
         multilineLog "processTheMessages/contracts" $ boringBox $ map show (Map.keys $ cc ^. contracts)
 
         deferredForeignKeys <- fmap concat $
-          forM (Map.toList $ cc ^. contracts) $ \(nameString, c) -> do
-            let a' =
-                  if a /= ""
-                    then a
-                    else case cp of
-                      SolidVMCode n' _ | nameString /= n' -> T.pack n'
-                      _ -> a
-
+          forM (Map.toList $ cc ^. contracts) $ \(_, c) -> do
             -- Here we will get the storageDefs attribute of the contract (c) and iterate through the Map of (Text, VariableDecl) and look for VariableDecls that have the last attribute (isRecord) true and thetype are mappings
             -- We will then create a table for each of these mappings and add a foreign key to the main table
 
             let mapNames = getMapNamesFromContract c
 
-            let historyTableNames = map (historyTableName o a') hl
+            let historyTableNames = map (historyTableName cn) hl
             $logDebugS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames
 
-            let nameParts@(o'', a'', n'') = (o, a', T.pack $ _contractName c)
-            $logInfoS "processTheMessages/Contract Added" $ "org=" <> o'' <> ", app=" <> a'' <> ", name=" <> n''
+            let nameParts@(cn'', n'') = (cn, T.pack $ _contractName c)
+            $logInfoS "processTheMessages/Contract Added" $ "common name=" <> cn'' <> ", name=" <> n''
             multilineLog "processTheMessages/fields" $ boringBox $ map (show) $ Map.toList $ fmap _varType $ c ^. storageDefs
 
             --Create mapping tables
@@ -388,8 +379,8 @@ processTheMessages env conn messages = do
               abstracts = actionAbstracts row
           --get columns for abstract table
           $logDebugLS "abstractColumns" $ T.pack $ "Getting abstract columns from " ++ (show abstracts)
-          abstractColumns <- fmap catMaybes . for (Map.toList abstracts) $ \((_, n'), (o', a')) -> do
-            let tableName = AbstractTableName o' a' n'
+          abstractColumns <- fmap catMaybes . for (Map.toList abstracts) $ \((_, n'), cn') -> do
+            let tableName = AbstractTableName cn' n'
                 tableNameText = tableNameToDoubleQuoteText tableName
             $logInfoS "Row will be inserted into abstract table: " tableNameText
             mCols <- getTableColumns g tableName

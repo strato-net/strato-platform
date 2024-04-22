@@ -901,13 +901,13 @@ initializeAction :: MonadSM m
                  -> String
                  -> Keccak256
                  -> CC.CodeCollection
-                 -> Map (Account, T.Text) (T.Text, T.Text)
+                 -> Map (Account, T.Text) T.Text
                  -> [T.Text]
                  -> [T.Text]
                  -> m ()
-initializeAction acct name appName hsh cc ab maps arrs = do
+initializeAction acct name cn hsh cc ab maps arrs = do
   -- org name to be set later, b/c the lookup is complex
-  let newData = Action.ActionData (SolidVMCode name hsh) cc "" (T.pack appName) SolidVM (Action.SolidVMDiff M.empty) ab maps arrs []
+  let newData = Action.ActionData (SolidVMCode name hsh) cc (T.pack cn) SolidVM (Action.SolidVMDiff M.empty) ab maps arrs []
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapInsertWith Action.mergeActionData acct newData
 
@@ -1007,27 +1007,26 @@ resolveNameParts ::
   MonadSM m =>
   Account ->
   T.Text ->
-  T.Text ->
   CC.Contract ->
-  m ((Account, T.Text), (T.Text, T.Text))
-resolveNameParts to' o a c = do
+  m ((Account, T.Text), T.Text)
+resolveNameParts to' cn c = do
   let tName = T.pack . CC._contractName
   case c ^. CC.importedFrom of
-    Nothing -> pure ((to', tName c), (o, a))
+    Nothing -> pure ((to', tName c), cn)
     Just acct ->
       A.select (A.Proxy @AddressState) acct >>= \case
         Nothing -> do
           $logWarnS "processTheMessages/resolveNameParts" . T.pack $
             "Could not find address state for account " ++ show acct
-          pure ((acct, tName c),(o, a))
+          pure ((acct, tName c), cn)
         Just s ->
           resolveCodePtr (acct ^. accountChainId) (addressStateCodeHash s) >>= \case
             Just (SolidVMCode appName _) -> do
               appCreator <- getSolidStorageKeyVal' acct $ MS.StoragePath [MS.Field ":creator"]
               case appCreator of
-                MS.BString org' -> pure ((acct, tName c), (T.pack $ BC.unpack org', T.pack appName))
-                _ -> pure ((acct, tName c),("", T.pack appName))
+                MS.BString cn' -> pure ((acct, tName c), T.pack $ BC.unpack cn')
+                _ -> pure ((acct, tName c), T.pack appName)
             _ -> do
               $logWarnS "resolveNameParts" . T.pack $
                 "Could not resolve code for account " ++ show acct
-              pure ((acct, tName c),(o, a))
+              pure ((acct, tName c), cn)
