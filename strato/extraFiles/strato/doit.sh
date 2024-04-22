@@ -182,6 +182,9 @@ function newnode {
   if [ -n "${gasLimit}" ]; then
       gasFlag="--gasLimit=${gasLimit}"
   fi
+  if [ -n "${creatorForkBlockNumber}" ]; then
+      creatorFlag="--creatorForkBlockNumber=${creatorForkBlockNumber}"
+  fi
   if [ -n "${idServerUrl}" ]; then
       idServer="--identityServerUrl=${idServerUrl}"
   fi
@@ -226,6 +229,7 @@ function newnode {
     "${aclFlag}" \
     "${txsFlag}" \
     "${gasFlag}" \
+    "${creatorFlag}" \
     +RTS "${vmRunnerRTSOPTs:-}" -I2 -N1 &>> logs/vm-runner
 
   # Leave the +RTS -N1, it is important

@@ -167,12 +167,12 @@ sendOutEvent (OutAction act) = do
           (Just c, Just n, actionDatas) ->
             let cp = case join $ fmap (M.lookup "VM") $ a ^. Action.metadata of
                   Just "SolidVM" -> SolidVMCode (T.unpack n) $ Keccak256.hash $ UTF8.encodeUtf8 c
-                  Just "EVM" -> EVMCode $ Keccak256.hash $ BC.pack $ T.unpack c
+                  Just "EVM" -> ExternallyOwned $ Keccak256.hash $ BC.pack $ T.unpack c
                   Just v -> error $ "Unknown VM: " ++ show v
-                  Nothing -> EVMCode $ Keccak256.hash $ BC.pack $ T.unpack c
-                org = fromMaybe "" . listToMaybe . catMaybes . flip map actionDatas $ \(_, Action.ActionData {..}) ->
+                  Nothing -> ExternallyOwned $ Keccak256.hash $ BC.pack $ T.unpack c
+                cn = fromMaybe "" . listToMaybe . catMaybes . flip map actionDatas $ \(_, Action.ActionData {..}) ->
                   if _actionDataCodeHash == cp
-                    then Just _actionDataOrganization
+                    then Just _actionDataCreator
                     else Nothing
                 cc = foldr (\ad b -> Action._actionDataCodeCollection ad <> b) mempty $ snd <$> actionDatas
                 abstracts' = foldr (\ad b -> Action._actionDataAbstracts ad <> b) mempty $ snd <$> actionDatas
@@ -180,8 +180,7 @@ sendOutEvent (OutAction act) = do
                   CodeCollectionAdded
                     { codeCollection = const () <$> cc,
                       codePtr = cp,
-                      organization = org,
-                      application = n,
+                      commonName = cn,
                       historyList =
                         case join $ fmap (M.lookup "history") (a ^. Action.metadata) of
                           Nothing -> []
@@ -197,7 +196,7 @@ sendOutEvent (OutAction act) = do
       vmes = ccEvents ++ dcEvents ++ actionEvents
   void . produceVMEvents $ toList vmes
 sendOutEvent (OutIndexEvent e) = void $ produceIndexEvents [e]
-sendOutEvent (OutToStateDiff cId cInfo bHash org app) = withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo org app
+sendOutEvent (OutToStateDiff cId cInfo bHash cn) = withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo cn
 sendOutEvent (OutStateDiff diff) = commitSqlDiffs diff
 sendOutEvent (OutLog l) = loopTimeit "flushLogEntries" $ void $ produceIndexEvents [LogDBEntry l]
 sendOutEvent (OutEvent e) = loopTimeit "flushEventEntries" $ void $ produceIndexEvents (EventDBEntry <$> e)
