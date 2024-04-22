@@ -6,7 +6,7 @@ describe('Create a new Asset', () => {
     cy.login()
   });
 
-  it.only('Add a product', () => {
+  it('Add a product', () => {
     cy.wait(10000)
     cy.get('#avatar')
     cy.url('').should("exist");
@@ -43,8 +43,8 @@ describe('Create a new Asset', () => {
 
     cy.get("input[type=file]").first()
     cy.get("input[type=file]").first().attachFile("cottonSeeds.jpg")
-    cy.get("#createItem")
-    cy.get("#createItem").click()
+    cy.get("#createItemSubmit")
+    cy.get("#createItemSubmit").click()
     cy.wait(7000)
   })
 

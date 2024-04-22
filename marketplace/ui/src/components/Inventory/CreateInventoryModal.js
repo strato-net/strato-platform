@@ -211,7 +211,7 @@ const CreateInventoryModal = ({
         footer={[
           <div className="flex justify-center mb-5 pt-4">
             <Button
-              id="createItem"
+              id="createItemSubmit"
               className="w-40"
               type="primary"
               onClick={() => {
