@@ -15,7 +15,6 @@ import Strato.Server.GetS3File
 import Strato.Server.Ping
 import Strato.Server.PutS3File
 
-
 highwayWrapper :: ServerT HighwayWrapperAPI HighwayM
 highwayWrapper =
   getS3File

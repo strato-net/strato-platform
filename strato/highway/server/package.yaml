@@ -84,6 +84,7 @@ tests:
       - blockapps-highway-server
       - bytestring 
       - hflags
+      - HUnit
       - hspec
       - http-client
       - http-client-tls
@@ -92,6 +93,8 @@ tests:
       - random
       - regex-compat
       - resourcet
+      - servant-client
+      - servant-client-core
       - servant-multipart
       - servant-multipart-api
       - servant-multipart-client
@@ -100,6 +103,7 @@ tests:
       - strato-model
       - text
       - transformers
+      - utf8-string
       - wai-cors
       - wai-extra
       - warp
