@@ -8,8 +8,15 @@ class RedemptionsController {
                 throw new Error('Missing common name in GET request /:commonName');
             }
 
-            const query = 'SELECT * FROM redemptions WHERE ownerCommonName = $1 ORDER BY createdDate DESC';
-            const values = [req.params.commonName];
+            let orderByClause = '';
+            const order = req.query.order;
+
+            if (order === 'ASC' || order === 'DESC') {
+                orderByClause = `ORDER BY createdDate ${order}`;
+            }
+
+            const query = `SELECT * FROM redemptions WHERE ownerCommonName = $1 AND ($2 = '' OR redemption_id::text = $2) ${orderByClause}`;
+            const values = [req.params.commonName, req.query.redemptionId];
 
             const result = await client.query(query, values);
 
@@ -55,8 +62,15 @@ class RedemptionsController {
                 throw new Error('Missing common name in GET request /:commonName');
             }
 
-            const query = 'SELECT * FROM redemptions WHERE issuerCommonName = $1 ORDER BY createdDate DESC';
-            const values = [req.params.commonName];
+            let orderByClause = '';
+            const order = req.query.order;
+
+            if (order === 'ASC' || order === 'DESC') {
+                orderByClause = `ORDER BY createdDate ${order}`;
+            }
+
+            const query = `SELECT * FROM redemptions WHERE issuerCommonName = $1 AND ($2 = '' OR redemption_id::text = $2) ${orderByClause}`;
+            const values = [req.params.commonName, req.query.redemptionId];
 
             const result = await client.query(query, values);
 

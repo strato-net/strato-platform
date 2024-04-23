@@ -84,11 +84,11 @@ const actions = {
         }
     },
 
-    fetchOutgoingRedemptionRequests: async (dispatch) => {
+    fetchOutgoingRedemptionRequests: async (dispatch, order, search) => {
         dispatch({ type: actionDescriptors.fetchOutgoingRedemptionRequests });
 
         try {
-            const response = await fetch(`${apiUrl}/redemption/outgoing`, {
+            const response = await fetch(`${apiUrl}/redemption/outgoing?order=${order}&search=${search ? search : ''}`, {
                 method: HTTP_METHODS.GET,
             });
 
@@ -131,11 +131,11 @@ const actions = {
         }
     },
 
-    fetchIncomingRedemptionRequests: async (dispatch) => {
+    fetchIncomingRedemptionRequests: async (dispatch, order, search) => {
         dispatch({ type: actionDescriptors.fetchIncomingRedemptionRequests });
 
         try {
-            const response = await fetch(`${apiUrl}/redemption/incoming`, {
+            const response = await fetch(`${apiUrl}/redemption/incoming?order=${order}&search=${search ? search : ''}`, {
                 method: HTTP_METHODS.GET,
             });
 

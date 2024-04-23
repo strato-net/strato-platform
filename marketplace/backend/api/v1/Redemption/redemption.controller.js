@@ -41,9 +41,9 @@ class RedemptionController {
 
     static async getOutgoingRedemptionRequests(req, res, next) {
         try {
-            const { dapp } = req
+            const { dapp, query } = req
 
-            const redemptions = await dapp.getOutgoingRedemptionRequests()
+            const redemptions = await dapp.getOutgoingRedemptionRequests(query)
             rest.response.status200(res, redemptions)
 
             return next()
@@ -54,9 +54,9 @@ class RedemptionController {
 
     static async getIncomingRedemptionRequests(req, res, next) {
         try {
-            const { dapp } = req
+            const { dapp, query } = req
 
-            const redemptions = await dapp.getIncomingRedemptionRequests()
+            const redemptions = await dapp.getIncomingRedemptionRequests(query)
             rest.response.status200(res, redemptions)
 
             return next()

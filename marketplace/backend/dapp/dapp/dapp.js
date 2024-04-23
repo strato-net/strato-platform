@@ -318,8 +318,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   contract.getOutgoingRedemptionRequests = async function (args, options = optionsNoChainIds) {
+    const { order, search } = args;
+    const queryParams = new URLSearchParams({
+      redemptionId: search,
+      order: order
+    }).toString();
+
     try {
-      const redemptions = await axios.get(new URL(`/redemption/outgoing/${userCert.commonName}`, STRIPE_PAYMENT_SERVER_URL).href).then(function (res) {
+      const redemptions = await axios.get(new URL(`/redemption/outgoing/${userCert.commonName}?${queryParams}`, STRIPE_PAYMENT_SERVER_URL).href).then(function (res) {
         if (res.status === 200) {
           return res.data.data;
         } else {
@@ -336,8 +342,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getIncomingRedemptionRequests = async function (args, options = optionsNoChainIds) {
+    const { order, search } = args;
+    const queryParams = new URLSearchParams({
+      redemptionId: search,
+      order: order
+    }).toString();
+
     try {
-      const redemptions = await axios.get(new URL(`/redemption/incoming/${userCert.commonName}`, STRIPE_PAYMENT_SERVER_URL).href).then(function (res) {
+      const redemptions = await axios.get(new URL(`/redemption/incoming/${userCert.commonName}?${queryParams}`, STRIPE_PAYMENT_SERVER_URL).href).then(function (res) {
         if (res.status === 200) {
           return res.data.data;
         } else {

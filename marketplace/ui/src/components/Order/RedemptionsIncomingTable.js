@@ -14,7 +14,7 @@ import routes from "../../helpers/routes";
 import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
 
 
-const RedemptionsIncomingTable = ({ user, selectedDate, download, isAllOrdersLoading }) => {
+const RedemptionsIncomingTable = ({ user, download, isAllOrdersLoading }) => {
     const navigate = useNavigate();
     const params = useParams();
     const location = useLocation();
@@ -28,15 +28,15 @@ const RedemptionsIncomingTable = ({ user, selectedDate, download, isAllOrdersLoa
     const limit = 10;
     const offset = ((pageNo - 1) * limit);
     const { incomingRedemptions, isFetchingIncomingRedemptions } = useRedemptionState();
-    const [order, setOrder] = useState("desc");
+    const [order, setOrder] = useState("DESC");
     const [search, setSearch] = useState("");
     const [data, setData] = useState([]);
 
     useEffect(() => {
         if (user?.commonName) {  // add type in conditional
-            actions.fetchIncomingRedemptionRequests(dispatch);
+            actions.fetchIncomingRedemptionRequests(dispatch, order, search);
         }
-    }, [dispatch, user]);
+    }, [dispatch, user, order, search]);
 
     useEffect(() => {
         const timeout = setTimeout(() => {
@@ -149,10 +149,10 @@ const RedemptionsIncomingTable = ({ user, selectedDate, download, isAllOrdersLoa
                 <div style={{ display: "flex" }}>
                     <div className="mt-1.5">{"Date"}</div>
                     <div>
-                        {order === "desc" ? (
-                            <UpOutlined className="icon-container icon-hover" onClick={() => setOrder("asc")} />
+                        {order === "DESC" ? (
+                            <UpOutlined className="icon-container icon-hover" onClick={() => setOrder("ASC")} />
                         ) : (
-                            <DownOutlined className="icon-container icon-hover" onClick={() => setOrder("desc")} />
+                            <DownOutlined className="icon-container icon-hover" onClick={() => setOrder("DESC")} />
                         )}
                     </div>
                 </div>
@@ -162,7 +162,6 @@ const RedemptionsIncomingTable = ({ user, selectedDate, download, isAllOrdersLoa
             title: "Asset Name",
             dataIndex: "assetName",
             key: "assetName",
-            align: "center",
             render: (text) => <p>{text}</p>,
         },
         {
@@ -170,7 +169,7 @@ const RedemptionsIncomingTable = ({ user, selectedDate, download, isAllOrdersLoa
             dataIndex: "quantity",
             key: "quantity",
             align: "center",
-            render: (text) => <p className="text-center">{text}</p>,
+            render: (text) => <p className="text-center" >{text}</p>,
             width: "10%",
         },
         {
@@ -195,10 +194,10 @@ const RedemptionsIncomingTable = ({ user, selectedDate, download, isAllOrdersLoa
     };
 
     const onChange = (pagination, filters, sorter) => {
-        if (order === "desc") {
-            setOrder("asc")
+        if (order === "DESC") {
+            setOrder("ASC")
         } else {
-            setOrder("desc")
+            setOrder("DESC")
         }
     };
 
@@ -227,7 +226,7 @@ const RedemptionsIncomingTable = ({ user, selectedDate, download, isAllOrdersLoa
                     onChange={(e) => { handleChangeSearch(e) }}
                     defaultValue={searchVal}
                     prefix={<SearchOutlined />}
-                    placeholder="Search Redemptions by Requestor or Redemption #" />
+                    placeholder="Search Redemptions by Redemption #" />
                 <Dropdown
                     className="md:hidden customButton"
                     menu={{ items: menuItems, onClick: (e) => download(e.key) }}
