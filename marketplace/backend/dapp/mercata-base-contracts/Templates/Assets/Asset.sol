@@ -138,6 +138,8 @@ abstract contract Asset is Utils {
     }
 
     function _transfer(address _newOwner, uint _quantity, bool _isUserTransfer, uint _transferNumber) internal virtual {
+        require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
+        require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
         string newOwnerCommonName = getCommonName(_newOwner);
 
         if(_isUserTransfer && _transferNumber>0){
@@ -180,6 +182,8 @@ abstract contract Asset is Utils {
     }
 
     function automaticTransfer(address _newOwner, uint _quantity, uint _transferNumber) public requireOwner("automatic transfer") returns (uint) {
+        require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
+        require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
         require(_quantity <= quantity, "Cannot transfer more than available quantity.");
         if (sale == address(0)) {
             // transfer feature - isUserTransfer: true, transferNumber: >0

@@ -16,6 +16,8 @@ import {
 import { useMatch } from "react-router-dom";
 import { actions } from "../../contexts/redemption/actions";
 import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
+import { actions as inventoryActions } from "../../contexts/inventory/actions";
+import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import routes from "../../helpers/routes";
 import { REDEMPTION_STATUS } from "../../helpers/constants";
 import classNames from "classnames";
@@ -39,6 +41,8 @@ const RedemptionsOutgoingDetails = ({ user }) => {
     const { TextArea } = Input;
     const [api, contextHolder] = notification.useNotification();
     const { redemption, isFetchingRedemptionDetails } = useRedemptionState();
+    const inventoryDispatch = useInventoryDispatch();
+    const { inventoryDetails, isInventoryDetailsLoading } = useInventoryState();
 
     const routeMatch = useMatch({
         path: routes.RedemptionsOutgoingDetails.url,
@@ -57,6 +61,15 @@ const RedemptionsOutgoingDetails = ({ user }) => {
             getData();
         }
     }, [id, dispatch]);
+
+    useEffect(() => {
+        if (redemption) {
+            const fetchAsset = async () => {
+                await inventoryActions.fetchInventoryDetail(inventoryDispatch, redemption.assetAddresses[0])
+            };
+            fetchAsset();
+        }
+    }, [redemption])
 
     const OrderData = ({ title, value }) => {
         return (
@@ -110,31 +123,31 @@ const RedemptionsOutgoingDetails = ({ user }) => {
     let column = [
         {
             title: "",
-            dataIndex: "productImage",
-            key: "productImage",
+            dataIndex: "images",
+            key: "images",
             render: (text) => <img className="w-[75px] h-[60px] object-contain" alt="" src={text} />,
         },
         {
             title: <Text className="text-primaryC text-[13px]">Product Name</Text>,
-            dataIndex: "productName",
-            key: "productName",
-            render: (text) => (
+            dataIndex: "name",
+            key: "name",
+            render: (text, record) => (
                 <p
                     // href={routes.BoughtOrderDetails.url}
                     className="text-primary text-[17px] cursor-pointer"
-                    onClick={() => { navigate(`${routes.MarketplaceProductDetail.url.replace(":address", text.address).replace(":name", text.name)}`) }}
+                    onClick={() => { navigate(`${routes.MarketplaceProductDetail.url.replace(":address", record.address).replace(":name", record.name)}`) }}
                 >
-                    {decodeURIComponent(text.name)}
+                    {decodeURIComponent(record?.name)}
                 </p>
             ),
         },
-        {
-            title: <Text className="text-primaryC text-[13px]">Unit Price($)</Text>,
-            dataIndex: "unitPrice",
-            key: "unitPrice",
-            align: "center",
-            render: (text) => <p>{text}</p>,
-        },
+        // {
+        //     title: <Text className="text-primaryC text-[13px]">Unit Price($)</Text>,
+        //     dataIndex: "unitPrice",
+        //     key: "unitPrice",
+        //     align: "center",
+        //     render: (text) => <p>{text}</p>,
+        // },
         {
             title: <Text className="text-primaryC text-[13px]">Quantity</Text>,
             dataIndex: "quantity",
@@ -142,26 +155,26 @@ const RedemptionsOutgoingDetails = ({ user }) => {
             align: "center",
             render: (text) => <p>{text}</p>,
         },
-        {
-            title: <Text className="text-primaryC text-[13px]">Tax($)</Text>,
-            dataIndex: "tax",
-            key: "tax",
-            align: "center",
-            render: (text) => <p>{text}</p>,
-        },
-        {
-            title: <Text className="text-primaryC text-[13px]">Amount($)</Text>,
-            dataIndex: "amount",
-            key: "amount",
-            align: "center",
-            render: (text) => <p>{text}</p>,
-        },
+        // {
+        //     title: <Text className="text-primaryC text-[13px]">Tax($)</Text>,
+        //     dataIndex: "tax",
+        //     key: "tax",
+        //     align: "center",
+        //     render: (text) => <p>{text}</p>,
+        // },
+        // {
+        //     title: <Text className="text-primaryC text-[13px]">Amount($)</Text>,
+        //     dataIndex: "amount",
+        //     key: "amount",
+        //     align: "center",
+        //     render: (text) => <p>{text}</p>,
+        // },
     ];
 
     return (
         <div>
             {contextHolder}
-            {redemption === undefined || isFetchingRedemptionDetails ? (
+            {redemption === undefined || inventoryDetails == undefined || isFetchingRedemptionDetails || isInventoryDetailsLoading ? (
                 <div className="h-screen flex justify-center items-center">
                     <Spin
                         spinning={isFetchingRedemptionDetails}
@@ -360,9 +373,9 @@ const RedemptionsOutgoingDetails = ({ user }) => {
                                             <div className="md:block hidden">
                                                 <DataTableComponent
                                                     columns={column}
-                                                    data={data}
+                                                    data={[inventoryDetails]}
                                                     scrollX="100%"
-                                                    isLoading={false}
+                                                    isLoading={isInventoryDetailsLoading}
                                                 />
                                             </div>
                                         </Card>

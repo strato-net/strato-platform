@@ -48,6 +48,8 @@ abstract contract Mintable is UTXO {
 
     function mintNewUnits(uint _quantity) public returns (uint) {
         require(isMint, "Only the mint contract can mint new units");
+        require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
+        require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
         require(getCommonName(msg.sender) == minterCommonName, "Only the minter can mint new units");
         emit OwnershipTransfer(
             originAddress,
@@ -63,6 +65,8 @@ abstract contract Mintable is UTXO {
     }
     
     function _callMint(address _newOwner, uint _quantity) internal virtual override{
+        require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
+        require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
         UTXO newAsset = mint(_quantity);
         // regular transfer - isUserTransfer: false, transferNumber: 0
         Asset(newAsset).transferOwnership(_newOwner, _quantity, false, 0);

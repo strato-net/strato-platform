@@ -39,6 +39,8 @@ abstract contract SemiFungible is Mintable {
     }
 
     function _callMint(address _newOwner, uint _quantity) internal override{
+        require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
+        require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
         for (uint i = 0; i < _quantity; i++) {
             UTXO newAsset = mint(1);
             // regular transfer - isUserTransfer: false, transferNumber: 0

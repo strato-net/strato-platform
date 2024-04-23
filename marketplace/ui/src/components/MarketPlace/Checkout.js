@@ -130,11 +130,8 @@ const Checkout = () => {
     let items = [...cartList];
     cartList.forEach((element, index) => {
       if (element.product.address === product.key) {
-        const availableQuantity = product.quantity ? product.quantity : 1;
-        if (items[index].qty - 1 <= availableQuantity) {
-          items[index].qty -= 1;
-          actions.addItemToCart(marketplaceDispatch, items);
-        }
+        items[index].qty -= 1;
+        actions.addItemToCart(marketplaceDispatch, items);
       }
     });
   };

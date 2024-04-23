@@ -28,6 +28,8 @@ abstract contract UTXO is Asset {
 
     // Quantity is already checked by transferOwnership function
     function _transfer(address _newOwner, uint _quantity, bool _isUserTransfer, uint _transferNumber) internal override {
+        require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
+        require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
         require(checkCondition(), "Condition is not met");
         // Create a new UTXO with a portion of the units
         try {
@@ -79,6 +81,8 @@ abstract contract UTXO is Asset {
     }
 
     function requestRedemption(uint _quantity) public returns (uint, address) {
+        require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
+        require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
         require(getCommonName(msg.sender) == ownerCommonName, "Only the owner of the Asset can request for redemption");
 
         UTXO newAsset = mint(_quantity);

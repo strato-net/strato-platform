@@ -45,8 +45,6 @@ const RedemptionsIncomingDetails = ({ user }) => {
     const { redemption, isFetchingRedemptionDetails, isClosingRedemption, message, success, } = useRedemptionState();
     const { inventoryDetails, isInventoryDetailsLoading } = useInventoryState();
 
-    console.log(inventoryDetails)
-
     const routeMatch = useMatch({
         path: routes.RedemptionsIncomingDetails.url,
         strict: true,
@@ -72,7 +70,7 @@ const RedemptionsIncomingDetails = ({ user }) => {
             };
             fetchAsset();
         }
-    }, [redemption])
+    }, [redemption, inventoryDispatch])
 
     const OrderData = ({ title, value }) => {
         return (
@@ -200,12 +198,16 @@ const RedemptionsIncomingDetails = ({ user }) => {
         }
 
         const isDone = await actions.closeRedemption(dispatch, body);
+
+        if (isDone) {
+            await actions.fetchRedemptionDetail(dispatch, id)
+        }
     }
 
     return (
         <div>
             {contextHolder}
-            {redemption === undefined || isFetchingRedemptionDetails ? (
+            {redemption === undefined || inventoryDetails == undefined || isFetchingRedemptionDetails || isInventoryDetailsLoading ? (
                 <div className="h-screen flex justify-center items-center">
                     <Spin
                         spinning={isFetchingRedemptionDetails}
