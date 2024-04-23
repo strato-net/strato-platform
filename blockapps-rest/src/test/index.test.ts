@@ -374,7 +374,7 @@ describe("history", function() {
       
     const contractHistory = await rest.searchUntil(
       admin,
-      { name: `history@TestHistory` },
+      { name: `history@Test-TestHistory` },
       (r) => r.length > 1,
       {
         ...options,
@@ -388,7 +388,7 @@ describe("history", function() {
 
     const filteredContractHistory = await rest.searchUntil(
       admin,
-      { name: `history@TestHistory` },
+      { name: `history@Test-TestHistory` },
       (r) => r.length > 0,
       {
         ...options,

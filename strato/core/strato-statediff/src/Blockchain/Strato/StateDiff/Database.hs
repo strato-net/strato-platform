@@ -46,7 +46,7 @@ commitSqlDiffs StateDiff {blockNumber, createdAccounts, deletedAccounts, updated
     sequence_ $ Map.mapWithKey (updateAccount blockNumber) updatedAccounts
 
 codePtrHash :: CodePtr -> Maybe Keccak256
-codePtrHash (EVMCode k) = Just k
+codePtrHash (ExternallyOwned k) = Just k
 codePtrHash (SolidVMCode _ k) = Just k
 codePtrHash _ = Nothing
 

@@ -100,7 +100,11 @@ async function state(contract:Contract) {
 }
 
 async function index(contract:Contract) {
-  return await rest.search(user, contract, {...options, query: {address: `eq.${contract.address}`}});
+  return await rest.search(user, {...contract, name: toTableName(contract.name)}, {...options, query: {address: `eq.${contract.address}`}});
+}
+
+function toTableName(contractName){
+  return `Test-${contractName}`; // prepend with Test cuz all users' commonName are Test
 }
 
 describe('Solid VM: Contract uploads', function() {
@@ -140,7 +144,7 @@ describe('Solid VM: Contract uploads', function() {
     console.log(`Contract is ${JSON.stringify(contract)}`);
 
     await sleep(2000);
-    const index1 = await rest.search(user, contract,
+    const index1 = await rest.search(user, {...contract, name: toTableName(contract.name)},
       {...options, query: {address: `eq.${contract.address}`}});
     console.log(`First index response is: ${JSON.stringify(index1)}`);
     assert.equal(index1[0].address, contract.address);
@@ -150,7 +154,7 @@ describe('Solid VM: Contract uploads', function() {
     await doubleY(user, contract, 'SolidVM');
 
     await sleep(2000);
-    const index2 = await rest.search(user, contract,
+    const index2 = await rest.search(user, {...contract, name: toTableName(contract.name)},
       {...options, query: {address: `eq.${contract.address}`, y: "eq.144"}});
     assert.equal(index2[0].address, contract.address);
     assert.equal(index2[0].x, 83);
@@ -161,11 +165,11 @@ describe('Solid VM: Contract uploads', function() {
     const contract = await upload('SolidVM', 'Deployer', deployAndModify);
 
     await sleep(2000);
-    const deployIndex = await rest.search(user, contract,
+    const deployIndex = await rest.search(user, {...contract, name: toTableName(contract.name)},
       {...options, query: {address: `eq.${contract.address}`}});
      console.log(`Index response is: ${JSON.stringify(deployIndex)}`);
     const pm = deployIndex[0].pm;
-    const modifyIndex = await rest.search(user, {...contract, name: "PartialModify"},
+    const modifyIndex = await rest.search(user, {...contract, name: toTableName("PartialModify")},
       {...options, query: {address: `eq.${pm}`}});
     assert.equal(modifyIndex[0].address, pm);
     assert.equal(modifyIndex[0].y, 144, "has y");
@@ -176,7 +180,7 @@ describe('Solid VM: Contract uploads', function() {
     const contract = await upload('SolidVM', 'EnumContract', enumContract);
 
     await sleep(2000);
-    const index = await rest.search(user, contract,
+    const index = await rest.search(user, {...contract, name: toTableName(contract.name)},
       {...options, query: {address: `eq.${contract.address}`}});
     console.log(`Index returned: ${JSON.stringify(index, null, 2)}`);
     assert.equal(index[0].address, contract.address);
