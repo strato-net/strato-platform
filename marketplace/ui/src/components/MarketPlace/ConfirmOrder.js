@@ -508,7 +508,7 @@ const ConfirmOrder = () => {
                 </Row>
                 {modalAddress && <AddAddressModal open={modalAddress} close={CloseAddressModel} />}
                 <div>
-                  <div className="mt-4">
+                  <div id="address-list-block" className="mt-4">
                     {isAddingShippingAddress || isLoadingUserAddresses || isLoadingStripeStatus ?
                       <div className="h-80 flex justify-center items-center">
                         <Spin spinning={isAddingShippingAddress || isLoadingUserAddresses || isLoadingStripeStatus} size="large" />
