@@ -11,6 +11,19 @@
   position: absolute;  /* Ensure position is absolute for correct placement */
 }
 
+/* Add to your CSS file */
+@media (max-width: 1024px) {
+  .mobile-hide {
+    display: none;
+  }
+}
+
+@media (min-width: 1025px) {
+  .desktop-hide {
+    display: none !important;
+  }
+}
+
 .slick-prev:before,
 .slick-next:before {
   display: none; /* Hide default arrows */
