@@ -83,7 +83,7 @@ mergeDiffs lhs rhs = error $ "Invalid diff combination: " ++ show (lhs, rhs)
 
 data BatchedInserts = BatchedInserts
   { indexInsert :: ProcessedContract,
-    abstractInsert :: [(ProcessedContract, T.Text, TableColumns)],
+    abstractInsert :: [(ProcessedContract, Map.Map Text NamedAccount ,T.Text, TableColumns)],
     historyInserts :: [ProcessedContract],
     mappingInserts :: [ProcessedMappingRow]
   }
@@ -249,6 +249,11 @@ getMapNamesFromContract c =
       listOfMappingsWithRecords = filter (\(_, vd) -> _isRecord vd) listOfMappings
    in T.pack . fst <$> listOfMappingsWithRecords
 
+-- Function to extract ValueContract from ProcessedContract
+extractFkeys :: ProcessedContract -> Map.Map Text NamedAccount
+extractFkeys pc = Map.foldrWithKey (\k v acc -> case v of
+    ValueContract na -> Map.insert k na acc
+    _ -> acc) Map.empty (contractData pc)
 
 processTheMessages ::
   ( MonadLogger m,
@@ -308,8 +313,9 @@ processTheMessages env conn messages = do
 
             deferredForeignKeys <- case (_contractType c) of
               AbstractType -> do
-                outputData conn $ createExpandAbstractTable g c nameParts abstracts' cc
-                -- $logInfoS "processTheMessages/deferredForeignKeys/abstractfkeys" $ T.pack $ show abstractfkeys
+                abstractfkeys <- outputData conn $ createExpandAbstractTable g c nameParts abstracts' cc
+                $logInfoS "processTheMessages/deferredForeignKeys/abstractfkeys" $ T.pack $ show abstractfkeys
+                return abstractfkeys
               _ -> do
                 indexfkeys <- outputData conn $ createExpandIndexTable g c nameParts
                 $logInfoS "processTheMessages/deferredForeignKeys/indexfkeys" $ T.pack $ show indexfkeys
@@ -351,7 +357,7 @@ processTheMessages env conn messages = do
   --           outputData' conn $ createExpandHistoryTable g c nameParts
   --           outputData conn $ createExpandEventTables g c nameParts
   --           pure deferredForeignKeys
-  --       forM_ deferredForeignKeys $ outputData conn . createForeignIndexesForJoins
+        -- forM_ deferredForeignKeys $ outputData conn . createForeignIndexesForJoins
   --       addDelegate g s c'
   --       pure $ Right deferredForeignKeys
 
@@ -385,6 +391,7 @@ processTheMessages env conn messages = do
           $logDebugLS "Contract name is: " $ T.pack $ show name
           oldState <- readPreviousSolidVMState g acct
           indexContract <- rowToInsert g abiid row cont oldState
+          fkeys <- extractFkeys indexContract
           hs <- rowToHistories g abiid actions cont oldState
           let mapNames = actionMappings row
               abstracts = actionAbstracts row
@@ -395,7 +402,7 @@ processTheMessages env conn messages = do
                 tableNameText = tableNameToDoubleQuoteText tableName
             $logInfoS "Row will be inserted into abstract table: " tableNameText
             mCols <- getTableColumns g tableName
-            pure $ (indexContract,tableNameText,) . map extractTextInsideQuotes <$> mCols
+            pure $ (indexContract, fkeys, tableNameText,) . map extractTextInsideQuotes <$> mCols
           $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
           $logDebugLS "History inserts are: " $ T.pack $ show hs
           stateDiff <- rowToMappings row

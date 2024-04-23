@@ -9,6 +9,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE MonoLocalBinds  #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE DataKinds #-}
 
 
 module Slipstream.OutputData (
@@ -308,6 +309,17 @@ data ForeignKeyInfo = ForeignKeyInfo
   }
   deriving (Show)
 
+instance Eq ForeignKeyInfo where
+    x == y =
+        tableName x == tableName y &&
+        columnName x == columnName y &&
+        foreignTableName x == foreignTableName y
+
+instance Ord ForeignKeyInfo where
+    compare x y =
+        compare (tableName x, columnName x, foreignTableName x)
+                (tableName y, columnName y, foreignTableName y)
+
 dropFkeysBetween :: OutputM m =>
   ForeignKeyInfo ->
   ConduitM () Text m ()
@@ -318,10 +330,10 @@ dropFkeysBetween foreignKey = do
       fkNameSrcToTarget = textToDoubleQuoteText $ tableNameToTextPostgres (tableName foreignKey) <> "_" <> tableNameToTextPostgres (foreignTableName foreignKey) <> "_fk"
       fkNameTargetToSrc = textToDoubleQuoteText $ tableNameToTextPostgres (foreignTableName foreignKey) <> "_" <> tableNameToTextPostgres (tableName foreignKey) <> "_fk"
       logMessage = 
-        "dropFkeysBetween srcTable: " <> (T.pack $ show $ tableName foreignKey) <>
+        "srcTable: " <> (T.pack $ show $ tableName foreignKey) <>
         ", targetTable: " <> (T.pack $ show $ foreignTableName foreignKey) 
   $logInfoS "dropFkeysBetween" logMessage
-  
+
   -- Drop existing foreign keys so theres no cyclical or old dependancy
   yield $ "ALTER TABLE " <> srcTable 
           <> " DROP CONSTRAINT IF EXISTS " <> fkNameSrcToTarget <> ";"
@@ -345,7 +357,7 @@ createForeignIndexesForJoins foreignKey = do
   -- Add new foreign key
   yield $ "ALTER TABLE " <> srcTable 
           <> " ADD CONSTRAINT " <> fkNameSrcToTarget <> " FOREIGN KEY (" 
-          <> srcColumn <> ") REFERENCES " <> targetTable <> " (address) DEFERRABLE INITIALLY DEFERRED;"
+          <> srcColumn <> ") REFERENCES " <> targetTable <> " (address);"
 
 notifyPostgREST ::
   OutputM m =>
@@ -458,10 +470,16 @@ createAbstractTable globalsIORef contract (o, a, n) abstracts' cc = do
   if tableExists
     then return []
     else do
-      let list = tableColumns $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
-      yield $ createAbstractTableQuery contract (o, a, n)
-      setTableCreated globalsIORef tableName (list ++ ["\"data\" jsonb"])
-      getDeferredForeignKeysAbstract tableName contract o a abstracts' cc
+      let columnsList = Map.toList $ contract ^. storageDefs
+          listForGlobals = tableColumns $ map (\(x, y) -> (labelToText x, y ^. varType)) $ columnsList
+      foreignKeys <- getDeferredForeignKeysAbstract tableName contract o a abstracts' cc
+      let fkColumnNames = map columnName foreignKeys
+          listWithFkeys = foldr (\col acc -> if col `elem` fkColumnNames
+                                            then col : (col <> "_fkey") : acc
+                                            else col : acc) [] columnsList
+      yield $ createAbstractTableQuery contract (o, a, n) listWithFkeys
+      setTableCreated globalsIORef tableName (listForGlobals ++ ["\"data\" jsonb"])
+      return foreignKeys
 
 -- if flag from solidvm that it is a record, vmevent
 createMappingTable ::
@@ -832,10 +850,9 @@ createMappingTableQuery (o, a, n, m) =
           ",\n  PRIMARY KEY (address, key));"
         ]
 
-createAbstractTableQuery :: ContractF () -> (Text, Text, Text) -> Text
-createAbstractTableQuery contract (o, a, n) =
+createAbstractTableQuery :: ContractF () -> (Text, Text, Text) -> TableColumns -> Text
+createAbstractTableQuery contract (o, a, n) list =
   let tableName = abstractTableName o a n
-      list = Map.toList $ contract ^. storageDefs
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS ",
           tableNameToDoubleQuoteText tableName,
@@ -1003,7 +1020,9 @@ insertAbstractTableQuery cs =
                     tshow . E.transactionSender
                   ]
                 vals = flip map contracts $ \((row, contractColumns), _) ->
-                  wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ [wrapSingleQuotes $ escapeQuotes (tableNameToText contractTableName)] ++ [wrapSingleQuotes . decodeUtf8 . BL.toStrict $ Aeson.encode $ MapWrapper $ aesonHelper $ Map.filterWithKey (\k _ -> k `notElem` abColumns) contractColumns] ++ (map snd $ Map.toList (Map.filterWithKey (\k _ -> k `elem` abColumns) contractColumns))
+                  wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals 
+                  ++ [wrapSingleQuotes $ escapeQuotes (tableNameToText contractTableName)] ++ [wrapSingleQuotes . decodeUtf8 . BL.toStrict $ Aeson.encode $ MapWrapper $ aesonHelper $ Map.filterWithKey (\k _ -> k `notElem` abColumns) contractColumns] 
+                  ++ (map snd $ Map.toList (Map.filterWithKey (\k _ -> k `elem` abColumns) contractColumns)) -- for data jsonb column
                 inserts = csv vals
             in (: []) $
                   T.concat
