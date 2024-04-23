@@ -88,9 +88,11 @@ SERVICE_PROVIDERS[SERVICE_PROVIDERS['PAYPAL'] = 2] = 'PAYPAL';
 Object.freeze(SERVICE_PROVIDERS)
 
 // Helpers to calculate average price, range, units sold for Pirce History Stats
-export const calculateAveragePrice =(records)=> {
-  return records.reduce((sum, record) => sum + record.price, 0) / records.length;
+export const calculateAveragePrice = (records) => {
+  const average = records.reduce((sum, record) => sum + record.price, 0) / records.length;
+  return parseFloat(average.toFixed(3));
 }
+
 
 export const calculatePriceFluctuation =(records)=> {
   const prices = records.map(record => record.price);

@@ -329,17 +329,26 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   
       const assetWithoutQuantity = await inventoryJs.get(rawAdmin, { address: assetAddress }, options);
       const originAddress = assetWithoutQuantity.originAddress;
+      const assetsOfOriginAsset = await inventoryJs.getAll(rawAdmin,{ originAddress: originAddress}, options);
+      
+      // Aggregate sales for all associated assets
+      let allAssetSales = [];
+      for (let asset of assetsOfOriginAsset) {
+        const assetSales = await saleJs.getAll(rawAdmin, { 
+          assetToBeSold: asset.address,
+          order: "block_timestamp.asc",
+          gtField: "block_timestamp",
+          gtValue: getOneYearAgoTime()
+        }, options);
+        allAssetSales = allAssetSales.concat(assetSales);
+      }
+
 
       // Fetch sales (12 months) for stats
-      const originSalesForStats = await saleJs.getAll(rawAdmin, {
-        assetToBeSold: originAddress,
-        order: "block_timestamp.asc",
-        gtField: "block_timestamp",
-        gtValue: getOneYearAgoTime()
-      }, options);
+      const originSalesForStats = allAssetSales;
       console.log("Fetched origin yearly sales:", originSalesForStats.length, "sales");
   
-      let salesFilter = { assetToBeSold: originAddress, order: "block_timestamp.asc" };
+      let salesFilter = { order: "block_timestamp.asc" };
   
       // Sales Filter modification based on timeFilter
       if (timeFilter === timeFilterForSixMonths()) { 
@@ -356,11 +365,17 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         console.log('Invalid timeFilter');
         return;
       }
+      let timeRangeSales= []
+      for (let asset of assetsOfOriginAsset) {
+        const assetTimeRangeSales = await saleJs.getAll(rawAdmin, { 
+          assetToBeSold: asset.address,
+          ...salesFilter
+        }, options);
+        timeRangeSales = timeRangeSales.concat(assetTimeRangeSales);
+      }
+
       // Fetch sales based on filter
-      const originTimeRangeSales = await saleJs.getAll(rawAdmin, {
-        ...salesFilter
-      }, options);
-  
+      const originTimeRangeSales = timeRangeSales
 
   
       // Process records such that for a given date the most recent sale price is fetched
@@ -372,12 +387,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           //Fetch saleHistory
           if(filter.assetToBeSold) 
           {
-            //if timeFilter is applied, also add those filters
-            return saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, ...filter  }, options);
+            //If timeFilter is applied, also add those filters
+            return saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, assetToBeSold: sale.assetToBeSold, ...filter  }, options);
           }else{
             //If historical data is fetched, apply 12 month timeFilter
 
-            return saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, assetToBeSold: originAddress, order: "block_timestamp.asc", gtField: "block_timestamp", gtValue: getOneYearAgoTime()  }, options); 
+            return saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, assetToBeSold: sale.assetToBeSold, order: "block_timestamp.asc", gtField: "block_timestamp", gtValue: getOneYearAgoTime() }, options); 
           }
         });
         const histories = await Promise.all(historyPromises);
