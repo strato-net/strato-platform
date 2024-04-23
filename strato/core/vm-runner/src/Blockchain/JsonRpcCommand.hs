@@ -78,9 +78,9 @@ runJsonRpcCommand' c@JRCGetCode {jrcAddress = address, jrcId = id} = do
   codeHash <-
     addressStateCodeHash
       <$> A.lookupWithDefault (A.Proxy @AddressState) (Account address Nothing)
-  code <- getEVMCode $
+  code <- getExternallyOwned $
     case codeHash of
-      EVMCode ch -> ch
+      ExternallyOwned ch -> ch
       _ -> error "runJsonRpcCommand currently only supported for the EVM"
   return (id, code)
 runJsonRpcCommand' c@JRCGetTransactionCount {jrcAddress = address, jrcId = id} = do

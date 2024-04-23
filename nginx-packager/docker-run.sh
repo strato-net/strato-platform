@@ -28,7 +28,6 @@ STRATO_HOSTNAME=${STRATO_HOSTNAME:-strato}
 STRATO_PORT_API=${STRATO_PORT_API:-3000}
 STRATO_PORT_API2=${STRATO_PORT_API2:-3001}
 STRATO_PORT_LOGS=${STRATO_PORT_LOGS:-7065}
-STRATO_PORT_BLOCKSTANBUL_VOTE=${STRATO_PORT_BLOCKSTANBUL_VOTE:-8050}
 STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
 
 # If container is running for the first time - generate config:
@@ -43,7 +42,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   # get oauth discovery url from strato api
   echo "Waiting for Strato api to be available..."
   ETH_ENDPOINT=http://${STRATO_HOSTNAME}:${STRATO_PORT_API}/eth/v1.2
-  until curl --silent --output /dev/null --fail --location ${ETH_ENDPOINT}/uuid
+  until curl --silent --output /dev/null --fail --location ${ETH_ENDPOINT}/stats/totaltx
   do
     echo "  Check at $(date)"
     sleep 1
@@ -121,7 +120,6 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   sed -i "s/__STRATO_PORT_API__/$STRATO_PORT_API/g" /tmp/nginx.conf
   sed -i "s/__STRATO_PORT_API2__/$STRATO_PORT_API2/g" /tmp/nginx.conf
   sed -i "s/__STRATO_PORT_LOGS__/$STRATO_PORT_LOGS/g" /tmp/nginx.conf
-  sed -i "s/__STRATO_PORT_BLOCKSTANBUL_VOTE__/$STRATO_PORT_BLOCKSTANBUL_VOTE/g" /tmp/nginx.conf
   sed -i "s/__STRATO_PORT_VAULT_PROXY__/$STRATO_PORT_VAULT_PROXY/g" /tmp/nginx.conf
 
   ########

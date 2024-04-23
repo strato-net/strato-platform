@@ -30,6 +30,8 @@ import TagManager from "react-gtm-module";
 import { SEO } from "../../helpers/seoConstant";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
 import { HTTP_METHODS, apiUrl } from "../../helpers/constants";
+import LoginModal from "../MarketPlace/LoginModal"
+import { setCookie } from "../../helpers/cookie";
 
 const { Header } = Layout;
 
@@ -81,6 +83,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const [showSearch, setShowSearch] = useState(false);
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(categoryQueryValue);
+  const [isModalVisible, setIsModalVisible] = useState(false);
 
   const stratsBalance = (Object.keys(strats).length > 0) ? strats : 0
 
@@ -89,17 +92,8 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   },[categoryQueryValue])
 
   const navItems = [
-    {
-      role: 0,
-      items: [
-        { label: <div id="Orders">Orders</div>, key: '0' },
-        { label: <div id="Inventory">My Items</div>, key: '1' }
-      ]
-    },
-    {
-      role: 1,
-      items: [ ]
-    },
+    { label: <div id="Orders">Orders</div>, key: '0' },
+    { label: <div id="Inventory">My Items</div>, key: '1' }
   ];
 
   const navUrls = [
@@ -249,8 +243,14 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
 
 
   const handleIntMenuTab = (data) => {
-    data.value == 'logout' ? logout() : data.value == 'orders' ? navigate(routes.Orders.url.replace(':type', 'sold'), { state: { defaultKey: "Sold" } }) : navigate(data.path)
-    handleMenuTab(data)
+    if (roleIndex === 1) {
+      // User is not logged in
+      data.value == 'orders' ? setSelectedTab(0) : setSelectedTab(1)
+      setIsModalVisible(true);
+    } else {
+      data.value == 'logout' ? logout() : data.value == 'orders' ? navigate(routes.Orders.url.replace(':type', 'sold'), { state: { defaultKey: "Sold" } }) : navigate(data.path)
+      handleMenuTab(data)
+    }
   }
 
   const handleSearchShow = (status) => {
@@ -300,6 +300,19 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     inputRef.current.select();
   }
 
+  const handleLogin = () => {
+    // Redirect to login page or handle login logic
+    setIsModalVisible(false);
+    if (!isAuthenticated && loginUrl !== undefined) {
+      setCookie("returnUrl", navUrls[selectedTab], 10);
+      window.location.href = loginUrl;
+    }
+  };
+
+  const handleClose = () => {
+      setIsModalVisible(false);
+  };
+
   return (
     <>
       <Header className={`fixed z-[100] !bg-[#ffffff] !pl-2 w-full !pr-4 md:px-12 flex md:!mb-10 ${showMenu ? '' : 'shadow-header'} items-center justify-between md:justify-start`}>
@@ -347,39 +360,44 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
           className="h-16 bg-white text-base mx-10 md:flex hidden"
           onClick={(item) => {
             setSelectedTab(item.key)
-            // These pages will be tracked automatically with lucky orange, no need to create an event here unluess we want to include additional metadata
-            if (item.key === "0") {
-              TagManager.dataLayer({
-                dataLayer: {
-                  event: 'view_orders_page',
-                },
-              });
+            if (roleIndex === 1) {
+              // User is not logged in
+              setIsModalVisible(true);
+            } else {
+              // These pages will be tracked automatically with lucky orange, no need to create an event here unluess we want to include additional metadata
+              if (item.key === "0") {
+                TagManager.dataLayer({
+                  dataLayer: {
+                    event: 'view_orders_page',
+                  },
+                });
+              }
+              if (item.key === "1") {
+                TagManager.dataLayer({
+                  dataLayer: {
+                    event: 'view_inventory_page',
+                  },
+                });
+              }
+              if (item.key === "2") {
+                TagManager.dataLayer({
+                  dataLayer: {
+                    event: 'view_products_page',
+                  },
+                });
+              }
+              if (item.key === "3") {
+                TagManager.dataLayer({
+                  dataLayer: {
+                    event: 'view_events_page',
+                  },
+                });
+                navigate(navUrls[item.key], { state: { tab: "EventType" } })
+              }
+              else navigate(navUrls[item.key]);
             }
-            if (item.key === "1") {
-              TagManager.dataLayer({
-                dataLayer: {
-                  event: 'view_inventory_page',
-                },
-              });
-            }
-            if (item.key === "2") {
-              TagManager.dataLayer({
-                dataLayer: {
-                  event: 'view_products_page',
-                },
-              });
-            }
-            if (item.key === "3") {
-              TagManager.dataLayer({
-                dataLayer: {
-                  event: 'view_events_page',
-                },
-              });
-              navigate(navUrls[item.key], { state: { tab: "EventType" } })
-            }
-            else navigate(navUrls[item.key]);
           }}
-          items={navItems[roleIndex]?.items}
+          items={navItems}
         />
         <Space size="large" className="!gap-0 md:!gap-4 mr-0 -ml-3">
           {<div className="flex md:hidden mx-2" onClick={() => handleSearchShow(true)}>
@@ -455,11 +473,16 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
           <div className="bg-white border-t border-[#E9E9E9] absolute w-full z-50 md:hidden top-16">
             {subMenuItems.map((item) => 
                 <Typography onClick={() => handleIntMenuTab(item)} className={`text-base py-3 px-4 cursor-pointer ${item ? '' : 'hidden'}`} >{item?.label}</Typography>
-             )}
+            )}
           </div>
           <div className="h-[100vh] w-full bg-[#00000020] absolute top-0 md:hidden z-40" onClick={handleMenuTab}></div>
         </div>
       }
+      <LoginModal
+          visible={isModalVisible}
+          onCancel={handleClose}
+          onLogin={handleLogin}
+      />
     </>
 
   );

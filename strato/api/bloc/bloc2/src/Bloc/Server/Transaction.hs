@@ -16,7 +16,6 @@
 
 module Bloc.Server.Transaction
   ( postBlocTransaction,
-    postBlocTransactionRaw,
     postBlocTransactionBody,
     postBlocTransactionUnsigned,
     postBlocTransactionParallel,
@@ -57,11 +56,9 @@ import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address hiding (unAddress)
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Code
-import Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256 hiding (rlpHash)
 import Blockchain.Strato.Model.Nonce
-import Blockchain.Strato.Model.Secp256k1 hiding (HasVault)
 import Blockchain.Strato.Model.Wei
 import Blockchain.Strato.RedisBlockDB (getBestBlockInfo, getSyncStatus, getWorldBestBlockInfo, runStratoRedisIO)
 import Blockchain.Strato.RedisBlockDB.Models (RedisBestBlock (..))
@@ -75,11 +72,9 @@ import Control.Monad.Composable.Vault
 import Control.Monad.Extra
 import Control.Monad.Reader
 import Control.Monad.Trans.State.Lazy
-import qualified Crypto.Secp256k1 as S
 import Data.Bool
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
-import qualified Data.ByteString.Short as BSS
 import qualified Data.Cache as Cache
 import qualified Data.Cache.Internal as Cache
 import Data.Conduit
@@ -101,7 +96,6 @@ import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Data.Time.Clock
 import qualified Data.Vector as V
-import Data.Word
 import qualified Database.Esqueleto.Legacy as E
 import Handlers.AccountInfo ()
 import Handlers.Transaction
@@ -146,96 +140,6 @@ txWorker = forever $ do
       lift . void $ postBlocTransaction' (Do CacheNonce) a b w r c
 
 --------------------------------- RAW (PRE-SIGNED) TRANSACTIONS ------------------------------------
-
-postBlocTransactionRaw ::
-  (MonadLogger m, HasSQL m, HasBlocEnv m) =>
-  Maybe Text -> -- username (unused)
-  Maybe ChainId ->
-  Bool -> -- hash
-  Bool -> -- resolve
-  PostBlocTransactionRawRequest ->
-  m BlocChainOrTransactionResult
-postBlocTransactionRaw _ _ h resolve PostBlocTransactionRawRequest {..} = do
-  checkIsSynced
-  txSizeLimit <- fmap txSizeLimit getBlocEnv
-  -- as a requirement for Pepsi, we have to be able to accept non-rec sigs
-  -- so, if 'v' is not provided, we have to figure out what 'v' is here
-
-  v <- case postbloctransactionrawrequestV of
-    Just v' -> return v'
-    Nothing -> do
-      let makeSigFromVals :: (Word256, Word256, Word8) -> Signature
-          makeSigFromVals (r', s', v') =
-            Signature
-              ( S.CompactRecSig
-                  (BSS.toShort $ word256ToBytes r')
-                  (BSS.toShort $ word256ToBytes s')
-                  (v' - 0x1b)
-              )
-          unsignedTX =
-            UnsignedTransaction
-              postbloctransactionrawrequestNonce
-              postbloctransactionrawrequestGasPrice
-              postbloctransactionrawrequestGasLimit
-              postbloctransactionrawrequestTo
-              postbloctransactionrawrequestValue
-              postbloctransactionrawrequestInitOrData
-              postbloctransactionrawrequestChainId
-          txHash = rlpHash unsignedTX
-
-          -- try both 27 and 28, see what matches
-          sig1 = makeSigFromVals (postbloctransactionrawrequestR, postbloctransactionrawrequestS, 27)
-          address1 = fromMaybe (Address 0x0) $ fmap fromPublicKey $ recoverPub sig1 txHash
-          sig2 = makeSigFromVals (postbloctransactionrawrequestR, postbloctransactionrawrequestS, 28)
-          address2 = fromMaybe (Address 0x0) $ fmap fromPublicKey $ recoverPub sig2 txHash
-      if address1 == postbloctransactionrawrequestAddress
-        then return 27
-        else
-          if address2 == postbloctransactionrawrequestAddress
-            then return 28
-            else throwIO $ UserError $ Text.pack "Couldn't calculate 'v' for transaction signature - must be a bad signature"
-
-  -- construct the Transaction
-  time <- liftIO getCurrentTime
-  let tx =
-        Transaction
-          postbloctransactionrawrequestNonce
-          postbloctransactionrawrequestGasPrice
-          postbloctransactionrawrequestGasLimit
-          postbloctransactionrawrequestTo
-          postbloctransactionrawrequestValue
-          postbloctransactionrawrequestInitOrData
-          postbloctransactionrawrequestChainId
-          v
-          postbloctransactionrawrequestR
-          postbloctransactionrawrequestS
-          postbloctransactionrawrequestMetadata
-      rawTx@(RawTransaction' raw _) = preparePostTx time postbloctransactionrawrequestAddress tx
-
-  if h
-    then
-      return . BlocTxResult $
-        BlocTransactionResult
-          { blocTransactionStatus = Success,
-            blocTransactionHash = transactionHash . rawTX2TX $ raw,
-            blocTransactionTxResult = Nothing,
-            blocTransactionData = Nothing
-          }
-    else do
-      txHash <- postTransaction (Just txSizeLimit) rawTx
-      trds <- recurseTRDs resolve [txHash]
-      case trds of
-        [] -> throwIO $ AnError $ Text.pack "empty TRD response, which shouldn't happen"
-        [x] ->
-          return $
-            BlocTxResult $
-              BlocTransactionResult
-                { blocTransactionStatus = trdStatus x,
-                  blocTransactionHash = txHash,
-                  blocTransactionTxResult = snd <$> trdResult x,
-                  blocTransactionData = Nothing -- can we get this without the txHash table query?
-                }
-        _ -> throwIO $ UserError $ Text.pack "found multiple tx results for a single tx"
 
 -- | postBlocTransactionBody(jwt, chain ID, [Transactions])
 postBlocTransactionBody ::
@@ -726,8 +630,8 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                         -- always return a name but in the case that it doesn't it will go in the
                         -- history table unnamed.
                         ( case md of
-                            Nothing -> Just $ Map.singleton "history" cn
-                            Just m -> Just $ Map.insert "history" cn m
+                            Nothing -> Just $ Map.insert "VM" "SolidVM" (Map.singleton "history" cn)
+                            Just m -> Just $ Map.insert "VM" "SolidVM" (Map.insert "history" cn m)
                         )
                         (contractpayloadChainid p <|> chainId)
                         resolve
@@ -784,8 +688,8 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                               v
                               cid
                               ( case m of
-                                  Nothing -> Just $ Map.singleton "history" cn
-                                  Just h -> Just $ Map.insert "history" cn h
+                                  Nothing -> Just $ Map.insert "VM" "SolidVM" (Map.singleton "history" cn)
+                                  Just h -> Just $ Map.insert "VM" "SolidVM" (Map.insert "history" cn h)
                               )
                       )
                       ps
