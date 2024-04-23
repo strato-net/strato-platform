@@ -147,24 +147,26 @@ class RedemptionsController {
         try {
             RedemptionsController.validateCreateRedemptionArgs(req.body);
 
-            const { quantity, ownerComments, issuerComments, ownerCommonName, issuerCommonName, assetAddresses, assetName, status, shippingAddressId } = req.body;
+            const { redemption_id, quantity, ownerComments, issuerComments, ownerCommonName, issuerCommonName, assetAddresses, assetName, status, shippingAddressId } = req.body;
 
             const query = `
-            INSERT INTO redemptions (
-            quantity, 
-            ownerComments, 
-            issuerComments, 
-            ownerCommonName, 
-            issuerCommonName, 
-            assetAddresses, 
-            assetName,
-            status,
-            shippingAddressId 
-            ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9
-            ) RETURNING redemption_id;`;
+                INSERT INTO redemptions (
+                    redemption_id,
+                    quantity, 
+                    ownerComments, 
+                    issuerComments, 
+                    ownerCommonName, 
+                    issuerCommonName, 
+                    assetAddresses, 
+                    assetName,
+                    status,
+                    shippingAddressId 
+                ) VALUES (
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+                ) RETURNING redemption_id;
+            `;
 
-            const values = [quantity, ownerComments, issuerComments, ownerCommonName, issuerCommonName, assetAddresses, assetName, status, shippingAddressId];
+            const values = [redemption_id, quantity, ownerComments, issuerComments, ownerCommonName, issuerCommonName, assetAddresses, assetName, status, shippingAddressId];
 
             const result = await client.query(query, values);
 
@@ -239,6 +241,7 @@ class RedemptionsController {
     // ********* VALIDATION ***********
     static validateCreateRedemptionArgs(args) {
         const createRedemptionSchema = Joi.object({
+            redemption_id: Joi.number().integer().required(),
             quantity: Joi.number().integer().greater(0).required(),
             ownerComments: Joi.string().allow(""),
             issuerComments: Joi.string().allow(""),

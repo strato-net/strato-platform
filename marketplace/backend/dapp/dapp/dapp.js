@@ -233,8 +233,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getInventoriesForUser = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options };
-    const {ownerCommonName, ...restArgs} = args;
-    const newArgs = { ...restArgs, ownerCommonName:ownerCommonName, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, userProfile:true }//'0000000000000000000000000000000000000000'
+    const { ownerCommonName, ...restArgs } = args;
+    const newArgs = { ...restArgs, ownerCommonName: ownerCommonName, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, userProfile: true }//'0000000000000000000000000000000000000000'
     return marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
   };
 
@@ -293,7 +293,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
     const originAsset = await inventoryJs.get(rawAdmin, { address: originAssetAddress }, getOptions);
     const issuerCommonName = originAsset.ownerCommonName;
-    const finalArgs = { issuerCommonName, assetAddresses: [assetAddress], quantity, ...restArgs }
+    const finalArgs = { redemption_id: parseInt(util.uid()), issuerCommonName, assetAddresses: [assetAddress], quantity, ...restArgs }
 
     if (requestRedemptionStatus) {
       try {
@@ -809,7 +809,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.export = async function (options = defaultOptions) {
     const getOptions = { ...options };
-    
+
     const processOrders = async (orderArg) => {
       const orders = await saleOrderJs.getAll(rawAdmin, orderArg, getOptions);
       if (orders.orders.length === 0) {

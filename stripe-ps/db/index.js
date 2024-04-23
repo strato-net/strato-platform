@@ -20,30 +20,32 @@ if (process.env.POSTGRESQL_SERVER_URL && process.env.POSTGRESQL_PASSWORD) {
             console.log(`Connected to the PostgreSQL database. Database name: ${client.database}`);
 
             const query = `
-            CREATE TABLE IF NOT EXISTS customer_address (
-            address_id SERIAL PRIMARY KEY,
-            commonName TEXT,
-            name TEXT,
-            zipcode TEXT,
-            state TEXT,
-            city TEXT,
-            addressLine1 TEXT,
-            addressLine2 TEXT,
-            country TEXT,
-            createdDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
-            
-            CREATE TABLE IF NOT EXISTS redemptions (
-            redemption_id SERIAL PRIMARY KEY,
-            quantity INTEGER,
-            ownerComments TEXT,
-            issuerComments TEXT,
-            ownerCommonName TEXT,
-            issuerCommonName TEXT,
-            assetAddresses TEXT[],
-            assetName TEXT,
-            status INTEGER,
-            shippingAddressId INT REFERENCES customer_address(address_id),
-            createdDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+                CREATE TABLE IF NOT EXISTS customer_address (
+                    address_id SERIAL PRIMARY KEY,
+                    commonName TEXT,
+                    name TEXT,
+                    zipcode TEXT,
+                    state TEXT,
+                    city TEXT,
+                    addressLine1 TEXT,
+                    addressLine2 TEXT,
+                    country TEXT,
+                    createdDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE TABLE IF NOT EXISTS redemptions (
+                    redemption_id INTEGER PRIMARY KEY,
+                    quantity INTEGER,
+                    ownerComments TEXT,
+                    issuerComments TEXT,
+                    ownerCommonName TEXT,
+                    issuerCommonName TEXT,
+                    assetAddresses TEXT[],
+                    assetName TEXT,
+                    status INTEGER,
+                    shippingAddressId INT REFERENCES customer_address(address_id),
+                    createdDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
             `;
 
             return client.query(query);
