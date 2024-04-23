@@ -39,7 +39,6 @@ class TokensController {
   static validateCreateTokensArgs(args) {
     const createTokensSchema = Joi.object({
       itemArgs: Joi.object({
-        serialNumber: Joi.string().allow("").optional(),
         name: Joi.string().required(),
         description: Joi.string().required(),
         quantity: Joi.number().integer().min(1).required(),
