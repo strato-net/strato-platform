@@ -98,7 +98,7 @@ readSupplementaryAccounts genesisBlockName = do
             [] -> []
             "s" : _ -> []
             ["a", a, b] -> [NonContract (Ad.Address (parseHex a)) (read b)]
-            ["a", a, b, c] -> [ContractNoStorage (Ad.Address (parseHex a)) (read b) (EVMCode $ unsafeCreateKeccak256FromWord256 (parseHex c))]
+            ["a", a, b, c] -> [ContractNoStorage (Ad.Address (parseHex a)) (read b) (ExternallyOwned $ unsafeCreateKeccak256FromWord256 (parseHex c))]
             _ -> error $ "invalid AccountInfo line: " ++ line
       return . concatMap parseAccounts . lines $ accountInfoString
 
@@ -258,9 +258,8 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
                     (codeHash d)
                     emptyCodeCollection
                     ""
-                    ""
                     ( case codeHash d of
-                        EVMCode _ -> EVM
+                        ExternallyOwned _ -> EVM
                         SolidVMCode _ _ -> SolidVM
                         CodeAtAccount _ _ -> error "CodeAtAccount not supported in genesis block"
                     )
@@ -273,7 +272,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
               A._metadata =
                 getMetadata
                   ( case codeHash d of
-                      EVMCode ch' -> ch'
+                      ExternallyOwned ch' -> ch'
                       SolidVMCode _ ch' -> ch'
                       CodeAtAccount _ _ -> error "TODO: Encountered CodeAtAccount in genesis block"
                   ),
@@ -303,7 +302,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
     forM_ (map (fromMaybe Map.empty . A._metadata) filteredActions) $ \md ->
       case (Map.lookup "src" md, Map.lookup "name" md) of
         (Just src, Just n) -> case runIdentity . runMemCompilerT $ compileSource False $ Map.singleton "" src of
-          Right cc -> void $ produceVMEvents [CodeCollectionAdded (const () <$> cc) (SolidVMCode (T.unpack n) $ hash $ BC.pack $ T.unpack src) "" "" [] Map.empty []]
+          Right cc -> void $ produceVMEvents [CodeCollectionAdded (const () <$> cc) (SolidVMCode (T.unpack n) $ hash $ BC.pack $ T.unpack src) "" [] Map.empty []]
           Left _ -> pure ()
         _ -> return ()
 

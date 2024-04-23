@@ -26,7 +26,7 @@ module Blockchain.DB.CodeDB
     addCode,
     getCode,
     getCodeKind,
-    getEVMCode,
+    getExternallyOwned,
     codeDBGet,
     codeDBPut,
   )
@@ -118,8 +118,8 @@ addCode = codeDBPut
 getCode :: HasCodeDB m => Keccak256 -> m (Maybe DBCode)
 getCode = codeDBGet
 
-getEVMCode :: HasCodeDB m => Keccak256 -> m B.ByteString
-getEVMCode hsh = maybe "" snd <$> getCode hsh
+getExternallyOwned :: HasCodeDB m => Keccak256 -> m B.ByteString
+getExternallyOwned hsh = maybe "" snd <$> getCode hsh
 
 getCodeKind :: HasCodeDB m => Keccak256 -> m CodeKind
 getCodeKind hsh = maybe (error $ "no codekind found for " ++ show hsh) fst <$> getCode hsh

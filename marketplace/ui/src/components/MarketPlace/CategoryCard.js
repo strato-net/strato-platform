@@ -1,4 +1,4 @@
-import { Typography } from "antd";
+import { Typography, Button } from "antd";
 import Slider from "react-slick";
 import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
@@ -20,42 +20,33 @@ const CategoryCard = () => {
     Images["Metal"],
     Images["Clothing-category"],
     Images["collectibles"],
-    Images["Art-category"],
     Images["tokens_card"],
+    Images["Art-category"],
     Images["membership_card"],
   ];
 
+  function Arrow(props) {
+    const char = props.type === "next" ? ">" : "<";
+    let className = props.type === "next" ? "slick-next" : "slick-prev";
+    return (
+      <Button
+        type='primary'
+        onClick={props.onClick}
+        className={`${className} cursor-pointer h-12 w-12 text-2xl bg-[#6A6A6A] rounded-full text-white`}
+      >
+        {char}
+      </Button>
+    );
+  }
+
   const settings = {
-    dots: true,
+    nextArrow: <Arrow type="next" />,
+    prevArrow: <Arrow type="prev" />,
+    dots: false,
     infinite: true,
     speed: 500,
     slidesToShow: 5,
-    slidesToScroll: 5,
-    responsive: [
-      {
-        breakpoint: 1024,
-        settings: {
-          slidesToShow: 3,
-          slidesToScroll: 3,
-          infinite: true,
-          dots: true
-        }
-      },
-      {
-        breakpoint: 600,
-        settings: {
-          slidesToShow: 2,
-          slidesToScroll: 2
-        }
-      },
-      {
-        breakpoint: 480,
-        settings: {
-          slidesToShow: 1,
-          slidesToScroll: 1
-        }
-      }
-    ]
+    slidesToScroll: 5
   };
   
   return (
@@ -66,52 +57,100 @@ const CategoryCard = () => {
       </Title>
       </Fade>
       <Fade direction="left" triggerOnce>
-      <Slider {...settings}>
-        {categorys.map((category, index) => {
-          return (
-            <div
-              id={category.name}
-              key={index}
-              className="transition-transform duration-500 hover:scale-105 w-[162px] md:w-[210px] 2xl:w-[248px] h-[160px] md:h-[180px] 2xl:h-[200px] border border-tertiaryB shadow-category rounded-lg cursor-pointer"
-              onClick={() => {
-                const subCat = category.subCategories.map((item)=>item.contract).join(",")
-                const url = `${naviroute.replace(':category', category.name)}?sc=${subCat}`
-                navigate(url)
-                sessionStorage.setItem('scrollPosition', 0);
-                window.LOQ.push(['ready', async LO => {
-                  // Track an event
-                  await LO.$internal.ready('events')
-                  LO.events.track(`Homepage Filter - ${category.name}`)
-                }])
-                TagManager.dataLayer({
-                  dataLayer: {
-                    event: `${category.name}_filter_homepage`,
-                  },
-                });
-              }}
-            >
-              <div className="flex flex-col">
-                <img
-                  alt={SEO.IMAGE_META}
-                  title={SEO.IMAGE_META}
-                  src={categoryImages[index]}
-                  className="rounded-t-lg px-[9px] py-[6px] lg:px-[0px] lg:py-[0px] h-[110px] md:h-[125px] 2xl:h-[140px]"
-                  preview={false}
-                />
+      <div className="mobile-hide"> {/* Hide this div on mobile/tablet */}
+        <Slider {...settings}>
+          {categorys.map((category, index) => {
+            return (
+              <div
+                id={category.name}
+                key={index}
+                className="transition-transform duration-500 hover:scale-105 w-[162px] md:w-[210px] 2xl:w-[248px] h-[160px] md:h-[180px] 2xl:h-[200px] border border-tertiaryB shadow-category rounded-lg cursor-pointer"
+                onClick={() => {
+                  const subCat = category.subCategories.map((item)=>item.contract).join(",")
+                  const url = `${naviroute.replace(':category', category.name)}?sc=${subCat}`
+                  navigate(url)
+                  sessionStorage.setItem('scrollPosition', 0);
+                  window.LOQ.push(['ready', async LO => {
+                    // Track an event
+                    await LO.$internal.ready('events')
+                    LO.events.track(`Homepage Filter - ${category.name}`)
+                  }])
+                  TagManager.dataLayer({
+                    dataLayer: {
+                      event: `${category.name}_filter_homepage`,
+                    },
+                  });
+                }}
+              >
+                <div className="flex flex-col">
+                  <img
+                    alt={SEO.IMAGE_META}
+                    title={SEO.IMAGE_META}
+                    src={categoryImages[index]}
+                    className="rounded-t-lg px-[9px] py-[6px] lg:px-[0px] lg:py-[0px] h-[110px] md:h-[125px] 2xl:h-[140px]"
+                    preview={false}
+                  />
 
-                  <div className="py-2 xl:py-3 flex justify-center md:justify-start ">
-                    <Text
-                      type="secondary"
-                      className="text-lg md:text-xl lg:text-2xl !text-primaryB font-semibold"
-                    >
-                      <span className="p-3 font-sans">{category.name}</span>
-                    </Text>
+                    <div className="py-2 xl:py-3 flex justify-center md:justify-start ">
+                      <Text
+                        type="secondary"
+                        className="text-lg md:text-xl lg:text-2xl !text-primaryB font-semibold"
+                      >
+                        <span className="p-3 font-sans">{category.name}</span>
+                      </Text>
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
-        </Slider>
+              );
+            })}
+          </Slider>
+        </div>
+        <div className="desktop-hide flex justify-start sm:justify-center md:justify-start gap-3 lg:gap-[15px] flex-wrap px-0 md:px-10 xl:grid xl:grid-cols-6"> {/* Show this div on mobile/tablet */}
+          {categorys.map((category, index) => {
+            return (
+              <div
+                id={category.name}
+                key={index}
+                className="transition-transform duration-500 hover:scale-105 w-[162px] md:w-[210px] 2xl:w-[248px] h-[160px] md:h-[180px] 2xl:h-[200px] border border-tertiaryB shadow-category rounded-lg cursor-pointer"
+                onClick={() => {
+                  const subCat = category.subCategories.map((item)=>item.contract).join(",")
+                  const url = `${naviroute.replace(':category', category.name)}?sc=${subCat}`
+                  navigate(url)
+                  sessionStorage.setItem('scrollPosition', 0);
+                  window.LOQ.push(['ready', async LO => {
+                    // Track an event
+                    await LO.$internal.ready('events')
+                    LO.events.track(`Homepage Filter - ${category.name}`)
+                  }])
+                  TagManager.dataLayer({
+                    dataLayer: {
+                      event: `${category.name}_filter_homepage`,
+                    },
+                  });
+                }}
+              >
+                <div className="flex flex-col">
+                  <img
+                    alt={SEO.IMAGE_META}
+                    title={SEO.IMAGE_META}
+                    src={categoryImages[index]}
+                    className="rounded-t-lg px-[9px] py-[6px] lg:px-[0px] lg:py-[0px] h-[110px] md:h-[125px] 2xl:h-[140px]"
+                    preview={false}
+                  />
+
+                    <div className="py-2 xl:py-3 flex justify-center md:justify-start ">
+                      <Text
+                        type="secondary"
+                        className="text-lg md:text-xl lg:text-2xl !text-primaryB font-semibold"
+                      >
+                        <span className="p-3 font-sans">{category.name}</span>
+                      </Text>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+        </div>
       </Fade>
     </>
   );

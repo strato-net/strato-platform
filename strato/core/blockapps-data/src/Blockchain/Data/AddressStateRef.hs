@@ -19,10 +19,10 @@ import qualified Database.Persist.Postgresql as SQL hiding (Update, get)
 
 addressStateRefCodePtr :: AddressStateRef -> Maybe CodePtr
 addressStateRefCodePtr AddressStateRef {..} = case addressStateRefContractName of
-  Nothing -> EVMCode <$> addressStateRefCodeHash
   Just name -> case addressStateRefCodePtrAddress of
     Just a -> Just $ CodeAtAccount (Account a addressStateRefCodePtrChainId) name
     Nothing -> SolidVMCode name <$> addressStateRefCodeHash
+  Nothing -> Nothing
 
 updateSQLBalanceAndNonce ::
   HasSQLDB m =>
