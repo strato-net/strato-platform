@@ -301,3 +301,20 @@ Cypress.Commands.add("certifyEvents", () => {
   })
 
 })
+
+Cypress.Commands.add("payment", () => {
+  cy.origin(Cypress.env("stripe_url"), () => {
+    cy.wait(10000)
+    cy.get('#email').type(`demo_@gmail.com`);
+    cy.get('#cardNumber').type('4242 4242 4242 4242');
+    cy.get("#cardExpiry").type(
+      "12" + (new Date().getFullYear() + 10).toString().substr(-2)
+    );
+    cy.get('#cardCvc').type('855');
+    cy.get('#billingName').type('Nitin Gupta');
+    cy.get('#billingPostalCode').type("12345");
+    cy.get('#enableStripePass').uncheck();
+    cy.wait(10000);
+
+  });
+});
