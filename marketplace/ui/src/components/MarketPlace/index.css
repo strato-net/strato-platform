@@ -11,18 +11,27 @@
   position: absolute;  /* Ensure position is absolute for correct placement */
 }
 
-/* Hide arrows on mobile and tablet */
-@media screen and (max-width: 768px) {
-  .slick-prev:before,
-  .slick-next:before {
-    display: none; /* Hide arrows */
-  }
-}
-
-/* Override carousel buttons and their icons style */
 .slick-prev:before,
 .slick-next:before {
-  color: #181EAC; /* Change color to blue */
+  display: none; /* Hide default arrows */
+}
+
+/* Custom CSS to override default slick arrow styles */
+.slick-prev:hover, 
+.slick-prev:focus, 
+.slick-next:hover, 
+.slick-next:focus {
+  color: white; /* Makes text color transparent */
+  background: #101481; /* Ensures no background change on hover/focus */
+}
+
+
+/* Hide arrows on mobile and tablet */
+@media screen and (max-width: 768px) {
+  .slick-prev,
+  .slick-next {
+    display: none; /* Hide arrows */
+  }
 }
 
 /* Custom styles for slick slider items */

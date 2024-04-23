@@ -1,4 +1,4 @@
-import { Typography } from "antd";
+import { Typography, Button } from "antd";
 import Slider from "react-slick";
 import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
@@ -15,6 +15,20 @@ const CategoryCard = () => {
   const naviroute = routes.MarketplaceCategoryProductList.url;
   const { categorys } = useCategoryState();
 
+  function Arrow(props) {
+    const char = props.type === "next" ? ">" : "<";
+    let className = props.type === "next" ? "slick-next" : "slick-prev";
+    return (
+      <Button
+        type='primary'
+        onClick={props.onClick}
+        className={`${className} cursor-pointer h-12 w-12 text-2xl bg-[#6A6A6A] rounded-full text-white`}
+      >
+        {char}
+      </Button>
+    );
+  }
+  
   const categoryImages = [
     Images["Carbon-category"],
     Images["Metal"],
@@ -26,7 +40,9 @@ const CategoryCard = () => {
   ];
 
   const settings = {
-    dots: true,
+    nextArrow: <Arrow type="next" />,
+    prevArrow: <Arrow type="prev" />,
+    dots: false,
     infinite: true,
     speed: 500,
     slidesToShow: 5,
