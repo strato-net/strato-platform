@@ -50,8 +50,6 @@ import Blockchain.Data.Transaction
 import Blockchain.Data.TransactionDef (formatChainId)
 import Blockchain.Data.TransactionResultStatus
 import qualified Blockchain.Database.MerklePatricia as MP
-import qualified Blockchain.EVM as EVM
-import Blockchain.EVM.Code
 import Blockchain.Event
 import Blockchain.Sequencer.Event
 import qualified Blockchain.SolidVM as SolidVM
@@ -72,6 +70,8 @@ import Blockchain.VM.VMException
 import Blockchain.VMConstants
 import Blockchain.VMContext
 import Blockchain.VMMetrics
+import qualified Blockchain.EVM as EVM
+-- import qualified Blockchain.EVM.Code as EVC
 import Blockchain.VMOptions
 import Blockchain.Verifier
 import Conduit
@@ -451,10 +451,10 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAcct t =
 
           let eCall =
                 case codeHash of
-                  EVMCode _ -> Right EVM.call
+                  ExternallyOwned _ -> Right EVM.call
                   SolidVMCode _ _ -> Right SolidVM.call
                   CodeAtAccount acct name -> case resolvedCodeHash of
-                    Just (EVMCode _) -> Right EVM.call
+                    Just (ExternallyOwned _) -> Right EVM.call
                     Just (SolidVMCode _ _) -> Right SolidVM.call
                     Just (CodeAtAccount acct' name') -> Left (acct', name')
                     Nothing -> Left (acct, name)
@@ -491,6 +491,10 @@ codeOrDataLength t =
    in if isMessageTX bt
         then B.length $ transactionData bt
         else codeLength $ transactionInit bt --is ContractCreationTX
+
+codeLength :: Code -> Int
+codeLength (Code bytes) = B.length bytes
+codeLength (PtrToCode _) = error "codeLength: called with PtrToCode"
 
 zeroBytesLength :: OutputTx -> Int
 zeroBytesLength t =
@@ -547,14 +551,14 @@ outputTransactionResult ::
   ConduitT a VmOutEvent m ()
 outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHash} result deltaT beforeMap afterMap newAddresses) = do
   let t = fromMaybe (otBaseTx ot) (otPrivatePayload ot)
-      (txrStatus, message, gasRemaining, orgName, appName) =
+      (txrStatus, message, gasRemaining, commonName) =
         case result of
-          Left err -> let fmt = format err in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0, "", "") -- TODO Also include the trace
+          Left err -> let fmt = format err in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0, "") -- TODO Also include the trace
           Right r -> case erException r of
-            Nothing -> (Success, "Success!", erRemainingTxGas r, erOrgName r, erAppName r)
+            Nothing -> (Success, "Success!", erRemainingTxGas r, erCreator r)
             Just ex ->
               let fmt = either show show ex
-               in (Failure "Execution" Nothing (ExecutionFailure $ show ex) Nothing Nothing (Just fmt), fmt, 0, "", "")
+               in (Failure "Execution" Nothing (ExecutionFailure $ show ex) Nothing Nothing (Just fmt), fmt, 0, "")
       gasUsed = fromInteger $ transactionGasLimit t - gasRemaining
       etherUsed = gasUsed * fromInteger (transactionGasPrice t)
 
@@ -590,8 +594,7 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
         transactionResultStatus = Just txrStatus,
         transactionResultChainId = chainId,
         transactionResultKind = erKind <$> eitherToMaybe result,
-        transactionResultOrgName = orgName,
-        transactionResultAppName = appName
+        transactionResultCommonName = commonName
       }
   when flags_diffPublish $ do
     traverse_ (yield . OutAction) $ either (const Nothing) erAction result

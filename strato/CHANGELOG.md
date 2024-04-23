@@ -18,13 +18,17 @@ so that they could be properly moved to their respective version's subsection.
 
 ### Added
 - POST `/transaction` allows users to create contracts by providing an address through the `codePtr` field
+- `creatorForkBlockNumber` flag added to customize at which block :creator field should start referring to the common name and not org
 
 ### Changed
+- Cirrus table namespacing is of format `creator-contractName` now
+- :creator field refers to user's common name, not org (can be customized to occur after particular block number for backwards compatibility)
 - `eth_<random 20 bytes>` database is now just named `eth`
 - `queryStrato` is now `strato-barometer`
 - `strato-barometer` commands point to a copy of `./ethereumH` to access LevelDB data
 
 ### Fixed
+- When a contract is created by a user, that user is the :creator. When a contract is created by another contract, :creator is the :creator of that contract
 
 ### Removed
 - Removed 'block', 'blockGO', 'canonRedis', 'compressRoundChanges' commands from blockapps-tools
