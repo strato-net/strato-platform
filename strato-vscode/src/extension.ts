@@ -218,7 +218,7 @@ export async function activate(context: vscode.ExtensionContext) {
 	const cirrusProvider = new CirrusProvider();
 	vscode.commands.registerCommand('cirrus.queryCirrus', async () => {
 		const argInput = await vscode.window.showInputBox({
-			placeHolder: 'ex: BlockApps-Mercata-Asset?address=eq.9b617d82a19cde1a5ad3489bfb91716c88f928a6',
+			placeHolder: 'ex: BlockApps-Asset?address=eq.9b617d82a19cde1a5ad3489bfb91716c88f928a6',
 			prompt: `Enter cirrus query.`
 		});
 		if (!argInput) return;

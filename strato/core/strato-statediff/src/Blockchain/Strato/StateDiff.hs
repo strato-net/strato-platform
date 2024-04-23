@@ -411,7 +411,7 @@ lookupAddress :: (MonadLogger m, HasHashDB m) => [N.Nibble] -> m Address
 lookupAddress (N.pack -> addrHash) = fromMaybe (Address 0) <$> lookupInMPDB "address" getAddressFromHash addrHash
 
 lookupCode :: (MonadLogger m, HasHashDB m, HasCodeDB m, Selectable Account AddressState m) => CodePtr -> m (CodeKind, ByteString)
-lookupCode (EVMCode ch) = fromMaybe (EVM, "") <$> lookupInMPDB "contract code" getCode ch
+lookupCode (ExternallyOwned ch) = fromMaybe (EVM, "") <$> lookupInMPDB "contract code" getCode ch
 lookupCode (SolidVMCode _ ch) = fromMaybe (SolidVM, "") <$> lookupInMPDB "contract code" getCode ch
 lookupCode cp@(CodeAtAccount _ _) = maybe (pure (EVM, "")) lookupCode =<< unsafeResolveCodePtr cp
 
