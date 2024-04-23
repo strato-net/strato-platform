@@ -307,7 +307,7 @@ runOperation EXTCODESIZE = do
   codeHash <-
     addressStateCodeHash
       <$> A.lookupWithDefault (A.Proxy @AddressState) account
-  code <- getEVMCode' codeHash
+  code <- getExternallyOwned' codeHash
   push $ (fromIntegral (B.length code) :: Word256)
 runOperation EXTCODECOPY = do
   address <- pop
@@ -320,7 +320,7 @@ runOperation EXTCODECOPY = do
   codeHash <-
     addressStateCodeHash
       <$> A.lookupWithDefault (A.Proxy @AddressState) account
-  code <- getEVMCode' codeHash
+  code <- getExternallyOwned' codeHash
   mStoreByteString memOffset (safeTake size $ safeDrop codeOffset $ code)
 runOperation RETURNDATASIZE = do
   ret <- getReturnVal
@@ -1046,8 +1046,7 @@ runVMM isRunningTests' isHomestead preExistingSuicideList cDepth env availableGa
               erKind = EVM,
               -- , erNewX509Certs       = M.empty
               erPragmas = [],
-              erOrgName = "",
-              erAppName = ""
+              erCreator = ""
             }
       Right _ -> do
         vmState'@VMState {..} <- readIORef vmStateRef
@@ -1096,7 +1095,7 @@ create
         Code c -> pure c
         PtrToCode cp -> do
           codeHash <- resolveCodePtr chainId cp
-          fromMaybe "" <$> traverse getEVMCode' codeHash
+          fromMaybe "" <$> traverse getExternallyOwned' codeHash
     let env =
           Environment
             { envGasPrice = gasPrice,
@@ -1160,7 +1159,7 @@ create' = do
   vmState <- vmstateGet
 
   let codeBytes = fromMaybe B.empty $ returnVal vmState
-  vmstateModify $ action . Action.actionData . Action.omapLens owner . mapped . Action.actionDataCodeHash .~ EVMCode (hash codeBytes)
+  vmstateModify $ action . Action.actionData . Action.omapLens owner . mapped . Action.actionDataCodeHash .~ ExternallyOwned (hash codeBytes)
   when flags_debug $ $logInfoS "create'" . T.pack $ "Result: " ++ show codeBytes
 
   -- this used to say "not enough ether, but im pretty sure it meant gas -io
@@ -1188,7 +1187,7 @@ create' = do
     assignCode codeBytes account = do
       hsh <- addCode EVM codeBytes
       A.adjustWithDefault_ (A.Proxy @AddressState) account $ \newAddressState ->
-        pure newAddressState {addressStateCodeHash = EVMCode hsh}
+        pure newAddressState {addressStateCodeHash = ExternallyOwned hsh}
     assignDetails = do
       vmState <- vmstateGet
       let Environment {..} = environment vmState
@@ -1197,7 +1196,7 @@ create' = do
           %~ (:) Action.Create
 
     -- insertFunc :: Maybe Action.ActionData -> Maybe Action.ActionData
-    -- insertFunc _ = Just $ Action.ActionData (EVMCode $ unsafeCreateKeccak256FromWord256 0) mempty "" "" EVM (Action.EVMDiff M.empty) M.empty [] [] []
+    -- insertFunc _ = Just $ Action.ActionData (ExternallyOwned $ unsafeCreateKeccak256FromWord256 0) mempty "" "" EVM (Action.EVMDiff M.empty) M.empty [] [] []
 
 call ::
   EVMBase m =>
@@ -1263,7 +1262,7 @@ call
         codeHash <-
           addressStateCodeHash
             <$> A.lookupWithDefault (A.Proxy @AddressState) codeAddress
-        code <- Code <$> getEVMCode' codeHash
+        code <- Code <$> getExternallyOwned' codeHash
         runVMM isRunningTests' isHomestead preExistingSuicideList callDepth (env code) availableGas $
           call' noValueTransfer
 
@@ -1274,7 +1273,7 @@ call' noValueTransfer = do
   sender <- getEnvVar envSender
   cp <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) receiveAddress
   let ch = case cp of
-        EVMCode x -> x
+        ExternallyOwned x -> x
         _ -> error "internal error- the EVM was called for non-evm code"
   vmstateModify $ action . Action.actionData %~ OMap.alter (insertFunc2 ch) receiveAddress
 
@@ -1300,11 +1299,11 @@ call' noValueTransfer = do
   return (fromMaybe B.empty $ returnVal vmState)
   where
     insertFunc2 :: Keccak256 -> Maybe Action.ActionData -> Maybe Action.ActionData
-    insertFunc2 ch _ = Just $ Action.ActionData (EVMCode $ ch) mempty "" "" EVM (Action.EVMDiff M.empty) M.empty [] [] []
+    insertFunc2 ch _ = Just $ Action.ActionData (ExternallyOwned $ ch) mempty "" EVM (Action.EVMDiff M.empty) M.empty [] [] []
 
 
 insertFunc :: Maybe Action.ActionData -> Maybe Action.ActionData
-insertFunc _ = Just $ Action.ActionData (EVMCode $ unsafeCreateKeccak256FromWord256 0) mempty "" "" EVM (Action.EVMDiff M.empty) M.empty [] [] []
+insertFunc _ = Just $ Action.ActionData (ExternallyOwned $ unsafeCreateKeccak256FromWord256 0) mempty "" EVM (Action.EVMDiff M.empty) M.empty [] [] []
 
 callPrecompiled' :: EVMBase m => Bool -> PrecompiledCode -> VMM m B.ByteString
 callPrecompiled' noValueTransfer precompiled = do
@@ -1482,10 +1481,9 @@ vmStateToExecResults vmState = do
         erKind = EVM,
         -- , erNewX509Certs       = M.empty
         erPragmas = [],
-        erOrgName = "",
-        erAppName = ""
+        erCreator = ""
       }
 
-getEVMCode' :: HasCodeDB m => CodePtr -> m BC.ByteString
-getEVMCode' (EVMCode ch) = getEVMCode ch
-getEVMCode' _ = error "internal error- the EVM was called for non-evm code"
+getExternallyOwned' :: HasCodeDB m => CodePtr -> m BC.ByteString
+getExternallyOwned' (ExternallyOwned ch) = getExternallyOwned ch
+getExternallyOwned' _ = error "internal error- the EVM was called for non-evm code"
