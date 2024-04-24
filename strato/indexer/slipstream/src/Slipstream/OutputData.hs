@@ -17,19 +17,19 @@ module Slipstream.OutputData (
   OutputM,
   ProcessedMappingRow(..),
   insertEventTables,
-  insertIndexTable,
-  insertForeignKeys,
+  -- insertIndexTable,
+  -- insertForeignKeys,
   insertMappingTable,
   insertMappingTableQuery,
   insertAbstractTable,
   insertAbstractTableQuery,
-  createIndexTable,
+  -- createIndexTable,
   createMappingTable,
   createHistoryTable,
   createAbstractTable,
   insertHistoryTable,
   createExpandEventTables,
-  createExpandIndexTable,
+  -- createExpandIndexTable,
   createForeignIndexesForJoins,
   createExpandAbstractTable,
   expandAbstractTable,
@@ -85,7 +85,7 @@ import qualified SolidVM.Model.Type              as SVMType
 import           Text.Printf
 import           Text.RawString.QQ
 import           Text.Tools                      
-import           UnliftIO.Exception              (SomeException, catch, handle)
+import           UnliftIO.Exception              (SomeException, handle)
 import           UnliftIO.IORef
 
 newtype First b a = First {unFirst :: (a, b)}
@@ -136,14 +136,14 @@ tableColumns = mapMaybe go . fillFirstEmptyEntries
 partialParseTableColumns :: TableColumns -> [Text]
 partialParseTableColumns = concat . mapM (fmap unwrapDoubleQuotes . listToMaybe . T.words)
 
-makeAccount :: Text -> Address -> Text
-makeAccount "" addr = tshow $ addr
-makeAccount chain addr =
-  T.concat
-    [ tshow $ addr,
-      ":",
-      chain
-    ]
+-- makeAccount :: Text -> Address -> Text
+-- makeAccount "" addr = tshow $ addr
+-- makeAccount chain addr =
+--   T.concat
+--     [ tshow $ addr,
+--       ":",
+--       chain
+--     ]
 
 tableUpsert :: [Text] -> Text
 tableUpsert = csv . map go
@@ -272,16 +272,16 @@ mappingTableName cn n m =
   let (cn', n') = constructTableNameParameters cn n
    in MappingTableName cn' n' m
 
-createExpandIndexTable ::
-  OutputM m =>
-  IORef Globals ->
-  ContractF () ->
-  (Text, Text) ->
-  ConduitM () Text m [ForeignKeyInfo]
-createExpandIndexTable g c nameParts = do
-  creationForeignKeys <- createIndexTable g c nameParts
-  expansionForeignKeys <- expandIndexTable g c nameParts
-  return $ creationForeignKeys ++ expansionForeignKeys
+-- createExpandIndexTable ::
+--   OutputM m =>
+--   IORef Globals ->
+--   ContractF () ->
+--   (Text, Text) ->
+--   ConduitM () Text m [ForeignKeyInfo]
+-- createExpandIndexTable g c nameParts = do
+--   creationForeignKeys <- createIndexTable g c nameParts
+--   expansionForeignKeys <- expandIndexTable g c nameParts
+--   return $ creationForeignKeys ++ expansionForeignKeys
 
 createExpandAbstractTable ::
   OutputM m =>
@@ -437,26 +437,26 @@ getDeferredForeignKeysForMapping tableName cn =
       }
   ]
 
-createIndexTable ::
-  OutputM m=>
-  IORef Globals ->
-  ContractF () ->
-  (Text, Text) ->
-  ConduitM () Text m [ForeignKeyInfo]
-createIndexTable globalsIORef contract (cn, n) = do
-  let tableName = indexTableName cn n
-  tableExists <- isTableCreated globalsIORef tableName
+-- createIndexTable ::
+--   OutputM m=>
+--   IORef Globals ->
+--   ContractF () ->
+--   (Text, Text) ->
+--   ConduitM () Text m [ForeignKeyInfo]
+-- createIndexTable globalsIORef contract (cn, n) = do
+--   let tableName = indexTableName cn n
+--   tableExists <- isTableCreated globalsIORef tableName
 
-  --When contract hasn't been written to "contract" table and indexing table doesn't exist
-  $logDebugLS "createIndexTable/tableExists" ("Table Name: " ++ show tableName ++ ", contract already created: " ++ show tableExists)
-  if tableExists 
-    then return []
-    else do
-      incNumTables
-      yield $ createIndexTableQuery contract (cn, n)
-      let list = tableColumns $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
-      setTableCreated globalsIORef tableName list
-      return $ []
+--   --When contract hasn't been written to "contract" table and indexing table doesn't exist
+--   $logDebugLS "createIndexTable/tableExists" ("Table Name: " ++ show tableName ++ ", contract already created: " ++ show tableExists)
+--   if tableExists 
+--     then return []
+--     else do
+--       incNumTables
+--       yield $ createIndexTableQuery contract (cn, n)
+--       let list = tableColumns $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
+--       setTableCreated globalsIORef tableName list
+--       return $ []
 
 createAbstractTable ::
   OutputM m =>
@@ -537,15 +537,15 @@ createHistoryTable globalsIORef contract (cn, n) = do
     setTableCreated globalsIORef tableName list
 
 -- Runs ALTER TABLE <name> [ADD COLUMN <column>] for any new fields added to a contract definition
-expandIndexTable ::
-  OutputM m =>
-  IORef Globals ->
-  ContractF () ->
-  (Text, Text) ->
-  ConduitM () Text m [ForeignKeyInfo]
-expandIndexTable globalsIORef contract (cn, n) = do
-  let tableName = indexTableName cn n
-  expandContractTable globalsIORef contract tableName
+-- expandIndexTable ::
+--   OutputM m =>
+--   IORef Globals ->
+--   ContractF () ->
+--   (Text, Text) ->
+--   ConduitM () Text m [ForeignKeyInfo]
+-- expandIndexTable globalsIORef contract (cn, n) = do
+--   let tableName = indexTableName cn n
+--   expandContractTable globalsIORef contract tableName
 
 expandAbstractTable ::
   OutputM m =>
@@ -619,54 +619,54 @@ expandContractTable' globalsIORef contract tableName = do
                   }
           _ -> []
 
-expandContractTable ::
-  OutputM m =>
-  IORef Globals ->
-  ContractF () ->
-  TableName ->
-  ConduitM () Text m [ForeignKeyInfo]
-expandContractTable globalsIORef contract tableName = do
-  columns <- getTableColumns globalsIORef tableName
-  case columns of
-    Nothing -> do
-      $logErrorLS "expandTable" $
-        T.concat
-          [ "Table ",
-            (tableNameToText tableName),
-            " does not exist, but we are trying to expand it?"
-          ]
-      return []
-    Just cols -> do
-      let list = fillFirstEmptyEntries . map (fmap _varType) . Map.toList $ Map.mapKeys labelToText $ contract ^. storageDefs
-          difference new old = filter ((`notElem` old) . fst) new
-          extras = difference list (partialParseTableColumns cols)
-          extraTableColumns = tableColumns extras
-      unless (null extraTableColumns) $ do
-        $logInfoS "expandTable" . T.pack $ "We just got new fields for a contract that already has a table!"
-        $logInfoS "expandTable" $
-          T.concat
-            [ "Adding columns to ",
-              (tableNameToText tableName),
-              " for the following new fields: ",
-              T.intercalate ", " extraTableColumns
-            ]
-        setTableCreated globalsIORef tableName $ cols ++ extraTableColumns
-        yield $ expandTableQuery tableName extraTableColumns
-      return $
-        case tableName of
-          IndexTableName cn n ->
-            flip
-              map
-              [(colName, foreignName) | (colName, SVMType.Contract foreignName) <- extras]
-              $ \(colName, foreignName) ->
-                ForeignKeyInfo
-                  { tableName = tableName,
-                    columnName = colName,
-                    foreignTableName =
-                      let cn' = case cn of "" -> n; _ -> cn
-                       in indexTableName cn' $ labelToText foreignName
-                  }
-          _ -> []
+-- expandContractTable ::
+--   OutputM m =>
+--   IORef Globals ->
+--   ContractF () ->
+--   TableName ->
+--   ConduitM () Text m [ForeignKeyInfo]
+-- expandContractTable globalsIORef contract tableName = do
+--   columns <- getTableColumns globalsIORef tableName
+--   case columns of
+--     Nothing -> do
+--       $logErrorLS "expandTable" $
+--         T.concat
+--           [ "Table ",
+--             (tableNameToText tableName),
+--             " does not exist, but we are trying to expand it?"
+--           ]
+--       return []
+--     Just cols -> do
+--       let list = fillFirstEmptyEntries . map (fmap _varType) . Map.toList $ Map.mapKeys labelToText $ contract ^. storageDefs
+--           difference new old = filter ((`notElem` old) . fst) new
+--           extras = difference list (partialParseTableColumns cols)
+--           extraTableColumns = tableColumns extras
+--       unless (null extraTableColumns) $ do
+--         $logInfoS "expandTable" . T.pack $ "We just got new fields for a contract that already has a table!"
+--         $logInfoS "expandTable" $
+--           T.concat
+--             [ "Adding columns to ",
+--               (tableNameToText tableName),
+--               " for the following new fields: ",
+--               T.intercalate ", " extraTableColumns
+--             ]
+--         setTableCreated globalsIORef tableName $ cols ++ extraTableColumns
+--         yield $ expandTableQuery tableName extraTableColumns
+--       return $
+--         case tableName of
+--           IndexTableName cn n ->
+--             flip
+--               map
+--               [(colName, foreignName) | (colName, SVMType.Contract foreignName) <- extras]
+--               $ \(colName, foreignName) ->
+--                 ForeignKeyInfo
+--                   { tableName = tableName,
+--                     columnName = colName,
+--                     foreignTableName =
+--                       let cn' = case cn of "" -> n; _ -> cn
+--                        in indexTableName cn' $ labelToText foreignName
+--                   }
+--           _ -> []
 
 expandAbstractContractTable ::
   OutputM m =>
@@ -702,7 +702,7 @@ expandAbstractContractTable globalsIORef contract tableName _ _ = do
               T.intercalate ", " extraTableColumns
             ]
         setTableCreated globalsIORef tableName $ cols ++ extraTableColumns
-        yield $ expandTableQuery tableName extraTableColumns
+        yield $ expandAbstractTableQuery tableName extraTableColumns
       case tableName of
         -- AbstractTableName cn _ -> getDeferredForeignKeysAbstract tableName contract cn abstracts' cc
         _ -> return $ []
@@ -717,12 +717,22 @@ expandTableQuery tableName cols =
       ";"
     ]
 
-insertIndexTable ::
-  OutputM m =>
-  E.ProcessedContract ->
-  ConduitM () Text m ()
-insertIndexTable contract = do
-  yield $ insertIndexTableQuery contract
+expandAbstractTableQuery :: TableName -> TableColumns -> Text
+expandAbstractTableQuery tableName cols =
+  T.concat
+    [ "ALTER TABLE ",
+      tableNameToDoubleQuoteText tableName,
+      " ADD COLUMN ",
+      T.intercalate ", ADD COLUMN " cols,
+      ";"
+    ]
+    
+-- insertIndexTable ::
+--   OutputM m =>
+--   E.ProcessedContract ->
+--   ConduitM () Text m ()
+-- insertIndexTable contract = do
+--   yield $ insertIndexTableQuery contract
 
 insertMappingTable ::
   OutputM m =>
@@ -736,41 +746,41 @@ insertMappingTable maps = do
       results = concat $ map insertMappingTableQuery grouped
   yieldMany $ results
 
-insertForeignKeys ::
-  (MonadLogger m, MonadUnliftIO m) =>
-  PGConnection ->
-  E.ProcessedContract ->
-  m ()
-insertForeignKeys conn contract = do
-  let c@E.ProcessedContract {commonName = cn, contractName = cName, contractData = contractData} = contract
-      tableName = indexTableName cn cName
+-- insertForeignKeys ::
+--   (MonadLogger m, MonadUnliftIO m) =>
+--   PGConnection ->
+--   E.ProcessedContract ->
+--   m ()
+-- insertForeignKeys conn contract = do
+--   let c@E.ProcessedContract {commonName = cn, contractName = cName, contractData = contractData} = contract
+--       tableName = indexTableName cn cName
 
-  --There are still reasons why a foreign key insertion might fail
-  --  1. The field type was changed in a solidity contract version update
-  --  2. solidity uses inheritance, and the foreign key points to the parent table
-  --  3. The user just sets a variable to a made up invalid address (0x1234)
-  --When an invalid foreign pointer is set, STRATO's stated behavior will be to set the value to null
-  forM_ [(n, a) | (n, ValueContract a) <- Map.toList $ contractData] $ \(theName, acct) ->
-    do
-      dbQuery conn $
-        "UPDATE "
-          <> tableNameToDoubleQuoteText tableName
-          <> " SET "
-          <> wrapDoubleQuotes theName
-          <> "="
-          <> wrapSingleQuotes (escapeQuotes $ T.pack $ show acct)
-          <> " WHERE address="
-          <> wrapSingleQuotes (makeAccount (E.chain c) (E.address c))
-          <> ";"
-      `catch` \(e :: SomeException) -> do
-        $logInfoS "insertHistoryTable" $ T.pack $ "foreign key update failed, value will be set to null: " ++ show e
-        dbQueryCatchError conn $
-          "UPDATE "
-            <> tableNameToDoubleQuoteText tableName
-            <> " SET "
-            <> wrapDoubleQuotes theName
-            <> "=null WHERE address="
-            <> wrapSingleQuotes (makeAccount (E.chain c) (E.address c))
+--   --There are still reasons why a foreign key insertion might fail
+--   --  1. The field type was changed in a solidity contract version update
+--   --  2. solidity uses inheritance, and the foreign key points to the parent table
+--   --  3. The user just sets a variable to a made up invalid address (0x1234)
+--   --When an invalid foreign pointer is set, STRATO's stated behavior will be to set the value to null
+--   forM_ [(n, a) | (n, ValueContract a) <- Map.toList $ contractData] $ \(theName, acct) ->
+--     do
+--       dbQuery conn $
+--         "UPDATE "
+--           <> tableNameToDoubleQuoteText tableName
+--           <> " SET "
+--           <> wrapDoubleQuotes theName
+--           <> "="
+--           <> wrapSingleQuotes (escapeQuotes $ T.pack $ show acct)
+--           <> " WHERE address="
+--           <> wrapSingleQuotes (makeAccount (E.chain c) (E.address c))
+--           <> ";"
+--       `catch` \(e :: SomeException) -> do
+--         $logInfoS "insertHistoryTable" $ T.pack $ "foreign key update failed, value will be set to null: " ++ show e
+--         dbQueryCatchError conn $
+--           "UPDATE "
+--             <> tableNameToDoubleQuoteText tableName
+--             <> " SET "
+--             <> wrapDoubleQuotes theName
+--             <> "=null WHERE address="
+--             <> wrapSingleQuotes (makeAccount (E.chain c) (E.address c))
 
 insertHistoryTable ::
   OutputM m =>
@@ -795,25 +805,25 @@ insertAbstractTable cs@((_, abTableName, _) : _) = do
   multilineLog "insertAbstractTable/processedContract" $ show cs
   yieldMany $ insertAbstractTableQuery cs
 
-createIndexTableQuery :: ContractF () -> (Text, Text) -> Text
-createIndexTableQuery contract (cn, n) =
-  let tableName = indexTableName cn n
-      list = Map.toList $ contract ^. storageDefs
-   in T.concat
-        [ "CREATE TABLE IF NOT EXISTS ",
-          tableNameToDoubleQuoteText tableName,
-          " (",
-          csv $
-            [ "address text",
-              "block_hash text",
-              "block_timestamp text",
-              "block_number text",
-              "transaction_hash text",
-              "transaction_sender text"
-            ]
-              ++ tableColumns (map (\(x, y) -> (labelToText x, y ^. varType)) list),
-          ",\n  PRIMARY KEY (address) );"
-        ]
+-- createIndexTableQuery :: ContractF () -> (Text, Text) -> Text
+-- createIndexTableQuery contract (cn, n) =
+--   let tableName = indexTableName cn n
+--       list = Map.toList $ contract ^. storageDefs
+--    in T.concat
+--         [ "CREATE TABLE IF NOT EXISTS ",
+--           tableNameToDoubleQuoteText tableName,
+--           " (",
+--           csv $
+--             [ "address text",
+--               "block_hash text",
+--               "block_timestamp text",
+--               "block_number text",
+--               "transaction_hash text",
+--               "transaction_sender text"
+--             ]
+--               ++ tableColumns (map (\(x, y) -> (labelToText x, y ^. varType)) list),
+--           ",\n  PRIMARY KEY (address) );"
+--         ]
 
 createMappingTableQuery :: (Text, Text, Text) -> Text
 createMappingTableQuery (cn, n, m) =
@@ -898,41 +908,41 @@ addHistoryUnique (cn, n) =
           <> ";"
       ]
 
-insertIndexTableQuery :: E.ProcessedContract -> Text
-insertIndexTableQuery cs = 
-    let cs' = (\c@E.ProcessedContract {contractData = contractData} -> (c, Map.toList $ Map.mapMaybe valueToSQLTextFilterContract $ contractData)) cs
-        processContract (contract, list) =
-            let tableName = indexTableName (E.commonName contract) (E.contractName contract)
-                keySt = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
-                baseVals =
-                  [ tshow . E.address,
-                    T.pack . keccak256ToHex . E.blockHash,
-                    tshow . E.blockTimestamp,
-                    tshow . E.blockNumber,
-                    T.pack . keccak256ToHex . E.transactionHash,
-                    tshow . E.transactionSender
-                  ]
-                insert = wrapAndEscape $ map (wrapSingleQuotes . ($ contract)) baseVals ++ map snd list
-            in T.concat
-                    [ "INSERT INTO ",
-                      tableNameToDoubleQuoteText tableName,
-                      " ",
-                      keySt,
-                      "\n  VALUES ",
-                      insert,
-                      [r|
-  ON CONFLICT (address) DO UPDATE SET
-    address = excluded.address,
-    block_hash = excluded.block_hash,
-    block_timestamp = excluded.block_timestamp,
-    block_number = excluded.block_number,
-    transaction_hash = excluded.transaction_hash,
-    transaction_sender = excluded.transaction_sender|],
-                      if null list then "" else ",\n    ",
-                      tableUpsert $ map fst list,
-                      ";"
-                    ]
-    in processContract cs'
+-- insertIndexTableQuery :: E.ProcessedContract -> Text
+-- insertIndexTableQuery cs = 
+--     let cs' = (\c@E.ProcessedContract {contractData = contractData} -> (c, Map.toList $ Map.mapMaybe valueToSQLTextFilterContract $ contractData)) cs
+--         processContract (contract, list) =
+--             let tableName = indexTableName (E.commonName contract) (E.contractName contract)
+--                 keySt = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
+--                 baseVals =
+--                   [ tshow . E.address,
+--                     T.pack . keccak256ToHex . E.blockHash,
+--                     tshow . E.blockTimestamp,
+--                     tshow . E.blockNumber,
+--                     T.pack . keccak256ToHex . E.transactionHash,
+--                     tshow . E.transactionSender
+--                   ]
+--                 insert = wrapAndEscape $ map (wrapSingleQuotes . ($ contract)) baseVals ++ map snd list
+--             in T.concat
+--                     [ "INSERT INTO ",
+--                       tableNameToDoubleQuoteText tableName,
+--                       " ",
+--                       keySt,
+--                       "\n  VALUES ",
+--                       insert,
+--                       [r|
+--   ON CONFLICT (address) DO UPDATE SET
+--     address = excluded.address,
+--     block_hash = excluded.block_hash,
+--     block_timestamp = excluded.block_timestamp,
+--     block_number = excluded.block_number,
+--     transaction_hash = excluded.transaction_hash,
+--     transaction_sender = excluded.transaction_sender|],
+--                       if null list then "" else ",\n    ",
+--                       tableUpsert $ map fst list,
+--                       ";"
+--                     ]
+--     in processContract cs'
 
 
 insertMappingTableQuery :: [ProcessedMappingRow] -> [Text]

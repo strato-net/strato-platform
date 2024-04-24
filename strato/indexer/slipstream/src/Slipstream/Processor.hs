@@ -303,10 +303,7 @@ processTheMessages env conn messages = do
                 _ <- outputData conn $ createExpandAbstractTable g c nameParts abstracts' cc
                 -- $logInfoS "processTheMessages/deferredForeignKeys/abstractfkeys" $ T.pack $ show abstractfkeys
                 return []
-              _ -> do
-                indexfkeys <- outputData conn $ createExpandIndexTable g c nameParts
-                $logInfoS "processTheMessages/deferredForeignKeys/indexfkeys" $ T.pack $ show indexfkeys
-                return indexfkeys
+              _ -> return []
 
             $logInfoS "processTheMessages/deferredForeignKeys" $ T.pack $ show deferredForeignKeys
 
@@ -399,13 +396,13 @@ processTheMessages env conn messages = do
   forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
 
   forM_ insertsByCodeHash $ \ins -> do
-    outputData conn $ insertIndexTable $ indexInsert ins
+    -- outputData conn $ insertIndexTable $ indexInsert ins
     outputData conn $ insertHistoryTable $ historyInserts ins
     unless ((length (mappingInserts ins) < 1)) $ outputData conn $ insertMappingTable $ mappingInserts ins
     outputData conn $ insertAbstractTable $ abstractInsert ins
 
-  forM_ insertsByCodeHash $ \ins -> do
-    insertForeignKeys conn $ indexInsert ins
+  -- forM_ insertsByCodeHash $ \ins -> do
+  --   insertForeignKeys conn $ indexInsert ins
 
   let concatFkeys = concat fkeys
   forM_ concatFkeys $ \deferredForeignKey -> do
