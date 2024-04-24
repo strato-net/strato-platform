@@ -173,7 +173,7 @@ const TopSellingProductCard = () => {
     <div>
       {contextHolder}
       <Fade triggerOnce>
-        <div className="pt-10 md:pt-16 pr-2 md:pr-10 flex justify-between">
+        <div className="pt-5 pr-2 md:pr-10 flex justify-between">
           <Title className="md:px-10 !text-xl md:!text-4xl !text-left">
             Trending in All Categories
           </Title>
