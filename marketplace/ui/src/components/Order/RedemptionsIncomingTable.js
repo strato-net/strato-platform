@@ -1,13 +1,11 @@
 import React, { useEffect, useState } from "react";
 import DataTableComponent from "../DataTableComponent";
-import { getStringDate } from "../../helpers/utils";
 import { actions } from "../../contexts/redemption/actions";
-import { US_DATE_FORMAT, REDEMPTION_STATUS } from "../../helpers/constants";
+import { REDEMPTION_STATUS } from "../../helpers/constants";
 import { Input, Pagination, Dropdown, Button, Space } from "antd";
 import "./ordersTable.css"
 import { DownOutlined, SearchOutlined, UpOutlined, DownloadOutlined } from "@ant-design/icons";
-import { ResponsiveOrderCard } from "./ResponsiveOrdersCard";
-import { ResponsiveTransferOrderCard } from "./ResponsiveTransferOrdersCard";
+import { ResponsiveRedemptionsCard } from "./ResponsiveRedemptionsCard";
 import classNames from "classnames";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import routes from "../../helpers/routes";
@@ -240,12 +238,13 @@ const RedemptionsIncomingTable = ({ user, download, isAllOrdersLoading }) => {
                     </Button>
                 </Dropdown>
             </div>
-            {/* <div className="flex md:hidden order_responsive">
-                <ResponsiveTransferOrderCard
+            <div className="flex md:hidden order_responsive">
+                <ResponsiveRedemptionsCard
                     data={data}
-                    isLoading={isFetchingItemTransfers}
+                    isLoading={isFetchingIncomingRedemptions}
+                    category={"incoming"}
                 />
-            </div> */}
+            </div>
             <div className="hidden md:block mt-5">
                 <DataTableComponent
                     columns={column}

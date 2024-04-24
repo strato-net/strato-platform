@@ -10,6 +10,7 @@ import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/mark
 import { MinusCircleOutlined } from '@ant-design/icons';
 import AddressComponent from "../MarketPlace/AddressComponent";
 import AddAddressModal from "../MarketPlace/AddAddressModal";
+import ResponsiveAddAddress from "../MarketPlace/ResponsiveAddAddress"
 import { Images } from "../../images";
 import { REDEMPTION_STATUS } from "../../helpers/constants";
 
@@ -22,16 +23,19 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
     const marketplaceDispatch = useMarketplaceDispatch();
     const [canRedeem, setCanRedeem] = useState(true);
     const [selectedAddress, setSelectedAddress] = useState(0);
-    const [modalAddress, setmodalAddress] = useState(false);
-    const [showAddress, setshowAddress] = useState(false);
+    const [showModal, setshowModal] = useState(false);
+    const [showResponsiveForm, setShowResponsiveForm] = useState(false);
     const { user } = useAuthenticateState();
     const { isRequestingRedemption } = useRedemptionState();
     const { userAddresses, isLoadingUserAddresses } = useMarketplaceState();
     const { TextArea } = Input;
 
     const closeAddressModel = () => {
-        setmodalAddress(false);
-        setshowAddress(false);
+        setshowModal(false);
+    }
+
+    const closeResponsiveAddressModel = () => {
+        setShowResponsiveForm(false);
     }
 
     useEffect(() => {
@@ -100,7 +104,7 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
             centered
             footer={[
                 <div className="flex justify-center md:block">
-                    <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canRedeem} loading={isRequestingRedemption}>
+                    <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canRedeem || showResponsiveForm} loading={isRequestingRedemption}>
                         Redeem
                     </Button>
                 </div>
@@ -114,29 +118,23 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
                 />
                 <div className="flex gap-4 mt-4">
                     <p className="text-base md:text-xl lg:text-2xl text-[#202020] font-semibold ">Address Details</p>
-                    {showAddress ?
+                    {showModal ?
                         <MinusCircleOutlined className="text-xl text-primary"
                             onClick={() => {
-                                setshowAddress(false);
+                                setshowModal(false);
                             }}
                         />
                         :
                         <>
-                            <div className="hidden md:block"><Button type="link" icon={<img src={Images.AddBlack} className=" w-4 h-4 lg:w-6 lg:h-6 " alt="add" />}
+                            <div className="hidden md:block"><Button type="link" icon={<img src={Images.AddBlack} className="w-4 h-4 lg:w-6 lg:h-6 " alt="add" />}
                                 onClick={() => {
-                                    setshowAddress(true);
-                                    setmodalAddress(true);
+                                    setshowModal(true);
                                 }}
                             /></div>
-                            {/* <div className="  md:hidden"><Button type="link" icon={<img src={Images.AddBlack} className=" w-4 h-4 lg:w-6 lg:h-6 " alt="add" />}
-                            onClick={() => {
-                                setResponsiveAddress(true);
-                            }}
-                        /></div> */}
                         </>
                     }
                 </div>
-                {modalAddress && <AddAddressModal open={modalAddress} close={closeAddressModel} />}
+                {showModal && <AddAddressModal open={showModal} close={closeAddressModel} />}
                 {isLoadingUserAddresses ?
                     <div className="h-80 flex justify-center items-center">
                         <Spin spinning={isLoadingUserAddresses} size="large" />
@@ -162,19 +160,75 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
                         </div>
                 }
             </div>
+            {/****** MOBILE VIEW ******/}
             <div className="flex flex-col gap-[18px] md:hidden mt-5">
-                <div> <p className="text-[#202020] font-medium text-sm">Quantity Available</p>
-                    <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center ">
-                        <p className="px-5 "> {inventory?.quantity}</p>
+                <div>
+                    <p className="text-[#202020] font-medium text-sm">Quantity Available</p>
+                    <div className="inventory_card">
+                        <InputNumber className="w-full pl-5" value={data[0].quantity} min={1} disabled />
                     </div>
                 </div>
                 <div>
-
                     <p className="text-[#202020] font-medium text-sm">Set Quantity</p>
                     <div className="inventory_card">
                         <InputNumber className="w-full pl-5" value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
                     </div>
                 </div>
+                <div>
+                    <p className="text-[#202020] font-medium text-sm">Additional comments</p>
+                    <div className="inventory_card">
+                        <TextArea className="w-full pl-5" value={comments} onChange={(e) => setComments(e.target.value)} />
+                    </div>
+                </div>
+                {isLoadingUserAddresses ?
+                    <div className="h-80 flex justify-center items-center">
+                        <Spin spinning={isLoadingUserAddresses} size="large" />
+                    </div>
+                    :
+                    <>
+                        <div className="flex items-center gap-4 mt-4">
+                            <p className="text-base md:text-xl lg:text-2xl text-[#202020] font-semibold">Address Details</p>
+                            {showResponsiveForm ?
+                                <MinusCircleOutlined className="text-xl text-primary"
+                                    onClick={() => {
+                                        setShowResponsiveForm(false);
+                                    }}
+                                />
+                                :
+                                <div className="md:hidden">
+                                    <Button
+                                        type="link"
+                                        icon={<img src={Images.AddBlack} className=" w-4 h-4 lg:w-6 lg:h-6 " alt="add" />}
+                                        onClick={() => {
+                                            setShowResponsiveForm(true)
+                                        }}
+                                    />
+                                </div>
+                            }
+                        </div>
+                        <div>
+                            {userAddresses.length !== 0 ?
+                                <div className="grid grid-cols-1 grid-flow-row gap-4 overflow-x-auto hide-Scroll pt-4 h-[50%]">
+                                    {
+                                        userAddresses.map((add, index) =>
+                                            <div key={index}>
+                                                <div className={`w-full h-[200px] overflow-x-auto hide-Scroll py-3 px-[14px] rounded-[4px] ${index !== selectedAddress ? " cursor-pointer border border-[#0000002E] " : " border border-primary cursor-pointer"}`} onClick={() => { setSelectedAddress(index) }}>
+                                                    <AddressComponent userAddress={add} />
+                                                </div>
+                                            </div>
+                                        )
+                                    }
+                                </div>
+                                :
+                                <div className="flex justify-center items-center h-48 ">
+                                    <p className="text-2xl font-semibold text-[#202020]">
+                                        Please Add Address
+                                    </p>
+                                </div>}
+                        </div>
+                    </>
+                }
+                {showResponsiveForm && <ResponsiveAddAddress open={showResponsiveForm} close={closeResponsiveAddressModel}/>}
             </div>
         </Modal>
     )

@@ -141,13 +141,6 @@ const RedemptionsIncomingDetails = ({ user }) => {
                 </p>
             ),
         },
-        // {
-        //     title: <Text className="text-primaryC text-[13px]">Unit Price($)</Text>,
-        //     dataIndex: "unitPrice",
-        //     key: "unitPrice",
-        //     align: "center",
-        //     render: (text) => <p>{text}</p>,
-        // },
         {
             title: <Text className="text-primaryC text-[13px]">Quantity</Text>,
             dataIndex: "quantity",
@@ -155,20 +148,6 @@ const RedemptionsIncomingDetails = ({ user }) => {
             align: "center",
             render: (text) => <p>{text}</p>,
         },
-        // {
-        //     title: <Text className="text-primaryC text-[13px]">Tax($)</Text>,
-        //     dataIndex: "tax",
-        //     key: "tax",
-        //     align: "center",
-        //     render: (text) => <p>{text}</p>,
-        // },
-        // {
-        //     title: <Text className="text-primaryC text-[13px]">Amount($)</Text>,
-        //     dataIndex: "amount",
-        //     key: "amount",
-        //     align: "center",
-        //     render: (text) => <p>{text}</p>,
-        // },
     ];
 
     const openToastOrder = (placement) => {
@@ -270,7 +249,7 @@ const RedemptionsIncomingDetails = ({ user }) => {
                                                     </div>
                                                 </div>
                                                 {redemption.status == REDEMPTION_STATUS.PENDING &&
-                                                    <div className="flex gap-4 mr-4 mt-2">
+                                                    <div className="flex gap-4 mr-4 mt-2 justify-center">
                                                         <Button
                                                             type="primary"
                                                             loading={isClosingRedemption}
@@ -315,100 +294,21 @@ const RedemptionsIncomingDetails = ({ user }) => {
                                                     title="Status"
                                                     value={statusComponent(redemption.status)}
                                                 />
-                                                {/* {
-                                                    status !== getStatus(1) || details.paymentSessionId !== "" ? <Col>
-                                                        <Text className="block text-primaryC text-[13px] mb-2">
-                                                            Status
-                                                        </Text>
-                                                        {statusComponent(status)}
-                                                    </Col> :
-                                                        <div>
-                                                            <Row className="items-center mb-2 gap-1">
-                                                                <Select
-                                                                    bordered={false}
-                                                                    defaultValue=""
-                                                                    value="STATUS"
-                                                                    size="small"
-                                                                    className="text-primaryC text-[13px]"
-                                                                    style={{
-                                                                        width: 120,
-                                                                        color: "#4E4D4B",
-                                                                    }}
-                                                                    options={
-                                                                        status === getStatus(1)
-                                                                            ? [
-                                                                                {
-                                                                                    text: getStatus(1),
-                                                                                    value: getStatus(1),
-                                                                                },
-                                                                                {
-                                                                                    text: getStatus(4),
-                                                                                    value: getStatus(4),
-                                                                                },
-                                                                            ]
-                                                                            : status === getStatus(2)
-                                                                                ? [
-                                                                                    {
-                                                                                        text: getStatus(2),
-                                                                                        value: getStatus(2),
-                                                                                    },
-                                                                                ]
-                                                                                : status === getStatus(4)
-                                                                                    ? [
-                                                                                        {
-                                                                                            text: getStatus(4),
-                                                                                            value: getStatus(4),
-                                                                                        },
-                                                                                    ]
-                                                                                    : [
-                                                                                        {
-                                                                                            text: getStatus(3),
-                                                                                            value: getStatus(3),
-                                                                                        },
-                                                                                    ]
-                                                                    }
-                                                                />
-                                                            </Row>
-                                                            {statusComponent(status)}
-                                                        </div>
-                                                } */}
-                                                {/* <div className="text-xs order_detail_date">
-                                                    <Text className="block text-primaryC text-[13px]">
-                                                        Order Close Date
-                                                    </Text>
-                                                    <DatePicker
-                                                        value={
-                                                            selectedDate
-                                                        }
-                                                        onChange={onDateChange}
-                                                        disabled={status === getStatus(3) || status === getStatus(4)}
-                                                    />
-                                                </div> */}
                                             </Row>
-                                            {/* <Row className="my-2 md:hidden flex-col gap-[6px] justify-between p-4 rounded">
+                                            <Row className="my-2 md:hidden flex-col gap-[6px] justify-between p-4 rounded">
                                                 <div className="flex gap-4">
-                                                    <NewOrderData className="w-2/4" title="Order Number" value={'#' + details.order.orderId} />
-                                                    <NewOrderData className="w-2/4" title="Buyer" value={details.order.purchasersCommonName} />
+                                                    <NewOrderData className="w-2/4" title="Redemption Number" value={'#' + redemption.redemption_id} />
+                                                    <NewOrderData className="w-2/4" title="Issuer" value={redemption.issuerCommonName} />
                                                 </div>
                                                 <div className="flex gap-4">
-                                                    <NewOrderData className="w-2/4" title="Seller" value={details.order.sellersCommonName} />
-                                                    <NewOrderData className="w-2/4" title="Total($)" value={'$' + details.order.totalPrice} />
+                                                    <NewOrderData className="w-2/4" title="Requestor" value={redemption.ownerCommonName} />
+                                                    <NewOrderData className="w-2/4" title="Asset Name" value={redemption.assetName} />
                                                 </div>
                                                 <div className="flex justify-between mobile_order_detail_card">
-                                                    <NewOrderData className="w-2/4" title="Date" value={getStringDate(details.order.createdDate, US_DATE_FORMAT)} />
-                                                    <NewOrderData className="w-2/4" title="Order Close Date"
-                                                        value={
-                                                            <DatePicker
-                                                                value={selectedDate}
-                                                                onChange={onDateChange}
-                                                                disabled={status === getStatus(3) || status === getStatus(4)}
-                                                            />} />
+                                                    <NewOrderData className="w-2/4" title="Date" value={redemption.createdDate} />
+                                                    <NewOrderData className="w-2/4" title="Status" value={statusComponent(redemption.status)} />
                                                 </div>
-                                                <div className="flex justify-between">
-                                                    <NewOrderData className="w-2/4" title="Status" value={statusComponent(status)} />
-                                                    <NewOrderData className="w-2/4" title="Payment Status" value={statusComponentForPayment(paid)} />
-                                                </div>
-                                            </Row> */}
+                                            </Row>
                                             <Row className="flex-nowrap items-center justify-between mb-2 md:mb-6 p-2">
                                                 <div className="w-full">
                                                     <Text className="block text-primaryC text-[13px] mb-2">

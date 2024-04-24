@@ -217,7 +217,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
               :
               (inventory.status == ASSET_STATUS.PENDING_REDEMPTION) ?
                 <div className="flex items-center justify-center gap-2 bg-[#FFA50029] p-[6px] rounded-md">
-                  <div className="w-[12px] h-[7px] rounded-full bg-[#FFA500]"></div>
+                  <div className="w-[7px] sm:w-[12px] h-[7px] rounded-full bg-[#FFA500]"></div>
                   <p className="text-[#4D4D4D] text-[13px]">Pending Redemption</p>
                 </div>
                 :
