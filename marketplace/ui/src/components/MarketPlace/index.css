@@ -3,18 +3,6 @@
   padding: 14px;
 }
 
-@media (max-width: 1024px) {
-  .mobile-hide {
-    display: none;
-  }
-}
-
-@media (min-width: 1025px) {
-  .desktop-hide {
-    display: none !important;
-  }
-}
-
 img.ant-image-preview-img {
   display: inline-block;
 }
