@@ -12,7 +12,7 @@ trap "docker rm -f ${REDIS}" EXIT
 
 cd strato
 
-stack test $1\
+stack test $4\
       blockapps-data \
       blockapps-init \
       blockapps-mpdbs \
@@ -28,6 +28,7 @@ stack test $1\
       fast-keccak256 \
       format \
       labeled-error \
+      highway/ --test-arguments="--awsaccesskeyid $1 --awssecretaccesskey $2 --awss3bucket $3" \
       merkle-patricia-db \
       seqevents \
       slipstream \
