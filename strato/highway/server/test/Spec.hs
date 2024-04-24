@@ -143,9 +143,9 @@ fourMBBasicTest highwaytestnetaccesskeyid
         let gets3filetesting' = runClientM (highwayGetS3FileTesting hash')
         eresponse'            <- liftIO $ gets3filetesting' gets3filetestingclientenv
         case eresponse' of
-          Left clienterr ->
+          Left clienterr      ->
             assertFailure $ show clienterr
-          Right (rsp,_)  -> do
+          Right (rsp,content) -> do
             cr                     <- Aws.makeCredentials (DBC8.pack highwaytestnetaccesskeyid)
                                                           (DBC8.pack highwaytestnetsecretaccesskey)
             let cfg                = Aws.Configuration { Aws.timeInfo    = Aws.Timestamp
@@ -167,8 +167,9 @@ fourMBBasicTest highwaytestnetaccesskeyid
                                          ( T.unpack hash'
                                          )
                                          ""
-            rsp    `shouldBe` status200
-            hash'' `shouldBe` contenthash
+            rsp                       `shouldBe` status200
+            hash''                    `shouldBe` contenthash
+            (contentTypeBody content) `shouldBe` fourmbtestdata
 
 fiveMBBasicTest :: String
                 -> String
@@ -223,9 +224,9 @@ fiveMBBasicTest highwaytestnetaccesskeyid
         let gets3filetesting' = runClientM (highwayGetS3FileTesting hash')
         eresponse'            <- liftIO $ gets3filetesting' gets3filetestingclientenv
         case eresponse' of
-          Left clienterr ->
+          Left clienterr      ->
             assertFailure $ show clienterr
-          Right (rsp,_)  -> do
+          Right (rsp,content) -> do
             cr                     <- Aws.makeCredentials (DBC8.pack highwaytestnetaccesskeyid)
                                                           (DBC8.pack highwaytestnetsecretaccesskey)
             let cfg                = Aws.Configuration { Aws.timeInfo    = Aws.Timestamp
@@ -247,8 +248,9 @@ fiveMBBasicTest highwaytestnetaccesskeyid
                                          ( T.unpack hash'
                                          )
                                          ""
-            rsp    `shouldBe` status200
-            hash'' `shouldBe` contenthash
+            rsp                       `shouldBe` status200
+            hash''                    `shouldBe` contenthash
+            (contentTypeBody content) `shouldBe` fivembtestdata
 
 sixMBBasicTest :: Text
                -> Spec
