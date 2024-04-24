@@ -25,7 +25,6 @@ module Slipstream.OutputData (
   insertAbstractTableQuery,
   createIndexTable,
   createMappingTable,
-  createHistoryTable,
   createAbstractTable,
   insertHistoryTable,
   createExpandEventTables,
@@ -48,6 +47,7 @@ import           Control.Arrow                   ((***))
 import           Control.Lens ((^.))
 import           Control.Monad
 import qualified Data.Aeson                      as Aeson
+import           Data.Bool                       (bool)
 import qualified Data.ByteString.Base16         as Base16
 import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString                 as B
@@ -349,12 +349,13 @@ notifyPostgREST conn = do
 
 createExpandHistoryTable ::
   OutputM m =>
+  Bool ->
   IORef Globals ->
   ContractF () ->
   (Text, Text) ->
   ConduitM () (Text, Maybe (IORef Globals, TableName, TableColumns)) m ()
-createExpandHistoryTable g c nameParts = do
-  createHistoryTable' g c nameParts
+createExpandHistoryTable isAbstract g c nameParts = do
+  createHistoryTable' isAbstract g c nameParts
   expandHistoryTable g c nameParts
 
 -- getDeferredForeignKeys :: TableName -> ContractF () -> Text -> [ForeignKeyInfo]
@@ -500,11 +501,12 @@ createMappingTable globalsIORef (cn, n) m = do
 
 createHistoryTable' ::
   OutputM m =>
+  Bool ->
   IORef Globals ->
   ContractF () ->
   (Text, Text) ->
   ConduitM () (Text, Maybe (IORef Globals, TableName, TableColumns)) m ()
-createHistoryTable' globalsIORef contract (cn, n) = do
+createHistoryTable' isAbstract globalsIORef contract (cn, n) = do
   let tableName = historyTableName cn n
   tableExists <- isTableCreated globalsIORef tableName
 
@@ -512,27 +514,8 @@ createHistoryTable' globalsIORef contract (cn, n) = do
 
   when (not tableExists) $ do
     incNumHistoryTables
-    yield $ ((createHistoryTableQuery contract (cn, n)), Nothing)
+    yield $ ((createHistoryTableQuery isAbstract contract (cn, n)), Nothing)
     yieldMany $ map (\x -> (x, Nothing)) (addHistoryUnique (cn, n))
-    let list = tableColumns $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
-    setTableCreated globalsIORef tableName list
-
-createHistoryTable ::
-  OutputM m =>
-  IORef Globals ->
-  ContractF () ->
-  (Text, Text) ->
-  ConduitM () Text m ()
-createHistoryTable globalsIORef contract (cn, n) = do
-  let tableName = historyTableName cn n
-  tableExists <- isTableCreated globalsIORef tableName
-
-  $logDebugLS "createHistoryTable'/tableExists" ("Table Name: " ++ show tableName ++ ", table exists: " ++ formatBool tableExists)
-
-  when (not tableExists) $ do
-    incNumHistoryTables
-    yield $ createHistoryTableQuery contract (cn, n)
-    yieldMany $ addHistoryUnique (cn, n)
     let list = tableColumns $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
     setTableCreated globalsIORef tableName list
 
@@ -795,6 +778,26 @@ insertAbstractTable cs@((_, abTableName, _) : _) = do
   multilineLog "insertAbstractTable/processedContract" $ show cs
   yieldMany $ insertAbstractTableQuery cs
 
+baseColumnsQuery :: [Text]
+baseColumnsQuery = 
+  [ 
+    "address text",
+    "block_hash text",
+    "block_timestamp text",
+    "block_number text",
+    "transaction_hash text",
+    "transaction_sender text"
+  ]
+
+abstractBaseColumnsQuery :: [Text]
+abstractBaseColumnsQuery = 
+  baseColumnsQuery ++ 
+  [
+    "creator text",
+    "contract_name text",
+    "data jsonb"
+  ]
+
 createIndexTableQuery :: ContractF () -> (Text, Text) -> Text
 createIndexTableQuery contract (cn, n) =
   let tableName = indexTableName cn n
@@ -803,15 +806,7 @@ createIndexTableQuery contract (cn, n) =
         [ "CREATE TABLE IF NOT EXISTS ",
           tableNameToDoubleQuoteText tableName,
           " (",
-          csv $
-            [ "address text",
-              "block_hash text",
-              "block_timestamp text",
-              "block_number text",
-              "transaction_hash text",
-              "transaction_sender text"
-            ]
-              ++ tableColumns (map (\(x, y) -> (labelToText x, y ^. varType)) list),
+          csv $ baseColumnsQuery ++ tableColumns (map (\(x, y) -> (labelToText x, y ^. varType)) list),
           ",\n  PRIMARY KEY (address) );"
         ]
 
@@ -822,14 +817,8 @@ createMappingTableQuery (cn, n, m) =
         [ "CREATE TABLE IF NOT EXISTS ",
           tableNameToDoubleQuoteText tableName,
           " (",
-          csv $
-            [ "address text",
-              "block_hash text",
-              "block_timestamp text",
-              "block_number text",
-              "transaction_hash text",
-              "transaction_sender text",
-              "contract_name text",
+          csv $ baseColumnsQuery ++
+            [ "contract_name text",
               "mapname text",
               "key text",
               "value text"
@@ -845,23 +834,12 @@ createAbstractTableQuery contract (cn, n) =
         [ "CREATE TABLE IF NOT EXISTS ",
           tableNameToDoubleQuoteText tableName,
           " (",
-          csv $
-            [ "address text",
-              "block_hash text",
-              "block_timestamp text",
-              "block_number text",
-              "transaction_hash text",
-              "transaction_sender text",
-              "creator text",
-              "contract_name text",
-              "data jsonb"
-            ]
-              ++ tableColumns (map (\(x, y) -> (labelToText x, y ^. varType)) list),
+          csv $ abstractBaseColumnsQuery ++ tableColumns (map (\(x, y) -> (labelToText x, y ^. varType)) list),
           ",\n  PRIMARY KEY (address));"
         ]
 
-createHistoryTableQuery :: ContractF () -> (Text, Text) -> Text
-createHistoryTableQuery contract (cn, n) =
+createHistoryTableQuery :: Bool -> ContractF () -> (Text, Text) -> Text
+createHistoryTableQuery isAbstract contract (cn, n) =
   let tableName = historyTableName cn n
       list = Map.toList $ contract ^. storageDefs
    in T.concat
@@ -869,13 +847,7 @@ createHistoryTableQuery contract (cn, n) =
           tableNameToDoubleQuoteText tableName,
           " (",
           csv $
-            [ "address text NOT NULL",
-              "block_hash text NOT NULL",
-              "block_timestamp text",
-              "block_number text",
-              "transaction_hash text NOT NULL",
-              "transaction_sender text"
-            ]
+            (bool baseColumnsQuery abstractBaseColumnsQuery isAbstract)
               ++ tableColumns (map (\(x, y) -> (labelToText x, y ^. varType)) list),
           ");"
         ]

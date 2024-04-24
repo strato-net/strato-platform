@@ -301,16 +301,17 @@ processTheMessages env conn messages = do
             deferredForeignKeys <- case (_contractType c) of
               AbstractType -> do
                 _ <- outputData conn $ createExpandAbstractTable g c nameParts abstracts' cc
+                outputData' conn $ createExpandHistoryTable True g c nameParts
                 -- $logInfoS "processTheMessages/deferredForeignKeys/abstractfkeys" $ T.pack $ show abstractfkeys
                 return []
               _ -> do
                 indexfkeys <- outputData conn $ createExpandIndexTable g c nameParts
                 $logInfoS "processTheMessages/deferredForeignKeys/indexfkeys" $ T.pack $ show indexfkeys
+                outputData' conn $ createExpandHistoryTable False g c nameParts
                 return indexfkeys
 
             $logInfoS "processTheMessages/deferredForeignKeys" $ T.pack $ show deferredForeignKeys
 
-            outputData' conn $ createExpandHistoryTable g c nameParts
 
             outputData conn $ createExpandEventTables g c nameParts
 
