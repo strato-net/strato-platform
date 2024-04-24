@@ -9,7 +9,7 @@
 module Main where
 
 import           API
---import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Keccak256
 import           Options
 import           Strato.Monad
 import           Strato.Client
@@ -128,19 +128,19 @@ fourMBBasicTest highwaytestnetaccesskeyid
       Left clienterr ->
         assertFailure $ "Error: \n" ++ show clienterr
       Right response -> do
-        let hash               = T.pack $
-                                   subRegex ( mkRegex ((T.unpack highwaytestneturl) ++ "/highway/")
-                                            )
-                                            ( T.unpack response
-                                            )
-                                            ""
+        let hash'               = T.pack $
+                                    subRegex ( mkRegex ((T.unpack highwaytestneturl) ++ "/highway/")
+                                             )
+                                             ( T.unpack response
+                                             )
+                                             ""
         let gets3filetestingclientenv = mkClientEnv mgr
                                                     BaseUrl { baseUrlScheme = Http
                                                             , baseUrlHost   = (T.unpack highwaytestneturl)
                                                             , baseUrlPort   = 8080
                                                             , baseUrlPath   = "" 
                                                             }
-        let gets3filetesting' = runClientM (highwayGetS3FileTesting hash)
+        let gets3filetesting' = runClientM (highwayGetS3FileTesting hash')
         eresponse'            <- liftIO $ gets3filetesting' gets3filetestingclientenv
         case eresponse' of
           Left clienterr ->
@@ -157,8 +157,18 @@ fourMBBasicTest highwaytestnetaccesskeyid
             _ <-
               runResourceT $
                 Aws.pureAws cfg s3cfg mgr $
-                  S3.DeleteObject hash highwaytestnets3bucket
-            rsp `shouldBe` status200
+                  S3.DeleteObject hash' highwaytestnets3bucket
+            let contenthash = T.pack . keccak256ToHex $
+                                hash                  $
+                                  DBL.toStrict fourmbtestdata
+            let hash''      = T.pack $
+                                subRegex ( mkRegex ".txt"
+                                         )
+                                         ( T.unpack hash'
+                                         )
+                                         ""
+            rsp    `shouldBe` status200
+            hash'' `shouldBe` contenthash
 
 fiveMBBasicTest :: String
                 -> String
@@ -198,19 +208,19 @@ fiveMBBasicTest highwaytestnetaccesskeyid
       Left clienterr -> 
         assertFailure $ "Error: \n" ++ show clienterr
       Right response -> do
-        let hash               = T.pack $
-                                   subRegex ( mkRegex ((T.unpack highwaytestneturl) ++ "/highway/")
-                                            )
-                                            ( T.unpack response
-                                            )
-                                            ""
+        let hash'               = T.pack $
+                                    subRegex ( mkRegex ((T.unpack highwaytestneturl) ++ "/highway/")
+                                             )
+                                             ( T.unpack response
+                                             )
+                                             ""
         let gets3filetestingclientenv = mkClientEnv mgr
                                                     BaseUrl { baseUrlScheme = Http
                                                             , baseUrlHost   = (T.unpack highwaytestneturl)
                                                             , baseUrlPort   = 8080
                                                             , baseUrlPath   = "" 
                                                             }
-        let gets3filetesting' = runClientM (highwayGetS3FileTesting hash)
+        let gets3filetesting' = runClientM (highwayGetS3FileTesting hash')
         eresponse'            <- liftIO $ gets3filetesting' gets3filetestingclientenv
         case eresponse' of
           Left clienterr ->
@@ -227,8 +237,18 @@ fiveMBBasicTest highwaytestnetaccesskeyid
             _ <-
               runResourceT $
                 Aws.pureAws cfg s3cfg mgr $
-                  S3.DeleteObject hash highwaytestnets3bucket
-            rsp `shouldBe` status200
+                  S3.DeleteObject hash' highwaytestnets3bucket
+            let contenthash = T.pack . keccak256ToHex $
+                                hash                  $
+                                  DBL.toStrict fivembtestdata
+            let hash''      = T.pack $
+                                subRegex ( mkRegex ".txt"
+                                         )
+                                         ( T.unpack hash'
+                                         )
+                                         ""
+            rsp    `shouldBe` status200
+            hash'' `shouldBe` contenthash
 
 sixMBBasicTest :: Text
                -> Spec
