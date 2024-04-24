@@ -90,7 +90,7 @@ Object.freeze(SERVICE_PROVIDERS)
 // Helpers to calculate average price, range, units sold for Pirce History Stats
 export const calculateAveragePrice = (records) => {
   const total = records.reduce((sum, record) => sum + Number(record.price), 0);
-  return (total / records.length).toFixed(3);
+  return (total / records.length).toFixed(2);
 }
 
 
