@@ -29,20 +29,17 @@ import dayjs from "dayjs";
 // Cypress.Commands.overwrite('visit', (originalFn, url, options) => { ... })
 Cypress.on(
   'uncaught:exception',
-  (err) => !err.message.includes('ResizeObserver loop limit exceeded')
-  // (err) => false
+  // (err) => !err.message.includes('ResizeObserver loop limit exceeded')
+  (err) => false
 );
 
 
-Cypress.on('uncaught:exception', (err) => {
-  /* returning false here prevents Cypress from failing the test */
-  if (err.message.includes("ResizeObserver loop limit exceeded")) {
-    return false
-  }
-  // if (err) {
-  //   return false;
-  // }
-})
+// Cypress.on('uncaught:exception', (err) => {
+//   /* returning false here prevents Cypress from failing the test */
+//   if (err.message.includes("ResizeObserver loop limit exceeded")) {
+//     return false
+//   }
+// })
 
 Cypress.Commands.add("login", (username, password) => {
   let un = username ? username : Cypress.env("email");

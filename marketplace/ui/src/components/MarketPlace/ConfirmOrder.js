@@ -491,7 +491,7 @@ const ConfirmOrder = () => {
                     />
                     :
                     <>
-                      <div id="add-Address" className="hidden md:block">
+                      <div id="add-Address-card-btn" className="hidden md:block">
                         <Button type="link" icon={<img src={Images.AddBlack} className=" w-4 h-4 lg:w-6 lg:h-6 " alt="add" />}
                         onClick={() => {
                           setshowAddress(true);
@@ -507,8 +507,8 @@ const ConfirmOrder = () => {
                   }
                 </Row>
                 {modalAddress && <AddAddressModal open={modalAddress} close={CloseAddressModel} />}
-                <div>
-                  <div id="address-list-block" className="mt-4">
+                <div id="address-list-block">
+                  <div id="address-list-block-div" className="mt-4">
                     {isAddingShippingAddress || isLoadingUserAddresses || isLoadingStripeStatus ?
                       <div className="h-80 flex justify-center items-center">
                         <Spin spinning={isAddingShippingAddress || isLoadingUserAddresses || isLoadingStripeStatus} size="large" />
@@ -527,7 +527,7 @@ const ConfirmOrder = () => {
                           }
                         </div>
                         :
-                        <div className="flex justify-center items-center h-48 ">
+                        <div id="add-address-text" className="flex justify-center items-center h-48 ">
                           <p className="text-2xl font-semibold text-[#202020]">
                             Please Add Address
                           </p>
