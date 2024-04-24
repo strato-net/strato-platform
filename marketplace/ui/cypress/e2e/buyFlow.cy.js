@@ -5,13 +5,7 @@ describe('Create a new Asset', () => {
   const userName = `User-${dayjs().unix()}`;
   const artistName = `User-${dayjs().unix()}`;
 
-  // beforeEach(function () {
-  //   cy.visit('/');
-  //   cy.get("#Login").click();
-  //   cy.login();
-  // });
-
-  it.only('It should add a new product', () => {
+  it('It should add a new product', () => {
     cy.visit('/');
     cy.get("#Login").click();
     cy.login(Cypress.env("sellerEmail"), Cypress.env("sellerPassword"))
@@ -52,7 +46,25 @@ describe('Create a new Asset', () => {
     cy.get("#createItemSubmit")
     cy.get("#createItemSubmit").click()
     cy.wait(7000)
-    cy.get("#user-dropdown").click()
+    cy.url().should("exist", "myitems");
+    cy.get(`#asset-${productName}`)
+
+    cy.get(`#asset-${productName}`).within(() => {
+      cy.get("#sell-listing-btn").click();
+    });
+    cy.get("#sellPrice")
+    cy.get("#sellPrice").type('321')
+    cy.get("#asset-update-list").click()
+    cy.wait(15000)
+
+    // cy.get("#asset-card-unlist-btn").click()
+    // cy.get("#modal-unlist-btn").click()
+
+
+    // cy.get('#sell-listing-btn')
+    // cy.get("#user-dropdown").click()
+    cy.get("#logout").click()
+    
 
   })
 
@@ -63,10 +75,10 @@ describe('Create a new Asset', () => {
     cy.visit('/');
     cy.get("#viewAll").click();
     cy.get("#product-list");
-    // cy.get(`asset-${productName}`)
-    // cy.get(`asset-${productName}`).click()
-    cy.get("#productCard")
-    cy.get("#productCard").first().click();
+    cy.get(`asset-${productName}`)
+    cy.get(`asset-${productName}`).click()
+    // cy.get("#productCard")
+    // cy.get("#productCard").first().click();
     cy.get('#price').then(productPrice => {
       cy.get('#buyNow').click();
       cy.wait(5000);
