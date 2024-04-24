@@ -24,6 +24,7 @@ import RestStatus from 'http-status-codes';
 import certificateJs from "/dapp/certificates/certificate";
 
 import artJs from "/dapp/items/art";
+import tokensJs from "/dapp/items/tokens";
 import carbonOffsetJs from "/dapp/items/carbonOffset";
 import metalsJs from "/dapp/items/metals";
 import clothingJs from "/dapp/items/clothing";
@@ -606,6 +607,24 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   // ------------------------------ ART ENDS --------------------------------
+
+  // ------------------------------ TOKENS STARTS ------------------------------
+
+  contract.createTokens = async function (args, options = defaultOptions) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const newArgs = {
+      ...args.itemArgs,
+      createdDate
+    };
+    return tokensJs.uploadContract(rawAdmin, newArgs, options);
+  };
+
+  contract.getTokens = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName, };
+    return tokensJs.getAll(rawAdmin, args, getOptions);
+  };
+
+  // ------------------------------ TOKENS ENDS --------------------------------
 
   // ------------------------------ CARBONOFFSET STARTS------------------------------
 
