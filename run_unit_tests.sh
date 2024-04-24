@@ -44,7 +44,7 @@ stack test $1\
       vm-runner \
       x509-certs
 
-if [ $1 = --coverage ]
+if [ $4 = --coverage ]
 then
       rm -rf hpc
       mkdir hpc
