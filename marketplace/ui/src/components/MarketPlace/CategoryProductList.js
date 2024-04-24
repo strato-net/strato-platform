@@ -248,7 +248,6 @@ const CategoryProductList = ({ user }) => {
     }
   }
 
-  console.log("offset", offset)
   const checkValues = (e, arr) => {
     let tempValues = [...arr];
     const existingIndex = tempValues.indexOf(e.target.value);
@@ -270,7 +269,6 @@ const CategoryProductList = ({ user }) => {
   const onChangeAvailability = (checkedValues) =>{
     setSelectedAvailability(checkedValues);
   }
-  console.log("offset", offset)
   const addItemToCart = async (product, quantity) => {
     if (product.ownerCommonName === user?.commonName) {
       openToast("bottom", true, "Cannot buy your own item");

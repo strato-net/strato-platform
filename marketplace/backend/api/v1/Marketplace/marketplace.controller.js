@@ -15,7 +15,6 @@ class MarketplaceController {
       let finalInventory = MarketplaceController.getFinalInventory(inventories, forSale, soldOut)
       const paginatedInventory = finalInventory.slice(offset, offset + limit);
 
-      // rest.response.status200(res, { productsWithImageUrl: finalInventory, inventoryCount: finalInventory?.length })
       rest.response.status200(res, {
         productsWithImageUrl: paginatedInventory,
         inventoryCount: finalInventory.length 
@@ -35,7 +34,6 @@ class MarketplaceController {
       const inventories = await dapp.getMarketplaceInventoriesLoggedIn({ ...restQuery })
       let finalInventory = MarketplaceController.getFinalInventory(inventories, forSale, soldOut)
       
-      // rest.response.status200(res, { productsWithImageUrl: finalInventory, inventoryCount: finalInventory?.length })
       const paginatedInventory = finalInventory.slice(offset, offset + limit);
 
       rest.response.status200(res, {
