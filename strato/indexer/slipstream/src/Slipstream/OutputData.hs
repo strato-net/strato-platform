@@ -1026,8 +1026,10 @@ insertAbstractTableQuery cs isHistoric =
                       "\n  VALUES ",
                       inserts
                     ] ++
-                    if (not isHistoric) 
+                    if isHistoric
                       then
+                        [[r| ON CONFLICT DO NOTHING;|]]
+                      else
                           [[r|
                           ON CONFLICT (address) DO UPDATE SET
                             block_hash = excluded.block_hash,
@@ -1041,8 +1043,6 @@ insertAbstractTableQuery cs isHistoric =
                           if null list' then "" else ",\n    ",
                           tableUpsert $ list',
                           ";"]
-                      else
-                        [[r| ON CONFLICT DO NOTHING;|]]
 
 insertHistoryTableQuery :: [E.ProcessedContract] -> [Text]
 insertHistoryTableQuery [] = error "insertHistoryTableQuery: unhandled empty list"
