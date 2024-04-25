@@ -83,7 +83,7 @@ mergeDiffs lhs rhs = error $ "Invalid diff combination: " ++ show (lhs, rhs)
 
 data BatchedInserts = BatchedInserts
   { indexInsert :: ProcessedContract,
-    abstractInsert :: [(ProcessedContract, Map.Map Text NamedAccount ,T.Text, TableColumns)],
+    abstractInsert :: [(ProcessedContract,[T.Text],T.Text, TableColumns)],
     historyInserts :: [ProcessedContract],
     mappingInserts :: [ProcessedMappingRow]
   }
@@ -247,11 +247,12 @@ getMapNamesFromContract c =
       listOfMappingsWithRecords = filter (\(_, vd) -> _isRecord vd) listOfMappings
    in T.pack . fst <$> listOfMappingsWithRecords
 
--- Function to extract ValueContract from ProcessedContract
-extractFkeys :: ProcessedContract -> Map.Map Text NamedAccount
-extractFkeys pc = Map.foldrWithKey (\k v acc -> case v of
-    ValueContract na -> Map.insert k na acc
-    _ -> acc) Map.empty (contractData pc)
+getContractsFromPC :: ProcessedContract -> [Text]
+getContractsFromPC pc = Map.keys $ Map.filter isValueContract (contractData pc)
+  where
+    isValueContract :: Value -> Bool
+    isValueContract (ValueContract _) = True
+    isValueContract _ = False
 
 processTheMessages ::
   ( MonadLogger m,
@@ -382,7 +383,7 @@ processTheMessages env conn messages = do
           $logDebugLS "Contract name is: " $ T.pack $ show name
           oldState <- readPreviousSolidVMState g acct
           indexContract <- rowToInsert g abiid row cont oldState
-          fkeys <- extractFkeys indexContract
+          let fkeys = getContractsFromPC indexContract
           hs <- rowToHistories g abiid actions cont oldState
           let mapNames = actionMappings row
               abstracts = actionAbstracts row
