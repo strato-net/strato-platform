@@ -94,8 +94,8 @@ class StripeService {
         try {
             return stripe.accountLinks.create({
                 account: stripeAccountId,
-                refresh_url: `${marketplaceUrl}/inventories/stripe/onboarding`,
-                return_url: `${marketplaceUrl}/myitems`,
+                refresh_url: `${marketplaceUrl}/myItems/stripe/onboarding`,
+                return_url: `${marketplaceUrl}/myItems`,
                 type: 'account_onboarding',
             });
         } catch (e) {
