@@ -9,9 +9,6 @@ import {
   fetchAccountDetail,
   fetchAccountDetailSuccess,
   fetchAccountDetailFailure,
-  faucetRequest,
-  faucetSuccess,
-  faucetFailure,
   resetUserAddress,
   fetchBalanceRequest,
   fetchBalanceSuccess,
@@ -120,25 +117,6 @@ describe('Accounts: action', () => {
     });
 
   })
-
-  describe('fetch faucet', () => {
-
-    test('request', () => {
-      let address = '76a3192ce9aa0531fe7e0e3489a469018c0bff03';
-      let name = 'blockapps';
-      let flag = 'faucet';
-      expect(faucetRequest(address, name, flag)).toMatchSnapshot();
-    });
-
-    test('success', () => {
-      expect(faucetSuccess()).toMatchSnapshot();
-    });
-
-    test('failure', () => {
-      expect(faucetFailure(error)).toMatchSnapshot();
-    });
-
-  });
 
   describe('fetch balance', () => {
 

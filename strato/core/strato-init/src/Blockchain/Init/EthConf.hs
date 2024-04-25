@@ -7,15 +7,12 @@ import Blockchain.EthConf
 import Blockchain.Init.Options
 import Blockchain.Strato.Model.Address
 import Control.Concurrent
-import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Char8 as C8
 import Data.Maybe
 import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Network.HTTP.Types.Status
 import Servant.Client
 import qualified Strato.Strato23.API as VC
 import Strato.Strato23.Client
-import System.Entropy
 import Text.Format
 
 defaultSqlConfig :: SqlConf
@@ -61,14 +58,6 @@ defaultBlockConfig =
       minBlockDifficulty = 131072
     }
 
-defaultEthUniqueId :: EthUniqueId
-defaultEthUniqueId =
-  EthUniqueId
-    { peerId = "",
-      genesisHash = "",
-      networkId = 0
-    }
-
 defaultQuarryConfig :: QuarryConf
 defaultQuarryConfig =
   QuarryConf
@@ -97,8 +86,7 @@ defaultRedisBlockDBConfig =
 defaultConfig :: EthConf
 defaultConfig =
   EthConf
-    { ethUniqueId = defaultEthUniqueId,
-      sqlConfig = defaultSqlConfig,
+    { sqlConfig = defaultSqlConfig,
       cirrusConfig = defaultCirrusConfig,
       redisBlockDBConfig = defaultRedisBlockDBConfig,
       levelDBConfig = defaultLevelDBConfig,
@@ -177,7 +165,6 @@ genEthConf = do
   putStrLn $ "the node's public key: " ++ format pub
   putStrLn $ "the node's address: " ++ format addr
 
-  bytes <- getEntropy 20
   let user'' = case maybePGuser of
         Nothing -> "postgres"
         Just "" -> "postgres"
@@ -200,21 +187,10 @@ genEthConf = do
                 { lazyBlocks = flags_lazyblocks
                 }
           }
-  let uniqueString = C8.unpack . B16.encode $ bytes
-      pgCfg = sqlConfig cfg
-      db = database pgCfg
-      db' = db ++ "_" ++ uniqueString
-      pgCfg'' = pgCfg {database = db'}
-      kafkaCfg = defaultKafkaConfig {kafkaHost = kafkaHostFlag}
 
   return
     cfg
-      { sqlConfig = pgCfg'',
-        kafkaConfig = kafkaCfg,
-        ethUniqueId =
-          defaultEthUniqueId
-            { peerId = uniqueString
-            },
+      { kafkaConfig = defaultKafkaConfig {kafkaHost = kafkaHostFlag},
         quarryConfig =
           (quarryConfig cfg)
             { coinbaseAddress = formatAddressWithoutColor addr

@@ -3,7 +3,6 @@ packages:
 - api/bloc/bloc2api
 - api/bloc/bloc2client
 - api/core
-- api/ethereum-jsonrpc
 - api/strato-api
 
 - core/blockapps-data
@@ -57,7 +56,6 @@ packages:
 - libs/json-rpc-server
 - libs/json-rpc-client
 - libs/labeled-error
-- libs/logserver
 - libs/kafka/milena
 - libs/kafka/milena-tools
 - libs/monad-alter

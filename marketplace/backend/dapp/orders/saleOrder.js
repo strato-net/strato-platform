@@ -159,7 +159,7 @@ function bindAddress(user, address, options) {
 
 async function get(user, args, options) {
   const { address, ...restArgs } = args;
-  const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
+  const newOptions = { ...options, org: 'BlockApps' }
   let order;
 
   const searchArgs = setSearchQueryOptions(restArgs, {
@@ -179,7 +179,7 @@ async function get(user, args, options) {
 
 async function getAll(admin, args = {}, options) {
   let saleOrders;
-  const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
+  const newOptions = { ...options, org: 'BlockApps' }
   saleOrders = await searchAllWithQueryArgs(constants.orderTableName, args, newOptions, admin);
 
   const count = await searchAllWithQueryArgs(

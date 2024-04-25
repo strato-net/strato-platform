@@ -13,7 +13,6 @@ import Control.Monad.Except (ExceptT (..))
 import Control.Monad.IO.Class
 import Control.Monad.Trans.State
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as B8
 import Data.String
 import Data.Yaml
 import qualified Database.Redis as Redis
@@ -57,10 +56,7 @@ mkConfiguredKafkaState cid = (mkKafkaState cid (kh, kp)) {_stateRequiredAcks = -
 
 lookupConsumerGroup :: KafkaClientId -> KP.ConsumerGroup
 lookupConsumerGroup "slipstream" = KP.ConsumerGroup "slipstream"
-lookupConsumerGroup kcid = KP.ConsumerGroup . KP.KString $ kStr `B8.append` nodeId
-  where
-    kStr = KP._kString kcid
-    nodeId = B8.pack $ "_" ++ peerId (ethUniqueId ethConf)
+lookupConsumerGroup kcid = KP.ConsumerGroup . KP.KString $ KP._kString kcid
 
 lookupRedisBlockDBConfig :: Redis.ConnectInfo
 lookupRedisBlockDBConfig = redisConnection $ redisBlockDBConfig ethConf

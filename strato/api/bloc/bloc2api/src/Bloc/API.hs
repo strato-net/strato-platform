@@ -30,8 +30,6 @@ import Servant.Docs
 type BlocAPI =
   -- / endpoint, for smoke test. Also exports git details.
   GetGitInfo
-    -- /users endpoints
-    :<|> PostUsersFill
     -- /contracts endpoints
     :<|> GetContracts
     :<|> PostContractsBatchStates
@@ -57,7 +55,6 @@ type BlocAPI =
     :<|> GetChainInfo
     -- /transaction endpoints
     :<|> PostBlocTransactionParallel
-    :<|> PostBlocTransactionRaw
     :<|> PostBlocTransactionBody
     :<|> PostBlocTransactionUnsigned
     :<|> PostBlocTransaction
