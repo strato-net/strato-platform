@@ -23,6 +23,7 @@ module Slipstream.OutputData (
   insertMappingTableQuery,
   insertAbstractTable,
   insertAbstractTableQuery,
+  insertHistoryAbstractTable,
   createIndexTable,
   createMappingTable,
   createAbstractTable,
@@ -790,15 +791,27 @@ insertHistoryTable contracts@(E.ProcessedContract {commonName = cn, contractName
   $logDebugLS "insertHistoryTable" $ T.pack $ "Inserting row in history table for: " ++ show tableName
   yieldMany $ insertHistoryTableQuery contracts
 
+insertHistoryAbstractTable :: 
+  OutputM m => 
+  [(E.ProcessedContract, T.Text, TableColumns)] ->
+  [E.ProcessedContract] ->
+  ConduitM () Text m ()
+insertHistoryAbstractTable [] _ = pure ()
+insertHistoryAbstractTable _ [] = pure ()
+insertHistoryAbstractTable abstracts hists = do 
+  let historyAbstracts = [(history, tableName, tableCols) | history <- hists, (_, tableName, tableCols) <- abstracts]
+  yieldMany $ insertAbstractTableQuery historyAbstracts True
+
 insertAbstractTable ::
   OutputM m =>
   [(E.ProcessedContract, T.Text, TableColumns)] ->
+  Bool ->
   ConduitM () Text m ()
-insertAbstractTable [] = pure ()
-insertAbstractTable cs@((_, abTableName, _) : _) = do
+insertAbstractTable [] _ = pure ()
+insertAbstractTable cs@((_, abTableName, _) : _) isHistoric = do
   $logInfoS "insertAbstractTable" $ T.pack $ "Inserting row in abstract table for: " ++ show abTableName
   multilineLog "insertAbstractTable/processedContract" $ show cs
-  yieldMany $ insertAbstractTableQuery cs
+  yieldMany $ insertAbstractTableQuery cs isHistoric
 
 baseColumnsQuery :: [Text]
 baseColumnsQuery = 
@@ -978,9 +991,9 @@ insertMappingTableQuery ms =
                       ";"
                     ]
 
-insertAbstractTableQuery :: [(E.ProcessedContract, T.Text, TableColumns)] -> [Text]
-insertAbstractTableQuery [] = error "insertAbstractTableQuery: unhandled empty list"
-insertAbstractTableQuery cs =
+insertAbstractTableQuery :: [(E.ProcessedContract, T.Text, TableColumns)] -> Bool -> [Text]
+insertAbstractTableQuery [] _ = error "insertAbstractTableQuery: unhandled empty list"
+insertAbstractTableQuery cs isHistoric =
   concat $
     let cs' = (\(c@E.ProcessedContract {contractData = contractData}, ab, abColumns) -> ((c, Map.mapMaybe valueToSQLTextFilterContract $ contractData), (ab, abColumns))) <$> cs
      in flip map (map snd $ partitionWith ((length . snd) *** fst) cs') $ \case
@@ -1007,7 +1020,7 @@ insertAbstractTableQuery cs =
             in (: []) $
                   T.concat
                     [ "INSERT INTO ",
-                      abTableName,
+                      (bool abTableName ("history@" <> abTableName) isHistoric),
                       " ",
                       keySt,
                       "\n  VALUES ",
