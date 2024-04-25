@@ -1018,26 +1018,31 @@ insertAbstractTableQuery cs isHistoric =
                   wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ [wrapSingleQuotes $ escapeQuotes (tableNameToText contractTableName)] ++ [wrapSingleQuotes . decodeUtf8 . BL.toStrict $ Aeson.encode $ MapWrapper $ aesonHelper $ Map.filterWithKey (\k _ -> k `notElem` abColumns) contractColumns] ++ (map snd $ Map.toList (Map.filterWithKey (\k _ -> k `elem` abColumns) contractColumns))
                 inserts = csv vals
             in (: []) $
-                  T.concat
+                  T.concat $
                     [ "INSERT INTO ",
-                      (bool abTableName ("history@" <> abTableName) isHistoric),
+                      (bool abTableName (wrapDoubleQuotes $ "history@" <> unwrapDoubleQuotes abTableName) isHistoric),
                       " ",
                       keySt,
                       "\n  VALUES ",
-                      inserts,
-                      [r|
-  ON CONFLICT (address) DO UPDATE SET
-    block_hash = excluded.block_hash,
-    block_timestamp = excluded.block_timestamp,
-    block_number = excluded.block_number,
-    transaction_hash = excluded.transaction_hash,
-    transaction_sender = excluded.transaction_sender,
-    contract_name = excluded.contract_name,
-    data = excluded.data|],
-                      if null list' then "" else ",\n    ",
-                      tableUpsert $ list',
-                      ";"
-                    ]
+                      inserts
+                    ] ++
+                    if (not isHistoric) 
+                      then
+                          [[r|
+                          ON CONFLICT (address) DO UPDATE SET
+                            block_hash = excluded.block_hash,
+                            block_timestamp = excluded.block_timestamp,
+                            block_number = excluded.block_number,
+                            transaction_hash = excluded.transaction_hash,
+                            transaction_sender = excluded.transaction_sender,
+                            contract_name = excluded.contract_name,
+                            data = excluded.data
+                          |],
+                          if null list' then "" else ",\n    ",
+                          tableUpsert $ list',
+                          ";"]
+                      else
+                        [[r| ON CONFLICT DO NOTHING;|]]
 
 insertHistoryTableQuery :: [E.ProcessedContract] -> [Text]
 insertHistoryTableQuery [] = error "insertHistoryTableQuery: unhandled empty list"
