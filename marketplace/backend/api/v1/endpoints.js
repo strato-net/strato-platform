@@ -78,6 +78,12 @@ export const Art = {
   create: '/'
 }
 
+export const Tokens = {
+  prefix: '/tokens',
+  getAll: '/',
+  create: '/'
+}
+
 export const CarbonOffset = {
   prefix: '/carbonOffset',
   getAll: '/',
