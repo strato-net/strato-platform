@@ -1,6 +1,7 @@
 import React from 'react';
 import { ShoppingCartOutlined, CalendarOutlined, SwapOutlined } from '@ant-design/icons';
 import { Typography, Button } from 'antd';
+import dayjs from 'dayjs';
 
 const { Text } = Typography;
 
@@ -28,7 +29,7 @@ const ActivityFeed = ({ type, description, timestamp, href }) => {
           <Text>{description}</Text>
         </div>
         <div className="activity-time">
-          <Text type="secondary">{new Date(timestamp).toLocaleString()}</Text>
+          <Text type="secondary">{dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss')}</Text>
         </div>
       </div>
       <div className="activity-action">
