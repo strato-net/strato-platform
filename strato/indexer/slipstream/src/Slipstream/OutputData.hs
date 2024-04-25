@@ -709,7 +709,7 @@ expandAbstractContractTable globalsIORef contract tableName _ _ = do
               T.intercalate ", " extraTableColumns
             ]
         setTableCreated globalsIORef tableName $ cols ++ extraTableColumns
-        yield $ expandTableQuery tableName extraTableColumns
+        yield $ expandAbstractTableQuery tableName extraTableColumns
       case tableName of
         -- AbstractTableName cn _ -> getDeferredForeignKeysAbstract tableName contract cn abstracts' cc
         _ -> return $ []
@@ -719,9 +719,29 @@ expandTableQuery tableName cols =
   T.concat
     [ "ALTER TABLE ",
       tableNameToDoubleQuoteText tableName,
-      " ADD COLUMN ",
-      T.intercalate ", ADD COLUMN " cols,
+      " ADD COLUMN IF NOT EXISTS",
+      T.intercalate ", ADD COLUMN IF NOT EXISTS" cols,
       ";"
+    ]
+
+expandAbstractTableQuery :: TableName -> TableColumns -> Text
+expandAbstractTableQuery tableName cols =
+  T.concat
+    [ "ALTER TABLE ",
+      tableNameToDoubleQuoteText tableName,
+      " ADD COLUMN IF NOT EXISTS",
+      T.intercalate ", ADD COLUMN IF NOT EXISTS" cols,
+      ";",
+      "BEGIN; ALTER TABLE ",
+      tableNameToDoubleQuoteText tableName,
+      " ADD COLUMN IF NOT EXISTS creator text;",
+      "BEGIN; ALTER TABLE ",
+      tableNameToDoubleQuoteText tableName,
+      " ADD COLUMN IF NOT EXISTS contract_name text;",
+      "BEGIN; ALTER TABLE ",
+      tableNameToDoubleQuoteText tableName,
+      " ADD COLUMN IF NOT EXISTS data jsonb",
+      "; COMMIT;"
     ]
 
 insertIndexTable ::
