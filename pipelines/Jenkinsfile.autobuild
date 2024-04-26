@@ -436,13 +436,19 @@ pipeline {
         }
 
         stage('Strato unit tests') {
-          steps{
-            sh '''#!/bin/bash -le
+          steps {
+            withCredentials([
+            string(credentialsId: 'DEV_EXT_STORAGE_S3_ACCESS_KEY_ID', variable:'DEV_EXT_STORAGE_S3_ACCESS_KEY_ID'),
+            string(credentialsId: 'DEV_EXT_STORAGE_S3_SECRET_ACCESS_KEY', variable:'DEV_EXT_STORAGE_S3_SECRET_ACCESS_KEY'),
+          ]) {
+            sh """#!/bin/bash -le
               set -x
               echo "Running unit tests"
-              ./run_unit_tests.sh
-            '''
+                EXT_STORAGE_S3_BUCKET='mercata-dev-tests'
+              ./run_unit_tests.sh ${DEV_EXT_STORAGE_S3_ACCESS_KEY_ID} ${DEV_EXT_STORAGE_S3_SECRET_ACCESS_KEY} ${EXT_STORAGE_S3_BUCKET} localhost --coverage
+            """
             }
+          }
         }
 
         stage('SMD tests') {
