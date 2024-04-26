@@ -357,7 +357,7 @@ createExpandHistoryTable ::
   ConduitM () (Text, Maybe (IORef Globals, TableName, TableColumns)) m ()
 createExpandHistoryTable isAbstract g c nameParts = do
   createHistoryTable' isAbstract g c nameParts
-  expandHistoryTable g c nameParts
+  expandHistoryTable isAbstract g c nameParts
 
 -- getDeferredForeignKeys :: TableName -> ContractF () -> Text -> [ForeignKeyInfo]
 -- getDeferredForeignKeys tableName cn a =
@@ -545,13 +545,18 @@ expandAbstractTable globalsIORef contract (cn, n) abstracts' cc = do
 
 expandHistoryTable ::
   OutputM m =>
+  Bool ->
   IORef Globals ->
   ContractF () ->
   (Text, Text) ->
   ConduitM () (Text, Maybe (IORef Globals, TableName, TableColumns)) m ()
-expandHistoryTable globalsIORef contract (cn, n) = do
+expandHistoryTable isAbstract globalsIORef contract (cn, n) = do
   let tableName = historyTableName cn n
   _ <- expandContractTable' globalsIORef contract tableName
+  when (isAbstract) $ 
+    mapOutput 
+      (\o -> (o, Nothing)) 
+      (void $ expandAbstractContractTable globalsIORef contract tableName Map.empty emptyCodeCollection)
   return ()
 
 expandContractTable' ::
