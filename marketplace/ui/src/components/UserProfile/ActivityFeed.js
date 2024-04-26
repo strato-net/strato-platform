@@ -1,7 +1,6 @@
 import React from 'react';
 import { ShoppingCartOutlined, CalendarOutlined, SwapOutlined } from '@ant-design/icons';
 import { Typography, Button } from 'antd';
-import dayjs from 'dayjs';
 
 const { Text } = Typography;
 
@@ -19,6 +18,16 @@ const ActivityIcon = ({ type }) => {
 };
 
 const ActivityFeed = ({ type, description, timestamp, href }) => {
+  const timeDate = new Date(timestamp);
+  const year = timeDate.getFullYear();
+  const month = String(timeDate.getMonth() + 1).padStart(2, '0');
+  const day = String(timeDate.getDate()).padStart(2, '0');
+  const hour = String(timeDate.getHours()).padStart(2, '0');
+  const minute = String(timeDate.getMinutes()).padStart(2, '0');
+  const second = String(timeDate.getSeconds()).padStart(2, '0');
+  
+  const formattedDate = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+
   return (
     <div className="activity-item flex items-center py-4 border-b">
       <div className="activity-icon mr-4">
@@ -29,7 +38,7 @@ const ActivityFeed = ({ type, description, timestamp, href }) => {
           <Text>{description}</Text>
         </div>
         <div className="activity-time">
-          <Text type="secondary">{dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss')}</Text>
+          <Text type="secondary">{formattedDate}</Text>
         </div>
       </div>
       <div className="activity-action">
