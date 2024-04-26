@@ -552,12 +552,10 @@ expandHistoryTable ::
   ConduitM () (Text, Maybe (IORef Globals, TableName, TableColumns)) m ()
 expandHistoryTable isAbstract globalsIORef contract (cn, n) = do
   let tableName = historyTableName cn n
-  _ <- expandContractTable' globalsIORef contract tableName
-  when (isAbstract) $ 
-    mapOutput 
-      (\o -> (o, Nothing)) 
-      (void $ expandAbstractContractTable globalsIORef contract tableName Map.empty emptyCodeCollection)
-  return ()
+  void $ 
+    if isAbstract
+      then mapOutput (\o -> (o, Nothing)) $ expandAbstractContractTable globalsIORef contract tableName Map.empty emptyCodeCollection
+      else expandContractTable' globalsIORef contract tableName
 
 expandContractTable' ::
   OutputM m =>
@@ -669,7 +667,7 @@ expandAbstractContractTable globalsIORef contract tableName _ _ = do
   columns <- getTableColumns globalsIORef tableName
   case columns of
     Nothing -> do
-      $logErrorLS "expandTable" $
+      $logErrorLS "expandAbstractTable" $
         T.concat
           [ "Table ",
             (tableNameToText tableName),
@@ -682,8 +680,8 @@ expandAbstractContractTable globalsIORef contract tableName _ _ = do
           extras = difference list (partialParseTableColumns cols)
           extraTableColumns = tableColumns extras
       unless (null extraTableColumns) $ do
-        $logInfoS "expandTable" . T.pack $ "We just got new fields for a contract that already has a table!"
-        $logInfoS "expandTable" $
+        $logInfoS "expandAbstractTable" . T.pack $ "We just got new fields for a contract that already has a table!"
+        $logInfoS "expandAbstractTable" $
           T.concat
             [ "Adding columns to ",
               (tableNameToText tableName),
@@ -713,19 +711,10 @@ expandAbstractTableQuery tableName cols =
       tableNameToDoubleQuoteText tableName,
       " ADD COLUMN IF NOT EXISTS",
       T.intercalate ", ADD COLUMN IF NOT EXISTS" cols,
-      ";",
-      "BEGIN; ALTER TABLE ",
-      tableNameToDoubleQuoteText tableName,
-      " ADD COLUMN IF NOT EXISTS creator text",
-      "; COMMIT;",
-      "BEGIN; ALTER TABLE ",
-      tableNameToDoubleQuoteText tableName,
-      " ADD COLUMN IF NOT EXISTS contract_name text",
-      "; COMMIT;",
-      "BEGIN; ALTER TABLE ",
-      tableNameToDoubleQuoteText tableName,
-      " ADD COLUMN IF NOT EXISTS data jsonb",
-      "; COMMIT;"
+      ", ADD COLUMN IF NOT EXISTS creator text",
+      ", ADD COLUMN IF NOT EXISTS contract_name text",
+      ", ADD COLUMN IF NOT EXISTS data jsonb",
+      ";"
     ]
 
 insertIndexTable ::
