@@ -12,7 +12,7 @@ trap "docker rm -f ${REDIS}" EXIT
 
 cd strato
 
-stack test $4\
+stack test $5\
       blockapps-data \
       blockapps-init \
       blockapps-mpdbs \
@@ -28,7 +28,6 @@ stack test $4\
       fast-keccak256 \
       format \
       labeled-error \
-      highway/ --test-arguments="--awsaccesskeyid $1 --awssecretaccesskey $2 --awss3bucket $3" \
       merkle-patricia-db \
       seqevents \
       slipstream \
@@ -45,7 +44,10 @@ stack test $4\
       vm-runner \
       x509-certs
 
-if [ $4 = --coverage ]
+stack test $5\
+  highway/ --test-arguments="--awsaccesskeyid '$1' --awssecretaccesskey '$2' --awss3bucket '$3' --highwayUrl '$4'"
+
+if [ $5 = --coverage ]
 then
       rm -rf hpc
       mkdir hpc
