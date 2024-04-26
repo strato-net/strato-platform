@@ -45,7 +45,7 @@ stack test $5\
       x509-certs
 
 stack test $5\
-  highway/ --test-arguments="--awsaccesskeyid '$1' --awssecretaccesskey '$2' --awss3bucket '$3' --highwayUrl '$4'"
+  highway/ --test-arguments="--awsaccesskeyid $1 --awssecretaccesskey $2 --awss3bucket $3 --highwayUrl $4"
 
 if [ $5 = --coverage ]
 then
