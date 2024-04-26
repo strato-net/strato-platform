@@ -86,6 +86,11 @@ handleVmEvents ::
   (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) =>
   ConduitT VmInEventBatch VmOutEvent m ()
 handleVmEvents = awaitForever $ \InBatch {..} -> do
+  mpResps <- lift $ for mpNodesReqs $ \(o, srs) -> do
+    nds <- catMaybes <$> traverse (A.lookup (A.Proxy @MP.NodeData)) srs
+    pure $! OutMPNodesResponse o nds
+  yieldMany $! mpResps
+
   rpcResps <- lift $ do
     bbHash <- maybe Keccak256.zeroHash fst <$> getChainBestBlock Nothing
     resps <- withCurrentBlockHash bbHash $ traverse runJsonRpcCommand' rpcCommands

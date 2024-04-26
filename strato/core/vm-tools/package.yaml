@@ -20,6 +20,7 @@ library:
     - Blockchain.Data.ExecResults
     - Blockchain.DB.BlockSummaryDB
     - Blockchain.DB.ModifyStateDB
+    - Blockchain.StateRootMismatch
     - Blockchain.Stream.Action
     - Blockchain.Stream.VMEvent
     - Blockchain.Stream.VMOutput
