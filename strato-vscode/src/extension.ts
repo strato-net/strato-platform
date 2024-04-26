@@ -77,6 +77,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		if (addressRegex.test(argInput)) {
 			try {
 				const user = await getApplicationUser();
+				if (!user) return;
 				const options = getOptions() || {}
 				// check if the contract exists, err out otherwise
 				const res = await rest.getContractsDetails(user, { address: argInput }, options)
@@ -99,6 +100,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		if (Object.keys(tokens).length === 0) { return vscode.window.showErrorMessage('Please log in to STRATO Mercata to upload a contract.') }
 		const activeNode: number = await vscode.workspace.getConfiguration().get('strato-vscode.activeNode') || 0;
 		const user = await getApplicationUser(activeNode, tokens);
+		if (!user) return;
 		const nodeOptions = getOptions() || {}
 		if (vscode.window.activeTextEditor) {
 			vscode.window.activeTextEditor.document.save();
@@ -176,6 +178,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		if (Object.keys(tokens).length === 0) { return vscode.window.showErrorMessage('Please log in to STRATO Mercata to upload a contract.') }
 		const activeNode: number = await vscode.workspace.getConfiguration().get('strato-vscode.activeNode') || 0;
 		const user = await getApplicationUser(activeNode, tokens);
+		if (!user) return;
 		const nodeOptions = getOptions() || {}
 		const val = await rest.getContractsContract(user, contractName, contractAddress, chainId, nodeOptions);
 		const func = ((val || {})._functions || {})[variableName]

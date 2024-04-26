@@ -8,12 +8,17 @@ class MarketplaceController {
     try {
       const { dapp, query } = req
       const {soldOut, forSale , ...restQuery} =  query  
+      const limit = parseInt(req.headers['limit']) || 10; 
+      const offset = (parseInt(req.headers['offset']) - 1 || 0) * limit;
 
       const inventories = await dapp.getMarketplaceInventories({ ...restQuery })
       let finalInventory = MarketplaceController.getFinalInventory(inventories, forSale, soldOut)
+      const paginatedInventory = finalInventory.slice(offset, offset + limit);
 
-      rest.response.status200(res, { productsWithImageUrl: finalInventory, inventoryCount: finalInventory?.length })
-
+      rest.response.status200(res, {
+        productsWithImageUrl: paginatedInventory,
+        inventoryCount: finalInventory.length 
+      });
       return next()
     } catch (e) {
       return next(e)
@@ -23,12 +28,18 @@ class MarketplaceController {
   static async getAllLoggedIn(req, res, next) {
     try {
       const { dapp, query } = req
-      const {soldOut, forSale , ...restQuery} =  query  
-
+      const {soldOut, forSale , ...restQuery} =  query 
+      const limit = parseInt(req.headers['limit']) || 10; 
+      const offset = (parseInt(req.headers['offset']) - 1 || 0) * limit;
       const inventories = await dapp.getMarketplaceInventoriesLoggedIn({ ...restQuery })
       let finalInventory = MarketplaceController.getFinalInventory(inventories, forSale, soldOut)
       
-      rest.response.status200(res, { productsWithImageUrl: finalInventory, inventoryCount: finalInventory?.length })
+      const paginatedInventory = finalInventory.slice(offset, offset + limit);
+
+      rest.response.status200(res, {
+          productsWithImageUrl: paginatedInventory,
+          inventoryCount: finalInventory.length 
+      });
 
       return next()
     } catch (e) {
