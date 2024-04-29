@@ -10,22 +10,22 @@ export const ResponsiveRedemptionsCard = ({ data, isLoading, category }) => {
     const navigate = useNavigate();
 
     const statusComponent = (status) => {
-        let textClass = "bg-[#FFF6EC]";
-        if (status === REDEMPTION_STATUS.PENDING) {
-            textClass = "bg-[#FF8C0033]"
-        } else if (status === REDEMPTION_STATUS.REJECTED) {
-            textClass = "bg-[#FFF0F0]";
-        } else if (status === REDEMPTION_STATUS.FULFILLED) {
-            textClass = "bg-[#119B2D33]";
-        }
-        let bgClass = "bg-[#119B2D]";
-        if (status === REDEMPTION_STATUS.PENDING) {
-            bgClass = "bg-[#FF8C00]"
-        } else if (status === REDEMPTION_STATUS.REJECTED) {
-            bgClass = "bg-[#FF0000]";
-        } else if (status === REDEMPTION_STATUS.FULFILLED) {
-            bgClass = "bg-[#119B2D]";
-        }
+        const statusClasses = {
+            [REDEMPTION_STATUS.PENDING]: {
+                textClass: "bg-[#FF8C0033]",
+                bgClass: "bg-[#FF8C00]"
+            },
+            [REDEMPTION_STATUS.REJECTED]: {
+                textClass: "bg-[#FFF0F0]",
+                bgClass: "bg-[#FF0000]"
+            },
+            [REDEMPTION_STATUS.FULFILLED]: {
+                textClass: "bg-[#119B2D33]",
+                bgClass: "bg-[#119B2D]"
+            }
+        };
+
+        const { textClass, bgClass } = statusClasses[status] || {};
         return (
             <div className="flex justify-center">
                 <div className={classNames(textClass, "w-full py-1 rounded-xl flex items-center gap-1 p-3")}>
