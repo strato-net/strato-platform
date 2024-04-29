@@ -340,7 +340,7 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOr
     }
 
     return (
-      <div className={classNames(textClass, "w-max text-center py-1 rounded-xl flex justify-start items-center gap-1 p-3")}>
+      <div id={status} className={classNames(textClass, "w-max text-center py-1 rounded-xl flex justify-start items-center gap-1 p-3")}>
         <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
         <p>{status}</p>
       </div>
