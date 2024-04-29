@@ -309,28 +309,30 @@ const RedemptionsIncomingDetails = ({ user }) => {
                                                     <NewOrderData className="w-2/4" title="Status" value={statusComponent(redemption.status)} />
                                                 </div>
                                             </Row>
-                                            <Row className="flex-nowrap items-center justify-between mb-2 md:mb-6 p-2">
+                                            {redemption.status == REDEMPTION_STATUS.PENDING && <Row className="flex-nowrap items-center justify-between mb-2 md:mb-6 p-2">
                                                 <div className="w-full">
                                                     <Text className="block text-primaryC text-[13px] mb-2">
                                                         Comments
                                                     </Text>
                                                     <TextArea
                                                         rows={2}
-                                                        placeholder={
-                                                            (redemption.status == REDEMPTION_STATUS.FULFILLED ||
-                                                                redemption.status == REDEMPTION_STATUS.REJECTED) ?
-                                                                redemption.issuerComments : "Enter Comments"}
-                                                        value={
-                                                            (redemption.status == REDEMPTION_STATUS.FULFILLED ||
-                                                                redemption.status == REDEMPTION_STATUS.REJECTED) ?
-                                                                redemption.issuerComments : comments}
-                                                        disabled={
-                                                            redemption.status == REDEMPTION_STATUS.FULFILLED ||
-                                                            redemption.status == REDEMPTION_STATUS.REJECTED
-                                                        }
+                                                        placeholder="Enter Comments"
+                                                        value={comments}
                                                         onChange={(event) => {
                                                             setComments(event.target.value);
                                                         }}
+                                                    />
+                                                </div>
+                                            </Row>}
+                                            <Row className="flex-nowrap items-center justify-between mb-2 md:mb-6 p-2">
+                                                <div className="w-full">
+                                                    <Text className="block text-primaryC text-[13px] mb-2">
+                                                        Requestor Comments
+                                                    </Text>
+                                                    <TextArea
+                                                        rows={2}
+                                                        value={redemption.ownerComments}
+                                                        disabled
                                                     />
                                                 </div>
                                             </Row>

@@ -258,7 +258,7 @@ const RedemptionsOutgoingDetails = ({ user }) => {
                                                     </Text>
                                                     <TextArea
                                                         rows={2}
-                                                        value={redemption.ownerComments}
+                                                        value={redemption.issuerComments}
                                                         disabled
                                                     />
                                                 </div>
