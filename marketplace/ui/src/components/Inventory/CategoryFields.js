@@ -26,6 +26,24 @@ export const categoricalProperties = (form, handleClothingTypeChange, clothingTy
                     </Form.Item>
                 </div>
             );
+        case "Tokens":
+            return (
+                <div className="flex justify-between mt-4 ">
+                    <Form.Item
+                        label="Quantity"
+                        name="quantity"
+                        className="w-full md:w-72"
+                        rules={[
+                            {
+                                required: true,
+                                message: 'Please enter a quantity',
+                            },
+                        ]}
+                    >
+                        <Input placeholder="Enter Quantity" />
+                    </Form.Item>
+                </div>
+            );
         case "CarbonOffset":
             return (
                 <div className="flex justify-between mt-4 ">
