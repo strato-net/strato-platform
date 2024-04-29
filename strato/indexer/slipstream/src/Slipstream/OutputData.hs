@@ -24,9 +24,9 @@ module Slipstream.OutputData (
   insertMappingTableQuery,
   insertAbstractTable,
   insertAbstractTableQuery,
+  insertHistoryAbstractTable,
   createIndexTable,
   createMappingTable,
-  createHistoryTable,
   createAbstractTable,
   insertHistoryTable,
   createExpandEventTables,
@@ -50,6 +50,7 @@ import           Conduit
 import           Control.Lens ((^.))
 import           Control.Monad
 import qualified Data.Aeson                      as Aeson
+import           Data.Bool                       (bool)
 import qualified Data.ByteString.Base16         as Base16
 import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString                 as B
@@ -62,7 +63,6 @@ import           Data.Traversable                (for)
 import           Bloc.Server.Utils               (partitionWith)
 import           BlockApps.Logging
 import           Blockchain.Strato.Model.Account
-import           Blockchain.SolidVM.SM           (getTypeOfName'')
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.CodePtr
 import qualified Blockchain.Strato.Model.Event   as Action
@@ -85,7 +85,6 @@ import           Slipstream.SolidityValue
 import           SolidVM.Model.CodeCollection    hiding (contractName, contracts, parents)
 import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type              as SVMType
-import qualified SolidVM.Model.Value             as SVMValue
 import           Text.Printf
 import           Text.RawString.QQ
 import           Text.Tools                      
@@ -128,7 +127,7 @@ fillFirstEmptyEntries :: [(Text, a)] -> [(Text, a)]
 fillFirstEmptyEntries = map unFirst . fillEmptyEntries . map First
 
 tableColumns :: CodeCollectionF () -> [(Text, SVMType.Type)] -> TableColumns
-tableColumns cc = concatMap go . fillFirstEmptyEntries
+tableColumns (CodeCollection ccs _ _ _ _ _ _ _) = concatMap go . fillFirstEmptyEntries
   where
     go :: (Text, SVMType.Type) -> [Text]
     go (x, y) = 
@@ -137,8 +136,8 @@ tableColumns cc = concatMap go . fillFirstEmptyEntries
         Just v -> 
           let defaultColumn = columnName x <> " " <> v
           in case y of
-            SVMType.UnknownLabel s _ -> case getTypeOfName'' s cc of 
-              SVMValue.ContractTypo _ ->
+            SVMType.UnknownLabel s _ -> case (Map.member s ccs) of 
+              True ->
                 [ defaultColumn,
                   columnName (x <> "_fkey") <> " " <> v
                 ]
@@ -378,21 +377,22 @@ notifyPostgREST conn = do
 
 createExpandHistoryTable ::
   OutputM m =>
+  Bool ->
   IORef Globals ->
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text) ->
   ConduitM () (Text, Maybe (IORef Globals, TableName, TableColumns)) m ()
-createExpandHistoryTable g c cc nameParts = do
-  createHistoryTable' g c cc nameParts
-  expandHistoryTable g c cc nameParts
+createExpandHistoryTable isAbstract g c cc nameParts = do
+  createHistoryTable' isAbstract g c cc nameParts
+  expandHistoryTable isAbstract g c cc nameParts
 
 getDeferredForeignKeys :: (MonadLogger m) => TableName -> ContractF () -> CodeCollectionF () -> Text -> m [ForeignKeyInfo]
-getDeferredForeignKeys tableName c cc cn = do
+getDeferredForeignKeys tableName c (CodeCollection ccs _ _ _ _ _ _ _) cn = do
   result <- fmap catMaybes . for [(theName, x) | (theName, VariableDecl {_varType = SVMType.UnknownLabel x _}) <- Map.toList (c ^. storageDefs)] $ \(theName, x) -> do
-      let vtype = getTypeOfName'' x cc
-      case vtype of
-        SVMValue.ContractTypo _ -> do
+      let isContract = Map.member x ccs
+      case isContract of
+        True -> do
           pure $ Just $ ForeignKeyInfo
               { tableName = tableName,
                 columnName = labelToText theName,
@@ -404,11 +404,11 @@ getDeferredForeignKeys tableName c cc cn = do
 getDeferredForeignKeysAbstract ::
   (MonadLogger m) =>
   TableName -> ContractF () -> Text -> Map.Map (Account, Text) (Text) -> CodeCollectionF () -> m [ForeignKeyInfo]
-getDeferredForeignKeysAbstract tableName c cn abstracts' cc = do
+getDeferredForeignKeysAbstract tableName c cn abstracts' cc@(CodeCollection ccs _ _ _ _ _ _ _) = do
   result <- fmap catMaybes . for [(theName, x) | (theName, VariableDecl {_varType = SVMType.UnknownLabel x _}) <- Map.toList (c ^. storageDefs)] $ \(theName, x) -> do
-      let vtype = getTypeOfName'' x cc
-      case vtype of
-        SVMValue.ContractTypo _ -> do
+      let isContract = Map.member x ccs
+      case isContract of
+        True -> do
           let contract = getContractsBySolidString x cc
           case contract of
             Just c' -> do
@@ -508,12 +508,13 @@ createMappingTable globalsIORef (cn, n) m = do
 
 createHistoryTable' ::
   OutputM m =>
+  Bool ->
   IORef Globals ->
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text) ->
   ConduitM () (Text, Maybe (IORef Globals, TableName, TableColumns)) m ()
-createHistoryTable' globalsIORef contract cc (cn, n) = do
+createHistoryTable' isAbstract globalsIORef contract cc (cn, n) = do
   let tableName = historyTableName cn n
   tableExists <- isTableCreated globalsIORef tableName
 
@@ -522,28 +523,8 @@ createHistoryTable' globalsIORef contract cc (cn, n) = do
   when (not tableExists) $ do
     incNumHistoryTables
     let list = tableColumns cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
-    yield $ ((createHistoryTableQuery (cn, n) list), Nothing)
+    yield $ ((createHistoryTableQuery isAbstract (cn, n) list), Nothing)
     yieldMany $ map (\x -> (x, Nothing)) (addHistoryUnique (cn, n))
-    setTableCreated globalsIORef tableName list
-
-createHistoryTable ::
-  OutputM m =>
-  IORef Globals ->
-  ContractF () ->
-  CodeCollectionF () ->
-  (Text, Text) ->
-  ConduitM () Text m ()
-createHistoryTable globalsIORef contract cc (cn, n) = do
-  let tableName = historyTableName cn n
-  tableExists <- isTableCreated globalsIORef tableName
-
-  $logDebugLS "createHistoryTable'/tableExists" ("Table Name: " ++ show tableName ++ ", table exists: " ++ formatBool tableExists)
-
-  when (not tableExists) $ do
-    incNumHistoryTables
-    let list = tableColumns cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
-    yield $ createHistoryTableQuery (cn, n) list
-    yieldMany $ addHistoryUnique (cn, n)
     setTableCreated globalsIORef tableName list
 
 -- Runs ALTER TABLE <name> [ADD COLUMN <column>] for any new fields added to a contract definition
@@ -572,15 +553,18 @@ expandAbstractTable globalsIORef contract (cn, n) abstracts' cc = do
 
 expandHistoryTable ::
   OutputM m =>
+  Bool ->
   IORef Globals ->
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text) ->
   ConduitM () (Text, Maybe (IORef Globals, TableName, TableColumns)) m ()
-expandHistoryTable globalsIORef contract cc (cn, n) = do
+expandHistoryTable isAbstract globalsIORef contract cc (cn, n) = do
   let tableName = historyTableName cn n
-  _ <- expandContractTable' globalsIORef contract cc tableName
-  return ()
+  void $ 
+    if isAbstract
+      then mapOutput (\o -> (o, Nothing)) $ expandAbstractContractTable globalsIORef contract tableName Map.empty emptyCodeCollection
+      else expandContractTable' globalsIORef contract cc tableName
 
 expandContractTable' ::
   OutputM m =>
@@ -680,7 +664,7 @@ expandAbstractContractTable globalsIORef contract tableName abstracts' cc = do
   -- $logInfoS "expandAbstractContractTable/foreignKeys " . T.pack $ show foreignKeys
   case columns of
     Nothing -> do
-      $logErrorLS "expandTable" $
+      $logErrorLS "expandAbstractTable" $
         T.concat
           [ "Table ",
             (tableNameToText tableName),
@@ -691,8 +675,8 @@ expandAbstractContractTable globalsIORef contract tableName abstracts' cc = do
       let list = fillFirstEmptyEntries . map (fmap _varType) . Map.toList $ Map.mapKeys labelToText $ contract ^. storageDefs
           cols = tableColumns cc list
       unless (null cols) $ do
-        $logInfoS "expandTable" . T.pack $ "We just got new fields for a contract that already has a table!"
-        $logInfoS "expandTable" $
+        $logInfoS "expandAbstractContractTable" . T.pack $ "We just got new fields for a contract that already has a table!"
+        $logInfoS "expandAbstractContractTable" $
           T.concat
             [ "Adding columns to ",
               (tableNameToText tableName),
@@ -707,48 +691,26 @@ expandAbstractContractTable globalsIORef contract tableName abstracts' cc = do
 
 expandTableQuery :: TableName -> TableColumns -> Text
 expandTableQuery tableName cols =
-  T.intercalate "\n" $ map createTransaction cols
-  where
-    createTransaction col =
-      T.concat
-        [ "BEGIN;\n",
-          "ALTER TABLE ",
-          tableNameToDoubleQuoteText tableName,
-          " ADD COLUMN IF NOT EXISTS ",
-          col,
-          ";\n",
-          "COMMIT;"
-        ]
+  T.concat
+    [ "ALTER TABLE ",
+      tableNameToDoubleQuoteText tableName,
+      " ADD COLUMN IF NOT EXISTS",
+      T.intercalate ", ADD COLUMN IF NOT EXISTS" cols,
+      ";"
+    ]
 
 expandAbstractTableQuery :: TableName -> TableColumns -> Text
 expandAbstractTableQuery tableName cols =
-  T.intercalate "\n" (map createTransaction cols ++ [staticTransactions])
-  where
-    createTransaction col =
-      T.concat
-        [ "BEGIN;\n",
-          "ALTER TABLE ",
-          tableNameToDoubleQuoteText tableName,
-          " ADD COLUMN IF NOT EXISTS ",
-          col,
-          ";\n",
-          "COMMIT;"
-        ]
-
-    staticTransactions =
-      T.concat
-        [ "BEGIN;\n",
-          "ALTER TABLE ",
-          tableNameToDoubleQuoteText tableName,
-          " ADD COLUMN IF NOT EXISTS creator text;\n",
-          "ALTER TABLE ",
-          tableNameToDoubleQuoteText tableName,
-          " ADD COLUMN IF NOT EXISTS contract_name text;\n",
-          "ALTER TABLE ",
-          tableNameToDoubleQuoteText tableName,
-          " ADD COLUMN IF NOT EXISTS data jsonb;\n",
-          "COMMIT;"
-        ]
+  T.concat
+    [ "ALTER TABLE ",
+      tableNameToDoubleQuoteText tableName,
+      " ADD COLUMN IF NOT EXISTS",
+      T.intercalate ", ADD COLUMN IF NOT EXISTS" cols,
+      ", ADD COLUMN IF NOT EXISTS creator text",
+      ", ADD COLUMN IF NOT EXISTS contract_name text",
+      ", ADD COLUMN IF NOT EXISTS data jsonb",
+      ";"
+    ]
 
 insertIndexTable ::
   OutputM m =>
@@ -818,15 +780,47 @@ insertHistoryTable contracts@(E.ProcessedContract {commonName = cn, contractName
   $logDebugLS "insertHistoryTable" $ T.pack $ "Inserting row in history table for: " ++ show tableName
   yieldMany $ insertHistoryTableQuery contracts
 
+insertHistoryAbstractTable :: 
+  OutputM m => 
+  [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] ->
+  [E.ProcessedContract] ->
+  ConduitM () Text m ()
+insertHistoryAbstractTable [] _ = pure ()
+insertHistoryAbstractTable _ [] = pure ()
+insertHistoryAbstractTable abstracts hists = do 
+  let historyAbstracts = [(history, fkeys, tableName, tableCols) | history <- hists, (_, fkeys, tableName, tableCols) <- abstracts]
+  yieldMany $ insertAbstractTableQuery historyAbstracts True
+
 insertAbstractTable ::
   OutputM m =>
   [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] ->
+  Bool ->
   ConduitM () Text m ()
-insertAbstractTable [] = pure ()
-insertAbstractTable cs@((_, _,abTableName, _) : _) = do
+insertAbstractTable [] _ = pure ()
+insertAbstractTable cs@((_, _,abTableName, _) : _) isHistoric = do
   $logInfoS "insertAbstractTable" $ T.pack $ "Inserting row in abstract table for: " ++ show abTableName
   multilineLog "insertAbstractTable/processedContract" $ show cs
-  yieldMany $ insertAbstractTableQuery cs
+  yieldMany $ insertAbstractTableQuery cs isHistoric
+
+baseColumnsQuery :: [Text]
+baseColumnsQuery = 
+  [ 
+    "address text",
+    "block_hash text",
+    "block_timestamp text",
+    "block_number text",
+    "transaction_hash text",
+    "transaction_sender text"
+  ]
+
+abstractBaseColumnsQuery :: [Text]
+abstractBaseColumnsQuery = 
+  baseColumnsQuery ++ 
+  [
+    "creator text",
+    "contract_name text",
+    "data jsonb"
+  ]
 
 createIndexTableQuery ::(Text, Text) -> TableColumns-> Text
 createIndexTableQuery (cn, n) cols =
@@ -835,15 +829,7 @@ createIndexTableQuery (cn, n) cols =
         [ "CREATE TABLE IF NOT EXISTS ",
           tableNameToDoubleQuoteText tableName,
           " (",
-          csv $
-            [ "address text",
-              "block_hash text",
-              "block_timestamp text",
-              "block_number text",
-              "transaction_hash text",
-              "transaction_sender text"
-            ]
-              ++ cols,
+          csv $ baseColumnsQuery ++ cols,
           ",\n  PRIMARY KEY (address) );"
         ]
 
@@ -854,14 +840,8 @@ createMappingTableQuery (cn, n, m) =
         [ "CREATE TABLE IF NOT EXISTS ",
           tableNameToDoubleQuoteText tableName,
           " (",
-          csv $
-            [ "address text",
-              "block_hash text",
-              "block_timestamp text",
-              "block_number text",
-              "transaction_hash text",
-              "transaction_sender text",
-              "contract_name text",
+          csv $ baseColumnsQuery ++
+            [ "contract_name text",
               "mapname text",
               "key text",
               "value text"
@@ -891,21 +871,15 @@ createAbstractTableQuery (cn, n) list =
           ",\n  PRIMARY KEY (address));"
         ]
 
-createHistoryTableQuery ::(Text, Text) -> TableColumns -> Text
-createHistoryTableQuery (cn, n) cols =
+createHistoryTableQuery :: Bool -> (Text, Text) ->  TableColumns -> Text
+createHistoryTableQuery isAbstract (cn, n) cols =
   let tableName = historyTableName cn n
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS ",
           tableNameToDoubleQuoteText tableName,
           " (",
           csv $
-            [ "address text NOT NULL",
-              "block_hash text NOT NULL",
-              "block_timestamp text",
-              "block_number text",
-              "transaction_hash text NOT NULL",
-              "transaction_sender text"
-            ]
+            (bool baseColumnsQuery abstractBaseColumnsQuery isAbstract)
               ++ cols,
           ");"
         ]
@@ -1014,9 +988,9 @@ insertMappingTableQuery ms =
                       ";"
                     ]
 
-insertAbstractTableQuery :: [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] -> [Text]
-insertAbstractTableQuery [] = error "insertAbstractTableQuery: unhandled empty list"
-insertAbstractTableQuery cs =
+insertAbstractTableQuery :: [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] -> Bool -> [Text]
+insertAbstractTableQuery [] _ = error "insertAbstractTableQuery: unhandled empty list"
+insertAbstractTableQuery cs isHistoric =
   concat $
     let cs' = (\(c@E.ProcessedContract {contractData = contractData}, fkeys, ab, abColumns) -> 
                 ((c, Map.mapMaybe valueToSQLTextFilterContract $ contractData), (ab, abColumns, fkeys))) <$> cs
@@ -1049,26 +1023,31 @@ insertAbstractTableQuery cs =
                   in wrapAndEscape valsForSQL
                 inserts = csv vals
             in (: []) $
-                  T.concat
+                  T.concat $
                     [ "INSERT INTO ",
-                      abTableName,
+                      (bool abTableName (wrapDoubleQuotes $ "history@" <> unwrapDoubleQuotes abTableName) isHistoric),
                       " ",
                       keySt,
                       "\n  VALUES ",
-                      inserts,
-                      [r|
-  ON CONFLICT (address) DO UPDATE SET
-    block_hash = excluded.block_hash,
-    block_timestamp = excluded.block_timestamp,
-    block_number = excluded.block_number,
-    transaction_hash = excluded.transaction_hash,
-    transaction_sender = excluded.transaction_sender,
-    contract_name = excluded.contract_name,
-    data = excluded.data|],
-                      if null keysForSQL then "" else ",\n    ",
-                      tableUpsert $ keysForSQL,
-                      ";"
-                    ]
+                      inserts
+                    ] ++
+                    if isHistoric
+                      then
+                        [[r| ON CONFLICT DO NOTHING;|]]
+                      else
+                          [[r|
+                          ON CONFLICT (address) DO UPDATE SET
+                            block_hash = excluded.block_hash,
+                            block_timestamp = excluded.block_timestamp,
+                            block_number = excluded.block_number,
+                            transaction_hash = excluded.transaction_hash,
+                            transaction_sender = excluded.transaction_sender,
+                            contract_name = excluded.contract_name,
+                            data = excluded.data
+                          |],
+                          if null keysForSQL then "" else ",\n    ",
+                          tableUpsert $ keysForSQL,
+                          ";"]
 
 insertHistoryTableQuery :: [E.ProcessedContract] -> [Text]
 insertHistoryTableQuery [] = error "insertHistoryTableQuery: unhandled empty list"

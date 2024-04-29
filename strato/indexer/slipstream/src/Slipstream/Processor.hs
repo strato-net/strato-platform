@@ -306,14 +306,17 @@ processTheMessages env conn messages = do
             deferredForeignKeys <- case (_contractType c) of
               AbstractType -> do
                 abstractfkeys <- outputData conn $ createExpandAbstractTable g c nameParts abstracts' cc
+                outputData' conn $ createExpandHistoryTable True g c cc nameParts
                 $logInfoS "processTheMessages/deferredForeignKeys/abstractfkeys" $ T.pack $ show abstractfkeys
                 return abstractfkeys
               _ -> do
                 indexfkeys <- outputData conn $ createExpandIndexTable g c cc nameParts
                 $logInfoS "processTheMessages/deferredForeignKeys/indexfkeys" $ T.pack $ show indexfkeys
+                outputData' conn $ createExpandHistoryTable False g c cc nameParts
                 return indexfkeys
 
-            outputData' conn $ createExpandHistoryTable g c cc nameParts
+            $logInfoS "processTheMessages/deferredForeignKeys" $ T.pack $ show deferredForeignKeys
+
 
             outputData conn $ createExpandEventTables g c cc nameParts
 
@@ -384,7 +387,7 @@ processTheMessages env conn messages = do
           let fkeysForThisContract = getContractsFromPC indexContract
           hs <- rowToHistories g abiid actions cont oldState
           let mapNames = actionMappings row
-              abstracts = actionAbstracts row
+              abstracts = actionAbstracts row -- to get abstract history info, get `actionAbstracts <$> actions`
           --get columns for abstract table
           $logDebugLS "abstractColumns" $ T.pack $ "Getting abstract columns from " ++ (show abstracts)
           abstractColumns <- fmap catMaybes . for (Map.toList abstracts) $ \((_, n'), cn') -> do
@@ -410,7 +413,8 @@ processTheMessages env conn messages = do
     outputData conn $ insertIndexTable $ indexInsert ins
     outputData conn $ insertHistoryTable $ historyInserts ins
     unless ((length (mappingInserts ins) < 1)) $ outputData conn $ insertMappingTable $ mappingInserts ins
-    outputData conn $ insertAbstractTable $ abstractInsert ins
+    outputData conn $ insertAbstractTable (abstractInsert ins) False -- not historic
+    outputData conn $ insertHistoryAbstractTable (abstractInsert ins) (historyInserts ins)
 
   forM_ insertsByCodeHash $ \ins -> do
     insertForeignKeys conn $ indexInsert ins
