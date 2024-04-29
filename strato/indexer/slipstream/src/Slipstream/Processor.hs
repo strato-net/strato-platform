@@ -309,15 +309,13 @@ processTheMessages env conn messages = do
                 $logInfoS "processTheMessages/deferredForeignKeys/abstractfkeys" $ T.pack $ show abstractfkeys
                 return abstractfkeys
               _ -> do
-                indexfkeys <- outputData conn $ createExpandIndexTable g c nameParts
+                indexfkeys <- outputData conn $ createExpandIndexTable g c cc nameParts
                 $logInfoS "processTheMessages/deferredForeignKeys/indexfkeys" $ T.pack $ show indexfkeys
                 return indexfkeys
 
-            $logInfoS "processTheMessages/deferredForeignKeys" $ T.pack $ show deferredForeignKeys
+            outputData' conn $ createExpandHistoryTable g c cc nameParts
 
-            outputData' conn $ createExpandHistoryTable g c nameParts
-
-            outputData conn $ createExpandEventTables g c nameParts
+            outputData conn $ createExpandEventTables g c cc nameParts
 
             return $ deferredForeignKeys ++ deferredForeignKeysForMappings
 
@@ -383,7 +381,7 @@ processTheMessages env conn messages = do
           $logDebugLS "Contract name is: " $ T.pack $ show name
           oldState <- readPreviousSolidVMState g acct
           indexContract <- rowToInsert g abiid row cont oldState
-          let fkeys = getContractsFromPC indexContract
+          let fkeysForThisContract = getContractsFromPC indexContract
           hs <- rowToHistories g abiid actions cont oldState
           let mapNames = actionMappings row
               abstracts = actionAbstracts row
@@ -394,7 +392,7 @@ processTheMessages env conn messages = do
                 tableNameText = tableNameToDoubleQuoteText tableName
             $logInfoS "Row will be inserted into abstract table: " tableNameText
             mCols <- getTableColumns g tableName
-            pure $ (indexContract, fkeys, tableNameText,) . map extractTextInsideQuotes <$> mCols
+            pure $ (indexContract, fkeysForThisContract, tableNameText,) . map extractTextInsideQuotes <$> mCols
           $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
           $logDebugLS "History inserts are: " $ T.pack $ show hs
           stateDiff <- rowToMappings row

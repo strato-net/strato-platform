@@ -41,6 +41,7 @@ module Blockchain.SolidVM.SM
     getGasInfo,
     getVariableOfName,
     getTypeOfName,
+    getTypeOfName'',
     getXabiType,
     getXabiValueType,
     getValueType,
@@ -594,6 +595,21 @@ getVariableOfName name = do
 getTypeOfName' :: SolidString -> CC.CodeCollection -> Typo
 getTypeOfName' s (CC.CodeCollection ccs _ _ enms strcts _ _ _) =
   let lookInContract :: CC.Contract -> [Typo]
+      lookInContract (CC.Contract {..}) =
+        catMaybes
+          [ fmap StructTypo (fmap (\(a, b, _) -> (a, b)) <$> M.lookup s _structs),
+            fmap EnumTypo (fst <$> M.lookup s _enums),
+            fmap StructTypo (fmap (\(a, b, _) -> (a, b)) <$> M.lookup s strcts),
+            fmap EnumTypo (fst <$> M.lookup s enms)
+          ]
+      ctrs = map ContractTypo $ M.keys ccs
+   in case concatMap lookInContract ccs ++ ctrs of
+        [] -> internalError "getTypeOfName" s
+        (typo : _) -> typo
+
+getTypeOfName'' :: SolidString -> CC.CodeCollectionF () -> Typo
+getTypeOfName'' s (CC.CodeCollection ccs _ _ enms strcts _ _ _) =
+  let lookInContract :: CC.ContractF () -> [Typo]
       lookInContract (CC.Contract {..}) =
         catMaybes
           [ fmap StructTypo (fmap (\(a, b, _) -> (a, b)) <$> M.lookup s _structs),
