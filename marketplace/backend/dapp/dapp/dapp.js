@@ -308,6 +308,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           });
         return {}
       } catch (error) {
+        // The AssetStaus is initially switched to PENDING_REDEMPTION but must be reverted if Redemption creation fails
+        const [updateStatus] = await inventoryJs.updateAssetStatus(rawAdmin, { address: assetAddress }, { status: ASSET_STATUS.ACTIVE }, options);
+
         if (error.response) {
           throw new rest.RestError(error.response.status, error.response.statusText);
         }
