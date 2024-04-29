@@ -44,7 +44,7 @@ stack test $5\
       vm-runner \
       x509-certs
 
-stack test $5\
+stack test \
   highway/ --test-arguments="--awsaccesskeyid $1 --awssecretaccesskey $2 --awss3bucket $3 --highwayUrl $4"
 
 if [ $5 = --coverage ]
