@@ -143,7 +143,9 @@ const actions = {
     minPrice,
     maxPrice,
     search,
-    availabilityQuery
+    availabilityQuery,
+    offset,
+    limit
   ) => {
     dispatch({ type: actionDescriptors.fetchMarketplace });
 
@@ -164,6 +166,10 @@ const actions = {
         `${apiUrl}/marketplace?${priceQuery}${categoryQuery}${subCategoryQuery}${searchQuery}${availabilityQuery}`,
         {
           method: HTTP_METHODS.GET,
+          headers: {
+            'offset': `${offset}`,
+            'limit': `${limit}`
+          }
         }
       );
 
@@ -201,7 +207,9 @@ const actions = {
     minPrice,
     maxPrice,
     search,
-    availabilityQuery
+    availabilityQuery,
+    offset,
+    limit
   ) => {
     dispatch({ type: actionDescriptors.fetchMarketplaceLoggedIn });
 
@@ -222,6 +230,10 @@ const actions = {
         `${apiUrl}/marketplace/all?${priceQuery}${categoryQuery}${subCategoryQuery}${searchQuery}${availabilityQuery}`,
         {
           method: HTTP_METHODS.GET,
+          headers: {
+            'offset': `${offset}`,
+            'limit': `${limit}`
+          }
         }
       );
 

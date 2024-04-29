@@ -1,10 +1,8 @@
-import React, { useState } from "react";
-import { Popover, Button, Typography, Tooltip } from "antd";
+import React, { useState, useEffect, useRef } from "react";
+import { Button, Typography, Tooltip } from "antd";
 import {
   DollarOutlined,
-  MoreOutlined,
   EditOutlined,
-  FormOutlined,
   SendOutlined,
   PieChartOutlined,
   StopOutlined,
@@ -25,6 +23,8 @@ import "react-responsive-carousel/lib/styles/carousel.min.css";
 import { SEO } from "../../helpers/seoConstant";
 
 const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentProviderAddress, allSubcategories, limit, offset }) => {
+  const textRef = useRef(null);
+  const [isOverflowing, setIsOverflowing] = useState(false);
   const [openPop, setOpenPop] = useState(false);
   const [open, setOpen] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
@@ -149,20 +149,46 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
     }
   }
 
+  /**
+   * Determines if the Tooltip of the asset name should be displayed.
+   */
+  useEffect(() => {
+    const checkOverflow = () => {
+      const element = textRef.current;
+      if (element) {
+        const isOverflow = element.scrollWidth > element.clientWidth;
+        setIsOverflowing(isOverflow);
+      }
+    };
+
+    // Check overflow on mount and window resize
+    checkOverflow();
+    window.addEventListener('resize', checkOverflow);
+
+    return () => window.removeEventListener('resize', checkOverflow);
+  }, []);
 
   return (
     <div className=" p-3 md:p-[18px] border border-[#BABABA] md:border-[#E9E9E9] rounded-lg sm:w-[343px] md:w-full">
       <div className="bg-[#F2F2F9] rounded-md px-[14px] flex flex-col justify-between items-center pb-[13px] pt-2 w-full">
         <div className="w-full">
-          <div className="grid grid-cols-1 lg:grid-cols-2 w-full auto-cols-max">
-            <p className="text-lg lg:text-xl font-semibold text-[#202020] hover:text-[#4285F4] cursor-pointer" onClick={callDetailPage}>
-              <Tooltip title={inventory?.name.length > 20 ? inventory?.name : null}>
-                <span className=" whitespace-nowrap max-w-[160px] inline-block">
-                  {inventory?.name.length > 20 ? `${inventory?.name.slice(0, 17)}...` : `${inventory?.name}`}
-                </span>
-              </Tooltip>
-            </p>
-            <div className="flex space-x-2 lg:justify-self-end">
+          <div className="flex flex-col lg:flex-row w-full">
+            <div className="flex-grow min-w-0">
+              <p className="text-lg lg:text-xl font-semibold text-[#202020] hover:text-[#4285F4] cursor-pointer" onClick={callDetailPage}>
+                {isOverflowing ? (
+                  <Tooltip title={inventory?.name}>
+                    <span ref={textRef} className="whitespace-nowrap overflow-hidden text-ellipsis block">
+                      {inventory?.name}
+                    </span>
+                  </Tooltip>
+                ) : (
+                  <span ref={textRef} className="whitespace-nowrap overflow-hidden text-ellipsis block">
+                    {inventory?.name}
+                  </span>
+                )}
+              </p>
+            </div>
+            <div className="flex flex-row space-x-2 lg:justify-self-end whitespace-nowrap">
               <Typography className="lg:pt-1">{`(${getCategory()})`}</Typography>
               {inventory?.contract_name.toLowerCase().includes("clothing") && (
                 <Typography className='lg:pt-1'>{'Size: ' + inventory?.data?.size || "N/A"}</Typography>
