@@ -1,10 +1,11 @@
-{-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE TypeApplications  #-}
-{-# LANGUAGE TypeFamilies      #-}
-{-# LANGUAGE TypeOperators     #-}
-{-# LANGUAGE QuasiQuotes       #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE TypeOperators       #-}
+{-# LANGUAGE QuasiQuotes         #-}
 
 module Main where
 
@@ -16,17 +17,21 @@ import BlockApps.Logging
 import Options
 
 import Aws as Aws (makeCredentials)
+import Control.Exception
 import Control.Monad
 import Control.Monad.IO.Unlift
 import Data.ByteString.Char8 as DBC8
+import Data.ByteString.Lazy.Char8 as DBLC8
 import Data.Text as T
 import HFlags
 import Network.HTTP.Client hiding (Proxy)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
+import Network.Wai
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Cors
 import Network.Wai.Middleware.Prometheus
-import Network.Wai.Parse (defaultParseRequestBodyOptions,setMaxRequestKeyLength,setMaxRequestFileSize)
+import Network.Wai.Parse (defaultParseRequestBodyOptions,setMaxRequestKeyLength,setMaxRequestFileSize,RequestParseException(..))
+import Network.HTTP.Types
 import Servant
 import Servant.Multipart
 import Servant.Multipart.Client
@@ -97,7 +102,26 @@ initHighway = do
                                                     (T.pack flags_awss3bucket)
                                                     (T.pack flags_highwayUrl)
                                         $logInfoS "highway/initHighway" $ T.pack $ "Initialization successful!"
-                                        liftIO $ run 8080 $ appHighwayWrapper env
+                                        --liftIO $ run 8080 $ appHighwayWrapper env
+                                        liftIO $ runSettings settings' --defaultSetting { settingsPort = 8080
+                                                                       --               , settingsOnExceptionResponse = highwayOnExceptionResponse
+                                                                       --               }
+                                               $ appHighwayWrapper env
+  where highwayOnExceptionResponse e
+          | Just (pe :: RequestParseException) <- fromException e =
+              responseLBS
+                  badRequest400
+                  [ ( hContentType
+                    , "text/plain; charset=utf-8"
+                    )
+                  ]
+                  ( DBLC8.pack $ show pe
+                  )
+          | otherwise = defaultOnExceptionResponse e
+        settings  = setPort 3000
+                            defaultSettings
+        settings' = setOnExceptionResponse highwayOnExceptionResponse
+                                           settings
 
 appHighwayWrapper :: HighwayWrapperEnv -> Application
 appHighwayWrapper env =
