@@ -306,17 +306,17 @@ filenameLengthTest highwaytestneturl =
      \ to AWS S3 via putS3File." $ do
     g                        <- getStdGen
     let filenamethatstoolong = "4mblongfilenamelengthtestthisshouldfailbecausetherearetoomanycharactersinthefilenamewithalengthlimitof109whichissurelytoolong.txt"
-    let sixmbtestdata        = randomByteString 4000000
-                                                g
-    let sixmbtestdatatype    = HighwayTesting
-                                 { highwaytesting_inputiname  = T.pack filenamethatstoolong
-                                 , highwaytesting_inputivalue = "6MB Tests" :: Text
-                                 , highwaytesting_inputname   = "6MBTest" :: Text
-                                 , highwaytesting_filename    = T.pack filenamethatstoolong
-                                 , highwaytesting_filetype    = "text/plain" :: Text
-                                 , highwaytesting_data        = sixmbtestdata
-                                 } 
-    let multipart            = toMultipart sixmbtestdatatype
+    let fourmbtestdata        = randomByteString 4000000
+                                                 g
+    let fourmbtestdatatype    = HighwayTesting
+                                  { highwaytesting_inputiname  = T.pack filenamethatstoolong
+                                  , highwaytesting_inputivalue = "4MB Tests" :: Text
+                                  , highwaytesting_inputname   = "4MBTest" :: Text
+                                  , highwaytesting_filename    = T.pack filenamethatstoolong
+                                  , highwaytesting_filetype    = "text/plain" :: Text
+                                  , highwaytesting_data        = fourmbtestdata
+                                  } 
+    let multipart            = toMultipart fourmbtestdatatype
     mgr                      <- newManager tlsManagerSettings
     let puts3fileclientenv   = mkClientEnv mgr
                                            BaseUrl { baseUrlScheme  = Http
