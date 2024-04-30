@@ -444,7 +444,7 @@ pipeline {
             sh '''#!/bin/bash -le
               set -x
               echo "Running unit tests"
-                EXT_STORAGE_S3_BUCKET='mercata-testnet2'
+                EXT_STORAGE_S3_BUCKET='mercata-dev-tests'
               ./run_unit_tests.sh ${DEV_EXT_STORAGE_S3_ACCESS_KEY_ID} ${DEV_EXT_STORAGE_S3_SECRET_ACCESS_KEY} ${EXT_STORAGE_S3_BUCKET} localhost
             '''
             }
