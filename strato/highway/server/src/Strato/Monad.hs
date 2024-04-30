@@ -22,6 +22,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import GHC.Stack
 import Network.HTTP.Client
+import Network.Wai.Parse
 import Servant
 import UnliftIO hiding (Handler (..))
 
@@ -65,6 +66,7 @@ data HighwayWrapperError
   | BadPostError
   | UserError Text
   | RuntimeError SomeException
+  | ParseError RequestParseException
   deriving (Show, Exception)
 
 --------------------------------------------------------------------------------
@@ -78,9 +80,16 @@ runHighwayToIO :: HighwayWrapperEnv -> HighwayM a -> IO (Either HighwayWrapperEr
 runHighwayToIO env = try . runHighwayWithEnv env
 
 handleRuntimeError :: SomeException -> HighwayM a
-handleRuntimeError (e :: SomeException) = case fromException e of
-  Just (_ :: HighwayWrapperError) -> throwIO e
-  Nothing -> throwIO $ RuntimeError e
+handleRuntimeError (e :: SomeException) =
+  case fromException e of
+    Just (_ :: HighwayWrapperError) -> throwIO e
+    Nothing -> throwIO $ RuntimeError e
+
+--handleParseError :: SomeException -> HighwayM a 
+--handleParseError (e :: SomeException) =
+--  case fromException e of
+--    Just (pe :: RequestParseException) -> throwIO $ ParseError pe
+--    Nothing -> throwIO e
 
 handleHighwayError :: HighwayWrapperError -> HighwayM a
 handleHighwayError = \case
@@ -98,13 +107,21 @@ handleHighwayError = \case
     $logErrorS "handleHighwayError/RuntimeError" . Text.pack $
       show e ++ "\n  callstack missing for runtime errors"
     throwIO e
+  --e@(RequestParseException (MaxParamSizeExceeded i)) -> do
+  e@(ParseError pe) -> do
+    $logErrorS "handleHighwayError/ParseError" . Text.pack $
+      show pe
+    throwIO e
   e -> do
     $logErrorLS "handleHighwayError" e
     throwIO e
 
 enterHighwayWrapper :: HighwayWrapperEnv -> HighwayM x -> Handler x
 enterHighwayWrapper env x = Handler $ do
-  eRes <- liftIO . runHighwayToIO env $ x `catch` handleRuntimeError `catch` handleHighwayError
+  eRes <- liftIO . runHighwayToIO env $ x                  `catch`
+                                        --handleParseError   `catch`
+                                        handleRuntimeError `catch`
+                                        handleHighwayError
   case eRes of
     Right a -> return a
     Left e -> throwE $ reThrowError e
@@ -140,13 +157,53 @@ enterHighwayWrapper env x = Handler $ do
                       Text.unpack err
                     ]
             }
-        RuntimeError _ ->
-          err500
-            { errBody =
-                fromString $
-                  unlines
-                    [ "Runtime Error!",
-                      "Something wrong has happened inside of STRATO.",
-                      "Please contact your network administrator to have this problem fixed."
-                    ]
-            }
+        RuntimeError e ->
+          case fromException e of
+            Just (pe :: RequestParseException) ->
+              err400
+                { errBody =
+                    fromString $
+                      show pe
+                }
+            Nothing                            ->
+              err500
+                { errBody =
+                    fromString $
+                      unlines
+                        [ "Runtime Error!",
+                          "Something wrong has happened inside of STRATO.",
+                          "Please contact your network administrator to have this problem fixed."
+                        ]
+                }
+        ParseError e ->
+          case e of
+            MaxParamSizeExceeded i  ->
+              err413
+                { errBody =
+                    fromString $
+                      "Maximum parameter size exceeded: " ++ show i
+                }
+            ParamNameTooLong s i    ->
+              err413
+                { errBody =
+                    fromString $
+                      "Param name: " ++ show s ++ ", is too long: " ++ show i
+                }
+            MaxFileNumberExceeded i ->
+              err413
+                { errBody =
+                    fromString $
+                      "Maximum number of files exceeded: " ++ show i
+                }
+            FilenameTooLong s i     ->
+              err413
+                { errBody =
+                    fromString $
+                      "File name: " ++ show s ++ ", is too long: " ++ show i
+                }
+            TooManyHeaderLines i    ->
+              err413
+                { errBody =
+                    fromString $
+                      "Too many lines in mime/multipart header: " ++ show i
+                }

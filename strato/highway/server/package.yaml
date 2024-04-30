@@ -44,6 +44,7 @@ library:
     - servant-server
     - text
     - unliftio-core
+    - wai-extra
 
 executables:
   blockapps-highway-server:
