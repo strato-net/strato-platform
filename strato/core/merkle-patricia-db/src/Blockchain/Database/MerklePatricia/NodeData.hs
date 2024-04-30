@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE IncoherentInstances #-}
@@ -37,6 +38,7 @@ import Control.Monad (liftM)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.State
 import Data.Bifunctor (first)
+import qualified Data.Binary as Bin
 import Data.Bitraversable (bitraverse)
 import Data.Bits
 import qualified Data.ByteString as B
@@ -48,7 +50,9 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import qualified Data.NibbleString as N
 import Data.Ranged
+import GHC.Generics
 import Numeric
+import Test.QuickCheck hiding ((.&.))
 import Text.Colors
 import Text.Format
 
@@ -91,7 +95,7 @@ data NodeDataF a
       { nextNibbleString :: Key,
         nextVal :: Either (NodeRefF a) Val
       }
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic)
 
 instance Functor NodeDataF where
   fmap _ EmptyNodeData = EmptyNodeData
@@ -107,6 +111,13 @@ instance Traversable NodeDataF where
   traverse _ EmptyNodeData = pure EmptyNodeData
   traverse f (FullNodeData cs v) = flip FullNodeData v <$> traverse (traverse f) cs
   traverse f (ShortcutNodeData k v) = ShortcutNodeData k <$> bitraverse (traverse f) pure v
+
+instance Bin.Binary NodeData where
+  get = rlpDecode . rlpDeserialize <$> Bin.get
+  put = Bin.put . rlpSerialize . rlpEncode
+
+instance Arbitrary NodeData where
+  arbitrary = pure EmptyNodeData -- TODO? make real instance?
 
 instance Monad m => (StateRoot `A.Alters` NodeData) (StateT (Map StateRoot NodeData) m) where
   lookup _ k = M.lookup k <$> get

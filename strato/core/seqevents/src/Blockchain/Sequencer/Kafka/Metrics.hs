@@ -2,9 +2,9 @@
 
 module Blockchain.Sequencer.Kafka.Metrics where
 
+import Blockchain.Sequencer.Event
 import Control.Monad
 import Control.Monad.IO.Class
-import Data.Data
 import Data.Text
 import Prometheus
 
@@ -39,8 +39,8 @@ seqVMWrites = buildCounter "seq_vm_writes" "Events written to seq_vm_events by k
 seqVMReads :: Vector Text Counter
 seqVMReads = buildCounter "seq_vm_reads" "Events read from seq_vm_events by kind"
 
-recordEvents :: (Data a, MonadIO m) => Vector Text Counter -> [a] -> m ()
-recordEvents vec = recordEvents' vec . fmap (show . toConstr)
+recordEvents :: (ShowConstructor a, MonadIO m) => Vector Text Counter -> [a] -> m ()
+recordEvents vec = recordEvents' vec . fmap (show . showConstructor)
 
 recordEvents' :: MonadIO m => Vector Text Counter -> [String] -> m ()
 recordEvents' vec events = liftIO $
