@@ -102,10 +102,7 @@ initHighway = do
                                                     (T.pack flags_awss3bucket)
                                                     (T.pack flags_highwayUrl)
                                         $logInfoS "highway/initHighway" $ T.pack $ "Initialization successful!"
-                                        --liftIO $ run 8080 $ appHighwayWrapper env
-                                        liftIO $ runSettings settings' --defaultSetting { settingsPort = 8080
-                                                                       --               , settingsOnExceptionResponse = highwayOnExceptionResponse
-                                                                       --               }
+                                        liftIO $ runSettings settings' 
                                                $ appHighwayWrapper env
   where highwayOnExceptionResponse e
           | Just (pe :: RequestParseException) <- fromException e =
@@ -118,7 +115,7 @@ initHighway = do
                   ( DBLC8.pack $ show pe
                   )
           | otherwise = defaultOnExceptionResponse e
-        settings  = setPort 3000
+        settings  = setPort 8080
                             defaultSettings
         settings' = setOnExceptionResponse highwayOnExceptionResponse
                                            settings

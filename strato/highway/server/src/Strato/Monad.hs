@@ -85,12 +85,6 @@ handleRuntimeError (e :: SomeException) =
     Just (_ :: HighwayWrapperError) -> throwIO e
     Nothing -> throwIO $ RuntimeError e
 
---handleParseError :: SomeException -> HighwayM a 
---handleParseError (e :: SomeException) =
---  case fromException e of
---    Just (pe :: RequestParseException) -> throwIO $ ParseError pe
---    Nothing -> throwIO e
-
 handleHighwayError :: HighwayWrapperError -> HighwayM a
 handleHighwayError = \case
   BadGetError -> do
@@ -107,7 +101,6 @@ handleHighwayError = \case
     $logErrorS "handleHighwayError/RuntimeError" . Text.pack $
       show e ++ "\n  callstack missing for runtime errors"
     throwIO e
-  --e@(RequestParseException (MaxParamSizeExceeded i)) -> do
   e@(ParseError pe) -> do
     $logErrorS "handleHighwayError/ParseError" . Text.pack $
       show pe
@@ -119,7 +112,6 @@ handleHighwayError = \case
 enterHighwayWrapper :: HighwayWrapperEnv -> HighwayM x -> Handler x
 enterHighwayWrapper env x = Handler $ do
   eRes <- liftIO . runHighwayToIO env $ x                  `catch`
-                                        --handleParseError   `catch`
                                         handleRuntimeError `catch`
                                         handleHighwayError
   case eRes of
