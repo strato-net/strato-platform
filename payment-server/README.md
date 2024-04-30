@@ -89,4 +89,22 @@ The server requires the following environmental variables to run:
 ```
 
 If running non-dockerized, use `npm run start` or `npm run dev`.  
-If running dockerized, provide a `docker-compose.payment.yml` file and use `docker-compose -f docker-compose.payment.yml up -d --remove-orphans`.
+If running dockerized, provide a `docker-compose.stripe-ps.yml` file and use `docker-compose -f docker-compose.stripe-ps.yml up -d --remove-orphans`.
+
+### Testing
+
+The payment server uses `jest` as its testing framework. In order to run the tests, the following environment variables are required:
+```
+`POSTGRESQL_SERVER_URL`
+`POSTGRESQL_PORT` Default: 5432
+`POSTGRESQL_USER` Default: postgres
+`POSTGRESQL_PASSWORD`
+`POSTGRESQL_DBNAME` Default: postgres
+`STRIPE_PUBLISHABLE_KEY` for Stripe API
+`STRIPE_SECRET_KEY` for Stripe API
+`TEST_ACCOUNT_ID` for Stripe API Tests
+`TEST_SESSION_ID` is optional for testing the Stripe session and intent endpoints
+```
+
+Afterwards, simply run `npm run test`.
+

@@ -1,6 +1,6 @@
-const dayjs = require('dayjs');
-const Joi = require('@hapi/joi');
-const stripeService = require('./stripe.service');
+import dayjs from 'dayjs';
+import Joi from '@hapi/joi';
+import stripeService from './stripe.service.js';
 
 class StripeServiceController {
 
@@ -197,4 +197,4 @@ class StripeServiceController {
 
 }
 
-module.exports = StripeServiceController;
+export default StripeServiceController;
