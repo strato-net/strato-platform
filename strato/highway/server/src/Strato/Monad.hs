@@ -66,7 +66,6 @@ data HighwayWrapperError
   | BadPostError
   | UserError Text
   | RuntimeError SomeException
-  | ParseError RequestParseException
   deriving (Show, Exception)
 
 --------------------------------------------------------------------------------
@@ -100,10 +99,6 @@ handleHighwayError = \case
   e@(RuntimeError _) -> do
     $logErrorS "handleHighwayError/RuntimeError" . Text.pack $
       show e ++ "\n  callstack missing for runtime errors"
-    throwIO e
-  e@(ParseError pe) -> do
-    $logErrorS "handleHighwayError/ParseError" . Text.pack $
-      show pe
     throwIO e
   e -> do
     $logErrorLS "handleHighwayError" e
@@ -166,36 +161,4 @@ enterHighwayWrapper env x = Handler $ do
                           "Something wrong has happened inside of STRATO.",
                           "Please contact your network administrator to have this problem fixed."
                         ]
-                }
-        ParseError e ->
-          case e of
-            MaxParamSizeExceeded i  ->
-              err413
-                { errBody =
-                    fromString $
-                      "Maximum parameter size exceeded: " ++ show i
-                }
-            ParamNameTooLong s i    ->
-              err413
-                { errBody =
-                    fromString $
-                      "Param name: " ++ show s ++ ", is too long: " ++ show i
-                }
-            MaxFileNumberExceeded i ->
-              err413
-                { errBody =
-                    fromString $
-                      "Maximum number of files exceeded: " ++ show i
-                }
-            FilenameTooLong s i     ->
-              err413
-                { errBody =
-                    fromString $
-                      "File name: " ++ show s ++ ", is too long: " ++ show i
-                }
-            TooManyHeaderLines i    ->
-              err413
-                { errBody =
-                    fromString $
-                      "Too many lines in mime/multipart header: " ++ show i
                 }
