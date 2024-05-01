@@ -56,7 +56,15 @@ export const Inventory = {
   transfer: '/transfer',
   updateSale: '/updateSale',
   getPriceHistory: '/price/history',
-  // audit: '/:address/:chainId/audit',
+}
+
+export const Redemption = {
+  prefix: '/redemption',
+  get: '/:id',
+  create: '/',
+  getOutgoingRedemptionRequests: '/outgoing',
+  getIncomingRedemptionRequests: '/incoming',
+  close: '/close'
 }
 
 export const Item = {

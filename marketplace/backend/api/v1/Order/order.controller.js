@@ -338,7 +338,6 @@ class OrderController {
         unitPrice: Joi.number().required()
       })).required(),
       orderTotal: Joi.number().required(),
-      shippingAddressId: Joi.number().min(1).required(),
       tax: Joi.number().required(),
       user: Joi.string().required(),
       email: Joi.string().required(),
@@ -447,7 +446,6 @@ class OrderController {
         quantity: Joi.number().required(),
         saleAddress: Joi.string().required(),
       })).required(),
-      shippingAddressId: Joi.number().min(1).required(),
       paymentSessionId: Joi.string().required(),
     }).required();
 

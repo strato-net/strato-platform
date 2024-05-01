@@ -60,6 +60,18 @@ export const CHARGES = {
   "TAX": 0
 }
 
+export const ASSET_STATUS = {
+  "ACTIVE": 1,
+  "PENDING_REDEMPTION": 2,
+  "RETIRED": 3,
+}
+
+export const REDEMPTION_STATUS = {
+  "PENDING": 1,
+  "FULFILLED": 2,
+  "REJECTED": 3
+}
+
 export const ORDER_STATUS = {
   "AWAITING_FULFILLMENT": 1,
   "AWAITING_SHIPMENT": 2,
@@ -88,11 +100,11 @@ SERVICE_PROVIDERS[SERVICE_PROVIDERS['PAYPAL'] = 2] = 'PAYPAL';
 Object.freeze(SERVICE_PROVIDERS)
 
 // Helpers to calculate average price, range, units sold for Pirce History Stats
-export const calculateAveragePrice =(records)=> {
+export const calculateAveragePrice = (records) => {
   return records.reduce((sum, record) => sum + record.price, 0) / records.length;
 }
 
-export const calculatePriceFluctuation =(records)=> {
+export const calculatePriceFluctuation = (records) => {
   const prices = records.map(record => record.price);
   return { min: Math.min(...prices), max: Math.max(...prices) };
 }
@@ -120,26 +132,26 @@ export const calculateVolumeTraded = (records) => {
 
 
 // Helpers to get time `x` months/years ago and date
-export const getOneYearAgoTime =()=>{
+export const getOneYearAgoTime = () => {
   const time = dayjs().utc().subtract(1, 'year').format('YYYY-MM-DD HH:mm:ss') + ' UTC';
   return time;
 }
-export const getSixMonthsAgoTime =()=>{
+export const getSixMonthsAgoTime = () => {
   const time = dayjs().utc().subtract(6, 'months').format('YYYY-MM-DD HH:mm:ss') + ' UTC';
   return time;
 }
-export const getDate = (record) =>{
+export const getDate = (record) => {
   const date = dayjs(record.block_timestamp).format('YYYY-MM-DD');
   return date;
 }
 
 //Helpers for timeFilter
-export const timeFilterForSixMonths = () =>{
+export const timeFilterForSixMonths = () => {
   return '1';
 }
-export const timeFilterForOneYear = () =>{
+export const timeFilterForOneYear = () => {
   return '2';
 }
-export const timeFilterForAll = () =>{
+export const timeFilterForAll = () => {
   return '3';
 }

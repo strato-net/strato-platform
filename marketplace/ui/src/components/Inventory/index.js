@@ -22,6 +22,7 @@ import {
 import { Images } from "../../images";
 //items
 import { actions as itemActions } from "../../contexts/item/actions";
+import { actions as redemptionActions } from "../../contexts/redemption/actions";
 import { useItemDispatch, useItemState } from "../../contexts/item";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
@@ -30,6 +31,7 @@ import { useAuthenticateState } from "../../contexts/authentication";
 import CategoryCard from "../MarketPlace/CategoryCard";
 import HelmetComponent from "../Helmet/HelmetComponent";
 import { SEO } from "../../helpers/seoConstant";
+import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
 
 
 const Inventory = ({ user }) => {
@@ -59,6 +61,13 @@ const Inventory = ({ user }) => {
     message: itemMsg,
     success: itemSuccess
   } = useItemState();
+
+  //redemptions
+  const redemptionDispatch = useRedemptionDispatch();
+  const {
+    message: redemptionMsg,
+    success: redemptionSuccess
+  } = useRedemptionState();
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
@@ -156,6 +165,24 @@ const Inventory = ({ user }) => {
         onClose: itemActions.resetMessage(itemDispatch),
         placement,
         key: 4,
+      });
+    }
+  };
+
+  const redemptionToast = (placement) => {
+    if (redemptionSuccess) {
+      api.success({
+        message: redemptionMsg,
+        onClose: redemptionActions.resetMessage(redemptionDispatch),
+        placement,
+        key: 5,
+      });
+    } else {
+      api.error({
+        message: redemptionMsg,
+        onClose: redemptionActions.resetMessage(redemptionDispatch),
+        placement,
+        key: 6,
       });
     }
   };
@@ -364,6 +391,7 @@ const metaImg = category ? category : SEO.IMAGE_META
       }
       {message && openToast("bottom")}
       {itemMsg && itemToast("bottom")}
+      {redemptionMsg && redemptionToast("bottom")}
     </>
   );
 };
