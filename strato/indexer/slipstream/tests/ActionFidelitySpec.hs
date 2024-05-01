@@ -25,10 +25,10 @@ convert :: Action -> Either String Action -- 🤔
 convert = eitherDecode . encode
 
 emptyEVMData :: Action.ActionData
-emptyEVMData = Action.ActionData (ExternallyOwned $ unsafeCreateKeccak256FromWord256 0) mempty "LambdaCorp1" EVM (Action.EVMDiff M.empty) M.empty [] [] []
+emptyEVMData = Action.ActionData (ExternallyOwned $ unsafeCreateKeccak256FromWord256 0) mempty "LambdaCorp1" "Clozure1" EVM (Action.EVMDiff M.empty) M.empty [] [] []
 
 emptySolidVMData :: Action.ActionData
-emptySolidVMData = Action.ActionData (SolidVMCode "ContractName" $ unsafeCreateKeccak256FromWord256 0) mempty "LambdaCorp2" SolidVM (Action.SolidVMDiff M.empty) M.empty [] [] []
+emptySolidVMData = Action.ActionData (SolidVMCode "ContractName" $ unsafeCreateKeccak256FromWord256 0) mempty "LambdaCorp2""Clozure2" SolidVM (Action.SolidVMDiff M.empty) M.empty [] [] []
 
 emptyAction :: Action
 emptyAction = Action.Action (unsafeCreateKeccak256FromWord256 0) (posixSecondsToUTCTime 0) 0 (unsafeCreateKeccak256FromWord256 0) Nothing (Account 0x0 Nothing) OMap.empty Nothing S.empty S.empty
@@ -98,7 +98,8 @@ spec = describe "Action conversions" $ do
                  },
                  "types": ["Create"],
                  "codeHash": "86bc2e2a375e6ea377ae90026248f472fbeaa1354ef4424f568d01f3a48ab5b9",
-                 "commonName": "BlockApps1",
+                 "creator": "BlockApps1",
+                 "application": "LogisticsEngine1",
                  "abstracts": [],
                  "mappings": [],
                  "arrays": []
@@ -117,7 +118,8 @@ spec = describe "Action conversions" $ do
          },
          "events" : 
          [ { "eventBlockHash": "0000000000000000000000000000000000000000000000000000000000000000",
-             "eventContractCommonName": "BlockApps2",
+             "eventContractCreator": "BlockApps2",
+             "eventContractApplication": "LogisticsEngine2",
              "eventContractName" : "Vehicle",
              "eventContractAccount" : "2e385b6a3aea46d4172df98617b5385c13b7100d",
              "eventName" : "Vehicle Event",
@@ -150,7 +152,7 @@ spec = describe "Action conversions" $ do
                       Action._actionDataCodeCollection = mempty,
                       Action._actionDataCodeHash = ExternallyOwned $ forceHash "86bc2e2a375e6ea377ae90026248f472fbeaa1354ef4424f568d01f3a48ab5b9",
                       Action._actionDataCreator = "BlockApps1",
-                      -- Action._actionDataApplication = "LogisticsEngine1",
+                      Action._actionDataApplication = "LogisticsEngine1",
                       Action._actionDataCodeKind = EVM,
                       Action._actionDataAbstracts = M.empty,
                       Action._actionDataMappings = [],
@@ -158,7 +160,7 @@ spec = describe "Action conversions" $ do
                       Action._actionDataCallTypes = [Action.Create]
                     }),
               Action._metadata = Just . M.fromList $ [("name", "Vehicle"), ("src", "contract Vehicle {}")],
-              Action._events = S.singleton $ Event zeroHash "BlockApps2" "Vehicle" (Account 0x2e385b6a3aea46d4172df98617b5385c13b7100d Nothing) "Vehicle Event" [("field", "value"), ("anotherField", "anotherValue")],
+              Action._events = S.singleton $ Event zeroHash "BlockApps2" "LogisticsEngine2" "Vehicle" (Account 0x2e385b6a3aea46d4172df98617b5385c13b7100d Nothing) "Vehicle Event" [("field", "value"), ("anotherField", "anotherValue")],
               Action._delegatecalls = S.empty
             }
         )

@@ -17,7 +17,11 @@ const buildOrderQueryOption = (args) => {
 export const waitForAddress = async (admin, contract, options) => {
   const org = options.org
 
-  const tableName = org ? (org + "-" + contract.name) : contract.name
+  const app = options.app == contract.name ? undefined : options.app
+
+  const tableName = org ?
+    (app ? (org + "-" + app + "-" + contract.name) : (org + "-" + contract.name))
+    : contract.name
 
   contract['name'] = tableName
 
@@ -35,8 +39,11 @@ export const waitForAddress = async (admin, contract, options) => {
  */
 export const waitForOwner = async (admin, contract, options) => {
   const org = options.org
+  const app = options.app == contract.name ? undefined : options.app
 
-  const tableName = org ? (org + "-" + contract.name) : contract.name
+  const tableName = org ?
+    (app ? (org + "-" + app + "-" + contract.name) : (org + "-" + contract.name))
+    : contract.name
 
   contract['name'] = tableName
 
@@ -72,8 +79,11 @@ export const search = async (contractName, args, options, user) => {
   const order = buildOrderQueryOption(args)
 
   const org = options.org
+  const app = options.app == contract.name ? undefined : options.app
 
-  const tableName = org ? (org + "-" + contractName) : contractName
+  const tableName = org ?
+    (app ? (org + "-" + app + "-" + contract.name) : (org + "-" + contract.name))
+    : contract.name
 
   const tableArgs = {
     name: tableName,
