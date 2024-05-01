@@ -15,7 +15,7 @@ router.get(
 
 router.get(
     PaymentService.stripeConnectStatus,
-    authHandler.authorizeRequest(),
+    authHandler.authorizeRequest(true),
     loadDapp,
     PaymentServiceController.stripeOnboardingStatus
 );

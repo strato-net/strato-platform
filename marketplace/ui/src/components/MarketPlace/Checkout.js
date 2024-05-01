@@ -8,32 +8,26 @@ import {
   InputNumber,
   Button,
 } from "antd";
-import { MinusOutlined, PlusOutlined } from "@ant-design/icons";
 import {
   useMarketplaceState,
   useMarketplaceDispatch,
 } from "../../contexts/marketplace";
-import { useNavigate } from "react-router-dom";
 import { useOrderState, useOrderDispatch } from "../../contexts/order";
 import { actions } from "../../contexts/marketplace/actions";
-import { actions as orderActions } from "../../contexts/order/actions";
 import { Images } from "../../images";
 import { useState, useEffect, useMemo } from "react";
-//   import { DeleteOutlined } from "@ant-design/icons";
 import "./index.css";
-import ConfirmOrderModel from "./ConfirmOrderModel";
-import { CHARGES, UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
+import { CHARGES } from "../../helpers/constants";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
-import CartComponent from "./CartComponent";
+import ConfirmOrder from "./ConfirmOrder";
 import TagManager from "react-gtm-module";
 import image_placeholder from "../../images/resources/image_placeholder.png";
 import ResponsiveCart from "./ResponsiveCart";
 
 const { Title, Text } = Typography;
 
-const Checkout = ({ user }) => {
-  const [open, setOpen] = useState(false);
+const Checkout = () => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const orderDispatch = useOrderDispatch();
   const [api, contextHolder] = notification.useNotification();
@@ -41,20 +35,11 @@ const Checkout = ({ user }) => {
   const { isCreateOrderSubmitting, message, success } = useOrderState();
 
   const [tax, setTax] = useState(0);
-  const [shipping, setShipping] = useState(0);
   const [total, setTotal] = useState(0);
   const [mapData, setmapData] = useState([]);
 
-  const handleCancel = () => {
-    setOpen(false);
-  };
-
   const calculateTax = (item) => {
     return (item.product.price * CHARGES.TAX) / 100;
-  };
-
-  const calculateShipping = (item) => {
-    return (item.product.price * CHARGES.SHIPPING) / 100;
   };
 
   const storedData = useMemo(() => {
@@ -105,17 +90,15 @@ const Checkout = ({ user }) => {
             status: "Active",
           },
           category: parts[parts.length - 1],
-          firstSale: item.product.address === item.product.originAddress? true: false,
+          firstSale: item.product.address === item.product.originAddress ? true : false,
           sellersCommonName: item.product.ownerCommonName,
           unitOfMeasure: item.product.unitOfMeasurement,
           unitPrice: item.product.price,
           quantity: item.product.saleQuantity,
           saleAddress: item.product.saleAddress,
           tax: calculateTax(item),
-          shippingCharges: calculateShipping(item),
           amount:
             item.product.price * item.qty +
-            calculateShipping(item) +
             calculateTax(item),
           action: item.product.address,
           qty: item.qty,
@@ -132,10 +115,6 @@ const Checkout = ({ user }) => {
     });
     setTax(t);
     let s = 0;
-    cartList.forEach((item) => {
-      s += calculateShipping(item);
-    });
-    setShipping(s);
     let sum = 0;
     cartList.forEach((item) => {
       sum += item.product.price;
@@ -151,11 +130,8 @@ const Checkout = ({ user }) => {
     let items = [...cartList];
     cartList.forEach((element, index) => {
       if (element.product.address === product.key) {
-        const availableQuantity = product.quantity ? product.quantity : 1;
-        if (items[index].qty - 1 <= availableQuantity) {
-          items[index].qty -= 1;
-          actions.addItemToCart(marketplaceDispatch, items);
-        }
+        items[index].qty -= 1;
+        actions.addItemToCart(marketplaceDispatch, items);
       }
     });
   };
@@ -218,22 +194,6 @@ const Checkout = ({ user }) => {
       }
     });
   };
-  
-  // const openToast = (placement, isError, msg) => {
-  //   if (isError) {
-  //     api.error({
-  //       message: msg,
-  //       placement,
-  //       key: 1,
-  //     });
-  //   } else {
-  //     api.success({
-  //       message: msg,
-  //       placement,
-  //       key: 1,
-  //     });
-  //   }
-  // };
 
   const openToastOrder = (placement, message) => {
     if (success) {
@@ -261,7 +221,7 @@ const Checkout = ({ user }) => {
         </Text>
       ),
       dataIndex: "item",
-        width:"230px",
+      width: "230px",
       render: (text) => {
         return (
           <div className="flex gap-3 items-center ml-3">
@@ -277,7 +237,6 @@ const Checkout = ({ user }) => {
         );
       },
     },
-
     {
       title: (
         <Text className="text-[#202020] text-base font-semibold">Seller</Text>
@@ -287,7 +246,6 @@ const Checkout = ({ user }) => {
       render: (text) => (
         <p className="text-center font-semibold text-sm">{text}</p>
       ),
-      // width: "12%"
     },
     {
       title: (
@@ -344,20 +302,6 @@ const Checkout = ({ user }) => {
         );
       },
     },
-
-    {
-      title: (
-        <Text className="text-[#202020] text-base font-semibold">
-          Shipping Charges
-        </Text>
-      ),
-      dataIndex: "shippingCharges",
-      align: "center",
-
-      render: (text) => (
-        <p className="text-sm font-semibold text-[#202020] ">{"$" + text}</p>
-      ),
-    },
     {
       title: (
         <Text className="text-[#202020] text-base font-semibold">Tax($)</Text>
@@ -384,7 +328,7 @@ const Checkout = ({ user }) => {
       title: <Text className="text-[#202020] text-base font-semibold "></Text>,
       dataIndex: "action",
       align: "",
-      width:"4%",
+      width: "4%",
       render: (text) => {
         return (
           <Button
@@ -399,29 +343,6 @@ const Checkout = ({ user }) => {
       },
     },
   ];
-
-  const navigate = useNavigate();
-
-  const handleOrderConfirm = async () => {
-    handleCancel();
-    let orderList = [];
-    cartList.forEach((item) => {
-      orderList.push({ inventoryId: item.product.address, quantity: item.qty });
-    });
-    const body = {
-      buyerCommonName: user.commonName,
-      orderList,
-      orderTotal: total + tax + shipping,
-    };
-
-    let isDone = await orderActions.createOrder(orderDispatch, body);
-    if (isDone) {
-      actions.addItemToCart(marketplaceDispatch, []);
-      setTimeout(function () {
-        navigate(`/`);
-      }, 2000);
-    }
-  };
 
   return (
     <div className="mx-4 my-2 lg:mx-8 xl:mx-14">
@@ -442,7 +363,7 @@ const Checkout = ({ user }) => {
               <p className="text-sm text-[#202020] font-medium">My Cart</p>
             </Breadcrumb.Item>
           </Breadcrumb>
-  
+
           <div className="pt-[18px] lg:pt-6">
             <p className="text-base md:text-xl lg:text-2xl font-bold lg:font-semibold leading-9">
               My Cart
@@ -459,9 +380,9 @@ const Checkout = ({ user }) => {
             ) : (
               mapData.map((e, index) => (
                 <React.Fragment key={e.key}>
-                  <div className={`hidden lg:block ${index === 0 ? "" : "mt-10"}`}>
-                    <CartComponent columns={columns} data={e.value} openToastOrder={openToastOrder}/> 
-                  </div> 
+                  <div className={`hidden lg:block`}>
+                    <ConfirmOrder data={e.value} columns={columns} />
+                  </div>
                   <div className="lg:hidden">
                     <ResponsiveCart
                       data={e.value}
@@ -478,11 +399,6 @@ const Checkout = ({ user }) => {
           </div>
         </div>
       )}
-      <ConfirmOrderModel
-        open={open}
-        handleCancel={handleCancel}
-        handleConfirm={handleOrderConfirm}
-      />
       {message && openToastOrder("bottom", message)}
     </div>
   );

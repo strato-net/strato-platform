@@ -39,14 +39,17 @@ contract Metals is Mintable, UnitOfMeasurement{
         UnitOfMeasurement _unitOfMeasurement,
         uint _leastSellableUnits,
         string _source,
-        string _purity
+        string _purity,
+        AssetStatus _status
     ) Mintable (
         _name,
         _description,
         _images,
         _files,
         _createdDate,
-        _quantity) 
+        _quantity,
+        _status
+        ) 
     {
         unitOfMeasurement = _unitOfMeasurement;
         leastSellableUnits = _leastSellableUnits;
@@ -64,7 +67,8 @@ contract Metals is Mintable, UnitOfMeasurement{
                               unitOfMeasurement,
                               leastSellableUnits,
                               source,
-                              purity
+                              purity,
+                              status
                               );
         return UTXO(address(newAsset)); 
 }
