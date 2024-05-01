@@ -28,14 +28,16 @@ import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
 import { useAuthenticateState } from "../../contexts/authentication";
-import CategoryCard from "../MarketPlace/CategoryCard";
 import HelmetComponent from "../Helmet/HelmetComponent";
 import { SEO } from "../../helpers/seoConstant";
 import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
+//authorized seller
+import RequestBeAuthorizedSellerModal from "./RequestBeAuthorizedSellerModal";
 
 
 const Inventory = ({ user }) => {
   const [open, setOpen] = useState(false);
+  const [reqModOpen, setReqModOpen] = useState(false);
   const [queryValue, setQueryValue] = useState("");
   const debouncedSearchTerm = useDebounce(queryValue, 1000);
   const limit = 10;
@@ -116,6 +118,13 @@ const Inventory = ({ user }) => {
     setOpen(false);
   };
 
+  const showReqModModal = () => {
+    setReqModOpen(true);
+  };
+
+  const handleReqModCancel = () => {
+    setReqModOpen(false);
+  };
 
   const openToast = (placement) => {
     if (success) {
@@ -278,7 +287,10 @@ const metaImg = category ? category : SEO.IMAGE_META
                   onClick={() => {
                     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                       window.location.href = loginUrl;
-                    } else {
+                    } else if (!user.authorizedSeller) {
+                      showReqModModal()
+                    }
+                    else {
                       showModal()
                     }
                   }}
@@ -386,6 +398,16 @@ const metaImg = category ? category : SEO.IMAGE_META
             resetPage={onPageChange}
             page={page}
             categoryName={category}
+          />
+        )
+      }
+      {
+        reqModOpen && (
+          <RequestBeAuthorizedSellerModal
+            open={reqModOpen}
+            handleCancel={handleReqModCancel}
+            commonName={user.commonName}
+            emailAddr={user.email}
           />
         )
       }

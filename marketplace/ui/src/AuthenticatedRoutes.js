@@ -21,6 +21,8 @@ import { EventTypesProvider } from "./contexts/eventType";
 import { EventsProvider } from "./contexts/event";
 import { UsersProvider } from "./contexts/users";
 import { UserActivityProvider } from "./contexts/userActivity";
+import AuthorizeSeller from "./components/AuthorizeSeller";
+import { SellerStatusProvider } from "./contexts/sellerStatus";
 import Certifier from "./components/Certifier";
 import OnboardingIntermediate from "./components/Inventory/OnboardingIntermediate";
 import ProductDetails from "./components/MarketPlace/ProductDetail";
@@ -149,6 +151,17 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
       />
       <Route
         exact
+        path={routes.Admin.url}
+        element={
+          <UsersProvider>
+            <SellerStatusProvider>
+              <AuthorizeSeller/>
+            </SellerStatusProvider>
+          </UsersProvider>
+        }
+      />
+      <Route
+        exact
         path={routes.MarketplaceProductDetail.url}
         element={
           <UsersProvider>
@@ -197,8 +210,10 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
                         <ProductsProvider>
                           <InventoriesProvider>
                             <RedemptionsProvider>
-                              <Inventory user={user} users={users} />
-                            </RedemptionsProvider>
+                              <SellerStatusProvider>
+                                <Inventory user={user} users={users} />
+                              </RedemptionsProvider>
+                            </SellerStatusProvider>
                           </InventoriesProvider>
                         </ProductsProvider>
                       </ItemsProvider>

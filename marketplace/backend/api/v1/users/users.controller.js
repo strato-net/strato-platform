@@ -1,6 +1,4 @@
 import { rest } from 'blockapps-rest'
-import { RestError } from 'blockapps-rest/dist/util/rest.util'
-import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
 import { pollingHelper } from '../../../helpers/utils'
 
@@ -23,10 +21,15 @@ class UsersController {
         rest.response.status400(res, { username })
       }
       else {
+        // search for user wallet TODO: clean this up
+        const searchOptions = {...options, query: {authorizedSeller: 'not.is.null', commonName: `eq.${user.commonName}`, limit: 1}}
+        let walletResp = await rest.search(accessToken, {name: 'BlockApps-UserRegistry-User'}, searchOptions)
+        console.log('AYA LOGS - walletResp', walletResp)
         rest.response.status200(res, {
           ...user,
           email: decodedToken.email,
           preferred_username: decodedToken.preferred_username,
+          authorizedSeller: walletResp[0].authorizedSeller
         })
       }
       return next()

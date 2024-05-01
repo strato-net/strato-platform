@@ -21,6 +21,7 @@ import orderLineItem from './OrderLineItem'
 import eventType from './EventType'
 import event from './Event'
 import authentication from './authentication'
+import sellerStatus from './SellerStatus'
 import users from './users'
 import marketplace from './Marketplace'
 import paymentService from './PaymentService'
@@ -30,6 +31,7 @@ import redemption from './Redemption'
 
 import {
   Authentication,
+  SellerStatus,
   Users,
   Category,
   SubCategory,
@@ -59,6 +61,7 @@ import {
 const router = express.Router()
 
 router.use(Authentication.prefix, authentication)
+router.use(SellerStatus.prefix, sellerStatus)
 router.use(Users.prefix, users)
 router.use(Category.prefix, category)
 router.use(SubCategory.prefix, subCategory)
