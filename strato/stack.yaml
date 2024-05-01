@@ -3,7 +3,6 @@ packages:
 - api/bloc/bloc2api
 - api/bloc/bloc2client
 - api/core
-- api/ethereum-jsonrpc
 - api/strato-api
 
 - core/blockapps-data
@@ -57,7 +56,6 @@ packages:
 - libs/json-rpc-server
 - libs/json-rpc-client
 - libs/labeled-error
-- libs/logserver
 - libs/kafka/milena
 - libs/kafka/milena-tools
 - libs/monad-alter
@@ -109,6 +107,7 @@ extra-deps:
 - bitwise-1.0.0.1
 - contra-tracer-0.2.0.0
 - dom-lt-0.2.3
+- wai-extra-3.1.14@sha256:1b093366842dc0057cebb4a23dbf9a29269321d70fd242c7695ce0bbd80d32fb,8056
 
 
 #- git: https://github.com/blockapps/milena

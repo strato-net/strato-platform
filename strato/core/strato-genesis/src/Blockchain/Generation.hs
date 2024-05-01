@@ -199,7 +199,7 @@ insertContracts slotss name src code start gi =
           Right v -> v
           _ -> error ("bytecode not encoded in base16:" ++ show code)
       codeHash = KECCAK256.hash decoded
-      mkContract (addr, slots) = ContractWithStorage addr 0 (EVMCode codeHash) slots
+      mkContract (addr, slots) = ContractWithStorage addr 0 (ExternallyOwned codeHash) slots
       addrs = map (start +) [0 ..]
       addrsAndSlots = zip addrs slotss
    in gi
@@ -231,7 +231,7 @@ readValidatorsFromGenesisInfo gi = catMaybes . flip map (genesisInfoAccountInfo 
         let o'' = decodeUtf8 o'
             u'' = decodeUtf8 u'
             c'' = decodeUtf8 c'
-        pure $ CommonName o'' u'' c'' True
+        pure $ (CommonName o'' u'' c'' True)
       _ -> Nothing
   _ -> Nothing
 

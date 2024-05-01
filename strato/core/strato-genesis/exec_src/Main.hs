@@ -102,7 +102,7 @@ showAccountInfo (ContractWithStorage (Address address) balance code storage) =
     ++ unlines (map (\(k, v) -> "s " ++ addressString ++ " " ++ showHex k "" ++ " " ++ showHex v "") storage)
   where
     addressString = showHex address ""
-    showCodeHash (EVMCode c) = showHex $ keccak256ToWord256 c
+    showCodeHash (ExternallyOwned c) = showHex $ keccak256ToWord256 c
     showCodeHash (SolidVMCode _ c) = showHex $ keccak256ToWord256 c
     showCodeHash (CodeAtAccount acct name) = const $ name ++ "@" ++ show acct
 showAccountInfo (SolidVMContractWithStorage (Address address) balance code storage) =
@@ -110,6 +110,6 @@ showAccountInfo (SolidVMContractWithStorage (Address address) balance code stora
     ++ unlines (map (\(k, v) -> "s " ++ addressString ++ " " ++ show k ++ " " ++ show v) storage)
   where
     addressString = showHex address ""
-    showCodeHash (EVMCode c) = showHex $ keccak256ToWord256 c
+    showCodeHash (ExternallyOwned c) = showHex $ keccak256ToWord256 c
     showCodeHash (SolidVMCode _ c) = showHex $ keccak256ToWord256 c
     showCodeHash (CodeAtAccount acct name) = const $ name ++ "@" ++ show acct

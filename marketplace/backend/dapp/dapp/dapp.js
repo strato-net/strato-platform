@@ -1,15 +1,28 @@
 import { rest, util, importer } from "blockapps-rest";
 const { createContract } = rest;
-import constants, { STRIPE_PAYMENT_SERVER_URL } from "/helpers/constants";
+import constants, { 
+  STRIPE_PAYMENT_SERVER_URL, 
+  calculatePriceFluctuation, 
+  calculateAveragePrice, 
+  calculateVolumeTraded, 
+  getOneYearAgoTime, 
+  getSixMonthsAgoTime, 
+  getDate,
+  timeFilterForAll, 
+  timeFilterForOneYear, 
+  timeFilterForSixMonths 
+} from "/helpers/constants";
 import { yamlWrite, yamlSafeDumpSync, getYamlFile } from "/helpers/config";
 import { pollingHelper } from "/helpers/utils";
 
 import axios from 'axios';
 import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
 import RestStatus from 'http-status-codes';
 import certificateJs from "/dapp/certificates/certificate";
 
 import artJs from "/dapp/items/art";
+import tokensJs from "/dapp/items/tokens";
 import carbonOffsetJs from "/dapp/items/carbonOffset";
 import metalsJs from "/dapp/items/metals";
 import clothingJs from "/dapp/items/clothing";
@@ -27,7 +40,7 @@ import paymentProviderJs from '/dapp/payments/paymentProvider';
 import strats from "../strats/strats";
 
 const allAssetNames = [];
-
+dayjs.extend(utc);
 const contractName = "Mercata";
 const contractFileName = `dapp/mercata-base-contracts/BaseCodeCollection.sol`;
 
@@ -133,7 +146,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   // includes the org+app for cirrus namespacing (helpers/utils.js will prepend to cirrus queries)
-  const defaultOptions = { ..._defaultOptions, app: contractName, chainIds: [], };
+  const defaultOptions = { ..._defaultOptions, app: contractName, chainIds: [], cacheNonce: true };
   // for querying data not on the dapp shard
   const optionsNoChainIds = {
     ...defaultOptions,
@@ -206,19 +219,19 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   // -------------------------- INVENTORY --------------------------------
 
   contract.getInventory = async function (args, options = optionsNoChainIds) {
-    const getOptions = { ...options, app: contractName, };
+    const getOptions = { ...options };
     return await inventoryJs.get(rawAdmin, { ...args }, getOptions);
   };
 
   contract.getInventories = async function (args, options = optionsNoChainIds) {
-    const getOptions = { ...options, app: contractName };
+    const getOptions = { ...options };
     const inventories = await inventoryJs.getAll(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
     const inventoryCount = await inventoryJs.inventoryCount(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
     return { inventories: inventories, inventoryCount: inventoryCount }
   };
 
   contract.getInventoriesForUser = async function (args, options = optionsNoChainIds) {
-    const getOptions = { ...options, app: contractName };
+    const getOptions = { ...options };
     const {ownerCommonName, ...restArgs} = args;
     const newArgs = { ...restArgs, ownerCommonName:ownerCommonName, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, userProfile:true }//'0000000000000000000000000000000000000000'
     return marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
@@ -254,7 +267,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   contract.getAllItemTransferEvents = function (args, options = defaultOptions) {
-    const getOptions = { ...options, app: contractName, };
+    const getOptions = { ...options };
     return inventoryJs.getAllItemTransferEvents(rawAdmin, args, getOptions);
   };
 
@@ -273,34 +286,170 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   // ------------------------------ INVENTORY ENDS--------------------------------
 
   contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, app: contractName };
-    const newArgs = { ...args, notEqualsField: 'sale', notEqualsValue: '0000000000000000000000000000000000000000' }
-    return marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
+    const getOptions = { ...options };
+    //for ba sellers, get all assets - display For Sale and Sold Out
+    const newArgs = { ...args, ownerCommonName: constants.baUserNames }
+    const all =  await marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
+
+    // for non-ba sellers, get assets with valid sale & saleQty > 0 - display only For Sale records
+    const newArgs1 = { ...args, notEqualsField: ['ownerCommonName', 'sale'], notEqualsValue: [constants.baUserNames, constants.zeroAddress] }
+    const all2 =  await marketplaceJs.getAll(rawAdmin, newArgs1, getOptions);
+        
+    return {inventoryResults: all.inventoryResults.concat(all2.inventoryResults), inventoryCount: all.inventoryCount + all2.inventoryCount};
   };
 
   contract.getMarketplaceInventoriesLoggedIn = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, app: contractName };
-    const newArgs = {
-      ...args, notEqualsField: ['sale', 'ownerCommonName'],
-      notEqualsValue: ['0000000000000000000000000000000000000000', userCommonName]
-    }
-    return marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
+    const getOptions = { ...options };
+    let usersArr = constants.baUserNames.filter(user => user !== userCommonName)
+    const newArgs = { ...args, ownerCommonName: usersArr }
+    const all = await marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
+
+    const newArgs1 = { ...args, notEqualsField: ['ownerCommonName', 'sale'], notEqualsValue: [[userCommonName, ...constants.baUserNames], constants.zeroAddress] }
+    const all2 = await marketplaceJs.getAll(rawAdmin, newArgs1, getOptions);
+    return {inventoryResults: all.inventoryResults.concat(all2.inventoryResults), inventoryCount: all.inventoryCount + all2.inventoryCount};
   };
 
   contract.getTopSellingProducts = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName }
-    const newArgs = { ...args, notEqualsField: 'sale', notEqualsValue: '0000000000000000000000000000000000000000' }
+    const newArgs = { ...args, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, ownerCommonName: constants.baUserNames }
     return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions)
   }
 
   contract.getTopSellingProductsLoggedIn = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, app: contractName }
+    const getOptions = { ...options }
     const newArgs = {
       ...args, notEqualsField: ['sale', 'ownerCommonName'],
-      notEqualsValue: ['0000000000000000000000000000000000000000', userCommonName]
+      notEqualsValue: [constants.zeroAddress, userCommonName], 
     }
     return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions)
   }
+
+  contract.getPriceHistory = async function(args, options = defaultOptions) {
+    try {
+      const { assetAddress, timeFilter } = args;
+  
+      const assetWithoutQuantity = await inventoryJs.get(rawAdmin, { address: assetAddress }, options);
+      const originAddress = assetWithoutQuantity.originAddress;
+
+      // Fetch sales (12 months) for stats
+      const originSalesForStats = await saleJs.getAll(rawAdmin, {
+        assetToBeSold: originAddress,
+        order: "block_timestamp.asc",
+        gtField: "block_timestamp",
+        gtValue: getOneYearAgoTime()
+      }, options);
+      console.log("Fetched origin yearly sales:", originSalesForStats.length, "sales");
+  
+      let salesFilter = { assetToBeSold: originAddress, order: "block_timestamp.asc" };
+  
+      // Sales Filter modification based on timeFilter
+      if (timeFilter === timeFilterForSixMonths()) { 
+        // Applying 6-month filter
+        salesFilter.gtField = "block_timestamp";
+        salesFilter.gtValue = getSixMonthsAgoTime();
+      } else if (timeFilter === timeFilterForOneYear()) { 
+        //Applying 1-year filter
+        salesFilter.gtField = "block_timestamp";
+        salesFilter.gtValue = getOneYearAgoTime();
+      } else if (timeFilter === timeFilterForAll()) {
+        // For 'All', no changes to salesFilter required
+      } else {
+        console.log('Invalid timeFilter');
+        return;
+      }
+      // Fetch sales based on filter
+      const originTimeRangeSales = await saleJs.getAll(rawAdmin, {
+        ...salesFilter
+      }, options);
+  
+
+  
+      // Process records such that for a given date the most recent sale price is fetched
+      // This method processes sales passed, drills down into history table for each sale
+      // This needs to be done as a 2 step process, i.e. a single query to fetch sale & saleHistory can't be done because the contract name is dependent on the sale
+      const processSalesHistory = async (sales, filter = {}) => {
+        //Fetch histories for each sale
+        const historyPromises = sales.map(sale => {
+          //Fetch saleHistory
+          if(filter.assetToBeSold) 
+          {
+            //if timeFilter is applied, also add those filters
+            return saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, ...filter  }, options);
+          }else{
+            //If historical data is fetched, apply 12 month timeFilter
+
+            return saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, assetToBeSold: originAddress, order: "block_timestamp.asc", gtField: "block_timestamp", gtValue: getOneYearAgoTime()  }, options); 
+          }
+        });
+        const histories = await Promise.all(historyPromises);
+        console.log("Histories fetched, checking for block_timestamp...");
+        histories.flat().forEach((record, index) => {
+          if (!record.block_timestamp) {
+            console.log(`Record at index ${index} is missing block_timestamp:`, record);
+          }
+        });
+        
+        // Faltten records, process them using accumulator hash map such that for a given date we fetch latest timestamp's sale record from history table
+        return histories.flat().reduce((acc, recordContainer) => {
+          Object.values(recordContainer).forEach(record => {
+            const date = getDate(record);
+            if (!date) return;
+            if (!acc[date] || acc[date].block_timestamp < record.block_timestamp) {
+              acc[date] = record;
+            }
+          });
+          return acc;
+        }, {});
+      };
+  
+      // Get the histories
+      // Driver to fetch history sales for- plotting data points, stats
+      const processedSalesResults = await Promise.allSettled([
+        processSalesHistory(originTimeRangeSales, salesFilter),// for data points to be plotted
+        processSalesHistory(originSalesForStats) // for 12-month historical data
+      ]);
+  
+      // Handling Promise.allSettled results (Logging purposes)
+      processedSalesResults.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          console.log(`Result ${index} fulfilled with value:`, result.value);
+        } else {
+          console.error(`Result ${index} rejected with reason:`, result.reason);
+        }
+      });
+
+      // Time Filter Records  
+      const originRecordsSorted = processedSalesResults[0].status === 'fulfilled' ? 
+        Object.values(processedSalesResults[0].value).sort((a, b) => new Date(a.block_timestamp) - new Date(b.block_timestamp)) : [];
+      // Only send price, timestamp as a part of the record
+      const originRecords = originRecordsSorted? Object.values(originRecordsSorted).map(({price, block_timestamp}) => ({price, block_timestamp})) : [];
+      // Append a record for the current date with the last known price
+      if (originRecords.length > 0) {
+        const lastKnownRecord = originRecords[originRecords.length - 1];
+        const currentDateTime = dayjs().utc().format('YYYY-MM-DD HH:mm:ss') + ' UTC';
+        originRecords.push({
+          price: lastKnownRecord.price,
+          block_timestamp: currentDateTime
+        });
+      }          
+      
+        
+      // 12 month historical data
+      const twelveMonthHistoryRecords = processedSalesResults[1].status === 'fulfilled' ? 
+        Object.values(processedSalesResults[1].value).sort((a, b) => new Date(a.block_timestamp) - new Date(b.block_timestamp)) : [];
+      // Only send Range, Units Sold, Average Price as the stats record
+      const records = {
+          originFluctuation: calculatePriceFluctuation(Object.values(twelveMonthHistoryRecords)),
+          originVolume: calculateVolumeTraded(Object.values(twelveMonthHistoryRecords)),
+          originAveragePrice: calculateAveragePrice(Object.values(twelveMonthHistoryRecords))
+        };
+
+    return { records, originRecords };
+    } catch (error) {
+      console.error("Error fetching price history:", error);
+    }
+  };
+  
 
   // ------------------------------ ART STARTS ------------------------------
 
@@ -315,11 +464,29 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getArts = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, app: contractName, };
+    const getOptions = { ...options };
     return artJs.getAll(rawAdmin, args, getOptions);
   };
 
   // ------------------------------ ART ENDS --------------------------------
+
+  // ------------------------------ TOKENS STARTS ------------------------------
+
+  contract.createTokens = async function (args, options = defaultOptions) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const newArgs = {
+      ...args.itemArgs,
+      createdDate
+    };
+    return tokensJs.uploadContract(rawAdmin, newArgs, options);
+  };
+
+  contract.getTokens = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName, };
+    return tokensJs.getAll(rawAdmin, args, getOptions);
+  };
+
+  // ------------------------------ TOKENS ENDS --------------------------------
 
   // ------------------------------ CARBONOFFSET STARTS------------------------------
 
@@ -333,7 +500,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getCarbonOffsets = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, app: contractName, };
+    const getOptions = { ...options };
     return carbonOffsetJs.getAll(rawAdmin, args, getOptions);
   };
 
@@ -352,7 +519,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getMetals = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, app: contractName, };
+    const getOptions = { ...options };
     return metalsJs.getAll(rawAdmin, args, getOptions);
   };
 
@@ -370,7 +537,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getClothings = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, app: contractName, };
+    const getOptions = { ...options };
     return clothingJs.getAll(rawAdmin, args, getOptions);
   };
 
@@ -391,7 +558,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getMemberships = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, app: contractName, };
+    const getOptions = { ...options };
     return membershipJs.getAll(rawAdmin, args, getOptions);
   };
 
@@ -410,7 +577,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getCarbonDAOs = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, app: contractName, };
+    const getOptions = { ...options };
     return carbonDAOJs.getAll(rawAdmin, args, getOptions);
   };
 
@@ -428,7 +595,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getCollectibles = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, app: contractName, };
+    const getOptions = { ...options };
     return collectibleJs.getAll(rawAdmin, args, getOptions);
   };
 
@@ -469,12 +636,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   contract.getSaleOrders = async function (args, options = defaultOptions) {
-    const getOptions = { ...options, app: contractName, };
+    const getOptions = { ...options };
     return saleOrderJs.getAll(rawAdmin, args, getOptions);
   }
 
   contract.checkSaleQuantity = async function (args, options = defaultOptions) {
-    const getOptions = { ...options, app: contractName }
+    const getOptions = { ...options }
     return inventoryJs.checkSaleQuantity(rawAdmin, args, getOptions)
   }
 
@@ -527,8 +694,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return saleOrderJs.updateOrderComment(rawAdmin, contract, options, comments);
   };
   
-  contract.export = async function ( options = defaultOptions) {
-    const getOptions = { ...options, app: contractName };
+  contract.export = async function (options = defaultOptions) {
+    const getOptions = { ...options };
     
     const processOrders = async (orderArg) => {
       const orders = await saleOrderJs.getAll(rawAdmin, orderArg, getOptions);
@@ -598,14 +765,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   /* ------------------------ User Activity Starts ------------------------ */
   contract.getAllUserActivity = async function (args, options = defaultOptions) {
-    const getOptions = { ...options, app: contractName };
+    const getOptions = { ...options };
     const { sellersCommonName, purchasersCommonName, newOwnerCommonName } = args
 
-    const currentDate = new Date();
-    // Subtract 10 days from the current date
-    const tenDaysAgoDate = new Date(currentDate.getTime() - (10 * 24 * 60 * 60 * 1000));
-    // Format the date as 'YYYY-MM-DD HH:MM:SS UTC'
-    const tenDaysAgoTimestamp = tenDaysAgoDate.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
+    const currentDate = dayjs(); // Get the current date with dayjs
+    const tenDaysAgoDate = currentDate.subtract(10, 'day'); // Subtract 10 days
+    const tenDaysAgoTimestamp = tenDaysAgoDate.utc().format('YYYY-MM-DD HH:mm:ss') + ' UTC'; // Format the date
 
     // Need to fetch purchases, closed orders, transfers for the user.
     // New Purchases of User's Products---Fetch Orders with filters of sellersCommonName, block_timestamp and Order Status = AWAITING_FULFILLMENT (1) 
@@ -639,7 +804,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   /* ------------------------ Stripe account connect starts here ------------------------ */
   contract.stripeOnboarding = async function (args, options = defaultOptions) {
     try {
-      const getOptions = { ...options, app: contractName };
+      const getOptions = { ...options };
       let userStripeAccount, connectLink;
       // get user paymentProvider details from cirrus
       const sellerStripeDetails = await paymentProviderJs.get(rawAdmin, { name: 'STRIPE', accountDeauthorized: false, ownerCommonName: userCert.commonName }, getOptions)
@@ -674,7 +839,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getStripeOnboardingStatus = async function (args, options = defaultOptions) {
     try {
-      const getOptions = { ...options, app: contractName };
+      const getOptions = { ...options };
 
       // get user paymentProvider details from cirrus
       const paymentProviders = await paymentProviderJs.get(rawAdmin, { name: 'STRIPE', accountDeauthorized: false, ...args }, getOptions);
@@ -743,7 +908,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       // get user paymentProvider details from cirrus
       const { accountId, ...restArgs } = args
 
-      const getOptions = { ...options, app: contractName };
+      const getOptions = { ...options };
       const chainOptions = { ...options, chainIds: [contract.chainId] };
 
       const paymentProvider = await paymentProviderJs.get(rawAdmin, { name: 'STRIPE', accountId }, getOptions);
@@ -832,7 +997,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         }
         stripePaymentSession = await axios.post(new URL('/stripe/checkout', STRIPE_PAYMENT_SERVER_URL).href, checkoutBody, {
           headers: {
-            'referer': `${originUrl}${options.config.marketplaceUiUrlPrefix}`
+            'referer': `${originUrl}`
           }
         })
           .then(function (res) {
@@ -958,7 +1123,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
       }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching addresses: ${JSON.stringify(err)} `);
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching addresses: ${JSON.stringify(error)} `);
     }
   };
 
@@ -983,7 +1148,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getStratsBalance = async function (args, options = defaultOptions) {
     const { userAddress } = args;
-    const getOptions = { ...options, org: "TestCompany", app: '' };
+    const getOptions = { ...options, org: "TestCompany" };
     let address;
 
     if (process.env.networkID === constants.prodNetworkId) {

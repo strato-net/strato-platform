@@ -55,6 +55,7 @@ export const Inventory = {
   resell: '/resell',
   transfer: '/transfer',
   updateSale: '/updateSale',
+  getPriceHistory: '/price/history',
   // audit: '/:address/:chainId/audit',
 }
 
@@ -73,6 +74,12 @@ export const Item = {
 
 export const Art = {
   prefix: '/art',
+  getAll: '/',
+  create: '/'
+}
+
+export const Tokens = {
+  prefix: '/tokens',
   getAll: '/',
   create: '/'
 }

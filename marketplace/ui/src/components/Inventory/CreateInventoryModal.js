@@ -183,7 +183,7 @@ const CreateInventoryModal = ({
     if (type === "Shoes") {
       setSizeOptions(["3.5", "4", "4.5", "5", "5.5", "6", "6.5", "7", "7.5", "8", "8.5", "9", "9.5", "10", "10.5", "11", "11.5", "12", "12.5", "13", "13.5", "14", "14.5", "15", "16", "17", "18"]);
     } else {
-      setSizeOptions(["XXS", "XS", "S", "M", "L", "XL", "XXL"]);
+      setSizeOptions(["OS (One Size)", "XXS", "XS", "S", "M", "L", "XL", "XXL"]);
     }
   };
 
@@ -220,13 +220,13 @@ const CreateInventoryModal = ({
               }}
               loading={isCreateInventorySubmitting || isUploadImageSubmitting}
             >
-              Create Inventory
+              Create Item
             </Button>
           </div>,
         ]}
       >
         <h1 className=" font-semibold text-lg text-[#202020]">
-          Create Inventory
+          Create Item
         </h1>
         <hr className="text-secondryD mt-3" />
         <Form

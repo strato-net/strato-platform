@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE IncoherentInstances #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -50,11 +51,10 @@ import Blockchain.Data.Transaction
 import Blockchain.Data.TransactionDef (formatChainId)
 import Blockchain.Data.TransactionResultStatus
 import qualified Blockchain.Database.MerklePatricia as MP
-import qualified Blockchain.EVM as EVM
-import Blockchain.EVM.Code
 import Blockchain.Event
 import Blockchain.Sequencer.Event
 import qualified Blockchain.SolidVM as SolidVM
+import Blockchain.StateRootMismatch
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
@@ -72,10 +72,11 @@ import Blockchain.VM.VMException
 import Blockchain.VMConstants
 import Blockchain.VMContext
 import Blockchain.VMMetrics
+import qualified Blockchain.EVM as EVM
+-- import qualified Blockchain.EVM.Code as EVC
 import Blockchain.VMOptions
 import Blockchain.Verifier
 import Conduit
-import Control.Arrow ((&&&))
 import Control.Lens.Operators
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
@@ -157,36 +158,45 @@ addBlocks unfiltered = do
       didReplaceBest <- newIORef False
       ranPrivateTxs <- newIORef M.empty
       replacedBest <- newIORef (error "addBlocks.replacedBest: evaluating uninitialized BestBlockInfo!")
-      srLog <- flip State.execStateT Nothing $
-        forM_ filtered $ \block -> do
-          let !blockNo = blockDataNumber $ obBlockData block
-              !txCount = length $ obReceiptTransactions block
-          timeit (printf "Block #%d (%d TXs insertion)" blockNo txCount) timerToUse $ do
-            lift $ addBlock block
-            (didReplaceThisTime, ranPriv, replacedBits@(hsh, num, _)) <- lift . lift $ replaceBestIfBetter block
-            when didReplaceThisTime $ do
-              writeIORef didReplaceBest True
-              writeIORef replacedBest replacedBits
-              -- Gather a chain of better block stateroots. The last one found should be the best block,
-              -- and the intermediate ones increase the granularity at which we can compute a sequence
-              -- of diffs. The number of blocks to skip between stateroots is determined by the cost of
-              -- the diff between them, which is estimated by the number of transactions.
-              State.put $! Just (blockDataStateRoot $ obBlockData block, hsh, num)
-            unless (M.null ranPriv) $
-              modifyIORef' ranPrivateTxs $
-                flip M.unionWith ranPriv $
-                  \(n1, s1) (n2, s2) -> if n1 > n2 then (n1, s1) else (n2, s2)
-      $logDebugLS "addBlocks/srLog" srLog
-      didReplaceBest' <- readIORef didReplaceBest
-      ranPrivateTxs' <- readIORef ranPrivateTxs
-      when didReplaceBest' $ do
-        $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
-        nbb <- readIORef replacedBest
-        yield . OutIndexEvent $ NewBestBlock nbb
-        when flags_sqlDiff $
-          timeit "calculateAndEmitStateDiffs" timerToUse $
-            calculateAndEmitStateDiffs srLog oldHeader
-      when (flags_sqlDiff && not (M.null ranPrivateTxs')) $ calculateAndEmitChainDiffs ranPrivateTxs'
+      let go block = do
+            let !blockNo = blockDataNumber $ obBlockData block
+                !txCount = length $ obReceiptTransactions block
+            timeit (printf "Block #%d (%d TXs insertion)" blockNo txCount) timerToUse $ do
+              mSRMismatch <- lift $ addBlock block
+              when (isNothing mSRMismatch) $ do
+                (didReplaceThisTime, ranPriv, replacedBits@(hsh, num, _)) <- lift . lift $ replaceBestIfBetter block
+                when didReplaceThisTime $ do
+                  writeIORef didReplaceBest True
+                  writeIORef replacedBest replacedBits
+                  -- Gather a chain of better block stateroots. The last one found should be the best block,
+                  -- and the intermediate ones increase the granularity at which we can compute a sequence
+                  -- of diffs. The number of blocks to skip between stateroots is determined by the cost of
+                  -- the diff between them, which is estimated by the number of transactions.
+                  State.put $! Just (blockDataStateRoot $ obBlockData block, hsh, num)
+                unless (M.null ranPriv) $
+                  modifyIORef' ranPrivateTxs $
+                    flip M.unionWith ranPriv $
+                      \(n1, s1) (n2, s2) -> if n1 > n2 then (n1, s1) else (n2, s2)
+              pure mSRMismatch
+          loop [] = pure Nothing
+          loop (b:bs) = go b >>= \case
+            Just srm -> pure $ Just srm
+            Nothing  -> loop bs
+      (mSRMismatch, srLog) <- flip State.runStateT Nothing $ loop filtered
+      case mSRMismatch of
+        Just srMismatch -> yield $ OutStateRootMismatch srMismatch
+        Nothing -> do
+          $logDebugLS "addBlocks/srLog" srLog
+          didReplaceBest' <- readIORef didReplaceBest
+          ranPrivateTxs' <- readIORef ranPrivateTxs
+          when didReplaceBest' $ do
+            $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
+            nbb <- readIORef replacedBest
+            yield . OutIndexEvent $ NewBestBlock nbb
+            when flags_sqlDiff $
+              timeit "calculateAndEmitStateDiffs" timerToUse $
+                calculateAndEmitStateDiffs srLog oldHeader
+          when (flags_sqlDiff && not (M.null ranPrivateTxs')) $ calculateAndEmitChainDiffs ranPrivateTxs'
 
 setParentStateRoot ::
   (MonadFail m, MonadIO m, BSDB.HasBlockSummaryDB m) =>
@@ -196,7 +206,7 @@ setParentStateRoot OutputBlock {..} = do
   liftIO $ setTitle $ "Block #" ++ show (blockDataNumber obBlockData)
   BSDB.getBSum (blockDataParentHash obBlockData)
 
-addBlock :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m ()
+addBlock :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m (Maybe StateRootMismatch)
 addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
   let obh = outputBlockHash b
    in withCurrentBlockHash obh $ do
@@ -233,25 +243,30 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
 
         postRewardSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
 
-        when (Just (blockDataStateRoot (obBlockData b)) /= postRewardSR) $ do
-          $logInfoS "addBlock/mined" . T.pack $ "newStateRoot: " ++ format postRewardSR
-          error $ "stateRoot mismatch!!  New stateRoot doesn't match block stateRoot: " ++ format (blockDataStateRoot $ obBlockData b)
+        if (Just (blockDataStateRoot (obBlockData b)) /= postRewardSR)
+          then do
+            $logInfoS "addBlock/mined" . T.pack $ "newStateRoot: " ++ format postRewardSR
+            pure . Just $ StateRootMismatch (blockDataNumber $ obBlockData b)
+                                            obh
+                                            (blockDataStateRoot $ obBlockData b)
+                                            (fromMaybe MP.emptyTriePtr postRewardSR)
+          else do
+            valid <- checkValidity (blockIsHomestead $ blockDataNumber bd) bSum b
+            case valid of
+              Nothing -> lift $ P.incCounter vmBlocksValid
+              Just _ -> lift $ P.incCounter vmBlocksInvalid -- error err -- todo: i dont think we ACTUALLY need to error here
+            when flags_debug $ do
+              bhr'' <- Mod.get (Proxy @BlockHashRoot)
+              $logDebugS "addBlock" $ T.pack $ "New blockhash root after running block: " ++ format bhr''
+              mcr'' <- getChainRoot $ blockHash b
+              case mcr'' of
+                Nothing -> $logDebugS "addBlock" $ T.pack $ "Could not locate new chain root after running block. Using emptyTriePtr"
+                Just cr -> $logDebugS "addBlock" $ T.pack $ "New chain root after running block: " ++ format cr
 
-        valid <- checkValidity (blockIsHomestead $ blockDataNumber bd) bSum b
-        case valid of
-          Nothing -> lift $ P.incCounter vmBlocksValid
-          Just _ -> lift $ P.incCounter vmBlocksInvalid -- error err -- todo: i dont think we ACTUALLY need to error here
-        when flags_debug $ do
-          bhr'' <- Mod.get (Proxy @BlockHashRoot)
-          $logDebugS "addBlock" $ T.pack $ "New blockhash root after running block: " ++ format bhr''
-          mcr'' <- getChainRoot $ blockHash b
-          case mcr'' of
-            Nothing -> $logDebugS "addBlock" $ T.pack $ "Could not locate new chain root after running block. Using emptyTriePtr"
-            Just cr -> $logDebugS "addBlock" $ T.pack $ "New chain root after running block: " ++ format cr
-
-        lift $ P.incCounter vmBlocksMined
-        lift $ P.incCounter vmBlocksProcessed
-        $logInfoS "addBlock" . T.pack $ "Inserted block became #" ++ show (blockDataNumber $ obBlockData b) ++ " (" ++ format obh ++ ")."
+            lift $ P.incCounter vmBlocksMined
+            lift $ P.incCounter vmBlocksProcessed
+            $logInfoS "addBlock" . T.pack $ "Inserted block became #" ++ show (blockDataNumber $ obBlockData b) ++ " (" ++ format obh ++ ")."
+            pure Nothing
 
 addBlockTransactions :: (Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m ()
 addBlockTransactions OutputBlock {obBlockData = bd, obReceiptTransactions = transactions} = do
@@ -353,17 +368,13 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
     $logDebugS "addTx" . T.pack $ "transaction cost: " ++ show gTX
     $logDebugS "addTx" . T.pack $ "intrinsicGas: " ++ show intrinsicGas'
 
-  let txCost = transactionGasLimit bt * transactionGasPrice bt + transactionValue bt
+  let txCost = transactionValue bt
       realIG = fromIntegral intrinsicGas'
       maxGas = fromIntegral (maxBound :: Int)
 
-  (acctBalance, acctNonce) <-
-    lift $
-      (addressStateBalance &&& addressStateNonce)
-        <$> A.lookupWithDefault (Proxy @AddressState) tAcct
+  acctNonce <- lift $ addressStateNonce <$> A.lookupWithDefault (Proxy @AddressState) tAcct
 
   when (chainId /= txChainId bt) $ throwE $ TFChainIdMismatch chainId (txChainId bt) t
-  when (flags_gasOn && txCost > acctBalance) $ throwE $ TFInsufficientFunds txCost acctBalance t
   when (realIG > transactionGasLimit bt) $ throwE $ TFIntrinsicGasExceedsTxLimit realIG (transactionGasLimit bt) t
   when (transactionGasLimit bt > min remainingBlockGas maxGas) $ throwE $ TFBlockGasLimitExceeded (transactionGasLimit bt) remainingBlockGas t
   unless nonceValid $ throwE $ TFNonceMismatch (transactionNonce bt) acctNonce t
@@ -373,53 +384,31 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
     . throwE
     $ TFTXSizeLimitExceeded txSize flags_txSizeLimit t
 
-  unless flags_gasOn $ do
-    $logInfoS "addTx" . T.pack $ "gas is off, so I'm giving the account enough balance for this TX"
-    faucetSuccess <- lift $ addToBalance tAcct txCost
-    unless faucetSuccess $ error "failed to give balance to a gasOff account"
-
   lift $ incrementNonce tAcct
 
-  success <- lift $ addToBalance tAcct (-transactionGasLimit bt * transactionGasPrice bt)
-  
   when (otHash t `S.member` knownFailedTxs) . throwE $ TFKnownFailedTX t
+
+  $logInfoS "addTx" . T.pack $ "gas is always off, so I'm giving the account enough balance for this TX"
+  faucetSuccess <- lift $ addToBalance tAcct txCost
+  unless faucetSuccess $ error "failed to give balance to a gasOff account"
 
   when flags_debug $ $logDebugS "addTx" "running code"
   let txTypeCounter = if isContractCreationTX bt then vmTxsCreation else vmTxsCall
-  -- coinbaseAcct = Account (blockDataCoinbase b) chainId
   lift $ P.incCounter txTypeCounter
-  if success --this should handle exceptions,shouldnt it?
-    then do
-      execResults <- runCodeForTransaction isRunningTests' isHomestead b (fromInteger (transactionGasLimit bt) - intrinsicGas') tAcct t
-      -- s1 <- lift $ addToBalance coinbaseAcct (transactionGasLimit bt * transactionGasPrice bt)
-      -- unless s1 $ error "addToBalance failed even after a check in addBlock"
-      lift $ P.incCounter vmTxsProcessed
+  execResults <- runCodeForTransaction isRunningTests' isHomestead b (fromInteger (transactionGasLimit bt) - intrinsicGas') tAcct t
+  lift $ P.incCounter vmTxsProcessed
 
-      -- success' <- lift $ pay "VM refund fees" coinbaseAcct tAcct (calculateReturned bt execResults * transactionGasPrice bt)
-      -- unless success' $ error "oops, refund was too much"
-
-      case erException execResults of
-        Just e -> do
-          when flags_debug $ $logDebugS "addTx" . T.pack . CL.red $ show e
-          lift $ P.incCounter vmTxsUnsuccessful
-        Nothing -> do
-          when flags_debug $ $logDebugS "addTx" . T.pack $ "Removing accounts in suicideList: " ++ intercalate ", " (format <$> S.toList (erSuicideList execResults))
-          forM_ (S.toList $ erSuicideList execResults) $ \address' -> do
-            lift $ purgeStorageMap address'
-            lift $ A.delete (Proxy @AddressState) address'
-          lift $ P.incCounter vmTxsSuccessful
-      return execResults
-    else do
-      -- s1 <- lift $ addToBalance coinbaseAcct (fromIntegral intrinsicGas' * transactionGasPrice bt)
-      -- unless s1 $ error "addToBalance failed even after a check in addTransaction"
-      balance <-
-        lift $
-          addressStateBalance
-            <$> A.lookupWithDefault (Proxy @AddressState) tAcct
-      let availableGas = transactionGasLimit bt - fromIntegral intrinsicGas'
-      $logInfoS "addTransaction/success=false" . T.pack $ "Insufficient funds to run the VM: need " ++ show (availableGas * transactionGasPrice bt) ++ ", have " ++ show balance
-      return $
-        evmErrorResults (transactionGasLimit bt) Blockchain.VM.VMException.InsufficientFunds
+  case erException execResults of
+    Just e -> do
+      when flags_debug $ $logDebugS "addTx" . T.pack . CL.red $ show e
+      lift $ P.incCounter vmTxsUnsuccessful
+    Nothing -> do
+      when flags_debug $ $logDebugS "addTx" . T.pack $ "Removing accounts in suicideList: " ++ intercalate ", " (format <$> S.toList (erSuicideList execResults))
+      forM_ (S.toList $ erSuicideList execResults) $ \address' -> do
+        lift $ purgeStorageMap address'
+        lift $ A.delete (Proxy @AddressState) address'
+      lift $ P.incCounter vmTxsSuccessful
+  return execResults
 
 runCodeForTransaction ::
   (VMBase m) =>
@@ -478,10 +467,10 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAcct t =
 
           let eCall =
                 case codeHash of
-                  EVMCode _ -> Right EVM.call
+                  ExternallyOwned _ -> Right EVM.call
                   SolidVMCode _ _ -> Right SolidVM.call
                   CodeAtAccount acct name -> case resolvedCodeHash of
-                    Just (EVMCode _) -> Right EVM.call
+                    Just (ExternallyOwned _) -> Right EVM.call
                     Just (SolidVMCode _ _) -> Right SolidVM.call
                     Just (CodeAtAccount acct' name') -> Left (acct', name')
                     Nothing -> Left (acct, name)
@@ -518,6 +507,10 @@ codeOrDataLength t =
    in if isMessageTX bt
         then B.length $ transactionData bt
         else codeLength $ transactionInit bt --is ContractCreationTX
+
+codeLength :: Code -> Int
+codeLength (Code bytes) = B.length bytes
+codeLength (PtrToCode _) = error "codeLength: called with PtrToCode"
 
 zeroBytesLength :: OutputTx -> Int
 zeroBytesLength t =
@@ -574,14 +567,14 @@ outputTransactionResult ::
   ConduitT a VmOutEvent m ()
 outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHash} result deltaT beforeMap afterMap newAddresses) = do
   let t = fromMaybe (otBaseTx ot) (otPrivatePayload ot)
-      (txrStatus, message, gasRemaining, orgName, appName) =
+      (txrStatus, message, gasRemaining, commonName) =
         case result of
-          Left err -> let fmt = format err in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0, "", "") -- TODO Also include the trace
+          Left err -> let fmt = format err in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0, "") -- TODO Also include the trace
           Right r -> case erException r of
-            Nothing -> (Success, "Success!", erRemainingTxGas r, erOrgName r, erAppName r)
+            Nothing -> (Success, "Success!", erRemainingTxGas r, erCreator r)
             Just ex ->
               let fmt = either show show ex
-               in (Failure "Execution" Nothing (ExecutionFailure $ show ex) Nothing Nothing (Just fmt), fmt, 0, "", "")
+               in (Failure "Execution" Nothing (ExecutionFailure $ show ex) Nothing Nothing (Just fmt), fmt, 0, "")
       gasUsed = fromInteger $ transactionGasLimit t - gasRemaining
       etherUsed = gasUsed * fromInteger (transactionGasPrice t)
 
@@ -599,28 +592,26 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
 
   yieldMany $ OutLog . mkLogEntry ranBlockHash theHash chainId <$> theLogs
   yield . OutEvent $ mkEventEntry chainId <$> theEvents
-  when flags_createTransactionResults $ do
-    yield . OutTXR $
-      TransactionResult
-        { transactionResultBlockHash = ranBlockHash,
-          transactionResultTransactionHash = theHash,
-          transactionResultMessage = message,
-          transactionResultResponse = response,
-          transactionResultTrace = theTrace',
-          transactionResultGasUsed = gasUsed,
-          transactionResultEtherUsed = etherUsed,
-          transactionResultContractsCreated = intercalate "," $ map (show . _accountAddress) newAddresses,
-          transactionResultContractsDeleted = intercalate "," $ map (show . _accountAddress) $ S.toList $ (beforeAddresses S.\\ afterAddresses) `S.union` (afterDeletes S.\\ beforeDeletes),
-          transactionResultStateDiff = "",
-          transactionResultTime = realToFrac deltaT,
-          transactionResultNewStorage = "",
-          transactionResultDeletedStorage = "",
-          transactionResultStatus = Just txrStatus,
-          transactionResultChainId = chainId,
-          transactionResultKind = erKind <$> eitherToMaybe result,
-          transactionResultOrgName = orgName,
-          transactionResultAppName = appName
-        }
+  yield . OutTXR $
+    TransactionResult
+      { transactionResultBlockHash = ranBlockHash,
+        transactionResultTransactionHash = theHash,
+        transactionResultMessage = message,
+        transactionResultResponse = response,
+        transactionResultTrace = theTrace',
+        transactionResultGasUsed = gasUsed,
+        transactionResultEtherUsed = etherUsed,
+        transactionResultContractsCreated = intercalate "," $ map (show . _accountAddress) newAddresses,
+        transactionResultContractsDeleted = intercalate "," $ map (show . _accountAddress) $ S.toList $ (beforeAddresses S.\\ afterAddresses) `S.union` (afterDeletes S.\\ beforeDeletes),
+        transactionResultStateDiff = "",
+        transactionResultTime = realToFrac deltaT,
+        transactionResultNewStorage = "",
+        transactionResultDeletedStorage = "",
+        transactionResultStatus = Just txrStatus,
+        transactionResultChainId = chainId,
+        transactionResultKind = erKind <$> eitherToMaybe result,
+        transactionResultCommonName = commonName
+      }
   when flags_diffPublish $ do
     traverse_ (yield . OutAction) $ either (const Nothing) erAction result
 

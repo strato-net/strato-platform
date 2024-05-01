@@ -14,9 +14,13 @@ import { Images } from '../../images';
 import images_placeholder from "../../images/resources/image_placeholder.png"
 import { SEO } from '../../helpers/seoConstant';
 import DOMPurify from 'dompurify';
+import { setCookie } from "../../helpers/cookie";
+import LoginModal from './LoginModal';
 
 const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, contextHolder, isUserProfile = false }) => {
+    const {Text} = Typography;
     const [quantity, setQuantity] = useState(1)
+    const [isModalVisible, setIsModalVisible] = useState(false);
 
     let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
     const ownerSameAsUser = () => {
@@ -31,6 +35,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
     const shouldShowWishlistIcon = isAuthenticated && user && !ownerSameAsUser();
 
     const naviroute = routes.MarketplaceProductDetail.url;
+    const isAvailableForSale = (!topSellingProduct.price || topSellingProduct.saleQuantity===0)
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -55,37 +60,53 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
     }, [topSellingProduct]);
 
     const toggleWishlist = () => {
-        const wishList = JSON.parse(localStorage.getItem('wishList')) || [];
-        if (isWishlisted) {
-            // Remove product from wishlist
-            const updatedWishList = wishList.filter(product => product.address !== topSellingProduct.address);
-            localStorage.setItem('wishList', JSON.stringify(updatedWishList));
-            setIsWishlisted(false);
+        if (!shouldShowWishlistIcon) {
+            setIsModalVisible(true);
         } else {
-            // Add product to wishlist
-            wishList.push(topSellingProduct);
-            localStorage.setItem('wishList', JSON.stringify(wishList));
-            setIsWishlisted(true);
+            const wishList = JSON.parse(localStorage.getItem('wishList')) || [];
+            if (isWishlisted) {
+                // Remove product from wishlist
+                const updatedWishList = wishList.filter(product => product.address !== topSellingProduct.address);
+                localStorage.setItem('wishList', JSON.stringify(updatedWishList));
+                setIsWishlisted(false);
+            } else {
+                // Add product to wishlist
+                wishList.push(topSellingProduct);
+                localStorage.setItem('wishList', JSON.stringify(wishList));
+                setIsWishlisted(true);
+            }
         }
     };
 
+    const handleCancel = () => {
+        setIsModalVisible(false);
+    };
+
+    const handleLogin = () => {
+        if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+            setCookie("returnUrl", window.location.pathname, 10);
+            window.location.href = loginUrl;
+        }
+        setIsModalVisible(false);
+    };
+
     return (
-        <div className={`relative trending_cards_container_card bg-white p-3 ${parent == 'Marketplace' ? 'min-w-[300px] w-auto' : 'min-w-[230px]'} min-w-[230px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}>
+        <>
+        <div className={`relative trending_cards_container_card bg-white p-3 ${parent == 'Marketplace' ? 'min-w-[300px] w-auto' : 'min-w-[230px]'}  min-w-[320px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}>
             {contextHolder}
-            {shouldShowWishlistIcon && (
-                <div onClick={toggleWishlist} className="absolute top-2 right-2 cursor-pointer hover:scale-110 transition-transform duration-200">
-                    {isWishlisted ? <HeartFilled style={{ fontSize: "20px", color: "#A15E49" }} /> : <HeartTwoTone style={{ fontSize: "20px" }} twoToneColor="#A15E49" />}
-                </div>
-            )}
+            <div onClick={toggleWishlist} className="absolute top-2 right-2 cursor-pointer hover:scale-110 transition-transform duration-200">
+                {isWishlisted ? <HeartFilled style={{ fontSize: "20px", color: "#A15E49" }} /> : <HeartTwoTone style={{ fontSize: "20px" }} twoToneColor="#A15E49" />}
+            </div>
             <a
-                href={`/marketplace${naviroute.replace(":address", topSellingProduct.address)}`}
+                href={`${naviroute.replace(":address", topSellingProduct.address).replace(":name",topSellingProduct.name)}`}
                 onClick={(e) => {
                     // Check if Command (metaKey) or Ctrl (ctrlKey) is pressed
                     if (e.metaKey || e.ctrlKey) {
                         // Let the browser handle it natively to open in a new tab
                     } else {
                         e.preventDefault();
-                        navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } });
+                        navigate(`${naviroute.replace(":address", topSellingProduct.address).replace(":name",topSellingProduct.name)}`, { state: { isCalledFromInventory: false } });
+                        window.scrollTo(0, 0);
                     }
                 }}
             >
@@ -97,10 +118,10 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                 <div className='flex justify-between items-center'>
                     <Typography
                         className='font-semibold overflow-hidden cursor-pointer w-[180px] md:w-[220px] whitespace-nowrap text-ellipsis'
-                    >
-                        <Tooltip title={topSellingProduct?.name.length > 20 ? topSellingProduct?.name : null}>
+                    >                        
+                        <Tooltip title={topSellingProduct?.name?.length > 20 ? topSellingProduct?.name : null}>
                             <span className=" whitespace-nowrap max-w-[160px] inline-block">
-                                {topSellingProduct?.name.length > 20 ? `${topSellingProduct?.name.slice(0, 20)}...` : `${topSellingProduct?.name}`}
+                                {topSellingProduct?.name?.length > 20 ? `${topSellingProduct?.name.slice(0, 20)}...` : `${topSellingProduct?.name}`}
                             </span>
                         </Tooltip>
                         {/* {topSellingProduct?.name || "N/A"} */}
@@ -109,9 +130,10 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                 </div>
             </a>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography className='font-normal text-black'>{'$' + topSellingProduct?.price || "N/A"}</Typography>
-                {topSellingProduct?.contract_name.toLowerCase().includes("clothing") && (
-                    <Typography className='font-normal text-black'>{'Size: ' + topSellingProduct?.data?.size || "N/A"}</Typography>
+            {topSellingProduct?.price && <Typography className='font-normal text-black'>{ `$ ${topSellingProduct?.price}`}</Typography>}
+            {isAvailableForSale && <Text type="danger" strong> Sold Out </Text>}
+                 {topSellingProduct?.contract_name?.includes("clothing") && (
+                    <Typography className='font-normal text-black'>Size: { topSellingProduct?.data?.size ? topSellingProduct?.data?.size : "N/A"}</Typography>
                 )}
             </div>
             <div style={customStyle} className="custom-typography">
@@ -157,12 +179,12 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                     </Typography>
                 </div>
             </div>
-            <div className='flex gap-4 mt-1'>
+            <div className={`flex gap-4 mt-1`}>
                 <Button
-                    id={`${topSellingProduct.name.replace(/ /g, "_")}-buy-now`}
-                    disabled={ownerSameAsUser()}
+                    id={`${topSellingProduct?.name?.replace(/ /g, "_")}-buy-now`}
+                    disabled={isAvailableForSale || ownerSameAsUser()}
                     type='primary'
-                    className={`flex-1 h-9 !bg-[#13188A] !text-white ${ownerSameAsUser() ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                    className={`flex-1 h-9 ${isAvailableForSale? '!bg-[#808080]': '!bg-[#13188A]'} !text-white ${ownerSameAsUser() ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                     onClick={async () => {
                         const dataLayerEventName = isUserProfile ? 'buy_now_from_user_profile' : 'buy_now_from_top_selling_product';
                         window.LOQ.push(['ready', async LO => {
@@ -184,14 +206,15 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                         });
                         if (await addItemToCart(topSellingProduct, quantity) === true) {
                             navigate("/checkout")
+                            window.scrollTo(0, 0);
                         }
                     }}
                 >
                     Buy Now
                 </Button>
                 <Button
-                    className={`h-9 w-9 flex items-center justify-center !bg-[#13188A] ${ownerSameAsUser() ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-                    disabled={ownerSameAsUser()}
+                    className={`h-9 w-9 flex items-center justify-center ${isAvailableForSale? '!bg-[#808080]':'!bg-[#13188A]'} ${ownerSameAsUser() ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                    disabled={isAvailableForSale || ownerSameAsUser()}
                     onClick={() => {
                         window.LOQ.push(['ready', async LO => {
                             await LO.$internal.ready('events')
@@ -220,6 +243,12 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                 </Button>
             </div>
         </div>
+        <LoginModal
+        visible={isModalVisible}
+        onCancel={handleCancel}
+        onLogin={handleLogin}
+        />
+        </>
     )
 }
 

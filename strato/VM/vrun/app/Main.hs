@@ -126,7 +126,7 @@ main = do
           { addressStateNonce = 0,
             addressStateBalance = 10000000000000000000000000000000000000000,
             addressStateContractRoot = MP.blankStateRoot,
-            addressStateCodeHash = EVMCode $ unsafeCreateKeccak256FromWord256 0,
+            addressStateCodeHash = ExternallyOwned $ unsafeCreateKeccak256FromWord256 0,
             addressStateChainId = Nothing
           }
 

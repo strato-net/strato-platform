@@ -248,7 +248,7 @@ storageSpec = do
             ]
       let codePtrs =
             [ SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0x123,
-              EVMCode $ unsafeCreateKeccak256FromWord256 0x456
+              ExternallyOwned $ unsafeCreateKeccak256FromWord256 0x456
             ]
       insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState {addressStateCodeHash = cp}) codePtrs
       resolveCodePtr (Just 0) (codePtrs !! 0) `shouldReturn` Just (codePtrs !! 0)

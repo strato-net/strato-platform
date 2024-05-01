@@ -257,30 +257,6 @@ describe("call", function() {
     assert.equal(result, expected, "method call results");
   });
 
-  // skipping for gasOn=false mode (which is the new default)
-  xit("call method with value - BAD_REQUEST - low account balance", async () => {
-    // create contract
-    const uid = util.uid();
-    const constructorArgs = { var1: 1234 };
-    const contract = await createContract(uid, admin, constructorArgs, options);
-    // call method
-    const methodArgs = { var2: 5678 };
-    const value = new BigNumber(10 ** 25);
-    const method = "multiplyPayable";
-    const callArgs = factory.createCallArgs(
-      contract,
-      method,
-      methodArgs,
-      value
-    );
-    await assert.restStatus(
-      async () => {
-        return rest.call(admin, callArgs, options);
-      },
-      RestStatus.BAD_REQUEST,
-      /low account balance/
-    );
-  });
 });
 
 describe("auth user", function() {
@@ -398,7 +374,7 @@ describe("history", function() {
       
     const contractHistory = await rest.searchUntil(
       admin,
-      { name: `history@TestHistory` },
+      { name: `history@Test-TestHistory` },
       (r) => r.length > 1,
       {
         ...options,
@@ -412,7 +388,7 @@ describe("history", function() {
 
     const filteredContractHistory = await rest.searchUntil(
       admin,
-      { name: `history@TestHistory` },
+      { name: `history@Test-TestHistory` },
       (r) => r.length > 0,
       {
         ...options,

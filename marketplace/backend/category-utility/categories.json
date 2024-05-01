@@ -45,6 +45,16 @@
             ]           
         },
         {
+            "name": "Tokens",
+            "imageKey": "",
+            "subCategories": [
+                {
+                    "name": "Tokens",
+                    "contract": "Tokens"
+                }
+            ]
+        },
+        {
             "name": "Art",
             "imageKey": "",
             "subCategories": [

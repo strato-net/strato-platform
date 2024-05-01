@@ -17,17 +17,53 @@ so that they could be properly moved to their respective version's subsection.
 ## [Unreleased] 
 
 ### Added
-- functionality to enumerate threads and their details in `/threads` endpoint of `P2PAPI`
+- POST `/transaction` allows users to create contracts by providing an address through the `codePtr` field
+- `creatorForkBlockNumber` flag added to customize at which block :creator field should start referring to the common name and not org
+
+### Changed
+- Expansion of Concrete contract to Abstract contract is accomodated by Cirrus
+- Cirrus table namespacing is of format `creator-contractName` now
+- :creator field refers to user's common name, not org (can be customized to occur after particular block number for backwards compatibility)
+- `eth_<random 20 bytes>` database is now just named `eth`
+- `queryStrato` is now `strato-barometer`
+- `strato-barometer` commands point to a copy of `./ethereumH` to access LevelDB data
+
+### Fixed
+- When a contract is created by a user, that user is the :creator. When a contract is created by another contract, :creator is the :creator of that contract
+
+### Removed
+- Removed 'block', 'blockGO', 'canonRedis', 'compressRoundChanges' commands from blockapps-tools
+- Removed `certInfo` flag from strato-sequencer (cert is now derived from genesis block or during sync)
+- Removed unused flags, such as `brokenRefundRenable`, `cacheTransactionResults`, `faucetEnabled`, `createTransactionResults`, `gasOn`, `splitinit`, and `useSyncMode`
+- unused api endpoints: `/version`, `/coinbase`, `/log`, `transactionList`, `/uuid`, `/transaction/raw`, and `/fill`
+- `logserver` package (fileserver for strato logs)
+- `blockchain` database in postgres (unused)
+
+## [11.1.0] - 3/28/2023
+
+### Added
+- Custom `Show` instances for `CodeCollection`, `Function`, `Contract` data types
+- Increase gas consumption for contract creation
+- `VM_DEBUGGER=bool` flag added for connecting to the VM debugger + static analysis websocket
+- Derive service provider URLs from node's network ID for testnet and production nodes
+- Update foreign keys for `BlockApps-Mercata-Asset` + `Sale` contracts whenever there is a table expansion
+- Functionality to enumerate threads and their details in `/threads` endpoint of `P2PAPI`
 - `/peers` endpoint in `P2PAPI` to list peer connections and their health
 - POST `/transaction` contract creation calls will now additionally check for address state ref table entry before resolving
 - Jenkins test to ensure slipstream post sync is consistent with boot node
 
-### Changed
+### Changed 
+- When a transaction fails, the `<failed>` message blinks :^)
+- `keccak256` built-in function should return hex-encoded value instead of bytestring
 - Optimized the byteString2Integer function that lies at the foundation of strato's RLP-related functionality (rlpDecode).
 - Optimized the integer2Bytes function that lies at the foundation of strato's RLP-related functionality (rlpEncode)
 - "DAO Fork" for mercata-hydrogen because buggy block got added to canonical blockchain
 
 ### Fixed
+- Mappings within a struct within a `(type => Struct)` mapping can be accessed
+- Constructor arguments are passed by value instead of reference 
+- Escaped quotes for slipstream values
+- Properly escape `"` and `\` string arguments in `strato-api`
 - `sendOutEvent` inconsistenly encoding code pointer hash
 - simplified p2p conduit code so that all threads handling a peer live or die together using the `async` library
 - Bugfix for slipstream regarding escaping quotes in contract name
@@ -37,32 +73,11 @@ so that they could be properly moved to their respective version's subsection.
 - Minimal changes to statetree before all tx checks complete to prevent potential stateroot mismatches between when the bagger adds txs vs when the vm does
 
 ### Removed
+- Removed slipstream's dependency on `eth` database for code collection data
 - Removed unnecessary stateDiff (and threading) in the vm-runner codebase, fixing numerous sources of persistent memory build-up.
 - Removed overcomplicated attempts at solving p2p thread issue (watchdogs, canaries, semaphore, threadmap, etc)
 - `bloc/v2.2/x509/createCert` is no more
 
-
-## [11.1.0] - 3/7/2023
-
-### Added
-- Custom `Show` instances for `CodeCollection`, `Function`, `Contract` data types
-- Increase gas consumption for contract creation
-- `VM_DEBUGGER=bool` flag added for connecting to the VM debugger + static analysis websocket
-- Derive service provider URLs from node's network ID for testnet and production nodes
-- Update foreign keys for `BlockApps-Mercata-Asset` + `Sale` contracts whenever there is a table expansion
-
-### Changed 
-- When a transaction fails, the `<failed>` message blinks :^)
-- `keccak256` built-in function should return hex-encoded value instead of bytestring
-
-### Fixed
-- Mappings within a struct within a `(type => Struct)` mapping can be accessed
-- Constructor arguments are passed by value instead of reference 
-- Escaped quotes for slipstream values
-- Properly escape `"` and `\` string arguments in `strato-api`
-
-### Removed
-- Removed slipstream's dependency on `eth` database for code collection data
 
 ## [11.0.0] - 1/22/2024
 

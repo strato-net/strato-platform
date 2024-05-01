@@ -362,6 +362,11 @@ handleEvents peer = awaitForever $ \case
     myX509 <- lift getMyX509
     let peerCheck (cId, _) = checkPeerIsMember myX509 peerX509 . fromMaybe def $ M.lookup cId mems
     yieldR . Transactions . map (morphTx . snd) $ filter peerCheck ptrs
+  MsgEvt (GetMPNodes srs) -> do
+    let txo = Origin.PeerString (peerString peer)
+    yieldL $ ToUnseq [IEGetMPNodesRequest txo srs]
+  MsgEvt (MPNodes nds) -> do
+    yieldL $ ToUnseq [IEMPNodesReceived nds]
   MsgEvt (Disconnect _) -> do
     $logInfoS "handleEvents/Disconnect" $ T.pack $ "Disconnect event received in Event handler"
     throwIO PeerDisconnected
@@ -463,6 +468,8 @@ handleEvents peer = awaitForever $ \case
         let outbound = BlockHeaders $ morphBlockHeader . unCanonical . snd <$> chain
         $logDebugS "handleEvents/P2pPushBlocks" . T.pack $ "Outgoing message: " ++ show outbound
         yieldR outbound
+    P2pGetMPNodes srs -> yieldR $ GetMPNodes srs
+    P2pMPNodesResponse o nds -> when (shouldRespond peer o) . yieldR $ MPNodes nds
   TimerEvt -> do
     maybeOldTS <- unActionTimestamp <$> lift getActionTimestamp
     case maybeOldTS of
@@ -544,6 +551,11 @@ syncFetch d num = do
   mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
   yieldR $ GetBlockHeaders (BlockNumber num) mrh 0 d
   lift stampActionTimestamp
+
+shouldRespond :: PPeer -> Origin.TXOrigin -> Bool
+shouldRespond peer txo = case txo of
+  Origin.PeerString ps -> ps == peerString peer
+  _ -> False
 
 shouldSend :: PPeer -> Origin.TXOrigin -> Bool
 shouldSend peer txo = case txo of

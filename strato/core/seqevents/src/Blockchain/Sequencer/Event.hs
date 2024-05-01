@@ -17,6 +17,7 @@ import Blockchain.Data.Json
 import Blockchain.Data.RLP
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.Transaction as TX
+import Blockchain.Database.MerklePatricia.NodeData (NodeData)
 import Blockchain.Sequencer.BinaryInstances ()
 import Blockchain.Sequencer.DB.Witnessable
 import qualified Blockchain.Strato.Model.Address as A
@@ -25,6 +26,7 @@ import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord (Word256)
 import Blockchain.Strato.Model.Keccak256 (Keccak256)
 import Blockchain.Strato.Model.MicroTime
+import Blockchain.Strato.Model.StateRoot
 import Control.DeepSeq
 import Control.Lens
 import Data.Aeson hiding (encode)
@@ -52,6 +54,9 @@ instance Format SeqLoopEvent where
   format (UnseqEvent ev) = "UnseqEvent " ++ format ev
   format WaitTerminated = "WaitTerminated"
 
+class ShowConstructor a where
+  showConstructor :: a -> String
+
 data IngestEvent
   = IETx Timestamp IngestTx
   | IEBlock IngestBlock
@@ -65,6 +70,10 @@ data IngestEvent
   | IEForcedConfigChange PBFT.ForcedConfigChange
   | IEValidatorBehavior PBFT.ForcedValidatorChange
   | IEDeleteDepBlock Keccak256
+  | IEGetMPNodes [StateRoot]
+  | IEGetMPNodesRequest TO.TXOrigin [StateRoot]
+  | IEMPNodesResponse TO.TXOrigin [NodeData]
+  | IEMPNodesReceived [NodeData]
   deriving (Eq, Show, GHCG.Generic)
 
 data IngestEventType
@@ -80,6 +89,10 @@ data IngestEventType
   | IETForcedConfigChange
   | IETValidatorBehavior
   | IETDeleteDepBlock
+  | IETGetMPNodes
+  | IETGetMPNodesRequest
+  | IETMPNodesResponse
+  | IETMPNodesReceived
   deriving (Eq, Ord, Show)
 
 iEventType :: IngestEvent -> IngestEventType
@@ -96,6 +109,10 @@ iEventType = \case
   IEForcedConfigChange {} -> IETForcedConfigChange
   IEValidatorBehavior {} -> IETValidatorBehavior
   IEDeleteDepBlock {} -> IETDeleteDepBlock
+  IEGetMPNodes {} -> IETGetMPNodes
+  IEGetMPNodesRequest {} -> IETGetMPNodesRequest
+  IEMPNodesResponse {} -> IETMPNodesResponse
+  IEMPNodesReceived {} -> IETMPNodesReceived
 
 instance Format IngestEvent where
   format (IETx ts o) = show ts ++ " " ++ format o
@@ -110,6 +127,28 @@ instance Format IngestEvent where
   format (IEForcedConfigChange o) = format o
   format (IEValidatorBehavior o) = show o
   format (IEDeleteDepBlock o) = show o
+  format (IEGetMPNodes o) = format o
+  format (IEGetMPNodesRequest o s) = format o ++ "requested: " ++ format s
+  format (IEMPNodesResponse o n) = "Response to " ++ format o ++ ": " ++ show n
+  format (IEMPNodesReceived o) = show o
+
+instance ShowConstructor IngestEvent where
+  showConstructor IETx{} = "IETx"
+  showConstructor IEBlock{} = "IEBlock"
+  showConstructor IEGenesis{} = "IEGenesis"
+  showConstructor IENewCertRegistered{} =  "IENewCertRegistered"
+  showConstructor IECertRevoked{} =  "IECertRevoked"
+  showConstructor IENewChainOrgName{} = "IENewChainOrgName"
+  showConstructor IEValidatorAdded{} = "IEValidatorAdded"
+  showConstructor IEValidatorRemoved{} = "IEValidatorRemoved"
+  showConstructor IEBlockstanbul{} = "IEBlockstanbul"
+  showConstructor IEForcedConfigChange{} = "IEForcedConfigChange"
+  showConstructor IEValidatorBehavior{} = "IEValidatorBehavior"
+  showConstructor IEDeleteDepBlock{} = "IEDeleteDepBlock"
+  showConstructor IEGetMPNodes{} = "IEGetMPNodes"
+  showConstructor IEGetMPNodesRequest{} = "IEGetMPNodesRequest"
+  showConstructor IEMPNodesResponse{} = "IEMPNodesResponse"
+  showConstructor IEMPNodesReceived{} = "IEMPNodesReceived"
 
 type Timestamp = Microtime
 
@@ -117,7 +156,7 @@ data IngestTx = IngestTx
   { itOrigin :: TO.TXOrigin,
     itTransaction :: TX.Transaction
   }
-  deriving (Eq, Read, Show, GHCG.Generic, Data)
+  deriving (Eq, Read, Show, GHCG.Generic)
 
 data IngestBlock = IngestBlock
   { ibOrigin :: TO.TXOrigin,
@@ -125,7 +164,7 @@ data IngestBlock = IngestBlock
     ibReceiptTransactions :: [TX.Transaction],
     ibBlockUncles :: [DD.BlockData]
   }
-  deriving (Eq, Read, Show, GHCG.Generic, Data)
+  deriving (Eq, Read, Show, GHCG.Generic)
 
 data IngestGenesis = IngestGenesis
   { igOrigin :: TO.TXOrigin,
@@ -161,7 +200,9 @@ data P2pEvent
   | -- Ask and push for inclusive ranges of blocks
     P2pAskForBlocks {askStart :: Integer, askEnd :: Integer, askPeer :: ChainMemberParsedSet}
   | P2pPushBlocks {pushStart :: Integer, pushEnd :: Integer, pushPeer :: ChainMemberParsedSet}
-  deriving (Eq, Show, GHCG.Generic, Data)
+  | P2pGetMPNodes [StateRoot]
+  | P2pMPNodesResponse TO.TXOrigin [NodeData]
+  deriving (Eq, Show, GHCG.Generic)
 
 instance Format P2pEvent where
   format (P2pTx o) = format o
@@ -171,7 +212,22 @@ instance Format P2pEvent where
   format (P2pGetTx shas) = "[" ++ (intercalate "," $ map format shas) ++ "]"
   format (P2pNewOrgName c cm) = intercalate ", " [CL.yellow $ format c, show cm]
   format (P2pBlockstanbul o) = format o
+  format (P2pGetMPNodes srs) = "[" ++ (intercalate "," $ map format srs) ++ "]"
+  format (P2pMPNodesResponse o nds) = "Response to " ++ show o ++ ": [" ++ (intercalate "," $ map show nds) ++ "]"
   format x = show x
+
+instance ShowConstructor P2pEvent where
+  showConstructor P2pTx{} = "P2pTx"
+  showConstructor P2pBlock{} = "P2pBlock"
+  showConstructor P2pGenesis{} = "P2pGenesis"
+  showConstructor P2pGetChain{} = "P2pGetChain"
+  showConstructor P2pGetTx{} = "P2pGetTx"
+  showConstructor P2pNewOrgName{} = "P2pNewOrgName"
+  showConstructor P2pBlockstanbul{} = "P2pBlockstanbul"
+  showConstructor P2pAskForBlocks{} = "P2pAskForBlocks"
+  showConstructor P2pPushBlocks{} = "P2pPushBlocks"
+  showConstructor P2pGetMPNodes{} = "P2pGetMPNodes"
+  showConstructor P2pMPNodesResponse{} = "P2pMPNodesResponse"
 
 data VmEvent
   = VmTx Timestamp OutputTx
@@ -180,13 +236,27 @@ data VmEvent
   | VmJsonRpcCommand JsonRpcCommand
   | VmCreateBlockCommand
   | VmPrivateTx OutputTx
-  deriving (Eq, Show, GHCG.Generic, Data)
+  | VmGetMPNodesRequest TO.TXOrigin [StateRoot]
+  | VmMPNodesReceived [NodeData]
+  deriving (Eq, Show, GHCG.Generic)
 
 instance Format VmEvent where
   format (VmTx ts o) = show ts ++ " " ++ format o
   format (VmBlock o) = format o
   format (VmGenesis o) = show o
+  format (VmGetMPNodesRequest o srs) = show o ++ " requested: " ++ format srs
+  format (VmMPNodesReceived nds) = show nds
   format x = show x
+
+instance ShowConstructor VmEvent where
+  showConstructor VmTx{} = "VmTx"
+  showConstructor VmBlock{} = "VmBlock"
+  showConstructor VmGenesis{} = "VmGenesis"
+  showConstructor VmJsonRpcCommand{} = "VmJsonRpcCommand"
+  showConstructor VmCreateBlockCommand{} = "VmCreateBlockCommand"
+  showConstructor VmPrivateTx{} = "VmPrivateTx"
+  showConstructor VmGetMPNodesRequest{} = "VmGetMPNodesRequest"
+  showConstructor VmMPNodesReceived{} = "VmMPNodesReceived"
 
 data OutputTx = OutputTx
   { otOrigin :: TO.TXOrigin,
