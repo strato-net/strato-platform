@@ -266,7 +266,7 @@ create _ _ _ blockData _ sender' origin' _ _ availableGas newAddress code txHash
 
     (hsh, cc) <- codeCollectionFromSource True initCode
     (issuerAcct, _, issuerName) <- getCreator origin'
-    create' sender' (accountToNamedAccount' issuerAcct) issuerAcct issuerName newAddress hsh cc contractName' args False
+    create' sender' (accountToNamedAccount' newAddress) issuerAcct issuerName newAddress hsh cc contractName' args False
 
 create' :: MonadSM m => Account -> NamedAccount -> Account -> String -> Account -> Keccak256 -> CC.CodeCollection -> SolidString -> CC.ArgList -> Bool -> m ExecResults
 create' creator originAddress issuerAcct issuerName newAccount ch cc contractName' argExps createBuiltinCall = do
@@ -2672,7 +2672,7 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
       metadata = Env.metadata theEnv
       isRunningTests = Env.runningTests theEnv
   (ctr, _, ctrName) <- getCreator origin --not sure if this should be there instead
-  execResults <- create' creator (accountToNamedAccount' ctr) ctr ctrName newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) pragmaCheck
+  execResults <- create' creator (accountToNamedAccount' newAddress) ctr ctrName newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) pragmaCheck
   case erNewContractAccount execResults of
     Just nca -> do
       when (not isRunningTests) $ 
