@@ -82,28 +82,34 @@ initHighway = do
   liftIO $ Prelude.putStrLn highway3DMacroFont
   liftIO $ forM_ [stdout, stderr] $ flip hSetBuffering LineBuffering --Do we need this?
   case Prelude.null flags_awsaccesskeyid of
-      True  -> do $logErrorS "highway/initHighway" $ T.pack $ "AWS Access Key ID highway env variable was not passed in."
-                  return ()
-      False -> case Prelude.null flags_awssecretaccesskey of
-                 True  -> do $logErrorS "highway/initHighway" $ T.pack $ "AWS Secret Access Key highway env variable was not passed in."
-                             return ()
-                 False -> case Prelude.null flags_awss3bucket of
-                            True  -> do $logErrorS "highway/initHighway" $ T.pack $ "AWS S3 Bucket highway env variable was not passed in."
-                                        return ()
-                            False -> do $logInfoS "highway/initHighway" $ T.pack $ "Preparing environment for highway."
-                                        mgr <- liftIO $ newManager tlsManagerSettings
-                                        boundary <- liftIO genBoundary
-                                        cr       <- liftIO $ Aws.makeCredentials (DBC8.pack flags_awsaccesskeyid)
-                                                                                 (DBC8.pack flags_awssecretaccesskey)              
-                                        let env = HighwayWrapperEnv
-                                                    mgr
-                                                    cr
-                                                    boundary
-                                                    (T.pack flags_awss3bucket)
-                                                    (T.pack flags_highwayUrl)
-                                        $logInfoS "highway/initHighway" $ T.pack $ "Initialization successful!"
-                                        liftIO $ runSettings settings' 
-                                               $ appHighwayWrapper env
+    True  -> do
+      $logErrorS "highway/initHighway" $ T.pack $ "AWS Access Key ID highway env variable was not passed in."
+      return ()
+    False ->
+      case Prelude.null flags_awssecretaccesskey of
+        True  -> do
+          $logErrorS "highway/initHighway" $ T.pack $ "AWS Secret Access Key highway env variable was not passed in."
+          return ()
+        False ->
+          case Prelude.null flags_awss3bucket of
+            True  -> do
+              $logErrorS "highway/initHighway" $ T.pack $ "AWS S3 Bucket highway env variable was not passed in."
+              return ()
+            False -> do
+              $logInfoS "highway/initHighway" $ T.pack $ "Preparing environment for highway."
+              mgr      <- liftIO $ newManager tlsManagerSettings
+              boundary <- liftIO genBoundary
+              cr       <- liftIO $ Aws.makeCredentials (DBC8.pack flags_awsaccesskeyid)
+                                                       (DBC8.pack flags_awssecretaccesskey)              
+              let env = HighwayWrapperEnv
+                          mgr
+                          cr
+                          boundary
+                          (T.pack flags_awss3bucket)
+                          (T.pack flags_highwayUrl)
+              $logInfoS "highway/initHighway" $ T.pack $ "Initialization successful!"
+              liftIO $ runSettings settings' 
+                     $ appHighwayWrapper env
   where highwayOnExceptionResponse e
           | Just (pe :: RequestParseException) <- fromException e =
               responseLBS
@@ -120,7 +126,8 @@ initHighway = do
         settings' = setOnExceptionResponse highwayOnExceptionResponse
                                            settings
 
-appHighwayWrapper :: HighwayWrapperEnv -> Application
+appHighwayWrapper :: HighwayWrapperEnv
+                  -> Application
 appHighwayWrapper env =
   prometheus
     def

@@ -14,7 +14,7 @@ module Strato.Monad where
 
 import Aws (Credentials(..))
 import Data.ByteString.Lazy as DBL hiding (map)
-import BlockApps.Logging
+import BlockApps.Logging as BL
 import Control.Monad.Reader
 import Control.Monad.Trans.Except
 import Data.String
