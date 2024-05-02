@@ -37,9 +37,11 @@ import Blockchain.JsonRpcCommand
 import qualified Blockchain.MilenaTools as K
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
+import Blockchain.StateRootMismatch
 import Blockchain.Strato.Indexer.Kafka (produceIndexEvents)
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import qualified Blockchain.Strato.Model.Keccak256 as Keccak256
+import Blockchain.Strato.StateDiff          (stateDiff')
 import Blockchain.Strato.StateDiff.Database (commitSqlDiffs)
 import Blockchain.Stream.Action (Action)
 import qualified Blockchain.Stream.Action as Action
@@ -57,6 +59,7 @@ import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.SQL
 import qualified Data.ByteString.Char8 as BC
+import Data.Conduit.List (mapMaybeM)
 import Data.Foldable hiding (fold)
 import Data.List
 import qualified Data.Map as M
@@ -88,22 +91,30 @@ ethereumVM d = runResourceT $ do
 
     Bagger.processNewBestBlock cpHash cpHead [] -- bootstrap Bagger with genesis block
 
-    consume "evm/loop" consumerGroup seqVmEventsTopicName $ \_ seqEvents -> do
+    StateRootMismatch{..} <- runConsume "evm/loop" consumerGroup seqVmEventsTopicName $ \_ seqEvents -> do
         recordBaggerMetrics =<< contextGets _baggerState
         logEventSummaries seqEvents
 
         let !vmInEventBatch = foldr insertInBatch newInBatch seqEvents
-        void . runConduit $
+        mSRMismatch <- fmap listToMaybe . runConduit $
           yield vmInEventBatch
             .| handleVmEvents
-            .| mapM_C sendOutEvent
+            .| mapMaybeM routeOutEvent
+            .| sinkList
 
         loopTimeit "compactContextM" $ compactContextM
 
         baggerData <- uncurry EVMCheckpoint <$> Bagger.getCheckpointableState
         checkpointData <- baggerData <$> getContextBestBlockInfo
         withChainroot <- checkpointData . unBlockHashRoot <$> Mod.get Proxy
-        return withChainroot
+        return (mSRMismatch, withChainroot)
+    
+    let err = "stateRoot mismatch!!  New stateRoot doesn't match block stateRoot: " ++ format _srmBlockSR 
+    runStateRootMismatchM $ do
+      sd <- runConduit $ stateDiff' Nothing _srmBlockNumber _srmBlockHash _srmBlockSR _srmNewSR
+         .| headDefC (error $ err ++ "\nError encountered while analyzing stateRoot mismatch")
+      $logErrorS "ethereumVM/StateRootMismatch" . T.pack $ formatStateRootMismatch sd
+    error err
 
 initializeCheckpointAndBlockSummary ::
   ( HasBlockSummaryDB m,
@@ -149,6 +160,8 @@ logEventSummaries events = do
     getNames (VmJsonRpcCommand _) = "JsonRpcCommand"
     getNames VmCreateBlockCommand = "CreateBlockCommand"
     getNames (VmPrivateTx _) = "PrivateTx"
+    getNames (VmGetMPNodesRequest _ _) = "GetMPNodesRequest"
+    getNames (VmMPNodesReceived _) = "MPNodesReceived"
 
     numberIt :: Int -> String -> String
     numberIt 1 x = "1 " ++ x
@@ -156,7 +169,11 @@ logEventSummaries events = do
 
 -- KAFKA
 
-sendOutEvent :: (MonadLogger m, HasKafka m, HasSQL m, HasContext m) => VmOutEvent -> m ()
+routeOutEvent :: (MonadLogger m, HasKafka m, HasSQL m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => VmOutEvent -> m (Maybe StateRootMismatch)
+routeOutEvent (OutStateRootMismatch srm) = pure $ Just srm
+routeOutEvent oev = Nothing <$ sendOutEvent oev
+
+sendOutEvent :: (MonadLogger m, HasKafka m, HasSQL m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => VmOutEvent -> m ()
 sendOutEvent (OutAction act) = do
   let extractCodeCollectionAddedMessages :: Action -> Maybe VMEvent
       extractCodeCollectionAddedMessages a =
@@ -212,6 +229,9 @@ sendOutEvent (OutASM asm) =
         ]
 sendOutEvent (OutJSONRPC s b) = liftIO $ produceResponse s b
 sendOutEvent (OutBlock o) = void . execKafka $ writeUnseqEvents [IEBlock $ blockToIngestBlock TO.Quarry $ outputBlockToBlock o]
+sendOutEvent (OutStateRootMismatch _) = pure ()
+sendOutEvent (OutGetMPNodes mpNodes) = void . execKafka $ writeUnseqEvents [IEGetMPNodes mpNodes]
+sendOutEvent (OutMPNodesResponse o nds) = void . execKafka $ writeUnseqEvents [IEMPNodesResponse o nds]
 
 consumerGroup :: KP.ConsumerGroup
 consumerGroup = lookupConsumerGroup "ethereum-vm"
@@ -224,13 +244,13 @@ getFirstBlockFromSequencer = do
 -- this one starts at 1, 0 is reserved for genesis block and is used to
 -- bootstrap a ton of this
 -- Also seeds the BlockSummaryDatabase
-initializeCheckpointAndBlockSummaryKafka :: (MonadLogger m, MonadFail m, HasKafka m, HasContext m) => m ()
+initializeCheckpointAndBlockSummaryKafka :: (MonadLogger m, MonadFail m, HasKafka m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => m ()
 initializeCheckpointAndBlockSummaryKafka = do
   block <- getFirstBlockFromSequencer
   checkpoint <- initializeCheckpointAndBlockSummary block
   setCheckpoint 1 checkpoint
 
-getCheckpoint :: (MonadLogger m, MonadFail m, HasKafka m, HasContext m) => m (KP.Offset, EVMCheckpoint)
+getCheckpoint :: (MonadLogger m, MonadFail m, HasKafka m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => m (KP.Offset, EVMCheckpoint)
 getCheckpoint = do
   let topic = seqVmEventsTopicName
       cg = consumerGroup

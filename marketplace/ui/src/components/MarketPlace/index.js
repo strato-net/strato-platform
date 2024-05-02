@@ -207,7 +207,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
         </div>
       ) : (
         <div className="px-3 md:px-0 py-30 mt-6 md:mt-10 mb-10">
-          <CategoryCard />
+          {/* <CategoryCard /> */}
           <TopSellingProductCard />
         </div>
       )}
