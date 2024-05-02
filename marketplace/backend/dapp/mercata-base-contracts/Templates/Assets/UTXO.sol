@@ -87,7 +87,7 @@ abstract contract UTXO is Asset {
         require(getCommonName(msg.sender) == ownerCommonName, "Only the owner of the Asset can request for redemption");
 
         UTXO newAsset = mint(_quantity);
-        Asset(newAsset).transferOwnership(owner, _quantity, false, 0);
+        Asset(newAsset).transferOwnership(owner, _quantity, false, 0, 0);
         Asset(newAsset).updateStatus(AssetStatus.PENDING_REDEMPTION);
         quantity -= _quantity;
 
