@@ -1,6 +1,8 @@
+import dotenv from 'dotenv';
 import fs from 'fs';
 import pg from 'pg';
 const { Client } = pg;
+dotenv.config();
 
 const client = new Client({
     host: process.env.POSTGRESQL_SERVER_URL,
@@ -31,7 +33,13 @@ if (process.env.POSTGRESQL_SERVER_URL && process.env.POSTGRESQL_PASSWORD) {
             addressLine1 TEXT,
             addressLine2 TEXT,
             country TEXT,
-            createdDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP);`;
+            createdDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+            
+            CREATE TABLE IF NOT EXISTS stripe_accounts (
+            commonName TEXT PRIMARY KEY,
+            accountId TEXT,
+            createdDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+            `;
 
             return client.query(query);
         })

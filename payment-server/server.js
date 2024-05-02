@@ -1,6 +1,5 @@
 import bodyParser from 'body-parser';
 import cors from 'cors';
-import dayjs from 'dayjs';
 import express from 'express';
 import expressWinston from 'express-winston';
 import helmet from 'helmet';
@@ -10,7 +9,7 @@ import { clientErrorHandler, commonErrorHandler } from './helpers/utils.js';
 import routes from './routes.js';
 
 const config = {
-    name: 'Payment Server (Stripe)',
+    name: 'Payment Server',
     port: process.env.PORT || 8018,
 };
 
@@ -37,9 +36,6 @@ app.use('/', routes);
 app.use(clientErrorHandler);
 app.use(commonErrorHandler);
 
-app.listen(config.port, (e)=> {
-    if(e) {
-        throw new Error('Internal Server Error');
-    }
-    console.log(`Listening on ${config.port}`)
+app.listen(config.port, function () {
+    console.log(`Listening on port ${config.port}...`)
 });

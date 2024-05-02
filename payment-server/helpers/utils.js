@@ -1,7 +1,6 @@
-import dotenv from 'dotenv';
+import client from '../db/index.js';
 import lodash from 'lodash';
 const { get } = lodash;
-dotenv.config();
 
 const clientErrorHandler = (err, req, res, next) => {
   const statusCode = get(err, 'statusCode');
@@ -18,13 +17,24 @@ const clientErrorHandler = (err, req, res, next) => {
 }
 
 const commonErrorHandler = (err, req, res, next) => {
-  console.log(`Server error. ${err}`);
   console.log(err.stack);
-  res.status(400).json({ success: false, error: err });
+  res.status(400).json({ success: false, error: err.message });
   return next(err);
+}
+
+const getStripeAccountForUser = async (commonName) => {
+  try {
+    const query = 'SELECT * FROM stripe_accounts WHERE commonName = $1';
+    const values = [ commonName ];
+    const result = await client.query(query, values);
+    return result.rows.length === 0 ? undefined : result.rows[0].accountid;
+  } catch (e) {
+    next(e);
+  }
 }
 
 export {
   clientErrorHandler,
   commonErrorHandler,
+  getStripeAccountForUser
 }

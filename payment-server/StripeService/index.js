@@ -4,38 +4,23 @@ import StripeServiceController from './stripeService.controller.js';
 const router = express.Router();
 
 router.get(
-  '/onboard/:accountId?', 
+  '/onboard', 
   StripeServiceController.stripeOnboarding
 );
 
 router.get(
-  '/status/:accountId', 
+  '/status', 
   StripeServiceController.stripeConnectStatus
 );
 
-router.post(
+router.get(
   '/checkout',
   StripeServiceController.stripeCheckout
-)
-
-router.get(
-  '/session/:sessionId/:sellerId',
-  StripeServiceController.stripeGetSession
-)
-
-router.get(
-  '/intent/:sessionId/:sellerId',
-  StripeServiceController.stripeGetIntent
-)
-
-router.post(
-  '/webhook',
-  StripeServiceController.stripeWebhook
 );
 
 router.post(
-  '/webhook/connect', 
-  StripeServiceController.stripeWebhookConnect
+  '/checkout/confirm',
+  StripeServiceController.stripeCheckoutConfirm
 );
 
 export default router;
