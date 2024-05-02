@@ -82,8 +82,8 @@ mergeDiffs (Action.SolidVMDiff lhs) (Action.SolidVMDiff rhs) = Action.SolidVMDif
 mergeDiffs lhs rhs = error $ "Invalid diff combination: " ++ show (lhs, rhs)
 
 data BatchedInserts = BatchedInserts
-  { indexInsert :: ProcessedContract,
-    abstractInsert :: [(ProcessedContract,[T.Text],T.Text, TableColumns)],
+  { indexInsert :: (ProcessedContract, [T.Text]),
+    abstractInserts :: [(ProcessedContract,[T.Text],T.Text, TableColumns)],
     historyInserts :: [ProcessedContract],
     mappingInserts :: [ProcessedMappingRow]
   }
@@ -357,9 +357,6 @@ processTheMessages env conn messages = do
   let fkeys = rights $ fkeys' -- ++ dfkeys'
       concatFkeys = concat fkeys
 
-  forM_ concatFkeys $ \deferredForeignKey -> do
-    outputData conn $ dropFkeysBetween deferredForeignKey
-
   inserts <- enterBloc2 env $ do
     forM changes $ \(acct, actions) -> do
       let row = combineActions actions
@@ -400,7 +397,7 @@ processTheMessages env conn messages = do
           $logDebugLS "History inserts are: " $ T.pack $ show hs
           stateDiff <- rowToMappings row
           pMappings <- processedContractToProcessedMappingRows stateDiff (mapNames) row abiid --get all mapping rows to insert
-          pure . Right $ BatchedInserts indexContract abstractColumns hs pMappings
+          pure . Right $ BatchedInserts (indexContract,fkeysForThisContract) abstractColumns hs pMappings
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
 
@@ -410,14 +407,17 @@ processTheMessages env conn messages = do
   forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
   
   forM_ insertsByCodeHash $ \ins -> do
-    outputData conn $ insertIndexTable $ indexInsert ins
-    outputData conn $ insertHistoryTable $ historyInserts ins
+    -- outputData conn $ insertIndexTable $ indexInsert ins
+    -- outputData conn $ insertHistoryTable $ historyInserts ins
     unless ((length (mappingInserts ins) < 1)) $ outputData conn $ insertMappingTable $ mappingInserts ins
-    outputData conn $ insertAbstractTable (abstractInsert ins) False -- not historic
-    outputData conn $ insertHistoryAbstractTable (abstractInsert ins) (historyInserts ins)
+    outputData conn $ insertAbstractTable (abstractInserts ins) False -- not historic
+    outputData conn $ insertHistoryAbstractTable (abstractInserts ins) (historyInserts ins)
 
+--updating the foreign keys from null
   forM_ insertsByCodeHash $ \ins -> do
-    insertForeignKeys conn $ indexInsert ins
+    outputData conn $ updateForeignKeysFromNULL (abstractInserts ins) False -- not historic
+    let historyAbstracts = [(history, fkeyz, tableName, tableCols) | history <- (historyInserts ins), (_, fkeyz, tableName, tableCols) <- (abstractInserts ins)]
+    outputData conn $ updateForeignKeysFromNULL historyAbstracts True
 
   forM_ concatFkeys $ \deferredForeignKey -> do
     outputData conn $ createForeignIndexesForJoins deferredForeignKey
