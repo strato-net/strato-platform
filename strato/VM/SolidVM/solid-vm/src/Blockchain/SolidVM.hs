@@ -722,7 +722,7 @@ getCreator caller = do
           case (appCreatorAddress, appCreator)  of
             (MS.BAccount creatorAddress, MS.BString creator') -> do
               $logDebugS "getCreator/versioning" . T.pack $ "Its creator is " ++ show creator'
-              appOriginAddress <- getSolidStorageKeyVal' acct $ MS.StoragePath [MS.Field ":creatorAddress"]
+              appOriginAddress <- getSolidStorageKeyVal' acct $ MS.StoragePath [MS.Field ":originAddress"]
               let originAddress = case appOriginAddress of
                     MS.BAccount oa -> oa
                     _ -> accountToNamedAccount' caller
