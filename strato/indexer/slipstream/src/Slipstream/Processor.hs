@@ -407,15 +407,16 @@ processTheMessages env conn messages = do
   forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
   
   forM_ insertsByCodeHash $ \ins -> do
-    -- outputData conn $ insertIndexTable $ indexInsert ins
-    -- outputData conn $ insertHistoryTable $ historyInserts ins
+    outputData conn $ insertIndexTable $ indexInsert ins
+    outputData conn $ insertHistoryTable $ historyInserts ins
     unless ((length (mappingInserts ins) < 1)) $ outputData conn $ insertMappingTable $ mappingInserts ins
     outputData conn $ insertAbstractTable (abstractInserts ins) False -- not historic
     outputData conn $ insertHistoryAbstractTable (abstractInserts ins) (historyInserts ins)
 
 --updating the foreign keys from null
   forM_ insertsByCodeHash $ \ins -> do
-    outputData conn $ updateForeignKeysFromNULL (abstractInserts ins) False -- not historic
+    outputData conn $ updateForeignKeysFromNULLAbstract (abstractInserts ins) -- not historic
+    outputData conn $ updateForeignKeysFromNULLIndex (indexInsert ins)
 
   forM_ concatFkeys $ \deferredForeignKey -> do
     outputData conn $ createForeignIndexesForJoins deferredForeignKey
