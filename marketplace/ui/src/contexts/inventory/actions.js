@@ -57,7 +57,7 @@ const actionDescriptors = {
   fetchInventoryForUserFailed: "fetch_inventory_user_profile_failed",
   fetchPriceHistory: "fetch_price_history",
   fetchPriceHistorySuccessful: "fetch_price_history_successful",
-  fetchPriceHistoryFailed: "fetch_price_history_failed"  
+  fetchPriceHistoryFailed: "fetch_price_history_failed"
 
 };
 
@@ -587,7 +587,6 @@ const actions = {
     }
   },
 
-
   fetchItemTransfers: async (dispatch, limit, offset, ownerCommonName, order, date, search) => {
     dispatch({ type: actionDescriptors.fetchItemTransfers });
 
@@ -782,12 +781,6 @@ const actions = {
           payload: body.data,
         });
         return body.data;
-      } else if (response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({
-          type: actionDescriptors.sellerStripeStatusFailed,
-          error: "Unauthorized while trying to get Stripe status"
-        });
-        window.location.href = body.error.loginUrl;
       }
 
       dispatch({

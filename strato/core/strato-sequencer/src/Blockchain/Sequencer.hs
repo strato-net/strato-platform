@@ -698,6 +698,18 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
         IETDeleteDepBlock -> do
           record "inevent_type_delete_dep_block" "DeleteDepBlock"
           traverse_ (\(IEDeleteDepBlock k) -> A.delete (A.Proxy @DependentBlockEntry) k) events
+        IETGetMPNodes -> do
+          record "inevent_type_get_mp_nodes" "GetMPNodes"
+          yieldMany $ map (\(IEGetMPNodes srs) -> ToP2p $ P2pGetMPNodes srs) events
+        IETGetMPNodesRequest -> do
+          record "inevent_type_get_mp_nodes_request" "GetMPNodesRequest"
+          yieldMany $ map (\(IEGetMPNodesRequest o srs) -> ToVm $ VmGetMPNodesRequest o srs) events
+        IETMPNodesResponse -> do
+          record "inevent_type_mp_nodes_response" "MPNodesResponse"
+          yieldMany $ map (\(IEMPNodesResponse o nds) -> ToP2p $ P2pMPNodesResponse o nds) events
+        IETMPNodesReceived -> do
+          record "inevent_type_mp_nodes_received" "MPNodesReceived"
+          yieldMany $ map (\(IEMPNodesReceived nds) -> ToVm $ VmMPNodesReceived nds) events
 
 prettyIBlock :: IngestBlock -> String
 prettyIBlock IngestBlock {ibOrigin = o, ibBlockData = bd, ibReceiptTransactions = txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"
