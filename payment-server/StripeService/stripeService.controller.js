@@ -12,13 +12,13 @@ class StripeServiceController {
   static async stripeOnboarding(req, res, next) {
     try {
       // Validation
-      StripeServiceController.validateStripeOnboardingArgs(req.headers.referer, req.body);
+      StripeServiceController.validateStripeOnboardingArgs(req.headers.referer, req.params);
 
       const marketplaceUrl = req.headers.referer;
-      const { commonName } = req.body;
+      const { commonName } = req.params;
 
-      const userAccount = getStripeAccountForUser(commonName);
-
+      const userAccount = await getStripeAccountForUser(commonName);
+      
       if (!userAccount) {
         // Generate a new Stripe Account Id
         let userStripeAccount = await stripeService.generateStripeAccountId();
@@ -54,11 +54,11 @@ class StripeServiceController {
   static async stripeConnectStatus(req, res, next) {
     try {
       // Validation
-      StripeServiceController.validateStripeStatusArgs(req.body);
+      StripeServiceController.validateStripeStatusArgs(req.params);
       
-      const { commonName } = req.body;
+      const { commonName } = req.params;
 
-      const userAccount = getStripeAccountForUser(commonName);
+      const userAccount = await getStripeAccountForUser(commonName);
 
       if (!userAccount) {
         throw new Error(`User not onboarded to Stripe yet.`);
@@ -85,7 +85,7 @@ class StripeServiceController {
       const marketplaceUrl = req.headers.referer;
       const { paymentTypes, cartData, orderDetail, sellerCommonName } = req.body;
 
-      const sellerAccount = getStripeAccountForUser(sellerCommonName);
+      const sellerAccount = await getStripeAccountForUser(sellerCommonName);
 
       // Seller account verification
       if (!sellerAccount) {
@@ -117,7 +117,7 @@ class StripeServiceController {
       const { paymentSessionId, sellerCommonName, paymentContractAddress, buyerAddress } = req.body;
 
       // Retrieve the session
-      const sellerAccount = getStripeAccountForUser(sellerCommonName);
+      const sellerAccount = await getStripeAccountForUser(sellerCommonName);
       const session = await stripeService.getPaymentSession(paymentSessionId, sellerAccount);
 
       // Verify payment and perform onchain transfer

@@ -4,12 +4,12 @@ import StripeServiceController from './stripeService.controller.js';
 const router = express.Router();
 
 router.get(
-  '/onboard', 
+  '/onboard/:commonName', 
   StripeServiceController.stripeOnboarding
 );
 
 router.get(
-  '/status', 
+  '/status/:commonName', 
   StripeServiceController.stripeConnectStatus
 );
 
