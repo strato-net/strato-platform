@@ -823,12 +823,11 @@ insertAbstractTable cs@((_, _,abTableName, _) : _) isHistoric = do
 updateForeignKeysFromNULL ::
   OutputM m =>
   [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] ->
-  Bool ->
   ConduitM () Text m ()
-updateForeignKeysFromNULL [] _ = pure ()
-updateForeignKeysFromNULL cs isHistoric = do
+updateForeignKeysFromNULL [] = pure ()
+updateForeignKeysFromNULL cs = do
   multilineLog "updateForeignKeysFromNULL/processedContract" $ show cs
-  yieldMany $ updateFkeysQueryAbstract cs isHistoric
+  yieldMany $ updateFkeysQueryAbstract cs
 
 
 baseColumnsQuery :: [Text]
@@ -1088,9 +1087,8 @@ insertAbstractTableQuery cs isHistoric =
                           ";"]
 
 -- Result: UPDATE table SET (fkey1,fkey2, ...)=(val1,val2, ...) where (fkey1_fkey,fkey2_fkey, ...)=(val1,val2, ...);
-updateFkeysQueryAbstract :: [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] -> Bool -> [Text]
--- updateFkeysQueryAbstract [] _ = error "updateFkeysQuery: unhandled empty list"
-updateFkeysQueryAbstract cs isHistoric =
+updateFkeysQueryAbstract :: [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] -> [Text]
+updateFkeysQueryAbstract cs =
   concat $
     let cs' = (\(c@E.ProcessedContract {contractData = contractData}, fkeys, ab, abColumns) -> 
                 ((c, Map.mapMaybe valueToSQLTextFilterContract $ contractData), (ab, abColumns, fkeys))) <$> cs
@@ -1111,7 +1109,7 @@ updateFkeysQueryAbstract cs isHistoric =
                then (: []) $
                   T.concat $
                     [ "UPDATE ",
-                      (bool abTableName (wrapDoubleQuotes $ "history@" <> unwrapDoubleQuotes abTableName) isHistoric),
+                      abTableName,
                       "\n  SET ",
                       keyStForFkeyColumnsWithPostFix,
                       " = ",

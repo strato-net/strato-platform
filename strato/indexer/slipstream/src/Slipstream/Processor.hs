@@ -416,8 +416,6 @@ processTheMessages env conn messages = do
 --updating the foreign keys from null
   forM_ insertsByCodeHash $ \ins -> do
     outputData conn $ updateForeignKeysFromNULL (abstractInserts ins) False -- not historic
-    let historyAbstracts = [(history, fkeyz, tableName, tableCols) | history <- (historyInserts ins), (_, fkeyz, tableName, tableCols) <- (abstractInserts ins)]
-    outputData conn $ updateForeignKeysFromNULL historyAbstracts True
 
   forM_ concatFkeys $ \deferredForeignKey -> do
     outputData conn $ createForeignIndexesForJoins deferredForeignKey
