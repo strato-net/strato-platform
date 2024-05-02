@@ -6,6 +6,14 @@ import "../Enums/RestStatus.sol";
 import "../Utils/Utils.sol";
 
 abstract contract Asset is Utils {
+    enum AssetStatus {
+        NULL,
+        ACTIVE,
+        PENDING_REDEMPTION,
+        RETIRED,
+        MAX
+    }
+
     uint public assetMagicNumber = 0x4173736574; // 'Asset'
     address public owner;
     string public ownerCommonName;
@@ -17,6 +25,7 @@ abstract contract Asset is Utils {
     uint public createdDate;
     uint public quantity;
     uint public itemNumber;
+    AssetStatus public status;
 
     address public sale;
 
@@ -50,7 +59,8 @@ abstract contract Asset is Utils {
         string[] _images,
         string[] _files,
         uint _createdDate,
-        uint _quantity
+        uint _quantity,
+        AssetStatus _status
     ) {
         // TODO: Get ownerCommonName by getting commonName field from on-chain wallet at that address
         owner  = msg.sender;
@@ -61,6 +71,7 @@ abstract contract Asset is Utils {
         files = _files;
         createdDate = _createdDate;
         quantity = _quantity;
+        status = _status;
         try {
             assert(Asset(msg.sender).assetMagicNumber() == assetMagicNumber);
             originAddress = Asset(msg.sender).originAddress();
@@ -127,6 +138,8 @@ abstract contract Asset is Utils {
     }
 
     function _transfer(address _newOwner, uint _quantity, bool _isUserTransfer, uint _transferNumber) internal virtual {
+        require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
+        require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
         string newOwnerCommonName = getCommonName(_newOwner);
 
         if(_isUserTransfer && _transferNumber>0){
@@ -169,6 +182,8 @@ abstract contract Asset is Utils {
     }
 
     function automaticTransfer(address _newOwner, uint _quantity, uint _transferNumber) public requireOwner("automatic transfer") returns (uint) {
+        require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
+        require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
         require(_quantity <= quantity, "Cannot transfer more than available quantity.");
         if (sale == address(0)) {
             // transfer feature - isUserTransfer: true, transferNumber: >0
@@ -186,6 +201,11 @@ abstract contract Asset is Utils {
     ) public requireOwner("update asset") returns (uint) {
         images = _images;
         files = _files;
+        return RestStatus.OK;
+    }
+
+    function updateStatus(AssetStatus _status) public returns (uint) {
+        status = _status;
         return RestStatus.OK;
     }
 }

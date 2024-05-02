@@ -183,7 +183,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
             width={650}
             footer={[
                 <div className="flex justify-center md:block">   
-                  <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canList || inventory.status === "1"} loading={inventory.saleAddress ? issaleUpdating : isListing}>
+                  <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canList} loading={inventory.saleAddress ? issaleUpdating : isListing}>
                       {inventory.saleAddress ? 'Update' : 'List' }
                   </Button>
                 </div>
