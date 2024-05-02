@@ -55,22 +55,38 @@ tableSeparator :: T.Text
 tableSeparator = "-"
 
 tableNameToText :: TableName -> T.Text
-tableNameToText (IndexTableName cn c) =
-  let prefix = if T.null cn then "" else cn <> tableSeparator
-  in prefix <> c
-tableNameToText (MappingTableName cn c m) =
-  let contractAndMapping = c <> "." <> m
-  in if T.null cn then contractAndMapping else cn <> tableSeparator <> contractAndMapping
-tableNameToText (HistoryTableName cn c) =
-  let prefix = if T.null cn then "" else "history@" <> cn <> tableSeparator
-  in prefix <> c
-tableNameToText (EventTableName cn c e) =
-  let contractAndEvent = c <> "." <> e
-  in if T.null cn then contractAndEvent else cn <> tableSeparator <> contractAndEvent
-tableNameToText (AbstractTableName cn c) =
-  let prefix = if T.null cn then "" else cn <> tableSeparator
-  in prefix <> c
-
+tableNameToText (IndexTableName c a n) =
+  let prefix
+        | T.null c = ""
+        | T.null a = c <> tableSeparator
+        | otherwise = c <> tableSeparator <> a <> tableSeparator
+   in prefix <> n
+tableNameToText (MappingTableName c a n m) =
+  let prefix
+        | T.null c = ""
+        | T.null a = c <> tableSeparator
+        | otherwise = c <> tableSeparator <> a <> tableSeparator
+      contractAndMapping = n <> "." <> m
+   in prefix <> contractAndMapping
+tableNameToText (HistoryTableName c a n) =
+  let prefix
+        | T.null c = ""
+        | T.null a = c <> tableSeparator
+        | otherwise = c <> tableSeparator <> a <> tableSeparator
+   in "history@" <> prefix <> n
+tableNameToText (EventTableName c a n e) =
+  let prefix
+        | T.null c = ""
+        | T.null a = c <> tableSeparator
+        | otherwise = c <> tableSeparator <> a <> tableSeparator
+      contractAndEvent = n <> "." <> e
+   in prefix <> contractAndEvent
+tableNameToText (AbstractTableName c a n) =
+  let prefix
+        | T.null c = ""
+        | T.null a = c <> tableSeparator
+        | otherwise = c <> tableSeparator <> a <> tableSeparator
+   in prefix <> n
 
 tableNameToTextPostgres :: TableName -> T.Text
 tableNameToTextPostgres = T.take 63 . tableNameToText -- max table name len in psql is 63 char

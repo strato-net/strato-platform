@@ -197,7 +197,8 @@ sendOutEvent (OutAction act) = do
                   CodeCollectionAdded
                     { codeCollection = const () <$> cc,
                       codePtr = cp,
-                      commonName = cn,
+                      creator = cn,
+                      application = n,
                       historyList =
                         case join $ fmap (M.lookup "history") (a ^. Action.metadata) of
                           Nothing -> []
@@ -213,7 +214,7 @@ sendOutEvent (OutAction act) = do
       vmes = ccEvents ++ dcEvents ++ actionEvents
   void . produceVMEvents $ toList vmes
 sendOutEvent (OutIndexEvent e) = void $ produceIndexEvents [e]
-sendOutEvent (OutToStateDiff cId cInfo bHash cn) = withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo cn
+sendOutEvent (OutToStateDiff cId cInfo bHash cn app) = withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo cn app
 sendOutEvent (OutStateDiff diff) = commitSqlDiffs diff
 sendOutEvent (OutLog l) = loopTimeit "flushLogEntries" $ void $ produceIndexEvents [LogDBEntry l]
 sendOutEvent (OutEvent e) = loopTimeit "flushEventEntries" $ void $ produceIndexEvents (EventDBEntry <$> e)

@@ -258,6 +258,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
                     (codeHash d)
                     emptyCodeCollection
                     ""
+                    ""
                     ( case codeHash d of
                         ExternallyOwned _ -> EVM
                         SolidVMCode _ _ -> SolidVM
@@ -302,7 +303,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
     forM_ (map (fromMaybe Map.empty . A._metadata) filteredActions) $ \md ->
       case (Map.lookup "src" md, Map.lookup "name" md) of
         (Just src, Just n) -> case runIdentity . runMemCompilerT $ compileSource False $ Map.singleton "" src of
-          Right cc -> void $ produceVMEvents [CodeCollectionAdded (const () <$> cc) (SolidVMCode (T.unpack n) $ hash $ BC.pack $ T.unpack src) "" [] Map.empty []]
+          Right cc -> void $ produceVMEvents [CodeCollectionAdded (const () <$> cc) (SolidVMCode (T.unpack n) $ hash $ BC.pack $ T.unpack src) "" "" [] Map.empty []]
           Left _ -> pure ()
         _ -> return ()
 
