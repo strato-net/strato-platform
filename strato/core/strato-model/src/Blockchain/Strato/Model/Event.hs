@@ -61,7 +61,7 @@ instance ToJSON Event where
   toJSON Event {..} =
     object
       [ "eventBlockHash" .= evBlockHash,
-        "eventContractCommonName" .= evContractCreator,
+        "eventContractCreator" .= evContractCreator,
         "eventContractApplication" .= evContractApplication,
         "eventContractName" .= evContractName,
         "eventContractAccount" .= evContractAccount,
@@ -73,7 +73,7 @@ instance FromJSON Event where
   parseJSON (Object o) =
     Event
       <$> (o .: "eventBlockHash")
-      <*> (o .: "eventContractCommonName")
+      <*> (o .: "eventContractCreator")
       <*> (o .: "eventContractApplication")
       <*> (o .: "eventContractName")
       <*> (o .: "eventContractAccount")

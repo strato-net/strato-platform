@@ -47,12 +47,6 @@ function toTableName(contractName){
 describe('Slipstream', function () {
   this.timeout(config.timeout);
   
-  const stringArray = `
-contract StringArray {
-  string[] xs = ["first", "second", "third"];
-}
-`;
-
   const newContract = `
 contract X {
   uint public z = 7624;
@@ -70,7 +64,7 @@ contract Y {
     await sleep(2000);
     const indexY = await rest.search(user, {...contract, name: toTableName("Y")}, {...options, query: {address: `eq.${contract.address}`}});
     assert.equal(indexY.length, 1, JSON.stringify(indexY, null, 2));
-    const indexX = await rest.search(user, {...contract, name: toTableName("X")}, options);
+    const indexX = await rest.search(user, {...contract, name: toTableName("Y-X")}, options);
     console.log(`indexX returned ${JSON.stringify(indexX, null, 2)}`);
     assert.equal(indexX[0].z, "7624", "z");
   });
