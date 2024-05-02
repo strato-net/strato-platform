@@ -1,5 +1,5 @@
-const client = require('../db');
-const Joi = require('@hapi/joi');
+import client from '../db/index.js';
+import Joi from '@hapi/joi';
 class RedemptionsController {
 
     static async getOutgoingRedemptionRequests(req, res, next) {
@@ -289,4 +289,4 @@ class RedemptionsController {
 
 }
 
-module.exports = RedemptionsController;
+export default RedemptionsController;

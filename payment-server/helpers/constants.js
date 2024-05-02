@@ -12,7 +12,7 @@ const STRIPE_ENV = {
 
 const TOKEN_LIFETIME_RESERVE_SECONDS = 30;
 
-const ADMIN = async () => {
+const bootStrapAdmin = async () => {
   let serviceUserToken
   try {
     serviceUserToken = await oauthHelper.getServiceToken()
@@ -34,5 +34,7 @@ const ADMIN = async () => {
     throw new Error(`Admin was not created/does not exist. Please check your credential setup.`);
   }
 }
+
+const ADMIN = await bootStrapAdmin();
 
 export { STRIPE_ENV, ADMIN, TOKEN_LIFETIME_RESERVE_SECONDS }

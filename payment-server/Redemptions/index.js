@@ -1,5 +1,5 @@
-const express = require('express');
-const RedemptionsController = require('./redemptions.controller');
+import express from 'express';
+import RedemptionsController from './redemptions.controller.js';
 
 const router = express.Router();
 
@@ -33,4 +33,4 @@ router.put(
   RedemptionsController.closeRedemption
 );
 
-module.exports = router;
+export default router;
