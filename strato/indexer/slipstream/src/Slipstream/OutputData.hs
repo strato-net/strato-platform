@@ -603,21 +603,7 @@ expandContractTable' globalsIORef contract cc tableName = do
             ]
         setTableCreated globalsIORef tableName $ cols
         yield $ ((expandTableQuery tableName cols), Just (globalsIORef, tableName, cols))
-      return $
-        case tableName of
-          IndexTableName cn n ->
-            flip
-              map
-              [(colName, foreignName) | (colName, SVMType.Contract foreignName) <- list]
-              $ \(colName, foreignName) ->
-                ForeignKeyInfo
-                  { tableName = tableName,
-                    columnName = colName,
-                    foreignTableName =
-                      let cn' = case cn of "" -> n; _ -> cn
-                       in indexTableName cn' $ labelToText foreignName
-                  }
-          _ -> []
+      return $ []
 
 expandContractTable ::
   OutputM m =>
