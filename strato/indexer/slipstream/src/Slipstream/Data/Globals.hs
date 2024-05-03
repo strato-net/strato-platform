@@ -33,7 +33,7 @@ instance NFData CirrusHandle where
   rnf = const ()
 
 data CirrusHandle
-  = CirrusHandle {cirrusConn :: PGConnection, queriedMaps :: S.Set (T.Text, T.Text)}
+  = CirrusHandle {cirrusConn :: PGConnection, queriedMaps :: S.Set (T.Text, T.Text, T.Text)}
   | FakeCirrusHandle
 
 data Globals = Globals
@@ -48,25 +48,30 @@ data Globals = Globals
 
 data TableName
   = IndexTableName
-      { itCommonName :: T.Text,
+      { itCreator :: T.Text,
+        itApplication :: T.Text,
         itContractName :: T.Text
       }
   | HistoryTableName -- technically the same as index, but logically different
-      { htCommonName :: T.Text,
+      { htCreator :: T.Text,
+        htApplication :: T.Text,
         htContractName :: T.Text
       }
   | EventTableName
-      { etCommonName :: T.Text,
+      { etCreator :: T.Text,
+        etApplication :: T.Text,
         etContractName :: T.Text,
         etEventName :: T.Text
       }
   | MappingTableName
-      { mtCommonName :: T.Text,
+      { mtCreator :: T.Text,
+        mtApplication :: T.Text,
         mtContractName :: T.Text,
         mtMappingName :: T.Text
       }
   | AbstractTableName
-      { atCommonName :: T.Text,
+      { atCreator :: T.Text,
+        atApplication :: T.Text,
         atContractName :: T.Text
       }
   deriving (Show, Eq, Ord)

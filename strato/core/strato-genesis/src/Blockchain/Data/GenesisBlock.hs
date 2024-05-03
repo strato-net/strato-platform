@@ -319,8 +319,9 @@ initializeChainDBs ::
   Maybe Word256 ->
   ChainInfo ->
   T.Text ->
+  T.Text ->
   m ()
-initializeChainDBs chainId (ChainInfo UnsignedChainInfo {..} _) cn = do
+initializeChainDBs chainId (ChainInfo UnsignedChainInfo {..} _) crtr app = do
   sRoot <- A.lookupWithDefault (A.Proxy @StateRoot) chainId
   genAddrStates <- getAllAddressStates chainId
   accountDiffs <- mapM eventualAccountState . Map.fromList $ genAddrStates
@@ -341,7 +342,7 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo {..} _) cn = do
           Just (SolidVMCode name ch) ->
             fmap (T.decodeUtf8' . snd) <$> getCode ch >>= \case
               Just (Right src) -> case runIdentity . runMemCompilerT $ compileSource False $ Map.singleton "" src of
-                Right cc -> void $ produceVMEvents [CodeCollectionAdded (const () <$> cc) (SolidVMCode name ch) cn [] Map.empty []]
+                Right cc -> void $ produceVMEvents [CodeCollectionAdded (const () <$> cc) (SolidVMCode name ch) crtr app [] Map.empty []]
                 Left _ -> pure ()
               _ -> pure ()
           _ -> pure ()
@@ -377,6 +378,7 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo {..} _) cn = do
                   A.ActionData
                     (codeHash d)
                     emptyCodeCollection
+                    ""
                     ""
                     vm
                     ( case storage d of

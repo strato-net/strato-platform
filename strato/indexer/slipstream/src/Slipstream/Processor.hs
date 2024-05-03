@@ -126,7 +126,8 @@ processedContract ABIID {..} state AggregateAction {..} =
   ProcessedContract
     { address = actionAccount ^. accountAddress,
       codehash = actionCodeHash,
-      commonName = actionCommonName,
+      creator = actionCreator,
+      application = actionApplication,
       contractName = aiName,
       chain = aiChain,
       contractData = state,
@@ -198,7 +199,8 @@ processedMappingRow mapping AggregateAction {..} ABIID {..} k v =
   ProcessedMappingRow
     { address = actionAccount ^. accountAddress,
       codehash = actionCodeHash,
-      commonName = actionCommonName,
+      creator = actionCreator,
+      application = actionApplication,
       contractname = aiName,
       mapname = mapping,
       blockHash = actionBlockHash,
@@ -274,11 +276,11 @@ processTheMessages env conn messages = do
   let changes = parseActions messages
       events' = parseEvents messages
       -- TODO (Dan) : would be nice if we didn't just rip events out at the top level like this
-      creates = [(cc, cp, cn, hl, abs', rm) | CodeCollectionAdded cc cp cn hl abs' rm <- messages]
+      creates = [(cc, cp, cr, ap, hl, abs', rm) | CodeCollectionAdded cc cp cr ap hl abs' rm <- messages]
       -- delegates = [d | DelegatecallMade d <- messages]
       transactionResults = [tr | NewTransactionResult tr <- messages]
 
-  fkeys' <- forM creates $ \(cc, cp, cn, hl, abstracts', _) -> do
+  fkeys' <- forM creates $ \(cc, cp, cr, ap, hl, abstracts', _) -> do
         $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (format cp) 
         multilineLog "processTheMessages/contracts" $ boringBox $ map show (Map.keys $ cc ^. contracts)
 
@@ -289,11 +291,11 @@ processTheMessages env conn messages = do
 
             let mapNames = getMapNamesFromContract c
 
-            let historyTableNames = map (historyTableName cn) hl
+            let historyTableNames = map (historyTableName cr ap) hl
             $logDebugS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames
 
-            let nameParts@(cn'', n'') = (cn, T.pack $ _contractName c)
-            $logInfoS "processTheMessages/Contract Added" $ "common name=" <> cn'' <> ", name=" <> n''
+            let nameParts@(cr', ap',  n'') = (cr, ap, T.pack $ _contractName c)
+            $logInfoS "processTheMessages/Contract Added" $ "ccreator=" <> cr' <> ", app=" <> ap' <> ", name=" <> n''
             multilineLog "processTheMessages/fields" $ boringBox $ map (show) $ Map.toList $ fmap _varType $ c ^. storageDefs
 
             --Create mapping tables
@@ -387,8 +389,8 @@ processTheMessages env conn messages = do
               abstracts = actionAbstracts row -- to get abstract history info, get `actionAbstracts <$> actions`
           --get columns for abstract table
           $logDebugLS "abstractColumns" $ T.pack $ "Getting abstract columns from " ++ (show abstracts)
-          abstractColumns <- fmap catMaybes . for (Map.toList abstracts) $ \((_, n'), cn') -> do
-            let tableName = AbstractTableName cn' n'
+          abstractColumns <- fmap catMaybes . for (Map.toList abstracts) $ \((_, n'), (cr', ap')) -> do
+            let tableName = AbstractTableName cr' ap' n'
                 tableNameText = tableNameToDoubleQuoteText tableName
             $logInfoS "Row will be inserted into abstract table: " tableNameText
             mCols <- getTableColumns g tableName

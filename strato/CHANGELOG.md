@@ -22,7 +22,6 @@ so that they could be properly moved to their respective version's subsection.
 
 ### Changed
 - Expansion of Concrete contract to Abstract contract is accomodated by Cirrus
-- Cirrus table namespacing is of format `creator-contractName` now
 - :creator field refers to user's common name, not org (can be customized to occur after particular block number for backwards compatibility)
 - `eth_<random 20 bytes>` database is now just named `eth`
 - `queryStrato` is now `strato-barometer`
