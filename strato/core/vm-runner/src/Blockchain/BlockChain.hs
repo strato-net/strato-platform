@@ -567,14 +567,14 @@ outputTransactionResult ::
   ConduitT a VmOutEvent m ()
 outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHash} result deltaT beforeMap afterMap newAddresses) = do
   let t = fromMaybe (otBaseTx ot) (otPrivatePayload ot)
-      (txrStatus, message, gasRemaining, commonName) =
+      (txrStatus, message, gasRemaining, creator, appName) =
         case result of
-          Left err -> let fmt = format err in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0, "") -- TODO Also include the trace
+          Left err -> let fmt = format err in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0, "", "") -- TODO Also include the trace
           Right r -> case erException r of
-            Nothing -> (Success, "Success!", erRemainingTxGas r, erCreator r)
+            Nothing -> (Success, "Success!", erRemainingTxGas r, erCreator r, erAppName r)
             Just ex ->
               let fmt = either show show ex
-               in (Failure "Execution" Nothing (ExecutionFailure $ show ex) Nothing Nothing (Just fmt), fmt, 0, "")
+               in (Failure "Execution" Nothing (ExecutionFailure $ show ex) Nothing Nothing (Just fmt), fmt, 0, "", "")
       gasUsed = fromInteger $ transactionGasLimit t - gasRemaining
       etherUsed = gasUsed * fromInteger (transactionGasPrice t)
 
@@ -610,7 +610,8 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
         transactionResultStatus = Just txrStatus,
         transactionResultChainId = chainId,
         transactionResultKind = erKind <$> eitherToMaybe result,
-        transactionResultCommonName = commonName
+        transactionResultCreator = creator,
+        transactionResultAppName = appName
       }
   when flags_diffPublish $ do
     traverse_ (yield . OutAction) $ either (const Nothing) erAction result
