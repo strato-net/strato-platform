@@ -15,7 +15,7 @@ import {
 import { actions } from "../../contexts/inventory/actions";
 import TextArea from "antd/es/input/TextArea";
 import TagManager from "react-gtm-module";
-import { unitOfMeasures } from "../../helpers/constants";
+import { unitOfMeasures, unitOfSpiritMeasures } from "../../helpers/constants";
 import { categoricalProperties } from "./CategoryFields";
 import RichEditor from "../RichEditor";
 
@@ -42,6 +42,7 @@ const CreateInventoryModal = ({
   const [sizeOptions, setSizeOptions] = useState([]);
   const [categoryValue, setCategoryValue] = useState("Art");
   const [subCategoryValue, setSubCategoryValue] = useState(form.getFieldValue("subCategory"));
+  const [measureUnit, setMeasureUnit] = useState(unitOfMeasures);
 
   const beforeImageUpload = (file) => {
     const isJpgOrPng = file.type === "image/jpeg" || file.type === "image/png";
@@ -194,6 +195,13 @@ const CreateInventoryModal = ({
       form.setFieldValue("subCategory", null);
       setSubCategoryValue(null);
     } else {
+      if (value === "Metals") {
+        setMeasureUnit(unitOfMeasures)
+      }
+      if (value === "Spirits") {
+        setMeasureUnit(unitOfSpiritMeasures)
+      }
+
       const subCat = categorys.find(item => item.name === value).subCategories[0].name
       form.setFieldValue("subCategory", subCat);
       setSubCategoryValue(subCat);
@@ -328,7 +336,7 @@ const CreateInventoryModal = ({
                 </Select>
               </Form.Item>
             </div>
-            {categoricalProperties(form, handleClothingTypeChange, clothingType, sizeOptions, unitOfMeasures)}
+            {categoricalProperties(form, handleClothingTypeChange, clothingType, sizeOptions, measureUnit)}
             <div className="flex justify-between mt-4 !list-disc">
               <Form.Item
                 label="Description"

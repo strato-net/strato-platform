@@ -81,6 +81,11 @@ export const unitOfMeasures = [
   { name: "Imperial Ton (TONNE)", value: 8 }
 ];
 
+export const unitOfSpiritMeasures = [
+  { name: "Barrell", value: 1 },
+  { name: "Bottle", value: 2 }
+];
+
 export const CHARGES = {
   "SHIPPING": 0,
   "TAX": 0
@@ -128,6 +133,19 @@ export const CATEGORIES = [
   "Membership",
   "CarbonDAO",
   "Collectibles"
+]
+
+export const spiritTypes = [
+  { value: "Whiskey", label: "Whiskey" },
+  { value: "Rye", label: "Rye" },
+  { value: "Bourbon", label: "Bourbon" },
+  { value: "Tequila", label: "Tequila" },
+  { value: "Gin", label: "Gin" },
+  { value: "Rum", label: "Rum" },
+  { value: "Cognac", label: "Cognac" },
+  { value: "Brandy", label: "Brandy" },
+  { value: "Port", label: "Port" },
+  { value: "Sherry", label: "Sherry" }
 ]
 
 export const PAYMENT_TYPE = [
