@@ -79,11 +79,11 @@ export const search = async (contractName, args, options, user) => {
   const order = buildOrderQueryOption(args)
 
   const org = options.org
-  const app = options.app == contract.name ? undefined : options.app
+  const app = options.app == contractName ? undefined : options.app
 
   const tableName = org ?
-    (app ? (org + "-" + app + "-" + contract.name) : (org + "-" + contract.name))
-    : contract.name
+    (app ? (org + "-" + app + "-" + contractName) : (org + "-" + contractName))
+    : contractName
 
   const tableArgs = {
     name: tableName,
