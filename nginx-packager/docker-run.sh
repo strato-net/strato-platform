@@ -21,6 +21,7 @@ APEX_HOST=${APEX_HOST:-apex:3009}
 DOCS_HOST=${DOCS_HOST:-docs:8080}
 MARKETPLACE_BACKEND_HOST=${MARKETPLACE_BACKEND_HOST:-marketplace-backend:3030}
 MARKETPLACE_UI_HOST=${MARKETPLACE_UI_HOST:-marketplace-ui:3003}
+MP_DISABLED=${MP_DISABLED:-false}
 POSTGREST_HOST=${POSTGREST_HOST:-postgrest:3001}
 PROMETHEUS_HOST=${PROMETHEUS_HOST:-prometheus:9090}
 SMD_HOST=${SMD_HOST:-smd:3002}
@@ -63,6 +64,12 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ### Generate nginx.conf from template according to configuration provided
   ########
   cp /tmp/nginx.tpl.conf /tmp/nginx.conf
+
+  if [ "$MP_DISABLED" == true ]; then
+    sed -i '/#TEMPLATE_MP_DISABLED/d' /tmp/nginx.conf
+  else
+    sed -i '/#TEMPLATE_MP_ENABLED/d' /tmp/nginx.conf
+  fi
 
   if [ "$VM_DEBUG" != true ]; then
     sed -i '/#TEMPLATE_MARK_DEBUG/d' /tmp/nginx.conf
