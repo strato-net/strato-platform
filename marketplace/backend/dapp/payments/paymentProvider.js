@@ -5,10 +5,10 @@ import { setSearchQueryOptions, search, searchOne, searchAll, searchAllWithQuery
 // import dayjs from 'dayjs';
 
 
-const contractName = 'BasePaymentProvider';
-const stripeContractName = 'StripePaymentProvider';
-const paymentContractName = 'StripePaymentProvider.StripePaymentInitialized';
-const contractFilename = `${util.cwd}/dapp/mercata-base-contracts/Templates/Payments/StripePaymentProvider.sol`;
+const contractName = 'PaymentService';
+const externalContractName = 'ExternalPaymentService';
+const paymentContractName = 'PaymentService.Payment';
+const contractFilename = `${util.cwd}/dapp/mercata-base-contracts/Templates/Payments/ExternalPaymentService.sol`;
 
 /** 
  * Upload a new PaymentProvider 
@@ -21,7 +21,7 @@ async function uploadContract(user, _constructorArgs, options) {
     const constructorArgs = marshalIn(_constructorArgs);
 
     const contractArgs = {
-        name: stripeContractName,
+        name: externalContractName,
         source: await importer.combine(contractFilename),
         args: util.usc(constructorArgs),
     };
@@ -181,7 +181,8 @@ async function get(user, args, defaultOptions) {
     return paymentProvider.map((p) => marshalOut({ ...p, }));
 }
 
-async function getAll(admin, args = {}, options) {
+async function getAll(admin, args = {}, baseOptions) {
+    const options = { ...baseOptions, org: 'BlockApps', app: 'Mercata' };
     const paymentProviders = await searchAllWithQueryArgs(contractName, args, options, admin);
     return paymentProviders.map((paymentProvider) => marshalOut(paymentProvider));
 }
@@ -208,10 +209,10 @@ async function getPaymentSession(user, args, defaultOptions) {
 
 async function createPayment(user, args, options) {
     const { address, ...restArgs } = args;
-    const contract = { name: stripeContractName, address }
+    const contract = { name: contractName, address }
     const callArgs = {
       contract,
-      method: "initializePayment",
+      method: "lockSales",
       args: util.usc({ ...restArgs }),
     };
     const createStatus = await rest.call(user, callArgs, options);
@@ -229,7 +230,7 @@ async function createPayment(user, args, options) {
 
 async function finalizePayment(user, args, options) {
     const { address, ...restArgs } = args;
-    const contract = { name: stripeContractName, ..._contract }
+    const contract = { name: contractName, ..._contract }
     const callArgs = {
       contract,
       method: "finalizePayment",
@@ -298,7 +299,6 @@ async function updatePaymentProvider(admin, contract, _args, baseOptions) {
 export default {
     uploadContract,
     contractName,
-    stripeContractName,
     contractFilename,
     bindAddress,
     get,
