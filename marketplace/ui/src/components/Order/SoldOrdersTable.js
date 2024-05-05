@@ -310,30 +310,30 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrde
   ];
 
   const statusComponent = (status) => {
-    let textClass = "bg-[#FFF6EC]";
-    if (status === "Awaiting Shipment") {
-      textClass = "bg-[#EBF7FF]";
-    } else if (status === "Awaiting Fulfillment") {
-      textClass = "bg-[#FF8C0033]"
-    } else if (status === "Payment Pending") {
-      textClass = "bg-[#FF8C0033]"
-    } else if (status === "Closed") {
-      textClass = "bg-[#119B2D33]";
-    } else if (status === "Canceled") {
-      textClass = "bg-[#FFF0F0]";
-    }
-    let bgClass = "bg-[#119B2D]";
-    if (status === "Awaiting Shipment") {
-      bgClass = "bg-[#13188A]";
-    } else if (status === "Payment Pending") {
-      bgClass = "bg-[#FF8C00]"
-    } else if (status === "Awaiting Fulfillment") {
-      bgClass = "bg-[#FF8C00]"
-    } else if (status === "Closed") {
-      bgClass = "bg-[#119B2D]";
-    } else if (status === "Canceled") {
-      bgClass = "bg-[#FF0000]";
-    }
+    const statusClasses = {
+      ["Awaiting Shipment"]: {
+        textClass: "bg-[#EBF7FF]",
+        bgClass: "bg-[#13188A]"
+      },
+      ["Awaiting Fulfillment"]: {
+        textClass: "bg-[#FF8C0033]",
+        bgClass: "bg-[#FF8C00]"
+      },
+      ["Payment Pending"]: {
+        textClass: "bg-[#FF8C0033]",
+        bgClass: "bg-[#FF8C00]"
+      },
+      ["Closed"]: {
+        textClass: "bg-[#119B2D33]",
+        bgClass: "bg-[#119B2D]"
+      },
+      ["Canceled"]: {
+        textClass: "bg-[#FFF0F0]",
+        bgClass: "bg-[#FF0000]"
+      },
+    };
+
+    const { textClass, bgClass } = statusClasses[status] || { textClass: "bg-[#FFF6EC]", bgClass: "bg-[#119B2D]" };
     return (
       <div className={classNames(textClass, "w-max text-center py-1 rounded-xl flex justify-start items-center gap-1 p-3")}>
         <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>

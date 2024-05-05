@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE IncoherentInstances #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -53,6 +54,7 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Event
 import Blockchain.Sequencer.Event
 import qualified Blockchain.SolidVM as SolidVM
+import Blockchain.StateRootMismatch
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
@@ -156,36 +158,45 @@ addBlocks unfiltered = do
       didReplaceBest <- newIORef False
       ranPrivateTxs <- newIORef M.empty
       replacedBest <- newIORef (error "addBlocks.replacedBest: evaluating uninitialized BestBlockInfo!")
-      srLog <- flip State.execStateT Nothing $
-        forM_ filtered $ \block -> do
-          let !blockNo = blockDataNumber $ obBlockData block
-              !txCount = length $ obReceiptTransactions block
-          timeit (printf "Block #%d (%d TXs insertion)" blockNo txCount) timerToUse $ do
-            lift $ addBlock block
-            (didReplaceThisTime, ranPriv, replacedBits@(hsh, num, _)) <- lift . lift $ replaceBestIfBetter block
-            when didReplaceThisTime $ do
-              writeIORef didReplaceBest True
-              writeIORef replacedBest replacedBits
-              -- Gather a chain of better block stateroots. The last one found should be the best block,
-              -- and the intermediate ones increase the granularity at which we can compute a sequence
-              -- of diffs. The number of blocks to skip between stateroots is determined by the cost of
-              -- the diff between them, which is estimated by the number of transactions.
-              State.put $! Just (blockDataStateRoot $ obBlockData block, hsh, num)
-            unless (M.null ranPriv) $
-              modifyIORef' ranPrivateTxs $
-                flip M.unionWith ranPriv $
-                  \(n1, s1) (n2, s2) -> if n1 > n2 then (n1, s1) else (n2, s2)
-      $logDebugLS "addBlocks/srLog" srLog
-      didReplaceBest' <- readIORef didReplaceBest
-      ranPrivateTxs' <- readIORef ranPrivateTxs
-      when didReplaceBest' $ do
-        $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
-        nbb <- readIORef replacedBest
-        yield . OutIndexEvent $ NewBestBlock nbb
-        when flags_sqlDiff $
-          timeit "calculateAndEmitStateDiffs" timerToUse $
-            calculateAndEmitStateDiffs srLog oldHeader
-      when (flags_sqlDiff && not (M.null ranPrivateTxs')) $ calculateAndEmitChainDiffs ranPrivateTxs'
+      let go block = do
+            let !blockNo = blockDataNumber $ obBlockData block
+                !txCount = length $ obReceiptTransactions block
+            timeit (printf "Block #%d (%d TXs insertion)" blockNo txCount) timerToUse $ do
+              mSRMismatch <- lift $ addBlock block
+              when (isNothing mSRMismatch) $ do
+                (didReplaceThisTime, ranPriv, replacedBits@(hsh, num, _)) <- lift . lift $ replaceBestIfBetter block
+                when didReplaceThisTime $ do
+                  writeIORef didReplaceBest True
+                  writeIORef replacedBest replacedBits
+                  -- Gather a chain of better block stateroots. The last one found should be the best block,
+                  -- and the intermediate ones increase the granularity at which we can compute a sequence
+                  -- of diffs. The number of blocks to skip between stateroots is determined by the cost of
+                  -- the diff between them, which is estimated by the number of transactions.
+                  State.put $! Just (blockDataStateRoot $ obBlockData block, hsh, num)
+                unless (M.null ranPriv) $
+                  modifyIORef' ranPrivateTxs $
+                    flip M.unionWith ranPriv $
+                      \(n1, s1) (n2, s2) -> if n1 > n2 then (n1, s1) else (n2, s2)
+              pure mSRMismatch
+          loop [] = pure Nothing
+          loop (b:bs) = go b >>= \case
+            Just srm -> pure $ Just srm
+            Nothing  -> loop bs
+      (mSRMismatch, srLog) <- flip State.runStateT Nothing $ loop filtered
+      case mSRMismatch of
+        Just srMismatch -> yield $ OutStateRootMismatch srMismatch
+        Nothing -> do
+          $logDebugLS "addBlocks/srLog" srLog
+          didReplaceBest' <- readIORef didReplaceBest
+          ranPrivateTxs' <- readIORef ranPrivateTxs
+          when didReplaceBest' $ do
+            $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
+            nbb <- readIORef replacedBest
+            yield . OutIndexEvent $ NewBestBlock nbb
+            when flags_sqlDiff $
+              timeit "calculateAndEmitStateDiffs" timerToUse $
+                calculateAndEmitStateDiffs srLog oldHeader
+          when (flags_sqlDiff && not (M.null ranPrivateTxs')) $ calculateAndEmitChainDiffs ranPrivateTxs'
 
 setParentStateRoot ::
   (MonadFail m, MonadIO m, BSDB.HasBlockSummaryDB m) =>
@@ -195,7 +206,7 @@ setParentStateRoot OutputBlock {..} = do
   liftIO $ setTitle $ "Block #" ++ show (blockDataNumber obBlockData)
   BSDB.getBSum (blockDataParentHash obBlockData)
 
-addBlock :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m ()
+addBlock :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m (Maybe StateRootMismatch)
 addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
   let obh = outputBlockHash b
    in withCurrentBlockHash obh $ do
@@ -232,25 +243,30 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
 
         postRewardSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
 
-        when (Just (blockDataStateRoot (obBlockData b)) /= postRewardSR) $ do
-          $logInfoS "addBlock/mined" . T.pack $ "newStateRoot: " ++ format postRewardSR
-          error $ "stateRoot mismatch!!  New stateRoot doesn't match block stateRoot: " ++ format (blockDataStateRoot $ obBlockData b)
+        if (Just (blockDataStateRoot (obBlockData b)) /= postRewardSR)
+          then do
+            $logInfoS "addBlock/mined" . T.pack $ "newStateRoot: " ++ format postRewardSR
+            pure . Just $ StateRootMismatch (blockDataNumber $ obBlockData b)
+                                            obh
+                                            (blockDataStateRoot $ obBlockData b)
+                                            (fromMaybe MP.emptyTriePtr postRewardSR)
+          else do
+            valid <- checkValidity (blockIsHomestead $ blockDataNumber bd) bSum b
+            case valid of
+              Nothing -> lift $ P.incCounter vmBlocksValid
+              Just _ -> lift $ P.incCounter vmBlocksInvalid -- error err -- todo: i dont think we ACTUALLY need to error here
+            when flags_debug $ do
+              bhr'' <- Mod.get (Proxy @BlockHashRoot)
+              $logDebugS "addBlock" $ T.pack $ "New blockhash root after running block: " ++ format bhr''
+              mcr'' <- getChainRoot $ blockHash b
+              case mcr'' of
+                Nothing -> $logDebugS "addBlock" $ T.pack $ "Could not locate new chain root after running block. Using emptyTriePtr"
+                Just cr -> $logDebugS "addBlock" $ T.pack $ "New chain root after running block: " ++ format cr
 
-        valid <- checkValidity (blockIsHomestead $ blockDataNumber bd) bSum b
-        case valid of
-          Nothing -> lift $ P.incCounter vmBlocksValid
-          Just _ -> lift $ P.incCounter vmBlocksInvalid -- error err -- todo: i dont think we ACTUALLY need to error here
-        when flags_debug $ do
-          bhr'' <- Mod.get (Proxy @BlockHashRoot)
-          $logDebugS "addBlock" $ T.pack $ "New blockhash root after running block: " ++ format bhr''
-          mcr'' <- getChainRoot $ blockHash b
-          case mcr'' of
-            Nothing -> $logDebugS "addBlock" $ T.pack $ "Could not locate new chain root after running block. Using emptyTriePtr"
-            Just cr -> $logDebugS "addBlock" $ T.pack $ "New chain root after running block: " ++ format cr
-
-        lift $ P.incCounter vmBlocksMined
-        lift $ P.incCounter vmBlocksProcessed
-        $logInfoS "addBlock" . T.pack $ "Inserted block became #" ++ show (blockDataNumber $ obBlockData b) ++ " (" ++ format obh ++ ")."
+            lift $ P.incCounter vmBlocksMined
+            lift $ P.incCounter vmBlocksProcessed
+            $logInfoS "addBlock" . T.pack $ "Inserted block became #" ++ show (blockDataNumber $ obBlockData b) ++ " (" ++ format obh ++ ")."
+            pure Nothing
 
 addBlockTransactions :: (Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m ()
 addBlockTransactions OutputBlock {obBlockData = bd, obReceiptTransactions = transactions} = do
@@ -551,14 +567,14 @@ outputTransactionResult ::
   ConduitT a VmOutEvent m ()
 outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHash} result deltaT beforeMap afterMap newAddresses) = do
   let t = fromMaybe (otBaseTx ot) (otPrivatePayload ot)
-      (txrStatus, message, gasRemaining, commonName) =
+      (txrStatus, message, gasRemaining, creator, appName) =
         case result of
-          Left err -> let fmt = format err in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0, "") -- TODO Also include the trace
+          Left err -> let fmt = format err in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0, "", "") -- TODO Also include the trace
           Right r -> case erException r of
-            Nothing -> (Success, "Success!", erRemainingTxGas r, erCreator r)
+            Nothing -> (Success, "Success!", erRemainingTxGas r, erCreator r, erAppName r)
             Just ex ->
               let fmt = either show show ex
-               in (Failure "Execution" Nothing (ExecutionFailure $ show ex) Nothing Nothing (Just fmt), fmt, 0, "")
+               in (Failure "Execution" Nothing (ExecutionFailure $ show ex) Nothing Nothing (Just fmt), fmt, 0, "", "")
       gasUsed = fromInteger $ transactionGasLimit t - gasRemaining
       etherUsed = gasUsed * fromInteger (transactionGasPrice t)
 
@@ -594,7 +610,8 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
         transactionResultStatus = Just txrStatus,
         transactionResultChainId = chainId,
         transactionResultKind = erKind <$> eitherToMaybe result,
-        transactionResultCommonName = commonName
+        transactionResultCreator = creator,
+        transactionResultAppName = appName
       }
   when flags_diffPublish $ do
     traverse_ (yield . OutAction) $ either (const Nothing) erAction result
