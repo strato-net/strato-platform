@@ -1030,6 +1030,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           throw new rest.RestError(err.statusCode, err.message);
         }
         return stripePaymentSession;
+      } else {
+        return { url: `${originUrl}/myitems` }
       }
 
     } catch (error) {
