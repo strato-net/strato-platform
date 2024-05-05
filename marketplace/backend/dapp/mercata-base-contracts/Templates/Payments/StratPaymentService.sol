@@ -18,12 +18,12 @@ contract StratPaymentService is PaymentService {
         checkoutText = "Checkout with " + serviceName;
     }
 
+    mapping (address => uint) stratQuantities;
     function _lockSales (
         address[] _saleAddresses,
         uint[] _quantities
     ) internal override returns (uint) {
         require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
-        mapping (address => uint) stratQuantities;
         address[] stratRecipients;
         uint totalAmount;
         for (uint i = 0; i < _saleAddresses.length; i++) {
@@ -47,6 +47,7 @@ contract StratPaymentService is PaymentService {
             address recipient = stratRecipients[j];
             bool success = stratAddress.call("transfer", recipient, stratQuantities[recipient]);
             emit Payment(getCommonName(tx.origin), getCommonName(recipient), stratQuantities[recipient]);
+            stratQuantities[recipient] = 0;
             require(success, err);
         }
 

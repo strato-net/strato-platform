@@ -199,10 +199,7 @@ export const Marketplace = {
 
 export const PaymentService = {
   prefix: '/payment',
-  stripeOnboarding: '/stripe/account',
-  stripeConnectStatus: '/stripe/account/status/:ownerCommonName',
-  stripeWebhook: '/stripe/webhook',
-  stripeWebhookConnect: '/stripe/webhook/connect',
+  getAll: '/',
 }
 
 export const UserActivity = {
