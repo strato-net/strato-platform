@@ -52,7 +52,7 @@ const Inventory = ({ user }) => {
   const categoryDispatch = useCategoryDispatch();
 
   const { categorys } = useCategoryState();
-  const { inventories, isInventoriesLoading, message, success, isLoadingStripeStatus, stripeStatus, inventoriesTotal } =
+  const { inventories, isInventoriesLoading, message, success, inventoriesTotal } =
     useInventoryState();
 
   //items
@@ -78,35 +78,6 @@ const Inventory = ({ user }) => {
       actions.fetchInventorySearch(dispatch, limit, offset, debouncedSearchTerm);
     } else actions.fetchInventory(dispatch, limit, offset, "", category);
   }, [dispatch, limit, offset, debouncedSearchTerm, category]);
-
-  useEffect(() => {
-    actions.sellerStripeStatus(dispatch, user?.commonName);
-  }, [dispatch, user]);
-
-  useEffect(() => {
-    const placement = 'bottom'; // Set placement to 'bottomCenter'
-
-    if (stripeStatus !== null && stripeStatus !== undefined) {
-      const { chargesEnabled, detailsSubmitted, payoutsEnabled } = stripeStatus;
-
-      const isOnboardedSuccess = (chargesEnabled && detailsSubmitted && payoutsEnabled)
-      const isOnboardNotStarted = (!chargesEnabled && !detailsSubmitted && !payoutsEnabled)
-
-      if (!(isOnboardedSuccess || isOnboardNotStarted)) {
-
-        setTimeout(() => {
-
-          api.error({
-            key: 1,
-            message: "Something went wrong with your Stripe account.",
-            description: "Please connect again.",
-            onClose: () => actions.resetMessage(dispatch),
-            placement,
-          });
-        }, 1000);
-      }
-    }
-  }, [stripeStatus]);
 
   const showModal = () => {
     setOpen(true);
@@ -189,10 +160,6 @@ const Inventory = ({ user }) => {
 
   const navigate = useNavigate();
 
-  const onboardSeller = async () => {
-    navigate(routes.OnboardingSellerToStripe.url)
-  }
-
 const getAllSubcategories = (categories) => {
   let subcategories = [];
   categories.forEach(category => {
@@ -221,11 +188,6 @@ const metaImg = category ? category : SEO.IMAGE_META
           description={SEO.DESCRIPTION_META} 
           link={linkUrl} />
       {contextHolder}
-      {stripeStatus == null || isLoadingStripeStatus ? (
-        <div className="h-screen flex justify-center items-center">
-          <Spin size="large" />
-        </div>
-      ) : (
         <>
           <Breadcrumb className="mx-5 md:mx-14 mt-2 lg:mt-4">
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
@@ -252,49 +214,26 @@ const metaImg = category ? category : SEO.IMAGE_META
               </Button>
             </div>
             <div className="flex gap-3">
-              <Button type="primary" className="w-40 h-9 "
-                id="connectStripe"
+              <Button
+                type="primary"
+                id="createItem"
+                className="w-40 h-9 flex items-center justify-center gap-[6px]"
                 onClick={() => {
                   if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                     window.location.href = loginUrl;
                   } else {
-                    onboardSeller()
+                    showModal()
                   }
                 }}
-                disabled={stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled}
               >
-                {"Connect Stripe"}
+                <div className="flex items-center justify-center gap-[6px]">
+                  <img src={Images.CreateInventory} 
+                  alt={metaImg}
+                  title={metaImg}
+                  className="w-[18px] h-[18px]" />
+                  Create Item
+                </div>
               </Button>
-              <Tooltip
-                title={
-                  stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled
-                    ? ""
-                    : "Please connect to Stripe first"
-                }
-                placement="bottom"
-              >
-                <Button
-                  type="primary"
-                  id="createItem"
-                  className="w-40 h-9 flex items-center justify-center gap-[6px]"
-                  onClick={() => {
-                    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                      window.location.href = loginUrl;
-                    } else {
-                      showModal()
-                    }
-                  }}
-                  disabled={!stripeStatus.chargesEnabled || !stripeStatus.detailsSubmitted || !stripeStatus.payoutsEnabled}
-                >
-                  <div className="flex items-center justify-center gap-[6px]">
-                    <img src={Images.CreateInventory} 
-                    alt={metaImg}
-                    title={metaImg}
-                    className="w-[18px] h-[18px]" />
-                    Create Item
-                  </div>
-                </Button>
-              </Tooltip>
             </div>
           </div>
           <div className="pt-6 mx-6 md:mx-5 md:px-10 mb-5 ">
@@ -319,9 +258,6 @@ const metaImg = category ? category : SEO.IMAGE_META
                             category={category}
                             key={index}
                             debouncedSearchTerm={debouncedSearchTerm}
-                            paymentProviderAddress={
-                              stripeStatus ? stripeStatus.paymentProviderAddress : undefined
-                            }
                             allSubcategories={allSubcategories}
                           />
                         );
@@ -348,9 +284,6 @@ const metaImg = category ? category : SEO.IMAGE_META
                             category={category}
                             key={index}
                             debouncedSearchTerm={debouncedSearchTerm}
-                            paymentProviderAddress={
-                              stripeStatus ? stripeStatus.paymentProviderAddress : undefined
-                            }
                             allSubcategories={allSubcategories}
                           />
                         );
@@ -377,7 +310,6 @@ const metaImg = category ? category : SEO.IMAGE_META
             </div>
           </div>
         </>
-      )}
       {
         open && (
           <CreateInventoryModal

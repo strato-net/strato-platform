@@ -330,7 +330,9 @@ class OrderController {
 
   static validatePaymentArgs(args) {
     const paymentSchema = Joi.object({
-      paymentList: Joi.array().items(Joi.string()).required(),
+      paymentProvider: Joi.object({
+        address: Joi.string().required(),
+      }).required(),
       buyerOrganization: Joi.string().required(),
       orderList: Joi.array().min(1).items(Joi.object({
         quantity: Joi.number().required(),
