@@ -106,7 +106,7 @@ function bindAddress(user, address, options) {
 
 async function get(user, args, options) {
     const { address, assetToBeSold, state, ...restArgs } = args;
-    const newOptions = { ...options, org: 'BlockApps' }
+    const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
     let sale;
     let searchArgs;
 
@@ -165,7 +165,7 @@ async function getSaleHistory(user, args, options) {
 
 async function getAll(admin, args = {}, defaultOptions) {
     const { saleAddresses, assetAddresses, isOpen, range, saleGtField, saleGtValue, ...restArgs } = args;
-    const options = { ...defaultOptions, org: 'BlockApps' }
+    const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
     let sales;
     if (assetAddresses) {
         sales = await searchAllWithQueryArgs(contractName, {

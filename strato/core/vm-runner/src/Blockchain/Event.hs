@@ -70,7 +70,7 @@ data VmOutEvent
   = OutAction Action
   | OutBlock OutputBlock
   | OutIndexEvent IndexEvent
-  | OutToStateDiff Word256 ChainInfo Keccak256 Text
+  | OutToStateDiff Word256 ChainInfo Keccak256 Text Text
   | OutStateDiff StateDiff
   | OutLog LogDB
   | OutEvent [EventDB]
@@ -86,7 +86,7 @@ data VmOutEventBatch = OutBatch
     outExecResults :: DL.DList ExecResults,
     outBlocks :: DL.DList OutputBlock,
     outIndexEvents :: DL.DList IndexEvent,
-    outToStateDiffs :: DL.DList (Word256, ChainInfo, Keccak256, Text),
+    outToStateDiffs :: DL.DList (Word256, ChainInfo, Keccak256, Text, Text),
     outStateDiffs :: DL.DList StateDiff,
     outLogs :: DL.DList LogDB,
     outEvents :: DL.DList EventDB,
@@ -121,7 +121,7 @@ insertOutBatch e b = case e of
   OutAction a -> b {outActions = outActions b `DL.snoc` a}
   OutBlock a -> b {outBlocks = outBlocks b `DL.snoc` a}
   OutIndexEvent a -> b {outIndexEvents = outIndexEvents b `DL.snoc` a}
-  OutToStateDiff v w x y  -> b {outToStateDiffs = outToStateDiffs b `DL.snoc` (v, w, x, y)}
+  OutToStateDiff v w x y z -> b {outToStateDiffs = outToStateDiffs b `DL.snoc` (v, w, x, y, z)}
   OutStateDiff a -> b {outStateDiffs = outStateDiffs b `DL.snoc` a}
   OutLog a -> b {outLogs = outLogs b `DL.snoc` a}
   OutEvent a -> b {outEvents = outEvents b `DL.append` DL.fromList a}

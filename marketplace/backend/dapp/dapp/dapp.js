@@ -222,19 +222,19 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   // -------------------------- INVENTORY --------------------------------
 
   contract.getInventory = async function (args, options = optionsNoChainIds) {
-    const getOptions = { ...options };
+    const getOptions = { ...options, app: contractName, };
     return await inventoryJs.get(rawAdmin, { ...args }, getOptions);
   };
 
   contract.getInventories = async function (args, options = optionsNoChainIds) {
-    const getOptions = { ...options };
+    const getOptions = { ...options, app: contractName };
     const inventories = await inventoryJs.getAll(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
     const inventoryCount = await inventoryJs.inventoryCount(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
     return { inventories: inventories, inventoryCount: inventoryCount }
   };
 
   contract.getInventoriesForUser = async function (args, options = optionsNoChainIds) {
-    const getOptions = { ...options };
+    const getOptions = { ...options, app: contractName };
     const { ownerCommonName, ...restArgs } = args;
     const newArgs = { ...restArgs, ownerCommonName: ownerCommonName, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, userProfile: true }//'0000000000000000000000000000000000000000'
     return marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
@@ -270,7 +270,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   contract.getAllItemTransferEvents = function (args, options = defaultOptions) {
-    const getOptions = { ...options };
+    const getOptions = { ...options, app: contractName, };
     return inventoryJs.getAllItemTransferEvents(rawAdmin, args, getOptions);
   };
 
@@ -428,7 +428,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   // ------------------------------ INVENTORY ENDS--------------------------------
 
   contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options };
+    const getOptions = { ...options, app: contractName };
     //for ba sellers, get all assets - display For Sale and Sold Out
     const newArgs = { ...args, ownerCommonName: constants.baUserNames }
     const all = await marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
@@ -441,7 +441,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getMarketplaceInventoriesLoggedIn = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options };
+    const getOptions = { ...options, app: contractName };
     let usersArr = constants.baUserNames.filter(user => user !== userCommonName)
     const newArgs = { ...args, ownerCommonName: usersArr }
     const all = await marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
@@ -458,7 +458,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   contract.getTopSellingProductsLoggedIn = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options }
+    const getOptions = { ...options, app: contractName }
     const newArgs = {
       ...args, notEqualsField: ['sale', 'ownerCommonName'],
       notEqualsValue: [constants.zeroAddress, userCommonName],
@@ -606,7 +606,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getArts = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options };
+    const getOptions = { ...options, app: contractName, };
     return artJs.getAll(rawAdmin, args, getOptions);
   };
 
@@ -643,7 +643,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getCarbonOffsets = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options };
+    const getOptions = { ...options, app: contractName, };
     return carbonOffsetJs.getAll(rawAdmin, args, getOptions);
   };
 
@@ -663,7 +663,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getMetals = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options };
+    const getOptions = { ...options, app: contractName, };
     return metalsJs.getAll(rawAdmin, args, getOptions);
   };
 
@@ -702,7 +702,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getClothings = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options };
+    const getOptions = { ...options, app: contractName, };
     return clothingJs.getAll(rawAdmin, args, getOptions);
   };
 
@@ -723,7 +723,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getMemberships = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options };
+    const getOptions = { ...options, app: contractName, };
     return membershipJs.getAll(rawAdmin, args, getOptions);
   };
 
@@ -743,7 +743,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getCarbonDAOs = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options };
+    const getOptions = { ...options, app: contractName, };
     return carbonDAOJs.getAll(rawAdmin, args, getOptions);
   };
 
@@ -762,7 +762,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getCollectibles = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options };
+    const getOptions = { ...options, app: contractName, };
     return collectibleJs.getAll(rawAdmin, args, getOptions);
   };
 
@@ -804,12 +804,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   contract.getSaleOrders = async function (args, options = defaultOptions) {
-    const getOptions = { ...options };
+    const getOptions = { ...options, app: contractName, };
     return saleOrderJs.getAll(rawAdmin, args, getOptions);
   }
 
   contract.checkSaleQuantity = async function (args, options = defaultOptions) {
-    const getOptions = { ...options }
+    const getOptions = { ...options, app: contractName }
     return inventoryJs.checkSaleQuantity(rawAdmin, args, getOptions)
   }
 
@@ -863,7 +863,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.export = async function (options = defaultOptions) {
-    const getOptions = { ...options };
+    const getOptions = { ...options, app: contractName };
 
     const processOrders = async (orderArg) => {
       const orders = await saleOrderJs.getAll(rawAdmin, orderArg, getOptions);
@@ -933,7 +933,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   /* ------------------------ User Activity Starts ------------------------ */
   contract.getAllUserActivity = async function (args, options = defaultOptions) {
-    const getOptions = { ...options };
+    const getOptions = { ...options, app: contractName };
     const { sellersCommonName, purchasersCommonName, newOwnerCommonName } = args
 
     const currentDate = dayjs(); // Get the current date with dayjs
@@ -972,7 +972,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   /* ------------------------ Stripe account connect starts here ------------------------ */
   contract.stripeOnboarding = async function (args, options = defaultOptions) {
     try {
-      const getOptions = { ...options };
+      const getOptions = { ...options, app: contractName };
       let userStripeAccount, connectLink;
       // get user paymentProvider details from cirrus
       const sellerStripeDetails = await paymentProviderJs.get(rawAdmin, { name: 'STRIPE', accountDeauthorized: false, ownerCommonName: userCert.commonName }, getOptions)
@@ -1007,7 +1007,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getStripeOnboardingStatus = async function (args, options = defaultOptions) {
     try {
-      const getOptions = { ...options };
+      const getOptions = { ...options, app: contractName };
 
       // get user paymentProvider details from cirrus
       const paymentProviders = await paymentProviderJs.get(rawAdmin, { name: 'STRIPE', accountDeauthorized: false, ...args }, getOptions);
@@ -1076,7 +1076,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       // get user paymentProvider details from cirrus
       const { accountId, ...restArgs } = args
 
-      const getOptions = { ...options };
+      const getOptions = { ...options, app: contractName };
       const chainOptions = { ...options, chainIds: [contract.chainId] };
 
       const paymentProvider = await paymentProviderJs.get(rawAdmin, { name: 'STRIPE', accountId }, getOptions);
@@ -1318,7 +1318,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getStratsBalance = async function (args, options = defaultOptions) {
     const { userAddress } = args;
-    const getOptions = { ...options, org: "TestCompany" };
+    const getOptions = { ...options, org: "TestCompany", app: '' };
     let address;
 
     if (process.env.networkID === constants.prodNetworkId) {
