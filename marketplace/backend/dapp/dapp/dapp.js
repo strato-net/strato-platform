@@ -286,15 +286,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   contract.requestRedemption = async function (args, options = defaultOptions) {
-    const getOptions = { ...options, app: contractName, };
-    const { originAssetAddress, assetAddresses, quantity, ...restArgs } = args;
+    const { assetAddresses, quantity, ...restArgs } = args;
 
     const contract = { address: assetAddresses[0] };
     const [requestRedemptionStatus, assetAddress] = await inventoryJs.requestRedemption(rawAdmin, contract, { quantity: quantity }, options);
 
-    const originAsset = await inventoryJs.get(rawAdmin, { address: originAssetAddress }, getOptions);
-    const issuerCommonName = originAsset.ownerCommonName;
-    const finalArgs = { redemption_id: parseInt(util.uid()), issuerCommonName, assetAddresses: [assetAddress], quantity, ...restArgs }
+    const finalArgs = { redemption_id: parseInt(util.uid()), assetAddresses: [assetAddress], quantity, ...restArgs }
 
     if (requestRedemptionStatus) {
       try {
