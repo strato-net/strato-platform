@@ -6,7 +6,7 @@ describe('Create a new Asset', () => {
   const amount = Math.floor(Math.random() * (max - min + 1)) + min;
   const productName = `Product-${dayjs().unix()}`;
   const userName = `User-${dayjs().unix()}`;
-  const artistName = `User-${dayjs().unix()}`;
+  const artistName = `Artist-${dayjs().unix()}`;
 
   
   it('It should add a new product', () => {
@@ -74,6 +74,7 @@ describe('Create a new Asset', () => {
     cy.get("#Login").click();
     cy.login();
     cy.visit('/');
+    cy.wait(3000)
 
     // Purchase a product
     cy.get("#viewAll").click();
