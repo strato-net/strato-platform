@@ -380,6 +380,7 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo {..} _) crtr app = do
                     emptyCodeCollection
                     ""
                     ""
+                    ""
                     vm
                     ( case storage d of
                         EVMDiff m -> A.EVMDiff $ Map.map fromDiff m

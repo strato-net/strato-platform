@@ -152,6 +152,7 @@ spec = describe "Action conversions" $ do
                       Action._actionDataCodeCollection = mempty,
                       Action._actionDataCodeHash = ExternallyOwned $ forceHash "86bc2e2a375e6ea377ae90026248f472fbeaa1354ef4424f568d01f3a48ab5b9",
                       Action._actionDataCreator = "BlockApps1",
+                      Action._actionDataRoot = "ClothingUTXO",
                       Action._actionDataApplication = "LogisticsEngine1",
                       Action._actionDataCodeKind = EVM,
                       Action._actionDataAbstracts = M.empty,

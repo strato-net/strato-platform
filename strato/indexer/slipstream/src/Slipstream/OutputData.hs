@@ -239,6 +239,7 @@ baseAbstractColumns =
     "transaction_hash",
     "transaction_sender",
     "creator",
+    "root",
     "contract_name",
     "data"
   ]
@@ -715,6 +716,7 @@ expandAbstractTableQuery tableName cols =
       " ADD COLUMN IF NOT EXISTS",
       T.intercalate ", ADD COLUMN IF NOT EXISTS" cols,
       ", ADD COLUMN IF NOT EXISTS creator text",
+      ", ADD COLUMN IF NOT EXISTS root text",
       ", ADD COLUMN IF NOT EXISTS contract_name text",
       ", ADD COLUMN IF NOT EXISTS data jsonb",
       ";"
@@ -1008,7 +1010,8 @@ insertAbstractTableQuery cs isHistoric =
                     tshow . E.blockNumber,
                     T.pack . keccak256ToHex . E.transactionHash,
                     tshow . E.transactionSender,
-                    E.creator
+                    E.creator,
+                    E.root
                   ]
                 vals = flip map contracts $ \((row, contractColumns), _) ->
                   wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ [wrapSingleQuotes $ escapeQuotes (tableNameToText contractTableName)] ++ [wrapSingleQuotes . decodeUtf8 . BL.toStrict $ Aeson.encode $ MapWrapper $ aesonHelper $ Map.filterWithKey (\k _ -> k `notElem` abColumns) contractColumns] ++ (map snd $ Map.toList (Map.filterWithKey (\k _ -> k `elem` abColumns) contractColumns))
