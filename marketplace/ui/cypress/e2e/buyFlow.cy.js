@@ -8,14 +8,15 @@ describe('Create a new Asset', () => {
   const userName = `User-${dayjs().unix()}`;
   const artistName = `User-${dayjs().unix()}`;
 
+  
   it('It should add a new product', () => {
-    // logged in using the seller credentials
+    // logged in as a seller
     cy.visit('/');
     cy.get("#Login").click();
     cy.login(Cypress.env("sellerEmail"), Cypress.env("sellerPassword"))
     cy.wait(10000)
-    // Clicked on the myItem(id="Inventory") to redirect to 
-    // myItem page and then clicked the create item
+
+    // Create an item
     cy.get('#avatar')
     cy.url('').should("exist");
     cy.get('#Inventory').should("exist").click();
@@ -27,8 +28,8 @@ describe('Create a new Asset', () => {
       cy.wrap($elements.eq(1))
       cy.wrap($elements.eq(1)).click();
     });
-    // Asset Creation
-    cy.wait(7000)
+
+    cy.wait(5000)
     cy.get('[title="Art"]').should('have.attr', 'title', 'Art').first()
     cy.get('[title="Art"]').should('have.attr', 'title', 'Art').first().click();
 
@@ -50,12 +51,12 @@ describe('Create a new Asset', () => {
     cy.get("input[type=file]").first().attachFile("cottonSeeds.jpg")
     cy.get("#createItemSubmit")
     cy.get("#createItemSubmit").click()
-    // Asset Creation
     cy.wait(7000)
-    // check the asset exists or not
+    
+    
+    // List for sale
     cy.url().should("exist", "myitems");
     cy.get(`#asset-${productName}`)
-    // List asset for sale
     cy.get(`#asset-${productName}`).within(() => {
       cy.get("#sell-listing-btn").click();
     });
@@ -63,70 +64,32 @@ describe('Create a new Asset', () => {
     cy.get("#sellPrice").type(amount)
     cy.get("#asset-update-list").click()
     cy.wait(15000)
-
-    // cy.get("#asset-card-unlist-btn").click()
-    // cy.get("#modal-unlist-btn").click()
-
-
-    // cy.get('#sell-listing-btn')
-    // cy.get("#user-dropdown").click()
+    cy.get("#user-dropdown").click()
     cy.get("#logout").click()
-
-
   })
 
   it('It should buy a product', () => {
-    // Login as a user
+    // Login as a buyer
     cy.visit('/');
     cy.get("#Login").click();
     cy.login();
     cy.visit('/');
-    // Got to marketplace
+
+    // Purchase a product
     cy.get("#viewAll").click();
     cy.get("#product-list");
-    cy.get(`asset-${productName}`)
-    cy.get(`asset-${productName}`).click()
-    // cy.get("#productCard")
-    // cy.get("#productCard").first().click();
-
-    // check the price on the checkout & submit page
-    cy.get('#price').then(productPrice => {
-      cy.get('#buyNow').click();
-      cy.wait(5000);
-      cy.get('#totalPrice').invoke('text').then(totalPriceText => {
-        cy.get('#submit-order-button').click();
-        cy.url().should('include', '/checkout');
-        cy.wait(10000);
-        cy.get('#productPrice').invoke('text').then(productPriceText => {
-          const totalPrice = totalPriceText.trim();
-          const productPrice = productPriceText.trim();
-          expect(totalPrice).to.equal(productPrice);
-        });
-      });
-    });
-
-    // Add address
-    cy.wait(12000);
-    cy.get('#add-address-text').should('exist', { timeout: 10000 }).then($element => {
-      cy.wait(6000)
-      // cy.get('#add-Address-card-btn').click();
-
-      cy.get('#add-Address-card-btn').click();
-      cy.get('input[name=name]').type('user-01').should('have.value', 'user-01');
-      cy.get('input[name=addressLine1]').type('Address-line-01').should('have.value', 'Address-line-01');
-      cy.get('input[name=addressLine2]').type('Address-line-02').should('have.value', 'Address-line-02');
-      cy.get('input[name=city]').type('Dallas').should('have.value', 'Dallas');
-      cy.get('input[name=state]').type('Dallas').should('have.value', 'Dallas');
-      cy.get('input[name=zipcode]').type('12345').should('have.value', '12345');
-      cy.get('input[name=country]').type('United States').should('have.value', 'United States');
-      cy.get('#add-Address-Btn').click();
+    cy.get(`#asset-${productName}`)
+    cy.get(`#asset-${productName}`).click()
+    cy.get('#price').invoke('text').then(productPrice => {
+      const Price = productPrice.trim().replace('$', '').replace(' ', '');
+      expect(Price).to.equal(`${amount}`);
     })
-    // select address
-    cy.wait(15000);
-    cy.get('#address-0').click();
-    // Enter payment details
-    cy.get('#pay-now-button').click();
-    cy.wait(60000)
+    cy.get('#buyNow').click();
+    cy.get('#review-and-submit').click();
+
+
+    // Make Payment
+    cy.wait(10000)
     cy.get('input[name=email]')
     cy.get('input[name=email]').type(`${userName}@blockapps.net`).should('have.value', `${userName}@blockapps.net`);
     cy.get('#card-tab').click();
@@ -137,14 +100,13 @@ describe('Create a new Asset', () => {
     cy.get('#country-fieldset').click();
     cy.get('select option[value="IN"]').should('be.selected');
     cy.get('button[type="submit"]').click();
-    // 
+    cy.wait(10000);
 
-    cy.wait(120000);
+    // Verify the order in the order table
     cy.get('#Orders')
     cy.get('#Orders').click();
     cy.get('#bought-tab')
     cy.get('#bought-tab').click();
-
     cy.wait(10000);
 
     cy.get(".ant-table-tbody").then(order => {
@@ -153,15 +115,21 @@ describe('Create a new Asset', () => {
       });
     });
 
-    cy.wait(15000);
+    cy.wait(10000);
     cy.get("#Buyer").should('have.text', Cypress.env("email"));
     cy.get("#Seller").should('have.text', Cypress.env("sellerEmail"));
-    cy.get("#detail-productName").should('have.text', 'VRM 0418 1');
-    cy.get("#detail-amount").should('have.text', amount);
 
+    cy.get(".ant-table-tbody").then(order => {
+      cy.get(".ant-table-row").first().within(() => {
+        cy.get(".ant-table-cell").eq(1).children().first().should('have.text', `${productName}`);
+        cy.get(".ant-table-cell").eq(2).children().first().should('have.text', `${amount}`);
+      });
+    });
+    cy.wait(3000);
     cy.get('#Inventory').should("exist").click();
-    cy.get(`#asset-${productName}`).should('exist');
-
+    cy.url().should("exist", "myitems");
+    cy.get(`#asset-${productName}`).should("exist")
+    cy.wait(3000);
   });
 
 });
