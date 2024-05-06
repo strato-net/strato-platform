@@ -43,8 +43,8 @@ abstract contract SemiFungible is Mintable {
         require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
         for (uint i = 0; i < _quantity; i++) {
             UTXO newAsset = mint(1);
-            // regular transfer - isUserTransfer: false, transferNumber: 0
-            Asset(newAsset).transferOwnership(_newOwner, 1, false, 0);
+            // regular transfer - isUserTransfer: false, transferNumber: 0, transferPrice:0
+            Asset(newAsset).transferOwnership(_newOwner, 1, false, 0, 0);
         }
         
     }
