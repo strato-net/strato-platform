@@ -6,13 +6,13 @@ import <BASE_CODE_COLLECTION>;
 contract UnitOfMeasurement {
 enum UnitOfMeasurement {
     NULL,
-    BL,              // Barrell
-    BT               // Bottle
+    BARRELL,
+    BOTTLE  
 }
 }
 
 /// @title A representation of Spirit assets
-contract Spirits is UnitOfMeasurement {
+contract Spirits is Mintable, UnitOfMeasurement {
     UnitOfMeasurement public unitOfMeasurement;
     string public spiritType;
 
@@ -39,27 +39,17 @@ contract Spirits is UnitOfMeasurement {
     }
 
     function mint(uint _quantity) internal override returns (UTXO) {
-        Spirit newAsset = new Spirit(
+        Spirits newAsset = new Spirits(
             name,
             description,
             images,
             files,
             createdDate,
             _quantity,
-            spiritType, 
+            spiritType,
+            unitOfMeasurement, 
             status
         );
         return UTXO(address(newAsset));
-    }
-
-    // TODO: Finish the update function. 
-    function updateSpirit(
-        string[] _images, 
-        string[] _files, 
-        string _spiritType
-    ) public requireOwner("update spirit") returns (uint) {
-        spiritType = _spiritType;
-        updateAsset(_images, _files);
-        return RestStatus.OK;
     }
 }

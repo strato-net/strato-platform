@@ -333,10 +333,11 @@ export const categoricalProperties = (form, handleClothingTypeChange, clothingTy
                     </Form.Item>
                 </div>);
         case "Spirits":
-            return (<div className="flex flex-wrap gap-4 mt-4 justify-between">
+            return (<div className="flex flex-wrap gap-3 mt-4 justify-between">
                 <Form.Item
                     label="Type"
                     name="spiritType"
+                    className="w-full md:w-[200px]"
                     rules={[
                         {
                             required: true,
