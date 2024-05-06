@@ -571,7 +571,7 @@ expandHistoryTable isAbstract globalsIORef contract cc (creator, a, n) = do
   let tableName = historyTableName creator a n
   void $ 
     if isAbstract
-      then mapOutput (\o -> (o, Nothing)) $ expandAbstractContractTable globalsIORef contract tableName Map.empty emptyCodeCollection
+      then mapOutput (\o -> (o, Nothing)) $ expandAbstractContractTable globalsIORef contract tableName Map.empty cc --abstracts' needs to be passed in for fkeys
       else expandContractTable' globalsIORef contract cc tableName
 
 expandContractTable' ::
