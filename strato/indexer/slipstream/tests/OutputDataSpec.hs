@@ -738,6 +738,7 @@ spec = do
           address = testAdd,
           codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- $ hash "<CODEHASH>",
           creator = "",
+          root = "",
           application = "",
           contractname = "SwissArmy",
           mapname = "SwissArmyMapping",

@@ -99,6 +99,7 @@ data ProcessedMappingRow = ProcessedMappingRow
   { address :: Address,
     codehash :: CodePtr,
     creator :: Text,
+    root :: Text,
     application :: Text,
     contractname :: Text,
     mapname :: Text,
