@@ -761,6 +761,8 @@ spec = do
     block_number text,
     transaction_hash text,
     transaction_sender text,
+    creator text,
+    root text,
     contract_name text,
     mapname text,
     key text,
