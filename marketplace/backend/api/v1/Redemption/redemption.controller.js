@@ -87,10 +87,10 @@ class RedemptionController {
             assetAddresses: Joi.array().items(Joi.string()),
             assetName: Joi.string().required(),
             status: Joi.number().integer().min(1).max(1).required(),
-            originAssetAddress: Joi.string().required(),
             quantity: Joi.number().integer().greater(0).required(),
             shippingAddressId: Joi.number().integer().required(),
             ownerCommonName: Joi.string().required(),
+            issuerCommonName: Joi.string().required(),
             ownerComments: Joi.string().allow("")
         });
 
