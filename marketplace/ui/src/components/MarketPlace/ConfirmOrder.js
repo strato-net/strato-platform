@@ -24,7 +24,7 @@ import { PAYMENT_LIST } from "../../helpers/constants";
 import TagManager from "react-gtm-module";
 import { setCookie } from "../../helpers/cookie";
 
-const ConfirmOrder = ({ data, columns }) => {
+const ConfirmOrder = ({ paymentProviders, data, columns }) => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const orderDispatch = useOrderDispatch();
   const [api, contextHolder] = notification.useNotification();
@@ -34,7 +34,6 @@ const ConfirmOrder = ({ data, columns }) => {
   const [tax, setTax] = useState(0);
   const [total, setTotal] = useState(0);
   const inventoryDispatch = useInventoryDispatch();
-  const { stripeStatus } = useInventoryState();
   const { success: marketplaceSuccess, message: marketplaceMessage } = useMarketplaceState();
   const [modal, contextHolderForModal] = Modal.useModal();
   const [cartData, setCartData] = useState(data);
@@ -114,7 +113,7 @@ const ConfirmOrder = ({ data, columns }) => {
     }
   };
 
-  const handlePaymentConfirm = async () => {
+  const handlePaymentConfirm = async (paymentProvider) => {
     actions.addItemToConfirmOrder(marketplaceDispatch, cartData);
     let orderList = [];
     cartData.forEach((item) => {
@@ -125,9 +124,9 @@ const ConfirmOrder = ({ data, columns }) => {
         unitPrice: item.unitPrice
       });
     });
-    // These additional fields need to be sent to form the request after stripe. 
+
     let body = {
-      paymentList: PAYMENT_LIST,
+      paymentProvider: { address: paymentProvider.address },
       buyerOrganization: userOrganization,
       orderList,
       orderTotal: total + tax,
@@ -146,17 +145,19 @@ const ConfirmOrder = ({ data, columns }) => {
         event: 'pay_now_button',
       },
     });
-    let data = await orderActions.createPayment(orderDispatch, body);
-    if (data != null && data.url !== undefined) {
-      window.location.replace(data.url);
+    let token = await orderActions.createPayment(orderDispatch, body);
+    if (paymentProvider.data
+          && paymentProvider.data.serviceURL
+          && paymentProvider.data.serviceURL !== ''
+          && paymentProvider.data.checkoutRoute
+          && paymentProvider.data.checkoutRoute !== ''
+       ) {
+      const url = `${paymentProvider.data.serviceURL}${paymentProvider.data.checkoutRoute}?token=${token}` // &redirectUrl=${}`
+      window.location.replace(url);
+    } else {
+      window.location.replace("/order/bought");
     }
   };
-
-  useEffect(() => {
-    if (cartData.length !== 0) {
-      inventoryAction.sellerStripeStatus(inventoryDispatch, cartData[0]["sellersCommonName"]);
-    }
-  }, [inventoryDispatch, cartData]);
 
   return (
     <>
@@ -202,13 +203,12 @@ const ConfirmOrder = ({ data, columns }) => {
                   </Row>
                 </div>
               </div>
-              <div className="flex md:pb-2 items-center mr-4">
-                {stripeStatus && <button id="pay-now-button" className={`p-1 md:p-3 h-max rounded-lg border ${stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled ? 'border-primary bg-primary hover:bg-primaryHover text-white' : 'cursor-not-allowed border-[#999999] rounded bg-[#cccccc] text-[#666666]'}`}
+              {paymentProviders.map((paymentProvider) => (<div className="flex md:pb-2 items-center mr-4">
+                <button id="pay-now-button" className={`p-1 md:p-3 h-max rounded-lg border border-primary bg-primary hover:bg-primaryHover text-white`}
                   onClick={async () => {
                     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                       countDown();
                     } else {
-                      if (stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled) {
                         const saleAddresses = [];
                         const quantities = [];
                         cartData.forEach((item) => {
@@ -217,7 +217,7 @@ const ConfirmOrder = ({ data, columns }) => {
                         })
                         const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities)
                         if (checkQuantity === true) {
-                          handlePaymentConfirm();
+                          handlePaymentConfirm(paymentProvider);
                         } else {
                           let insufficientQuantityMessage = "";
                           let outOfStockMessage = "";
@@ -242,11 +242,14 @@ const ConfirmOrder = ({ data, columns }) => {
                         }
                       }
                     }
-                  }}
+                  }
                 >
-                  Review and Submit
-                </button>}
-              </div>
+                  <div className="flex items-center mr-1">
+                    {paymentProvider && paymentProvider.checkoutText}&nbsp; 
+                    {paymentProvider && paymentProvider.imageURL && paymentProvider.imageURL !== '' ? <img src={paymentProvider.imageURL} alt={paymentProvider.serviceName} height="16px" width="16px"/> : ''}
+                  </div>
+                </button>
+              </div>))}
             </div>
           </div>
         )}

@@ -12,6 +12,7 @@ import { useInventoryDispatch, } from "../../contexts/inventory";
 import { PAYMENT_LIST } from "../../helpers/constants";
 
 const ResponsiveCart = ({
+  paymentProviders,
   data,
   confirm,
   AddQty,
@@ -66,7 +67,7 @@ const ResponsiveCart = ({
     }
   });
 
-  const handlePaymentConfirm = async () => {
+  const handlePaymentConfirm = async (paymentProvider) => {
     actions.addItemToConfirmOrder(marketplaceDispatch, cartData);
     let orderList = [];
     cartData.forEach((item) => {
@@ -77,15 +78,15 @@ const ResponsiveCart = ({
         unitPrice: item.unitPrice
       });
     });
-    // These additional fields need to be sent to form the request after stripe. 
+
     let body = {
-      paymentList: PAYMENT_LIST,
+      paymentProvider: { address: paymentProvider.address },
       buyerOrganization: userOrganization,
       orderList,
       orderTotal: total + tax,
       tax: tax,
-      user: user?.commonName,
-      email: user?.email,
+      user: user.commonName,
+      email: user.email,
     };
 
     window.LOQ.push(['ready', async LO => {
@@ -98,17 +99,19 @@ const ResponsiveCart = ({
         event: 'pay_now_button',
       },
     });
-    let data = await orderActions.createPayment(orderDispatch, body);
-    if (data != null && data.url !== undefined) {
-      window.location.replace(data.url);
+    let token = await orderActions.createPayment(orderDispatch, body);
+    if (paymentProvider.data
+          && paymentProvider.data.serviceURL
+          && paymentProvider.data.serviceURL !== ''
+          && paymentProvider.data.checkoutRoute
+          && paymentProvider.data.checkoutRoute !== ''
+       ) {
+      const url = `${paymentProvider.data.serviceURL}${paymentProvider.data.checkoutRoute}?token=${token}` // &redirectUrl=${}`
+      window.location.replace(url);
+    } else {
+      window.location.replace("/order/bought");
     }
   };
-
-  useEffect(() => {
-    if (cartData.length !== 0) {
-      inventoryAction.sellerStripeStatus(inventoryDispatch, cartData[0]["sellersCommonName"]);
-    }
-  }, [inventoryDispatch, cartData]);
 
   return (
     <div className=" border border-[#E9E9E9]  rounded-md mt-3 flex flex-col gap-[18px]   sm:w-[400px] md:w-[450px]  items-center    ">
@@ -261,12 +264,12 @@ const ResponsiveCart = ({
           </div>
         </div>
 
-        {!confirm && (
+        {!confirm && paymentProviders.map((paymentProvider) => (
           <Row className="justify-center mt-4">
             <Button
               type="primary"
               id="submit-order-button"
-              className=" w-full sm:w-44 h-9 !bg-[#13188A]"
+              className=" w-full sm:w-52 h-9 !bg-[#13188A]"
               loading={isCreatePaymentSubmitting}
               onClick={async () => {
                 if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
@@ -291,7 +294,7 @@ const ResponsiveCart = ({
                         event: 'submit_order_from_cart',
                       },
                     });
-                    handlePaymentConfirm();
+                    handlePaymentConfirm(paymentProvider);
                   } else {
                     let insufficientQuantityMessage = "";
                     let outOfStockMessage = "";
@@ -320,10 +323,13 @@ const ResponsiveCart = ({
               }}
               disabled={cartData.length === 0}
             >
-              Submit & Checkout
+              <div className="flex items-center mr-1">
+                {paymentProvider.checkoutText}&nbsp; 
+                {paymentProvider.imageURL && paymentProvider.imageURL !== '' ? <img src={paymentProvider.imageURL} alt={paymentProvider.serviceName} height="16px" width="16px"/> : ''}
+              </div>
             </Button>
           </Row>
-        )}
+        ))}
       </div>
     </div>
   );
