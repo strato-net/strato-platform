@@ -21,8 +21,9 @@ contract Collectibles is Mintable {
         string[] _files,
         uint _createdDate,
         uint _quantity,
-        string _condition
-    ) public Mintable(_name, _description, _images, _files, _createdDate, _quantity) {
+        string _condition,
+        AssetStatus _status
+    ) public Mintable(_name, _description, _images, _files, _createdDate, _quantity, _status) {
         condition = _condition;
     }
 
@@ -34,7 +35,8 @@ contract Collectibles is Mintable {
             files,
             createdDate,
             _quantity,
-            condition
+            condition,
+            status
         );
         return UTXO(address(newAsset));
     }

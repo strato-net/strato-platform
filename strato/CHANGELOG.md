@@ -21,7 +21,7 @@ so that they could be properly moved to their respective version's subsection.
 - `creatorForkBlockNumber` flag added to customize at which block :creator field should start referring to the common name and not org
 
 ### Changed
-- Cirrus table namespacing is of format `creator-contractName` now
+- Expansion of Concrete contract to Abstract contract is accomodated by Cirrus
 - :creator field refers to user's common name, not org (can be customized to occur after particular block number for backwards compatibility)
 - `eth_<random 20 bytes>` database is now just named `eth`
 - `queryStrato` is now `strato-barometer`

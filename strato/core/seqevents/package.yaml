@@ -20,6 +20,7 @@ library:
     - format
     - generic-arbitrary
     - lens
+    - merkle-patricia-db
     - milena
     - monad-alter
     - prometheus-client

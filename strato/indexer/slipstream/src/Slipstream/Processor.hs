@@ -128,7 +128,8 @@ processedContract ABIID {..} state AggregateAction {..} =
   ProcessedContract
     { address = actionAccount ^. accountAddress,
       codehash = actionCodeHash,
-      commonName = actionCommonName,
+      creator = actionCreator,
+      application = actionApplication,
       contractName = aiName,
       chain = aiChain,
       contractData = state,
@@ -200,7 +201,8 @@ processedMappingRow mapping AggregateAction {..} ABIID {..} k v =
   ProcessedMappingRow
     { address = actionAccount ^. accountAddress,
       codehash = actionCodeHash,
-      commonName = actionCommonName,
+      creator = actionCreator,
+      application = actionApplication,
       contractname = aiName,
       mapname = mapping,
       blockHash = actionBlockHash,
@@ -269,11 +271,11 @@ processTheMessages env conn messages = do
   let changes = parseActions messages
       events' = parseEvents messages
       -- TODO (Dan) : would be nice if we didn't just rip events out at the top level like this
-      creates = [(cc, cp, cn, hl, abs', rm) | CodeCollectionAdded cc cp cn hl abs' rm <- messages]
+      creates = [(cc, cp, cr, ap, hl, abs', rm) | CodeCollectionAdded cc cp cr ap hl abs' rm <- messages]
       -- delegates = [d | DelegatecallMade d <- messages]
       transactionResults = [tr | NewTransactionResult tr <- messages]
 
-  fkeys' <- forM creates $ \(cc, cp, cn, hl, abstracts', _) -> do
+  fkeys' <- forM creates $ \(cc, cp, cr, ap, hl, abstracts', _) -> do
         $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (format cp) 
         multilineLog "processTheMessages/contracts" $ boringBox $ map show (Map.keys $ cc ^. contracts)
 
@@ -284,11 +286,11 @@ processTheMessages env conn messages = do
 
             let mapNames = getMapNamesFromContract c
 
-            let historyTableNames = map (historyTableName cn) hl
+            let historyTableNames = map (historyTableName cr ap) hl
             $logDebugS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames
 
-            let nameParts@(cn'', n'') = (cn, T.pack $ _contractName c)
-            $logInfoS "processTheMessages/Contract Added" $ "common name=" <> cn'' <> ", name=" <> n''
+            let nameParts@(cr', ap',  n'') = (cr, ap, T.pack $ _contractName c)
+            $logInfoS "processTheMessages/Contract Added" $ "ccreator=" <> cr' <> ", app=" <> ap' <> ", name=" <> n''
             multilineLog "processTheMessages/fields" $ boringBox $ map (show) $ Map.toList $ fmap _varType $ c ^. storageDefs
 
             --Create mapping tables
@@ -301,16 +303,17 @@ processTheMessages env conn messages = do
             deferredForeignKeys <- case (_contractType c) of
               AbstractType -> do
                 _ <- outputData conn $ createExpandAbstractTable g c nameParts abstracts' cc
+                outputData' conn $ createExpandHistoryTable True g c nameParts
                 -- $logInfoS "processTheMessages/deferredForeignKeys/abstractfkeys" $ T.pack $ show abstractfkeys
                 return []
               _ -> do
                 indexfkeys <- outputData conn $ createExpandIndexTable g c nameParts
                 $logInfoS "processTheMessages/deferredForeignKeys/indexfkeys" $ T.pack $ show indexfkeys
+                outputData' conn $ createExpandHistoryTable False g c nameParts
                 return indexfkeys
 
             $logInfoS "processTheMessages/deferredForeignKeys" $ T.pack $ show deferredForeignKeys
 
-            outputData' conn $ createExpandHistoryTable g c nameParts
 
             outputData conn $ createExpandEventTables g c nameParts
 
@@ -376,11 +379,11 @@ processTheMessages env conn messages = do
           indexContract <- rowToInsert g abiid row cont oldState
           hs <- rowToHistories g abiid actions cont oldState
           let mapNames = actionMappings row
-              abstracts = actionAbstracts row
+              abstracts = actionAbstracts row -- to get abstract history info, get `actionAbstracts <$> actions`
           --get columns for abstract table
           $logDebugLS "abstractColumns" $ T.pack $ "Getting abstract columns from " ++ (show abstracts)
-          abstractColumns <- fmap catMaybes . for (Map.toList abstracts) $ \((_, n'), cn') -> do
-            let tableName = AbstractTableName cn' n'
+          abstractColumns <- fmap catMaybes . for (Map.toList abstracts) $ \((_, n'), (cr', ap')) -> do
+            let tableName = AbstractTableName cr' ap' n'
                 tableNameText = tableNameToDoubleQuoteText tableName
             $logInfoS "Row will be inserted into abstract table: " tableNameText
             mCols <- getTableColumns g tableName
@@ -402,7 +405,8 @@ processTheMessages env conn messages = do
     outputData conn $ insertIndexTable $ indexInsert ins
     outputData conn $ insertHistoryTable $ historyInserts ins
     unless ((length (mappingInserts ins) < 1)) $ outputData conn $ insertMappingTable $ mappingInserts ins
-    outputData conn $ insertAbstractTable $ abstractInsert ins
+    outputData conn $ insertAbstractTable (abstractInsert ins) False -- not historic
+    outputData conn $ insertHistoryAbstractTable (abstractInsert ins) (historyInserts ins)
 
   forM_ insertsByCodeHash $ \ins -> do
     insertForeignKeys conn $ indexInsert ins

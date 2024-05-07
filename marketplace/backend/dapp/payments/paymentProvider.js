@@ -153,7 +153,7 @@ function bindAddress(user, address, options) {
 
 async function get(user, args, defaultOptions) {
     const { ownerCommonName, name, address, accountId, accountDeauthorized, transaction_sender, ...restArgs } = args;
-    const options = { ...defaultOptions, org: 'BlockApps' }
+    const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
     let paymentProvider;
 
     if (address) {

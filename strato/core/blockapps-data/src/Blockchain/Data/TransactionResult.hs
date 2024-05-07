@@ -106,6 +106,7 @@ exampleTxResult =
     Nothing
     (Just SolidVM)
     "BlockApps"
+    "Sample App"
 
 instance ToSchema TransactionResult where
   declareNamedSchema _ =

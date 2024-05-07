@@ -9,6 +9,7 @@ import product from './Product'
 import inventory from './Inventory'
 import item from './Item'
 import art from './Art'
+import tokens from './Tokens'
 import carbonOffset from './CarbonOffset'
 import metals from './Metals'
 import clothing from './Clothing'
@@ -25,6 +26,7 @@ import marketplace from './Marketplace'
 import paymentService from './PaymentService'
 import orderLine from "./OrderLine"
 import userActivity from './UserActivity'
+import redemption from './Redemption'
 
 import {
   Authentication,
@@ -35,6 +37,7 @@ import {
   Inventory,
   Item,
   Art,
+  Tokens,
   CarbonOffset,
   Metals,
   Clothing,
@@ -48,7 +51,8 @@ import {
   Marketplace,
   OrderLine,
   PaymentService,
-  UserActivity
+  UserActivity,
+  Redemption
 } from './endpoints'
 
 
@@ -62,6 +66,7 @@ router.use(Product.prefix, product)
 router.use(Inventory.prefix, inventory)
 router.use(Item.prefix, item)
 router.use(Art.prefix, art)
+router.use(Tokens.prefix, tokens)
 router.use(CarbonOffset.prefix, carbonOffset)
 router.use(Clothing.prefix, clothing)
 router.use(Membership.prefix, membership)
@@ -76,6 +81,7 @@ router.use(Marketplace.prefix, marketplace)
 router.use(OrderLine.prefix, orderLine)
 router.use(PaymentService.prefix, paymentService)
 router.use(UserActivity.prefix, userActivity)
+router.use(Redemption.prefix, redemption)
 
 
 router.get(`/health`, (req, res) => {

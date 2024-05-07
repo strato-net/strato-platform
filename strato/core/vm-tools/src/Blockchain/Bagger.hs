@@ -152,7 +152,8 @@ txsDroppedCallback rejections bestBlockShas = forM_ rejections $ \rejection -> d
           transactionResultStatus = Just (txRejectionToAPIFailureCause rejection),
           transactionResultChainId = txChainId . otBaseTx $ rejectedTx rejection,
           transactionResultKind = Nothing,
-          transactionResultCommonName = ""
+          transactionResultCreator = "",
+          transactionResultAppName = ""
         }
 
 -- Would it make more sense to expand the MiningCache than to introduce a separate cache?

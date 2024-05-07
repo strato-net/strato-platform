@@ -13,12 +13,13 @@ contract Art is UTXO {
         string[] _images,
         string[] _files,
         uint _createdDate,
-        string _artist
-    ) public UTXO(_name, _description, _images, _files, _createdDate, 1) {
+        string _artist,
+        AssetStatus _status
+    ) public UTXO(_name, _description, _images, _files, _createdDate, 1, _status) {
         artist = _artist;
     }
     function mint(uint splitQuantity) internal override returns (UTXO) {
-        Art a = new Art(name, description, images, files, createdDate, artist);
+        Art a = new Art(name, description, images, files, createdDate, artist, status);
         return UTXO(address(a)); 
     }
 }
