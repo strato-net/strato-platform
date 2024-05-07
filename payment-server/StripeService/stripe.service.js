@@ -1,14 +1,14 @@
-import { STRIPE_ENV } from '../helpers/constants.js';
+import { STRIPE_ENV, CHECKOUT_URL } from '../helpers/constants.js';
 import Stripe from 'stripe';
 const stripe = Stripe(STRIPE_ENV.CREDENTIALS.STRIPE_SECRET_KEY);
 
 class StripeService {
     // TODO implement orderDetail to create actual order line items 
-    static initiatePayment(marketplaceUrl, paymentTypes, cartData, orderDetail, CONNECTED_ACCOUNT_ID = '') {
+    static initiatePayment(marketplaceUrl, cartData, orderDetail, CONNECTED_ACCOUNT_ID = '') {
         try {
             // Create a checkout session with Stripe
             return stripe.checkout.sessions.create({
-                payment_method_types: paymentTypes,
+                payment_method_types: [ 'card', 'us_bank_account' ],
                 payment_method_options: {
                     us_bank_account: {
                       verification_method: 'instant',
@@ -38,7 +38,7 @@ class StripeService {
                     // },
                 },
                 mode: "payment",
-                success_url: `${marketplaceUrl}/order/status?session_id={CHECKOUT_SESSION_ID}`,
+                success_url: `${CHECKOUT_URL}?session_id={CHECKOUT_SESSION_ID}`,
                 cancel_url: `${marketplaceUrl}/checkout`,
             }, {
                 stripeAccount: CONNECTED_ACCOUNT_ID

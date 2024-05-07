@@ -37,4 +37,6 @@ const bootStrapAdmin = async () => {
 
 const ADMIN = await bootStrapAdmin();
 
-export { STRIPE_ENV, ADMIN, TOKEN_LIFETIME_RESERVE_SECONDS }
+const CHECKOUT_URL = `${process.env.SERVER_HOST}:${process.env.PORT ? process.env.PORT : 8018}/checkout/process`;
+
+export { STRIPE_ENV, ADMIN, TOKEN_LIFETIME_RESERVE_SECONDS, CHECKOUT_URL }

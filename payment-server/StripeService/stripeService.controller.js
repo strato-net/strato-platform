@@ -102,7 +102,20 @@ class StripeServiceController {
 
       // Create and return checkout link
       const session = await stripeService.initiatePayment(marketplaceUrl, paymentTypes, cartData, orderDetail, sellerAccount);
-      res.status(200).send(session);
+
+      console.log("DEBUG", session);
+      res.setHeader('Content-Type', 'text/html');
+      res.send(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta http-equiv="refresh" content="0;url=${session.url}">
+          </head>
+          <body>
+          </body>
+        </html>
+      `);
+
       return next();
     } catch (e) {
       next(e);
@@ -205,21 +218,6 @@ class StripeServiceController {
 
     if (!referer) {
       throw new Error(`Missing MarketplaceURL as referer header in GET request /checkout.`);
-    }
-  }
-
-  static validateStripeCheckoutConfirmArgs(args) {
-    const stripeCheckoutConfirmSchema = Joi.object({
-      paymentSessionId: Joi.string().required(),
-      sellerCommonName: Joi.string().required(),
-      paymentContractAddress: Joi.string().required(),
-      buyerAddress: Joi.string().required(),
-    })
-
-    const validation = stripeCheckoutConfirmSchema.validate(args);
-
-    if (validation.error) {
-      throw new Error(`Missing args or bad format in POST request /checkout/confirm: ${validation.error.message}.`);
     }
   }
 

@@ -13,7 +13,7 @@ marketplaceUiUrlPrefix: "/"
 nodes:
   - id: 0
     label: localhost
-    url: https://marketplace.mercata-testnet2.blockapps.net/
+    url: http://localhost:8080
     oauth:
       appTokenCookieName: asset_framework_session
       appTokenCookieMaxAge: 7776000000

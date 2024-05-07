@@ -953,6 +953,65 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const paymentServices = await paymentProviderJs.getAll(rawAdmin, args, options);
       return paymentServices;
   }
+  /* ------------------------ Stripe account connect starts here ------------------------ */
+  contract.stripeOnboarding = async function (originUrl, args, options = defaultOptions) {
+    try {
+      let connectLink;
+      await axios.get(new URL(`/stripe/onboard/${userCert.commonName}`, STRIPE_PAYMENT_SERVER_URL).href, {
+          headers: {
+            'referer': `${originUrl}`
+          }
+        })
+          .then(function (res) {
+            if (res.status === 200) {
+              connectLink = res.data.connectLink;
+            } else {
+              throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+            }
+          });
+      return connectLink;
+    } catch (error) {
+      console.error(`${error}`);
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `${error.message}`);
+    }
+  }
+
+  contract.getStripeOnboardingStatus = async function (args, options = defaultOptions) {
+    try {
+          let connectedStripeAccountStatus = { 
+            chargesEnabled: false, 
+            detailsSubmitted: false, 
+            payoutsEnabled: false, 
+            accountDeauthorized: false, 
+            eventTime: Date.now() 
+          };
+          try {
+            await axios.get(new URL(`/stripe/status/${userCert.commonName}`, STRIPE_PAYMENT_SERVER_URL).href)
+              .then(function (res) {
+                if (res.status === 200) {
+                  connectedStripeAccountStatus.chargesEnabled = res.data.chargesEnabled;
+                  connectedStripeAccountStatus.detailsSubmitted = res.data.detailsSubmitted;
+                  connectedStripeAccountStatus.payoutsEnabled = res.data.payoutsEnabled;
+                } else {
+                  throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+                }
+              }, (error) => {
+                console.log(error);
+              });
+          } catch (error) {
+            if (error.code == 'account_invalid') {
+              connectedStripeAccountStatus.accountDeauthorized = true
+            }
+          }
+
+        return connectedStripeAccountStatus;
+    } catch (error) {
+      console.error(`${error}`);
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `${error.message}`);
+    }
+  }
+
+  // //-----------------------------PAYMENT starts here -------------------------------
 
   contract.paymentCheckout = async function (originUrl, args, options = defaultOptions) {
     try {
@@ -1008,6 +1067,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
         if (calculatedOrderTotal != recievedOrderTotal) {
           throw new rest.RestError(RestStatus.BAD_REQUEST, "Incorrect order value.");
+      try {
+        const checkoutBody = {
+          paymentTypes: paymentList,
+          cartData: newArgs,
+          orderDetail: invoices,
+          sellerCommonName: sellerName,
         }
         let stripePaymentSession;
         const { paymentList, ...restArgs } = args;

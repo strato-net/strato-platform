@@ -10,11 +10,11 @@ const client = new Client({
     user: process.env.POSTGRESQL_USER || 'postgres',
     password: process.env.POSTGRESQL_PASSWORD,
     database: process.env.POSTGRESQL_DBNAME || 'postgres',
-    ssl: {
-        require: true,
-        rejectUnauthorized: true,
-        ca: fs.readFileSync('./dbCert/us-east-1-bundle.cer').toString(),
-    }
+    // ssl: {
+    //     require: true,
+    //     rejectUnauthorized: true,
+    //     ca: fs.readFileSync('./dbCert/us-east-1-bundle.cer').toString(),
+    // }
 });
 
 if (process.env.POSTGRESQL_SERVER_URL && process.env.POSTGRESQL_PASSWORD) {
@@ -54,6 +54,12 @@ if (process.env.POSTGRESQL_SERVER_URL && process.env.POSTGRESQL_PASSWORD) {
                     commonName TEXT PRIMARY KEY,
                     accountId TEXT,
                     createdDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE TABLE IF NOT EXISTS stripe_payments (
+                    order_id TEXT PRIMARY KEY,
+                    paymentSessionId TEXT,
+                    createdDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP 
                 );
             `;
 

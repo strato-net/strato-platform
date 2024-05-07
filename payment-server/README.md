@@ -57,20 +57,6 @@ Create a checkout session given the following information from the order:
 `cartData`, `orderDetail`, and `accountId` in a JSON body.  
 **Returns** a new Stripe checkout session for the provided order.
 
-##### GET `/stripe/session/:sessionId/:sellerId`
-Get a stripe session given the `sessionId` and the `sellerId` in a JSON body.  
-**Returns** the session information.
-
-##### GET `/stripe/intent/:sessionId/:sellerId`
-Get the stripe payment intent given the `sessionId` and the `sellerId` in a JSON body.  
-**Returns** the payment intent information.
-
-##### POST `/stripe/webhook`
-TODO
-
-##### POST `/stripe/webhook/connect`
-TODO
-
 ### Dependencies
 
 1. Docker Engine v24+ (For dockerized deployment)
