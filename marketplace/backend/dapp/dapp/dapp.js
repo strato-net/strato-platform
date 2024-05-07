@@ -1006,9 +1006,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         saleAddresses,
         quantities,
       }
-      await paymentProviderJs.createPayment(rawAdmin, paymentParameters, options);
+      const token = await paymentProviderJs.createPayment(rawAdmin, paymentParameters, options);
+      return token;
 
-      if (paymentProvider.serviceURL && paymentProvider.serviceURL !== '') {
+      if (paymentProvider.data
+            && paymentProvider.data.serviceURL
+            && paymentProvider.data.serviceURL !== ''
+            && paymentProvider.data.checkoutRoute
+            && paymentProvider.data.checkoutRoute !== ''
+         ) {
         const invoices = [];
         let calculatedOrderTotal = 0;
 
@@ -1028,12 +1034,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
         try {
           const checkoutBody = {
-            paymentTypes: paymentList,
             cartData: newArgs,
             orderDetail: invoices,
-            accountId: sellerStripeDetails[0].accountId,
           }
-          stripePaymentSession = await axios.post(new URL('/checkout', paymentProvider.serviceURL).href, checkoutBody, {
+          stripePaymentSession = await axios.post(new URL(paymentProvider.data.checkoutRoute, paymentProvider.data.serviceURL).href, checkoutBody, {
             headers: {
               'referer': `${originUrl}`
             }
@@ -1059,64 +1063,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         throw new rest.RestError(error.response.status, error.response.statusText);
       }
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while updating the order");
-    }
-  };
-
-  // Stripe Webhook TODO
-
-  contract.updatePayment = async function (args, options = defaultOptions, token) {
-    try {
-      return paymentProviderJs.finalizePayment(args, options)
-    } catch (error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while updating payment status", { message: "Error while updating payment status" })
-    }
-  };
-
-  // Stripe Webhook End
-
-  contract.getPaymentSession = async function (args, options = defaultOptions) {
-    try {
-      const { session_id, sellersCommonName } = args;
-      const paymentDetail = await paymentProviderJs.get(rawAdmin,
-        { name: 'STRIPE', ownerCommonName: sellersCommonName, accountDeauthorized: false },
-        options);
-      if (paymentDetail.length === 0) {
-        throw new rest.RestError(RestStatus.CONFLICT, "Seller payment details cannot be found.");
-      }
-      const paymentSession = await axios.get(new URL(`/stripe/session/${session_id}/${paymentDetail[0].accountId}`, STRIPE_PAYMENT_SERVER_URL).href)
-        .then(function (res) {
-          if (res.status === 200) {
-            return res.data;
-          } else {
-            throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
-          }
-        });
-      return { ...paymentSession }
-    } catch (error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while fetching payment session", { message: "Error while fetching payment" })
-    }
-  };
-
-  contract.getPaymentIntent = async function (args, options = defaultOptions) {
-    try {
-      const { session_id, sellersCommonName } = args;
-      const paymentDetail = await paymentProviderJs.get(rawAdmin,
-        { name: 'STRIPE', ownerCommonName: sellersCommonName, accountDeauthorized: false },
-        options);
-      if (paymentDetail.length === 0) {
-        throw new rest.RestError(RestStatus.CONFLICT, "Seller payment details cannot be found.");
-      }
-      const paymentIntent = await axios.get(new URL(`/stripe/intent/${session_id}/${paymentDetail[0].accountId}`, STRIPE_PAYMENT_SERVER_URL).href)
-        .then(function (res) {
-          if (res.status === 200) {
-            return res.data;
-          } else {
-            throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
-          }
-        });
-      return { ...paymentIntent }
-    } catch (error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while fetching payment intent", { message: "Error while fetching payment intent" })
     }
   };
 
