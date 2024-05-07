@@ -54,6 +54,7 @@ library:
     - unliftio-core
     - vm-tools
     - ordered-containers
+    - solid-vm
 
 executables:
   slipstream:
