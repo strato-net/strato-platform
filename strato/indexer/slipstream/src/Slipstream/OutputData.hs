@@ -1067,7 +1067,9 @@ insertHistoryTableQuery cs =
                     tshow . E.blockTimestamp,
                     tshow . E.blockNumber,
                     T.pack . keccak256ToHex . E.transactionHash,
-                    tshow . E.transactionSender
+                    tshow . E.transactionSender,
+                    E.creator,
+                    E.root
                   ]
                 vals = flip map contracts $ \(row, rowList) ->
                   wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
