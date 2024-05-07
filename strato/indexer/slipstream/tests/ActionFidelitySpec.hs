@@ -99,6 +99,7 @@ spec = describe "Action conversions" $ do
                  "types": ["Create"],
                  "codeHash": "86bc2e2a375e6ea377ae90026248f472fbeaa1354ef4424f568d01f3a48ab5b9",
                  "creator": "BlockApps1",
+                 "root" : "ClothingUTXO",
                  "application": "LogisticsEngine1",
                  "abstracts": [],
                  "mappings": [],
@@ -119,6 +120,7 @@ spec = describe "Action conversions" $ do
          "events" : 
          [ { "eventBlockHash": "0000000000000000000000000000000000000000000000000000000000000000",
              "eventContractCreator": "BlockApps2",
+             "eventContractRoot": "ClothingUTXO",
              "eventContractApplication": "LogisticsEngine2",
              "eventContractName" : "Vehicle",
              "eventContractAccount" : "2e385b6a3aea46d4172df98617b5385c13b7100d",
