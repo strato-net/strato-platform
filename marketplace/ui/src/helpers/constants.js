@@ -70,6 +70,24 @@ export const getUnitNameByIndex = (index) => {
   return null;
 };
 
+export const getSpiritUnitNameByIndex = (index) => {
+  const unit = unitOfSpiritMeasures.find((measure) => measure.value === parseInt(index));
+
+  if (unit) {
+    if (unit.name.length > 20) {
+      // Extract abbreviation from inside brackets
+      const matches = unit.name.match(/\((.*?)\)/);
+      if (matches && matches.length > 1) {
+        return matches[1];
+      }
+    }
+    
+    return unit.name;
+  }
+  
+  return null;
+};
+
 export const unitOfMeasures = [
   { name: "Gram (G)", value: 1 },
   { name: "Kilogram (KG)", value: 2 },
