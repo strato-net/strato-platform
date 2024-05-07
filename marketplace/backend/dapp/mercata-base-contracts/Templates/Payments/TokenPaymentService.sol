@@ -24,7 +24,7 @@ contract TokenPaymentService is PaymentService {
         uint _tokensPerDollar,
         string _imageURL,
         string _checkoutText
-    ) PaymentService(_serviceName, "", _imageURL, "", _checkoutText) public {
+    ) PaymentService(_serviceName, _imageURL, _checkoutText) public {
         decimals = _decimals;
         reserve = _supply * (10 ** decimals);
         tokensPerDollar = _tokensPerDollar;
@@ -68,25 +68,24 @@ contract TokenPaymentService is PaymentService {
         }
     }
 
-    mapping (address => uint) quantities;
-    function _lockSales (
+    function _createOrder (
         address[] _saleAddresses,
-        uint[] _quantities
-    ) internal override returns (uint) {
-        require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
+        uint[] _quantities,
+        string token
+    ) internal override returns (string) {
         address[] recipients;
         uint totalAmount;
         for (uint i = 0; i < _saleAddresses.length; i++) {
             Sale s = Sale(_saleAddresses[i]);
             Asset a = s.assetToBeSold();
             address recipient = a.owner();
-            if (quantities[recipient] == 0) {
+            if (quantitiesMap[recipient] == 0) {
                 recipients.push(recipient);
             }
             uint quantity = _quantities[i];
             uint amount = s.price() * quantity * tokensPerDollar * (10 ** decimals);
             totalAmount += amount;
-            quantities[recipient] += amount;
+            quantitiesMap[recipient] += amount;
             s.lockQuantity(quantity, msg.sender);
             s.completeSale(msg.sender);
         }
@@ -95,48 +94,19 @@ contract TokenPaymentService is PaymentService {
         require(myBalance >= totalAmount, err);
         for (uint j = 0; j < recipients.length; j++) {
             address recipient = recipients[j];
-            bool success = transfer(recipient, quantities[recipient]);
-            emit Payment(getCommonName(msg.sender), getCommonName(recipient), quantities[recipient]);
-            quantities[recipient] = 0;
+            bool success = transfer(recipient, quantitiesMap[recipient]);
+            emit Payment(getCommonName(msg.sender), getCommonName(recipient), quantitiesMap[recipient], true);
+            quantitiesMap[recipient] = 0;
             require(success, err);
         }
 
-        return RestStatus.OK;
+        return token;
     }
 
-    function _completeSales (
-        address[] _saleAddresses,
-        address _purchaser
-    ) internal override returns (uint) {
+    function _completeOrder (
+        string token
+    ) internal override returns (address[]) {
         require(false, "Cannot call completeSales for STRAT payments.");
-    }
-
-    function _update(
-        string _serviceURL
-    ,   string _imageURL
-    ,   string _onboardingText
-    ,   string _checkoutText
-    ,   uint   _scheme
-    ) internal override returns (uint) {
-
-      if (_scheme == 0) {
-        return RestStatus.OK;
-      }
-
-      if ((_scheme & (1 << 0)) == (1 << 0)) {
-        return RestStatus.CONFLICT;
-      }
-      if ((_scheme & (1 << 1)) == (1 << 1)) {
-        imageURL = _imageURL;
-      }
-      if ((_scheme & (1 << 2)) == (1 << 2)) {
-        return RestStatus.CONFLICT;
-      }
-      if ((_scheme & (1 << 3)) == (1 << 3)) {
-        checkoutText = _checkoutText;
-      }
-
-      return RestStatus.OK;
     }
 
     function updateTokensPerDollar(uint _tokensPerDollar) requireOwner() public returns (uint) {

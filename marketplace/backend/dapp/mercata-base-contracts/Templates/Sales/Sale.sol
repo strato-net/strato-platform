@@ -48,14 +48,12 @@ abstract contract Sale is Utils {
         _;
     }
 
-    modifier requireBuyerSellerOrPaymentProvider(address purchaser, string action) {
+    modifier requireSellerOrPaymentProvider(string action) {
         string sellersCommonName = assetToBeSold.ownerCommonName();
-        string purchasersCommonName = getCommonName(purchaser);
         string commonName = getCommonName(msg.sender);
-        bool isAuthorized = commonName == purchasersCommonName
-                         || commonName == sellersCommonName
+        bool isAuthorized = commonName == sellersCommonName
                          || isPaymentProvider(msg.sender);
-        require(isAuthorized, "Only the buyer, seller, or payment provider can perform " + action + ".");
+        require(isAuthorized, "Only the seller, or payment provider can perform " + action + ".");
         _;
     }
 
@@ -165,14 +163,14 @@ abstract contract Sale is Utils {
 
     function unlockQuantity(
         address purchaser
-    ) requireBuyerSellerOrPaymentProvider(purchaser, "unlock quantity") public {
+    ) requireSellerOrPaymentProvider("unlock quantity") public {
         uint quantityToReturn = takeLockedQuantity(purchaser);
         quantity += quantityToReturn;
     }
 
     function cancelOrder(
         address purchaser
-    ) public requireBuyerSellerOrPaymentProvider(purchaser, "cancel order") returns (uint) {
+    ) public requireSellerOrPaymentProvider("cancel order") returns (uint) {
         unlockQuantity(purchaser);
         return RestStatus.OK;
     }

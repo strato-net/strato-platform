@@ -11,48 +11,39 @@ abstract contract PaymentService is Utils {
     address public owner;
     string public ownerCommonName;
 
+    bool public isActive;
+
     string public serviceName;
     string public imageURL;
-    string public onboardingText;
     string public checkoutText;
 
-    // There are multiple alternatives
-    string public serviceURL; // Provide server base URL, have app append routes
-    ////
-    //// Provide server base URL, allow custom onboarding and payment routes
-    // string public serviceURL;
-    // string public onboardingRoute;
-    // string public checkoutRoute;
-    ////
-    //// Provide entire URLs for onboarding and checkout, no app-side manipulation required
-    // string public onboardingURL;
-    // string public checkoutURL;
+    struct Order {
+        address purchaser;
+        address[] saleAddresses;
+        address[] recipients;
+        uint[] quantities;
+    }
+    mapping (string => Order) public record openOrders;
 
     event Payment(
         string purchasersCommonName,
         string sellersCommonName,
-        string amount
+        uint amount,
+        bool success
     );
 
     constructor (
         string _serviceName,
-        string _serviceURL,
         string _imageURL,
-        string _onboardingText,
         string _checkoutText
     ) public {
         owner = msg.sender;
         ownerCommonName = getCommonName(msg.sender);
 
+        isActive = true;
+
         serviceName = _serviceName;
-        serviceURL = _serviceURL;
         imageURL = _imageURL;
-        if (_onboardingText != "") {
-            onboardingText = _onboardingText;
-            checkoutText = _checkoutText;
-        } else {
-            onboardingText = "Connect " + serviceName;
-        }
         if (_checkoutText != "") {
             checkoutText = _checkoutText;
         } else {
@@ -68,73 +59,128 @@ abstract contract PaymentService is Utils {
         _;
     }
 
-    function lockSales (
-        address[] _saleAddresses,
-        uint[] _quantities
-    ) external returns (uint) {
-        return _lockSales(_saleAddresses, _quantities);
+    modifier requirePurchaserOrOwner(string token, string action) {
+        string err = "Only the purchaser or owner can "
+                   + action
+                   + ".";
+        string commonName = getCommonName(msg.sender);
+        require(commonName == ownerCommonName || commonName == getCommonName(openOrders[token].purchaser), err);
+        _;
     }
 
-    function _lockSales (
+    function transferOwnership(address _newOwner) requireOwner("transfer ownership") external {
+        owner = _newOwner;
+        ownerCommonName = getCommonName(owner);
+    }
+
+    function deactivate() requireOwner("deactivate the payment service") external {
+        isActive = false;
+    }
+
+    function createOrder (
         address[] _saleAddresses,
         uint[] _quantities
-    ) internal virtual returns (uint) {
+    ) external returns (string) {
         require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
+        string token = keccak256(string(this), string(msg.sender), string(block.timestamp));
+        return _createOrder(_saleAddresses, _quantities, token);
+    }
+
+    mapping (address => uint) quantitiesMap;
+    function _createOrder (
+        address[] _saleAddresses,
+        uint[] _quantities,
+        string token
+    ) internal virtual returns (string) {
+        openOrders[token].purchaser = msg.sender;
+        return token;
         for (uint i = 0; i < _saleAddresses.length; i++) {
+            Sale s = Sale(_saleAddresses[i]);
+            Asset a = s.assetToBeSold();
+            address recipient = a.owner();
+            openOrders[token].saleAddresses.push(_saleAddresses[i]);
+            if (quantitiesMap[recipient] == 0) {
+                openOrders[token].recipients.push(recipient);
+            }
+            uint quantity = _quantities[i];
+            uint amount = s.price();
+            quantitiesMap[recipient] += amount;
             Sale(_saleAddresses[i]).lockQuantity(_quantities[i], msg.sender);
         }
-        return RestStatus.OK;
-    }
-
-    function completeSales (
-        address[] _saleAddresses,
-        address _purchaser
-    ) requireOwner("complete sales") external returns (uint) {
-        return _completeSales(_saleAddresses, _purchaser);
-    }
-
-    function _completeSales (
-        address[] _saleAddresses,
-        address _purchaser
-    ) internal virtual returns (uint) {
-        for (uint i = 0; i < _saleAddresses.length; i++) {
-            Sale(_saleAddresses[i]).completeSale(_purchaser);
+        for (uint j = 0; j < openOrders[token].recipients.length; j++) {
+            address recipient = openOrders[token].recipients[j];
+            openOrders[token].quantities.push(quantitiesMap[recipient]);
+            quantitiesMap[recipient] = 0;
         }
-        // emit Payment(getCommonName(_purchaser), _amount);
-        return RestStatus.OK;
+        return token;
+    }
+
+    function completeOrder (
+        string _token
+    ) requireOwner("complete order") external returns (address[]) {
+        return _completeOrder(_token);
+    }
+
+    function _completeOrder (
+        string token
+    ) internal virtual returns (address[]) {
+        require(openOrders[token].purchaser != address(0), "Invalid order token: " + token);
+        address[] assets;
+        for (uint i = 0; i < openOrders[token].saleAddresses.length; i++) {
+            Sale s = Sale(openOrders[token].saleAddresses[i]);
+            Asset a = s.assetToBeSold();
+            assets.push(address(a));
+            s.completeSale(openOrders[token].purchaser);
+            openOrders[token].saleAddresses[i] = address(0);
+        }
+        for (uint j = 0; j < openOrders[token].recipients.length; j++) {
+            address recipient = openOrders[token].recipients[j];
+            emit Payment(getCommonName(msg.sender), getCommonName(recipient), openOrders[token].quantities[j], true);
+            openOrders[token].recipients[j] = address(0);
+            openOrders[token].quantities[j] = 0;
+        }
+        openOrders[token].purchaser = address(0);
+        return assets;
+    }
+
+    function cancelOrder (
+        string _token
+    ) requirePurchaserOrOwner(_token, "cancel order") external {
+        return _cancelOrder(_token);
+    }
+
+    function _cancelOrder (
+        string token
+    ) internal virtual {
+        require(openOrders[token].purchaser != address(0), "Invalid order token: " + token);
+        for (uint i = 0; i < openOrders[token].saleAddresses.length; i++) {
+            Sale s = Sale(openOrders[token].saleAddresses[i]);
+            s.unlockQuantity(openOrders[token].purchaser);
+            openOrders[token].saleAddresses[i] = address(0);
+        }
+        for (uint j = 0; j < openOrders[token].recipients.length; j++) {
+            address recipient = openOrders[token].recipients[j];
+            emit Payment(getCommonName(msg.sender), getCommonName(recipient), quantitiesMap[recipient], false);
+            openOrders[token].recipients[j] = address(0);
+            openOrders[token].quantities[j] = 0;
+            quantitiesMap[recipient] = 0;
+        }
+        openOrders[token].purchaser = address(0);
     }
 
     function update(
-        string _serviceURL
-    ,   string _imageURL
-    ,   string _onboardingText
+        string _imageURL
     ,   string _checkoutText
     ,   uint   _scheme
-    ) external returns (uint) {
-        return _update(_serviceURL, _imageURL, _onboardingText, _checkoutText, _scheme);
-    }
-
-    function _update(
-        string _serviceURL
-    ,   string _imageURL
-    ,   string _onboardingText
-    ,   string _checkoutText
-    ,   uint   _scheme
-    ) internal virtual returns (uint) {
+    ) requireOwner("update the payment service") public returns (uint) {
       if (_scheme == 0) {
         return RestStatus.OK;
       }
 
       if ((_scheme & (1 << 0)) == (1 << 0)) {
-        serviceURL = _serviceURL;
-      }
-      if ((_scheme & (1 << 1)) == (1 << 1)) {
         imageURL = _imageURL;
       }
-      if ((_scheme & (1 << 2)) == (1 << 2)) {
-        onboardingText = _onboardingText;
-      }
-      if ((_scheme & (1 << 3)) == (1 << 3)) {
+      if ((_scheme & (1 << 1)) == (1 << 1)) {
         checkoutText = _checkoutText;
       }
 
