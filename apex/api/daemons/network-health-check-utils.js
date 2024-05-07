@@ -18,7 +18,9 @@ async function singleCheck() {
     } else {
       updateNetworkHealthStatus(
         {
-          latestHealthStatus: true,
+          healthPublicInfo: {
+            latestHealthStatus: false,
+          },
         },
         "UNKNOWN"
       );
@@ -29,7 +31,9 @@ async function singleCheck() {
     winston.error("Network health status error: " + err.message);
     updateNetworkHealthStatus(
       {
-        latestHealthStatus: true,
+        healthPublicInfo: {
+          latestHealthStatus: false,
+        },
       },
       "UNKNOWN"
     );
@@ -44,12 +48,16 @@ function queryNetworkHealthStatus() {
       );
       const status = await getNetworkStatus();
       winston.debug(
-        `Network is ${status.latestHealthStatus ? "unhealthy" : "healthy"}`
+        `Network is ${
+          status.healthPublicInfo.latestHealthStatus ? "unhealthy" : "healthy"
+        }`
       );
       winston.info("Updating network health");
       await updateNetworkHealthStatus(
         status,
-        `${status.latestHealthStatus ? "UNHEALTHY" : "HEALTHY"}`
+        `${
+          status.healthPublicInfo.latestHealthStatus ? "UNHEALTHY" : "HEALTHY"
+        }`
       );
       winston.info("Network health updated");
       return resolve();
@@ -69,7 +77,7 @@ async function updateNetworkHealthStatus(status, statusMessage) {
   let [stat, created] = await models.CurrentHealth.findOrCreate({
     where: { processName: "NetworkHealthStat" },
     defaults: {
-      latestHealthStatus: status.latestHealthStatus,
+      latestHealthStatus: status.healthPublicInfo.latestHealthStatus,
       latestCheckTimestamp: currentTime,
       lastFailureTimestamp: currentTime, //default first time marked as failure
       additionalInfo: JSON.stringify({ ...status, statusMessage }),
@@ -79,8 +87,8 @@ async function updateNetworkHealthStatus(status, statusMessage) {
     await stat.update(
       {
         latestCheckTimestamp: currentTime,
-        latestHealthStatus: status.latestHealthStatus,
-        lastFailureTimestamp: status.latestHealthStatus
+        latestHealthStatus: status.healthPublicInfo.latestHealthStatus,
+        lastFailureTimestamp: status.healthPublicInfo.latestHealthStatus
           ? stat.lastFailureTimestamp
           : currentTime,
         additionalInfo: JSON.stringify({ ...status, statusMessage }),
