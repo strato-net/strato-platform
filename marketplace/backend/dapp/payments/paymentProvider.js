@@ -183,7 +183,8 @@ async function get(user, args, defaultOptions) {
 
 async function getAll(admin, args = {}, baseOptions) {
     const options = { ...baseOptions, org: 'BlockApps', app: 'Mercata' };
-    const paymentProviders = await searchAllWithQueryArgs(contractName, args, options, admin);
+    const searchArgs = setSearchQueryOptions(args, [{ key: 'isActive', value: 'true' }])
+    const paymentProviders = await searchAllWithQueryArgs(contractName, searchArgs, options, admin);
     return paymentProviders.map((paymentProvider) => marshalOut(paymentProvider));
 }
 
@@ -212,7 +213,7 @@ async function createPayment(user, args, options) {
     const contract = { name: contractName, address }
     const callArgs = {
       contract,
-      method: "lockSales",
+      method: "createOrder",
       args: util.usc({ ...restArgs }),
     };
     const createStatus = await rest.call(user, callArgs, options);

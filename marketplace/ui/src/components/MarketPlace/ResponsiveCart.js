@@ -78,15 +78,15 @@ const ResponsiveCart = ({
         unitPrice: item.unitPrice
       });
     });
-    // These additional fields need to be sent to form the request after stripe. 
+
     let body = {
       paymentProvider: { address: paymentProvider.address },
       buyerOrganization: userOrganization,
       orderList,
       orderTotal: total + tax,
       tax: tax,
-      user: user?.commonName,
-      email: user?.email,
+      user: user.commonName,
+      email: user.email,
     };
 
     window.LOQ.push(['ready', async LO => {
@@ -99,9 +99,17 @@ const ResponsiveCart = ({
         event: 'pay_now_button',
       },
     });
-    let data = await orderActions.createPayment(orderDispatch, body);
-    if (data != null && data.url !== undefined) {
-      window.location.replace(data.url);
+    let token = await orderActions.createPayment(orderDispatch, body);
+    if (paymentProvider.data
+          && paymentProvider.data.serviceURL
+          && paymentProvider.data.serviceURL !== ''
+          && paymentProvider.data.checkoutRoute
+          && paymentProvider.data.checkoutRoute !== ''
+       ) {
+      const url = `${paymentProvider.data.serviceURL}${paymentProvider.data.checkoutRoute}?token=${token}` // &redirectUrl=${}`
+      window.location.replace(url);
+    } else {
+      window.location.replace("/order/bought");
     }
   };
 

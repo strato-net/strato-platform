@@ -145,9 +145,17 @@ const ConfirmOrder = ({ paymentProviders, data, columns }) => {
         event: 'pay_now_button',
       },
     });
-    let data = await orderActions.createPayment(orderDispatch, body);
-    if (data != null && data.url !== undefined) {
-      window.location.replace(data.url);
+    let token = await orderActions.createPayment(orderDispatch, body);
+    if (paymentProvider.data
+          && paymentProvider.data.serviceURL
+          && paymentProvider.data.serviceURL !== ''
+          && paymentProvider.data.checkoutRoute
+          && paymentProvider.data.checkoutRoute !== ''
+       ) {
+      const url = `${paymentProvider.data.serviceURL}${paymentProvider.data.checkoutRoute}?token=${token}` // &redirectUrl=${}`
+      window.location.replace(url);
+    } else {
+      window.location.replace("/order/bought");
     }
   };
 
@@ -237,8 +245,8 @@ const ConfirmOrder = ({ paymentProviders, data, columns }) => {
                   }
                 >
                   <div className="flex items-center mr-1">
-                    {paymentProvider.checkoutText}&nbsp; 
-                    {paymentProvider.imageURL && paymentProvider.imageURL !== '' ? <img src={paymentProvider.imageURL} alt={paymentProvider.serviceName} height="16px" width="16px"/> : ''}
+                    {paymentProvider && paymentProvider.checkoutText}&nbsp; 
+                    {paymentProvider && paymentProvider.imageURL && paymentProvider.imageURL !== '' ? <img src={paymentProvider.imageURL} alt={paymentProvider.serviceName} height="16px" width="16px"/> : ''}
                   </div>
                 </button>
               </div>))}
