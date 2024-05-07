@@ -1236,7 +1236,9 @@ insertEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
           tshow . eventBlockTimestamp,
           tshow . eventBlockNumber,
           T.pack . keccak256ToHex . eventTxHash,
-          tshow . eventTxSender
+          tshow . eventTxSender,
+          E.creator,
+          E.root
         ]
       vals = csv $ map (wrapSingleQuotes . escapeQuotes . ($ agEv)) baseVals ++ map (wrapSingleQuotes . escapeQuotes . T.pack . snd) (Action.evArgs ev)
    in T.concat $
