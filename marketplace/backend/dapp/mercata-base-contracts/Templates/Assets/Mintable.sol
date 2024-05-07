@@ -68,8 +68,8 @@ abstract contract Mintable is UTXO {
         require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
         require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
         UTXO newAsset = mint(_quantity);
-        // regular transfer - isUserTransfer: false, transferNumber: 0
-        Asset(newAsset).transferOwnership(_newOwner, _quantity, false, 0);
+        // regular transfer - isUserTransfer: false, transferNumber: 0, transferPrice: 0
+        Asset(newAsset).transferOwnership(_newOwner, _quantity, false, 0, 0);
     }
     
     function checkCondition() internal virtual override returns (bool){

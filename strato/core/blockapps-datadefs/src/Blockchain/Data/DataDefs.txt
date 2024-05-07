@@ -116,7 +116,8 @@ TransactionResult json
     status TransactionResultStatus Maybe
     chainId Word256 Maybe
     kind CodeKind Maybe
-    commonName String
+    creator String
+    appName String
     deriving Eq Read Show Generic
 
 UserN json

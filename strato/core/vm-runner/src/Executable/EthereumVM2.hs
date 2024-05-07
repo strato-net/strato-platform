@@ -202,9 +202,9 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis {..} -> do
           [] -> do
             yieldMany . concat $! map (OutLog . mkLogEntry bHash tHash (Just cId)) . erLogs <$> mExecResults
             yield . OutEvent . concat $! map (mkEventEntry (Just cId)) . erEvents <$> mExecResults
-            let commonName = case mExecResults of
-                  [] -> ""
-                  x : _ -> erCreator x
+            let (creator, appName) = case mExecResults of
+                  [] -> ("", "")
+                  x : _ -> (erCreator x, erAppName x)
             yield . OutTXR $
               TransactionResult
                 { transactionResultBlockHash = cBlock,
@@ -225,7 +225,8 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis {..} -> do
                   transactionResultStatus = Just Success,
                   transactionResultChainId = Just cId,
                   transactionResultKind = Just kind,
-                  transactionResultCommonName = commonName
+                  transactionResultCreator = creator,
+                  transactionResultAppName = appName
                 }
             Just (cId, cInfo, bHash, mExecResults) <$ putChainGenesisInfo (Just cId) cBlock sr pChains
           x : _ -> do
@@ -250,19 +251,25 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis {..} -> do
                   transactionResultStatus = Just $ Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt),
                   transactionResultChainId = Just cId,
                   transactionResultKind = Just kind,
-                  transactionResultCommonName = ""
+                  transactionResultCreator = "",
+                  transactionResultAppName = ""
                 }
             return Nothing
 
 outputNewChains :: VMBase m => [(Word256, ChainInfo, Keccak256, [ExecResults])] -> ConduitT a VmOutEvent m ()
 outputNewChains = traverse_ $ \(cId, cInfo, bHash, execr) -> do
   yield . OutIndexEvent $! NewChainInfo cId cInfo
-  let cn = fromMaybe "" $ do
+  let crtr = fromMaybe "" $ do
         e <- listToMaybe execr
         a <- erAction e
         d <- listToMaybe . OMap.assocs $ a ^. Action.actionData
         pure $ d ^. _2 . Action.actionDataCreator
-  yield $ OutToStateDiff cId cInfo bHash cn
+      app = fromMaybe "" $ do
+        e <- listToMaybe execr
+        a <- erAction e
+        d <- listToMaybe . OMap.assocs $ a ^. Action.actionData
+        pure $ d ^. _2 . Action.actionDataApplication
+  yield $ OutToStateDiff cId cInfo bHash crtr app
   for_ (catMaybes $ erAction <$> execr) $ yield . OutAction
   yield . OutEvent $ flip map (concatMap erEvents execr) $ mkEventEntry (Just cId)
 
