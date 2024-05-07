@@ -221,6 +221,16 @@ baseColumns =
     "root"
   ]
 
+baseEventColumns :: TableColumns
+baseEventColumns =
+  [ "address",
+    "block_hash",
+    "block_timestamp",
+    "block_number",
+    "transaction_hash",
+    "transaction_sender"
+  ]
+
 baseMappingColumns :: TableColumns
 baseMappingColumns =
   [ "address",
@@ -249,6 +259,9 @@ baseAbstractColumns =
 
 baseTableColumns :: TableColumns
 baseTableColumns = baseColumns
+
+baseTableColumnsForEvent :: TableColumns
+baseTableColumnsForEvent = baseEventColumns
 
 baseMappingTableColumns :: TableColumns
 baseMappingTableColumns = baseMappingColumns
@@ -1229,16 +1242,14 @@ insertEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
           (T.pack $ Action.evContractName ev)
       tableName = EventTableName c a cname (escapeQuotes $ T.pack $ Action.evName ev)
       filledArgs = map fst . fillFirstEmptyEntries . map (first T.pack) $ Action.evArgs ev
-      keySt = wrapAndEscapeDouble . map escapeQuotes $ ("id" : baseTableColumns) ++ filledArgs
+      keySt = wrapAndEscapeDouble . map escapeQuotes $ ("id" : baseTableColumnsForEvent) ++ filledArgs
       baseVals =
         [ tshow . _accountAddress . Action.evContractAccount . eventEvent,
           T.pack . keccak256ToHex . eventBlockHash,
           tshow . eventBlockTimestamp,
           tshow . eventBlockNumber,
           T.pack . keccak256ToHex . eventTxHash,
-          tshow . eventTxSender,
-          E.creator,
-          E.root
+          tshow . eventTxSender
         ]
       vals = csv $ map (wrapSingleQuotes . escapeQuotes . ($ agEv)) baseVals ++ map (wrapSingleQuotes . escapeQuotes . T.pack . snd) (Action.evArgs ev)
    in T.concat $
