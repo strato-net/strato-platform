@@ -216,7 +216,9 @@ baseColumns =
     "block_timestamp",
     "block_number",
     "transaction_hash",
-    "transaction_sender"
+    "transaction_sender",
+    "creator",
+    "root"
   ]
 
 baseMappingColumns :: TableColumns
@@ -716,8 +718,6 @@ expandAbstractTableQuery tableName cols =
       tableNameToDoubleQuoteText tableName,
       " ADD COLUMN IF NOT EXISTS",
       T.intercalate ", ADD COLUMN IF NOT EXISTS" cols,
-      ", ADD COLUMN IF NOT EXISTS creator text",
-      ", ADD COLUMN IF NOT EXISTS root text",
       ", ADD COLUMN IF NOT EXISTS contract_name text",
       ", ADD COLUMN IF NOT EXISTS data jsonb",
       ";"
@@ -818,14 +818,15 @@ baseColumnsQuery =
     "block_timestamp text",
     "block_number text",
     "transaction_hash text",
-    "transaction_sender text"
+    "transaction_sender text",
+    "creator text",
+    "root text"
   ]
 
 abstractBaseColumnsQuery :: [Text]
 abstractBaseColumnsQuery = 
   baseColumnsQuery ++ 
   [
-    "creator text",
     "contract_name text",
     "data jsonb"
   ]
@@ -914,7 +915,9 @@ insertIndexTableQuery cs =
                     tshow . E.blockTimestamp,
                     tshow . E.blockNumber,
                     T.pack . keccak256ToHex . E.transactionHash,
-                    tshow . E.transactionSender
+                    tshow . E.transactionSender,
+                    E.creator,
+                    E.root
                   ]
                 insert = wrapAndEscape $ map (wrapSingleQuotes . ($ contract)) baseVals ++ map snd list
             in T.concat
