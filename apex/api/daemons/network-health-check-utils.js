@@ -18,7 +18,7 @@ async function singleCheck() {
     } else {
       updateNetworkHealthStatus(
         {
-          needsAttention: true,
+          latestHealthStatus: true,
         },
         "UNKNOWN"
       );
@@ -29,7 +29,7 @@ async function singleCheck() {
     winston.error("Network health status error: " + err.message);
     updateNetworkHealthStatus(
       {
-        needsAttention: true,
+        latestHealthStatus: true,
       },
       "UNKNOWN"
     );
@@ -44,12 +44,12 @@ function queryNetworkHealthStatus() {
       );
       const status = await getNetworkStatus();
       winston.debug(
-        `Network is ${status.needsAttention ? "unhealthy" : "healthy"}`
+        `Network is ${status.latestHealthStatus ? "unhealthy" : "healthy"}`
       );
       winston.info("Updating network health");
       await updateNetworkHealthStatus(
         status,
-        `${status.needsAttention ? "UNHEALTHY" : "HEALTHY"}`
+        `${status.latestHealthStatus ? "UNHEALTHY" : "HEALTHY"}`
       );
       winston.info("Network health updated");
       return resolve();
@@ -69,7 +69,7 @@ async function updateNetworkHealthStatus(status, statusMessage) {
   let [stat, created] = await models.CurrentHealth.findOrCreate({
     where: { processName: "NetworkHealthStat" },
     defaults: {
-      latestHealthStatus: !status.needsAttention,
+      latestHealthStatus: status.latestHealthStatus,
       latestCheckTimestamp: currentTime,
       lastFailureTimestamp: currentTime, //default first time marked as failure
       additionalInfo: JSON.stringify({ ...status, statusMessage }),
@@ -79,8 +79,8 @@ async function updateNetworkHealthStatus(status, statusMessage) {
     await stat.update(
       {
         latestCheckTimestamp: currentTime,
-        latestHealthStatus: !status.needsAttention,
-        lastFailureTimestamp: !status.needsAttention
+        latestHealthStatus: status.latestHealthStatus,
+        lastFailureTimestamp: status.latestHealthStatus
           ? stat.lastFailureTimestamp
           : currentTime,
         additionalInfo: JSON.stringify({ ...status, statusMessage }),
@@ -97,7 +97,7 @@ async function updateNetworkHealthStatus(status, statusMessage) {
 async function getMonitorUrl() {
   const options = {
     method: "GET",
-    url: `http://${process.env['STRATO_HOSTNAME']}:${process.env['STRATO_PORT_API']}/eth/v1.2/metadata`,
+    url: `http://${process.env["STRATO_HOSTNAME"]}:${process.env["STRATO_PORT_API"]}/eth/v1.2/metadata`,
     followRedirects: false,
     timeout: config.healthCheck.requestTimeout - 100,
     json: true,
