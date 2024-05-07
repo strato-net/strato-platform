@@ -834,17 +834,7 @@ createAbstractTableQuery (creator, a, n) list =
         [ "CREATE TABLE IF NOT EXISTS ",
           tableNameToDoubleQuoteText tableName,
           " (",
-          csv $
-            [ "address text",
-              "block_hash text",
-              "block_timestamp text",
-              "block_number text",
-              "transaction_hash text",
-              "transaction_sender text",
-              "creator text",
-              "contract_name text",
-              "data jsonb"
-            ]
+          csv $ abstractBaseColumnsQuery
               ++ list,
           ",\n  PRIMARY KEY (address));"
         ]
