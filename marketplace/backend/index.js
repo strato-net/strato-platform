@@ -7,7 +7,7 @@ import constants from "./helpers/constants";
 import routes from "./api/v1/routes";
 import cors from "cors";
 import cookieParser from 'cookie-parser'
-import { fsUtil,assert} from "blockapps-rest";
+import { fsUtil, assert } from "blockapps-rest";
 import ErrorHandlers from './api/middleware/errorHandler';
 import config from "./load.config";
 import authHandler from './api/middleware/authHandler'
@@ -16,6 +16,9 @@ import swaggerSpecs from "./swaggerspecs";
 import dotenv from "dotenv";
 import websocket from "./websocket";
 import axios from "axios";
+import { cronSyncCall } from "./helpers/cronSyncCall";
+import cronFunc from "./cron";
+const isLocalHost = config.serverHost === constants.localHost;
 
 let server
 (async () => {
@@ -29,12 +32,13 @@ let server
     throw new Error(`Deploy file '${config.configDirPath}/${config.deployFilename}' not found`);
   }
 
-  const marketplaceUrl = `${config.serverHost}/marketplace`
+  const marketplaceUrl = `${config.serverHost}`
   axios.defaults.headers.common['Referer'] = marketplaceUrl;
 
   app.set(deployParamName, deploy);
   
   // Setup middleware
+  app.use('/', express.static('./public'));
   app.use(helmet());
   app.use(cors());
   app.use(bodyParser.json());
@@ -71,6 +75,13 @@ let server
     swaggerUi.serve,
     swaggerUi.setup(swaggerSpecs)
   );
+
+  if (isLocalHost) {
+    cronFunc();
+ } else {
+    cronSyncCall();
+ }
+
 })();
 
 export default server;

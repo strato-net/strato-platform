@@ -614,7 +614,7 @@ typecheckStatic (SVMType.Mapping d1 k1 v1) (SVMType.Mapping d2 k2 v2) = do
     _ -> Right $ SVMType.Mapping (d1 <|> d2) k v
 typecheckStatic (SVMType.Bytes d1 b1) (SVMType.String _) = Right (SVMType.Bytes d1 b1)
 typecheckStatic (SVMType.UserDefined alias1 a) (SVMType.UserDefined alias2 b) =
-  if alias1 == alias2
+  if alias1 == alias2 
     then typecheckStatic a b
     else
       Left $
@@ -625,7 +625,7 @@ typecheckStatic (SVMType.UserDefined alias1 a) (SVMType.UserDefined alias2 b) =
           <> " do not match."
 typecheckStatic (SVMType.UserDefined a c) b =
   Left $
-    "Type mismatch Test1: "
+    "Type mismatch: "
       <> showType (SVMType.UserDefined a c)
       <> " and "
       <> showType b
@@ -743,6 +743,10 @@ typecheckMember (Static (SVMType.Account _) x) "code" =
 typecheckMember (Static (SVMType.Account _) x) "codehash" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.Account _) x) "chainId" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Account _) x) "chainIdString" = pure $ Static (SVMType.String Nothing) x
+typecheckMember (Static (SVMType.Account _) x) "creator" = pure $ Static (SVMType.String Nothing) x
+typecheckMember (Static (SVMType.Address _) x) "creator" = pure $ Static (SVMType.String Nothing) x
+typecheckMember (Static (SVMType.Account _) x) "root" = pure $ Static (SVMType.Account False) x
+typecheckMember (Static (SVMType.Address _) x) "root" = pure $ Static (SVMType.Account False) x
 typecheckMember (Static (SVMType.Struct _ struct) x) n = do
   names <- M.fromList <$> lookupStruct struct
   pure $ case M.lookup n names of
@@ -774,6 +778,7 @@ typecheckMember (Static (SVMType.Contract _) x) "code" =
 -- typecheckMember (Static (SVMType.Contract _) x) "searchcode" = pure $ Function (Static (SVMType.String Nothing) x) (Static (SVMType.String Nothing) x) x
 typecheckMember (Static (SVMType.Contract _) x) "codehash" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.Contract _) x) "chainId" = pure $ Static (SVMType.Int Nothing Nothing) x
+typecheckMember (Static (SVMType.Contract _) x) "root" = pure $ Static (SVMType.Account False) x
 typecheckMember (Static (SVMType.Contract c) x) n = lookupContractFunction x c n
 typecheckMember (Static (SVMType.UnknownLabel c _) x) n = do
   e <- typecheckMember (Static (SVMType.Enum Nothing c Nothing) x) n

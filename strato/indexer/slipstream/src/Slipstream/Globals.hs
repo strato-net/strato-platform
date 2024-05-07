@@ -75,13 +75,13 @@ isTableCreated globalsIORef tableName = do
       return $ tableName `M.member` createdTables'
 
 getCollectionTables :: MonadIO m => IORef Globals -> T.Text -> T.Text -> T.Text -> m [T.Text]
-getCollectionTables globalsIORef org app contract = do
-  createdTables <- scrapeFor globalsIORef (CollectionTableName org app contract "") -- empty map name to get all map tables
+getCollectionTables globalsIORef crtr app contract = do
+  createdTables <- scrapeFor globalsIORef (CollectionTableName crtr app contract "") -- empty map name to get all map tables
   let collectionTables = M.filterWithKey isCollectionTableName createdTables
         where
           isCollectionTableName :: TableName -> TableColumns -> Bool
-          isCollectionTableName (CollectionTableName o a n _) _ =
-            o == org && a == app && n == contract
+          isCollectionTableName (CollectionTableName c a n _) _ =
+            crtr == c && app == a && n == contract
           isCollectionTableName _ _ = False
   let collectionNames = map mtCollectionName (M.keys collectionTables)
   return collectionNames
@@ -103,9 +103,9 @@ scrapeFor globalsIORef tableName = do
   case cirrusHandle of
     FakeCirrusHandle -> return createdTables
     CirrusHandle {..} -> case tableName of
-      CollectionTableName org app contract _ | (org, app, contract) `S.member` queriedMaps -> return createdTables
-      CollectionTableName org app contract "" -> do
-        let theMapTablesQuery = queryForMatchingTables $ CollectionTableName org app contract ""
+      CollectionTableName c a contract _ | (c, a, contract) `S.member` queriedMaps -> return createdTables
+      CollectionTableName c a contract "" -> do
+        let theMapTablesQuery = queryForMatchingTables $ CollectionTableName c a contract ""
         results :: [PGValues] <- liftIO $ pgQuery cirrusConn theMapTablesQuery
         forM_
           results
@@ -113,11 +113,11 @@ scrapeFor globalsIORef tableName = do
               [PGTextValue tn] -> do
                 cols <- scrapeForCols (wrapSingleQuotes $ decodeUtf8 tn) cirrusConn
                 let mapName = last $ T.splitOn "." (decodeUtf8 tn)
-                setTableCreated globalsIORef (CollectionTableName org app contract mapName) cols
+                setTableCreated globalsIORef (CollectionTableName c a contract mapName) cols
               _ -> return ()
           )
         g@Globals {createdTables = createdTables'} <- readIORef globalsIORef -- need to read again so have current ver of createdTables
-        updateGlobals globalsIORef g {cirrusHandle = cirrusHandle {queriedMaps = (org, app, contract) `S.insert` queriedMaps}}
+        updateGlobals globalsIORef g {cirrusHandle = cirrusHandle {queriedMaps = (c, a, contract) `S.insert` queriedMaps}}
         return createdTables'
       _ -> do
         cols <- scrapeForCols (tableNameToSingleQuoteText tableName) cirrusConn

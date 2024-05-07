@@ -67,10 +67,10 @@ instance ToParam (QueryFlag "queue") where
   toParam _ =
     DocQueryParam "queue" ["true", "false", ""] "flag for queueing a transaction request" Flag
 
-type PostBlocTransactionParallel =
+type PostBlocTransactionParallelCommon tokenHeaderName = 
   "transaction"
     :> "parallel"
-    :> S.Header "X-USER-ACCESS-TOKEN" Text
+    :> S.Header tokenHeaderName Text
     :> QueryParam "chainid" ChainId
     :> QueryParam "use_wallet" Bool -- Using QueryParam here to distinguish between Nothing and Just False
     :> QueryFlag "resolve"
@@ -78,32 +78,18 @@ type PostBlocTransactionParallel =
     :> ReqBody '[JSON] PostBlocTransactionRequest
     :> Post '[JSON] [BlocChainOrTransactionResult]
 
-type PostBlocTransactionRaw =
+type PostBlocTransactionParallel = PostBlocTransactionParallelCommon "X-USER-ACCESS-TOKEN"
+type PostBlocTransactionParallelExternal = PostBlocTransactionParallelCommon "Authorization"
+
+type PostBlocTransaction =
   "transaction"
-    :> "raw"
     :> S.Header "X-USER-ACCESS-TOKEN" Text
     :> QueryParam "chainid" ChainId
-    :> QueryFlag "hash"
-    :> QueryFlag "resolve"
-    :> ReqBody '[JSON] PostBlocTransactionRawRequest
-    :> Post '[JSON] BlocChainOrTransactionResult
-
-type PostBlocTransactionCommon =
-  QueryParam "chainid" ChainId
     :> QueryParam "use_wallet" Bool -- Using QueryParam here to distinguish between Nothing and Just False
     :> QueryFlag "resolve"
     :> ReqBody '[JSON] PostBlocTransactionRequest
     :> Post '[JSON] [BlocChainOrTransactionResult]
 
-type PostBlocTransaction =
-  "transaction"
-    :> S.Header "X-USER-ACCESS-TOKEN" Text
-    :> PostBlocTransactionCommon
-
-type PostBlocTransactionExternal =
-  "transaction" -- only to be used for external api client bindings
-    :> S.Header "Authorization" Text
-    :> PostBlocTransactionCommon
 
 -- | PostBlocTransactionBody should return a list of signed transaction hashes,
 -- using the caller's JWT, and their respective raw transaction bodies without
@@ -286,6 +272,7 @@ data ContractPayload = ContractPayload
     contractpayloadValue :: Maybe (Strung Natural),
     contractpayloadTxParams :: Maybe TxParams,
     contractpayloadChainid :: Maybe ChainId,
+    contractpayloadCodePtr :: Maybe Address,
     contractpayloadMetadata :: Maybe (Map Text Text)
   }
   deriving (Eq, Show, Generic)
@@ -328,6 +315,7 @@ instance ToJSON ContractPayload where
         "value" .= contractpayloadValue,
         "txParams" .= contractpayloadTxParams,
         "chainid" .= contractpayloadChainid,
+        "codePtr" .= contractpayloadCodePtr,
         "metadata" .= contractpayloadMetadata
       ]
 
@@ -346,6 +334,7 @@ instance FromJSON ContractPayload where
       <*> (o .:? "value")
       <*> (o .:? "txParams")
       <*> (o .:? "chainid")
+      <*> (o .:? "codePtr")
       <*> (o .:? "metadata")
   parseJSON o = fail $ "parseJSON ContractPayload: Expected Object, got " ++ show o
 
@@ -372,6 +361,7 @@ instance ToSchema BlocTransactionPayload where
               contractpayloadValue = Nothing,
               contractpayloadTxParams = Nothing,
               contractpayloadChainid = Nothing,
+              contractpayloadCodePtr = Nothing,
               contractpayloadMetadata = Nothing
             }
 
@@ -391,6 +381,7 @@ instance ToSchema ContractPayload where
             contractpayloadValue = Nothing,
             contractpayloadTxParams = Nothing,
             contractpayloadChainid = Nothing,
+            contractpayloadCodePtr = Nothing,
             contractpayloadMetadata = Nothing
           }
 

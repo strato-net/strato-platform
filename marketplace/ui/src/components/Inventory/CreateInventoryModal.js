@@ -15,8 +15,9 @@ import {
 import { actions } from "../../contexts/inventory/actions";
 import TextArea from "antd/es/input/TextArea";
 import TagManager from "react-gtm-module";
-import { unitOfMeasures } from "../../helpers/constants";
+import { unitOfMeasures, unitOfSpiritMeasures } from "../../helpers/constants";
 import { categoricalProperties } from "./CategoryFields";
+import RichEditor from "../RichEditor";
 
 const { Option } = Select;
 
@@ -41,6 +42,7 @@ const CreateInventoryModal = ({
   const [sizeOptions, setSizeOptions] = useState([]);
   const [categoryValue, setCategoryValue] = useState("Art");
   const [subCategoryValue, setSubCategoryValue] = useState(form.getFieldValue("subCategory"));
+  const [measureUnit, setMeasureUnit] = useState(unitOfMeasures);
 
   const beforeImageUpload = (file) => {
     const isJpgOrPng = file.type === "image/jpeg" || file.type === "image/png";
@@ -48,9 +50,9 @@ const CreateInventoryModal = ({
       setUploadErr("Image must be of jpeg or png format");
       return Upload.LIST_IGNORE;
     }
-    const isLt1M = file.size / 1024 / 1024 < 1;
-    if (!isLt1M) {
-      setUploadErr("Cannot upload an image of size more than 1mb");
+    const isLt5M = file.size / 1024 / 1024 < 5;
+    if (!isLt5M) {
+      setUploadErr("Cannot upload image files of total size more than 5mb");
       return Upload.LIST_IGNORE;
     }
     const isNameLengthValid = file.name.length <= 100;
@@ -73,9 +75,9 @@ const CreateInventoryModal = ({
       setUploadErr("File must be PDF format");
       return Upload.LIST_IGNORE;
     }
-    const isLt1M = file.size / 1024 / 1024 < 1;
-    if (!isLt1M) {
-      setUploadErr("Cannot upload a PDF of size more than 1mb");
+    const isLt5M = file.size / 1024 / 1024 < 5; // Check if the file size is less than 6 MB
+    if (!isLt5M) {
+      setUploadErr("Cannot upload a PDF of size more than 5 MB");
       return Upload.LIST_IGNORE;
     }
     const isNameLengthValid = file.name.length <= 100;
@@ -180,11 +182,31 @@ const CreateInventoryModal = ({
 
   const updateSizeOptions = (type) => {
     if (type === "Shoes") {
-      setSizeOptions(["5", "5.5", "6", "6.5", "7", "7.5", "8", "8.5", "9", "9.5", "10", "10.5", "11", "11.5", "12", "12.5", "13", "13.5", "14",]);
+      setSizeOptions(["3.5", "4", "4.5", "5", "5.5", "6", "6.5", "7", "7.5", "8", "8.5", "9", "9.5", "10", "10.5", "11", "11.5", "12", "12.5", "13", "13.5", "14", "14.5", "15", "16", "17", "18"]);
     } else {
-      setSizeOptions(["XXS", "XS", "S", "M", "L", "XL", "XXL"]);
+      setSizeOptions(["OS (One Size)", "XXS", "XS", "S", "M", "L", "XL", "XXL"]);
     }
   };
+
+  const handleCategory = (value) => {
+    form.setFieldValue("category", value);
+    setCategoryValue(value);
+    if (value === 'Carbon') {
+      form.setFieldValue("subCategory", null);
+      setSubCategoryValue(null);
+    } else {
+      if (value === "Metals") {
+        setMeasureUnit(unitOfMeasures)
+      }
+      if (value === "Spirits") {
+        setMeasureUnit(unitOfSpiritMeasures)
+      }
+
+      const subCat = categorys.find(item => item.name === value).subCategories[0].name
+      form.setFieldValue("subCategory", subCat);
+      setSubCategoryValue(subCat);
+    }
+  }
 
   return (
     <>
@@ -206,13 +228,13 @@ const CreateInventoryModal = ({
               }}
               loading={isCreateInventorySubmitting || isUploadImageSubmitting}
             >
-              Create Inventory
+              Create Item
             </Button>
           </div>,
         ]}
       >
         <h1 className=" font-semibold text-lg text-[#202020]">
-          Create Inventory
+          Create Item
         </h1>
         <hr className="text-secondryD mt-3" />
         <Form
@@ -272,10 +294,7 @@ const CreateInventoryModal = ({
                   allowClear
                   value={categoryValue}
                   onChange={(value) => {
-                    form.setFieldValue("category", value);
-                    setCategoryValue(value);
-                    form.setFieldValue("subCategory", null);
-                    setSubCategoryValue(null);
+                    handleCategory(value)
                   }}
                 >
                   {categorys.map((e, index) => (
@@ -317,8 +336,8 @@ const CreateInventoryModal = ({
                 </Select>
               </Form.Item>
             </div>
-            {categoricalProperties(form, handleClothingTypeChange, clothingType, sizeOptions, unitOfMeasures)}
-            <div className="flex justify-between mt-4 ">
+            {categoricalProperties(form, handleClothingTypeChange, clothingType, sizeOptions, measureUnit)}
+            <div className="flex justify-between mt-4 !list-disc">
               <Form.Item
                 label="Description"
                 name="description"
@@ -330,7 +349,12 @@ const CreateInventoryModal = ({
                   },
                 ]}
               >
-                <TextArea placeholder="Enter Description" />
+                <RichEditor
+                  onChange={(content) => {
+                    form.setFieldsValue({ description: content });
+                  }}
+                  initialValue={form.getFieldValue("description") || ""}
+                />
               </Form.Item>
             </div>
             <div className="mt-4 flex-wrap gap-5 sm:flex-nowrap flex justify-between">
@@ -364,7 +388,7 @@ const CreateInventoryModal = ({
                 <div className="flex items-start">
                   <p className="mt-1 text-xs italic font-medium ">Note:</p>
                   <p className="mt-1 text-xs italic ml-1 mr-4">
-                    use jpg, png format of size less than 1mb. Limit of 10.
+                    use jpg, png format of size less than 5mb. Limit of 10.
                   </p>
                 </div>
               </Form.Item>
@@ -391,7 +415,7 @@ const CreateInventoryModal = ({
                 <div className="flex items-start">
                   <p className="mt-1 text-xs italic font-medium ">Note:</p>
                   <p className="mt-1 text-xs italic ml-1 mr-4">
-                    use pdf format of size less than 1mb. Limit of 10.
+                    use pdf files with total size of less than 5mb. Limit of 10 files.
                   </p>
                 </div>
               </Form.Item>

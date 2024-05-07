@@ -1,15 +1,15 @@
-import { Button, Row,  Typography, InputNumber } from "antd";
-import { useNavigate } from "react-router-dom";
+import { Button, Row, Typography, InputNumber } from "antd";
 import { useState, useEffect } from "react";
-import { actions } from "../../contexts/marketplace/actions";
 import { Images } from "../../images";
-import {
-  useMarketplaceState,
-  useMarketplaceDispatch,
-} from "../../contexts/marketplace";
+import { useMarketplaceState, useMarketplaceDispatch } from "../../contexts/marketplace";
 import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
-
+import { actions } from "../../contexts/marketplace/actions";
+import { actions as orderActions } from "../../contexts/order/actions"
+import { useOrderDispatch, useOrderState } from "../../contexts/order";
+import { actions as inventoryAction } from "../../contexts/inventory/actions";
+import { useInventoryDispatch, } from "../../contexts/inventory";
+import { PAYMENT_LIST } from "../../helpers/constants";
 
 const ResponsiveCart = ({
   data,
@@ -18,16 +18,20 @@ const ResponsiveCart = ({
   MinusQty,
   ValueQty,
   removeCartList,
+  openToastOrder
 }) => {
-  const navigate = useNavigate();
   const [tax, setTax] = useState(0);
-  const [shipping, setShipping] = useState(0);
   const { cartList } = useMarketplaceState();
-  const [total, setTotal] = useState(0);
   const marketplaceDispatch = useMarketplaceDispatch();
-  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
+  const inventoryDispatch = useInventoryDispatch();
+  const [total, setTotal] = useState(0);
+  const orderDispatch = useOrderDispatch();
+  let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
+  const { isCreatePaymentSubmitting } = useOrderState();
+  const userOrganization = user?.organization
+  const [cartData, setCartData] = useState(data);
   const [faqOpenState, setFaqOpenState] = useState(
-    Array(data.length).fill(false)
+    Array(cartData.length).fill(false)
   );
   const toggleFaq = (index) => {
     setFaqOpenState((prev) => {
@@ -38,31 +42,77 @@ const ResponsiveCart = ({
   };
 
   useEffect(() => {
+    setCartData(data);
+  }, [data]);
+
+  useEffect(() => {
     let t = 0;
     let s = 0;
     let tot = 0;
-    data.forEach((element) => {
+    cartData.forEach((element) => {
       t += element.tax;
-      s += element.shippingCharges;
       tot += element.amount;
     });
     setTax(t);
-    setShipping(s);
     setTotal(tot);
-  }, [data]);
+  }, [cartData]);
 
   let qty = 1;
   let product;
   cartList.forEach((element) => {
-    if (element.product.address === data) {
+    if (element.product.address === cartData) {
       qty = element.qty;
       product = element.product;
     }
   });
 
+  const handlePaymentConfirm = async () => {
+    actions.addItemToConfirmOrder(marketplaceDispatch, cartData);
+    let orderList = [];
+    cartData.forEach((item) => {
+      orderList.push({
+        quantity: item.qty,
+        assetAddress: item.key,
+        firstSale: item.firstSale,
+        unitPrice: item.unitPrice
+      });
+    });
+    // These additional fields need to be sent to form the request after stripe. 
+    let body = {
+      paymentList: PAYMENT_LIST,
+      buyerOrganization: userOrganization,
+      orderList,
+      orderTotal: total + tax,
+      tax: tax,
+      user: user?.commonName,
+      email: user?.email,
+    };
+
+    window.LOQ.push(['ready', async LO => {
+      // Track an event
+      await LO.$internal.ready('events')
+      LO.events.track('Buy Now Button')
+    }])
+    TagManager.dataLayer({
+      dataLayer: {
+        event: 'pay_now_button',
+      },
+    });
+    let data = await orderActions.createPayment(orderDispatch, body);
+    if (data != null && data.url !== undefined) {
+      window.location.replace(data.url);
+    }
+  };
+
+  useEffect(() => {
+    if (cartData.length !== 0) {
+      inventoryAction.sellerStripeStatus(inventoryDispatch, cartData[0]["sellersCommonName"]);
+    }
+  }, [inventoryDispatch, cartData]);
+
   return (
     <div className=" border border-[#E9E9E9]  rounded-md mt-3 flex flex-col gap-[18px]   sm:w-[400px] md:w-[450px]  items-center    ">
-      {data.map((element, index) => {
+      {cartData.map((element, index) => {
         let qty = element.qty;
         let product = element;
         return (
@@ -122,12 +172,12 @@ const ResponsiveCart = ({
                       }}
                     />
                     <div
-                      onClick={() => { 
+                      onClick={() => {
                         AddQty(product);
                       }}
                       className={`w-6 h-6 bg-[#E9E9E9] flex justify-center items-center rounded-full ${qty >= product.quantity ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
                     >
-                     <p className="text-lg text-[#202020] font-medium">+</p>
+                      <p className="text-lg text-[#202020] font-medium">+</p>
                     </div>
                   </div>
                 </div>
@@ -143,9 +193,8 @@ const ResponsiveCart = ({
                     <img
                       src={Images.Dropdown}
                       alt=""
-                      className={`w-5 h-5 transition-transform transform ${
-                        faqOpenState[index] ? "rotate-180" : "rotate-0"
-                      } `}
+                      className={`w-5 h-5 transition-transform transform ${faqOpenState[index] ? "rotate-180" : "rotate-0"
+                        } `}
                       onClick={() => {
                         toggleFaq(index);
                       }}
@@ -156,9 +205,8 @@ const ResponsiveCart = ({
 
               {faqOpenState[index] && (
                 <div
-                  className={`overflow-hidden   ${
-                    faqOpenState[index] ? "max-h-[145px] open" : "max-h-0 faq-container"
-                  }`}
+                  className={`overflow-hidden   ${faqOpenState[index] ? "max-h-[145px] open" : "max-h-0 faq-container"
+                    }`}
                 >
                   <div
                     className={`  bg-[#F6F6F6] rounded-b-md flex flex-col gap-3 px-3 py-2 `}
@@ -172,12 +220,8 @@ const ResponsiveCart = ({
                       <Typography className="text-sm text-[#202020] font-semibold">{`$${element?.unitPrice}`}</Typography>
                     </div>
                     <div className="flex justify-between">
-                      <Typography className="text-sm text-[#202020] font-medium">Shipping Charges:</Typography>
-                      <Typography className="text-sm text-[#202020] font-semibold">{ '$'+ element?.shippingCharges} </Typography>
-                    </div>
-                    <div className="flex justify-between">
-                      <Typography  className="text-sm text-[#202020] font-medium">Tax($):</Typography>
-                      <Typography className="text-sm text-[#202020] font-semibold">{'$'+element?.tax}</Typography>
+                      <Typography className="text-sm text-[#202020] font-medium">Tax($):</Typography>
+                      <Typography className="text-sm text-[#202020] font-semibold">{'$' + element?.tax}</Typography>
                     </div>
                   </div>
                 </div>
@@ -188,7 +232,7 @@ const ResponsiveCart = ({
                   Amount($):
                 </Typography>
                 <Typography className="text-sm  font-semibold text-[#202020]">
-                  {'$'+ element?.amount}
+                  {'$' + element?.amount}
                 </Typography>
               </div>
             </div>
@@ -207,17 +251,12 @@ const ResponsiveCart = ({
 
             <p className="text-sm  font-semibold  text-right">${tax}</p>
           </div>
-          <div className="flex justify-between">
-            <p className="text-sm font-medium  ">Shipping Charges:</p>
-
-            <p className="text-sm  font-semibold  text-right">${shipping}</p>
-          </div>
           <div className="w-full h-[1px] bg-[#E9E9E9]"></div>
           <div className="flex justify-between">
             <p className="text-sm font-medium ">Total:</p>
 
             <p className="text-sm   font-semibold  text-right">
-              ${total + tax + shipping}
+              ${total + tax}
             </p>
           </div>
         </div>
@@ -228,30 +267,60 @@ const ResponsiveCart = ({
               type="primary"
               id="submit-order-button"
               className=" w-full sm:w-44 h-9 !bg-[#13188A]"
-              onClick={() => {
+              loading={isCreatePaymentSubmitting}
+              onClick={async () => {
                 if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                   window.location.href = loginUrl;
                 } else {
-                  actions.addItemToConfirmOrder(marketplaceDispatch, data);
-                  window.LOQ.push([
-                    "ready",
-                    async (LO) => {
+                  const saleAddresses = [];
+                  const quantities = [];
+                  cartData.forEach((item) => {
+                    saleAddresses.push(item.saleAddress)
+                    quantities.push(item.qty)
+                  })
+                  const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities)
+                  if (checkQuantity === true) {
+                    // Proceed with order submission
+                    window.LOQ.push(['ready', async LO => {
                       // Track an event
-                      await LO.$internal.ready("events");
-                      LO.events.track("Submit Order (from cart)");
-                    },
-                  ]);
-                  TagManager.dataLayer({
-                    dataLayer: {
-                      event: "submit_order_from_cart",
-                    },
-                  });
-                  navigate("/confirmOrder");
+                      await LO.$internal.ready('events')
+                      LO.events.track('Submit Order (from cart)')
+                    }])
+                    TagManager.dataLayer({
+                      dataLayer: {
+                        event: 'submit_order_from_cart',
+                      },
+                    });
+                    handlePaymentConfirm();
+                  } else {
+                    let insufficientQuantityMessage = "";
+                    let outOfStockMessage = "";
+
+                    // Generate the messages of products with too little or no quantity
+                    checkQuantity.forEach(detail => {
+                      if (detail.availableQuantity === 0) {
+                        outOfStockMessage += `Product ${detail.assetName}\n`;
+                      } else {
+                        insufficientQuantityMessage += `Product ${detail.assetName}: ${detail.availableQuantity}\n`;
+                      }
+                    });
+
+                    // Throw the appropriate error messages. Throw both if applicable. 
+                    let errorMessage = "";
+                    if (insufficientQuantityMessage) {
+                      errorMessage += `The following item(s) in your cart have limited quantity available and will need to be adjusted. Please reduce the quantity to proceed:\n${insufficientQuantityMessage}`;
+                    }
+                    if (outOfStockMessage) {
+                      if (errorMessage) errorMessage += "\n"; // Add a new line if there's already an error message
+                      errorMessage += `The following item(s) are temporarily out of stock and should be removed:\n${outOfStockMessage}`;
+                    }
+                    openToastOrder("bottom", errorMessage);
+                  }
                 }
               }}
-              disabled={data.length === 0}
+              disabled={cartData.length === 0}
             >
-            Submit & Checkout
+              Submit & Checkout
             </Button>
           </Row>
         )}

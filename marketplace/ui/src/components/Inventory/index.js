@@ -1,13 +1,10 @@
 import React, { useState, useEffect } from "react";
 import {
   Breadcrumb,
-  Input,
   Button,
   Pagination,
   notification,
   Spin,
-  Typography,
-  Image,
   Tooltip, 
   Tabs
 } from "antd";
@@ -25,16 +22,17 @@ import {
 import { Images } from "../../images";
 //items
 import { actions as itemActions } from "../../contexts/item/actions";
+import { actions as redemptionActions } from "../../contexts/redemption/actions";
 import { useItemDispatch, useItemState } from "../../contexts/item";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
 import { useAuthenticateState } from "../../contexts/authentication";
 import CategoryCard from "../MarketPlace/CategoryCard";
+import HelmetComponent from "../Helmet/HelmetComponent";
+import { SEO } from "../../helpers/seoConstant";
+import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
 
-const { Search } = Input;
-
-const { Title, Text } = Typography;
 
 const Inventory = ({ user }) => {
   const [open, setOpen] = useState(false);
@@ -47,7 +45,7 @@ const Inventory = ({ user }) => {
   const [api, contextHolder] = notification.useNotification();
   const [isSearch, setIsSearch] = useState(false);
   const [category, setCategory] = useState(undefined);
-
+  const linkUrl = window.location.href;
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
   //Categories
@@ -63,6 +61,13 @@ const Inventory = ({ user }) => {
     message: itemMsg,
     success: itemSuccess
   } = useItemState();
+
+  //redemptions
+  const redemptionDispatch = useRedemptionDispatch();
+  const {
+    message: redemptionMsg,
+    success: redemptionSuccess
+  } = useRedemptionState();
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
@@ -164,6 +169,24 @@ const Inventory = ({ user }) => {
     }
   };
 
+  const redemptionToast = (placement) => {
+    if (redemptionSuccess) {
+      api.success({
+        message: redemptionMsg,
+        onClose: redemptionActions.resetMessage(redemptionDispatch),
+        placement,
+        key: 5,
+      });
+    } else {
+      api.error({
+        message: redemptionMsg,
+        onClose: redemptionActions.resetMessage(redemptionDispatch),
+        placement,
+        key: 6,
+      });
+    }
+  };
+
   const navigate = useNavigate();
 
   const onboardSeller = async () => {
@@ -190,9 +213,13 @@ const allSubcategories = getAllSubcategories(categorys);
     return;
   };
   // ------------------ Tabs END------------------
-
+const metaImg = category ? category : SEO.IMAGE_META
   return (
     <>
+     <HelmetComponent 
+          title={`${category ? `${category} |` :''} ${SEO.TITLE_META} `}
+          description={SEO.DESCRIPTION_META} 
+          link={linkUrl} />
       {contextHolder}
       {stripeStatus == null || isLoadingStripeStatus ? (
         <div className="h-screen flex justify-center items-center">
@@ -210,13 +237,18 @@ const allSubcategories = getAllSubcategories(categorys);
             </Breadcrumb.Item>
             <Breadcrumb.Item>
               <p className="text-sm text-[#202020] font-medium">
-                My Store
+                My Items
               </p>
             </Breadcrumb.Item>
           </Breadcrumb>
           <div className="w-full h-[116px] py-4 px-4 md:h-[96px] bg-[#F6F6F6] flex flex-col md:flex-row md:px-14  justify-between items-center mt-6 lg:mt-8">
             <div className="flex justify-between w-full">
-              <Button className="!px-1 md:!px-0 flex items-center flex-row-reverse gap-[6px] text-lg md:text-2xl font-semibold !text-[#13188A] " type="link" icon={<img src={Images.ForwardIcon} alt="inventory" className="hidden md:block w-6 h-6" />}> Inventory
+              <Button className="!px-1 md:!px-0 flex items-center flex-row-reverse gap-[6px] text-lg md:text-2xl font-semibold !text-[#13188A] " 
+              type="link" 
+              icon={<img src={Images.ForwardIcon} 
+              alt={metaImg} 
+              title={metaImg}
+              className="hidden md:block w-6 h-6" />}> My Items
               </Button>
             </div>
             <div className="flex gap-3">
@@ -253,8 +285,11 @@ const allSubcategories = getAllSubcategories(categorys);
                   disabled={!stripeStatus.chargesEnabled || !stripeStatus.detailsSubmitted || !stripeStatus.payoutsEnabled}
                 >
                   <div className="flex items-center justify-center gap-[6px]">
-                    <img src={Images.CreateInventory} alt="Inventory" className="w-[18px] h-[18px]" />
-                    Create Inventory
+                    <img src={Images.CreateInventory} 
+                    alt={metaImg}
+                    title={metaImg}
+                    className="w-[18px] h-[18px]" />
+                    Create Item
                   </div>
                 </Button>
               </Tooltip>
@@ -263,19 +298,21 @@ const allSubcategories = getAllSubcategories(categorys);
           <div className="pt-6 mx-6 md:mx-5 md:px-10 mb-5 ">
           <Tabs
             defaultActiveKey={category ? category : "All"}
-            className="store"
+            className="items"
             onChange={(key) => handleTabSelect(key)}
             items={[
               {
                 label: "All",
                 key: undefined,
                 children: (
-                  <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 sm:place-items-center md:place-items-start  inventoryCard max-w-full">
+                  <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 sm:place-items-center md:place-items-start  inventoryCard max-w-full">
                     {!isInventoriesLoading ? (
                       inventories.map((inventory, index) => {
                         return (
                           <InventoryCard
                             id={index}
+                            limit={limit}
+                            offset={offset}
                             inventory={inventory}
                             category={category}
                             key={index}
@@ -299,7 +336,7 @@ const allSubcategories = getAllSubcategories(categorys);
                 label: categoryObject.name,
                 key: categoryObject.name,
                 children: (
-                  <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 inventoryCard max-w-full">
+                  <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 inventoryCard max-w-full">
                     {!isInventoriesLoading ? (
                       inventories.map((inventory, index) => {
                         return (
@@ -354,6 +391,7 @@ const allSubcategories = getAllSubcategories(categorys);
       }
       {message && openToast("bottom")}
       {itemMsg && itemToast("bottom")}
+      {redemptionMsg && redemptionToast("bottom")}
     </>
   );
 };

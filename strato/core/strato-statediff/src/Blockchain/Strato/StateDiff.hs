@@ -14,6 +14,7 @@ module Blockchain.Strato.StateDiff
     Detailed (..),
     chainDiff,
     stateDiff,
+    stateDiff',
     eventualAccountState,
     incrementalAccountState,
   )
@@ -208,14 +209,30 @@ stateDiff chainId blockNumber blockHash oldRoot newRoot = do
   lift $ putChainBestBlock chainId blockHash blockNumber
   mOldSR <- lift $ A.lookup (A.Proxy @MP.StateRoot) chainId
   lift $ A.insert (A.Proxy @MP.StateRoot) chainId newRoot
-  let go _ diffs Nothing = yield $ reverse diffs
-      go 100 diffs d = yield (reverse diffs) >> go 0 [] d
-      go n diffs (Just d) = await >>= go (n + 1) (d : diffs)
+  stateDiff' chainId blockNumber blockHash oldRoot newRoot
+  lift $ A.alter_ (A.Proxy @MP.StateRoot) chainId $ pure . const mOldSR
+
+stateDiff' ::
+  ( MonadLogger m,
+    HasCodeDB m,
+    HasHashDB m,
+    (MP.StateRoot `Alters` MP.NodeData) m,
+    Selectable Account AddressState m
+  ) =>
+  Maybe Word256 ->
+  Integer ->
+  Keccak256 ->
+  StateRoot ->
+  StateRoot ->
+  ConduitT i StateDiff m ()
+stateDiff' chainId blockNumber blockHash oldRoot newRoot = do
   Diff.dbDiff oldRoot newRoot
     .| (await >>= go (0 :: Integer) [])
     .| awaitForever (\i -> collectModes i emitDiff)
-  lift $ A.alter_ (A.Proxy @MP.StateRoot) chainId $ pure . const mOldSR
   where
+    go _ diffs Nothing = yield $ reverse diffs
+    go 100 diffs d = yield (reverse diffs) >> go 0 [] d
+    go n diffs (Just d) = await >>= go (n + 1) (d : diffs)
     collectModes diffs f = do
       (c, d, u) <- coll [] [] [] diffs
       f c d u
@@ -411,9 +428,9 @@ lookupAddress :: (MonadLogger m, HasHashDB m) => [N.Nibble] -> m Address
 lookupAddress (N.pack -> addrHash) = fromMaybe (Address 0) <$> lookupInMPDB "address" getAddressFromHash addrHash
 
 lookupCode :: (MonadLogger m, HasHashDB m, HasCodeDB m, Selectable Account AddressState m) => CodePtr -> m (CodeKind, ByteString)
-lookupCode (EVMCode ch) = fromMaybe (EVM, "") <$> lookupInMPDB "contract code" getCode ch
+lookupCode (ExternallyOwned ch) = fromMaybe (EVM, "") <$> lookupInMPDB "contract code" getCode ch
 lookupCode (SolidVMCode _ ch) = fromMaybe (SolidVM, "") <$> lookupInMPDB "contract code" getCode ch
-lookupCode cp@(CodeAtAccount _ _) = maybe (pure (EVM, "")) lookupCode =<< unsafeResolveCodePtr cp
+lookupCode cp@(CodeAtAccount _ _) = maybe (pure (SolidVM, "")) lookupCode =<< unsafeResolveCodePtr cp
 
 lookupInMPDB ::
   (MonadLogger m, Format a) =>

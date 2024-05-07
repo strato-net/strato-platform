@@ -35,11 +35,8 @@ initializeDebugger restServer =
     then pure Nothing
     else do
       dSettings <- atomically newDebugSettings
-      let debuggerRunner =
-            let rest = run flags_debugPort $ restServer dSettings
-             in if flags_wsDebug
-                  then race_ rest $ wsDebugger flags_debugWSHost flags_debugWSPort dSettings
-                  else rest
+      let rest = run flags_debugPort $ restServer dSettings
+          debuggerRunner = race_ rest $ wsDebugger flags_debugWSHost flags_debugWSPort dSettings
       pure $ Just (dSettings, debuggerRunner)
 
 initializeDebuggerSimple :: IO (Maybe (DebugSettings, IO ()))

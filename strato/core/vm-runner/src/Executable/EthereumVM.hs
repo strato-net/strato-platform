@@ -37,9 +37,11 @@ import Blockchain.JsonRpcCommand
 import qualified Blockchain.MilenaTools as K
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
+import Blockchain.StateRootMismatch
 import Blockchain.Strato.Indexer.Kafka (produceIndexEvents)
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import qualified Blockchain.Strato.Model.Keccak256 as Keccak256
+import Blockchain.Strato.StateDiff          (stateDiff')
 import Blockchain.Strato.StateDiff.Database (commitSqlDiffs)
 import Blockchain.Stream.Action (Action)
 import qualified Blockchain.Stream.Action as Action
@@ -50,30 +52,28 @@ import Blockchain.VMMetrics
 import Blockchain.VMOptions
 import Blockchain.Wiring
 import Conduit hiding (Flush)
-import Control.Concurrent.STM (TQueue, atomically, readTQueue, writeTQueue)
 import Control.Lens hiding (Context)
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
-import Control.Monad.Composable.Base
 import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.SQL
-import Control.Monad.Reader (ask, runReaderT)
 import qualified Data.ByteString.Char8 as BC
-import qualified Data.DList as DL
+import Data.Conduit.List (mapMaybeM)
 import Data.Foldable hiding (fold)
 import Data.List
 import qualified Data.Map as M
+import qualified Data.Map.Ordered as OMap
 import Data.Maybe
 import Data.Proxy
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as UTF8
 import Debugger
 import Executable.EthereumVM2
 import Executable.EVMCheckpoint
 import Executable.EVMFlags
 import qualified Network.Kafka.Protocol as KP
 import Text.Format (format)
-import UnliftIO (race_)
 
 -- newtype CertRoot = CertRoot { unCertRoot :: MP.StateRoot }
 --   deriving (Eq, Ord, Show)
@@ -81,7 +81,7 @@ import UnliftIO (race_)
 ethereumVM :: Maybe DebugSettings -> LoggingT IO ()
 ethereumVM d = runResourceT $ do
   ctx <- initContext d
-  race_ (deployCommitsSqlDiffs ctx) . runSQLM . runKafkaMConfigured "ethereum-vm" . execContextM' ctx $ do
+  void . runSQLM . runKafkaMConfigured "ethereum-vm" $ execContextM' ctx $ do
     Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
     (_, EVMCheckpoint cpHash cpHead cpBBI cpSR) <- getCheckpoint
     $logInfoLS "ethereumVM/getCheckpoint" (cpHash, cpBBI, cpSR)
@@ -91,23 +91,30 @@ ethereumVM d = runResourceT $ do
 
     Bagger.processNewBestBlock cpHash cpHead [] -- bootstrap Bagger with genesis block
 
-    consume "evm/loop" consumerGroup seqVmEventsTopicName $ \_ seqEvents -> do
+    StateRootMismatch{..} <- runConsume "evm/loop" consumerGroup seqVmEventsTopicName $ \_ seqEvents -> do
+        recordBaggerMetrics =<< contextGets _baggerState
         logEventSummaries seqEvents
 
         let !vmInEventBatch = foldr insertInBatch newInBatch seqEvents
-        void . runConduit $
+        mSRMismatch <- fmap listToMaybe . runConduit $
           yield vmInEventBatch
-            .| handleVmEvents flags_useSyncMode
-            .| mapM_C sendOutEvent
-        contx <- ask
-        void . liftIO $ enqueue (_stateDiffQueue contx) Flush
+            .| handleVmEvents
+            .| mapMaybeM routeOutEvent
+            .| sinkList
 
         loopTimeit "compactContextM" $ compactContextM
 
         baggerData <- uncurry EVMCheckpoint <$> Bagger.getCheckpointableState
         checkpointData <- baggerData <$> getContextBestBlockInfo
         withChainroot <- checkpointData . unBlockHashRoot <$> Mod.get Proxy
-        return withChainroot
+        return (mSRMismatch, withChainroot)
+    
+    let err = "stateRoot mismatch!!  New stateRoot doesn't match block stateRoot: " ++ format _srmBlockSR 
+    runStateRootMismatchM $ do
+      sd <- runConduit $ stateDiff' Nothing _srmBlockNumber _srmBlockHash _srmBlockSR _srmNewSR
+         .| headDefC (error $ err ++ "\nError encountered while analyzing stateRoot mismatch")
+      $logErrorS "ethereumVM/StateRootMismatch" . T.pack $ formatStateRootMismatch sd
+    error err
 
 initializeCheckpointAndBlockSummary ::
   ( HasBlockSummaryDB m,
@@ -153,6 +160,8 @@ logEventSummaries events = do
     getNames (VmJsonRpcCommand _) = "JsonRpcCommand"
     getNames VmCreateBlockCommand = "CreateBlockCommand"
     getNames (VmPrivateTx _) = "PrivateTx"
+    getNames (VmGetMPNodesRequest _ _) = "GetMPNodesRequest"
+    getNames (VmMPNodesReceived _) = "MPNodesReceived"
 
     numberIt :: Int -> String -> String
     numberIt 1 x = "1 " ++ x
@@ -160,23 +169,27 @@ logEventSummaries events = do
 
 -- KAFKA
 
-sendOutEvent :: (MonadLogger m, HasKafka m, HasSQL m, HasContext m) => VmOutEvent -> m ()
+routeOutEvent :: (MonadLogger m, HasKafka m, HasSQL m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => VmOutEvent -> m (Maybe StateRootMismatch)
+routeOutEvent (OutStateRootMismatch srm) = pure $ Just srm
+routeOutEvent oev = Nothing <$ sendOutEvent oev
+
+sendOutEvent :: (MonadLogger m, HasKafka m, HasSQL m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => VmOutEvent -> m ()
 sendOutEvent (OutAction act) = do
   let extractCodeCollectionAddedMessages :: Action -> Maybe VMEvent
       extractCodeCollectionAddedMessages a =
         case ( join $ fmap (M.lookup "src") $ a ^. Action.metadata,
                join $ fmap (M.lookup "name") $ a ^. Action.metadata,
-               M.toList $ a ^. Action.actionData
+               OMap.assocs $ a ^. Action.actionData
              ) of
           (Just c, Just n, actionDatas) ->
             let cp = case join $ fmap (M.lookup "VM") $ a ^. Action.metadata of
-                  Just "SolidVM" -> SolidVMCode (T.unpack n) $ Keccak256.hash $ BC.pack $ T.unpack c
-                  Just "EVM" -> EVMCode $ Keccak256.hash $ BC.pack $ T.unpack c
+                  Just "SolidVM" -> SolidVMCode (T.unpack n) $ Keccak256.hash $ UTF8.encodeUtf8 c
+                  Just "EVM" -> ExternallyOwned $ Keccak256.hash $ BC.pack $ T.unpack c
                   Just v -> error $ "Unknown VM: " ++ show v
-                  Nothing -> EVMCode $ Keccak256.hash $ BC.pack $ T.unpack c
-                org = fromMaybe "" . listToMaybe . catMaybes . flip map actionDatas $ \(_, Action.ActionData {..}) ->
+                  Nothing -> ExternallyOwned $ Keccak256.hash $ BC.pack $ T.unpack c
+                cn = fromMaybe "" . listToMaybe . catMaybes . flip map actionDatas $ \(_, Action.ActionData {..}) ->
                   if _actionDataCodeHash == cp
-                    then Just _actionDataOrganization
+                    then Just _actionDataCreator
                     else Nothing
                 cc = foldr (\ad b -> Action._actionDataCodeCollection ad <> b) mempty $ snd <$> actionDatas
                 abstracts' = foldr (\ad b -> Action._actionDataAbstracts ad <> b) mempty $ snd <$> actionDatas
@@ -184,7 +197,7 @@ sendOutEvent (OutAction act) = do
                   CodeCollectionAdded
                     { codeCollection = const () <$> cc,
                       codePtr = cp,
-                      organization = org,
+                      creator = cn,
                       application = n,
                       historyList =
                         case join $ fmap (M.lookup "history") (a ^. Action.metadata) of
@@ -196,20 +209,16 @@ sendOutEvent (OutAction act) = do
           _ -> Nothing
       ccEvents = maybeToList $ extractCodeCollectionAddedMessages act
       dcEvents = DelegatecallMade <$> toList (act ^. Action.delegatecalls)
-      act' = act { Action._actionData = M.map (Action.actionDataCodeCollection .~ mempty) (Action._actionData act) }
+      act' = act { Action._actionData = Action.omapMap (Action.actionDataCodeCollection .~ mempty) (Action._actionData act) }
       actionEvents = [NewAction act']
       vmes = ccEvents ++ dcEvents ++ actionEvents
   void . produceVMEvents $ toList vmes
 sendOutEvent (OutIndexEvent e) = void $ produceIndexEvents [e]
-sendOutEvent (OutToStateDiff cId cInfo bHash org app) = withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo org app
-sendOutEvent (OutStateDiff diff) = do
-  contx <- accessEnv
-  void . liftIO $ enqueue (_stateDiffQueue contx) (SD diff)
+sendOutEvent (OutToStateDiff cId cInfo bHash cn app) = withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo cn app
+sendOutEvent (OutStateDiff diff) = commitSqlDiffs diff
 sendOutEvent (OutLog l) = loopTimeit "flushLogEntries" $ void $ produceIndexEvents [LogDBEntry l]
 sendOutEvent (OutEvent e) = loopTimeit "flushEventEntries" $ void $ produceIndexEvents (EventDBEntry <$> e)
-sendOutEvent (OutTXR tr) = do
-  contx <- accessEnv
-  void . liftIO $ enqueue (_stateDiffQueue contx) (TXR tr)
+sendOutEvent (OutTXR tr) = void . produceVMEvents $ [NewTransactionResult tr]
 sendOutEvent (OutASM asm) =
   when (not flags_sqlDiff) $
     timeit "updateSQLBalanceAndNonce" (Just vmBlockInsertionMined) $
@@ -221,6 +230,9 @@ sendOutEvent (OutASM asm) =
         ]
 sendOutEvent (OutJSONRPC s b) = liftIO $ produceResponse s b
 sendOutEvent (OutBlock o) = void . execKafka $ writeUnseqEvents [IEBlock $ blockToIngestBlock TO.Quarry $ outputBlockToBlock o]
+sendOutEvent (OutStateRootMismatch _) = pure ()
+sendOutEvent (OutGetMPNodes mpNodes) = void . execKafka $ writeUnseqEvents [IEGetMPNodes mpNodes]
+sendOutEvent (OutMPNodesResponse o nds) = void . execKafka $ writeUnseqEvents [IEMPNodesResponse o nds]
 
 consumerGroup :: KP.ConsumerGroup
 consumerGroup = lookupConsumerGroup "ethereum-vm"
@@ -233,13 +245,13 @@ getFirstBlockFromSequencer = do
 -- this one starts at 1, 0 is reserved for genesis block and is used to
 -- bootstrap a ton of this
 -- Also seeds the BlockSummaryDatabase
-initializeCheckpointAndBlockSummaryKafka :: (MonadLogger m, MonadFail m, HasKafka m, HasContext m) => m ()
+initializeCheckpointAndBlockSummaryKafka :: (MonadLogger m, MonadFail m, HasKafka m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => m ()
 initializeCheckpointAndBlockSummaryKafka = do
   block <- getFirstBlockFromSequencer
   checkpoint <- initializeCheckpointAndBlockSummary block
   setCheckpoint 1 checkpoint
 
-getCheckpoint :: (MonadLogger m, MonadFail m, HasKafka m, HasContext m) => m (KP.Offset, EVMCheckpoint)
+getCheckpoint :: (MonadLogger m, MonadFail m, HasKafka m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => m (KP.Offset, EVMCheckpoint)
 getCheckpoint = do
   let topic = seqVmEventsTopicName
       cg = consumerGroup
@@ -287,25 +299,3 @@ getUnprocessedKafkaEvents offset = do
 
       !ret' = eventLimit . countLimit $ ret
   return ret'
-
--- This function lives on its own thread
-checkQueueAndCommitsSqlDiffsForever :: (MonadLogger m, HasSQL m, HasContext m) => DL.DList VMEvent -> m ()
-checkQueueAndCommitsSqlDiffsForever vmEvents = do
-  context' <- accessEnv
-  let que = _stateDiffQueue context'
-  msg <- liftIO . atomically $ readTQueue que
-  case msg of
-    TXR !txResult -> checkQueueAndCommitsSqlDiffsForever $ vmEvents `DL.snoc` NewTransactionResult txResult
-    SD !stateDiff' -> do
-      commitSqlDiffs stateDiff'
-      checkQueueAndCommitsSqlDiffsForever vmEvents
-    Flush -> do
-      void . produceVMEvents $ toList vmEvents
-      checkQueueAndCommitsSqlDiffsForever DL.empty
-
-deployCommitsSqlDiffs :: Context -> ResourceT (LoggingT IO) ()
-deployCommitsSqlDiffs context' = runSQLM $ runReaderT (checkQueueAndCommitsSqlDiffsForever DL.empty) context'
-
--- Add an element to the end of the queue
-enqueue :: TQueue a -> a -> IO ()
-enqueue queue item = atomically $ writeTQueue queue item

@@ -138,12 +138,6 @@ const PreviewInventoryModal = ({ open, handleCancel, inventory, category }) => {
             <Button
               className="h-11 bg-primary text-white w-9/12"
               disabled={user?.commonName === inventory.ownerCommonName}
-              onClick={() => {
-                if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                  window.location.href = loginUrl;
-                } else {
-                }
-              }}
             >
               Add To Cart
             </Button>
@@ -151,12 +145,6 @@ const PreviewInventoryModal = ({ open, handleCancel, inventory, category }) => {
             <Button
               className="h-11 bg-primary text-white w-9/12 ml-4"
               disabled={user?.commonName === inventory.ownerCommonName}
-              onClick={() => {
-                if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                  window.location.href = loginUrl;
-                } else {
-                }
-              }}
             >
               Buy now
             </Button>

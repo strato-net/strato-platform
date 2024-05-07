@@ -39,17 +39,16 @@ class SubCategoryController {
         }
         else {
           const categoryRecord = categories.find((record) => record.name === category[0]);
-          const subCategories = categoryRecord.subCategories;
+          const subCategories = categoryRecord?.subCategories;
+          rest.response.status200(res, subCategories ? subCategories : [])
           
-          rest.response.status200(res, subCategories)
         }
+      } else {
+        const categoryRecord = categories.find((record) => record.name === category);
+        const subCategories = categoryRecord?.subCategories;
+        
+        rest.response.status200(res, subCategories)
       }
-
-      const categoryRecord = categories.find((record) => record.name === category);
-      const subCategories = categoryRecord.subCategories;
-      
-      rest.response.status200(res, subCategories)
-     
       return next()
     } catch (e) {
       return next(e)

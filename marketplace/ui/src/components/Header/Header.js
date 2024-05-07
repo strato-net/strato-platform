@@ -1,46 +1,77 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Layout,
   Input,
   Menu,
-  Image,
   Space,
   Badge,
   Avatar,
   Dropdown,
   Button,
-  Typography
+  Typography,
+  Select,
+  Row,
+  Col
 } from "antd";
-import { ArrowLeftOutlined, LogoutOutlined, } from "@ant-design/icons";
+import { ArrowLeftOutlined, LogoutOutlined } from "@ant-design/icons";
 import { Images } from "../../images";
 import "./header.css";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import routes from "../../helpers/routes";
 import {
   useMarketplaceState,
   useMarketplaceDispatch,
 } from "../../contexts/marketplace";
 import { actions } from "../../contexts/marketplace/actions";
+import { actions as categoryActions } from "../../contexts/category/actions";
 import { actions as userActions } from "../../contexts/authentication/actions";
-import { useAuthenticateDispatch } from "../../contexts/authentication";
+import { useAuthenticateDispatch, useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
-import { ProfileIcon } from "../../images/SVGComponents";
+import { SEO } from "../../helpers/seoConstant";
+import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
+import { HTTP_METHODS, apiUrl } from "../../helpers/constants";
+import LoginModal from "../MarketPlace/LoginModal"
+import { setCookie } from "../../helpers/cookie";
 
 const { Header } = Layout;
 
-const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, handleMenuTab }) => {
+const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTab }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const queryParams = new URLSearchParams(location.search);
-  const categoryQueryValue = queryParams.get('category');
-  const searchQueryValue = queryParams.get('search');
+  const IMG_META = SEO.TITLE_META
+  const inputRef = useRef(null);
+  
+  const getCategoryFromURL = () => {
+    if(window.location.pathname.includes('/c/')){
+      const parts = window.location.pathname.split('/');
+      return parts[parts.length - 1];
+    }else{
+      return 'All'
+    }
+  };
 
+  const categoryQueryValue = getCategoryFromURL()
+
+  const queryParams = new URLSearchParams(location.search);
+  const searchQueryValue = queryParams.get('s') || '';
+  //Dispatch
   const marketplaceDispatch = useMarketplaceDispatch();
+  const categoryDispatch = useCategoryDispatch();
   const userDispatch = useAuthenticateDispatch();
-  const { cartList } = useMarketplaceState();
+  //States
+  const { cartList, strats } = useMarketplaceState();
+  const { categorys } = useCategoryState();
+  let { isAuthenticated } = useAuthenticateState();
+
   const storedData = useMemo(() => {
     return window.localStorage.getItem("cartList") == null ? [] : JSON.parse(window.localStorage.getItem("cartList"));
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      actions.fetchStratsBalance(marketplaceDispatch);
+    }
+  }, [user]);
 
   useEffect(() => {
     actions.fetchCartItems(marketplaceDispatch, storedData);
@@ -49,31 +80,25 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
   const [selectedTab, setSelectedTab] = useState("0");
   const [initials, setInitials] = useState("");
   const [roleIndex, setRoleIndex] = useState();
-  const [showSearch, setShowSearch] = useState(false)
+  const [showSearch, setShowSearch] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState(categoryQueryValue);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+
+  const stratsBalance = (Object.keys(strats).length > 0) ? strats : 0
+
+  useEffect(()=>{
+    setSelectedCategory(categoryQueryValue)
+  },[categoryQueryValue])
 
   const navItems = [
-    {
-      role: 0,
-      items: [
-        { label: <div id="Marketplace">Marketplace</div>, key: '0' },
-        { label: <div id="Orders">Orders</div>, key: '1' },
-        { label: <div id="Inventory">My Store</div>, key: '2' },
-        // { label: <div id="Products">Products</div>, key: '3' },
-        // { label: <div id="Events">Events</div>, key: '4' }, // hiding events from marketplace
-      ]
-    },
-    {
-      role: 1,
-      items: [
-        { label: <div id="Marketplace">Marketplace</div>, key: '0' },
-      ]
-    },
+    { label: <div id="Orders">Orders</div>, key: '0' },
+    { label: <div id="Inventory">My Items</div>, key: '1' }
   ];
 
   const navUrls = [
-    routes.Marketplace.url,
     routes.Orders.url.replace(':type', 'sold'),
-    routes.MyStore.url,
+    routes.MyItems.url,
     routes.Products.url,
     routes.Events.url,
   ];
@@ -95,12 +120,9 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
 
   useEffect(() => {
     let pathName = window.location.pathname;
-    // if (pathName.includes("/marketplace")) {
-    //   setSelectedTab("0");
-    // } else 
     if (pathName.includes("/order") || pathName.includes("/orders") || pathName.includes('sold-orders') || pathName.includes('bought-orders')) {
       setSelectedTab("1");
-    } else if (pathName.includes("/mystore")) {
+    } else if (pathName.includes("/myitems")) {
       setSelectedTab("2");
     } else if (pathName.includes("/products")) {
       setSelectedTab("3");
@@ -110,9 +132,29 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
     else {
       setSelectedTab("0");
     }
+    categoryActions.fetchCategories(categoryDispatch);
+
   }, [window.location.pathname]);
 
+  useEffect(() => {
+    const allCat = { label: 'All', value: 'All' }
+    let categories = categorys.map(({ name, subCategories }, index) => {
+      const subCat = subCategories.map(item=>item.contract).join(',')
+      return { label: name, value: name, subCategory:subCat }
+    })
+    categories = [allCat, ...categories];
+    setCategories(categories)
+  }, [categorys])
+
   const items = user ? [
+    {
+      key: '3',
+      label: (
+        <div onClick={() => { navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", user.commonName)}`) }}>
+          <p>My Profile</p>
+        </div>
+      ),
+    },
     {
       key: '2',
       label: (
@@ -121,7 +163,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
             {user == null ? "" : user.commonName}
           </p>
           <p className="text-xs">
-            {user == null ? "" : user.preferred_username}
+            {user == null ? "" : user.email}
           </p>
         </div>
       ),
@@ -144,6 +186,19 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
     },
   ];
 
+  const stratsItem = [{
+    key: '2',
+    label: (
+      <div>
+        {user &&
+          <p className="text-xs mt-1">
+            STRATs: {stratsBalance}
+          </p>
+        }
+      </div>
+    ),
+  }]
+
   useEffect(() => {
     let temp = "";
     if (user != null) {
@@ -162,29 +217,59 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
   }, [user])
 
   const subMenuItems = [
-    { value: "marketplace", path: routes.MarketplaceProductList.url, label: "Marketplace" },
     { value: "orders", path: routes.Orders.url.replace(':type', 'sold'), label: "Orders" },
-    { value: "mystore", path: "/mystore", label: "My Store" },
-    user ? { value: "logout", path: "/logout", label: <div><p className="!mb-0">Logout</p><p className="text-xs text-gray">{user?.preferred_username}</p></div> } : null,
-  ]
+    { value: "myitems", path: "/myitems", label: "My Items" },
+    user ? {
+      value: "my-profile",
+      path: routes.MarketplaceUserProfile.url.replace(':commonName', user.commonName),
+      label: (
+        <div>
+          <p className="!mb-0">My Profile</p>
+        </div>
+      )
+    } : null,
+    user ? {
+      value: "logout",
+      path: "/logout",
+      label: (
+        <div>
+          <p className="text-gray">{user?.commonName}</p>
+          <p className="text-xs text-gray">{user?.preferred_username}</p>
+          <p className="!mb-0">Logout</p>
+        </div>
+      )
+    } : null,
+  ].filter(Boolean);
+
 
   const handleIntMenuTab = (data) => {
-    data.value == 'logout' ? logout() : data.value == 'orders' ? navigate(routes.Orders.url.replace(':type', 'sold'), { state: { defaultKey: "Sold" } }) : navigate(data.path)
-    handleMenuTab(data)
+    if (roleIndex === 1) {
+      // User is not logged in
+      data.value == 'orders' ? setSelectedTab(0) : setSelectedTab(1)
+      setIsModalVisible(true);
+    } else {
+      data.value == 'logout' ? logout() : data.value == 'orders' ? navigate(routes.Orders.url.replace(':type', 'sold'), { state: { defaultKey: "Sold" } }) : navigate(data.path)
+      handleMenuTab(data)
+    }
   }
 
   const handleSearchShow = (status) => {
     setShowSearch(status)
   }
 
-  const navigateSearch = (value) => {
-    const baseUrl = new URL('/category', window.location.origin);
 
-    if (categoryQueryValue) {
-      baseUrl.searchParams.set('category', categoryQueryValue);
+  const navigateSearch = (selectedCateg, value) => {
+    const baseUrl = new URL(`/c/${selectedCateg}`, window.location.origin);
+    
+    if(selectedCateg && selectedCateg!=='All'){
+      const subCat = categorys.find((item)=>item.name===selectedCateg)
+      ?.subCategories.map(item=>item.contract).join(',')
+      if(subCat){
+        baseUrl.searchParams.set('sc', subCat);
+      }
     }
     if (value.length > 0) {
-      baseUrl.searchParams.set('search', value);
+      baseUrl.searchParams.set('s', value);
     }
 
     const url = baseUrl.pathname + baseUrl.search;
@@ -194,93 +279,132 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
   const handleChangeSearch = (e) => {
     const value = e.target.value;
     if (value.length === 0 && searchQueryValue) {
-      navigateSearch(value)
+      navigateSearch('All',value)
     }
   }
 
   const handleEnterSearch = (e) => {
     const value = e.target.value;
-    navigateSearch(value)
+    const baseUrl = new URL(`/c/All`, window.location.origin);
+    if(value){
+      baseUrl.searchParams.set('s', value);
+      const url = baseUrl.pathname + baseUrl.search;
+      navigate(url, { replace: true });
+    }
+  };
+
+  const handleCategoryChange = (cat) => {
+    setSelectedCategory(cat)
+    navigateSearch(cat,"")
+    inputRef.current.focus();
+    inputRef.current.select();
+  }
+
+  const handleLogin = () => {
+    // Redirect to login page or handle login logic
+    setIsModalVisible(false);
+    if (!isAuthenticated && loginUrl !== undefined) {
+      setCookie("returnUrl", navUrls[selectedTab], 10);
+      window.location.href = loginUrl;
+    }
+  };
+
+  const handleClose = () => {
+      setIsModalVisible(false);
   };
 
   return (
     <>
-      <Header className={`fixed z-[100] !bg-[#ffffff] !pl-2 w-full !pr-4 md:px-12 flex md:!mb-10 ${showMenu ? '' : 'shadow-header'} md:p-10 justify-between md:justify-start`}>
-        <Space className="relative flex-grow-0 md:flex-1 ml-2 md:ml-5">
-          <div
+      <Header className={`fixed z-[100] !bg-[#ffffff] !pl-2 w-full !pr-4 md:px-12 flex md:!mb-10 ${showMenu ? '' : 'shadow-header'} items-center justify-between md:justify-start`}>
+        <Row className="relative flex-grow-0 md:flex-1 ml-2 md:ml-5">
+          <Col xs={20} md={10} lg={4} 
             className="mt-4 mr-5 md:mt-0 cursor-pointer flex-grow-0 w-max md:w-[170px] h-[44px]"
-            onClick={() => { navigate(routes.Marketplace.url) }}
+            onClick={() => { 
+              navigate(routes.Marketplace.url) 
+              window.scrollTo(0, 0);
+            }}
           >
-            <img src={Images.newLogo} className="h-[31px] w-[120px] md:w-[170px] md:h-[44px]" preview={false} />
-          </div>
-          <div className={`lg:ml-28 md:ml-1 flex-1 ${showSearch ? '-mt-[6px] fixed top-[13px] left-0 flex w-[100vw] z-50 mb-4' : 'hidden md:flex mb-10'}`}>
+            <img src={Images.newLogo} alt={IMG_META} title={IMG_META} className="h-[31px] w-[120px] md:w-[170px] md:h-[44px]" preview={false} />
+          </Col>
+          <Col xs={showSearch ? 24 : 4} md={12} lg={18} className={`lg:ml-4 mf:ml-20 md:ml-1 bg-[#F6F6F6] shadow-md flex-1 header-search ${showSearch ? ' fixed top-[13px] left-0 flex w-[100vw] z-50 mb-2' : 'hidden md:flex '}`}>
+            <Select
+              defaultValue="All"
+              className="border-none header-category"
+              dropdownStyle={{position:'fixed'}}
+              style={{ width: 170 }}
+              onChange={handleCategoryChange}
+              options={categories}
+              value={selectedCategory}
+            />
             <Input
-              // key={searchQueryValue}
+              key={searchQueryValue || categoryQueryValue}
+              ref={inputRef}
               size="large"
+              type="search"
               placeholder="Search"
-              // defaultValue={searchQueryValue}
+              defaultValue={searchQueryValue}
               onChange={(e) => { handleChangeSearch(e) }}
               onPressEnter={(e) => { handleEnterSearch(e) }}
-              prefix={showSearch ? <ArrowLeftOutlined onClick={() => handleSearchShow(false)} /> : <img src={Images.Header_Search} className="w-[18px] h-[18px]" />}
-              className="bg-[#F6F6F6] border-none rounded-[100px] md:!w-[35%] lg:w-[40%] absolute p-[10px] "
+              suffix={showSearch 
+                ? <ArrowLeftOutlined onClick={() => handleSearchShow(false)} /> 
+                : <img src={Images.Header_Search} alt={IMG_META} title={IMG_META} className="w-[18px] h-[18px]" />}
+              className="bg-[#F6F6F6] outline-none"
             />
-          </div>
-        </Space>
+          </Col>
+        </Row>
         <Menu
           mode="horizontal"
           defaultSelectedKeys={["0"]}
           selectedKeys={[selectedTab]}
           disabledOverflow={true}
-          className="h-16 bg-white text-base mx-10 -mt-7 md:flex hidden"
+          className="h-16 bg-white text-base mx-10 md:flex hidden"
           onClick={(item) => {
             setSelectedTab(item.key)
-            // These pages will be tracked automatically with lucky orange, no need to create an event here unluess we want to include additional metadata
-            if (item.key === "0") {
-              TagManager.dataLayer({
-                dataLayer: {
-                  event: 'view_marketplace_page',
-                },
-              });
+            if (roleIndex === 1) {
+              // User is not logged in
+              setIsModalVisible(true);
+            } else {
+              // These pages will be tracked automatically with lucky orange, no need to create an event here unluess we want to include additional metadata
+              if (item.key === "0") {
+                TagManager.dataLayer({
+                  dataLayer: {
+                    event: 'view_orders_page',
+                  },
+                });
+              }
+              if (item.key === "1") {
+                TagManager.dataLayer({
+                  dataLayer: {
+                    event: 'view_inventory_page',
+                  },
+                });
+              }
+              if (item.key === "2") {
+                TagManager.dataLayer({
+                  dataLayer: {
+                    event: 'view_products_page',
+                  },
+                });
+              }
+              if (item.key === "3") {
+                TagManager.dataLayer({
+                  dataLayer: {
+                    event: 'view_events_page',
+                  },
+                });
+                navigate(navUrls[item.key], { state: { tab: "EventType" } })
+              }
+              else navigate(navUrls[item.key]);
             }
-            if (item.key === "1") {
-              TagManager.dataLayer({
-                dataLayer: {
-                  event: 'view_orders_page',
-                },
-              });
-            }
-            if (item.key === "2") {
-              TagManager.dataLayer({
-                dataLayer: {
-                  event: 'view_inventory_page',
-                },
-              });
-            }
-            if (item.key === "3") {
-              TagManager.dataLayer({
-                dataLayer: {
-                  event: 'view_products_page',
-                },
-              });
-            }
-            if (item.key === "4") {
-              TagManager.dataLayer({
-                dataLayer: {
-                  event: 'view_events_page',
-                },
-              });
-              navigate(navUrls[item.key], { state: { tab: "EventType" } })
-            }
-            else navigate(navUrls[item.key]);
           }}
-          items={navItems[roleIndex]?.items}
+          items={navItems}
         />
         <Space size="large" className="!gap-0 md:!gap-4 mr-0 -ml-3">
           {<div className="flex md:hidden mx-2" onClick={() => handleSearchShow(true)}>
-            <img src={Images.Responsive_search} className="w-6 h-6" />
+            <img src={Images.Responsive_search} alt={IMG_META} title={IMG_META} className="w-6 h-6" />
           </div>}
-          {roleIndex === undefined || roleIndex === 1 ? null : <Badge
-            className="cursor-pointer"
+          <Badge
+            className="cursor-pointer mr-3 md:mr-1"
             count={cartList.length}
             onClick={() => {
               TagManager.dataLayer({
@@ -289,19 +413,34 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
                 },
               });
               navigate("/checkout");
+              window.scrollTo(0, 0);
             }}
           >
             <div className="md:hidden">
               <Avatar
-                icon={<img src={Images.Responsive_cart} alt="" className="w-6 h-6" />}
+                icon={<img src={Images.Responsive_cart} alt={IMG_META} title={IMG_META} className="w-6 h-6" />}
               />
             </div>
             <div className="hidden md:inline-block">
               <Avatar
-                icon={<img src={Images.Header_cart} alt="" className="w-6 h-6" />}
+                icon={<img src={Images.Header_cart} alt={IMG_META} title={IMG_META} className="w-6 h-6" />}
               />
             </div>
           </Badge>
+
+          {(roleIndex !== undefined && roleIndex !== 1)
+            && <Dropdown menu={{ items: stratsItem }} placement="bottomRight" trigger={["hover", "click"]} className="xs:mt-5 md:mt-0" overlayStyle={{ position: 'fixed' }}>
+              <a onClick={(e) => e.preventDefault()} className="md:flex mx-1 text-base text-white" id="user-dropdown">
+              <Badge
+              style={{backgroundColor:"#13188A"}}
+              className="cursor-pointer mt-7 md:mt-0 mx-2"
+              count={stratsBalance}
+              overflowCount={9999999}
+              >
+              <img src={Images.logo} alt={IMG_META} title={IMG_META} className="w-[30px] h-[30px] " />
+            </Badge>
+              </a>
+            </Dropdown>
           }
           {
             roleIndex === undefined || roleIndex === 1 ? (
@@ -318,29 +457,32 @@ const HeaderComponent = ({ isOauth, user, loginUrl, showMenu, handleSubMenu, han
                 <Button size="large" className="flex sm:hidden bg-primary text-white w-[90%] !h-[25%] !text-sm justify-center items-center">Login/Register</Button>
               </a> : null
             ) :
-              <Dropdown menu={{ items }} placement="bottomRight" trigger={["click"]} overlayStyle={{ marginTop: "40px" }}>
+              <Dropdown menu={{ items }} placement="bottomRight" trigger={["click"]} overlayStyle={{ marginTop: "40px", position: 'fixed' }}>
                 <a onClick={(e) => e.preventDefault()} className="hidden md:flex text-base text-white" id="user-dropdown">
-                  <img src={Images.Setting_icon} className="w-[30px] h-[30px] " />
+                  <img src={Images.Setting_icon} alt={IMG_META} title={IMG_META} className="w-[30px] h-[30px] " />
                 </a>
               </Dropdown>
           }
           {<div className="block md:hidden px-1" onClick={handleSubMenu}>
-            <img src={Images.menu_icon} alt="" className="w-6 h-6" />
+            <img src={Images.menu_icon} alt={IMG_META} title={IMG_META} className="w-6 h-6" />
           </div>}
         </Space>
       </Header>
       {showMenu &&
         <div>
           <div className="bg-white border-t border-[#E9E9E9] absolute w-full z-50 md:hidden top-16">
-            {subMenuItems.map((item) => {
-              return (
+            {subMenuItems.map((item) => 
                 <Typography onClick={() => handleIntMenuTab(item)} className={`text-base py-3 px-4 cursor-pointer ${item ? '' : 'hidden'}`} >{item?.label}</Typography>
-              )
-            })}
+            )}
           </div>
           <div className="h-[100vh] w-full bg-[#00000020] absolute top-0 md:hidden z-40" onClick={handleMenuTab}></div>
         </div>
       }
+      <LoginModal
+          visible={isModalVisible}
+          onCancel={handleClose}
+          onLogin={handleLogin}
+      />
     </>
 
   );

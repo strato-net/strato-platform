@@ -39,7 +39,10 @@ const actionDescriptors = {
   fetchUserAddressFailed: "fetch_user_address_failed",
   fetchUserAddresses: "fetch_user_addresses",
   fetchUserAddressesSuccessful: "fetch_user_addresses_successful",
-  fetchUserAddressesFailed: "fetch_user_addresses_failed"
+  fetchUserAddressesFailed: "fetch_user_addresses_failed",
+  fetchStratsBalance: "fetch_strats_balance",
+  fetchStratsBalanceSuccessful: "fetch_strats_balance_successful",
+  fetchStratsBalanceFailed: "fetch_strats_balance_failed"
 };
 
 const actions = {
@@ -137,11 +140,12 @@ const actions = {
     dispatch,
     categorys,
     subCategorys,
-    products,
-    manufacturers,
     minPrice,
     maxPrice,
-    search
+    search,
+    availabilityQuery,
+    offset,
+    limit
   ) => {
     dispatch({ type: actionDescriptors.fetchMarketplace });
 
@@ -151,11 +155,6 @@ const actions = {
       ? `&subCategory[]=${subCategorys}`
       : "";
 
-    const manufacturerQuery = manufacturers
-      ? `&manufacturer[]=${manufacturers}`
-      : "";
-
-    const productIdQuery = products ? `&name[]=${products}` : "";
     const searchQuery = search
       ? `&queryValue=${search}&queryFields=name`
       : "";
@@ -164,9 +163,13 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace?${priceQuery}${categoryQuery}${subCategoryQuery}${productIdQuery}${manufacturerQuery}${searchQuery}`,
+        `${apiUrl}/marketplace?${priceQuery}${categoryQuery}${subCategoryQuery}${searchQuery}${availabilityQuery}`,
         {
           method: HTTP_METHODS.GET,
+          headers: {
+            'offset': `${offset}`,
+            'limit': `${limit}`
+          }
         }
       );
 
@@ -183,12 +186,6 @@ const actions = {
           type: actionDescriptors.fetchMarketplaceFailed,
           error: "Error while fetching marketplace products",
         });
-      } else if (response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({
-          type: actionDescriptors.fetchMarketplaceFailed,
-          error: "Unauthorized while fetching marketplace products"
-        });
-        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -207,11 +204,12 @@ const actions = {
     dispatch,
     categorys,
     subCategorys,
-    products,
-    manufacturers,
     minPrice,
     maxPrice,
-    search
+    search,
+    availabilityQuery,
+    offset,
+    limit
   ) => {
     dispatch({ type: actionDescriptors.fetchMarketplaceLoggedIn });
 
@@ -221,22 +219,21 @@ const actions = {
       ? `&subCategory[]=${subCategorys}`
       : "";
 
-    const manufacturerQuery = manufacturers
-      ? `&manufacturer[]=${manufacturers}`
-      : "";
-
-    const productIdQuery = products ? `&name[]=${products}` : "";
     const priceQuery = `&range[]=price,${minPrice},${maxPrice}`;
     // const sortLatest = "&order=createdDate.desc"
     const searchQuery = search
-    ? `&queryValue=${search}&queryFields=name`
-    : "";
+      ? `&queryValue=${search}&queryFields=name`
+      : "";
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace/all?${priceQuery}${categoryQuery}${subCategoryQuery}${productIdQuery}${manufacturerQuery}${searchQuery}`,
+        `${apiUrl}/marketplace/all?${priceQuery}${categoryQuery}${subCategoryQuery}${searchQuery}${availabilityQuery}`,
         {
           method: HTTP_METHODS.GET,
+          headers: {
+            'offset': `${offset}`,
+            'limit': `${limit}`
+          }
         }
       );
 
@@ -253,12 +250,6 @@ const actions = {
           type: actionDescriptors.fetchMarketplaceLoggedInFailed,
           error: "Error while fetching marketplace products",
         });
-      } else if (response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({
-          type: actionDescriptors.fetchMarketplaceLoggedInFailed,
-          error: "Unauthorized while fetching marketplace products"
-        });
-        window.location.href = body.error.loginUrl;
       }
 
 
@@ -279,7 +270,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace/topselling?offset=${offset}&limit=${limit}`,
+        `${apiUrl}/marketplace/topselling?offset=${offset}&limit=${limit}&gtField=quantity&gtValue=0`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -293,13 +284,7 @@ const actions = {
           payload: body.data,
         });
         return;
-      } else if (response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({
-          type: actionDescriptors.fetchTopSellingProductsFailed,
-          error: "Unauthorized while fetching topselling products"
-        });
-        window.location.href = body.error.loginUrl;
-      }
+      } 
       dispatch({
         type: actionDescriptors.fetchTopSellingProductsFailed,
         error: undefined,
@@ -317,7 +302,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace/user/topselling?offset=${offset}&limit=${limit}`,
+        `${apiUrl}/marketplace/user/topselling?offset=${offset}&limit=${limit}&gtField=quantity&gtValue=0`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -331,13 +316,7 @@ const actions = {
           payload: body.data,
         });
         return;
-      } else if (response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({
-          type: actionDescriptors.fetchTopSellingProductsLoggedInFailed,
-          error: "Unauthorized while fetching topselling products"
-        });
-        window.location.href = body.error.loginUrl;
-      }
+      } 
       dispatch({
         type: actionDescriptors.fetchTopSellingProductsLoggedInFailed,
         error: undefined,
@@ -370,7 +349,7 @@ const actions = {
           type: actionDescriptors.addShippingAddressSuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, "Shipping address added successfully", true);
+        actions.setMessage(dispatch, "Address added successfully", true);
         return body.data;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
@@ -428,13 +407,7 @@ const actions = {
         });
         actions.setMessage(dispatch, "Error while getting Shipping address");
         return false;
-      } else if (response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({
-          type: actionDescriptors.fetchUserAddressFailed,
-          error: "Unauthorized while getting Shipping address"
-        });
-        window.location.href = body.error.loginUrl;
-      }
+      } 
       dispatch({
         type: actionDescriptors.fetchUserAddressFailed,
         error: body.error,
@@ -476,13 +449,7 @@ const actions = {
         });
         actions.setMessage(dispatch, "Error while getting Shipping address");
         return false;
-      } else if (response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({
-          type: actionDescriptors.fetchUserAddressesFailed,
-          error: "Unauthorized while getting Shipping address"
-        });
-        window.location.href = body.error.loginUrl;
-      }
+      } 
       dispatch({
         type: actionDescriptors.fetchUserAddressesFailed,
         error: body.error,
@@ -497,7 +464,33 @@ const actions = {
       actions.setMessage(dispatch, "Error while getting Shipping address");
     }
   },
-
+  fetchStratsBalance: async (dispatch) => {
+    dispatch({ type: actionDescriptors.fetchStratsBalance });
+    try {
+      let response = await fetch(`${apiUrl}/marketplace/strats`, {
+        method: HTTP_METHODS.GET,
+        credentials: "same-origin",
+      });
+      const body = await response.json();
+      if (response.status === RestStatus.UNAUTHORIZED || response.status === RestStatus.FORBIDDEN) {
+        dispatch({
+          type: actionDescriptors.fetchStratsBalanceFailed,
+          payload: "Error while fetching STRATS",
+        });
+        return;
+      }
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchStratsBalanceSuccessful,
+          payload: body.data
+        });
+        return;
+      }
+      dispatch({ type: actionDescriptors.fetchStratsBalanceFailed, payload: "Error while fetching STRATS" });
+    } catch (err) {
+      dispatch({ type: actionDescriptors.fetchStratsBalanceFailed, payload: "Error while fetching STRATS" });
+    }
+  },
 
 };
 

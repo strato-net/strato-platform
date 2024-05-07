@@ -55,38 +55,38 @@ tableSeparator :: T.Text
 tableSeparator = "-"
 
 tableNameToText :: TableName -> T.Text
-tableNameToText (IndexTableName o a c) =
+tableNameToText (IndexTableName c a n) =
   let prefix
-        | T.null o = ""
-        | T.null a = o <> tableSeparator
-        | otherwise = o <> tableSeparator <> a <> tableSeparator
-   in prefix <> c
-tableNameToText (CollectionTableName o a c m) =
+        | T.null c = ""
+        | T.null a = c <> tableSeparator
+        | otherwise = c <> tableSeparator <> a <> tableSeparator
+   in prefix <> n
+tableNameToText (CollectionTableName c a n m) =
   let prefix
-        | T.null o = ""
-        | T.null a = o <> tableSeparator
-        | otherwise = o <> tableSeparator <> a <> tableSeparator
-      contractAndCollection = c <> "." <> m
+        | T.null c = ""
+        | T.null a = c <> tableSeparator
+        | otherwise = c <> tableSeparator <> a <> tableSeparator
+      contractAndCollection = n <> "." <> m
    in prefix <> contractAndCollection
-tableNameToText (HistoryTableName o a c) =
+tableNameToText (HistoryTableName c a n) =
   let prefix
-        | T.null o = ""
-        | T.null a = o <> tableSeparator
-        | otherwise = o <> tableSeparator <> a <> tableSeparator
-   in "history@" <> prefix <> c
-tableNameToText (EventTableName o a c e) =
+        | T.null c = ""
+        | T.null a = c <> tableSeparator
+        | otherwise = c <> tableSeparator <> a <> tableSeparator
+   in "history@" <> prefix <> n
+tableNameToText (EventTableName c a n e) =
   let prefix
-        | T.null o = ""
-        | T.null a = o <> tableSeparator
-        | otherwise = o <> tableSeparator <> a <> tableSeparator
-      contractAndEvent = c <> "." <> e
+        | T.null c = ""
+        | T.null a = c <> tableSeparator
+        | otherwise = c <> tableSeparator <> a <> tableSeparator
+      contractAndEvent = n <> "." <> e
    in prefix <> contractAndEvent
-tableNameToText (AbstractTableName o a c) =
+tableNameToText (AbstractTableName c a n) =
   let prefix
-        | T.null o = ""
-        | T.null a = o <> tableSeparator
-        | otherwise = o <> tableSeparator <> a <> tableSeparator
-   in prefix <> c
+        | T.null c = ""
+        | T.null a = c <> tableSeparator
+        | otherwise = c <> tableSeparator <> a <> tableSeparator
+   in prefix <> n
 
 tableNameToTextPostgres :: TableName -> T.Text
 tableNameToTextPostgres = T.take 63 . tableNameToText -- max table name len in psql is 63 char
@@ -96,6 +96,9 @@ tableNameToSingleQuoteText = wrapSingleQuotes . escapeQuotes . tableNameToTextPo
 
 tableNameToDoubleQuoteText :: TableName -> T.Text
 tableNameToDoubleQuoteText = wrapDoubleQuotes . escapeQuotes . tableNameToText
+
+textToDoubleQuoteText :: T.Text -> T.Text
+textToDoubleQuoteText =  wrapDoubleQuotes . escapeQuotes
 
 removeSingleQuotes :: T.Text -> T.Text
 removeSingleQuotes inputText =

@@ -35,7 +35,26 @@ class InventoryController {
 
       const inventories = await dapp.getInventories({ ...query })
       const inventoriesWithImageUrl = inventories?.inventories
-      rest.response.status200(res, {inventoriesWithImageUrl:inventoriesWithImageUrl, count: inventories.inventoryCount})
+      rest.response.status200(res, { inventoriesWithImageUrl: inventoriesWithImageUrl, count: inventories.inventoryCount })
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
+  static async getAllUserInventories(req, res, next) {
+    try {
+      const { dapp, query } = req
+      const { gtField, gtValue, ...restQuery } = query;
+
+      const inventories = await dapp.getInventoriesForUser({ userProfileGtField: gtField, userProfileGtValue: gtValue, ...restQuery });
+      const productsWithImageUrl = inventories?.inventoryResults.sort((a, b) => {
+        return b.saleDate.localeCompare(a.saleDate);
+      });
+
+      rest.response.status200(res, { inventoriesWithImageUrl: productsWithImageUrl, count: productsWithImageUrl.length })
+
 
       return next()
     } catch (e) {
@@ -176,6 +195,20 @@ class InventoryController {
     }
   }
 
+  static async getPriceHistory(req, res, next) {
+    try {
+      const { dapp, query } = req
+      const { assetToBeSold, limit, offset, timeFilter } = query;
+
+      const priceHistoryData = await dapp.getPriceHistory({ assetAddress: assetToBeSold, limit: limit, offset: offset, timeFilter: timeFilter });
+
+      return rest.response.status200(res, priceHistoryData)
+    } catch (e) {
+      console.log("Couldn't fetch price history");
+      return next(e)
+    }
+  }
+
   // static async audit(req, res, next) {
   //   try {
   //     const { dapp, params } = req
@@ -292,11 +325,32 @@ class InventoryController {
     }
   }
 
+  static validateRequestRedemptionArgs(args) {
+    const requestRedemptionSchema = Joi.object({
+      assetAddresses: Joi.array().items(Joi.string()),
+      originAssetAddress: Joi.string().required(),
+      quantity: Joi.number().integer().greater(0).required(),
+      shippingAddressId: Joi.number().integer().required(),
+      ownerCommonName: Joi.string().required(),
+      ownerComments: Joi.string().allow("")
+    });
+
+    const validation = requestRedemptionSchema.validate(args);
+
+    if (validation.error) {
+      console.log('validation error: ', validation.error)
+      throw new rest.RestError(RestStatus.BAD_REQUEST, validation.error.message, {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      })
+    }
+  }
+
   static validateTransferItemArgs(args) {
     const transferItemSchema = Joi.object({
       assetAddress: Joi.string().required(),
       newOwner: Joi.string().required(),
       quantity: Joi.number().integer().greater(0).required(),
+      price: Joi.number().integer().min(0).required(),
     });
 
     const validation = transferItemSchema.validate(args);

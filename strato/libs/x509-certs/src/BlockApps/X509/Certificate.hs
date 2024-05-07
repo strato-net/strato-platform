@@ -191,12 +191,12 @@ getAddressFromCM (Everyone _) (X509CertInfoState ua _ _ _ _ _ _) = Just ua
 getAddressFromCM (Org on _) (X509CertInfoState ua _ _ _ onx _ _) =
   if on == T.pack onx then Just ua else Nothing
 getAddressFromCM (OrgUnit on ou _) (X509CertInfoState ua _ _ _ onx oux _) =
-  if on == T.pack onx && ou == T.pack (fromMaybe " " oux) then Just ua else Nothing
+  if on == T.pack onx && ou == T.pack (fromMaybe "" oux) then Just ua else Nothing
 getAddressFromCM (CommonName on ou cmn _) (X509CertInfoState ua _ _ _ onx oux cnmx) =
-  if on == T.pack onx && ou == T.pack (fromMaybe " " oux) && cmn == T.pack cnmx then Just ua else Nothing
+  if on == T.pack onx && ou == T.pack (fromMaybe "" oux) && cmn == T.pack cnmx then Just ua else Nothing
 
 getChainMemberFromX509 :: X509CertInfoState -> ChainMemberParsedSet
-getChainMemberFromX509 (X509CertInfoState _ _ _ _ on ou cname) = (CommonName (T.pack $ on) (T.pack (fromMaybe " " ou)) (T.pack $ cname) True)
+getChainMemberFromX509 (X509CertInfoState _ _ _ _ on ou cname) = (CommonName (T.pack $ on) (T.pack (fromMaybe "" ou)) (T.pack $ cname) True)
 
 getX509FromAddress ::
   A.Selectable Address X509CertInfoState m =>
@@ -470,7 +470,8 @@ getValidity :: IO (DateTime, DateTime)
 getValidity = do
   (DateTime dt tm') <- dateCurrent
   let curDate@(DateTime _ tm) = DateTime dt tm' {todNSec = 0} -- need to wipe out nanseconds b/c they won't serialize
-      endDate = DateTime dt {dateYear = (dateYear dt) + 1} tm -- all certs are valid for a year
+      oneYear = Period {periodYears = 1, periodMonths = 0, periodDays = 0}
+      endDate = DateTime (dt `dateAddPeriod` oneYear) tm -- all certs are valid for a year
   return (curDate, endDate)
 
 dateTimeToString :: DateTime -> String

@@ -1,18 +1,18 @@
 #stripe-ps-version:<VERSION>
-#strato-getting-started-min-version:4.2.1
+#strato-getting-started-min-version:4.4.0
 version: '3'
-volumes:
-  sqlitedb:
-   driver: local
 services:
   stripe-ps:
     environment:
     - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
     - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+    - POSTGRESQL_SERVER_URL=${POSTGRESQL_SERVER_URL}
+    - POSTGRESQL_PORT=${POSTGRESQL_PORT}
+    - POSTGRESQL_USER=${POSTGRESQL_USER}
+    - POSTGRESQL_PASSWORD=${POSTGRESQL_PASSWORD}
+    - POSTGRESQL_DBNAME=${POSTGRESQL_DBNAME}
     build: .
     image: ${STRIPE_PS_IMAGE:-<REPO_URL>stripe-ps:<VERSION>}
-    volumes:
-    - sqlitedb:/sqlitedb
     restart: unless-stopped
     logging:
       driver: "json-file"

@@ -10,6 +10,31 @@
   text-align: center;
 }
 .full-width {
-  display: 'inline-block';
+  display: "inline-block";
   width: 100%;
+}
+
+.bad-metric {
+  color: #f74b4b;
+}
+
+.good-metric {
+  color: #f5f8fa;
+}
+
+.metric {
+  display: inline-block;
+}
+
+.healthy-network {
+  color: #62d96b;
+}
+
+.unhealthy-network {
+  color: #ffc940;
+}
+
+#networkInfo {
+  display: flex;
+  flex-direction: column;
 }

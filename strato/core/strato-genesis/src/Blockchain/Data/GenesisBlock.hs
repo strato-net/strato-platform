@@ -51,6 +51,7 @@ import Control.Monad.Change.Modify
 import Control.Monad.IO.Class
 import Crypto.Util (i2bs_unsized)
 import Data.ByteString as BS hiding (map, zip)
+import qualified Data.Map.Ordered as OMap
 import qualified Data.ByteString.Lazy.Char8 as BLC
 import Data.Functor.Identity
 import Data.List.Split (chunksOf)
@@ -194,7 +195,7 @@ initializeStateDBAndAccountInfos chainId addressInfo genesisBlockName = do
           let account = Account (Ad.Address $ parseHex a) chainId
           $logInfoS "initializeStateDBAndAccountInfos" . T.pack $
             "adding account: " ++ format account
-          A.insert A.Proxy account blankAddressState {addressStateBalance = read b, addressStateCodeHash = EVMCode $ unsafeCreateKeccak256FromWord256 $ parseHex c}
+          A.insert A.Proxy account blankAddressState {addressStateBalance = read b, addressStateCodeHash = ExternallyOwned $ unsafeCreateKeccak256FromWord256 $ parseHex c}
         _ -> error $ "wrong format for accountInfo, line is: " ++ BLC.unpack theLine
 
     $logInfoS "initializeStateDBAndAccountInfos" . T.pack $
@@ -246,13 +247,13 @@ zipSourceInfo accounts codes =
       codeMap = Map.fromList . map hashPair $ codes
       findCodeFor :: AccountInfo -> Maybe (AccountInfo, CodeInfo)
       findCodeFor (NonContract _ _) = Nothing
-      findCodeFor acc@(ContractNoStorage _ _ (EVMCode hsh)) = (acc,) <$> Map.lookup hsh codeMap
+      findCodeFor acc@(ContractNoStorage _ _ (ExternallyOwned hsh)) = (acc,) <$> Map.lookup hsh codeMap
       findCodeFor acc@(ContractNoStorage _ _ (SolidVMCode _ hsh)) = (acc,) <$> Map.lookup hsh codeMap
       findCodeFor (ContractNoStorage _ _ (CodeAtAccount _ _)) = Nothing -- this is only for the main chain genesis block, so we'll stipulate that it cannot contain references by address
-      findCodeFor acc@(ContractWithStorage _ _ (EVMCode hsh) _) = (acc,) <$> Map.lookup hsh codeMap
+      findCodeFor acc@(ContractWithStorage _ _ (ExternallyOwned hsh) _) = (acc,) <$> Map.lookup hsh codeMap
       findCodeFor acc@(ContractWithStorage _ _ (SolidVMCode _ hsh) _) = (acc,) <$> Map.lookup hsh codeMap
       findCodeFor (ContractWithStorage _ _ (CodeAtAccount _ _) _) = Nothing
-      findCodeFor acc@(SolidVMContractWithStorage _ _ (EVMCode hsh) _) = (acc,) <$> Map.lookup hsh codeMap
+      findCodeFor acc@(SolidVMContractWithStorage _ _ (ExternallyOwned hsh) _) = (acc,) <$> Map.lookup hsh codeMap
       findCodeFor acc@(SolidVMContractWithStorage _ _ (SolidVMCode _ hsh) _) = (acc,) <$> Map.lookup hsh codeMap
       findCodeFor (SolidVMContractWithStorage _ _ (CodeAtAccount _ _) _) = Nothing
    in catMaybes $ map findCodeFor accounts
@@ -320,7 +321,7 @@ initializeChainDBs ::
   T.Text ->
   T.Text ->
   m ()
-initializeChainDBs chainId (ChainInfo UnsignedChainInfo {..} _) org app = do
+initializeChainDBs chainId (ChainInfo UnsignedChainInfo {..} _) crtr app = do
   sRoot <- A.lookupWithDefault (A.Proxy @StateRoot) chainId
   genAddrStates <- getAllAddressStates chainId
   accountDiffs <- mapM eventualAccountState . Map.fromList $ genAddrStates
@@ -341,7 +342,7 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo {..} _) org app = do
           Just (SolidVMCode name ch) ->
             fmap (T.decodeUtf8' . snd) <$> getCode ch >>= \case
               Just (Right src) -> case runIdentity . runMemCompilerT $ compileSource False $ Map.singleton "" src of
-                Right cc -> void $ produceVMEvents [CodeCollectionAdded (const () <$> cc) (SolidVMCode name ch) org app [] Map.empty []]
+                Right cc -> void $ produceVMEvents [CodeCollectionAdded (const () <$> cc) (SolidVMCode name ch) crtr app [] Map.empty []]
                 Left _ -> pure ()
               _ -> pure ()
           _ -> pure ()
@@ -373,7 +374,7 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo {..} _) org app = do
               A._transactionChainId = chainId,
               A._transactionSender = Account (Ad.Address 0) chainId,
               A._actionData =
-                Map.singleton a $
+                OMap.singleton (a,
                   A.ActionData
                     (codeHash d)
                     emptyCodeCollection
@@ -385,7 +386,7 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo {..} _) org app = do
                         SolidVMDiff m -> A.SolidVMDiff $ Map.map fromDiff m
                     )
                     Map.empty [] []
-                    [A.Create],
+                    [A.Create]),
               A._metadata = getMetadata ch,
               A._events = S.empty,
               A._delegatecalls = S.empty
@@ -393,7 +394,7 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo {..} _) org app = do
         where
           ch =
             case codeHash d of
-              EVMCode ch' -> Just ch'
+              ExternallyOwned ch' -> Just ch'
               SolidVMCode _ ch' -> Just ch'
               CodeAtAccount _ _ -> Nothing
       fromDiff (Value v) = v

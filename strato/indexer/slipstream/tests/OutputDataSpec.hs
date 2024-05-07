@@ -82,7 +82,7 @@ createInsertsCollection :: OutputM m
 createInsertsCollection globalsIORef collections = do
   unless (null collections) $ do
     let collection = head collections
-    _ <- createCollectionTable globalsIORef (organization collection, application collection, contractname collection) (collectionname collection)
+    _ <- createCollectionTable globalsIORef (creator collection, application collection, contractname collection) (collectionname collection)
     insertCollectionTable collections
 
 -- createInsertsAbstract :: (OutputM m,
@@ -737,7 +737,7 @@ spec = do
         input = [ProcessedCollectionRow {
           address = testAdd,
           codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- $ hash "<CODEHASH>",
-          organization = "",
+          creator = "",
           application = "",
           contractname = "SwissArmy",
           collectionname = "SwissArmyMapping",

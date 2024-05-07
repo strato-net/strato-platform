@@ -13,14 +13,16 @@ contract CarbonOffset is Mintable {
         string[] _images,
         string[] _files,
         uint _createdDate,
-        uint _quantity
+        uint _quantity,
+        AssetStatus _status
     ) Mintable (
         _name,
         _description,
         _images,
         _files,
         _createdDate,
-        _quantity
+        _quantity,
+        _status
     ) {
     }
 
@@ -30,7 +32,9 @@ contract CarbonOffset is Mintable {
                               images, 
                               files, 
                               createdDate, 
-                              splitQuantity);
+                              splitQuantity,
+                              status
+                              );
         return UTXO(address(c)); // Typechecker won't let me cast directly to UTXO
     }
 }

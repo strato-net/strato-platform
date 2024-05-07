@@ -555,10 +555,6 @@ spec:
           value: ""
         - name: bootnode
           value: "52.7.26.21"
-        - name: brokenRefundReenable
-          value: ""
-        - name: cacheTransactionResults
-          value: ""
         - name: certInfo
           value: ""
         - name: connectionTimeout
@@ -570,8 +566,6 @@ spec:
         - name: debugWSPort
           value: ""
         - name: evmDebugMode
-          value: ""
-        - name: faucetEnabled
           value: ""
         - name: gasLimit
           value: ""
@@ -669,13 +663,9 @@ spec:
           value: ""
         - name: validatorBehavior
           value: "true"
-        - name: vmDebug
+        - name: VM_DEBUGGER
           value: ""
         - name: vmRunnerRTSOPTs
-          value: ""
-        - name: wireMessageCacheSize
-          value: ""
-        - name: wsDebug
           value: ""
         - name: zkHost
           value: "localhost"
@@ -785,7 +775,7 @@ spec:
           value: ""
         - name: STRATO_PORT_VAULT_PROXY
           value: "8013"
-        - name: vmDebug
+        - name: VM_DEBUGGER
           value: ""
       - image: swaggerapi/swagger-ui:v3.22.1
         name: docs

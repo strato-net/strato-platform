@@ -6,43 +6,52 @@ import { getApplicationUser } from './auth';
 
 export class NodesProvider implements vscode.TreeDataProvider<Node> {
   constructor() {}
+  // generate tooltip+ label generator
 
   getTreeItem(element: Node): vscode.TreeItem {
     return element;
   }
 
-  createNode(label: any, target: any){
-    let childData = this.getNodesFromParent(target[1]);
-    return new Node(label, vscode.TreeItemCollapsibleState.Expanded, childData)
+  createNode(label: any, target: any, collapse: vscode.TreeItemCollapsibleState){
+    let childData = this.getNodesFromParent(target);
+    return new Node(label, collapse, childData)
   }
 
   toChild = (key: string, value: any): Node => {
-    return new Node({label: key, tooltip: `${JSON.stringify(value)}`, description: `${JSON.stringify(value)}`}, vscode.TreeItemCollapsibleState.None);
+    return new Node({label: `${key}`, tooltip: `${value}`, description: `${value}`}, vscode.TreeItemCollapsibleState.None);
   }
 
   getNodesFromParent(target: any) {
     let childrenArray: any = [];
-    for(let i in target) {
-      let currentChild: any = target[i];
-      let currentConvertedChild = this.toChild(i, currentChild);
+    let keys = Object.keys(target)
+    for(let i in keys) {
+      let currentChild: any = target[keys[i]];
+      let currentConvertedChild = this.toChild(keys[i], currentChild);
       childrenArray.push(currentConvertedChild);
     }
-    console.debug(`NodesProvider/getNodesFromParent/childrenArray: ${childrenArray}`)
     return childrenArray;
   }
+  
   getMenu(element?: any) {
     let menus: any = [];
-    for(let i in element) {
-      if(element[i][0] != 'version' && Object.keys(element[i][1]).length != 0) {
-        menus.push(this.createNode({label: `${element[i][0]}`, tooltip: `${element[i][0]}`}, element[i]));
+    let elements = Object.keys(element)
+    for(let i in elements) {
+      if(typeof element[elements[i]] == "object") {
+        menus.push(new Node(
+          { label: `${elements[i]}` }, 
+          vscode.TreeItemCollapsibleState.Expanded, 
+          this.getMenu(element[elements[i]])
+        ));
       } else {
-        menus.push(new Node({label: `${element[i][0]}`, tooltip: `${JSON.stringify(element[i][1])}`, description: `${JSON.stringify(element[i][1])}`}, vscode.TreeItemCollapsibleState.None))
+        menus.push(new Node({
+          label: `${elements[i]}`, 
+          tooltip: `${element[elements[i]]}`, 
+          description: `${element[elements[i]]}`
+        }, vscode.TreeItemCollapsibleState.None))
       }
     }
 
-    console.debug(`NodesProvider/getMenu/menus: ${menus}`)
     return menus;
-
   }
 
   async getChildren(element?: Node): Promise<Node[]> {
@@ -53,8 +62,7 @@ export class NodesProvider implements vscode.TreeDataProvider<Node> {
 
         if (!node) return []
 
-        const entries = Object.entries(node);
-        let newResults = this.getMenu(entries);
+        let newResults = this.getMenu(node);
         return newResults;
 
       } else {
@@ -80,7 +88,7 @@ export class NodesProvider implements vscode.TreeDataProvider<Node> {
   async getNodesInternal(): Promise<any[]> {
     const config = getConfig() || {}
     const nodes = config.nodes || []
-    console.debug(`NodesProvider/getNodesInternal/nodes: ${nodes}`)
+    // console.debug(`NodesProvider/getNodesInternal/nodes: ${nodes}`)
     const filledNodes = await Promise.all(nodes.map(async (element) => {
       try {
         const node = await this.getNodeVersion(element);
@@ -100,11 +108,17 @@ export class NodesProvider implements vscode.TreeDataProvider<Node> {
     const nodes = await this.getNodesInternal();
 
     const toDep = (dep: any): Node => {
-      const connected = dep && dep.healthInfo
-      const prefix = connected ? (connected.isHealthy ? '✅ ' : '⚠️ ') : '❌ ';
+      console.debug(dep)
+      const connected = dep && dep.healthData
+      const prefix = connected ? (dep.healthStatus === 'HEALTHY' ? '✅ ' : '⚠️ ') : '❌ ';
       const prefixedLabel = `${prefix}${dep.label ? dep.label : dep.url}`;
       return new Node(
-        { ...dep, label: prefixedLabel, tooltip: dep.url, description: dep.label ? dep.url : undefined },
+        { 
+          ...dep, 
+          label: prefixedLabel, 
+          tooltip: dep.url, 
+          description: dep.label ? dep.url : undefined 
+        },
         connected ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None,
         undefined,
         'node'
@@ -137,6 +151,7 @@ class Node extends vscode.TreeItem {
     this.id = node.id;
     this.tooltip = node.tooltip;
     this.description = node.description;
+    this.contextValue = nodeType;
   }
 
   iconPath = {

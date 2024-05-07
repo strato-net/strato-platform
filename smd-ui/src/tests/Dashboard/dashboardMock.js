@@ -157,11 +157,11 @@ export const nodeWithPeers = {
   "peers": {
     '192.168.10.36': {
       tcp_port: "30303",
-      enode: "enode://687294782948972018571047ra9asd8f97381asdfasd",
+      pubkey: "687294782948972018571047ra9asd8f97381asdfasd"
     },
     '192.168.10.33':{
       tcp_port: "30303",
-      enode: "enode://687294782948972018571047ra9asd8f97381asdfasd",
+      pubkey: "687294782948972018571047ra9asd8f97381asdfasd"
     }
   },
   "coinbase": {
@@ -195,6 +195,7 @@ export const unSubscribeRoomMock = [
   ['GET_NODE_UPTIME'],
   ['GET_SYSTEM_INFO'],
   ['GET_SHARD_COUNT'],
+  ['GET_NETWORK_HEALTH']
 ]
 
 export const subscribeRoomMock = [
@@ -207,4 +208,6 @@ export const subscribeRoomMock = [
   ['TRANSACTIONS_COUNT'],
   ['TRANSACTIONS_TYPE'],
   ['GET_SHARD_COUNT'],
+  ['GET_SYSTEM_INFO'],
+  ['GET_NETWORK_HEALTH']
 ]

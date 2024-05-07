@@ -21,7 +21,6 @@ executables:
       - ethereum-discovery
       - hflags
       - lifted-async
-      - ordered-containers
       - strato-model
       - strato-p2p
       - wai-middleware-prometheus
@@ -31,16 +30,13 @@ library:
   source-dirs: src
   ghc-options: -Wall -O2
   dependencies:
-    - SafeSemaphore
     - aeson
-    - alarmclock
     - base16-bytestring
     - blockapps-data
     - blockapps-datadefs
     - blockapps-vault-wrapper-api
     - blockapps-vault-wrapper-client
     - blockstanbul
-    - broadcast-chan
     - bytestring
     - composable-monads-base
     - conduit
@@ -61,21 +57,15 @@ library:
     - hflags
     - http-client
     - iproute
-    # - json-rpc
-    - json-rpc-server
-    - json-rpc-client
-    - ki-unlifted
     - lens
     - lifted-async
     - lifted-base
+    - merkle-patricia-db
     - milena
     - milena-tools
     - monad-alter
-    - monad-logger
-    - monadIO
     - mtl
     - network
-    - ordered-containers
     - persistent
     - prometheus-client
     - random
@@ -125,7 +115,6 @@ tests:
       - hspec
       - hspec-expectations-lifted
       - hourglass
-      - ki-unlifted
       - labeled-error
       - lens
       - merkle-patricia-db

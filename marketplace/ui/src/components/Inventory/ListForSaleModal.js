@@ -6,9 +6,9 @@ import { PAYMENT_TYPE } from "../../helpers/constants";
 
 const { Option } = Select;
 
-const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddress, categoryName }) => {
+const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddress, categoryName, limit, offset }) => {
     const [data, setData] = useState([inventory]);
-    const [quantity, setQuantity] = useState(inventory.quantity);
+    const [quantity, setQuantity] = useState(inventory.saleAddress ? inventory.saleQuantity : inventory.quantity);
     const [paymentTypes, setPaymentTypes] = useState([PAYMENT_TYPE[0].value]);
     const [pricePerUnit, setpricePerUnit] = useState(inventory.price ? inventory.price : inventory.pricePerUnit);
     const inventoryDispatch = useInventoryDispatch();
@@ -19,8 +19,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
     } = useInventoryState();
 
     useEffect(() => {
-        console.log(inventory)
-        if (quantity > inventory.quantity || quantity <= 0 || pricePerUnit <= 0) {
+        if ( inventory.saleAddress ? quantity > (inventory.quantity - inventory.totalLockedQuantity) : quantity > inventory.quantity || quantity <= 0 || pricePerUnit <= 0) {
             setCanList(false);
         }
         else {
@@ -171,7 +170,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
             isDone = await actions.listInventory(inventoryDispatch, body);
         }
         if ( isDone ) {
-            await actions.fetchInventory(inventoryDispatch, 10, 0, "", categoryName);
+            await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
             handleCancel();
         }
     }
@@ -184,7 +183,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
             width={650}
             footer={[
                 <div className="flex justify-center md:block">   
-                  <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canList || inventory.status === "1"} loading={inventory.saleAddress ? issaleUpdating : isListing}>
+                  <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canList} loading={inventory.saleAddress ? issaleUpdating : isListing}>
                       {inventory.saleAddress ? 'Update' : 'List' }
                   </Button>
                 </div>

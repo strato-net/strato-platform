@@ -49,6 +49,24 @@ const reducer = (state, action) => {
         error: action.error,
         isInventoriesLoading: false
       };
+    case actionDescriptors.fetchInventoryForUser:
+      return {
+        ...state,
+        isUserInventoriesLoading: true
+      };
+    case actionDescriptors.fetchInventoryForUserSuccessful:
+      return {
+        ...state,
+        userInventories: action.payload.data,
+        userInventoriesTotal: action.payload.count,
+        isUserInventoriesLoading: false
+      };
+    case actionDescriptors.fetchInventoryForUserFailed:
+      return {
+        ...state,
+        error: action.error,
+        isUserInventoriesLoading: false
+      };
     case actionDescriptors.fetchInventorySearch:
       return {
         ...state,
@@ -288,6 +306,22 @@ const reducer = (state, action) => {
         error: action.error,
         isCreateInventorySubmitting: false,
       }
+    case actionDescriptors.fetchPriceHistory:
+      return {
+        ...state,
+        isFetchingPriceHistory: true,
+      };
+    case actionDescriptors.fetchPriceHistorySuccessful:
+      return {
+        ...state,
+        isFetchingPriceHistory: false,
+        priceHistory: action.payload,
+      };
+    case actionDescriptors.fetchPriceHistoryFailed:
+      return {
+        ...state,
+        isFetchingPriceHistory: false,
+      };
     default:
       throw new Error(`Unhandled action: '${action.type}'`);
   }

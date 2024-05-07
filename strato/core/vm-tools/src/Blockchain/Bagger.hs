@@ -41,7 +41,6 @@ import Blockchain.VMContext hiding (state)
 import Blockchain.VMMetrics
 import Blockchain.VMOptions
 import qualified Blockchain.Verification as V
-import Control.Arrow ((&&&))
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
@@ -105,7 +104,6 @@ runFromStateRoot mineTransactions remainingGas theBlockHeader txs = do
   return $ case res of -- currently only get GasLimit errors out of mineTransactions'
     Nothing -> Right (newStateRoot, ranTxs, newGas)
     Just TFBlockGasLimitExceeded {} -> Left (GasLimitReached ranTxs unranTxs newStateRoot newGas)
-    Just f@TFInsufficientFunds {} -> recoverable f
     Just f@TFIntrinsicGasExceedsTxLimit {} -> recoverable f
     Just f@TFChainIdMismatch {} -> recoverable f
     Just f@TFNonceMismatch {} -> error $ "mineTransactions' we messed up: " ++ format f
@@ -133,7 +131,7 @@ txsDroppedCallback rejections bestBlockShas = forM_ rejections $ \rejection -> d
   -- if a tx is dropped from Queued during demotion, it means it was likely culled during the demotion as the
   -- new best block we just mined came in
   let isRecentlyRan = theHash `elem` bestBlockShas
-  when (flags_createTransactionResults && not isRecentlyRan) $ do
+  when (not isRecentlyRan) $ do
     $logInfoS "txsDroppedCallback" . T.pack $ "Transaction rejection :: " ++ format theHash
     $logInfoS "txsDroppedCallback" . T.pack $ "Reason: " ++ message
     Mod.yield
@@ -154,13 +152,13 @@ txsDroppedCallback rejections bestBlockShas = forM_ rejections $ \rejection -> d
           transactionResultStatus = Just (txRejectionToAPIFailureCause rejection),
           transactionResultChainId = txChainId . otBaseTx $ rejectedTx rejection,
           transactionResultKind = Nothing,
-          transactionResultOrgName = "",
+          transactionResultCreator = "",
           transactionResultAppName = ""
         }
 
 -- Would it make more sense to expand the MiningCache than to introduce a separate cache?
 cacheRunResults :: MonadBagger m => DD.BlockData -> (StateRoot, Integer, [TxRunResult]) -> m ()
-cacheRunResults bd (sr, gasRemaining, trrs) = when flags_cacheTransactionResults $ do
+cacheRunResults bd (sr, gasRemaining, trrs) = do
   -- Private run results should not be cached, as on the second run
   -- the hydrated transaction will reach a different stateroot.
   -- Filtering them out makes the assumption that the inclusion of the unhydrated
@@ -173,22 +171,19 @@ cacheRunResults bd (sr, gasRemaining, trrs) = when flags_cacheTransactionResults
   liftIO $ TRC.insert cache bhash (sr, gasRemaining, publicTrrs)
 
 getCachedRunResults :: MonadBagger m => DD.BlockData -> m (Maybe (StateRoot, Integer, [TxRunResult]))
-getCachedRunResults bd =
-  if not flags_cacheTransactionResults
-    then return Nothing
-    else do
-      cache <- Mod.access (Mod.Proxy @TRC.Cache)
-      let pHash = blockHeaderPartialHash bd
-      mres <- liftIO $ TRC.lookup cache pHash
-      case mres of
-        Nothing -> do
-          $logInfoLS "getCachedRunResults/cache_miss" . T.pack $ format pHash
-          $logDebugLS "getCacheRunResults/cache_miss" bd
-          return Nothing
-        Just (sr, gasRemaining, trrs) -> do
-          $logInfoLS "getCachedRunResults/cache_hit" . T.pack $ format pHash
-          let trrs' = map (rewriteBlockHash (blockHeaderHash bd)) trrs
-          return $ Just (sr, gasRemaining, trrs')
+getCachedRunResults bd = do 
+    cache <- Mod.access (Mod.Proxy @TRC.Cache)
+    let pHash = blockHeaderPartialHash bd
+    mres <- liftIO $ TRC.lookup cache pHash
+    case mres of
+      Nothing -> do
+        $logInfoLS "getCachedRunResults/cache_miss" . T.pack $ format pHash
+        $logDebugLS "getCacheRunResults/cache_miss" bd
+        return Nothing
+      Just (sr, gasRemaining, trrs) -> do
+        $logInfoLS "getCachedRunResults/cache_hit" . T.pack $ format pHash
+        let trrs' = map (rewriteBlockHash (blockHeaderHash bd)) trrs
+        return $ Just (sr, gasRemaining, trrs')
 
 baggerRejectionToTransactionResultBits :: TxRejection -> (String, Keccak256) -- pretty, txHash
 baggerRejectionToTransactionResultBits rejection = case rejection of
@@ -544,12 +539,8 @@ removeFromSeen t = updateBaggerState (B.removeFromSeen t)
 
 getAddressNonceAndBalance :: MonadBagger m => Address -> m (Integer, Integer)
 getAddressNonceAndBalance addr = do
-  (nonce, balance) <-
-    (DD.addressStateNonce &&& DD.addressStateBalance)
-      <$> A.lookupWithDefault (A.Proxy @DD.AddressState) (Account addr Nothing)
-  if flags_gasOn
-    then return (nonce, balance)
-    else return (nonce, 9999999999999999999999999999) -- fake a high balance, so all TXs are accepted
+  nonce <- DD.addressStateNonce <$> A.lookupWithDefault (A.Proxy @DD.AddressState) (Account addr Nothing)
+  return (nonce, 9999999999999999999999999999) -- gas off; fake a high balance, so all TXs are accepted
 
 addToPromotionCache :: MonadBagger m => OutputTx -> m ()
 addToPromotionCache tx = updateBaggerState (B.addToPromotionCache tx)

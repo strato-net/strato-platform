@@ -6,7 +6,7 @@ import * as yup from "yup";
 import { actions } from "../../contexts/marketplace/actions";
 import { useMarketplaceDispatch } from "../../contexts/marketplace";
 
-const ResponsiveAddAddress = ({ back }) => {
+const ResponsiveAddAddress = ({ close }) => {
   const [showAddress, setshowAddress] = useState(false);
   const marketplaceDispatch = useMarketplaceDispatch();
   const ShippingDetailsSchema = () => {
@@ -58,7 +58,6 @@ const ResponsiveAddAddress = ({ back }) => {
       await actions.fetchUserAddresses(marketplaceDispatch);
     }
   };
-  const { TextArea } = Input;
   const formik = useFormik({
     initialValues: {
       sameAddress: true,
@@ -71,17 +70,19 @@ const ResponsiveAddAddress = ({ back }) => {
       country: "",
     },
     validationSchema: ShippingDetailsSchema,
-    onSubmit: function (values) {
+    onSubmit: function (values, { resetForm }) {
       handleFormSubmit(values);
-      back();
+      resetForm();
+      close();
     },
   });
   return (
     <Form layout="horizontal" className="">
-      <div className="pt-2 pb-5 px-4 h-[70vh] overflow-y-auto">
+      <div className="pt-2 px-4 overflow-y-auto">
+        <p className="text-base md:text-xl lg:text-2xl text-[#202020] font-semibold mb-6">Add New Address</p>
         <div className="flex flex-col gap-[18px]">
           <Form.Item name="name" className="">
-            <p className="text-left text-[#202020]  text-smfont-medium">Name</p>
+            <p className="text-left text-[#202020]  text-sm font-medium">Name</p>
             <Input
               label="name"
               name="name"
@@ -89,6 +90,7 @@ const ResponsiveAddAddress = ({ back }) => {
               placeholder="Enter Name"
               value={formik.values.name}
               onChange={formik.handleChange}
+              style={{ fontSize: '16px' }}
             />
             {formik.touched.name && formik.errors.name && (
               <p className="text-error text-xs text-left">
@@ -98,7 +100,7 @@ const ResponsiveAddAddress = ({ back }) => {
           </Form.Item>
 
           <Form.Item label="" name="addressLine1" className="">
-            <p className="text-left text-[#202020]  text-smfont-medium">
+            <p className="text-left text-[#202020]  text-sm font-medium">
               Address line 1
             </p>
             <Input
@@ -107,6 +109,7 @@ const ResponsiveAddAddress = ({ back }) => {
               placeholder="Enter Address Line 1"
               value={formik.values.addressLine1}
               onChange={formik.handleChange}
+              style={{ fontSize: '16px' }}
             />
             {formik.touched.addressLine1 && formik.errors.addressLine1 && (
               <p className="text-error text-xs text-left">
@@ -116,7 +119,7 @@ const ResponsiveAddAddress = ({ back }) => {
           </Form.Item>
 
           <Form.Item label="" name="" className="">
-            <p className="text-left text-[#202020]  text-smfont-medium">
+            <p className="text-left text-[#202020]  text-sm font-medium">
               Address line 2
             </p>
             <Input
@@ -125,6 +128,7 @@ const ResponsiveAddAddress = ({ back }) => {
               placeholder="Enter Address Line 2"
               value={formik.values.addressLine2}
               onChange={formik.handleChange}
+              style={{ fontSize: '16px' }}
             />
             {formik.touched.addressLine2 && formik.errors.addressLine2 && (
               <p className="text-error text-xs  text-left">
@@ -133,7 +137,7 @@ const ResponsiveAddAddress = ({ back }) => {
             )}
           </Form.Item>
           <Form.Item label="" name="city" className="">
-            <p className="text-[#202020]  text-smfont-medium text-left">City</p>
+            <p className="text-[#202020]  text-sm font-medium text-left">City</p>
             <Input
               label="city"
               name="city"
@@ -141,6 +145,7 @@ const ResponsiveAddAddress = ({ back }) => {
               placeholder="Enter City"
               value={formik.values.city}
               onChange={formik.handleChange}
+              style={{ fontSize: '16px' }}
             />
             {formik.touched.city && formik.errors.city && (
               <p className="text-error text-xs text-left">
@@ -159,6 +164,7 @@ const ResponsiveAddAddress = ({ back }) => {
               placeholder="Enter State"
               value={formik.values.state}
               onChange={formik.handleChange}
+              style={{ fontSize: '16px' }}
             />
             {formik.touched.state && formik.errors.state && (
               <p className="text-error text-xs text-left">
@@ -178,6 +184,7 @@ const ResponsiveAddAddress = ({ back }) => {
               maxLength={15}
               value={formik.values.zipcode}
               onChange={formik.handleChange}
+              style={{ fontSize: '16px' }}
             />
             {formik.touched.zipcode && formik.errors.zipcode && (
               <p className="text-error text-xs text-left">
@@ -186,7 +193,7 @@ const ResponsiveAddAddress = ({ back }) => {
             )}
           </Form.Item>
           <Form.Item label="" name="country" className="">
-            <p className="text-[#202020]  text-sm font-medium text-left">
+            <p className="text-[#202020] text-sm font-medium text-left">
               Country
             </p>
             <Input
@@ -196,6 +203,7 @@ const ResponsiveAddAddress = ({ back }) => {
               placeholder="Enter Country"
               value={formik.values.country}
               onChange={formik.handleChange}
+              style={{ fontSize: '16px' }}
             />
             {formik.touched.country && formik.errors.country && (
               <p className="text-error text-xs text-left">
@@ -206,21 +214,12 @@ const ResponsiveAddAddress = ({ back }) => {
         </div>
       </div>
 
-      <div className="absolute bottom-0 px-[14px] w-full py-[14px] shadow-Footer  !z-50">
-        <div className="flex w-full justify-between items-center gap-4">
-          <Button
-            type="default"
-            className="h-[42px] pt-1  w-[163px]"
-            onClick={back}
-          >
-            Cancel
-          </Button>
-          <div
-            className="cursor-pointer justify-center flex items-center w-40 h-[42px] pt-1   border border-primary rounded bg-primary hover:bg-primaryHover text-white"
-            onClick={formik.handleSubmit}
-          >
-            Add address
-          </div>
+      <div className="flex justify-center px-[14px] py-[14px] mt-2 mb-6 !z-50">
+        <div
+          className="cursor-pointer justify-center flex items-center w-40 h-[42px] pt-1 border border-primary rounded bg-primary hover:bg-primaryHover text-white"
+          onClick={formik.handleSubmit}
+        >
+          Add address
         </div>
       </div>
     </Form>

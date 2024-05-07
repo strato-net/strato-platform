@@ -27,15 +27,12 @@ library:
     - binary
     - bloc2
     - blockapps-data
-    - blockapps-datadefs
     - blockapps-mpdbs
     - classy-prelude
     - conduit
     - containers
-    - core-api2
     - cross-monitoring
     - deepseq
-    - ethereum-rlp
     - extra
     - format
     - lens
@@ -46,10 +43,8 @@ library:
     - persistent
     - postgresql-typed
     - prometheus-client
-    - solid-vm
     - solid-vm-model
     - scientific
-    - source-tools
     - sql-monad
     - strato-model
     - text
@@ -58,6 +53,8 @@ library:
     - unliftio
     - unliftio-core
     - vm-tools
+    - ordered-containers
+    - solid-vm
 
 executables:
   slipstream:
@@ -103,3 +100,4 @@ tests:
       - time
       - unliftio
       - vm-tools
+      - ordered-containers

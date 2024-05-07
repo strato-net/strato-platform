@@ -3,6 +3,7 @@ import * as path from 'path';
 import { rest } from 'blockapps-rest';
 import { getApplicationUser } from './auth';
 import getConfig from './load.config';
+import getOptions from './load.options';
 
 export class CirrusProvider implements vscode.TreeDataProvider<CirrusItem> {
   _queryString: string;
@@ -25,15 +26,14 @@ export class CirrusProvider implements vscode.TreeDataProvider<CirrusItem> {
   }
 
   async callCirrus(name, query): Promise<string[]> {
-    const config = getConfig() || {}
-    const options = { config };
+    const options = getOptions() 
     const appUser = await getApplicationUser()
     const results = await rest.search(appUser, { name }, { ...options, query })
     return results
   }
 
   /**
-   * Given the path to package.json, read all its deployments and devDeployments.
+   * Given the path to a designated config.yaml, read all its deployments information
    */
   private async queryCirrus(): Promise<CirrusItem[]> {
     const [name, queryString] = this._queryString.split('?')
@@ -83,9 +83,12 @@ class CirrusItem extends vscode.TreeItem {
     public readonly collapsibleState: vscode.TreeItemCollapsibleState
   ) {
     super(item.label, collapsibleState);
+    this.tooltip = item.tooltip;
+    this.description = item.description;
+    delete item.tooltip
+    delete item.description
+    delete item.label
     this._item = item;
-    this.tooltip = this._item.tooltip;
-    this.description = this._item.description;
   }
 
   iconPath = {

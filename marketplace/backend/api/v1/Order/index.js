@@ -7,6 +7,13 @@ import loadDapp from "../../middleware/loadDappHandler";
 const router = express.Router();
 
 router.get(
+  Order.export,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  OrderController.export
+)
+
+router.get(
   Order.get,
   authHandler.authorizeRequest(),
   loadDapp,
@@ -116,6 +123,13 @@ router.put(
   authHandler.authorizeRequest(),
   loadDapp,
   OrderController.updateOrderComment
+)
+
+router.post(
+  Order.checkSaleQuantity,
+  authHandler.authorizeRequest(true),
+  loadDapp,
+  OrderController.checkSaleQuantity
 )
 
 

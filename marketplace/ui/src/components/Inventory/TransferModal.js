@@ -7,9 +7,10 @@ import { useUsersDispatch, useUsersState } from "../../contexts/users";
 import { useAuthenticateState } from "../../contexts/authentication";
 import { SearchOutlined } from '@ant-design/icons';
 
-const TransferModal = ({ open, handleCancel, inventory, categoryName }) => {
+const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, offset }) => {
     const [data, setData] = useState([inventory]);
     const [quantity, setQuantity] = useState(1);
+    const [price, setPrice] = useState(0);
     const [userAddress, setUserAddress] = useState("");
     const inventoryDispatch = useInventoryDispatch();
     const userDispatch = useUsersDispatch();
@@ -41,6 +42,8 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName }) => {
 
     const handleSelect = (userAddress) => {
         setUserAddress(userAddress);
+
+        setDropdownOpen(false);
     }
 
     useEffect(() => {
@@ -77,11 +80,18 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName }) => {
             )
         },
         {
+            title: "Set Price",
+            align: "center",
+            render: () => (
+                <InputNumber value={price} controls={false} min={1} onChange={(value) => setPrice(value)} />
+            )
+        },
+        {
             title: "Select recipient",
             align: "center",
             render: () => (
                 <Select
-                    className="w-64"
+                    className="w-[390px]"
                     showSearch
                     onSelect={handleSelect}
                     onSearch={handleSearchChange}
@@ -94,6 +104,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName }) => {
                     suffixIcon={<SearchOutlined />}
                     onFocus={() => setDropdownOpen(!!searchInput)} // Open dropdown on focus if there is any input
                     onBlur={() => setDropdownOpen(false)} // Close dropdown on blur
+                    popupClassName="custom-select-dropdown" // Add this line
                 />
             )
         }
@@ -104,13 +115,15 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName }) => {
         const body = {
             assetAddress: inventory.address,
             newOwner: userAddress,
-            quantity
+            quantity,
+            price
         };
 
         if (quantity > 0 && quantity <= inventory.quantity && userAddress) {
             let isDone = await actions.transferInventory(inventoryDispatch, body);
             if (isDone) {
-                await actions.fetchInventory(inventoryDispatch, 10, 0, "", categoryName);
+                await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
+                await actions.fetchInventoryForUser(inventoryDispatch, user.commonName);
                 handleCancel();
             }
         }
@@ -121,7 +134,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName }) => {
             open={open}
             onCancel={handleCancel}
             title={`Transfer - ${decodeURIComponent(inventory.name)}`}
-            width={650}
+            width={825}
             footer={[
                 <div className="flex justify-center md:block">
                     <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canTransfer} loading={isTransferring}>
@@ -146,10 +159,15 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName }) => {
                     </div>
                 </div>
                 <div>
-
                     <p className="text-[#202020] font-medium text-sm">Set Quantity</p>
                     <div className="inventory_card">
                         <InputNumber className="w-full pl-5" value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
+                    </div>
+                </div>
+                <div>
+                    <p className="text-[#202020] font-medium text-sm">Set Price</p>
+                    <div className="inventory_card">
+                        <InputNumber className="w-full pl-5" value={price} controls={false} min={1} onChange={(value) => setPrice(value)} />
                     </div>
                 </div>
                 <div>
@@ -168,6 +186,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName }) => {
                         suffixIcon={<SearchOutlined />}
                         onFocus={() => setDropdownOpen(!!searchInput)} // Open dropdown on focus if there is any input
                         onBlur={() => setDropdownOpen(false)} // Close dropdown on blur
+                        popupClassName="custom-select-dropdown"
                     />
                 </div>
 

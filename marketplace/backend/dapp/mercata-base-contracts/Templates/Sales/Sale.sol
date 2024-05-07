@@ -45,6 +45,23 @@ abstract contract Sale is Utils {
         require(commonName == sellersCommonName, err);
     }
 
+    modifier requireSellerOrBuyer(string action) {
+        string sellersCommonName = assetToBeSold.ownerCommonName();
+        Order order = Order(msg.sender);
+        string purchasersCommonName = order.purchasersCommonName();
+        string err = "Only "
+                   + sellersCommonName
+                   + ","
+                   + purchasersCommonName
+                   + " can perform "
+                   + action
+                   + ".";
+        string commonName = getCommonName(tx.origin);
+
+        require((commonName == purchasersCommonName || commonName == sellersCommonName), err);
+
+    }
+
     function changePrice(uint _price) public requireSeller("change price"){
         price=_price;
     }
@@ -81,17 +98,17 @@ abstract contract Sale is Utils {
     }
 
     function completeSale(
-    ) public requireSeller("complete sale") returns (uint) {
+    ) public requireSellerOrBuyer("complete sale") returns (uint) {
         Order order = Order(msg.sender);
         address purchaser = order.purchasersAddress();
         uint orderQuantity = takeLockedQuantity(msg.sender);
-        // regular transfer - isUserTransfer: false, transferNumber: 0
-        assetToBeSold.transferOwnership(purchaser, orderQuantity, false, 0);
+        // regular transfer - isUserTransfer: false, transferNumber: 0, transferPrice: 0
+        assetToBeSold.transferOwnership(purchaser, orderQuantity, false, 0, 0);
         closeSaleIfEmpty();
         return RestStatus.OK;
     }
 
-    function automaticTransfer(address _newOwner, uint _quantity, uint _transferNumber) public returns (uint) {
+    function automaticTransfer(address _newOwner, uint _price, uint _quantity, uint _transferNumber) public returns (uint) {
         require(msg.sender == address(assetToBeSold), "Only the underlying Asset can call automaticTransfer.");
         uint assetQuantity = assetToBeSold.quantity();
         require(_quantity <= assetQuantity - totalLockedQuantity, "Cannot transfer more units than are available.");
@@ -100,8 +117,8 @@ abstract contract Sale is Utils {
         } else {
             quantity -= _quantity;
         }
-        // transfer feature - isUserTransfer: true, transferNumber: _transferNumber
-        assetToBeSold.transferOwnership(_newOwner, _quantity, true, _transferNumber);
+        // transfer feature - isUserTransfer: true, transferNumber: _transferNumber, transferPrice: _price
+        assetToBeSold.transferOwnership(_newOwner, _quantity, true, _transferNumber, _price);
         closeSaleIfEmpty();
         return RestStatus.OK;
     }
