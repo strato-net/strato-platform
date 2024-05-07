@@ -4,14 +4,16 @@ import sendEmail from '../../../helpers/email';
 class SellerStatusController {
   static async requestReview(req, res, next){
     try {
-      const {emailAddr, commonName} = req.body;
+      const {dapp, body} = req;
+      const user = await dapp.requestReview( {commonName} )
+      const {emailAddr, commonName} = body;
       const contents = `The user <b>${commonName}</b> is requesting to be an authorized seller on Strato Mercata. You may get in contact with them by reaching out at ${emailAddr}. If you decide to authorize them, you may do so at the /admin endpoint on the marketplace.`
       // todo: remember to change to address after done testing
-      let resp = await sendEmail('aya_abdelgawad@blockapps.net', commonName + ' Requesting Seller Status', contents);
-      console.log('AYA LOGS - email resp', resp);
-      // what to return?
+      await sendEmail('aya_abdelgawad@blockapps.net', commonName + ' Requesting Seller Status', contents);
+      rest.response.status200(res, user);
+      return next();
     } catch (e) {
-      return next(e);
+      next(e);
     }
   }
 

@@ -33,6 +33,7 @@ import { SEO } from "../../helpers/seoConstant";
 import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
 //authorized seller
 import RequestBeAuthorizedSellerModal from "./RequestBeAuthorizedSellerModal";
+import { SELLER_STATUS } from '../../helpers/constants';
 
 
 const Inventory = ({ user }) => {
@@ -287,7 +288,7 @@ const metaImg = category ? category : SEO.IMAGE_META
                   onClick={() => {
                     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                       window.location.href = loginUrl;
-                    } else if (!user.authorizedSeller) {
+                    } else if (user.sellerStatus != SELLER_STATUS.AUTHORIZED) {
                       showReqModModal()
                     }
                     else {
@@ -408,6 +409,7 @@ const metaImg = category ? category : SEO.IMAGE_META
             handleCancel={handleReqModCancel}
             commonName={user.commonName}
             emailAddr={user.email}
+            sellerStatus={user.sellerStatus}
           />
         )
       }

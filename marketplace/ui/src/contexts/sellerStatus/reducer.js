@@ -2,6 +2,18 @@ import { actionDescriptors } from "./actions";
 
 const reducer = (state, action) => {
     switch (action.type) {
+        case actionDescriptors.resetMessage:
+            return {
+                ...state,
+                success: false,
+                message: null
+            };
+        case actionDescriptors.setMessage:
+            return {
+                ...state,
+                success: action.success,
+                message: action.message
+            };
         case actionDescriptors.requestReview:
             return {
                 ...state,
@@ -28,6 +40,21 @@ const reducer = (state, action) => {
                 changingSellerStatus: false,
             };
         case actionDescriptors.authorizeSellerFailed:
+            return {
+                ...state,
+                changingSellerStatus: false,
+            };
+        case actionDescriptors.deauthorizeSeller:
+            return {
+                ...state,
+                changingSellerStatus: true,
+            };
+        case actionDescriptors.deauthorizeSellerSuccessful:
+            return {
+                ...state,
+                changingSellerStatus: false,
+            };
+        case actionDescriptors.deauthorizeSellerFailed:
             return {
                 ...state,
                 changingSellerStatus: false,

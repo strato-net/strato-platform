@@ -152,12 +152,6 @@ export const ORDER_STATUS = {
   "PAYMENT_PENDING": 5
 }
 
-export const ASSET_STATUS = {
-  "ACTIVE": 1,
-  "PENDING_REDEMPTION": 2,
-  "RETIRED": 3
-}
-
 export const REDEMPTION_STATUS = {
   "PENDING": 1,
   "FULFILLED": 2,
@@ -166,5 +160,17 @@ export const REDEMPTION_STATUS = {
   "2": "Fulfilled",
   "3": "Rejected"
 }
+
+export const ASSET_STATUS = {
+  "ACTIVE": 1,
+  "PENDING_REDEMPTION": 2,
+  "RETIRED": 3
+}
+
+export const SELLER_STATUS = {
+  "UNAUTHORIZED": "1",
+  "PENDING_REVIEW": "2",
+  "AUTHORIZED": "3" 
+ }
 
 export const PAYMENT_LIST = ['card','us_bank_account']

@@ -4,10 +4,12 @@ import { actions } from "../../contexts/sellerStatus/actions";
 import { useSellerStatusState, useSellerStatusDispatch } from "../../contexts/sellerStatus";
 
 export default function AuthorizeSeller(){
+    const { changingSellerStatus } = useSellerStatusState();
     const dispatch = useSellerStatusDispatch();
     const onFinish = async (values) => {
         console.log('AYAS LOGS - values', values);
-        await actions.authorizeSeller(dispatch, values);
+        let resp = await actions.authorizeSeller(dispatch, values);
+        console.log(resp);
     }
     return (
         <Form 
@@ -24,7 +26,7 @@ export default function AuthorizeSeller(){
             <Form.Item label="Seller's Common Name" name="commonName">
             <Input/>
             </Form.Item> 
-            <Button type="primary" htmlType="submit">
+            <Button type="primary" htmlType="submit" loading={changingSellerStatus}>
             Authorize Seller
             </Button>
         </Form>

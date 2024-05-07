@@ -5,18 +5,24 @@ import {
 } from "antd";
 import { actions } from "../../contexts/sellerStatus/actions";
 import { useSellerStatusState, useSellerStatusDispatch } from "../../contexts/sellerStatus";
+import { SELLER_STATUS } from '../../helpers/constants';
 
 const RequestBeAuthorizedSellerModal = ({
   open,
   handleCancel,
   commonName,
-  emailAddr
+  emailAddr,
+  sellerStatus
 }) => {
   const dispatch = useSellerStatusDispatch();
-  function sendRequest(){
-    actions.requestReview(dispatch, {email: emailAddr, commonName: commonName});
+  const { requestingReview } = useSellerStatusState();
+  async function sendRequest(){
+    await actions.requestReview(dispatch, {emailAddr: emailAddr, commonName: commonName});
     handleCancel();
   }
+
+  const requestReviewText = 'Thank you for interest in being a seller on Mercata! To keep our platform safe, we must first verify you as a seller. Click the button to request a review, and our team will get back to you shortly with our response!';
+  const alreadyRequestedReviewText = 'Thank you for interest in being a seller on Mercata! You have already requested to be reviewed as a seller. Our team will get back to you shortly with a response. If you have questions, please feel free to reach out to support@blockapps.net';
   
   return (
     <>
@@ -31,6 +37,8 @@ const RequestBeAuthorizedSellerModal = ({
               className="w-40"
               type="primary"
               onClick={sendRequest}
+              loading={requestingReview}
+              disabled={sellerStatus === SELLER_STATUS.PENDING_REVIEW}
             >
               Request Review
             </Button>
@@ -40,7 +48,7 @@ const RequestBeAuthorizedSellerModal = ({
         <h1 className=" font-semibold text-lg text-[#202020]">
           Unauthorized to Create Assets
         </h1>
-        <p> Thank you for interest in being a seller on Mercata! To keep our platform safe, we must first verify you as a seller. Click the button to request a review, and our team will get back to you shortly with our response!</p>
+        <p> {sellerStatus === SELLER_STATUS.PENDING_REVIEW ? alreadyRequestedReviewText : requestReviewText } </p>
         
       </Modal>
     </>

@@ -217,6 +217,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getCertificates = async function (args) {
     return certificateJs.getCertificates(admin, args);
   };
+  contract.requestReview = async function (args) {
+    return certificateJs.requestReview(admin, args);
+  };
   contract.authorizeSeller = async function (args) {
     return certificateJs.authorizeSeller(admin, args);
   };

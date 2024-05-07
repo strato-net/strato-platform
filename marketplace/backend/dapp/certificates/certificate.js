@@ -1,7 +1,6 @@
 import { rest } from 'blockapps-rest'
 import config from "/load.config"
 import constants from '/helpers/constants'
-import RestStatus from 'http-status-codes';
 import { setSearchQueryOptions, searchOne, searchAllWithQueryArgs } from '/helpers/utils'
 
 // Utility functions for getting Certificates from the CertRegistry Dapp on the main chain in Mercata
@@ -32,65 +31,77 @@ async function getCertificates(admin, args = {}, options = defaultOptions) {
     return certs
 }
 
-// USING user commonname 
-// -> query User table in cirrus to get user contract address 
-// -> call "authorizeSeller" method via strato api with address 
-async function authorizeSeller(admin, args, options=defaultOptions) {   
-    const {commonName} = args;
-    // todo put in constants
-    const searchOptions = {...options, query: {authorizedSeller: 'not.is.null', commonName: `eq.${commonName}`, limit: 1}}
-    let user = await rest.search(admin, {name: 'BlockApps-UserRegisry-User'}, searchOptions)
-    console.log('AYA LOGS - user', user);
-    
-    const callArgs = {
-        contract: {address: user[0].address},
-        method: "authorizeSeller",
-        args: {}
-    };
-    
-    const authorizationStatus = await rest.call(admin, callArgs, options);
+// --------------------------- USER WALLETS ---------------------------
+const userSearchOptions = {notEqualsField: 'sellerStatus', notEqualsValue: 'null', sort: '-block_timestamp', limit: 1}
 
-    if (parseInt(authorizationStatus, 10) !== RestStatus.OK) {
-        throw new rest.RestError(
-            authorizationStatus,
-            "You cannot resell the item because it has already been sold by the original owner.",
-            { callArgs }
-        );
-    }
+async function requestReview(admin, args, options=defaultOptions) {   
+    const { commonName } = args;
+    const searchOptions = { commonName: commonName, ...userSearchOptions };
+    const user = await searchAllWithQueryArgs(constants.userContractName, searchOptions, options, admin);
     
-    return authorizationStatus;
+    if (user[0]) {  
+        try {
+            const callArgs = {
+                contract: {address: user[0].address},
+                method: "requestReview",
+                args: {}
+            };
+            await rest.call(admin, callArgs, options);
+        } catch {
+            throw new rest.RestError("Could not set seller status to pending review");
+        }
+    } else {
+        throw new rest.RestError("No user contract found to modify seller status of");
+    }
+}
+
+async function authorizeSeller(admin, args, options=defaultOptions) {   
+    const { commonName } = args;
+    const searchOptions = { commonName: commonName, ...userSearchOptions };
+    const user = await searchAllWithQueryArgs(constants.userContractName, searchOptions, options, admin);
+    
+    if (user[0]) {
+        try {
+            const callArgs = {
+                contract: {address: user[0].address},
+                method: "authorizeSeller",
+                args: {}
+            };    
+            await rest.call(admin, callArgs, options);
+        } catch (e) {
+            throw new rest.RestError("Only admins can authorize a seller");
+        }
+    } else {
+        throw new rest.RestError("No user found with that username");
+    }
 }
 
 async function deauthorizeSeller(admin, args, options=defaultOptions) {   
     const {commonName} = args;
-    // todo put in constants
-    const searchOptions = {...options, query: {authorizedSeller: 'not.is.null', commonName: `eq.${commonName}`, limit: 1}}
-    let user = await rest.search(admin, {name: 'BlockApps-UserRegistry-User'}, searchOptions)
-    console.log('AYA LOGS - user', user);
+    const searchOptions = { commonName: commonName, ...userSearchOptions };
+    const user = await searchAllWithQueryArgs(constants.userContractName, searchOptions, options, admin);
     
-    const callArgs = {
-        contract: {address: user[0].address},
-        method: "deauthorizeSeller",
-        args: {}
-    };
-    
-    const authorizationStatus = await rest.call(admin, callArgs, options);
-
-    if (parseInt(authorizationStatus, 10) !== RestStatus.OK) {
-        throw new rest.RestError(
-            authorizationStatus,
-            "You cannot resell the item because it has already been sold by the original owner.",
-            { callArgs }
-        );
+    if (user[0]) {
+        try {
+            const callArgs = {
+                contract: {address: user[0].address},
+                method: "deauthorizeSeller",
+                args: {}
+            };     
+            await rest.call(admin, callArgs, options);
+        } catch {
+            throw new rest.RestError("Only admins can deauthorize a seller");
+        }
+    } else {
+        throw new rest.RestError("No user found with that username");
     }
-    
-    return authorizationStatus;
 }
 
 export default {
     getCertificate,
     getCertificateMe,
     getCertificates,
+    requestReview,
     authorizeSeller,
     deauthorizeSeller,
 }

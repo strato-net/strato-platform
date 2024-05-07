@@ -9,6 +9,7 @@ const router = express.Router()
 router.post(
   SellerStatus.requestReview,
   authHandler.authorizeRequest(),
+  loadDapp,
   SellerStatusController.requestReview,
 )
 

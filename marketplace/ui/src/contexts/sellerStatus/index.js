@@ -6,6 +6,8 @@ const SellerStatusDispatchContext = createContext();
 
 const SellerStatusProvider = ({children}) => {
     const initialState = {
+        success: false,
+        message: null,
         changingSellerStatus: false,
         requestingReview: false,
     }
