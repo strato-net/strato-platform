@@ -108,7 +108,8 @@ class OrderController {
   static async payment(req, res, next) {
     try {
       const { dapp, body, accessToken } = req
-      const originUrl = req.headers.origin || constants.localHost
+      console.log("originUrl-Header--------------------------------------------------------", req.headers);
+      const originUrl = req.headers.origin || constants.localHost;
       OrderController.validatePaymentArgs(body)
 
       const result = await dapp.paymentCheckout(originUrl, body, options, accessToken)
