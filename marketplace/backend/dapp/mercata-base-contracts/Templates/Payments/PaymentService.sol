@@ -32,6 +32,9 @@ abstract contract PaymentService is Utils {
         bool success
     );
 
+    address public purchasersAddress;   // ONLY USED FOR BACKWARDS COMPATIBILITY WITH SALE. DELETE ONCE ALL SALES USE NEW LOGIC!!!
+    string public purchasersCommonName; // ONLY USED FOR BACKWARDS COMPATIBILITY WITH SALE. DELETE ONCE ALL SALES USE NEW LOGIC!!!
+
     constructor (
         string _serviceName,
         string _imageURL,
@@ -104,7 +107,11 @@ abstract contract PaymentService is Utils {
             uint quantity = _quantities[i];
             uint amount = s.price();
             quantitiesMap[recipient] += amount;
-            Sale(_saleAddresses[i]).lockQuantity(_quantities[i], msg.sender);
+            try {
+                Sale(_saleAddresses[i]).lockQuantity(_quantities[i], msg.sender);
+            } catch { // Support for legacy sales
+                _saleAddresses[i].call("lockQuantity", _quantities[i]);
+            }
         }
         for (uint j = 0; j < openOrders[token].recipients.length; j++) {
             address recipient = openOrders[token].recipients[j];
@@ -124,12 +131,18 @@ abstract contract PaymentService is Utils {
         string token
     ) internal virtual returns (address[]) {
         require(openOrders[token].purchaser != address(0), "Invalid order token: " + token);
+        purchasersAddress = openOrders[token].purchaser; // Support for legacy sales
+        purchasersCommonName = getCommonName(tx.origin);
         address[] assets;
         for (uint i = 0; i < openOrders[token].saleAddresses.length; i++) {
             Sale s = Sale(openOrders[token].saleAddresses[i]);
             Asset a = s.assetToBeSold();
             assets.push(address(a));
-            s.completeSale(openOrders[token].purchaser);
+            try {
+                s.completeSale(openOrders[token].purchaser);
+            } catch { // Support for legacy sales
+                address(s).call("completeSale");
+            }
             openOrders[token].saleAddresses[i] = address(0);
         }
         for (uint j = 0; j < openOrders[token].recipients.length; j++) {
@@ -139,6 +152,8 @@ abstract contract PaymentService is Utils {
             openOrders[token].quantities[j] = 0;
         }
         openOrders[token].purchaser = address(0);
+        purchasersAddress = address(0); // Support for legacy sales
+        purchasersCommonName = "";
         return assets;
     }
 
@@ -154,7 +169,11 @@ abstract contract PaymentService is Utils {
         require(openOrders[token].purchaser != address(0), "Invalid order token: " + token);
         for (uint i = 0; i < openOrders[token].saleAddresses.length; i++) {
             Sale s = Sale(openOrders[token].saleAddresses[i]);
-            s.unlockQuantity(openOrders[token].purchaser);
+            try {
+                s.unlockQuantity(openOrders[token].purchaser);
+            } catch { // Support for legacy sales
+                address(s).call("unlockQuantity");
+            }
             openOrders[token].saleAddresses[i] = address(0);
         }
         for (uint j = 0; j < openOrders[token].recipients.length; j++) {

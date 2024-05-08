@@ -24,7 +24,7 @@ import { PAYMENT_LIST } from "../../helpers/constants";
 import TagManager from "react-gtm-module";
 import { setCookie } from "../../helpers/cookie";
 
-const ConfirmOrder = ({ paymentProviders, data, columns }) => {
+const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const orderDispatch = useOrderDispatch();
   const [api, contextHolder] = notification.useNotification();
