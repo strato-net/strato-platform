@@ -22,6 +22,7 @@ const ResponsiveCart = ({
   openToastOrder
 }) => {
   const [tax, setTax] = useState(0);
+  const [selectedPaymentService, setSelectedPaymentService] = useState('');
   const { cartList } = useMarketplaceState();
   const marketplaceDispatch = useMarketplaceDispatch();
   const inventoryDispatch = useInventoryDispatch();
@@ -68,6 +69,7 @@ const ResponsiveCart = ({
   });
 
   const handlePaymentConfirm = async (paymentProvider) => {
+    setSelectedPaymentService(paymentProvider.serviceName);
     actions.addItemToConfirmOrder(marketplaceDispatch, cartData);
     let orderList = [];
     cartData.forEach((item) => {
@@ -100,17 +102,19 @@ const ResponsiveCart = ({
       },
     });
     let token = await orderActions.createPayment(orderDispatch, body);
-    let serviceURL = paymentProvider.serviceURL || paymentProvider.data.serviceURL;
-    let checkoutRoute = paymentProvider.checkoutRoute || paymentProvider.data.checkoutRoute;
-    if (serviceURL
-          && serviceURL !== ''
-          && checkoutRoute
-          && checkoutRoute !== ''
-       ) {
-      const url = `${serviceURL}${checkoutRoute}?token=${token}&redirectUrl=${window.location.protocol}//${window.location.host}`
-      window.location.replace(url);
-    } else {
-      window.location.replace("/order/bought");
+    if (token && token !== false) {
+      let serviceURL = paymentProvider.serviceURL || paymentProvider.data.serviceURL;
+      let checkoutRoute = paymentProvider.checkoutRoute || paymentProvider.data.checkoutRoute;
+      if (serviceURL
+            && serviceURL !== ''
+            && checkoutRoute
+            && checkoutRoute !== ''
+         ) {
+        const url = `${serviceURL}${checkoutRoute}?token=${token}&redirectUrl=${window.location.protocol}//${window.location.host}`
+        window.location.replace(url);
+      } else {
+        window.location.replace("/order/bought");
+      }
     }
   };
 
@@ -271,7 +275,7 @@ const ResponsiveCart = ({
               type="primary"
               id="submit-order-button"
               className=" w-full sm:w-52 h-9 !bg-[#13188A]"
-              loading={isCreatePaymentSubmitting}
+              loading={isCreatePaymentSubmitting && selectedPaymentService === paymentProvider.serviceName}
               onClick={async () => {
                 if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                   window.location.href = loginUrl;
