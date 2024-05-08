@@ -3,6 +3,7 @@ import {
     Input,
     Select
 } from "antd";
+import { spiritTypes } from "../../helpers/constants";
 
 const { Option } = Select;
 
@@ -331,6 +332,68 @@ export const categoricalProperties = (form, handleClothingTypeChange, clothingTy
                         <Input placeholder="Enter Quantity" />
                     </Form.Item>
                 </div>);
+        case "Spirits":
+            return (<div className="flex flex-wrap gap-3 mt-4 justify-between">
+                <Form.Item
+                    label="Type"
+                    name="spiritType"
+                    className="w-full md:w-[200px]"
+                    rules={[
+                        {
+                            required: true,
+                            message: 'Please select a spirit type',
+                        },
+                    ]}
+                >
+                    <Select
+                        placeholder="Select Type of spirit"
+                        onChange={handleClothingTypeChange}
+                    >
+                        {spiritTypes.map(({ value, label }) => <Option key={value} value={value}>{label}</Option>)}
+                    </Select>
+                </Form.Item>
+                <Form.Item
+                    label="Unit of Measurement"
+                    name="unitOfMeasurement"
+                    className="w-full md:w-[200px]"
+                    rules={[
+                        {
+                            required: true,
+                            message: 'Please enter a unit of measurement',
+                        },
+                    ]}
+                >
+                    <Select
+                        placeholder="Select Unit of Measurement "
+                        allowClear
+                        className="w-full "
+                        onChange={(value) => {
+                            let selectedUOM = unitOfMeasures.find(u => u.value === value);
+                            form.setFieldValue("unitOfMeasurement.name", selectedUOM.name);
+                            form.setFieldValue("unitOfMeasurement.value", value);
+                        }}
+                    >
+                        {unitOfMeasures.map((e, index) => (
+                            <Option value={e.value} key={index}>
+                                {e.name}
+                            </Option>
+                        ))}
+                    </Select>
+                </Form.Item>
+                <Form.Item
+                    label="Quantity"
+                    name="quantity"
+                    className="w-full sm:w-[200px] md:w-30"
+                    rules={[
+                        {
+                            required: true,
+                            message: 'Please enter a quantity',
+                        },
+                    ]}
+                >
+                    <Input placeholder="Enter Quantity" />
+                </Form.Item>
+            </div>);
         default:
             break;
     }

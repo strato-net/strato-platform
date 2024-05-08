@@ -133,7 +133,6 @@ const RedemptionsIncomingDetails = ({ user }) => {
             key: "name",
             render: (text, record) => (
                 <p
-                    // href={routes.BoughtOrderDetails.url}
                     className="text-primary text-[17px] cursor-pointer"
                     onClick={() => { navigate(`${routes.MarketplaceProductDetail.url.replace(":address", record.address).replace(":name", record.name)}`) }}
                 >
@@ -276,8 +275,8 @@ const RedemptionsIncomingDetails = ({ user }) => {
                                                 />
                                                 <Divider type="vertical" className="h-14 bg-secondryD" />
                                                 <OrderData
-                                                    title="Issuer"
-                                                    value={redemption.issuerCommonName}
+                                                    title="Requestor"
+                                                    value={redemption.ownerCommonName}
                                                 />
                                                 <Divider type="vertical" className="h-14 bg-secondryD" />
                                                 <OrderData
@@ -298,7 +297,7 @@ const RedemptionsIncomingDetails = ({ user }) => {
                                             <Row className="my-2 md:hidden flex-col gap-[6px] justify-between p-4 rounded">
                                                 <div className="flex gap-4">
                                                     <NewOrderData className="w-2/4" title="Redemption Number" value={'#' + redemption.redemption_id} />
-                                                    <NewOrderData className="w-2/4" title="Issuer" value={redemption.issuerCommonName} />
+                                                    <NewOrderData className="w-2/4" title="Requestor" value={redemption.ownerCommonName} />
                                                 </div>
                                                 <div className="flex gap-4">
                                                     <NewOrderData className="w-2/4" title="Requestor" value={redemption.ownerCommonName} />

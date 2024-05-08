@@ -76,12 +76,12 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
     const handleSubmit = async () => {
         const body = {
             assetAddresses: [inventory.address],
-            originAssetAddress: inventory.originAddress,
             assetName: inventory.name,
             status: REDEMPTION_STATUS.PENDING,
             quantity: quantity,
             shippingAddressId: userAddresses[selectedAddress].address_id,
             ownerCommonName: user.commonName,
+            issuerCommonName: inventory.creator,
             ownerComments: comments
         };
 

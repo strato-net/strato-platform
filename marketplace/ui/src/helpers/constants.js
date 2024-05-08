@@ -70,6 +70,24 @@ export const getUnitNameByIndex = (index) => {
   return null;
 };
 
+export const getSpiritUnitNameByIndex = (index) => {
+  const unit = unitOfSpiritMeasures.find((measure) => measure.value === parseInt(index));
+
+  if (unit) {
+    if (unit.name.length > 20) {
+      // Extract abbreviation from inside brackets
+      const matches = unit.name.match(/\((.*?)\)/);
+      if (matches && matches.length > 1) {
+        return matches[1];
+      }
+    }
+    
+    return unit.name;
+  }
+  
+  return null;
+};
+
 export const unitOfMeasures = [
   { name: "Gram (G)", value: 1 },
   { name: "Kilogram (KG)", value: 2 },
@@ -79,6 +97,11 @@ export const unitOfMeasures = [
   { name: "Avoirdupois Pound (AVDP Lb)", value: 6 },
   { name: "Metric Ton (TON)", value: 7 },
   { name: "Imperial Ton (TONNE)", value: 8 }
+];
+
+export const unitOfSpiritMeasures = [
+  { name: "Barrell", value: 1 },
+  { name: "Bottle", value: 2 }
 ];
 
 export const CHARGES = {
@@ -128,6 +151,19 @@ export const CATEGORIES = [
   "Membership",
   "CarbonDAO",
   "Collectibles"
+]
+
+export const spiritTypes = [
+  { value: "Whiskey", label: "Whiskey" },
+  { value: "Rye", label: "Rye" },
+  { value: "Bourbon", label: "Bourbon" },
+  { value: "Tequila", label: "Tequila" },
+  { value: "Gin", label: "Gin" },
+  { value: "Rum", label: "Rum" },
+  { value: "Cognac", label: "Cognac" },
+  { value: "Brandy", label: "Brandy" },
+  { value: "Port", label: "Port" },
+  { value: "Sherry", label: "Sherry" }
 ]
 
 export const PAYMENT_TYPE = [
