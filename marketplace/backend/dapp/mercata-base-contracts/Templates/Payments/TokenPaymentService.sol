@@ -86,8 +86,20 @@ contract TokenPaymentService is PaymentService {
             uint amount = s.price() * quantity * tokensPerDollar * (10 ** decimals);
             totalAmount += amount;
             quantitiesMap[recipient] += amount;
-            s.lockQuantity(quantity, msg.sender);
-            s.completeSale(msg.sender);
+            try {
+                s.lockQuantity(quantity, msg.sender);
+            } catch { // Support for legacy sales
+                address(s).call("lockQuantity", quantity);
+            }
+            purchasersAddress = msg.sender; // Support for legacy sales
+            purchasersCommonName = getCommonName(tx.origin);
+            try {
+                s.completeSale(msg.sender);
+            } catch { // Support for legacy sales
+                address(s).call("completeSale");
+            }
+            purchasersAddress = address(0); // Support for legacy sales
+            purchasersCommonName = "";
         }
         string err = "Your " + serviceName + " balance is not high enough to cover the purchase.";
         uint myBalance = balance();

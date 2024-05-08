@@ -20,7 +20,7 @@ contract StratPaymentService is PaymentService {
         address[] _saleAddresses,
         uint[] _quantities,
         string token
-    ) internal override returns (uint) {
+    ) internal override returns (string) {
         require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
         address[] stratRecipients;
         uint totalAmount;
@@ -35,8 +35,20 @@ contract StratPaymentService is PaymentService {
             uint amount = s.price() * quantity * stratsPerDollar * 100; // 1 STRAT = 1 STRAT cents
             totalAmount += amount;
             quantitiesMap[recipient] += amount;
-            s.lockQuantity(quantity, token); // The STRAT contract uses tx.origin for transfers, so it would be
-            s.completeSale(token);           // a security hole for us to use msg.sender here
+            try {
+                s.lockQuantity(quantity, tx.origin);
+            } catch { // Support for legacy sales
+                address(s).call("lockQuantity", quantity);
+            }
+            purchasersAddress = tx.origin; // Support for legacy sales
+            purchasersCommonName = getCommonName(tx.origin);
+            try {
+                s.completeSale(tx.origin);
+            } catch { // Support for legacy sales
+                address(s).call("completeSale");
+            }
+            purchasersAddress = address(0); // Support for legacy sales
+            purchasersCommonName = "";
         }
         string err = "Your STRAT account balance is not high enough to cover the purchase.";
         uint myBalance = stratAddress.call("balance");
@@ -49,7 +61,7 @@ contract StratPaymentService is PaymentService {
             require(success, err);
         }
 
-        return RestStatus.OK;
+        return token;
     }
 
     function _completeOrder (
