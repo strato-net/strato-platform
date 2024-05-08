@@ -1,7 +1,7 @@
 pragma es6;
 pragma strict;
 
-import <d816194227e1a7a780fff236a449604afeb36255>;
+import <2813f256f50370bca8e294ddb7183096cac2099e>;
 
 /// @title A representation of Art assets
 contract Art is UTXO {

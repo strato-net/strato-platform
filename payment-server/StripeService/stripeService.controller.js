@@ -80,10 +80,14 @@ class StripeServiceController {
   static async stripeCheckout(req, res, next) {
     try {
       // Validation 
-      StripeServiceController.validateStripeCheckoutArgs(req.headers.referer, req.body);
+      StripeServiceController.validateStripeCheckoutArgs(req.headers.referer, req.params);
 
       const marketplaceUrl = req.headers.referer;
-      const { paymentTypes, cartData, orderDetail, sellerCommonName } = req.body;
+      const { address, token } = req.params;
+      const paymentProviderContract = { name: "PaymentService", address };
+      const state = await rest.getState(ADMIN, contract, options);
+
+      console.log(state);
 
       const sellerAccount = await getStripeAccountForUser(sellerCommonName);
 
@@ -101,7 +105,7 @@ class StripeServiceController {
       }
 
       // Create and return checkout link
-      const session = await stripeService.initiatePayment(marketplaceUrl, paymentTypes, cartData, orderDetail, sellerAccount);
+      const session = await stripeService.initiatePayment(marketplaceUrl, orderDetail, sellerAccount);
 
       console.log("DEBUG", session);
       res.setHeader('Content-Type', 'text/html');
@@ -185,29 +189,8 @@ class StripeServiceController {
 
   static validateStripeCheckoutArgs(referer, args) {
     const stripeCheckoutSchema = Joi.object({
-      paymentTypes: Joi.array().min(1).items(Joi.string().required()).required(),
-      cartData: Joi.object({
-        buyerOrganization: Joi.string().required(),
-        orderList: Joi.array().min(1).items(Joi.object({
-              quantity: Joi.number().required(),
-              assetAddress: Joi.string().required(),
-              firstSale: Joi.boolean().required(),
-              unitPrice: Joi.number().required()
-            })).required(),
-        orderTotal: Joi.number().required(),
-        shippingAddressId: Joi.number().min(1).required(),
-        tax: Joi.number().required(),
-        user: Joi.string().required(),
-        email: Joi.string().required(),
-      }),
-      orderDetail: Joi.array().items(
-        Joi.object({
-          productName: Joi.string().required(),
-          unitPrice: Joi.number().min(1).required(),
-          quantity: Joi.number().min(1).required(),
-        })
-      ),
-      sellerCommonName: Joi.string().required(),
+      address: Joi.string().required(),
+      token: Joi.string().required(),
     });
 
     const validation = stripeCheckoutSchema.validate(args);

@@ -972,57 +972,76 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       return paymentServices;
   }
   /* ------------------------ Stripe account connect starts here ------------------------ */
-  contract.stripeOnboarding = async function (originUrl, args, options = defaultOptions) {
+  contract.paymentServiceOnboarding = async function (originUrl, args, options = defaultOptions) {
     try {
-      let connectLink;
-      await axios.get(new URL(`/stripe/onboard/${userCert.commonName}`, STRIPE_PAYMENT_SERVER_URL).href, {
-          headers: {
-            'referer': `${originUrl}`
-          }
-        })
-          .then(function (res) {
-            if (res.status === 200) {
-              connectLink = res.data.connectLink;
-            } else {
-              throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+      const { paymentProvider } = args;
+      if (paymentProvider.data
+        && paymentProvider.data.serviceURL
+        && paymentProvider.data.serviceURL !== ''
+        && paymentProvider.data.checkoutRoute
+        && paymentProvider.data.checkoutRoute !== ''
+      ) {
+        let connectLink;
+        await axios.get(new URL(`${paymentProvider.data.onboardingRoute}/${userCert.commonName}`, paymentProvider.data.serviceURL).href, {
+            headers: {
+              'referer': `${originUrl}`
             }
-          });
-      return connectLink;
+          })
+            .then(function (res) {
+              if (res.status === 200) {
+                connectLink = res.data.connectLink;
+              } else {
+                throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+              }
+            });
+        return connectLink;
+      } else {
+        throw new rest.RestError(RestStatus.BAD_REQUEST, 'Payment provider does not exist.');
+      }
     } catch (error) {
       console.error(`${error}`);
       throw new rest.RestError(RestStatus.BAD_REQUEST, `${error.message}`);
     }
   }
 
-  contract.getStripeOnboardingStatus = async function (args, options = defaultOptions) {
+  contract.paymentServiceOnboardingStatus = async function (args, options = defaultOptions) {
     try {
-          let connectedStripeAccountStatus = { 
-            chargesEnabled: false, 
-            detailsSubmitted: false, 
-            payoutsEnabled: false, 
-            accountDeauthorized: false, 
-            eventTime: Date.now() 
-          };
-          try {
-            await axios.get(new URL(`/stripe/status/${userCert.commonName}`, STRIPE_PAYMENT_SERVER_URL).href)
-              .then(function (res) {
-                if (res.status === 200) {
-                  connectedStripeAccountStatus.chargesEnabled = res.data.chargesEnabled;
-                  connectedStripeAccountStatus.detailsSubmitted = res.data.detailsSubmitted;
-                  connectedStripeAccountStatus.payoutsEnabled = res.data.payoutsEnabled;
-                } else {
-                  throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
-                }
-              }, (error) => {
-                console.log(error);
-              });
-          } catch (error) {
-            if (error.code == 'account_invalid') {
-              connectedStripeAccountStatus.accountDeauthorized = true
-            }
+      const { paymentProvider } = args;
+      if (paymentProvider.data
+        && paymentProvider.data.serviceURL
+        && paymentProvider.data.serviceURL !== ''
+        && paymentProvider.data.checkoutRoute
+        && paymentProvider.data.checkoutRoute !== ''
+      ) {
+        let connectedStripeAccountStatus = { 
+          chargesEnabled: false, 
+          detailsSubmitted: false, 
+          payoutsEnabled: false, 
+          accountDeauthorized: false, 
+          eventTime: Date.now() 
+        };
+        try {
+          await axios.get(new URL(`${paymentProvider.data.onboardingStatusRoute}/${userCert.commonName}`, paymentProvider.data.serviceURL).href)
+            .then(function (res) {
+              if (res.status === 200) {
+                connectedStripeAccountStatus.chargesEnabled = res.data.chargesEnabled;
+                connectedStripeAccountStatus.detailsSubmitted = res.data.detailsSubmitted;
+                connectedStripeAccountStatus.payoutsEnabled = res.data.payoutsEnabled;
+              } else {
+                throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+              }
+            }, (error) => {
+              console.log(error);
+            });
+        } catch (error) {
+          if (error.code == 'account_invalid') {
+            connectedStripeAccountStatus.accountDeauthorized = true
           }
-
+        }
         return connectedStripeAccountStatus;
+      } else {
+        throw new rest.RestError(RestStatus.BAD_REQUEST, 'Payment provider does not exist.');
+      }
     } catch (error) {
       console.error(`${error}`);
       throw new rest.RestError(RestStatus.BAD_REQUEST, `${error.message}`);
@@ -1072,53 +1091,49 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             && paymentProvider.data.checkoutRoute
             && paymentProvider.data.checkoutRoute !== ''
          ) {
-        const invoices = [];
-        let calculatedOrderTotal = 0;
+          const invoices = [];
+          let calculatedOrderTotal = 0;
 
-        orderList.forEach(item => {
-          const inventoryItem = assets.find(asset => asset.address == item.assetAddress);
-          invoices.push({ productName: decodeURIComponent(inventoryItem.name), unitPrice: inventoryItem.price, quantity: item.quantity });
+          orderList.forEach(item => {
+            const inventoryItem = assets.find(asset => asset.address == item.assetAddress);
+            invoices.push({ productName: decodeURIComponent(inventoryItem.name), unitPrice: inventoryItem.price, quantity: item.quantity });
 
-          calculatedOrderTotal += (inventoryItem.price * item.quantity);
-        })
-
-        if (calculatedOrderTotal != recievedOrderTotal) {
-          throw new rest.RestError(RestStatus.BAD_REQUEST, "Incorrect order value.");
-      try {
-        const checkoutBody = {
-          paymentTypes: paymentList,
-          cartData: newArgs,
-          orderDetail: invoices,
-          sellerCommonName: sellerName,
-        }
-        let stripePaymentSession;
-        const { paymentList, ...restArgs } = args;
-        const newArgs = { shippingAddressId: 1, ...restArgs };  // placeholder
-
-        try {
-          const checkoutBody = {
-            cartData: newArgs,
-            orderDetail: invoices,
-          }
-          stripePaymentSession = await axios.post(new URL(paymentProvider.data.checkoutRoute, paymentProvider.data.serviceURL).href, checkoutBody, {
-            headers: {
-              'referer': `${originUrl}`
-            }
+            calculatedOrderTotal += (inventoryItem.price * item.quantity);
           })
-            .then(function (res) {
-              if (res.status === 200) {
-                return res.data;
-              } else {
-                throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+
+          if (calculatedOrderTotal != recievedOrderTotal) {
+            throw new rest.RestError(RestStatus.BAD_REQUEST, "Incorrect order value.");
+          }
+
+          let paymentSession;
+          const { paymentList, ...restArgs } = args;
+          const newArgs = { shippingAddressId: 1, ...restArgs };  // placeholder
+
+          console.log(newArgs);
+
+          try {
+            const checkoutBody = {
+              cartData: newArgs,
+              orderDetail: invoices,
+            }
+            paymentSession = await axios.get(new URL(`${paymentProvider.data.checkoutRoute}/${paymentProvider.address}/${token}`, paymentProvider.data.serviceURL).href, checkoutBody, {
+              headers: {
+                'referer': `${originUrl}`
               }
-            });
-        } catch (err) {
-          throw new rest.RestError(err.statusCode, err.message);
+            }).then(function (res) {
+                if (res.status === 200) {
+                  return res.data;
+                } else {
+                  throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+                }
+              });
+            return paymentSession;
+          } catch (err) {
+            throw new rest.RestError(err.statusCode, err.message);
+          }
+        } else {
+          throw new rest.RestError(RestStatus.BAD_REQUEST, 'Payment provider does not exist.');
         }
-        return stripePaymentSession;
-      } else {
-        return { url: `${originUrl}/myitems` }
-      }
 
     } catch (error) {
       console.log(error);

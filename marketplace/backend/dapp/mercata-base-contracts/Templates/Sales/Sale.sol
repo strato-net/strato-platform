@@ -97,7 +97,7 @@ abstract contract Sale is Utils {
     ) public requirePaymentProvider("complete sale") returns (uint) {
         uint orderQuantity = takeLockedQuantity(purchaser);
         // regular transfer - isUserTransfer: false, transferNumber: 0
-        assetToBeSold.transferOwnership(purchaser, orderQuantity, false, 0);
+        assetToBeSold.transferOwnership(purchaser, orderQuantity, false, 0, price);
         closeSaleIfEmpty();
         return RestStatus.OK;
     }

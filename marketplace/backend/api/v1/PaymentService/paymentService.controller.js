@@ -4,13 +4,11 @@ import RestStatus from 'http-status-codes'
 
 class PaymentServiceController {
 
-  static async stripeOnboarding(req, res, next) {
+  static async getAll(req, res, next) {
     try {
-      const { dapp } = req
+      const { dapp, params } = req
 
-      const originUrl = req.headers.origin;
-
-      const result = await dapp.stripeOnboarding(originUrl);
+      const result = await dapp.getPaymentServices(params)
       rest.response.status200(res, result)
 
       return next()
@@ -19,11 +17,26 @@ class PaymentServiceController {
     }
   }
 
-  static async stripeOnboardingStatus(req, res, next) {
+  static async onboard(req, res, next) {
+    try {
+      const { dapp } = req
+
+      const originUrl = req.headers.origin;
+
+      const result = await dapp.paymentServiceOnboarding(originUrl);
+      rest.response.status200(res, result)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
+  static async onboardStatus(req, res, next) {
     try {
       const { dapp, params } = req
 
-      const result = await dapp.getPaymentServices(params)
+      const result = await dapp.paymentServiceOnboardingStatus(params)
       rest.response.status200(res, result)
 
       return next()

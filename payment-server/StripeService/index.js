@@ -14,7 +14,7 @@ router.get(
 );
 
 router.get(
-  '/checkout',
+  '/checkout/:address/:token',
   StripeServiceController.stripeCheckout
 );
 
