@@ -111,6 +111,12 @@ export const Metals = {
   create: '/'
 }
 
+export const Spirits = {
+  prefix: '/spirits',
+  getAll: '/',
+  create: '/'
+}
+
 export const Clothing = {
   prefix: '/clothing',
   getAll: '/',
