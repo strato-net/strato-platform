@@ -1,10 +1,10 @@
-import { STRIPE_ENV, CHECKOUT_URL } from '../helpers/constants.js';
+import { STRIPE_ENV, CHECKOUT_URL, SERVER_HOST } from '../helpers/constants.js';
 import Stripe from 'stripe';
 const stripe = Stripe(STRIPE_ENV.CREDENTIALS.STRIPE_SECRET_KEY);
 
 class StripeService {
     // TODO implement orderDetail to create actual order line items 
-    static initiatePayment(marketplaceUrl, cartData, orderDetail, CONNECTED_ACCOUNT_ID = '') {
+    static initiatePayment(marketplaceUrl, token, orderDetails, CONNECTED_ACCOUNT_ID = '') {
         try {
             // Create a checkout session with Stripe
             return stripe.checkout.sessions.create({
@@ -14,7 +14,7 @@ class StripeService {
                       verification_method: 'instant',
                   },
                 },
-                line_items: orderDetail.map(({ productName, unitPrice, quantity }) => {
+                line_items: orderDetails.map(({ productName, unitPrice, quantity }) => {
                     return {
                         price_data: {
                             currency: "usd",
@@ -26,19 +26,17 @@ class StripeService {
                         quantity: quantity,
                     }
                 }),
-                metadata: {
-                    cart: JSON.stringify(cartData)
-                },
+                metadata: {},
                 payment_intent_data: {
                     // Calculation of Application Fee
-                    application_fee_amount: this.calculateApplicationFee(cartData.orderList),
+                    // application_fee_amount: this.calculateApplicationFee(cartData.orderList),
                     /* To be used in case of destination charge */
                     // transfer_data: {
                     //     destination: CONNECTED_ACCOUNT_ID
                     // },
                 },
                 mode: "payment",
-                success_url: `${CHECKOUT_URL}?session_id={CHECKOUT_SESSION_ID}`,
+                success_url: `${CHECKOUT_URL}?token=${token}&redirectUrl=${marketplaceUrl}`,
                 cancel_url: `${marketplaceUrl}/checkout`,
             }, {
                 stripeAccount: CONNECTED_ACCOUNT_ID
@@ -79,12 +77,12 @@ class StripeService {
         }
     }
 
-    static generateStripeAccountConnectLink(marketplaceUrl, stripeAccountId) {
+    static generateStripeAccountConnectLink(marketplaceUrl, username, stripeAccountId) {
         try {
             return stripe.accountLinks.create({
                 account: stripeAccountId,
-                refresh_url: `${marketplaceUrl}/myItems/stripe/onboarding`,
-                return_url: `${marketplaceUrl}/myItems`,
+                refresh_url: `${SERVER_HOST}/stripe/onboard?username=${username}&redirectUrl=${marketplaceUrl}`,
+                return_url: `${marketplaceUrl}`,
                 type: 'account_onboarding',
             });
         } catch (e) {

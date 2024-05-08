@@ -4,21 +4,21 @@ import StripeServiceController from './stripeService.controller.js';
 const router = express.Router();
 
 router.get(
-  '/onboard/:commonName', 
+  '/onboard', 
   StripeServiceController.stripeOnboarding
 );
 
 router.get(
-  '/status/:commonName', 
+  '/status', 
   StripeServiceController.stripeConnectStatus
 );
 
 router.get(
-  '/checkout/:address/:token',
+  '/checkout',
   StripeServiceController.stripeCheckout
 );
 
-router.post(
+router.get(
   '/checkout/confirm',
   StripeServiceController.stripeCheckoutConfirm
 );

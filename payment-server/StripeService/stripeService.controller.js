@@ -3,8 +3,13 @@ import config from '../load.config.js';
 import Joi from '@hapi/joi';
 import { rest, util } from "blockapps-rest";
 import stripeService from './stripe.service.js';
-import { ADMIN } from "../helpers/constants.js";
-import { getStripeAccountForUser } from '../helpers/utils.js';
+import { 
+  getStripeAccountForUser, 
+  getStripePaymentFromToken,
+  getPaymentState, 
+  validateAndGetOrderDetails ,
+  completeOrder
+} from '../helpers/utils.js';
 
 class StripeServiceController {
 
@@ -12,12 +17,11 @@ class StripeServiceController {
   static async stripeOnboarding(req, res, next) {
     try {
       // Validation
-      StripeServiceController.validateStripeOnboardingArgs(req.headers.referer, req.params);
+      StripeServiceController.validateStripeOnboardingArgs(req.query);
 
-      const marketplaceUrl = req.headers.referer;
-      const { commonName } = req.params;
+      const { username, redirectUrl } = req.query;
 
-      const userAccount = await getStripeAccountForUser(commonName);
+      const userAccount = await getStripeAccountForUser(username);
       
       if (!userAccount) {
         // Generate a new Stripe Account Id
@@ -25,25 +29,41 @@ class StripeServiceController {
 
         // Insert new Stripe Account Id for user in DB
         const insertQuery = `
-          INSERT INTO stripe_Accounts (
+          INSERT INTO stripe_accounts (
             commonName,
             accountId
           ) VALUES (
             $1, $2
           )`;
-        const insertValues = [ commonName, userStripeAccount.id ];
+        const insertValues = [ username, userStripeAccount.id ];
         const insertResult = await client.query(insertQuery, insertValues);
 
         // Generate and return Stripe connect link 
-        const connectLink = await stripeService.generateStripeAccountConnectLink(marketplaceUrl, userStripeAccount.id);
-        res.status(200).json({
-          connectLink: connectLink
-        });
+        const connectLink = await stripeService.generateStripeAccountConnectLink(redirectUrl, username, userStripeAccount.id);
+        res.setHeader('Content-Type', 'text/html');
+        res.send(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta http-equiv="refresh" content="0;url=${connectLink.url}">
+            </head>
+            <body>
+            </body>
+          </html>
+        `);
       } else {
-        const connectLink = await stripeService.generateStripeAccountConnectLink(marketplaceUrl, userAccount);
-        res.status(200).json({
-          connectLink: connectLink
-        });
+        const connectLink = await stripeService.generateStripeAccountConnectLink(redirectUrl, username, userAccount);
+        res.setHeader('Content-Type', 'text/html');
+        res.send(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta http-equiv="refresh" content="0;url=${connectLink.url}">
+            </head>
+            <body>
+            </body>
+          </html>
+        `);
       }
       return next();
     } catch (e) {
@@ -54,11 +74,11 @@ class StripeServiceController {
   static async stripeConnectStatus(req, res, next) {
     try {
       // Validation
-      StripeServiceController.validateStripeStatusArgs(req.params);
+      StripeServiceController.validateStripeStatusArgs(req.query);
       
-      const { commonName } = req.params;
+      const { username } = req.query;
 
-      const userAccount = await getStripeAccountForUser(commonName);
+      const userAccount = await getStripeAccountForUser(username);
 
       if (!userAccount) {
         throw new Error(`User not onboarded to Stripe yet.`);
@@ -80,14 +100,37 @@ class StripeServiceController {
   static async stripeCheckout(req, res, next) {
     try {
       // Validation 
-      StripeServiceController.validateStripeCheckoutArgs(req.headers.referer, req.params);
+      StripeServiceController.validateStripeCheckoutArgs(req.query);
 
-      const marketplaceUrl = req.headers.referer;
-      const { address, token } = req.params;
-      const paymentProviderContract = { name: "PaymentService", address };
-      const state = await rest.getState(ADMIN, contract, options);
+      const { token, redirectUrl } = req.query;
 
-      console.log(state);
+      // Check if the payment session already exists for the token
+      const paymentDetails = await getStripePaymentFromToken(token);
+
+      // Skip all the extra work if the session already exists
+      if (paymentDetails) {
+        const session = await stripeService.getPaymentSession(paymentDetails.paymentsessionid, paymentDetails.accountid);
+        // Serve a static page that redirects to Stripe
+        res.setHeader('Content-Type', 'text/html');
+        res.send(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta http-equiv="refresh" content="0;url=${session.url}">
+            </head>
+            <body>
+            </body>
+          </html>
+        `);
+        return next();
+      }
+
+      // Get the payment server contract
+      const paymentState = await getPaymentState();
+
+      // Get and validate the order details
+      const order = paymentState.openOrders[token];
+      const { sellerCommonName, orderDetails } = await validateAndGetOrderDetails(order.quantities, order.saleAddresses);
 
       const sellerAccount = await getStripeAccountForUser(sellerCommonName);
 
@@ -104,10 +147,20 @@ class StripeServiceController {
         throw new Error(`Seller has not enabled payments on Stripe yet.`);
       }
 
-      // Create and return checkout link
-      const session = await stripeService.initiatePayment(marketplaceUrl, orderDetail, sellerAccount);
+      // Create checkout session and store in db
+      const session = await stripeService.initiatePayment(redirectUrl, token, orderDetails, sellerAccount);
+      const insertQuery = `
+        INSERT INTO stripe_payments (
+          token,
+          paymentSessionId,
+          sellerCommonName
+        ) VALUES (
+          $1, $2, $3
+        )`;
+      const insertValues = [ token, session.id, sellerCommonName ];
+      const insertResult = await client.query(insertQuery, insertValues);
 
-      console.log("DEBUG", session);
+      // Serve a static page that redirects to Stripe
       res.setHeader('Content-Type', 'text/html');
       res.send(`
         <!DOCTYPE html>
@@ -119,7 +172,6 @@ class StripeServiceController {
           </body>
         </html>
       `);
-
       return next();
     } catch (e) {
       next(e);
@@ -129,29 +181,35 @@ class StripeServiceController {
   static async stripeCheckoutConfirm(req, res, next) {
     try {
       // Validation 
-      StripeServiceController.validateStripeCheckoutConfirmArgs(req.body);
+      StripeServiceController.validateStripeCheckoutConfirmArgs(req.query);
 
-      const { paymentSessionId, sellerCommonName, paymentContractAddress, buyerAddress } = req.body;
+      const { token, redirectUrl } = req.query;
 
       // Retrieve the session
-      const sellerAccount = await getStripeAccountForUser(sellerCommonName);
-      const session = await stripeService.getPaymentSession(paymentSessionId, sellerAccount);
+      const paymentDetails = await getStripePaymentFromToken(token);
+      const session = await stripeService.getPaymentSession(paymentDetails.paymentsessionid, paymentDetails.accountid);
 
       // Verify payment and perform onchain transfer
       if (session.payment_status === 'paid') {
-        const contract = { name: "CreditCard", address: paymentContractAddress };
-        const options = { config };
-        const callArgs = {
-          contract,
-          method: "transfer",
-          args: util.usc({ to: buyerAddress }),
-        };
-        const transferStatus = await rest.call(ADMIN, callArgs, options);
-        console.log("transferStatus", transferStatus);
+        const completeOrderStatus = await completeOrder(token);
+        console.log("completeOrderStatus", completeOrderStatus);
         res.status(200);
       } else {
         throw new Error(`Payment has not been processed. Failed to confirm purchase.`);
       }
+
+      // Redirect back to marketplace
+      res.setHeader('Content-Type', 'text/html');
+      res.send(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta http-equiv="refresh" content="0;url=${redirectUrl}">
+          </head>
+          <body>
+          </body>
+        </html>
+      `);
       return next();
     } catch (e) {
       next(e);
@@ -159,9 +217,10 @@ class StripeServiceController {
   }
 
   // ********* VALIDATION ***********
-  static validateStripeOnboardingArgs(referer, args) {
+  static validateStripeOnboardingArgs(args) {
     const stripeOnboardingSchema = Joi.object({
-      commonName: Joi.string().required(),
+      username: Joi.string().required(),
+      redirectUrl: Joi.string().required(),
     })
 
     const validation = stripeOnboardingSchema.validate(args);
@@ -169,15 +228,11 @@ class StripeServiceController {
     if (validation.error) {
       throw new Error(`Missing args or bad format in GET request /onboard: ${validation.error.message}.`);
     }
-
-    if (!referer) {
-      throw new Error(`Missing MarketplaceURL as referer header in GET request /onboard.`);
-    }
   }
 
   static validateStripeStatusArgs(args) {
     const stripeStatusSchema = Joi.object({
-      commonName: Joi.string().required(),
+      username: Joi.string().required(),
     })
 
     const validation = stripeStatusSchema.validate(args);
@@ -187,10 +242,10 @@ class StripeServiceController {
     }
   }
 
-  static validateStripeCheckoutArgs(referer, args) {
+  static validateStripeCheckoutArgs(args) {
     const stripeCheckoutSchema = Joi.object({
-      address: Joi.string().required(),
       token: Joi.string().required(),
+      redirectUrl: Joi.string().required(),
     });
 
     const validation = stripeCheckoutSchema.validate(args);
@@ -198,12 +253,20 @@ class StripeServiceController {
     if (validation.error) {
       throw new Error(`Missing args or bad format in GET request /checkout: ${validation.error.message}.`);
     }
-
-    if (!referer) {
-      throw new Error(`Missing MarketplaceURL as referer header in GET request /checkout.`);
-    }
   }
 
+  static validateStripeCheckoutConfirmArgs(args) {
+    const stripeCheckoutConfirmSchema = Joi.object({
+      token: Joi.string().required(),
+      redirectUrl: Joi.string().required(),
+    });
+
+    const validation = stripeCheckoutConfirmSchema.validate(args);
+
+    if (validation.error) {
+      throw new Error(`Missing args or bad format in POST request /checkout/confirm: ${validation.error.message}.`);
+    }
+  }
 }
 
 export default StripeServiceController;
