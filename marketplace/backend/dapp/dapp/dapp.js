@@ -27,6 +27,7 @@ import artJs from "/dapp/items/art";
 import tokensJs from "/dapp/items/tokens";
 import carbonOffsetJs from "/dapp/items/carbonOffset";
 import metalsJs from "/dapp/items/metals";
+import spiritsJs from "/dapp/items/spirits";
 import clothingJs from "/dapp/items/clothing";
 import membershipJs from "/dapp/items/membership";
 import carbonDAOJs from "/dapp/items/carbonDAO";
@@ -286,15 +287,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   contract.requestRedemption = async function (args, options = defaultOptions) {
-    const getOptions = { ...options, app: contractName, };
-    const { originAssetAddress, assetAddresses, quantity, ...restArgs } = args;
+    const { assetAddresses, quantity, ...restArgs } = args;
 
     const contract = { address: assetAddresses[0] };
     const [requestRedemptionStatus, assetAddress] = await inventoryJs.requestRedemption(rawAdmin, contract, { quantity: quantity }, options);
 
-    const originAsset = await inventoryJs.get(rawAdmin, { address: originAssetAddress }, getOptions);
-    const issuerCommonName = originAsset.ownerCommonName;
-    const finalArgs = { redemption_id: parseInt(util.uid()), issuerCommonName, assetAddresses: [assetAddress], quantity, ...restArgs }
+    const finalArgs = { redemption_id: parseInt(util.uid()), assetAddresses: [assetAddress], quantity, ...restArgs }
 
     if (requestRedemptionStatus) {
       try {
@@ -666,7 +664,27 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return metalsJs.getAll(rawAdmin, args, getOptions);
   };
 
-  // ------------------------------ MATERIALS ENDS--------------------------------
+  // ------------------------------ METALS ENDS--------------------------------
+
+    // ------------------------------ SPIRITS STARTS------------------------------
+
+    contract.createSpirits = async function (args, options = defaultOptions) {
+      const createdDate = Math.floor(Date.now() / 1000);
+      const newArgs = {
+        ...args.itemArgs,
+        createdDate,
+        owner: rawAdmin.address,
+        status: ASSET_STATUS.ACTIVE
+      };
+      return spiritsJs.uploadContract(rawAdmin, newArgs, options);
+    };
+  
+    contract.getSpirits = async function (args = {}, options = optionsNoChainIds) {
+      const getOptions = { ...options };
+      return spiritsJs.getAll(rawAdmin, args, getOptions);
+    };
+  
+    // ------------------------------ SPIRITS ENDS--------------------------------
 
   // ------------------------------ CLOTHING STARTS------------------------------
 
