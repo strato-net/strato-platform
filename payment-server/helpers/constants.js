@@ -1,4 +1,7 @@
-import oauthHelper from "./oauthHelper.js"
+import config from "../load.config.js";
+import oauthHelper from "./oauthHelper.js";
+
+const options = { config, logger: console };
 
 const STRIPE_ENV = {
   CREDENTIALS: {
@@ -10,12 +13,12 @@ const STRIPE_ENV = {
   }
 }
 
-const TOKEN_LIFETIME_RESERVE_SECONDS = 30;
+const TOKEN_LIFETIME_RESERVE_SECONDS = 300;
 
 const bootStrapAdmin = async () => {
   let serviceUserToken
   try {
-    serviceUserToken = await oauthHelper.getServiceToken()
+    serviceUserToken = await oauthHelper.getServiceToken();
   } catch(e) {
     console.error("ERROR: Unable to fetch the service user token, check your OAuth settings in config", e);
     throw e;
@@ -37,6 +40,20 @@ const bootStrapAdmin = async () => {
 
 const ADMIN = await bootStrapAdmin();
 
-const CHECKOUT_URL = `${process.env.SERVER_HOST}:${process.env.PORT ? process.env.PORT : 8018}/checkout/process`;
+const DEFAULT_OPTIONS = { ...options, chainIds: [], cacheNonce: true };
 
-export { STRIPE_ENV, ADMIN, TOKEN_LIFETIME_RESERVE_SECONDS, CHECKOUT_URL }
+const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS;
+
+const SERVER_HOST = `${process.env.SERVER_HOST}:${process.env.PORT ? process.env.PORT : 8018}`;
+
+const CHECKOUT_URL = `${SERVER_HOST}/stripe/checkout/confirm`;
+
+export { 
+  STRIPE_ENV, 
+  ADMIN, 
+  TOKEN_LIFETIME_RESERVE_SECONDS, 
+  CHECKOUT_URL,  
+  CONTRACT_ADDRESS,
+  SERVER_HOST,
+  DEFAULT_OPTIONS,
+}
