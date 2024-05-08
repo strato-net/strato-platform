@@ -988,55 +988,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         quantities,
       }
       const token = await paymentProviderJs.createPayment(rawAdmin, paymentParameters, options);
-      return token;
-
-      if (paymentProvider.data
-            && paymentProvider.data.serviceURL
-            && paymentProvider.data.serviceURL !== ''
-            && paymentProvider.data.checkoutRoute
-            && paymentProvider.data.checkoutRoute !== ''
-         ) {
-        const invoices = [];
-        let calculatedOrderTotal = 0;
-
-        orderList.forEach(item => {
-          const inventoryItem = assets.find(asset => asset.address == item.assetAddress);
-          invoices.push({ productName: decodeURIComponent(inventoryItem.name), unitPrice: inventoryItem.price, quantity: item.quantity });
-
-          calculatedOrderTotal += (inventoryItem.price * item.quantity);
-        })
-
-        if (calculatedOrderTotal != recievedOrderTotal) {
-          throw new rest.RestError(RestStatus.BAD_REQUEST, "Incorrect order value.");
-        }
-        let stripePaymentSession;
-        const { paymentList, ...restArgs } = args;
-        const newArgs = { shippingAddressId: 1, ...restArgs };  // placeholder
-
-        try {
-          const checkoutBody = {
-            cartData: newArgs,
-            orderDetail: invoices,
-          }
-          stripePaymentSession = await axios.post(new URL(paymentProvider.data.checkoutRoute, paymentProvider.data.serviceURL).href, checkoutBody, {
-            headers: {
-              'referer': `${originUrl}`
-            }
-          })
-            .then(function (res) {
-              if (res.status === 200) {
-                return res.data;
-              } else {
-                throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
-              }
-            });
-        } catch (err) {
-          throw new rest.RestError(err.statusCode, err.message);
-        }
-        return stripePaymentSession;
-      } else {
-        return { url: `${originUrl}/myitems` }
-      }
+      return token[0];
 
     } catch (error) {
       console.log(error);
