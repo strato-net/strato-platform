@@ -216,17 +216,9 @@ async function createPayment(user, args, options) {
       method: "createOrder",
       args: util.usc({ ...restArgs }),
     };
-    const createStatus = await rest.call(user, callArgs, options);
+    const token = await rest.call(user, callArgs, options);
   
-    if (parseInt(createStatus, 10) !== RestStatus.OK) {
-      throw new rest.RestError(
-        createStatus,
-        "You cannot initialize the payment because it's already been initialized",
-        { callArgs }
-      );
-    }
-  
-    return createStatus;
+    return token;
 }
 
 async function finalizePayment(user, args, options) {

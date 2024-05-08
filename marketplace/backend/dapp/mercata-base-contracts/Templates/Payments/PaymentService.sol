@@ -93,7 +93,6 @@ abstract contract PaymentService is Utils {
         string token
     ) internal virtual returns (string) {
         openOrders[token].purchaser = msg.sender;
-        return token;
         for (uint i = 0; i < _saleAddresses.length; i++) {
             Sale s = Sale(_saleAddresses[i]);
             Asset a = s.assetToBeSold();

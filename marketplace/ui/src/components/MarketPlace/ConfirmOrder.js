@@ -146,13 +146,14 @@ const ConfirmOrder = ({ paymentProviders, data, columns }) => {
       },
     });
     let token = await orderActions.createPayment(orderDispatch, body);
-    if (paymentProvider.data
-          && paymentProvider.data.serviceURL
-          && paymentProvider.data.serviceURL !== ''
-          && paymentProvider.data.checkoutRoute
-          && paymentProvider.data.checkoutRoute !== ''
+    let serviceURL = paymentProvider.serviceURL || paymentProvider.data.serviceURL;
+    let checkoutRoute = paymentProvider.checkoutRoute || paymentProvider.data.checkoutRoute;
+    if (serviceURL
+          && serviceURL !== ''
+          && checkoutRoute
+          && checkoutRoute !== ''
        ) {
-      const url = `${paymentProvider.data.serviceURL}${paymentProvider.data.checkoutRoute}?token=${token}` // &redirectUrl=${}`
+      const url = `${serviceURL}${checkoutRoute}?token=${token}&redirectUrl=${window.location.protocol}//${window.location.host}`
       window.location.replace(url);
     } else {
       window.location.replace("/order/bought");
