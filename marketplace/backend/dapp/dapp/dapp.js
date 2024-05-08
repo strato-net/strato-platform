@@ -1047,7 +1047,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         quantities,
       }
       const token = await paymentProviderJs.createPayment(rawAdmin, paymentParameters, options);
-      return token;
 
       if (paymentProvider.data
             && paymentProvider.data.serviceURL
