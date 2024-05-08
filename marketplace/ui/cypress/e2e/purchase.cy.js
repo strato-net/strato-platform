@@ -74,7 +74,7 @@ describe('Create a new Asset', () => {
     cy.visit('/');
     cy.get("#Login").click();
     cy.login();
-    cy.visit('/');
+
     cy.wait(3000)
 
     // Purchase a product
