@@ -57,8 +57,9 @@ if (process.env.POSTGRESQL_SERVER_URL && process.env.POSTGRESQL_PASSWORD) {
                 );
 
                 CREATE TABLE IF NOT EXISTS stripe_payments (
-                    order_id TEXT PRIMARY KEY,
+                    token TEXT PRIMARY KEY,
                     paymentSessionId TEXT,
+                    sellerCommonName TEXT REFERENCES stripe_accounts(commonName),
                     createdDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP 
                 );
             `;
