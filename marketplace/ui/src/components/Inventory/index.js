@@ -19,6 +19,8 @@ import {
   useInventoryDispatch,
   useInventoryState,
 } from "../../contexts/inventory";
+import { usePaymentServiceDispatch, usePaymentServiceState } from "../../contexts/payment";
+import { actions as paymentServiceActions } from "../../contexts/payment/actions";
 import { Images } from "../../images";
 //items
 import { actions as itemActions } from "../../contexts/item/actions";
@@ -54,6 +56,16 @@ const Inventory = ({ user }) => {
   const { categorys } = useCategoryState();
   const { inventories, isInventoriesLoading, message, success, inventoriesTotal } =
     useInventoryState();
+  
+  const {
+      paymentServices,
+      arePaymentServicesLoading
+  } = usePaymentServiceState();
+  const paymentServiceDispatch = usePaymentServiceDispatch();
+
+  useEffect(() => {
+    paymentServiceActions.getPaymentServices(paymentServiceDispatch);
+  }, [paymentServiceDispatch]);
 
   //items
   const itemDispatch = useItemDispatch();
@@ -181,6 +193,13 @@ const allSubcategories = getAllSubcategories(categorys);
   };
   // ------------------ Tabs END------------------
 const metaImg = category ? category : SEO.IMAGE_META
+
+const renderImg = (service) => {
+    return service.imageURL && service.imageURL !== ''
+        ? <img src={service.imageURL} alt={service.serviceName} height="16px" width="16px"/>
+        : ''
+}
+
   return (
     <>
      <HelmetComponent 
@@ -214,6 +233,37 @@ const metaImg = category ? category : SEO.IMAGE_META
               </Button>
             </div>
             <div className="flex gap-3">
+              {!arePaymentServicesLoading ? (
+                (paymentServices || []).filter((p) => (
+                  p &&
+                  p.data &&
+                  (p.serviceURL || p.data.serviceURL) &&
+                  (p.onboardingRoute || p.data.onboardingRoute)
+                )).map((e) => (
+                  <Button type="primary" className="w-52 h-9 "
+                      onClick={() => {
+                        if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                          window.location.href = loginUrl;
+                        } else {
+                          const serviceURL = e.serviceURL || e.data.serviceURL
+                          const onboardingRoute = e.onboardingRoute || e.data.onboardingRoute
+                          const url = `${serviceURL}${onboardingRoute}?username=${user.commonName}&redirectUrl=${window.location.protocol}//${window.location.host}${window.location.pathname}`
+                          window.location.replace(url);
+                        }
+                      }}
+                  >
+                    <div className="flex items-center mr-1">
+                      {`${e.onboardingText || e.data.onboardingText}`}&nbsp;
+                      {renderImg(e)}
+                    </div>
+                  </Button>
+                ))
+                ) : (
+                  <div className="absolute left-[50%] md:top-4">
+                    <Spin size="large" />
+                  </div>
+                )
+              }
               <Button
                 type="primary"
                 id="createItem"
