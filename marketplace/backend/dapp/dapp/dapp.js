@@ -993,7 +993,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     } catch (error) {
       console.log(error);
       if (error.response) {
-        throw new rest.RestError(error.response.status, error.response.statusText);
+        throw new rest.RestError(error.response.status, error.response.data);
       }
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while updating the order");
     }
