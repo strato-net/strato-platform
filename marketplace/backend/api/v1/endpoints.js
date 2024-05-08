@@ -200,8 +200,6 @@ export const Marketplace = {
 export const PaymentService = {
   prefix: '/payment',
   getAll: '/',
-  onboard: '/onboard',
-  status: '/status',
 }
 
 export const UserActivity = {

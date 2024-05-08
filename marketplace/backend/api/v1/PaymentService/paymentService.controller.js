@@ -17,34 +17,6 @@ class PaymentServiceController {
     }
   }
 
-  static async onboard(req, res, next) {
-    try {
-      const { dapp } = req
-
-      const originUrl = req.headers.origin;
-
-      const result = await dapp.paymentServiceOnboarding(originUrl);
-      rest.response.status200(res, result)
-
-      return next()
-    } catch (e) {
-      return next(e)
-    }
-  }
-
-  static async onboardStatus(req, res, next) {
-    try {
-      const { dapp, params } = req
-
-      const result = await dapp.paymentServiceOnboardingStatus(params)
-      rest.response.status200(res, result)
-
-      return next()
-    } catch (e) {
-      return next(e)
-    }
-  }
-
 }
 
 
