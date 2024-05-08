@@ -23,6 +23,7 @@ import { Images } from "../../images";
 //items
 import { actions as itemActions } from "../../contexts/item/actions";
 import { actions as redemptionActions } from "../../contexts/redemption/actions";
+import { actions as sellerStatusActions } from "../../contexts/sellerStatus/actions";
 import { useItemDispatch, useItemState } from "../../contexts/item";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
@@ -34,6 +35,7 @@ import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemp
 //authorized seller
 import RequestBeAuthorizedSellerModal from "./RequestBeAuthorizedSellerModal";
 import { SELLER_STATUS } from '../../helpers/constants';
+import { useSellerStatusState , useSellerStatusDispatch } from "../../contexts/sellerStatus";
 
 
 const Inventory = ({ user }) => {
@@ -71,6 +73,13 @@ const Inventory = ({ user }) => {
     message: redemptionMsg,
     success: redemptionSuccess
   } = useRedemptionState();
+
+  //seller status
+  const sellerStatusDipatch = useSellerStatusDispatch();
+  const {
+    message: sellerStatusMsg,
+    success: sellerStatusSuccess
+  } = useSellerStatusState();
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
@@ -193,6 +202,24 @@ const Inventory = ({ user }) => {
         onClose: redemptionActions.resetMessage(redemptionDispatch),
         placement,
         key: 6,
+      });
+    }
+  };
+
+  const sellerStatusToast = (placement) => {
+    if (sellerStatusSuccess) {
+      api.success({
+        message: sellerStatusMsg,
+        onClose: sellerStatusActions.resetMessage(sellerStatusDipatch),
+        placement,
+        key: 7,
+      });
+    } else {
+      api.error({
+        message: sellerStatusMsg,
+        onClose: sellerStatusActions.resetMessage(sellerStatusDipatch),
+        placement,
+        key: 8,
       });
     }
   };
@@ -416,6 +443,7 @@ const metaImg = category ? category : SEO.IMAGE_META
       {message && openToast("bottom")}
       {itemMsg && itemToast("bottom")}
       {redemptionMsg && redemptionToast("bottom")}
+      {sellerStatusMsg && sellerStatusToast("bottom")}
     </>
   );
 };

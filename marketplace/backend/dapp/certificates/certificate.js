@@ -1,3 +1,4 @@
+import RestStatus from 'http-status-codes'
 import { rest } from 'blockapps-rest'
 import config from "/load.config"
 import constants from '/helpers/constants'
@@ -48,10 +49,16 @@ async function requestReview(admin, args, options=defaultOptions) {
             };
             await rest.call(admin, callArgs, options);
         } catch {
-            throw new rest.RestError("Could not set seller status to pending review");
+            throw new rest.RestError(
+                RestStatus.INTERNAL_SERVER_ERROR,
+                "Could not set seller as pending review"
+            );
         }
     } else {
-        throw new rest.RestError("No user contract found to modify seller status of");
+        throw new rest.RestError(
+            RestStatus.BAD_REQUEST,
+            "No user contract found to modify seller status of"
+        );
     }
 }
 
@@ -69,10 +76,16 @@ async function authorizeSeller(admin, args, options=defaultOptions) {
             };    
             await rest.call(admin, callArgs, options);
         } catch (e) {
-            throw new rest.RestError("Only admins can authorize a seller");
+            throw new rest.RestError(
+                RestStatus.FORBIDDEN,
+                "Only admins can authorize a seller"
+            );
         }
     } else {
-        throw new rest.RestError("No user found with that username");
+        throw new rest.RestError(
+            RestStatus.BAD_REQUEST,
+            "No user found with that username"
+        );
     }
 }
 
@@ -90,10 +103,16 @@ async function deauthorizeSeller(admin, args, options=defaultOptions) {
             };     
             await rest.call(admin, callArgs, options);
         } catch {
-            throw new rest.RestError("Only admins can deauthorize a seller");
+            throw new rest.RestError(
+                RestStatus.FORBIDDEN,
+                "Only admins can deauthorize a seller"
+            );
         }
     } else {
-        throw new rest.RestError("No user found with that username");
+        throw new rest.RestError(
+            RestStatus.BAD_REQUEST,
+            "No user found with that username"
+        );
     }
 }
 
