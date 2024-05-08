@@ -394,14 +394,14 @@ const Checkout = () => {
                 <React.Fragment key={e.key}>
                   <div className={`hidden lg:block`}>
                     <ConfirmOrder
-                      paymentProviders={e.value.paymentProviders.map(p => paymentServices.find(s => s.address === p))}
+                      paymentProviders={e.value.paymentProviders.map(p => paymentServices.find(s => s.address === p)).filter((p) => p)}
                       data={e.value.items}
                       columns={columns}
                     />
                   </div>
                   <div className="lg:hidden">
                     <ResponsiveCart
-                      paymentProviders={e.value.paymentProviders.map(p => paymentServices.find(s => s.address === p))}
+                      paymentProviders={e.value.paymentProviders.map(p => paymentServices.find(s => s.address === p)).filter((p) => p)}
                       data={e.value.items}
                       AddQty={AddQty}
                       MinusQty={MinusQty}
