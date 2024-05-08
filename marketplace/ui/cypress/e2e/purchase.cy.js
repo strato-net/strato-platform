@@ -7,6 +7,7 @@ describe('Create a new Asset', () => {
   const productName = `Product-${dayjs().unix()}`;
   const userName = `User-${dayjs().unix()}`;
   const artistName = `Artist-${dayjs().unix()}`;
+  const cardNo = '4000 0035 6000 0008'
 
   
   it('It should add a new product', () => {
@@ -94,10 +95,10 @@ describe('Create a new Asset', () => {
     cy.get('input[name=email]')
     cy.get('input[name=email]').type(`${userName}@blockapps.net`).should('have.value', `${userName}@blockapps.net`);
     cy.get('#card-tab').click();
-    cy.get('input[name=cardNumber]').type('4000 0035 6000 0008').should('have.value', '4000 0035 6000 0008');
-    cy.get('input[name=cardExpiry]').type('0325')
+    cy.get('input[name=cardNumber]').type(cardNo).should('have.value', cardNo);
+    cy.get('input[name=cardExpiry]').type('0327')
     cy.get('input[name=cardCvc]').type('007').should('have.value', '007');
-    cy.get('input[name=billingName]').type('Tanuj Soni').should('have.value', 'Tanuj Soni');
+    cy.get('input[name=billingName]').type(userName).should('have.value', userName);
     cy.get('#country-fieldset').click();
     cy.get('select option[value="IN"]').should('be.selected');
     cy.get('button[type="submit"]').click();
