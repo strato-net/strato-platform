@@ -139,11 +139,16 @@ const actions = {
         window.location.href = body.error.loginUrl;
       }
 
+      let err = body.error || "Error while creating Order";
+      let errs = err.split('"');
+      if (errs.length > 1) {
+        err = errs[1]
+      }
       dispatch({
         type: actionDescriptors.createPaymentFailed,
-        error: "Error while creating Order",
+        error: err,
       });
-      actions.setMessage(dispatch, "Error while creating Order");
+      actions.setMessage(dispatch, err);
       return false;
     } catch (err) {
       dispatch({
