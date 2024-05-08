@@ -146,17 +146,19 @@ const ConfirmOrder = ({ paymentProviders, data, columns }) => {
       },
     });
     let token = await orderActions.createPayment(orderDispatch, body);
-    let serviceURL = paymentProvider.serviceURL || paymentProvider.data.serviceURL;
-    let checkoutRoute = paymentProvider.checkoutRoute || paymentProvider.data.checkoutRoute;
-    if (serviceURL
-          && serviceURL !== ''
-          && checkoutRoute
-          && checkoutRoute !== ''
-       ) {
-      const url = `${serviceURL}${checkoutRoute}?token=${token}&redirectUrl=${window.location.protocol}//${window.location.host}`
-      window.location.replace(url);
-    } else {
-      window.location.replace("/order/bought");
+    if (token && token !== false) {
+      let serviceURL = paymentProvider.serviceURL || paymentProvider.data.serviceURL;
+      let checkoutRoute = paymentProvider.checkoutRoute || paymentProvider.data.checkoutRoute;
+      if (serviceURL
+            && serviceURL !== ''
+            && checkoutRoute
+            && checkoutRoute !== ''
+         ) {
+        const url = `${serviceURL}${checkoutRoute}?token=${token}&redirectUrl=${window.location.protocol}//${window.location.host}`
+        window.location.replace(url);
+      } else {
+        window.location.replace("/order/bought");
+      }
     }
   };
 
