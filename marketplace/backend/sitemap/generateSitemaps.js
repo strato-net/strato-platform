@@ -5,7 +5,7 @@ const { default: constants } = require('../helpers/constants');
 
 const url = [
   "/",
-  "/c/A                                                                                             ll",
+  "/c/All,                                                                                       ll",
   "/c/Carbon?sc=CarbonOffset%2CCarbonDAO",
   "/c/Metals?sc=Metals",
   "/c/Clothing?sc=Clothing",
