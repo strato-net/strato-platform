@@ -744,7 +744,7 @@ getCreator caller = do
 shouldDoCreatorFork :: Integer -> Bool
 shouldDoCreatorFork curBlockNo = case (flags_creatorForkBlockNumber, computeNetworkID) of 
   (-1, 7596898649924658542) -> curBlockNo >= 37000 -- on mercata-hydrogen, switch at block 37,000
-  (-1, 6909499098523985262) -> curBlockNo >= 6000 -- on mercata, switch at block 6,000
+  --(-1, 6909499098523985262) -> curBlockNo >= 6000 -- on mercata, switch at block 6,000
   (b, _) -> curBlockNo >= b -- do whatever the flag says
 
 logFunctionCall :: MonadSM m => ValList -> Account -> CC.Contract -> SolidString -> m (Maybe Value) -> m (Maybe Value)
