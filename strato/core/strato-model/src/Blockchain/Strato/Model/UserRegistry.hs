@@ -28,42 +28,6 @@ contract UserRegistry {
         User newUser = new User{salt: _commonName}(_commonName);
         return address(newUser);
     }
-
-    function requestReview(string commonName) public {
-        try {
-            // derive the address of the user contract w/ the salt (commonName)
-            User theUser = User(address(this).derive(commonName, commonName));
-            address(theUser).call("requestReview");
-        } catch Require {
-            throw userError("You must be the owner of the wallet to call this");
-        } catch {
-            throw userError("No User contract associated with the common name " + commonName + " in this registry");
-        }
-    }
-
-    function authorizeSeller(string commonName) public {
-        try {
-            // derive the address of the user contract w/ the salt (commonName)
-            User theUser = User(address(this).derive(commonName, commonName));
-            address(theUser).call("authorizeSeller");
-        } catch Require {
-            throw userError("You must be an admin to call this");
-        } catch {
-            throw userError("No User contract associated with the common name " + commonName + " in this registry");
-        }
-    }
-
-    function deauthorizeSeller(string commonName) public {
-        try {
-            // derive the address of the user contract w/ the salt (commonName)
-            User theUser = User(address(this).derive(commonName, commonName));
-            address(theUser).call("deauthorizeSeller");
-        } catch Require {
-            throw userError("You must be an admin to call this");
-        } catch {
-            throw userError("No User contract associated with the common name " + commonName + " in this registry");
-        }
-    }
 }
 
 contract User {

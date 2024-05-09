@@ -75,6 +75,7 @@ const Inventory = ({ user }) => {
   } = useRedemptionState();
 
   //seller status
+  const [sellerStatus, setSellerStatus] = useState(user?.sellerStatus);
   const sellerStatusDipatch = useSellerStatusDispatch();
   const {
     message: sellerStatusMsg,
@@ -315,7 +316,7 @@ const metaImg = category ? category : SEO.IMAGE_META
                   onClick={() => {
                     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                       window.location.href = loginUrl;
-                    } else if (user.sellerStatus != SELLER_STATUS.AUTHORIZED) {
+                    } else if (sellerStatus != SELLER_STATUS.AUTHORIZED) {
                       showReqModModal()
                     }
                     else {
@@ -436,7 +437,8 @@ const metaImg = category ? category : SEO.IMAGE_META
             handleCancel={handleReqModCancel}
             commonName={user.commonName}
             emailAddr={user.email}
-            sellerStatus={user.sellerStatus}
+            sellerStatus={sellerStatus}
+            setSellerStatus={setSellerStatus}
           />
         )
       }

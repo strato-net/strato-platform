@@ -12,12 +12,16 @@ const RequestBeAuthorizedSellerModal = ({
   handleCancel,
   commonName,
   emailAddr,
-  sellerStatus
+  sellerStatus,
+  setSellerStatus
 }) => {
   const dispatch = useSellerStatusDispatch();
   const { requestingReview } = useSellerStatusState();
   async function sendRequest(){
-    await actions.requestReview(dispatch, {emailAddr: emailAddr, commonName: commonName});
+    try{
+      await actions.requestReview(dispatch, {emailAddr: emailAddr, commonName: commonName});
+      setSellerStatus(SELLER_STATUS.PENDING_REVIEW);
+    } catch {}
     handleCancel();
   }
 

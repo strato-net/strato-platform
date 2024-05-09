@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useReducer } from "react";
 import reducer from "./reducer";
+import { SELLER_STATUS } from "../../helpers/constants";
 
 const SellerStatusStateContext = createContext();
 const SellerStatusDispatchContext = createContext();
@@ -8,6 +9,7 @@ const SellerStatusProvider = ({children}) => {
     const initialState = {
         success: false,
         message: null,
+        sellerStatus: SELLER_STATUS.NULL,
         changingSellerStatus: false,
         requestingReview: false,
     }
