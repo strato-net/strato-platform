@@ -66,7 +66,7 @@ tableNameToText (CollectionTableName c a n m) =
         | T.null c = ""
         | T.null a = c <> tableSeparator
         | otherwise = c <> tableSeparator <> a <> tableSeparator
-      contractAndCollection = n <> "." <> m
+      contractAndCollection = n <> "-" <> m
    in prefix <> contractAndCollection
 tableNameToText (HistoryTableName c a n) =
   let prefix
