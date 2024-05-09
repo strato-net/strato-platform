@@ -1010,8 +1010,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         saleAddresses,
         quantities,
       }
-      const token = await paymentProviderJs.createPayment(rawAdmin, paymentParameters, options);
-      return token[0];
+      const tokenAndAssets = await paymentProviderJs.createPayment(rawAdmin, paymentParameters, options);
+      return tokenAndAssets;
 
     } catch (error) {
       console.log(error);
