@@ -97,7 +97,11 @@ abstract contract Sale is Utils {
     ) public requirePaymentProvider("complete sale") returns (uint) {
         uint orderQuantity = takeLockedQuantity(purchaser);
         // regular transfer - isUserTransfer: false, transferNumber: 0, transferPrice: 0
-        assetToBeSold.transferOwnership(purchaser, orderQuantity, false, 0, 0);
+        try {
+            assetToBeSold.transferOwnership(purchaser, orderQuantity, false, 0, 0);
+        } catch { // Backwards compatibility for old assets
+            address(assetToBeSold).call("transferOwnership", purchaser, orderQuantity, false, 0);
+        }
         closeSaleIfEmpty();
         return RestStatus.OK;
     }
@@ -112,7 +116,11 @@ abstract contract Sale is Utils {
             quantity -= _quantity;
         }
         // transfer feature - isUserTransfer: true, transferNumber: _transferNumber, transferPrice: _price
-        assetToBeSold.transferOwnership(_newOwner, _quantity, true, _transferNumber, _price);
+        try {
+            assetToBeSold.transferOwnership(_newOwner, _quantity, true, _transferNumber, _price);
+        } catch { // Backwards compatibility for old assets
+            address(assetToBeSold).call("transferOwnership", _newOwner, _quantity, true, _transferNumber);
+        }
         closeSaleIfEmpty();
         return RestStatus.OK;
     }
