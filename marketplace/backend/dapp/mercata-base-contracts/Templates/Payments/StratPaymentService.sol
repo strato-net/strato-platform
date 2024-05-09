@@ -20,21 +20,23 @@ contract StratPaymentService is PaymentService {
         address[] _saleAddresses,
         uint[] _quantities,
         string token
-    ) internal override returns (string) {
+    ) internal override returns (string, address[]) {
         require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
         address[] stratRecipients;
         uint totalAmount;
+        address[] assets;
         for (uint i = 0; i < _saleAddresses.length; i++) {
             Sale s = Sale(_saleAddresses[i]);
             Asset a = s.assetToBeSold();
+            assets.push(address(a));
             address recipient = a.owner();
-            if (quantitiesMap[recipient] == 0) {
+            if (totalsMap[recipient] == 0) {
                 stratRecipients.push(recipient);
             }
             uint quantity = _quantities[i];
             uint amount = s.price() * quantity * stratsPerDollar * 100; // 1 STRAT = 1 STRAT cents
             totalAmount += amount;
-            quantitiesMap[recipient] += amount;
+            totalsMap[recipient] += amount;
             try {
                 s.lockQuantity(quantity, tx.origin);
             } catch { // Support for legacy sales
@@ -55,13 +57,13 @@ contract StratPaymentService is PaymentService {
         require(myBalance >= totalAmount, err);
         for (uint j = 0; j < stratRecipients.length; j++) {
             address recipient = stratRecipients[j];
-            bool success = stratAddress.call("transfer", recipient, quantitiesMap[recipient]);
-            emit Payment(getCommonName(tx.origin), getCommonName(recipient), quantitiesMap[recipient]);
-            quantitiesMap[recipient] = 0;
+            bool success = stratAddress.call("transfer", recipient, totalsMap[recipient]);
+            emit Payment(getCommonName(tx.origin), getCommonName(recipient), totalsMap[recipient], true);
+            totalsMap[recipient] = 0;
             require(success, err);
         }
 
-        return token;
+        return (token, assets);
     }
 
     function _completeOrder (
