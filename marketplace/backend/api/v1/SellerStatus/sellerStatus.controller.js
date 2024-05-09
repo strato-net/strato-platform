@@ -10,10 +10,10 @@ class SellerStatusController {
       const {emailAddr, commonName} = body;
       try {
         const contents = `The user <b>${commonName}</b> is requesting to be an authorized seller on Strato Mercata. You may get in contact with them by reaching out at ${emailAddr}. You may grant or deny seller authorization at the admin dashboad: ${config.serverHost}/admin.`
-        await sendEmail('support@blockapps.net', commonName + ' Requesting Seller Status', contents);
+        await sendEmail('product@blockapps.net', commonName + ' Requesting Seller Status', contents);
       } catch {
         throw new rest.RestError(RestStatus.BAD_GATEWAY,
-          "Unable to send request; notify support@blockapps.net for help"
+          "Unable to send request; notify product@blockapps.net for help"
         );
       }
       await dapp.requestReview(body);

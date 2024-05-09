@@ -26,7 +26,7 @@ const RequestBeAuthorizedSellerModal = ({
   }
 
   const requestReviewText = 'Thank you for interest in being a seller on Mercata! To keep our platform safe, we must first verify you as a seller. Click the button to request a review, and our team will get back to you shortly with our response!';
-  const alreadyRequestedReviewText = 'Thank you for interest in being a seller on Mercata! You have already requested to be reviewed as a seller. Our team will get back to you shortly with a response. If you have questions, please feel free to reach out to support@blockapps.net';
+  const alreadyRequestedReviewText = 'Thank you for interest in being a seller on Mercata! You have already requested to be reviewed as a seller. Our team will get back to you shortly with a response. If you have questions, please feel free to reach out to product@blockapps.net';
   
   return (
     <>
