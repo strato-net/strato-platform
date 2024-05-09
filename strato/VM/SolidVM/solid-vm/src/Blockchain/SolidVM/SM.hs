@@ -603,7 +603,7 @@ getTypeOfName' s (CC.CodeCollection ccs _ _ enms strcts _ _ _) =
           ]
       ctrs = map ContractTypo $ M.keys ccs
    in case concatMap lookInContract ccs ++ ctrs of
-        [] -> internalError "getTypeOfName' " s
+        [] -> internalError "getTypeOfName" s
         (typo : _) -> typo
 
 getTypeOfName :: MonadSM m => SolidString -> m Typo

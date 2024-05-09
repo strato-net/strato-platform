@@ -38,6 +38,7 @@ import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Stream.Action as Action
 import Blockchain.Stream.VMEvent
+-- import Control.Arrow ((&&&))
 import Control.Lens ((^.))
 import Control.Monad (forM, forM_, unless, when)
 import qualified Control.Monad.Change.Modify as Mod
@@ -62,6 +63,7 @@ import Database.PostgreSQL.Typed (PGConnection)
 import SelectAccessible ()
 import Slipstream.Data.Action
 import Slipstream.Events
+-- import qualified Slipstream.Events as SE
 import Slipstream.Globals
 import Slipstream.Metrics
 import Slipstream.OutputData
@@ -82,8 +84,8 @@ mergeDiffs (Action.SolidVMDiff lhs) (Action.SolidVMDiff rhs) = Action.SolidVMDif
 mergeDiffs lhs rhs = error $ "Invalid diff combination: " ++ show (lhs, rhs)
 
 data BatchedInserts = BatchedInserts
-  { indexInsert :: (ProcessedContract, [T.Text]),
-    abstractInserts :: [(ProcessedContract,[T.Text],T.Text, TableColumns)],
+  { indexInsert :: ProcessedContract,
+    abstractInsert :: [(ProcessedContract, T.Text, TableColumns)],
     historyInserts :: [ProcessedContract],
     mappingInserts :: [ProcessedMappingRow]
   }
@@ -249,13 +251,6 @@ getMapNamesFromContract c =
       listOfMappingsWithRecords = filter (\(_, vd) -> _isRecord vd) listOfMappings
    in T.pack . fst <$> listOfMappingsWithRecords
 
-getContractsFromPC :: ProcessedContract -> [Text]
-getContractsFromPC pc = Map.keys $ Map.filter isValueContract (contractData pc)
-  where
-    isValueContract :: Value -> Bool
-    isValueContract (ValueContract _) = True
-    isValueContract _ = False
-
 processTheMessages ::
   ( MonadLogger m,
     HasSQL m,
@@ -307,20 +302,20 @@ processTheMessages env conn messages = do
 
             deferredForeignKeys <- case (_contractType c) of
               AbstractType -> do
-                abstractfkeys <- outputData conn $ createExpandAbstractTable g c nameParts abstracts' cc
-                outputData' conn $ createExpandHistoryTable True g c cc nameParts
-                $logInfoS "processTheMessages/deferredForeignKeys/abstractfkeys" $ T.pack $ show abstractfkeys
-                return abstractfkeys
+                _ <- outputData conn $ createExpandAbstractTable g c nameParts abstracts' cc
+                outputData' conn $ createExpandHistoryTable True g c nameParts
+                -- $logInfoS "processTheMessages/deferredForeignKeys/abstractfkeys" $ T.pack $ show abstractfkeys
+                return []
               _ -> do
-                indexfkeys <- outputData conn $ createExpandIndexTable g c cc nameParts
+                indexfkeys <- outputData conn $ createExpandIndexTable g c nameParts
                 $logInfoS "processTheMessages/deferredForeignKeys/indexfkeys" $ T.pack $ show indexfkeys
-                outputData' conn $ createExpandHistoryTable False g c cc nameParts
+                outputData' conn $ createExpandHistoryTable False g c nameParts
                 return indexfkeys
 
             $logInfoS "processTheMessages/deferredForeignKeys" $ T.pack $ show deferredForeignKeys
 
 
-            outputData conn $ createExpandEventTables g c cc nameParts
+            outputData conn $ createExpandEventTables g c nameParts
 
             return $ deferredForeignKeys ++ deferredForeignKeysForMappings
 
@@ -352,12 +347,11 @@ processTheMessages env conn messages = do
   --           outputData' conn $ createExpandHistoryTable g c nameParts
   --           outputData conn $ createExpandEventTables g c nameParts
   --           pure deferredForeignKeys
-        -- forM_ deferredForeignKeys $ outputData conn . createForeignIndexesForJoins
+  --       forM_ deferredForeignKeys $ outputData conn . createForeignIndexesForJoins
   --       addDelegate g s c'
   --       pure $ Right deferredForeignKeys
 
   let fkeys = rights $ fkeys' -- ++ dfkeys'
-      concatFkeys = concat fkeys
 
   inserts <- enterBloc2 env $ do
     forM changes $ \(acct, actions) -> do
@@ -383,7 +377,6 @@ processTheMessages env conn messages = do
           $logDebugLS "Contract name is: " $ T.pack $ show name
           oldState <- readPreviousSolidVMState g acct
           indexContract <- rowToInsert g abiid row cont oldState
-          let fkeysForThisContract = getContractsFromPC indexContract
           hs <- rowToHistories g abiid actions cont oldState
           let mapNames = actionMappings row
               abstracts = actionAbstracts row -- to get abstract history info, get `actionAbstracts <$> actions`
@@ -394,12 +387,12 @@ processTheMessages env conn messages = do
                 tableNameText = tableNameToDoubleQuoteText tableName
             $logInfoS "Row will be inserted into abstract table: " tableNameText
             mCols <- getTableColumns g tableName
-            pure $ (indexContract, fkeysForThisContract, tableNameText,) . map extractTextInsideQuotes <$> mCols
+            pure $ (indexContract,tableNameText,) . map extractTextInsideQuotes <$> mCols
           $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
           $logDebugLS "History inserts are: " $ T.pack $ show hs
           stateDiff <- rowToMappings row
           pMappings <- processedContractToProcessedMappingRows stateDiff (mapNames) row abiid --get all mapping rows to insert
-          pure . Right $ BatchedInserts (indexContract,fkeysForThisContract) abstractColumns hs pMappings
+          pure . Right $ BatchedInserts indexContract abstractColumns hs pMappings
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
 
@@ -407,19 +400,18 @@ processTheMessages env conn messages = do
   let insertsByCodeHash = rights inserts
 
   forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
-  
+
   forM_ insertsByCodeHash $ \ins -> do
     outputData conn $ insertIndexTable $ indexInsert ins
     outputData conn $ insertHistoryTable $ historyInserts ins
     unless ((length (mappingInserts ins) < 1)) $ outputData conn $ insertMappingTable $ mappingInserts ins
-    outputData conn $ insertAbstractTable (abstractInserts ins) False -- not historic
-    outputData conn $ insertHistoryAbstractTable (abstractInserts ins) (historyInserts ins)
+    outputData conn $ insertAbstractTable (abstractInsert ins) False -- not historic
+    outputData conn $ insertHistoryAbstractTable (abstractInsert ins) (historyInserts ins)
 
---updating the foreign keys from null
   forM_ insertsByCodeHash $ \ins -> do
-    outputData conn $ updateForeignKeysFromNULLAbstract (abstractInserts ins) -- not historic
-    outputData conn $ updateForeignKeysFromNULLIndex (indexInsert ins)
+    insertForeignKeys conn $ indexInsert ins
 
+  let concatFkeys = concat fkeys
   forM_ concatFkeys $ \deferredForeignKey -> do
     outputData conn $ createForeignIndexesForJoins deferredForeignKey
 
