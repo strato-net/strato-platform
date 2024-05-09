@@ -37,7 +37,7 @@ import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Stream.Action as Action
-import Blockchain.Stream.VMEvent
+import qualified Blockchain.Stream.VMEvent as VME
 import Control.Lens ((^.))
 import Control.Monad (forM, forM_, unless, when)
 import qualified Control.Monad.Change.Modify as Mod
@@ -62,7 +62,7 @@ import Data.Traversable (for)
 import Database.PostgreSQL.Typed (PGConnection)
 import SelectAccessible ()
 import Slipstream.Data.Action
-import Slipstream.Events
+import qualified Slipstream.Events as E
 import Slipstream.Globals
 import Slipstream.Metrics
 import Slipstream.OutputData
@@ -83,9 +83,9 @@ mergeDiffs (Action.SolidVMDiff lhs) (Action.SolidVMDiff rhs) = Action.SolidVMDif
 mergeDiffs lhs rhs = error $ "Invalid diff combination: " ++ show (lhs, rhs)
 
 data BatchedInserts = BatchedInserts
-  { indexInsert :: (ProcessedContract, [T.Text]),
-    abstractInserts :: [(ProcessedContract,[T.Text],T.Text, TableColumns)],
-    historyInserts :: [ProcessedContract],
+  { indexInsert :: (E.ProcessedContract, [T.Text]),
+    abstractInserts :: [(E.ProcessedContract,[T.Text],T.Text, TableColumns)],
+    historyInserts :: [E.ProcessedContract],
     collectionInserts :: [ProcessedCollectionRow]
   }
   deriving (Show)
@@ -122,9 +122,9 @@ processedContract ::
   ABIID ->
   Map.Map Text Value ->
   AggregateAction ->
-  ProcessedContract
+  E.ProcessedContract
 processedContract ABIID {..} state AggregateAction {..} =
-  ProcessedContract
+  E.ProcessedContract
     { address = actionAccount ^. accountAddress,
       codehash = actionCodeHash,
       creator = actionCreator,
@@ -153,7 +153,7 @@ rowToInsert ::
   AggregateAction ->
   OLD.Contract ->
   [(Text, Value)] ->
-  m ProcessedContract
+  m E.ProcessedContract
 rowToInsert gref abiid row cont oldState = do
   let newState = case actionStorage row of
         Action.EVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp) oldState
@@ -189,7 +189,7 @@ processedContractToProcessedCollectionRows state mapAndArrayNames row abiid = do
           processRecord (mName, value) = 
             case value of
               Left theMap -> 
-                map (\(k, v) -> processedCollectionRow mName row abiid (SimpleValue k) v) (Map.toList theMap)
+                map (\(k, v) -> processedCollectionRow mName (T.pack "Mapping") row abiid (SimpleValue k) v) (Map.toList theMap)
               Right (Left arrayValues) -> 
                 map (processArrayFixed mName row abiid) (zip [0..] arrayValues)
               Right (Right intMapValues) -> 
@@ -203,7 +203,7 @@ rowToHistories ::
   [AggregateAction] ->
   OLD.Contract ->
   [(Text, Value)] ->
-  m [ProcessedContract]
+  m [E.ProcessedContract]
 rowToHistories _ abiId actions cont oldState = do
   flip evalStateT oldState . forM actions $ \hRow -> do
     modify $ case actionStorage hRow of
@@ -212,8 +212,8 @@ rowToHistories _ abiId actions cont oldState = do
     newMap <- gets Map.fromList
     return $ processedContract abiId newMap hRow
 
-processedCollectionRow :: Text -> AggregateAction -> ABIID -> Value -> Value -> ProcessedCollectionRow
-processedCollectionRow collection AggregateAction {..} ABIID {..} k v =
+processedCollectionRow :: Text -> Text -> AggregateAction -> ABIID -> Value -> Value -> ProcessedCollectionRow
+processedCollectionRow collection ttype AggregateAction {..} ABIID {..} k v =
   ProcessedCollectionRow
     { address = actionAccount ^. accountAddress,
       codehash = actionCodeHash,
@@ -221,6 +221,7 @@ processedCollectionRow collection AggregateAction {..} ABIID {..} k v =
       application = actionApplication,
       contractname = aiName,
       collectionname = collection,
+      collectiontype = ttype,
       blockHash = actionBlockHash,
       blockTimestamp = actionBlockTimestamp,
       blockNumber = actionBlockNumber,
@@ -232,29 +233,29 @@ processedCollectionRow collection AggregateAction {..} ABIID {..} k v =
 
 processArrayFixed :: Text -> AggregateAction -> ABIID -> (Int, Value) -> ProcessedCollectionRow
 processArrayFixed mName row abiid (index, value) =
-  processedCollectionRow mName row abiid (SimpleValue (ValueInt False Nothing (fromIntegral index))) value
+  processedCollectionRow mName (T.pack "Array") row abiid (SimpleValue (ValueInt False Nothing (fromIntegral index))) value
 
 processArrayDynamic :: Text -> AggregateAction -> ABIID -> (Int, Value) -> ProcessedCollectionRow
 processArrayDynamic mName row abiid (index, value) =
-  processedCollectionRow mName row abiid (SimpleValue (ValueInt False Nothing (fromIntegral index))) value
+  processedCollectionRow mName (T.pack "Array") row abiid (SimpleValue (ValueInt False Nothing (fromIntegral index))) value
 
 -- Prioritizing with-source actions prevents the issue where updates to contracts
 -- at different addresses are lost because the schema has not been seen yet.
 withSourceFirst :: (a, [AggregateAction]) -> Down Bool
 withSourceFirst = Down . any (Map.member "src" . actionMetadata) . snd
 
-parseActions :: [VMEvent] -> [(Account, [AggregateAction])]
+parseActions :: [VME.VMEvent] -> [(Account, [AggregateAction])]
 parseActions events' =
   sortOn withSourceFirst
     . splitActions
     . filter matters
     . concatMap (flatten)
-    $ [a | NewAction a <- events']
+    $ [a | VME.NewAction a <- events']
 
-parseEvents :: [VMEvent] -> [AggregateEvent]
+parseEvents :: [VME.VMEvent] -> [AggregateEvent]
 parseEvents = concatMap parseEvent
   where
-    parseEvent (NewAction a) = mkAggregateEvent a <$> toList (Action._events a)
+    parseEvent (VME.NewAction a) = mkAggregateEvent a <$> toList (Action._events a)
     parseEvent _ = []
     mkAggregateEvent a e =
       AggregateEvent
@@ -277,12 +278,19 @@ getCollectionNamesFromContract c =
       listOfCollections = listOfArrays ++ listOfMappingsWithRecords
    in T.pack . fst <$> listOfCollections
 
-getContractsFromPC :: ProcessedContract -> [Text]
-getContractsFromPC pc = Map.keys $ Map.filter isValueContract (contractData pc)
+getContractsFromPC :: E.ProcessedContract -> [Text]
+getContractsFromPC pc = Map.keys $ Map.filter isValueContract (E.contractData pc)
   where
     isValueContract :: Value -> Bool
     isValueContract (ValueContract _) = True
     isValueContract _ = False
+
+-- Function to duplicate each collection row for each parent, changing the contract name, and include the original
+duplicateForParentsAndIncludeOriginal :: [ProcessedCollectionRow] -> [(Text,Text,Text)] -> [ProcessedCollectionRow]
+duplicateForParentsAndIncludeOriginal collections parentz = concatMap duplicateForSingle collections
+  where
+    duplicateForSingle :: ProcessedCollectionRow -> [ProcessedCollectionRow]
+    duplicateForSingle row = row : [ row { creator = c, application = a, contractname = n } | (c,a,n) <- parentz ]
 
 processTheMessages ::
   ( MonadLogger m,
@@ -291,7 +299,7 @@ processTheMessages ::
   ) =>
   BlocEnv ->
   PGConnection ->
-  [VMEvent] ->
+  [VME.VMEvent] ->
   m [AggregateEvent]
 processTheMessages env conn messages = do
   g <- Mod.access (Mod.Proxy @(IORef Globals))
@@ -304,9 +312,9 @@ processTheMessages env conn messages = do
   let changes = parseActions messages
       events' = parseEvents messages
       -- TODO (Dan) : would be nice if we didn't just rip events out at the top level like this
-      creates = [(cc, cp, cr, ap, hl, abs', rm) | CodeCollectionAdded cc cp cr ap hl abs' rm <- messages]
+      creates = [(cc, cp, cr, ap, hl, abs', rm) | VME.CodeCollectionAdded cc cp cr ap hl abs' rm <- messages]
       -- delegates = [d | DelegatecallMade d <- messages]
-      transactionResults = [tr | NewTransactionResult tr <- messages]
+      transactionResults = [tr | VME.NewTransactionResult tr <- messages]
 
   fkeys' <- forM creates $ \(cc, cp, cr, ap, hl, abstracts', _) -> do
         $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (format cp) 
@@ -411,24 +419,27 @@ processTheMessages env conn messages = do
           indexContract <- rowToInsert g abiid row cont oldState
           let fkeysForThisContract = getContractsFromPC indexContract
           hs <- rowToHistories g abiid actions cont oldState
-          let mapNames = actionMappings row
-              arrNames = actionArrays row
+          let mapNames = actionMappings row --recorded mappings
+              arrNames = actionArrays row --all
               collectionNames = mapNames ++ arrNames
               abstracts = actionAbstracts row
           --get columns for abstract table
           $logDebugLS "abstractColumns" $ T.pack $ "Getting abstract columns from " ++ (show abstracts)
-          abstractColumns <- fmap catMaybes . for (Map.toList abstracts) $ \((_, n'), (cr', ap')) -> do
+          abstractColumns' <- fmap catMaybes . for (Map.toList abstracts) $ \((_, n'), (cr', ap')) -> do
             let tableName = AbstractTableName cr' ap' n'
                 tableNameText = tableNameToDoubleQuoteText tableName
             $logInfoS "Row will be inserted into abstract table: " tableNameText
             mCols <- getTableColumns g tableName
-            pure $ (indexContract, fkeysForThisContract, tableNameText,) . map extractTextInsideQuotes <$> mCols
-          $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
-          $logDebugLS "Globals: Recorded Array names are: " . T.pack $ show arrNames ++ " contract: " ++ show (contractName indexContract)
+            pure $ (indexContract, fkeysForThisContract, tableNameText, (cr',ap',n'),) . map extractTextInsideQuotes <$> mCols
+          $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (E.contractName indexContract)
+          $logDebugLS "Globals: Recorded Array names are: " . T.pack $ show arrNames ++ " contract: " ++ show (E.contractName indexContract)
           $logDebugLS "History inserts are: " $ T.pack $ show hs
           stateDiff <- rowToCollections row
+          parents' <- pure $ map (\(_,_,_,p ,_)-> p) abstractColumns'
+          abstractColumns <- pure $ map (\(a,b,c,_,e) -> (a,b,c,e)) abstractColumns'
           pCollections <- processedContractToProcessedCollectionRows stateDiff (collectionNames) row abiid --get all collection rows to insert
-          pure . Right $ BatchedInserts (indexContract,fkeysForThisContract) abstractColumns hs pCollections
+          pCollectionsWithAbstracts <- pure $ duplicateForParentsAndIncludeOriginal pCollections parents'
+          pure . Right $ BatchedInserts (indexContract, fkeysForThisContract) abstractColumns hs pCollectionsWithAbstracts
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
 
@@ -440,8 +451,8 @@ processTheMessages env conn messages = do
   forM_ insertsByCodeHash $ \ins -> do
     outputData conn $ insertIndexTable $ indexInsert ins
     outputData conn $ insertHistoryTable $ historyInserts ins
-    unless ((length (collectionInserts ins) < 1)) $ outputData conn $ insertCollectionTable $ collectionInserts ins
     outputData conn $ insertAbstractTable (abstractInserts ins) False -- not historic
+    unless ((length (collectionInserts ins) < 1)) $ outputData conn $ insertCollectionTable $ collectionInserts ins
     outputData conn $ insertHistoryAbstractTable (abstractInserts ins) (historyInserts ins)
 
 --updating the foreign keys from null

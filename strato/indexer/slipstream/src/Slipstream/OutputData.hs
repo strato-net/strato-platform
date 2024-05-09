@@ -32,6 +32,7 @@ module Slipstream.OutputData (
   createExpandIndexTable,
   createForeignIndexesForJoins,
   createExpandAbstractTable,
+  createHistoryTable',
   expandAbstractTable,
   expandAbstractContractTable,
   notifyPostgREST,
@@ -69,8 +70,9 @@ import           Blockchain.Strato.Model.CodePtr
 import qualified Blockchain.Strato.Model.Event   as Action
 import           Blockchain.Strato.Model.Keccak256
 import           Data.Bifunctor                  (first)
-import           Data.Function                   (on)
-import           Data.List                       (groupBy, nubBy)
+-- import           Data.Function                   (on)
+import           Data.List                       (groupBy, nubBy, sortBy)
+import           Data.Ord (comparing)
 import           Data.Text.Encoding              (decodeUtf8, decodeUtf8', encodeUtf8)
 import           Data.Time
 import           Database.PostgreSQL.Typed
@@ -105,6 +107,7 @@ data ProcessedCollectionRow = ProcessedCollectionRow
     application :: Text,
     contractname :: Text,
     collectionname :: Text,
+    collectiontype ::Text,
     blockHash :: Keccak256,
     blockTimestamp :: UTCTime,
     blockNumber :: Integer,
@@ -241,7 +244,8 @@ baseMappingColumns =
     "transaction_hash",
     "transaction_sender",
     "contract_name",
-    "collectionname"
+    "collectionname",
+    "collectiontype"
   ]
 
 baseAbstractColumns :: TableColumns
@@ -289,6 +293,20 @@ collectionTableName creator a n m =
 
 uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
 uncurry3 f (x, y, z) = f x y z
+
+compareCollectionRows :: ProcessedCollectionRow -> ProcessedCollectionRow -> Bool
+compareCollectionRows x y = collectionDataKey x == collectionDataKey y &&
+                   creator x == creator y &&
+                   application x == application y &&
+                   contractname x == contractname y &&
+                   collectionname x == collectionname y
+
+compareCollectionRows' :: ProcessedCollectionRow -> ProcessedCollectionRow -> Bool
+compareCollectionRows' x y =
+                   creator x == creator y &&
+                   application x == application y &&
+                   contractname x == contractname y &&
+                   collectionname x == collectionname y
 
 createExpandIndexTable ::
   OutputM m =>
@@ -690,10 +708,15 @@ insertCollectionTable ::
   ConduitM () Text m ()
 insertCollectionTable [] = error "insertCollectionTable: unhandled empty list"
 insertCollectionTable maps = do
-  let newMaps = nubBy ((==) `on` collectionDataKey) maps
-  multilineLog "insertCollectionTable" $ boringBox $ map show newMaps
-  let grouped = (groupBy ((==) `on` collectionname) newMaps)
-      results = concat $ map insertCollectionTableQuery grouped
+  -- Removing duplicates with all relevant fields
+  let newMaps = nubBy compareCollectionRows maps
+  multilineLog "insertCollectionTable/newMaps" $ boringBox $ map show newMaps
+  -- Sorting by 'creator', 'application', 'contractname' before grouping
+  let sortedMaps = sortBy (comparing (\x -> (creator x, application x, contractname x))) newMaps
+  -- Grouping by 'creator', 'application', 'contractname'
+  let grouped = groupBy compareCollectionRows' sortedMaps
+  -- Processing grouped data with another function if necessary
+  let results = concatMap insertCollectionTableQuery grouped
   yieldMany $ results
 
 insertForeignKeys ::
@@ -821,6 +844,7 @@ createCollectionTableQuery (creator, a, n, m) =
           csv $ baseColumnsQuery ++
             [ "contract_name text",
               "collectionname text",
+              "collectiontype text",
               "key text",
               "value text"
             ],
@@ -937,7 +961,8 @@ insertCollectionTableQuery ms =
                     T.pack . keccak256ToHex . transactionHash,
                     tshow . transactionSender,
                     contractname,
-                    collectionname
+                    collectionname,
+                    collectiontype
                   ]
                 vals = flip map mappings $ \(row, rowList) ->
                   wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
