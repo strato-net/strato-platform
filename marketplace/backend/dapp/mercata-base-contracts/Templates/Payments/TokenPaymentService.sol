@@ -72,20 +72,22 @@ contract TokenPaymentService is PaymentService {
         address[] _saleAddresses,
         uint[] _quantities,
         string token
-    ) internal override returns (string) {
+    ) internal override returns (string, address[]) {
         address[] recipients;
+        address[] assets;
         uint totalAmount;
         for (uint i = 0; i < _saleAddresses.length; i++) {
             Sale s = Sale(_saleAddresses[i]);
             Asset a = s.assetToBeSold();
+            assets.push(address(a));
             address recipient = a.owner();
-            if (quantitiesMap[recipient] == 0) {
+            if (totalsMap[recipient] == 0) {
                 recipients.push(recipient);
             }
             uint quantity = _quantities[i];
             uint amount = s.price() * quantity * tokensPerDollar * (10 ** decimals);
             totalAmount += amount;
-            quantitiesMap[recipient] += amount;
+            totalsMap[recipient] += amount;
             try {
                 s.lockQuantity(quantity, msg.sender);
             } catch { // Support for legacy sales
@@ -106,13 +108,13 @@ contract TokenPaymentService is PaymentService {
         require(myBalance >= totalAmount, err);
         for (uint j = 0; j < recipients.length; j++) {
             address recipient = recipients[j];
-            bool success = transfer(recipient, quantitiesMap[recipient]);
-            emit Payment(getCommonName(msg.sender), getCommonName(recipient), quantitiesMap[recipient], true);
-            quantitiesMap[recipient] = 0;
+            bool success = transfer(recipient, totalsMap[recipient]);
+            emit Payment(getCommonName(msg.sender), getCommonName(recipient), totalsMap[recipient], true);
+            totalsMap[recipient] = 0;
             require(success, err);
         }
 
-        return token;
+        return (token, assets);
     }
 
     function _completeOrder (
