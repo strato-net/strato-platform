@@ -12,11 +12,12 @@ contract Tokens is Mintable {
         string[] _images,
         string[] _files,
         uint _createdDate,
-        uint _quantity
-    ) public Mintable(_name, _description, _images, _files, _createdDate, _quantity) {}
+        uint _quantity,
+        AssetStatus _status
+    ) public Mintable(_name, _description, _images, _files, _createdDate, _quantity, _status) {}
 
     function mint(uint _quantity) internal override returns (UTXO) {
-        Tokens newToken = new Tokens(name, description, images, files, createdDate, _quantity);
+        Tokens newToken = new Tokens(name, description, images, files, createdDate, _quantity, status);
         return UTXO(address(newToken)); 
     }
 }

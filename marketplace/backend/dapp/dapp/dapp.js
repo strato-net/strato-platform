@@ -615,7 +615,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const createdDate = Math.floor(Date.now() / 1000);
     const newArgs = {
       ...args.itemArgs,
-      createdDate
+      createdDate,
+      status: ASSET_STATUS.ACTIVE
     };
     return tokensJs.uploadContract(rawAdmin, newArgs, options);
   };
