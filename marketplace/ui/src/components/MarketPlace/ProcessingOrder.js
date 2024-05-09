@@ -22,7 +22,7 @@ function useQuery() {
 const ProcessingOrder = ({ user }) => {
 
   const navigate = useNavigate();
-  const [sessionId, setSessionId] = useState(undefined);
+  const [assetAddresses, setAssetAddresses] = useState([]);
   const orderDispatch = useOrderDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
   const [error, seterror] = useState(null)
@@ -47,118 +47,20 @@ const ProcessingOrder = ({ user }) => {
   const query = useQuery();
 
   useEffect(() => {
-    setSessionId(query.get("session_id"));
+    setAssetAddresses(query.get("assets"));
   }, [routeMatch, query]);
 
   useEffect(() => {
-    if (sessionId !== undefined && user !== undefined && !called) {
+    if (assetAddresses !== undefined && user !== undefined && !called) {
       setCalled(true);
       getCartData();
     }
 
-  }, [sessionId, user])
+  }, [assetAddresses, user])
 
 
   const getCartData = async () => {
     try {
-      const sellersCommonName = storedConfirmList[0].sellersCommonName;
-      const response = await fetch(
-        `${apiUrl}/order/payment/session/${sessionId}/${sellersCommonName}`,
-        {
-          method: HTTP_METHODS.GET,
-        }
-      );
-
-      const body = await response.json();
-      if (response.status === RestStatus.OK) {
-        try {
-          const cartObject = JSON.parse(body.data.metadata.cart);
-          if (Object.keys(cartObject).length !== 0) {
-            if (body.data["payment_status"] === "paid") {
-              const customerEmail = user.email;
-              const cart = JSON.parse(body.data.metadata.cart);
-              let object = { paymentSessionId: sessionId, status: ORDER_STATUS.AWAITING_FULFILLMENT, paymentMethod: body.data.payment_method, ...cart };
-              handleOrderConfirm(object, customerEmail);
-            }
-            else if (body.data["payment_method_options"].hasOwnProperty("us_bank_account")) {
-              const customerEmail = user.email;
-              const cart = JSON.parse(body.data.metadata.cart);
-              let object = { paymentSessionId: sessionId, status: ORDER_STATUS.PAYMENT_PENDING, paymentMethod: body.data.payment_method, ...cart };
-              handleOrderConfirm(object, customerEmail);
-            }
-          }
-        } catch (error) {
-          seterror(error);
-          setTimeout(function () {
-            navigate(routes.Checkout.url)
-          }, 2000);
-        }
-      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
-        seterror("Cannot find session ID");
-        setTimeout(function () {
-          navigate(routes.Checkout.url)
-        }, 2000);
-      } else {
-        seterror(body.error);
-        setTimeout(function () {
-          navigate(routes.Checkout.url)
-        }, 2000);
-      }
-
-    } catch (err) {
-      seterror(err);
-    }
-  }
-
-
-
-  const handleOrderConfirm = async (cartData, customerEmail) => {
-    let htmlContents = [];
-
-    let customerFirstName = cartData.user.split(" ")[0];
-
-    // Construct Email with order details
-    let concatenatedOrderString = "";
-    let orderTotal = 0;
-    for (let i = 0; i < storedConfirmList.length; i++) {
-      let orderItem = storedConfirmList[i];
-      let itemName = decodeURIComponent(orderItem.item.name);
-      let itemPrice = parseFloat(orderItem.unitPrice).toFixed(2);
-      let itemQty = orderItem.qty;
-      let itemTotal = (itemPrice * itemQty).toFixed(2);
-
-      concatenatedOrderString += `${itemName}:\n`;
-      concatenatedOrderString += `$${itemTotal} <br>`;
-      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each <br><br>`;
-      orderTotal += parseFloat(itemTotal);
-      if (i === storedConfirmList.length - 1) {
-        concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
-        concatenatedOrderString += `Sales Tax: $${parseFloat(cartData.tax).toFixed(2)} <br>`;
-        concatenatedOrderString += `Shipping Fee: <i><strong>Free</strong></i><br><br>`;
-        concatenatedOrderString += `Order Total: $${orderTotal.toFixed(2)} <br>`;
-      }
-    }
-
-    htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
-
-    // Prepare order data to be sent to order controller
-    let assetAddresses = [];
-    const orderList = storedConfirmList.map(o => {
-      assetAddresses.push(o.key);
-      return { saleAddress: o.saleAddress, quantity: o.qty };
-    });
-
-    const body = {
-      status: cartData.status,
-      items: orderList,
-      paymentSessionId: cartData.paymentSessionId,
-      to: customerEmail,
-      subject: "Your Order Confirmation",
-      htmlContents: htmlContents,
-    }
-
-    let isDone = await orderActions.createSaleOrder(orderDispatch, body);
-    if (isDone) {
       let updatedCart = [];
       storedData.forEach(cart => {
         if (!assetAddresses.includes(cart.product.address)) {
@@ -169,12 +71,10 @@ const ProcessingOrder = ({ user }) => {
       setTimeout(() => {
         navigate(routes.Orders.url.replace(':type', 'bought'));
       }, 500);
-    } else {
-      setTimeout(function () {
-        navigate(routes.Checkout.url)
-      }, 2000);
+    } catch (err) {
+      seterror(err);
     }
-  };
+  }
 
   const openToastMarketplace = (placement) => {
     if (error != null) {
