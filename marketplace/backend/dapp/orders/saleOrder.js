@@ -11,6 +11,7 @@ import constants from "../../helpers/constants";
 
 const contractName = "SimpleOrder";
 const contractFilename = `${util.cwd}/dapp/mercata-base-contracts/Templates/Orders/SimpleOrder.sol`;
+const paymentTableName = "PaymentService.Payment";
 
 /**
  * Upload a new Sale Order
@@ -107,8 +108,13 @@ async function getHistory(user, chainId, address, options) {
  * @param _args - Contract state
  */
 function marshalOut(_args) {
+  const { token, orderId, unitsPerDollar, amount, totalPrice, createdDate, block_timestamp, status } = _args;
   const args = {
     ..._args,
+    orderId: orderId || token,
+    totalPrice: totalPrice || (unitsPerDollar ? Math.round((amount * 100) / unitsPerDollar) / 100 : amount),
+    createdDate: createdDate || (new Date(block_timestamp)).getTime() / 1000,
+    status: status || 3,
   };
   return args;
 }
@@ -159,14 +165,23 @@ function bindAddress(user, address, options) {
 
 async function get(user, args, options) {
   const { address, ...restArgs } = args;
+  const { orderId, ...otherArgs } = restArgs;
   const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
   let order;
 
-  const searchArgs = setSearchQueryOptions(restArgs, {
+  let searchArgs = setSearchQueryOptions( { ...otherArgs, token: orderId }, {
     key: "address",
     value: address,
   });
-  order = await searchOne(constants.orderTableName, searchArgs, newOptions, user);
+  order = await searchOne(paymentTableName, searchArgs, newOptions, user);
+
+  if (!order) {
+    searchArgs = setSearchQueryOptions(restArgs, {
+      key: "address",
+      value: address,
+    });
+    order = await searchOne(constants.orderTableName, searchArgs, newOptions, user);
+  }
 
   if (!order) {
     return undefined;
@@ -179,25 +194,51 @@ async function get(user, args, options) {
 
 async function getAll(admin, args = {}, options) {
   let saleOrders;
+  const { order, ...restArgs } = args;
+  const { offset, limit } = args;
   const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
-  saleOrders = await searchAllWithQueryArgs(constants.orderTableName, args, newOptions, admin);
+  const countArgs = {
+    ...args,
+    limit: undefined,
+    offset: 0,
+    order: undefined,
+    queryOptions: {
+      select: "count",
+    }
+  };
 
-  const count = await searchAllWithQueryArgs(
-    constants.orderTableName,
-    {
-      ...args,
-      limit: undefined,
-      offset: 0,
-      order: undefined,
-      queryOptions: {
-        select: "count",
-      }
-    },
+  const newCount = await searchAllWithQueryArgs(
+    paymentTableName,
+    countArgs,
     newOptions,
     admin
   );
 
-  return saleOrders ? { orders: saleOrders.map((order) => marshalOut(order)), total: count[0].count } : undefined;
+  let totalCount = newCount[0].count;
+
+  if (totalCount && !(offset && (totalCount < offset))) {
+    const newArgs = { ...restArgs, order: 'block_timestamp.desc' };
+    saleOrders = await searchAllWithQueryArgs(paymentTableName, newArgs, newOptions, admin);
+  }
+
+  if (!saleOrders || !limit || saleOrders.length < limit) {
+    let oldLimit = saleOrders ? limit && limit - saleOrders.length : limit;
+    let oldOffset = saleOrders && saleOrders.length > 0 ? 0 : offset ? offset - saleOrders.length : 0;
+    let oldArgs = { ...args, limit: oldLimit, offset: oldOffset };
+    const oldSaleOrders = await searchAllWithQueryArgs(constants.orderTableName, oldArgs, newOptions, admin);
+    saleOrders = [...saleOrders, ...oldSaleOrders];
+  }
+
+  const oldCount = await searchAllWithQueryArgs(
+    constants.orderTableName,
+    countArgs,
+    newOptions,
+    admin
+  );
+
+  totalCount += oldCount[0].count;
+
+  return saleOrders ? { orders: saleOrders.map((order) => marshalOut(order)), total: totalCount } : undefined;
 }
 
 /**
