@@ -9,8 +9,8 @@ import { clientErrorHandler, commonErrorHandler } from './helpers/utils.js';
 import routes from './routes.js';
 
 const config = {
-    name: 'Payment Server',
-    port: process.env.PORT || 8018,
+  name: 'Payment Server',
+  port: process.env.PORT || 8018,
 };
 
 const app = express();
@@ -37,5 +37,5 @@ app.use(clientErrorHandler);
 app.use(commonErrorHandler);
 
 app.listen(config.port, function () {
-    console.log(`Listening on port ${config.port}...`)
+  console.log(`Listening on port ${config.port}...`);
 });

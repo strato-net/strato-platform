@@ -1,7 +1,7 @@
 import client from '../db/index.js';
 import { rest, util } from "blockapps-rest";
-import { ADMIN, CONTRACT_ADDRESS, DEFAULT_OPTIONS } from "./constants.js";
-import oauthHelper from './oauthHelper.js';
+import { CONTRACT_ADDRESS, DEFAULT_OPTIONS } from "./constants.js";
+import ADMIN from './oauth.js';
 import lodash from 'lodash';
 const { get } = lodash;
 
@@ -89,21 +89,15 @@ const updateStripePayment = async (token, status) => {
 }
 
 const getPaymentState = async () => {
-  // Refresh JWT token if necessary
-  const jwtToken = await oauthHelper.getServiceToken();
-
   const paymentProviderContract = { name: "PaymentService", address: CONTRACT_ADDRESS };
-  return await rest.getState(ADMIN, paymentProviderContract, DEFAULT_OPTIONS);
+  return await rest.getState(ADMIN.getUser(), paymentProviderContract, DEFAULT_OPTIONS);
 }
 
 const validateAndGetOrderDetails = async (quantities, saleAddresses) => {
-  // Refresh JWT token if necessary
-  const jwtToken = await oauthHelper.getServiceToken();
-
   // Get Sale Contracts
   const saleAddressQuery = saleAddresses.map(addr => `address.eq.${addr}`);
   const saleContracts = await rest.search(
-    ADMIN, 
+    ADMIN.getUser(), 
     { 
       name: 'BlockApps-Mercata-Sale' 
     }, 
@@ -117,7 +111,7 @@ const validateAndGetOrderDetails = async (quantities, saleAddresses) => {
   // Get Asset Contracts
   const assetAddressQuery = saleContracts.map(s => `address.eq.${s.assetToBeSold}`);
   const assetContracts = await rest.search(
-    ADMIN, 
+    ADMIN.getUser(), 
     { 
       name: 'BlockApps-Mercata-Asset' 
     }, 
@@ -150,9 +144,6 @@ const validateAndGetOrderDetails = async (quantities, saleAddresses) => {
 }
 
 const completeOrder = async (token) => {
-  // Refresh JWT token if necessary
-  const jwtToken = await oauthHelper.getServiceToken();
-
   // Make the call and return results
   const contract = { name: "PaymentService", address: CONTRACT_ADDRESS };
   const callArgs = {
@@ -160,14 +151,11 @@ const completeOrder = async (token) => {
     method: "completeOrder",
     args: util.usc({ token: token }),
   };
-  const completeOrderStatus = await rest.call(ADMIN, callArgs, DEFAULT_OPTIONS);
+  const completeOrderStatus = await rest.call(ADMIN.getUser(), callArgs, DEFAULT_OPTIONS);
   return completeOrderStatus;
 }
 
 const cancelOrder = async (token) => {
-  // Refresh JWT token if necessary
-  const jwtToken = await oauthHelper.getServiceToken();
-
   // Make the call and return results
   const contract = { name: "PaymentService", address: CONTRACT_ADDRESS };
   const callArgs = {
@@ -175,7 +163,7 @@ const cancelOrder = async (token) => {
     method: "cancelOrder",
     args: util.usc({ token: token }),
   };
-  const completeOrderStatus = await rest.call(ADMIN, callArgs, DEFAULT_OPTIONS);
+  const completeOrderStatus = await rest.call(ADMIN.getUser(), callArgs, DEFAULT_OPTIONS);
   return completeOrderStatus;
 }
 

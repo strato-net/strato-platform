@@ -1,4 +1,4 @@
-import { STRIPE_ENV, CHECKOUT_URL, SERVER_URL } from '../helpers/constants.js';
+import { STRIPE_ENV, STRIPE_CHECKOUT_URL, SERVER_URL } from '../helpers/constants.js';
 import Stripe from 'stripe';
 const stripe = Stripe(STRIPE_ENV.CREDENTIALS.STRIPE_SECRET_KEY);
 
@@ -38,7 +38,6 @@ class StripeService {
                 mode: "payment",
                 ui_mode: "embedded",
                 redirect_on_completion: "if_required",
-                return_url: `${CHECKOUT_URL}?token=${token}&redirectUrl=${marketplaceUrl}`,
             }, {
                 stripeAccount: CONNECTED_ACCOUNT_ID
             })

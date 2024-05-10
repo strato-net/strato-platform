@@ -3,23 +3,18 @@ import jwtDecode from 'jwt-decode';
 import config from '../load.config.js';
 import { TOKEN_LIFETIME_RESERVE_SECONDS } from './constants.js';
 
-const options = { config }
-
-const CACHED_DATA = {
-  serviceToken: null,
-  serviceTokenExpiresAt: null,
-}
+const options = { config };
 
 const oauth = await oauthUtil.init(config.nodes[0].oauth);
 
 const getEmailIdFromToken = function (accessToken) {
-  return jwtDecode(accessToken).email
+  return jwtDecode(accessToken).email;
 }
 
 async function createStratoUser(accessToken) {
   try {
-    const user = await rest.createUser(accessToken, options)
-    return { status: 200, message: 'success', user }
+    const user = await rest.createUser(accessToken, options);
+    return { status: 200, message: 'success', user };
   } catch (e) {
     return {
       // eslint-disable-next-line no-nested-ternary
@@ -29,32 +24,31 @@ async function createStratoUser(accessToken) {
           ? e.code
           : 'NO_CONNECTION',
       message: 'error while creating user',
-    }
+    };
   }
 }
 
-const getServiceToken = async () => {
-  let token = CACHED_DATA.serviceToken;
-  const expiresAt = CACHED_DATA.serviceTokenExpiresAt;
+const getServiceToken = async (token = null, expiration = null) => {
   if (
     !token
-    || !expiresAt
-    || expiresAt
+    || !expiration
+    || expiration
       <= Math.floor(Date.now() / 1000)
         + TOKEN_LIFETIME_RESERVE_SECONDS
   ) {
     const tokenObj = await oauth.getAccessTokenByClientSecret();
-    token = tokenObj.token[
+    const new_token = tokenObj.token[
       config.nodes[0].oauth.tokenField
         ? config.nodes[0].oauth.tokenField
         : 'access_token'
     ];
-    CACHED_DATA.serviceToken = token;
-    CACHED_DATA.serviceTokenExpiresAt = Math.floor(
+    const expiresAt = Math.floor(
       tokenObj.token.expires_at / 1000,
     );
+    return { token: new_token, expiration: expiresAt };
   }
-  return token;
+
+  return { token: token, expiration: expiration };
 }
 
 export default {

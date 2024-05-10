@@ -60,7 +60,7 @@ class StripeServiceController {
         `);
       }
       return next();
-    } catch (e) {
+    } catch(e) {
       next(e);
     }
   }
@@ -86,7 +86,7 @@ class StripeServiceController {
         payoutsEnabled: userStripeAccount.payouts_enabled,
       });
       return next();
-    } catch (e) {
+    } catch(e) {
       next(e);
     }
   }
@@ -95,7 +95,7 @@ class StripeServiceController {
     // Validation try catch
     try {
        StripeServiceController.validateStripeCheckoutArgs(req.query);
-     } catch (e) {
+     } catch(e) {
        next(e);
      }
 
@@ -115,11 +115,11 @@ class StripeServiceController {
         </html>
       `);
       return next();
-    } catch (e) {
+    } catch(e) {
       try {
         const cancelOrderStatus = await cancelOrder(token);
       }
-      catch (err) {
+      catch(err) {
         return next(err);
       }
 
@@ -143,7 +143,7 @@ class StripeServiceController {
     // Validation try catch
     try {
       StripeServiceController.validateInitiateStripeCheckoutArgs(req.query);
-    } catch (e) {
+    } catch(e) {
       next(e);
     }
 
@@ -190,11 +190,11 @@ class StripeServiceController {
       // Return client secret
       res.status(200).send({ clientSecret: session.client_secret, accountId: sellerAccount });
       return next();
-    } catch (e) {
+    } catch(e) {
       try {
         const cancelOrderStatus = await cancelOrder(token);
       }
-      catch (err) {
+      catch(err) {
         return next(err);
       }
       next(e);
@@ -224,7 +224,7 @@ class StripeServiceController {
       const updateResult = await updateStripePayment(token, "PAID");
 
       return next();
-    } catch (e) {
+    } catch(e) {
       next(e);
     }
   }
@@ -244,7 +244,7 @@ class StripeServiceController {
       const updateResult = await updateStripePayment(token, "CANCELED");
 
       return next();
-    } catch (e) {
+    } catch(e) {
       next(e);
     }
   }
