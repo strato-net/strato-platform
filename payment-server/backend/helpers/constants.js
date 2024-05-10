@@ -5,7 +5,6 @@ const options = { config, logger: console };
 
 const STRIPE_ENV = {
   CREDENTIALS: {
-    STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY,
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
   },
   ACCOUNT_ONBOARDING: {
@@ -44,16 +43,19 @@ const DEFAULT_OPTIONS = { ...options, chainIds: [], cacheNonce: true };
 
 const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS;
 
-const SERVER_HOST = `${process.env.SERVER_HOST}:${process.env.PORT ? process.env.PORT : 8018}`;
+const SERVER_URL = `${process.env.SERVER_HOST}:${process.env.PORT ? process.env.PORT : 8018}`;
 
-const CHECKOUT_URL = `${SERVER_HOST}/stripe/checkout/confirm`;
+const CLIENT_URL = `${process.env.SERVER_HOST}:${process.env.CLIENT_PORT ? process.env.CLIENT_PORT : 8020}`;
+
+const CHECKOUT_URL = `${CLIENT_URL}/stripe/checkout/confirm`;
 
 export { 
   STRIPE_ENV, 
   ADMIN, 
-  TOKEN_LIFETIME_RESERVE_SECONDS, 
-  CHECKOUT_URL,  
+  TOKEN_LIFETIME_RESERVE_SECONDS,
+  CHECKOUT_URL,
   CONTRACT_ADDRESS,
-  SERVER_HOST,
+  SERVER_URL,
+  CLIENT_URL,
   DEFAULT_OPTIONS,
 }

@@ -12,7 +12,6 @@ const clientErrorHandler = (err, req, res, next) => {
     const message = get(err, 'raw.message');
     console.log(`Unhandled API error. Status: ${statusCode}. Message: ${message}`);
     console.log(`Request: ${req}`);
-    console.log(`Response: ${res}`);
     return res.status(statusCode).json({ success: false, error: message });
   }
 
@@ -51,10 +50,48 @@ const getStripePaymentFromToken = async (token) => {
   }
 }
 
+const insertStripeAccount = async (commonName, accountId) => {
+  const insertQuery = `
+    INSERT INTO stripe_accounts (
+      commonName,
+      accountId
+    ) VALUES (
+      $1, $2
+    )`;
+  const insertValues = [ commonName, accountId ];
+  const insertResult = await client.query(insertQuery, insertValues);
+  return insertResult;
+}
+
+const insertStripePayment = async (token, sessionId, sellerCommonName) => {
+  const insertQuery = `
+    INSERT INTO stripe_payments (
+      token,
+      paymentSessionId,
+      sellerCommonName,
+      status
+    ) VALUES (
+      $1, $2, $3, $4
+    )`;
+  const insertValues = [ token, sessionId, sellerCommonName, "PENDING" ];
+  const insertResult = await client.query(insertQuery, insertValues);
+  return insertResult;
+}
+
+const updateStripePayment = async (token, status) => {
+  const updateQuery = `
+    UPDATE stripe_payments
+    SET status = $1
+    WHERE token = $2`;
+  const updateValues = [ status, token ];
+  const updateResult = await client.query(updateQuery, updateValues);
+  return updateResult;
+}
+
 const getPaymentState = async () => {
   // Refresh JWT token if necessary
   const jwtToken = await oauthHelper.getServiceToken();
-  
+
   const paymentProviderContract = { name: "PaymentService", address: CONTRACT_ADDRESS };
   return await rest.getState(ADMIN, paymentProviderContract, DEFAULT_OPTIONS);
 }
@@ -127,12 +164,31 @@ const completeOrder = async (token) => {
   return completeOrderStatus;
 }
 
+const cancelOrder = async (token) => {
+  // Refresh JWT token if necessary
+  const jwtToken = await oauthHelper.getServiceToken();
+
+  // Make the call and return results
+  const contract = { name: "PaymentService", address: CONTRACT_ADDRESS };
+  const callArgs = {
+    contract,
+    method: "cancelOrder",
+    args: util.usc({ token: token }),
+  };
+  const completeOrderStatus = await rest.call(ADMIN, callArgs, DEFAULT_OPTIONS);
+  return completeOrderStatus;
+}
+
 export {
   clientErrorHandler,
   commonErrorHandler,
   getStripeAccountForUser,
   getStripePaymentFromToken,
+  insertStripeAccount,
+  insertStripePayment,
+  updateStripePayment,
   getPaymentState,
   validateAndGetOrderDetails,
   completeOrder,
+  cancelOrder,
 }

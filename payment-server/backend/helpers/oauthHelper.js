@@ -10,6 +10,8 @@ const CACHED_DATA = {
   serviceTokenExpiresAt: null,
 }
 
+const oauth = await oauthUtil.init(config.nodes[0].oauth);
+
 const getEmailIdFromToken = function (accessToken) {
   return jwtDecode(accessToken).email
 }
@@ -31,10 +33,9 @@ async function createStratoUser(accessToken) {
   }
 }
 
-const getServiceToken = async (req = null) => {
-  const oauth = req ? req.app.oauth : await oauthUtil.init(config.nodes[0].oauth)
-  let token = CACHED_DATA.serviceToken
-  const expiresAt = CACHED_DATA.serviceTokenExpiresAt
+const getServiceToken = async () => {
+  let token = CACHED_DATA.serviceToken;
+  const expiresAt = CACHED_DATA.serviceTokenExpiresAt;
   if (
     !token
     || !expiresAt
@@ -42,18 +43,18 @@ const getServiceToken = async (req = null) => {
       <= Math.floor(Date.now() / 1000)
         + TOKEN_LIFETIME_RESERVE_SECONDS
   ) {
-    const tokenObj = await oauth.getAccessTokenByClientSecret()
+    const tokenObj = await oauth.getAccessTokenByClientSecret();
     token = tokenObj.token[
       config.nodes[0].oauth.tokenField
         ? config.nodes[0].oauth.tokenField
         : 'access_token'
-    ]
-    CACHED_DATA.serviceToken = token
+    ];
+    CACHED_DATA.serviceToken = token;
     CACHED_DATA.serviceTokenExpiresAt = Math.floor(
       tokenObj.token.expires_at / 1000,
-    )
+    );
   }
-  return token
+  return token;
 }
 
 export default {

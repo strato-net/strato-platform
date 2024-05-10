@@ -60,6 +60,7 @@ if (process.env.POSTGRESQL_SERVER_URL && process.env.POSTGRESQL_PASSWORD) {
                     token TEXT PRIMARY KEY,
                     paymentSessionId TEXT,
                     sellerCommonName TEXT REFERENCES stripe_accounts(commonName),
+                    status TEXT,
                     createdDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP 
                 );
             `;

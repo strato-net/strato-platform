@@ -1,4 +1,4 @@
-import { STRIPE_ENV, CHECKOUT_URL, SERVER_HOST } from '../helpers/constants.js';
+import { STRIPE_ENV, CHECKOUT_URL, SERVER_URL } from '../helpers/constants.js';
 import Stripe from 'stripe';
 const stripe = Stripe(STRIPE_ENV.CREDENTIALS.STRIPE_SECRET_KEY);
 
@@ -36,8 +36,9 @@ class StripeService {
                     // },
                 },
                 mode: "payment",
-                success_url: `${CHECKOUT_URL}?token=${token}&redirectUrl=${marketplaceUrl}`,
-                cancel_url: `${marketplaceUrl}/checkout`,
+                ui_mode: "embedded",
+                redirect_on_completion: "if_required",
+                return_url: `${CHECKOUT_URL}?token=${token}&redirectUrl=${marketplaceUrl}`,
             }, {
                 stripeAccount: CONNECTED_ACCOUNT_ID
             })
@@ -81,7 +82,7 @@ class StripeService {
         try {
             return stripe.accountLinks.create({
                 account: stripeAccountId,
-                refresh_url: `${SERVER_HOST}/stripe/onboard?username=${username}&redirectUrl=${marketplaceUrl}`,
+                refresh_url: `${SERVER_URL}/stripe/onboard?username=${username}&redirectUrl=${marketplaceUrl}`,
                 return_url: `${marketplaceUrl}`,
                 type: 'account_onboarding',
             });

@@ -19,8 +19,18 @@ router.get(
 );
 
 router.get(
+  '/checkout/initiate',
+  StripeServiceController.initiateStripeCheckout
+)
+
+router.get(
   '/checkout/confirm',
   StripeServiceController.stripeCheckoutConfirm
+);
+
+router.get(
+  '/checkout/cancel',
+  StripeServiceController.stripeCheckoutCancel
 );
 
 export default router;

@@ -2,9 +2,22 @@
 #strato-getting-started-min-version:4.4.0
 version: '3'
 services:
-  payment-server:
+  payment-server-ui:
     environment:
+    - PORT=${PORT}
     - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
+    depends_on:
+    - payment-server-backend
+    build: .
+    image: ${PAYMENT_SERVER_IMAGE:-<REPO_URL>payment-server-ui:<VERSION>}
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+  payment-server-backend:
+    environment:
     - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
     - POSTGRESQL_SERVER_URL=${POSTGRESQL_SERVER_URL}
     - POSTGRESQL_PORT=${POSTGRESQL_PORT}
@@ -12,7 +25,7 @@ services:
     - POSTGRESQL_PASSWORD=${POSTGRESQL_PASSWORD}
     - POSTGRESQL_DBNAME=${POSTGRESQL_DBNAME}
     build: .
-    image: ${PAYMENT_SERVER_IMAGE:-<REPO_URL>payment-server:<VERSION>}
+    image: ${PAYMENT_SERVER_IMAGE:-<REPO_URL>payment-server-backend:<VERSION>}
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -21,7 +34,7 @@ services:
         max-file: "3"
   nginx:
     depends_on:
-    - payment-server
+    - payment-server-backend
     environment:
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
