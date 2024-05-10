@@ -65,7 +65,14 @@ main = do
             ( KP.Host (KP.KString (C8.pack khost)),
               KP.Port (readDef 9092 (drop 1 kport))
             )
-      gregorCfg =
+      gregorCfg' =
+        GregorConfig
+          { kafkaAddress = mKafkaAddress,
+            kafkaClientId = kafkaClientId',
+            kafkaConsumerGroup = EC.lookupConsumerGroup kafkaClientId',
+            cablePackage = pkg
+          }
+      gregorCfg'' =
         GregorConfig
           { kafkaAddress = mKafkaAddress,
             kafkaClientId = kafkaClientId',
@@ -95,7 +102,7 @@ main = do
 
         putStrLn $ "ACTUAL validators list: " ++ show validators
 
-        ckpt <- runGregorM gregorCfg $ initializeCheckpoint validators
+        ckpt <- runGregorM gregorCfg' $ initializeCheckpoint validators
         putStrLn $ "Checkpoint: " ++ show ckpt
 
         return $ Just $ newContext ckpt (Just selfAddress) flags_validatorBehavior Nothing
@@ -116,7 +123,7 @@ main = do
             maxUsPerIter = flags_seq_max_us_per_iter,
             vaultClient = Just clientEnv
           }
-  race_ (runTheGregor gregorCfg)
+  race_ (runTheGregor gregorCfg'')
     . race_ (runLoggingT (runSequencerM seqCfg mCtx (sequencer validators)))
     . run 8050
     $ metricsApp
