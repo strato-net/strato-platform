@@ -58,7 +58,7 @@ contract StratPaymentService is PaymentService {
         for (uint j = 0; j < stratRecipients.length; j++) {
             address recipient = stratRecipients[j];
             bool success = stratAddress.call("transfer", recipient, totalsMap[recipient]);
-            emit Payment(getCommonName(tx.origin), getCommonName(recipient), totalsMap[recipient], true);
+            emit Payment(token, getCommonName(tx.origin), getCommonName(recipient), totalsMap[recipient], 0, _unitsPerDollar(), true);
             totalsMap[recipient] = 0;
             require(success, err);
         }
@@ -70,6 +70,10 @@ contract StratPaymentService is PaymentService {
         string token
     ) internal override returns (address[]) {
         require(false, "Cannot call completeSales for STRAT payments.");
+    }
+
+    function _unitsPerDollar() internal override returns (uint) {
+        return stratsPerDollar * 100;
     }
 
     function updateStratsPerDollar(uint _stratsPerDollar) requireOwner() public returns (uint) {

@@ -109,7 +109,7 @@ contract TokenPaymentService is PaymentService {
         for (uint j = 0; j < recipients.length; j++) {
             address recipient = recipients[j];
             bool success = transfer(recipient, totalsMap[recipient]);
-            emit Payment(getCommonName(msg.sender), getCommonName(recipient), totalsMap[recipient], true);
+            emit Payment(token, getCommonName(msg.sender), getCommonName(recipient), totalsMap[recipient], 0, _unitsPerDollar(), true);
             totalsMap[recipient] = 0;
             require(success, err);
         }
@@ -121,6 +121,10 @@ contract TokenPaymentService is PaymentService {
         string token
     ) internal override returns (address[]) {
         require(false, "Cannot call completeSales for STRAT payments.");
+    }
+
+    function _unitsPerDollar() internal override returns (uint) {
+        return tokensPerDollar * (10 ** decimals);
     }
 
     function updateTokensPerDollar(uint _tokensPerDollar) requireOwner() public returns (uint) {
