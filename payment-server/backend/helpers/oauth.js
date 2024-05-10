@@ -35,7 +35,7 @@ class Admin {
       this.expiration = tokenExpiration;
 
       // Schedule token refresh for 30 seconds before expiration
-      this._scheduleTokenRefresh(tokenExpiration - 0.5 * 60 * 1000); 
+      this._scheduleTokenRefresh((tokenExpiration - 30) * 1000);
     } else {
       throw new Error(`Admin was not created/does not exist. Please check your credential setup.`);
     }
@@ -46,13 +46,14 @@ class Admin {
   }
 
   async _refreshToken() {
+    console.log("Refreshing token...");
     try {
       const { token, expiration } = await oauthHelper.getServiceToken();
       this.token = token;
       this.expiration = expiration;
       
       // Schedule new token refresh for 30 seconds before expiration
-      this._scheduleTokenRefresh(expiration - 0.5 * 60 * 1000);
+      this._scheduleTokenRefresh((expiration - 30) * 1000);
     } catch(e) {
       console.error("ERROR: Unable to update the token, check your OAuth settings in config", e);
       throw e;
@@ -60,14 +61,10 @@ class Admin {
   }
 
   _scheduleTokenRefresh(t) {
-    if (this.timer) {
-      clearTimeout(this.timer);
-    }
-    this.timer = setTimeout(async () => {
+    setTimeout(async () => {
       await this._refreshToken().catch(e => {
           console.log("Error updating token before expiration", e);
       });
-      this.timer = null;
     }, t);
   }
 }

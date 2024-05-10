@@ -34,10 +34,11 @@ const getServiceToken = async () => {
       ? config.nodes[0].oauth.tokenField
       : 'access_token'
   ];
+  const now = Math.floor(Date.now() / 1000);
   const expiresAt = Math.floor(
     tokenObj.token.expires_at / 1000,
   );
-  return { token: new_token, expiration: expiresAt };
+  return { token: new_token, expiration: expiresAt - now };
 }
 
 export default {
