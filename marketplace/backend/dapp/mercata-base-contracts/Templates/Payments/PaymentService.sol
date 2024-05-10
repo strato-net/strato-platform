@@ -20,8 +20,9 @@ abstract contract PaymentService is Utils {
     struct Order {
         address purchaser;
         address[] saleAddresses;
-        address[] recipients;
         uint[] quantities;
+        address[] recipients;
+        uint[] totals;
     }
     mapping (string => Order) public record openOrders;
 
@@ -31,6 +32,9 @@ abstract contract PaymentService is Utils {
         uint amount,
         bool success
     );
+
+    address public purchasersAddress;   // ONLY USED FOR BACKWARDS COMPATIBILITY WITH SALE. DELETE ONCE ALL SALES USE NEW LOGIC!!!
+    string public purchasersCommonName; // ONLY USED FOR BACKWARDS COMPATIBILITY WITH SALE. DELETE ONCE ALL SALES USE NEW LOGIC!!!
 
     constructor (
         string _serviceName,
@@ -68,6 +72,14 @@ abstract contract PaymentService is Utils {
         _;
     }
 
+    modifier requireActive(string action) {
+        string err = "The payment service must be active to "
+                   + action
+                   + ".";
+        require(isActive, err);
+        _;
+    }
+
     function transferOwnership(address _newOwner) requireOwner("transfer ownership") external {
         owner = _newOwner;
         ownerCommonName = getCommonName(owner);
@@ -80,43 +92,50 @@ abstract contract PaymentService is Utils {
     function createOrder (
         address[] _saleAddresses,
         uint[] _quantities
-    ) external returns (string) {
+    ) requireActive("create order") external returns (string, address[]) {
         require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
         string token = keccak256(string(this), string(msg.sender), string(block.timestamp));
         return _createOrder(_saleAddresses, _quantities, token);
     }
 
-    mapping (address => uint) quantitiesMap;
+    mapping (address => uint) totalsMap;
     function _createOrder (
         address[] _saleAddresses,
         uint[] _quantities,
         string token
-    ) internal virtual returns (string) {
+    ) internal virtual returns (string, address[]) {
         openOrders[token].purchaser = msg.sender;
+        address[] assets;
         for (uint i = 0; i < _saleAddresses.length; i++) {
             Sale s = Sale(_saleAddresses[i]);
             Asset a = s.assetToBeSold();
+            assets.push(address(a));
             address recipient = a.owner();
             openOrders[token].saleAddresses.push(_saleAddresses[i]);
-            if (quantitiesMap[recipient] == 0) {
+            uint quantity = _quantities[i];
+            openOrders[token].quantities.push(quantity);
+            if (totalsMap[recipient] == 0) {
                 openOrders[token].recipients.push(recipient);
             }
-            uint quantity = _quantities[i];
             uint amount = s.price();
-            quantitiesMap[recipient] += amount;
-            Sale(_saleAddresses[i]).lockQuantity(_quantities[i], msg.sender);
+            totalsMap[recipient] += amount;
+            try {
+                Sale(_saleAddresses[i]).lockQuantity(quantity, msg.sender);
+            } catch { // Support for legacy sales
+                _saleAddresses[i].call("lockQuantity", quantity);
+            }
         }
         for (uint j = 0; j < openOrders[token].recipients.length; j++) {
             address recipient = openOrders[token].recipients[j];
-            openOrders[token].quantities.push(quantitiesMap[recipient]);
-            quantitiesMap[recipient] = 0;
+            openOrders[token].totals.push(totalsMap[recipient]);
+            totalsMap[recipient] = 0;
         }
-        return token;
+        return (token, assets);
     }
 
     function completeOrder (
         string _token
-    ) requireOwner("complete order") external returns (address[]) {
+    ) requireActive("complete order") requireOwner("complete order") external returns (address[]) {
         return _completeOrder(_token);
     }
 
@@ -124,27 +143,36 @@ abstract contract PaymentService is Utils {
         string token
     ) internal virtual returns (address[]) {
         require(openOrders[token].purchaser != address(0), "Invalid order token: " + token);
+        purchasersAddress = openOrders[token].purchaser; // Support for legacy sales
+        purchasersCommonName = getCommonName(tx.origin);
         address[] assets;
         for (uint i = 0; i < openOrders[token].saleAddresses.length; i++) {
             Sale s = Sale(openOrders[token].saleAddresses[i]);
             Asset a = s.assetToBeSold();
             assets.push(address(a));
-            s.completeSale(openOrders[token].purchaser);
+            try {
+                s.completeSale(openOrders[token].purchaser);
+            } catch { // Support for legacy sales
+                address(s).call("completeSale");
+            }
             openOrders[token].saleAddresses[i] = address(0);
+            openOrders[token].quantities[i] = 0;
         }
         for (uint j = 0; j < openOrders[token].recipients.length; j++) {
             address recipient = openOrders[token].recipients[j];
-            emit Payment(getCommonName(msg.sender), getCommonName(recipient), openOrders[token].quantities[j], true);
+            emit Payment(getCommonName(msg.sender), getCommonName(recipient), openOrders[token].totals[j], true);
             openOrders[token].recipients[j] = address(0);
-            openOrders[token].quantities[j] = 0;
+            openOrders[token].totals[j] = 0;
         }
         openOrders[token].purchaser = address(0);
+        purchasersAddress = address(0); // Support for legacy sales
+        purchasersCommonName = "";
         return assets;
     }
 
     function cancelOrder (
         string _token
-    ) requirePurchaserOrOwner(_token, "cancel order") external {
+    ) requireActive("cancel order") requirePurchaserOrOwner(_token, "cancel order") external {
         return _cancelOrder(_token);
     }
 
@@ -154,15 +182,20 @@ abstract contract PaymentService is Utils {
         require(openOrders[token].purchaser != address(0), "Invalid order token: " + token);
         for (uint i = 0; i < openOrders[token].saleAddresses.length; i++) {
             Sale s = Sale(openOrders[token].saleAddresses[i]);
-            s.unlockQuantity(openOrders[token].purchaser);
+            try {
+                s.unlockQuantity(openOrders[token].purchaser);
+            } catch { // Support for legacy sales
+                address(s).call("unlockQuantity");
+            }
             openOrders[token].saleAddresses[i] = address(0);
+            openOrders[token].quantities[i] = 0;
         }
         for (uint j = 0; j < openOrders[token].recipients.length; j++) {
             address recipient = openOrders[token].recipients[j];
-            emit Payment(getCommonName(msg.sender), getCommonName(recipient), quantitiesMap[recipient], false);
+            emit Payment(getCommonName(msg.sender), getCommonName(recipient), totalsMap[recipient], false);
             openOrders[token].recipients[j] = address(0);
-            openOrders[token].quantities[j] = 0;
-            quantitiesMap[recipient] = 0;
+            openOrders[token].totals[j] = 0;
+            totalsMap[recipient] = 0;
         }
         openOrders[token].purchaser = address(0);
     }

@@ -1,7 +1,11 @@
 pragma es6;
 pragma strict;
 
+<<<<<<< HEAD
 import <2813f256f50370bca8e294ddb7183096cac2099e>;
+=======
+import <BASE_CODE_COLLECTION>;
+>>>>>>> payment-server-madness
 
 contract ExternalPaymentService is PaymentService {
 

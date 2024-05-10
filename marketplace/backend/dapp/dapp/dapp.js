@@ -615,7 +615,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const createdDate = Math.floor(Date.now() / 1000);
     const newArgs = {
       ...args.itemArgs,
-      createdDate
+      createdDate,
+      status: ASSET_STATUS.ACTIVE
     };
     return tokensJs.uploadContract(rawAdmin, newArgs, options);
   };
@@ -972,8 +973,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       return paymentServices;
   }
 
-  // //-----------------------------PAYMENT starts here -------------------------------
-
   contract.paymentCheckout = async function (originUrl, args, options = defaultOptions) {
     try {
 
@@ -1007,8 +1006,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         saleAddresses,
         quantities,
       }
-      const token = await paymentProviderJs.createPayment(rawAdmin, paymentParameters, options);
-      return token[0];
+      const tokenAndAssets = await paymentProviderJs.createPayment(rawAdmin, paymentParameters, options);
+      return tokenAndAssets;
+
     } catch (error) {
       console.log(error);
       if (error.response) {
