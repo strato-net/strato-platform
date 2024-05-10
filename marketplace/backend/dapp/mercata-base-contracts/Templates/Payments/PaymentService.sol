@@ -27,9 +27,12 @@ abstract contract PaymentService is Utils {
     mapping (string => Order) public record openOrders;
 
     event Payment(
+        string token,
         string purchasersCommonName,
         string sellersCommonName,
         uint amount,
+        uint tax,
+        uint unitsPerDollar,
         bool success
     );
 
@@ -160,7 +163,7 @@ abstract contract PaymentService is Utils {
         }
         for (uint j = 0; j < openOrders[token].recipients.length; j++) {
             address recipient = openOrders[token].recipients[j];
-            emit Payment(getCommonName(msg.sender), getCommonName(recipient), openOrders[token].totals[j], true);
+            emit Payment(token, getCommonName(msg.sender), getCommonName(recipient), openOrders[token].totals[j], 0, _unitsPerDollar(), true);
             openOrders[token].recipients[j] = address(0);
             openOrders[token].totals[j] = 0;
         }
@@ -192,12 +195,16 @@ abstract contract PaymentService is Utils {
         }
         for (uint j = 0; j < openOrders[token].recipients.length; j++) {
             address recipient = openOrders[token].recipients[j];
-            emit Payment(getCommonName(msg.sender), getCommonName(recipient), totalsMap[recipient], false);
+            emit Payment(token, getCommonName(msg.sender), getCommonName(recipient), totalsMap[recipient], 0, _unitsPerDollar(), false);
             openOrders[token].recipients[j] = address(0);
             openOrders[token].totals[j] = 0;
             totalsMap[recipient] = 0;
         }
         openOrders[token].purchaser = address(0);
+    }
+
+    function _unitsPerDollar() internal virtual returns (uint) {
+        return 1;
     }
 
     function update(
