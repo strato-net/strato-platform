@@ -11,8 +11,6 @@ const STRIPE_ENV = {
   }
 }
 
-const TOKEN_LIFETIME_RESERVE_SECONDS = 60 * 60 * 1000; // 1 hour
-
 const DEFAULT_OPTIONS = { ...OPTIONS, chainIds: [], cacheNonce: true };
 
 const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS;
@@ -25,7 +23,6 @@ const STRIPE_CHECKOUT_URL = `${CLIENT_URL}/stripe/checkout/confirm`;
 
 export { 
   STRIPE_ENV,
-  TOKEN_LIFETIME_RESERVE_SECONDS,
   STRIPE_CHECKOUT_URL,
   CONTRACT_ADDRESS,
   SERVER_URL,

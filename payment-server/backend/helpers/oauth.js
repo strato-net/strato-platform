@@ -34,8 +34,8 @@ class Admin {
       this.address = adminResponse.user.address;
       this.expiration = tokenExpiration;
 
-      // Schedule token refresh for 5 minutes before expiration
-      this._scheduleTokenRefresh(tokenExpiration - 5 * 60 * 1000); 
+      // Schedule token refresh for 30 seconds before expiration
+      this._scheduleTokenRefresh(tokenExpiration - 0.5 * 60 * 1000); 
     } else {
       throw new Error(`Admin was not created/does not exist. Please check your credential setup.`);
     }
@@ -51,8 +51,8 @@ class Admin {
       this.token = token;
       this.expiration = expiration;
       
-      // Schedule new token refresh for 5 minutes before expiration
-      this._scheduleTokenRefresh(expiration - 5 * 60 * 1000);
+      // Schedule new token refresh for 30 seconds before expiration
+      this._scheduleTokenRefresh(expiration - 0.5 * 60 * 1000);
     } catch(e) {
       console.error("ERROR: Unable to update the token, check your OAuth settings in config", e);
       throw e;

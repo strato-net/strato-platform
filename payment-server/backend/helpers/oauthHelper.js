@@ -1,7 +1,6 @@
 import { rest, oauthUtil } from 'blockapps-rest';
 import jwtDecode from 'jwt-decode';
 import config from '../load.config.js';
-import { TOKEN_LIFETIME_RESERVE_SECONDS } from './constants.js';
 
 const options = { config };
 
@@ -28,27 +27,17 @@ async function createStratoUser(accessToken) {
   }
 }
 
-const getServiceToken = async (token = null, expiration = null) => {
-  if (
-    !token
-    || !expiration
-    || expiration
-      <= Math.floor(Date.now() / 1000)
-        + TOKEN_LIFETIME_RESERVE_SECONDS
-  ) {
-    const tokenObj = await oauth.getAccessTokenByClientSecret();
-    const new_token = tokenObj.token[
-      config.nodes[0].oauth.tokenField
-        ? config.nodes[0].oauth.tokenField
-        : 'access_token'
-    ];
-    const expiresAt = Math.floor(
-      tokenObj.token.expires_at / 1000,
-    );
-    return { token: new_token, expiration: expiresAt };
-  }
-
-  return { token: token, expiration: expiration };
+const getServiceToken = async () => {
+  const tokenObj = await oauth.getAccessTokenByClientSecret();
+  const new_token = tokenObj.token[
+    config.nodes[0].oauth.tokenField
+      ? config.nodes[0].oauth.tokenField
+      : 'access_token'
+  ];
+  const expiresAt = Math.floor(
+    tokenObj.token.expires_at / 1000,
+  );
+  return { token: new_token, expiration: expiresAt };
 }
 
 export default {
