@@ -76,6 +76,9 @@ const Inventory = ({ user }) => {
 
   //seller status
   const [sellerStatus, setSellerStatus] = useState(user?.sellerStatus);
+  useEffect(() => {
+    setSellerStatus(user?.sellerStatus);
+  }, [user]);
   const sellerStatusDipatch = useSellerStatusDispatch();
   const {
     message: sellerStatusMsg,
