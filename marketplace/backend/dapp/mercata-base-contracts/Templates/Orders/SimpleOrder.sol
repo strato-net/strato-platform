@@ -1,6 +1,6 @@
 pragma es6;
 pragma strict;
-import <2813f256f50370bca8e294ddb7183096cac2099e>;
+import <BASE_CODE_COLLECTION>;
 
 contract SimpleOrder is Order {
     constructor(
