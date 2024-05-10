@@ -197,19 +197,6 @@ class StripeServiceController {
       catch (err) {
         return next(err);
       }
-
-      // Redirect back to marketplace
-      res.setHeader('Content-Type', 'text/html');
-      res.send(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta http-equiv="refresh" content="0;url=${redirectUrl}">
-          </head>
-          <body>
-          </body>
-        </html>
-      `);
       next(e);
     }
   }
@@ -219,7 +206,7 @@ class StripeServiceController {
       // Validation 
       StripeServiceController.validateStripeCheckoutConfirmArgs(req.query);
 
-      const { token, redirectUrl } = req.query;
+      const { token } = req.query;
 
       // Retrieve the session
       const paymentDetails = await getStripePaymentFromToken(token);
@@ -228,26 +215,14 @@ class StripeServiceController {
       if (session.payment_status === 'paid') {
         const completeOrderStatus = await completeOrder(token);
         console.log("completeOrderStatus", completeOrderStatus);
-        res.status(200);
+        res.status(200).send(completeOrderStatus);
       } else {
-        throw new Error(`Payment has not been processed. Failed to confirm purchase.`);
+        throw new Error(`Payment has not been processed. Failed to confirm purchase. Please contact an Admin or the Payment Server Admin.`);
       }
 
       // Update payment status in DB
       const updateResult = await updateStripePayment(token, "PAID");
 
-      // Redirect back to marketplace
-      res.setHeader('Content-Type', 'text/html');
-      res.send(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta http-equiv="refresh" content="0;url=${redirectUrl}">
-          </head>
-          <body>
-          </body>
-        </html>
-      `);
       return next();
     } catch (e) {
       next(e);
@@ -259,26 +234,15 @@ class StripeServiceController {
       // Validation 
       StripeServiceController.validateStripeCheckoutCancelArgs(req.query);
 
-      const { token, redirectUrl } = req.query;
+      const { token } = req.query;
 
       const cancelOrderStatus = await cancelOrder(token);
       console.log("cancelOrderStatus", cancelOrderStatus);
-      res.status(200);
+      res.status(200).send(cancelOrderStatus);
 
+      // Update payment status in DB
       const updateResult = await updateStripePayment(token, "CANCELED");
 
-      // Redirect back to marketplace
-      res.setHeader('Content-Type', 'text/html');
-      res.send(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta http-equiv="refresh" content="0;url=${redirectUrl}">
-          </head>
-          <body>
-          </body>
-        </html>
-      `);
       return next();
     } catch (e) {
       next(e);
@@ -340,7 +304,6 @@ class StripeServiceController {
   static validateStripeCheckoutConfirmArgs(args) {
     const stripeCheckoutConfirmSchema = Joi.object({
       token: Joi.string().required(),
-      redirectUrl: Joi.string().required(),
     });
 
     const validation = stripeCheckoutConfirmSchema.validate(args);
@@ -353,7 +316,6 @@ class StripeServiceController {
   static validateStripeCheckoutCancelArgs(args) {
     const stripeCheckoutCancelSchema = Joi.object({
       token: Joi.string().required(),
-      redirectUrl: Joi.string().required(),
     });
 
     const validation = stripeCheckoutCancelSchema.validate(args);
