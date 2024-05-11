@@ -49,9 +49,7 @@ const BoughtOrderDetails = ({ user, users }) => {
   const [status, setStatus] = useState(getStatus(0));
   const { TextArea } = Input;
   const [paid, setPaid] = useState("Processing");
-  const [isLoadingPaymentStatus, setisLoadingPaymentStatus] = useState(false);
   const [selectedDate, setSelectedDate] = useState("");
-  const [shouldCheckPaymentStatus, setShouldCheckPaymentStatus] = useState(false);
   const { state } = useLocation()
 
   const navigate = useNavigate();
@@ -81,8 +79,6 @@ const BoughtOrderDetails = ({ user, users }) => {
     isbuyerDetailsUpdating,
     success,
     message,
-    // paymentStatus,
-    // isLoadingPaymentStatus,
   } = useOrderState();
 
   const routeMatch = useMatch({
@@ -103,90 +99,8 @@ const BoughtOrderDetails = ({ user, users }) => {
   }, [Id, dispatch]);
 
   const getData = async () => {
-    const data = await actions.fetchOrderDetails(dispatch, Id);
-    if (data != null && parseInt(orderDetails.order.status) !== 3) {
-      setShouldCheckPaymentStatus(true);
-    }
+    await actions.fetchOrderDetails(dispatch, Id);
   };
-
-  useEffect(() => {
-    if (shouldCheckPaymentStatus && orderDetails) {
-      getPaymentStatus(orderDetails.order.paymentSessionId, orderDetails.order.sellersCommonName);
-      setShouldCheckPaymentStatus(false);
-    }
-  }, [shouldCheckPaymentStatus, orderDetails]);
-
-
-  const validatePayment = async (paymentSessionId) => {
-    if (!paymentSessionId || !orderDetails) return;
-
-    const currentStatus = getStatus(parseInt(orderDetails.order.status));
-    const isPending = currentStatus === getStatusByName("Payment Pending");
-    const isCanceled = currentStatus === getStatusByName("Canceled");
-
-    if (isCanceled) {
-      setPaid("Payment Failed");
-      setcomment(orderDetails.order.comments);
-    }
-
-    if (isPending) {
-      try {
-        const response = await fetch(
-          `${apiUrl}/order/payment/intent/${paymentSessionId}/${orderDetails.order.sellersCommonName}`,
-          { method: HTTP_METHODS.GET }
-        );
-        const intentBody = await response.json();
-        const paymentErrorAndRequiresMethod = intentBody.data.last_payment_error?.message && intentBody.data.status === 'requires_payment_method';
-
-        if (paymentErrorAndRequiresMethod && !isCanceled) {
-          setisLoadingPaymentStatus(true)
-          const body = {
-            saleOrderAddress: orderDetails.order.address,
-            comments: encodeURIComponent('Stripe: ' + intentBody.data.last_payment_error.message),
-          };
-          //Update Order Details and change the Order Status to 'Canceled' from 'Payment Pending'
-          let isDone = await actions.cancelSale(dispatch, body);
-          setcomment(`Stripe: ${orderDetails.order.comments}`);
-          if (isDone) {
-            setStatus("Canceled");
-            setPaid("Payment Failed");
-            await actions.fetchOrderDetails(dispatch, Id);
-            setisLoadingPaymentStatus(false);
-          }
-        }
-
-      } catch (err) {
-        console.error(`Error: ${err}`);
-      }
-    }
-  };
-
-  const getPaymentStatus = async (paymentSessionId, sellersCommonName) => {
-    if (!paymentSessionId) return;
-
-    setisLoadingPaymentStatus(true);
-    try {
-      const response = await fetch(
-        `${apiUrl}/order/payment/session/${paymentSessionId}/${sellersCommonName}`,
-        { method: HTTP_METHODS.GET }
-      );
-
-      const body = await response.json();
-      if (response.status === RestStatus.OK) {
-        if (body.data["payment_status"] === "paid") {
-          setPaid("Paid");
-        } else {
-          await validatePayment(paymentSessionId);
-        }
-      }
-    } catch (err) {
-      console.error(`Error: ${err}`);
-    } finally {
-      setisLoadingPaymentStatus(false);
-    }
-  };
-
-
 
   useEffect(() => {
     if (orderDetails) {
@@ -414,14 +328,6 @@ const BoughtOrderDetails = ({ user, users }) => {
   return (
     <div>
       {contextHolder}
-      {details === null || isorderDetailsLoading || isbuyerDetailsUpdating || isLoadingPaymentStatus ? (
-        <div className="h-screen flex justify-center items-center">
-          <Spin
-            spinning={isorderDetailsLoading || isbuyerDetailsUpdating || isLoadingPaymentStatus}
-            size="large"
-          />
-        </div>
-      ) : (
         <div>
           <Breadcrumb className="text-sm ml-4 md:ml-20 mt-4 md:mt-5 mb-2">
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
@@ -441,7 +347,7 @@ const BoughtOrderDetails = ({ user, users }) => {
               </div>
             </Breadcrumb.Item>
             <Breadcrumb.Item className="text-sm font-medium text-[#202020]">
-              {`#${`${details.order.orderId}`.substring(0,6)}`}
+              {`#${`${details?.order?.orderId || ''}`.substring(0,6)}`}
             </Breadcrumb.Item>
           </Breadcrumb>
 
@@ -462,6 +368,14 @@ const BoughtOrderDetails = ({ user, users }) => {
                 children:
                   <div className="mb-10">
                     <Button type="ghost" onClick={() => onChange('Bought')} className="cursor-pointer mb-1 px-2 flex md:hidden items-center gap-2 text-sm font-semibold"><LeftArrow /> Back</Button>
+                    {details === null || isorderDetailsLoading || isbuyerDetailsUpdating ? (
+                      <div className="h-screen flex justify-center items-center">
+                        <Spin
+                          spinning={isorderDetailsLoading || isbuyerDetailsUpdating}
+                          size="large"
+                        />
+                      </div>
+                    ) : (
                     <Card className="md:p-2 mb-4 md:mb-14 md:shadow-card_shadow order_detail_card">
                       <div className="flex flex-col md:flex-row md:justify-between">
                         <div className="flex flex-col">
@@ -475,7 +389,7 @@ const BoughtOrderDetails = ({ user, users }) => {
                           id="cancel-order-button"
                           type="primary"
                           className="min-w-max w-max h-9 px-[2%] ml-2 bg-primary !hover:bg-primaryHover"
-                          disabled={status !== getStatus(1) || comment === "" || details.order.paymentSessionId !== ""}
+                          disabled={status !== getStatus(1) || comment === ""}
                           onClick={() => {
                             handleCancelOrder()
                             window.LOQ.push(['ready', async LO => {
@@ -542,7 +456,7 @@ const BoughtOrderDetails = ({ user, users }) => {
                             rows={2}
                             placeholder="Enter Comments"
                             value={decodeURIComponent(comment)}
-                            disabled={status !== getStatus(1) || details.order.paymentSessionId !== ""}
+                            disabled={status !== getStatus(1)}
                             onChange={(event) => {
                               setcomment(event.target.value);
                             }}
@@ -558,6 +472,7 @@ const BoughtOrderDetails = ({ user, users }) => {
                           scrollX="100%"
                         /></div>
                     </Card>
+                    )}
                     {data?.length > 0 && data?.map((item) => {
                       return (
                         <ResponsiveOrderDetailCard data={item} />)
