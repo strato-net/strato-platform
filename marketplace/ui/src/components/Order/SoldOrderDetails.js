@@ -45,7 +45,6 @@ const SoldOrderDetails = ({ user, users }) => {
   const [selectedDate, setSelectedDate] = useState("");
   const [status, setStatus] = useState(getStatus(1));
   const [paid, setPaid] = useState("Processing");
-  const [isLoadingPaymentStatus, setisLoadingPaymentStatus] = useState(false)
   const [comment, setComment] = useState("");
   const { TextArea } = Input;
   const [api, contextHolder] = notification.useNotification();
@@ -112,81 +111,8 @@ const SoldOrderDetails = ({ user, users }) => {
   }, [Id, dispatch, status]);
 
   const getData = async () => {
-    const data = await actions.fetchOrderDetails(dispatch, Id);
-    if (data != null && parseInt(orderDetails.order.status) !== 3) {
-      getPaymentStatus(data.order.paymentSessionId, data.order.sellersCommonName);
-    }
+    await actions.fetchOrderDetails(dispatch, Id);
   };
-
-  const validatePayment = async (paymentSessionId) => {
-    if (!paymentSessionId || !orderDetails) return;
-
-    const currentStatus = getStatus(parseInt(orderDetails.order.status));
-    const isPending = currentStatus === getStatusByName("Payment Pending")
-    const isCanceled = currentStatus === getStatusByName("Canceled");
-
-    if (isCanceled) {
-      setPaid("Payment Failed");
-      setComment(orderDetails.order.comments);
-    }
-    if (isPending) {
-      try {
-        const response = await fetch(
-          `${apiUrl}/order/payment/intent/${paymentSessionId}/${orderDetails.order.sellersCommonName}`,
-          { method: HTTP_METHODS.GET }
-        );
-        const intentBody = await response.json();
-        const paymentErrorAndRequiresMethod = intentBody.data.last_payment_error?.message && intentBody.data.status === 'requires_payment_method';
-
-        if (paymentErrorAndRequiresMethod && !isCanceled) {
-          setisLoadingPaymentStatus(true)
-          const body = {
-            saleOrderAddress: orderDetails.order.address,
-            comments: encodeURIComponent('Stripe: ' + intentBody.data.last_payment_error.message),
-          };
-          //Update Order Details and change the Order Status to 'Canceled' from 'Payment Pending'
-          let isDone = await actions.cancelSale(dispatch, body);
-          setComment(`Stripe: ${orderDetails.order.comments}`);
-          if (isDone) {
-            setStatus("Canceled");
-            setPaid("Payment Failed");
-            await actions.fetchOrderDetails(dispatch, Id);
-            setisLoadingPaymentStatus(false);
-          }
-        }
-
-      } catch (err) {
-        console.error(`Error: ${err}`);
-      }
-    }
-  };
-
-  const getPaymentStatus = async (paymentSessionId, sellersCommonName) => {
-    if (!paymentSessionId) return;
-
-    setisLoadingPaymentStatus(true);
-    try {
-      const response = await fetch(
-        `${apiUrl}/order/payment/session/${paymentSessionId}/${sellersCommonName}`,
-        { method: HTTP_METHODS.GET }
-      );
-
-      const body = await response.json();
-      if (response.status === RestStatus.OK) {
-        if (body.data["payment_status"] === "paid") {
-          setPaid("Paid");
-        } else {
-          await validatePayment(paymentSessionId);
-        }
-      }
-    } catch (err) {
-      console.error(`Error: ${err}`);
-    } finally {
-      setisLoadingPaymentStatus(false);
-    }
-  };
-
-
 
   const details = orderDetails;
   const audits = ordersAudit;
@@ -391,14 +317,6 @@ const SoldOrderDetails = ({ user, users }) => {
   return (
     <div>
       {contextHolder}
-      {details === null || isorderDetailsLoading || isLoadingPaymentStatus ? (
-        <div className="h-screen flex justify-center items-center">
-          <Spin
-            spinning={isorderDetailsLoading || isLoadingPaymentStatus}
-            size="large"
-          />
-        </div>
-      ) : (
         <div>
           <Breadcrumb className="text-sm ml-4 md:ml-20  mt-0 md:mt-5 mb-2">
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
@@ -412,7 +330,7 @@ const SoldOrderDetails = ({ user, users }) => {
               </div>
             </Breadcrumb.Item>
             <Breadcrumb.Item className="text-sm text-[#202020] font-medium">
-              {`${details.order.orderId}`.substring(0,6)}
+              {`${details?.order?.orderId || ''}`.substring(0,6)}
             </Breadcrumb.Item>
           </Breadcrumb>
 
@@ -427,6 +345,14 @@ const SoldOrderDetails = ({ user, users }) => {
                 children:
                   <div className="mb-10">
                     <Button type="ghost" onClick={() => onChange('Sold')} className="cursor-pointer px-2 flex md:hidden items-center gap-2 text-xs font-semibold"><LeftArrow /> Back</Button>
+                    {details === null || isorderDetailsLoading ? (
+                      <div className="h-screen flex justify-center items-center">
+                        <Spin
+                          spinning={isorderDetailsLoading}
+                          size="large"
+                        />
+                      </div>
+                    ) : (
                     <Card className="md:p-2 mb-4 md:mb-14 md:shadow-card_shadow order_detail_card">
                       <div className="flex flex-col md:flex-row md:justify-between">
                         <div className="flex flex-col">
@@ -486,7 +412,7 @@ const SoldOrderDetails = ({ user, users }) => {
                         <Divider type="vertical" className="h-14 bg-secondryD" />
 
                         {
-                          status !== getStatus(1) || details.paymentSessionId !== "" ? <Col>
+                          status !== getStatus(1) ? <Col>
                             <Text className="block text-primaryC text-[13px] mb-2">
                               Status
                             </Text>
@@ -607,6 +533,7 @@ const SoldOrderDetails = ({ user, users }) => {
                         />
                       </div>
                     </Card>
+                    )}
                     {data?.length > 0 && data?.map((item) => {
                       return (
                         <ResponsiveOrderDetailCard data={item} />)

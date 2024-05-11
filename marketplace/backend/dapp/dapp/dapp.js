@@ -772,37 +772,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   // ------------------------------ SALE TEST STARTS ------------------------------
 
-  contract.createSaleOrder = async function (args, options = defaultOptions) {
-    const createdDate = Math.floor(Date.now() / 1000);
-    const { items, ...restArgs } = args;
-    const saleAddresses = items.map(item => {
-      return item.saleAddress;
-    })
-    const quantities = items.map(item => {
-      return item.quantity;
-    })
-
-    const newArgs = {
-      ...restArgs,
-      saleAddresses,
-      quantities,
-      orderId: util.uid(),
-      createdDate: createdDate,
-      shippingAddressId: 1   // placeholder
-    }
-    return saleOrderJs.uploadContract(rawAdmin, newArgs, options);
-  }
-
   contract.cancelSaleOrder = async function (args, options = defaultOptions) {
     const { saleOrderAddress, comments, ...restArgs } = args;
-    const contract = { name: saleOrderJs.contractName, address: saleOrderAddress }
+    const contract = { name: saleOrderJs.paymentServiceContractName, address: saleOrderAddress }
     return saleOrderJs.cancelOrder(rawAdmin, contract, options, comments);
-  }
-
-  contract.updateOrderStatus = async function (args, options = defaultOptions) {
-    const { saleOrderAddress, status, ...restArgs } = args;
-    const contract = { name: saleOrderJs.contractName, address: saleOrderAddress }
-    return saleOrderJs.updateOrderStatus(rawAdmin, contract, options, status);
   }
 
   contract.getSaleOrders = async function (args, options = defaultOptions) {
@@ -850,12 +823,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while fetching the order");
     }
   };
-
-  contract.cancelSaleOrder = async function (args, options = defaultOptions) {
-    const { saleOrderAddress, comments, ...restArgs } = args;
-    const contract = { name: saleOrderJs.contractName, address: saleOrderAddress }
-    return saleOrderJs.cancelOrder(rawAdmin, contract, options, comments);
-  }
 
   contract.completeOrder = async function (args, options = defaultOptions) {
     return saleOrderJs.completeOrder(rawAdmin, args, options);

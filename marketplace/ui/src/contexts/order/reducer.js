@@ -133,19 +133,6 @@ const reducer = (state, action) => {
           error: action.error,
           saleQuantityLoading: false,
         };
-    case actionDescriptors.updateOrderStatus:
-      return {
-        ...state,
-      };
-    case actionDescriptors.updateOrderStatusSuccessful:
-      return {
-        ...state,
-      };
-    case actionDescriptors.updateOrderStatusFailed:
-      return {
-        ...state,
-        error: action.error,
-      };
     case actionDescriptors.fetchOrderSold:
       return {
         ...state,
@@ -263,22 +250,6 @@ const reducer = (state, action) => {
         ...state,
         error: action.error,
         isUpdatingOrderComment: false,
-      }
-    case actionDescriptors.createSaleOrder:
-      return {
-        ...state,
-        isCreateOrderSubmitting: true,
-      }
-    case actionDescriptors.createSaleOrderSuccessful:
-      return {
-        ...state,
-        isCreateOrderSubmitting: false,
-      }
-    case actionDescriptors.createSaleOrderFailed:
-      return {
-        ...state,
-        error: action.error,
-        isCreateOrderSubmitting: false,
       }
     default:
       throw new Error(`Unhandled action: '${action.type}'`);

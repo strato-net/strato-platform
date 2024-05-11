@@ -143,8 +143,6 @@ export const Order = {
   updateBuyerDetails: '/updateBuyerDetails',
   updateSellerDetails: '/updateSellerDetails',
   payment: '/payment',
-  paymentSession: '/payment/session/:session_id/:sellersCommonName',
-  paymentIntent: '/payment/intent/:session_id/:sellersCommonName',
   userAddress: '/userAddress',
   getAllUserAddress: '/userAddresses/user',
   getAddressFromId: '/userAddress/:id',
