@@ -35,13 +35,6 @@ router.post(
 );
 
 router.put(
-  Order.updateOrderStatus,
-  authHandler.authorizeRequest(),
-  loadDapp,
-  OrderController.updateOrderStatus
-);
-
-router.put(
   Order.updateBuyerDetails,
   authHandler.authorizeRequest(),
   loadDapp,
@@ -60,20 +53,6 @@ router.post(
   authHandler.authorizeRequest(),
   loadDapp,
   OrderController.payment
-)
-
-router.get(
-  Order.paymentSession,
-  authHandler.authorizeRequest(),
-  loadDapp,
-  OrderController.paymentSession
-)
-
-router.get(
-  Order.paymentIntent,
-  authHandler.authorizeRequest(),
-  loadDapp,
-  OrderController.paymentIntent
 )
 
 router.post(
@@ -95,13 +74,6 @@ router.get(
   authHandler.authorizeRequest(),
   loadDapp,
   OrderController.getAllUserAddress
-)
-
-router.post(
-  Order.createSaleOrder,
-  authHandler.authorizeRequest(),
-  loadDapp,
-  OrderController.createSaleOrder,
 )
 
 router.post(

@@ -166,10 +166,6 @@ async function get(user, args, defaultOptions) {
         }
         const searchArgs = setSearchQueryOptions(restArgs, searchValues);
         paymentProvider = await search(contractName, searchArgs, options, user);
-    } else if (accountId) {
-
-        const searchArgs = setSearchQueryOptions(restArgs, [{ key: 'accountId', value: accountId }, { key: 'name', value: name }, {key: 'order', value: 'chargesEnabled.desc,block_timestamp.desc'}]);
-        paymentProvider = await search(contractName, searchArgs, options, user);
     } else if (transaction_sender) {
         const searchArgs = setSearchQueryOptions(restArgs, [{ key: 'transaction_sender', value: transaction_sender }, { key: 'name', value: name }, {key: 'order', value: 'chargesEnabled.desc,block_timestamp.desc'}]);
         paymentProvider = await search(contractName, searchArgs, options, user);
@@ -196,17 +192,6 @@ async function getState(user, contract, options) {
     const state = await rest.getState(user, contract, options);
     return marshalOut(state);
 }
-
-async function getPaymentSession(user, args, defaultOptions) {
-    const { paymentSessionId, contractName, ...restArgs } = args;
-    const {app, ...defaultOptions1} = defaultOptions
-    const options = { ...defaultOptions1, org: contractName}
-    const searchArgs = setSearchQueryOptions(restArgs, { key: 'paymentSessionId', value: paymentSessionId });
-    const paymentProvider = await searchOne(paymentContractName, searchArgs, options, user);
-
-    return marshalOut({ ...paymentProvider, });
-}
-
 
 async function createPayment(user, args, options) {
     const { address, ...restArgs } = args;
@@ -299,7 +284,6 @@ export default {
     marshalIn,
     marshalOut,
     getHistory,
-    getPaymentSession,
     createPayment,
     finalizePayment,
     updatePaymentProvider,

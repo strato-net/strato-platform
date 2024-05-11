@@ -11,6 +11,7 @@ import constants from "../../helpers/constants";
 
 const contractName = "SimpleOrder";
 const contractFilename = `${util.cwd}/dapp/mercata-base-contracts/Templates/Orders/SimpleOrder.sol`;
+const paymentServiceContractName = "PaymentService";
 const paymentTableName = "PaymentService.Payment";
 
 /**
@@ -269,25 +270,6 @@ async function cancelOrder(user, contract, options, comments = "") {
   return cancelStatus;
 }
 
-async function updateOrderStatus(user, contract, options, status) {
-  const callArgs = {
-    contract,
-    method: "updateOrderStatus",
-    args: util.usc({ status }),
-  };
-  const updateOrderStatusResponse = await rest.call(user, callArgs, options);
-
-  if (parseInt(updateOrderStatusResponse, 10) !== RestStatus.OK) {
-    throw new rest.RestError(
-      updateOrderStatusResponse,
-      "Order Cannot Be Updated",
-      {}
-    );
-  }
-
-  return updateOrderStatusResponse;
-}
-
 /**
  * Complete an Order
  * @param newOwner The common name of the new owner of the SimpleSale.
@@ -342,11 +324,11 @@ export default {
   uploadContract,
   contractName,
   contractFilename,
+  paymentServiceContractName,
   bindAddress,
   get,
   getAll,
   cancelOrder,
-  updateOrderStatus,
   completeOrder,
   updateOrderComment,
   marshalIn,
