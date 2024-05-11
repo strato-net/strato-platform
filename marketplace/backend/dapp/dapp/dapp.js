@@ -814,7 +814,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getOrder = async function (args, options = defaultOptions) {
     try {
       const order = await saleOrderJs.get(rawAdmin, args, options);
-      const sales = await saleJs.getAll(rawAdmin, { saleAddresses: order.saleAddresses }, options);
+      let sales = [];
+      if (order && order.saleAddresses) {
+        sales = await saleJs.getAll(rawAdmin, { saleAddresses: (order.saleAddresses || []) }, options);
+      }
       let assets = [];
 
       for (const sale of sales) {

@@ -19,10 +19,14 @@ abstract contract PaymentService is Utils {
 
     struct Order {
         address purchaser;
+        string[] sellers;
+        mapping(string => OrderLine) orderLines;
+    }
+
+    struct OrderLine {
         address[] saleAddresses;
         uint[] quantities;
-        address[] recipients;
-        uint[] totals;
+        uint total;
     }
     mapping (string => Order) public record openOrders;
 
@@ -30,6 +34,8 @@ abstract contract PaymentService is Utils {
         string token,
         string purchasersCommonName,
         string sellersCommonName,
+        address[] saleAddresses,
+        uint[] quantities,
         uint amount,
         uint tax,
         uint unitsPerDollar,
@@ -101,7 +107,6 @@ abstract contract PaymentService is Utils {
         return _createOrder(_saleAddresses, _quantities, token);
     }
 
-    mapping (address => uint) totalsMap;
     function _createOrder (
         address[] _saleAddresses,
         uint[] _quantities,
@@ -113,25 +118,20 @@ abstract contract PaymentService is Utils {
             Sale s = Sale(_saleAddresses[i]);
             Asset a = s.assetToBeSold();
             assets.push(address(a));
-            address recipient = a.owner();
-            openOrders[token].saleAddresses.push(_saleAddresses[i]);
+            string seller = getCommonName(a.owner());
             uint quantity = _quantities[i];
-            openOrders[token].quantities.push(quantity);
-            if (totalsMap[recipient] == 0) {
-                openOrders[token].recipients.push(recipient);
-            }
+            openOrders[token].orderLines[seller].saleAddresses.push(_saleAddresses[i]);
+            openOrders[token].orderLines[seller].quantities.push(quantity);
             uint amount = s.price();
-            totalsMap[recipient] += amount;
+            if (openOrders[token].orderLines[seller].total == 0) {
+                openOrders[token].sellers.push(seller);
+            }
+            openOrders[token].orderLines[seller].total += amount;
             try {
                 Sale(_saleAddresses[i]).lockQuantity(quantity, msg.sender);
             } catch { // Support for legacy sales
                 _saleAddresses[i].call("lockQuantity", quantity);
             }
-        }
-        for (uint j = 0; j < openOrders[token].recipients.length; j++) {
-            address recipient = openOrders[token].recipients[j];
-            openOrders[token].totals.push(totalsMap[recipient]);
-            totalsMap[recipient] = 0;
         }
         return (token, assets);
     }
@@ -149,25 +149,43 @@ abstract contract PaymentService is Utils {
         purchasersAddress = openOrders[token].purchaser; // Support for legacy sales
         purchasersCommonName = getCommonName(tx.origin);
         address[] assets;
-        for (uint i = 0; i < openOrders[token].saleAddresses.length; i++) {
-            Sale s = Sale(openOrders[token].saleAddresses[i]);
-            Asset a = s.assetToBeSold();
-            assets.push(address(a));
-            try {
-                s.completeSale(openOrders[token].purchaser);
-            } catch { // Support for legacy sales
-                address(s).call("completeSale");
+        for (uint i = 0; i < openOrders[token].sellers.length; i++) {
+            string seller = openOrders[token].sellers[i];
+            address[] saleAddresses;
+            uint[] quantities;
+            for (uint j = 0; j < openOrders[token].orderLines[seller].saleAddresses.length; j++) {
+                address saleAddress = openOrders[token].orderLines[seller].saleAddresses[j];
+                saleAddresses.push(saleAddress);
+                quantities.push(openOrders[token].orderLines[seller].quantities[j]);
+                Sale s = Sale(saleAddress);
+                Asset a = s.assetToBeSold();
+                assets.push(address(a));
+                try {
+                    s.completeSale(openOrders[token].purchaser);
+                } catch { // Support for legacy sales
+                    address(s).call("completeSale");
+                }
+                openOrders[token].orderLines[seller].saleAddresses[j] = address(0);
+                openOrders[token].orderLines[seller].quantities[j] = 0;
             }
-            openOrders[token].saleAddresses[i] = address(0);
-            openOrders[token].quantities[i] = 0;
-        }
-        for (uint j = 0; j < openOrders[token].recipients.length; j++) {
-            address recipient = openOrders[token].recipients[j];
-            emit Payment(token, getCommonName(msg.sender), getCommonName(recipient), openOrders[token].totals[j], 0, _unitsPerDollar(), true);
-            openOrders[token].recipients[j] = address(0);
-            openOrders[token].totals[j] = 0;
+            emit Payment(
+                token,
+                getCommonName(openOrders[token].purchaser),
+                seller,
+                saleAddresses,
+                quantities,
+                openOrders[token].orderLines[seller].total,
+                0,
+                _unitsPerDollar(),
+                true
+            );
+            openOrders[token].orderLines[seller].saleAddresses.length = 0;
+            openOrders[token].orderLines[seller].quantities.length = 0;
+            openOrders[token].orderLines[seller].total = 0;
+            openOrders[token].sellers[i] = "";
         }
         openOrders[token].purchaser = address(0);
+        openOrders[token].sellers.length = 0;
         purchasersAddress = address(0); // Support for legacy sales
         purchasersCommonName = "";
         return assets;
@@ -183,24 +201,41 @@ abstract contract PaymentService is Utils {
         string token
     ) internal virtual {
         require(openOrders[token].purchaser != address(0), "Invalid order token: " + token);
-        for (uint i = 0; i < openOrders[token].saleAddresses.length; i++) {
-            Sale s = Sale(openOrders[token].saleAddresses[i]);
-            try {
-                s.unlockQuantity(openOrders[token].purchaser);
-            } catch { // Support for legacy sales
-                address(s).call("unlockQuantity");
+        for (uint i = 0; i < openOrders[token].sellers.length; i++) {
+            string seller = openOrders[token].sellers[i];
+            address[] saleAddresses;
+            uint[] quantities;
+            for (uint j = 0; j < openOrders[token].orderLines[seller].saleAddresses.length; j++) {
+                address saleAddress = openOrders[token].orderLines[seller].saleAddresses[j];
+                saleAddresses.push(saleAddress);
+                quantities.push(openOrders[token].orderLines[seller].quantities[j]);
+                Sale s = Sale(saleAddress);
+                try {
+                    s.unlockQuantity(openOrders[token].purchaser);
+                } catch { // Support for legacy sales
+                    address(s).call("unlockQuantity");
+                }
+                openOrders[token].orderLines[seller].saleAddresses[j] = address(0);
+                openOrders[token].orderLines[seller].quantities[j] = 0;
             }
-            openOrders[token].saleAddresses[i] = address(0);
-            openOrders[token].quantities[i] = 0;
-        }
-        for (uint j = 0; j < openOrders[token].recipients.length; j++) {
-            address recipient = openOrders[token].recipients[j];
-            emit Payment(token, getCommonName(msg.sender), getCommonName(recipient), totalsMap[recipient], 0, _unitsPerDollar(), false);
-            openOrders[token].recipients[j] = address(0);
-            openOrders[token].totals[j] = 0;
-            totalsMap[recipient] = 0;
+            emit Payment(
+                token,
+                getCommonName(openOrders[token].purchaser),
+                seller,
+                saleAddresses,
+                quantities,
+                openOrders[token].orderLines[seller].total,
+                0,
+                _unitsPerDollar(),
+                false
+            );
+            openOrders[token].orderLines[seller].saleAddresses.length = 0;
+            openOrders[token].orderLines[seller].quantities.length = 0;
+            openOrders[token].orderLines[seller].total = 0;
+            openOrders[token].sellers[i] = "";
         }
         openOrders[token].purchaser = address(0);
+        openOrders[token].sellers.length = 0;
     }
 
     function _unitsPerDollar() internal virtual returns (uint) {

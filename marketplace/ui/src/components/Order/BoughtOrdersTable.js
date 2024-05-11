@@ -215,7 +215,7 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOr
           }}
           className="text-primary hover:text-primaryHover cursor-pointer"
         >
-          {`#${order.orderId}`}
+          {`#${`${order.orderId}`.substring(0,6)}`}
         </p>
       ),
     },
