@@ -67,7 +67,11 @@ const SoldOrderDetails = ({ user, users }) => {
 
   useEffect(() => {
     if (orderDetails) {
-      setStatus(getStatus(parseInt(orderDetails.order.status)));
+      const statusInt = parseInt(orderDetails.order.status);
+      setStatus(getStatus(statusInt));
+      if (statusInt === 3) {
+        setPaid("Paid");
+      }
       setComment(orderDetails.order.comments);
       // Fulfillment date is sometimes coming in as 0. a unix of 0 sets the date to 1969. So we need to check for 0 and null, I added undefined just in case too. 
       if (orderDetails.order.fulfillmentDate === 0 || orderDetails.order.fulfillmentDate === null || orderDetails.order.fulfillmentDate === undefined) {
@@ -78,6 +82,7 @@ const SoldOrderDetails = ({ user, users }) => {
 
       let items = [];
       orderDetails.assets.forEach((prod, index) => {
+        const quantity = orderDetails.order.quantities ? parseInt(orderDetails.order.quantities[index]) : 1;
         items.push({
           address: prod.address,
           chainId: prod.chainId,
@@ -86,8 +91,8 @@ const SoldOrderDetails = ({ user, users }) => {
           productName: prod,
           name: prod.name,
           unitPrice: prod.price,
-          quantity: parseInt(orderDetails.order.quantities[index]),
-          amount: prod.price * parseInt(orderDetails.order.quantities[index]),
+          quantity,
+          amount: prod.price * quantity,
           serialNumber: prod,
           tax: prod.tax ? prod.tax : 0,
         });
@@ -108,7 +113,7 @@ const SoldOrderDetails = ({ user, users }) => {
 
   const getData = async () => {
     const data = await actions.fetchOrderDetails(dispatch, Id);
-    if (data != null) {
+    if (data != null && parseInt(orderDetails.order.status) !== 3) {
       getPaymentStatus(data.order.paymentSessionId, data.order.sellersCommonName);
     }
   };
@@ -407,7 +412,7 @@ const SoldOrderDetails = ({ user, users }) => {
               </div>
             </Breadcrumb.Item>
             <Breadcrumb.Item className="text-sm text-[#202020] font-medium">
-              {details.order.orderId}
+              {`${details.order.orderId}`.substring(0,6)}
             </Breadcrumb.Item>
           </Breadcrumb>
 
@@ -460,7 +465,7 @@ const SoldOrderDetails = ({ user, users }) => {
                         </Button>
                       </div>
                       <Row className="hidden md:flex my-6 justify-between bg-[#F6F6F6] p-4 pb-2 rounded">
-                        <OrderData title="Order Number" value={`#${details.order.orderId}`} />
+                        <OrderData title="Order Number" value={`#${`${details.order.orderId}`.substring(0,6)}`} />
                         <Divider type="vertical" className="h-14 bg-secondryD" />
                         <OrderData
                           title="Buyer"
@@ -553,7 +558,7 @@ const SoldOrderDetails = ({ user, users }) => {
                       </Row>
                       <Row className="my-2 md:hidden flex-col gap-[6px] justify-between p-4 rounded">
                         <div className="flex gap-4">
-                          <NewOrderData className="w-2/4" title="Order Number" value={'#' + details.order.orderId} />
+                          <NewOrderData className="w-2/4" title="Order Number" value={'#' + `${details.order.orderId}`.substring(0,6)} />
                           <NewOrderData className="w-2/4" title="Buyer" value={details.order.purchasersCommonName} />
                         </div>
                         <div className="flex gap-4">

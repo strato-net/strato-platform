@@ -21,47 +21,75 @@ contract StratPaymentService is PaymentService {
         uint[] _quantities,
         string token
     ) internal override returns (string, address[]) {
-        require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
-        address[] stratRecipients;
-        uint totalAmount;
         address[] assets;
+        address[] sellerAddresses;
+        uint totalAmount;
+        openOrders[token].purchaser = msg.sender;
         for (uint i = 0; i < _saleAddresses.length; i++) {
             Sale s = Sale(_saleAddresses[i]);
             Asset a = s.assetToBeSold();
-            assets.push(address(a));
-            address recipient = a.owner();
-            if (totalsMap[recipient] == 0) {
-                stratRecipients.push(recipient);
-            }
+            string seller = getCommonName(a.owner());
             uint quantity = _quantities[i];
-            uint amount = s.price() * quantity * stratsPerDollar * 100; // 1 STRAT = 1 STRAT cents
+            openOrders[token].orderLines[seller].saleAddresses.push(_saleAddresses[i]);
+            openOrders[token].orderLines[seller].quantities.push(quantity);
+            uint amount = s.price() * quantity * stratsPerDollar * 100;
+            if (openOrders[token].orderLines[seller].total == 0) {
+                openOrders[token].sellers.push(seller);
+                sellerAddresses.push(a.owner());
+            }
+            openOrders[token].orderLines[seller].total += amount;
             totalAmount += amount;
-            totalsMap[recipient] += amount;
             try {
-                s.lockQuantity(quantity, tx.origin);
+                s.lockQuantity(quantity, msg.sender);
             } catch { // Support for legacy sales
                 address(s).call("lockQuantity", quantity);
             }
-            purchasersAddress = tx.origin; // Support for legacy sales
-            purchasersCommonName = getCommonName(tx.origin);
-            try {
-                s.completeSale(tx.origin);
-            } catch { // Support for legacy sales
-                address(s).call("completeSale");
-            }
-            purchasersAddress = address(0); // Support for legacy sales
-            purchasersCommonName = "";
         }
         string err = "Your STRAT account balance is not high enough to cover the purchase.";
         uint myBalance = stratAddress.call("balance");
         require(myBalance >= totalAmount, err);
-        for (uint j = 0; j < stratRecipients.length; j++) {
-            address recipient = stratRecipients[j];
-            bool success = stratAddress.call("transfer", recipient, totalsMap[recipient]);
-            emit Payment(token, getCommonName(tx.origin), getCommonName(recipient), totalsMap[recipient], 0, _unitsPerDollar(), true);
-            totalsMap[recipient] = 0;
-            require(success, err);
+        purchasersAddress = msg.sender; // Support for legacy sales
+        purchasersCommonName = getCommonName(tx.origin);
+        for (uint j = 0; j < openOrders[token].sellers.length; j++) {
+            string seller = openOrders[token].sellers[j];
+            address[] saleAddresses;
+            uint[] quantities;
+            for (uint k = 0; k < openOrders[token].orderLines[seller].saleAddresses.length; k++) {
+                address saleAddress = openOrders[token].orderLines[seller].saleAddresses[k];
+                saleAddresses.push(saleAddress);
+                quantities.push(openOrders[token].orderLines[seller].quantities[k]);
+                Sale s = Sale(saleAddress);
+                Asset a = s.assetToBeSold();
+                assets.push(address(a));
+                try {
+                    s.completeSale(openOrders[token].purchaser);
+                } catch { // Support for legacy sales
+                    address(s).call("completeSale");
+                }
+                openOrders[token].orderLines[seller].saleAddresses[k] = address(0);
+                openOrders[token].orderLines[seller].quantities[k] = 0;
+            }
+            bool success = stratAddress.call("transfer", sellerAddresses[j], openOrders[token].orderLines[seller].total);
+            emit Payment(
+                token,
+                getCommonName(openOrders[token].purchaser),
+                seller,
+                saleAddresses,
+                quantities,
+                openOrders[token].orderLines[seller].total,
+                0,
+                _unitsPerDollar(),
+                true
+            );
+            openOrders[token].orderLines[seller].saleAddresses.length = 0;
+            openOrders[token].orderLines[seller].quantities.length = 0;
+            openOrders[token].orderLines[seller].total = 0;
+            openOrders[token].sellers[j] = "";
         }
+        openOrders[token].purchaser = address(0);
+        openOrders[token].sellers.length = 0;
+        purchasersAddress = address(0); // Support for legacy sales
+        purchasersCommonName = "";
 
         return (token, assets);
     }
