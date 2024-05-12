@@ -139,8 +139,6 @@ export const Order = {
   get: '/:address',
   getAll: '/',
   create: '/',
-  updateBuyerDetails: '/updateBuyerDetails',
-  updateSellerDetails: '/updateSellerDetails',
   payment: '/payment',
   userAddress: '/userAddress',
   getAllUserAddress: '/userAddresses/user',
@@ -150,21 +148,6 @@ export const Order = {
   executeSale: '/closeSale',
   updateOrderComment: '/updateComment',
   export: '/exportOrders'
-}
-
-export const OrderLine = {
-  prefix: '/orderLine',
-  get: '/:address'
-}
-
-export const OrderLineItem = {
-  prefix: '/orderLineItem',
-  get: '/:orderLineId',
-  getAll: '/',
-  create: '/',
-  update: '/update',
-  audit: '/:address/:chainId/audit',
-  transferOwnership: '/transferOwnership',
 }
 
 export const EventType = {

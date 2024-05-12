@@ -28,27 +28,6 @@ router.get(
 );
 
 router.post(
-  Order.create,
-  authHandler.authorizeRequest(),
-  loadDapp,
-  OrderController.create
-);
-
-router.put(
-  Order.updateBuyerDetails,
-  authHandler.authorizeRequest(),
-  loadDapp,
-  OrderController.updateBuyerDetails
-)
-
-router.put(
-  Order.updateSellerDetails,
-  authHandler.authorizeRequest(),
-  loadDapp,
-  OrderController.updateSellerDetails
-)
-
-router.post(
   Order.payment,
   authHandler.authorizeRequest(),
   loadDapp,
