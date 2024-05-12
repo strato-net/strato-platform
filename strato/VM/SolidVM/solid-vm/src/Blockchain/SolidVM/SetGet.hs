@@ -295,7 +295,7 @@ jsonSM = go False
   where
     go _ SNULL = return "null"
     go _ (SInteger v) = return $ show v
-    go b (SString v) = return . bool id show b $ show v
+    go b (SString v) = return $ bool id show b v
     go _ (SBool v) = return $ bool "false" "true" v
     go _ (SEnumVal _ _ num) = return $ show num
     go b (SAccount a _) = return . bool id show b $ show a
