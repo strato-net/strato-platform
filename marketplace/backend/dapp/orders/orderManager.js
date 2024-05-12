@@ -66,19 +66,6 @@ function marshalOut(_args) {
   return args;
 }
 
-function marshalInUpdateSeller(_args){
-  const defaultArgs = {
-    status:1,
-    fullfilmentDate:0,
-    sellerComments:''
-  }
-  const args = {
-    ...defaultArgs,
-    ..._args,
-  };
-  return args;
-}
-
 /**
  * Bind functions relevant for inventory to the _contract object.
  * @param user User token
@@ -116,24 +103,6 @@ function bind(user, _contract, options) {
     orderJs.getAll(user, args, _options);
   contract.createOrder = async (args) =>
     createOrder(user, contract, args, options);
-  contract.updateBuyerDetails = async (args) =>
-    updateBuyerDetails(user, contract, args, options);
-  contract.updateSellerDetails = async (args) =>
-    updateSellerDetails(user, contract, args, options);
-  contract.getInventoriesAndAvailableQuantity = async (args) =>
-    getInventoriesAndAvailableQuantity(user, contract, args, options);
-  contract.addOrderLine = async (args) =>
-    addOrderLine(user, contract, args, options);
-  contract.getOrderLine = async (args,options=defaultOptions) =>
-    orderLineJs.get(user, args, options);
-  contract.getOrderLines = async (args,options=defaultOptions) =>
-    orderLineJs.getAll(user, args, options);
-  contract.addOrderLineItems = async (args) =>
-    addOrderLineItems(user, contract, args, options);
-  contract.getOrderLineItem = async (args,options=defaultOptions) =>
-    orderLineItemJs.get(user, args, options);
-  contract.getOrderLineItems = async (args,options=defaultOptions) =>
-    orderLineItemJs.getAll(user, args, options);
   return contract;
 }
 
@@ -161,161 +130,6 @@ async function createOrder(admin, contract, _args, baseOptions) {
     throw new rest.RestError(restStatus, 0, { callArgs });
 
   return [restStatus, orderAddress];
-}
-
-/**
- * Update buyer order details
- */
- async function updateBuyerDetails(admin, contract, _args, baseOptions) {
-  _args = {
-    orderAddress:_args.orderAddress,
-    ..._args
-  }
-  
-  const scheme = Object.keys(_args).reduce((agg, key) => {
-    const base = 1;
-    switch (key) {
-      case "status":
-        return agg | (base << 0);
-      case "buyerComments":
-        return agg | (base << 1);
-      default:
-        return agg;
-    }
-  }, 0);
-
-  
-
-  const callArgs = {
-    contract,
-    method: "updateBuyerDetails",
-    args: util.usc({
-      scheme,
-      ..._args,
-    }),
-  };
-
-  const options = {
-    ...baseOptions,
-    history: [contractName],
-  };
-
-  const [restStatus, OrderAddress, quantities] = await rest.call(
-    admin,
-    callArgs,
-    options
-  );
-
-  if (parseInt(restStatus, 10) !== RestStatus.OK)
-    throw new rest.RestError(restStatus, 0, { callArgs });
-
-  return [restStatus, OrderAddress, quantities];
-}
-
-
-
-/**
- * Update seller order details
- */
- async function updateSellerDetails(admin, contract, _args, baseOptions) {
-  const args = marshalInUpdateSeller(_args);
-  // console.log("===========================================",_args);
-
-  const scheme = Object.keys(_args).reduce((agg, key) => {
-    const base = 1;
-    switch (key) {
-      case "status":
-        return agg | (base << 0);
-      case "fullfilmentDate":
-        return agg | (base << 1);
-      case "sellerComments":
-        return agg | (base << 2);
-      default:
-        return agg;
-    }
-  }, 0);
-
-  const callArgs = {
-    contract,
-    method: "updateSellerDetails",
-    args: util.usc({
-      scheme,
-      ...args,
-    }),
-  };
-
-  const options = {
-    ...baseOptions,
-    history: [contractName],
-  };
-
-  const [restStatus, OrderAddress, quantities] = await rest.call(
-    admin,
-    callArgs,
-    options
-  );
-
-  if (parseInt(restStatus, 10) !== RestStatus.OK)
-    throw new rest.RestError(restStatus, 0, { callArgs });
-
-  return [restStatus, OrderAddress, quantities];
-}
-
-
-/**
- * Add the oderLine for a order
- */
- async function addOrderLine(admin, contract, _args, baseOptions) {
-  const callArgs = {
-    contract,
-    method: "addOrderLine",
-    args: util.usc({
-      ..._args,
-    }),
-  };
-  const options = {
-    ...baseOptions,
-    history: [contractName],
-  };
-
-  const [restStatus, orderLineAddress] = await rest.call(
-    admin,
-    callArgs,
-    options
-  );
-
-  if (parseInt(restStatus, 10) !== RestStatus.OK)
-    throw new rest.RestError(restStatus, 0, { callArgs });
-
-  return [restStatus, orderLineAddress];
-}
-
-/**
- * Add the oderLineItems for a order
- */
- async function addOrderLineItems(admin, contract, _args, baseOptions) {
-  const callArgs = {
-    contract,
-    method: "addOrderLineItems",
-    args: util.usc({
-      ..._args,
-    }),
-  };
-  const options = {
-    ...baseOptions,
-    history: [contractName],
-  };
-
-  const [restStatus, orderLineItemAddress] = await rest.call(
-    admin,
-    callArgs,
-    options
-  );
-
-  if (parseInt(restStatus, 10) !== RestStatus.OK)
-    throw new rest.RestError(restStatus, 0, { callArgs });
-
-  return [restStatus, orderLineItemAddress];
 }
 
 /**

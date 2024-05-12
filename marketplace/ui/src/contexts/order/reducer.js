@@ -185,40 +185,6 @@ const reducer = (state, action) => {
         error: action.error,
         isOrderLineDetailsLoading: false,
       };
-    case actionDescriptors.updateBuyerDetails:
-      return {
-        ...state,
-        isbuyerDetailsUpdating: true,
-      };
-    case actionDescriptors.updateBuyerDetailsSuccessful:
-      return {
-        ...state,
-        buyerUpdateObject: action.payload,
-        isbuyerDetailsUpdating: false,
-      };
-    case actionDescriptors.updateBuyerDetailsFailed:
-      return {
-        ...state,
-        error: action.error,
-        isbuyerDetailsUpdating: false,
-      };
-    case actionDescriptors.updateSellerDetails:
-      return {
-        ...state,
-        issellerDetailsUpdating: true,
-      };
-    case actionDescriptors.updateSellerDetailsSuccessful:
-      return {
-        ...state,
-        sellerUpdateObject: action.payload,
-        issellerDetailsUpdating: false,
-      };
-    case actionDescriptors.updateSellerDetailsFailed:
-      return {
-        ...state,
-        error: action.error,
-        issellerDetailsUpdating: false,
-      };
     case actionDescriptors.executeSale:
       return {
         ...state,
