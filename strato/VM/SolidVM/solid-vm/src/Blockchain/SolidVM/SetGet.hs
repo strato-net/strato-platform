@@ -19,6 +19,7 @@ module Blockchain.SolidVM.SetGet
     toBasic,
     fromBasic,
     showSM,
+    jsonSM
   )
 where
 
@@ -30,6 +31,7 @@ import Control.Monad
 import Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.UTF8 as UTF8
+import Data.Bool (bool)
 import Data.Foldable (for_)
 import Data.List
 import qualified Data.Map as M
@@ -287,3 +289,45 @@ showSM (SContractFunction maybeContractName address functionName) = do
   return $ "Contract function: " ++ labelToString contractName ++ "/" ++ format address ++ "." ++ labelToString functionName
 showSM (SVariadic xs) = ('[' :) . (++ "]") . intercalate ", " <$> traverse showSM xs
 showSM x = todo "showSM called for unsupported value: " x
+
+jsonSM :: MonadSM m => Value -> m String
+jsonSM = go False
+  where
+    go _ SNULL = return "null"
+    go _ (SInteger v) = return $ show v
+    go b (SString v) = return . bool id show b $ show v
+    go _ (SBool v) = return $ bool "false" "true" v
+    go _ (SEnumVal _ _ num) = return $ show num
+    go b (SAccount a _) = return . bool id show b $ show a
+    go _ (STuple v) = do
+      vals <- mapM getVar (V.toList v)
+      strings <- forM vals (go True)
+      return $ "[" ++ intercalate ", " strings ++ "]"
+    go _ (SArray _ v) = do
+      vals <- mapM getVar (V.toList v)
+      strings <- forM vals (go True)
+      return $ "[" ++ intercalate ", " strings ++ "]"
+    go _ (SStruct name m) = do
+      valStrings <-
+        forM (M.toList m) $ \(n, var) -> do
+          val <- getVar var
+          valString <- go True val
+          return (n, valString)
+      return $
+        labelToString name ++ "{"
+          ++ intercalate ", " (map (\(n, v) -> show (labelToString n) ++ ": " ++ v) valStrings)
+          ++ "}"
+    go _ (SMap _ m) = do
+      valStrings <-
+        forM (M.toList m) $ \(key, var) -> do
+          val <- getVar var
+          valString <- go True val
+          keyString <- go True key
+          return (keyString, valString)
+      return $
+        "{"
+          ++ intercalate ", " (map (\(k, v) -> k ++ ": " ++ v) valStrings)
+          ++ "}"
+    go b (SContract _ address) = return . bool id show b $ show address
+    go _ (SVariadic xs) = ('[' :) . (++ "]") . intercalate ", " <$> traverse (go True) xs
+    go _ _ = return "undefined"
