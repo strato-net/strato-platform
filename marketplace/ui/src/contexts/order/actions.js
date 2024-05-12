@@ -29,12 +29,6 @@ const actionDescriptors = {
   fetchSaleQuantity: "fetch_sale_quantity",
   fetchSaleQuantitySuccessful: "fetch_sale_quantity_successful",
   fetchSaleQuantityFailed: "fetch_sale_quantity_failed",
-  updateBuyerDetails: "update_buyer_details",
-  updateBuyerDetailsSuccessful: "update_buyer_details_successful",
-  updateBuyerDetailsFailed: "update_buyer_details_failed",
-  updateSellerDetails: "update_seller_details",
-  updateSellerDetailsSuccessful: "update_seller_details_successful",
-  updateSellerDetailsFailed: "update_seller_details_failed",
   resetMessage: "reset_message",
   setMessage: "set_message",
   cancelSale: "cancel_sale",
@@ -454,98 +448,6 @@ const actions = {
         type: actionDescriptors.fetchSaleQuantityFailed,
         error: "Error while fetching Order",
       });
-    }
-  },
-
-  updateBuyerDetails: async (dispatch, payload) => {
-    dispatch({ type: actionDescriptors.updateBuyerDetails });
-
-    try {
-      const response = await fetch(`${apiUrl}/order/updateBuyerDetails`, {
-        method: HTTP_METHODS.PUT,
-        credentials: "same-origin",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const body = await response.json();
-
-      if (response.status === RestStatus.OK) {
-        dispatch({
-          type: actionDescriptors.updateBuyerDetailsSuccessful,
-          payload: body.data,
-        });
-        actions.setMessage(dispatch, "Order has been updated", true);
-        return true;
-      } else if (response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({
-          type: actionDescriptors.updateBuyerDetailsFailed,
-          error: "Unauthorized while updating Order"
-        });
-        window.location.href = body.error.loginUrl;
-      }
-
-      dispatch({
-        type: actionDescriptors.updateBuyerDetailsFailed,
-        error: body.error,
-      });
-      actions.setMessage(dispatch, body.error);
-      return false;
-    } catch (err) {
-      dispatch({
-        type: actionDescriptors.updateBuyerDetailsFailed,
-        error: "Error while updating Order",
-      });
-      actions.setMessage(dispatch, "Error while updating Order");
-    }
-  },
-
-  updateSellerDetails: async (dispatch, payload) => {
-    dispatch({ type: actionDescriptors.updateSellerDetails });
-
-    try {
-      const response = await fetch(`${apiUrl}/order/updateSellerDetails`, {
-        method: HTTP_METHODS.PUT,
-        credentials: "same-origin",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const body = await response.json();
-
-      if (response.status === RestStatus.OK) {
-        dispatch({
-          type: actionDescriptors.updateSellerDetailsSuccessful,
-          payload: body.data,
-        });
-        actions.setMessage(dispatch, "Order has been updated", true);
-        return true;
-      } else if (response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({
-          type: actionDescriptors.updateSellerDetailsFailed,
-          error: "Unauthorized while updating Order"
-        });
-        window.location.href = body.error.loginUrl;
-      }
-
-      dispatch({
-        type: actionDescriptors.updateSellerDetailsFailed,
-        error: body.error,
-      });
-      actions.setMessage(dispatch, body.error);
-      return false;
-    } catch (err) {
-      dispatch({
-        type: actionDescriptors.updateSellerDetailsFailed,
-        error: "Error while updating Order",
-      });
-      actions.setMessage(dispatch, "Error while updating Order");
     }
   },
 

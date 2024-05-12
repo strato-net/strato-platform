@@ -44,37 +44,6 @@ class OrderController {
     }
   }
 
-  static async updateBuyerDetails(req, res, next) {
-    try {
-      const { dapp, body } = req
-
-      OrderController.validateUpdateBuyerArgs(body)
-
-      const result = await dapp.updateBuyerDetails(body, options)
-
-      rest.response.status200(res, result)
-      return next()
-    } catch (e) {
-      return next(e)
-    }
-  }
-
-
-  static async updateSellerDetails(req, res, next) {
-    try {
-      const { dapp, body } = req
-
-      OrderController.validateUpdateSellerArgs(body)
-
-      const result = await dapp.updateSellerDetails(body, options)
-
-      rest.response.status200(res, result)
-      return next()
-    } catch (e) {
-      return next(e)
-    }
-  }
-
   static async payment(req, res, next) {
     try {
       const { dapp, body, accessToken } = req
@@ -224,42 +193,6 @@ class OrderController {
     if (validation.error) {
       console.log(validation.error.message);
       throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Payment Argument Validation Error', {
-        message: `Missing args or bad format: ${validation.error.message}`,
-      })
-    }
-  }
-
-  static validateUpdateBuyerArgs(args) {
-    const updateBuyerSchema = Joi.object({
-      address: Joi.string().required(),
-      updates: Joi.object({
-        status: Joi.number().required(),
-        buyerComments: Joi.string().required(),
-      }),
-    });
-
-    const validation = updateBuyerSchema.validate(args);
-
-    if (validation.error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Update Buyer Argument Validation Error', {
-        message: `Missing args or bad format: ${validation.error.message}`,
-      })
-    }
-  }
-
-  static validateUpdateSellerArgs(args) {
-    const updateSellerSchema = Joi.object({
-      address: Joi.string().required(),
-      updates: Joi.object({
-        status: Joi.number().required(),
-        sellerComments: Joi.string().allow(''),
-        fullfilmentDate: Joi.number()
-      }),
-    });
-
-    const validation = updateSellerSchema.validate(args);
-    if (validation.error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Update Seller Argument Validation Error', {
         message: `Missing args or bad format: ${validation.error.message}`,
       })
     }
