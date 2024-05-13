@@ -19,11 +19,14 @@ const SERVER_URL = `${process.env.SERVER_HOST}:${process.env.PORT ? process.env.
 
 const CLIENT_URL = `${process.env.SERVER_HOST}:${process.env.CLIENT_PORT ? process.env.CLIENT_PORT : 8020}`;
 
-const STRIPE_CHECKOUT_URL = `${CLIENT_URL}/stripe/checkout/confirm`;
+const SERVER_CONFIRM_URL = `${SERVER_URL}/stripe/checkout/confirm`;
+
+const SERVER_CANCEL_URL = `${SERVER_URL}/stripe/checkout/cancel`;
 
 export { 
   STRIPE_ENV,
-  STRIPE_CHECKOUT_URL,
+  SERVER_CONFIRM_URL,
+  SERVER_CANCEL_URL,
   CONTRACT_ADDRESS,
   SERVER_URL,
   CLIENT_URL,

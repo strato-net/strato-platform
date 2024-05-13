@@ -25,29 +25,21 @@ const commonErrorHandler = (err, req, res, next) => {
 }
 
 const getStripeAccountForUser = async (commonName) => {
-  try {
-    const query = 'SELECT * FROM stripe_accounts WHERE commonName = $1';
-    const values = [ commonName ];
-    const result = await client.query(query, values);
-    return result.rows.length === 0 ? undefined : result.rows[0].accountid;
-  } catch (e) {
-    next(e);
-  }
+  const query = 'SELECT * FROM stripe_accounts WHERE commonName = $1';
+  const values = [ commonName ];
+  const result = await client.query(query, values);
+  return result.rows.length === 0 ? undefined : result.rows[0].accountid;
 }
 
 const getStripePaymentFromToken = async (token) => {
-  try {
-    const query = `
-      SELECT sa.accountId, sp.paymentSessionId 
-      FROM stripe_payments sp 
-      JOIN stripe_accounts sa ON sa.commonName = sp.sellerCommonName
-      WHERE token = $1`;
-    const values = [ token ];
-    const result = await client.query(query, values);
-    return result.rows.length === 0 ? undefined : result.rows[0];
-  } catch (e) {
-    next(e);
-  }
+  const query = `
+    SELECT sa.accountId, sp.paymentSessionId, sp.status
+    FROM stripe_payments sp 
+    JOIN stripe_accounts sa ON sa.commonName = sp.sellerCommonName
+    WHERE token = $1`;
+  const values = [ token ];
+  const result = await client.query(query, values);
+  return result.rows.length === 0 ? undefined : result.rows[0];
 }
 
 const insertStripeAccount = async (commonName, accountId) => {

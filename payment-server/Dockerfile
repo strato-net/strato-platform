@@ -7,9 +7,9 @@ HEALTHCHECK --interval=3s --timeout=2s --start-period=300s \
   CMD lsof -i :8018 || \
   exit 1
 
-COPY . /usr/src/payment-server/backend
+COPY . /usr/src/payment-server
 
-WORKDIR /usr/src/payment-server/backend
+WORKDIR /usr/src/payment-server
 
 RUN yarn install
 

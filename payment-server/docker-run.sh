@@ -3,5 +3,5 @@ set -e
 
 export DOCKERIZED="true"
 
-echo 'Starting payment server (Stripe)...'
+echo 'Starting Payment Server...'
 yarn start

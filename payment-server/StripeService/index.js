@@ -19,11 +19,6 @@ router.get(
 );
 
 router.get(
-  '/checkout/initiate',
-  StripeServiceController.initiateStripeCheckout
-)
-
-router.get(
   '/checkout/confirm',
   StripeServiceController.stripeCheckoutConfirm
 );
