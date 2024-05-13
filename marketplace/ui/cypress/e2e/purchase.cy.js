@@ -89,7 +89,6 @@ describe('Create a new Asset', () => {
     cy.get('#buyNow').click();
     cy.get('#review-and-submit').click();
 
-
     // Make Payment
     cy.wait(10000)
     cy.get('input[name=email]')
@@ -100,6 +99,7 @@ describe('Create a new Asset', () => {
     cy.get('input[name=cardCvc]').type('007').should('have.value', '007');
     cy.get('input[name=billingName]').type(userName).should('have.value', userName);
     cy.get('#country-fieldset').click();
+    cy.get("#billingCountry").select('US');
     cy.get('select option[value="US"]').should('be.selected');
     cy.get('#billingPostalCode').click().type('323210'); 
     cy.get('button[type="submit"]').click();
