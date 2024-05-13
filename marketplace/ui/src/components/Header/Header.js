@@ -16,7 +16,7 @@ import {
 import { ArrowLeftOutlined, LogoutOutlined } from "@ant-design/icons";
 import { Images } from "../../images";
 import "./header.css";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
 import {
   useMarketplaceState,
@@ -29,7 +29,6 @@ import { useAuthenticateDispatch, useAuthenticateState } from "../../contexts/au
 import TagManager from "react-gtm-module";
 import { SEO } from "../../helpers/seoConstant";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
-import { HTTP_METHODS, apiUrl } from "../../helpers/constants";
 import LoginModal from "../MarketPlace/LoginModal"
 import { setCookie } from "../../helpers/cookie";
 
@@ -40,12 +39,12 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const navigate = useNavigate();
   const IMG_META = SEO.TITLE_META
   const inputRef = useRef(null);
-  
+
   const getCategoryFromURL = () => {
-    if(window.location.pathname.includes('/c/')){
+    if (window.location.pathname.includes('/c/')) {
       const parts = window.location.pathname.split('/');
       return parts[parts.length - 1];
-    }else{
+    } else {
       return 'All'
     }
   };
@@ -87,9 +86,9 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
 
   const stratsBalance = (Object.keys(strats).length > 0) ? strats : 0
 
-  useEffect(()=>{
+  useEffect(() => {
     setSelectedCategory(categoryQueryValue)
-  },[categoryQueryValue])
+  }, [categoryQueryValue])
 
   const navItems = [
     { label: <div id="Orders">Orders</div>, key: '0' },
@@ -139,8 +138,8 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   useEffect(() => {
     const allCat = { label: 'All', value: 'All' }
     let categories = categorys.map(({ name, subCategories }, index) => {
-      const subCat = subCategories.map(item=>item.contract).join(',')
-      return { label: name, value: name, subCategory:subCat }
+      const subCat = subCategories.map(item => item.contract).join(',')
+      return { label: <h1 className="h-0">{name}</h1>, value: name, subCategory: subCat }
     })
     categories = [allCat, ...categories];
     setCategories(categories)
@@ -150,10 +149,11 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     {
       key: '3',
       label: (
-        <div onClick={() => { navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", user.commonName)}`) }}>
+        <div>
           <p>My Profile</p>
         </div>
       ),
+      onClick: () => navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", user.commonName)}`)
     },
     {
       key: '2',
@@ -171,11 +171,12 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     {
       key: '1',
       label: (
-        <div type="text" id="logout" className="w-full text-secondryB text-sm !hover:bg-success flex gap-2 items-center" onClick={logout}>
+        <div type="text" id="logout" className="w-full text-secondryB text-sm !hover:bg-success flex gap-2 items-center">
           <div className="-rotate-90"><LogoutOutlined /></div>
           Logout
         </div>
       ),
+      onClick: () => logout()
     },
   ] : [
     {
@@ -260,11 +261,11 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
 
   const navigateSearch = (selectedCateg, value) => {
     const baseUrl = new URL(`/c/${selectedCateg}`, window.location.origin);
-    
-    if(selectedCateg && selectedCateg!=='All'){
-      const subCat = categorys.find((item)=>item.name===selectedCateg)
-      ?.subCategories.map(item=>item.contract).join(',')
-      if(subCat){
+
+    if (selectedCateg && selectedCateg !== 'All') {
+      const subCat = categorys.find((item) => item.name === selectedCateg)
+        ?.subCategories.map(item => item.contract).join(',')
+      if (subCat) {
         baseUrl.searchParams.set('sc', subCat);
       }
     }
@@ -279,14 +280,14 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const handleChangeSearch = (e) => {
     const value = e.target.value;
     if (value.length === 0 && searchQueryValue) {
-      navigateSearch('All',value)
+      navigateSearch('All', value)
     }
   }
 
   const handleEnterSearch = (e) => {
     const value = e.target.value;
     const baseUrl = new URL(`/c/All`, window.location.origin);
-    if(value){
+    if (value) {
       baseUrl.searchParams.set('s', value);
       const url = baseUrl.pathname + baseUrl.search;
       navigate(url, { replace: true });
@@ -295,7 +296,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
 
   const handleCategoryChange = (cat) => {
     setSelectedCategory(cat)
-    navigateSearch(cat,"")
+    navigateSearch(cat, "")
     inputRef.current.focus();
     inputRef.current.select();
   }
@@ -310,17 +311,17 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   };
 
   const handleClose = () => {
-      setIsModalVisible(false);
+    setIsModalVisible(false);
   };
 
   return (
     <>
       <Header className={`fixed z-[100] !bg-[#ffffff] !pl-2 w-full !pr-4 md:px-12 flex md:!mb-10 ${showMenu ? '' : 'shadow-header'} items-center justify-between md:justify-start`}>
         <Row className="relative flex-grow-0 md:flex-1 ml-2 md:ml-5">
-          <Col xs={20} md={10} lg={4} 
+          <Col xs={20} md={10} lg={4}
             className="mt-4 mr-5 md:mt-0 cursor-pointer flex-grow-0 w-max md:w-[170px] h-[44px]"
-            onClick={() => { 
-              navigate(routes.Marketplace.url) 
+            onClick={() => {
+              navigate(routes.Marketplace.url)
               window.scrollTo(0, 0);
             }}
           >
@@ -330,7 +331,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
             <Select
               defaultValue="All"
               className="border-none header-category"
-              dropdownStyle={{position:'fixed'}}
+              dropdownStyle={{ position: 'fixed' }}
               style={{ width: 170 }}
               onChange={handleCategoryChange}
               options={categories}
@@ -345,8 +346,8 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
               defaultValue={searchQueryValue}
               onChange={(e) => { handleChangeSearch(e) }}
               onPressEnter={(e) => { handleEnterSearch(e) }}
-              suffix={showSearch 
-                ? <ArrowLeftOutlined onClick={() => handleSearchShow(false)} /> 
+              suffix={showSearch
+                ? <ArrowLeftOutlined onClick={() => handleSearchShow(false)} />
                 : <img src={Images.Header_Search} alt={IMG_META} title={IMG_META} className="w-[18px] h-[18px]" />}
               className="bg-[#F6F6F6] outline-none"
             />
@@ -431,14 +432,14 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
           {(roleIndex !== undefined && roleIndex !== 1)
             && <Dropdown menu={{ items: stratsItem }} placement="bottomRight" trigger={["hover", "click"]} className="xs:mt-5 md:mt-0" overlayStyle={{ position: 'fixed' }}>
               <a onClick={(e) => e.preventDefault()} className="md:flex mx-1 text-base text-white" id="user-dropdown">
-              <Badge
-              style={{backgroundColor:"#13188A"}}
-              className="cursor-pointer mt-7 md:mt-0 mx-2"
-              count={stratsBalance}
-              overflowCount={9999999}
-              >
-              <img src={Images.logo} alt={IMG_META} title={IMG_META} className="w-[30px] h-[30px] " />
-            </Badge>
+                <Badge
+                  style={{ backgroundColor: "#13188A" }}
+                  className="cursor-pointer mt-7 md:mt-0 mx-2"
+                  count={stratsBalance}
+                  overflowCount={9999999}
+                >
+                  <img src={Images.logo} alt={IMG_META} title={IMG_META} className="w-[30px] h-[30px] " />
+                </Badge>
               </a>
             </Dropdown>
           }
@@ -471,17 +472,17 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
       {showMenu &&
         <div>
           <div className="bg-white border-t border-[#E9E9E9] absolute w-full z-50 md:hidden top-16">
-            {subMenuItems.map((item) => 
-                <Typography onClick={() => handleIntMenuTab(item)} className={`text-base py-3 px-4 cursor-pointer ${item ? '' : 'hidden'}`} >{item?.label}</Typography>
+            {subMenuItems.map((item) =>
+              <Typography onClick={() => handleIntMenuTab(item)} className={`text-base py-3 px-4 cursor-pointer ${item ? '' : 'hidden'}`} >{item?.label}</Typography>
             )}
           </div>
           <div className="h-[100vh] w-full bg-[#00000020] absolute top-0 md:hidden z-40" onClick={handleMenuTab}></div>
         </div>
       }
       <LoginModal
-          visible={isModalVisible}
-          onCancel={handleClose}
-          onLogin={handleLogin}
+        visible={isModalVisible}
+        onCancel={handleClose}
+        onLogin={handleLogin}
       />
     </>
 
