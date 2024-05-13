@@ -973,6 +973,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       }
       const paymentParameters = {
         address: paymentProvider.address,
+        orderId: util.uid(),
         saleAddresses,
         quantities,
       }
