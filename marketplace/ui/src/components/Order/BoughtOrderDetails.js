@@ -498,7 +498,6 @@ const BoughtOrderDetails = ({ user, users }) => {
             ]}
           />
         </div>
-      )}
 
       {message && openToastOrder("bottom")}
     </div>
