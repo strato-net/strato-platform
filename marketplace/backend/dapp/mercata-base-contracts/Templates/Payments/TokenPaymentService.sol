@@ -70,85 +70,90 @@ contract TokenPaymentService is PaymentService {
     }
 
     function _createOrder (
+        string token,
+        string _orderId,
+        address _purchaser,
+        string _purchasersCommonName,
         address[] _saleAddresses,
-        uint[] _quantities,
-        string token
+        uint[] _quantities
     ) internal override returns (string, address[]) {
         address[] assets;
-        uint totalAmount;
-        openOrders[token].purchaser = msg.sender;
+        uint totalAmount = 0;
+        string seller;
+        string err = "Your " + serviceName + " balance is not high enough to cover the purchase.";
+        purchasersAddress = msg.sender; // Support for legacy sales
+        purchasersCommonName = getCommonName(tx.origin);
         for (uint i = 0; i < _saleAddresses.length; i++) {
             Sale s = Sale(_saleAddresses[i]);
             Asset a = s.assetToBeSold();
-            string seller = getCommonName(a.owner());
+            assets.push(address(a));
             uint quantity = _quantities[i];
-            openOrders[token].orderLines[seller].saleAddresses.push(_saleAddresses[i]);
-            openOrders[token].orderLines[seller].quantities.push(quantity);
             uint amount = s.price() * quantity * tokensPerDollar * (10 ** decimals);
-            if (openOrders[token].orderLines[seller].total == 0) {
-                openOrders[token].sellers.push(seller);
-            }
-            openOrders[token].orderLines[seller].total += amount;
             totalAmount += amount;
+            seller = getCommonName(a.owner());
             try {
-                s.lockQuantity(quantity, msg.sender);
+                Sale(_saleAddresses[i]).lockQuantity(quantity, _purchaser);
             } catch { // Support for legacy sales
-                address(s).call("lockQuantity", quantity);
+                _saleAddresses[i].call("lockQuantity", quantity);
+            }
+            bool success = transfer(seller, amount);
+            require(success, err);
+            try {
+                s.completeSale(_purchaser);
+            } catch { // Support for legacy sales
+                address(s).call("completeSale");
             }
         }
-        string err = "Your " + serviceName + " balance is not high enough to cover the purchase.";
-        uint myBalance = balance();
-        require(myBalance >= totalAmount, err);
-        purchasersAddress = msg.sender; // Support for legacy sales
-        purchasersCommonName = getCommonName(tx.origin);
-        for (uint j = 0; j < openOrders[token].sellers.length; j++) {
-            string seller = openOrders[token].sellers[j];
-            address[] saleAddresses;
-            uint[] quantities;
-            for (uint k = 0; k < openOrders[token].orderLines[seller].saleAddresses.length; k++) {
-                address saleAddress = openOrders[token].orderLines[seller].saleAddresses[k];
-                quantities.push(openOrders[token].orderLines[seller].quantities[k]);
-                saleAddresses.push(saleAddress);
-                Sale s = Sale(saleAddress);
-                Asset a = s.assetToBeSold();
-                assets.push(address(a));
-                try {
-                    s.completeSale(openOrders[token].purchaser);
-                } catch { // Support for legacy sales
-                    address(s).call("completeSale");
-                }
-                openOrders[token].orderLines[seller].saleAddresses[k] = address(0);
-                openOrders[token].orderLines[seller].quantities[k] = 0;
-            }
-            bool success = transfer(seller, openOrders[token].orderLines[seller].total);
-            emit Payment(
-                token,
-                getCommonName(openOrders[token].purchaser),
-                seller,
-                saleAddresses,
-                quantities,
-                openOrders[token].orderLines[seller].total,
-                0,
-                _unitsPerDollar(),
-                true
-            );
-            openOrders[token].orderLines[seller].saleAddresses.length = 0;
-            openOrders[token].orderLines[seller].quantities.length = 0;
-            openOrders[token].orderLines[seller].total = 0;
-            openOrders[token].sellers[j] = "";
-        }
-        openOrders[token].purchaser = address(0);
-        openOrders[token].sellers.length = 0;
+        emit Payment(
+            token,
+            _orderId,
+            _purchaser,
+            _purchasersCommonName,
+            seller,
+            _saleAddresses,
+            _quantities,
+            totalAmount,
+            0,
+            _unitsPerDollar(),
+            PaymentStatus.ORDER_COMPLETED
+        );
         purchasersAddress = address(0); // Support for legacy sales
         purchasersCommonName = "";
-
         return (token, assets);
     }
 
+    function _initializePayment (
+        string token,
+        string _orderId,
+        address _purchaser,
+        string _purchaserCommonName,
+        address[] _saleAddresses,
+        uint[] _quantities
+    ) internal override {
+        require(false, "Cannot call initializePayment for token payments.");
+    }
+
     function _completeOrder (
-        string token
+        string token,
+        string _orderId,
+        address _purchaser,
+        string _purchaserCommonName,
+        address[] _saleAddresses,
+        uint[] _quantities
     ) internal override returns (address[]) {
-        require(false, "Cannot call completeSales for STRAT payments.");
+        require(false, "Cannot call completeOrder for token payments.");
+        return [];
+    }
+
+    function _cancelOrder (
+        string token,
+        string _orderId,
+        address _purchaser,
+        string _purchaserCommonName,
+        address[] _saleAddresses,
+        uint[] _quantities
+    ) internal override {
+        require(false, "Cannot call cancelOrder for token payments.");
     }
 
     function _unitsPerDollar() internal override returns (uint) {

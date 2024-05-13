@@ -17,21 +17,12 @@ abstract contract PaymentService is Utils {
     string public imageURL;
     string public checkoutText;
 
-    struct Order {
-        address purchaser;
-        string[] sellers;
-        mapping(string => OrderLine) orderLines;
-    }
+    enum PaymentStatus { NULL, ORDER_CREATED, PAYMENT_INITIALIZED, ORDER_COMPLETED, ORDER_CANCELLED }
 
-    struct OrderLine {
-        address[] saleAddresses;
-        uint[] quantities;
-        uint total;
-    }
-    mapping (string => Order) public record openOrders;
-
-    event Payment(
+    event Payment (
         string token,
+        string orderId,
+        address purchaser,
         string purchasersCommonName,
         string sellersCommonName,
         address[] saleAddresses,
@@ -39,7 +30,7 @@ abstract contract PaymentService is Utils {
         uint amount,
         uint tax,
         uint unitsPerDollar,
-        bool success
+        PaymentStatus status
     );
 
     address public purchasersAddress;   // ONLY USED FOR BACKWARDS COMPATIBILITY WITH SALE. DELETE ONCE ALL SALES USE NEW LOGIC!!!
@@ -72,15 +63,6 @@ abstract contract PaymentService is Utils {
         _;
     }
 
-    modifier requirePurchaserOrOwner(string token, string action) {
-        string err = "Only the purchaser or owner can "
-                   + action
-                   + ".";
-        string commonName = getCommonName(msg.sender);
-        require(commonName == ownerCommonName || commonName == getCommonName(openOrders[token].purchaser), err);
-        _;
-    }
-
     modifier requireActive(string action) {
         string err = "The payment service must be active to "
                    + action
@@ -98,144 +80,272 @@ abstract contract PaymentService is Utils {
         isActive = false;
     }
 
+    function getToken (
+        string _orderId,
+        string _purchasersCommonName,
+        address[] _saleAddresses,
+        uint[] _quantities
+    ) internal returns (string) {
+        string salesString = "[";
+        string quantitiesString = "[";
+        for (uint i=0; i < _saleAddresses.length; i++) {
+            if (i > 0) {
+                salesString += ",";
+                quantitiesString += ",";
+            }
+            salesString += string(_saleAddresses[i]);
+            quantitiesString += string(_quantities[i]);
+        }
+        salesString += "]";
+        quantitiesString += "]";
+        string token = keccak256(
+            string(this),
+            _purchasersCommonName,
+            _orderId,
+            salesString,
+            quantitiesString
+        );
+        return token;
+    }
+
     function createOrder (
+        string _orderId,
         address[] _saleAddresses,
         uint[] _quantities
     ) requireActive("create order") external returns (string, address[]) {
         require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
-        string token = keccak256(string(this), string(msg.sender), string(block.timestamp));
-        return _createOrder(_saleAddresses, _quantities, token);
+        string _purchasersCommonName = getCommonName(msg.sender);
+        string token = getToken(_orderId, _purchasersCommonName, _saleAddresses, _quantities);
+        return _createOrder(
+            token,
+            _orderId,
+            msg.sender,
+            _purchasersCommonName,
+            _saleAddresses,
+            _quantities
+        );
     }
 
     function _createOrder (
+        string token,
+        string _orderId,
+        address _purchaser,
+        string _purchasersCommonName,
         address[] _saleAddresses,
-        uint[] _quantities,
-        string token
+        uint[] _quantities
     ) internal virtual returns (string, address[]) {
-        openOrders[token].purchaser = msg.sender;
         address[] assets;
+        uint totalAmount = 0;
+        string seller;
         for (uint i = 0; i < _saleAddresses.length; i++) {
             Sale s = Sale(_saleAddresses[i]);
             Asset a = s.assetToBeSold();
             assets.push(address(a));
-            string seller = getCommonName(a.owner());
-            uint quantity = _quantities[i];
-            openOrders[token].orderLines[seller].saleAddresses.push(_saleAddresses[i]);
-            openOrders[token].orderLines[seller].quantities.push(quantity);
             uint amount = s.price();
-            if (openOrders[token].orderLines[seller].total == 0) {
-                openOrders[token].sellers.push(seller);
-            }
-            openOrders[token].orderLines[seller].total += amount;
+            totalAmount += amount;
+            seller = getCommonName(a.owner());
+            uint quantity = _quantities[i];
             try {
-                Sale(_saleAddresses[i]).lockQuantity(quantity, msg.sender);
+                s.lockQuantity(quantity, _purchaser);
             } catch { // Support for legacy sales
                 _saleAddresses[i].call("lockQuantity", quantity);
             }
         }
+        emit Payment(
+            token,
+            _orderId,
+            _purchaser,
+            _purchasersCommonName,
+            seller,
+            _saleAddresses,
+            _quantities,
+            totalAmount,
+            0,
+            _unitsPerDollar(),
+            PaymentStatus.ORDER_CREATED
+        );
         return (token, assets);
     }
 
+    function initializePayment (
+        string _token,
+        string _orderId,
+        address _purchaser,
+        address[] _saleAddresses,
+        uint[] _quantities
+    ) requireActive("initialize payment") requireOwner("initialize payment") external {
+        require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
+        string _purchasersCommonName = getCommonName(_purchaser);
+        string token = getToken(_orderId, _purchasersCommonName, _saleAddresses, _quantities);
+        require(token == _token, "Invalid order data");
+        return _initializePayment(
+            _token,
+            _orderId,
+            _purchaser,
+            _purchasersCommonName,
+            _saleAddresses,
+            _quantities
+        );
+    }
+
+    function _initializePayment (
+        string token,
+        string _orderId,
+        address _purchaser,
+        string _purchasersCommonName,
+        address[] _saleAddresses,
+        uint[] _quantities
+    ) internal virtual {
+        uint totalAmount = 0;
+        address[] assets;
+        string seller;
+        for (uint i = 0; i < _saleAddresses.length; i++) {
+            Sale s = Sale(_saleAddresses[i]);
+            Asset a = s.assetToBeSold();
+            assets.push(address(a));
+            seller = getCommonName(a.owner());
+            totalAmount += s.price();
+            try {
+                s.unlockQuantity(_purchaser);
+            } catch { // Support for legacy sales
+                address(s).call("unlockQuantity");
+            }
+        }
+        emit Payment(
+            token,
+            _orderId,
+            _purchaser,
+            _purchasersCommonName,
+            seller,
+            _saleAddresses,
+            _quantities,
+            totalAmount,
+            0,
+            _unitsPerDollar(),
+            PaymentStatus.PAYMENT_INITIALIZED
+        );
+    }
+
     function completeOrder (
-        string _token
+        string _token,
+        string _orderId,
+        address _purchaser,
+        address[] _saleAddresses,
+        uint[] _quantities
     ) requireActive("complete order") requireOwner("complete order") external returns (address[]) {
-        return _completeOrder(_token);
+        require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
+        string _purchasersCommonName = getCommonName(_purchaser);
+        string token = getToken(_orderId, _purchasersCommonName, _saleAddresses, _quantities);
+        require(token == _token, "Invalid order data");
+        return _completeOrder(
+            _token,
+            _orderId,
+            _purchaser,
+            _purchasersCommonName,
+            _saleAddresses,
+            _quantities
+        );
     }
 
     function _completeOrder (
-        string token
+        string token,
+        string _orderId,
+        address _purchaser,
+        string _purchasersCommonName,
+        address[] _saleAddresses,
+        uint[] _quantities
     ) internal virtual returns (address[]) {
-        require(openOrders[token].purchaser != address(0), "Invalid order token: " + token);
-        purchasersAddress = openOrders[token].purchaser; // Support for legacy sales
-        purchasersCommonName = getCommonName(tx.origin);
+        uint totalAmount = 0;
         address[] assets;
-        for (uint i = 0; i < openOrders[token].sellers.length; i++) {
-            string seller = openOrders[token].sellers[i];
-            address[] saleAddresses;
-            uint[] quantities;
-            for (uint j = 0; j < openOrders[token].orderLines[seller].saleAddresses.length; j++) {
-                address saleAddress = openOrders[token].orderLines[seller].saleAddresses[j];
-                saleAddresses.push(saleAddress);
-                quantities.push(openOrders[token].orderLines[seller].quantities[j]);
-                Sale s = Sale(saleAddress);
-                Asset a = s.assetToBeSold();
-                assets.push(address(a));
-                try {
-                    s.completeSale(openOrders[token].purchaser);
-                } catch { // Support for legacy sales
-                    address(s).call("completeSale");
-                }
-                openOrders[token].orderLines[seller].saleAddresses[j] = address(0);
-                openOrders[token].orderLines[seller].quantities[j] = 0;
+        string seller;
+        for (uint i = 0; i < _saleAddresses.length; i++) {
+            Sale s = Sale(_saleAddresses[i]);
+            Asset a = s.assetToBeSold();
+            assets.push(address(a));
+            seller = getCommonName(a.owner());
+            totalAmount += s.price();
+            try {
+                s.unlockQuantity(_purchaser);
+            } catch { // Support for legacy sales
+                address(s).call("unlockQuantity");
             }
-            emit Payment(
-                token,
-                getCommonName(openOrders[token].purchaser),
-                seller,
-                saleAddresses,
-                quantities,
-                openOrders[token].orderLines[seller].total,
-                0,
-                _unitsPerDollar(),
-                true
-            );
-            openOrders[token].orderLines[seller].saleAddresses.length = 0;
-            openOrders[token].orderLines[seller].quantities.length = 0;
-            openOrders[token].orderLines[seller].total = 0;
-            openOrders[token].sellers[i] = "";
         }
-        openOrders[token].purchaser = address(0);
-        openOrders[token].sellers.length = 0;
-        purchasersAddress = address(0); // Support for legacy sales
-        purchasersCommonName = "";
+        emit Payment(
+            token,
+            _orderId,
+            _purchaser,
+            _purchasersCommonName,
+            seller,
+            _saleAddresses,
+            _quantities,
+            totalAmount,
+            0,
+            _unitsPerDollar(),
+            PaymentStatus.ORDER_COMPLETED
+        );
         return assets;
     }
 
     function cancelOrder (
-        string _token
-    ) requireActive("cancel order") requirePurchaserOrOwner(_token, "cancel order") external {
-        return _cancelOrder(_token);
+        string _token,
+        string _orderId,
+        address _purchaser,
+        address[] _saleAddresses,
+        uint[] _quantities
+    ) requireActive("cancel order") external {
+        require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
+        string _purchasersCommonName = getCommonName(_purchaser);
+        string token = getToken(_orderId, _purchasersCommonName, _saleAddresses, _quantities);
+        require(token == _token, "Invalid order data");
+        string err = "Only the purchaser or owner can cancel the order.";
+        string commonName = getCommonName(msg.sender);
+        require(commonName == ownerCommonName || commonName == _purchasersCommonName, err);
+        return _cancelOrder(
+            _token,
+            _orderId,
+            _purchaser,
+            _purchasersCommonName,
+            _saleAddresses,
+            _quantities
+        );
     }
 
     function _cancelOrder (
-        string token
+        string token,
+        string _orderId,
+        address _purchaser,
+        string _purchasersCommonName,
+        address[] _saleAddresses,
+        uint[] _quantities
     ) internal virtual {
-        require(openOrders[token].purchaser != address(0), "Invalid order token: " + token);
-        for (uint i = 0; i < openOrders[token].sellers.length; i++) {
-            string seller = openOrders[token].sellers[i];
-            address[] saleAddresses;
-            uint[] quantities;
-            for (uint j = 0; j < openOrders[token].orderLines[seller].saleAddresses.length; j++) {
-                address saleAddress = openOrders[token].orderLines[seller].saleAddresses[j];
-                saleAddresses.push(saleAddress);
-                quantities.push(openOrders[token].orderLines[seller].quantities[j]);
-                Sale s = Sale(saleAddress);
-                try {
-                    s.unlockQuantity(openOrders[token].purchaser);
-                } catch { // Support for legacy sales
-                    address(s).call("unlockQuantity");
-                }
-                openOrders[token].orderLines[seller].saleAddresses[j] = address(0);
-                openOrders[token].orderLines[seller].quantities[j] = 0;
+        uint totalAmount = 0;
+        string seller;
+        address[] assets;
+        for (uint i = 0; i < _saleAddresses.length; i++) {
+            Sale s = Sale(_saleAddresses[i]);
+            totalAmount += s.price();
+            Asset a = s.assetToBeSold();
+            assets.push(address(a));
+            seller = getCommonName(a.owner());
+            try {
+                s.unlockQuantity(_purchaser);
+            } catch { // Support for legacy sales
+                address(s).call("unlockQuantity");
             }
-            emit Payment(
-                token,
-                getCommonName(openOrders[token].purchaser),
-                seller,
-                saleAddresses,
-                quantities,
-                openOrders[token].orderLines[seller].total,
-                0,
-                _unitsPerDollar(),
-                false
-            );
-            openOrders[token].orderLines[seller].saleAddresses.length = 0;
-            openOrders[token].orderLines[seller].quantities.length = 0;
-            openOrders[token].orderLines[seller].total = 0;
-            openOrders[token].sellers[i] = "";
         }
-        openOrders[token].purchaser = address(0);
-        openOrders[token].sellers.length = 0;
+        emit Payment(
+            token,
+            _orderId,
+            _purchaser,
+            _purchasersCommonName,
+            seller,
+            _saleAddresses,
+            _quantities,
+            totalAmount,
+            0,
+            _unitsPerDollar(),
+            PaymentStatus.ORDER_CANCELLED
+        );
     }
 
     function _unitsPerDollar() internal virtual returns (uint) {
