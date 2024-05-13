@@ -45,14 +45,12 @@ Cypress.Commands.add("login", (username, password) => {
   let un = username ? username : Cypress.env("email");
   let pwd = password ? password : Cypress.env("password")
 
-  cy.origin(Cypress.env("login_url"), { args: { un, pwd } }, ({ un, pwd }) => {
     cy.get("input[name=username]").type(
       un
     );
     cy.get("input[name=password]").type(pwd);
     cy.get("form").submit();
   });
-});
 
 Cypress.Commands.add("loginAsSeller", () => {
   cy.origin(Cypress.env("login_url"), () => {

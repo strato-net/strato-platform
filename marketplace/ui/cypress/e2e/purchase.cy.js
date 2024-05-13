@@ -80,8 +80,8 @@ describe('Create a new Asset', () => {
     // Purchase a product
     cy.get("#viewAll").click();
     cy.get("#product-list");
-    cy.get(`#asset-${productName}`)
-    cy.get(`#asset-${productName}`).click()
+    cy.get(`#asset-${productName}`);
+    cy.get(`#asset-${productName}`).click();
     cy.get('#price').invoke('text').then(productPrice => {
       const Price = productPrice.trim().replace('$', '').replace(' ', '');
       expect(Price).to.equal(`${amount}`);
@@ -100,7 +100,8 @@ describe('Create a new Asset', () => {
     cy.get('input[name=cardCvc]').type('007').should('have.value', '007');
     cy.get('input[name=billingName]').type(userName).should('have.value', userName);
     cy.get('#country-fieldset').click();
-    cy.get('select option[value="IN"]').should('be.selected');
+    cy.get('select option[value="US"]').should('be.selected');
+    cy.get('#billingPostalCode').click().type('323210'); 
     cy.get('button[type="submit"]').click();
     cy.wait(10000);
 
@@ -113,7 +114,8 @@ describe('Create a new Asset', () => {
 
     cy.get(".ant-table-tbody").then(order => {
       cy.get(".ant-table-row").first().within(() => {
-        cy.get(".ant-table-cell").first().click()
+      cy.get(".ant-table-cell").last().should('have.text','Closed');
+        cy.get(".ant-table-cell").first().click();
       });
     });
 
@@ -135,3 +137,4 @@ describe('Create a new Asset', () => {
   });
 
 });
+
