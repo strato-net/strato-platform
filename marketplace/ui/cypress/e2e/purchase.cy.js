@@ -1,5 +1,6 @@
 import dayjs from "dayjs";
-
+// import { apiUrl } from "../../src/helpers/constants";
+const apiUrl = 'http:/localhost:3000'
 describe('Create a new Asset', () => {
   const min = 10;
   const max = 99;
@@ -9,13 +10,21 @@ describe('Create a new Asset', () => {
   const artistName = `Artist-${dayjs().unix()}`;
   const cardNo = '4000 0035 6000 0008'
 
-  
   it('It should add a new product', () => {
     // logged in as a seller
     cy.visit('/');
     cy.get("#Login").click();
     cy.login(Cypress.env("sellerEmail"), Cypress.env("sellerPassword"))
     cy.wait(10000)
+    //  API-CAll
+    cy.request({
+      url: `/api/v1/users/me`,
+      method: 'GET',
+      credentials: 'same-origin'
+    }).then((response) => {
+      expect(response.status).to.eq(200);
+      cy.wrap(response.body.data.commonName).as('sellerName');
+    });
 
     // Create an item
     cy.get('#avatar')
@@ -29,8 +38,11 @@ describe('Create a new Asset', () => {
       cy.wrap($elements.eq(1))
       cy.wrap($elements.eq(1)).click();
     });
-
+    
     cy.wait(5000)
+    cy.get('@sellerName').then((name) => {
+      console.log("seller-Name", name);
+    });
     cy.get('[title="Art"]').should('have.attr', 'title', 'Art').first()
     cy.get('[title="Art"]').should('have.attr', 'title', 'Art').first().click();
 
@@ -53,8 +65,7 @@ describe('Create a new Asset', () => {
     cy.get("#createItemSubmit")
     cy.get("#createItemSubmit").click()
     cy.wait(7000)
-    
-    
+
     // List for sale
     cy.url().should("exist", "myitems");
     cy.get(`#asset-${productName}`)
@@ -75,7 +86,16 @@ describe('Create a new Asset', () => {
     cy.get("#Login").click();
     cy.login();
 
-    cy.wait(3000)
+    cy.wait(6000)
+
+    cy.request({
+      url: `/api/v1/users/me`,
+      method: 'GET',
+      credentials: 'same-origin'
+    }).then((response) => {
+      expect(response.status).to.eq(200);
+      cy.wrap(response.body.data.commonName).as('buyerName');
+    });
 
     // Purchase a product
     cy.get("#viewAll").click();
@@ -101,7 +121,12 @@ describe('Create a new Asset', () => {
     cy.get('#country-fieldset').click();
     cy.get("#billingCountry").select('US');
     cy.get('select option[value="US"]').should('be.selected');
-    cy.get('#billingPostalCode').click().type('323210'); 
+    cy.get('#billingPostalCode').click().type('323210');
+    cy.get('body').then($body => {
+      if ($body.find('#phoneNumber').length) {
+        cy.get('#enableStripePass').click();
+      }
+    });
     cy.get('button[type="submit"]').click();
     cy.wait(10000);
 
@@ -114,14 +139,21 @@ describe('Create a new Asset', () => {
 
     cy.get(".ant-table-tbody").then(order => {
       cy.get(".ant-table-row").first().within(() => {
-      cy.get(".ant-table-cell").last().should('have.text','Closed');
+        cy.get(".ant-table-cell").last().should('have.text', 'Closed');
         cy.get(".ant-table-cell").first().click();
       });
     });
 
     cy.wait(10000);
-    cy.get("#Buyer").should('have.text', Cypress.env("email"));
-    cy.get("#Seller").should('have.text', Cypress.env("sellerEmail"));
+    cy.get('@sellerName').then((sName) => {
+      cy.get('@buyerName').then((bName) => {
+        cy.get("#Buyer").should('have.text', bName);
+        cy.get("#Seller").should('have.text', sName);
+      });
+    });
+
+    // cy.get("#Buyer").should('have.text', buyerName);
+    // cy.get("#Seller").should('have.text', sellerName);
 
     cy.get(".ant-table-tbody").then(order => {
       cy.get(".ant-table-row").first().within(() => {
@@ -137,4 +169,3 @@ describe('Create a new Asset', () => {
   });
 
 });
-
