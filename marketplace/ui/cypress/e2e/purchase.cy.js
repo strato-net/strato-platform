@@ -1,6 +1,5 @@
 import dayjs from "dayjs";
-// import { apiUrl } from "../../src/helpers/constants";
-const apiUrl = 'http:/localhost:3000'
+
 describe('Create a new Asset', () => {
   const min = 10;
   const max = 99;
