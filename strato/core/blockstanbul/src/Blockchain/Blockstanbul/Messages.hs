@@ -98,6 +98,7 @@ makeLenses ''WireMessage
 
 -- TODO: Allow changing blockstanbul admins without a restart
 data ForcedConfigChange = ForcedRound RoundNumber
+                        | ForcedSequence SequenceNumber
   deriving (Eq, Show, Generic, Binary, NFData, Data)
 
 instance Format ForcedConfigChange where
