@@ -32,8 +32,9 @@ contract Spirits is Mintable, UnitOfMeasurement {
         uint _quantity,
         string _spiritType,
         UnitOfMeasurement _unitOfMeasurement,
-        AssetStatus _status
-    ) public Mintable(_name, _description, _images, _files, _createdDate, _quantity, _status) {
+        AssetStatus _status,
+        address _redemptionService
+    ) public Mintable(_name, _description, _images, _files, _createdDate, _quantity, _status, _redemptionService) {
         unitOfMeasurement = _unitOfMeasurement;
         spiritType = _spiritType;
     }
@@ -48,7 +49,8 @@ contract Spirits is Mintable, UnitOfMeasurement {
             _quantity,
             spiritType,
             unitOfMeasurement, 
-            status
+            status,
+            address(redemptionService)
         );
         return UTXO(address(newAsset));
     }

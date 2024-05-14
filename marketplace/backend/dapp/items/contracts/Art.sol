@@ -4,7 +4,7 @@ pragma strict;
 import <BASE_CODE_COLLECTION>;
 
 /// @title A representation of Art assets
-contract Art is UTXO {
+contract Art is Redeemable {
     string public artist;
 
     constructor(
@@ -14,12 +14,13 @@ contract Art is UTXO {
         string[] _files,
         uint _createdDate,
         string _artist,
-        AssetStatus _status
-    ) public UTXO(_name, _description, _images, _files, _createdDate, 1, _status) {
+        AssetStatus _status,
+        address _redemptionService
+    ) public Redeemable(_name, _description, _images, _files, _createdDate, 1, _status, _redemptionService) {
         artist = _artist;
     }
     function mint(uint splitQuantity) internal override returns (UTXO) {
-        Art a = new Art(name, description, images, files, createdDate, artist, status);
+        Art a = new Art(name, description, images, files, createdDate, artist, status, address(redemptionService));
         return UTXO(address(a)); 
     }
 }

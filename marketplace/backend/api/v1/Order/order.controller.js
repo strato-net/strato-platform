@@ -97,19 +97,6 @@ class OrderController {
     }
   }
 
-  static async getAddressFromId(req, res, next) {
-    try {
-      const { dapp, params } = req
-
-      const orders = await dapp.getAddressFromId(params)
-      rest.response.status200(res, orders)
-
-      return next()
-    } catch (e) {
-      return next(e)
-    }
-  }
-
   static async cancelSaleOrder(req, res, next) {
     try {
       const { dapp, body } = req

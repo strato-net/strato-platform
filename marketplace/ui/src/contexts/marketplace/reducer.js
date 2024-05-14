@@ -174,11 +174,6 @@ const reducer = (state, action) => {
         error: action.error,
         isAddingShippingAddress: false,
       };
-    case actionDescriptors.fetchUserAddress:
-      return {
-        ...state,
-        isLoadingUserAddress: true,
-      };
     case actionDescriptors.fetchUserAddressSuccessful:
       return {
         ...state,
