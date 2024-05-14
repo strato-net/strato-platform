@@ -19,6 +19,7 @@ so that they could be properly moved to their respective version's subsection.
 ### Added
 - POST `/transaction` allows users to create contracts by providing an address through the `codePtr` field
 - `creatorForkBlockNumber` flag added to customize at which block :creator field should start referring to the common name and not org
+- `forced-config-change` executable can now update `sequence_number` in addition to `round_number` of sequencer view
 
 ### Changed
 - Expansion of Concrete contract to Abstract contract is accomodated by Cirrus
