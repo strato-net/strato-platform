@@ -417,12 +417,12 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
               window.scrollTo(0, 0);
             }}
           >
-            <div className="md:hidden">
+            <div id='avatar' className="md:hidden">
               <Avatar
                 icon={<img src={Images.Responsive_cart} alt={IMG_META} title={IMG_META} className="w-6 h-6" />}
               />
             </div>
-            <div className="hidden md:inline-block">
+            <div id='avatar' className="hidden md:inline-block">
               <Avatar
                 icon={<img src={Images.Header_cart} alt={IMG_META} title={IMG_META} className="w-6 h-6" />}
               />
@@ -431,7 +431,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
 
           {(roleIndex !== undefined && roleIndex !== 1)
             && <Dropdown menu={{ items: stratsItem }} placement="bottomRight" trigger={["hover", "click"]} className="xs:mt-5 md:mt-0" overlayStyle={{ position: 'fixed' }}>
-              <a onClick={(e) => e.preventDefault()} className="md:flex mx-1 text-base text-white" id="user-dropdown">
+              <a onClick={(e) => e.preventDefault()} className="md:flex mx-1 text-base text-white" id="strats-dropdown">
                 <Badge
                   style={{ backgroundColor: "#13188A" }}
                   className="cursor-pointer mt-7 md:mt-0 mx-2"
