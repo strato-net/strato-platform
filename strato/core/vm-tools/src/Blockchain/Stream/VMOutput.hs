@@ -173,4 +173,4 @@ getBestKafkaBlockHelper lower upper = do
       let blocks = [b | ChainBlock b <- vmOutputs]
       case blocks of
         [] -> return Nothing
-        xs -> return . Just $ maximum (map (blockDataNumber . blockBlockData) xs)
+        xs -> return . Just $ maximum (map (number . blockBlockData) xs)

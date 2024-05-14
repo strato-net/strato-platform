@@ -329,26 +329,26 @@ blockDataRefToBlock bdr txs =
   Block
     { blockBlockData =
         BlockData
-          { blockDataParentHash = blockDataRefParentHash bdr,
-            blockDataUnclesHash = blockDataRefUnclesHash bdr,
-            blockDataCoinbase =
+          { parentHash = blockDataRefParentHash bdr,
+            ommersHash = blockDataRefUnclesHash bdr,
+            beneficiary =
               CommonName
                 (blockDataRefCoinbaseOrg bdr)
                 (blockDataRefCoinbaseOrgUnit bdr)
                 (blockDataRefCoinbaseCommonName bdr)
                 True,
-            blockDataStateRoot = blockDataRefStateRoot bdr,
-            blockDataTransactionsRoot = blockDataRefTransactionsRoot bdr,
-            blockDataReceiptsRoot = blockDataRefReceiptsRoot bdr,
-            blockDataLogBloom = blockDataRefLogBloom bdr,
-            blockDataDifficulty = blockDataRefDifficulty bdr,
-            blockDataNumber = blockDataRefNumber bdr,
-            blockDataGasLimit = blockDataRefGasLimit bdr,
-            blockDataGasUsed = blockDataRefGasUsed bdr,
-            blockDataTimestamp = blockDataRefTimestamp bdr,
-            blockDataExtraData = blockDataRefExtraData bdr,
-            blockDataNonce = blockDataRefNonce bdr,
-            blockDataMixHash = blockDataRefMixHash bdr
+            stateRoot = blockDataRefStateRoot bdr,
+            transactionsRoot = blockDataRefTransactionsRoot bdr,
+            receiptsRoot = blockDataRefReceiptsRoot bdr,
+            logsBloom = blockDataRefLogBloom bdr,
+            difficulty = blockDataRefDifficulty bdr,
+            number = blockDataRefNumber bdr,
+            gasLimit = blockDataRefGasLimit bdr,
+            gasUsed = blockDataRefGasUsed bdr,
+            timestamp = blockDataRefTimestamp bdr,
+            extraData = blockDataRefExtraData bdr,
+            nonce = blockDataRefNonce bdr,
+            mixHash = blockDataRefMixHash bdr
           },
       blockReceiptTransactions = txs,
       blockBlockUncles = []

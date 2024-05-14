@@ -364,7 +364,7 @@ sequencedBlockToBlock sb = BDB.Block (sbBlockData sb) (map otBaseTx $ sbReceiptT
 
 sequencedBlockShortName :: SequencedBlock -> String
 sequencedBlockShortName SequencedBlock {sbBlockData = d, sbHash = theHash} =
-  "Block #" ++ CL.yellow (show . blockDataNumber $ d) ++ "/" ++ CL.blue (format theHash)
+  "Block #" ++ CL.yellow (show . number $ d) ++ "/" ++ CL.blue (format theHash)
 
 wrapTransaction :: Monad m => IngestTx -> m (Maybe OutputTx)
 wrapTransaction tx@IngestTx {} = do
@@ -426,7 +426,7 @@ wrapIngestBlockTransactionUnanchored hash tx =
           }
 
 parentHashBS :: SequencedBlock -> BS.ByteString
-parentHashBS = B.toStrict . encode . blockDataParentHash . sbBlockData
+parentHashBS = B.toStrict . encode . parentHash . sbBlockData
 
 ingestBlockHash :: IngestBlock -> Keccak256
 ingestBlockHash = blockHeaderHash . ibBlockData
@@ -435,13 +435,13 @@ ingestBlockHashBS :: IngestBlock -> BS.ByteString
 ingestBlockHashBS = B.toStrict . encode . ingestBlockHash
 
 ingestBlockDifficulty :: IngestBlock -> Integer
-ingestBlockDifficulty = blockDataDifficulty . ibBlockData
+ingestBlockDifficulty = difficulty . ibBlockData
 
 blockHashBS :: SequencedBlock -> BS.ByteString
 blockHashBS = B.toStrict . encode . sbHash
 
 sequencedBlockDifficulty :: SequencedBlock -> Integer
-sequencedBlockDifficulty = blockDataDifficulty . sbBlockData
+sequencedBlockDifficulty = difficulty . sbBlockData
 
 outputBlockHash :: OutputBlock -> Keccak256
 outputBlockHash = blockHeaderHash . obBlockData
@@ -521,7 +521,7 @@ instance Format IngestBlock where
         ibReceiptTransactions = receipts,
         ibBlockUncles = uncles
       } =
-      CL.blue ("Block #" ++ show (blockDataNumber bd)) ++ " (via " ++ format origin ++ ") "
+      CL.blue ("Block #" ++ show (number bd)) ++ " (via " ++ format origin ++ ") "
         ++ tab'
           ( format (ingestBlockHash b) ++ "\n"
               ++ format bd
@@ -544,7 +544,7 @@ instance Format OutputBlock where
         obReceiptTransactions = receipts,
         obBlockUncles = uncles
       } =
-      CL.blue ("OutputBlock #" ++ show (blockDataNumber bd) ++ "; total diff " ++ show totDiff) ++ " (via " ++ format origin ++ ") "
+      CL.blue ("OutputBlock #" ++ show (number bd) ++ "; total diff " ++ show totDiff) ++ " (via " ++ format origin ++ ") "
         ++ tab'
           ( format (outputBlockHash b) ++ "\n"
               ++ format bd
@@ -617,7 +617,7 @@ instance BlockLike BlockData OutputTx OutputBlock where
   blockTransactions = obReceiptTransactions
   blockUncleHeaders = obBlockUncles
 
-  blockOrdering = blockDataNumber . obBlockData
+  blockOrdering = number . obBlockData
   buildBlock = OutputBlock TO.Morphism 0
 
 instance Arbitrary IngestEvent where

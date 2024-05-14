@@ -282,21 +282,21 @@ genesisInfoToGenesisBlock gi gn as = do
   let sourceInfo = zipSourceInfo (accounts ++ as) codes
       bData =
         BlockData
-          { blockDataParentHash = genesisInfoParentHash gi,
-            blockDataUnclesHash = genesisInfoUnclesHash gi,
-            blockDataCoinbase = genesisInfoCoinbase gi,
-            blockDataStateRoot = sr,
-            blockDataTransactionsRoot = genesisInfoTransactionRoot gi,
-            blockDataReceiptsRoot = genesisInfoReceiptsRoot gi,
-            blockDataLogBloom = genesisInfoLogBloom gi,
-            blockDataDifficulty = genesisInfoDifficulty gi,
-            blockDataNumber = genesisInfoNumber gi,
-            blockDataGasLimit = genesisInfoGasLimit gi,
-            blockDataGasUsed = genesisInfoGasUsed gi,
-            blockDataTimestamp = genesisInfoTimestamp gi,
-            blockDataExtraData = i2bs_unsized $ genesisInfoExtraData gi,
-            blockDataMixHash = genesisInfoMixHash gi,
-            blockDataNonce = genesisInfoNonce gi
+          { parentHash = genesisInfoParentHash gi,
+            ommersHash = genesisInfoUnclesHash gi,
+            beneficiary = genesisInfoCoinbase gi,
+            stateRoot = sr,
+            transactionsRoot = genesisInfoTransactionRoot gi,
+            receiptsRoot = genesisInfoReceiptsRoot gi,
+            logsBloom = genesisInfoLogBloom gi,
+            difficulty = genesisInfoDifficulty gi,
+            number = genesisInfoNumber gi,
+            gasLimit = genesisInfoGasLimit gi,
+            gasUsed = genesisInfoGasUsed gi,
+            timestamp = genesisInfoTimestamp gi,
+            extraData = i2bs_unsized $ genesisInfoExtraData gi,
+            mixHash = genesisInfoMixHash gi,
+            nonce = genesisInfoNonce gi
           }
   return
     ( sourceInfo,

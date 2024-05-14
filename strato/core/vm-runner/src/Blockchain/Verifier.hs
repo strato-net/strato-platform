@@ -41,7 +41,7 @@ nextGasLimitDelta oldGasLimit = oldGasLimit `div` 1024
 
 -- checkUnclesHash::OutputBlock->Bool
 -- checkUnclesHash OutputBlock{obBlockData=bd,obBlockUncles=bus} =
---     blockDataUnclesHash bd == hash (rlpSerialize $ RLPArray (rlpEncode <$> bus))
+--     ommersHash bd == hash (rlpSerialize $ RLPArray (rlpEncode <$> bus))
 
 --data BlockValidityError = BlockDifficultyWrong Integer Integer | BlockNumberWrong Integer Integer | BlockGasLimitWrong Integer Integer | BlockNonceWrong | BlockUnclesHashWrong
 {-
@@ -57,20 +57,20 @@ checkParentChildValidity ::
   BlockSummary ->
   m ()
 checkParentChildValidity _ OutputBlock {obBlockData = c} parentBSum = do
-  unless (blockDataNumber c == bSumNumber parentBSum + 1) $
-    fail $ "Block number is wrong: got " ++ show (blockDataNumber c) ++ ", expected " ++ show (bSumNumber parentBSum + 1)
-  unless (blockDataGasLimit c <= bSumGasLimit parentBSum + nextGasLimitDelta (bSumGasLimit parentBSum)) $
+  unless (number c == bSumNumber parentBSum + 1) $
+    fail $ "Block number is wrong: got " ++ show (number c) ++ ", expected " ++ show (bSumNumber parentBSum + 1)
+  unless (gasLimit c <= bSumGasLimit parentBSum + nextGasLimitDelta (bSumGasLimit parentBSum)) $
     fail $
-      "Block gasLimit is too high: got " ++ show (blockDataGasLimit c)
+      "Block gasLimit is too high: got " ++ show (gasLimit c)
         ++ ", should be less than "
         ++ show (bSumGasLimit parentBSum + nextGasLimitDelta (bSumGasLimit parentBSum))
-  unless (blockDataGasLimit c >= bSumGasLimit parentBSum - nextGasLimitDelta (bSumGasLimit parentBSum)) $
+  unless (gasLimit c >= bSumGasLimit parentBSum - nextGasLimitDelta (bSumGasLimit parentBSum)) $
     fail $
-      "Block gasLimit is too low: got " ++ show (blockDataGasLimit c)
+      "Block gasLimit is too low: got " ++ show (gasLimit c)
         ++ ", should be less than '"
         ++ show (bSumGasLimit parentBSum - nextGasLimitDelta (bSumGasLimit parentBSum))
-  unless (blockDataGasLimit c >= minGasLimit flags_testnet) $
-    fail $ "Block gasLimit is lower than minGasLimit: got " ++ show (blockDataGasLimit c) ++ ", should be larger than " ++ show (minGasLimit flags_testnet :: Integer)
+  unless (gasLimit c >= minGasLimit flags_testnet) $
+    fail $ "Block gasLimit is lower than minGasLimit: got " ++ show (gasLimit c) ++ ", should be larger than " ++ show (minGasLimit flags_testnet :: Integer)
   return ()
 
 -- verifier::Miner
@@ -78,15 +78,15 @@ checkParentChildValidity _ OutputBlock {obBlockData = c} parentBSum = do
 
 verifyTransactionRoot' :: OutputBlock -> (Bool, MP.StateRoot)
 verifyTransactionRoot' OutputBlock {obBlockData = bd, obReceiptTransactions = txs} =
-  let tVal = transactionsVerificationValue (otBaseTx <$> txs) in (blockDataTransactionsRoot bd == tVal, tVal)
+  let tVal = transactionsVerificationValue (otBaseTx <$> txs) in (transactionsRoot bd == tVal, tVal)
 
 verifyTransactionRoot :: HasStateDB m => OutputBlock -> m (Bool, MP.StateRoot)
 verifyTransactionRoot OutputBlock {obBlockData = bd, obReceiptTransactions = txs} = do
   sr <- MP.addAllKVs MP.emptyTriePtr $ zip [(0 :: Integer) ..] $ (otBaseTx <$> txs)
-  return (blockDataTransactionsRoot bd == sr, sr)
+  return (transactionsRoot bd == sr, sr)
 
 verifyOmmersRoot :: HasStateDB m => OutputBlock -> m Bool
-verifyOmmersRoot OutputBlock {obBlockData = bd, obBlockUncles = bu} = return $ blockDataUnclesHash bd == hash (rlpSerialize $ RLPArray $ map rlpEncode $ bu)
+verifyOmmersRoot OutputBlock {obBlockData = bd, obBlockUncles = bu} = return $ ommersHash bd == hash (rlpSerialize $ RLPArray $ map rlpEncode $ bu)
 
 checkValidity :: (MonadFail m, HasStateDB m) => Bool -> BlockSummary -> OutputBlock -> m (Maybe String)
 checkValidity isHomestead parentBSum b = do

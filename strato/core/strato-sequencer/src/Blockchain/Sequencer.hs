@@ -714,19 +714,19 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
 prettyIBlock :: IngestBlock -> String
 prettyIBlock IngestBlock {ibOrigin = o, ibBlockData = bd, ibReceiptTransactions = txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"
   where
-    blockNonce = show . blockDataNumber $ bd
+    blockNonce = show . number $ bd
     bHash = format . BDB.blockHeaderHash $ bd
 
 prettyOBlock :: OutputBlock -> String
 prettyOBlock OutputBlock {obOrigin = o, obBlockData = bd, obReceiptTransactions = txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"
   where
-    blockNonce = show . blockDataNumber $ bd
+    blockNonce = show . number $ bd
     bHash = format . BDB.blockHeaderHash $ bd
 
 prettyBlock :: SequencedBlock -> String
 prettyBlock SequencedBlock {sbOrigin = o, sbBlockData = bd, sbReceiptTransactions = txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"
   where
-    blockNonce = show . blockDataNumber $ bd
+    blockNonce = show . number $ bd
     bHash = format . blockHeaderHash $ bd
 
 prettyTx :: IngestTx -> String

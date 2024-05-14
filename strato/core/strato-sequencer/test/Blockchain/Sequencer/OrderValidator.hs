@@ -89,10 +89,10 @@ validateOrder = runValidatorM validator
 
 instance OrderValidateable SE.IngestBlock where
   getBlockHash = blockHeaderHash . SE.ibBlockData
-  getParentHash = blockDataParentHash . SE.ibBlockData
-  getBlockNumber = blockDataNumber . SE.ibBlockData
+  getParentHash = parentHash . SE.ibBlockData
+  getBlockNumber = number . SE.ibBlockData
 
 instance OrderValidateable SE.OutputBlock where
   getBlockHash = blockHeaderHash . SE.obBlockData
-  getParentHash = blockDataParentHash . SE.obBlockData
-  getBlockNumber = blockDataNumber . SE.obBlockData
+  getParentHash = parentHash . SE.obBlockData
+  getBlockNumber = number . SE.obBlockData

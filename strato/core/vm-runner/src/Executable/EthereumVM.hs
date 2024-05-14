@@ -142,7 +142,7 @@ outputBlockToEvmCheckpoint block =
       txL = length txs
       uncL = length (obBlockUncles block)
       cbbi = ContextBestBlockInfo sha header td txL uncL
-      sr = blockDataStateRoot header
+      sr = stateRoot header
    in EVMCheckpoint sha header cbbi sr
 
 logEventSummaries :: MonadLogger m => [VmEvent] -> m ()
@@ -294,7 +294,7 @@ getUnprocessedKafkaEvents offset = do
         VmBlock OutputBlock {..} ->
           fromMaybe (length obReceiptTransactions)
             . extraData2TxsLen
-            $ blockDataExtraData obBlockData
+            $ extraData obBlockData
         _ -> 1
 
       !ret' = eventLimit . countLimit $ ret

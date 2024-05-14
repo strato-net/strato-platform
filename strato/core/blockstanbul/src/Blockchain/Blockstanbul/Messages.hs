@@ -192,7 +192,7 @@ instance Format OutEvent where
   format (NewCheckpoint ckpt) = "NewCheckpoint " ++ show ckpt
 
 blkNum :: Block -> String
-blkNum = show . blockDataNumber . blockBlockData
+blkNum = show . number . blockBlockData
 
 shortFormat :: WireMessage -> String
 shortFormat (WireMessage (MsgAuth s _) (Preprepare v blk)) =

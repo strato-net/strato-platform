@@ -87,8 +87,8 @@ debugShowCtx = do
   infoLog "showctx/view" view format
   infoLog "showctx/proposer" proposer ((++ "\n") . format)
   infoLog "showctx/validators" validators (show . map ((++ "\n") . format) . S.toList . unChainMembers)
-  infoLog "showctx/mBlockNumber" proposal (show . fmap (blockDataNumber . blockBlockData))
-  infoLog "showctx/mLockedBlockNo" blockLock (show . fmap (blockDataNumber . blockBlockData))
+  infoLog "showctx/mBlockNumber" proposal (show . fmap (number . blockBlockData))
+  infoLog "showctx/mLockedBlockNo" blockLock (show . fmap (number . blockBlockData))
   infoLog "showctx/mLockedSender" lockSender (show . fmap format)
   infoLog "showctx/isValidator" isValidator show
   debugLog "showctx/prepared" prepared show

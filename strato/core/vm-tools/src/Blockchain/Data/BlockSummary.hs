@@ -34,13 +34,13 @@ data BlockSummary = BlockSummary
 blockHeaderToBSum :: BlockData -> Difficulty -> Integer -> BlockSummary
 blockHeaderToBSum b totalDiff txCount =
   BlockSummary
-    { bSumParentHash = blockDataParentHash b,
-      bSumDifficulty = blockDataDifficulty b,
+    { bSumParentHash = parentHash b,
+      bSumDifficulty = difficulty b,
       bSumTotalDifficulty = totalDiff,
-      bSumStateRoot = blockDataStateRoot b,
-      bSumGasLimit = blockDataGasLimit b,
-      bSumTimestamp = blockDataTimestamp b,
-      bSumNumber = blockDataNumber b,
+      bSumStateRoot = stateRoot b,
+      bSumGasLimit = gasLimit b,
+      bSumTimestamp = timestamp b,
+      bSumNumber = number b,
       bSumTxCount = txCount
     }
 

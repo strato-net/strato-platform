@@ -26,7 +26,8 @@ import BlockApps.X509.Certificate as XC
 import Blockchain.Blockstanbul (blockstanbulSender)
 import Blockchain.Context
 import Blockchain.Data.Block
-import Blockchain.Data.BlockData
+import Blockchain.Data.BlockData (BlockData)
+import qualified Blockchain.Data.BlockData as BlockHeader
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.ChainInfo
 import Blockchain.Data.Control (P2PCNC (..))
@@ -94,7 +95,7 @@ setTitleAndProduceBlocks blocks = do
   lastBlockHashes <- map blockHash <$> takeStack (Proxy @Block) 200
   let newBlocks = filter (not . (`elem` lastBlockHashes) . blockHash) blocks
   unless (null newBlocks) $ do
-    liftIO . setTitle $ "Block #" ++ show (maximum $ map (blockDataNumber . blockBlockData) newBlocks)
+    liftIO . setTitle $ "Block #" ++ show (maximum $ map (BlockHeader.number . blockBlockData) newBlocks)
     pushStack newBlocks
   return $ length newBlocks
 
@@ -207,7 +208,7 @@ handleEvents peer = awaitForever $ \case
     let headers = morphBlockHeader <$> bHeaders
     lift stampActionTimestamp
     -- check if blockheaders we recieved have parents.
-    let parents = map blockDataParentHash headers
+    let parents = map BlockHeader.parentHash headers
     existingParents <- lift $ lookupMany (Proxy @BlockData) parents
     let missingParents = S.fromList parents S.\\ M.keysSet existingParents
     unless (S.null missingParents) $ do
@@ -314,10 +315,10 @@ handleEvents peer = awaitForever $ \case
   MsgEvt (BlockBodies bodies) -> do
     lift stampActionTimestamp
     headers <- lift getBlockHeaders
-    let verified = and $ zipWith (\h b -> blockDataTransactionsRoot h == transactionsVerificationValue (fst b)) headers bodies
+    let verified = and $ zipWith (\h b -> BlockHeader.transactionsRoot h == transactionsVerificationValue (fst b)) headers bodies
     unless verified $ error "headers don't match bodies"
     $logInfoS "handleEvents/BlockBodies" $ T.pack $ "len headers is " ++ show (length headers) ++ ", len bodies is " ++ show (length bodies)
-    recordMaxBlockNumber "p2p_block_bodies" . maximum $ map blockDataNumber headers
+    recordMaxBlockNumber "p2p_block_bodies" . maximum $ map BlockHeader.number headers
     let blocks' = zipWith createBlockFromHeaderAndBody (morphBlockHeader <$> headers) bodies
     newCount <- lift $ setTitleAndProduceBlocks blocks'
     yieldL . ToUnseq $ IEBlock . blockToIngestBlock (Origin.PeerString $ peerString peer) <$> blocks'
@@ -376,7 +377,7 @@ handleEvents peer = awaitForever $ \case
         WorldBestBlock (BestBlock _ _ worldTDiff) <- lift $ Mod.get (Proxy @WorldBestBlock)
         $logInfoS "handleEvents/P2pBlock" . T.pack $ "World TDiff: " ++ show worldTDiff
         when (obTotalDifficulty b >= worldTDiff) $ do
-          $logInfoS "handleEvents/P2pBlock" . T.pack $ "yielding new block: " ++ show (blockDataNumber . blockBlockData . outputBlockToBlock $ b)
+          $logInfoS "handleEvents/P2pBlock" . T.pack $ "yielding new block: " ++ show (BlockHeader.number . blockBlockData . outputBlockToBlock $ b)
           yieldR $ NewBlock (outputBlockToBlock b) (obTotalDifficulty b)
     P2pTx tx -> do
       let mCid = txChainId tx
@@ -606,7 +607,7 @@ splitNeededHeaders x =
 
 splitNeededHeaders :: [BlockData] -> ([BlockData], [BlockData])
 splitNeededHeaders neededHeaders =
-  let txsLens = extraData2TxsLen <$> blockDataExtraData <$> neededHeaders
+  let txsLens = extraData2TxsLen <$> BlockHeader.extraData <$> neededHeaders
       txsLensInSums = scanl (+) (0) $ fromMaybe flags_averageTxsPerBlock <$> txsLens
       txsLensInLimit = takeWhile (< flags_maxHeadersTxsLens) $ tail txsLensInSums
    in splitAt (length txsLensInLimit) neededHeaders

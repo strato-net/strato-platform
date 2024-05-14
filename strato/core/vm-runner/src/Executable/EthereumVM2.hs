@@ -291,13 +291,13 @@ processBlockSummaries ::
   [OutputBlock] ->
   m ()
 processBlockSummaries = mapM_ $ \b -> do
-  let number = blockDataNumber $ obBlockData b
+  let number' = number $ obBlockData b
       txCount = length $ obReceiptTransactions b
-  recordMaxBlockNumber "vm_seqevents" number
+  recordMaxBlockNumber "vm_seqevents" number'
   $logDebugS "evm/processBlockSummaries" . T.pack $
     concat
       [ "Received block number ",
-        show number,
+        show number',
         " with ",
         show txCount,
         " transactions from seqEvents"

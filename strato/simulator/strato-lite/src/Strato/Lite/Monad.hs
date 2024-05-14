@@ -234,7 +234,7 @@ instance (Monad m, Mod.Accessible PublicKey m) => Mod.Accessible PublicKey (Mona
 instance MonadIO m => Stacks Block (MonadTest m) where
   takeStack _ n = take n <$> use blocks
   pushStack bs = do
-    let maxNum = maximum $ blockDataNumber . blockBlockData <$> bs
+    let maxNum = maximum $ number . blockBlockData <$> bs
     bestBlockNumber %= (\(BestBlockNumber n) -> BestBlockNumber $ max maxNum n)
     blocks %= (bs ++)
 
@@ -836,7 +836,7 @@ instance MonadIO m => (Keccak256 `A.Alters` P2P OutputBlock) (MonadTest m) where
   lookup _ _ = liftIO . throwIO $ Lookup "P2P" "Keccak256" "OutputBlock"
   delete _ _ = liftIO . throwIO $ Delete "P2P" "Keccak256" "OutputBlock"
   insert _ k (P2P v@OutputBlock {..}) = do
-    canonicalBlockDataMap . at (blockDataNumber obBlockData) ?= Canonical obBlockData
+    canonicalBlockDataMap . at (number obBlockData) ?= Canonical obBlockData
     genericTestInsert (sequencerContext . blockHashRegistry) (A.Proxy @OutputBlock) k v
 
 instance MonadIO m => Mod.Modifiable (P2P BestBlock) (MonadTest m) where

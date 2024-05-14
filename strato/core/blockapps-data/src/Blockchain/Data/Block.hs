@@ -10,7 +10,7 @@ module Blockchain.Data.Block
     WorldBestBlock (..),
     Canonical (..),
     Private (..),
-    blockDataLens,
+    blockHeaderLens,
     extraLens,
     setBlockNo,
     nextDifficulty,
@@ -46,17 +46,17 @@ data Block = Block
   }
   deriving (Eq, Read, Show, Generic, Binary, NFData, Data)
 
-makeLensesFor [("blockBlockData", "blockDataLens")] ''Block
+makeLensesFor [("blockBlockData", "blockHeaderLens")] ''Block
 
 extraLens :: Lens' Block BS.ByteString
-extraLens = blockDataLens . extraDataLens
+extraLens = blockHeaderLens . extraDataLens
 
 setBlockNo :: Integer -> Block -> Block
-setBlockNo n blk = blk {blockBlockData = (blockBlockData blk) {blockDataNumber = n}}
+setBlockNo n blk = blk {blockBlockData = (blockBlockData blk) {number = n}}
 
 instance Format Block where
   format b@Block {blockBlockData = bd, blockReceiptTransactions = receipts, blockBlockUncles = uncles} =
-    CL.blue ("Block #" ++ show (blockDataNumber bd)) ++ " "
+    CL.blue ("Block #" ++ show (number bd)) ++ " "
       ++ tab'
         ( format (blockHash b) ++ "\n"
             ++ format bd

@@ -29,12 +29,12 @@ $(makeLensesBy (\n -> Just ("_" ++ n)) ''Block)
 makeGenesisBlock :: IO BlockData
 makeGenesisBlock = do
   startBlock <-
-    ( (over _blockDataParentHash (const . unsafeCreateKeccak256FromWord256 $ 0))
-        --                   . (over _blockDataUnclesHash (const (ommersVerificationValue [])))
-        . (over _blockDataNumber (const 0))
-        . (over _blockDataGasUsed (const 0))
-        . (over _blockDataNonce (const 42)) -- this is ethereum spec!
-        --                   . (over _blockDataReceiptTransactions (const []))
+    ( (over _parentHash (const . unsafeCreateKeccak256FromWord256 $ 0))
+        --                   . (over _ommersHash (const (ommersVerificationValue [])))
+        . (over _number (const 0))
+        . (over _gasUsed (const 0))
+        . (over _nonce (const 42)) -- this is ethereum spec!
+        --                   . (over _receiptTransactions (const []))
         --                   . (over _blockDataUncles              (const []))
       )
       <$> generate arbitrary
@@ -48,26 +48,26 @@ buildChain seed depth maxSiblings = do
 makeNextBlock :: BlockData -> IO BlockData
 makeNextBlock block = do
   let parent = blockHeaderHash block
-      nextNumber = (blockDataNumber block) + 1
+      nextNumber = (number block) + 1
   diff <- return 1 --((blockDataDifficulty block) +) <$> (generate $ choose (1,1000))
   child <- generate arbitrary :: IO BlockData
   return $
-    ( (over _blockDataParentHash (const parent))
-        . (over _blockDataDifficulty (const diff))
-        . (over _blockDataNumber (const nextNumber))
+    ( (over _parentHash (const parent))
+        . (over _difficulty (const diff))
+        . (over _number (const nextNumber))
     )
       child
 
 makeNextBlockIncorrectly :: BlockData -> IO BlockData
 makeNextBlockIncorrectly block = do
   let parent = blockHeaderHash block
-      nextNumber = (blockDataNumber block) + 2
-  diff <- ((blockDataDifficulty block) +) <$> (generate $ choose (1, 1000))
+      nextNumber = (number block) + 2
+  diff <- ((difficulty block) +) <$> (generate $ choose (1, 1000))
   child <- generate arbitrary :: IO BlockData
   return $
-    ( (over _blockDataParentHash (const parent))
-        . (over _blockDataDifficulty (const diff))
-        . (over _blockDataNumber (const nextNumber))
+    ( (over _parentHash (const parent))
+        . (over _difficulty (const diff))
+        . (over _number (const nextNumber))
     )
       child
 
@@ -92,8 +92,8 @@ createChain = flip extendChain []
 
 validateLink :: BlockData -> BlockData -> Bool
 validateLink parent child =
-  ((blockHeaderHash parent) == (blockDataParentHash child))
-    && (((blockDataNumber parent) + 1) == (blockDataNumber child))
+  ((blockHeaderHash parent) == (parentHash child))
+    && (((number parent) + 1) == (number child))
 
 validateChain :: [BlockData] -> Bool
 validateChain [] = True
@@ -110,13 +110,13 @@ buildY _ _ n | n < 2 = error "fewer than 2 siblings make no sense"
 buildY seed depth maxSiblings = do
   let spread = if depth == 1 then maxSiblings else 1
   nextDifficulty' <- return 1 --((blockDataDifficulty seed) +) <$> (generate $ choose (1, 1000))
-  nextNumber <- return $ (blockDataNumber seed) + 1
+  nextNumber <- return $ (number seed) + 1
   siblings <- generate $ vectorOf spread arbitrary :: IO [BlockData]
   withUpdates <-
     return $
-      ( (over _blockDataParentHash (const . blockHeaderHash $ seed))
-          . (over _blockDataDifficulty (const nextDifficulty'))
-          . (over _blockDataNumber (const nextNumber))
+      ( (over _parentHash (const . blockHeaderHash $ seed))
+          . (over _difficulty (const nextDifficulty'))
+          . (over _number (const nextNumber))
       )
         <$> siblings
   expanded <- forM withUpdates $ \sibling -> do
@@ -130,13 +130,13 @@ buildTree _ _ n | n < 2 = error "fewer than 2 siblings make no sense"
 buildTree seed depth maxSiblings = do
   siblingCount <- generate $ invDist maxSiblings
   nextDifficulty' <- return 1 --((blockDataDifficulty seed) +) <$> (generate $ choose (1, 1000))
-  nextNumber <- return $ (blockDataNumber seed) + 1
+  nextNumber <- return $ (number seed) + 1
   siblings <- generate $ vectorOf siblingCount arbitrary :: IO [BlockData]
   withUpdates <-
     return $
-      ( (over _blockDataParentHash (const . blockHeaderHash $ seed))
-          . (over _blockDataDifficulty (const nextDifficulty'))
-          . (over _blockDataNumber (const nextNumber))
+      ( (over _parentHash (const . blockHeaderHash $ seed))
+          . (over _difficulty (const nextDifficulty'))
+          . (over _number (const nextNumber))
       )
         <$> siblings
   expanded <- forM (zip withUpdates ([1 ..] :: [Int])) $ \(sibling, i) -> do
@@ -192,14 +192,14 @@ stem' l (c : cs)
   | l == c = [l]
   | otherwise = l : (stem' parent (c : cs))
   where
-    hsh = blockDataParentHash l
+    hsh = parentHash l
     parent = fromMaybe l (find (\b -> blockHeaderHash b == hsh) (c : cs))
 
 showTree :: (Show a) => Tree a -> String
 showTree = drawTree . prettyTree
 
 prettyTree' :: Tree BlockData -> Tree String
-prettyTree' tree = prettyTree $ (\x -> (blockDataNumber x, showHash . blockHeaderHash $ x)) <$> tree
+prettyTree' tree = prettyTree $ (\x -> (number x, showHash . blockHeaderHash $ x)) <$> tree
 
 showHash :: Keccak256 -> String
 showHash = take 8 . keccak256ToHex

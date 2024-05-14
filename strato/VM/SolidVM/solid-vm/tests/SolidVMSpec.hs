@@ -263,21 +263,21 @@ generateGBlock gi = do
   sr <- A.lookupWithDefault (Proxy @StateRoot) (Nothing :: Maybe Word256)
   let bData =
         BlockData
-          { blockDataParentHash = genesisInfoParentHash gi,
-            blockDataUnclesHash = genesisInfoUnclesHash gi,
-            blockDataCoinbase = genesisInfoCoinbase gi,
-            blockDataStateRoot = sr,
-            blockDataTransactionsRoot = genesisInfoTransactionRoot gi,
-            blockDataReceiptsRoot = genesisInfoReceiptsRoot gi,
-            blockDataLogBloom = genesisInfoLogBloom gi,
-            blockDataDifficulty = genesisInfoDifficulty gi,
-            blockDataNumber = genesisInfoNumber gi,
-            blockDataGasLimit = genesisInfoGasLimit gi,
-            blockDataGasUsed = genesisInfoGasUsed gi,
-            blockDataTimestamp = genesisInfoTimestamp gi,
-            blockDataExtraData = i2bs_unsized $ genesisInfoExtraData gi,
-            blockDataMixHash = genesisInfoMixHash gi,
-            blockDataNonce = genesisInfoNonce gi
+          { parentHash = genesisInfoParentHash gi,
+            ommersHash = genesisInfoUnclesHash gi,
+            beneficiary = genesisInfoCoinbase gi,
+            stateRoot = sr,
+            transactionsRoot = genesisInfoTransactionRoot gi,
+            receiptsRoot = genesisInfoReceiptsRoot gi,
+            logsBloom = genesisInfoLogBloom gi,
+            difficulty = genesisInfoDifficulty gi,
+            number = genesisInfoNumber gi,
+            gasLimit = genesisInfoGasLimit gi,
+            gasUsed = genesisInfoGasUsed gi,
+            timestamp = genesisInfoTimestamp gi,
+            extraData = i2bs_unsized $ genesisInfoExtraData gi,
+            mixHash = genesisInfoMixHash gi,
+            nonce = genesisInfoNonce gi
           }
   return
     ( Block
@@ -321,10 +321,10 @@ runTestWithTimeout timeout f = do
 
       (blockCreated, outputBlock) <- generateGBlock gi'
       MP.initializeBlank
-      setStateDBStateRoot Nothing $ blockDataStateRoot $ blockBlockData $ blockCreated
+      setStateDBStateRoot Nothing $ stateRoot $ blockBlockData $ blockCreated
       writeBlockSummary outputBlock
       let genHash = rlpHash $ (blockCreated)
-      bhr <- bootstrapChainDB genHash [(Nothing, (blockDataStateRoot $ blockBlockData $ blockCreated))]
+      bhr <- bootstrapChainDB genHash [(Nothing, (stateRoot $ blockBlockData $ blockCreated))]
       putContextBestBlockInfo $ ContextBestBlockInfo genHash (blockBlockData $ blockCreated) 0 0 0
       Mod.put (Mod.Proxy @BlockHashRoot) $ bhr
       processNewBestBlock genHash (blockBlockData $ blockCreated) [] -- bootstrap Bagger with genesis block
@@ -382,21 +382,21 @@ runArgsWithSenderBeef acc args bs = do
       suicides = error "TODO: suicides"
       blockData =
         BlockData
-          { blockDataParentHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataCoinbase = emptyChainMember,
-            blockDataStateRoot = "",
-            blockDataTransactionsRoot = "",
-            blockDataReceiptsRoot = "",
-            blockDataLogBloom = "",
-            blockDataDifficulty = 900,
-            blockDataNumber = 8033,
-            blockDataGasLimit = 1000000,
-            blockDataGasUsed = 10000,
-            blockDataExtraData = "",
-            blockDataNonce = 22,
-            blockDataMixHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataTimestamp = posixSecondsToUTCTime 0x4000
+          { parentHash = unsafeCreateKeccak256FromWord256 0x0,
+            ommersHash = unsafeCreateKeccak256FromWord256 0x0,
+            beneficiary = emptyChainMember,
+            stateRoot = "",
+            transactionsRoot = "",
+            receiptsRoot = "",
+            logsBloom = "",
+            difficulty = 900,
+            number = 8033,
+            gasLimit = 1000000,
+            gasUsed = 10000,
+            extraData = "",
+            nonce = 22,
+            mixHash = unsafeCreateKeccak256FromWord256 0x0,
+            timestamp = posixSecondsToUTCTime 0x4000
           }
       callDepth = 0
       value = error "TODO: value"
@@ -436,21 +436,21 @@ runArgsWithSender acc args bs = do
       suicides = error "TODO: suicides"
       blockData =
         BlockData
-          { blockDataParentHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataCoinbase = emptyChainMember,
-            blockDataStateRoot = "",
-            blockDataTransactionsRoot = "",
-            blockDataReceiptsRoot = "",
-            blockDataLogBloom = "",
-            blockDataDifficulty = 900,
-            blockDataNumber = 8033,
-            blockDataGasLimit = 1000000,
-            blockDataGasUsed = 10000,
-            blockDataExtraData = "",
-            blockDataNonce = 22,
-            blockDataMixHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataTimestamp = posixSecondsToUTCTime 0x4000
+          { parentHash = unsafeCreateKeccak256FromWord256 0x0,
+            ommersHash = unsafeCreateKeccak256FromWord256 0x0,
+            beneficiary = emptyChainMember,
+            stateRoot = "",
+            transactionsRoot = "",
+            receiptsRoot = "",
+            logsBloom = "",
+            difficulty = 900,
+            number = 8033,
+            gasLimit = 1000000,
+            gasUsed = 10000,
+            extraData = "",
+            nonce = 22,
+            mixHash = unsafeCreateKeccak256FromWord256 0x0,
+            timestamp = posixSecondsToUTCTime 0x4000
           }
       callDepth = 0
       value = error "TODO: value"
@@ -491,21 +491,21 @@ runArgsWithOrigin orig acc args bs = do
       suicides = error "TODO: suicides"
       blockData =
         BlockData
-          { blockDataParentHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataCoinbase = emptyChainMember,
-            blockDataStateRoot = "",
-            blockDataTransactionsRoot = "",
-            blockDataReceiptsRoot = "",
-            blockDataLogBloom = "",
-            blockDataDifficulty = 900,
-            blockDataNumber = 8033,
-            blockDataGasLimit = 1000000,
-            blockDataGasUsed = 10000,
-            blockDataExtraData = "",
-            blockDataNonce = 22,
-            blockDataMixHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataTimestamp = posixSecondsToUTCTime 0x4000
+          { parentHash = unsafeCreateKeccak256FromWord256 0x0,
+            ommersHash = unsafeCreateKeccak256FromWord256 0x0,
+            beneficiary = emptyChainMember,
+            stateRoot = "",
+            transactionsRoot = "",
+            receiptsRoot = "",
+            logsBloom = "",
+            difficulty = 900,
+            number = 8033,
+            gasLimit = 1000000,
+            gasUsed = 10000,
+            extraData = "",
+            nonce = 22,
+            mixHash = unsafeCreateKeccak256FromWord256 0x0,
+            timestamp = posixSecondsToUTCTime 0x4000
           }
       callDepth = 0
       value = error "TODO: value"
@@ -611,21 +611,21 @@ runCall funcName callArgs bs = do
       suicides = error "TODO: suicides"
       blockData =
         BlockData
-          { blockDataParentHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataCoinbase = emptyChainMember,
-            blockDataStateRoot = "",
-            blockDataTransactionsRoot = "",
-            blockDataReceiptsRoot = "",
-            blockDataLogBloom = "",
-            blockDataDifficulty = 900,
-            blockDataNumber = 8033,
-            blockDataGasLimit = 1000000,
-            blockDataGasUsed = 10000,
-            blockDataExtraData = "",
-            blockDataNonce = 22,
-            blockDataMixHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataTimestamp = posixSecondsToUTCTime 0x4000
+          { parentHash = unsafeCreateKeccak256FromWord256 0x0,
+            ommersHash = unsafeCreateKeccak256FromWord256 0x0,
+            beneficiary = emptyChainMember,
+            stateRoot = "",
+            transactionsRoot = "",
+            receiptsRoot = "",
+            logsBloom = "",
+            difficulty = 900,
+            number = 8033,
+            gasLimit = 1000000,
+            gasUsed = 10000,
+            extraData = "",
+            nonce = 22,
+            mixHash = unsafeCreateKeccak256FromWord256 0x0,
+            timestamp = posixSecondsToUTCTime 0x4000
           }
       callDepth = 0
       value = error "TODO: value"
@@ -695,21 +695,21 @@ runCall' funcName callArgs bs = do
       suicides = error "TODO: suicides"
       blockData =
         BlockData
-          { blockDataParentHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataCoinbase = emptyChainMember,
-            blockDataStateRoot = "",
-            blockDataTransactionsRoot = "",
-            blockDataReceiptsRoot = "",
-            blockDataLogBloom = "",
-            blockDataDifficulty = 900,
-            blockDataNumber = 8033,
-            blockDataGasLimit = 1000000,
-            blockDataGasUsed = 10000,
-            blockDataExtraData = "",
-            blockDataNonce = 22,
-            blockDataMixHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataTimestamp = posixSecondsToUTCTime 0x4000
+          { parentHash = unsafeCreateKeccak256FromWord256 0x0,
+            ommersHash = unsafeCreateKeccak256FromWord256 0x0,
+            beneficiary = emptyChainMember,
+            stateRoot = "",
+            transactionsRoot = "",
+            receiptsRoot = "",
+            logsBloom = "",
+            difficulty = 900,
+            number = 8033,
+            gasLimit = 1000000,
+            gasUsed = 10000,
+            extraData = "",
+            nonce = 22,
+            mixHash = unsafeCreateKeccak256FromWord256 0x0,
+            timestamp = posixSecondsToUTCTime 0x4000
           }
       callDepth = 0
       value = error "TODO: value"
@@ -781,21 +781,21 @@ call2 funcName callArgs contractAddress = do
       suicides = error "TODO: suicides"
       blockData =
         BlockData
-          { blockDataParentHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataCoinbase = emptyChainMember,
-            blockDataStateRoot = "",
-            blockDataTransactionsRoot = "",
-            blockDataReceiptsRoot = "",
-            blockDataLogBloom = "",
-            blockDataDifficulty = 900,
-            blockDataNumber = 8033,
-            blockDataGasLimit = 1000000,
-            blockDataGasUsed = 10000,
-            blockDataExtraData = "",
-            blockDataNonce = 22,
-            blockDataMixHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataTimestamp = posixSecondsToUTCTime 0x4000
+          { parentHash = unsafeCreateKeccak256FromWord256 0x0,
+            ommersHash = unsafeCreateKeccak256FromWord256 0x0,
+            beneficiary = emptyChainMember,
+            stateRoot = "",
+            transactionsRoot = "",
+            receiptsRoot = "",
+            logsBloom = "",
+            difficulty = 900,
+            number = 8033,
+            gasLimit = 1000000,
+            gasUsed = 10000,
+            extraData = "",
+            nonce = 22,
+            mixHash = unsafeCreateKeccak256FromWord256 0x0,
+            timestamp = posixSecondsToUTCTime 0x4000
           }
       callDepth = 0
       value = error "TODO: value"
