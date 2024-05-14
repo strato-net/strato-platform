@@ -136,7 +136,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   }, [window.location.pathname]);
 
   useEffect(() => {
-    const allCat = { label: 'All', value: 'All' }
+    const allCat = { label: <h1 className="h-0">All</h1>, value: 'All' }
     let categories = categorys.map(({ name, subCategories }, index) => {
       const subCat = subCategories.map(item => item.contract).join(',')
       return { label: <h1 className="h-0">{name}</h1>, value: name, subCategory: subCat }
