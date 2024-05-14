@@ -73,101 +73,23 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrde
     }
   }, [search])
 
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      ordersSold.map(async (order) => {
-        if (order.paymentSessionId !== "" && getStatus(parseInt(order.status)) === getStatusByName("Payment Pending")) {
-          try {
-            setIsLoading(true);
-            await validatePayment(order);
-          } catch (err) {
-            console.error(err);
-          }
-        }
-        setIsLoading(false);
-      })
-    }, 10000); // Poll every 30 seconds, adjust as needed
-
-    return () => clearInterval(intervalId); // Clear interval on component unmount
-  }, [ordersSold]); // Dependency array
-
   const [data, setdata] = useState([]);
-
-  const validatePayment = async (order) => {
-    const response = await fetch(
-      `${apiUrl}/order/payment/session/${order.paymentSessionId}/${order.sellersCommonName}`,
-      {
-        method: HTTP_METHODS.GET,
-      }
-    );
-
-    const body = await response.json();
-
-    if (response.status === RestStatus.OK) {
-      if (
-        body.data["payment_status"] === "paid" &&
-        getStatus(parseInt(order.status)) === getStatusByName("Payment Pending")
-      ) {
-        // Update order status
-        const isDone = await actions.updateOrderStatus(dispatch, {
-          saleOrderAddress: order.address,
-          status: 1,
-        });
-
-        if (isDone.includes('200')) {
-          setShouldRefetch(!shouldRefetch);
-        }
-      }
-      else {
-        const response2 = await fetch(
-          `${apiUrl}/order/payment/intent/${order.paymentSessionId}/${order.sellersCommonName}`,
-          { method: HTTP_METHODS.GET }
-        );
-        const intentBody = await response2.json();
-        const paymentErrorAndRequiresMethod = intentBody.data.last_payment_error?.message && intentBody.data.status === 'requires_payment_method';
-
-        if (paymentErrorAndRequiresMethod) {
-          // Update order status
-          const body = {
-            saleOrderAddress: order.address,
-            comments: encodeURIComponent('Stripe: ' + intentBody.data.last_payment_error.message),
-          };
-          //Update Order Details and change the Order Status to 'Canceled' from 'Payment Pending'
-          let isDone = await actions.cancelSale(dispatch, body);
-
-          if (isDone) {
-            setShouldRefetch(!shouldRefetch);
-          }
-        }
-      }
-    }
-  }
 
   useEffect(() => {
     const fetchData = async () => {
-      const updatedData = await Promise.all(
-        ordersSold.map(async (order) => {
-          if (order.paymentSessionId !== "" && getStatus(parseInt(order.status)) === getStatusByName("Payment Pending")) {
-            try {
-              setIsLoading(true);
-              await validatePayment(order);
-            } catch (err) {
-              console.error(err);
-            }
-          }
-          return {
-            address: order.address,
-            chainId: order.chainId,
-            key: order.address,
-            orderNumber: order,
-            buyersCommonName: order.purchasersCommonName,
-            orderTotal: order.totalPrice,
-            date: getStringDate(order.createdDate, US_DATE_FORMAT),
-            status: getStatus(parseInt(order.status)),
-            invoice: order,
-          };
-        })
-      );
+      const updatedData = ordersSold.map((order) => {
+        return {
+          address: order.address,
+          chainId: order.chainId,
+          key: order.address,
+          orderNumber: order,
+          buyersCommonName: order.purchasersCommonName,
+          orderTotal: order.totalPrice,
+          date: getStringDate(order.createdDate, US_DATE_FORMAT),
+          status: getStatus(parseInt(order.status)),
+          invoice: order,
+        };
+      });
       setIsLoading(false);
       setdata(updatedData);
     };
@@ -210,7 +132,7 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrde
           }}
           className="text-[#13188A] hover:text-primaryHover cursor-pointer"
         >
-          {`#${order.orderId}`}
+          {`#${`${order.orderId}`.substring(0,6)}`}
         </p>
       ),
     },

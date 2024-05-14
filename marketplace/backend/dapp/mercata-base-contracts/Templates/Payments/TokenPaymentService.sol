@@ -6,16 +6,16 @@ import <BASE_CODE_COLLECTION>;
 contract TokenPaymentService is PaymentService {   
     // TODO: receipts for minting/removing?
     enum ReceiptType { TRANSFER, PURCHASE, MINT }
-    event Receipt(ReceiptType type, address _from, address _to, uint _value, uint timestamp);
+    event Receipt(ReceiptType type, string _from, string _to, uint _value, uint timestamp);
 
-    event Transfer(address _from, address _to, uint _value);
-    event Approval(address _owner, address _spender, uint _value);
+    event Transfer(string _from, string _to, uint _value);
+    event Approval(string _owner, string _spender, uint _value);
 
     // token data
     uint public reserve;
     uint public decimals;
     uint public tokensPerDollar;
-    mapping (address => uint) public record balances;
+    mapping (string => uint) public record balances;
 
     constructor (
         string _serviceName,
@@ -28,40 +28,41 @@ contract TokenPaymentService is PaymentService {
         decimals = _decimals;
         reserve = _supply * (10 ** decimals);
         tokensPerDollar = _tokensPerDollar;
-        emit Receipt(ReceiptType.MINT, address(0), address(0), _supply, block.timestamp);
+        emit Receipt(ReceiptType.MINT, "", "", _supply, block.timestamp);
     }
 
     // OWNER/PROVIDER FUNCTIONS
     function reserveBalance() requireOwner() external returns (uint) {
-      return _balanceOf(owner);
+      return _balanceOf(ownerCommonName);
     }
 
-    function transfer(address _to, uint _value) public returns (bool) {
-        if (msg.sender == owner) { // if provider, send balance from the reserve
+    function transfer(string _to, uint _value) public returns (bool) {
+        string senderCommonName = getCommonName(msg.sender);
+        if (senderCommonName == ownerCommonName) { // if provider, send balance from the reserve
             if (reserve < _value) { return false; }
             balances[_to] += _value;
             reserve -= _value;
-            emit Receipt(ReceiptType.PURCHASE, address(0), _to, _value, block.timestamp);
+            emit Receipt(ReceiptType.PURCHASE, "", _to, _value, block.timestamp);
             return true;
         }
 
-        if (balances[msg.sender] < _value) { return false; }
+        if (balances[senderCommonName] < _value) { return false; }
         balances[_to] += _value;
-        balances[msg.sender] -= _value;
-        emit Receipt(ReceiptType.TRANSFER, msg.sender, _to, _value, block.timestamp);
+        balances[senderCommonName] -= _value;
+        emit Receipt(ReceiptType.TRANSFER, senderCommonName, _to, _value, block.timestamp);
         return true;
     }
 
     function balance() public returns (uint) {
-        return _balanceOf(msg.sender);
+        return _balanceOf(getCommonName(msg.sender));
     }
     
-    function balanceOf(address _user) requireOwner() external returns (uint) {
+    function balanceOf(string _user) requireOwner() external returns (uint) {
         return _balanceOf(_user);
     }
 
-    function _balanceOf(address _user) internal returns (uint) {
-        if (_user == owner) {
+    function _balanceOf(string _user) internal returns (uint) {
+        if (_user == ownerCommonName) {
             return reserve;
         } else {
             return balances[_user];
@@ -69,58 +70,94 @@ contract TokenPaymentService is PaymentService {
     }
 
     function _createOrder (
+        string token,
+        string _orderId,
+        address _purchaser,
+        string _purchasersCommonName,
         address[] _saleAddresses,
-        uint[] _quantities,
-        string token
+        uint[] _quantities
     ) internal override returns (string, address[]) {
-        address[] recipients;
         address[] assets;
-        uint totalAmount;
+        uint totalAmount = 0;
+        string seller;
+        string err = "Your " + serviceName + " balance is not high enough to cover the purchase.";
+        purchasersAddress = msg.sender; // Support for legacy sales
+        purchasersCommonName = getCommonName(tx.origin);
         for (uint i = 0; i < _saleAddresses.length; i++) {
             Sale s = Sale(_saleAddresses[i]);
             Asset a = s.assetToBeSold();
             assets.push(address(a));
-            address recipient = a.owner();
-            if (totalsMap[recipient] == 0) {
-                recipients.push(recipient);
-            }
             uint quantity = _quantities[i];
             uint amount = s.price() * quantity * tokensPerDollar * (10 ** decimals);
             totalAmount += amount;
-            totalsMap[recipient] += amount;
+            seller = getCommonName(a.owner());
             try {
-                s.lockQuantity(quantity, msg.sender);
+                Sale(_saleAddresses[i]).lockQuantity(quantity, _purchaser);
             } catch { // Support for legacy sales
-                address(s).call("lockQuantity", quantity);
+                _saleAddresses[i].call("lockQuantity", quantity);
             }
-            purchasersAddress = msg.sender; // Support for legacy sales
-            purchasersCommonName = getCommonName(tx.origin);
+            bool success = transfer(seller, amount);
+            require(success, err);
             try {
-                s.completeSale(msg.sender);
+                s.completeSale(_purchaser);
             } catch { // Support for legacy sales
                 address(s).call("completeSale");
             }
-            purchasersAddress = address(0); // Support for legacy sales
-            purchasersCommonName = "";
         }
-        string err = "Your " + serviceName + " balance is not high enough to cover the purchase.";
-        uint myBalance = balance();
-        require(myBalance >= totalAmount, err);
-        for (uint j = 0; j < recipients.length; j++) {
-            address recipient = recipients[j];
-            bool success = transfer(recipient, totalsMap[recipient]);
-            emit Payment(getCommonName(msg.sender), getCommonName(recipient), totalsMap[recipient], true);
-            totalsMap[recipient] = 0;
-            require(success, err);
-        }
-
+        emit Payment(
+            token,
+            _orderId,
+            _purchaser,
+            _purchasersCommonName,
+            seller,
+            _saleAddresses,
+            _quantities,
+            totalAmount,
+            0,
+            _unitsPerDollar(),
+            PaymentStatus.ORDER_COMPLETED
+        );
+        purchasersAddress = address(0); // Support for legacy sales
+        purchasersCommonName = "";
         return (token, assets);
     }
 
+    function _initializePayment (
+        string token,
+        string _orderId,
+        address _purchaser,
+        string _purchaserCommonName,
+        address[] _saleAddresses,
+        uint[] _quantities
+    ) internal override {
+        require(false, "Cannot call initializePayment for token payments.");
+    }
+
     function _completeOrder (
-        string token
+        string token,
+        string _orderId,
+        address _purchaser,
+        string _purchaserCommonName,
+        address[] _saleAddresses,
+        uint[] _quantities
     ) internal override returns (address[]) {
-        require(false, "Cannot call completeSales for STRAT payments.");
+        require(false, "Cannot call completeOrder for token payments.");
+        return [];
+    }
+
+    function _cancelOrder (
+        string token,
+        string _orderId,
+        address _purchaser,
+        string _purchaserCommonName,
+        address[] _saleAddresses,
+        uint[] _quantities
+    ) internal override {
+        require(false, "Cannot call cancelOrder for token payments.");
+    }
+
+    function _unitsPerDollar() internal override returns (uint) {
+        return tokensPerDollar * (10 ** decimals);
     }
 
     function updateTokensPerDollar(uint _tokensPerDollar) requireOwner() public returns (uint) {

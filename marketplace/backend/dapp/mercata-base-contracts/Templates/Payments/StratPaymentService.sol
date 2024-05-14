@@ -17,59 +17,95 @@ contract StratPaymentService is PaymentService {
     }
 
     function _createOrder (
+        string token,
+        string _orderId,
+        address _purchaser,
+        string _purchasersCommonName,
         address[] _saleAddresses,
-        uint[] _quantities,
-        string token
+        uint[] _quantities
     ) internal override returns (string, address[]) {
-        require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
-        address[] stratRecipients;
-        uint totalAmount;
         address[] assets;
+        uint totalAmount = 0;
+        string seller;
+        string err = "Your STRAT balance is not high enough to cover the purchase.";
+        purchasersAddress = msg.sender; // Support for legacy sales
+        purchasersCommonName = getCommonName(tx.origin);
         for (uint i = 0; i < _saleAddresses.length; i++) {
             Sale s = Sale(_saleAddresses[i]);
             Asset a = s.assetToBeSold();
             assets.push(address(a));
-            address recipient = a.owner();
-            if (totalsMap[recipient] == 0) {
-                stratRecipients.push(recipient);
-            }
             uint quantity = _quantities[i];
-            uint amount = s.price() * quantity * stratsPerDollar * 100; // 1 STRAT = 1 STRAT cents
+            uint amount = s.price() * quantity * stratsPerDollar * 100;
             totalAmount += amount;
-            totalsMap[recipient] += amount;
+            address sellerAddress = a.owner();
+            seller = getCommonName(sellerAddress);
             try {
-                s.lockQuantity(quantity, tx.origin);
+                Sale(_saleAddresses[i]).lockQuantity(quantity, _purchaser);
             } catch { // Support for legacy sales
-                address(s).call("lockQuantity", quantity);
+                _saleAddresses[i].call("lockQuantity", quantity);
             }
-            purchasersAddress = tx.origin; // Support for legacy sales
-            purchasersCommonName = getCommonName(tx.origin);
+            bool success = stratAddress.call("transfer", sellerAddress, amount);
+            require(success, err);
             try {
-                s.completeSale(tx.origin);
+                s.completeSale(_purchaser);
             } catch { // Support for legacy sales
                 address(s).call("completeSale");
             }
-            purchasersAddress = address(0); // Support for legacy sales
-            purchasersCommonName = "";
         }
-        string err = "Your STRAT account balance is not high enough to cover the purchase.";
-        uint myBalance = stratAddress.call("balance");
-        require(myBalance >= totalAmount, err);
-        for (uint j = 0; j < stratRecipients.length; j++) {
-            address recipient = stratRecipients[j];
-            bool success = stratAddress.call("transfer", recipient, totalsMap[recipient]);
-            emit Payment(getCommonName(tx.origin), getCommonName(recipient), totalsMap[recipient], true);
-            totalsMap[recipient] = 0;
-            require(success, err);
-        }
-
+        emit Payment(
+            token,
+            _orderId,
+            _purchaser,
+            _purchasersCommonName,
+            seller,
+            _saleAddresses,
+            _quantities,
+            totalAmount,
+            0,
+            _unitsPerDollar(),
+            PaymentStatus.ORDER_COMPLETED
+        );
+        purchasersAddress = address(0); // Support for legacy sales
+        purchasersCommonName = "";
         return (token, assets);
     }
 
+    function _initializePayment (
+        string token,
+        string _orderId,
+        address _purchaser,
+        string _purchaserCommonName,
+        address[] _saleAddresses,
+        uint[] _quantities
+    ) internal override {
+        require(false, "Cannot call initializePayment for STRAT payments.");
+    }
+
     function _completeOrder (
-        string token
+        string token,
+        string _orderId,
+        address _purchaser,
+        string _purchaserCommonName,
+        address[] _saleAddresses,
+        uint[] _quantities
     ) internal override returns (address[]) {
-        require(false, "Cannot call completeSales for STRAT payments.");
+        require(false, "Cannot call completeOrder for STRAT payments.");
+        return [];
+    }
+
+    function _cancelOrder (
+        string token,
+        string _orderId,
+        address _purchaser,
+        string _purchaserCommonName,
+        address[] _saleAddresses,
+        uint[] _quantities
+    ) internal override {
+        require(false, "Cannot call cancelOrder for STRAT payments.");
+    }
+
+    function _unitsPerDollar() internal override returns (uint) {
+        return stratsPerDollar * 100;
     }
 
     function updateStratsPerDollar(uint _stratsPerDollar) requireOwner() public returns (uint) {
