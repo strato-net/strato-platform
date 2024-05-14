@@ -319,7 +319,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while requesting redemption");
       }
     } catch (error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "There was trouble redeeming this item. Please contract support sales@blockapps.net")
+      throw new rest.RestError(RestStatus.BAD_REQUEST, "Please contact sales@blockapps.net to redeem this item")
     }
   }
 
