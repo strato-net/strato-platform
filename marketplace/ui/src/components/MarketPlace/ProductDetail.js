@@ -64,7 +64,7 @@ const ProductDetails = ({ user, users }) => {
 
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
-  const { Text, Paragraph } = Typography;
+  const { Text, Paragraph, Title } = Typography;
   const [Id, setId] = useState(undefined);
   const [itemData, setItemData] = useState({});
   const [timeFilter, setTimeFilter] = useState('1');
@@ -427,10 +427,9 @@ const ProductDetails = ({ user, users }) => {
                   {isWishlisted ? <HeartFilled className="cursor-pointer" onClick={toggleWishlist} style={{ fontSize: "20px", color: "#A15E49" }} /> : <HeartTwoTone className="cursor-pointer" onClick={toggleWishlist} style={{ fontSize: "20px" }} twoToneColor="#A15E49" />}
                 </div>
                 <div className=" lg:border-b lg:border-[#E9E9E9] pb-[6px]">
-                  <Text className="font-semibold text-base lg:text-3xl text-[#202020]">
-
+                  <Title style={{fontSize:'30px'}} className="font-semibold text-base lg:text-3xl text-[#202020]">
                     {decodeURIComponent(details?.name)}
-                  </Text>
+                  </Title>
                   <div className="flex pt-[6px] ">
                     {/* <Text className="text-[#202020] text-xs  font-medium">Owned By: {details?.ownerCommonName}</Text>
                      */}
