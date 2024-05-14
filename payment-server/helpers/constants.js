@@ -17,11 +17,11 @@ const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS;
 
 const SERVER_URL = `${process.env.SERVER_HOST}:${process.env.PORT ? process.env.PORT : 8018}`;
 
-const CLIENT_URL = `${process.env.SERVER_HOST}:${process.env.CLIENT_PORT ? process.env.CLIENT_PORT : 8020}`;
-
 const SERVER_CONFIRM_URL = `${SERVER_URL}/stripe/checkout/confirm`;
 
 const SERVER_CANCEL_URL = `${SERVER_URL}/stripe/checkout/cancel`;
+
+const PAYMENT_EVENT_TABLE = 'BlockApps-Mercata-PaymentService.Payment';
 
 export { 
   STRIPE_ENV,
@@ -29,6 +29,6 @@ export {
   SERVER_CANCEL_URL,
   CONTRACT_ADDRESS,
   SERVER_URL,
-  CLIENT_URL,
   DEFAULT_OPTIONS,
+  PAYMENT_EVENT_TABLE,
 }

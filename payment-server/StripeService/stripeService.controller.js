@@ -1,15 +1,15 @@
 import Joi from '@hapi/joi';
 import stripeService from './stripe.service.js';
-import { CLIENT_URL } from "../helpers/constants.js";
 import { 
   getStripeAccountForUser, 
   getStripePaymentFromToken,
   insertStripeAccount,
   insertStripePayment,
   updateStripePayment,
-  getPaymentState, 
+  getPaymentEvent, 
   validateAndGetOrderDetails ,
   completeOrder,
+  initializePayment,
   cancelOrder
 } from '../helpers/utils.js';
 
@@ -102,7 +102,7 @@ class StripeServiceController {
       const paymentDetails = await getStripePaymentFromToken(token);
 
       // Skip all the extra work if the session already exists
-      if (paymentDetails && paymentDetails.status !== "CANCELED") {
+      if (paymentDetails && paymentDetails.status === "OPEN") {
         const session = await stripeService.getPaymentSession(paymentDetails.paymentsessionid, paymentDetails.accountid);
         
         // Redirect to Stripe payment session
@@ -120,16 +120,16 @@ class StripeServiceController {
         return next();
       }
 
-      // Get the payment server contract
-      const paymentState = await getPaymentState();
+      // Get the payment event from Cirrus
+      const paymentEvent = await getPaymentEvent(token);
 
       // Get and validate the order details
-      const order = paymentState.openOrders[token];
-      const { sellerCommonName, orderDetails } = await validateAndGetOrderDetails(order.quantities, order.saleAddresses);
-
-      const sellerAccount = await getStripeAccountForUser(sellerCommonName);
+      const saleAddresses = paymentEvent[0].saleAddresses;
+      const quantities = paymentEvent[0].quantities;
+      const { sellerCommonName, orderDetails } = await validateAndGetOrderDetails(quantities, saleAddresses);
 
       // Seller account verification
+      const sellerAccount = await getStripeAccountForUser(sellerCommonName);
       if (!sellerAccount) {
         throw new Error(`Seller not onboarded to Stripe yet.`);
       }
@@ -175,37 +175,46 @@ class StripeServiceController {
       const paymentDetails = await getStripePaymentFromToken(token);
       const session = await stripeService.getPaymentSession(paymentDetails.paymentsessionid, paymentDetails.accountid);
 
-      console.log(session);
       // Verify payment and perform onchain transfer
-      let completeOrderStatus;
+      let returnStatus;
       if (session.payment_status === 'paid') {
-        completeOrderStatus = await completeOrder(token);
-        console.log("completeOrderStatus", completeOrderStatus);
+        // Get the payment event from Cirrus
+        const paymentEvent = await getPaymentEvent(token);
+
+        // Call completeOrder
+        const callArgs = {
+          token: paymentEvent[0].token,
+          orderId: paymentEvent[0].orderId,
+          purchaser: paymentEvent[0].purchaser,
+          saleAddresses: paymentEvent[0].saleAddresses,
+          quantities: paymentEvent[0].quantities,
+        } 
+        returnStatus = await completeOrder(callArgs);
+
         // Update payment status in DB
         const updateResult = await updateStripePayment(token, "PAID");
       } else if (session.payment_status === 'unpaid' && session.status === 'complete') {
         // ACH payment
-        console.log("Placeholder ACH");
+        // Get the payment event from Cirrus
+        const paymentEvent = await getPaymentEvent(token);
+
+        // Call initializePayment
+        const callArgs = {
+          token: paymentEvent[0].token,
+          orderId: paymentEvent[0].orderId,
+          purchaser: paymentEvent[0].purchaser,
+          saleAddresses: paymentEvent[0].saleAddresses,
+          quantities: paymentEvent[0].quantities,
+        } 
+        returnStatus = await initializePayment(callArgs);
 
         // Update payment status in DB
-        const updateResult = await updateStripePayment(token, "PENDING");
-
-        // Redirect back to marketplace
-        res.setHeader('Content-Type', 'text/html');
-        res.send(`
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <meta http-equiv="refresh" content="0;url=${redirectUrl}?assets=${completeOrderStatus}">
-            </head>
-            <body>
-            </body>
-          </html>
-        `);
-        return next();
+        const updateResult = await updateStripePayment(token, "INITIALIZED");
       } else {
         throw new Error(`Payment has not been processed. Failed to confirm purchase. Please contact an Admin or the Payment Server Admin.`);
       }
+
+      console.log("returnStatus", returnStatus);
 
       // Redirect back to marketplace
       res.setHeader('Content-Type', 'text/html');
@@ -213,7 +222,7 @@ class StripeServiceController {
         <!DOCTYPE html>
         <html>
           <head>
-            <meta http-equiv="refresh" content="0;url=${redirectUrl}?assets=${completeOrderStatus}">
+            <meta http-equiv="refresh" content="0;url=${redirectUrl}?assets=${returnStatus}">
           </head>
           <body>
           </body>
@@ -232,7 +241,19 @@ class StripeServiceController {
 
       const { token, redirectUrl } = req.query;
 
-      const cancelOrderStatus = await cancelOrder(token);
+      // Get the payment event from Cirrus
+      const paymentEvent = await getPaymentEvent(token);
+
+      // Construct completeOrder args
+      const callArgs = {
+        token: paymentEvent[0].token,
+        orderId: paymentEvent[0].orderId,
+        purchaser: paymentEvent[0].purchaser,
+        saleAddresses: paymentEvent[0].saleAddresses,
+        quantities: paymentEvent[0].quantities,
+      } 
+
+      const cancelOrderStatus = await cancelOrder(callArgs);
       console.log("cancelOrderStatus", cancelOrderStatus);
 
       // Update payment status in DB

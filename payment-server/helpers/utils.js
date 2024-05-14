@@ -1,6 +1,6 @@
 import client from '../db/index.js';
 import { rest, util } from "blockapps-rest";
-import { CONTRACT_ADDRESS, DEFAULT_OPTIONS } from "./constants.js";
+import { CONTRACT_ADDRESS, DEFAULT_OPTIONS, PAYMENT_EVENT_TABLE } from "./constants.js";
 import ADMIN from './oauth.js';
 import lodash from 'lodash';
 const { get } = lodash;
@@ -65,7 +65,7 @@ const insertStripePayment = async (token, sessionId, sellerCommonName) => {
     ) VALUES (
       $1, $2, $3, $4
     )`;
-  const insertValues = [ token, sessionId, sellerCommonName, "INITIALIZED" ];
+  const insertValues = [ token, sessionId, sellerCommonName, "OPEN" ];
   const insertResult = await client.query(insertQuery, insertValues);
   return insertResult;
 }
@@ -80,12 +80,24 @@ const updateStripePayment = async (token, status) => {
   return updateResult;
 }
 
-const getPaymentState = async () => {
-  const paymentProviderContract = { name: "PaymentService", address: CONTRACT_ADDRESS };
-  return await rest.getState(ADMIN.getUser(), paymentProviderContract, DEFAULT_OPTIONS);
+const getPaymentEvent = async (token) => {
+  const tableArgs = {
+    name: PAYMENT_EVENT_TABLE,
+  };
+  
+  const searchOptions = {
+    ...DEFAULT_OPTIONS,
+    query: {
+      limit: 1,
+      ['token']: `eq.${token}`,
+    }
+  };
+
+  return await rest.search(ADMIN.getUser(), tableArgs, searchOptions);
 }
 
 const validateAndGetOrderDetails = async (quantities, saleAddresses) => {
+  console.log(quantities, saleAddresses);
   // Get Sale Contracts
   const saleAddressQuery = saleAddresses.map(addr => `address.eq.${addr}`);
   const saleContracts = await rest.search(
@@ -135,25 +147,37 @@ const validateAndGetOrderDetails = async (quantities, saleAddresses) => {
   }
 }
 
-const completeOrder = async (token) => {
+const completeOrder = async (args) => {
   // Make the call and return results
   const contract = { name: "PaymentService", address: CONTRACT_ADDRESS };
   const callArgs = {
     contract,
     method: "completeOrder",
-    args: util.usc({ token: token }),
+    args: util.usc({ ...args }),
   };
   const completeOrderStatus = await rest.call(ADMIN.getUser(), callArgs, DEFAULT_OPTIONS);
   return completeOrderStatus;
 }
 
-const cancelOrder = async (token) => {
+const initializePayment = async (args) => {
+  // Make the call and return results
+  const contract = { name: "PaymentService", address: CONTRACT_ADDRESS };
+  const callArgs = {
+    contract,
+    method: "initializePayment",
+    args: util.usc({ ...args }),
+  };
+  const completeOrderStatus = await rest.call(ADMIN.getUser(), callArgs, DEFAULT_OPTIONS);
+  return completeOrderStatus;
+}
+
+const cancelOrder = async (args) => {
   // Make the call and return results
   const contract = { name: "PaymentService", address: CONTRACT_ADDRESS };
   const callArgs = {
     contract,
     method: "cancelOrder",
-    args: util.usc({ token: token }),
+    args: util.usc({ ...args }),
   };
   const completeOrderStatus = await rest.call(ADMIN.getUser(), callArgs, DEFAULT_OPTIONS);
   return completeOrderStatus;
@@ -167,8 +191,9 @@ export {
   insertStripeAccount,
   insertStripePayment,
   updateStripePayment,
-  getPaymentState,
+  getPaymentEvent,
   validateAndGetOrderDetails,
   completeOrder,
+  initializePayment,
   cancelOrder,
 }
