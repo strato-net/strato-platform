@@ -80,17 +80,4 @@ abstract contract UTXO is Asset {
     function checkCondition() internal virtual returns (bool){
         return true;
     }
-
-    function requestRedemption(uint _quantity) public returns (uint, address) {
-        require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
-        require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
-        require(getCommonName(msg.sender) == ownerCommonName, "Only the owner of the Asset can request for redemption");
-
-        UTXO newAsset = mint(_quantity);
-        Asset(newAsset).transferOwnership(owner, _quantity, false, 0, 0);
-        Asset(newAsset).updateStatus(AssetStatus.PENDING_REDEMPTION);
-        quantity -= _quantity;
-
-        return (RestStatus.OK, address(newAsset));
-    }
 }

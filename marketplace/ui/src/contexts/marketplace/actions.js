@@ -34,7 +34,6 @@ const actionDescriptors = {
   addShippingAddress: "add_shipping_address",
   addShippingAddressSuccessful: "add_shipping_address_successful",
   addShippingAddressFailed: "add_shipping_address_failed",
-  fetchUserAddress: "fetch_user_address",
   fetchUserAddressSuccessful: "fetch_user_address_successful",
   fetchUserAddressFailed: "fetch_user_address_failed",
   fetchUserAddresses: "fetch_user_addresses",
@@ -378,48 +377,6 @@ const actions = {
         error: "Error while adding Shipping address",
       });
       actions.setMessage(dispatch, "Error while adding Shipping address");
-    }
-  },
-
-  fetchUserAddress: async (dispatch, addressId) => {
-    dispatch({ type: actionDescriptors.fetchUserAddress });
-
-    try {
-      const response = await fetch(
-        `${apiUrl}/order/userAddress/${addressId}`,
-        {
-          method: HTTP_METHODS.GET,
-        }
-      );
-
-      const body = await response.json();
-
-      if (response.status === RestStatus.OK) {
-        dispatch({
-          type: actionDescriptors.fetchUserAddressSuccessful,
-          payload: body.data,
-        });
-        return;
-      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
-        dispatch({
-          type: actionDescriptors.fetchUserAddressFailed,
-          error: "Error while getting Shipping address",
-        });
-        actions.setMessage(dispatch, "Error while getting Shipping address");
-        return false;
-      } 
-      dispatch({
-        type: actionDescriptors.fetchUserAddressFailed,
-        error: body.error,
-      });
-      actions.setMessage(dispatch, body.error);
-      return false;
-    } catch (err) {
-      dispatch({
-        type: actionDescriptors.fetchUserAddressFailed,
-        error: undefined,
-      });
-      actions.setMessage(dispatch, "Error while getting Shipping address");
     }
   },
 

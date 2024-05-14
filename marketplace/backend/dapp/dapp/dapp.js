@@ -39,6 +39,7 @@ import saleOrderJs from "/dapp/orders/saleOrder";
 import inventoryJs from "/dapp/products/inventory";
 import marketplaceJs from "/dapp/marketplace/marketplace.js";
 import paymentProviderJs from '/dapp/payments/paymentProvider';
+import redemptionServiceJs from '/dapp/redemptions/redemptionService';
 
 import strats from "../strats/strats";
 
@@ -287,51 +288,47 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   contract.requestRedemption = async function (args, options = defaultOptions) {
-    try {
-      const { assetAddresses, quantity, ...restArgs } = args;
+    const { assetAddresses, redemptionAddress, quantity, ...restArgs } = args;
 
-      const contract = { address: assetAddresses[0] };
-      const [requestRedemptionStatus, assetAddress] = await inventoryJs.requestRedemption(rawAdmin, contract, { quantity: quantity }, options);
+    const contract = { address: assetAddresses[0] };
+    const [requestRedemptionStatus, assetAddress] = await inventoryJs.requestRedemption(rawAdmin, contract, { quantity: quantity }, options);
 
-      const finalArgs = { redemption_id: parseInt(util.uid()), assetAddresses: [assetAddress], quantity, ...restArgs }
+    const finalArgs = { redemption_id: parseInt(util.uid()), assetAddresses: [assetAddress], quantity, ...restArgs }
 
-      if (requestRedemptionStatus) {
-        try {
-          await axios.post(new URL(`/redemption/create`, STRIPE_PAYMENT_SERVER_URL).href, { ...finalArgs })
-            .then(function (res) {
-              if (res.status === 200) {
-                console.log(res.data);
-              } else {
-                throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
-              }
-            });
-          return {}
-        } catch (error) {
-          // The AssetStaus is initially switched to PENDING_REDEMPTION but must be reverted if Redemption creation fails
-          const [updateStatus] = await inventoryJs.updateAssetStatus(rawAdmin, { address: assetAddress }, { status: ASSET_STATUS.ACTIVE }, options);
+    if (requestRedemptionStatus) {
+      try {
+        const { serviceUrl, createRedemptionRoute = '' } = await redemptionServiceJs.get(rawAdmin, { address: redemptionAddress }, options);
+        await axios.post(new URL(createRedemptionRoute, serviceUrl).href, { ...finalArgs })
+          .then(function (res) {
+            if (res.status === 200) {
+              console.log(res.data);
+            } else {
+              throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+            }
+          });
+        return {}
+      } catch (error) {
+        // The AssetStaus is initially switched to PENDING_REDEMPTION but must be reverted if Redemption creation fails
+        const [updateStatus] = await inventoryJs.updateAssetStatus(rawAdmin, { address: assetAddress }, { status: ASSET_STATUS.ACTIVE }, options);
 
-          if (error.response) {
-            throw new rest.RestError(error.response.status, error.response.statusText);
-          }
-          throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while creating redemption record: ${JSON.stringify(error)} `);
+        if (error.response) {
+          throw new rest.RestError(error.response.status, error.response.statusText);
         }
-      } else {
-        throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while requesting redemption");
+        throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while creating redemption record: ${JSON.stringify(error)} `);
       }
-    } catch (error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Please contact sales@blockapps.net to redeem this item")
     }
   }
 
   contract.getOutgoingRedemptionRequests = async function (args, options = optionsNoChainIds) {
-    const { order, search } = args;
+    const { redemptionAddress, order, search } = args;
     const queryParams = new URLSearchParams({
       redemptionId: search,
       order: order
     }).toString();
 
     try {
-      const redemptions = await axios.get(new URL(`/redemption/outgoing/${userCert.commonName}?${queryParams}`, STRIPE_PAYMENT_SERVER_URL).href).then(function (res) {
+      const { serviceUrl, outgoingRedemptionsRoute = '' } = await redemptionServiceJs.get(rawAdmin, { address: redemptionAddress }, options);
+      const redemptions = await axios.get(new URL(`${outgoingRedemptionsRoute}/${userCert.commonName}?${queryParams}`, serviceUrl).href).then(function (res) {
         if (res.status === 200) {
           return res.data.data;
         } else {
@@ -348,14 +345,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getIncomingRedemptionRequests = async function (args, options = optionsNoChainIds) {
-    const { order, search } = args;
+    const { redemptionAddress, order, search } = args;
     const queryParams = new URLSearchParams({
       redemptionId: search,
       order: order
     }).toString();
 
     try {
-      const redemptions = await axios.get(new URL(`/redemption/incoming/${userCert.commonName}?${queryParams}`, STRIPE_PAYMENT_SERVER_URL).href).then(function (res) {
+      const { serviceUrl, incomingRedemptionsRoute = '' } = await redemptionServiceJs.get(rawAdmin, { address: redemptionAddress }, options);
+      const redemptions = await axios.get(new URL(`${incomingRedemptionsRoute}/${userCert.commonName}?${queryParams}`, serviceUrl).href).then(function (res) {
         if (res.status === 200) {
           return res.data.data;
         } else {
@@ -372,8 +370,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getRedemption = async function (args, options = optionsNoChainIds) {
+    const { redemptionAddress } = args;
     try {
-      const redemption = await axios.get(new URL(`/redemption/${args.id}`, STRIPE_PAYMENT_SERVER_URL).href).then(function (res) {
+      const { serviceUrl, getRedemptionRoute = '' } = await redemptionServiceJs.get(rawAdmin, { address: redemptionAddress }, options);
+      const redemption = await axios.get(new URL(`${getRedemptionRoute}/${args.id}`, serviceUrl).href).then(function (res) {
         if (res.status === 200) {
           return res.data.data;
         } else {
@@ -390,7 +390,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.closeRedemption = async function (args, options = optionsNoChainIds) {
-    const { id, assetAddresses, status, ...restArgs } = args;
+    const { id, assetAddresses, redemptionAddress, status, ...restArgs } = args;
 
     let assetStatus;
     if (status === REDEMPTION_STATUS.FULFILLED) {
@@ -406,7 +406,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
     if (updateStatus) {
       try {
-        const redemption = await axios.put(new URL(`/redemption/close/${id}`, STRIPE_PAYMENT_SERVER_URL).href, { ...finalArgs })
+        const { serviceUrl, closeRedemptionRoute = '' } = await redemptionServiceJs.get(rawAdmin, { address: redemptionAddress }, options);
+        const redemption = await axios.put(new URL(`${closeRedemptionRoute}/${id}`, serviceUrl).href, { ...finalArgs })
           .then(function (res) {
             if (res.status === 200) {
               return res.data.data;
@@ -994,8 +995,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.createUserAddress = async function (args, options = defaultOptions) {
+    const { redemptionAddress } = args;
     try {
-      await axios.post(new URL(`/customer/address`, STRIPE_PAYMENT_SERVER_URL).href, { commonName: userCert.commonName, ...args })
+      const { serviceUrl, createCustomerAddressRoute = '' } = await redemptionServiceJs.get(rawAdmin, { address: redemptionAddress }, options);
+      await axios.post(new URL(createCustomerAddressRoute, serviceUrl).href, { commonName: userCert.commonName, ...args })
         .then(function (res) {
           if (res.status === 200) {
             console.log(res.data);
@@ -1013,8 +1016,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getAllUserAddress = async function (args, options = optionsNoChainIds) {
+    const { redemptionAddress } = args;
     try {
-      const userAddresses = await axios.get(new URL(`/customer/address/${userCert.commonName}`, STRIPE_PAYMENT_SERVER_URL).href).then(function (res) {
+      const { serviceUrl, getCustomerAddressRoute = '' } = await redemptionServiceJs.get(rawAdmin, { address: redemptionAddress }, options);
+      const userAddresses = await axios.get(new URL(`${getCustomerAddressRoute}/${userCert.commonName}`, serviceUrl).href).then(function (res) {
         if (res.status === 200) {
           return res.data.data;
         } else {
@@ -1027,25 +1032,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         throw new rest.RestError(error.response.status, error.response.statusText);
       }
       throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching addresses: ${JSON.stringify(error)} `);
-    }
-  };
-
-  contract.getAddressFromId = async function (args, options = defaultOptions) {
-    try {
-      const { id } = args;
-      const userAddress = await axios.get(new URL(`/customer/address/id/${id}`, STRIPE_PAYMENT_SERVER_URL).href).then(function (res) {
-        if (res.status === 200) {
-          return res.data.data;
-        } else {
-          throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
-        }
-      });
-      return userAddress;
-    } catch (error) {
-      if (error.response) {
-        throw new rest.RestError(error.response.status, error.response.statusText);
-      }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching address: ${JSON.stringify(err)} `);
     }
   };
 
