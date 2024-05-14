@@ -6,7 +6,7 @@ module Blockchain.SolidVM.Environment
   )
 where
 
-import Blockchain.Data.DataDefs (BlockData (..))
+import Blockchain.Data.BlockData
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Keccak256
 import qualified Data.Map as M

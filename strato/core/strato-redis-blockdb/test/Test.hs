@@ -7,7 +7,7 @@ module Main where
 
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.Block (Block (..))
-import Blockchain.Data.DataDefs
+import Blockchain.Data.BlockData
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Keccak256

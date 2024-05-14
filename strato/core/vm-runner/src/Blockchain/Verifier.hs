@@ -11,8 +11,8 @@ where
 import Blockchain.Constants
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
+import Blockchain.Data.BlockData
 import Blockchain.Data.BlockSummary
-import Blockchain.Data.DataDefs
 import Blockchain.Data.RLP
 import Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia as MP

@@ -1,6 +1,6 @@
 module Blockchain.Sequencer.ChainHelpers where
 
-import Blockchain.Data.DataDefs
+import Blockchain.Data.BlockData
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Verification (ommersVerificationValue)

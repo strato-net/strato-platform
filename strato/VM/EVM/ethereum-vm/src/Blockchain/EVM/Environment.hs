@@ -3,7 +3,7 @@
 
 module Blockchain.EVM.Environment where
 
-import Blockchain.Data.DataDefs
+import Blockchain.Data.BlockData
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord

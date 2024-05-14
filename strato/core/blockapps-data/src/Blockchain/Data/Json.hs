@@ -8,6 +8,7 @@
 module Blockchain.Data.Json where
 
 import Blockchain.Data.Block
+import Blockchain.Data.BlockData
 import Blockchain.Data.DataDefs
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction
@@ -350,7 +351,7 @@ blockDataRefToBlock bdr txs =
             blockDataMixHash = blockDataRefMixHash bdr
           },
       blockReceiptTransactions = txs,
-      blockBlockUncles = blockDataRefBlockUncles bdr
+      blockBlockUncles = []
     }
 
 bToBPrime :: String -> BlockDataRef -> [Transaction] -> Block'
@@ -358,6 +359,7 @@ bToBPrime s x txs = Block' (blockDataRefToBlock x txs) s
 
 bToBPrime' :: BlockDataRef -> [Transaction] -> Block'
 bToBPrime' x txs = Block' (blockDataRefToBlock x txs) ""
+
 
 bPrimeToB :: Block' -> Block
 bPrimeToB (Block' x _) = x
@@ -422,7 +424,7 @@ bdPrimeToBd (BlockData' bd) = bd
 data BlockDataRef' = BlockDataRef' BlockDataRef deriving (Eq, Show)
 
 instance ToJSON BlockDataRef' where
-  toJSON (BlockDataRef' (BlockDataRef ph uh co cu cc sr tr rr _ d num gl gu ts ed non mh h uncles pow isConf td)) =
+  toJSON (BlockDataRef' (BlockDataRef ph uh co cu cc sr tr rr _ d num gl gu ts ed non mh h pow isConf td)) =
     object
       [ "parentHash" .= ph,
         "unclesHash" .= uh,
@@ -441,7 +443,6 @@ instance ToJSON BlockDataRef' where
         "nonce" .= non,
         "mixHash" .= mh,
         "hash" .= h,
-        "uncles" .= map bdToBdPrime uncles,
         "powVerified" .= pow,
         "isConfirmed" .= isConf,
         "totalDifficulty" .= td

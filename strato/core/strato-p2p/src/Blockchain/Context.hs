@@ -98,8 +98,8 @@ import           BlockApps.Logging
 import           BlockApps.X509.Certificate
 
 import           Blockchain.Data.Block
+import           Blockchain.Data.BlockData
 import           Blockchain.Data.ChainInfo
-import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Enode
 import           Blockchain.Data.PubKey
 import           Blockchain.DB.DetailsDB

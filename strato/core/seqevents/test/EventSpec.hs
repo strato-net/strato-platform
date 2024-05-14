@@ -1,6 +1,7 @@
 {-# OPTIONS -fno-warn-unused-imports #-}
 
 import Blockchain.Data.ArbitraryInstances ()
+import Blockchain.Data.BlockData
 import qualified Blockchain.Data.ChainInfo as CI
 import qualified Blockchain.Data.DataDefs as DD
 import qualified Blockchain.Data.Transaction as TX
@@ -24,7 +25,7 @@ spec = parallel $ do
   describe "BlockData" $ do
     it "should be serializable and deserializable" $
       property $
-        \x -> binaryFidelity (x :: DD.BlockData)
+        \x -> binaryFidelity (x :: BlockData)
   describe "AccountInfo" $ do
     it "should be serializable and deserializable" $
       property $

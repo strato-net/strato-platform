@@ -27,8 +27,8 @@ import Blockchain.DB.ModifyStateDB
 import Blockchain.DB.RawStorageDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
+import Blockchain.Data.BlockData
 import Blockchain.Data.BlockSummary
-import Blockchain.Data.DataDefs
 import Blockchain.Data.ExecResults
 import Blockchain.Data.Log
 import qualified Blockchain.Database.MerklePatricia as MP

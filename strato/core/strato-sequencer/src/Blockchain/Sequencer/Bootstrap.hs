@@ -7,7 +7,7 @@ import BlockApps.Logging
 import BlockApps.X509.Certificate
 import Blockchain.Constants
 import Blockchain.Data.Block
-import Blockchain.Data.DataDefs
+import Blockchain.Data.BlockData
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.Transaction as TX
 import Blockchain.EthConf as EC

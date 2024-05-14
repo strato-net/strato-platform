@@ -9,7 +9,7 @@ module Blockchain.Strato.RedisBlockDB.Test.Chain where
 
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.Block
-import Blockchain.Data.DataDefs
+import Blockchain.Data.BlockData
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Keccak256
 import Control.Monad

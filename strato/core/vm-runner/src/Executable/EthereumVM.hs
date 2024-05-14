@@ -26,8 +26,8 @@ import Blockchain.DB.ChainDB
 import qualified Blockchain.DB.MemAddressStateDB as Mem
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.AddressStateRef (updateSQLBalanceAndNonce)
+import Blockchain.Data.BlockData
 import Blockchain.Data.BlockHeader (extraData2TxsLen)
-import Blockchain.Data.DataDefs (BlockData (..), blockDataExtraData)
 import Blockchain.Data.GenesisBlock
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Database.MerklePatricia as MP

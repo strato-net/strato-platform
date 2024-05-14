@@ -19,6 +19,7 @@ module Blockchain.Data.Block
 where
 
 import Blockchain.Constants
+import Blockchain.Data.BlockData
 import Blockchain.Data.DataDefs
 import Blockchain.Data.RLP
 import Blockchain.Data.Transaction

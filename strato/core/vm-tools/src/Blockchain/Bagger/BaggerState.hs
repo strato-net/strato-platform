@@ -6,7 +6,7 @@ module Blockchain.Bagger.BaggerState where
 
 import Blockchain.Bagger.TransactionList
 import Blockchain.Bagger.Transactions
-import qualified Blockchain.Data.DataDefs as DD
+import Blockchain.Data.BlockData
 import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.Database.MerklePatricia (StateRoot (..), blankStateRoot)
 import Blockchain.Sequencer.Event (OutputTx (..))
@@ -28,7 +28,7 @@ type ATL = M.Map Address TransactionList
 
 data MiningCache = MiningCache
   { bestBlockSHA :: Keccak256,
-    bestBlockHeader :: DD.BlockData,
+    bestBlockHeader :: BlockData,
     bestBlockTxHashes :: [Keccak256],
     lastExecutedStateRoot :: StateRoot,
     remainingGas :: Integer,
@@ -86,7 +86,7 @@ defaultMiningCache =
   MiningCache
     { bestBlockSHA = unsafeCreateKeccak256FromWord256 0,
       bestBlockHeader =
-        ( DD.BlockData
+        ( BlockData
             (unsafeCreateKeccak256FromWord256 0)
             (unsafeCreateKeccak256FromWord256 0)
             (Everyone False)
@@ -142,7 +142,7 @@ calculateIntrinsicTxFee bs t@OutputTx {otBaseTx = bt} =
 
 calculateIntrinsicGasAtNextBlock :: BaggerState -> OutputTx -> Integer
 calculateIntrinsicGasAtNextBlock BaggerState {miningCache = MiningCache {bestBlockHeader = bh}, calculateIntrinsicGas = cig} =
-  cig (DD.blockDataNumber bh + 1)
+  cig (blockDataNumber bh + 1)
 
 addToPending :: OutputTx -> BaggerState -> (Maybe OutputTx, OutputTx, BaggerState)
 addToPending t s@BaggerState {pending = p} =

@@ -6,6 +6,7 @@ dependencies:
   - base16-bytestring
   - binary
   - bytestring
+  - bytestring-arbitrary
   - crypto-pubkey-types
   - deepseq
   - ethereum-encryption

@@ -43,6 +43,7 @@ import           Blockchain.Blockstanbul.EventLoop
 import           Blockchain.Blockstanbul.Messages hiding (round)
 import           Blockchain.Blockstanbul.StateMachine
 import           Blockchain.Data.Block
+import           Blockchain.Data.BlockData
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP

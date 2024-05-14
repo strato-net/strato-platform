@@ -13,7 +13,7 @@ module Blockchain.Blockstanbul.Messages where
 import BlockApps.Logging
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.Block
-import Blockchain.Data.DataDefs
+import Blockchain.Data.BlockData
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class (blockHash)

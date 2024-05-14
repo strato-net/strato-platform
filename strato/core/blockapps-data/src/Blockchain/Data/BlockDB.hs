@@ -14,6 +14,7 @@ where
 
 import Blockchain.DB.SQLDB
 import Blockchain.Data.Block
+import Blockchain.Data.BlockData
 import Blockchain.Data.DataDefs
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction
@@ -33,11 +34,10 @@ blk2BlkDataRef ::
   Bool ->
   BlockDataRef
 blk2BlkDataRef b hash' difficulty' makeHashOne =
-  BlockDataRef pH uH cO cU cC sR tR rR lB d n gL gU t eD nc mH hash'' uncles True True difficulty' --- Horrible! Apparently I need to learn the Lens library, yesterday
+  BlockDataRef pH uH cO cU cC sR tR rR lB d n gL gU t eD nc mH hash'' True True difficulty' --- Horrible! Apparently I need to learn the Lens library, yesterday
   where
     hash'' = if makeHashOne then unsafeCreateKeccak256FromWord256 1 else hash'
     bd = blockBlockData b
-    uncles = blockBlockUncles b
     pH = blockDataParentHash bd
     uH = blockDataUnclesHash bd
     cB = blockDataCoinbase bd

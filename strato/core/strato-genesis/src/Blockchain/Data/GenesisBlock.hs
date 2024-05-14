@@ -28,8 +28,8 @@ import Blockchain.DB.StateDB
 import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
+import Blockchain.Data.BlockData
 import Blockchain.Data.ChainInfo
-import Blockchain.Data.DataDefs
 import Blockchain.Data.GenesisInfo
 import Blockchain.Data.RLP
 import Blockchain.Database.MerklePatricia

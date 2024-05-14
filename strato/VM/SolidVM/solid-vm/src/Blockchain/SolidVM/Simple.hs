@@ -38,6 +38,7 @@ module Blockchain.SolidVM.Simple
   )
 where
 
+import Blockchain.Data.BlockData
 import Blockchain.Data.DataDefs
 import Blockchain.Data.ExecResults
 import qualified Blockchain.Database.MerklePatricia as MP

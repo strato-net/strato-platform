@@ -20,8 +20,8 @@ import BlockApps.Logging
 import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul
 import qualified Blockchain.Data.Block as BDB
+import Blockchain.Data.BlockData
 import Blockchain.Data.ChainInfo (chainInfo, creationBlock, parentChains)
-import qualified Blockchain.Data.DataDefs as BDB
 import qualified Blockchain.Data.RLP as RL
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.TransactionDef as TD
@@ -714,20 +714,20 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
 prettyIBlock :: IngestBlock -> String
 prettyIBlock IngestBlock {ibOrigin = o, ibBlockData = bd, ibReceiptTransactions = txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"
   where
-    blockNonce = show . BDB.blockDataNumber $ bd
+    blockNonce = show . blockDataNumber $ bd
     bHash = format . BDB.blockHeaderHash $ bd
 
 prettyOBlock :: OutputBlock -> String
 prettyOBlock OutputBlock {obOrigin = o, obBlockData = bd, obReceiptTransactions = txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"
   where
-    blockNonce = show . BDB.blockDataNumber $ bd
+    blockNonce = show . blockDataNumber $ bd
     bHash = format . BDB.blockHeaderHash $ bd
 
 prettyBlock :: SequencedBlock -> String
 prettyBlock SequencedBlock {sbOrigin = o, sbBlockData = bd, sbReceiptTransactions = txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"
   where
-    blockNonce = show . BDB.blockDataNumber $ bd
-    bHash = format . BDB.blockHeaderHash $ bd
+    blockNonce = show . blockDataNumber $ bd
+    bHash = format . blockHeaderHash $ bd
 
 prettyTx :: IngestTx -> String
 prettyTx IngestTx {itOrigin = o, itTransaction = t} = prefix t ++ " via " ++ shortOrigin o

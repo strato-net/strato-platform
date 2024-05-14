@@ -28,8 +28,8 @@ import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
+import Blockchain.Data.BlockData
 import Blockchain.Data.BlockSummary
-import Blockchain.Data.DataDefs (BlockData (..))
 import Blockchain.Data.ExecResults
 import Blockchain.Data.GenesisInfo
 import Blockchain.Data.RLP

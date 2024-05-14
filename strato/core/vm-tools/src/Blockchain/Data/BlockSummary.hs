@@ -12,6 +12,7 @@ module Blockchain.Data.BlockSummary
   )
 where
 
+import Blockchain.Data.BlockData
 import Blockchain.Data.DataDefs
 import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP

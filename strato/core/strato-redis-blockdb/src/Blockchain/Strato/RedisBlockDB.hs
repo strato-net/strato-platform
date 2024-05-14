@@ -102,8 +102,8 @@ where
 
 import BlockApps.Logging
 import BlockApps.X509.Certificate
+import Blockchain.Data.BlockData
 import Blockchain.Data.ChainInfo
-import Blockchain.Data.DataDefs
 import Blockchain.EthConf (lookupRedisBlockDBConfig)
 import Blockchain.Partitioner (partitionWith)
 import Blockchain.Sequencer.Event

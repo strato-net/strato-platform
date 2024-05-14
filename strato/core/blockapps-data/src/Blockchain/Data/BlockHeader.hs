@@ -10,7 +10,7 @@ module Blockchain.Data.BlockHeader
 where
 
 import Blockchain.Data.Block
-import Blockchain.Data.DataDefs
+import Blockchain.Data.BlockData
 import Blockchain.Data.RLP
 import Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia as MP
