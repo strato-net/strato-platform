@@ -175,17 +175,37 @@ class StripeServiceController {
       const paymentDetails = await getStripePaymentFromToken(token);
       const session = await stripeService.getPaymentSession(paymentDetails.paymentsessionid, paymentDetails.accountid);
 
+      console.log(session);
       // Verify payment and perform onchain transfer
       let completeOrderStatus;
       if (session.payment_status === 'paid') {
         completeOrderStatus = await completeOrder(token);
         console.log("completeOrderStatus", completeOrderStatus);
+        // Update payment status in DB
+        const updateResult = await updateStripePayment(token, "PAID");
+      } else if (session.payment_status === 'unpaid' && session.status === 'complete') {
+        // ACH payment
+        console.log("Placeholder ACH");
+
+        // Update payment status in DB
+        const updateResult = await updateStripePayment(token, "PENDING");
+
+        // Redirect back to marketplace
+        res.setHeader('Content-Type', 'text/html');
+        res.send(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta http-equiv="refresh" content="0;url=${redirectUrl}?assets=${completeOrderStatus}">
+            </head>
+            <body>
+            </body>
+          </html>
+        `);
+        return next();
       } else {
         throw new Error(`Payment has not been processed. Failed to confirm purchase. Please contact an Admin or the Payment Server Admin.`);
       }
-
-      // Update payment status in DB
-      const updateResult = await updateStripePayment(token, "PAID");
 
       // Redirect back to marketplace
       res.setHeader('Content-Type', 'text/html');

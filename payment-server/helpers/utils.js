@@ -65,7 +65,7 @@ const insertStripePayment = async (token, sessionId, sellerCommonName) => {
     ) VALUES (
       $1, $2, $3, $4
     )`;
-  const insertValues = [ token, sessionId, sellerCommonName, "PENDING" ];
+  const insertValues = [ token, sessionId, sellerCommonName, "INITIALIZED" ];
   const insertResult = await client.query(insertQuery, insertValues);
   return insertResult;
 }
