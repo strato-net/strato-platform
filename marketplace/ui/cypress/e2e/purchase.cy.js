@@ -126,11 +126,8 @@ describe('Create a new Asset', () => {
     cy.get('button[type="submit"]').click();
     cy.wait(10000);
 
-    // Verify the order in the order table
-    cy.get('#Orders')
-    cy.get('#Orders').click();
+    cy.url().should("exist", "/order/bought");
     cy.get('#bought-tab')
-    cy.get('#bought-tab').click();
     cy.wait(10000);
 
     cy.get(".ant-table-tbody").then(order => {
