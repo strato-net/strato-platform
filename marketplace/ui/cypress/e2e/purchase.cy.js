@@ -23,7 +23,7 @@ describe('Create a new Asset', () => {
       credentials: 'same-origin'
     }).then((response) => {
       expect(response.status).to.eq(200);
-      cy.wrap(response.body.data.commonName).as('sellerName');
+      Cypress.env('sellerName', response.body.data.commonName);
     });
 
     // Create an item
@@ -40,9 +40,6 @@ describe('Create a new Asset', () => {
     });
     
     cy.wait(5000)
-    cy.get('@sellerName').then((name) => {
-      console.log("seller-Name", name);
-    });
     cy.get('[title="Art"]').should('have.attr', 'title', 'Art').first()
     cy.get('[title="Art"]').should('have.attr', 'title', 'Art').first().click();
 
@@ -145,15 +142,10 @@ describe('Create a new Asset', () => {
     });
 
     cy.wait(10000);
-    cy.get('@sellerName').then((sName) => {
-      cy.get('@buyerName').then((bName) => {
-        cy.get("#Buyer").should('have.text', bName);
-        cy.get("#Seller").should('have.text', sName);
-      });
+    cy.get('@buyerName').then((buyerName) => {
+      cy.get("#Buyer").should('have.text', buyerName);
+      cy.get("#Seller").should('have.text', Cypress.env('sellerName'));
     });
-
-    // cy.get("#Buyer").should('have.text', buyerName);
-    // cy.get("#Seller").should('have.text', sellerName);
 
     cy.get(".ant-table-tbody").then(order => {
       cy.get(".ant-table-row").first().within(() => {
