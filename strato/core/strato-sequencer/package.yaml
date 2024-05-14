@@ -65,9 +65,7 @@ executables:
     source-dirs:      exec-src
     main:             Main.hs
     dependencies:
-      - aeson
       - async
-      - base64
       - blockapps-data
       - blockapps-init
       - blockapps-vault-wrapper-api
@@ -75,8 +73,6 @@ executables:
       - blockstanbul
       - bytestring
       - common-log
-      - containers
-      - extra
       - hflags
       - http-client
       - milena

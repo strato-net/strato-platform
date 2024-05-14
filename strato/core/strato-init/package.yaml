@@ -28,7 +28,6 @@ library:
   - containers
   - directory
   - either
-  - entropy
   - ethereum-discovery
   - ethereum-rlp
   - evm-solidity
