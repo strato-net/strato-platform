@@ -15,21 +15,31 @@ All changes merged to `develop` should be documented in "Unreleased" until the v
 so that they could be properly moved to their respective version's subsection.
 
 ## [Unreleased] 
+### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+
+## [11.2.0] - 5/15/2024 
 ### Added
 - POST `/transaction` allows users to create contracts by providing an address through the `codePtr` field
 - `creatorForkBlockNumber` flag added to customize at which block :creator field should start referring to the common name and not org
+- can access an address's `creator` (uploader of original contract) and `root` (address of original contract) within SolidVM
 - `forced-config-change` executable can now update `sequence_number` in addition to `round_number` of sequencer view
 
 ### Changed
 - Expansion of Concrete contract to Abstract contract is accomodated by Cirrus
-- :creator field refers to user's common name, not org (can be customized to occur after particular block number for backwards compatibility)
+- `:creator` field refers to user's common name, not org (can be customized to occur after particular block number for backwards compatibility)
 - `eth_<random 20 bytes>` database is now just named `eth`
 - `queryStrato` is now `strato-barometer`
 - `strato-barometer` commands point to a copy of `./ethereumH` to access LevelDB data
 
 ### Fixed
-- When a contract is created by a user, that user is the :creator. When a contract is created by another contract, :creator is the :creator of that contract
+- When a contract is created by a user, that user is the `:creator`. When a contract is created by another contract, `:creator` is the `:creator` of that contract
 
 ### Removed
 - Removed 'block', 'blockGO', 'canonRedis', 'compressRoundChanges' commands from blockapps-tools
@@ -39,7 +49,8 @@ so that they could be properly moved to their respective version's subsection.
 - `logserver` package (fileserver for strato logs)
 - `blockchain` database in postgres (unused)
 
-## [11.1.0] - 3/28/2023
+
+## [11.1.0] - 3/28/2024
 
 ### Added
 - Custom `Show` instances for `CodeCollection`, `Function`, `Contract` data types
