@@ -50,7 +50,7 @@ import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Stream.Action as Action
 import Blockchain.VMContext
-import Blockchain.VMOptions ()
+import Blockchain.VMOptions (flags_useSaltedCerts)
 import Blockchain.Wiring ()
 import Control.Concurrent
 import Control.Concurrent.Async

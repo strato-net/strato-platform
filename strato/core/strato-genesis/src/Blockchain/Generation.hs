@@ -288,7 +288,7 @@ insertCertRegistryContract certs useSaltedCerts gi =
                 0x509
                 509
                 (SolidVMCode "CertificateRegistry" (KECCAK256.hash encodedRegistry))
-                $ [ (".owner", rootAddress) ]
+                []
       _ -> SolidVMContractWithStorage
              0x509
              509
