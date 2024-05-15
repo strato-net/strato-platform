@@ -56,7 +56,7 @@ abstract contract Redeemable is UTXO {
         require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
 
         _transfer(_newOwner, quantity, false, 0, 0);
-        redemptionService.redemptionRequested(_redemptionId, ownerCommonName, quantity);
+        redemptionService.redemptionRequested(_redemptionId);
         status = AssetStatus.PENDING_REDEMPTION;
 
         return RestStatus.OK;

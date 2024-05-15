@@ -2,6 +2,7 @@ pragma es6;
 pragma strict;
 
 import <509>;
+import "../Assets/Asset.sol";
 import "../Enums/RestStatus.sol";
 import "../Utils/Utils.sol";
 
@@ -27,7 +28,7 @@ abstract contract RedemptionService is Utils {
 
     event Redemption (
         string redemptionId,
-        address asset,
+        Asset asset,
         string issuer,
         string owner,
         uint quantity
@@ -95,16 +96,15 @@ abstract contract RedemptionService is Utils {
     }
 
     function redemptionRequested (
-        string _redemptionId,
-        string _owner,
-        uint _quantity
+        string _redemptionId
     ) public {
+        Asset asset = Asset(msg.sender);
         emit Redemption (
             _redemptionId,
-            msg.sender,
+            Asset(msg.sender),
             msg.sender.creator,
-            _owner,
-            _quantity
+            asset.ownerCommonName(),
+            asset.quantity()
         );
     }
 
