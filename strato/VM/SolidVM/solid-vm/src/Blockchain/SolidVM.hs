@@ -1258,7 +1258,7 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
   solidVMBreakpoint pos
   exps <- mapM (expToVar . snd) exptups
   expVals <- mapM getVar exps
-  expStrs <- mapM showSM expVals
+  expStrs <- mapM jsonSM expVals
 
   -- checks that the event is declared and that the number of args match
   --   DOES NOT check consistency of arg types
