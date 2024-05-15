@@ -25,6 +25,14 @@ abstract contract RedemptionService is Utils {
     string public createCustomerAddressRoute;
     string public getCustomerAddressRoute;
 
+    event Redemption (
+        string redemptionId,
+        address asset,
+        string issuer,
+        string owner,
+        uint quantity
+    );
+
     constructor (
         string _serviceName,
         string _imageURL,
@@ -84,6 +92,20 @@ abstract contract RedemptionService is Utils {
 
     function deactivate() requireOwner("deactivate the redemption service") external {
         isActive = false;
+    }
+
+    function redemptionRequested (
+        string _redemptionId,
+        string _owner,
+        uint _quantity
+    ) public {
+        emit Redemption (
+            _redemptionId,
+            msg.sender,
+            msg.sender.creator,
+            _owner,
+            _quantity
+        );
     }
 
     function update(

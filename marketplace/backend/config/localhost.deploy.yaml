@@ -2,4 +2,4 @@ url: https://marketplace.mercata-testnet2.blockapps.net/
 dapp:
   contract:
     name: Mercata
-    address: 4755d5d8996a8adcd4e06f112f14d855de0e3cf3
+    address: BASE_CODE_COLLECTION

@@ -9,6 +9,8 @@ const RedemptionsProvider = ({ children }) => {
         error: undefined,
         success: false,
         message: null,
+        redemptionServices: [],
+        isFetchingRedemptionServices: false,
         isRequestingRedemption: false,
         isFetchingOutgoingRedemptions: false,
         isFetchingIncomingRedemptions: false,

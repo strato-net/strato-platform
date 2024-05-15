@@ -40,16 +40,25 @@ abstract contract Redeemable is UTXO {
         return true;   
     }
 
-    function requestRedemption(uint _quantity) public returns (uint, address) {
+    function requestRedemption(string _redemptionId, uint _quantity) requireOwner("request redemption") public returns (uint, address) {
         require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
         require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
-        require(getCommonName(msg.sender) == ownerCommonName, "Only the owner of the Asset can request for redemption");
 
         UTXO newAsset = mint(_quantity);
-        Asset(newAsset).transferOwnership(owner, _quantity, false, 0, 0);
-        Asset(newAsset).updateStatus(AssetStatus.PENDING_REDEMPTION);
         quantity -= _quantity;
+        uint restStatus = Redeemable(newAsset).issueRedemptionRequest(_redemptionId, owner);
 
-        return (RestStatus.OK, address(newAsset));
+        return (restStatus, address(newAsset));
+    }
+
+    function issueRedemptionRequest(string _redemptionId, address _newOwner) requireOwner("issue redemption request") public returns (uint) {
+        require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
+        require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
+
+        _transfer(_newOwner, quantity, false, 0, 0);
+        redemptionService.redemptionRequested(_redemptionId, ownerCommonName, quantity);
+        status = AssetStatus.PENDING_REDEMPTION;
+
+        return RestStatus.OK;
     }
 }

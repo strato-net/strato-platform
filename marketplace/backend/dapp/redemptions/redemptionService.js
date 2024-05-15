@@ -1,8 +1,9 @@
 import { util, rest, importer } from '/blockapps-rest-plus';
-import { setSearchQueryOptions, search, searchAllWithQueryArgs } from '/helpers/utils';
+import { setSearchQueryOptions, searchOne, searchAllWithQueryArgs } from '/helpers/utils';
 
 const contractName = 'RedemptionService';
 const externalContractName = 'ExternalRedemptionService';
+const eventName = 'RedemptionService.Redemption';
 const contractFilename = `${util.cwd}/dapp/mercata-base-contracts/Templates/Redemptions/ExternalRedemptionService.sol`;
 
 /** 
@@ -75,7 +76,7 @@ function marshalOut(_args) {
 }
 
 async function get(user, args, defaultOptions) {
-    const { address } = args;
+    const { address, ...restArgs } = args;
     const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
     let redemptionService;
     let searchArgs;
@@ -83,10 +84,10 @@ async function get(user, args, defaultOptions) {
     if (address) {
         searchArgs = setSearchQueryOptions(restArgs, [{ key: 'address', value: address }, {key: 'isActive', value: 'true'}]);
     } else {
-        searchArgs = setSearchQueryOptions(restArgs, [{ key: 'ownerCommonName', value: 'BlockApps' }, {key: 'isActive', value: 'true'}]);
+        searchArgs = setSearchQueryOptions(restArgs, [{ key: 'serviceName', value: 'BlockApps Redemptions' }, {key: 'isActive', value: 'true'}]);
     }
   
-    redemptionService = await search(contractName, searchArgs, options, user);
+    redemptionService = await searchOne(contractName, searchArgs, options, user);
 
     return redemptionService ? marshalOut(redemptionService) : undefined;
 }
@@ -98,12 +99,19 @@ async function getAll(admin, args = {}, baseOptions) {
     return redemptionServices.map((redemptionService) => marshalOut(redemptionService));
 }
 
+async function getRedemptions(admin, args = {}, baseOptions) {
+    const options = { ...baseOptions, org: 'BlockApps', app: 'Mercata' };
+    const redemptions = await searchAllWithQueryArgs(eventName, args, options, admin);
+    return redemptions;
+}
+
 export default {
     uploadContract,
     contractName,
     contractFilename,
     get,
     getAll,
+    getRedemptions,
     marshalIn,
     marshalOut,
 }
