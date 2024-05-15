@@ -5,7 +5,7 @@ export CONFIG_DIR_PATH=/config
 export DEPLOY_FILE_NAME=marketplace.deploy.yaml
 export STRATO_NODE_PROTOCOL=${STRATO_NODE_PROTOCOL:-http}
 export STRATO_NODE_HOST=${STRATO_NODE_HOST:-nginx}
-export BASE_CODE_COLLECTION=${BASE_CODE_COLLECTION:-9ed8a49bbd72fc4ca3ee7dcce9bc25be23014a7f} # Current deployment address on testnet2
+export BASE_CODE_COLLECTION=${BASE_CODE_COLLECTION:-2ca6ae0a2e398ea0d39a47dbeef3d20e3d60b084} # Current deployment address on testnet2
 export STRATO_HOSTNAME=${STRATO_HOSTNAME:-strato}
 export STRATO_PORT_API=${STRATO_PORT_API:-3000}
 
@@ -16,7 +16,7 @@ echo 'STRATO is available via nginx'
 # confirm strato api is up, then query the /eth/v1.2/metadata for urls of payment server and oauth discovery
 ETH_ENDPOINT=${STRATO_NODE_PROTOCOL}://${STRATO_HOSTNAME}:${STRATO_PORT_API}/eth/v1.2
 echo 'Waiting for STRATO API to be available...'
-until curl --silent --output /dev/null --fail --location ${ETH_ENDPOINT}/uuid ; do sleep 1; done
+until curl --silent --output /dev/null --fail --location ${ETH_ENDPOINT}/stats/totaltx ; do sleep 1; done
 echo 'STRATO API is available'
 METADATA=$(curl --silent --fail ${ETH_ENDPOINT}/metadata)
 

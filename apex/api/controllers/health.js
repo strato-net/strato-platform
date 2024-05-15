@@ -1,9 +1,10 @@
 const BlockDataRef = require("../models/strato/eth/blockDataRef");
-const models = require("../models");
 const winston = require("winston-color");
 const rp = require("request-promise");
 const config = require("../config/app.config");
+
 const utils = require("../lib/utils");
+
 
 const API_VERSION = "2.0";
 
@@ -67,10 +68,7 @@ module.exports = {
         },
       };
 
-      const responses = await Promise.all([getLatestHealth(), getPbftData()]);
-
-      const [[healthInfo, stallInfo, systemInfo, syncInfo], pbftData] =
-        responses;
+      const [[healthInfo, stallInfo, systemInfo, syncInfo], pbftData] = await Promise.all([utils.getLatestHealth(), getPbftData()]);
 
       if (healthInfo && stallInfo && systemInfo && syncInfo) {
         healthBody = utils.consolidateHealthData(
@@ -107,12 +105,12 @@ module.exports = {
 
   healthStatus: async function (req, res, next) {
     try {
-      let health = null;
+      let health = null, uptime = null;
       const [healthInfo, stallInfo, systemInfo, syncInfo] =
-        await getLatestHealth();
+        await utils.getLatestHealth();
 
       if (healthInfo && stallInfo && systemInfo && syncInfo) {
-        ({ health } = utils.consolidateHealthData(
+        ({ health, uptime } = utils.consolidateHealthData(
           healthInfo,
           stallInfo,
           systemInfo,
@@ -129,6 +127,7 @@ module.exports = {
         version: process.env.STRATO_VERSION,
         timestamp: new Date().toISOString(),
         health: health,
+        uptime: uptime,
       });
     } catch (error) {
       console.error(error);
@@ -136,65 +135,6 @@ module.exports = {
     }
   },
 };
-
-async function getLatestHealth() {
-  const [healthInfo, stallInfo, systemInfo, syncInfo] = await Promise.all([
-    models.CurrentHealth.findOne({
-      where: {
-        processName: "HealthStat",
-      },
-      attributes: [
-        "latestHealthStatus",
-        "latestCheckTimestamp",
-        "lastFailureTimestamp",
-        "additionalInfo",
-      ],
-      raw: true,
-    }),
-
-    models.CurrentHealth.findOne({
-      where: {
-        processName: "StallStat",
-      },
-      attributes: [
-        "latestHealthStatus",
-        "latestCheckTimestamp",
-        "lastFailureTimestamp",
-        "validBlocksIncreased",
-        "hasPendingTxs",
-      ],
-      raw: true,
-    }),
-
-    models.CurrentHealth.findOne({
-      where: {
-        processName: "SystemInfoStat",
-      },
-      attributes: [
-        "latestHealthStatus",
-        "latestCheckTimestamp",
-        "lastFailureTimestamp",
-        "additionalInfo",
-      ],
-      raw: true,
-    }),
-
-    models.CurrentHealth.findOne({
-      where: {
-        processName: "SyncStat",
-      },
-      attributes: [
-        "latestHealthStatus",
-        "latestCheckTimestamp",
-        "lastFailureTimestamp",
-        "additionalInfo",
-      ],
-      raw: true,
-    }),
-  ]);
-
-  return [healthInfo, stallInfo, systemInfo, syncInfo];
-}
 
 function getPbftData() {
   if (!process.env["PROMETHEUS_HOST"]) {

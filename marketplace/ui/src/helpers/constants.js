@@ -19,12 +19,12 @@ export const HTTP_METHODS = {
   PUT: "PUT",
 };
 
-export const homeUrl = new URL("/marketplace/", window.location.origin).toString();
-export const soldOrdersBaseUrl = new URL("/marketplace/order/sold", window.location.origin).toString();
-export const boughtOrdersBaseUrl = new URL("/marketplace/order/bought", window.location.origin).toString();
-export const transfersBaseUrl = new URL("/marketplace/order/transfers", window.location.origin).toString();
-export const soldOrderDetailssBaseUrl = new URL("/marketplace/sold-orders", window.location.origin).toString();
-export const boughtOrderDetailssBaseUrl = new URL("/marketplace/bought-orders", window.location.origin).toString();
+export const homeUrl = new URL("/", window.location.origin).toString();
+export const soldOrdersBaseUrl = new URL("/order/sold", window.location.origin).toString();
+export const boughtOrdersBaseUrl = new URL("/order/bought", window.location.origin).toString();
+export const transfersBaseUrl = new URL("/order/transfers", window.location.origin).toString();
+export const soldOrderDetailssBaseUrl = new URL("/sold-orders", window.location.origin).toString();
+export const boughtOrderDetailssBaseUrl = new URL("/bought-orders", window.location.origin).toString();
 
 export const UNIT_OF_MEASUREMENTS = {
   1: "LB",
@@ -70,6 +70,24 @@ export const getUnitNameByIndex = (index) => {
   return null;
 };
 
+export const getSpiritUnitNameByIndex = (index) => {
+  const unit = unitOfSpiritMeasures.find((measure) => measure.value === parseInt(index));
+
+  if (unit) {
+    if (unit.name.length > 20) {
+      // Extract abbreviation from inside brackets
+      const matches = unit.name.match(/\((.*?)\)/);
+      if (matches && matches.length > 1) {
+        return matches[1];
+      }
+    }
+    
+    return unit.name;
+  }
+  
+  return null;
+};
+
 export const unitOfMeasures = [
   { name: "Gram (G)", value: 1 },
   { name: "Kilogram (KG)", value: 2 },
@@ -79,6 +97,11 @@ export const unitOfMeasures = [
   { name: "Avoirdupois Pound (AVDP Lb)", value: 6 },
   { name: "Metric Ton (TON)", value: 7 },
   { name: "Imperial Ton (TONNE)", value: 8 }
+];
+
+export const unitOfSpiritMeasures = [
+  { name: "Barrell", value: 1 },
+  { name: "Bottle", value: 2 }
 ];
 
 export const CHARGES = {
@@ -130,6 +153,19 @@ export const CATEGORIES = [
   "Collectibles"
 ]
 
+export const spiritTypes = [
+  { value: "Whiskey", label: "Whiskey" },
+  { value: "Rye", label: "Rye" },
+  { value: "Bourbon", label: "Bourbon" },
+  { value: "Tequila", label: "Tequila" },
+  { value: "Gin", label: "Gin" },
+  { value: "Rum", label: "Rum" },
+  { value: "Cognac", label: "Cognac" },
+  { value: "Brandy", label: "Brandy" },
+  { value: "Port", label: "Port" },
+  { value: "Sherry", label: "Sherry" }
+]
+
 export const PAYMENT_TYPE = [
   { 
     name: "Credit Card / ACH", 
@@ -150,6 +186,21 @@ export const ORDER_STATUS = {
   "CLOSED": 3,
   "CANCELED": 4,
   "PAYMENT_PENDING": 5
+}
+
+export const ASSET_STATUS = {
+  "ACTIVE": 1,
+  "PENDING_REDEMPTION": 2,
+  "RETIRED": 3
+}
+
+export const REDEMPTION_STATUS = {
+  "PENDING": 1,
+  "FULFILLED": 2,
+  "REJECTED": 3,
+  "1": "Pending",
+  "2": "Fulfilled",
+  "3": "Rejected"
 }
 
 export const PAYMENT_LIST = ['card','us_bank_account']

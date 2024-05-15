@@ -75,13 +75,13 @@ isTableCreated globalsIORef tableName = do
       return $ tableName `M.member` createdTables'
 
 getMappingTables :: MonadIO m => IORef Globals -> T.Text -> T.Text -> T.Text -> m [T.Text]
-getMappingTables globalsIORef org app contract = do
-  createdTables <- scrapeFor globalsIORef (MappingTableName org app contract "") -- empty map name to get all map tables
+getMappingTables globalsIORef crtr app contract = do
+  createdTables <- scrapeFor globalsIORef (MappingTableName crtr app contract "") -- empty map name to get all map tables
   let mappingTables = M.filterWithKey isMappingTableName createdTables
         where
           isMappingTableName :: TableName -> TableColumns -> Bool
-          isMappingTableName (MappingTableName o a n _) _ =
-            o == org && a == app && n == contract
+          isMappingTableName (MappingTableName c a n _) _ =
+            crtr == c && app == a && n == contract
           isMappingTableName _ _ = False
   let mapNames = map mtMappingName (M.keys mappingTables)
   return mapNames
@@ -103,9 +103,9 @@ scrapeFor globalsIORef tableName = do
   case cirrusHandle of
     FakeCirrusHandle -> return createdTables
     CirrusHandle {..} -> case tableName of
-      MappingTableName org app contract _ | (org, app, contract) `S.member` queriedMaps -> return createdTables
-      MappingTableName org app contract "" -> do
-        let theMapTablesQuery = queryForMatchingTables $ MappingTableName org app contract ""
+      MappingTableName c a contract _ | (c, a, contract) `S.member` queriedMaps -> return createdTables
+      MappingTableName c a contract "" -> do
+        let theMapTablesQuery = queryForMatchingTables $ MappingTableName c a contract ""
         results :: [PGValues] <- liftIO $ pgQuery cirrusConn theMapTablesQuery
         forM_
           results
@@ -113,11 +113,11 @@ scrapeFor globalsIORef tableName = do
               [PGTextValue tn] -> do
                 cols <- scrapeForCols (wrapSingleQuotes $ decodeUtf8 tn) cirrusConn
                 let mapName = last $ T.splitOn "." (decodeUtf8 tn)
-                setTableCreated globalsIORef (MappingTableName org app contract mapName) cols
+                setTableCreated globalsIORef (MappingTableName c a contract mapName) cols
               _ -> return ()
           )
         g@Globals {createdTables = createdTables'} <- readIORef globalsIORef -- need to read again so have current ver of createdTables
-        updateGlobals globalsIORef g {cirrusHandle = cirrusHandle {queriedMaps = (org, app, contract) `S.insert` queriedMaps}}
+        updateGlobals globalsIORef g {cirrusHandle = cirrusHandle {queriedMaps = (c, a, contract) `S.insert` queriedMaps}}
         return createdTables'
       _ -> do
         cols <- scrapeForCols (tableNameToSingleQuoteText tableName) cirrusConn

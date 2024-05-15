@@ -55,7 +55,16 @@ export const Inventory = {
   resell: '/resell',
   transfer: '/transfer',
   updateSale: '/updateSale',
-  // audit: '/:address/:chainId/audit',
+  getPriceHistory: '/price/history',
+}
+
+export const Redemption = {
+  prefix: '/redemption',
+  get: '/:id',
+  create: '/',
+  getOutgoingRedemptionRequests: '/outgoing',
+  getIncomingRedemptionRequests: '/incoming',
+  close: '/close'
 }
 
 export const Item = {
@@ -77,6 +86,12 @@ export const Art = {
   create: '/'
 }
 
+export const Tokens = {
+  prefix: '/tokens',
+  getAll: '/',
+  create: '/'
+}
+
 export const CarbonOffset = {
   prefix: '/carbonOffset',
   getAll: '/',
@@ -85,6 +100,12 @@ export const CarbonOffset = {
 
 export const Metals = {
   prefix: '/metals',
+  getAll: '/',
+  create: '/'
+}
+
+export const Spirits = {
+  prefix: '/spirits',
   getAll: '/',
   create: '/'
 }

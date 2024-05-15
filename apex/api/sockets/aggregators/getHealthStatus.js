@@ -5,12 +5,10 @@ const {
   GET_NETWORK_HEALTH,
 } = require("../rooms");
 const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require("../eventBroker");
-const rp = require("request-promise");
 const models = require("../../models");
 const config = require("../../config/app.config");
 const { Prometheus } = require("../../lib/promClient");
 const utils = require("../../lib/utils");
-const health = require("../../controllers/health");
 
 let healthBody = {
   healthStatus: null,
@@ -60,74 +58,8 @@ const counter = new Prometheus.Counter({
 
 async function getHealthStatus() {
   counter.inc();
-  const healthInfoPromise = models.CurrentHealth.findOne({
-    where: {
-      processName: "HealthStat",
-    },
-    attributes: [
-      "latestHealthStatus",
-      "latestCheckTimestamp",
-      "lastFailureTimestamp",
-    ],
-  });
-  const stallInfoPromise = models.CurrentHealth.findOne({
-    where: {
-      processName: "StallStat",
-    },
-    attributes: [
-      "latestHealthStatus",
-      "latestCheckTimestamp",
-      "lastFailureTimestamp",
-    ],
-  });
 
-  const systemInfoPromise = models.CurrentHealth.findOne({
-    where: {
-      processName: "SystemInfoStat",
-    },
-    attributes: [
-      "latestHealthStatus",
-      "latestCheckTimestamp",
-      "lastFailureTimestamp",
-      "additionalInfo",
-    ],
-    raw: true,
-  });
-
-  const syncInfoPromise = models.CurrentHealth.findOne({
-    where: {
-      processName: "SyncStat",
-    },
-    attributes: [
-      "latestHealthStatus",
-      "latestCheckTimestamp",
-      "lastFailureTimestamp",
-      "additionalInfo",
-    ],
-    raw: true,
-  });
-
-  const networkHealthPromise = models.CurrentHealth.findOne({
-    where: {
-      processName: "NetworkHealthStat",
-    },
-    attributes: [
-      "latestHealthStatus",
-      "latestCheckTimestamp",
-      "lastFailureTimestamp",
-      "additionalInfo",
-    ],
-    raw: true,
-  });
-
-  const [healthInfo, stallInfo, systemInfo, syncInfo, networkHealthInfo] =
-    await Promise.all([
-      healthInfoPromise,
-      stallInfoPromise,
-      systemInfoPromise,
-      syncInfoPromise,
-      networkHealthPromise,
-    ]);
+  const [healthInfo, stallInfo, systemInfo, syncInfo, networkHealthInfo] = await utils.getLatestHealth()
 
   if (healthInfo && stallInfo && systemInfo && syncInfo) {
     healthBody = utils.consolidateHealthData(
@@ -146,7 +78,7 @@ async function getHealthStatus() {
     emitter.emit(
       ON_SOCKET_PUBLISH_EVENTS,
       GET_NODE_UPTIME,
-      healthBody.uptime / 1000
+      healthBody.uptime
     );
     emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_SYSTEM_INFO, {
       status: healthBody.healthData.systemHealth.health,
@@ -175,7 +107,7 @@ function initialHydrateHealthStatus(socket) {
 }
 
 function initialHydrateUptime(socket) {
-  socket.emit(`PRELOAD_${GET_NODE_UPTIME}`, healthBody.uptime / 1000);
+  socket.emit(`PRELOAD_${GET_NODE_UPTIME}`, healthBody.uptime);
 }
 
 function initialHydrateSystemInfo(socket) {

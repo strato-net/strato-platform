@@ -22,6 +22,7 @@ import {
 import { Images } from "../../images";
 //items
 import { actions as itemActions } from "../../contexts/item/actions";
+import { actions as redemptionActions } from "../../contexts/redemption/actions";
 import { useItemDispatch, useItemState } from "../../contexts/item";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
@@ -30,6 +31,7 @@ import { useAuthenticateState } from "../../contexts/authentication";
 import CategoryCard from "../MarketPlace/CategoryCard";
 import HelmetComponent from "../Helmet/HelmetComponent";
 import { SEO } from "../../helpers/seoConstant";
+import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
 
 
 const Inventory = ({ user }) => {
@@ -59,6 +61,13 @@ const Inventory = ({ user }) => {
     message: itemMsg,
     success: itemSuccess
   } = useItemState();
+
+  //redemptions
+  const redemptionDispatch = useRedemptionDispatch();
+  const {
+    message: redemptionMsg,
+    success: redemptionSuccess
+  } = useRedemptionState();
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
@@ -160,6 +169,24 @@ const Inventory = ({ user }) => {
     }
   };
 
+  const redemptionToast = (placement) => {
+    if (redemptionSuccess) {
+      api.success({
+        message: redemptionMsg,
+        onClose: redemptionActions.resetMessage(redemptionDispatch),
+        placement,
+        key: 5,
+      });
+    } else {
+      api.error({
+        message: redemptionMsg,
+        onClose: redemptionActions.resetMessage(redemptionDispatch),
+        placement,
+        key: 6,
+      });
+    }
+  };
+
   const navigate = useNavigate();
 
   const onboardSeller = async () => {
@@ -210,7 +237,7 @@ const metaImg = category ? category : SEO.IMAGE_META
             </Breadcrumb.Item>
             <Breadcrumb.Item>
               <p className="text-sm text-[#202020] font-medium">
-                My Store
+                My Items
               </p>
             </Breadcrumb.Item>
           </Breadcrumb>
@@ -221,11 +248,12 @@ const metaImg = category ? category : SEO.IMAGE_META
               icon={<img src={Images.ForwardIcon} 
               alt={metaImg} 
               title={metaImg}
-              className="hidden md:block w-6 h-6" />}> Inventory
+              className="hidden md:block w-6 h-6" />}> My Items
               </Button>
             </div>
             <div className="flex gap-3">
               <Button type="primary" className="w-40 h-9 "
+                id="connectStripe"
                 onClick={() => {
                   if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                     window.location.href = loginUrl;
@@ -247,6 +275,7 @@ const metaImg = category ? category : SEO.IMAGE_META
               >
                 <Button
                   type="primary"
+                  id="createItem"
                   className="w-40 h-9 flex items-center justify-center gap-[6px]"
                   onClick={() => {
                     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
@@ -262,7 +291,7 @@ const metaImg = category ? category : SEO.IMAGE_META
                     alt={metaImg}
                     title={metaImg}
                     className="w-[18px] h-[18px]" />
-                    Create Inventory
+                    Create Item
                   </div>
                 </Button>
               </Tooltip>
@@ -271,7 +300,7 @@ const metaImg = category ? category : SEO.IMAGE_META
           <div className="pt-6 mx-6 md:mx-5 md:px-10 mb-5 ">
           <Tabs
             defaultActiveKey={category ? category : "All"}
-            className="store"
+            className="items"
             onChange={(key) => handleTabSelect(key)}
             items={[
               {
@@ -364,6 +393,7 @@ const metaImg = category ? category : SEO.IMAGE_META
       }
       {message && openToast("bottom")}
       {itemMsg && itemToast("bottom")}
+      {redemptionMsg && redemptionToast("bottom")}
     </>
   );
 };

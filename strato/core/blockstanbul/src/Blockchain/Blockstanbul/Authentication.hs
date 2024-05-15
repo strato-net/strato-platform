@@ -22,7 +22,7 @@ import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.Blockstanbul.StateMachine
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.Block
-import Blockchain.Data.DataDefs
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
@@ -40,7 +40,7 @@ import Data.Binary
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.Either.Extra
-import Data.Maybe (catMaybes, mapMaybe)
+import Data.Maybe (catMaybes, mapMaybe, fromJust)
 import qualified Data.Set as S
 import Test.QuickCheck
 import Text.Printf
@@ -155,9 +155,9 @@ verifyBenfInfo bnf sig =
 signMessage :: (StateMachineM m) => TrustedMessage -> m (OutEvent)
 signMessage tm = do
   let mesg = getHash tm
-  addr <- use selfAddr
+  addr <- use selfCert
   sig <- sign mesg
-  return $ OMsg (MsgAuth addr sig) $ tm
+  return $ OMsg (MsgAuth (fromJust addr) sig) $ tm
 
 authenticate :: (A.Selectable Address X509CertInfoState m) => InEvent -> m Bool
 authenticate (IMsg (MsgAuth cm sig) tm) = do
@@ -180,7 +180,7 @@ replayHistoricBlock realValidators@(ChainMembers chainWorkAround) seqNo blk = ru
         S.fromList
           . mapMaybe (verifyCommitmentSeal (blockHash blk))
           $ _commitment
-      blockNo = fromIntegral . blockDataNumber . blockBlockData $ blk
+      blockNo = fromIntegral . number . blockBlockData $ blk
   -- signersX509 =
   -- signersX509 <- liftEither $ maybeToEither "no istanbul metadata" mapMaybe =<<(getX509FromAddress (S.toList signers))
   -- signersz <-  S.fromList $ (map getChainMemberFromX509 signersX509)

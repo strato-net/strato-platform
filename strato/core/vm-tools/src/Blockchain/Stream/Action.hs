@@ -224,11 +224,11 @@ parseDiffSolidVM x = typeMismatch "SolidVMDiff" x
 data ActionData = ActionData
   { _actionDataCodeHash :: CodePtr,
     _actionDataCodeCollection :: CodeCollection,
-    _actionDataOrganization :: Text,
+    _actionDataCreator :: Text,
     _actionDataApplication :: Text,
     _actionDataCodeKind :: CodeKind,
     _actionDataStorageDiffs :: DataDiff,
-    _actionDataAbstracts :: Map (Account, Text) (Text, Text), -- (import address, contract name) -> (org, app)
+    _actionDataAbstracts :: Map (Account, Text) (Text, Text), -- (import address, contract name) -> (cn, app)
     _actionDataMappings :: [Text],
     _actionDataArrays :: [Text],
     _actionDataCallTypes :: [CallType]
@@ -240,8 +240,8 @@ makeLenses ''ActionData
 instance Format ActionData where
   format ActionData {..} =
     "actionDataCodeHash: " ++ format _actionDataCodeHash ++ "\n"
-      ++ "actionDataOrganization: "
-      ++ show _actionDataOrganization
+      ++ "actionDataCreator: "
+      ++ T.unpack _actionDataCreator
       ++ "\n"
       ++ "actionDataApplication: "
       ++ T.unpack _actionDataApplication
@@ -268,14 +268,14 @@ mergeActionData newData oldData =
       abstracts = _actionDataAbstracts oldData <> _actionDataAbstracts newData
       mappings = nub $ _actionDataMappings oldData ++ _actionDataMappings newData
       arrays = nub $ _actionDataArrays oldData ++ _actionDataArrays newData
-   in ActionData (_actionDataCodeHash oldData) cc (_actionDataOrganization newData) (_actionDataApplication newData) (_actionDataCodeKind oldData) diffs abstracts mappings arrays calls
+   in ActionData (_actionDataCodeHash oldData) cc (_actionDataCreator newData) (_actionDataApplication newData) (_actionDataCodeKind oldData) diffs abstracts mappings arrays calls
 
 instance ToJSON ActionData where
   toJSON ActionData {..} =
     object
       [ "codeHash" .= _actionDataCodeHash,
         "codeCollection" .= _actionDataCodeCollection,
-        "organization" .= _actionDataOrganization,
+        "creator" .= _actionDataCreator,
         "application" .= _actionDataApplication,
         "diff" .= _actionDataStorageDiffs,
         "abstracts" .= _actionDataAbstracts,
@@ -289,7 +289,7 @@ instance FromJSON ActionData where
   parseJSON (Object o) = do
     ch <- o .: "codeHash"
     cc <- o .: "codeCollection"
-    og <- o .: "organization"
+    cr <- o .: "creator"
     ap <- o .: "application"
     ck <- o .:? "codeKind" .!= EVM
     df <-
@@ -303,7 +303,7 @@ instance FromJSON ActionData where
     dm <- o .: "mappings"
     dr <- o .: "arrays"
     dt <- o .: "types"
-    return $ ActionData ch cc og ap ck df da dm dr dt
+    return $ ActionData ch cc cr ap ck df da dm dr dt
   parseJSON o = fail $ "parseJSON ActionData: Expected object, got: " ++ show o
 
 data Delegatecall = Delegatecall

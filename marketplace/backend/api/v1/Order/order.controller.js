@@ -3,6 +3,7 @@ import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
 import sendEmail from '../../../helpers/email'
+import constants from '../../../helpers/constants'
 const options = { config, cacheNonce: true }
 
 class OrderController {
@@ -107,7 +108,7 @@ class OrderController {
   static async payment(req, res, next) {
     try {
       const { dapp, body, accessToken } = req
-      const originUrl = req.headers.origin
+      const originUrl = req.headers.origin || config.serverHost;
       OrderController.validatePaymentArgs(body)
 
       const result = await dapp.paymentCheckout(originUrl, body, options, accessToken)
@@ -338,7 +339,6 @@ class OrderController {
         unitPrice: Joi.number().required()
       })).required(),
       orderTotal: Joi.number().required(),
-      shippingAddressId: Joi.number().min(1).required(),
       tax: Joi.number().required(),
       user: Joi.string().required(),
       email: Joi.string().required(),
@@ -447,7 +447,6 @@ class OrderController {
         quantity: Joi.number().required(),
         saleAddress: Joi.string().required(),
       })).required(),
-      shippingAddressId: Joi.number().min(1).required(),
       paymentSessionId: Joi.string().required(),
     }).required();
 

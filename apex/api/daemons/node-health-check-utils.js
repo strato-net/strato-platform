@@ -38,17 +38,15 @@ function queryHealthStatus() {
     try {
       // TODO: you may think Promise.all() is a good idea here but I strongly recommend not to try refactoring it unless you also rewrite this file with OOP (see TODO in the beginning)
 
-      const isGlobalPasswordSet = await checkIfGlobalPasswordSet();
-      await checkHealthIsFresh(isGlobalPasswordSet);
+      await checkHealthIsFresh();
 
       const prometheusData = await getPrometheusMetrics();
       const prometheusMetrics = reformatPrometheusMetrics(prometheusData);
 
       const nodeHealthData = await calcNodeHealthAndSaveVitalStats(
-        prometheusMetrics,
-        isGlobalPasswordSet
+        prometheusMetrics
       );
-      await updateNodeHealthStatus(nodeHealthData, isGlobalPasswordSet);
+      await updateNodeHealthStatus(nodeHealthData);
       return resolve();
     } catch (error) {
       winston.error(
@@ -77,18 +75,6 @@ function getPrometheusMetrics() {
   return rp(options);
 }
 
-async function checkIfGlobalPasswordSet() {
-  const options = {
-    method: "GET",
-    url: `${process.env.vaultProxyUrl}/strato/v2.3/verify-password`,
-    followRedirects: false,
-    timeout: config.healthCheck.requestTimeout - 100,
-    json: true,
-  };
-
-  return await rp(options);
-}
-
 async function checkNodeSyncStallStatus(syncStat) {
   let currentTime = Date.now();
 
@@ -113,7 +99,7 @@ async function checkNodeSyncStallStatus(syncStat) {
   const pbftInfo = await getPbftData();
   const { sequence_number: currSeqBlockNum = 0 } = findView(pbftInfo);
 
-  const { isSynced } = await getStratoMetadata();
+  const { isSynced = false} = await getStratoMetadata();
 
   try {
     if (isSynced) {
@@ -178,16 +164,31 @@ async function checkNodeSyncStallStatus(syncStat) {
 async function getStratoMetadata() {
   const options = {
     method: "GET",
-    url: `http://strato:3000/eth/v1.2/metadata`,
+    url: `http://${process.env['STRATO_HOSTNAME']}:${process.env['STRATO_PORT_API']}/eth/v1.2/metadata`,
     followRedirects: false,
     timeout: config.healthCheck.requestTimeout - 100,
     json: true,
   };
 
-  return await rp(options);
+  try {
+    return await rp(options);
+  } catch (error) {
+    winston.error('Error fetching Strato metadata:', error);
+    return {}; // Return a default value in case of error
+  }
 }
 
-function reformatPrometheusMetrics(obj) {
+// TODO rewrite this guy!
+// Should return an object like: 
+// {
+//   'core-api': true,
+//   slipstream: true,
+//   'strato-p2p': true,
+//   'strato-sequencer': true,
+//   'vm-runner': true
+// }
+// but the logic must be simpler and prevent issues when no results are returned.
+  function reformatPrometheusMetrics(obj) {
   if (!(obj && obj.data && obj.data.result)) {
     winston.warn(
       `Not Found results while querying health status: prometheus path might be incorrect`
@@ -224,7 +225,7 @@ function reformatPrometheusMetrics(obj) {
           ? true
           : false;
     } else {
-      winston.info(`Metric format is updated; need to update its handling`);
+      winston.error(`Unexpected Prometheus response format`);
     }
   });
 
@@ -237,21 +238,28 @@ function reformatPrometheusMetrics(obj) {
 
   winston.info("Create entry for latest health status:", ret);
 
+  // TODO: Quick dirty fix for cases with empty metrics array returned from Prometheus - REWRITE the whole thing!
+  if (!Array.isArray(res) || res.length === 0) {
+    winston.error('Unexpected format of Prometheus metrics, or the metrics are empty!')
+    let newReturn = {};
+    for (let key in neededJobs) {
+      newReturn[neededJobs[key]] = false;
+    }
+    return newReturn;
+  }
+  
   return ret;
 }
 
 //TODO: refactor - make a batch db insert for all stats at once, divide node health calc and db insert (ridiculous function name)
-async function calcNodeHealthAndSaveVitalStats(
-  prometheusHealthMetrics,
-  isGlobalPasswordSet
-) {
+async function calcNodeHealthAndSaveVitalStats(prometheusHealthMetrics) {
   let isNodeHealthy = true;
   let currentTime = Date.now();
   let failedChecks = [];
 
   Object.keys(prometheusHealthMetrics).forEach(async (keyProcess) => {
     if (!prometheusHealthMetrics[keyProcess]) {
-      failedChecks.push(keyProcess);
+      failedChecks.push(`${keyProcess} is unavailable`);
     }
     isNodeHealthy = prometheusHealthMetrics[keyProcess] && isNodeHealthy;
     await models.HealthStat.create({
@@ -261,22 +269,22 @@ async function calcNodeHealthAndSaveVitalStats(
     });
   });
 
-  // TODO: move out from here (into checkSystemInfo?)
-  if (!isGlobalPasswordSet) {
+  const { isVaultPasswordSet = false  } = await getStratoMetadata();
+  if (isVaultPasswordSet === false) {
+    winston.error('Vault password not set!');
     isNodeHealthy = false;
-    failedChecks.push("stratoPassword");
+    failedChecks.push("STRATO Vault password is not set");
   }
+
 
   return [isNodeHealthy, failedChecks];
 }
 
-async function updateNodeHealthStatus(nodeHealthData, isGlobalPasswordSet) {
+async function updateNodeHealthStatus(nodeHealthData) {
   let currentTime = Date.now();
 
   // TODO: move checkSystemInfo out of here!
-  let [systemInfoStatus, systemInfo] = await checkSystemInfo(
-    isGlobalPasswordSet
-  );
+  let [systemInfoStatus, systemInfo] = await checkSystemInfo();
 
   // TODO: Should the unhealthy 'SystemInfoStat' make the HealthStat false??? Or add the status as a separate value in /health output
   let [stat, created] = await models.CurrentHealth.findOrCreate({
@@ -362,7 +370,7 @@ async function updateNodeHealthStatus(nodeHealthData, isGlobalPasswordSet) {
   return;
 }
 
-async function checkHealthIsFresh(isGlobalPasswordSet) {
+async function checkHealthIsFresh() {
   try {
     const healthInfo = await models.CurrentHealth.findOne({
       where: {
@@ -383,8 +391,8 @@ async function checkHealthIsFresh(isGlobalPasswordSet) {
         config.healthCheck.pollFrequency *
           config.healthCheck.pollTimeoutsForUnhealthy;
       if (!isHealthcheckUptodate) {
-        const currentStatus = [false, "Latest health check is outdated"];
-        await updateNodeHealthStatus(currentStatus, isGlobalPasswordSet);
+        const currentStatus = [false, ["Latest health check is outdated"]];
+        await updateNodeHealthStatus(currentStatus);
       }
     }
   } catch (err) {
@@ -395,13 +403,13 @@ async function checkHealthIsFresh(isGlobalPasswordSet) {
     );
     const currentStatus = [
       false,
-      "Server error: could not calculate the health status",
+      ["Server error: could not calculate the health status"],
     ];
-    await updateNodeHealthStatus(currentStatus, isGlobalPasswordSet);
+    await updateNodeHealthStatus(currentStatus);
   }
 }
 
-async function checkSystemInfo(isGlobalPasswordSet) {
+async function checkSystemInfo() {
   try {
     let additional_info = [];
     let sysInfoCollected = {};
@@ -501,11 +509,6 @@ async function checkSystemInfo(isGlobalPasswordSet) {
     });
     sysInfoCollected.networkStats = nwData;
 
-    if (!isGlobalPasswordSet) {
-      isHealthy = false;
-      additional_info.push("STRATO Vault password is not set");
-    }
-
     if (additional_info) {
       sysInfoCollected.Alerts = additional_info;
     }
@@ -520,7 +523,7 @@ async function checkSystemInfo(isGlobalPasswordSet) {
       } occurred while checking System Information`
     );
     const currentStatus = [false, ["Error when checking System Information"]];
-    await updateNodeHealthStatus(currentStatus, isGlobalPasswordSet);
+    await updateNodeHealthStatus(currentStatus);
   }
 }
 

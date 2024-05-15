@@ -7,7 +7,7 @@ import BlockApps.Logging
 import BlockApps.X509.Certificate
 import Blockchain.Constants
 import Blockchain.Data.Block
-import Blockchain.Data.DataDefs
+import Blockchain.Data.BlockHeader
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.Transaction as TX
 import Blockchain.EthConf as EC
@@ -49,11 +49,11 @@ bootstrapSequencer
           { obOrigin = TO.Direct,
             obBlockData = bd,
             obBlockUncles = us,
-            obTotalDifficulty = difficulty,
+            obTotalDifficulty = difficulty',
             obReceiptTransactions = map kludge txs
           }
       hash = blockHeaderHash bd
-      difficulty = blockDataDifficulty bd
+      difficulty' = difficulty bd
       kludge t = fromMaybe fallback (wrapIngestBlockTransactionUnanchored hash t)
         where
           fallback =
@@ -88,7 +88,7 @@ bootstrapSequencer
                   vaultClient = Just clientEnv
                 }
         runLoggingT . runSequencerM dummySequencerCfg Nothing $ do
-          bootstrapGenesisBlock hash difficulty
+          bootstrapGenesisBlock hash difficulty'
           A.insert (A.Proxy @EmittedBlock) hash alreadyEmittedBlock
           for_ extraCerts . uncurry $ A.insert (A.Proxy @X509CertInfoState)
           flushLdbBatchOps

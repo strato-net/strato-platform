@@ -10,6 +10,7 @@ import { SearchOutlined } from '@ant-design/icons';
 const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, offset }) => {
     const [data, setData] = useState([inventory]);
     const [quantity, setQuantity] = useState(1);
+    const [price, setPrice] = useState(0);
     const [userAddress, setUserAddress] = useState("");
     const inventoryDispatch = useInventoryDispatch();
     const userDispatch = useUsersDispatch();
@@ -79,11 +80,18 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
             )
         },
         {
+            title: "Set Price",
+            align: "center",
+            render: () => (
+                <InputNumber value={price} controls={false} min={1} onChange={(value) => setPrice(value)} />
+            )
+        },
+        {
             title: "Select recipient",
             align: "center",
             render: () => (
                 <Select
-                    className="w-[440px]"
+                    className="w-[390px]"
                     showSearch
                     onSelect={handleSelect}
                     onSearch={handleSearchChange}
@@ -107,14 +115,15 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
         const body = {
             assetAddress: inventory.address,
             newOwner: userAddress,
-            quantity
+            quantity,
+            price
         };
 
         if (quantity > 0 && quantity <= inventory.quantity && userAddress) {
             let isDone = await actions.transferInventory(inventoryDispatch, body);
             if (isDone) {
                 await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
-                await actions.fetchInventoryForUser(inventoryDispatch, limit, offset, user.commonName);
+                await actions.fetchInventoryForUser(inventoryDispatch, user.commonName);
                 handleCancel();
             }
         }
@@ -150,10 +159,15 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
                     </div>
                 </div>
                 <div>
-
                     <p className="text-[#202020] font-medium text-sm">Set Quantity</p>
                     <div className="inventory_card">
                         <InputNumber className="w-full pl-5" value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
+                    </div>
+                </div>
+                <div>
+                    <p className="text-[#202020] font-medium text-sm">Set Price</p>
+                    <div className="inventory_card">
+                        <InputNumber className="w-full pl-5" value={price} controls={false} min={1} onChange={(value) => setPrice(value)} />
                     </div>
                 </div>
                 <div>

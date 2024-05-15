@@ -1,15 +1,8 @@
-const request = require('sync-request');
-
-
-const res =  request('GET',`${process.env['stratoRoot']}/uuid`);
-const user = JSON.parse(res.getBody('utf8'));
-const nodeUUID = user && user.peerId;
-
 const dbConfig = {
   development: {
     username: 'postgres',
     password: 'api',
-    database: 'eth_' + nodeUUID,
+    database: 'eth',
     host: 'localhost',
     port: '15433',
     dialect: 'postgres',
@@ -17,7 +10,7 @@ const dbConfig = {
   test: {
     username: 'postgres',
     password: 'api',
-    database: 'eth_' + nodeUUID,
+    database: 'eth',
     host: 'postgres',
     port: '5432',
     dialect: 'postgres',
@@ -25,7 +18,7 @@ const dbConfig = {
   production: {
     username: '__strato_postgres_user__',
     password: '__strato_postgres_password__',
-    database: 'eth_' + nodeUUID,
+    database: 'eth',
     host: '__strato_postgres_host__',
     port: '__strato_postgres_port__',
     dialect: 'postgres',

@@ -17,7 +17,7 @@ const UnlistModal = ({ open, handleCancel, inventory, saleAddress, categoryName,
         let isDone = await actions.unlistInventory(inventoryDispatch, body);
         if (isDone) {
             await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
-            await actions.fetchInventoryForUser(inventoryDispatch, limit, offset, user.commonName);
+            await actions.fetchInventoryForUser(inventoryDispatch, user.commonName);
             handleCancel();
         }
     }
@@ -29,7 +29,7 @@ const UnlistModal = ({ open, handleCancel, inventory, saleAddress, categoryName,
             title={`Unlist - ${decodeURIComponent(inventory.name)}`}
             width={650}
             footer={[
-                <Button type="primary" className="w-32 h-9" onClick={handleSubmit} loading={isUnlisting}>
+                <Button id="modal-unlist-btn" type="primary" className="w-32 h-9" onClick={handleSubmit} loading={isUnlisting}>
                     Unlist
                 </Button>
             ]}

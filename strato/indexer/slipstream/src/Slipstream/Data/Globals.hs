@@ -48,29 +48,29 @@ data Globals = Globals
 
 data TableName
   = IndexTableName
-      { itOrganization :: T.Text,
+      { itCreator :: T.Text,
         itApplication :: T.Text,
         itContractName :: T.Text
       }
   | HistoryTableName -- technically the same as index, but logically different
-      { htOrganization :: T.Text,
+      { htCreator :: T.Text,
         htApplication :: T.Text,
         htContractName :: T.Text
       }
   | EventTableName
-      { etOrganization :: T.Text,
+      { etCreator :: T.Text,
         etApplication :: T.Text,
         etContractName :: T.Text,
         etEventName :: T.Text
       }
   | MappingTableName
-      { mtOrganization :: T.Text,
+      { mtCreator :: T.Text,
         mtApplication :: T.Text,
         mtContractName :: T.Text,
         mtMappingName :: T.Text
       }
   | AbstractTableName
-      { atOrganization :: T.Text,
+      { atCreator :: T.Text,
         atApplication :: T.Text,
         atContractName :: T.Text
       }

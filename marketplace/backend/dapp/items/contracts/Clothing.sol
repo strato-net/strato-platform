@@ -29,8 +29,9 @@ contract Clothing is Mintable {
         string _size,
         string _skuNumber,
         string _condition,
-        string _brand
-    ) public Mintable(_name, _description, _images, _files, _createdDate, _quantity) {
+        string _brand,
+        AssetStatus _status
+    ) public Mintable(_name, _description, _images, _files, _createdDate, _quantity, _status) {
         clothingType = _clothingType;
         size = _size;
         skuNumber = _skuNumber;
@@ -50,7 +51,8 @@ contract Clothing is Mintable {
             size,
             skuNumber,
             condition,
-            brand
+            brand,
+            status
         );
         return UTXO(address(newAsset));
     }

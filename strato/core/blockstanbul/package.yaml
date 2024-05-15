@@ -12,7 +12,6 @@ library:
   - aeson
   - binary
   - blockapps-data
-  - blockapps-datadefs
   - bytestring
   - common-log
   - conduit

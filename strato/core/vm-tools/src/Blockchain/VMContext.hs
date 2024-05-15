@@ -83,6 +83,7 @@ import Blockchain.DB.StateDB
 import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.ChainInfo
 import Blockchain.Data.DataDefs
@@ -212,7 +213,7 @@ newtype GasCap = GasCap {unVmGasCap :: Gas}
 instance NFData RBDB.RedisConnection where
   rnf (RBDB.RedisConnection c) = c `seq` ()
 
-data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo !Keccak256 !BlockData !Integer !Int !Int
+data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo !Keccak256 !BlockHeader !Integer !Int !Int
   deriving (Eq, Read, Show, Generic, NFData)
 
 instance Binary ContextBestBlockInfo
@@ -357,149 +358,6 @@ withCurrentBlockHash bh f = do
 instance Show Context where
   show = const "<context>"
 
-instance Mod.Modifiable ContextState ContextM where
-  get _ = get
-  put _ = put
-
-instance Mod.Accessible Context ContextM where
-  access _ = ask
-
-instance Mod.Modifiable (Maybe DebugSettings) ContextM where
-  get _ = gets $ view debugSettings
-  put _ ds = modify $ debugSettings .~ ds
-
-instance Mod.Accessible ContextState ContextM where
-  access _ = get
-
-instance Mod.Accessible MemDBs ContextM where
-  access _ = gets $ view memDBs
-
-instance Mod.Modifiable MemDBs ContextM where
-  get _ = gets $ view memDBs
-  put _ md = modify $ memDBs .~ md
-
-instance Mod.Accessible IsBlockstanbul ContextM where
-  access _ = IsBlockstanbul <$> contextGets _hasBlockstanbul
-
-instance Mod.Modifiable BaggerState ContextM where
-  get _ = contextGets _baggerState
-  put _ s = contextModify $ baggerState .~ s
-
-instance Mod.Accessible TRC.Cache ContextM where
-  access _ = contextGets _txRunResultsCache
-
-instance ContextM `Mod.Yields` TransactionResult where
-  yield = void . putTransactionResult
-
-vmBlockHashRootKey :: B.ByteString
-vmBlockHashRootKey = "block_hash_root"
-
-vmGenesisRootKey :: B.ByteString
-vmGenesisRootKey = "genesis_root"
-
-vmBestBlockRootKey :: B.ByteString
-vmBestBlockRootKey = "best_block_root"
-
-instance Mod.Modifiable BlockHashRoot ContextM where
-  get _ = do
-    db <- getStateDB
-    BlockHashRoot . maybe MP.emptyTriePtr MP.StateRoot <$> DB.get db def vmBlockHashRootKey
-  put _ (BlockHashRoot (MP.StateRoot sr)) = do
-    db <- getStateDB
-    DB.put db def vmBlockHashRootKey sr
-
-instance Mod.Modifiable GenesisRoot ContextM where
-  get _ = do
-    db <- getStateDB
-    GenesisRoot . maybe MP.emptyTriePtr MP.StateRoot <$> DB.get db def vmGenesisRootKey
-  put _ (GenesisRoot (MP.StateRoot sr)) = do
-    db <- getStateDB
-    DB.put db def vmGenesisRootKey sr
-
-instance Mod.Modifiable BestBlockRoot ContextM where
-  get _ = do
-    db <- getStateDB
-    BestBlockRoot . maybe MP.emptyTriePtr MP.StateRoot <$> DB.get db def vmBestBlockRootKey
-  put _ (BestBlockRoot (MP.StateRoot sr)) = do
-    db <- getStateDB
-    DB.put db def vmBestBlockRootKey sr
-
-instance Mod.Modifiable K.KafkaState ContextM where
-  get _ = readIORef =<< view (dbs . kafkaState)
-  put _ ks = view (dbs . kafkaState) >>= flip writeIORef ks
-
-instance Mod.Modifiable CurrentBlockHash ContextM where
-  get _ = fmap (fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0)) . gets $ view $ memDBs . currentBlock
-  put _ bh = modify $ memDBs . currentBlock ?~ bh
-
-instance HasMemAddressStateDB ContextM where
-  getAddressStateTxDBMap = gets $ view $ memDBs . stateTxMap
-  putAddressStateTxDBMap theMap = modify $ memDBs . stateTxMap .~ theMap
-  getAddressStateBlockDBMap = gets $ view $ memDBs . stateBlockMap
-  putAddressStateBlockDBMap theMap = modify $ memDBs . stateBlockMap .~ theMap
-
-instance (MP.StateRoot `A.Alters` MP.NodeData) ContextM where
-  lookup _ = MP.genericLookupDB $ getStateDB
-  insert _ = MP.genericInsertDB $ getStateDB
-  delete _ = MP.genericDeleteDB $ getStateDB
-
-instance (Account `A.Alters` AddressState) ContextM where
-  lookup _ = getAddressStateMaybe
-  insert _ = putAddressState
-  delete _ = deleteAddressState
-
-instance A.Selectable Account AddressState ContextM where
-  select _ = getAddressStateMaybe
-
-instance (Maybe Word256 `A.Alters` MP.StateRoot) ContextM where
-  lookup _ chainId = do
-    mBH <- gets $ view $ memDBs . currentBlock
-    fmap join . for mBH $ \(CurrentBlockHash bh) -> do
-      mSR <- gets $ view $ memDBs . stateRoots . at (bh, chainId)
-      case mSR of
-        Just sr -> pure $ Just sr
-        Nothing -> getChainStateRoot chainId bh
-  insert _ chainId sr = do
-    mBH <- gets $ view $ memDBs . currentBlock
-    case mBH of
-      Nothing -> pure ()
-      Just (CurrentBlockHash bh) -> do
-        modify $ memDBs . stateRoots %~ M.insert (bh, chainId) sr
-        putChainStateRoot chainId bh sr
-  delete _ chainId = do
-    mBH <- gets $ view $ memDBs . currentBlock
-    case mBH of
-      Nothing -> pure ()
-      Just (CurrentBlockHash bh) -> do
-        modify $ memDBs . stateRoots %~ M.delete (bh, chainId)
-        deleteChainStateRoot chainId bh
-
-instance A.Selectable Word256 ParentChainIds ContextM where
-  select _ chainId = fmap (\(_, _, p) -> ParentChainIds p) <$> getChainGenesisInfo (Just chainId)
-
-instance (Keccak256 `A.Alters` DBCode) ContextM where
-  lookup _ = genericLookupCodeDB $ getCodeDB
-  insert _ = genericInsertCodeDB $ getCodeDB
-  delete _ = genericDeleteCodeDB $ getCodeDB
-
-instance ((Address, T.Text) `A.Selectable` X509CertificateField) ContextM where
-  select _ (k, t) = do
-    let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8
-    mCertAddress <- if flags_useSaltedCerts then deriveX509AddrFromUserAddress k else lookupX509AddrFromCBHash k
-    fmap join . for mCertAddress $ \certAddress -> do
-      maybe Nothing (readMaybe . T.unpack . Text.decodeUtf8) <$> A.lookup (A.Proxy) (certKey certAddress t)
-
-instance (Address `A.Selectable` X509Certificate) ContextM where
-  select _ k = do
-    let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8
-    mCertAddress <- if flags_useSaltedCerts then deriveX509AddrFromUserAddress k else lookupX509AddrFromCBHash k
-    fmap join . for mCertAddress $ \certAddress -> do
-      mBString <- fmap (rlpDecode . rlpDeserialize) <$> A.lookup (A.Proxy) (certKey certAddress ".certificateString")
-      case mBString of
-        Just (BString bs) -> pure . eitherToMaybe $ bsToCert bs
-        _ -> pure Nothing
-
-
 lookupX509AddrFromCBHash ::
   ( MonadLogger m,
     (A.Alters (Account, B.ByteString) B.ByteString) m
@@ -519,48 +377,6 @@ deriveX509AddrFromUserAddress :: MonadLogger m => Address -> m (Maybe Address)
 deriveX509AddrFromUserAddress addr = do
   $logDebugS "deriveX509AddrFromUserAddress" $ T.pack $ "Deriving X509 address for address " ++ show addr
   pure $ Just $ deriveAddressWithSalt (Just $ Address 0x509) (show addr) (Just $ hash $ Text.encodeUtf8 certificateRegistryContract) Nothing
-
-instance (N.NibbleString `A.Alters` N.NibbleString) ContextM where
-  lookup _ = genericLookupHashDB $ getHashDB
-  insert _ = genericInsertHashDB $ getHashDB
-  delete _ = genericDeleteHashDB $ getHashDB
-
-instance HasMemRawStorageDB ContextM where
-  getMemRawStorageTxDB = gets $ view $ memDBs . storageTxMap
-  putMemRawStorageTxMap theMap = modify $ memDBs . storageTxMap .~ theMap
-  getMemRawStorageBlockDB = gets $ view $ memDBs . storageBlockMap
-  putMemRawStorageBlockMap theMap = modify $ memDBs . storageBlockMap .~ theMap
-
-instance (RawStorageKey `A.Alters` RawStorageValue) ContextM where
-  lookup _ = genericLookupRawStorageDB
-  insert _ = genericInsertRawStorageDB
-  delete _ = genericDeleteRawStorageDB
-  lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
-
-instance (Keccak256 `A.Alters` BlockSummary) ContextM where
-  lookup _ = genericLookupBlockSummaryDB $ getBlockSummaryDB
-  insert _ = genericInsertBlockSummaryDB $ getBlockSummaryDB
-  delete _ = genericDeleteBlockSummaryDB $ getBlockSummaryDB
-
-instance MonadReader Context m => Mod.Accessible SQLDB m where
-  access _ = view $ dbs . sqldb
-
-instance Mod.Accessible RBDB.RedisConnection ContextM where
-  access _ = view $ dbs . redisPool
-
-instance Mod.Accessible (Maybe WorldBestBlock) ContextM where
-  access _ = do
-    mRBB <- RBDB.withRedisBlockDB RBDB.getWorldBestBlockInfo
-    for mRBB $ \(RedisBestBlock sha num diff) ->
-      return . WorldBestBlock $ BestBlock sha num diff
-
-instance Mod.Modifiable GasCap ContextM where
-  get _ = contextGets (GasCap . _vmGasCap)
-
-  put _ (GasCap g) = do
-    contextModify (vmGasCap .~ g)
-    $logDebugS "#### Mod.put @vmGasCap" . T.pack $ "VM Gas Cap updated to: " ++ show g
-
 
 runTestContextM ::
   ( MonadUnliftIO m,
@@ -738,16 +554,16 @@ incrementNonce account = A.adjustWithDefault_ Mod.Proxy account $ \addressState 
 
 getNewAddress :: (MonadIO m, (Account `A.Alters` AddressState) m) => Account -> m Account
 getNewAddress account = do
-  nonce <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy account
-  when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ format account ++ ", nonce=" ++ show nonce
-  let newAddress = getNewAddress_unsafe (account ^. accountAddress) nonce
+  nonce' <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy account
+  when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ format account ++ ", nonce=" ++ show nonce'
+  let newAddress = getNewAddress_unsafe (account ^. accountAddress) nonce'
   incrementNonce account
   return $ (accountAddress .~ newAddress) account
 
 getNewAddressWithSalt :: (MonadIO m, MonadLogger m, (Account `A.Alters` AddressState) m) => Account -> Value -> Keccak256 -> String -> m Account
 getNewAddressWithSalt account salt hsh args = do
-  nonce <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy account
-  when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ format account ++ ", nonce=" ++ show nonce
+  nonce' <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy account
+  when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ format account ++ ", nonce=" ++ show nonce'
   let saltAsString = case salt of
         (SString s) -> s
         _ -> invalidArguments "big major bad" salt

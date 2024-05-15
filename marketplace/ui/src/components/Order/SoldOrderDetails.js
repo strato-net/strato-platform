@@ -32,6 +32,8 @@ import TagManager from "react-gtm-module";
 import image_placeholder from "../../images/resources/image_placeholder.png";
 import BoughtOrdersTable from "./BoughtOrdersTable";
 import TransfersTable from "./TransfersTable";
+import RedemptionsOutgoingTable from "./RedemptionsOutgoingTable";
+import RedemptionsIncomingTable from "./RedemptionsIncomingTable";
 import { ResponsiveOrderDetailCard } from "./ResponsiveOrderDetailCard";
 import { LeftArrow } from "../../images/SVGComponents";
 
@@ -85,7 +87,6 @@ const SoldOrderDetails = ({ user, users }) => {
           name: prod.name,
           unitPrice: prod.price,
           quantity: parseInt(orderDetails.order.quantities[index]),
-          shippingCharges: prod.shippingCharges ? prod.shippingCharges : 0,
           amount: prod.price * parseInt(orderDetails.order.quantities[index]),
           serialNumber: prod,
           tax: prod.tax ? prod.tax : 0,
@@ -249,32 +250,30 @@ const SoldOrderDetails = ({ user, users }) => {
   }
 
   const statusComponent = (status) => {
-    let textClass = "bg-[#FFF6EC]";
-    if (status === "Awaiting Shipment") {
-      textClass = "bg-[#EBF7FF]";
-    } else if (status === "Awaiting Fulfillment") {
-      textClass = "bg-[#FF8C0033]"
-    } else if (status === "Payment Pending") {
-      textClass = "bg-[#FF8C0033]"
-    } else if (status === "Closed") {
-      textClass = "bg-[#119B2D33]";
-    } else if (status === "Canceled") {
-      textClass = "bg-[#FFF0F0]";
-    }
-    let bgClass = "bg-[#119B2D]";
-    if (status === "Awaiting Shipment") {
-      bgClass = "bg-[#13188A]";
-    } else if (status === "Payment Pending") {
-      bgClass = "bg-[#FF8C00]"
-    } else if (status === "Awaiting Fulfillment") {
-      bgClass = "bg-[#FF8C00]"
-    } else if (status === "Closed") {
-      bgClass = "bg-[#119B2D]";
-    } else if (status === "Paid") {
-      textClass = "bg-[#119B2D]";
-    } else if (status === "Canceled") {
-      bgClass = "bg-[#FF0000]";
-    }
+    const statusClasses = {
+      ["Awaiting Shipment"]: {
+        textClass: "bg-[#EBF7FF]",
+        bgClass: "bg-[#13188A]"
+      },
+      ["Awaiting Fulfillment"]: {
+        textClass: "bg-[#FF8C0033]",
+        bgClass: "bg-[#FF8C00]"
+      },
+      ["Payment Pending"]: {
+        textClass: "bg-[#FF8C0033]",
+        bgClass: "bg-[#FF8C00]"
+      },
+      ["Closed"]: {
+        textClass: "bg-[#119B2D33]",
+        bgClass: "bg-[#119B2D]"
+      },
+      ["Canceled"]: {
+        textClass: "bg-[#FFF0F0]",
+        bgClass: "bg-[#FF0000]"
+      },
+    };
+
+    const { textClass, bgClass } = statusClasses[status] || { textClass: "bg-[#FFF6EC]", bgClass: "bg-[#119B2D]" };
     return (
       <div className={classNames(textClass, "status_contain w-max text-center py-1 px-2 rounded-md md:rounded-xl flex justify-start items-center gap-1 p-1")}>
         <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
@@ -284,23 +283,22 @@ const SoldOrderDetails = ({ user, users }) => {
   };
 
   const statusComponentForPayment = (status) => {
-    let textClass = "bg-[#FFF6EC]";
-    if (status === "Processing") {
-      textClass = "bg-[#FF8C0033]"
-    } else if (status === "Paid") {
-      textClass = "bg-[#119B2D33]";
-    } else if (status === "Payment Failed") {
-      textClass = "bg-[#FFF0F0]";
-    }
-    let bgClass = "bg-[#119B2D]";
-    if (status === "Processing") {
-      bgClass = "bg-[#FF8C00]"
-    } else if (status === "Paid") {
-      bgClass = "bg-[#119B2D]";
-    } else if (status === "Payment Failed") {
-      bgClass = "bg-[#FF0000]";
-    }
+    const statusClasses = {
+      ["Processing"]: {
+        textClass: "bg-[#FF8C0033]",
+        bgClass: "bg-[#FF8C00]"
+      },
+      ["Paid"]: {
+        textClass: "bg-[#119B2D33]",
+        bgClass: "bg-[#119B2D]"
+      },
+      ["Payment Failed"]: {
+        textClass: "bg-[#FFF0F0]",
+        bgClass: "bg-[#FF0000]"
+      },
+    };
 
+    const { textClass, bgClass } = statusClasses[status] || { textClass: "bg-[#FFF6EC]", bgClass: "bg-[#119B2D]" };
     return (
       <div className={classNames(textClass, "status_contain w-max h-max text-center py-1 px-2 rounded-md md:rounded-xl flex justify-start items-center gap-1 p-1")}>
         <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
@@ -311,7 +309,7 @@ const SoldOrderDetails = ({ user, users }) => {
 
 
   const onChange = (key) => {
-    navigate(routes.Orders.url.replace(':type', 'sold'))
+    navigate(routes.Orders.url.replace(':type', key))
   };
 
   const navigate = useNavigate();
@@ -331,7 +329,7 @@ const SoldOrderDetails = ({ user, users }) => {
         <p
           // href={routes.BoughtOrderDetails.url}
           className="text-primary text-[17px] cursor-pointer"
-          onClick={() => { navigate(`${routes.MarketplaceProductDetail.url.replace(":address", text.address)}`) }}
+          onClick={() => { navigate(`${routes.MarketplaceProductDetail.url.replace(":address", text.address).replace(":name", text.name)}`) }}
         >
           {decodeURIComponent(text.name)}
         </p>
@@ -348,15 +346,6 @@ const SoldOrderDetails = ({ user, users }) => {
       title: <Text className="text-primaryC text-[13px]">Quantity</Text>,
       dataIndex: "quantity",
       key: "quantity",
-      align: "center",
-      render: (text) => <p>{text}</p>,
-    },
-    {
-      title: (
-        <Text className="text-primaryC text-[13px]">Shipping Charges($)</Text>
-      ),
-      dataIndex: "shippingCharges",
-      key: "shippingCharges",
       align: "center",
       render: (text) => <p>{text}</p>,
     },
@@ -424,12 +413,12 @@ const SoldOrderDetails = ({ user, users }) => {
 
           <Tabs
             className="mx-4 md:mx-20 mt-0 md:mt-5"
-            defaultActiveKey={state == null ? "Sold" : state.defaultKey}
+            defaultActiveKey={"sold"}
             onChange={onChange}
             items={[
               {
                 label: <p id="sold-tab" className="font-semibold text-sm md:text-base">Orders (Sold)</p>,
-                key: "Sold",
+                key: "sold",
                 children:
                   <div className="mb-10">
                     <Button type="ghost" onClick={() => onChange('Sold')} className="cursor-pointer px-2 flex md:hidden items-center gap-2 text-xs font-semibold"><LeftArrow /> Back</Button>
@@ -621,13 +610,23 @@ const SoldOrderDetails = ({ user, users }) => {
               },
               {
                 label: <p id="bought-tab" className="font-semibold text-sm md:text-base">Orders (Bought)</p>,
-                key: "Bought",
+                key: "bought",
                 children: <BoughtOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
               },
               {
                 label: <p id="transfers-tab" className="font-semibold text-sm md:text-base">Transfers</p>,
-                key: "Transfers",
+                key: "transfers",
                 children: <TransfersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
+              },
+              {
+                label: <p id="redemptions-outgoing-tab" className="font-semibold text-sm md:text-base">Redemptions (Outgoing)</p>,
+                key: "redemptions-outgoing",
+                children: <RedemptionsOutgoingTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
+              },
+              {
+                label: <p id="redemptions-incoming-tab" className="font-semibold text-sm md:text-base">Redemptions (Incoming)</p>,
+                key: "redemptions-incoming",
+                children: <RedemptionsIncomingTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
               }
             ]}
           />

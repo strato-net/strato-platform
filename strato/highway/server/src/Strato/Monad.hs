@@ -14,7 +14,7 @@ module Strato.Monad where
 
 import Aws (Credentials(..))
 import Data.ByteString.Lazy as DBL hiding (map)
-import BlockApps.Logging
+import BlockApps.Logging as BL
 import Control.Monad.Reader
 import Control.Monad.Trans.Except
 import Data.String
@@ -22,6 +22,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import GHC.Stack
 import Network.HTTP.Client
+import Network.Wai.Parse
 import Servant
 import UnliftIO hiding (Handler (..))
 
@@ -78,9 +79,10 @@ runHighwayToIO :: HighwayWrapperEnv -> HighwayM a -> IO (Either HighwayWrapperEr
 runHighwayToIO env = try . runHighwayWithEnv env
 
 handleRuntimeError :: SomeException -> HighwayM a
-handleRuntimeError (e :: SomeException) = case fromException e of
-  Just (_ :: HighwayWrapperError) -> throwIO e
-  Nothing -> throwIO $ RuntimeError e
+handleRuntimeError (e :: SomeException) =
+  case fromException e of
+    Just (_ :: HighwayWrapperError) -> throwIO e
+    Nothing -> throwIO $ RuntimeError e
 
 handleHighwayError :: HighwayWrapperError -> HighwayM a
 handleHighwayError = \case
@@ -104,7 +106,9 @@ handleHighwayError = \case
 
 enterHighwayWrapper :: HighwayWrapperEnv -> HighwayM x -> Handler x
 enterHighwayWrapper env x = Handler $ do
-  eRes <- liftIO . runHighwayToIO env $ x `catch` handleRuntimeError `catch` handleHighwayError
+  eRes <- liftIO . runHighwayToIO env $ x                  `catch`
+                                        handleRuntimeError `catch`
+                                        handleHighwayError
   case eRes of
     Right a -> return a
     Left e -> throwE $ reThrowError e
@@ -140,13 +144,21 @@ enterHighwayWrapper env x = Handler $ do
                       Text.unpack err
                     ]
             }
-        RuntimeError _ ->
-          err500
-            { errBody =
-                fromString $
-                  unlines
-                    [ "Runtime Error!",
-                      "Something wrong has happened inside of STRATO.",
-                      "Please contact your network administrator to have this problem fixed."
-                    ]
-            }
+        RuntimeError e ->
+          case fromException e of
+            Just (pe :: RequestParseException) ->
+              err400
+                { errBody =
+                    fromString $
+                      show pe
+                }
+            Nothing                            ->
+              err500
+                { errBody =
+                    fromString $
+                      unlines
+                        [ "Runtime Error!",
+                          "Something wrong has happened inside of STRATO.",
+                          "Please contact your network administrator to have this problem fixed."
+                        ]
+                }

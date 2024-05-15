@@ -9,30 +9,29 @@ import {
   InputNumber,
   Space,
   Avatar,
-  Input,
+  Pagination,
   notification,
 } from "antd";
 import { CloseOutlined, DeleteOutlined } from "@ant-design/icons";
 // Actions
 import { actions as categoryActions } from "../../contexts/category/actions";
-import { actions as subCategoryActions } from "../../contexts/subCategory/actions";
 import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
+import { actions as orderActions } from "../../contexts/order/actions"
 // Dispatch and states
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
 import { useSubCategoryDispatch, useSubCategoryState } from "../../contexts/subCategory";
 import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/marketplace";
 import { useAuthenticateState } from "../../contexts/authentication";
+import { useOrderDispatch} from "../../contexts/order";
 // other
 import { arrayToStr } from "../../helpers/utils";
 import routes from "../../helpers/routes";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { MAX_PRICE } from "../../helpers/constants";
 import ClickableCell from "../ClickableCell";
 import NewTrendingCard from "./NewTrendingCard";
 import { Images } from "../../images";
 import './index.css'
-import { actions as orderActions } from "../../contexts/order/actions"
-import { useOrderDispatch} from "../../contexts/order";
 import { debounce } from 'lodash';
 import HelmetComponent from "../Helmet/HelmetComponent";
 import { SEO } from "../../helpers/seoConstant";
@@ -40,114 +39,67 @@ import { SEO } from "../../helpers/seoConstant";
 const { Panel } = Collapse;
 const { Text } = Typography;
 
+const availabilityOptions = [{label:'For Sale', value:'forSale'},
+                             {label:'Sold Out', value:'soldOut'}]
+
 const CategoryProductList = ({ user }) => {
 
   const location = useLocation();
   const navigate = useNavigate();
 
   const { state } = location;
-
+  const { category } = useParams()
+  const categoryParam = category == 'All' ? '' : category 
   const queryParams = new URLSearchParams(location.search);
 
-  const searchQueryValue = queryParams.get('search');
-  const categoryQueryValue = queryParams.get('category');
-  const categoryQueryValueArr = categoryQueryValue ? categoryQueryValue.split(',') : []
-
+  const searchQueryValue = queryParams.get('s') || '';
+  const subCategoryQueryValue = queryParams.get('sc') || '';
+  const selectedSubCat = subCategoryQueryValue.split(",") || [];
   const [api, contextHolder] = notification.useNotification();
   // States
-  const [selectedCategories, setSelectedCategories] = useState(categoryQueryValueArr);
-  const [selectedSubCategories, setSelectedSubCategories] = useState([]);
+  const [selectedSubCategories, setSelectedSubCategories] = useState(selectedSubCat);
+  const [selectedAvailability, setSelectedAvailability] = useState(['forSale', 'soldOut'])
   const [minPrice, setMinPrice] = useState(0);
   const [maxPrice, setMaxPrice] = useState(MAX_PRICE);
   const [subCategories, setSubCategories] = useState([]);
-  const [uniqueProductNames, setUniqueProductNames] = useState([]);
   const [desktopOpenFilter, setDesktopOpenFilter] = useState(true);
   const [mobileOpenFilter, setMobileOpenFilter] = useState(false);
-  const [search, setSearch] = useState(searchQueryValue);
   const [unSelected, setUnSelected] = useState([]);
-  const [scrollPosition, setScrollPosition] = useState(state?.scroll || 0);
 
   //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
-  const subCategoryDispatch = useSubCategoryDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
   const orderDispatch = useOrderDispatch();
   // states
-  const { marketplaceList, isMarketplaceLoading } = useMarketplaceState();
-  const { categorys, iscategorysLoading } = useCategoryState();
+  const { marketplaceList, marketplaceListCount, isMarketplaceLoading } = useMarketplaceState();
+  const { categorys } = useCategoryState();
   let { hasChecked, isAuthenticated } = useAuthenticateState();
-  const { subCategorys } = useSubCategoryState();
   const { cartList } = useMarketplaceState();
-
-  useEffect(() => {
-    categoryActions.fetchCategories(categoryDispatch);
-  }, []);
-
+  const [scrollPosition, setScrollPosition] = useState(0);
+  const [offset, setOffset] = useState(1);
+  const [limit, setLimit] = useState(10)
   const isLoading = isMarketplaceLoading;
 
   useEffect(() => {
-    const handleScroll = () => {
-      setScrollPosition(window.scrollY);
-    };
-  
-   if(!isLoading && !iscategorysLoading){
-     window.addEventListener('scroll', handleScroll);
-   }
-
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-    };
-  }, []);
+    categoryActions.fetchCategories(categoryDispatch);
+    const selectedSubCat = subCategoryQueryValue.split(",");
+    setSelectedSubCategories(selectedSubCat);
+  }, [categoryParam]);
 
   useEffect(() => {
-    if(!isLoading){
-      window.scrollTo(0, state?.scroll);
+    if(categorys.length > 0 && categoryParam!=='All'){
+      let subCat = categorys.find(item=>item.name===categoryParam)?.subCategories
+      setSubCategories(subCat)
+    }else{
+      setSubCategories([])
     }
-  }, [isLoading]);
+    
+  }, [categorys,categoryParam, subCategoryQueryValue]);
 
-  const onChangeCategory = async (checkedValues) => {
-    const categoryStr = checkedValues.join(",");
-    const baseUrl = new URL('/category', window.location.origin);
-
-    if (checkedValues.length === 0 && searchQueryValue) {
-      baseUrl.searchParams.set('search', searchQueryValue);
-    }
-    if (checkedValues.length > 0) {
-      baseUrl.searchParams.set('category', categoryStr);
-    }
-    if (searchQueryValue) {
-      baseUrl.searchParams.set('search', searchQueryValue);
-    }
-
-    const url = baseUrl.pathname + baseUrl.search;
-    navigate(url);
-    setSelectedCategories(checkedValues);
-    let categorys = arrayToStr(checkedValues);
-    await subCategoryActions.fetchSubCategoryList(subCategoryDispatch, categorys);
-    if (checkedValues.length === 0) {
-      clearSelection();
-    }
-  };
-
-  useEffect(() => {
-    let selection = subCategorys
-      .map(item => item.contract)
-      .filter(item => !unSelected.includes(item));
-  
-    // Update only if there's a change
-    if (JSON.stringify(selection) !== JSON.stringify(selectedSubCategories)) {
-      setSelectedSubCategories(selection);
-    }
-  
-    // update subCategories only if it's different
-    if (JSON.stringify(subCategorys) !== JSON.stringify(subCategories)) {
-      setSubCategories(subCategorys);
-    }
-  }, [unSelected, subCategorys, selectedSubCategories, subCategories]);
 
   const onChangeSubCategory = (e) => {
     let valuesChecked = checkValues(e, selectedSubCategories)
-    const unSelectedSubCat = subCategorys.filter((item) => {
+    const unSelectedSubCat = categorys.find(item=>item.name==categoryParam).subCategories.filter((item) => {
       if(valuesChecked.includes(item.contract)){}
       else{ return item }
     }).map(item => item.contract)
@@ -157,100 +109,124 @@ const CategoryProductList = ({ user }) => {
     // In this context, if both "CarbonDAO" and "CarbonOffset" 
     // are found within unSelectedSubCat, the "Carbon" category is also deselected.
     if(unSelectedSubCat.includes("CarbonDAO") && unSelectedSubCat.includes("CarbonOffset")){
-      const baseUrl = new URL('/category', window.location.origin);
-      const categoryData = selectedCategories.filter(item=>item!=="Carbon")
-      const selectedCategory = categoryData.join(',')
-
-      if (selectedCategory) {
-        baseUrl.searchParams.set('category', selectedCategory);
-      }
-      if (search) {
-        baseUrl.searchParams.set('search', search);
-      }
+      let baseUrl = new URL(`/c/All`, window.location.origin);
 
       const url = baseUrl.pathname + baseUrl.search;
       setUnSelected([])
-      setSelectedCategories(categoryData)
-      navigate(url);
-    }
+      navigate(url,{replace:true});
+    } else{
 
+    let baseUrl = new URL(`/c/${category}`, window.location.origin);
+    const subCategories = valuesChecked.join(',')
+    if (categoryParam && valuesChecked.length > 0) {
+      baseUrl.searchParams.set('sc', subCategories);
+    }
+    if(valuesChecked.length == 0){
+      setSubCategories([])
+    }
+    if (searchQueryValue) {
+      baseUrl.searchParams.set('s', searchQueryValue);
+    }
+    const url = baseUrl.pathname + baseUrl.search;
+    navigate(url, { replace: true });
+  }
+    
     setUnSelected(unSelectedSubCat)
     setSelectedSubCategories(valuesChecked);
   };
 
-
+  const availabilityFilter = `&forSale=${selectedAvailability.includes('forSale')}&soldOut=${selectedAvailability.includes('soldOut')}`;
   useEffect(() => {
     if (hasChecked && !isAuthenticated) {
       marketplaceActions.fetchMarketplace(
         marketplaceDispatch,
-        arrayToStr(selectedCategories),
-        arrayToStr(selectedSubCategories),
+        categoryParam,
+        subCategoryQueryValue,
         minPrice,
         maxPrice,
-        searchQueryValue
+        searchQueryValue,
+        availabilityFilter,
+        offset, 
+        limit
       );
     } else if (hasChecked && isAuthenticated) {
       marketplaceActions.fetchMarketplaceLoggedIn(
         marketplaceDispatch,
-        arrayToStr(selectedCategories),
-        arrayToStr(selectedSubCategories),
+        categoryParam,
+        subCategoryQueryValue,
         minPrice,
         maxPrice,
-        searchQueryValue
+        searchQueryValue,
+        availabilityFilter,
+        offset,
+        limit
       );
     }
   }, [
-    // selectedCategories,
-    selectedSubCategories,
+    categoryParam,
+    subCategoryQueryValue,
     minPrice,
     maxPrice,
     hasChecked,
     isAuthenticated,
-    searchQueryValue
+    searchQueryValue,
+    selectedAvailability,
+    offset,
+    limit
   ]);
 
-  const generateBaseUrl = () =>{
-    const baseUrl = new URL('/category', window.location.origin);
 
-    if (categoryQueryValue) {
-      baseUrl.searchParams.set('category', categoryQueryValue);
+  const generateBaseUrl = () =>{
+    const baseUrl = new URL(`/c/${category}`, window.location.origin);
+
+    if(subCategoryQueryValue){
+      baseUrl.searchParams.set('sc', subCategoryQueryValue);
     }
-    if (search) {
-      baseUrl.searchParams.set('search', search);
+    if (searchQueryValue) {
+      baseUrl.searchParams.set('s', searchQueryValue);
     }
 
     const url = baseUrl.pathname + baseUrl.search;
     return url;
   }
 
+  const getSavedScrollPosition = () => {
+    return parseInt(sessionStorage.getItem('scrollPosition')) || 0;
+  }
+
+  const saveScrollPosition = (position) => {
+    sessionStorage.setItem('scrollPosition', position);
+  }
+
   useEffect(() => {
-    const timeOut = setTimeout(() => {
-     const url = generateBaseUrl();
-      navigate(url, { state: { scroll: scrollPosition }});
-    }, 500);
+    const handleScroll = () => {
+      saveScrollPosition(window.scrollY);
+      setScrollPosition(window.scrollY)
+    };
+
+    window.addEventListener('scroll', handleScroll);
 
     return () => {
-      clearTimeout(timeOut);
+      window.removeEventListener('scroll', handleScroll);
     };
-  }, [search, minPrice, maxPrice]);
+  }, [scrollPosition]);
 
-  useEffect(()=>{
-      
+  useEffect(() => {
+    const url = generateBaseUrl();
+    navigate(url, { state: { scroll: getSavedScrollPosition() } });
+  }, []);
 
-      const url = generateBaseUrl();
-        if(!isLoading){
-          navigate(url, { state: { scroll: scrollPosition } });
-      }else{
-        navigate(url, { state: { scroll: state?.scroll || 0 } });
-      }
-      
-  },[scrollPosition])
+  useEffect(() => { 
+    if (!isLoading) {
+      window.scrollTo(0, state?.scroll);
+    }
+  }, [isLoading, state?.scroll]);
 
   //=========================Other functions===============================//
   const linkUrl = window.location.href;
-  const metaTitle = selectedCategories.length === 1 ? `${selectedCategories[0]} | ${SEO.TITLE_META} ` : `${SEO.TITLE_META}`
-  const metaImg = selectedCategories.length === 1 ? `${selectedCategories[0]}` : `${SEO.IMAGE_META}`
-  const metaCategory = selectedCategories.length === 1 ? `?category=${selectedCategories[0]}` : '' 
+  const metaTitle = categoryParam === 1 ? `${categoryParam} | ${SEO.TITLE_META} ` : `${SEO.TITLE_META}`
+  const metaImg = categoryParam === 1 ? `${categoryParam}` : `${SEO.IMAGE_META}`
+  const metaCategory = categoryParam === 1 ? `?category=${categoryParam}` : '' 
   const metaDescription = SEO.DESCRIPTION_META
 
   const clearSelection = () => {
@@ -259,20 +235,16 @@ const CategoryProductList = ({ user }) => {
   };
 
   const handleClearFilter = () => {
-    const isFilter = selectedCategories.length != 0 || selectedSubCategories.length != 0
-      || minPrice !== 0 || maxPrice !== MAX_PRICE
+    const isFilter = selectedSubCategories.length != 0
+      || minPrice !== 0 || maxPrice !== MAX_PRICE || selectedAvailability.length !== 2
     if (isFilter) {
-      const baseUrl = new URL('/category', window.location.origin);
-      if (searchQueryValue) {
-        baseUrl.searchParams.set('search', searchQueryValue);
-      }
+      const baseUrl = new URL(`/c/All`, window.location.origin);
       const url = baseUrl.pathname + baseUrl.search;
       navigate(url)
       clearSelection()
-      setSelectedCategories([]);
       setMinPrice(0)
       setMaxPrice(MAX_PRICE)
-
+      setSelectedAvailability(['forSale', 'soldOut'])
     }
   }
 
@@ -294,21 +266,23 @@ const CategoryProductList = ({ user }) => {
     setMobileOpenFilter(!mobileOpenFilter);
   };
 
+  const onChangeAvailability = (checkedValues) =>{
+    setSelectedAvailability(checkedValues);
+  }
   const addItemToCart = async (product, quantity) => {
     if (product.ownerCommonName === user?.commonName) {
       openToast("bottom", true, "Cannot buy your own item");
       return false;
     }
-  
+
     // Search for the product in the cart
     let foundIndex = cartList.findIndex((item) => item.product.address === product.address);
     let items = [...cartList];
-  
+
     // Found index will be -1 if it's not in the cart list
     if (foundIndex === -1) {
       // Product not found, check quantity before adding
       const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity]);
-
       if (checkQuantity === true) {
         // Quantity check passed, add new item to the cart
         items.push({ product, qty: quantity });
@@ -327,11 +301,11 @@ const CategoryProductList = ({ user }) => {
       }
     } else {
       // Product found, prepare to update quantity after check
-      const potentialNewQty = items[foundIndex].qty + quantity; 
+      const potentialNewQty = items[foundIndex].qty + quantity;
       const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity]);
       if (checkQuantity === true) {
         // Quantity check passed, update item quantity in the cart
-        items[foundIndex].qty = potentialNewQty; 
+        items[foundIndex].qty = potentialNewQty;
         marketplaceActions.addItemToCart(marketplaceDispatch, items);
         openToast("bottom", false, "Item updated in cart");
         return true;
@@ -341,7 +315,7 @@ const CategoryProductList = ({ user }) => {
           openToast("bottom", true, `Unfortunately, ${product.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
         } else { // Case 2: We are trying to add too much quantity
           openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${product.name} are available. Please update your cart quantity accordingly.`);
-        }        
+        }
         return false;
       }
     }
@@ -356,12 +330,6 @@ const CategoryProductList = ({ user }) => {
     isError ? api.error(msgObj) : api.success(msgObj)
   };
 
-  const handleChangeSearch = (e) => {
-    const value = e.target.value;
-    setSearch(value)
-  }
-
-
   const BreadCrumbComponent = () =>
     <Breadcrumb className="text-xs ml-4 md:ml-14 mt-14 lg:mt-5">
       <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
@@ -371,18 +339,12 @@ const CategoryProductList = ({ user }) => {
           </p>
         </ClickableCell>
       </Breadcrumb.Item>
-      <Breadcrumb.Item href="" onClick={e => setSelectedCategories([])}>
-        <ClickableCell href={routes.MarketplaceProductList.url}>
-          <p href={routes.MarketplaceProductList.url} className={`${selectedCategories.length > 0 ? "text-[#13188A] font-semibold " : "text-[#202020] font-medium"} text-sm hover:bg-transparent`}>
-            Marketplace
-          </p>
-        </ClickableCell>
-      </Breadcrumb.Item>
-      {selectedCategories?.map((category, index) => (
-        <Breadcrumb.Item key={index} className="text-[#202020] font-medium text-sm">
-          {category ? category : ""}
+      <Breadcrumb.Item className="text-[#202020] font-medium text-sm">
+          Category
         </Breadcrumb.Item>
-      ))}
+       {category && <Breadcrumb.Item className="text-[#202020] font-medium text-sm">
+          {category}
+        </Breadcrumb.Item>}
     </Breadcrumb>
 
   const ClearFilterComponent = () =>
@@ -416,15 +378,15 @@ const CategoryProductList = ({ user }) => {
       ghost="true"
       reverse={false}
       expandIcon={({ isActive }) =>
-        isActive ? 
-        <img src={Images.Dropdown} 
-        alt={metaImg} 
-        title={metaImg} 
-        style={{ width: "24px", height: "24px", transform: "rotate(180deg)" }} /> : 
-        <img src={Images.Dropdown} 
-        alt={metaImg} 
-        title={metaImg} 
-        style={{ width: "24px", height: "24px" }} />
+        isActive ?
+          <img src={Images.Dropdown}
+            alt={metaImg}
+            title={metaImg}
+            style={{ width: "24px", height: "24px", transform: "rotate(180deg)" }} /> :
+          <img src={Images.Dropdown}
+            alt={metaImg}
+            title={metaImg}
+            style={{ width: "24px", height: "24px" }} />
       }
     >
       {children}
@@ -444,13 +406,33 @@ const CategoryProductList = ({ user }) => {
   const PriceFilterComponent = () =>
     <Panel header={<Text strong className="text-base">Price ($)</Text>} key="1">
       <Space>
-        <InputNumber size="large" min={0} className="w-full" controls={false} prefix='$' value={minPrice} placeholder="min" 
-         onChange={(value) => debouncedSetMinPrice(value)} />
+        <InputNumber size="large" min={0} className="w-full" controls={false} prefix='$' value={minPrice} placeholder="min"
+          onChange={(value) => debouncedSetMinPrice(value)} />
         -
-        <InputNumber size="large" controls={false} className="w-full" min={minPrice} prefix='$' value={maxPriceValue} placeholder="max" 
-        onChange={(value) => debouncedSetMaxPrice(value)} />
+        <InputNumber size="large" controls={false} className="w-full" min={minPrice} prefix='$' value={maxPriceValue} placeholder="max"
+          onChange={(value) => debouncedSetMaxPrice(value)} />
       </Space>
     </Panel>
+
+
+const AvailabilityFilter = () =>
+<>
+<Panel header={<Text strong className="text-base">Availability</Text>} key="1">
+<Checkbox.Group
+  onChange={onChangeAvailability}
+  value={selectedAvailability}
+>
+  <div className="flex flex-col gap-3">
+    {availabilityOptions.map((category, index) => (
+      <Checkbox value={category.value} key={index} className="m-0">
+        {category.label}
+      </Checkbox>
+    ))}
+  </div>
+</Checkbox.Group>
+</Panel>
+<Divider className="m-auto w-[94%] min-w-[80%]" />
+</>
 
   const SubCategoryFilterComponent = () =>
     <Panel header={<Text strong className="text-base">Sub Categories</Text>} key="1">
@@ -458,9 +440,9 @@ const CategoryProductList = ({ user }) => {
         value={selectedSubCategories}
       >
         <div className="flex flex-col gap-3">
-          {subCategories.filter(item => item.name.toLowerCase().includes('carbon')).map((subcategory, index) => (
-            <Checkbox value={subcategory.contract} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
-              {subcategory.name}
+          {subCategories.map(({name,contract}, index) => (
+            <Checkbox value={contract} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
+              {name}
             </Checkbox>
           ))}
         </div>
@@ -471,28 +453,7 @@ const CategoryProductList = ({ user }) => {
     {ClearFilterComponent()}
     <div className="bg-white border border-solid border-[#E9E9E9] my-6 mb-24">
 
-      {categorys.length > 0 && (
-        <>
-          {DesktopCollapseComponent(<Panel header={<Text strong className="text-base">Categories</Text>} key="1">
-            <Checkbox.Group
-              onChange={onChangeCategory}
-              value={selectedCategories}
-            >
-              <div className="flex flex-col gap-3">
-                {categorys.map((category, index) => (
-                  <Checkbox value={category.name} key={index} className="m-0">
-                    {category.name}
-                  </Checkbox>
-                ))}
-              </div>
-            </Checkbox.Group>
-          </Panel>)}
-
-          <Divider className="m-auto w-[94%] min-w-[80%]" />
-        </>
-      )}
-
-      {selectedCategories.includes("Carbon") && (
+      {subCategories?.length > 1 && category === 'Carbon' && (
         <>
           {DesktopCollapseComponent(
             SubCategoryFilterComponent()
@@ -506,6 +467,7 @@ const CategoryProductList = ({ user }) => {
         PriceFilterComponent()
       )}
 
+      {DesktopCollapseComponent(AvailabilityFilter())}
     </div>
   </div>
 
@@ -519,31 +481,9 @@ const CategoryProductList = ({ user }) => {
         </div>
         <Divider className="m-0 mt-3" />
 
-        {/* Panel - Category */}
-        {categorys.length > 0 && (
-          <>
-            {MobileCollapseComponent(
-              <Panel header={<Text strong className="text-base">Categories</Text>} key="1">
-                <Checkbox.Group
-                  onChange={onChangeCategory}
-                  value={selectedCategories}
-                >
-                  <div className="flex flex-col gap-3">
-                    {categorys.map((category, index) => (
-                      <Checkbox value={category.name} key={index} className="m-0">
-                        {category.name}
-                      </Checkbox>
-                    ))}
-                  </div>
-                </Checkbox.Group>
-              </Panel>
-            )}
-            <Divider className="m-0" />
-          </>
-        )}
         {/* Panel - Sub Category */}
         <>
-          {selectedCategories.includes("Carbon") && MobileCollapseComponent(
+          {subCategories?.length > 1 && category === 'Carbon' && MobileCollapseComponent(
             SubCategoryFilterComponent()
           )}
           <Divider className="m-0" />
@@ -553,16 +493,11 @@ const CategoryProductList = ({ user }) => {
           PriceFilterComponent()
         )}
 
+       {MobileCollapseComponent(AvailabilityFilter())}
       </div>
     </div>
     <div className="h-full w-full bg-[#00000020] absolute top-0 md:hidden"></div>
   </div>
-
-  const handleSearchFocus = () =>{
-    const url = generateBaseUrl();
-    navigate(url, { state: { scroll: 0 }});
-    window.scrollTo(0, 0);
-  }
 
   return (
     <>
@@ -573,88 +508,69 @@ const CategoryProductList = ({ user }) => {
     <div className={`${mobileOpenFilter ? 'overflow-y-hidden h-[100vh] w-[100vw] bg-[#00000020] relative mt-0 md:bg-white md:mt-[auto] md:overflow-scroll trending_cards' : ' '}`}>
       <div className="fixed bg-white w-full top-7 z-10 md:static">
         {BreadCrumbComponent()}
+        <div className="flex justify-between items-center ml-4 px-2 mt-2 md:ml-14 md:hidden">
+          <div className="flex items-center">
 
-        <div className="flex items-center justify-center ml-4 md:ml-14 mr-14 mt-6 lg:mt-8 gap-4">
-          <div className="border border-solid border-[#6A6A6A] rounded-md cursor-pointer p-1 md:p-2" onClick={handleFilterClick}>
-            <img src={Images.filter} 
-            alt={metaImg}
-            title={metaImg}
-            className=" w-5 h-5 md:w-6 md:h-6" />
           </div>
+          <div className="border border-solid border-[#6A6A6A] rounded-md cursor-pointer p-1 md:p-2" onClick={handleFilterClick}>
+            <img src={Images.filter} alt={metaImg}
+                title={metaImg} className=" w-5 h-5 md:w-6 md:h-6" />
+          </div>
+        </div>
+      </div>
 
-          <div className={`flex-1`}>
-            <Input
-              size="large"
-              onChange={(e) => { handleChangeSearch(e) }}
-              onClick={handleSearchFocus}
-              placeholder="Search Marketplace"
-              prefix={
-              <img src={Images.Header_Search} 
-              alt={metaImg} 
-              title={metaImg} 
-              className="w-[18px] h-[18px]" />}
-              className="bg-[#F6F6F6] border-none rounded-3xl p-[10px]"
+        <div className="flex pt-4 mx-14 mt-[60px] md:mt-4 ">
+          {/* Filter section */}
+          {desktopOpenFilter && DesktopFilterComponent()}
+
+          {/* Product list section */}
+          <div className="mb-12 w-full">
+            {isLoading ?
+              <div className="h-96 w-full flex justify-center items-center">
+                <Spin spinning={isLoading} size="large" />
+              </div>
+              :
+              <div>
+                {marketplaceListCount > 0 ? (
+
+                  <div className={`mt-[61px] md:mt-4 mb-8 flex w-full md:grid flex-col items-center ${desktopOpenFilter ? "grid-cols-1 gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 4xl:grid-cols-5 lg:gap-14 xl:gap-x-10 2xl:gap-x-20" : " sm:grid-cols-1 gap-4 md:grid-cols-2 md:gap-14 lg:grid-cols-3 lg:gap-16 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 5xl:grid-cols-7"}`} id="product-list">
+                    {marketplaceList
+                      // .filter(product => product.saleQuantity > 0)
+                      .map((product, index) => {
+                        return (
+                          <NewTrendingCard
+                            topSellingProduct={product}
+                            key={index}
+                            addItemToCart={addItemToCart}
+                            parent={"Marketplace"}
+                            api={api}
+                            contextHolder={contextHolder}
+                            scrollPosition={scrollPosition}
+                            saveScrollPosition={saveScrollPosition}
+                          />
+                        );
+                      })}
+
+                  </div>
+                ) : (
+                  <div className="h-96 flex justify-center items-center" id="product-list">
+                    No data found
+                  </div>
+                )}
+              </div>
+            }
+            <Pagination 
+              onChange={(page, pageSize)=> setOffset(page) & setLimit(pageSize)} 
+              total={marketplaceListCount} 
+              size="default" 
+              showTotal={(total) => `Total ${total} items`}
             />
           </div>
         </div>
 
-        <div className="flex items-center ml-4 mt-2 md:ml-14 md:hidden">
-          <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
-          <Text className="text-gray-800 ml-1 text-sm font-normal">
-            {marketplaceList?.length} Results
-          </Text>
-        </div>
+        {mobileOpenFilter && MobileFilterComponent()}
       </div>
-
-      <div className="flex pt-4 mx-14 mt-[60px] md:mt-4 ">
-        {/* Filter section */}
-        {desktopOpenFilter && DesktopFilterComponent()}
-
-        {/* Product list section */}
-        <div className="mb-12 w-full">
-          <div className="hidden md:flex mt-4 items-center">
-            <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
-            <Text className="text-gray-800 ml-1 text-xl font-semibold">
-              {isLoading ? <Spin spinning={isLoading} size="small" /> : marketplaceList?.length} Results
-            </Text>
-          </div>
-          {isLoading ?
-            <div className="h-96 w-full flex justify-center items-center">
-              <Spin spinning={isLoading} size="large" />
-            </div>
-            :
-            <div>
-              {marketplaceList?.length > 0 ? (
-
-                <div className={`mt-[61px] md:mt-4 mb-8 flex w-full md:grid flex-col items-center ${desktopOpenFilter ? "grid-cols-1 gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 4xl:grid-cols-5 lg:gap-14 xl:gap-x-10 2xl:gap-x-20" : " sm:grid-cols-1 gap-4 md:grid-cols-2 md:gap-14 lg:grid-cols-3 lg:gap-16 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 5xl:grid-cols-7"}`} id="product-list">
-                  {marketplaceList
-                    // .filter(product => product.saleQuantity > 0)
-                    .map((product, index) => {
-                      return (
-                        <NewTrendingCard
-                          topSellingProduct={product}
-                          key={index}
-                          addItemToCart={addItemToCart}
-                          parent={"Marketplace"}
-                          api={api}
-                          contextHolder={contextHolder}
-                        />
-                      );
-                    })}
-
-                </div>
-              ) : (
-                <div className="h-96 flex justify-center items-center" id="product-list">
-                  No data found
-                </div>
-              )}
-            </div>
-          }
-        </div>
-      </div>
-
-      {mobileOpenFilter && MobileFilterComponent()}
-    </div>
+      
     </>
   );
 };

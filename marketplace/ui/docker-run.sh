@@ -5,7 +5,7 @@ export STRATO_HOSTNAME=${STRATO_HOSTNAME:-strato}
 export STRATO_PORT_API=${STRATO_PORT_API:-3000}
 export ETH_ENDPOINT=http://${STRATO_HOSTNAME}:${STRATO_PORT_API}/eth/v1.2
 echo 'Waiting for Strato api to be available...'
-until curl --silent --output /dev/null --fail --location ${ETH_ENDPOINT}/uuid
+until curl --silent --output /dev/null --fail --location ${ETH_ENDPOINT}/stats/totaltx
 do
   echo "  Check at $(date)"
   sleep 1

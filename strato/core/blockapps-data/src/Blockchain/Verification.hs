@@ -9,7 +9,7 @@ module Blockchain.Verification
   )
 where
 
-import Blockchain.Data.DataDefs
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.RLP
 import Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia as MP
@@ -25,7 +25,7 @@ transactionsVerificationValue = MP.sha2StateRoot . listToRLPVerificationValue
 transactionsVerificationValue :: [Transaction] -> MP.StateRoot
 transactionsVerificationValue theList = runIdentity . MP.runMP . MP.addAllKVs MP.emptyTriePtr $ zip [(0 :: Integer) ..] theList
 
-ommersVerificationValue :: [BlockData] -> Keccak256
+ommersVerificationValue :: [BlockHeader] -> Keccak256
 ommersVerificationValue = listToRLPVerificationValue
 
 receiptsVerificationValue :: () -> MP.StateRoot

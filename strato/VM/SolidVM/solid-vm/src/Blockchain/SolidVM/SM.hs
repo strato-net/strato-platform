@@ -26,8 +26,7 @@ module Blockchain.SolidVM.SM
     withCallInfo,
     withTempCallInfo,
     withUncheckedCallInfo,
-    pushLocalVars,
-    popLocalVars,
+    withLocalVars,
     getLocal,
     setLocal,
     getCurrentCallInfo,
@@ -132,7 +131,6 @@ data CallInfo = CallInfo
     codeCollection :: CC.CodeCollection,
     collectionHash :: Keccak256,
     localVariables :: Map SolidString (SVMType.Type, Variable),
-    variableStack :: [Map SolidString (SVMType.Type, Variable)],
     readOnly :: Bool,
     isUncheckedSection :: Bool, -- TODO: Perform overflow/underflow checks for all arithmetic operations and revert if so, use this flag to disable checks
     currentSourcePos :: Maybe SourcePosition,
@@ -605,7 +603,7 @@ getTypeOfName' s (CC.CodeCollection ccs _ _ enms strcts _ _ _) =
           ]
       ctrs = map ContractTypo $ M.keys ccs
    in case concatMap lookInContract ccs ++ ctrs of
-        [] -> internalError "getTypeOfName" s
+        [] -> internalError "getTypeOfName' " s
         (typo : _) -> typo
 
 getTypeOfName :: MonadSM m => SolidString -> m Typo
@@ -651,7 +649,6 @@ addCallInfo a c fn hsh cc initialLocalVariables ro ff = do
             codeCollection = cc,
             collectionHash = hsh,
             localVariables = initialLocalVariables,
-            variableStack = [initialLocalVariables],
             readOnly = ro,
             isUncheckedSection = False, -- The rationale here is that unchecked sections only apply to the current stack frame
             currentSourcePos = Nothing,
@@ -675,30 +672,19 @@ popCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
   [] -> internalError "popCallInfo was called on an already empty stack" ()
   (_ : rest) -> pure rest
 
+withLocalVars :: MonadSM m => m a -> m a
+withLocalVars = bracket_ pushLocalVars popLocalVars
+
 pushLocalVars :: MonadSM m => m ()
 pushLocalVars = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
   [] -> internalError "pushLocalVars was called with an empty stack" ()
-  (curFrame : rest) -> do
-    let localVariables' = localVariables curFrame
-        variableStack' = variableStack curFrame
-    {-- We save the local variables available in this scope to the 'stack',
-    which is simply a list of mappings from name to type/values
-    --}
-    pure $ curFrame {variableStack = (localVariables' : variableStack')} : rest
+  (curFrame : rest) -> pure $ curFrame : curFrame : rest
 
 -- The inverse operation as above, called when exiting a statement block and those declared variables need to be destroyed
 popLocalVars :: MonadSM m => m ()
 popLocalVars = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
   [] -> internalError "popLocalVars was called with an empty stack" ()
-  (curFrame : rest) -> do
-    let (varFrame, st) = case variableStack curFrame of
-          (varFrame' : st') -> (varFrame', st')
-          [] -> (M.empty, [])
-    {-- Since all the variables from the previous scope are saved to the most recent stack frame (vars),
-    we simply reassign the local variables to the top frame of the stack
-    and the new stack's value is the rest of the frames
-    --}
-    pure $ (curFrame {localVariables = varFrame, variableStack = st} : rest)
+  (_ : rest) -> pure rest
 
 withTempCallInfo :: MonadSM m => Bool -> m a -> m a
 withTempCallInfo ro f = do
@@ -899,15 +885,15 @@ initializeAction :: MonadSM m
                  => Account
                  -> String
                  -> String
+                 -> String
                  -> Keccak256
                  -> CC.CodeCollection
                  -> Map (Account, T.Text) (T.Text, T.Text)
                  -> [T.Text]
                  -> [T.Text]
                  -> m ()
-initializeAction acct name appName hsh cc ab maps arrs = do
-  -- org name to be set later, b/c the lookup is complex
-  let newData = Action.ActionData (SolidVMCode name hsh) cc "" (T.pack appName) SolidVM (Action.SolidVMDiff M.empty) ab maps arrs []
+initializeAction acct name crtr appName hsh cc ab maps arrs = do
+  let newData = Action.ActionData (SolidVMCode name hsh) cc (T.pack crtr) (T.pack appName) SolidVM (Action.SolidVMDiff M.empty) ab maps arrs []
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapInsertWith Action.mergeActionData acct newData
 
@@ -1010,24 +996,24 @@ resolveNameParts ::
   T.Text ->
   CC.Contract ->
   m ((Account, T.Text), (T.Text, T.Text))
-resolveNameParts to' o a c = do
+resolveNameParts to' crtr app c = do
   let tName = T.pack . CC._contractName
   case c ^. CC.importedFrom of
-    Nothing -> pure ((to', tName c), (o, a))
+    Nothing -> pure ((to', tName c), (crtr, app))
     Just acct ->
       A.select (A.Proxy @AddressState) acct >>= \case
         Nothing -> do
           $logWarnS "processTheMessages/resolveNameParts" . T.pack $
             "Could not find address state for account " ++ show acct
-          pure ((acct, tName c),(o, a))
+          pure ((acct, tName c), (crtr, app))
         Just s ->
           resolveCodePtr (acct ^. accountChainId) (addressStateCodeHash s) >>= \case
             Just (SolidVMCode appName _) -> do
               appCreator <- getSolidStorageKeyVal' acct $ MS.StoragePath [MS.Field ":creator"]
               case appCreator of
-                MS.BString org' -> pure ((acct, tName c), (T.pack $ BC.unpack org', T.pack appName))
-                _ -> pure ((acct, tName c),("", T.pack appName))
+                MS.BString cn' -> pure ((acct, tName c), (T.pack $ BC.unpack cn', T.pack appName))
+                _ -> pure ((acct, tName c), (crtr, T.pack appName))
             _ -> do
               $logWarnS "resolveNameParts" . T.pack $
                 "Could not resolve code for account " ++ show acct
-              pure ((acct, tName c),(o, a))
+              pure ((acct, tName c), (crtr, app))

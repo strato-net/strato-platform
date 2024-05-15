@@ -43,6 +43,7 @@ module.exports = {
     fontFamily: {
       sans: ["Montserrat", "sans-serif"],
       serif: ["Montserrat", "serif"],
+      arial: ["Arial", "sans-serif"],
     },
 
     extend: {
@@ -55,7 +56,10 @@ module.exports = {
       },
       boxShadow: {
         Footer: "0px -4px 4px 0px #00000029"
-      }
+      },
+      lineHeight: {
+        "12": "4.25rem"
+      },
 
     },
   },

@@ -102,8 +102,8 @@ where
 
 import BlockApps.Logging
 import BlockApps.X509.Certificate
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.ChainInfo
-import Blockchain.Data.DataDefs
 import Blockchain.EthConf (lookupRedisBlockDBConfig)
 import Blockchain.Partitioner (partitionWith)
 import Blockchain.Sequencer.Event
@@ -565,8 +565,8 @@ getCertFromParsedSet _ = pure $ Nothing
 addParsedSet :: X509CertInfoState -> Redis (Either Reply Status)
 addParsedSet (X509CertInfoState _ _ _ _ o u c) = do
   let setOrg = CM.Org (T.pack o) True
-      setOrgUnit = CM.OrgUnit (T.pack o) (T.pack $ fromMaybe "Nothing" u) True
-      setCommonName = CM.CommonName (T.pack o) (T.pack $ fromMaybe "Nothing" u) (T.pack c) True
+      setOrgUnit = CM.OrgUnit (T.pack o) (T.pack $ fromMaybe "" u) True
+      setCommonName = CM.CommonName (T.pack o) (T.pack $ fromMaybe "" u) (T.pack c) True
   currentUnits <-
     getInNamespace ParsedSetWhitePage setOrg >>= \case
       Right (Just runits) ->
@@ -602,7 +602,7 @@ addParsedSet (X509CertInfoState _ _ _ _ o u c) = do
 
 modifyParsedSetFromCert :: X509CertInfoState -> Redis (Either Reply Status)
 modifyParsedSetFromCert certInfo@(X509CertInfoState _ _ _ _ o u c) = do
-  let parsedSet = CM.CommonName (T.pack o) (T.pack $ fromMaybe "Nothing" u) (T.pack c) True
+  let parsedSet = CM.CommonName (T.pack o) (T.pack $ fromMaybe "" u) (T.pack c) True
   res <- multiExec $ set (inNamespace ParsedSetToX509 parsedSet) (toValue certInfo)
   case res of
     TxSuccess _ -> pure $ Right Ok
@@ -611,7 +611,7 @@ modifyParsedSetFromCert certInfo@(X509CertInfoState _ _ _ _ o u c) = do
 
 removeCertFromParsedSet :: X509CertInfoState -> Redis (Either Reply Status)
 removeCertFromParsedSet (X509CertInfoState addr cert _ children o u c) = do
-  let parsedSet = CM.CommonName (T.pack o) (T.pack $ fromMaybe "Nothing" u) (T.pack c) True
+  let parsedSet = CM.CommonName (T.pack o) (T.pack $ fromMaybe "" u) (T.pack c) True
   res <- multiExec $ set (inNamespace ParsedSetToX509 parsedSet) $ toValue (X509CertInfoState addr cert False children o u c)
   case res of
     TxSuccess _ -> pure $ Right Ok
@@ -651,7 +651,7 @@ getSHAsByNumber n =
 
 getHeader ::
   Keccak256 ->
-  Redis (Maybe BlockData)
+  Redis (Maybe BlockHeader)
 getHeader sha =
   getInNamespace Headers sha >>= \case
     Left _ -> return Nothing
@@ -662,12 +662,12 @@ getHeader sha =
 
 getHeaders ::
   [Keccak256] ->
-  Redis [(Keccak256, Maybe BlockData)]
+  Redis [(Keccak256, Maybe BlockHeader)]
 getHeaders = zipMapM getHeader
 
 getHeadersByNumber ::
   Integer ->
-  Redis [(Keccak256, Maybe BlockData)]
+  Redis [(Keccak256, Maybe BlockHeader)]
 getHeadersByNumber n =
   getMembersInNamespace Numbers n >>= \case
     Left _ -> return []
@@ -675,7 +675,7 @@ getHeadersByNumber n =
 
 getHeadersByNumbers ::
   [Integer] ->
-  Redis [(Integer, [(Keccak256, Maybe BlockData)])]
+  Redis [(Integer, [(Keccak256, Maybe BlockHeader)])]
 getHeadersByNumbers = zipMapM getHeadersByNumber
 
 getTransactions ::
@@ -715,7 +715,7 @@ addPrivateTransactions ptxs = do
 
 getUncles ::
   Keccak256 ->
-  Redis (Maybe [BlockData])
+  Redis (Maybe [BlockHeader])
 getUncles sha =
   getInNamespace Uncles sha >>= \case
     Left _ -> return Nothing
@@ -770,7 +770,7 @@ getZippedParentChain mapper start limit = do
 getHeaderChain ::
   Keccak256 ->
   Int ->
-  Redis [(Keccak256, BlockData)]
+  Redis [(Keccak256, BlockHeader)]
 getHeaderChain = getZippedParentChain getHeader
 
 getBlockChain ::
@@ -790,7 +790,7 @@ getCanonical n =
 
 getCanonicalHeader ::
   Integer ->
-  Redis (Maybe BlockData)
+  Redis (Maybe BlockHeader)
 getCanonicalHeader n =
   getCanonical n >>= \case
     Nothing -> return Nothing
@@ -817,7 +817,7 @@ getZippedCanonicalChain mapper start limit = do
 getCanonicalHeaderChain ::
   Integer ->
   Int ->
-  Redis [(Keccak256, BlockData)]
+  Redis [(Keccak256, BlockHeader)]
 getCanonicalHeaderChain = getZippedCanonicalChain getHeader
 
 getChildren ::
@@ -868,19 +868,19 @@ getBlocksByNumbers ::
 getBlocksByNumbers = zipMapM getBlocksByNumber
 
 putHeader ::
-  BlockData ->
+  BlockHeader ->
   Redis (Either Reply Status)
 putHeader = uncurry insertHeader . (blockHeaderHash &&& id)
 
 putHeaders ::
   Traversable t =>
-  t BlockData ->
+  t BlockHeader ->
   Redis (t (Either Reply Status))
 putHeaders = mapM putHeader
 
 insertHeader ::
   Keccak256 ->
-  BlockData ->
+  BlockHeader ->
   Redis (Either Reply Status)
 insertHeader sha h = do
   let parent = blockHeaderParentHash h
@@ -899,7 +899,7 @@ insertHeader sha h = do
     TxError e -> pure . Left $ SingleLine (S8.pack $ "insertHeader - Error" ++ e)
 
 insertHeaders ::
-  M.Map Keccak256 BlockData ->
+  M.Map Keccak256 BlockHeader ->
   Redis (M.Map Keccak256 (Either Reply Status))
 insertHeaders = sequenceA . M.mapWithKey insertHeader
 

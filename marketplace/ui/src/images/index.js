@@ -46,6 +46,7 @@ export const Images = {
   'Metal' : require("./resources/categories/metal.png"),
   'Metal_card' : require("./resources/categories/metal_card.png"),
   'art_card' : require("./resources/categories/art_card.png"),
+  'tokens_card' : require("./resources/categories/tokens.jpg"),
   'carbon_card' : require("./resources/categories/carbon_card.png"),
   'membership_card' : require("./resources/categories/membership_card.jpg"),
   'menu_icon' : require("./resources/Ham_menu.png"),
@@ -57,4 +58,5 @@ export const Images = {
   'filter' : require('./resources/Filter.png'),
   'Remove_filter' : require('./resources/remove-filter.png'),
   'calender' : require('./resources/Calendar.png'),
+  'logo_white' : require('./resources/logo_white.png'),
 };

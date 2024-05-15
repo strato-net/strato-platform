@@ -11,7 +11,7 @@ import Underline from "@tiptap/extension-underline";
 import Paragraph from "@tiptap/extension-paragraph";
 import Document from "@tiptap/extension-document";
 import Text from "@tiptap/extension-text";
-import { FontFamily, FontSize } from "./customExtensions.js";
+import { FontFamily, FontSize, BlockquoteNode, UnorderedListNode, OrderedListNode } from "./customExtensions.js";
 
 import "./index.css";
 import {
@@ -43,6 +43,9 @@ const RichEditor = ({ onChange, initialValue }) => {
       Color,
       Underline,
       Paragraph,
+      BlockquoteNode,
+      UnorderedListNode,
+      OrderedListNode,
       Document,
       Text,
     ],
@@ -53,6 +56,54 @@ const RichEditor = ({ onChange, initialValue }) => {
       onChange(htmlContent);
     },
   });
+
+  // allows tiptap blockquote to work properly
+  useEffect(() => {
+    const styleElement = document.createElement('style');
+    styleElement.innerHTML = `
+      .ProseMirror blockquote {
+        padding-left: 1rem;
+        border-left: 2px solid rgba(13, 13, 13, 0.1);
+      }
+    `;
+    document.head.appendChild(styleElement);
+
+    return () => {
+      document.head.removeChild(styleElement);
+    };
+  }, []);
+
+  // allows tiptap bullet list to work properly
+  useEffect(() => {
+    const styleElement = document.createElement('style');
+    styleElement.innerHTML = `
+      .ProseMirror ul {
+        padding: 0 1rem;
+        list-style: disc;
+      }
+    `;
+    document.head.appendChild(styleElement);
+
+    return () => {
+      document.head.removeChild(styleElement);
+    };
+  }, []);
+
+  // allows tiptap ordered list to work properly
+  useEffect(() => {
+    const styleElement = document.createElement('style');
+    styleElement.innerHTML = `
+      .ProseMirror ol {
+        padding: 0 1rem;
+        list-style: decimal;
+      }
+    `;
+    document.head.appendChild(styleElement);
+
+    return () => {
+      document.head.removeChild(styleElement);
+    };
+  }, []);
 
   useEffect(() => {
     if (initialValue && editor) {
@@ -159,7 +210,7 @@ const RichEditor = ({ onChange, initialValue }) => {
       </BubbleMenu>
       <MenuBar editor={editor} addLink={addLink} />
 
-      <EditorContent editor={editor} />
+      <EditorContent className="mt-2" editor={editor} />
     </div>
   );
 };

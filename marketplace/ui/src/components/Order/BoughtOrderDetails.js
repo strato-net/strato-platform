@@ -33,6 +33,8 @@ import image_placeholder from "../../images/resources/image_placeholder.png";
 import dayjs from "dayjs";
 import TransfersTable from "./TransfersTable";
 import SoldOrdersTable from "./SoldOrdersTable";
+import RedemptionsOutgoingTable from "./RedemptionsOutgoingTable";
+import RedemptionsIncomingTable from "./RedemptionsIncomingTable";
 import { ResponsiveOrderDetailCard } from "./ResponsiveOrderDetailCard";
 import { LeftArrow } from "../../images/SVGComponents";
 
@@ -99,14 +101,14 @@ const BoughtOrderDetails = ({ user, users }) => {
       getData();
     }
   }, [Id, dispatch]);
-  
+
   const getData = async () => {
     const data = await actions.fetchOrderDetails(dispatch, Id);
     if (data != null) {
       setShouldCheckPaymentStatus(true);
     }
   };
-  
+
   useEffect(() => {
     if (shouldCheckPaymentStatus && orderDetails) {
       getPaymentStatus(orderDetails.order.paymentSessionId, orderDetails.order.sellersCommonName);
@@ -122,11 +124,11 @@ const BoughtOrderDetails = ({ user, users }) => {
     const isPending = currentStatus === getStatusByName("Payment Pending");
     const isCanceled = currentStatus === getStatusByName("Canceled");
 
-    if (isCanceled){
+    if (isCanceled) {
       setPaid("Payment Failed");
       setcomment(orderDetails.order.comments);
     }
-    
+
     if (isPending) {
       try {
         const response = await fetch(
@@ -136,8 +138,7 @@ const BoughtOrderDetails = ({ user, users }) => {
         const intentBody = await response.json();
         const paymentErrorAndRequiresMethod = intentBody.data.last_payment_error?.message && intentBody.data.status === 'requires_payment_method';
 
-        if(paymentErrorAndRequiresMethod && !isCanceled)
-        {
+        if (paymentErrorAndRequiresMethod && !isCanceled) {
           setisLoadingPaymentStatus(true)
           const body = {
             saleOrderAddress: orderDetails.order.address,
@@ -151,9 +152,9 @@ const BoughtOrderDetails = ({ user, users }) => {
             setPaid("Payment Failed");
             await actions.fetchOrderDetails(dispatch, Id);
             setisLoadingPaymentStatus(false);
-            }
+          }
         }
-        
+
       } catch (err) {
         console.error(`Error: ${err}`);
       }
@@ -201,9 +202,8 @@ const BoughtOrderDetails = ({ user, users }) => {
           productImage: prod.images && prod.images.length > 0 ? prod.images[0] : image_placeholder,
           productName: prod,
           name: prod.name,
-          unitPrice:  prod.price,
+          unitPrice: prod.price,
           quantity: parseInt(orderDetails.order.quantities[index]),
-          shippingCharges: prod.shippingCharges ? prod.shippingCharges : 0,
           amount: prod.price * parseInt(orderDetails.order.quantities[index]),
           serialNumber: prod,
           tax: prod.tax ? prod.tax : 0,
@@ -236,7 +236,7 @@ const BoughtOrderDetails = ({ user, users }) => {
     return (
       <Col>
         <Text className="block text-[#6A6A6A] text-[13px] mb-2">{title}</Text>
-        <Text className="block text-[#202020] text-[17px] font-semibold">{value}</Text>
+        <Text id={title} className="block text-[#202020] text-[17px] font-semibold">{value}</Text>
       </Col>
     );
   };
@@ -246,30 +246,30 @@ const BoughtOrderDetails = ({ user, users }) => {
   };
 
   const statusComponent = (status) => {
-    let textClass = "bg-[#FFF6EC]";
-    if (status === "Awaiting Shipment") {
-      textClass = "bg-[#EBF7FF]";
-    } else if (status === "Awaiting Fulfillment"){
-      textClass = "bg-[#FF8C0033]"
-    } else if (status === "Payment Pending"){
-      textClass = "bg-[#FF8C0033]"
-    } else if (status === "Closed") {
-      textClass = "bg-[#119B2D33]";
-    } else if (status === "Canceled") {
-      textClass = "bg-[#FFF0F0]";
-    }
-    let bgClass = "bg-[#119B2D]";
-    if (status === "Awaiting Shipment") {
-      bgClass = "bg-[#13188A]";
-    } else if (status === "Payment Pending"){
-      bgClass = "bg-[#FF8C00]"
-    } else if (status === "Awaiting Fulfillment"){
-      bgClass = "bg-[#FF8C00]"
-    } else if (status === "Closed") {
-      bgClass = "bg-[#119B2D]";
-    } else if (status === "Canceled") {
-      bgClass = "bg-[#FF0000]";
-    }
+    const statusClasses = {
+      ["Awaiting Shipment"]: {
+        textClass: "bg-[#EBF7FF]",
+        bgClass: "bg-[#13188A]"
+      },
+      ["Awaiting Fulfillment"]: {
+        textClass: "bg-[#FF8C0033]",
+        bgClass: "bg-[#FF8C00]"
+      },
+      ["Payment Pending"]: {
+        textClass: "bg-[#FF8C0033]",
+        bgClass: "bg-[#FF8C00]"
+      },
+      ["Closed"]: {
+        textClass: "bg-[#119B2D33]",
+        bgClass: "bg-[#119B2D]"
+      },
+      ["Canceled"]: {
+        textClass: "bg-[#FFF0F0]",
+        bgClass: "bg-[#FF0000]"
+      },
+    };
+
+    const { textClass, bgClass } = statusClasses[status] || { textClass: "bg-[#FFF6EC]", bgClass: "bg-[#119B2D]" };
     return (
       <div className={classNames(textClass, "status_contain w-max h-max text-center py-1 px-3 rounded-md md:rounded-xl flex justify-start items-center gap-1 p-1")}>
         <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
@@ -278,24 +278,23 @@ const BoughtOrderDetails = ({ user, users }) => {
     );
   };
 
-    const statusComponentForPayment = (status) => {
-      let textClass = "bg-[#FFF6EC]";
-      if (status === "Processing"){
-        textClass = "bg-[#FF8C0033]"
-      } else if (status === "Paid") {
-        textClass = "bg-[#119B2D33]";
-      } else if (status === "Payment Failed") {
-        textClass = "bg-[#FFF0F0]";
-      }
-      let bgClass = "bg-[#119B2D]";
-      if (status === "Processing"){
-        bgClass = "bg-[#FF8C00]"
-      } else if (status === "Paid") {
-        bgClass = "bg-[#119B2D]";
-      } else if (status === "Payment Failed") {
-        bgClass = "bg-[#FF0000]";
-      }
-        
+  const statusComponentForPayment = (status) => {
+    const statusClasses = {
+      ["Processing"]: {
+        textClass: "bg-[#FF8C0033]",
+        bgClass: "bg-[#FF8C00]"
+      },
+      ["Paid"]: {
+        textClass: "bg-[#119B2D33]",
+        bgClass: "bg-[#119B2D]"
+      },
+      ["Payment Failed"]: {
+        textClass: "bg-[#FFF0F0]",
+        bgClass: "bg-[#FF0000]"
+      },
+    };
+
+    const { textClass, bgClass } = statusClasses[status] || { textClass: "bg-[#FFF6EC]", bgClass: "bg-[#119B2D]" };
     return (
       <div className={classNames(textClass, "status_contain w-max h-max text-center py-1 px-3 rounded-md md:rounded-xl flex justify-start items-center gap-1 p-1")}>
         <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
@@ -305,7 +304,7 @@ const BoughtOrderDetails = ({ user, users }) => {
   };
 
   const onChange = (key) => {
-    navigate(routes.Orders.url.replace(':type', 'bought'))
+    navigate(routes.Orders.url.replace(':type', key))
   };
 
   const NewOrderData = ({ title, value, className }) => {
@@ -331,8 +330,9 @@ const BoughtOrderDetails = ({ user, users }) => {
       render: (text) => (
         <p
           // href={routes.BoughtOrderDetails.url}
+          id="detail-productName"
           className="text-primary text-[17px] cursor-pointer"
-          onClick={() => {navigate(`${routes.MarketplaceProductDetail.url.replace(":address", text.address)}`) }}
+          onClick={() => { navigate(`${routes.MarketplaceProductDetail.url.replace(":address", text.address).replace(":name", text.name)}`) }}
         >
           {decodeURIComponent(text.name)}
         </p>
@@ -377,15 +377,6 @@ const BoughtOrderDetails = ({ user, users }) => {
       render: (text) => <p>{text}</p>,
     },
     {
-      title: (
-        <Text className="text-primaryC text-[13px]">Shipping Charges($)</Text>
-      ),
-      dataIndex: "shippingCharges",
-      key: "shippingCharges",
-      align: "center",
-      render: (text) => <p>{text}</p>,
-    },
-    {
       title: <Text className="text-primaryC text-[13px]">Tax($)</Text>,
       dataIndex: "tax",
       key: "tax",
@@ -397,7 +388,7 @@ const BoughtOrderDetails = ({ user, users }) => {
       dataIndex: "amount",
       key: "amount",
       align: "center",
-      render: (text) => <p>{text}</p>,
+      render: (text) => <p id="detail-amount" >{text}</p>,
     },
   ];
 
@@ -420,20 +411,20 @@ const BoughtOrderDetails = ({ user, users }) => {
     <div>
       {contextHolder}
       {details === null || isorderDetailsLoading || isbuyerDetailsUpdating || isLoadingPaymentStatus ? (
-      <div className="h-screen flex justify-center items-center">
-        <Spin
-          spinning={isorderDetailsLoading || isbuyerDetailsUpdating || isLoadingPaymentStatus}
-          size="large"
-        />
-      </div>
-    ) : (
+        <div className="h-screen flex justify-center items-center">
+          <Spin
+            spinning={isorderDetailsLoading || isbuyerDetailsUpdating || isLoadingPaymentStatus}
+            size="large"
+          />
+        </div>
+      ) : (
         <div>
           <Breadcrumb className="text-sm ml-4 md:ml-20 mt-4 md:mt-5 mb-2">
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
               <ClickableCell href={routes.Marketplace.url}>
                 <p className="text-sm text-[#13188A] font-semibold">
 
-                Home
+                  Home
                 </p>
               </ClickableCell>
             </Breadcrumb.Item>
@@ -441,7 +432,7 @@ const BoughtOrderDetails = ({ user, users }) => {
               <div onClick={() => { navigate(routes.Orders.url.replace(':type', 'bought')); }}>
                 <p className="text-sm text-[#13188A] font-semibold">
 
-                Orders (bought)
+                  Orders (bought)
                 </p>
               </div>
             </Breadcrumb.Item>
@@ -453,20 +444,20 @@ const BoughtOrderDetails = ({ user, users }) => {
           <Tabs
             className="mx-4 md:mx-20 mt-5"
             onChange={onChange}
-            defaultActiveKey={state == null ? "Bought" : state.defaultKey}
+            defaultActiveKey={"bought"}
             items={[
               {
                 label: <p id="sold-tab" className="font-semibold text-sm md:text-base">Orders (Sold)</p>,
-                key: "Sold",
+                key: "sold",
                 children: <SoldOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
 
               },
               {
                 label: <p id="bought-tab" className="font-semibold text-sm md:text-base">Orders (Bought)</p>,
-                key: "Bought",
+                key: "bought",
                 children:
                   <div className="mb-10">
-                    <Button type="ghost" onClick={()=>onChange('Bought')} className="cursor-pointer mb-1 px-2 flex md:hidden items-center gap-2 text-sm font-semibold"><LeftArrow /> Back</Button>
+                    <Button type="ghost" onClick={() => onChange('Bought')} className="cursor-pointer mb-1 px-2 flex md:hidden items-center gap-2 text-sm font-semibold"><LeftArrow /> Back</Button>
                     <Card className="md:p-2 mb-4 md:mb-14 md:shadow-card_shadow order_detail_card">
                       <div className="flex flex-col md:flex-row md:justify-between">
                         <div className="flex flex-col">
@@ -477,25 +468,25 @@ const BoughtOrderDetails = ({ user, users }) => {
                           <Text className="text-[#6A6A6A] md:text-black px-3 my-2 text-xs md:text-sm md:font-semibold">Please enter the fulfillment date to close the order</Text>
                         </div>
                         <Button
-                        id="cancel-order-button"
-                        type="primary"
-                        className="min-w-max w-max h-9 px-[2%] ml-2 bg-primary !hover:bg-primaryHover"
-                        disabled={status !== getStatus(1) || comment === "" || details.order.paymentSessionId !== ""}
-                        onClick={() => {
-                          handleCancelOrder()
-                          window.LOQ.push(['ready', async LO => {
-                            await LO.$internal.ready('events')
-                            LO.events.track('Order Details: Cancel Order')
-                          }])
-                          TagManager.dataLayer({
-                            dataLayer: {
-                              event: 'orderDetails_bought_cancel_click',
-                            },
-                          });
-                        }}
-                      >
-                        Cancel Order
-                      </Button>
+                          id="cancel-order-button"
+                          type="primary"
+                          className="min-w-max w-max h-9 px-[2%] ml-2 bg-primary !hover:bg-primaryHover"
+                          disabled={status !== getStatus(1) || comment === "" || details.order.paymentSessionId !== ""}
+                          onClick={() => {
+                            handleCancelOrder()
+                            window.LOQ.push(['ready', async LO => {
+                              await LO.$internal.ready('events')
+                              LO.events.track('Order Details: Cancel Order')
+                            }])
+                            TagManager.dataLayer({
+                              dataLayer: {
+                                event: 'orderDetails_bought_cancel_click',
+                              },
+                            });
+                          }}
+                        >
+                          Cancel Order
+                        </Button>
                       </div>
                       <Row className="hidden md:flex my-6 justify-between bg-[#F6F6F6] p-4 pb-2 rounded">
                         <OrderData title="Order Number" value={`#${details.order.orderId}`} />
@@ -571,8 +562,18 @@ const BoughtOrderDetails = ({ user, users }) => {
               },
               {
                 label: <p id="transfers-tab" className="font-semibold text-sm md:text-base">Transfers</p>,
-                key: "Transfers",
+                key: "transfers",
                 children: <TransfersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
+              },
+              {
+                label: <p id="redemptions-outgoing-tab" className="font-semibold text-sm md:text-base">Redemptions (Outgoing)</p>,
+                key: "redemptions-outgoing",
+                children: <RedemptionsOutgoingTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
+              },
+              {
+                label: <p id="redemptions-incoming-tab" className="font-semibold text-sm md:text-base">Redemptions (Incoming)</p>,
+                key: "redemptions-incoming",
+                children: <RedemptionsIncomingTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
               }
             ]}
           />

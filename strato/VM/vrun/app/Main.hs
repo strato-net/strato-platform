@@ -10,7 +10,8 @@ import Blockchain.BlockChain
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
-import Blockchain.Data.DataDefs
+import Blockchain.Data.BlockHeader (BlockHeader(..))
+import qualified Blockchain.Data.BlockHeader as BlockHeader
 import qualified Blockchain.Data.TXOrigin as TO
 import Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia as MP
@@ -93,23 +94,23 @@ main = do
   signedTransaction' <- liftIO t
 
   let blockData =
-        BlockData
-          { blockDataParentHash = unsafeCreateKeccak256FromWord256 0xabcd,
-            blockDataNumber = 1,
-            blockDataCoinbase = CommonName "BlockApps" "Engineering" "James Hormuzdiar" True,
-            blockDataDifficulty = 1,
-            blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0xabcd,
-            blockDataStateRoot = MP.blankStateRoot,
-            blockDataTransactionsRoot = MP.blankStateRoot,
-            blockDataReceiptsRoot = MP.blankStateRoot,
-            blockDataLogBloom = "",
-            blockDataGasLimit = 100000000000000,
-            blockDataGasUsed = 1,
-            blockDataTimestamp = posixSecondsToUTCTime 0,
+        BlockHeader
+          { BlockHeader.parentHash = unsafeCreateKeccak256FromWord256 0xabcd,
+            BlockHeader.number = 1,
+            BlockHeader.beneficiary = CommonName "BlockApps" "Engineering" "James Hormuzdiar" True,
+            BlockHeader.difficulty = 1,
+            BlockHeader.ommersHash = unsafeCreateKeccak256FromWord256 0xabcd,
+            BlockHeader.stateRoot = MP.blankStateRoot,
+            BlockHeader.transactionsRoot = MP.blankStateRoot,
+            BlockHeader.receiptsRoot = MP.blankStateRoot,
+            BlockHeader.logsBloom = "",
+            BlockHeader.gasLimit = 100000000000000,
+            BlockHeader.gasUsed = 1,
+            BlockHeader.timestamp = posixSecondsToUTCTime 0,
             --timestamp = posixSecondsToUTCTime . fromInteger . read . currentTimestamp . env $ test,
-            blockDataExtraData = "",
-            blockDataNonce = 0,
-            blockDataMixHash = unsafeCreateKeccak256FromWord256 0
+            BlockHeader.extraData = "",
+            BlockHeader.nonce = 0,
+            BlockHeader.mixHash = unsafeCreateKeccak256FromWord256 0
           }
 
   let signedTransaction = txToOutputTx signedTransaction'
@@ -126,7 +127,7 @@ main = do
           { addressStateNonce = 0,
             addressStateBalance = 10000000000000000000000000000000000000000,
             addressStateContractRoot = MP.blankStateRoot,
-            addressStateCodeHash = EVMCode $ unsafeCreateKeccak256FromWord256 0,
+            addressStateCodeHash = ExternallyOwned $ unsafeCreateKeccak256FromWord256 0,
             addressStateChainId = Nothing
           }
 

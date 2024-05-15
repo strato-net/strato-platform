@@ -60,7 +60,7 @@ describe("Concurrent uploads", function() {
     console.log(allResults);
     const query = rest.searchUntil
     const qromises = transactions.map(tx =>
-      query(user, {name: tx.name}, results => results.length > 0, options));
+      query(user, {name: `Test-${tx.name}`}, results => results.length > 0, options));
     let allQueries = await Promise.all(qromises);
     console.log(allQueries);
   });

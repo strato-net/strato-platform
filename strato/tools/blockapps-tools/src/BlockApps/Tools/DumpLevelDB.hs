@@ -40,13 +40,10 @@ showAllKeyVal db f = do
       v <- DB.iterValid i
       when v $ showAllKeyVal' db' i
 
-showKeyVal :: (B.ByteString -> String) -> String -> String -> Maybe String -> IO ()
-showKeyVal f dbType dbName maybeKey = do
-  --  let options = DB.defaultOptions {
-  --        DB.createIfMissing=True, DB.cacheSize=1024}
-  dbDir <- typeToDB dbType
+showKeyVal :: (B.ByteString -> String) -> String -> Maybe String -> IO ()
+showKeyVal f dbName maybeKey = do
   runResourceT $ do
-    db <- DB.open (dbDir </> dbName) def
+    db <- DB.open ("/tmp/.ethereumH" </> dbName) def
     case maybeKey of
       Nothing -> showAllKeyVal db f
       Just key -> do
@@ -57,5 +54,4 @@ showKeyVal f dbType dbName maybeKey = do
 
 typeToDB :: String -> IO String
 typeToDB "h" = return ".ethereumH"
-typeToDB "c" = return ".ethereum"
 typeToDB x = error $ "Unsupported case in typeToDB: " ++ show x

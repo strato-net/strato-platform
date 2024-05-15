@@ -19,7 +19,7 @@ import Blockchain.Blockstanbul.Messages
 import Blockchain.Blockstanbul.Metrics
 import Blockchain.Blockstanbul.StateMachine
 import Blockchain.Data.Block
-import Blockchain.Data.DataDefs
+import Blockchain.Data.BlockHeader
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class (blockHash)
@@ -110,8 +110,8 @@ isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ 
 assertChainConsistency :: Word256 -> Maybe Keccak256 -> Block -> Either T.Text ()
 assertChainConsistency seqNo wantParent blk = do
   let blkData = blockBlockData blk
-      blkNo = fromIntegral . blockDataNumber $ blkData
-      gotParent = blockDataParentHash blkData
+      blkNo = fromIntegral . number $ blkData
+      gotParent = parentHash blkData
   unless (seqNo + 1 == blkNo)
     . Left
     . T.pack
@@ -128,8 +128,8 @@ hasSameHash di = uses proposal $ maybe False ((== di) . blockHash)
 
 createRoundChangeMessage :: MonadIO m => View -> m TrustedMessage
 createRoundChangeMessage vw = do
-  nonce <- bytesToWord256 <$> liftIO (getEntropy 32)
-  pure $ RoundChange vw nonce
+  nonce' <- bytesToWord256 <$> liftIO (getEntropy 32)
+  pure $ RoundChange vw nonce'
 
 roundChange :: (StateMachineM m) => ConduitM InEvent EOutEvent m ()
 roundChange = do
@@ -137,7 +137,8 @@ roundChange = do
   pendingRound .= Just (_round nextView)
   rawMsg <- createRoundChangeMessage nextView
   valB <- use validatorBehavior
-  when (valB) $ do
+  self <- use selfCert
+  when (isJust self && valB) $ do
     msg <- signMessage rawMsg
     yieldR msg
 
@@ -156,15 +157,15 @@ nextRound nt = do
   let leader = (fromIntegral thisR `mod` S.size vals) `S.elemAt` vals
   proposer .= leader
   proposal .= Nothing
-  self <- use selfAddr
-  when (leader == self) $ do
+  self <- use selfCert
+  when (Just leader == self) $ do
     lock <- use blockLock
     case lock of
       Nothing -> yieldR MakeBlockCommand
       Just lb -> do
         v <- use view
         valB <- use validatorBehavior
-        when (valB) $ do
+        when (isJust self && valB) $ do
           msg <- signMessage (Preprepare v lb)
           yieldR msg
 
@@ -177,7 +178,7 @@ nextRound nt = do
   hasPrepared .= False
   pendingRound .= Nothing
 
-  isValidator .= (self `elem` vals)
+  when (isJust self) $ isValidator .= ((fromJust self) `elem` vals)
 
   yieldR . NewCheckpoint
     =<< liftA2
@@ -235,11 +236,17 @@ eventLoop ctx = execStateC ctx $
                 else
                   $logErrorS "blockstanbul/config_change" . T.pack $
                     printf "Refusing to move round backwards in time %d to %d" (_round v) rn
+            ForcedSequence s ->
+              if s >= _sequence v
+                then nextRound (Sequence s)
+                else 
+                  $logErrorS "blockstanbul/config_change" . T.pack $
+                    printf "Refusing to move sequence backwards in time %d to %d" (_sequence v) s
         PreviousBlock blk -> do
           realValidators <- use validators
           seqNo <- use $ view . sequence
           eNextSeqNo <- lift . lift $ replayHistoricBlock realValidators seqNo blk
-          let blockNo = blockDataNumber . blockBlockData $ blk
+          let blockNo = number . blockBlockData $ blk
           recordMaxBlockNumber "pbft_previousblock" blockNo
           case eNextSeqNo of
             Left err -> do
@@ -256,8 +263,8 @@ eventLoop ctx = execStateC ctx $
           let blk = truncateExtra blk'
           ppl <- use proposal
           leader <- use proposer
-          self <- use selfAddr
-          when (isNothing ppl && leader == self) $ do
+          self <- use selfCert
+          when (isNothing ppl && Just leader == self) $ do
             vs <- use validators
             let blockWithVs = addValidators vs blk
             pseal <- proposerSeal blockWithVs
@@ -279,7 +286,7 @@ eventLoop ctx = execStateC ctx $
                 hasPreprepared .= True
                 proposal .= Just realSealed
                 valB <- use validatorBehavior
-                when (valB) $ do
+                when (isJust self && valB) $ do
                   msg <- signMessage (Preprepare v realSealed)
                   yieldR msg
         IMsg auth ppp@(Preprepare v' pp) -> do
@@ -316,8 +323,9 @@ eventLoop ctx = execStateC ctx $
                     wasProposed <- isJust <$> use proposal
                     unless wasProposed . yieldL $ OMsg auth ppp
                     proposal .= Just pp
+                    self <- use selfCert
                     valB <- use validatorBehavior
-                    when (valB) $ do
+                    when (isJust self && valB) $ do
                       msg <- signMessage (Prepare v (blockHash pp))
                       yieldR msg
         IMsg auth ppp@(Prepare v' di) -> when (v <= v') $ do
@@ -332,8 +340,9 @@ eventLoop ctx = execStateC ctx $
             hasPrepared .= True
             setLock
             seal <- commitmentSeal di
+            self <- use selfCert
             valB <- use validatorBehavior
-            when (valB) $ do
+            when (isJust self && valB) $ do
               msg <- signMessage (Commit v di seal)
               yieldR msg
         IMsg auth ccc@(Commit v' di seal) -> when (v <= v') $ do
@@ -352,7 +361,7 @@ eventLoop ctx = execStateC ctx $
               Nothing -> error "TODO(tim): Decide how to handle this"
               Just blk -> do
                 let seals = map snd . M.elems $ cs
-                let blockNo = blockDataNumber . blockBlockData $ blk
+                let blockNo = number . blockBlockData $ blk
                 recordMaxBlockNumber "pbft_commit" blockNo
                 yieldR . ToCommit . addCommitmentSeals seals $ blk
         IMsg auth (RoundChange vn _) -> when (_round v < _round vn) $ do
@@ -370,7 +379,8 @@ eventLoop ctx = execStateC ctx $
                 pendingRound .= Just rn
                 $logInfoS "blockstanbul/roundchange" "agreed change"
                 valB <- use validatorBehavior
-                when (valB) $ do
+                self <- use selfCert
+                when (isJust self && valB) $ do
                   msg <- signMessage rawMsg
                   yieldR msg
               when (3 * sameRNCount > 2 * total) $ do
