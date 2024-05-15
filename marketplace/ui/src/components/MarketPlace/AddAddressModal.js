@@ -143,7 +143,6 @@ const AddAddressModal = ({open , close }) => {
     title={
       <div className="flex justify-between border-b border-[#BABABA]">
         <Typography className="text-xl text-[#202020] font-semibold">Add New Address</Typography>
-
       </div>
     }
     footer={
@@ -287,7 +286,7 @@ const AddAddressModal = ({open , close }) => {
         </div>
       </div>
       <div className="flex justify-center pt-6" id="add-address-button">
-        <div className="cursor-pointer justify-center flex items-center w-40 h-9  border border-primary rounded bg-primary hover:bg-primaryHover text-white"
+        <div id="add-Address-Btn" className="cursor-pointer justify-center flex items-center w-40 h-9 border border-primary rounded bg-primary hover:bg-primaryHover text-white"
           onClick={formik.handleSubmit}>
           Add Address
         </div>

@@ -1269,7 +1269,7 @@ insertEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
           T.pack . keccak256ToHex . eventTxHash,
           tshow . eventTxSender
         ]
-      vals = csv $ map (wrapSingleQuotes . escapeQuotes . ($ agEv)) baseVals ++ map (wrapSingleQuotes . escapeQuotes . T.pack . snd) (Action.evArgs ev)
+      vals = csv $ map (wrapSingleQuotes . escapeQuotes . ($ agEv)) baseVals ++ map (wrapSingleQuotes . escapeSingleQuotes . T.pack . snd) (Action.evArgs ev)
    in T.concat $
         [ "INSERT INTO ",
           tableNameToDoubleQuoteText tableName,

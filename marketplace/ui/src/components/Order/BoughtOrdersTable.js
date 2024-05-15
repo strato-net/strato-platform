@@ -340,7 +340,7 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOr
     const { textClass, bgClass } = statusClasses[status] || { textClass: "bg-[#FFF6EC]", bgClass: "bg-[#119B2D]" };
 
     return (
-      <div className={classNames(textClass, "w-max text-center py-1 rounded-xl flex justify-start items-center gap-1 p-3")}>
+      <div id={status} className={classNames(textClass, "w-max text-center py-1 rounded-xl flex justify-start items-center gap-1 p-3")}>
         <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
         <p>{status}</p>
       </div>

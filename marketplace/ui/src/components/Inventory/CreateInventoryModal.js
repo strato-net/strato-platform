@@ -219,6 +219,7 @@ const CreateInventoryModal = ({
         footer={[
           <div className="flex justify-center mb-5 pt-4">
             <Button
+              id="createItemSubmit"
               className="w-40"
               type="primary"
               onClick={() => {
@@ -290,6 +291,7 @@ const CreateInventoryModal = ({
                 ]}
               >
                 <Select
+                  id="category"
                   placeholder="Select Category"
                   allowClear
                   value={categoryValue}
@@ -328,7 +330,7 @@ const CreateInventoryModal = ({
                 >
                   {categorys.map((category) =>
                     category.name === categoryValue ? category.subCategories.map((e, index) => (
-                      <Option value={e.contract} key={index}>
+                      <Option id="subCategory-options" value={e.contract} key={index}>
                         {e.name}
                       </Option>
                     )) : null
@@ -350,6 +352,7 @@ const CreateInventoryModal = ({
                 ]}
               >
                 <RichEditor
+                  id="description"
                   onChange={(content) => {
                     form.setFieldsValue({ description: content });
                   }}
@@ -371,6 +374,7 @@ const CreateInventoryModal = ({
               >
                 <div className="p-4 border-secondryD border rounded flex flex-col justify-around">
                   <Upload
+                    id="imageUpload"
                     onChange={handleImageChange}
                     fileList={selectedImages}
                     accept="image/png, image/jpeg"

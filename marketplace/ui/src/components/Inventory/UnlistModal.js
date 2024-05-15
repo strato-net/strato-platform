@@ -29,7 +29,7 @@ const UnlistModal = ({ open, handleCancel, inventory, saleAddress, categoryName,
             title={`Unlist - ${decodeURIComponent(inventory.name)}`}
             width={650}
             footer={[
-                <Button type="primary" className="w-32 h-9" onClick={handleSubmit} loading={isUnlisting}>
+                <Button id="modal-unlist-btn" type="primary" className="w-32 h-9" onClick={handleSubmit} loading={isUnlisting}>
                     Unlist
                 </Button>
             ]}

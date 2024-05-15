@@ -236,6 +236,12 @@ eventLoop ctx = execStateC ctx $
                 else
                   $logErrorS "blockstanbul/config_change" . T.pack $
                     printf "Refusing to move round backwards in time %d to %d" (_round v) rn
+            ForcedSequence s ->
+              if s >= _sequence v
+                then nextRound (Sequence s)
+                else 
+                  $logErrorS "blockstanbul/config_change" . T.pack $
+                    printf "Refusing to move sequence backwards in time %d to %d" (_sequence v) s
         PreviousBlock blk -> do
           realValidators <- use validators
           seqNo <- use $ view . sequence

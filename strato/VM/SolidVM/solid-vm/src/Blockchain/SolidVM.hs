@@ -1259,7 +1259,7 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
   solidVMBreakpoint pos
   exps <- mapM (expToVar . snd) exptups
   expVals <- mapM getVar exps
-  expStrs <- mapM showSM expVals
+  expStrs <- mapM jsonSM expVals
 
   -- checks that the event is declared and that the number of args match
   --   DOES NOT check consistency of arg types
@@ -2328,6 +2328,13 @@ evaluateAccountMember a _ "code" = do
   let decodeCD = DT.decodeUtf8 cd'
   -- Format the result
   return $ Constant $ SString $ T.unpack decodeCD
+evaluateAccountMember a _ "nonce" = do
+  cid <- _accountChainId <$> getCurrentAccount
+  let realAccount = namedAccountToAccount cid a
+  mAddrSt <- A.lookup (A.Proxy @AddressState) realAccount
+  case mAddrSt of
+    Just as -> return $ Constant $ SInteger $ addressStateNonce as
+    _ -> return $ Constant $ SInteger 0
 evaluateAccountMember a _ "balance" = do
   cid <- _accountChainId <$> getCurrentAccount
   let realAccount = namedAccountToAccount cid a
