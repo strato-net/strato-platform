@@ -1,21 +1,19 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module Blockchain.Data.BlockHeader
   ( BlockHeader (..),
     headerHash,
     extraData2TxsLen,
     mixHashlens,
     extraDataLens,
-    txsLen2ExtraData,
-    createBlockFromHeaderAndBody,
+    txsLen2ExtraData
   )
 where
 
-import Blockchain.Data.Block
-import qualified Blockchain.Data.BlockData as BlockData
 import Blockchain.Data.RLP
-import Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class
@@ -60,6 +58,11 @@ data BlockHeader = BlockHeader
     nonce :: Word64
   }
   deriving (Eq, Read, Show, Generic, Data)
+
+instance Binary UTCTime where
+  put = put . (round :: POSIXTime -> Integer) . utcTimeToPOSIXSeconds
+  get = (posixSecondsToUTCTime . fromInteger) <$> get
+
 
 instance Binary BlockHeader
 
@@ -202,14 +205,6 @@ extraData2TxsLen ed = guard (B.length ed >= 32) >> result
     result = case len of
       0 -> Nothing
       x -> Just (fromInteger x :: Int)
-
-createBlockFromHeaderAndBody :: BlockHeader -> ([Transaction], [BlockHeader]) -> Block
-createBlockFromHeaderAndBody header (transactions, uncles) =
-  Block (headerToBlockData header) transactions (map headerToBlockData uncles)
-  where
-    headerToBlockData (BlockHeader ph oh b sr tr rr lb d number' gl gu ts ed mh nonce') =
-      BlockData.BlockData ph oh b sr tr rr lb d number' gl gu ts ed nonce' mh
-
 
 instance Arbitrary BlockHeader where
   arbitrary = do

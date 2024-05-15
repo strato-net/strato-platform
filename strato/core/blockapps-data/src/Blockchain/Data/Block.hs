@@ -15,11 +15,14 @@ module Blockchain.Data.Block
     setBlockNo,
     nextDifficulty,
     homesteadNextDifficulty,
+    createBlockFromHeaderAndBody,
   )
 where
 
 import Blockchain.Constants
-import Blockchain.Data.BlockData
+import Blockchain.Data.BlockData (BlockData)
+import qualified Blockchain.Data.BlockData as BlockData
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.DataDefs
 import Blockchain.Data.RLP
 import Blockchain.Data.Transaction
@@ -49,14 +52,14 @@ data Block = Block
 makeLensesFor [("blockBlockData", "blockHeaderLens")] ''Block
 
 extraLens :: Lens' Block BS.ByteString
-extraLens = blockHeaderLens . extraDataLens
+extraLens = blockHeaderLens . BlockData.extraDataLens
 
 setBlockNo :: Integer -> Block -> Block
-setBlockNo n blk = blk {blockBlockData = (blockBlockData blk) {number = n}}
+setBlockNo n blk = blk {blockBlockData = (blockBlockData blk) {BlockData.number = n}}
 
 instance Format Block where
   format b@Block {blockBlockData = bd, blockReceiptTransactions = receipts, blockBlockUncles = uncles} =
-    CL.blue ("Block #" ++ show (number bd)) ++ " "
+    CL.blue ("Block #" ++ show (BlockData.number bd)) ++ " "
       ++ tab'
         ( format (blockHash b) ++ "\n"
             ++ format bd
@@ -130,3 +133,10 @@ newtype WorldBestBlock = WorldBestBlock {unWorldBestBlock :: BestBlock} deriving
 newtype Canonical a = Canonical {unCanonical :: a} deriving (Functor)
 
 newtype Private a = Private {unPrivate :: a} deriving (Functor)
+
+createBlockFromHeaderAndBody :: BlockHeader -> ([Transaction], [BlockHeader]) -> Block
+createBlockFromHeaderAndBody header (transactions, uncles) =
+  Block (headerToBlockData header) transactions (map headerToBlockData uncles)
+  where
+    headerToBlockData (BlockHeader ph oh b sr tr rr lb d number' gl gu ts ed mh nonce') =
+      BlockData.BlockData ph oh b sr tr rr lb d number' gl gu ts ed nonce' mh
