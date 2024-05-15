@@ -11,7 +11,7 @@ module Blockchain.Blockstanbul.StateMachine where
 import BlockApps.Logging
 import Blockchain.Blockstanbul.Messages
 import Blockchain.Data.Block
-import Blockchain.Data.DataDefs
+import Blockchain.Data.BlockHeader
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Keccak256
@@ -87,8 +87,8 @@ debugShowCtx = do
   infoLog "showctx/view" view format
   infoLog "showctx/proposer" proposer ((++ "\n") . format)
   infoLog "showctx/validators" validators (show . map ((++ "\n") . format) . S.toList . unChainMembers)
-  infoLog "showctx/mBlockNumber" proposal (show . fmap (blockDataNumber . blockBlockData))
-  infoLog "showctx/mLockedBlockNo" blockLock (show . fmap (blockDataNumber . blockBlockData))
+  infoLog "showctx/mBlockNumber" proposal (show . fmap (number . blockBlockData))
+  infoLog "showctx/mLockedBlockNo" blockLock (show . fmap (number . blockBlockData))
   infoLog "showctx/mLockedSender" lockSender (show . fmap format)
   infoLog "showctx/isValidator" isValidator show
   debugLog "showctx/prepared" prepared show

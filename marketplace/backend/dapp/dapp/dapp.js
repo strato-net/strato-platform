@@ -27,6 +27,7 @@ import artJs from "/dapp/items/art";
 import tokensJs from "/dapp/items/tokens";
 import carbonOffsetJs from "/dapp/items/carbonOffset";
 import metalsJs from "/dapp/items/metals";
+import spiritsJs from "/dapp/items/spirits";
 import clothingJs from "/dapp/items/clothing";
 import membershipJs from "/dapp/items/membership";
 import carbonDAOJs from "/dapp/items/carbonDAO";
@@ -286,38 +287,39 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   contract.requestRedemption = async function (args, options = defaultOptions) {
-    const getOptions = { ...options, app: contractName, };
-    const { originAssetAddress, assetAddresses, quantity, ...restArgs } = args;
+    try {
+      const { assetAddresses, quantity, ...restArgs } = args;
 
-    const contract = { address: assetAddresses[0] };
-    const [requestRedemptionStatus, assetAddress] = await inventoryJs.requestRedemption(rawAdmin, contract, { quantity: quantity }, options);
+      const contract = { address: assetAddresses[0] };
+      const [requestRedemptionStatus, assetAddress] = await inventoryJs.requestRedemption(rawAdmin, contract, { quantity: quantity }, options);
 
-    const originAsset = await inventoryJs.get(rawAdmin, { address: originAssetAddress }, getOptions);
-    const issuerCommonName = originAsset.ownerCommonName;
-    const finalArgs = { redemption_id: parseInt(util.uid()), issuerCommonName, assetAddresses: [assetAddress], quantity, ...restArgs }
+      const finalArgs = { redemption_id: parseInt(util.uid()), assetAddresses: [assetAddress], quantity, ...restArgs }
 
-    if (requestRedemptionStatus) {
-      try {
-        await axios.post(new URL(`/redemption/create`, STRIPE_PAYMENT_SERVER_URL).href, { ...finalArgs })
-          .then(function (res) {
-            if (res.status === 200) {
-              console.log(res.data);
-            } else {
-              throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
-            }
-          });
-        return {}
-      } catch (error) {
-        // The AssetStaus is initially switched to PENDING_REDEMPTION but must be reverted if Redemption creation fails
-        const [updateStatus] = await inventoryJs.updateAssetStatus(rawAdmin, { address: assetAddress }, { status: ASSET_STATUS.ACTIVE }, options);
+      if (requestRedemptionStatus) {
+        try {
+          await axios.post(new URL(`/redemption/create`, STRIPE_PAYMENT_SERVER_URL).href, { ...finalArgs })
+            .then(function (res) {
+              if (res.status === 200) {
+                console.log(res.data);
+              } else {
+                throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+              }
+            });
+          return {}
+        } catch (error) {
+          // The AssetStaus is initially switched to PENDING_REDEMPTION but must be reverted if Redemption creation fails
+          const [updateStatus] = await inventoryJs.updateAssetStatus(rawAdmin, { address: assetAddress }, { status: ASSET_STATUS.ACTIVE }, options);
 
-        if (error.response) {
-          throw new rest.RestError(error.response.status, error.response.statusText);
+          if (error.response) {
+            throw new rest.RestError(error.response.status, error.response.statusText);
+          }
+          throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while creating redemption record: ${JSON.stringify(error)} `);
         }
-        throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while creating redemption record: ${JSON.stringify(error)} `);
+      } else {
+        throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while requesting redemption");
       }
-    } else {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while requesting redemption");
+    } catch (error) {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, "Please contact sales@blockapps.net to redeem this item")
     }
   }
 
@@ -633,7 +635,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const createdDate = Math.floor(Date.now() / 1000);
     const newArgs = {
       ...args.itemArgs,
-      createdDate
+      createdDate,
+      status: ASSET_STATUS.ACTIVE
     };
     return tokensJs.uploadContract(rawAdmin, newArgs, options);
   };
@@ -682,7 +685,27 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return metalsJs.getAll(rawAdmin, args, getOptions);
   };
 
-  // ------------------------------ MATERIALS ENDS--------------------------------
+  // ------------------------------ METALS ENDS--------------------------------
+
+  // ------------------------------ SPIRITS STARTS------------------------------
+
+  contract.createSpirits = async function (args, options = defaultOptions) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const newArgs = {
+      ...args.itemArgs,
+      createdDate,
+      owner: rawAdmin.address,
+      status: ASSET_STATUS.ACTIVE
+    };
+    return spiritsJs.uploadContract(rawAdmin, newArgs, options);
+  };
+
+  contract.getSpirits = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options };
+    return spiritsJs.getAll(rawAdmin, args, getOptions);
+  };
+
+  // ------------------------------ SPIRITS ENDS--------------------------------
 
   // ------------------------------ CLOTHING STARTS------------------------------
 

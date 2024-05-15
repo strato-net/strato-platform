@@ -27,8 +27,8 @@ import Blockchain.DB.ModifyStateDB
 import Blockchain.DB.RawStorageDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
-import Blockchain.Data.DataDefs
 import Blockchain.Data.ExecResults
 import Blockchain.Data.Log
 import qualified Blockchain.Database.MerklePatricia as MP
@@ -333,35 +333,35 @@ runOperation RETURNDATACOPY = do
   ret <- getReturnVal
   mStoreByteString memP . safeTake size . safeDrop codeP $ ret
 runOperation BLOCKHASH = do
-  number :: Word256 <- pop
+  number' :: Word256 <- pop
 
   curBlock <- getEnvVar envBlockHeader
-  let currentBlockNumber = blockDataNumber curBlock
+  let currentBlockNumber = number curBlock
 
   let inRange =
         not $
-          toInteger number >= currentBlockNumber
-            || toInteger number < currentBlockNumber - 256
+          toInteger number' >= currentBlockNumber
+            || toInteger number' < currentBlockNumber - 256
 
   vmState <- vmstateGet
 
   case (inRange, isRunningTests vmState) of
     (False, _) -> push (0 :: Word256)
     (True, False) -> do
-      maybeBlockHash <- getBlockHashWithNumber (fromIntegral number) (blockDataParentHash curBlock)
+      maybeBlockHash <- getBlockHashWithNumber (fromIntegral number') (parentHash curBlock)
       case maybeBlockHash of
         Nothing -> push (0 :: Word256)
         Just theBlockHash -> push theBlockHash
     (True, True) -> do
-      let h = hash $ BC.pack $ show $ toInteger number
+      let h = hash $ BC.pack $ show $ toInteger number'
       push $ keccak256ToWord256 h
-runOperation COINBASE = pushEnvVar (const $ Address 0) -- (blockDataCoinbase . envBlockHeader) -- TODO: fix?
+runOperation COINBASE = pushEnvVar (const $ Address 0) -- (beneficiary . envBlockHeader) -- TODO: fix?
 runOperation TIMESTAMP = do
   VMState {environment = env} <- vmstateGet
-  push $ ((round . utcTimeToPOSIXSeconds . blockDataTimestamp . envBlockHeader) env :: Word256)
-runOperation NUMBER = pushEnvVar (blockDataNumber . envBlockHeader)
-runOperation DIFFICULTY = pushEnvVar (blockDataDifficulty . envBlockHeader)
-runOperation GASLIMIT = pushEnvVar (blockDataGasLimit . envBlockHeader)
+  push $ ((round . utcTimeToPOSIXSeconds . timestamp . envBlockHeader) env :: Word256)
+runOperation NUMBER = pushEnvVar (number . envBlockHeader)
+runOperation DIFFICULTY = pushEnvVar (difficulty . envBlockHeader)
+runOperation GASLIMIT = pushEnvVar (gasLimit . envBlockHeader)
 runOperation POP = do
   _ :: Word256 <- pop
   return ()
@@ -1062,7 +1062,7 @@ create ::
   Bool ->
   Bool ->
   S.Set Account ->
-  BlockData ->
+  BlockHeader ->
   Int ->
   Account ->
   Account ->
@@ -1206,7 +1206,7 @@ call ::
   Bool ->
   Bool ->
   S.Set Account ->
-  BlockData ->
+  BlockHeader ->
   Int ->
   Account ->
   Account ->
@@ -1329,7 +1329,7 @@ callPrecompiled' noValueTransfer precompiled = do
 
   return (fromMaybe B.empty $ returnVal vmState)
 
-create_debugWrapper :: EVMBase m => BlockData -> Account -> Word256 -> B.ByteString -> VMM m (Maybe Account)
+create_debugWrapper :: EVMBase m => BlockHeader -> Account -> Word256 -> B.ByteString -> VMM m (Maybe Account)
 create_debugWrapper block owner value initCodeBytes = do
   balance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy @AddressState) owner
 

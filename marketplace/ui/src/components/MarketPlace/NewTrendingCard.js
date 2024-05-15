@@ -92,7 +92,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
 
     return (
         <>
-        <div className={`relative trending_cards_container_card bg-white p-3 ${parent == 'Marketplace' ? 'min-w-[300px] w-auto' : 'min-w-[230px]'}  min-w-[320px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}>
+        <div id='productCard' className={`relative trending_cards_container_card bg-white p-3 ${parent == 'Marketplace' ? 'min-w-[300px] w-auto' : 'min-w-[230px]'}  min-w-[320px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}>
             {contextHolder}
             <div onClick={toggleWishlist} className="absolute top-2 right-2 cursor-pointer hover:scale-110 transition-transform duration-200">
                 {isWishlisted ? <HeartFilled style={{ fontSize: "20px", color: "#A15E49" }} /> : <HeartTwoTone style={{ fontSize: "20px" }} twoToneColor="#A15E49" />}
@@ -120,7 +120,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                         className='font-semibold overflow-hidden cursor-pointer w-[180px] md:w-[220px] whitespace-nowrap text-ellipsis'
                     >                        
                         <Tooltip title={topSellingProduct?.name?.length > 20 ? topSellingProduct?.name : null}>
-                            <span className=" whitespace-nowrap max-w-[160px] inline-block">
+                            <span id={`asset-${topSellingProduct?.name}`} className=" whitespace-nowrap max-w-[160px] inline-block">
                                 {topSellingProduct?.name?.length > 20 ? `${topSellingProduct?.name.slice(0, 20)}...` : `${topSellingProduct?.name}`}
                             </span>
                         </Tooltip>

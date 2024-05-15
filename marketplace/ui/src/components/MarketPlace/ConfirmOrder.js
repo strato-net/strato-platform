@@ -196,13 +196,13 @@ const ConfirmOrder = ({ data, columns }) => {
                   </Row>
                   <Row className="justify-between">
                     <p className="text-base text-[#6A6A6A]">Total:</p>
-                    <p className="text-xl text-[#202020]   text-right">
+                    <p id="totalPrice" className="text-xl text-[#202020] text-right">
                       ${total + tax}
                     </p>
                   </Row>
                 </div>
               </div>
-              <div className="flex md:pb-2 items-center mr-4">
+              <div id="review-and-submit" className="flex md:pb-2 items-center mr-4">
                 {stripeStatus && <button id="pay-now-button" className={`p-1 md:p-3 h-max rounded-lg border ${stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled ? 'border-primary bg-primary hover:bg-primaryHover text-white' : 'cursor-not-allowed border-[#999999] rounded bg-[#cccccc] text-[#666666]'}`}
                   onClick={async () => {
                     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {

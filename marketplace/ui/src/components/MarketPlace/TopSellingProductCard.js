@@ -179,6 +179,7 @@ const TopSellingProductCard = () => {
           </Title>
           <Button
             size="large"
+            id="viewAll"
             onClick={() => {
               navigate(navRoute);
               sessionStorage.setItem('scrollPosition', 0);

@@ -253,6 +253,7 @@ const metaImg = category ? category : SEO.IMAGE_META
             </div>
             <div className="flex gap-3">
               <Button type="primary" className="w-40 h-9 "
+                id="connectStripe"
                 onClick={() => {
                   if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                     window.location.href = loginUrl;
@@ -274,6 +275,7 @@ const metaImg = category ? category : SEO.IMAGE_META
               >
                 <Button
                   type="primary"
+                  id="createItem"
                   className="w-40 h-9 flex items-center justify-center gap-[6px]"
                   onClick={() => {
                     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
