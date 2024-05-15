@@ -4,7 +4,7 @@ module Executable.EVMCheckpoint (
   EVMCheckpoint(..)
   ) where
 
-import Blockchain.Data.BlockData
+import Blockchain.Data.BlockHeader
 
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Strato.Model.Keccak256
@@ -16,7 +16,7 @@ import Text.Format
 
 data EVMCheckpoint = EVMCheckpoint
   { checkpointSHA :: Keccak256,
-    checkpointHead :: BlockData,
+    checkpointHead :: BlockHeader,
     ctxBestBlockInfo :: ContextBestBlockInfo,
     ctxChainDBStateRoot :: MP.StateRoot
   }

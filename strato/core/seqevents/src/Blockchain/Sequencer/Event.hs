@@ -11,7 +11,7 @@ module Blockchain.Sequencer.Event where
 import BlockApps.X509.Certificate
 import qualified Blockchain.Blockstanbul as PBFT
 import qualified Blockchain.Data.Block as BDB
-import Blockchain.Data.BlockData
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.ChainInfo
 import Blockchain.Data.Json
 import Blockchain.Data.RLP
@@ -160,9 +160,9 @@ data IngestTx = IngestTx
 
 data IngestBlock = IngestBlock
   { ibOrigin :: TO.TXOrigin,
-    ibBlockData :: BlockData,
+    ibBlockData :: BlockHeader,
     ibReceiptTransactions :: [TX.Transaction],
-    ibBlockUncles :: [BlockData]
+    ibBlockUncles :: [BlockHeader]
   }
   deriving (Eq, Read, Show, GHCG.Generic)
 
@@ -175,9 +175,9 @@ data IngestGenesis = IngestGenesis
 data SequencedBlock = SequencedBlock
   { sbOrigin :: TO.TXOrigin,
     sbHash :: Keccak256,
-    sbBlockData :: BlockData,
+    sbBlockData :: BlockHeader,
     sbReceiptTransactions :: [OutputTx],
-    sbBlockUncles :: [BlockData]
+    sbBlockUncles :: [BlockHeader]
   }
   deriving (Read, Show, GHCG.Generic)
 
@@ -287,9 +287,9 @@ otxPrimeToOtx (OutputTx' o h s b mp) = OutputTx o h s (unTransaction' b) (unTran
 data OutputBlock = OutputBlock
   { obOrigin :: TO.TXOrigin,
     obTotalDifficulty :: Integer,
-    obBlockData :: BlockData,
+    obBlockData :: BlockHeader,
     obReceiptTransactions :: [OutputTx],
-    obBlockUncles :: [BlockData]
+    obBlockUncles :: [BlockHeader]
   }
   deriving (Eq, Read, Show, GHCG.Generic, Data)
 
@@ -612,7 +612,7 @@ instance RLPSerializable OutputBlock where
   rlpEncode = rlpEncode . (morphBlock :: OutputBlock -> BDB.Block)
   rlpDecode = morphBlock . (rlpDecode :: RLPObject -> BDB.Block)
 
-instance BlockLike BlockData OutputTx OutputBlock where
+instance BlockLike BlockHeader OutputTx OutputBlock where
   blockHeader = obBlockData
   blockTransactions = obReceiptTransactions
   blockUncleHeaders = obBlockUncles

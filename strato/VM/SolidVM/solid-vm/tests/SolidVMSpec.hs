@@ -28,7 +28,7 @@ import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
-import Blockchain.Data.BlockData
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.ExecResults
 import Blockchain.Data.GenesisInfo
@@ -262,7 +262,7 @@ generateGBlock :: (MonadLogger m, HasStateDB m) => GenesisInfo -> m (Block, Outp
 generateGBlock gi = do
   sr <- A.lookupWithDefault (Proxy @StateRoot) (Nothing :: Maybe Word256)
   let bData =
-        BlockData
+        BlockHeader
           { parentHash = genesisInfoParentHash gi,
             ommersHash = genesisInfoUnclesHash gi,
             beneficiary = genesisInfoCoinbase gi,
@@ -381,7 +381,7 @@ runArgsWithSenderBeef acc args bs = do
       isHomestead = error "TODO: isHomestead"
       suicides = error "TODO: suicides"
       blockData =
-        BlockData
+        BlockHeader
           { parentHash = unsafeCreateKeccak256FromWord256 0x0,
             ommersHash = unsafeCreateKeccak256FromWord256 0x0,
             beneficiary = emptyChainMember,
@@ -435,7 +435,7 @@ runArgsWithSender acc args bs = do
       isHomestead = error "TODO: isHomestead"
       suicides = error "TODO: suicides"
       blockData =
-        BlockData
+        BlockHeader
           { parentHash = unsafeCreateKeccak256FromWord256 0x0,
             ommersHash = unsafeCreateKeccak256FromWord256 0x0,
             beneficiary = emptyChainMember,
@@ -490,7 +490,7 @@ runArgsWithOrigin orig acc args bs = do
       isHomestead = error "TODO: isHomestead"
       suicides = error "TODO: suicides"
       blockData =
-        BlockData
+        BlockHeader
           { parentHash = unsafeCreateKeccak256FromWord256 0x0,
             ommersHash = unsafeCreateKeccak256FromWord256 0x0,
             beneficiary = emptyChainMember,
@@ -610,7 +610,7 @@ runCall funcName callArgs bs = do
       isRCC = False
       suicides = error "TODO: suicides"
       blockData =
-        BlockData
+        BlockHeader
           { parentHash = unsafeCreateKeccak256FromWord256 0x0,
             ommersHash = unsafeCreateKeccak256FromWord256 0x0,
             beneficiary = emptyChainMember,
@@ -694,7 +694,7 @@ runCall' funcName callArgs bs = do
       isRCC = False
       suicides = error "TODO: suicides"
       blockData =
-        BlockData
+        BlockHeader
           { parentHash = unsafeCreateKeccak256FromWord256 0x0,
             ommersHash = unsafeCreateKeccak256FromWord256 0x0,
             beneficiary = emptyChainMember,
@@ -780,7 +780,7 @@ call2 funcName callArgs contractAddress = do
       isRCC = False
       suicides = error "TODO: suicides"
       blockData =
-        BlockData
+        BlockHeader
           { parentHash = unsafeCreateKeccak256FromWord256 0x0,
             ommersHash = unsafeCreateKeccak256FromWord256 0x0,
             beneficiary = emptyChainMember,

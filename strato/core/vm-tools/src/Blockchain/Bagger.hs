@@ -21,8 +21,7 @@ import Blockchain.DB.ChainDB
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.StorageDB
 import qualified Blockchain.Data.AddressStateDB as DD
-import Blockchain.Data.BlockData
-import Blockchain.Data.BlockHeader (txsLen2ExtraData)
+import Blockchain.Data.BlockHeader
 import qualified Blockchain.Data.DataDefs as DD
 import qualified Blockchain.Data.TXOrigin as TO
 import Blockchain.Data.Transaction
@@ -81,7 +80,7 @@ data TxMiningResult = TxMiningResult
   }
   deriving (Show)
 
-type MineTransactions m = BlockData -> Integer -> [OutputTx] -> m TxMiningResult
+type MineTransactions m = BlockHeader -> Integer -> [OutputTx] -> m TxMiningResult
 
 isBlockstanbul :: (Functor m, Mod.Accessible IsBlockstanbul m) => m Bool
 isBlockstanbul = unIsBlockstanbul <$> Mod.access (Mod.Proxy @IsBlockstanbul)
@@ -92,7 +91,7 @@ getBaggerState = Mod.get (Mod.Proxy @B.BaggerState)
 putBaggerState :: Mod.Modifiable B.BaggerState m => B.BaggerState -> m ()
 putBaggerState = Mod.put (Mod.Proxy @B.BaggerState)
 
-runFromStateRoot :: MonadBagger m => MineTransactions m -> Integer -> BlockData -> [OutputTx] -> m (Either RunAttemptError (StateRoot, [TxRunResult], Integer))
+runFromStateRoot :: MonadBagger m => MineTransactions m -> Integer -> BlockHeader -> [OutputTx] -> m (Either RunAttemptError (StateRoot, [TxRunResult], Integer))
 runFromStateRoot mineTransactions remainingGas theBlockHeader txs = do
   A.insert (A.Proxy @StateRoot) (Nothing :: Maybe Word256) (stateRoot theBlockHeader)
   (TxMiningResult res ranTxs unranTxs newGas) <-
@@ -114,7 +113,7 @@ runFromStateRoot mineTransactions remainingGas theBlockHeader txs = do
     Just f@TFTXSizeLimitExceeded {} -> recoverable f
     Just f@TFKnownFailedTX {} -> recoverable f
 
--- rewardCoinbases :: MonadBagger m => ChainMemberParsedSet -> [BlockData] -> Integer -> m StateRoot -- miner coinbase -> known uncles -> this block number -> stateRoot
+-- rewardCoinbases :: MonadBagger m => ChainMemberParsedSet -> [BlockHeader] -> Integer -> m StateRoot -- miner coinbase -> known uncles -> this block number -> stateRoot
 -- rewardCoinbases us uncles ourNumber = do
 --     _ <- addToBalance (Account us Nothing) $ rewardBase flags_testnet
 --     forM_ uncles $ \uncle -> do
@@ -158,7 +157,7 @@ txsDroppedCallback rejections bestBlockShas = forM_ rejections $ \rejection -> d
         }
 
 -- Would it make more sense to expand the MiningCache than to introduce a separate cache?
-cacheRunResults :: MonadBagger m => BlockData -> (StateRoot, Integer, [TxRunResult]) -> m ()
+cacheRunResults :: MonadBagger m => BlockHeader -> (StateRoot, Integer, [TxRunResult]) -> m ()
 cacheRunResults bd (sr, gasRemaining, trrs) = do
   -- Private run results should not be cached, as on the second run
   -- the hydrated transaction will reach a different stateroot.
@@ -171,7 +170,7 @@ cacheRunResults bd (sr, gasRemaining, trrs) = do
   cache <- Mod.access (Mod.Proxy @TRC.Cache)
   liftIO $ TRC.insert cache bhash (sr, gasRemaining, publicTrrs)
 
-getCachedRunResults :: MonadBagger m => BlockData -> m (Maybe (StateRoot, Integer, [TxRunResult]))
+getCachedRunResults :: MonadBagger m => BlockHeader -> m (Maybe (StateRoot, Integer, [TxRunResult]))
 getCachedRunResults bd = do 
     cache <- Mod.access (Mod.Proxy @TRC.Cache)
     let pHash = blockHeaderPartialHash bd
@@ -214,7 +213,7 @@ baggerRejectionToTransactionResultBits rejection = case rejection of
     p stage queue = "Rejected from mempool at " ++ show stage ++ "/" ++ show queue ++ " due to "
     p' s q = p s q ++ "low "
 
-getCheckpointableState :: MonadBagger m => m (Keccak256, BlockData)
+getCheckpointableState :: MonadBagger m => m (Keccak256, BlockHeader)
 getCheckpointableState = do
   state <- getBaggerState
   let miningCache = B.miningCache state
@@ -238,7 +237,7 @@ addTransactionsToMempool ts = do
     putBaggerState state {B.miningCache = cache {B.privateHashes = hashes}}
     promoteExecutables
 
-processNewBestBlock :: MonadBagger m => Keccak256 -> BlockData -> [Keccak256] -> m ()
+processNewBestBlock :: MonadBagger m => Keccak256 -> BlockHeader -> [Keccak256] -> m ()
 processNewBestBlock bh bd txShas = do
   $logDebugS "Bagger.processNewBestBlock" . T.pack $ "called with " ++ show (length txShas) ++ " txs"
   state <- getBaggerState
@@ -589,22 +588,22 @@ buildFromMiningCache = do
       }
 
 buildNextBlockHeader ::
-  BlockData ->
+  BlockHeader ->
   Keccak256 ->
-  [BlockData] ->
+  [BlockHeader] ->
   StateRoot ->
   [OutputTx] ->
   UTCTime ->
   Bool ->
   ChainMemberParsedSet ->
   Word64 ->
-  BlockData
+  BlockHeader
 buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT coinbaseAddr nonce =
   let --parentDiff = difficulty parentHeader
       parentNum = number parentHeader
    in --parentTS   = timestamp parentHeader
       --nextDiff   = nextDifficulty flags_difficultyBomb flags_testnet parentNum parentDiff parentTS time
-      BlockData
+      BlockHeader
         { parentHash = parentHash,
           ommersHash = V.ommersVerificationValue uncles,
           beneficiary = coinbaseAddr, -- TODO?: Removed case for PoW because it relied on ethConf, but should really come from Vault now
@@ -622,7 +621,7 @@ buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT co
           nonce = nonce
         }
 
-buildRewardedBlockHeader :: MonadBagger m => BlockData -> m BlockData
+buildRewardedBlockHeader :: MonadBagger m => BlockHeader -> m BlockHeader
 buildRewardedBlockHeader bd = do
   $logInfoS "Bagger.buildRewardedBlockHeader" . T.pack $ "pre-reward :: (" ++ format (stateRoot bd) ++ ")"
   oldSR <- A.lookupWithDefault (A.Proxy @StateRoot) (Nothing :: Maybe Word256)

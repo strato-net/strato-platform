@@ -24,7 +24,7 @@ where
 
 import BlockApps.Logging
 import Blockchain.Data.Block
-import Blockchain.Data.BlockData
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.RLP
 import Blockchain.EthConf
 import Blockchain.KafkaTopics

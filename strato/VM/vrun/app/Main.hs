@@ -10,8 +10,8 @@ import Blockchain.BlockChain
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
-import Blockchain.Data.BlockData (BlockData(..))
-import qualified Blockchain.Data.BlockData as BlockHeader
+import Blockchain.Data.BlockHeader (BlockHeader(..))
+import qualified Blockchain.Data.BlockHeader as BlockHeader
 import qualified Blockchain.Data.TXOrigin as TO
 import Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia as MP
@@ -94,7 +94,7 @@ main = do
   signedTransaction' <- liftIO t
 
   let blockData =
-        BlockData
+        BlockHeader
           { BlockHeader.parentHash = unsafeCreateKeccak256FromWord256 0xabcd,
             BlockHeader.number = 1,
             BlockHeader.beneficiary = CommonName "BlockApps" "Engineering" "James Hormuzdiar" True,

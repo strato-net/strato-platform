@@ -27,7 +27,7 @@ import Blockchain.DB.ModifyStateDB
 import Blockchain.DB.RawStorageDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
-import Blockchain.Data.BlockData
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.ExecResults
 import Blockchain.Data.Log
@@ -1062,7 +1062,7 @@ create ::
   Bool ->
   Bool ->
   S.Set Account ->
-  BlockData ->
+  BlockHeader ->
   Int ->
   Account ->
   Account ->
@@ -1206,7 +1206,7 @@ call ::
   Bool ->
   Bool ->
   S.Set Account ->
-  BlockData ->
+  BlockHeader ->
   Int ->
   Account ->
   Account ->
@@ -1329,7 +1329,7 @@ callPrecompiled' noValueTransfer precompiled = do
 
   return (fromMaybe B.empty $ returnVal vmState)
 
-create_debugWrapper :: EVMBase m => BlockData -> Account -> Word256 -> B.ByteString -> VMM m (Maybe Account)
+create_debugWrapper :: EVMBase m => BlockHeader -> Account -> Word256 -> B.ByteString -> VMM m (Maybe Account)
 create_debugWrapper block owner value initCodeBytes = do
   balance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy @AddressState) owner
 

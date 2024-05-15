@@ -32,8 +32,8 @@ import Blockchain.DB.CodeDB
 import Blockchain.DB.ModifyStateDB (pay)
 import Blockchain.DB.SolidStorageDB
 import Blockchain.Data.AddressStateDB
-import Blockchain.Data.BlockData (BlockData)
-import qualified Blockchain.Data.BlockData as BlockHeader
+import Blockchain.Data.BlockHeader (BlockHeader)
+import qualified Blockchain.Data.BlockHeader as BlockHeader
 import Blockchain.Data.ChainInfo
 import Blockchain.Data.ExecResults
 import Blockchain.Data.Transaction (whoSignedThisTransactionEcrecover)
@@ -215,7 +215,7 @@ create ::
   Bool ->
   Bool ->
   S.Set Account ->
-  BlockData ->
+  BlockHeader ->
   Int ->
   Account ->
   Account ->
@@ -366,7 +366,7 @@ call ::
   Bool ->
   Bool ->
   S.Set Account ->
-  BlockData ->
+  BlockHeader ->
   Int ->
   Account ->
   Account ->

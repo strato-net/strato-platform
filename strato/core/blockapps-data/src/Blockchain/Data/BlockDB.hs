@@ -14,7 +14,7 @@ where
 
 import Blockchain.DB.SQLDB
 import Blockchain.Data.Block
-import Blockchain.Data.BlockData
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.DataDefs
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction

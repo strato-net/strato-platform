@@ -98,7 +98,7 @@ import           BlockApps.Logging
 import           BlockApps.X509.Certificate
 
 import           Blockchain.Data.Block
-import           Blockchain.Data.BlockData
+import           Blockchain.Data.BlockHeader
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Enode
 import           Blockchain.Data.PubKey
@@ -181,7 +181,7 @@ newtype ActionTimestamp = ActionTimestamp {unActionTimestamp :: Maybe UTCTime}
 emptyActionTimestamp :: ActionTimestamp
 emptyActionTimestamp = ActionTimestamp Nothing
 
-newtype RemainingBlockHeaders = RemainingBlockHeaders {unRemainingBlockHeaders :: [BlockData]}
+newtype RemainingBlockHeaders = RemainingBlockHeaders {unRemainingBlockHeaders :: [BlockHeader]}
 
 newtype MaxReturnedHeaders = MaxReturnedHeaders {unMaxReturnedHeaders :: Int}
 
@@ -194,7 +194,7 @@ withPeerAddress f = PeerAddress . f . unPeerAddress
 
 data Context = Context
   { contextKafkaState        :: K.KafkaState
-  , blockHeaders             :: ([BlockData], UTCTime) -- keep track when last updated global headers cache
+  , blockHeaders             :: ([BlockHeader], UTCTime) -- keep track when last updated global headers cache
   , remainingBlockHeaders    :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
   , actionTimestamp          :: ActionTimestamp
   , _blockstanbulPeerAddr    :: PeerAddress
@@ -251,7 +251,7 @@ instance RunsServer ContextM (LoggingT IO) where
 instance MonadIO m => Mod.Accessible PublicKey (ReaderT Config m) where
   access _ = asks configPubKey
 
-instance MonadIO m => (Keccak256 `A.Alters` BlockData) (ReaderT Config m) where
+instance MonadIO m => (Keccak256 `A.Alters` BlockHeader) (ReaderT Config m) where
   lookup _ = RBDB.withRedisBlockDB . RBDB.getHeader
   insert _ k v = void . RBDB.withRedisBlockDB $ RBDB.insertHeader k v
   delete _ = void . RBDB.withRedisBlockDB . RBDB.deleteHeader
@@ -283,7 +283,7 @@ instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestBlock (ReaderT Config 
       Left _ -> $logInfoS "ContextM.put BestBlock" $ T.pack "Failed to update BestBlock"
       Right _ -> return ()
 
-instance MonadIO m => A.Selectable Integer (Canonical BlockData) (ReaderT Config m) where
+instance MonadIO m => A.Selectable Integer (Canonical BlockHeader) (ReaderT Config m) where
   select _ i = fmap (fmap Canonical) . RBDB.withRedisBlockDB $ RBDB.getCanonicalHeader i
 
 instance MonadIO m => A.Selectable ChainMemberParsedSet TrueOrgNameChains (ReaderT Config m) where
@@ -380,7 +380,7 @@ instance MonadIO m => Mod.Modifiable ActionTimestamp (ReaderT Config m) where
 instance MonadIO m => Mod.Accessible ActionTimestamp (ReaderT Config m) where
   access _ = Mod.get (Proxy @ActionTimestamp)
 
-instance MonadIO m => Mod.Modifiable [BlockData] (ReaderT Config m) where
+instance MonadIO m => Mod.Modifiable [BlockHeader] (ReaderT Config m) where
   get _ = do
     (bHeaders, lastUpdateTS) <- blockHeaders <$> Mod.get (Proxy @Context)
     now <- liftIO getCurrentTime
@@ -389,15 +389,15 @@ instance MonadIO m => Mod.Modifiable [BlockData] (ReaderT Config m) where
     if diffTime > maxTime
       then do
         -- stale cache; override it
-        Mod.put (Proxy @[BlockData]) []
+        Mod.put (Proxy @[BlockHeader]) []
         pure []
       else pure bHeaders
   put _ k = do
     now <- liftIO getCurrentTime
     asks configContext >>= flip atomicModifyIORef' (\c -> (c {blockHeaders = (k, now)}, ()))
 
-instance MonadIO m => Mod.Accessible [BlockData] (ReaderT Config m) where
-  access _ = Mod.get (Proxy @[BlockData])
+instance MonadIO m => Mod.Accessible [BlockHeader] (ReaderT Config m) where
+  access _ = Mod.get (Proxy @[BlockHeader])
 
 instance MonadIO m => Mod.Modifiable RemainingBlockHeaders (ReaderT Config m) where
   get _ = do
@@ -503,7 +503,7 @@ type MonadP2P m =
     All
       '[Mod.Accessible, Mod.Modifiable]
       '[ ActionTimestamp,
-         [BlockData],
+         [BlockHeader],
          RemainingBlockHeaders,
          PeerAddress
        ]
@@ -527,7 +527,7 @@ type MonadP2P m =
       m,
     All2
       '[A.Selectable]
-      '[ '(Integer, Canonical BlockData),
+      '[ '(Integer, Canonical BlockHeader),
          '(ChainMemberParsedSet, TrueOrgNameChains),
          '(ChainMemberParsedSet, FalseOrgNameChains),
          '(Keccak256, ChainTxsInBlock),
@@ -554,7 +554,7 @@ type MonadP2P m =
       m,
     All2
       '[A.Alters]
-      '[ '(Keccak256, BlockData),
+      '[ '(Keccak256, BlockHeader),
          '(Keccak256, OutputBlock),
          '((IPAsText, TCPPort), ActivityState)
        ]
@@ -563,16 +563,16 @@ type MonadP2P m =
 
 type PeerRunner n m a = (ConduitM () P2pEvent n a -> n a) -> m a
 
-getBlockHeaders :: Mod.Accessible [BlockData] m => m [BlockData]
-getBlockHeaders = Mod.access (Proxy @[BlockData])
+getBlockHeaders :: Mod.Accessible [BlockHeader] m => m [BlockHeader]
+getBlockHeaders = Mod.access (Proxy @[BlockHeader])
 
-putBlockHeaders :: Mod.Modifiable [BlockData] m => [BlockData] -> m ()
-putBlockHeaders = Mod.put (Proxy @[BlockData])
+putBlockHeaders :: Mod.Modifiable [BlockHeader] m => [BlockHeader] -> m ()
+putBlockHeaders = Mod.put (Proxy @[BlockHeader])
 
-getRemainingBHeaders :: (Functor m, Mod.Accessible RemainingBlockHeaders m) => m [BlockData]
+getRemainingBHeaders :: (Functor m, Mod.Accessible RemainingBlockHeaders m) => m [BlockHeader]
 getRemainingBHeaders = unRemainingBlockHeaders <$> Mod.access (Proxy @RemainingBlockHeaders)
 
-putRemainingBHeaders :: Mod.Modifiable RemainingBlockHeaders m => [BlockData] -> m ()
+putRemainingBHeaders :: Mod.Modifiable RemainingBlockHeaders m => [BlockHeader] -> m ()
 putRemainingBHeaders = Mod.put (Proxy @RemainingBlockHeaders) . RemainingBlockHeaders
 
 stampActionTimestamp :: (MonadIO m, Mod.Modifiable ActionTimestamp m) => m ()

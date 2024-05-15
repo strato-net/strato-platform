@@ -6,7 +6,7 @@ module Blockchain.Bagger.BaggerState where
 
 import Blockchain.Bagger.TransactionList
 import Blockchain.Bagger.Transactions
-import Blockchain.Data.BlockData
+import Blockchain.Data.BlockHeader
 import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.Database.MerklePatricia (StateRoot (..), blankStateRoot)
 import Blockchain.Sequencer.Event (OutputTx (..))
@@ -28,7 +28,7 @@ type ATL = M.Map Address TransactionList
 
 data MiningCache = MiningCache
   { bestBlockSHA :: Keccak256,
-    bestBlockHeader :: BlockData,
+    bestBlockHeader :: BlockHeader,
     bestBlockTxHashes :: [Keccak256],
     lastExecutedStateRoot :: StateRoot,
     remainingGas :: Integer,
@@ -86,7 +86,7 @@ defaultMiningCache =
   MiningCache
     { bestBlockSHA = unsafeCreateKeccak256FromWord256 0,
       bestBlockHeader =
-        ( BlockData
+        ( BlockHeader
             (unsafeCreateKeccak256FromWord256 0)
             (unsafeCreateKeccak256FromWord256 0)
             (Everyone False)
@@ -100,8 +100,8 @@ defaultMiningCache =
             100
             (posixSecondsToUTCTime 0)
             ""
-            137
             (unsafeCreateKeccak256FromWord256 30)
+            137
         ),
       bestBlockTxHashes = [],
       lastExecutedStateRoot = blankStateRoot,

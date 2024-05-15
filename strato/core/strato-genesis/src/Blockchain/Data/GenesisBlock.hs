@@ -28,7 +28,7 @@ import Blockchain.DB.StateDB
 import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
-import Blockchain.Data.BlockData
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.ChainInfo
 import Blockchain.Data.GenesisInfo
 import Blockchain.Data.RLP
@@ -281,7 +281,7 @@ genesisInfoToGenesisBlock gi gn as = do
   sr <- A.lookupWithDefault (Proxy @StateRoot) (Nothing :: Maybe Word256)
   let sourceInfo = zipSourceInfo (accounts ++ as) codes
       bData =
-        BlockData
+        BlockHeader
           { parentHash = genesisInfoParentHash gi,
             ommersHash = genesisInfoUnclesHash gi,
             beneficiary = genesisInfoCoinbase gi,

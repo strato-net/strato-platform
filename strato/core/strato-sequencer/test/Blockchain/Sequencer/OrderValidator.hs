@@ -6,7 +6,7 @@ module Blockchain.Sequencer.OrderValidator
   )
 where
 
-import Blockchain.Data.BlockData
+import Blockchain.Data.BlockHeader
 import qualified Blockchain.Sequencer.Event as SE
 import Blockchain.Strato.Model.Class (blockHeaderHash)
 import Blockchain.Strato.Model.Keccak256

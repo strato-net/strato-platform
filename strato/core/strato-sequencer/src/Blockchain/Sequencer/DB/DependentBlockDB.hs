@@ -9,7 +9,7 @@
 module Blockchain.Sequencer.DB.DependentBlockDB where
 
 import BlockApps.Logging
-import Blockchain.Data.BlockData
+import Blockchain.Data.BlockHeader
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Model.Keccak256
 import Control.Monad (join)

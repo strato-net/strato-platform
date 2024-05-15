@@ -28,7 +28,7 @@ import Blockchain.DB.CodeDB (CodeKind (..), getCode)
 import qualified Blockchain.DB.MemAddressStateDB as Mem
 import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
-import Blockchain.Data.BlockData
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.ChainInfo
 import Blockchain.Data.DataDefs (TransactionResult (..))
@@ -377,7 +377,7 @@ runChainConstructors cId cInfo = do
           False --noValueTransfer
           True -- isRunChainConstructors
           S.empty --pre-existing suicide list
-          ( BlockData
+          ( BlockHeader
               (Keccak256.unsafeCreateKeccak256FromWord256 0)
               (Keccak256.unsafeCreateKeccak256FromWord256 0)
               emptyChainMember
@@ -391,8 +391,8 @@ runChainConstructors cId cInfo = do
               0
               (bSumTimestamp curBlockSummary)
               ""
-              0
               (Keccak256.unsafeCreateKeccak256FromWord256 0)
+              0
           )
           0 --callDepth
           (Account 0 $ Just cId) --receiveAddress

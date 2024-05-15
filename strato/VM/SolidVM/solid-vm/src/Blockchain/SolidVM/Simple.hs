@@ -38,7 +38,7 @@ module Blockchain.SolidVM.Simple
   )
 where
 
-import Blockchain.Data.BlockData
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.DataDefs
 import Blockchain.Data.ExecResults
 import qualified Blockchain.Database.MerklePatricia as MP
@@ -57,9 +57,9 @@ import qualified Data.Text as T
 import Data.Time.Clock.POSIX
 import GHC.Generics
 
-defaultBlockData :: BlockData
+defaultBlockData :: BlockHeader
 defaultBlockData =
-  BlockData
+  BlockHeader
     emptyHash
     emptyHash
     emptyChainMember
@@ -73,11 +73,11 @@ defaultBlockData =
     0
     (posixSecondsToUTCTime 0)
     ""
-    0
     emptyHash
+    0
 
 data SolidVMTxArgs = SolidVMTxArgs
-  { _argsBlockData :: BlockData,
+  { _argsBlockData :: BlockHeader,
     _argsSender :: Account,
     _argsOrigin :: Account,
     _argsTxHash :: Keccak256,

@@ -43,7 +43,7 @@ import Blockchain.DB.ModifyStateDB
 import Blockchain.DB.RawStorageDB
 import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
-import Blockchain.Data.BlockData
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.DataDefs
 import Blockchain.Data.ExecResults
@@ -283,7 +283,7 @@ addBlockTransactions OutputBlock {obBlockData = bd, obReceiptTransactions = tran
 
 addTransactions ::
   (VMBase m, MonadMonitor m) =>
-  BlockData ->
+  BlockHeader ->
   [OutputTx] ->
   ConduitT a VmOutEvent m ()
 addTransactions blockData txs =
@@ -318,7 +318,7 @@ addTransactions blockData txs =
 mineTransactions :: (VMBase m, MonadMonitor m) => Bagger.MineTransactions m
 mineTransactions bd remGas otxs = mineTransactions' bd remGas DL.empty otxs
 
-mineTransactions' :: (VMBase m, MonadMonitor m) => BlockData -> Integer -> DL.DList TxRunResult -> [OutputTx] -> m Bagger.TxMiningResult
+mineTransactions' :: (VMBase m, MonadMonitor m) => BlockHeader -> Integer -> DL.DList TxRunResult -> [OutputTx] -> m Bagger.TxMiningResult
 mineTransactions' _ remGas ran [] = return $ Bagger.TxMiningResult Nothing (DL.toList ran) [] remGas
 mineTransactions' header remGas ran unran@(tx : txs) = do
   let bt = fromMaybe (otBaseTx tx) (otPrivatePayload tx)
@@ -352,7 +352,7 @@ addTransaction ::
   (VMBase m, MonadMonitor m) =>
   Maybe Word256 ->
   Bool ->
-  BlockData ->
+  BlockHeader ->
   Integer ->
   OutputTx ->
   ExceptT TransactionFailureCause m ExecResults
@@ -415,7 +415,7 @@ runCodeForTransaction ::
   (VMBase m) =>
   Bool ->
   Bool ->
-  BlockData ->
+  BlockHeader ->
   Gas ->
   Account ->
   OutputTx ->
@@ -562,8 +562,8 @@ mkEventEntry chainId Event {..} = EventDB evBlockHash evContractAccount chainId 
 
 outputTransactionResult ::
   VMBase m =>
-  BlockData ->
-  (BlockData -> Keccak256) ->
+  BlockHeader ->
+  (BlockHeader -> Keccak256) ->
   TxRunResult ->
   ConduitT a VmOutEvent m ()
 outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHash} result deltaT beforeMap afterMap newAddresses) = do
@@ -720,7 +720,7 @@ replaceBestIfBetter b@OutputBlock {obBlockData = bd, obTotalDifficulty = td, obR
 calculateAndEmitStateDiffs ::
   VMBase m =>
   Maybe (MP.StateRoot, Keccak256, Integer) ->
-  BlockData ->
+  BlockHeader ->
   ConduitT a VmOutEvent m ()
 calculateAndEmitStateDiffs Nothing _ = pure ()
 calculateAndEmitStateDiffs (Just (next, hsh, num)) oldHeader =

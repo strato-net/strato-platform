@@ -20,7 +20,7 @@ import BlockApps.Logging
 import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul
 import qualified Blockchain.Data.Block as BDB
-import Blockchain.Data.BlockData
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.ChainInfo (chainInfo, creationBlock, parentChains)
 import qualified Blockchain.Data.RLP as RL
 import qualified Blockchain.Data.TXOrigin as TO

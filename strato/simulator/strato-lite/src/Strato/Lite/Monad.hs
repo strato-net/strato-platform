@@ -33,7 +33,7 @@ import Blockchain.Data.AddressStateDB
 import qualified Blockchain.Data.AlternateTransaction as U
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.Block hiding (bestBlockNumber)
-import Blockchain.Data.BlockData
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockDB ()
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.ChainInfo
@@ -150,7 +150,7 @@ preAlGoreInternet :: Internet
 preAlGoreInternet = Internet M.empty M.empty
 
 data P2PContext = P2PContext
-  { _blockHeaders :: ([BlockData], UTCTime),
+  { _blockHeaders :: ([BlockHeader], UTCTime),
     _remainingBlockHeaders :: (RemainingBlockHeaders, UTCTime),
     _actionTimestamp :: ActionTimestamp,
     _peerAddr :: PeerAddress,
@@ -175,10 +175,10 @@ data TestContext = TestContext
     _connectionTimeout :: ConnectionTimeout,
     _maxReturnedHeaders :: MaxReturnedHeaders,
     _prvKey :: PrivateKey,
-    _shaBlockDataMap :: Map Keccak256 BlockData,
+    _shaBlockDataMap :: Map Keccak256 BlockHeader,
     _p2pWorldBestBlock :: WorldBestBlock,
     _bestBlock :: BestBlock,
-    _canonicalBlockDataMap :: Map Integer (Canonical BlockData),
+    _canonicalBlockDataMap :: Map Integer (Canonical BlockHeader),
     _ipAddressIpChainsMap :: Map IPAddress IPChains,
     _orgIdChainsMap :: Map OrgId OrgIdChains,
     _shaChainTxsInBlockMap :: Map Keccak256 ChainTxsInBlock,
@@ -238,7 +238,7 @@ instance MonadIO m => Stacks Block (MonadTest m) where
     bestBlockNumber %= (\(BestBlockNumber n) -> BestBlockNumber $ max maxNum n)
     blocks %= (bs ++)
 
-instance MonadIO m => (Keccak256 `A.Alters` BlockData) (MonadTest m) where
+instance MonadIO m => (Keccak256 `A.Alters` BlockHeader) (MonadTest m) where
   lookup _ k = M.lookup k <$> use shaBlockDataMap
   insert _ k v = shaBlockDataMap %= M.insert k v
   delete _ k = shaBlockDataMap %= M.delete k
@@ -251,7 +251,7 @@ instance MonadIO m => Mod.Modifiable BestBlock (MonadTest m) where
   get _ = use bestBlock
   put _ = assign bestBlock
 
-instance MonadIO m => A.Selectable Integer (Canonical BlockData) (MonadTest m) where
+instance MonadIO m => A.Selectable Integer (Canonical BlockHeader) (MonadTest m) where
   select _ i = M.lookup i <$> use canonicalBlockDataMap
 
 instance MonadIO m => A.Selectable IPAddress IPChains (MonadTest m) where
@@ -296,7 +296,7 @@ instance MonadIO m => Mod.Modifiable ActionTimestamp (MonadP2PTest m) where
 instance MonadIO m => Mod.Accessible ActionTimestamp (MonadP2PTest m) where
   access _ = Mod.get (Mod.Proxy @ActionTimestamp)
 
-instance (MonadIO m, Mod.Accessible ConnectionTimeout m) => Mod.Modifiable [BlockData] (MonadP2PTest m) where
+instance (MonadIO m, Mod.Accessible ConnectionTimeout m) => Mod.Modifiable [BlockHeader] (MonadP2PTest m) where
   get _ = do
     (bHeaders, lastUpdateTS) <- use blockHeaders
     now <- liftIO getCurrentTime
@@ -305,15 +305,15 @@ instance (MonadIO m, Mod.Accessible ConnectionTimeout m) => Mod.Modifiable [Bloc
     if diffTime > maxTime
       then do
         -- stale cache; override it
-        Mod.put (Mod.Proxy @[BlockData]) []
+        Mod.put (Mod.Proxy @[BlockHeader]) []
         pure []
       else pure bHeaders
   put _ k = do
     now <- liftIO getCurrentTime
     assign blockHeaders (k, now)
 
-instance (MonadIO m, Mod.Accessible ConnectionTimeout m) => Mod.Accessible [BlockData] (MonadP2PTest m) where
-  access _ = Mod.get (Mod.Proxy @[BlockData])
+instance (MonadIO m, Mod.Accessible ConnectionTimeout m) => Mod.Accessible [BlockHeader] (MonadP2PTest m) where
+  access _ = Mod.get (Mod.Proxy @[BlockHeader])
 
 instance (MonadIO m, Mod.Accessible ConnectionTimeout m) => Mod.Modifiable RemainingBlockHeaders (MonadP2PTest m) where
   get _ = do
@@ -394,7 +394,7 @@ instance (Monad m, Stacks Block m) => Stacks Block (MonadP2PTest m) where
   takeStack a b = lift $ takeStack a b
   pushStack bs = lift $ pushStack bs
 
-instance (Keccak256 `A.Alters` BlockData) m => (Keccak256 `A.Alters` BlockData) (MonadP2PTest m) where
+instance (Keccak256 `A.Alters` BlockHeader) m => (Keccak256 `A.Alters` BlockHeader) (MonadP2PTest m) where
   lookup p k = lift $ A.lookup p k
   insert p k v = lift $ A.insert p k v
   delete p k = lift $ A.delete p k
@@ -407,7 +407,7 @@ instance Mod.Modifiable BestBlock m => Mod.Modifiable BestBlock (MonadP2PTest m)
   get p = lift $ Mod.get p
   put p k = lift $ Mod.put p k
 
-instance A.Selectable Integer (Canonical BlockData) m => A.Selectable Integer (Canonical BlockData) (MonadP2PTest m) where
+instance A.Selectable Integer (Canonical BlockHeader) m => A.Selectable Integer (Canonical BlockHeader) (MonadP2PTest m) where
   select p i = lift $ A.select p i
 
 instance A.Selectable IPAddress IPChains m => A.Selectable IPAddress IPChains (MonadP2PTest m) where
@@ -1348,7 +1348,7 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAs
   let cstate = def & txRunResultsCache .~ cache
       vmCtx = MemContext def cstate
       genesisBlock =
-        BlockData
+        BlockHeader
           zeroHash
           zeroHash
           emptyChainMember
@@ -1362,8 +1362,8 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAs
           1
           jamshidBirth
           ""
-          12345
           zeroHash
+          12345
       genHash = rlpHash genesisBlock
       genesisOutputBlock =
         OutputBlock

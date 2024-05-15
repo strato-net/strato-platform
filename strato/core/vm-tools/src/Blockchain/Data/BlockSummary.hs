@@ -12,7 +12,7 @@ module Blockchain.Data.BlockSummary
   )
 where
 
-import Blockchain.Data.BlockData
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.DataDefs
 import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
@@ -31,7 +31,7 @@ data BlockSummary = BlockSummary
     bSumTxCount :: Integer
   }
 
-blockHeaderToBSum :: BlockData -> Difficulty -> Integer -> BlockSummary
+blockHeaderToBSum :: BlockHeader -> Difficulty -> Integer -> BlockSummary
 blockHeaderToBSum b totalDiff txCount =
   BlockSummary
     { bSumParentHash = parentHash b,

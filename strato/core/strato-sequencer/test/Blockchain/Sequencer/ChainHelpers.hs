@@ -1,6 +1,6 @@
 module Blockchain.Sequencer.ChainHelpers where
 
-import Blockchain.Data.BlockData
+import Blockchain.Data.BlockHeader
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Verification (ommersVerificationValue)
@@ -39,7 +39,7 @@ buildIngestChain seed depth maxSiblings = do
     return $ sibling : grandchildren
   return . join $ expanded
 
-mapIngestHeader :: (BlockData -> BlockData) -> IngestBlock -> IngestBlock
+mapIngestHeader :: (BlockHeader -> BlockHeader) -> IngestBlock -> IngestBlock
 mapIngestHeader f baseBlock = baseBlock {ibBlockData = (f . ibBlockData $ baseBlock)}
 
 setIngestBlockParentHash :: Keccak256 -> IngestBlock -> IngestBlock

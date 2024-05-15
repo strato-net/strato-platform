@@ -8,7 +8,7 @@
 module Blockchain.Data.Json where
 
 import Blockchain.Data.Block
-import Blockchain.Data.BlockData
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.DataDefs
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction
@@ -328,7 +328,7 @@ blockDataRefToBlock :: BlockDataRef -> [Transaction] -> Block
 blockDataRefToBlock bdr txs =
   Block
     { blockBlockData =
-        BlockData
+        BlockHeader
           { parentHash = blockDataRefParentHash bdr,
             ommersHash = blockDataRefUnclesHash bdr,
             beneficiary =
@@ -364,10 +364,10 @@ bToBPrime' x txs = Block' (blockDataRefToBlock x txs) ""
 bPrimeToB :: Block' -> Block
 bPrimeToB (Block' x _) = x
 
-data BlockData' = BlockData' BlockData deriving (Eq, Show)
+data BlockData' = BlockData' BlockHeader deriving (Eq, Show)
 
 instance ToJSON BlockData' where
-  toJSON (BlockData' (BlockData ph uh a sr tr rr _ d num gl gu ts ed non mh)) =
+  toJSON (BlockData' (BlockHeader ph uh a sr tr rr _ d num gl gu ts ed non mh)) =
     object
       [ "kind" .= ("BlockData" :: String),
         "parentHash" .= ph,
@@ -389,7 +389,7 @@ instance ToJSON BlockData' where
 instance FromJSON BlockData' where
   parseJSON = withObject "BlockData'" $ \v ->
     BlockData'
-      <$> ( BlockData
+      <$> ( BlockHeader
               <$> v .: "parentHash"
               <*> v .: "unclesHash"
               <*> v .: "coinbase"
@@ -415,10 +415,10 @@ instance FromJSON Block' where
     next <- v .: "next"
     pure $ Block' (Block bData bTxs bUncles) next
 
-bdToBdPrime :: BlockData -> BlockData'
+bdToBdPrime :: BlockHeader -> BlockData'
 bdToBdPrime = BlockData'
 
-bdPrimeToBd :: BlockData' -> BlockData
+bdPrimeToBd :: BlockData' -> BlockHeader
 bdPrimeToBd (BlockData' bd) = bd
 
 data BlockDataRef' = BlockDataRef' BlockDataRef deriving (Eq, Show)

@@ -9,7 +9,7 @@ module Blockchain.Strato.RedisBlockDB.Test.Chain where
 
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.Block
-import Blockchain.Data.BlockData
+import Blockchain.Data.BlockHeader
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Keccak256
 import Control.Monad
@@ -23,10 +23,10 @@ import Test.QuickCheck
 ------------------------------------------------------------------------------
 -- Lenses
 --
-$(makeLensesBy (\n -> Just ("_" ++ n)) ''BlockData)
+$(makeLensesBy (\n -> Just ("_" ++ n)) ''BlockHeader)
 $(makeLensesBy (\n -> Just ("_" ++ n)) ''Block)
 
-makeGenesisBlock :: IO BlockData
+makeGenesisBlock :: IO BlockHeader
 makeGenesisBlock = do
   startBlock <-
     ( (over _parentHash (const . unsafeCreateKeccak256FromWord256 $ 0))
@@ -40,17 +40,17 @@ makeGenesisBlock = do
       <$> generate arbitrary
   return $ startBlock
 
-buildChain :: BlockData -> Int -> Int -> IO [BlockData]
+buildChain :: BlockHeader -> Int -> Int -> IO [BlockHeader]
 buildChain seed depth maxSiblings = do
   tree <- buildTree seed depth maxSiblings
   return $ toList tree
 
-makeNextBlock :: BlockData -> IO BlockData
+makeNextBlock :: BlockHeader -> IO BlockHeader
 makeNextBlock block = do
   let parent = blockHeaderHash block
       nextNumber = (number block) + 1
   diff <- return 1 --((blockDataDifficulty block) +) <$> (generate $ choose (1,1000))
-  child <- generate arbitrary :: IO BlockData
+  child <- generate arbitrary :: IO BlockHeader
   return $
     ( (over _parentHash (const parent))
         . (over _difficulty (const diff))
@@ -58,12 +58,12 @@ makeNextBlock block = do
     )
       child
 
-makeNextBlockIncorrectly :: BlockData -> IO BlockData
+makeNextBlockIncorrectly :: BlockHeader -> IO BlockHeader
 makeNextBlockIncorrectly block = do
   let parent = blockHeaderHash block
       nextNumber = (number block) + 2
   diff <- ((difficulty block) +) <$> (generate $ choose (1, 1000))
-  child <- generate arbitrary :: IO BlockData
+  child <- generate arbitrary :: IO BlockHeader
   return $
     ( (over _parentHash (const parent))
         . (over _difficulty (const diff))
@@ -71,7 +71,7 @@ makeNextBlockIncorrectly block = do
     )
       child
 
-extendChain :: Int -> [BlockData] -> IO [BlockData]
+extendChain :: Int -> [BlockHeader] -> IO [BlockHeader]
 extendChain n blocks | n <= 0 = return blocks
 extendChain n [] = makeGenesisBlock >>= makeNextBlock >>= (\b -> extendChain (n - 1) [b])
 extendChain n blocks = blocks' >>= extendChain (n - 1)
@@ -79,7 +79,7 @@ extendChain n blocks = blocks' >>= extendChain (n - 1)
     blocks' = newBlock >>= (\b -> return (blocks ++ [b]))
     newBlock = makeNextBlock $ last blocks
 
-extendChainIncorrectly :: Int -> [BlockData] -> IO [BlockData]
+extendChainIncorrectly :: Int -> [BlockHeader] -> IO [BlockHeader]
 extendChainIncorrectly n blocks | n <= 0 = return blocks
 extendChainIncorrectly n [] = makeGenesisBlock >>= makeNextBlockIncorrectly >>= (\b -> extendChain (n - 1) [b])
 extendChainIncorrectly n blocks = blocks' >>= extendChain (n - 1)
@@ -87,15 +87,15 @@ extendChainIncorrectly n blocks = blocks' >>= extendChain (n - 1)
     blocks' = newBlock >>= (\b -> return (blocks ++ [b]))
     newBlock = makeNextBlockIncorrectly $ last blocks
 
-createChain :: Int -> IO [BlockData]
+createChain :: Int -> IO [BlockHeader]
 createChain = flip extendChain []
 
-validateLink :: BlockData -> BlockData -> Bool
+validateLink :: BlockHeader -> BlockHeader -> Bool
 validateLink parent child =
   ((blockHeaderHash parent) == (parentHash child))
     && (((number parent) + 1) == (number child))
 
-validateChain :: [BlockData] -> Bool
+validateChain :: [BlockHeader] -> Bool
 validateChain [] = True
 validateChain [_] = True
 validateChain (x : xs) = (validateLink x $ head xs) && (validateChain xs)
@@ -104,14 +104,14 @@ validateChain (x : xs) = (validateLink x $ head xs) && (validateChain xs)
 --                /o
 --  o-o-o-o-o-o-o--o
 --                \o
-buildY :: BlockData -> Int -> Int -> IO (Tree BlockData)
+buildY :: BlockHeader -> Int -> Int -> IO (Tree BlockHeader)
 buildY seed 0 _ = pure (Node seed [])
 buildY _ _ n | n < 2 = error "fewer than 2 siblings make no sense"
 buildY seed depth maxSiblings = do
   let spread = if depth == 1 then maxSiblings else 1
   nextDifficulty' <- return 1 --((blockDataDifficulty seed) +) <$> (generate $ choose (1, 1000))
   nextNumber <- return $ (number seed) + 1
-  siblings <- generate $ vectorOf spread arbitrary :: IO [BlockData]
+  siblings <- generate $ vectorOf spread arbitrary :: IO [BlockHeader]
   withUpdates <-
     return $
       ( (over _parentHash (const . blockHeaderHash $ seed))
@@ -124,14 +124,14 @@ buildY seed depth maxSiblings = do
     return $ grandchildren
   return $ Node seed expanded
 
-buildTree :: BlockData -> Int -> Int -> IO (Tree BlockData)
+buildTree :: BlockHeader -> Int -> Int -> IO (Tree BlockHeader)
 buildTree seed 0 _ = pure (Node seed [])
 buildTree _ _ n | n < 2 = error "fewer than 2 siblings make no sense"
 buildTree seed depth maxSiblings = do
   siblingCount <- generate $ invDist maxSiblings
   nextDifficulty' <- return 1 --((blockDataDifficulty seed) +) <$> (generate $ choose (1, 1000))
   nextNumber <- return $ (number seed) + 1
-  siblings <- generate $ vectorOf siblingCount arbitrary :: IO [BlockData]
+  siblings <- generate $ vectorOf siblingCount arbitrary :: IO [BlockHeader]
   withUpdates <-
     return $
       ( (over _parentHash (const . blockHeaderHash $ seed))
@@ -163,14 +163,14 @@ draw' (Node x ts0) = lines x ++ drawSubTrees ts0
       "|" : shift "+- " "|  " (draw' t) ++ drawSubTrees ts
     shift first other = zipWith (++) (first : repeat other)
 
-bush :: BlockData -> Int -> Int -> IO (Tree BlockData)
+bush :: BlockHeader -> Int -> Int -> IO (Tree BlockHeader)
 bush g n m = do
   tree <- buildTree g n m
   if (length . leaves $ tree) < 2
     then bush g n (m + 1)
     else return tree
 
-bushY :: BlockData -> Int -> Int -> IO (Tree BlockData)
+bushY :: BlockHeader -> Int -> Int -> IO (Tree BlockHeader)
 bushY g n m = do
   tree <- buildY g n m
   if (length . leaves $ tree) < 2
@@ -186,7 +186,7 @@ stem l (Node n []) = if n == l then [n] else []
 stem l (Node _ [t]) = (rootLabel t) : (stem l t) -- if rootLabel t == l then [rootLabel t] else stem l t
 stem l (Node _ f) = concat $ map (stem l) f
 
-stem' :: BlockData -> [BlockData] -> [BlockData]
+stem' :: BlockHeader -> [BlockHeader] -> [BlockHeader]
 stem' _ [] = error "stem' called with empty list"
 stem' l (c : cs)
   | l == c = [l]
@@ -198,7 +198,7 @@ stem' l (c : cs)
 showTree :: (Show a) => Tree a -> String
 showTree = drawTree . prettyTree
 
-prettyTree' :: Tree BlockData -> Tree String
+prettyTree' :: Tree BlockHeader -> Tree String
 prettyTree' tree = prettyTree $ (\x -> (number x, showHash . blockHeaderHash $ x)) <$> tree
 
 showHash :: Keccak256 -> String
