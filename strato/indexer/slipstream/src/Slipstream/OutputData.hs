@@ -451,6 +451,21 @@ getDeferredForeignKeysForMapping tableName creator a =
       }
   ]
 
+getDeferredForeignKeysForEvents :: TableName -> Text -> Text -> [ForeignKeyInfo]
+getDeferredForeignKeysForEvents tableName creator a =
+  [ ForeignKeyInfo
+      { tableName = tableName,
+        columnName = T.pack "address",
+        foreignTableName =
+          indexTableName creator a $
+            ( \case
+                EventTableName _ _ n' _ -> n'
+                _ -> ""
+            )
+              tableName
+      }
+  ]
+
 createIndexTable ::
   OutputM m=>
   IORef Globals ->
@@ -1132,12 +1147,13 @@ createExpandEventTables ::
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text, Text) ->
-  ConduitM () Text m ()
-createExpandEventTables globalsIORef c cc nameParts = mapM_ go . Map.toList $ c ^. events
+  ConduitM () Text m [ForeignKeyInfo]
+createExpandEventTables globalsIORef c cc nameParts = fmap concat . mapM go . Map.toList $ c ^. events
   where
     go (evName, ev) = do
-      createEventTable globalsIORef nameParts evName ev cc
+      fkInfo <- createEventTable globalsIORef nameParts evName ev cc
       expandEventTable globalsIORef nameParts evName ev cc
+      return fkInfo
 
 createEventTable ::
   OutputM m =>
@@ -1146,16 +1162,19 @@ createEventTable ::
   SolidString ->
   EventF () ->
   CodeCollectionF () ->
-  ConduitM () Text m ()
+  ConduitM () Text m [ForeignKeyInfo]
 createEventTable globalsIORef (creator, a, n) evName ev cc = do
   let (crtr, app, cname) = constructTableNameParameters creator a n
       eventTable = EventTableName crtr app cname (escapeQuotes $ labelToText evName)
       cols = getTableColumnAndType cc [(x, indexedTypeType y) | (x, y) <- fillFirstEmptyEntries $ ev ^. eventLogs]
       colsCombined = map (\(x,y)-> x <> " " <> y) cols
   eventAlreadyCreated <- isTableCreated globalsIORef eventTable
-  unless eventAlreadyCreated $ do
-    setTableCreated globalsIORef eventTable $ colsCombined
-    yield $ createEventTableQuery eventTable colsCombined
+  if eventAlreadyCreated
+    then return []
+    else do
+      setTableCreated globalsIORef eventTable $ colsCombined
+      yield $ createEventTableQuery eventTable colsCombined
+      return $ getDeferredForeignKeysForEvents eventTable creator a
 
 createEventTableQuery :: TableName -> TableColumns -> Text
 createEventTableQuery tableName cols =

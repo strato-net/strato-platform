@@ -320,9 +320,9 @@ processTheMessages env conn messages = do
             $logInfoS "processTheMessages/deferredForeignKeys" $ T.pack $ show deferredForeignKeys
 
 
-            outputData conn $ createExpandEventTables g c cc nameParts
+            deferredForeignKeysForEvents <- outputData conn $ createExpandEventTables g c cc nameParts
 
-            return $ deferredForeignKeys ++ deferredForeignKeysForMappings
+            return $ deferredForeignKeys ++ deferredForeignKeysForMappings ++ deferredForeignKeysForEvents
 
         -- forM_ deferredForeignKeys $ \deferredForeignKey -> do
         --   outputData conn $ createForeignIndexesForJoins deferredForeignKey
