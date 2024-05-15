@@ -28,8 +28,8 @@ export default {
   InventoryEventSerialNumberList: { label: "Inventory Event Serial Numbers", url: "/inventories/events/serialNumbers" },
   Items: { label: "Item", url: "/items" },
   Orders: { label: "Order", url: "/order/:type" },
-  RedemptionsOutgoingDetails: { label: "Redemption Outgoing Detail", url: "/redemptions-outgoing/:id" },
-  RedemptionsIncomingDetails: { label: "Redemption Incoming Detail", url: "/redemptions-incoming/:id" },
+  RedemptionsOutgoingDetails: { label: "Redemption Outgoing Detail", url: "/redemptions-outgoing/:redemptionService/:id" },
+  RedemptionsIncomingDetails: { label: "Redemption Incoming Detail", url: "/redemptions-incoming/:redemptionService/:id" },
   SoldOrderDetails: { label: "Sold Order Detail", url: "/sold-orders/:id" },
   BoughtOrderDetails: {
     label: "Bought Order Detail",

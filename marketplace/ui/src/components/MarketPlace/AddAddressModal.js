@@ -13,7 +13,7 @@ import {
 
 
 
-const AddAddressModal = ({open , close }) => {
+const AddAddressModal = ({open , close, redemptionService}) => {
     const [showAddress, setshowAddress] = useState(false);
     const marketplaceDispatch = useMarketplaceDispatch();
     const ShippingDetailsSchema = () => {
@@ -89,6 +89,7 @@ const AddAddressModal = ({open , close }) => {
         addressLine1: encodeURIComponent(values.addressLine1),
         addressLine2: encodeURIComponent(values.addressLine2),
         country: encodeURIComponent(values.country),
+        redemptionService: encodeURIComponent(redemptionService),
         // billing address
       };
     
@@ -104,7 +105,7 @@ const AddAddressModal = ({open , close }) => {
       });
       let res = await actions.addShippingAddress(marketplaceDispatch, body);
       if (res != null) {
-        await actions.fetchUserAddresses(marketplaceDispatch);
+        await actions.fetchUserAddresses(marketplaceDispatch, redemptionService);
       }
     };
     const { TextArea } = Input;

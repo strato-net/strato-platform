@@ -62,6 +62,7 @@ export const Redemption = {
   prefix: '/redemption',
   get: '/:id',
   create: '/',
+  getRedemptionServices: '/services',
   getOutgoingRedemptionRequests: '/outgoing',
   getIncomingRedemptionRequests: '/incoming',
   close: '/close'

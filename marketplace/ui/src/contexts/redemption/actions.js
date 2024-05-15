@@ -1,9 +1,12 @@
 import RestStatus from "http-status-codes";
-import { apiUrl, fileServerUrl, HTTP_METHODS } from "../../helpers/constants";
+import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
 
 const actionDescriptors = {
     resetMessage: "reset_message",
     setMessage: "set_message",
+    fetchRedemptionServices: "fetch_redemption_services",
+    fetchRedemptionServicesSuccessful: "fetch_redemption_services_successful",
+    fetchRedemptionServicesFailed: "fetch_redemption_services_failed",
     requestRedemption: "request_redemption",
     requestRedemptionSuccessful: "request_redemption_successful",
     requestRedemptionFailed: "request_redemption_failed",
@@ -28,6 +31,44 @@ const actions = {
 
     setMessage: (dispatch, message, success = false) => {
         dispatch({ type: actionDescriptors.setMessage, message, success });
+    },
+
+    fetchRedemptionServices: async (dispatch) => {
+        dispatch({ type: actionDescriptors.fetchRedemptionServices });
+
+        try {
+            const response = await fetch(`${apiUrl}/redemption/services`, {
+                method: HTTP_METHODS.GET,
+            });
+
+            const body = await response.json();
+
+            if (response.status === RestStatus.OK) {
+                dispatch({
+                    type: actionDescriptors.fetchRedemptionServicesSuccessful,
+                    payload: body.data,
+                });
+
+                return true;
+            } else if (response.status === RestStatus.UNAUTHORIZED) {
+                dispatch({
+                    type: actionDescriptors.fetchRedemptionServicesFailed,
+                    error: "Unauthorized while fetching Redemption services"
+                });
+                window.location.href = body.error.loginUrl;
+            }
+
+            dispatch({
+                type: actionDescriptors.fetchRedemptionServicesFailed,
+                error: "Error while fetching Redemption services",
+            });
+            return false;
+        } catch (err) {
+            dispatch({
+                type: actionDescriptors.fetchRedemptionServicesFailed,
+                error: "Error while fetching Redemption services",
+            });
+        }
     },
 
     requestRedemption: async (dispatch, payload) => {
@@ -178,11 +219,11 @@ const actions = {
         }
     },
 
-    fetchRedemptionDetail: async (dispatch, id) => {
+    fetchRedemptionDetail: async (dispatch, redemptionService, id) => {
         dispatch({ type: actionDescriptors.fetchRedemptionDetails });
 
         try {
-            const response = await fetch(`${apiUrl}/redemption/${id}`, {
+            const response = await fetch(`${apiUrl}/redemption/${id}?redemptionService=${redemptionService}`, {
                 method: HTTP_METHODS.GET,
             });
 
