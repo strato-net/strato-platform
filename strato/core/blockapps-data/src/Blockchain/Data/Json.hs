@@ -367,7 +367,7 @@ bPrimeToB (Block' x _) = x
 data BlockData' = BlockData' BlockHeader deriving (Eq, Show)
 
 instance ToJSON BlockData' where
-  toJSON (BlockData' (BlockHeader ph uh a sr tr rr _ d num gl gu ts ed non mh)) =
+  toJSON (BlockData' (BlockHeader ph uh a sr tr rr _ d num gl gu ts ed mh non)) =
     object
       [ "kind" .= ("BlockData" :: String),
         "parentHash" .= ph,
@@ -403,8 +403,8 @@ instance FromJSON BlockData' where
               <*> v .: "gasUsed"
               <*> v .: "timestamp"
               <*> v .: "extraData"
-              <*> v .: "nonce"
               <*> v .: "mixHash"
+              <*> v .: "nonce"
           )
 
 instance FromJSON Block' where
