@@ -34,30 +34,10 @@ class StripeServiceController {
 
         // Generate and return Stripe connect link 
         const connectLink = await stripeService.generateStripeAccountConnectLink(redirectUrl, username, userStripeAccount.id);
-        res.setHeader('Content-Type', 'text/html');
-        res.send(`
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <meta http-equiv="refresh" content="0;url=${connectLink.url}">
-            </head>
-            <body>
-            </body>
-          </html>
-        `);
+        res.redirect(`${connectLink.url}`);
       } else {
         const connectLink = await stripeService.generateStripeAccountConnectLink(redirectUrl, username, userAccount);
-        res.setHeader('Content-Type', 'text/html');
-        res.send(`
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <meta http-equiv="refresh" content="0;url=${connectLink.url}">
-            </head>
-            <body>
-            </body>
-          </html>
-        `);
+        res.redirect(`${connectLink.url}`);
       }
       return next();
     } catch(e) {
@@ -106,17 +86,7 @@ class StripeServiceController {
         const session = await stripeService.getPaymentSession(paymentDetails.paymentsessionid, paymentDetails.accountid);
         
         // Redirect to Stripe payment session
-        res.setHeader('Content-Type', 'text/html');
-        res.send(`
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <meta http-equiv="refresh" content="0;url=${session.url}">
-            </head>
-            <body>
-            </body>
-          </html>
-        `);
+        res.redirect(`${session.url}`);
         return next();
       }
 
@@ -147,17 +117,7 @@ class StripeServiceController {
       const insertResult = await insertStripePayment(token, session.id, sellerCommonName);
 
       // Redirect to Stripe payment session
-      res.setHeader('Content-Type', 'text/html');
-      res.send(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta http-equiv="refresh" content="0;url=${session.url}">
-          </head>
-          <body>
-          </body>
-        </html>
-      `);
+      res.redirect(`${session.url}`);
       return next();
     } catch(e) {
       next(e);
@@ -217,17 +177,7 @@ class StripeServiceController {
       console.log("returnStatus", returnStatus);
 
       // Redirect back to marketplace
-      res.setHeader('Content-Type', 'text/html');
-      res.send(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta http-equiv="refresh" content="0;url=${redirectUrl}?assets=${returnStatus}">
-          </head>
-          <body>
-          </body>
-        </html>
-      `);
+      res.redirect(`${redirectUrl}?assets=${returnStatus}`);
       return next();
     } catch(e) {
       next(e);
@@ -260,17 +210,7 @@ class StripeServiceController {
       const updateResult = await updateStripePayment(token, "CANCELED");
 
       // Redirect back to marketplace
-      res.setHeader('Content-Type', 'text/html');
-      res.send(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta http-equiv="refresh" content="0;url=${redirectUrl}">
-          </head>
-          <body>
-          </body>
-        </html>
-      `);
+      res.redirect(`${redirectUrl}`);
       return next();
     } catch(e) {
       next(e);

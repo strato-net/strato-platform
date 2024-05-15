@@ -25,7 +25,7 @@ const ProcessingOrder = ({ user }) => {
   const [assetAddresses, setAssetAddresses] = useState([]);
   const orderDispatch = useOrderDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
-  const [error, seterror] = useState(null)
+  const [error, setError] = useState(null)
   const { message, success } = useOrderState();
   const [api, contextHolder] = notification.useNotification();
   const [called, setCalled] = useState(false);
@@ -61,26 +61,32 @@ const ProcessingOrder = ({ user }) => {
 
   const getCartData = async () => {
     try {
-      let updatedCart = [];
-      storedData.forEach(cart => {
-        if (!assetAddresses.includes(cart.product.address)) {
-          updatedCart.push(cart);
-        }
-      });
-      actions.addItemToCart(marketplaceDispatch, updatedCart);
-      setTimeout(() => {
-        navigate(routes.Orders.url.replace(':type', 'bought'));
-      }, 500);
+      if (assetAddresses) {
+        let updatedCart = [];
+        storedData.forEach(cart => {
+          if (!assetAddresses.includes(cart.product.address)) {
+            updatedCart.push(cart);
+          }
+        });
+        actions.addItemToCart(marketplaceDispatch, updatedCart);
+        setTimeout(() => {
+          navigate(routes.Orders.url.replace(':type', 'bought'));
+        }, 500);
+      } else {
+        setTimeout(() => {
+          navigate(routes.Checkout.url);
+        }, 500);
+      }
     } catch (err) {
-      seterror(err);
+      setError(err);
     }
   }
 
   const openToastMarketplace = (placement) => {
     if (error != null) {
       api.error({
-        message: error,
-        onClose: seterror(null),
+        message: error.message,
+        onClose: setError(null),
         placement,
         key: 2,
       });
@@ -107,15 +113,17 @@ const ProcessingOrder = ({ user }) => {
 
 
 
-  return <div>
-    {contextHolder}
-    <div className="h-96 flex flex-col justify-center items-center">
-      <Spin spinning={true} size="large" />
-      <p className="mt-4">Please wait while your order is being processed</p>
+  return (
+    <div>
+      {contextHolder}
+      <div className="h-96 flex flex-col justify-center items-center">
+        <Spin spinning={true} size="large" />
+        <p className="mt-4">Please wait while your order is being processed</p>
+      </div>
+      {error && openToastMarketplace("bottom")}
+      {message && openToastOrder("bottom")}
     </div>
-    {error && openToastMarketplace("bottom")}
-    {message && openToastOrder("bottom")}
-  </div>
+  )
 };
 
 export default ProcessingOrder;
