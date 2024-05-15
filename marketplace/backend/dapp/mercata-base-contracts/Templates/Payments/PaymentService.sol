@@ -227,6 +227,7 @@ abstract contract PaymentService is Utils {
         string _orderId,
         address _purchaser,
         address[] _saleAddresses,
+        address[][] _utxoAddresses,
         uint[] _quantities
     ) requireActive("complete order") requireOwner("complete order") external returns (address[]) {
         require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
@@ -239,6 +240,7 @@ abstract contract PaymentService is Utils {
             _purchaser,
             _purchasersCommonName,
             _saleAddresses,
+            _utxoAddresses,
             _quantities
         );
     }
@@ -249,6 +251,7 @@ abstract contract PaymentService is Utils {
         address _purchaser,
         string _purchasersCommonName,
         address[] _saleAddresses,
+        address[][] _utxoAddresses,
         uint[] _quantities
     ) internal virtual returns (address[]) {
         uint totalAmount = 0;
@@ -261,7 +264,7 @@ abstract contract PaymentService is Utils {
             seller = getCommonName(a.owner());
             totalAmount += s.price();
             try {
-                s.completeSale(_purchaser);
+                s.completeSale(_purchaser, _utxoAddresses[i]);
             } catch { // Support for legacy sales
                 address(s).call("unlockQuantity");
             }

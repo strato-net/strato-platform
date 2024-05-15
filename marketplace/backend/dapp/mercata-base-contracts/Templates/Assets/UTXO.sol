@@ -93,4 +93,23 @@ abstract contract UTXO is Asset {
 
         return (RestStatus.OK, address(newAsset));
     }
+
+    function setQuantity(uint _quantity) external {
+        quantity = _quantity;
+    } 
+
+    function combineUTXOs(Asset assetToBeSold, address[] _utxoAddressesPerSale) private returns(uint){
+        // Grouping UTXOs
+        uint groupedQuantity = 0;
+        try {
+        for (uint i = 0; i < _utxoAddressesPerSale.length; i++) {
+            UTXO utxo = UTXO(_utxoAddressesPerSale[i]);
+            if(assetToBeSold.root == utxo.root){
+                groupedQuantity += utxo.quantity();
+                utxo.setQuantity(0);
+                }
+        }
+        } catch{}
+        return groupedQuantity;
+    }
 }

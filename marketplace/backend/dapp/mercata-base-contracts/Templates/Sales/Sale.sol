@@ -3,6 +3,7 @@ pragma strict;
 
 import <509>;
 import "../Assets/Asset.sol";
+import "../Assets/UTXO.sol";
 import "../Enums/RestStatus.sol";
 import "../Utils/Utils.sol";
 
@@ -93,15 +94,19 @@ abstract contract Sale is Utils {
     }
 
     function completeSale(
-        address purchaser
+        address purchaser,
+        address[] _utxoAddressesPerSale
     ) public requirePaymentProvider("complete sale") returns (uint) {
         uint orderQuantity = takeLockedQuantity(purchaser);
+
+        uint groupedQuantity = UTXO.combineUTXOs(_utxoAddressesPerSale);
+        
         // regular transfer - isUserTransfer: false, transferNumber: 0, transferPrice: 0
         try {
-            assetToBeSold.transferOwnership(purchaser, orderQuantity, false, 0, 0);
+            assetToBeSold.transferOwnership(purchaser, orderQuantity + groupedQuantity, false, 0, 0);
         } catch { // Backwards compatibility for old assets
-            address(assetToBeSold).call("transferOwnership", purchaser, orderQuantity, false, 0);
-        }
+            address(assetToBeSold).call("transferOwnership", purchaser, orderQuantity + groupedQuantity, false, 0);
+        }        
         closeSaleIfEmpty();
         return RestStatus.OK;
     }
