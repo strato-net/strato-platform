@@ -23,6 +23,5 @@ library:
     - milena
     - mtl
     - postgresql-simple
-    - swagger2
     - transformers
     - yaml

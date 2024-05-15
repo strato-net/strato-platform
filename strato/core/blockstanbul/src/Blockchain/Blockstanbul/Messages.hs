@@ -13,7 +13,7 @@ module Blockchain.Blockstanbul.Messages where
 import BlockApps.Logging
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.Block
-import Blockchain.Data.DataDefs
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class (blockHash)
@@ -193,7 +193,7 @@ instance Format OutEvent where
   format (NewCheckpoint ckpt) = "NewCheckpoint " ++ show ckpt
 
 blkNum :: Block -> String
-blkNum = show . blockDataNumber . blockBlockData
+blkNum = show . number . blockBlockData
 
 shortFormat :: WireMessage -> String
 shortFormat (WireMessage (MsgAuth s _) (Preprepare v blk)) =

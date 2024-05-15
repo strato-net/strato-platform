@@ -22,7 +22,7 @@ import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.Blockstanbul.StateMachine
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.Block
-import Blockchain.Data.DataDefs
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
@@ -180,7 +180,7 @@ replayHistoricBlock realValidators@(ChainMembers chainWorkAround) seqNo blk = ru
         S.fromList
           . mapMaybe (verifyCommitmentSeal (blockHash blk))
           $ _commitment
-      blockNo = fromIntegral . blockDataNumber . blockBlockData $ blk
+      blockNo = fromIntegral . number . blockBlockData $ blk
   -- signersX509 =
   -- signersX509 <- liftEither $ maybeToEither "no istanbul metadata" mapMaybe =<<(getX509FromAddress (S.toList signers))
   -- signersz <-  S.fromList $ (map getChainMemberFromX509 signersX509)

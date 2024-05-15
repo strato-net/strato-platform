@@ -28,9 +28,10 @@ import Blockchain.DB.CodeDB (CodeKind (..), getCode)
 import qualified Blockchain.DB.MemAddressStateDB as Mem
 import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.ChainInfo
-import Blockchain.Data.DataDefs (BlockData (..), TransactionResult (..), blockDataNumber)
+import Blockchain.Data.DataDefs (TransactionResult (..))
 import Blockchain.Data.ExecResults
 import Blockchain.Data.GenesisBlock
 import Blockchain.Data.TransactionResultStatus
@@ -290,13 +291,13 @@ processBlockSummaries ::
   [OutputBlock] ->
   m ()
 processBlockSummaries = mapM_ $ \b -> do
-  let number = blockDataNumber $ obBlockData b
+  let number' = number $ obBlockData b
       txCount = length $ obReceiptTransactions b
-  recordMaxBlockNumber "vm_seqevents" number
+  recordMaxBlockNumber "vm_seqevents" number'
   $logDebugS "evm/processBlockSummaries" . T.pack $
     concat
       [ "Received block number ",
-        show number,
+        show number',
         " with ",
         show txCount,
         " transactions from seqEvents"
@@ -376,7 +377,7 @@ runChainConstructors cId cInfo = do
           False --noValueTransfer
           True -- isRunChainConstructors
           S.empty --pre-existing suicide list
-          ( BlockData
+          ( BlockHeader
               (Keccak256.unsafeCreateKeccak256FromWord256 0)
               (Keccak256.unsafeCreateKeccak256FromWord256 0)
               emptyChainMember
@@ -390,8 +391,8 @@ runChainConstructors cId cInfo = do
               0
               (bSumTimestamp curBlockSummary)
               ""
-              0
               (Keccak256.unsafeCreateKeccak256FromWord256 0)
+              0
           )
           0 --callDepth
           (Account 0 $ Just cId) --receiveAddress

@@ -27,7 +27,6 @@ library:
   - bytestring
   - http-media
   - http-types
-  - resourcet
   - servant
   - servant-multipart
   - servant-server
