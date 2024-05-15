@@ -103,10 +103,11 @@ abstract contract Sale is Utils {
         
         // regular transfer - isUserTransfer: false, transferNumber: 0, transferPrice: 0
         try {
-            assetToBeSold.transferOwnership(purchaser, orderQuantity + groupedQuantity, false, 0, 0);
+            assetToBeSold.transferOwnership(purchaser, orderQuantity, false, 0, 0);
         } catch { // Backwards compatibility for old assets
-            address(assetToBeSold).call("transferOwnership", purchaser, orderQuantity + groupedQuantity, false, 0);
+            address(assetToBeSold).call("transferOwnership", purchaser, orderQuantity, false, 0);
         }        
+        assetToBeSold.setQuantity(assetToBeSold.quantity() + groupedQuantity);
         closeSaleIfEmpty();
         return RestStatus.OK;
     }
