@@ -13,4 +13,11 @@ router.get(
     PaymentServiceController.getAll
 );
 
+router.get(
+    PaymentService.getNotOnboarded,
+    authHandler.authorizeRequest(),
+    loadDapp,
+    PaymentServiceController.getNotOnboarded
+);
+
 export default router;

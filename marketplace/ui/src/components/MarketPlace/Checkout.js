@@ -356,6 +356,15 @@ const Checkout = () => {
     },
   ];
 
+  const filterPaymentServices = (es) => {
+    const ps = es.map(p => paymentServices.find(s => s.address === p)).filter((p) => p);
+    if (ps.length === 0) {
+      return paymentServices.filter((p) => p && p.serviceName === 'Stripe');
+    } else {
+      return ps;
+    }
+  }
+
   return (
     <div className="mx-4 my-2 lg:mx-8 xl:mx-14">
       {contextHolder}
@@ -394,14 +403,14 @@ const Checkout = () => {
                 <React.Fragment key={e.key}>
                   <div className={`hidden lg:block`}>
                     <ConfirmOrder
-                      paymentProviders={e.value.paymentProviders.map(p => paymentServices.find(s => s.address === p)).filter((p) => p)}
+                      paymentProviders={filterPaymentServices(e.value.paymentProviders)}
                       data={e.value.items}
                       columns={columns}
                     />
                   </div>
                   <div className="lg:hidden">
                     <ResponsiveCart
-                      paymentProviders={e.value.paymentProviders.map(p => paymentServices.find(s => s.address === p)).filter((p) => p)}
+                      paymentProviders={filterPaymentServices(e.value.paymentProviders)}
                       data={e.value.items}
                       AddQty={AddQty}
                       MinusQty={MinusQty}

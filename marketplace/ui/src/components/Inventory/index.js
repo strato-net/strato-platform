@@ -59,12 +59,15 @@ const Inventory = ({ user }) => {
   
   const {
       paymentServices,
-      arePaymentServicesLoading
+      arePaymentServicesLoading,
+      notOnboarded,
+      areNotOnboardedLoading
   } = usePaymentServiceState();
   const paymentServiceDispatch = usePaymentServiceDispatch();
 
   useEffect(() => {
     paymentServiceActions.getPaymentServices(paymentServiceDispatch);
+    paymentServiceActions.getNotOnboarded(paymentServiceDispatch, user?.commonName, 10, 0);
   }, [paymentServiceDispatch]);
 
   //items
@@ -233,8 +236,8 @@ const renderImg = (service) => {
               </Button>
             </div>
             <div className="flex gap-3">
-              {!arePaymentServicesLoading ? (
-                (paymentServices || []).filter((p) => (
+              {!areNotOnboardedLoading ? (
+                (notOnboarded || []).filter((p) => (
                   p &&
                   p.data &&
                   (p.serviceURL || p.data.serviceURL) &&
