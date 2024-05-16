@@ -217,6 +217,33 @@ class StripeServiceController {
     }
   }
 
+  static async stripeOrderStatus(req, res, next) {
+    try {
+      // Validation
+      StripeServiceController.validateStripeOrderStatusArgs(req.query);
+      
+      const { tokens } = req.query;
+
+      const statuses = tokens.map(async (t) => {
+        const paymentDetails = await getStripePaymentFromToken(t);
+        if (paymentDetails.status === 'INITIALIZED') {
+          const session = await stripeService.getPaymentSession(paymentDetails.paymentsessionid, paymentDetails.accountid);
+          if (session.payment_status === 'paid') {
+            // Update payment status in DB
+            const updateResult = await updateStripePayment(t, 'PAID');
+            return 'PAID';
+          }
+        }
+        return paymentDetails.status;
+      });
+
+      res.status(200).send(statuses);
+      return next();
+    } catch(e) {
+      next(e);
+    }
+  }
+
   // ********* VALIDATION ***********
   static validateStripeOnboardingArgs(args) {
     const stripeOnboardingSchema = Joi.object({
@@ -279,6 +306,18 @@ class StripeServiceController {
 
     if (validation.error) {
       throw new Error(`Missing args or bad format in GET request /checkout/cancel: ${validation.error.message}.`);
+    }
+  }
+
+  static validateStripeOrderStatusArgs(args) {
+    const stripeOrderStatusSchema = Joi.object({
+      tokens: Joi.array().items(Joi.string().required()).required(),
+    });
+
+    const validation = stripeOrderStatusSchema.validate(args);
+
+    if (validation.error) {
+      throw new Error(`Missing args or bad format in GET request /order/status: ${validation.error.message}.`);
     }
   }
 }

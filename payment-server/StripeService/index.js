@@ -1,5 +1,6 @@
 import express from 'express';
 import StripeServiceController from './stripeService.controller.js';
+import Stripe from 'stripe';
 
 const router = express.Router();
 
@@ -27,5 +28,10 @@ router.get(
   '/checkout/cancel',
   StripeServiceController.stripeCheckoutCancel
 );
+
+router.get(
+  '/order/status',
+  StripeServiceController.stripeOrderStatus
+)
 
 export default router;
