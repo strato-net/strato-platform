@@ -16,6 +16,7 @@ so that they could be properly moved to their respective version's subsection.
 
 ## [Unreleased] 
 ### Added
+- <address>.nonce accessor in SolidVM
 
 ### Changed
 
