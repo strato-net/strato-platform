@@ -17,6 +17,11 @@ abstract contract PaymentService is Utils {
     string public imageURL;
     string public checkoutText;
 
+    event SellerOnboarded (
+        string sellersCommonName,
+        bool isActive
+    );
+
     enum PaymentStatus { NULL, ORDER_CREATED, PAYMENT_INITIALIZED, ORDER_COMPLETED, ORDER_CANCELLED }
 
     event Payment (
@@ -106,6 +111,14 @@ abstract contract PaymentService is Utils {
             quantitiesString
         );
         return token;
+    }
+
+    function onboardSeller(
+        string _sellersCommonName,
+        bool _isActive
+    ) requireOwner("onboard sellers") public returns (uint) {
+        emit SellerOnboarded(_sellersCommonName, _isActive);
+        return RestStatus.OK;
     }
 
     function createOrder (

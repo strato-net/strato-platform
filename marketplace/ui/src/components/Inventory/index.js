@@ -240,7 +240,7 @@ const renderImg = (service) => {
                   (p.serviceURL || p.data.serviceURL) &&
                   (p.onboardingRoute || p.data.onboardingRoute)
                 )).map((e) => (
-                  <Button type="primary" className="w-52 h-9 "
+                  <Button type="primary" className="w-44 h-9 items-center justify-center"
                       onClick={() => {
                         if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                           window.location.href = loginUrl;
@@ -252,7 +252,7 @@ const renderImg = (service) => {
                         }
                       }}
                   >
-                    <div className="flex items-center mr-1">
+                    <div className="flex items-center justify-center mr-1">
                       {`${e.onboardingText || e.data.onboardingText}`}&nbsp;
                       {renderImg(e)}
                     </div>
