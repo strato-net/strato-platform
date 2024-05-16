@@ -25,8 +25,8 @@ const RequestBeAuthorizedSellerModal = ({
     handleCancel();
   }
 
-  const requestReviewText = 'Thank you for interest in being a seller on Mercata! To keep our platform safe, we must first verify you as a seller. Click the button to request a review, and our team will get back to you shortly with our response!';
-  const alreadyRequestedReviewText = 'Thank you for interest in being a seller on Mercata! You have already requested to be reviewed as a seller. Our team will get back to you shortly with a response. If you have questions, please feel free to reach out to product@blockapps.net';
+  const requestReviewText = 'Thank you for interest in being an issuer of new products for sale on Mercata! To keep our platform safe, we must first verify you as an issuer. Click the button to request a review, and our team will get back to you shortly with our response!';
+  const alreadyRequestedReviewText = 'Thank you for interest in being an issuer of new products for sale on Mercata! You have already requested to be reviewed as an issuer. Our team will get back to you shortly with a response. If you have questions, please feel free to reach out to sales@blockapps.net';
   
   return (
     <>
@@ -50,7 +50,7 @@ const RequestBeAuthorizedSellerModal = ({
         ]}
       >
         <h1 className=" font-semibold text-lg text-[#202020]">
-          Unauthorized to Create Assets
+          Issuer Authorization
         </h1>
         <p> {sellerStatus === SELLER_STATUS.PENDING_REVIEW ? alreadyRequestedReviewText : requestReviewText } </p>
         
