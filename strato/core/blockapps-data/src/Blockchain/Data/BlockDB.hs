@@ -14,6 +14,7 @@ where
 
 import Blockchain.DB.SQLDB
 import Blockchain.Data.Block
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.DataDefs
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction
@@ -33,31 +34,30 @@ blk2BlkDataRef ::
   Bool ->
   BlockDataRef
 blk2BlkDataRef b hash' difficulty' makeHashOne =
-  BlockDataRef pH uH cO cU cC sR tR rR lB d n gL gU t eD nc mH hash'' uncles True True difficulty' --- Horrible! Apparently I need to learn the Lens library, yesterday
+  BlockDataRef pH uH cO cU cC sR tR rR lB d n gL gU t eD nc mH hash'' True True difficulty' --- Horrible! Apparently I need to learn the Lens library, yesterday
   where
     hash'' = if makeHashOne then unsafeCreateKeccak256FromWord256 1 else hash'
     bd = blockBlockData b
-    uncles = blockBlockUncles b
-    pH = blockDataParentHash bd
-    uH = blockDataUnclesHash bd
-    cB = blockDataCoinbase bd
+    pH = parentHash bd
+    uH = ommersHash bd
+    cB = beneficiary bd
     (cO, cU, cC) = case cB of
       Org o True -> (o, "", "")
       OrgUnit o u True -> (o, u, "")
       CommonName o u c True -> (o, u, c)
       _ -> ("", "", "")
-    sR = blockDataStateRoot bd
-    tR = blockDataTransactionsRoot bd
-    rR = blockDataReceiptsRoot bd
-    lB = blockDataLogBloom bd
-    n = blockDataNumber bd
-    d = blockDataDifficulty bd
-    gL = blockDataGasLimit bd
-    gU = blockDataGasUsed bd
-    t = blockDataTimestamp bd
-    eD = blockDataExtraData bd
-    nc = blockDataNonce bd
-    mH = blockDataMixHash bd
+    sR = stateRoot bd
+    tR = transactionsRoot bd
+    rR = receiptsRoot bd
+    lB = logsBloom bd
+    n = number bd
+    d = difficulty bd
+    gL = gasLimit bd
+    gU = gasUsed bd
+    t = timestamp bd
+    eD = extraData bd
+    nc = nonce bd
+    mH = mixHash bd
 
 getBlock ::
   HasSQLDB m =>
@@ -84,7 +84,7 @@ putBlocks blocksAndDifficulties makeHashOne = do
   let blocksHashesAndDifficulties = (\(b, d) -> (b, blockHash b, d)) <$> blocksAndDifficulties
   sqlQuery $
     forM blocksHashesAndDifficulties $ \(b, hash', diff) -> do
-      insertTXIfNew' (BlockHash $ blockHash b) (Just $ blockDataNumber $ blockBlockData b) (blockReceiptTransactions b)
+      insertTXIfNew' (BlockHash $ blockHash b) (Just $ number $ blockBlockData b) (blockReceiptTransactions b)
 
       existingBlockData <- SQL.selectList [BlockDataRefHash SQL.==. blockHash b] []
 
@@ -105,5 +105,5 @@ putBlocks blocksAndDifficulties makeHashOne = do
         case ret of
           Just x -> return $ entityKey x
           Nothing -> error "error in putBlocks: no transaction exists in the DB, even though I just inserted it"
-      SQL.update key [RawTransactionBlockNumber SQL.=. fromIntegral (blockDataNumber (blockBlockData b))]
+      SQL.update key [RawTransactionBlockNumber SQL.=. fromIntegral (number (blockBlockData b))]
       return key

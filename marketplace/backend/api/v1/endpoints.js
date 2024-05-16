@@ -62,6 +62,7 @@ export const Redemption = {
   prefix: '/redemption',
   get: '/:id',
   create: '/',
+  getRedemptionServices: '/services',
   getOutgoingRedemptionRequests: '/outgoing',
   getIncomingRedemptionRequests: '/incoming',
   close: '/close'
@@ -142,7 +143,6 @@ export const Order = {
   payment: '/payment',
   userAddress: '/userAddress',
   getAllUserAddress: '/userAddresses/user',
-  getAddressFromId: '/userAddress/:id',
   cancelSaleOrder: '/sale/cancel',
   checkSaleQuantity: '/saleQuantity',
   executeSale: '/closeSale',

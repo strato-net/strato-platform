@@ -8,7 +8,6 @@ description:         Functions to operate against the Redis-backed BlockDB
 dependencies:
   - base
   - blockapps-data
-  - blockapps-datadefs
   - containers
 
 library:

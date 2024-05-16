@@ -201,13 +201,13 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
                   </Row>
                   <Row className="justify-between">
                     <p className="text-base text-[#6A6A6A]">Total:</p>
-                    <p className="text-xl text-[#202020]   text-right">
+                    <p id="totalPrice" className="text-xl text-[#202020] text-right">
                       ${total + tax}
                     </p>
                   </Row>
                 </div>
               </div>
-              {paymentProviders.map((paymentProvider) => (<div className="flex md:pb-2 items-center mr-4">
+              {paymentProviders.map((paymentProvider) => (<div id="review-and-submit" className="flex md:pb-2 items-center mr-4">
                 <button id="pay-now-button" className={`p-1 md:p-3 h-max rounded-lg border border-primary bg-primary hover:bg-primaryHover text-white`}
                   onClick={async () => {
                     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {

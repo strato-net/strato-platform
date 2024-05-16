@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Form,
   Modal,
@@ -12,6 +12,8 @@ import {
   useInventoryDispatch,
   useInventoryState,
 } from "../../contexts/inventory";
+import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
+import { actions as redemptionActions } from "../../contexts/redemption/actions";
 import { actions } from "../../contexts/inventory/actions";
 import TextArea from "antd/es/input/TextArea";
 import TagManager from "react-gtm-module";
@@ -36,6 +38,8 @@ const CreateInventoryModal = ({
   const [uploadErr, setUploadErr] = useState("");
   const { isCreateInventorySubmitting, isUploadImageSubmitting } =
     useInventoryState();
+  const { redemptionServices, isFetchingRedemptionServices } = useRedemptionState();
+  const redemptionDispatch = useRedemptionDispatch();
   const [selectedImages, setSelectedImages] = useState(null);
   const [selectedFiles, setSelectedFiles] = useState(null);
   const [clothingType, setClothingType] = useState(null);
@@ -43,6 +47,10 @@ const CreateInventoryModal = ({
   const [categoryValue, setCategoryValue] = useState("Art");
   const [subCategoryValue, setSubCategoryValue] = useState(form.getFieldValue("subCategory"));
   const [measureUnit, setMeasureUnit] = useState(unitOfMeasures);
+
+  useEffect(() => {
+    redemptionActions.fetchRedemptionServices(redemptionDispatch);
+  }, [redemptionDispatch]);
 
   const beforeImageUpload = (file) => {
     const isJpgOrPng = file.type === "image/jpeg" || file.type === "image/png";
@@ -124,10 +132,12 @@ const CreateInventoryModal = ({
     }
 
     const { category, subCategory, images, files, ...body } = values;
+    const redemptionService = redemptionServices ? (redemptionServices[0] || {}).address : undefined;
     const newBody = {
       itemArgs: {
         images: imageKeys || [],
         files: fileKeys || [],
+        redemptionService,
         ...body
       },
     };
@@ -219,6 +229,7 @@ const CreateInventoryModal = ({
         footer={[
           <div className="flex justify-center mb-5 pt-4">
             <Button
+              id="createItemSubmit"
               className="w-40"
               type="primary"
               onClick={() => {
@@ -226,7 +237,7 @@ const CreateInventoryModal = ({
                   handleCreateFormSubmit(values);
                 })
               }}
-              loading={isCreateInventorySubmitting || isUploadImageSubmitting}
+              loading={isCreateInventorySubmitting || isUploadImageSubmitting || isFetchingRedemptionServices}
             >
               Create Item
             </Button>
@@ -290,6 +301,7 @@ const CreateInventoryModal = ({
                 ]}
               >
                 <Select
+                  id="category"
                   placeholder="Select Category"
                   allowClear
                   value={categoryValue}
@@ -328,7 +340,7 @@ const CreateInventoryModal = ({
                 >
                   {categorys.map((category) =>
                     category.name === categoryValue ? category.subCategories.map((e, index) => (
-                      <Option value={e.contract} key={index}>
+                      <Option id="subCategory-options" value={e.contract} key={index}>
                         {e.name}
                       </Option>
                     )) : null
@@ -350,6 +362,7 @@ const CreateInventoryModal = ({
                 ]}
               >
                 <RichEditor
+                  id="description"
                   onChange={(content) => {
                     form.setFieldsValue({ description: content });
                   }}
@@ -371,6 +384,7 @@ const CreateInventoryModal = ({
               >
                 <div className="p-4 border-secondryD border rounded flex flex-col justify-around">
                   <Upload
+                    id="imageUpload"
                     onChange={handleImageChange}
                     fileList={selectedImages}
                     accept="image/png, image/jpeg"

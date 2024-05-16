@@ -9,7 +9,10 @@ import "Templates/Assets/SemiFungible.sol";
 import "Templates/Assets/UTXO.sol";
 import "Templates/Enums/RestStatus.sol";
 import "Templates/Payments/PaymentService.sol";
+import "Templates/Redemptions/RedemptionService.sol";
 import "Templates/Sales/Sale.sol";
 import "Templates/Utils/Utils.sol";
+// Uncomment to test whether all non-base contracts typecheck
+// import "All.sol";
 
 contract Mercata{}

@@ -3,6 +3,7 @@ import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
 import sendEmail from '../../../helpers/email'
+import constants from '../../../helpers/constants'
 const options = { config, cacheNonce: true }
 
 class OrderController {
@@ -46,7 +47,7 @@ class OrderController {
   static async payment(req, res, next) {
     try {
       const { dapp, body, accessToken } = req
-      const originUrl = req.headers.origin
+      const originUrl = req.headers.origin || config.serverHost;
       OrderController.validatePaymentArgs(body)
 
       const result = await dapp.paymentCheckout(originUrl, body, options, accessToken)
@@ -88,19 +89,6 @@ class OrderController {
       const { dapp, query } = req
 
       const orders = await dapp.getAllUserAddress({ ...query })
-      rest.response.status200(res, orders)
-
-      return next()
-    } catch (e) {
-      return next(e)
-    }
-  }
-
-  static async getAddressFromId(req, res, next) {
-    try {
-      const { dapp, params } = req
-
-      const orders = await dapp.getAddressFromId(params)
       rest.response.status200(res, orders)
 
       return next()
@@ -206,6 +194,7 @@ class OrderController {
       addressLine1: Joi.string().required(),
       addressLine2: Joi.string().allow(""),
       country: Joi.string().required(),
+      redemptionService: Joi.string().required(),
     }).required();
 
     const validation = createUserAddressSchema.validate(args);

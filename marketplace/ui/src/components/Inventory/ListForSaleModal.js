@@ -141,7 +141,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                     title: "Set Price",
                     align: "center",
                     render: () => (
-                        <InputNumber value={pricePerUnit} controls={false} min={1} onChange={(value) => setpricePerUnit(value)} />
+                        <InputNumber id="sellPrice" value={pricePerUnit} controls={false} min={1} onChange={(value) => setpricePerUnit(value)} />
                     )
                 })
                 break;
@@ -193,7 +193,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
             width={650}
             footer={[
                 <div className="flex justify-center md:block">   
-                  <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canList} loading={inventory.saleAddress ? issaleUpdating : isListing}>
+                  <Button id="asset-update-list" type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canList} loading={inventory.saleAddress ? issaleUpdating : isListing}>
                       {inventory.saleAddress ? 'Update' : 'List' }
                   </Button>
                 </div>

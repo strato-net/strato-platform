@@ -266,6 +266,7 @@ const renderImg = (service) => {
               }
               <Button
                 type="primary"
+                id="createItem"
                 className="w-40 h-9 flex items-center justify-center gap-[6px]"
                 onClick={() => {
                   if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
@@ -359,7 +360,6 @@ const renderImg = (service) => {
             </div>
           </div>
         </>
-      )}
       {
         open && (
           <CreateInventoryModal

@@ -99,7 +99,6 @@ pipeline {
                 OAUTH_CLIENT_SECRET='${KEYCLOAK_STRATODEVEL_DEV_SECRET}' \\
                 VAULT_URL=https://\$(</host):8093 \\
                 VAULT_PROXY_DEBUG=true \\
-                STRIPE_PAYMENT_SERVER_URL=https://\$(</host):44301 \\
                 FILE_SERVER_URL=https://\$(</host):44300/highway \\
                 idServerUrl=https://\$(</host):8001 \\
                 GLOBAL_ADMIN_NAME='${GLOBAL_ADMIN_NAME}' \\
