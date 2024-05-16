@@ -24,6 +24,21 @@ so that they could be properly moved to their respective version's subsection.
 ### Removed
 
 
+## [11.2.1] - 5/16/2024
+### Added
+- Contract's `root` is available in slipstream tables
+
+### Changed
+- hard-coded `creatorForkBlockNumber` for prod network
+- unifying block header data definitions throughout platform
+
+### Fixed
+- Fixed the way arrays of strings & assets are displayed in slipstream
+
+### Removed
+- Removed block_data table from `eth` database
+
+
 ## [11.2.0] - 5/15/2024 
 ### Added
 - POST `/transaction` allows users to create contracts by providing an address through the `codePtr` field
