@@ -432,21 +432,6 @@ abstract contract UTXO is Asset {
     function setQuantity(uint _quantity) external {
         quantity = _quantity;
     } 
-
-    function combineUTXOs(Asset assetToBeSold, address[] _utxoAddressesPerSale) external returns(uint){
-        // Grouping UTXOs
-        uint groupedQuantity = 0;
-        try {
-        for (uint i = 0; i < _utxoAddressesPerSale.length; i++) {
-            UTXO utxo = UTXO(_utxoAddressesPerSale[i]);
-            if(assetToBeSold.root == utxo.root){
-                groupedQuantity += utxo.quantity();
-                utxo.setQuantity(0);
-                }
-        }
-        } catch{}
-        return groupedQuantity;
-    }
 }
 
 abstract contract Sale is Utils { 
@@ -541,16 +526,32 @@ abstract contract Sale is Utils {
     ) public requirePaymentProvider("complete sale") returns (uint) {
         uint orderQuantity = takeLockedQuantity(purchaser);
 
-        uint groupedQuantity = UTXO.combineUTXOs(assetToBeSold, _utxoAddressesPerSale);
+        uint groupedQuantity = combineUTXOs(_utxoAddressesPerSale);
         
         // regular transfer - isUserTransfer: false, transferNumber: 0, transferPrice: 0
         try {
-            assetToBeSold.transferOwnership(purchaser, orderQuantity + groupedQuantity, false, 0, 0);
+            assetToBeSold.transferOwnership(purchaser, orderQuantity, false, 0, 0);
         } catch { // Backwards compatibility for old assets
-            address(assetToBeSold).call("transferOwnership", purchaser, orderQuantity + groupedQuantity, false, 0);
+            address(assetToBeSold).call("transferOwnership", purchaser, orderQuantity, false, 0);
         }        
+        assetToBeSold.setQuantity(assetToBeSold.quantity() + groupedQuantity);
         closeSaleIfEmpty();
         return RestStatus.OK;
+    }
+
+    function combineUTXOs(Asset assetToBeSold, address[] _utxoAddressesPerSale) requirePaymentProvider("combine UTXOs") internal returns(uint){
+        // Grouping UTXOs
+        uint groupedQuantity = 0;
+        try {
+        for (uint i = 0; i < _utxoAddressesPerSale.length; i++) {
+            UTXO utxo = UTXO(_utxoAddressesPerSale[i]);
+            if(assetToBeSold.root == utxo.root & assetToBeSold.ownerCommonName == utxo.ownerCommonName){
+                groupedQuantity += utxo.quantity();
+                utxo.setQuantity(0);
+                }
+        }
+        } catch{}
+        return groupedQuantity;
     }
 
     function automaticTransfer(address _newOwner, uint _price, uint _quantity, uint _transferNumber) public returns (uint) {

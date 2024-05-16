@@ -227,7 +227,7 @@ abstract contract PaymentService is Utils {
         string _orderId,
         address _purchaser,
         address[] _saleAddresses,
-        address[][] _utxoAddresses,
+        address[][] _utxoAddresses, //query cirrus to get all utxos with the same owner and originAddress. originAddress will be stored as root in cirrrus.
         uint[] _quantities
     ) requireActive("complete order") requireOwner("complete order") external returns (address[]) {
         require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");

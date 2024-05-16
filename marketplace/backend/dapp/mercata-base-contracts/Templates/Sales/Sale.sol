@@ -3,7 +3,6 @@ pragma strict;
 
 import <509>;
 import "../Assets/Asset.sol";
-import "../Assets/UTXO.sol";
 import "../Enums/RestStatus.sol";
 import "../Utils/Utils.sol";
 
@@ -99,7 +98,7 @@ abstract contract Sale is Utils {
     ) public requirePaymentProvider("complete sale") returns (uint) {
         uint orderQuantity = takeLockedQuantity(purchaser);
 
-        uint groupedQuantity = UTXO.combineUTXOs(_utxoAddressesPerSale);
+        uint groupedQuantity = combineUTXOs(_utxoAddressesPerSale);
         
         // regular transfer - isUserTransfer: false, transferNumber: 0, transferPrice: 0
         try {
@@ -110,6 +109,21 @@ abstract contract Sale is Utils {
         assetToBeSold.setQuantity(assetToBeSold.quantity() + groupedQuantity);
         closeSaleIfEmpty();
         return RestStatus.OK;
+    }
+
+    function combineUTXOs(Asset assetToBeSold, address[] _utxoAddressesPerSale) requirePaymentProvider("combine UTXOs") internal returns(uint){
+        // Grouping UTXOs
+        uint groupedQuantity = 0;
+        try {
+        for (uint i = 0; i < _utxoAddressesPerSale.length; i++) {
+            UTXO utxo = UTXO(_utxoAddressesPerSale[i]);
+            if(assetToBeSold.root == utxo.root & assetToBeSold.ownerCommonName == utxo.ownerCommonName){
+                groupedQuantity += utxo.quantity();
+                utxo.setQuantity(0);
+                }
+        }
+        } catch{}
+        return groupedQuantity;
     }
 
     function automaticTransfer(address _newOwner, uint _price, uint _quantity, uint _transferNumber) public returns (uint) {
