@@ -728,6 +728,7 @@ typecheckMember (Static e@(SVMType.Enum _ enum mNames) x) n = do
 -- Static: argType, ContextType
 typecheckMember (Static (SVMType.Account True) x) "transfer" = pure $ Function (Static (SVMType.Int Nothing Nothing) x) (Product [] x) x [] [] False
 typecheckMember (Static (SVMType.Account True) x) "send" = pure $ Function (Static (SVMType.Int Nothing Nothing) x) (Static (SVMType.Bool) x) x [] [] False
+typecheckMember (Static (SVMType.Account _) x) "nonce" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Account _) x) "balance" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Account _) x) "code" =
   pure . Sum $
@@ -762,6 +763,7 @@ typecheckMember (Static (SVMType.Struct _ struct) x) n = do
         )
           <$ x
 -- I'm intentionally leaving out send and transfer for Contract types, since we don't have a payable flag for them yet
+typecheckMember (Static (SVMType.Contract _) x) "nonce" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Contract _) x) "balance" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Contract _) x) "code" =
   pure . Sum $
