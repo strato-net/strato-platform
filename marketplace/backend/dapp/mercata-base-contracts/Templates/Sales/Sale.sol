@@ -3,6 +3,7 @@ pragma strict;
 
 import <509>;
 import "../Assets/Asset.sol";
+import "../Assets/UTXO.sol";
 import "../Enums/RestStatus.sol";
 import "../Utils/Utils.sol";
 
@@ -92,44 +93,32 @@ abstract contract Sale is Utils {
         return paymentProvidersMap[_paymentProvider] != 0;
     }
 
+    //Works only for UTXOs
     function completeSale(
         address purchaser,
         address[] _utxoAddressesPerSale
     ) public requirePaymentProvider("complete sale") returns (uint) {
         uint orderQuantity = takeLockedQuantity(purchaser);
 
-        uint groupedQuantity = combineUTXOs(_utxoAddressesPerSale);
-        
         // regular transfer - isUserTransfer: false, transferNumber: 0, transferPrice: 0
         try {
             assetToBeSold.transferOwnership(purchaser, orderQuantity, false, 0, 0);
         } catch { // Backwards compatibility for old assets
             address(assetToBeSold).call("transferOwnership", purchaser, orderQuantity, false, 0);
         }        
-        assetToBeSold.setQuantity(assetToBeSold.quantity() + groupedQuantity);
+        
+        UTXO.combineUTXOs(assetToBeSold, _utxoAddressesPerSale);
+        
         closeSaleIfEmpty();
         return RestStatus.OK;
     }
 
-    function combineUTXOs(Asset assetToBeSold, address[] _utxoAddressesPerSale) requirePaymentProvider("combine UTXOs") internal returns(uint){
-        // Grouping UTXOs
-        uint groupedQuantity = 0;
-        try {
-        for (uint i = 0; i < _utxoAddressesPerSale.length; i++) {
-            UTXO utxo = UTXO(_utxoAddressesPerSale[i]);
-            if(assetToBeSold.root == utxo.root & assetToBeSold.ownerCommonName == utxo.ownerCommonName){
-                groupedQuantity += utxo.quantity();
-                utxo.setQuantity(0);
-                }
-        }
-        } catch{}
-        return groupedQuantity;
-    }
-
-    function automaticTransfer(address _newOwner, uint _price, uint _quantity, uint _transferNumber) public returns (uint) {
+    function automaticTransfer(address _newOwner, uint _price, uint _quantity, uint _transferNumber, address[] _utxoAddresses) public returns (uint) {
         require(msg.sender == address(assetToBeSold), "Only the underlying Asset can call automaticTransfer.");
         uint assetQuantity = assetToBeSold.quantity();
         require(_quantity <= assetQuantity - totalLockedQuantity, "Cannot transfer more units than are available.");
+
+
         if (_quantity > quantity) { // We can transfer more than the Sale quantity
             quantity = 0;
         } else {
@@ -141,6 +130,9 @@ abstract contract Sale is Utils {
         } catch { // Backwards compatibility for old assets
             address(assetToBeSold).call("transferOwnership", _newOwner, _quantity, true, _transferNumber);
         }
+
+        UTXO.combineUTXOs(assetToBeSold, _utxoAddressesPerSale);
+
         closeSaleIfEmpty();
         return RestStatus.OK;
     }
@@ -228,3 +220,6 @@ abstract contract Sale is Utils {
       return RestStatus.OK;
     }
 }
+
+
+

@@ -11,6 +11,7 @@ abstract contract Asset is Utils {
         ACTIVE,
         PENDING_REDEMPTION,
         RETIRED,
+        MERGED,
         MAX
     }
 

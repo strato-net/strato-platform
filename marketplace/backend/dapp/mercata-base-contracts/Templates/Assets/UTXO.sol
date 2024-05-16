@@ -96,5 +96,35 @@ abstract contract UTXO is Asset {
 
     function setQuantity(uint _quantity) external {
         quantity = _quantity;
-    } 
+    }
+
+    //This is used for old UTXOs
+    function mergeUTXOs(address[] _utxoAddressesPerSale) ("combine UTXOs") external returns(UTXO){
+        uint groupedQuantity = 0;
+        uint firstRoot = UTXO(_utxoAddressesPerSale[0]).root;
+        uint firstOwnerCommonName = UTXO(_utxoAddressesPerSale[0]).ownerCommonName();
+        for (uint i = 0; i < _utxoAddressesPerSale.length; i++) {
+            UTXO utxo = UTXO(_utxoAddressesPerSale[i]);
+            if(firstRoot == utxo.root & firstOwnerCommonName == utxo.ownerCommonName){
+                groupedQuantity += utxo.quantity();
+                utxo.setQuantity(0);
+                //utxo.updateStatus(AssetStatus.MERGED);
+                //or transfer
+                }
+        }
+        return new UTXO(name, description, images, files, createdDate, groupedQuantity, status);
+    }
+
+    //This is used for new Sales
+    function combineUTXOs(Asset assetToBeSold, address[] _utxoAddresses) external {
+        UTXO groupedUTXO = UTXO.mergeUTXOs(_utxoAddressesPerSale);
+        groupedQuantity = groupedUTXO.quantity();
+
+        if(groupedQuantity.ownerCommonName == assetToBeSold.ownerCommonName & groupedQuantity.root = assetToBeSold.root)
+            {
+            groupedUTXO.setQuantity(0);
+            groupedUTXO.updateStatus(AssetStatus.Merged);
+            assetToBeSold.setQuantity(assetToBeSold.quantity() + groupedQuantity);
+            }
+    }
 }
