@@ -244,23 +244,22 @@ class StripeServiceController {
 
   static async stripeOrderStatus(req, res, next) {
     try {
-      // Validation
-      StripeServiceController.validateStripeOrderStatusArgs(req.query);
       
       const { tokens } = req.query;
 
       // Get all statuses from tokens and recheck status from Stripe if ACH initialized
-      const paymentDetails = await getStripePaymentsFromTokens(tokens);
-      const statuses = paymentDetails.map(async (p) => {
+      let statuses = {};
+      const paymentDetails = await getStripePaymentsFromTokens(JSON.parse(tokens));
+      paymentDetails.map(async (p) => {
         if (p.status === 'INITIALIZED') {
           const session = await stripeService.getPaymentSession(p.paymentsessionid, p.accountid);
           if (session.payment_status === 'paid') {
             // Update payment status in DB
             const updateResult = await updateStripePayment(p.token, 'PAID');
-            return 'PAID';
+            statuses[p.token] = 'PAID';
           }
         }
-        return p.status;
+        statuses[p.token] = p.status;
       });
 
       res.status(200).send(statuses);

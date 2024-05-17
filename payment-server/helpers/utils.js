@@ -50,7 +50,7 @@ const getStripePaymentsFromTokens = async (tokens) => {
     WHERE token = ANY ($1)`;
   const values = [ tokens ];
   const result = await client.query(query, values);
-  return result.rows.length === 0 ? undefined : result.rows[0];
+  return result.rows.length === 0 ? undefined : result.rows;
 }
 
 const insertStripeAccount = async (commonName, accountId) => {
