@@ -56,7 +56,7 @@ class StripeServiceController {
 
       // Call onboardSeller
       const callArgs = {
-        username: username,
+        sellersCommonName: username,
         isActive: true,
       }
       const onboardSellerStatus = await emitOnboardSeller(callArgs);
