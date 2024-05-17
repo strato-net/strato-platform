@@ -17,8 +17,6 @@ abstract contract PaymentService is Utils {
     string public imageURL;
     string public checkoutText;
 
-    enum PaymentStatus { NULL, ORDER_CREATED, PAYMENT_INITIALIZED, ORDER_COMPLETED, ORDER_CANCELLED }
-
     event Payment (
         string token,
         string orderId,
@@ -29,8 +27,7 @@ abstract contract PaymentService is Utils {
         uint[] quantities,
         uint amount,
         uint tax,
-        uint unitsPerDollar,
-        PaymentStatus status
+        uint unitsPerDollar
     );
 
     address public purchasersAddress;   // ONLY USED FOR BACKWARDS COMPATIBILITY WITH SALE. DELETE ONCE ALL SALES USE NEW LOGIC!!!
@@ -161,8 +158,7 @@ abstract contract PaymentService is Utils {
             _quantities,
             totalAmount,
             0,
-            _unitsPerDollar(),
-            PaymentStatus.ORDER_CREATED
+            _unitsPerDollar()
         );
         return (token, assets);
     }
@@ -216,8 +212,7 @@ abstract contract PaymentService is Utils {
             _quantities,
             totalAmount,
             0,
-            _unitsPerDollar(),
-            PaymentStatus.PAYMENT_INITIALIZED
+            _unitsPerDollar()
         );
         return assets;
     }
@@ -276,8 +271,7 @@ abstract contract PaymentService is Utils {
             _quantities,
             totalAmount,
             0,
-            _unitsPerDollar(),
-            PaymentStatus.ORDER_COMPLETED
+            _unitsPerDollar()
         );
         return assets;
     }
@@ -339,8 +333,7 @@ abstract contract PaymentService is Utils {
             _quantities,
             totalAmount,
             0,
-            _unitsPerDollar(),
-            PaymentStatus.ORDER_CANCELLED
+            _unitsPerDollar()
         );
     }
 
