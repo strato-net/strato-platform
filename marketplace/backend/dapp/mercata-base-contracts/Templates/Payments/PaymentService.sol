@@ -232,7 +232,7 @@ abstract contract PaymentService is Utils {
         return _cancelOrder(
             _token,
             _purchaser,
-            _saleAddresses,
+            _saleAddresses
         );
     }
 
