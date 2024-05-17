@@ -27,6 +27,7 @@ export default {
   sellerOrgName: "blockapps",
   assetTableName: "Asset",
   saleTableName: "Sale",
+  saleAllTableName: "BlockApps-Mercata-Sale",
   orderTableName: "Order",
   blockAppsOrg: "BlockApps",
   prodNetworkId: "6909499098523985262",

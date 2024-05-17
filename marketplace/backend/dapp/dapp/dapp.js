@@ -532,11 +532,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           if(filter.assetToBeSold) 
           {
             //If timeFilter is applied, also add those filters
-            return saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, assetToBeSold: sale.assetToBeSold, ...filter  }, options);
+            return saleJs.getAllSaleHistory(rawAdmin, { assetToBeSold: sale.assetToBeSold, ...filter  }, options);
           }else{
             //If historical data is fetched, apply 12 month timeFilter
 
-            return saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, assetToBeSold: sale.assetToBeSold, order: "block_timestamp.asc", gtField: "block_timestamp", gtValue: getOneYearAgoTime() }, options); 
+            return saleJs.getAllSaleHistory(rawAdmin, { assetToBeSold: sale.assetToBeSold, order: "block_timestamp.asc", gtField: "block_timestamp", gtValue: getOneYearAgoTime() }, options); 
           }
         });
         const histories = await Promise.all(historyPromises);
