@@ -2,7 +2,7 @@ FROM ubuntu:16.04
 
 MAINTAINER BlockApps Inc.
 
-ENV POSTGREST_VERSION=v9.0.0
+ENV POSTGREST_VERSION=v12.0.0
 
 ENV POSTGREST_SOURCE=https://github.com/PostgREST/postgrest/releases/download \
     POSTGREST_LISTEN_PORT=3001 \
