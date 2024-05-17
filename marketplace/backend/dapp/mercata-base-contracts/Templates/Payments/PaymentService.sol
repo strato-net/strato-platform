@@ -154,9 +154,9 @@ abstract contract PaymentService is Utils {
             Asset a = s.assetToBeSold();
             assets.push(address(a));
             uint amount = s.price();
-            totalAmount += amount;
-            seller = getCommonName(a.owner());
             uint quantity = _quantities[i];
+            totalAmount += quantity * amount;
+            seller = getCommonName(a.owner());
             try {
                 s.lockQuantity(quantity, _purchaser);
             } catch { // Support for legacy sales
