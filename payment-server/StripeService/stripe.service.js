@@ -82,7 +82,7 @@ class StripeService {
             return stripe.accountLinks.create({
                 account: stripeAccountId,
                 refresh_url: `${SERVER_URL}/stripe/onboard?username=${username}&redirectUrl=${marketplaceUrl}`,
-                return_url: `${marketplaceUrl}`,
+                return_url: `${SERVER_URL}/stripe/onboard/confirm?username=${username}&redirectUrl=${marketplaceUrl}`,
                 type: 'account_onboarding',
             });
         } catch (e) {

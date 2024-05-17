@@ -7,6 +7,7 @@ import {
   insertStripeAccount,
   insertStripePayment,
   updateStripePayment,
+  emitOnboardSeller,
   getPaymentEvent, 
   validateAndGetOrderDetails ,
   completeOrder,
@@ -40,6 +41,29 @@ class StripeServiceController {
         const connectLink = await stripeService.generateStripeAccountConnectLink(redirectUrl, username, userAccount);
         res.redirect(`${connectLink.url}`);
       }
+      return next();
+    } catch(e) {
+      next(e);
+    }
+  }
+
+  static async stripeOnboardingConfirm(req, res, next) {
+    try {
+      // Validation
+      StripeServiceController.validateStripeOnboardingConfirmArgs(req.query);
+
+      const { username, redirectUrl } = req.query;
+
+      // Call onboardSeller
+      const callArgs = {
+        username: username,
+        isActive: true,
+      }
+      const onboardSellerStatus = await emitOnboardSeller(callArgs);
+      console.log("onboardSellerStatus", onboardSellerStatus);
+
+      // Redirect back to marketplace
+      res.redirect(`${redirectUrl}`);
       return next();
     } catch(e) {
       next(e);
@@ -257,6 +281,19 @@ class StripeServiceController {
 
     if (validation.error) {
       throw new Error(`Missing args or bad format in GET request /onboard: ${validation.error.message}.`);
+    }
+  }
+
+  static validateStripeOnboardingConfirmArgs(args) {
+    const stripeOnboardingConfirmSchema = Joi.object({
+      username: Joi.string().required(),
+      redirectUrl: Joi.string().required(),
+    })
+
+    const validation = stripeOnboardingConfirmSchema.validate(args);
+
+    if (validation.error) {
+      throw new Error(`Missing args or bad format in GET request /onboard/confirm: ${validation.error.message}.`);
     }
   }
 

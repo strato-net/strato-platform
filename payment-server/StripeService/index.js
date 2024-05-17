@@ -10,6 +10,11 @@ router.get(
 );
 
 router.get(
+  '/onboard/confirm',
+  StripeServiceController.stripeOnboardingConfirm
+);
+
+router.get(
   '/status', 
   StripeServiceController.stripeConnectStatus
 );

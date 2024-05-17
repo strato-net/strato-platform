@@ -91,6 +91,18 @@ const updateStripePayment = async (token, status) => {
   return updateResult;
 }
 
+const emitOnboardSeller = async (args) => {
+  // Make the call and return results
+  const contract = { name: "PaymentService", address: CONTRACT_ADDRESS };
+  const callArgs = {
+    contract,
+    method: "onboardSeller",
+    args: util.usc({ ...args }),
+  };
+  const onboardSellerStatus = await rest.call(ADMIN.getUser(), callArgs, DEFAULT_OPTIONS);
+  return onboardSellerStatus;
+}
+
 const getPaymentEvent = async (token) => {
   const tableArgs = {
     name: PAYMENT_EVENT_TABLE,
@@ -203,6 +215,7 @@ export {
   insertStripeAccount,
   insertStripePayment,
   updateStripePayment,
+  emitOnboardSeller,
   getPaymentEvent,
   validateAndGetOrderDetails,
   completeOrder,
