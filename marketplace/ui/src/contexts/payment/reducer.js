@@ -20,6 +20,24 @@ const reducer = (state, action) => {
         error: action.error,
         arePaymentServicesLoading: false
       };
+    case actionDescriptors.getNotOnboarded:
+      return {
+        ...state,
+        areNotOnboardedLoading: true
+      };
+    case actionDescriptors.getNotOnboardedSuccessful:
+      return {
+        ...state,
+        notOnboarded: action.payload.data,
+        notOnboardedTotal: action.payload.count,
+        areNotOnboardedLoading: false
+      };
+    case actionDescriptors.getNotOnboardedFailed:
+      return {
+        ...state,
+        error: action.error,
+        areNotOnboardedLoading: false
+      };
     default:
       throw new Error(`Unhandled action: '${action.type}'`);
   }

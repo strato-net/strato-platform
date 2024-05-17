@@ -259,6 +259,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
                     emptyCodeCollection
                     ""
                     ""
+                    ""
                     ( case codeHash d of
                         ExternallyOwned _ -> EVM
                         SolidVMCode _ _ -> SolidVM

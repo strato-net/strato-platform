@@ -236,8 +236,6 @@ async function getAll(admin, args = {}, options) {
     admin
   );
 
-  console.log(oldCount);
-
   totalCount += oldCount[0] ? oldCount[0].count : 0;
 
   return saleOrders ? { orders: saleOrders.map((order) => marshalOut(order)), total: totalCount } : undefined;

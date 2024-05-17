@@ -179,6 +179,7 @@ export const Marketplace = {
 export const PaymentService = {
   prefix: '/payment',
   getAll: '/',
+  getNotOnboarded: '/onboarding',
 }
 
 export const UserActivity = {

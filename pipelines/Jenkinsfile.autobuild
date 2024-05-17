@@ -300,18 +300,18 @@ pipeline {
                     lib.runSyncTester()
                   }
                 }
-                  // unstash 'slipstream_integrity_tests'
-                  // // script {
-                  //   dir('strato/indexer/slipstream/integrity_tests') {
-                  //      withCredentials([
-                  //           usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
-                  //           usernamePassword(credentialsId: 'keycloak-mercata-testnet2-localhost-client', passwordVariable: 'KEYCLOAK_MERCATATESTNET2_LOCALHOST_SECRET', usernameVariable: 'KEYCLOAK_MERCATATESTNET2_LOCALHOST_ID'),
-                  //               ]) {
-                  //       // Now CLIENT_ID1, CLIENT_SECRET1, and CLIENT_SECRET2 are available as environment variables
-                  //       sh "pip3 install -r requirements.txt"
-                  //       sh "python3 slipstream_sync.py '${KEYCLOAK_STRATODEVEL_DEV_ID}' '${KEYCLOAK_MERCATATESTNET2_LOCALHOST_ID}' '${KEYCLOAK_STRATODEVEL_DEV_SECRET}' '${KEYCLOAK_MERCATATESTNET2_LOCALHOST_SECRET}' 'strato-devel' 'mercata-testnet2' 10 30"
-                  //     }
-                  //   } 
+                  unstash 'slipstream_integrity_tests'
+                  // script {
+                    dir('strato/indexer/slipstream/integrity_tests') {
+                       withCredentials([
+                            usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
+                            usernamePassword(credentialsId: 'keycloak-mercata-testnet2-localhost-client', passwordVariable: 'KEYCLOAK_MERCATATESTNET2_LOCALHOST_SECRET', usernameVariable: 'KEYCLOAK_MERCATATESTNET2_LOCALHOST_ID'),
+                                ]) {
+                        // Now CLIENT_ID1, CLIENT_SECRET1, and CLIENT_SECRET2 are available as environment variables
+                        sh "pip3 install -r requirements.txt"
+                        sh "python3 slipstream_sync.py '${KEYCLOAK_STRATODEVEL_DEV_ID}' '${KEYCLOAK_MERCATATESTNET2_LOCALHOST_ID}' '${KEYCLOAK_STRATODEVEL_DEV_SECRET}' '${KEYCLOAK_MERCATATESTNET2_LOCALHOST_SECRET}' 'strato-devel' 'mercata-testnet2' 10 30"
+                      }
+                    } 
                 
               }
               post {

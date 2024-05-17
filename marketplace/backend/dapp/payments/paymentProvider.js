@@ -5,9 +5,11 @@ import { setSearchQueryOptions, search, searchOne, searchAll, searchAllWithQuery
 // import dayjs from 'dayjs';
 
 
+const tablePrefix = 'BlockApps-Mercata-';
 const contractName = 'PaymentService';
 const externalContractName = 'ExternalPaymentService';
-const paymentContractName = 'PaymentService.Payment';
+const paymentEventName = 'PaymentService.Payment';
+const onboardedEventName = 'PaymentService.SellerOnboarded';
 const contractFilename = `${util.cwd}/dapp/mercata-base-contracts/Templates/Payments/ExternalPaymentService.sol`;
 
 /** 
@@ -184,6 +186,26 @@ async function getAll(admin, args = {}, baseOptions) {
     return paymentProviders.map((paymentProvider) => marshalOut(paymentProvider));
 }
 
+async function getNotOnboarded(admin, args = {}, baseOptions) {
+    const { sellersCommonName, ...restArgs } = args;
+    const eventContract = { name: `${tablePrefix}${onboardedEventName}` }
+    const onboardedQuery = {
+      sellersCommonName: `eq.${sellersCommonName}`,
+      select: 'address'
+    }
+    const onboardedOptions = { ...baseOptions, query: onboardedQuery };
+    const onboardedAddresses = await rest.search(admin, eventContract, onboardedOptions);
+    const contract = { name: `${tablePrefix}${contractName}` }
+    const notOnboardedQuery = {
+      isActive: 'eq.true',
+      contract_name: `like.*${externalContractName}`,
+      address: `not.in.(${onboardedAddresses.join(',')})`
+    }
+    const notOnboardedOptions = { ...baseOptions, query: notOnboardedQuery }
+    const paymentServices = await rest.search(admin, contract, notOnboardedOptions);
+    return paymentServices.map((paymentService) => marshalOut(paymentService));
+}
+
 /**
  * Get contract state in bloc.
  * @deprecated Use {@link get `get`} instead.
@@ -281,6 +303,7 @@ export default {
     bindAddress,
     get,
     getAll,
+    getNotOnboarded,
     marshalIn,
     marshalOut,
     getHistory,

@@ -930,6 +930,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       return paymentServices;
   }
 
+  contract.getNotOnboardedPaymentServices = async function (args, options = defaultOptions) {
+      const paymentServices = await paymentProviderJs.getNotOnboarded(rawAdmin, args, options);
+      return paymentServices;
+  }
+
   contract.paymentCheckout = async function (originUrl, args, options = defaultOptions) {
     try {
 

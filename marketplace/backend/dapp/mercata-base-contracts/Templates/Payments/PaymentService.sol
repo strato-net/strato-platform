@@ -17,6 +17,13 @@ abstract contract PaymentService is Utils {
     string public imageURL;
     string public checkoutText;
 
+    event SellerOnboarded (
+        string sellersCommonName,
+        bool isActive
+    );
+
+    enum PaymentStatus { NULL, ORDER_CREATED, PAYMENT_INITIALIZED, ORDER_COMPLETED, ORDER_CANCELLED }
+
     event Payment (
         string token,
         string orderId,
@@ -103,6 +110,14 @@ abstract contract PaymentService is Utils {
             quantitiesString
         );
         return token;
+    }
+
+    function onboardSeller(
+        string _sellersCommonName,
+        bool _isActive
+    ) requireOwner("onboard sellers") public returns (uint) {
+        emit SellerOnboarded(_sellersCommonName, _isActive);
+        return RestStatus.OK;
     }
 
     function createOrder (
@@ -207,6 +222,7 @@ abstract contract PaymentService is Utils {
         address[] _saleAddresses,
         uint[] _quantities
     ) requireActive("cancel order") external {
+        require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
         string _purchasersCommonName = getCommonName(_purchaser);
         string token = getToken(_orderId, _purchasersCommonName, _saleAddresses, _quantities);
         require(token == _token, "Invalid order data");

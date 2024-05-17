@@ -17,6 +17,19 @@ class PaymentServiceController {
     }
   }
 
+  static async getNotOnboarded(req, res, next) {
+    try {
+      const { dapp, query } = req
+
+      const result = await dapp.getNotOnboardedPaymentServices(query)
+      rest.response.status200(res, result)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
 }
 
 

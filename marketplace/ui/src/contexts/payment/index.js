@@ -9,6 +9,9 @@ const PaymentServicesProvider = ({ children }) => {
     paymentServices: [],
     paymentServicesTotal: 10,
     arePaymentServicesLoading: false,
+    notOnboarded: [],
+    notOnboardedTotal: 10,
+    areNotOnboardedLoading: false,
     error: undefined,
   };
 
