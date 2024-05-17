@@ -42,6 +42,17 @@ const getStripePaymentFromToken = async (token) => {
   return result.rows.length === 0 ? undefined : result.rows[0];
 }
 
+const getStripePaymentsFromTokens = async (tokens) => {
+  const query = `
+    SELECT sa.accountId, sp.token, sp.paymentSessionId, sp.status
+    FROM stripe_payments sp 
+    JOIN stripe_accounts sa ON sa.commonName = sp.sellerCommonName
+    WHERE token = ANY ($1)`;
+  const values = [ tokens ];
+  const result = await client.query(query, values);
+  return result.rows.length === 0 ? undefined : result.rows[0];
+}
+
 const insertStripeAccount = async (commonName, accountId) => {
   const insertQuery = `
     INSERT INTO stripe_accounts (
@@ -188,6 +199,7 @@ export {
   commonErrorHandler,
   getStripeAccountForUser,
   getStripePaymentFromToken,
+  getStripePaymentsFromTokens,
   insertStripeAccount,
   insertStripePayment,
   updateStripePayment,

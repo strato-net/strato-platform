@@ -3,6 +3,7 @@ import stripeService from './stripe.service.js';
 import { 
   getStripeAccountForUser, 
   getStripePaymentFromToken,
+  getStripePaymentsFromTokens,
   insertStripeAccount,
   insertStripePayment,
   updateStripePayment,
@@ -224,17 +225,18 @@ class StripeServiceController {
       
       const { tokens } = req.query;
 
-      const statuses = tokens.map(async (t) => {
-        const paymentDetails = await getStripePaymentFromToken(t);
-        if (paymentDetails.status === 'INITIALIZED') {
-          const session = await stripeService.getPaymentSession(paymentDetails.paymentsessionid, paymentDetails.accountid);
+      // Get all statuses from tokens and recheck status from Stripe if ACH initialized
+      const paymentDetails = await getStripePaymentsFromTokens(tokens);
+      const statuses = paymentDetails.map(async (p) => {
+        if (p.status === 'INITIALIZED') {
+          const session = await stripeService.getPaymentSession(p.paymentsessionid, p.accountid);
           if (session.payment_status === 'paid') {
             // Update payment status in DB
-            const updateResult = await updateStripePayment(t, 'PAID');
+            const updateResult = await updateStripePayment(p.token, 'PAID');
             return 'PAID';
           }
         }
-        return paymentDetails.status;
+        return p.status;
       });
 
       res.status(200).send(statuses);
