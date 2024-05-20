@@ -186,7 +186,7 @@ abstract contract PaymentService is Utils {
         address _purchaser,
         address[] _saleAddresses,
         uint[] _quantities
-    ) requireActive("initialize payment") requireOwner("initialize payment") external {
+    ) requireActive("initialize payment") requireOwner("initialize payment") external returns (address[]){
         require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
         string _purchasersCommonName = getCommonName(_purchaser);
         string token = getToken(_orderId, _purchasersCommonName, _saleAddresses, _quantities);
@@ -208,7 +208,7 @@ abstract contract PaymentService is Utils {
         string _purchasersCommonName,
         address[] _saleAddresses,
         uint[] _quantities
-    ) internal virtual {
+    ) internal virtual returns (address[]){
         uint totalAmount = 0;
         address[] assets;
         string seller;
@@ -232,6 +232,7 @@ abstract contract PaymentService is Utils {
             _unitsPerDollar(),
             PaymentStatus.PAYMENT_INITIALIZED
         );
+        return assets;
     }
 
     function completeOrder (
