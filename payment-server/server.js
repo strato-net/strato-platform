@@ -5,7 +5,11 @@ import expressWinston from 'express-winston';
 import helmet from 'helmet';
 import winston from 'winston';
 
-import { clientErrorHandler, commonErrorHandler } from './helpers/utils.js';
+import { 
+  clientErrorHandler, 
+  commonErrorHandler, 
+  validatePaymentServiceContract 
+} from './helpers/utils.js';
 import routes from './routes.js';
 
 const config = {
@@ -38,4 +42,5 @@ app.use(commonErrorHandler);
 
 app.listen(config.port, function () {
   console.log(`Listening on port ${config.port}...`);
+  validatePaymentServiceContract();
 });

@@ -91,6 +91,16 @@ const updateStripePayment = async (token, status) => {
   return updateResult;
 }
 
+const validatePaymentServiceContract = async () => {
+  try {
+    const contract = { name: "PaymentService", address: CONTRACT_ADDRESS };
+    const res = await rest.getState(ADMIN.getUser(), contract, DEFAULT_OPTIONS);
+  } catch (e) {
+    console.error(`Contract could not be found at address ${CONTRACT_ADDRESS}. Now exiting...`);
+    process.exit();
+  }
+}
+
 const emitOnboardSeller = async (args) => {
   // Make the call and return results
   const contract = { name: "PaymentService", address: CONTRACT_ADDRESS };
@@ -215,6 +225,7 @@ export {
   insertStripeAccount,
   insertStripePayment,
   updateStripePayment,
+  validatePaymentServiceContract,
   emitOnboardSeller,
   getPaymentEvent,
   validateAndGetOrderDetails,
