@@ -1,10 +1,29 @@
-# Payment Server (CREDIT CARD)
+# Payment Server (CREDIT CARD/ACH)
 
-### TODO DESCRIPTION AND UPDATE ENDPOINTS
+Official BlockApps Credit Card and ACH Payment Server | Powered by Stripe
 
-### Endpoints
+## Endpoints
 
-#### Customer Endpoints
+##### GET `/ping`
+Lets you play a full game of ping pong with Fan ZhenDong, one of the top table tennis players in the world.
+
+---
+### Redemption Endpoints
+
+##### GET `/redemption/outgoing/:commonName`
+
+##### GET `/redemption/incoming/:commonName`
+
+##### POST `/redemption/create`
+
+##### GET `/redemption/:id`
+
+##### DELETE `/redemption/id/:id`
+
+##### PUT `/redemption/close/:id`
+
+---
+### Customer Endpoints
 
 ##### GET `/customer/address/:commonName`
 Get all addresses associated with a customer's `commonName`.  
@@ -34,30 +53,34 @@ Gets an address given the table `id` of the address.
 Deletes an address given the table `id` of the address.  
 **Returns** the number of `changes` made after the deletion.
 
-#### Stripe Endpoints
+---
+### Stripe Endpoints
 
-##### GET `/stripe/onboard/:accountId?`
-Onboard a user, `accountId` optional.  
-**Returns** the `connectLink` and the `accountDetails` if an `accountId` is not supplied. Else, return the `connectLink`.
+##### GET `/stripe/onboard?:username&:redirectUrl`
+Onboard a user, `username` and `redirectUrl` required.  
+**Returns** a redirect to the Stripe hosted connect link for the user.
 
-##### GET `/stripe/status/:accountId`
-Get the status of a stripe account given the `accountId` in the call URL.  
+##### GET `/stripe/status?:username`
+Get the status of a stripe account given the `username` as a parameter.  
 **Returns** the status of `chargesEnabled`, `detailsSubmitted`, and `payoutsEnabled` of the Stripe account.
 
-##### POST `/stripe/checkout`
-Create a checkout session given the following information from the order:
-```
-{
-  paymentTypes: list of payment types,
-  cartData: list of cart items,
-  orderDetail: list of order invoices,
-  accountId: string
-}
-```
-`cartData`, `orderDetail`, and `accountId` in a JSON body.  
-**Returns** a new Stripe checkout session for the provided order.
+##### GET `/stripe/checkout?:token&:redirectUrl`
+Create and redirect to a Stripe hosted checkout session given the token of the order and a redirect back to the Marketplace.  
+**Returns** a redirect to the Stripe checkout session for the provided order.
 
-### Dependencies
+##### GET `/stripe/checkout/confirm?:token&:redirectUrl`
+Confirms the payment of the order associated with the given token and performs the onchain transfer of the assets.  
+**Returns** a redirect back to the Marketplace (redirectUrl) along with the list of assets that were transferred.
+
+##### GET `/stripe/checkout/cancel?:token&:redirectUrl`
+Cancels the order associated with the given token.  
+**Returns** a redirect back to the Martkeplace (redirectUrl).
+
+##### GET `/stripe/order/status?:tokens`
+Get the most recent statuses of the orders associated with a given list of tokens.  
+**Returns** a key/value pair of token to payment status.
+
+## Dependencies
 
 1. Docker Engine v24+ (For dockerized deployment)
 2. Docker Compose V2
@@ -66,28 +89,38 @@ Create a checkout session given the following information from the order:
 *NOTE*  
 Report and update dependencies if needed.
 
-### Running
+## Running
 
-The server requires the following environmental variables to run:
-```
-`STRIPE_PUBLISHABLE_KEY` for Stripe API
-`STRIPE_SECRET_KEY` for Stripe API
-```
-
-If running non-dockerized, use `npm run start` or `npm run dev`.  
-If running dockerized, provide a `docker-compose.stripe-ps.yml` file and use `docker-compose -f docker-compose.stripe-ps.yml up -d --remove-orphans`.
-
-### Testing
-
-The payment server uses `jest` as its testing framework. In order to run the tests, the following environment variables are required:
+The server **requires** the following environmental variables to run:
 ```
 `POSTGRESQL_SERVER_URL`
 `POSTGRESQL_PORT` Default: 5432
 `POSTGRESQL_USER` Default: postgres
 `POSTGRESQL_PASSWORD`
 `POSTGRESQL_DBNAME` Default: postgres
-`STRIPE_PUBLISHABLE_KEY` for Stripe API
 `STRIPE_SECRET_KEY` for Stripe API
+`SERVER_HOST` for the Payment Server
+`CONTRACT_ADDRESS` to the ExternalPaymentService contract
+```
+
+If running non-dockerized, use `npm run start` or `npm run dev`.  
+If running dockerized, provide a `docker-compose.payment-server.yml` file and use `docker-compose -f docker-compose.payment-server.yml up -d --remove-orphans`.
+
+## Testing
+
+The payment server uses `jest` as its testing framework. In order to run the tests, the following environment variables should be available:
+```
+<!-- REQUIRED ENV -->
+`POSTGRESQL_SERVER_URL`
+`POSTGRESQL_PORT` Default: 5432
+`POSTGRESQL_USER` Default: postgres
+`POSTGRESQL_PASSWORD`
+`POSTGRESQL_DBNAME` Default: postgres
+`STRIPE_SECRET_KEY` for Stripe API
+`SERVER_HOST` for the Payment Server
+`CONTRACT_ADDRESS` to the ExternalPaymentService contract
+
+<!-- OPTIONAL ENV -->
 `TEST_ACCOUNT_ID` for Stripe API Tests
 `TEST_SESSION_ID` is optional for testing the Stripe session and intent endpoints
 ```
