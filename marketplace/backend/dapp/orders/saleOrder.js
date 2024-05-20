@@ -221,9 +221,31 @@ async function getAll(admin, args = {}, options) {
     saleOrders = await searchAllWithQueryArgs(paymentTableName, newArgs, newOptions, admin);
   }
 
+  // Get the latest payment event for each sale token
+  if (saleOrders) {
+    const uniqueOrders = await rest.search(
+      admin,
+      {
+        name: 'BlockApps-Mercata-PaymentService.Payment',
+      },
+      {
+        ...options,
+        query: {
+          ['select']: 'id:id.max(),token,block_timestamp.max()'
+        }
+      }
+    )
+    const idArgs = {
+      id: uniqueOrders.map((uo) => uo.id),
+    }
+    saleOrders = await searchAllWithQueryArgs(paymentTableName, idArgs, newOptions, admin);
+  }
+
   if (!saleOrders || !limit || saleOrders.length < limit) {
-    let oldLimit = saleOrders ? limit && limit - saleOrders.length : limit;
-    let oldOffset = saleOrders && saleOrders.length > 0 ? 0 : offset ? offset - saleOrders.length : 0;
+    let oldLimit = saleOrders && limit ? limit - saleOrders.length : limit;
+    let oldOffset = 0;
+    if (offset)
+      oldOffset = offset - (saleOrders ? saleOrders.length : 0);
     let oldArgs = { ...args, limit: oldLimit, offset: oldOffset };
     const oldSaleOrders = await searchAllWithQueryArgs(constants.orderTableName, oldArgs, newOptions, admin);
     saleOrders = [...saleOrders, ...oldSaleOrders];
