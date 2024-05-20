@@ -13,8 +13,6 @@ pragma es6;
 pragma strict;
 pragma builtinCreates;
 
-import { Certificate, CertificateRegistry } from <509>;
-
 enum SellerStatus {
     NULL,
     UNAUTHORIZED,
@@ -66,11 +64,8 @@ contract User {
 
     // Checks if the caller is indeed the user the wallet belongs to.
     function authenticate() internal returns (bool) {
-        Certificate cert = CertificateRegistry(address(0x509)).getCertByAddress(msg.sender);
-        if (address(cert) != address(0)) {
-            return cert.commonName() == commonName;
-        }
-        return false;
+        mapping (string => string) cert = getUserCert(msg.sender);
+        return cert["commonName"] == commonName;
     }
 
     function requestReview() public authenticated {
