@@ -164,13 +164,12 @@ function bindAddress(user, address, options) {
  */
 
 async function get(user, args, options) {
-  const { address, ...restArgs } = args;
-  const { orderId, ...otherArgs } = restArgs;
+  const { address, orderId, ...restArgs } = args;
   const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
   let order;
 
-  let searchArgs = setSearchQueryOptions( { ...otherArgs, token: orderId }, {
-    key: "address",
+  let searchArgs = setSearchQueryOptions( { ...restArgs, token: orderId }, {
+    key: "transaction_hash",
     value: address,
   });
   order = await searchOne(paymentTableName, searchArgs, newOptions, user);

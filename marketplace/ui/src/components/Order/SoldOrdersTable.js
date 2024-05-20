@@ -79,7 +79,7 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrde
     const fetchData = async () => {
       const updatedData = ordersSold.map((order) => {
         return {
-          address: order.address,
+          address: order.id ? order.transaction_hash : order.address,
           chainId: order.chainId,
           key: order.address,
           orderNumber: order,
@@ -87,7 +87,7 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrde
           orderTotal: order.totalPrice,
           date: getStringDate(order.createdDate, US_DATE_FORMAT),
           status: getStatus(parseInt(order.status)),
-          invoice: order,
+          invoice: order.id ? order.transaction_hash : order.address,
         };
       });
       setIsLoading(false);
@@ -127,7 +127,7 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrde
           id={order.orderId}
           onClick={() => {
             navigate(
-              `${routes.SoldOrderDetails.url.replace(":id", order.address)}`
+              `${routes.SoldOrderDetails.url.replace(":id", order.id ? order.transaction_hash : order.address)}`
             );
           }}
           className="text-[#13188A] hover:text-primaryHover cursor-pointer"
@@ -205,7 +205,7 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrde
           }}
         >
           <Link
-            to={`${routes.Invoice.url.replace(":id", text.address)}`}
+            to={`${routes.Invoice.url.replace(":id", text)}`}
             target="_blank"
           >
             <div className="flex items-center cursor-pointer hover:text-primary">
