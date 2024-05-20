@@ -11,26 +11,54 @@ Lets you play a full game of ping pong with Fan ZhenDong, one of the top table t
 ### Redemption Endpoints
 
 ##### GET `/redemption/outgoing/:commonName`
+**Returns** a list of outgoing redemption requests for a given `commonName`.
 
 ##### GET `/redemption/incoming/:commonName`
+**Returns** a list of incoming redemption requests for a given `commonName`.
 
 ##### POST `/redemption/create`
+Create a new redemption request.
+```
+{
+  redemption_id: number,
+  quantity: number,
+  ownerComments: string,
+  issuerComments: string,
+  ownerCommonName: string,
+  issuerCommonName: string,
+  assetAddresses: string[],
+  assetName: string,
+  status: 1,
+  shippingAddressId: number
+}
+```
+**Returns** the `redemptionId` of the new request.
 
 ##### GET `/redemption/:id`
+**Returns** the redemption request associated with the given `id`.
 
 ##### DELETE `/redemption/id/:id`
+Delete a redemption request associated with the given `id`.
+**Returns** the count of rows deleted.
 
 ##### PUT `/redemption/close/:id`
+Close a redemption request associated with the given `id` and update the issuer comment field.
+```
+{
+  issuerComments: string,
+  status: 2 or 3
+}
+```
+**Returns** the count of rows changed.
 
 ---
 ### Customer Endpoints
 
 ##### GET `/customer/address/:commonName`
-Get all addresses associated with a customer's `commonName`.  
-**Returns** a list of addresses in the `data` field of the response.
+**Returns** a list of addresses associated with the given `commonName`.
 
 ##### POST `/customer/address`
-Adds an address using the following information from the JSON body:
+Add an address using the following information from the JSON body:
 ```
 {
   commonName: string,
