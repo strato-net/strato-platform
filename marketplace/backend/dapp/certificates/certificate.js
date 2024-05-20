@@ -33,7 +33,7 @@ async function getCertificates(admin, args = {}, options = defaultOptions) {
 }
 
 // --------------------------- USER WALLETS ---------------------------
-const userSearchOptions = {notEqualsField: 'sellerStatus', notEqualsValue: 'null', sort: '-block_timestamp', limit: 1}
+const userSearchOptions = {notEqualsField: 'issuerStatus', notEqualsValue: 'null', sort: '-block_timestamp', limit: 1}
 
 async function requestReview(admin, args, options=defaultOptions) {   
     const { commonName } = args;
@@ -51,18 +51,18 @@ async function requestReview(admin, args, options=defaultOptions) {
         } catch {
             throw new rest.RestError(
                 RestStatus.INTERNAL_SERVER_ERROR,
-                "Could not set seller as pending review"
+                "Could not set issuer as pending review"
             );
         }
     } else {
         throw new rest.RestError(
             RestStatus.BAD_REQUEST,
-            "No user contract found to modify seller status of"
+            "No user contract found to modify the issuer status of"
         );
     }
 }
 
-async function authorizeSeller(admin, args, options=defaultOptions) {   
+async function authorizeIssuer(admin, args, options=defaultOptions) {   
     const { commonName } = args;
     const searchOptions = { commonName: commonName, ...userSearchOptions };
     const user = await searchAllWithQueryArgs(constants.userContractName, searchOptions, options, admin);
@@ -71,14 +71,14 @@ async function authorizeSeller(admin, args, options=defaultOptions) {
         try {
             const callArgs = {
                 contract: {address: user[0].address},
-                method: "authorizeSeller",
+                method: "authorizeIssuer",
                 args: {}
             };    
             await rest.call(admin, callArgs, options);
         } catch (e) {
             throw new rest.RestError(
                 RestStatus.FORBIDDEN,
-                "Only admins can authorize a seller"
+                "Only admins can authorize an issuer"
             );
         }
     } else {
@@ -89,7 +89,7 @@ async function authorizeSeller(admin, args, options=defaultOptions) {
     }
 }
 
-async function deauthorizeSeller(admin, args, options=defaultOptions) {   
+async function deauthorizeIssuer(admin, args, options=defaultOptions) {   
     const {commonName} = args;
     const searchOptions = { commonName: commonName, ...userSearchOptions };
     const user = await searchAllWithQueryArgs(constants.userContractName, searchOptions, options, admin);
@@ -98,14 +98,14 @@ async function deauthorizeSeller(admin, args, options=defaultOptions) {
         try {
             const callArgs = {
                 contract: {address: user[0].address},
-                method: "deauthorizeSeller",
+                method: "deauthorizeIssuer",
                 args: {}
             };     
             await rest.call(admin, callArgs, options);
         } catch {
             throw new rest.RestError(
                 RestStatus.FORBIDDEN,
-                "Only admins can deauthorize a seller"
+                "Only admins can deauthorize an issuer"
             );
         }
     } else {
@@ -121,6 +121,6 @@ export default {
     getCertificateMe,
     getCertificates,
     requestReview,
-    authorizeSeller,
-    deauthorizeSeller,
+    authorizeIssuer,
+    deauthorizeIssuer,
 }

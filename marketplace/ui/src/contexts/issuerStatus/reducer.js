@@ -29,35 +29,35 @@ const reducer = (state, action) => {
                     ...state,
                     requestingReview: false,
                 }            
-        case actionDescriptors.authorizeSeller:
+        case actionDescriptors.authorizeIssuer:
             return {
                 ...state,
-                changingSellerStatus: true,
+                changingIssuerStatus: true,
             };
-        case actionDescriptors.authorizeSellerSuccessful:
+        case actionDescriptors.authorizeIssuerSuccessful:
             return {
                 ...state,
-                changingSellerStatus: false,
+                changingIssuerStatus: false,
             };
-        case actionDescriptors.authorizeSellerFailed:
+        case actionDescriptors.authorizeIssuerFailed:
             return {
                 ...state,
-                changingSellerStatus: false,
+                changingIssuerStatus: false,
             };
-        case actionDescriptors.deauthorizeSeller:
+        case actionDescriptors.deauthorizeIssuer:
             return {
                 ...state,
-                changingSellerStatus: true,
+                changingIssuerStatus: true,
             };
-        case actionDescriptors.deauthorizeSellerSuccessful:
+        case actionDescriptors.deauthorizeIssuerSuccessful:
             return {
                 ...state,
-                changingSellerStatus: false,
+                changingIssuerStatus: false,
             };
-        case actionDescriptors.deauthorizeSellerFailed:
+        case actionDescriptors.deauthorizeIssuerFailed:
             return {
                 ...state,
-                changingSellerStatus: false,
+                changingIssuerStatus: false,
             };
         default:
             throw new Error(`Unhandled action: '${action.type}'`);

@@ -1,30 +1,30 @@
 import express from 'express'
-import { SellerStatus } from '../endpoints'
-import SellerStatusController from './sellerStatus.controller'
+import { IssuerStatus } from '../endpoints'
+import IssuerStatusController from './issuerStatus.controller'
 import authHandler from '../../middleware/authHandler'
 import loadDapp from '../../middleware/loadDappHandler'
 
 const router = express.Router()
 
 router.post(
-  SellerStatus.requestReview,
+  IssuerStatus.requestReview,
   authHandler.authorizeRequest(),
   loadDapp,
-  SellerStatusController.requestReview,
+  IssuerStatusController.requestReview,
 )
 
 router.post(
-  SellerStatus.authorizeSeller,
+  IssuerStatus.authorizeIssuer,
   authHandler.authorizeRequest(),
   loadDapp,
-  SellerStatusController.authorizeSeller
+  IssuerStatusController.authorizeIssuer
 )
 
 router.post(
-    SellerStatus.deauthorizeSeller,
+    IssuerStatus.deauthorizeIssuer,
     authHandler.authorizeRequest(),
     loadDapp,
-    SellerStatusController.deauthorizeSeller
+    IssuerStatusController.deauthorizeIssuer
   )
   
 export default router

@@ -7,12 +7,12 @@ const actionDescriptors = {
     requestReview: "request_review",
     requestReviewSuccessful: "request_review_success",
     requestReviewFailed: "request_review_failed",
-    authorizeSeller: "authorize_seller",
-    authorizeSellerSuccessful: "authorize_seller_success",
-    authorizeSellerFailed: "athorize_seller_failed",  
-    deauthorizeSeller: "deauthorize_seller",
-    deauthorizeSellerSuccessful: "deauthorize_seller_success",
-    deauthorizeSellerFailed: "deathorize_seller_failed",  
+    authorizeIssuer: "authorize_issuer",
+    authorizeIssuerSuccessful: "authorize_issuer_success",
+    authorizeIssuerFailed: "athorize_issuer_failed",  
+    deauthorizeIssuer: "deauthorize_issuer",
+    deauthorizeIssuerSuccessful: "deauthorize_issuer_success",
+    deauthorizeIssuerFailed: "deathorize_issuer_failed",  
 };
 
 const actions = {
@@ -26,7 +26,7 @@ const actions = {
         dispatch({type: actionDescriptors.requestReview});
         try {
             console.log('AYAS LOGS - payload in actions', payload);
-            const response = await fetch(`${apiUrl}/sellerstatus/requestReview`, {
+            const response = await fetch(`${apiUrl}/issuerstatus/requestReview`, {
                 method: HTTP_METHODS.POST,
                 credentials: "same-origin",
                 headers: {
@@ -49,10 +49,10 @@ const actions = {
             actions.setMessage(dispatch, "Error occurred while requesting review: " + e.message, false);
         }
     },
-    authorizeSeller: async (dispatch, payload) => {
-        dispatch({ type: actionDescriptors.authorizeSeller,});
+    authorizeIssuer: async (dispatch, payload) => {
+        dispatch({ type: actionDescriptors.authorizeIssuer,});
         try {
-            const response = await fetch(`${apiUrl}/sellerstatus/authorizeSeller`, {
+            const response = await fetch(`${apiUrl}/issuerstatus/authorizeIssuer`, {
                 method: HTTP_METHODS.POST,
                 credentials: "same-origin",
                 headers: {
@@ -63,22 +63,22 @@ const actions = {
             });
             const body = await response.json();
             if (response.status === RestStatus.OK) {
-                dispatch({ type: actionDescriptors.authorizeSellerSuccessful, payload: body.data });
-                actions.setMessage(dispatch, "Successfully authorized seller", true);
+                dispatch({ type: actionDescriptors.authorizeIssuerSuccessful, payload: body.data });
+                actions.setMessage(dispatch, "Successfully authorized issuer", true);
                 return body;
             } else {
-                dispatch({ type: actionDescriptors.authorizeSellerFailed });
+                dispatch({ type: actionDescriptors.authorizeIssuerFailed });
                 actions.setMessage(dispatch, body.error, false);
             }
         } catch (err) {
-            dispatch({ type: actionDescriptors.authorizeSellerFailed });
+            dispatch({ type: actionDescriptors.authorizeIssuerFailed });
             actions.setMessage(dispatch, err.message, false);
         }
     },
-    deauthorizeSeller: async (dispatch, payload) => {
-        dispatch({ type: actionDescriptors.deauthorizeSeller,});
+    deauthorizeIssuer: async (dispatch, payload) => {
+        dispatch({ type: actionDescriptors.deauthorizeIssuer,});
         try {
-            const response = await fetch(`${apiUrl}/sellerstatus/deauthorizeSeller`, {
+            const response = await fetch(`${apiUrl}/issuerstatus/deauthorizeIssuer`, {
                 method: HTTP_METHODS.POST,
                 credentials: "same-origin",
                 headers: {
@@ -89,15 +89,15 @@ const actions = {
             });
             const body = await response.json();
             if (response.status === RestStatus.OK) {
-                dispatch({ type: actionDescriptors.deauthorizeSellerSuccessful, payload: body.data });
-                actions.setMessage(dispatch, "Successfully deauthorized seller", true);
+                dispatch({ type: actionDescriptors.deauthorizeIssuerSuccessful, payload: body.data });
+                actions.setMessage(dispatch, "Successfully deauthorized issuer", true);
                 return body;
             } else {
-                dispatch({ type: actionDescriptors.deauthorizeSellerFailed });
+                dispatch({ type: actionDescriptors.deauthorizeIssuerFailed });
                 actions.setMessage(dispatch, body.error, false);
             }
         } catch (err) {
-            dispatch({ type: actionDescriptors.deauthorizeSellerFailed });
+            dispatch({ type: actionDescriptors.deauthorizeIssuerFailed });
             actions.setMessage(dispatch, err.message, false);
         }
     },

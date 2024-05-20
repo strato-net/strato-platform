@@ -87,7 +87,7 @@ export const ITEM_STATUS = {
   "SOLD": 4
 }
 
-export const SELLER_STATUS = {
+export const ISSUER_STATUS = {
  "UNAUTHORIZED": "1",
  "PENDING_REVIEW": "2",
  "AUTHORIZED": "3" 

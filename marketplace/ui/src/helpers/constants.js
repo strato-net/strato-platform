@@ -203,7 +203,7 @@ export const ASSET_STATUS = {
   "RETIRED": 3
 }
 
-export const SELLER_STATUS = {
+export const ISSUER_STATUS = {
   "UNAUTHORIZED": "1",
   "PENDING_REVIEW": "2",
   "AUTHORIZED": "3" 

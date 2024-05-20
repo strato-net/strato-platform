@@ -221,11 +221,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.requestReview = async function (args) {
     return certificateJs.requestReview(admin, args);
   };
-  contract.authorizeSeller = async function (args) {
-    return certificateJs.authorizeSeller(admin, args);
+  contract.authorizeIssuer = async function (args) {
+    return certificateJs.authorizeIssuer(admin, args);
   };
-  contract.deauthorizeSeller = async function (args) {
-    return certificateJs.deauthorizeSeller(admin, args);
+  contract.deauthorizeIssuer = async function (args) {
+    return certificateJs.deauthorizeIssuer(admin, args);
   };
 
   // -------------------------- INVENTORY --------------------------------

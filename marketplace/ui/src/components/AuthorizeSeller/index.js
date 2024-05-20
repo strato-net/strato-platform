@@ -1,18 +1,18 @@
 import React from "react";
 import { Button, Form, Input, Radio, notification } from "antd";
-import { actions } from "../../contexts/sellerStatus/actions";
-import { useSellerStatusState, useSellerStatusDispatch } from "../../contexts/sellerStatus";
+import { actions } from "../../contexts/issuerStatus/actions";
+import { useIssuerStatusState, useIssuerStatusDispatch } from "../../contexts/issuerStatus";
 
 export default function AuthorizeSeller(){
-    const { changingSellerStatus, success, message } = useSellerStatusState();
-    const dispatch = useSellerStatusDispatch();
+    const { changingIssuerStatus, success, message } = useIssuerStatusState();
+    const dispatch = useIssuerStatusDispatch();
     const onFinish = async (values) => {
         const { commonName, setStatusTo } = values;
         let resp;
         if (setStatusTo === 'Authorized') {
-            resp = await actions.authorizeSeller(dispatch, { commonName });
+            resp = await actions.authorizeIssuer(dispatch, { commonName });
         } else {
-            resp = await actions.deauthorizeSeller(dispatch, { commonName });
+            resp = await actions.deauthorizeIssuer(dispatch, { commonName });
         }
         console.log(resp);
     }
@@ -48,19 +48,19 @@ export default function AuthorizeSeller(){
             }}
         >
             <p className="text-base md:text-l lg:text-2xl font-bold lg:font-semibold leading-9">
-                Change Seller's Authorization Status
+                Change Issuer's Authorization Status
             </p>
-            <Form.Item label="Seller's username" name="commonName">
+            <Form.Item label="Issuer's username" name="commonName">
                 <Input/>
             </Form.Item> 
-            <Form.Item label="Set seller status to" name="setStatusTo">
+            <Form.Item label="Set issuer status to" name="setStatusTo">
                 <Radio.Group>
                     <Radio.Button value='Authorized'>Authorized</Radio.Button>
                     <Radio.Button value='Deauthorized'>Deauthorized</Radio.Button>
                 </Radio.Group>
             </Form.Item>
-            <Button type="primary" htmlType="submit" loading={changingSellerStatus}>
-            Change Seller Status
+            <Button type="primary" htmlType="submit" loading={changingIssuerStatus}>
+            Change Issuer Status
             </Button>
         </Form>
         {message && openToast("bottom")}

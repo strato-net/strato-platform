@@ -13,7 +13,7 @@ pragma es6;
 pragma strict;
 pragma builtinCreates;
 
-enum SellerStatus {
+enum IssuerStatus {
     NULL,
     UNAUTHORIZED,
     PENDING_REVIEW,
@@ -30,11 +30,11 @@ contract UserRegistry {
 
 contract User {
     string public commonName;
-    SellerStatus public sellerStatus;
+    IssuerStatus public issuerStatus;
 
     constructor(string _commonName) {
         commonName = _commonName;
-        sellerStatus = SellerStatus.UNAUTHORIZED;
+        issuerStatus = IssuerStatus.UNAUTHORIZED;
     }
 
     modifier onlyAdmins() {
@@ -69,15 +69,15 @@ contract User {
     }
 
     function requestReview() public authenticated {
-        require(sellerStatus != SellerStatus.AUTHORIZED, "You are already an authorized seller");
-        sellerStatus = SellerStatus.PENDING_REVIEW;
+        require(issuerStatus != IssuerStatus.AUTHORIZED, "You are already an authorized issuer");
+        issuerStatus = IssuerStatus.PENDING_REVIEW;
     }
     
-    function authorizeSeller() public onlyAdmins {
-        sellerStatus = SellerStatus.AUTHORIZED;
+    function authorizeIssuer() public onlyAdmins {
+        issuerStatus = IssuerStatus.AUTHORIZED;
     }
 
-    function deauthorizeSeller() public onlyAdmins {
-        sellerStatus = SellerStatus.UNAUTHORIZED;
+    function deauthorizeIssuer() public onlyAdmins {
+        issuerStatus = IssuerStatus.UNAUTHORIZED;
     }
 }|]

@@ -1,7 +1,7 @@
 import { rest } from 'blockapps-rest'
 import config from '../../../load.config'
 import { pollingHelper, searchAllWithQueryArgs } from '../../../helpers/utils'
-import constants, { SELLER_STATUS } from '../../../helpers/constants'
+import constants, { ISSUER_STATUS } from '../../../helpers/constants'
 
 const options = { config, cacheNonce: true }
 
@@ -22,13 +22,13 @@ class UsersController {
         rest.response.status400(res, { username })
       }
       else {
-        const searchOptions = {commonName: user.commonName, notEqualsField: 'sellerStatus', notEqualsValue: 'null', sort: '-block_timestamp', limit: 1};
+        const searchOptions = {commonName: user.commonName, notEqualsField: 'issuerStatus', notEqualsValue: 'null', sort: '-block_timestamp', limit: 1};
         const walletResp = await searchAllWithQueryArgs(constants.userContractName, searchOptions, options, accessToken);
         rest.response.status200(res, {
           ...user,
           email: decodedToken.email,
           preferred_username: decodedToken.preferred_username,
-          sellerStatus: (walletResp[0] ? walletResp[0].sellerStatus : SELLER_STATUS.UNAUTHORIZED)
+          issuerStatus: (walletResp[0] ? walletResp[0].issuerStatus : ISSUER_STATUS.UNAUTHORIZED)
         })
       }
       return next()

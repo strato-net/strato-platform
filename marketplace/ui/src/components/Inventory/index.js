@@ -23,7 +23,7 @@ import { Images } from "../../images";
 //items
 import { actions as itemActions } from "../../contexts/item/actions";
 import { actions as redemptionActions } from "../../contexts/redemption/actions";
-import { actions as sellerStatusActions } from "../../contexts/sellerStatus/actions";
+import { actions as issuerStatusActions } from "../../contexts/issuerStatus/actions";
 import { useItemDispatch, useItemState } from "../../contexts/item";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
@@ -32,10 +32,10 @@ import { useAuthenticateState } from "../../contexts/authentication";
 import HelmetComponent from "../Helmet/HelmetComponent";
 import { SEO } from "../../helpers/seoConstant";
 import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
-//authorized seller
-import RequestBeAuthorizedSellerModal from "./RequestBeAuthorizedSellerModal";
-import { SELLER_STATUS } from '../../helpers/constants';
-import { useSellerStatusState , useSellerStatusDispatch } from "../../contexts/sellerStatus";
+//authorized issuer
+import RequestBeAuthorizedIssuerModal from "./RequestBeAuthorizedIssuerModal";
+import { ISSUER_STATUS } from '../../helpers/constants';
+import { useIssuerStatusState , useIssuerStatusDispatch } from "../../contexts/issuerStatus";
 
 
 const Inventory = ({ user }) => {
@@ -74,16 +74,16 @@ const Inventory = ({ user }) => {
     success: redemptionSuccess
   } = useRedemptionState();
 
-  //seller status
-  const [sellerStatus, setSellerStatus] = useState(user?.sellerStatus);
+  //issuer status
+  const [issuerStatus, setIssuerStatus] = useState(user?.issuerStatus);
   useEffect(() => {
-    setSellerStatus(user?.sellerStatus);
+    setIssuerStatus(user?.issuerStatus);
   }, [user]);
-  const sellerStatusDipatch = useSellerStatusDispatch();
+  const issuerStatusDipatch = useIssuerStatusDispatch();
   const {
-    message: sellerStatusMsg,
-    success: sellerStatusSuccess
-  } = useSellerStatusState();
+    message: issuerStatusMsg,
+    success: issuerStatusSuccess
+  } = useIssuerStatusState();
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
@@ -210,18 +210,18 @@ const Inventory = ({ user }) => {
     }
   };
 
-  const sellerStatusToast = (placement) => {
-    if (sellerStatusSuccess) {
+  const issuerStatusToast = (placement) => {
+    if (issuerStatusSuccess) {
       api.success({
-        message: sellerStatusMsg,
-        onClose: sellerStatusActions.resetMessage(sellerStatusDipatch),
+        message: issuerStatusMsg,
+        onClose: issuerStatusActions.resetMessage(issuerStatusDipatch),
         placement,
         key: 7,
       });
     } else {
       api.error({
-        message: sellerStatusMsg,
-        onClose: sellerStatusActions.resetMessage(sellerStatusDipatch),
+        message: issuerStatusMsg,
+        onClose: issuerStatusActions.resetMessage(issuerStatusDipatch),
         placement,
         key: 8,
       });
@@ -319,7 +319,7 @@ const metaImg = category ? category : SEO.IMAGE_META
                   onClick={() => {
                     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                       window.location.href = loginUrl;
-                    } else if (sellerStatus != SELLER_STATUS.AUTHORIZED) {
+                    } else if (issuerStatus != ISSUER_STATUS.AUTHORIZED) {
                       showReqModModal()
                     }
                     else {
@@ -435,20 +435,20 @@ const metaImg = category ? category : SEO.IMAGE_META
       }
       {
         reqModOpen && (
-          <RequestBeAuthorizedSellerModal
+          <RequestBeAuthorizedIssuerModal
             open={reqModOpen}
             handleCancel={handleReqModCancel}
             commonName={user.commonName}
             emailAddr={user.email}
-            sellerStatus={sellerStatus}
-            setSellerStatus={setSellerStatus}
+            issuerStatus={issuerStatus}
+            setIssuerStatus={setIssuerStatus}
           />
         )
       }
       {message && openToast("bottom")}
       {itemMsg && itemToast("bottom")}
       {redemptionMsg && redemptionToast("bottom")}
-      {sellerStatusMsg && sellerStatusToast("bottom")}
+      {issuerStatusMsg && issuerStatusToast("bottom")}
     </>
   );
 };

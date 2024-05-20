@@ -3,24 +3,24 @@ import {
   Modal,
   Button,
 } from "antd";
-import { actions } from "../../contexts/sellerStatus/actions";
-import { useSellerStatusState, useSellerStatusDispatch } from "../../contexts/sellerStatus";
-import { SELLER_STATUS } from '../../helpers/constants';
+import { actions } from "../../contexts/issuerStatus/actions";
+import { useIssuerStatusState, useIssuerStatusDispatch } from "../../contexts/issuerStatus";
+import { ISSUER_STATUS } from '../../helpers/constants';
 
-const RequestBeAuthorizedSellerModal = ({
+const RequestBeAuthorizedIssuerModal = ({
   open,
   handleCancel,
   commonName,
   emailAddr,
-  sellerStatus,
-  setSellerStatus
+  issuerStatus,
+  setIssuerStatus
 }) => {
-  const dispatch = useSellerStatusDispatch();
-  const { requestingReview } = useSellerStatusState();
+  const dispatch = useIssuerStatusDispatch();
+  const { requestingReview } = useIssuerStatusState();
   async function sendRequest(){
     try{
       await actions.requestReview(dispatch, {emailAddr: emailAddr, commonName: commonName});
-      setSellerStatus(SELLER_STATUS.PENDING_REVIEW);
+      setIssuerStatus(ISSUER_STATUS.PENDING_REVIEW);
     } catch {}
     handleCancel();
   }
@@ -42,7 +42,7 @@ const RequestBeAuthorizedSellerModal = ({
               type="primary"
               onClick={sendRequest}
               loading={requestingReview}
-              disabled={sellerStatus === SELLER_STATUS.PENDING_REVIEW}
+              disabled={issuerStatus === ISSUER_STATUS.PENDING_REVIEW}
             >
               Request Review
             </Button>
@@ -52,11 +52,11 @@ const RequestBeAuthorizedSellerModal = ({
         <h1 className=" font-semibold text-lg text-[#202020]">
           Issuer Authorization
         </h1>
-        <p> {sellerStatus === SELLER_STATUS.PENDING_REVIEW ? alreadyRequestedReviewText : requestReviewText } </p>
+        <p> {issuerStatus === ISSUER_STATUS.PENDING_REVIEW ? alreadyRequestedReviewText : requestReviewText } </p>
         
       </Modal>
     </>
   );
 };
 
-export default RequestBeAuthorizedSellerModal;
+export default RequestBeAuthorizedIssuerModal;
