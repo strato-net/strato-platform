@@ -16,6 +16,8 @@ so that they could be properly moved to their respective version's subsection.
 
 ## [Unreleased] 
 ### Added
+- <address>.nonce accessor in SolidVM
+- Upgraded PostgREST to version 12.0
 
 ### Changed
 
