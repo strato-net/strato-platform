@@ -9,7 +9,7 @@ router.get(
   StripeServiceController.stripeOnboarding
 );
 
-router.post(
+router.get(
   '/onboard/confirm',
   StripeServiceController.stripeOnboardingConfirm
 );
@@ -24,12 +24,12 @@ router.get(
   StripeServiceController.stripeCheckout
 );
 
-router.post(
+router.get(
   '/checkout/confirm',
   StripeServiceController.stripeCheckoutConfirm
 );
 
-router.put(
+router.get(
   '/checkout/cancel',
   StripeServiceController.stripeCheckoutCancel
 );
