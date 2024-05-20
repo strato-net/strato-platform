@@ -217,7 +217,7 @@ abstract contract PaymentService is Utils {
             Asset a = s.assetToBeSold();
             assets.push(address(a));
             seller = getCommonName(a.owner());
-            totalAmount += s.price() * quantities[i];
+            totalAmount += s.price() * _quantities[i];
         }
         emit Payment(
             token,
@@ -271,11 +271,11 @@ abstract contract PaymentService is Utils {
             Asset a = s.assetToBeSold();
             assets.push(address(a));
             seller = getCommonName(a.owner());
-            totalAmount += s.price() * quantities[i];
+            totalAmount += s.price() * _quantities[i];
             try {
-                s.unlockQuantity(_purchaser);
+                s.completeSale(_purchaser);
             } catch { // Support for legacy sales
-                address(s).call("unlockQuantity");
+                address(s).call("completeSale");
             }
         }
         emit Payment(
