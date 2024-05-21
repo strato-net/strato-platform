@@ -4,12 +4,18 @@ import pg from 'pg';
 const { Client } = pg;
 dotenv.config();
 
+const host = process.env.POSTGRES_SERVER_URL || 'postgres';
+const port = process.env.POSTGRES_PORT || '5432';
+const user = process.env.POSTGRES_USER || 'postgres';
+const password = process.env.POSTGRES_PASSWORD;
+const database = process.env.POSTGRES_DBNAME || 'postgres';
+
 const client = new Client({
-    host: process.env.POSTGRESQL_SERVER_URL,
-    port: process.env.POSTGRESQL_PORT || '5432',
-    user: process.env.POSTGRESQL_USER || 'postgres',
-    password: process.env.POSTGRESQL_PASSWORD,
-    database: process.env.POSTGRESQL_DBNAME || 'postgres',
+    host,
+    port,
+    user,
+    password,
+    database,
     // ssl: {
     //     require: true,
     //     rejectUnauthorized: true,
@@ -17,7 +23,7 @@ const client = new Client({
     // }
 });
 
-if (process.env.POSTGRESQL_SERVER_URL && process.env.POSTGRESQL_PASSWORD) {
+if (host && password) {
     client.connect()
         .then(() => {
             console.log(`Connected to the PostgreSQL database. Database name: ${client.database}`);

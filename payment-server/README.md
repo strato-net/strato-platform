@@ -119,13 +119,13 @@ Report and update dependencies if needed.
 
 ## Running
 
-The server **requires** the following environmental variables to run:
+The server **requires** the following environmental variables to run in non-dockerized mode:
 ```
-`POSTGRESQL_SERVER_URL`
-`POSTGRESQL_PORT` Default: 5432
-`POSTGRESQL_USER` Default: postgres
-`POSTGRESQL_PASSWORD`
-`POSTGRESQL_DBNAME` Default: postgres
+`POSTGRES_SERVER_URL` Default: postgres (for dockerized mode)
+`POSTGRES_PORT` Default: 5432
+`POSTGRES_USER` Default: postgres
+`POSTGRES_PASSWORD`
+`POSTGRES_DBNAME` Default: postgres
 `STRIPE_SECRET_KEY` for Stripe API
 `CONTRACT_ADDRESS` to the ExternalPaymentService contract
 ```
@@ -138,11 +138,11 @@ If running dockerized, provide a `docker-compose.payment-server.yml` file and us
 The payment server uses `jest` as its testing framework. In order to run the tests, the following environment variables should be available:
 ```
 <!-- REQUIRED ENV -->
-`POSTGRESQL_SERVER_URL`
-`POSTGRESQL_PORT` Default: 5432
-`POSTGRESQL_USER` Default: postgres
-`POSTGRESQL_PASSWORD`
-`POSTGRESQL_DBNAME` Default: postgres
+`POSTGRES_SERVER_URL` Default: postgres
+`POSTGRES_PORT` Default: 5432
+`POSTGRES_USER` Default: postgres
+`POSTGRES_PASSWORD`
+`POSTGRES_DBNAME` Default: postgres
 `STRIPE_SECRET_KEY` for Stripe API
 `CONTRACT_ADDRESS` to the ExternalPaymentService contract
 

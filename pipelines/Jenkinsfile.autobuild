@@ -415,11 +415,11 @@ pipeline {
               set -x
               echo "Running payment server tests"
               cd stripe-ps
-              POSTGRESQL_SERVER_URL=${PS_POSTGRESQL_SERVER_URL}
-              POSTGRESQL_PORT=5432
-              POSTGRESQL_USER=postgres
-              POSTGRESQL_PASSWORD=${PS_POSTGRESQL_PASSWORD}
-              POSTGRESQL_DBNAME=postgres
+              POSTGRES_SERVER_URL=${PS_POSTGRES_SERVER_URL}
+              POSTGRES_PORT=5432
+              POSTGRES_USER=postgres
+              POSTGRES_PASSWORD=${PS_POSTGRES_PASSWORD}
+              POSTGRES_DBNAME=postgres
               STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
               STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
               TEST_ACCOUNT_ID=${PS_TEST_ACCOUNT_ID}
