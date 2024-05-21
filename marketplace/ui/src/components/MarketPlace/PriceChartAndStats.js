@@ -11,11 +11,17 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
   }
 
   const fillDataGaps = (records) => {
+    if (records.length === 1) {
+      return [{
+        x: dayjs(records[0].block_timestamp.replace(' UTC', 'Z')).valueOf(),
+        y: records[0].price,
+      }];
+    }
+
     const filledData = [];
     let lastKnownPrice = null;
   
-    for (let i = 0; i < records.length; i++) {
-      const currentRecord = records[i];
+    records.forEach((currentRecord, i) => {
       const isoDate = currentRecord.block_timestamp.replace(' UTC', 'Z');
       const date = dayjs(isoDate).utc();
       const price = currentRecord.price;
@@ -46,19 +52,19 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
           currentDate = currentDate.add(1, 'day');
         }
       }
-    }
+    });
   
-    // Fill the gap until the current date with the last known price
-    let currentDate = dayjs(filledData[filledData.length - 1].x).add(1, 'day');
-    const today = dayjs().utc().endOf('day');
-    while (currentDate.isBefore(today, 'day')) {
-      filledData.push({
-        x: currentDate.valueOf(),
-        y: lastKnownPrice,
-      });
-      currentDate = currentDate.add(1, 'day');
-    }
-  
+      // // Fill the gap until the current date with the last known price
+      // let currentDate = dayjs(filledData[filledData.length - 1].x).add(1, 'day');
+      // const today = dayjs().utc().endOf('day');
+      // while (currentDate.isBefore(today, 'day')) {
+      //   filledData.push({
+      //     x: currentDate.valueOf(),
+      //     y: lastKnownPrice,
+      //   });
+      //   currentDate = currentDate.add(1, 'day');
+      // }
+
     return filledData;
   };
   
