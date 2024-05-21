@@ -8,6 +8,8 @@ import {
   waitForAddress
 } from "/helpers/utils";
 import constants from "../../helpers/constants";
+import axios from "axios";
+import paymentProvider from "../payments/paymentProvider";
 
 const contractName = "SimpleOrder";
 const contractFilename = `${util.cwd}/dapp/mercata-base-contracts/Templates/Orders/SimpleOrder.sol`;
@@ -198,7 +200,6 @@ async function getAll(admin, args = {}, options) {
   const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
   const countArgs = {
     ...args,
-    limit: undefined,
     offset: 0,
     order: undefined,
     queryOptions: {
@@ -240,22 +241,69 @@ async function getAll(admin, args = {}, options) {
     saleOrders = await searchAllWithQueryArgs(paymentTableName, idArgs, newOptions, admin);
   }
 
-  if (!saleOrders || !limit || saleOrders.length < limit) {
-    let oldLimit = saleOrders && limit ? limit - saleOrders.length : limit;
-    let oldOffset = 0;
-    if (offset)
-      oldOffset = offset - (saleOrders ? saleOrders.length : 0);
-    let oldArgs = { ...args, limit: oldLimit, offset: oldOffset };
-    const oldSaleOrders = await searchAllWithQueryArgs(constants.orderTableName, oldArgs, newOptions, admin);
-    saleOrders = [...saleOrders, ...oldSaleOrders];
+  // ACH status updates
+  let tokensToIndicies = {};
+  let paymentProvidersToTokens = {};
+  let paymentServiceRes = {};
+  for (let i = 0; i < saleOrders.length; i++) {
+    const order = saleOrders[i];
+    if (order.status === '2') {
+      if (paymentProvidersToTokens[order.address]) {
+        paymentProvidersToTokens[order.address].push(order.token);
+      }
+      else {
+        paymentProvidersToTokens[order.address] = [order.token];
+      }
+      tokensToIndicies[order.token] = i;
+    }
+  }
+  if (Object.keys(paymentProvidersToTokens).length > 0) {
+    const paymentProviderAddresses = Object.keys(paymentProvidersToTokens);
+    const paymentProviders = await paymentProvider.getAll(admin, { address: paymentProviderAddresses }, options);
+    paymentProviders.map(async (ppro) => {
+      const serviceUrl = ppro.serviceURL || ppro.data.serviceURL;
+      const statusRoute = ppro.orderStatusRoute || ppro.data.orderStatusRoute;
+      const tokens = encodeURIComponent(JSON.stringify(paymentProvidersToTokens[ppro.address]));
+      const statusRes = await axios.get(new URL(`${serviceUrl}${statusRoute}?tokens=${tokens}`).href).then(function (res) {
+        if (res.status === 200) {
+          paymentServiceRes = { ...paymentServiceRes, ...res.data }
+        }
+      })
+    });
+  }
+  if (Object.keys(paymentServiceRes).length > 0) {
+    Object.keys(paymentServiceRes)
+      .forEach(function (key) {
+        const index = tokensToIndicies[key];
+        saleOrders[index] = {
+          ...saleOrders[index],
+          status: paymentServiceRes[key],
+        }
+      });
   }
 
-  const oldCount = await searchAllWithQueryArgs(
-    constants.orderTableName,
-    countArgs,
-    newOptions,
-    admin
-  );
+  let oldCount = 0;
+  try {
+    if (!saleOrders || !limit || saleOrders.length < limit) {
+      let oldLimit = saleOrders && limit ? limit - saleOrders.length : limit;
+      console.log("DEBUG", oldLimit);
+      let oldOffset = 0;
+      if (offset)
+        oldOffset = offset - (saleOrders ? saleOrders.length : 0);
+      let oldArgs = { ...args, limit: oldLimit, offset: oldOffset };
+      const oldSaleOrders = await searchAllWithQueryArgs(constants.orderTableName, oldArgs, newOptions, admin);
+      saleOrders = [...saleOrders, ...oldSaleOrders];
+    }
+
+    oldCount = await searchAllWithQueryArgs(
+      constants.orderTableName,
+      countArgs,
+      newOptions,
+      admin
+    );
+  } catch(err) {
+    console.log("Legacy order table does not exist.");
+  }
 
   totalCount += oldCount[0] ? oldCount[0].count : 0;
 

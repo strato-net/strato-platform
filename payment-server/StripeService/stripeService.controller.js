@@ -14,6 +14,7 @@ import {
   initializePayment,
   cancelOrder
 } from '../helpers/utils.js';
+import { PAYMENT_STATUS } from '../helpers/constants.js';
 
 class StripeServiceController {
 
@@ -254,15 +255,28 @@ class StripeServiceController {
         if (p.status === 'INITIALIZED') {
           const session = await stripeService.getPaymentSession(p.paymentsessionid, p.accountid);
           if (session.payment_status === 'paid') {
+            // Get the payment event from Cirrus
+            const paymentEvent = await getPaymentEvent(p.token);
+
+            // Call completeOrder
+            const callArgs = {
+              token: paymentEvent[0].token,
+              orderId: paymentEvent[0].orderId,
+              purchaser: paymentEvent[0].purchaser,
+              saleAddresses: paymentEvent[0].saleAddresses,
+              quantities: paymentEvent[0].quantities,
+            } 
+            const returnStatus = await completeOrder(callArgs);
+
             // Update payment status in DB
             const updateResult = await updateStripePayment(p.token, 'PAID');
-            statuses[p.token] = 'PAID';
+            statuses[p.token] = PAYMENT_STATUS['PAID'];
           }
         }
-        statuses[p.token] = p.status;
+        statuses[p.token] = PAYMENT_STATUS[p.status];
       });
 
-      res.status(200).send(statuses);
+      res.status(200).json(statuses);
       return next();
     } catch(e) {
       next(e);

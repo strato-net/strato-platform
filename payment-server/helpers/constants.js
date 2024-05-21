@@ -23,6 +23,12 @@ const SERVER_CANCEL_URL = `${SERVER_URL}/stripe/checkout/cancel`;
 
 const PAYMENT_EVENT_TABLE = 'BlockApps-Mercata-PaymentService.Payment';
 
+const PAYMENT_STATUS = {
+  'INITIALIZED': '2',
+  'PAID': '3',
+  'CANCELED': '4',
+}
+
 export { 
   STRIPE_ENV,
   SERVER_CONFIRM_URL,
@@ -31,4 +37,5 @@ export {
   SERVER_URL,
   DEFAULT_OPTIONS,
   PAYMENT_EVENT_TABLE,
+  PAYMENT_STATUS,
 }
