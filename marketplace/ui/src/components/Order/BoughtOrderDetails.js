@@ -213,6 +213,10 @@ const BoughtOrderDetails = ({ user, users }) => {
         textClass: "bg-[#FFF0F0]",
         bgClass: "bg-[#FF0000]"
       },
+      ["Canceled"]: {
+        textClass: "bg-[#FFF0F0]",
+        bgClass: "bg-[#FF0000]"
+      },
     };
 
     const { textClass, bgClass } = statusClasses[status] || { textClass: "bg-[#FFF6EC]", bgClass: "bg-[#119B2D]" };

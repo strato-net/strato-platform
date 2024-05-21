@@ -70,6 +70,8 @@ const SoldOrderDetails = ({ user, users }) => {
       setStatus(getStatus(statusInt));
       if (statusInt === 3) {
         setPaid("Paid");
+      } else if (statusInt === 4) {
+        setPaid("Canceled");
       }
       setComment(orderDetails.order.comments);
       // Fulfillment date is sometimes coming in as 0. a unix of 0 sets the date to 1969. So we need to check for 0 and null, I added undefined just in case too. 
@@ -227,6 +229,10 @@ const SoldOrderDetails = ({ user, users }) => {
         textClass: "bg-[#FFF0F0]",
         bgClass: "bg-[#FF0000]"
       },
+      ["Canceled"]: {
+        textClass: "bg-[#FFF0F0]",
+        bgClass: "bg-[#FF0000]"
+      }
     };
 
     const { textClass, bgClass } = statusClasses[status] || { textClass: "bg-[#FFF6EC]", bgClass: "bg-[#119B2D]" };
