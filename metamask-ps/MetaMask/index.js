@@ -26,4 +26,9 @@ router.get(
     MetaMaskController.checkout
 )
 
+router.post(
+    '/checkout',
+    MetaMaskController.completeCheckout
+)
+
 module.exports = router;

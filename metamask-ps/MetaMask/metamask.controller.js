@@ -1,5 +1,4 @@
 const client = require('../db');
-// const Joi = require('@hapi/joi');
 class MetaMaskController {
     static async onboarding(req, res, next) {
         try {
@@ -17,14 +16,19 @@ class MetaMaskController {
                 throw new Error('Missing username OR eth_address in GET request')
             }
 
+            const { supported_tokens } = req.body;
+
             const query = `INSERT INTO metamask (
                 username,
-                eth_address
-            ) VALUES ($1, $2);`;
+                eth_address,
+                supported_tokens
+            ) VALUES ($1, $2, $3);`
 
-            await client.query(query, [req.query.username, req.query.address])
+            await client.query(query, [req.query.username, req.query.address, supported_tokens])
 
-            res.status(200)
+            res.status(204); // Success without content
+
+            next();
         } catch (error) {
             console.log(error)
             next(error);
@@ -50,8 +54,7 @@ class MetaMaskController {
                 })
             }
 
-            return next();
-
+            next();
         } catch (error) {
             console.error('DB Error:', error.message);
             next(error);
@@ -59,6 +62,38 @@ class MetaMaskController {
     }
 
     static async checkout(req, res, next) {
+        try {
+            res.status(200)
+            res.sendFile(__dirname + '/checkout.html')
+        } catch (error) {
+            console.log(error)
+            next(error);
+        }
+    }
+
+    static async completeCheckout(req, res, next) {
+        try {            
+            // Focusing on ETH and USDC
+            // Need a flag that triggers network (Mainnet, )
+            const { price } = req.body; 
+            const query = 'SELECT eth_address FROM metamask WHERE username = $1';
+            const query_result = await client.query(query, [req.query.username])
+            
+            if (query_result.rows.length != 1) {
+                res.status(500).json({
+                    error: "This user has not been onboarded through MetaMask yet."
+                });
+            } 
+
+
+        } catch (error) {
+            console.log(error);
+            next(error);
+        }
+
+    }
+
+    static async changeUserWallet(req, res, next) {
 
     }
 }
