@@ -6,7 +6,7 @@ import <BASE_CODE_COLLECTION>;
 contract UnitOfMeasurement {
 enum UnitOfMeasurement {
     NULL,
-    BARRELL,
+    BARREL,
     BOTTLE  
 }
 }

@@ -102,6 +102,7 @@ data ProcessedMappingRow = ProcessedMappingRow
   { address :: Address,
     codehash :: CodePtr,
     creator :: Text,
+    root :: Text,
     application :: Text,
     contractname :: Text,
     mapname :: Text,
@@ -229,6 +230,18 @@ baseColumns =
     "block_timestamp",
     "block_number",
     "transaction_hash",
+    "transaction_sender",
+    "creator",
+    "root"
+  ]
+
+baseEventColumns :: TableColumns
+baseEventColumns =
+  [ "address",
+    "block_hash",
+    "block_timestamp",
+    "block_number",
+    "transaction_hash",
     "transaction_sender"
   ]
 
@@ -253,12 +266,16 @@ baseAbstractColumns =
     "transaction_hash",
     "transaction_sender",
     "creator",
+    "root",
     "contract_name",
     "data"
   ]
 
 baseTableColumns :: TableColumns
 baseTableColumns = baseColumns
+
+baseTableColumnsForEvent :: TableColumns
+baseTableColumnsForEvent = baseEventColumns
 
 baseMappingTableColumns :: TableColumns
 baseMappingTableColumns = baseMappingColumns
@@ -671,7 +688,6 @@ expandAbstractTableQuery tableName cols =
       tableNameToDoubleQuoteText tableName,
       " ADD COLUMN IF NOT EXISTS",
       T.intercalate ", ADD COLUMN IF NOT EXISTS" cols,
-      ", ADD COLUMN IF NOT EXISTS creator text",
       ", ADD COLUMN IF NOT EXISTS contract_name text",
       ", ADD COLUMN IF NOT EXISTS data jsonb",
       ";"
@@ -788,14 +804,15 @@ baseColumnsQuery =
     "block_timestamp text",
     "block_number text",
     "transaction_hash text",
-    "transaction_sender text"
+    "transaction_sender text",
+    "creator text",
+    "root text"
   ]
 
 abstractBaseColumnsQuery :: [Text]
 abstractBaseColumnsQuery = 
   baseColumnsQuery ++ 
   [
-    "creator text",
     "contract_name text",
     "data jsonb"
   ]
@@ -884,7 +901,9 @@ insertIndexTableQuery cs =
                     tshow . E.blockTimestamp,
                     tshow . E.blockNumber,
                     T.pack . keccak256ToHex . E.transactionHash,
-                    tshow . E.transactionSender
+                    tshow . E.transactionSender,
+                    E.creator,
+                    E.root
                   ]
                 baseRowVals = map (wrapSingleQuotes . ($ contract)) baseVals
                 contractValEntries = list
@@ -986,7 +1005,8 @@ insertAbstractTableQuery cs isHistoric =
                     tshow . E.blockNumber,
                     T.pack . keccak256ToHex . E.transactionHash,
                     tshow . E.transactionSender,
-                    E.creator
+                    E.creator,
+                    E.root
                   ]
                 vals = flip map contracts $ \((row, contractColumns), _) ->
                   let baseRowVals = map (wrapSingleQuotes . ($ row)) baseVals
@@ -1109,7 +1129,9 @@ insertHistoryTableQuery cs =
                     tshow . E.blockTimestamp,
                     tshow . E.blockNumber,
                     T.pack . keccak256ToHex . E.transactionHash,
-                    tshow . E.transactionSender
+                    tshow . E.transactionSender,
+                    E.creator,
+                    E.root
                   ]
                 vals = flip map contracts $ \(row, rowList) ->
                   wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
@@ -1260,7 +1282,7 @@ insertEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
           (T.pack $ Action.evContractName ev)
       tableName = EventTableName creator a cname (escapeQuotes $ T.pack $ Action.evName ev)
       filledArgs = map fst . fillFirstEmptyEntries . map (first T.pack) $ Action.evArgs ev
-      keySt = wrapAndEscapeDouble . map escapeQuotes $ ("id" : baseTableColumns) ++ filledArgs
+      keySt = wrapAndEscapeDouble . map escapeQuotes $ ("id" : baseTableColumnsForEvent) ++ filledArgs
       baseVals =
         [ tshow . _accountAddress . Action.evContractAccount . eventEvent,
           T.pack . keccak256ToHex . eventBlockHash,

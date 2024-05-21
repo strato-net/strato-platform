@@ -25,10 +25,10 @@ convert :: Action -> Either String Action -- 🤔
 convert = eitherDecode . encode
 
 emptyEVMData :: Action.ActionData
-emptyEVMData = Action.ActionData (ExternallyOwned $ unsafeCreateKeccak256FromWord256 0) mempty "LambdaCorp1" "Clozure1" EVM (Action.EVMDiff M.empty) M.empty [] [] []
+emptyEVMData = Action.ActionData (ExternallyOwned $ unsafeCreateKeccak256FromWord256 0) mempty "LambdaCorp1" "Clozure1" "Clozure1 address" EVM (Action.EVMDiff M.empty) M.empty [] [] []
 
 emptySolidVMData :: Action.ActionData
-emptySolidVMData = Action.ActionData (SolidVMCode "ContractName" $ unsafeCreateKeccak256FromWord256 0) mempty "LambdaCorp2""Clozure2" SolidVM (Action.SolidVMDiff M.empty) M.empty [] [] []
+emptySolidVMData = Action.ActionData (SolidVMCode "ContractName" $ unsafeCreateKeccak256FromWord256 0) mempty "LambdaCorp2" "Clozure2" "Clozure2 address" SolidVM (Action.SolidVMDiff M.empty) M.empty [] [] []
 
 emptyAction :: Action
 emptyAction = Action.Action (unsafeCreateKeccak256FromWord256 0) (posixSecondsToUTCTime 0) 0 (unsafeCreateKeccak256FromWord256 0) Nothing (Account 0x0 Nothing) OMap.empty Nothing S.empty S.empty
@@ -99,6 +99,7 @@ spec = describe "Action conversions" $ do
                  "types": ["Create"],
                  "codeHash": "86bc2e2a375e6ea377ae90026248f472fbeaa1354ef4424f568d01f3a48ab5b9",
                  "creator": "BlockApps1",
+                 "root" : "ClothingUTXO",
                  "application": "LogisticsEngine1",
                  "abstracts": [],
                  "mappings": [],
@@ -119,6 +120,7 @@ spec = describe "Action conversions" $ do
          "events" : 
          [ { "eventBlockHash": "0000000000000000000000000000000000000000000000000000000000000000",
              "eventContractCreator": "BlockApps2",
+             "eventContractRoot": "ClothingUTXO",
              "eventContractApplication": "LogisticsEngine2",
              "eventContractName" : "Vehicle",
              "eventContractAccount" : "2e385b6a3aea46d4172df98617b5385c13b7100d",
@@ -152,6 +154,7 @@ spec = describe "Action conversions" $ do
                       Action._actionDataCodeCollection = mempty,
                       Action._actionDataCodeHash = ExternallyOwned $ forceHash "86bc2e2a375e6ea377ae90026248f472fbeaa1354ef4424f568d01f3a48ab5b9",
                       Action._actionDataCreator = "BlockApps1",
+                      Action._actionDataRoot = "ClothingUTXO",
                       Action._actionDataApplication = "LogisticsEngine1",
                       Action._actionDataCodeKind = EVM,
                       Action._actionDataAbstracts = M.empty,
