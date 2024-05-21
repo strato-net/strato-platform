@@ -271,22 +271,13 @@ async function getState(user, contract, options) {
   return marshalOut(state);
 }
 
-async function cancelOrder(user, contract, options, comments = "") {
+async function cancelOrder(user, contract, args, options) {
   const callArgs = {
     contract,
     method: "cancelOrder",
-    args: util.usc({ comments }),
+    args: util.usc({ ...args }),
   };
   const cancelStatus = await rest.call(user, callArgs, options);
-
-  if (parseInt(cancelStatus, 10) !== RestStatus.OK) {
-    throw new rest.RestError(
-      cancelStatus,
-      "You cannot cancel an order you don't co-own",
-      {}
-    );
-  }
-
   return cancelStatus;
 }
 

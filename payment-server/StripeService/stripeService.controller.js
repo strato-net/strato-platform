@@ -36,10 +36,10 @@ class StripeServiceController {
 
         // Generate and return Stripe connect link 
         const connectLink = await stripeService.generateStripeAccountConnectLink(redirectUrl, username, userStripeAccount.id);
-        res.redirect(`${connectLink.url}`);
+        res.status(200).json(`${connectLink.url}`);
       } else {
         const connectLink = await stripeService.generateStripeAccountConnectLink(redirectUrl, username, userAccount);
-        res.redirect(`${connectLink.url}`);
+        res.status(200).json(`${connectLink.url}`);
       }
       return next();
     } catch(e) {
@@ -111,7 +111,7 @@ class StripeServiceController {
         const session = await stripeService.getPaymentSession(paymentDetails.paymentsessionid, paymentDetails.accountid);
         
         // Redirect to Stripe payment session
-        res.redirect(`${session.url}`);
+        res.status(200).json(`${session.url}`);
         return next();
       }
 
@@ -142,7 +142,7 @@ class StripeServiceController {
       const insertResult = await insertStripePayment(token, session.id, sellerCommonName);
 
       // Redirect to Stripe payment session
-      res.redirect(`${session.url}`);
+      res.status(200).json(`${session.url}`);
       return next();
     } catch(e) {
       next(e);

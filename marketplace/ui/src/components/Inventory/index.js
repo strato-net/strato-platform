@@ -34,6 +34,7 @@ import CategoryCard from "../MarketPlace/CategoryCard";
 import HelmetComponent from "../Helmet/HelmetComponent";
 import { SEO } from "../../helpers/seoConstant";
 import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
+import { HTTP_METHODS } from "../../helpers/constants";
 
 
 const Inventory = ({ user }) => {
@@ -101,6 +102,27 @@ const Inventory = ({ user }) => {
   const handleCancel = () => {
     setOpen(false);
   };
+
+  const handleOnboard = async (e) => {
+    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+      window.location.href = loginUrl;
+    } else {
+      const serviceURL = e.serviceURL || e.data.serviceURL;
+      const onboardingRoute = e.onboardingRoute || e.data.onboardingRoute;
+      try {
+        const onboardUrl = await fetch(
+          `${serviceURL}${onboardingRoute}?username=${user.commonName}&redirectUrl=${window.location.protocol}//${window.location.host}${window.location.pathname}`,
+          {
+            method: HTTP_METHODS.GET,
+          });
+        const res = await onboardUrl.json();
+        window.location.replace(res);
+      } catch(err) {
+        actions.setMessage(dispatch, err.message ? err.message : "Unable to onboard.");
+      }
+    }
+  }
+
 
 
   const openToast = (placement) => {
@@ -244,16 +266,7 @@ const renderImg = (service) => {
                   (p.onboardingRoute || p.data.onboardingRoute)
                 )).map((e) => (
                   <Button type="primary" className="w-44 h-9 items-center justify-center"
-                      onClick={() => {
-                        if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                          window.location.href = loginUrl;
-                        } else {
-                          const serviceURL = e.serviceURL || e.data.serviceURL
-                          const onboardingRoute = e.onboardingRoute || e.data.onboardingRoute
-                          const url = `${serviceURL}${onboardingRoute}?username=${user.commonName}&redirectUrl=${window.location.protocol}//${window.location.host}${window.location.pathname}`
-                          window.location.replace(url);
-                        }
-                      }}
+                      onClick={() => handleOnboard(e)}
                   >
                     <div className="flex items-center justify-center mr-1">
                       {`${e.onboardingText || e.data.onboardingText}`}&nbsp;

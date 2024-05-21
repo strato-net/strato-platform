@@ -24,4 +24,4 @@ max-rows = ${POSTGREST_MAX_ROWS}
 
 # allow aggregate queries
 db-aggregates-enabled = true
-statement_timeout = 5s
+statement_timeout = 5

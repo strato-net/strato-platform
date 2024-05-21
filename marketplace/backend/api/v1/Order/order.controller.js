@@ -208,8 +208,14 @@ class OrderController {
 
   static validateCancelSaleOrderArgs(args) {
     const cancelSaleOrderSchema = Joi.object({
-      saleOrderAddress: Joi.string().required(),
-      comments: Joi.string().allow(""),
+      paymentProvider: Joi.object({
+        address: Joi.string().required(),
+      }).required(),
+      token: Joi.string().required(),
+      orderId: Joi.string().required(),
+      purchaser: Joi.string().required(),
+      saleAddresses: Joi.array().min(1).items(Joi.string().required()).required(),
+      quantities: Joi.array().min(1).items(Joi.number().required()).required(),
     }).required();
 
     const validation = cancelSaleOrderSchema.validate(args);

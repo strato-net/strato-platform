@@ -108,6 +108,8 @@ const BoughtOrderDetails = ({ user, users }) => {
       setStatus(getStatus(statusInt));
       if (statusInt === 3) {
         setPaid("Paid");
+      } else if (statusInt === 4) {
+        setPaid("Canceled");
       }
       setcomment(orderDetails.order.comments);
 
@@ -317,8 +319,14 @@ const BoughtOrderDetails = ({ user, users }) => {
 
   const handleCancelOrder = async () => {
     const body = {
-      saleOrderAddress: details.order.address,
-      comments: comment,
+      paymentProvider: {
+        address: details.order.address,
+      },
+      token: details.order.token,
+      orderId: details.order.orderId,
+      purchaser: details.order.purchaser,
+      saleAddresses: details.order.saleAddresses,
+      quantities: details.order.quantities,
     };
     let isDone = await actions.cancelSale(dispatch, body);
     if (isDone) {

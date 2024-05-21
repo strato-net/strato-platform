@@ -261,13 +261,6 @@ definitions:
         type: string
       paymentSessionId:
         type: string
-  cancelSaleOrder:
-    type: object
-    properties:
-      saleOrderAddress:
-        type: string
-      comments:
-        type: string
   executeSale:
     type: object
     properties:

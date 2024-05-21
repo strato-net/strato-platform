@@ -9,7 +9,7 @@ import { actions as orderActions } from "../../contexts/order/actions"
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import { actions as inventoryAction } from "../../contexts/inventory/actions";
 import { useInventoryDispatch, } from "../../contexts/inventory";
-import { PAYMENT_LIST } from "../../helpers/constants";
+import { PAYMENT_LIST, HTTP_METHODS } from "../../helpers/constants";
 
 const ResponsiveCart = ({
   paymentProviders,
@@ -111,8 +111,17 @@ const ResponsiveCart = ({
             && checkoutRoute
             && checkoutRoute !== ''
          ) {
-        const url = `${serviceURL}${checkoutRoute}?token=${token}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`
-        window.location.replace(url);
+          try {
+            const checkoutUrl = await fetch(
+              `${serviceURL}${checkoutRoute}?token=${token}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`,
+              {
+                method: HTTP_METHODS.GET,
+              });
+            const res = await checkoutUrl.json();
+            window.location.replace(res);
+          } catch (err) {
+            openToastOrder("bottom", err.message ? err.message : "Unable to checkout.");
+          }
       } else {
         window.location.replace(`/order/status?assets=${assets}`);
       }

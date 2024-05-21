@@ -20,7 +20,7 @@ import {
 } from "../../contexts/inventory";
 import DataTableComponent from "../DataTableComponent";
 import "./index.css";
-import { PAYMENT_LIST } from "../../helpers/constants";
+import { HTTP_METHODS, PAYMENT_LIST } from "../../helpers/constants";
 import TagManager from "react-gtm-module";
 import { setCookie } from "../../helpers/cookie";
 
@@ -155,8 +155,17 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
             && checkoutRoute
             && checkoutRoute !== ''
          ) {
-        const url = `${serviceURL}${checkoutRoute}?token=${token}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`
-        window.location.replace(url);
+          try {
+            const checkoutUrl = await fetch(
+              `${serviceURL}${checkoutRoute}?token=${token}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`,
+              {
+                method: HTTP_METHODS.GET,
+              });
+            const res = await checkoutUrl.json();
+            window.location.replace(res);
+          } catch (err) {
+            orderActions.setMessage(orderDispatch, err.message ? err.message : "Unable to checkout.");
+          }
       } else {
         window.location.replace(`/order/status?assets=${assets}`);
       }

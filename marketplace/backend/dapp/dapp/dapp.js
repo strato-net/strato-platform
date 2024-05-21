@@ -756,9 +756,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   // ------------------------------ SALE TEST STARTS ------------------------------
 
   contract.cancelSaleOrder = async function (args, options = defaultOptions) {
-    const { saleOrderAddress, comments, ...restArgs } = args;
-    const contract = { name: saleOrderJs.paymentServiceContractName, address: saleOrderAddress }
-    return saleOrderJs.cancelOrder(rawAdmin, contract, options, comments);
+    const { paymentProvider, ...restArgs } = args;
+    const contract = { name: saleOrderJs.paymentServiceContractName, address: paymentProvider.address }
+    return saleOrderJs.cancelOrder(rawAdmin, contract, restArgs, options);
   }
 
   contract.getSaleOrders = async function (args, options = defaultOptions) {
