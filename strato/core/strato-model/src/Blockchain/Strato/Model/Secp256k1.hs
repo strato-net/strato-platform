@@ -9,6 +9,7 @@ module Blockchain.Strato.Model.Secp256k1
   ( PrivateKey (..),
     PublicKey (..),
     Signature (..),
+    Signed (..),
     SharedKey (..),
     HasVault (..),
     newPrivateKey,
@@ -19,6 +20,7 @@ module Blockchain.Strato.Model.Secp256k1
     importPublicKey,
     deriveSharedKey,
     recoverPub,
+    recoverSigned,
     signMsg,
     verifySig,
     exportSignature,
@@ -30,6 +32,7 @@ where
 -- import qualified Data.ByteString.Conversion       as BSC
 
 import Blockchain.Data.RLP
+import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq
 import Control.Monad
 import Control.Monad.Trans.Class (lift)
@@ -50,11 +53,14 @@ import Data.Maybe
 import Data.Swagger (ToSchema)
 import Data.Swagger.Internal.Schema (binarySchema, declareNamedSchema, named)
 import qualified Data.Text as T
+import Data.Text.Encoding (decodeUtf8)
 import GHC.Generics
 import qualified LabeledError
+import Numeric (showHex)
 import Test.QuickCheck
 import qualified Text.Colors as CL
 import Text.Format
+import Text.Tools
 
 -- This module is a wrapper for Crypto.Secp256k1, with
 -- all the extra instances we need
@@ -254,8 +260,64 @@ instance FromJSON Signature where
       dec = BSS.toShort . LabeledError.b16Decode "FromJSON<Signature>" . C8.pack . T.unpack
   parseJSON o = fail $ "parseJSON Signature failed: expected object, got: " ++ show o
 
+instance Format Signature where
+  format (Signature (S.CompactRecSig r s v)) =
+    unlines
+      [ "Signature",
+        "--------------",
+        tab' $ "r: " ++ CL.yellow (T.unpack . decodeUtf8 . B16.encode $ BSS.fromShort r),
+        tab' $ "s: " ++ CL.yellow (T.unpack . decodeUtf8 . B16.encode $ BSS.fromShort s),
+        tab' $ "v: " ++ showHex v "0x"
+      ]
+
 instance ToSchema Signature where
   declareNamedSchema _ = return $ named "Signature" binarySchema
+
+data Signed a = Signed
+  { unsigned :: a,
+    signature :: Signature
+  }
+  deriving (Eq, Show, Generic, Data)
+
+instance Format a => Format (Signed a) where
+  format (Signed d s) =
+    unlines
+      [ "Signed message",
+        "-----------------",
+        tab' $ format s,
+        tab' $ format d
+      ]
+
+instance FromJSON a => FromJSON (Signed a) where
+  parseJSON (Object o) = do
+    d <- o .: "data"
+    s <- o .: "signature"
+    pure $ Signed d s
+  parseJSON x = fail $ "couldn't parse JSON for signed data: " ++ show x
+
+instance ToJSON a => ToJSON (Signed a) where
+  toJSON (Signed d s) =
+    object
+      [ "data" .= d,
+        "signature" .= s
+      ]
+
+instance Arbitrary a => Arbitrary (Signed a) where
+  arbitrary = Signed <$> arbitrary <*> arbitrary
+
+instance RLPSerializable a => RLPSerializable (Signed a) where
+  rlpEncode (Signed d s) =
+    RLPArray
+      [ rlpEncode d,
+        rlpEncode s
+      ]
+  rlpDecode (RLPArray [d, s]) =
+    Signed
+      (rlpDecode d)
+      (rlpDecode s)
+  rlpDecode o = error $ "rlpDecode Signed data: Expected 2 element RLPArray, got " ++ show o
+
+instance ToSchema a => ToSchema (Signed a)
 
 -- NOTE: secp256k1-haskell, in its infinite wisdom, has swapped the R and S
 -- values in the signatures it generates...this is verified against the signatures
@@ -284,6 +346,11 @@ recoverPub (Signature (S.CompactRecSig r s v)) msgHash =
       sig = fromMaybe (error "could not import recsig") (S.importCompactRecSig sig')
       mesg = fromMaybe (error "could not import msgHash") (S.msg msgHash)
    in PublicKey <$> (S.recover sig mesg)
+
+recoverSigned :: RLPSerializable a => Signed a -> Maybe PublicKey
+recoverSigned (Signed d sig) =
+  let msg = keccak256ToByteString $ rlpHash d
+   in recoverPub sig msg
 
 signMsg :: PrivateKey -> B.ByteString -> Signature
 signMsg pk msgHash =

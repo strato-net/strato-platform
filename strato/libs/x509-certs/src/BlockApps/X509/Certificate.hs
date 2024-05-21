@@ -55,7 +55,7 @@ import BlockApps.X509.Keys
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember hiding (commonName, orgName, orgUnit)
-import Blockchain.Strato.Model.Secp256k1
+import Blockchain.Strato.Model.Secp256k1 hiding (Signed)
 import Control.Applicative ((<|>))
 import Control.DeepSeq
 import qualified Control.Lens as Lens

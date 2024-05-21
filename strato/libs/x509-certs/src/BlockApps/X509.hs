@@ -8,5 +8,5 @@ where
 
 import BlockApps.X509.Certificate
 import BlockApps.X509.Keys
-import Data.X509
+import Data.X509 hiding (Signed (..))
 import Data.X509.Validation

@@ -37,6 +37,10 @@ packages:
 - identity-provider/server
 - identity-provider/client
 
+- identity-service/api
+- identity-service/server
+- identity-service/client
+
 - indexer/slipstream
 - indexer/strato-index
 
