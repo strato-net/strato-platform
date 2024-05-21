@@ -1,4 +1,3 @@
-const fs = require('fs');
 const { Client } = require('pg');
 
 const client = new Client({
@@ -23,7 +22,8 @@ if (process.env.POSTGRESQL_SERVER_URL && process.env.POSTGRESQL_PASSWORD) {
             const query = `
                 CREATE TABLE IF NOT EXISTS metamask (
                     username TEXT PRIMARY KEY,
-                    eth_address TEXT
+                    eth_address TEXT,
+                    supported_tokens TEXT[]
                 );
             `;
 
