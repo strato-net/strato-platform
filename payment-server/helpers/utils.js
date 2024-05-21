@@ -10,8 +10,8 @@ const clientErrorHandler = (err, req, res, next) => {
 
   if (statusCode) {
     const message = get(err, 'raw.message');
-    console.log(`Unhandled API error. Status: ${statusCode}. Message: ${message}`);
-    console.log(`Request: ${req}`);
+    console.log(`Unhandled API error. Status: ${JSON.stringify(statusCode)}. Message: ${JSON.stringify(message)}`);
+    console.log(`Request: ${JSON.stringify(req)}`);
     return res.status(statusCode).json({ success: false, error: message });
   }
 
