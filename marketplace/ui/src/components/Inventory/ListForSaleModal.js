@@ -98,7 +98,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                         className="w-64"
                     >
                         {!arePaymentServicesLoading ? (
-                            paymentServices.map((e, index) => (
+                            availablePaymentProviders.map((e, index) => (
                                 <Option value={index}>
                                     <div className="flex items-center mr-1">
                                         {e.serviceName}&nbsp;
