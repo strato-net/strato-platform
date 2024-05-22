@@ -13,6 +13,7 @@ contract ExternalPaymentService is PaymentService {
     string public onboardingRoute;
     string public onboardingStatusRoute;
     string public checkoutRoute;
+    string public orderStatusRoute;
     ////
     //// Provide entire URLs for onboarding and checkout, no app-side manipulation required
     // string public onboardingURL;
@@ -27,6 +28,7 @@ contract ExternalPaymentService is PaymentService {
         string _onboardingRoute,
         string _onboardingStatusRoute,
         string _checkoutRoute,
+        string _orderStatusRoute,
         string _imageURL,
         string _onboardingText,
         string _checkoutText
@@ -39,6 +41,7 @@ contract ExternalPaymentService is PaymentService {
         onboardingRoute = _onboardingRoute;
         onboardingStatusRoute = _onboardingStatusRoute;
         checkoutRoute = _checkoutRoute;
+        orderStatusRoute = _orderStatusRoute;
         if (_onboardingText != "") {
             onboardingText = _onboardingText;
         } else {
@@ -51,6 +54,7 @@ contract ExternalPaymentService is PaymentService {
     ,   string _onboardingRoute
     ,   string _onboardingStatusRoute
     ,   string _checkoutRoute
+    ,   string _orderStatusRoute
     ,   string _onboardingText
     ,   uint   _scheme
     ) requireOwner("update the payment server information") public returns (uint) {
@@ -71,6 +75,9 @@ contract ExternalPaymentService is PaymentService {
         checkoutRoute = _checkoutRoute;
       }
       if ((_scheme & (1 << 4)) == (1 << 4)) {
+        orderStatusRoute = _orderStatusRoute;
+      }
+      if ((_scheme & (1 << 5)) == (1 << 5)) {
         onboardingText = _onboardingText;
       }
 
