@@ -26,6 +26,11 @@ router.get(
     MetaMaskController.checkout
 )
 
+router.get(
+    '/checkout/options',
+    MetaMaskController.paymentOptions
+)
+
 router.post(
     '/checkout',
     MetaMaskController.completeCheckout

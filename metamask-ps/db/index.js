@@ -30,7 +30,7 @@ if (process.env.POSTGRESQL_SERVER_URL && process.env.POSTGRESQL_PASSWORD) {
             return client.query(query);
         })
         .then(() => {
-            console.log('Table created or already exists.');
+            console.log("Table 'metamask' is ready.");
         })
         .catch(error => {
             console.error('Error creating table:', error);

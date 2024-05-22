@@ -10,7 +10,7 @@ document.getElementById('tokenSelection').addEventListener('submit', event => {
         
         formData.forEach((value, key) => {
             if (key === 'option') {
-            selectedOptions.push(value);
+                selectedOptions.push(value);
             }
         });
 
@@ -29,7 +29,6 @@ document.getElementById('tokenSelection').addEventListener('submit', event => {
                     body: JSON.stringify({ supported_tokens: selectedOptions })
                 })
                 .then(res => {
-                    console.log(res)
                     if (res.status === 204) {
                         console.log(`success - user's metamask account has been onboarded with tokens ${selectedOptions}`)
                     } else {
@@ -40,7 +39,7 @@ document.getElementById('tokenSelection').addEventListener('submit', event => {
                 })
             }))
         } else {
-            alert('Must select a fucking token')
+            alert('Must select at least 1 token.')
         }
     };
 
