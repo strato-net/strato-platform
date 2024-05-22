@@ -165,10 +165,9 @@ async function getSaleHistory(user, args, options) {
 }
 
 async function getAllSaleHistory(user, args, options) {
-    const { contract, ...restArgs } = args;
 
     const newOptions = { ...options, org: undefined, app: undefined }
-    let historySale = await searchAllWithQueryArgs(`history@${saleAllTableContract}`, restArgs, newOptions, user);
+    let historySale = await searchAllWithQueryArgs(`history@${saleAllTableContract}`, args, newOptions, user);
 
     if (!historySale) {
         return undefined;

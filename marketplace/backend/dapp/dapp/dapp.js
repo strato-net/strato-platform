@@ -570,16 +570,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         Object.values(processedSalesResults[0].value).sort((a, b) => new Date(a.block_timestamp) - new Date(b.block_timestamp)) : [];
       // Only send price, timestamp as a part of the record
       const originRecords = originRecordsSorted ? Object.values(originRecordsSorted).map(({ price, block_timestamp }) => ({ price, block_timestamp })) : [];
-      // Append a record for the current date with the last known price
-      // if (originRecords.length > 0) {
-      //   const lastKnownRecord = originRecords[originRecords.length - 1];
-      //   const currentDateTime = dayjs().utc().format('YYYY-MM-DD HH:mm:ss') + ' UTC';
-      //   originRecords.push({
-      //     price: lastKnownRecord.price,
-      //     block_timestamp: currentDateTime
-      //   });
-      // }
-
 
       // 12 month historical data
       const twelveMonthHistoryRecords = processedSalesResults[1].status === 'fulfilled' ?
