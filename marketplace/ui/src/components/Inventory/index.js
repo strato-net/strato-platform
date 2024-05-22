@@ -44,6 +44,7 @@ const Inventory = ({ user }) => {
   const limit = 10;
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState(1);
+  const [availablePaymentProviders, setAvailablePaymentProviders] = useState([]);
   const dispatch = useInventoryDispatch();
   const [api, contextHolder] = notification.useNotification();
   const [isSearch, setIsSearch] = useState(false);
@@ -69,7 +70,14 @@ const Inventory = ({ user }) => {
   useEffect(() => {
     paymentServiceActions.getPaymentServices(paymentServiceDispatch);
     paymentServiceActions.getNotOnboarded(paymentServiceDispatch, user?.commonName, 10, 0);
-  }, [paymentServiceDispatch]);
+  }, [paymentServiceDispatch, user]);
+
+  useEffect(() => {
+    const diff = paymentServices.filter(ps => 
+      !notOnboarded.some(x => x.address === ps.address)
+    );
+    setAvailablePaymentProviders(diff);
+  }, [paymentServices, notOnboarded]);
 
   //items
   const itemDispatch = useItemDispatch();
@@ -284,6 +292,7 @@ const renderImg = (service) => {
                 type="primary"
                 id="createItem"
                 className="w-40 h-9 flex items-center justify-center gap-[6px]"
+                disabled={availablePaymentProviders.length === 0}
                 onClick={() => {
                   if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                     window.location.href = loginUrl;
@@ -325,6 +334,7 @@ const renderImg = (service) => {
                             key={index}
                             debouncedSearchTerm={debouncedSearchTerm}
                             allSubcategories={allSubcategories}
+                            user={user}
                           />
                         );
                       })

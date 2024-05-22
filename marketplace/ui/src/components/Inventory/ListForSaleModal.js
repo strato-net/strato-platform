@@ -7,10 +7,11 @@ import { actions as paymentServiceActions } from "../../contexts/payment/actions
 
 const { Option } = Select;
 
-const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, offset }) => {
+const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, offset, user }) => {
     const [data, setData] = useState([inventory]);
     const [quantity, setQuantity] = useState(inventory.saleAddress ? inventory.saleQuantity : inventory.quantity);
     const [paymentTypes, setPaymentTypes] = useState([]);
+    const [availablePaymentProviders, setAvailablePaymentProviders] = useState([]);
     const [pricePerUnit, setpricePerUnit] = useState(inventory.price ? inventory.price : inventory.pricePerUnit);
     const inventoryDispatch = useInventoryDispatch();
     const [canList, setCanList] = useState(true);
@@ -20,13 +21,16 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
     } = useInventoryState();
     const {
         paymentServices,
-        arePaymentServicesLoading
+        arePaymentServicesLoading,
+        notOnboarded,
+        areNotOnboardedLoading
     } = usePaymentServiceState();
     const paymentServiceDispatch = usePaymentServiceDispatch();
 
     useEffect(() => {
       paymentServiceActions.getPaymentServices(paymentServiceDispatch);
-    }, [paymentServiceDispatch]);
+      paymentServiceActions.getNotOnboarded(paymentServiceDispatch, user?.commonName, 10, 0);
+    }, [paymentServiceDispatch, user]);
 
     useEffect(() => {
         if ( inventory.saleAddress ? quantity > (inventory.quantity - inventory.totalLockedQuantity) : quantity > inventory.quantity || quantity <= 0 || pricePerUnit <= 0) {
@@ -36,6 +40,13 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
             setCanList(true);
         };
     }, [quantity, pricePerUnit])
+
+    useEffect(() => {
+        const diff = paymentServices.filter(ps => 
+          !notOnboarded.some(x => x.address === ps.address)
+        );
+        setAvailablePaymentProviders(diff);
+      }, [paymentServices, notOnboarded]);
 
     const renderImg = (service) => {
         return service.imageURL && service.imageURL !== ''
@@ -222,7 +233,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                         showSearch={false}
                         className="w-full"
                     >
-                        {paymentServices.map((e, index) => (
+                        {availablePaymentProviders.map((e, index) => (
                             <Option value={index}>
                                 <div className="flex items-center mr-1">
                                     {e.serviceName}&nbsp;

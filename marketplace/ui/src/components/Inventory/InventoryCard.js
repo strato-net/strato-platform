@@ -22,7 +22,7 @@ import image_placeholder from "../../images/resources/image_placeholder.png";
 import "react-responsive-carousel/lib/styles/carousel.min.css";
 import { SEO } from "../../helpers/seoConstant";
 
-const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcategories, limit, offset }) => {
+const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcategories, limit, offset, user }) => {
   const textRef = useRef(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [openPop, setOpenPop] = useState(false);
@@ -311,6 +311,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
           offset={offset}
           inventory={inventory}
           categoryName={category}
+          user={user}
         />
       )}
       {unlistModalOpen && (
