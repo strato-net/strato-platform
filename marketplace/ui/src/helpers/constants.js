@@ -100,7 +100,7 @@ export const unitOfMeasures = [
 ];
 
 export const unitOfSpiritMeasures = [
-  { name: "Barrell", value: 1 },
+  { name: "Barrel", value: 1 },
   { name: "Bottle", value: 2 }
 ];
 
