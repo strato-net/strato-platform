@@ -1,0 +1,43 @@
+#payment-server-version:<VERSION>
+#strato-getting-started-min-version:4.4.0
+version: '3'
+services:
+  payment-server:
+    environment:
+    - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+    - POSTGRESQL_SERVER_URL=${POSTGRESQL_SERVER_URL}
+    - POSTGRESQL_PORT=${POSTGRESQL_PORT}
+    - POSTGRESQL_USER=${POSTGRESQL_USER}
+    - POSTGRESQL_PASSWORD=${POSTGRESQL_PASSWORD}
+    - POSTGRESQL_DBNAME=${POSTGRESQL_DBNAME}
+    build: .
+    image: ${PAYMENT_SERVER_IMAGE:-<REPO_URL>payment-server:<VERSION>}
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+  nginx:
+    depends_on:
+    - payment-server-backend
+    environment:
+    - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
+    - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+    - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
+    - OAUTH_SCOPE=${OAUTH_SCOPE}
+    - ssl=${ssl}
+    - sslCertFileType=${sslCertFileType}
+    build: .
+    image: ${PAYMENT_SERVER_NGINX_IMAGE:-<REPO_URL>payment-server-nginx:<VERSION>}
+    ports:
+    - ${HTTP_PORT:-80}:80 #TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT
+    - ${HTTPS_PORT:-443}:443 #TAG_REMOVE_WHEN_NO_SSL
+    volumes:
+    - ./ssl:/tmp/ssl:ro
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"

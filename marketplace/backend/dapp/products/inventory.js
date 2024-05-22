@@ -462,7 +462,8 @@ async function getAll(admin, args = {}, defaultOptions) {
                     saleAddress: itemSale?.address,
                     saleQuantity: itemSale?.quantity,
                     saleDate: itemSale?.block_timestamp,
-                    totalLockedQuantity: itemSale?.totalLockedQuantity
+                    totalLockedQuantity: itemSale?.totalLockedQuantity,
+                    paymentProviders: itemSale?.paymentProviders
                 });
             }
             else if (isMarketplaceSearch) {
@@ -473,7 +474,8 @@ async function getAll(admin, args = {}, defaultOptions) {
                         saleAddress: null,
                         saleQuantity: null,
                         saleDate: null,
-                        totalLockedQuantity: null
+                        totalLockedQuantity: null,
+                        paymentProviders: null
                     })
                 }
             }

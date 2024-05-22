@@ -9,9 +9,10 @@ import { actions as orderActions } from "../../contexts/order/actions"
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import { actions as inventoryAction } from "../../contexts/inventory/actions";
 import { useInventoryDispatch, } from "../../contexts/inventory";
-import { PAYMENT_LIST } from "../../helpers/constants";
+import { PAYMENT_LIST, HTTP_METHODS } from "../../helpers/constants";
 
 const ResponsiveCart = ({
+  paymentProviders,
   data,
   confirm,
   AddQty,
@@ -21,6 +22,7 @@ const ResponsiveCart = ({
   openToastOrder
 }) => {
   const [tax, setTax] = useState(0);
+  const [selectedPaymentService, setSelectedPaymentService] = useState('');
   const { cartList } = useMarketplaceState();
   const marketplaceDispatch = useMarketplaceDispatch();
   const inventoryDispatch = useInventoryDispatch();
@@ -66,7 +68,8 @@ const ResponsiveCart = ({
     }
   });
 
-  const handlePaymentConfirm = async () => {
+  const handlePaymentConfirm = async (paymentProvider) => {
+    setSelectedPaymentService(paymentProvider.serviceName);
     actions.addItemToConfirmOrder(marketplaceDispatch, cartData);
     let orderList = [];
     cartData.forEach((item) => {
@@ -77,15 +80,15 @@ const ResponsiveCart = ({
         unitPrice: item.unitPrice
       });
     });
-    // These additional fields need to be sent to form the request after stripe. 
+
     let body = {
-      paymentList: PAYMENT_LIST,
+      paymentProvider: { address: paymentProvider.address },
       buyerOrganization: userOrganization,
       orderList,
       orderTotal: total + tax,
       tax: tax,
-      user: user?.commonName,
-      email: user?.email,
+      user: user.commonName,
+      email: user.email,
     };
 
     window.LOQ.push(['ready', async LO => {
@@ -98,17 +101,32 @@ const ResponsiveCart = ({
         event: 'pay_now_button',
       },
     });
-    let data = await orderActions.createPayment(orderDispatch, body);
-    if (data != null && data.url !== undefined) {
-      window.location.replace(data.url);
+    let tokenAndAssets = await orderActions.createPayment(orderDispatch, body);
+    if (tokenAndAssets && tokenAndAssets !== false) {
+      const [token, assets] = tokenAndAssets;
+      let serviceURL = paymentProvider.serviceURL || paymentProvider.data.serviceURL;
+      let checkoutRoute = paymentProvider.checkoutRoute || paymentProvider.data.checkoutRoute;
+      if (serviceURL
+            && serviceURL !== ''
+            && checkoutRoute
+            && checkoutRoute !== ''
+         ) {
+          try {
+            const checkoutUrl = await fetch(
+              `${serviceURL}${checkoutRoute}?token=${token}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`,
+              {
+                method: HTTP_METHODS.GET,
+              });
+            const res = await checkoutUrl.json();
+            window.location.replace(res);
+          } catch (err) {
+            openToastOrder("bottom", err.message ? err.message : "Unable to checkout.");
+          }
+      } else {
+        window.location.replace(`/order/status?assets=${assets}`);
+      }
     }
   };
-
-  useEffect(() => {
-    if (cartData.length !== 0) {
-      inventoryAction.sellerStripeStatus(inventoryDispatch, cartData[0]["sellersCommonName"]);
-    }
-  }, [inventoryDispatch, cartData]);
 
   return (
     <div className=" border border-[#E9E9E9]  rounded-md mt-3 flex flex-col gap-[18px]   sm:w-[400px] md:w-[450px]  items-center    ">
@@ -261,13 +279,13 @@ const ResponsiveCart = ({
           </div>
         </div>
 
-        {!confirm && (
+        {!confirm && paymentProviders.map((paymentProvider) => (
           <Row className="justify-center mt-4">
             <Button
               type="primary"
               id="submit-order-button"
-              className=" w-full sm:w-44 h-9 !bg-[#13188A]"
-              loading={isCreatePaymentSubmitting}
+              className=" w-full sm:w-52 h-9 !bg-[#13188A]"
+              loading={isCreatePaymentSubmitting && selectedPaymentService === paymentProvider.serviceName}
               onClick={async () => {
                 if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                   window.location.href = loginUrl;
@@ -291,7 +309,7 @@ const ResponsiveCart = ({
                         event: 'submit_order_from_cart',
                       },
                     });
-                    handlePaymentConfirm();
+                    handlePaymentConfirm(paymentProvider);
                   } else {
                     let insufficientQuantityMessage = "";
                     let outOfStockMessage = "";
@@ -320,10 +338,13 @@ const ResponsiveCart = ({
               }}
               disabled={cartData.length === 0}
             >
-              Submit & Checkout
+              <div className="flex items-center mr-1">
+                {paymentProvider.checkoutText}&nbsp; 
+                {paymentProvider.imageURL && paymentProvider.imageURL !== '' ? <img src={paymentProvider.imageURL} alt={paymentProvider.serviceName} height="16px" width="16px"/> : ''}
+              </div>
             </Button>
           </Row>
-        )}
+        ))}
       </div>
     </div>
   );

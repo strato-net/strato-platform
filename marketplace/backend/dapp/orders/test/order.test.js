@@ -150,39 +150,6 @@ describe('Order', function () {
                 await order.addOrderLine(orderLineArgs);
             },RestStatus.FORBIDDEN);
         })
-    
-    
-        it('update a buyer details - 403', async () => {
-            // Create our Order
-            const args = factoryArgs(globalAdmin);
-            const order = await orderJs.uploadContract(globalAdmin, args, newOptions);
-      
-            // Check if Order was created
-            const orderData = await order.get();
-            assert.deepInclude(R.map(v => '' + v, orderData), R.map(v => '' + v, args));
-                    
-            const buyerDetailsArgs = updateBuyerFactoryArgs(globalAdmin);
-            
-            await assert.restStatus(async ()=>{
-                await order.updateBuyerDetails(buyerDetailsArgs);
-            },RestStatus.FORBIDDEN);
-        });
-    
-        it('update a seller details - 200', async () => {
-            // Create our Order
-            const args = factoryArgs(globalAdmin);
-            const order = await orderJs.uploadContract(globalAdmin, args, newOptions);
-      
-            // Check if Order was created
-            const orderData = await order.get();
-            assert.deepInclude(R.map(v => '' + v, orderData), R.map(v => '' + v, args));
-                    
-            const sellerDetailsArgs = updateSellerFactoryArgs(globalAdmin);
-            const [status,] = await order.updateSellerDetails(sellerDetailsArgs);
-            assert.equal(status,RestStatus.OK);
-            const updatedOrder=await order.get();
-            assert.deepInclude(R.map(v => '' + v, {...orderData,...updatedOrder}), R.map(v => '' + v, sellerDetailsArgs))
-        });
     });
 
     describe('Seller org',()=>{

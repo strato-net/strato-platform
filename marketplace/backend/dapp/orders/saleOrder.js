@@ -8,9 +8,13 @@ import {
   waitForAddress
 } from "/helpers/utils";
 import constants from "../../helpers/constants";
+import axios from "axios";
+import paymentProvider from "../payments/paymentProvider";
 
 const contractName = "SimpleOrder";
 const contractFilename = `${util.cwd}/dapp/mercata-base-contracts/Templates/Orders/SimpleOrder.sol`;
+const paymentServiceContractName = "PaymentService";
+const paymentTableName = "PaymentService.Payment";
 
 /**
  * Upload a new Sale Order
@@ -107,8 +111,12 @@ async function getHistory(user, chainId, address, options) {
  * @param _args - Contract state
  */
 function marshalOut(_args) {
+  const { unitsPerDollar, amount, totalPrice, createdDate, block_timestamp, status } = _args;
   const args = {
     ..._args,
+    totalPrice: totalPrice || (unitsPerDollar ? Math.round((amount * 100) / unitsPerDollar) / 100 : amount),
+    createdDate: createdDate || (new Date(block_timestamp)).getTime() / 1000,
+    status: status || 3,
   };
   return args;
 }
@@ -158,15 +166,23 @@ function bindAddress(user, address, options) {
  */
 
 async function get(user, args, options) {
-  const { address, ...restArgs } = args;
+  const { address, orderId, ...restArgs } = args;
   const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
   let order;
 
-  const searchArgs = setSearchQueryOptions(restArgs, {
-    key: "address",
+  let searchArgs = setSearchQueryOptions( { ...restArgs, token: orderId }, {
+    key: "transaction_hash",
     value: address,
   });
-  order = await searchOne(constants.orderTableName, searchArgs, newOptions, user);
+  order = await searchOne(paymentTableName, searchArgs, newOptions, user);
+
+  if (!order) {
+    searchArgs = setSearchQueryOptions(restArgs, {
+      key: "address",
+      value: address,
+    });
+    order = await searchOne(constants.orderTableName, searchArgs, newOptions, user);
+  }
 
   if (!order) {
     return undefined;
@@ -179,25 +195,119 @@ async function get(user, args, options) {
 
 async function getAll(admin, args = {}, options) {
   let saleOrders;
+  const { order, ...restArgs } = args;
+  const { offset, limit } = args;
   const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
-  saleOrders = await searchAllWithQueryArgs(constants.orderTableName, args, newOptions, admin);
+  const countArgs = {
+    ...args,
+    offset: 0,
+    order: undefined,
+    queryOptions: {
+      select: "count",
+    }
+  };
 
-  const count = await searchAllWithQueryArgs(
-    constants.orderTableName,
-    {
-      ...args,
-      limit: undefined,
-      offset: 0,
-      order: undefined,
-      queryOptions: {
-        select: "count",
-      }
-    },
+  const newCount = await searchAllWithQueryArgs(
+    paymentTableName,
+    countArgs,
     newOptions,
     admin
   );
 
-  return saleOrders ? { orders: saleOrders.map((order) => marshalOut(order)), total: count[0].count } : undefined;
+  let totalCount = newCount[0].count;
+
+  if (totalCount && !(offset && (totalCount < offset))) {
+    const newArgs = { ...restArgs, order: 'block_timestamp.desc' };
+    saleOrders = await searchAllWithQueryArgs(paymentTableName, newArgs, newOptions, admin);
+  }
+
+  // Get the latest payment event for each sale token
+  if (saleOrders) {
+    const uniqueOrders = await rest.search(
+      admin,
+      {
+        name: 'BlockApps-Mercata-PaymentService.Payment',
+      },
+      {
+        ...options,
+        query: {
+          ['select']: 'id:id.max(),token,block_timestamp.max()'
+        }
+      }
+    )
+    const idArgs = {
+      id: uniqueOrders.map((uo) => uo.id),
+    }
+    saleOrders = await searchAllWithQueryArgs(paymentTableName, idArgs, newOptions, admin);
+  }
+
+  // ACH status updates
+  let tokensToIndicies = {};
+  let paymentProvidersToTokens = {};
+  let paymentServiceRes = {};
+  for (let i = 0; i < saleOrders.length; i++) {
+    const order = saleOrders[i];
+    if (order.status === '2') {
+      if (paymentProvidersToTokens[order.address]) {
+        paymentProvidersToTokens[order.address].push(order.token);
+      }
+      else {
+        paymentProvidersToTokens[order.address] = [order.token];
+      }
+      tokensToIndicies[order.token] = i;
+    }
+  }
+  if (Object.keys(paymentProvidersToTokens).length > 0) {
+    const paymentProviderAddresses = Object.keys(paymentProvidersToTokens);
+    const paymentProviders = await paymentProvider.getAll(admin, { address: paymentProviderAddresses }, options);
+    paymentProviders.map(async (ppro) => {
+      const serviceUrl = ppro.serviceURL || ppro.data.serviceURL;
+      const statusRoute = ppro.orderStatusRoute || ppro.data.orderStatusRoute;
+      const tokens = encodeURIComponent(JSON.stringify(paymentProvidersToTokens[ppro.address]));
+      const statusRes = await axios.get(new URL(`${serviceUrl}${statusRoute}?tokens=${tokens}`).href).then(function (res) {
+        if (res.status === 200) {
+          paymentServiceRes = { ...paymentServiceRes, ...res.data }
+        }
+      })
+    });
+  }
+  if (Object.keys(paymentServiceRes).length > 0) {
+    Object.keys(paymentServiceRes)
+      .forEach(function (key) {
+        const index = tokensToIndicies[key];
+        saleOrders[index] = {
+          ...saleOrders[index],
+          status: paymentServiceRes[key],
+        }
+      });
+  }
+
+  let oldCount = 0;
+  try {
+    if (!saleOrders || !limit || saleOrders.length < limit) {
+      let oldLimit = saleOrders && limit ? limit - saleOrders.length : limit;
+      console.log("DEBUG", oldLimit);
+      let oldOffset = 0;
+      if (offset)
+        oldOffset = offset - (saleOrders ? saleOrders.length : 0);
+      let oldArgs = { ...args, limit: oldLimit, offset: oldOffset };
+      const oldSaleOrders = await searchAllWithQueryArgs(constants.orderTableName, oldArgs, newOptions, admin);
+      saleOrders = [...saleOrders, ...oldSaleOrders];
+    }
+
+    oldCount = await searchAllWithQueryArgs(
+      constants.orderTableName,
+      countArgs,
+      newOptions,
+      admin
+    );
+  } catch(err) {
+    console.log("Legacy order table does not exist.");
+  }
+
+  totalCount += oldCount[0] ? oldCount[0].count : 0;
+
+  return saleOrders ? { orders: saleOrders.map((order) => marshalOut(order)), total: totalCount } : undefined;
 }
 
 /**
@@ -209,42 +319,14 @@ async function getState(user, contract, options) {
   return marshalOut(state);
 }
 
-async function cancelOrder(user, contract, options, comments = "") {
+async function cancelOrder(user, contract, args, options) {
   const callArgs = {
     contract,
     method: "cancelOrder",
-    args: util.usc({ comments }),
+    args: util.usc({ ...args }),
   };
   const cancelStatus = await rest.call(user, callArgs, options);
-
-  if (parseInt(cancelStatus, 10) !== RestStatus.OK) {
-    throw new rest.RestError(
-      cancelStatus,
-      "You cannot cancel an order you don't co-own",
-      {}
-    );
-  }
-
   return cancelStatus;
-}
-
-async function updateOrderStatus(user, contract, options, status) {
-  const callArgs = {
-    contract,
-    method: "updateOrderStatus",
-    args: util.usc({ status }),
-  };
-  const updateOrderStatusResponse = await rest.call(user, callArgs, options);
-
-  if (parseInt(updateOrderStatusResponse, 10) !== RestStatus.OK) {
-    throw new rest.RestError(
-      updateOrderStatusResponse,
-      "Order Cannot Be Updated",
-      {}
-    );
-  }
-
-  return updateOrderStatusResponse;
 }
 
 /**
@@ -301,11 +383,11 @@ export default {
   uploadContract,
   contractName,
   contractFilename,
+  paymentServiceContractName,
   bindAddress,
   get,
   getAll,
   cancelOrder,
-  updateOrderStatus,
   completeOrder,
   updateOrderComment,
   marshalIn,
