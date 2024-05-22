@@ -11,30 +11,11 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
   }
 
   const fillDataGaps = (records) => {
-    if (records.length === 1) {
-      const originalTimestamp = dayjs(records[0].block_timestamp.replace(' UTC', 'Z'));
-      const currentTimestamp = dayjs().utc();
-    
-      let record = [{
-        x: originalTimestamp.valueOf(),
-        y: records[0].price,
-      }];
-    
-      // Check if the original timestamp date is not the same as the current date
-      if (!originalTimestamp.isSame(currentTimestamp, 'day')) {
-        record.push({
-          x: currentTimestamp.valueOf(),
-          y: records[0].price
-        });
-      }
-    
-      return record;
-    }
-
     const filledData = [];
     let lastKnownPrice = null;
   
-    records.forEach((currentRecord, i) => {
+    for (let i = 0; i < records.length; i++) {
+      const currentRecord = records[i];
       const isoDate = currentRecord.block_timestamp.replace(' UTC', 'Z');
       const date = dayjs(isoDate).utc();
       const price = currentRecord.price;
@@ -65,19 +46,24 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
           currentDate = currentDate.add(1, 'day');
         }
       }
-    });
+    }
   
-      // // Fill the gap until the current date with the last known price
-      // let currentDate = dayjs(filledData[filledData.length - 1].x).add(1, 'day');
-      // const today = dayjs().utc().endOf('day');
-      // while (currentDate.isBefore(today, 'day')) {
-      //   filledData.push({
-      //     x: currentDate.valueOf(),
-      //     y: lastKnownPrice,
-      //   });
-      //   currentDate = currentDate.add(1, 'day');
-      // }
+    // Check if last record's date is the current date
+    const lastRecordDate = dayjs(filledData[filledData.length - 1].x);
+    const today = dayjs().utc().endOf('day');
+    if (!lastRecordDate.isSame(today, 'day')) {
+      // Fill the gap until the current date with the last known price
+      let currentDate = lastRecordDate.add(1, 'day');
+      while (currentDate.isBefore(today, 'day') || currentDate.isSame(today, 'day')) {
+        filledData.push({
+          x: currentDate.valueOf(),
+          y: lastKnownPrice,
+        });
+        currentDate = currentDate.add(1, 'day');
+      }
+    }
 
+  
     return filledData;
   };
   
