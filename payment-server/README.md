@@ -127,7 +127,6 @@ The server **requires** the following environmental variables to run:
 `POSTGRESQL_PASSWORD`
 `POSTGRESQL_DBNAME` Default: postgres
 `STRIPE_SECRET_KEY` for Stripe API
-`SERVER_HOST` for the Payment Server
 `CONTRACT_ADDRESS` to the ExternalPaymentService contract
 ```
 
@@ -145,7 +144,6 @@ The payment server uses `jest` as its testing framework. In order to run the tes
 `POSTGRESQL_PASSWORD`
 `POSTGRESQL_DBNAME` Default: postgres
 `STRIPE_SECRET_KEY` for Stripe API
-`SERVER_HOST` for the Payment Server
 `CONTRACT_ADDRESS` to the ExternalPaymentService contract
 
 <!-- OPTIONAL ENV -->
