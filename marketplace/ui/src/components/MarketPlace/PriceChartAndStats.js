@@ -132,6 +132,8 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
       tickPlacement: 'on',
       labels: {
         format: 'MMMM d', 
+        showDuplicates: false,
+        hideOverlappingLabels:true,
       },
       axisBorder: {
         show: false
