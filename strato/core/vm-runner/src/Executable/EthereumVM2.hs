@@ -28,6 +28,7 @@ import Blockchain.DB.CodeDB (CodeKind (..), getCode)
 import qualified Blockchain.DB.MemAddressStateDB as Mem
 import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
+import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.ChainInfo
@@ -102,6 +103,25 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
   numPoolable <- uncurry (*>) . (yieldMany *** pure) =<< lift (processTransactions txPairs)
   yieldMany $ outputPrivateTransactions privateTxs
   processBlocksAndNewChains blocksAndNewChains
+
+  mBHash <- lift $ do
+    case preprepareBlock of
+      Nothing -> pure Nothing
+      Just block -> do
+        $logInfoS "handleVmEvents" "Got a preprepare block to run!"
+        let bHeader = blockBlockData block
+            bHash = blockHeaderHash bHeader
+            -- bro if there are any maybes in this list thaz BAD
+            otxs = catMaybes $ wrapIngestBlockTransaction  bHash <$> (blockReceiptTransactions block)
+        mSumm <- A.lookup (A.Proxy @BlockSummary) (parentHash bHeader)
+        case mSumm of 
+          Nothing -> pure Nothing
+          Just summ -> do
+            res <- Bagger.runFromStateRoot mineTransactions (gasLimit bHeader) bHeader{stateRoot=bSumStateRoot summ} otxs 
+            case res of 
+              Right (sr, _, _) | sr == stateRoot bHeader -> pure $ Just bHash
+              _ -> pure Nothing
+  traverse_ (yield . OutAcceptPreprepare) mBHash
 
   mNewBlock <- lift $ do
     Mod.modify_ (Mod.Proxy @ContextState) $ pure . (blockRequested ||~ createBlock)

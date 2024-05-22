@@ -147,6 +147,7 @@ data InEvent
     CommitResult (Either Text Keccak256)
   | UnannouncedBlock Block
   | PreviousBlock Block
+  | AcceptPreprepare Keccak256
   | ForcedConfigChange ForcedConfigChange
   | ValidatorBehaviorChange ForcedValidatorChange
   | ValidatorChange ChainMemberParsedSet Bool
@@ -158,6 +159,7 @@ instance Format InEvent where
   format (CommitResult (Left text)) = unpack $ "CommitResult Error: " <> text
   format (CommitResult (Right sha)) = "CommitResult Success: " ++ format sha
   format (UnannouncedBlock blk) = "UnannouncedBlock " ++ format (blockHash blk)
+  format (AcceptPreprepare bhsh) = "Accept Preprepare " ++ format bhsh
   format (PreviousBlock blk) = "PreviousBlock " ++ format (blockHash blk)
   format (ForcedConfigChange cc) = "ForcedConfigChange " ++ format cc
   format (ValidatorBehaviorChange theBool) = "ValidatorBehaviorChange " ++ format theBool
@@ -175,6 +177,7 @@ data OutEvent
     GapFound {have :: Integer, require :: Integer, peer :: ChainMemberParsedSet}
   | LeadFound {weHave :: Integer, theyHave :: Integer, peer :: ChainMemberParsedSet}
   | NewCheckpoint Checkpoint
+  | RunPreprepare Block
   deriving (Eq, Show, Generic)
 
 type EOutEvent = Either OutEvent OutEvent
@@ -191,6 +194,7 @@ instance Format OutEvent where
   format (GapFound we they p) = "GapFound " ++ show (we, they, p)
   format (LeadFound we they p) = "LeadFound " ++ show (we, they, p)
   format (NewCheckpoint ckpt) = "NewCheckpoint " ++ show ckpt
+  format (RunPreprepare blk) = "RunPreprepare " ++ format (blockHash blk)
 
 blkNum :: Block -> String
 blkNum = show . number . blockBlockData
@@ -208,6 +212,7 @@ inShortLog loc iev = $logInfoS loc . pack $
     CommitResult (Left err) -> CL.red "COMMIT_RESULT " ++ show err
     CommitResult (Right hsh) -> CL.blue "COMMIT_RESULT " ++ format hsh
     UnannouncedBlock blk -> CL.blue "UNANNOUNCED_BLOCK " ++ blkNum blk
+    AcceptPreprepare hsh -> CL.blue "ACCEPT_PRE_PREPARE " ++ format hsh
     PreviousBlock blk -> CL.blue "PREVIOUS_BLOCK " ++ blkNum blk
     ForcedConfigChange cc -> CL.blue "FORCED_CONFIG_CHANGE " ++ format cc
     ValidatorBehaviorChange vc -> CL.blue "VALIDATOR_BEHAVIOR_CHANGE " ++ show vc
@@ -226,6 +231,7 @@ outShortLog loc eoev = do
       GapFound h r p -> prefix ++ CL.blue "GAP_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
       LeadFound h r p -> prefix ++ CL.blue "LEAD_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
       NewCheckpoint ckpt -> prefix ++ CL.blue "NEW_CHECKPOINT " ++ show ckpt
+      RunPreprepare blk -> prefix ++ CL.blue "RUN_PRE_PREPARE " ++ format (blockHash blk)
 
 instance NFData OutEvent
 

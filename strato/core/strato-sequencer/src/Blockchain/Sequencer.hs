@@ -329,6 +329,7 @@ blockstanbulSend' msg = do
         GapFound h l p -> (vms, (P2pAskForBlocks (h + 1) l p) : p2ps, ctxs)
         LeadFound h l p -> (vms, (P2pPushBlocks (l + 1) h p) : p2ps, ctxs)
         NewCheckpoint ck -> (vms, p2ps, ck : ctxs)
+        RunPreprepare b -> (VmRunPreprepare b : vms, p2ps, ctxs)
         _ -> (vms, p2ps, ctxs)
     vmEvenP2pCheckptFilterHelper [] = ([], [], [])
 
@@ -710,6 +711,9 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
         IETMPNodesReceived -> do
           record "inevent_type_mp_nodes_received" "MPNodesReceived"
           yieldMany $ map (\(IEMPNodesReceived nds) -> ToVm $ VmMPNodesReceived nds) events
+        IETAcceptPreprepare -> do
+          record "inevent_type_accept_preprepare" "AcceptPreprepare"
+          blockstanbulSend $ map (\(IEAcceptPreprepare bh) -> AcceptPreprepare bh) events
 
 prettyIBlock :: IngestBlock -> String
 prettyIBlock IngestBlock {ibOrigin = o, ibBlockData = bd, ibReceiptTransactions = txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"

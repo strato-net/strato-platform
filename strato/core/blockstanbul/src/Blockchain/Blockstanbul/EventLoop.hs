@@ -289,6 +289,12 @@ eventLoop ctx = execStateC ctx $
                 when (isJust self && valB) $ do
                   msg <- signMessage (Preprepare v realSealed)
                   yieldR msg
+        AcceptPreprepare bh -> do
+          self <- use selfCert
+          valB <- use validatorBehavior
+          when (isJust self && valB) $ do
+            msg <- signMessage (Prepare v bh)
+            yieldR msg
         IMsg auth ppp@(Preprepare v' pp) -> do
           pr <- use proposer
           mBlockLock <- use blockLock
@@ -326,8 +332,8 @@ eventLoop ctx = execStateC ctx $
                     self <- use selfCert
                     valB <- use validatorBehavior
                     when (isJust self && valB) $ do
-                      msg <- signMessage (Prepare v (blockHash pp))
-                      yieldR msg
+                      -- run in vm before sending prepare
+                      yieldR $ RunPreprepare pp
         IMsg auth ppp@(Prepare v' di) -> when (v <= v') $ do
           preparers <- use prepared
           unless (M.member (sender auth) preparers) . yieldL $ OMsg auth ppp
@@ -483,6 +489,7 @@ recordInEvent ev =
         CommitResult {} -> inc "commit_result"
         UnannouncedBlock {} -> inc "unannounced_block"
         PreviousBlock {} -> inc "previous_block"
+        AcceptPreprepare {} -> inc "accept_preprepare"
         ForcedConfigChange {} -> inc "forced_config_change"
         ValidatorBehaviorChange {} -> inc "validator_behavior_change"
         ValidatorChange {} -> inc "validator_change"
@@ -502,3 +509,4 @@ recordOutEvent eev =
         GapFound {} -> inc "gap_found"
         LeadFound {} -> inc "lead_found"
         NewCheckpoint {} -> inc "new_checkpoint"
+        RunPreprepare {} -> inc "run_preprepare"

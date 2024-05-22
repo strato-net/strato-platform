@@ -161,6 +161,7 @@ logEventSummaries events = do
     getNames (VmPrivateTx _) = "PrivateTx"
     getNames (VmGetMPNodesRequest _ _) = "GetMPNodesRequest"
     getNames (VmMPNodesReceived _) = "MPNodesReceived"
+    getNames (VmRunPreprepare _) = "VmRunPreprepare"
 
     numberIt :: Int -> String -> String
     numberIt 1 x = "1 " ++ x
@@ -232,6 +233,7 @@ sendOutEvent (OutBlock o) = void . execKafka $ writeUnseqEvents [IEBlock $ block
 sendOutEvent (OutStateRootMismatch _) = pure ()
 sendOutEvent (OutGetMPNodes mpNodes) = void . execKafka $ writeUnseqEvents [IEGetMPNodes mpNodes]
 sendOutEvent (OutMPNodesResponse o nds) = void . execKafka $ writeUnseqEvents [IEMPNodesResponse o nds]
+sendOutEvent (OutAcceptPreprepare bh) = void . execKafka $ writeUnseqEvents [IEAcceptPreprepare bh]
 
 consumerGroup :: KP.ConsumerGroup
 consumerGroup = lookupConsumerGroup "ethereum-vm"

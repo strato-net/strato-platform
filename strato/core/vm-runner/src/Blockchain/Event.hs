@@ -19,6 +19,7 @@ module Blockchain.Event
 where
 
 import Blockchain.DB.MemAddressStateDB
+import Blockchain.Data.Block (Block(..))
 import Blockchain.Data.ChainInfo
 import Blockchain.Data.DataDefs
 import Blockchain.Data.ExecResults
@@ -49,11 +50,12 @@ data VmInEventBatch = InBatch
     createBlock :: !Bool,
     privateTxs :: [OutputTx],
     mpNodesReqs :: [(TXOrigin, [StateRoot])],
-    mpNodesResps :: [[NodeData]]
+    mpNodesResps :: [[NodeData]],
+    preprepareBlock :: Maybe Block
   }
 
 newInBatch :: VmInEventBatch
-newInBatch = InBatch [] [] 0 [] 0 False [] [] []
+newInBatch = InBatch [] [] 0 [] 0 False [] [] [] Nothing
 
 insertInBatch :: VmInEvent -> VmInEventBatch -> VmInEventBatch
 insertInBatch e b = case e of
@@ -65,6 +67,7 @@ insertInBatch e b = case e of
   VmPrivateTx otx -> b {privateTxs = otx : privateTxs b}
   VmGetMPNodesRequest o srs -> b {mpNodesReqs = (o, srs) : mpNodesReqs b}
   VmMPNodesReceived nds -> b {mpNodesResps = nds : mpNodesResps b}
+  VmRunPreprepare b' -> b {preprepareBlock = Just b'}
 
 data VmOutEvent
   = OutAction Action
@@ -80,6 +83,7 @@ data VmOutEvent
   | OutStateRootMismatch StateRootMismatch
   | OutGetMPNodes [StateRoot]
   | OutMPNodesResponse TXOrigin [NodeData]
+  | OutAcceptPreprepare Keccak256
 
 data VmOutEventBatch = OutBatch
   { outActions :: DL.DList Action,
@@ -120,6 +124,7 @@ insertOutBatch :: VmOutEvent -> VmOutEventBatch -> VmOutEventBatch
 insertOutBatch e b = case e of
   OutAction a -> b {outActions = outActions b `DL.snoc` a}
   OutBlock a -> b {outBlocks = outBlocks b `DL.snoc` a}
+  OutAcceptPreprepare _ -> b --todo: add to batch?
   OutIndexEvent a -> b {outIndexEvents = outIndexEvents b `DL.snoc` a}
   OutToStateDiff v w x y z -> b {outToStateDiffs = outToStateDiffs b `DL.snoc` (v, w, x, y, z)}
   OutStateDiff a -> b {outStateDiffs = outStateDiffs b `DL.snoc` a}
