@@ -12,10 +12,23 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
 
   const fillDataGaps = (records) => {
     if (records.length === 1) {
-      return [{
-        x: dayjs(records[0].block_timestamp.replace(' UTC', 'Z')).valueOf(),
+      const originalTimestamp = dayjs(records[0].block_timestamp.replace(' UTC', 'Z'));
+      const currentTimestamp = dayjs().utc();
+    
+      let record = [{
+        x: originalTimestamp.valueOf(),
         y: records[0].price,
       }];
+    
+      // Check if the original timestamp date is not the same as the current date
+      if (!originalTimestamp.isSame(currentTimestamp, 'day')) {
+        record.push({
+          x: currentTimestamp.valueOf(),
+          y: records[0].price
+        });
+      }
+    
+      return record;
     }
 
     const filledData = [];
