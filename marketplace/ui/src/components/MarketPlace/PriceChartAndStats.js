@@ -48,16 +48,21 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
       }
     }
   
-    // Fill the gap until the current date with the last known price
-    let currentDate = dayjs(filledData[filledData.length - 1].x).add(1, 'day');
+    // Check if last record's date is the current date
+    const lastRecordDate = dayjs(filledData[filledData.length - 1].x);
     const today = dayjs().utc().endOf('day');
-    while (currentDate.isBefore(today, 'day')) {
-      filledData.push({
-        x: currentDate.valueOf(),
-        y: lastKnownPrice,
-      });
-      currentDate = currentDate.add(1, 'day');
+    if (!lastRecordDate.isSame(today, 'day')) {
+      // Fill the gap until the current date with the last known price
+      let currentDate = lastRecordDate.add(1, 'day');
+      while (currentDate.isBefore(today, 'day') || currentDate.isSame(today, 'day')) {
+        filledData.push({
+          x: currentDate.valueOf(),
+          y: lastKnownPrice,
+        });
+        currentDate = currentDate.add(1, 'day');
+      }
     }
+
   
     return filledData;
   };
@@ -109,7 +114,7 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
       enabled: false
     },
     stroke: {
-      curve: 'smooth',
+      curve: 'straight',
       width: 3
     },
     fill: {
@@ -159,8 +164,6 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
     }
   };
 
-  
-
   return (
     <div>
       <div className="flex justify-center w-full">
@@ -169,10 +172,7 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
       </div>
     </div>
     </div>
-
   );
 };
 
 export default PriceChartAndStats;
-
-
