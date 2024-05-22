@@ -467,30 +467,25 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions)
   }
 
-  contract.getPriceHistory = async function (args, options = defaultOptions) {
+  contract.getPriceHistory = async function (args, options = defaultOptions) {  
     try {
       const { assetAddress, timeFilter } = args;
 
       const assetWithoutQuantity = await inventoryJs.get(rawAdmin, { address: assetAddress }, options);
       const originAddress = assetWithoutQuantity.originAddress;
       const assetsOfOriginAsset = await inventoryJs.getAll(rawAdmin,{ originAddress: originAddress}, options);
-      
+      const assetsAddressArr = assetsOfOriginAsset.map(item=>item.address);
       // Aggregate sales for all associated assets
-      let allAssetSales = [];
-      for (let asset of assetsOfOriginAsset) {
-        const assetSales = await saleJs.getAll(rawAdmin, { 
-          assetToBeSold: asset.address,
+
+        const allAssetSales = await saleJs.getAll(rawAdmin, { 
+          assetToBeSold: assetsAddressArr,
           order: "block_timestamp.asc",
           gtField: "block_timestamp",
           gtValue: getOneYearAgoTime()
         }, options);
-        allAssetSales = allAssetSales.concat(assetSales);
-      }
-
 
       // Fetch sales (12 months) for stats
-      const originSalesForStats = allAssetSales;
-      console.log("Fetched origin yearly sales:", originSalesForStats.length, "sales");
+      console.log("Fetched origin yearly sales:", allAssetSales.length, "sales");
   
       let salesFilter = { order: "block_timestamp.asc" };
   
@@ -509,18 +504,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         console.log('Invalid timeFilter');
         return;
       }
-      let timeRangeSales= []
-      for (let asset of assetsOfOriginAsset) {
-        const assetTimeRangeSales = await saleJs.getAll(rawAdmin, { 
-          assetToBeSold: asset.address,
+        const timeRangeSales = await saleJs.getAll(rawAdmin, {
+          assetToBeSold: assetsAddressArr,
           ...salesFilter
         }, options);
-        timeRangeSales = timeRangeSales.concat(assetTimeRangeSales);
-      }
 
       // Fetch sales based on filter
-      const originTimeRangeSales = timeRangeSales
-
 
       // Process records such that for a given date the most recent sale price is fetched
       // This method processes sales passed, drills down into history table for each sale
@@ -532,11 +521,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           if(filter.assetToBeSold) 
           {
             //If timeFilter is applied, also add those filters
-            return saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, assetToBeSold: sale.assetToBeSold, ...filter  }, options);
+            return saleJs.getAllSaleHistory(rawAdmin, { assetToBeSold: sale.assetToBeSold, ...filter  }, options);
           }else{
             //If historical data is fetched, apply 12 month timeFilter
 
-            return saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, assetToBeSold: sale.assetToBeSold, order: "block_timestamp.asc", gtField: "block_timestamp", gtValue: getOneYearAgoTime() }, options); 
+            return saleJs.getAllSaleHistory(rawAdmin, { assetToBeSold: sale.assetToBeSold, order: "block_timestamp.asc", gtField: "block_timestamp", gtValue: getOneYearAgoTime() }, options); 
           }
         });
         const histories = await Promise.all(historyPromises);
@@ -563,8 +552,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       // Get the histories
       // Driver to fetch history sales for- plotting data points, stats
       const processedSalesResults = await Promise.allSettled([
-        processSalesHistory(originTimeRangeSales, salesFilter),// for data points to be plotted
-        processSalesHistory(originSalesForStats) // for 12-month historical data
+        processSalesHistory(timeRangeSales, salesFilter),// for data points to be plotted
+        processSalesHistory(allAssetSales) // for 12-month historical data
       ]);
 
       // Handling Promise.allSettled results (Logging purposes)
