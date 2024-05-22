@@ -115,7 +115,7 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
       enabled: false
     },
     stroke: {
-      curve: 'smooth',
+      curve: 'straight',
       width: 3
     },
     fill: {
