@@ -285,7 +285,7 @@ const actions = {
       if (!isNaN(searchValue)) {
         query = search ? query.concat(`&orderId=${searchValue}`) : query;
       } else {
-        query = search ? query.concat(`&queryValue=${searchValue}&queryFields=sellersCommonName`) : query;
+        query = search ? query.concat(`&queryValue=${searchValue}&queryFields=purchasersCommonName`) : query;
       }
     }
 
@@ -336,7 +336,7 @@ const actions = {
       if (!isNaN(searchValue)) {
         query = search ? query.concat(`&orderId=${searchValue}`) : query;
       } else {
-        query = search ? query.concat(`&queryValue=${searchValue}&queryFields=purchasersCommonName`) : query;
+        query = search ? query.concat(`&queryValue=${searchValue}&queryFields=sellersCommonName`) : query;
       }
     }
 

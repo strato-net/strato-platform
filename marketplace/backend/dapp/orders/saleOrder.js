@@ -200,10 +200,11 @@ async function getAll(admin, args = {}, options) {
   const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
   const countArgs = {
     ...args,
+    limit: undefined,
     offset: 0,
     order: undefined,
     queryOptions: {
-      select: "count",
+      select: 'count:isNewOrder.sum(),sellersCommonName',
     }
   };
 
@@ -216,25 +217,15 @@ async function getAll(admin, args = {}, options) {
 
   let totalCount = newCount[0].count;
 
-  if (totalCount && !(offset && (totalCount < offset))) {
-    const newArgs = { ...restArgs, order: 'block_timestamp.desc' };
-    saleOrders = await searchAllWithQueryArgs(paymentTableName, newArgs, newOptions, admin);
-  }
-
   // Get the latest payment event for each sale token
-  if (saleOrders) {
-    const uniqueOrders = await rest.search(
-      admin,
-      {
-        name: 'BlockApps-Mercata-PaymentService.Payment',
-      },
-      {
-        ...options,
-        query: {
-          ['select']: 'id:id.max(),token,block_timestamp.max()'
-        }
+  if (totalCount && !(offset && (totalCount < offset))) {
+    const uniqueOrderArgs = {
+      ...restArgs,
+      queryOptions: {
+        select: 'id:id.max(),token',
       }
-    )
+    };
+    const uniqueOrders = await searchAllWithQueryArgs(paymentTableName, uniqueOrderArgs, newOptions, admin);
     const idArgs = {
       id: uniqueOrders.map((uo) => uo.id),
     }
@@ -245,16 +236,19 @@ async function getAll(admin, args = {}, options) {
   let tokensToIndicies = {};
   let paymentProvidersToTokens = {};
   let paymentServiceRes = {};
-  for (let i = 0; i < saleOrders.length; i++) {
-    const order = saleOrders[i];
-    if (order.status === '2') {
-      if (paymentProvidersToTokens[order.address]) {
-        paymentProvidersToTokens[order.address].push(order.token);
+
+  if (saleOrders) {
+    for (let i = 0; i < saleOrders.length; i++) {
+      const order = saleOrders[i];
+      if (order.status === '2') {
+        if (paymentProvidersToTokens[order.address]) {
+          paymentProvidersToTokens[order.address].push(order.token);
+        }
+        else {
+          paymentProvidersToTokens[order.address] = [order.token];
+        }
+        tokensToIndicies[order.token] = i;
       }
-      else {
-        paymentProvidersToTokens[order.address] = [order.token];
-      }
-      tokensToIndicies[order.token] = i;
     }
   }
   if (Object.keys(paymentProvidersToTokens).length > 0) {
@@ -286,7 +280,6 @@ async function getAll(admin, args = {}, options) {
   try {
     if (!saleOrders || !limit || saleOrders.length < limit) {
       let oldLimit = saleOrders && limit ? limit - saleOrders.length : limit;
-      console.log("DEBUG", oldLimit);
       let oldOffset = 0;
       if (offset)
         oldOffset = offset - (saleOrders ? saleOrders.length : 0);
