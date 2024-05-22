@@ -191,10 +191,10 @@ async function getNotOnboarded(admin, args = {}, baseOptions) {
     const eventContract = { name: `${tablePrefix}${onboardedEventName}` }
     const onboardedQuery = {
       sellersCommonName: `eq.${sellersCommonName}`,
-      select: 'address'
     }
     const onboardedOptions = { ...baseOptions, query: onboardedQuery };
-    const onboardedAddresses = await rest.search(admin, eventContract, onboardedOptions);
+    const onboardedEventsRes = await rest.search(admin, eventContract, onboardedOptions);
+    const onboardedAddresses = onboardedEventsRes.map((oe) => oe.address);
     const contract = { name: `${tablePrefix}${contractName}` }
     const notOnboardedQuery = {
       isActive: 'eq.true',
