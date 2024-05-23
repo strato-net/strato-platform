@@ -56,7 +56,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
 
     const tagRender = (props) => {
         const { value, closable, onClose } = props;
-        const service = paymentServices[value];
+        const service = availablePaymentProviders[value];
         const onPreventMouseDown = (event) => {
             event.preventDefault();
             event.stopPropagation();
@@ -171,7 +171,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
 
     const handleSubmit = async () => {
         let body = {
-            paymentProviders: paymentTypes.map((p) => paymentServices[p].address),
+            paymentProviders: paymentTypes.map((p) => availablePaymentProviders[p].address),
             price: pricePerUnit,
         };
         if (inventory.saleAddress) {

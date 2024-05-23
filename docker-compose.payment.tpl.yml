@@ -1,11 +1,15 @@
 #payment-server-version:<VERSION>
 #strato-getting-started-min-version:4.4.0
 version: '3'
+volumes:
+  paymentpgdata:
+    driver: local
 services:
   payment-server:
     depends_on:
     - postgres
     environment:
+    - SERVER_HOST=${SERVER_HOST}
     - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
     - POSTGRES_PASSWORD=${postgres_password:-api}
     - CONTRACT_ADDRESS=${CONTRACT_ADDRESS}
@@ -21,6 +25,8 @@ services:
     environment:
       - POSTGRES_PASSWORD=${postgres_password:-api}
     image: postgres:9.6
+    volumes:
+      - paymentpgdata:/var/lib/postgresql/data
     command:
       - "postgres"
       - "-c"
