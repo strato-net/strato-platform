@@ -69,6 +69,8 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
 
   const filledSeriesData = fillDataGaps(priceHistory.originRecords);
   const useCategory = filledSeriesData.length <= 7;
+  const singleDataPoint = filledSeriesData.length === 1;
+
 
   const options = {
     chart: {
@@ -91,6 +93,9 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
         autoSelected: 'pan'
       }
     },
+    markers: (singleDataPoint)?{
+      size: 6
+    }:{},
 
     colors: ['#181EAC', '#FF4560'],
     dataLabels: {
