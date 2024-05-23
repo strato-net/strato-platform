@@ -35,6 +35,7 @@ abstract contract PaymentService is Utils {
         uint amount,
         uint tax,
         uint unitsPerDollar,
+        uint isNewOrder,
         PaymentStatus status
     );
 
@@ -175,6 +176,7 @@ abstract contract PaymentService is Utils {
             totalAmount,
             0,
             _unitsPerDollar(),
+            1,
             PaymentStatus.ORDER_CREATED
         );
         return (token, assets);
@@ -230,6 +232,7 @@ abstract contract PaymentService is Utils {
             totalAmount,
             0,
             _unitsPerDollar(),
+            0,
             PaymentStatus.PAYMENT_INITIALIZED
         );
         return assets;
@@ -290,6 +293,7 @@ abstract contract PaymentService is Utils {
             totalAmount,
             0,
             _unitsPerDollar(),
+            0,
             PaymentStatus.ORDER_COMPLETED
         );
         return assets;
@@ -353,6 +357,7 @@ abstract contract PaymentService is Utils {
             totalAmount,
             0,
             _unitsPerDollar(),
+            0,
             PaymentStatus.ORDER_CANCELLED
         );
     }
