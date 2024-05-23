@@ -34,6 +34,8 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.ExtendedWord
+import Blockchain.Strato.Model.Validator (Validator)
+import qualified Blockchain.Strato.Model.Validator as Validator
 import qualified Blockchain.Strato.Model.Keccak256 as KECCAK256
 import Blockchain.Strato.Model.UserRegistry
 import qualified Data.Aeson as Ae
@@ -218,7 +220,7 @@ readCertsFromGenesisInfo gi = catMaybes . flip map (genesisInfoAccountInfo gi) $
       _ -> Nothing
   _ -> Nothing
 
-readValidatorsFromGenesisInfo :: GenesisInfo -> [ChainMemberParsedSet]
+readValidatorsFromGenesisInfo :: GenesisInfo -> [Validator]
 readValidatorsFromGenesisInfo gi = catMaybes . flip map (genesisInfoAccountInfo gi) $ \case
   SolidVMContractWithStorage _ _ (SolidVMCode "MercataValidator" _) storage -> do
     let storageMap = M.fromList storage
@@ -231,7 +233,7 @@ readValidatorsFromGenesisInfo gi = catMaybes . flip map (genesisInfoAccountInfo 
         let o'' = decodeUtf8 o'
             u'' = decodeUtf8 u'
             c'' = decodeUtf8 c'
-        pure $ (CommonName o'' u'' c'' True)
+        pure $ (Validator.CommonName o'' u'' c'' True)
       _ -> Nothing
   _ -> Nothing
 

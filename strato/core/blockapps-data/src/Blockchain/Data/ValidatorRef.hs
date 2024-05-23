@@ -10,13 +10,13 @@ module Blockchain.Data.ValidatorRef where
 
 import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
-import Blockchain.Strato.Model.ChainMember
+import Blockchain.Strato.Model.Validator
 import Control.Monad (forM_)
 import qualified Database.Esqueleto.Legacy as E
 
 addRemoveValidator ::
   HasSQLDB m =>
-  ([ChainMemberParsedSet], [ChainMemberParsedSet]) ->
+  ([Validator], [Validator]) ->
   m ()
 addRemoveValidator (remove, add) = do
   forM_ add $ \x -> do

@@ -30,6 +30,7 @@ import Blockchain.Strato.Model.Class (blockHash)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
+import Blockchain.Strato.Model.Validator
 import Control.Applicative ((<|>))
 import Control.Lens as L
 import Control.Monad (liftM2, liftM3, unless)
@@ -54,14 +55,14 @@ instance Arbitrary ExtraData where
 truncateExtra :: Block -> Block
 truncateExtra = over extraLens scrubConsensus
 
-addValidators :: ChainMembers -> Block -> Block
+addValidators :: ValidatorSet -> Block -> Block
 addValidators vs =
   over extraLens $
     uncookRawExtra
       . set istanbul (Just (IstanbulExtra vs Nothing []))
       . cookRawExtra
 
-getValidatorList :: Block -> ChainMembers
+getValidatorList :: Block -> ValidatorSet
 getValidatorList x = L.view (istanbul . _Just . validatorList) (cookRawExtra $ L.view extraLens x)
 
 getProposerSeal :: Block -> Maybe Signature
@@ -142,12 +143,12 @@ finalHash =
     . over extraDataLens scrubCommitmentSeals
     . blockBlockData
 
-signBenfInfo :: (HasVault m) => (ChainMemberParsedSet, Bool, Int) -> m (Signature)
+signBenfInfo :: (HasVault m) => (Validator, Bool, Int) -> m (Signature)
 signBenfInfo bnf =
   let mesg = keccak256ToByteString $ hash $ BL.toStrict $ encode bnf
    in sign mesg
 
-verifyBenfInfo :: (ChainMemberParsedSet, Bool, Int) -> Signature -> Maybe Address
+verifyBenfInfo :: (Validator, Bool, Int) -> Signature -> Maybe Address
 verifyBenfInfo bnf sig =
   let mesg = keccak256ToByteString $ hash $ BL.toStrict $ encode (bnf)
    in fromPublicKey <$> recoverPub sig mesg
@@ -171,8 +172,8 @@ authenticate (IMsg (MsgAuth cm sig) tm) = do
   return (mAddress == cmAddress)
 authenticate _ = return True
 
-replayHistoricBlock :: (A.Selectable Address X509CertInfoState m) => ChainMembers -> Word256 -> Block -> m (Either String (Word256, ChainMemberParsedSet))
-replayHistoricBlock realValidators@(ChainMembers chainWorkAround) seqNo blk = runExceptT $ do
+replayHistoricBlock :: (A.Selectable Address X509CertInfoState m) => ValidatorSet -> Word256 -> Block -> m (Either String (Word256, Validator))
+replayHistoricBlock realValidators@(ValidatorSet chainWorkAround) seqNo blk = runExceptT $ do
   let ExtraData {..} = cookRawExtra . L.view extraLens $ blk
   IstanbulExtra {..} <- liftEither $ maybeToEither "no istanbul metadata" _istanbul
   let mProp = verifyProposerSeal blk =<< _proposedSig
@@ -188,7 +189,7 @@ replayHistoricBlock realValidators@(ChainMembers chainWorkAround) seqNo blk = ru
 
   -- unless (all  (== True) (map isJust noAddress ))  $ liftEither $ Left $ printf "No address realated to singers"
 
-  let signerRes = S.fromList $ ((getChainMemberFromX509) <$> (catMaybes noAddress))
+  let signerRes = S.fromList $ ((chainMemberParsedSetToValidator . getChainMemberFromX509) <$> (catMaybes noAddress))
   unless (seqNo + 1 == blockNo) $
     liftEither $ Left $ printf "unexpected block number: have %d, wanted %d" blockNo (seqNo + 1)
   unless (realValidators == _validatorList) $
@@ -200,7 +201,7 @@ replayHistoricBlock realValidators@(ChainMembers chainWorkAround) seqNo blk = ru
   case mPropCert of
     Nothing -> liftEither . Left $ "Proposer does not have an X509 certificate: " ++ formatAddressWithoutColor prop
     Just propCert -> do
-      let propChainMember = getChainMemberFromX509 propCert
+      let propChainMember = chainMemberParsedSetToValidator $ getChainMemberFromX509 propCert
       -- unless ( propT == Nothing) $ liftEither $ Left $ printf "No x509 "
       -- propRes <-  getChainMemberFromX509  (getX509FromAddress prop)
       unless (propChainMember `S.member` chainWorkAround) $

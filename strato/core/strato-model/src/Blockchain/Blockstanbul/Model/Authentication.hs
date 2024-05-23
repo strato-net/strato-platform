@@ -5,15 +5,15 @@ module Blockchain.Blockstanbul.Model.Authentication where
 import Blockchain.Data.RLP
 -- import Blockchain.Strato.Model.Address
 
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Secp256k1
+import Blockchain.Strato.Model.Validator
 import Control.Lens
 import qualified Data.ByteString as B
 
 type RawExtraData = B.ByteString
 
 data IstanbulExtra = IstanbulExtra
-  { _validatorList :: ChainMembers,
+  { _validatorList :: ValidatorSet,
     _proposedSig :: Maybe Signature,
     _commitment :: [Signature]
   }

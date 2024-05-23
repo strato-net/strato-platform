@@ -26,6 +26,7 @@ import Blockchain.Strato.Model.Class (blockHash)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
+import Blockchain.Strato.Model.Validator
 import Conduit
 import Control.Lens hiding (view)
 import Control.Monad hiding (sequence)
@@ -56,7 +57,7 @@ yieldManyR = yieldMany . map Right
 authorize :: (StateMachineM m) => InEvent -> ExceptT String m ()
 authorize = \case
   IMsg (MsgAuth addr _) _ -> do
-    ret <- uses validators (S.member addr . unChainMembers)
+    ret <- uses validators (S.member (chainMemberParsedSetToValidator addr) . unValidatorSet)
     unless ret $ do
       let reason = "Rejecting message; sender not a validator: " ++ show addr
       $logWarnS "blockstanbul/auth" . T.pack $ reason
@@ -78,14 +79,14 @@ isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ 
   -- but with incorrect extraData.
     IMsg _ (Preprepare _ pp) -> do
       vals <- use validators -- this is _validators from bloctanbul context?
-      let valSet = unChainMembers vals
+      let valSet = unValidatorSet vals
       let payloadVals = getValidatorList pp -- getvalslsit::Block -> [Address] to word256 x 2
           validatorsMatch = vals == payloadVals -- if validators match perform getvalslist
           mSignatory = verifyProposerSeal pp =<< getProposerSeal pp -- same convention getProposerSeal :: Block -> Maybe Signature
       case mSignatory of
         Nothing -> raiseInProd "Rejecting Preprepare; proposer seal could not be verified"
         Just signatory -> do
-          mChainMember <- lift $ fmap getChainMemberFromX509 <$> getX509FromAddress signatory
+          mChainMember <- lift $ fmap (chainMemberParsedSetToValidator . getChainMemberFromX509) <$> getX509FromAddress signatory
           let signerExists = maybe False (`S.member` valSet) mChainMember
           unless signerExists $
             raiseInProd $
@@ -94,7 +95,7 @@ isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ 
           unless validatorsMatch $
             raiseInProd $
               "Rejecting Preprepare; payload validators "
-                ++ show (S.map format $ unChainMembers payloadVals)
+                ++ show (S.map format $ unValidatorSet payloadVals)
                 ++ " are not expected validators "
                 ++ show (S.map format valSet)
     IMsg (MsgAuth addr _) (Commit _ di seal) -> case verifyCommitmentSeal di seal of
@@ -150,7 +151,7 @@ nextRound nt = do
       view . round .= r
       yieldR $ ResetTimer r
   use view >>= recordView
-  vals <- unChainMembers <$> use validators
+  vals <- unValidatorSet <$> use validators
   thisR <- use $ view . round
   when (S.null vals) . liftIO $
     die "All participants voted out, consensus is stuck."
@@ -158,7 +159,7 @@ nextRound nt = do
   proposer .= leader
   proposal .= Nothing
   self <- use selfCert
-  when (Just leader == self) $ do
+  when (Just leader == fmap chainMemberParsedSetToValidator self) $ do
     lock <- use blockLock
     case lock of
       Nothing -> yieldR MakeBlockCommand
@@ -178,13 +179,13 @@ nextRound nt = do
   hasPrepared .= False
   pendingRound .= Nothing
 
-  when (isJust self) $ isValidator .= ((fromJust self) `elem` vals)
+  when (isJust self) $ isValidator .= (chainMemberParsedSetToValidator (fromJust self) `elem` vals)
 
   yieldR . NewCheckpoint
     =<< liftA2
       Checkpoint
       (use view)
-      (uses validators (S.toList . unChainMembers))
+      (uses validators (S.toList . unValidatorSet))
 
 instance A.Selectable Address X509CertInfoState m => A.Selectable Address X509CertInfoState (StateT BlockstanbulContext m) where
   select p = lift . A.select p
@@ -214,8 +215,8 @@ eventLoop ctx = execStateC ctx $
         ValidatorChange val dir -> do
           modify' $
             validators
-              %~ ( \(ChainMembers cm) ->
-                     let cm' = (if dir then S.insert else S.delete) val cm in ChainMembers cm'
+              %~ ( \(ValidatorSet cm) ->
+                     let cm' = (if dir then S.insert else S.delete) val cm in ValidatorSet cm'
                  )
           vals' <- use validators
           $logInfoLS "blockstanbul/ValidatorChange" . T.pack $
@@ -264,7 +265,7 @@ eventLoop ctx = execStateC ctx $
           ppl <- use proposal
           leader <- use proposer
           self <- use selfCert
-          when (isNothing ppl && Just leader == self) $ do
+          when (isNothing ppl && Just leader == fmap chainMemberParsedSetToValidator self) $ do
             vs <- use validators
             let blockWithVs = addValidators vs blk
             pseal <- proposerSeal blockWithVs
@@ -294,9 +295,9 @@ eventLoop ctx = execStateC ctx $
           mBlockLock <- use blockLock
           case () of
             ()
-              | sender auth /= pr ->
+              | chainMemberParsedSetToValidator (sender auth) /= pr ->
                 $logWarnS "blockstanbul/ppl" . T.pack $
-                  "Rejecting proposal: proposer " ++ format (sender auth) ++ " is not " ++ format pr
+                  "Rejecting proposal: proposer " ++ format (chainMemberParsedSetToValidator $ sender auth) ++ " is not " ++ format pr
               | v /= v' -> do
                 $logInfoS "blockstanbul/roundchange" . T.pack $
                   "view mismatch (us, sender): " ++ format (v, v')
@@ -330,8 +331,8 @@ eventLoop ctx = execStateC ctx $
                       yieldR msg
         IMsg auth ppp@(Prepare v' di) -> when (v <= v') $ do
           preparers <- use prepared
-          unless (M.member (sender auth) preparers) . yieldL $ OMsg auth ppp
-          ps <- prepared <%= M.insert (sender auth) di
+          unless (M.member (chainMemberParsedSetToValidator $ sender auth) preparers) . yieldL $ OMsg auth ppp
+          ps <- prepared <%= M.insert (chainMemberParsedSetToValidator $ sender auth) di
           total <- poolSize
           let sameVoteCount = M.size . M.filter (== di) $ ps
           sameHash <- hasSameHash di
@@ -347,8 +348,8 @@ eventLoop ctx = execStateC ctx $
               yieldR msg
         IMsg auth ccc@(Commit v' di seal) -> when (v <= v') $ do
           committors <- use committed
-          unless (M.member (sender auth) committors) . yieldL $ OMsg auth ccc
-          cs <- committed <%= M.insert (sender auth) (di, seal)
+          unless (M.member (chainMemberParsedSetToValidator $ sender auth) committors) . yieldL $ OMsg auth ccc
+          cs <- committed <%= M.insert (chainMemberParsedSetToValidator $ sender auth) (di, seal)
           total <- poolSize
           let sameVoteCount = M.size . M.filter ((== di) . fst) $ cs
           sameHash <- hasSameHash di
@@ -367,10 +368,10 @@ eventLoop ctx = execStateC ctx $
         IMsg auth (RoundChange vn _) -> when (_round v < _round vn) $ do
           let rn = _round vn
           mSigners <- use $ roundChanged . at rn
-          case S.member (sender auth) <$> mSigners of
+          case S.member (chainMemberParsedSetToValidator $ sender auth) <$> mSigners of
             Just True -> return ()
             _ -> do
-              rs <- roundChanged <%= M.alter (Just . S.insert (sender auth) . fromMaybe S.empty) rn
+              rs <- roundChanged <%= M.alter (Just . S.insert (chainMemberParsedSetToValidator $ sender auth) . fromMaybe S.empty) rn
               total <- poolSize
               sentRN <- use pendingRound
               let sameRNCount = maybe 0 S.size . M.lookup rn $ rs
