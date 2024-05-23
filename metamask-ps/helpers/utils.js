@@ -1,6 +1,6 @@
 import { rest, util } from 'blockapps-rest';
 import ADMIN from './oauth.js'
-import { DEFAULT_OPTIONS, PAYMENT_EVENT_TABLE } from '../../metamask-ps/helpers/constants.js';
+import { DEFAULT_OPTIONS, PAYMENT_EVENT_TABLE } from './constants.js';
 import lodash from 'lodash';
 const { get } = lodash;
 

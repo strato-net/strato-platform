@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const form = document.getElementById('paymentSelection');
 
     // Fetch options from the API
-    const seller = "dave@blockapps.net" // TODO dynamic
+    const seller = req.query.seller; // TODO read request
     fetch(`http://${window.location.host}/metamask/checkout/options?seller=${seller}`, {
             method: "GET",
         })
