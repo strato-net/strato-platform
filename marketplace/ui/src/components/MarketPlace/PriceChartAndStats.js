@@ -77,6 +77,12 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
       data: filledSeriesData,
     },
   ];
+  const calculateOptimalTicks = (data) => {
+    if (!data || data.length === 0) return 0;
+    const dateRange = dayjs(data[data.length - 1].x).diff(dayjs(data[0].x), 'day');
+    return Math.min(Math.max(2, dateRange), 20); // Ensure a minimum of 2 ticks and a maximum of 20
+  };
+  
   
 
   const options = {
@@ -128,8 +134,10 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
     },
     xaxis: {
       type: 'datetime',
-      range: undefined,
-      tickPlacement: 'on',
+      tickPlacement: 'between',
+      min: dayjs(filledSeriesData[0].x).valueOf(), // First data point
+      max: (filledSeriesData.length===1)? dayjs(filledSeriesData[0].x).valueOf(): dayjs(filledSeriesData[filledSeriesData.length - 1].x).valueOf() + (86400000 - 1), // Adding nearly one full day in milliseconds
+      tickAmount: calculateOptimalTicks(filledSeriesData),
       labels: {
         format: 'MMMM d', 
         showDuplicates: false,
@@ -153,10 +161,10 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
         show: false
       },
     },
-    tooltip: {
-      x: {
-        format: 'MMMM d, yyyy' // Full date format for the tooltip
-      }
+    tooltip: {     
+    x: {
+      format: 'MMMM d, yyyy' // Full date format
+    }
     },
     responsive: [{
       breakpoint: 480,
