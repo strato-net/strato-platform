@@ -15,7 +15,7 @@ const DEFAULT_OPTIONS = { ...OPTIONS, chainIds: [], cacheNonce: true };
 
 const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS;
 
-const SERVER_URL = `${process.env.serverHost}`;
+const SERVER_URL = `${config.serverHost}`;
 
 const SERVER_CONFIRM_URL = `${SERVER_URL}/stripe/checkout/confirm`;
 

@@ -1,6 +1,6 @@
 pragma es6;
 pragma strict;
-import <38165102fdbede507d90c38c6603c6dd84827089>;
+import <BASE_CODE_COLLECTION>;
 
 /// @title A representation of asset sale contract
 contract SimpleSale is Sale {
