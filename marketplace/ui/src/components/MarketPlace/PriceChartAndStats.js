@@ -68,7 +68,7 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
   };
 
   const filledSeriesData = fillDataGaps(priceHistory.originRecords);
-  const useCategory = filledSeriesData.length === 2;
+  const useCategory = filledSeriesData.length <= 7;
 
   const options = {
     chart: {
@@ -113,7 +113,7 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
       type: 'category',
       overwriteCategories: filledSeriesData.map(data => dayjs(data.x).format('MMMM D')), // Ensures categories are overwritten with date strings
       
-      tickAmount: 2
+      tickAmount: filledSeriesData.length
     } : {
       type: 'datetime',
       tickAmount: undefined,
