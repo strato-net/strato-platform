@@ -1,5 +1,13 @@
-const client = require('../db');
-const ethers = require('ethers')
+import client from '../db/index.js';
+import { ethers } from 'ethers';
+import Joi from '@hapi/joi';
+import { 
+  completeOrder,
+  getPaymentEvent,
+  getMetaMaskAccountForUser,
+  validateAndGetOrderDetails
+} from '../helpers/utils.js'
+const __dirname = import.meta.dirname;
 
 class MetaMaskController {
     static async onboarding(req, res, next) {
@@ -73,7 +81,7 @@ class MetaMaskController {
         }
     }
 
-    static async completeCheckout(req, res, next) {
+    static async metamaskPayload(req, res, next) {
         try {            
             const { checkout_total, token } = req.body; 
             const query = 'SELECT eth_address FROM metamask WHERE username = $1';
@@ -100,9 +108,6 @@ class MetaMaskController {
                         const eth_amount = (checkout_total / eth_usd_price).toString() // amount in ether
                         const amount_in_wei = ethers.parseEther(eth_amount).toString() // amount in wei
 
-                        console.log(eth_amount)
-                        console.log(amount_in_wei)
-                        
                         res.status(200).json({
                             to: seller_address,
                             value: amount_in_wei
@@ -128,6 +133,52 @@ class MetaMaskController {
         }
     }
 
+    static async completeCheckout(req, res, next) {
+        try {
+            MetaMaskController.validateMetaMaskCheckoutArgs(req.query)
+
+            const { token, redirectUrl } = req.query;
+
+            const paymentEvent = await getPaymentEvent(token)
+
+            // Get and validate the order details
+            const saleAddresses = paymentEvent[0].saleAddresses;
+            const quantities = paymentEvent[0].quantities;
+            const { sellerCommonName, orderDetails } = await validateAndGetOrderDetails(quantities, saleAddresses);
+            
+            // Call completeOrder
+            const callArgs = {
+                token: paymentEvent[0].token,
+                orderId: paymentEvent[0].orderId,
+                purchaser: paymentEvent[0].purchaser,
+                saleAddresses: paymentEvent[0].saleAddresses,
+                quantities: paymentEvent[0].quantities,
+            } 
+            const returnStatus = await completeOrder(callArgs);
+            console.log("returnStatus", returnStatus);
+
+            // Redirect back to marketplace
+            res.redirect(`${redirectUrl}?assets=${returnStatus}`);
+            return next();
+
+        } catch (error) {
+            console.log(error)
+        }
+    }  
+
+    static validateMetaMaskCheckoutArgs(args) {
+        const metamaskCheckoutSchema = Joi.object({
+            token: Joi.string().required(),
+            redirectUrl: Joi.string().required(),
+        });
+
+        const validation = metamaskCheckoutSchema.validate(args);
+
+        if (validation.error) {
+            throw new Error(`Missing args or bad format in GET request /checkout: ${validation.error.message}.`);
+        }
+    }
+
     static async paymentOptions(req, res, next) {
         try {
             const query = 'SELECT supported_tokens FROM metamask WHERE username = $1';
@@ -145,4 +196,4 @@ class MetaMaskController {
     }
 }
 
-module.exports = MetaMaskController;
+export default MetaMaskController;

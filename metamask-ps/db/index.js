@@ -1,4 +1,5 @@
-const { Client } = require('pg');
+import pg from 'pg';
+const { Client } = pg;
 
 const client = new Client({
     host: process.env.POSTGRESQL_SERVER_URL,
@@ -40,5 +41,4 @@ if (process.env.POSTGRESQL_SERVER_URL && process.env.POSTGRESQL_PASSWORD) {
     process.exit(1)
 }
 
-module.exports = client;
-
+export default client;

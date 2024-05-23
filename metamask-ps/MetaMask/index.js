@@ -1,5 +1,5 @@
-const express = require('express');
-const MetaMaskController = require('./metamask.controller');
+import express from 'express';
+import MetaMaskController from './metamask.controller.js';
 
 const router = express.Router();
 
@@ -33,7 +33,7 @@ router.get(
 
 router.post(
     '/checkout',
-    MetaMaskController.completeCheckout
+    MetaMaskController.metamaskPayload
 )
 
-module.exports = router;
+export default router;

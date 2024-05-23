@@ -2,14 +2,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const form = document.getElementById('paymentSelection');
 
     // Fetch options from the API
-    const seller = "dave@blockapps.net"
+    const seller = "dave@blockapps.net" // TODO dynamic
     fetch(`http://${window.location.host}/metamask/checkout/options?seller=${seller}`, {
             method: "GET",
         })
         .then(response => response.json())
         .then(data => {
             // Assuming the API returns an array of options
-            const { supported_tokens } = data; // TODO return address as well?
+            const { supported_tokens } = data;
 
             // Create radio buttons for each option
             supported_tokens.forEach(option => {
@@ -57,7 +57,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                             from: accounts[0],
                             ...txParams
                         }]
-                    }).then((txHash) => console.log(txHash))
+                    }).then((txHash) => { 
+                        console.log(txHash)
+                        // call completeOrder
+                    })
                 })
                 .catch((error) => {
                     console.error('Error:', error);
