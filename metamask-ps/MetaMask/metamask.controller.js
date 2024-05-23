@@ -105,8 +105,8 @@ class MetaMaskController {
 
                         const coin_gecko_response = await response.json();
                         const eth_usd_price = coin_gecko_response.ethereum.usd;
-                        const eth_amount = (checkout_total / eth_usd_price).toString() // amount in ether
-                        const amount_in_wei = ethers.parseEther(eth_amount).toString() // amount in wei
+                        const eth_amount = (checkout_total / eth_usd_price).toFixed(8).toString() // amount in ether
+                        const amount_in_wei = ethers.parseEther(eth_amount).toString(16) // amount in wei
 
                         res.status(200).json({
                             to: seller_address,
