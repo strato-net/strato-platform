@@ -13,7 +13,7 @@ const STRIPE_ENV = {
 
 const DEFAULT_OPTIONS = { ...OPTIONS, chainIds: [], cacheNonce: true };
 
-const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS;
+const CONTRACT_ADDRESS = process.env.PAYMENT_SERVICE_CONTRACT_ADDRESS;
 
 const SERVER_URL = `${config.serverHost}`;
 
