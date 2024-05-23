@@ -386,7 +386,7 @@ pipeline {
             sh '''#!/bin/bash -le
               set -x
               echo "Running payment server tests"
-              cd stripe-ps
+              cd payment-server
               POSTGRES_SERVER_URL=${PS_POSTGRES_SERVER_URL}
               POSTGRES_PORT=5432
               POSTGRES_USER=postgres
