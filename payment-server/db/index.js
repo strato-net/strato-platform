@@ -9,6 +9,11 @@ const port = process.env.POSTGRES_PORT || '5432';
 const user = process.env.POSTGRES_USER || 'postgres';
 const password = process.env.POSTGRES_PASSWORD;
 const database = process.env.POSTGRES_DBNAME || 'postgres';
+const ssl = host !== 'postgres' ? {
+    require: true,
+    rejectUnauthorized: true,
+    ca: fs.readFileSync('./dbCert/us-east-1-bundle.cer').toString(),
+} : undefined;
 
 const client = new Client({
     host,
@@ -16,11 +21,7 @@ const client = new Client({
     user,
     password,
     database,
-    // ssl: {
-    //     require: true,
-    //     rejectUnauthorized: true,
-    //     ca: fs.readFileSync('./dbCert/us-east-1-bundle.cer').toString(),
-    // }
+    ssl
 });
 
 if (host && password) {
