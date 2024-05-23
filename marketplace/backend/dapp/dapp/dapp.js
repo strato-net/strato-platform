@@ -467,24 +467,28 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions)
   }
 
-  contract.getPriceHistory = async function (args, options = defaultOptions) {
+  contract.getPriceHistory = async function (args, options = defaultOptions) {  
     try {
       const { assetAddress, timeFilter } = args;
 
       const assetWithoutQuantity = await inventoryJs.get(rawAdmin, { address: assetAddress }, options);
       const originAddress = assetWithoutQuantity.originAddress;
+      const assetsOfOriginAsset = await inventoryJs.getAll(rawAdmin,{ originAddress: originAddress}, options);
+      const assetsAddressArr = assetsOfOriginAsset.map(item=>item.address);
+      // Aggregate sales for all associated assets
+
+        const allAssetSales = await saleJs.getAll(rawAdmin, { 
+          assetToBeSold: assetsAddressArr,
+          order: "block_timestamp.asc",
+          gtField: "block_timestamp",
+          gtValue: getOneYearAgoTime()
+        }, options);
 
       // Fetch sales (12 months) for stats
-      const originSalesForStats = await saleJs.getAll(rawAdmin, {
-        assetToBeSold: originAddress,
-        order: "block_timestamp.asc",
-        gtField: "block_timestamp",
-        gtValue: getOneYearAgoTime()
-      }, options);
-      console.log("Fetched origin yearly sales:", originSalesForStats.length, "sales");
-
-      let salesFilter = { assetToBeSold: originAddress, order: "block_timestamp.asc" };
-
+      console.log("Fetched origin yearly sales:", allAssetSales.length, "sales");
+  
+      let salesFilter = { order: "block_timestamp.asc" };
+  
       // Sales Filter modification based on timeFilter
       if (timeFilter === timeFilterForSixMonths()) {
         // Applying 6-month filter
@@ -500,12 +504,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         console.log('Invalid timeFilter');
         return;
       }
+        const timeRangeSales = await saleJs.getAll(rawAdmin, {
+          assetToBeSold: assetsAddressArr,
+          ...salesFilter
+        }, options);
+
       // Fetch sales based on filter
-      const originTimeRangeSales = await saleJs.getAll(rawAdmin, {
-        ...salesFilter
-      }, options);
-
-
 
       // Process records such that for a given date the most recent sale price is fetched
       // This method processes sales passed, drills down into history table for each sale
@@ -514,13 +518,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         //Fetch histories for each sale
         const historyPromises = sales.map(sale => {
           //Fetch saleHistory
-          if (filter.assetToBeSold) {
-            //if timeFilter is applied, also add those filters
-            return saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, ...filter }, options);
-          } else {
+          if(filter.assetToBeSold) 
+          {
+            //If timeFilter is applied, also add those filters
+            return saleJs.getAllSaleHistory(rawAdmin, { assetToBeSold: sale.assetToBeSold, ...filter  }, options);
+          }else{
             //If historical data is fetched, apply 12 month timeFilter
 
-            return saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, assetToBeSold: originAddress, order: "block_timestamp.asc", gtField: "block_timestamp", gtValue: getOneYearAgoTime() }, options);
+            return saleJs.getAllSaleHistory(rawAdmin, { assetToBeSold: sale.assetToBeSold, order: "block_timestamp.asc", gtField: "block_timestamp", gtValue: getOneYearAgoTime() }, options); 
           }
         });
         const histories = await Promise.all(historyPromises);
@@ -547,8 +552,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       // Get the histories
       // Driver to fetch history sales for- plotting data points, stats
       const processedSalesResults = await Promise.allSettled([
-        processSalesHistory(originTimeRangeSales, salesFilter),// for data points to be plotted
-        processSalesHistory(originSalesForStats) // for 12-month historical data
+        processSalesHistory(timeRangeSales, salesFilter),// for data points to be plotted
+        processSalesHistory(allAssetSales) // for 12-month historical data
       ]);
 
       // Handling Promise.allSettled results (Logging purposes)
@@ -565,16 +570,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         Object.values(processedSalesResults[0].value).sort((a, b) => new Date(a.block_timestamp) - new Date(b.block_timestamp)) : [];
       // Only send price, timestamp as a part of the record
       const originRecords = originRecordsSorted ? Object.values(originRecordsSorted).map(({ price, block_timestamp }) => ({ price, block_timestamp })) : [];
-      // Append a record for the current date with the last known price
-      if (originRecords.length > 0) {
-        const lastKnownRecord = originRecords[originRecords.length - 1];
-        const currentDateTime = dayjs().utc().format('YYYY-MM-DD HH:mm:ss') + ' UTC';
-        originRecords.push({
-          price: lastKnownRecord.price,
-          block_timestamp: currentDateTime
-        });
-      }
-
+      //  Append a record for the current date with the last known price
+      //  if (originRecords.length > 0) {
+      //    const lastKnownRecord = originRecords[originRecords.length - 1];
+      //    const currentDateTime = dayjs().utc().format('YYYY-MM-DD HH:mm:ss') + ' UTC';
+      //    originRecords.push({
+      //      price: lastKnownRecord.price,
+      //      block_timestamp: currentDateTime
+      //    });
+      //  }
 
       // 12 month historical data
       const twelveMonthHistoryRecords = processedSalesResults[1].status === 'fulfilled' ?
