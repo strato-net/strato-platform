@@ -1,4 +1,4 @@
-import { HeartFilled, HeartTwoTone } from '@ant-design/icons';
+import { HeartFilled, HeartTwoTone } from '@ant-design/icons'
 import { useAuthenticateState } from "../../contexts/authentication";
 import React, { useState, useEffect } from "react";
 import {
@@ -9,7 +9,6 @@ import {
 } from "antd";
 import { useLocation, useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
-import { removeSpecialCharacters } from '../../helpers/utils';
 import TagManager from "react-gtm-module";
 import { Images } from '../../images';
 import images_placeholder from "../../images/resources/image_placeholder.png"
@@ -106,7 +105,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                             // Let the browser handle it natively to open in a new tab
                         } else {
                             e.preventDefault();
-                            navigate(`${naviroute.replace(":address", topSellingProduct.address).replace(":name", removeSpecialCharacters(topSellingProduct.name))}`, { state: { isCalledFromInventory: false } });
+                            navigate(`${naviroute.replace(":address", topSellingProduct.address).replace(":name", encodeURIComponent(topSellingProduct.name))}`, { state: { isCalledFromInventory: false } });
                             window.scrollTo(0, 0);
                         }
                     }}

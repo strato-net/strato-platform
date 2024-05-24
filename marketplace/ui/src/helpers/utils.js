@@ -49,7 +49,3 @@ export const downloadSample = () => {
 export function epochToDate(epoch) {
   return dayjs.unix(epoch).format(US_DATE_FORMAT);
 }
-
-export function removeSpecialCharacters(str) {
-  return str.replace(/[^a-zA-Z0-9 ]/g, '');
-}
