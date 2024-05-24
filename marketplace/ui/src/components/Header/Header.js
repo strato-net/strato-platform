@@ -99,7 +99,6 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     routes.Orders.url.replace(':type', 'sold'),
     routes.MyItems.url,
     routes.Products.url,
-    routes.Events.url,
   ];
 
   const logout = () => {
@@ -125,10 +124,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
       setSelectedTab("2");
     } else if (pathName.includes("/products")) {
       setSelectedTab("3");
-    } else if (pathName.includes("/events") || pathName === "/certifier") {
-      setSelectedTab("4");
-    }
-    else {
+    } else {
       setSelectedTab("0");
     }
     categoryActions.fetchCategories(categoryDispatch);
@@ -365,7 +361,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
               // User is not logged in
               setIsModalVisible(true);
             } else {
-              // These pages will be tracked automatically with lucky orange, no need to create an event here unluess we want to include additional metadata
+              // These pages will be tracked automatically with lucky orange, no need to create an event here unless we want to include additional metadata
               if (item.key === "0") {
                 TagManager.dataLayer({
                   dataLayer: {
@@ -386,14 +382,6 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
                     event: 'view_products_page',
                   },
                 });
-              }
-              if (item.key === "3") {
-                TagManager.dataLayer({
-                  dataLayer: {
-                    event: 'view_events_page',
-                  },
-                });
-                navigate(navUrls[item.key], { state: { tab: "EventType" } })
               }
               else navigate(navUrls[item.key]);
             }
