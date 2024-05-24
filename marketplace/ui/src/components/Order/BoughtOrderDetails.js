@@ -236,7 +236,7 @@ const BoughtOrderDetails = ({ user, users }) => {
     return (
       <Col>
         <Text className="block text-[#6A6A6A] text-[13px] mb-2">{title}</Text>
-        <Text className="block text-[#202020] text-[17px] font-semibold">{value}</Text>
+        <Text id={title} className="block text-[#202020] text-[17px] font-semibold">{value}</Text>
       </Col>
     );
   };
@@ -330,6 +330,7 @@ const BoughtOrderDetails = ({ user, users }) => {
       render: (text) => (
         <p
           // href={routes.BoughtOrderDetails.url}
+          id="detail-productName"
           className="text-primary text-[17px] cursor-pointer"
           onClick={() => { navigate(`${routes.MarketplaceProductDetail.url.replace(":address", text.address).replace(":name", text.name)}`) }}
         >
@@ -387,7 +388,7 @@ const BoughtOrderDetails = ({ user, users }) => {
       dataIndex: "amount",
       key: "amount",
       align: "center",
-      render: (text) => <p>{text}</p>,
+      render: (text) => <p id="detail-amount" >{text}</p>,
     },
   ];
 

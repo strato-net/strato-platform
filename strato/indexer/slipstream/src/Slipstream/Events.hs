@@ -22,6 +22,7 @@ data ProcessedContract = ProcessedContract
   { address :: Address,
     codehash :: CodePtr,
     creator :: Text,
+    root :: Text,
     application :: Text,
     contractName :: Text,
     chain :: Text,

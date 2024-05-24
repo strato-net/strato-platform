@@ -225,6 +225,7 @@ data ActionData = ActionData
   { _actionDataCodeHash :: CodePtr,
     _actionDataCodeCollection :: CodeCollection,
     _actionDataCreator :: Text,
+    _actionDataRoot :: Text,
     _actionDataApplication :: Text,
     _actionDataCodeKind :: CodeKind,
     _actionDataStorageDiffs :: DataDiff,
@@ -242,6 +243,9 @@ instance Format ActionData where
     "actionDataCodeHash: " ++ format _actionDataCodeHash ++ "\n"
       ++ "actionDataCreator: "
       ++ T.unpack _actionDataCreator
+      ++ "\n"
+      ++ "actionDataRoot: "
+      ++ T.unpack _actionDataRoot
       ++ "\n"
       ++ "actionDataApplication: "
       ++ T.unpack _actionDataApplication
@@ -268,7 +272,7 @@ mergeActionData newData oldData =
       abstracts = _actionDataAbstracts oldData <> _actionDataAbstracts newData
       mappings = nub $ _actionDataMappings oldData ++ _actionDataMappings newData
       arrays = nub $ _actionDataArrays oldData ++ _actionDataArrays newData
-   in ActionData (_actionDataCodeHash oldData) cc (_actionDataCreator newData) (_actionDataApplication newData) (_actionDataCodeKind oldData) diffs abstracts mappings arrays calls
+   in ActionData (_actionDataCodeHash oldData) cc (_actionDataCreator newData) (_actionDataRoot newData) (_actionDataApplication newData) (_actionDataCodeKind oldData) diffs abstracts mappings arrays calls
 
 instance ToJSON ActionData where
   toJSON ActionData {..} =
@@ -276,6 +280,7 @@ instance ToJSON ActionData where
       [ "codeHash" .= _actionDataCodeHash,
         "codeCollection" .= _actionDataCodeCollection,
         "creator" .= _actionDataCreator,
+        "root" .= _actionDataRoot,
         "application" .= _actionDataApplication,
         "diff" .= _actionDataStorageDiffs,
         "abstracts" .= _actionDataAbstracts,
@@ -290,6 +295,7 @@ instance FromJSON ActionData where
     ch <- o .: "codeHash"
     cc <- o .: "codeCollection"
     cr <- o .: "creator"
+    rt <- o .: "root"
     ap <- o .: "application"
     ck <- o .:? "codeKind" .!= EVM
     df <-
@@ -303,7 +309,7 @@ instance FromJSON ActionData where
     dm <- o .: "mappings"
     dr <- o .: "arrays"
     dt <- o .: "types"
-    return $ ActionData ch cc cr ap ck df da dm dr dt
+    return $ ActionData ch cc cr rt ap ck df da dm dr dt
   parseJSON o = fail $ "parseJSON ActionData: Expected object, got: " ++ show o
 
 data Delegatecall = Delegatecall

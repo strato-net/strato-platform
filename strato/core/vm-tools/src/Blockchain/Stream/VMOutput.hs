@@ -24,7 +24,7 @@ where
 
 import BlockApps.Logging
 import Blockchain.Data.Block
-import Blockchain.Data.DataDefs
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.RLP
 import Blockchain.EthConf
 import Blockchain.KafkaTopics
@@ -173,4 +173,4 @@ getBestKafkaBlockHelper lower upper = do
       let blocks = [b | ChainBlock b <- vmOutputs]
       case blocks of
         [] -> return Nothing
-        xs -> return . Just $ maximum (map (blockDataNumber . blockBlockData) xs)
+        xs -> return . Just $ maximum (map (number . blockBlockData) xs)

@@ -32,8 +32,9 @@ import Blockchain.DB.CodeDB
 import Blockchain.DB.ModifyStateDB (pay)
 import Blockchain.DB.SolidStorageDB
 import Blockchain.Data.AddressStateDB
+import Blockchain.Data.BlockHeader (BlockHeader)
+import qualified Blockchain.Data.BlockHeader as BlockHeader
 import Blockchain.Data.ChainInfo
-import Blockchain.Data.DataDefs
 import Blockchain.Data.ExecResults
 import Blockchain.Data.Transaction (whoSignedThisTransactionEcrecover)
 import qualified Blockchain.Database.MerklePatricia as MP
@@ -214,7 +215,7 @@ create ::
   Bool ->
   Bool ->
   S.Set Account ->
-  BlockData ->
+  BlockHeader ->
   Int ->
   Account ->
   Account ->
@@ -289,7 +290,7 @@ create' creator originAddress issuerAcct issuerName newAccount ch cc contractNam
 
   !abstracts <- M.fromList <$> traverse (resolveNameParts newAccount (T.pack issuerName) (T.pack parentName)) abstracts'
 
-  initializeAction newAccount (labelToString contractName') issuerName parentName ch cc abstracts mappings arrays
+  initializeAction newAccount (labelToString contractName') issuerName (show $ _namedAccountAddress originAddress) parentName ch cc abstracts mappings arrays
 
   A.adjustWithDefault_ (A.Proxy @AddressState) newAccount $ \newAddressState ->
     pure
@@ -318,7 +319,7 @@ create' creator originAddress issuerAcct issuerName newAccount ch cc contractNam
       parentName' = bool parentName "" (useWallet && parentName == "User")
       issuer = if shouldDoCreatorFork . blockHeaderBlockNumber $ Env.blockHeader env then issuerAcct else Env.origin env
   -- set creator
-  setCreator issuer originAddress newAccount contract' (blockDataNumber $ Env.blockHeader env)
+  setCreator issuer originAddress newAccount contract' (BlockHeader.number $ Env.blockHeader env)
 
   -- Run the constructor
   runTheConstructors creator newAccount ch cc contractName' argExps
@@ -327,7 +328,7 @@ create' creator originAddress issuerAcct issuerName newAccount ch cc contractNam
 
   void . withCallInfo newAccount contract' (stringToLabel $ labelToString contractName' ++ " constructor") ch cc M.empty False False $ do
     -- set creator again, in case the caller's cert changed during constructor execution
-    setCreator issuer originAddress newAccount contract' (blockDataNumber $ Env.blockHeader env)
+    setCreator issuer originAddress newAccount contract' (BlockHeader.number $ Env.blockHeader env)
 
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapAdjust (Action.actionDataCreator .~ (T.pack issuerName)) newAccount
@@ -365,7 +366,7 @@ call ::
   Bool ->
   Bool ->
   S.Set Account ->
-  BlockData ->
+  BlockHeader ->
   Int ->
   Account ->
   Account ->
@@ -488,15 +489,15 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
           CodeAtAccount {} -> pure to
           _ -> pure from
       else pure to
-  (ctr, _, ctrName) <- getCreator cnAccount
+  (ctr, oAddr, ctrName) <- getCreator cnAccount
   !abstracts <- M.fromList <$> traverse (resolveNameParts to' (T.pack ctrName) (T.pack parentName')) abstracts'
 
-  initializeAction to (labelToString $ CC._contractName contract) (labelToString ctrName) (labelToString parentName') hsh cc abstracts mappings arrays
+  initializeAction to (labelToString $ CC._contractName contract) (labelToString ctrName) (show $ _namedAccountAddress oAddr) (labelToString parentName') hsh cc abstracts mappings arrays
 
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapAdjust (Action.actionDataCreator .~ (T.pack ctrName)) to
   when (isRCC) $
-    (\env -> setCreator ctr (accountToNamedAccount' to) to contract (blockDataNumber $ Env.blockHeader env)) =<< getEnv
+    (\env -> setCreator ctr (accountToNamedAccount' to) to contract (BlockHeader.number $ Env.blockHeader env)) =<< getEnv
 
   let functionsIncludingConstructor =
         case contract ^. CC.constructor of
@@ -701,7 +702,7 @@ setCreator creator originAddress contract _ _ = do
   when forkYeah $ do
     putSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":originAddress"]) (MS.BAccount originAddress)
 
-getCreator :: MonadSM m => Account -> m (Account, NamedAccount, String)
+getCreator :: MonadSM m => Account -> m (Account, NamedAccount, String) -- (creatorAddress, originAddress, creatorName)
 getCreator caller = do
   $logDebugS "getCreator/versioning" . T.pack $ "Getting creator for the caller " ++ format caller
   callerCodeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) caller
@@ -744,7 +745,7 @@ getCreator caller = do
 shouldDoCreatorFork :: Integer -> Bool
 shouldDoCreatorFork curBlockNo = case (flags_creatorForkBlockNumber, computeNetworkID) of 
   (-1, 7596898649924658542) -> curBlockNo >= 37000 -- on mercata-hydrogen, switch at block 37,000
-  (-1, 6909499098523985262) -> curBlockNo >= 6000 -- on mercata, switch at block 6,000
+  (-1, 6909499098523985262) -> curBlockNo >= 6200 -- on mercata, switch at block 6,200
   (b, _) -> curBlockNo >= b -- do whatever the flag says
 
 logFunctionCall :: MonadSM m => ValList -> Account -> CC.Contract -> SolidString -> m (Maybe Value) -> m (Maybe Value)
@@ -1258,7 +1259,7 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
   solidVMBreakpoint pos
   exps <- mapM (expToVar . snd) exptups
   expVals <- mapM getVar exps
-  expStrs <- mapM showSM expVals
+  expStrs <- mapM jsonSM expVals
 
   -- checks that the event is declared and that the number of args match
   --   DOES NOT check consistency of arg types
@@ -1459,7 +1460,7 @@ expToVar' (CC.HexaLiteral _ a) = return $ Constant $ SString $ BC.unpack . eithe
 expToVar' (CC.Variable _ "bytes32ToString") = return $ Constant $ SHexDecodeAndTrim
 expToVar' (CC.Variable _ "addressToAsciiString") = return $ Constant SAddressToAscii
 expToVar' (CC.Variable _ "bytes") = return $ Constant $ SBuiltinFunction "identity" Nothing
-expToVar' (CC.Variable _ "now") = Constant . SInteger . round . utcTimeToPOSIXSeconds . blockDataTimestamp . Env.blockHeader <$> getEnv
+expToVar' (CC.Variable _ "now") = Constant . SInteger . round . utcTimeToPOSIXSeconds . BlockHeader.timestamp . Env.blockHeader <$> getEnv
 expToVar' (CC.Variable _ name) = getVariableOfName name
 expToVar' (CC.Unitary _ "-" e) = do
   var <- expToVar e
@@ -1599,14 +1600,14 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
           Just (CC.ConstantDecl _ _ constExp _) -> expToVar constExp
     (SBuiltinVariable "block", "timestamp") -> do
       env' <- getEnv
-      return $ Constant $ SInteger $ round $ utcTimeToPOSIXSeconds $ blockDataTimestamp $ Env.blockHeader env'
-    (SBuiltinVariable "block", "number") -> (Constant . SInteger . blockDataNumber . Env.blockHeader) <$> getEnv
+      return $ Constant $ SInteger $ round $ utcTimeToPOSIXSeconds $ BlockHeader.timestamp $ Env.blockHeader env'
+    (SBuiltinVariable "block", "number") -> (Constant . SInteger . BlockHeader.number . Env.blockHeader) <$> getEnv
     (SBuiltinVariable "block", "coinbase") ->
       pure . Constant . ((flip SAccount) True) . (accountToNamedAccount chainId) $ Account (Address 0) Nothing -- TODO: fix?
     (SBuiltinVariable "block", "difficulty") ->
-      (Constant . SInteger . blockDataDifficulty . Env.blockHeader) <$> getEnv
+      (Constant . SInteger . BlockHeader.difficulty . Env.blockHeader) <$> getEnv
     (SBuiltinVariable "block", "gaslimit") ->
-      (Constant . SInteger . blockDataGasLimit . Env.blockHeader) <$> getEnv
+      (Constant . SInteger . BlockHeader.gasLimit . Env.blockHeader) <$> getEnv
     (SBuiltinVariable "super", method) -> do
       ctract <- getCurrentContract
       (_, cc) <- getCurrentCodeCollection
@@ -2327,6 +2328,13 @@ evaluateAccountMember a _ "code" = do
   let decodeCD = DT.decodeUtf8 cd'
   -- Format the result
   return $ Constant $ SString $ T.unpack decodeCD
+evaluateAccountMember a _ "nonce" = do
+  cid <- _accountChainId <$> getCurrentAccount
+  let realAccount = namedAccountToAccount cid a
+  mAddrSt <- A.lookup (A.Proxy @AddressState) realAccount
+  case mAddrSt of
+    Just as -> return $ Constant $ SInteger $ addressStateNonce as
+    _ -> return $ Constant $ SInteger 0
 evaluateAccountMember a _ "balance" = do
   cid <- _accountChainId <$> getCurrentAccount
   let realAccount = namedAccountToAccount cid a
@@ -2506,7 +2514,7 @@ callBuiltin ("blockhash") [SInteger blockNum] _ | blockNum < 0 = invalidArgument
 callBuiltin ("blockhash") [SInteger blockNum] _ = do
   env' <- getEnv
   let curBlock = Env.blockHeader env'
-  maybeTheHash <- getBlockHashWithNumber blockNum (blockDataParentHash curBlock)
+  maybeTheHash <- getBlockHashWithNumber blockNum (BlockHeader.parentHash curBlock)
   maybe (invalidArguments "the block number given does not exist" [blockNum]) (return . SString . BC.unpack . keccak256ToByteString) maybeTheHash
 callBuiltin ("selfdestruct") [SAccount a _] _ = do
   contract' <- getCurrentAccount

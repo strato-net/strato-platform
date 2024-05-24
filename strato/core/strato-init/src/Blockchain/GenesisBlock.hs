@@ -23,9 +23,9 @@ import Blockchain.DB.StateDB
 import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockDB
 import Blockchain.Data.ChainInfo
-import Blockchain.Data.DataDefs
 import Blockchain.Data.Extra
 import Blockchain.Data.GenesisBlock
 import Blockchain.Data.GenesisInfo
@@ -177,7 +177,7 @@ initializeGenesisBlock genesisBlockName = do
   obGB <- liftIO $ bootstrapSequencer extraCertInfoStates genesisBlock
   putGenesisHash $ blockHash genesisBlock
   $logInfoS "initgen" "Initial merkle patricia tries successfully created"
-  void $ putBlocks [(genesisBlock, blockDataDifficulty (blockBlockData genesisBlock))] False
+  void $ putBlocks [(genesisBlock, difficulty (blockBlockData genesisBlock))] False
   $logInfoS "initgen" "Genesis Block put"
   $logInfoS "initgen" "State diff has been generated"
 
@@ -188,8 +188,8 @@ initializeGenesisBlock genesisBlockName = do
   void . execRedis $
     RBDB.forceBestBlockInfo
       (blockHash genesisBlock)
-      (blockDataNumber . blockBlockData $ genesisBlock)
-      (blockDataDifficulty . blockBlockData $ genesisBlock)
+      (number . blockBlockData $ genesisBlock)
+      (difficulty . blockBlockData $ genesisBlock)
   $logInfoS "initgen" "best block info inserted"
   liftIO $ bootstrapIndexer obGB
   $logInfoS "initgen" "indexer has been bootstrapped"
@@ -257,6 +257,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
                   A.ActionData
                     (codeHash d)
                     emptyCodeCollection
+                    ""
                     ""
                     ""
                     ( case codeHash d of

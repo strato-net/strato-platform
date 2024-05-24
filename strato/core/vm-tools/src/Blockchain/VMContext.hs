@@ -82,6 +82,7 @@ import Blockchain.DB.StateDB
 import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.ChainInfo
 import Blockchain.Data.DataDefs
@@ -210,7 +211,7 @@ newtype GasCap = GasCap {unVmGasCap :: Gas}
 instance NFData RBDB.RedisConnection where
   rnf (RBDB.RedisConnection c) = c `seq` ()
 
-data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo !Keccak256 !BlockData !Integer !Int !Int
+data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo !Keccak256 !BlockHeader !Integer !Int !Int
   deriving (Eq, Read, Show, Generic, NFData)
 
 instance Binary ContextBestBlockInfo
@@ -546,16 +547,16 @@ incrementNonce account = A.adjustWithDefault_ Mod.Proxy account $ \addressState 
 
 getNewAddress :: (MonadIO m, (Account `A.Alters` AddressState) m) => Account -> m Account
 getNewAddress account = do
-  nonce <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy account
-  when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ format account ++ ", nonce=" ++ show nonce
-  let newAddress = getNewAddress_unsafe (account ^. accountAddress) nonce
+  nonce' <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy account
+  when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ format account ++ ", nonce=" ++ show nonce'
+  let newAddress = getNewAddress_unsafe (account ^. accountAddress) nonce'
   incrementNonce account
   return $ (accountAddress .~ newAddress) account
 
 getNewAddressWithSalt :: (MonadIO m, MonadLogger m, (Account `A.Alters` AddressState) m) => Account -> Value -> Keccak256 -> String -> m Account
 getNewAddressWithSalt account salt hsh args = do
-  nonce <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy account
-  when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ format account ++ ", nonce=" ++ show nonce
+  nonce' <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy account
+  when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ format account ++ ", nonce=" ++ show nonce'
   let saltAsString = case salt of
         (SString s) -> s
         _ -> invalidArguments "big major bad" salt

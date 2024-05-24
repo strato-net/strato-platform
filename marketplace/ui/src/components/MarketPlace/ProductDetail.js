@@ -64,7 +64,7 @@ const ProductDetails = ({ user, users }) => {
 
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
-  const { Text, Paragraph } = Typography;
+  const { Text, Paragraph, Title } = Typography;
   const [Id, setId] = useState(undefined);
   const [itemData, setItemData] = useState({});
   const [timeFilter, setTimeFilter] = useState('1');
@@ -427,10 +427,9 @@ const ProductDetails = ({ user, users }) => {
                   {isWishlisted ? <HeartFilled className="cursor-pointer" onClick={toggleWishlist} style={{ fontSize: "20px", color: "#A15E49" }} /> : <HeartTwoTone className="cursor-pointer" onClick={toggleWishlist} style={{ fontSize: "20px" }} twoToneColor="#A15E49" />}
                 </div>
                 <div className=" lg:border-b lg:border-[#E9E9E9] pb-[6px]">
-                  <Text className="font-semibold text-base lg:text-3xl text-[#202020]">
-
+                  <Title style={{fontSize:'30px'}} className="font-semibold text-base lg:text-3xl text-[#202020]">
                     {decodeURIComponent(details?.name)}
-                  </Text>
+                  </Title>
                   <div className="flex pt-[6px] ">
                     {/* <Text className="text-[#202020] text-xs  font-medium">Owned By: {details?.ownerCommonName}</Text>
                      */}
@@ -463,8 +462,8 @@ const ProductDetails = ({ user, users }) => {
                 </div>
                 <div className=" pt-4 lg:pt-[22px]">
 
-                  <Paragraph level={4} className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold">
-                    {details?.price ? <>${details?.price}</> : "No Price Available"}
+                  <Paragraph level={4} id="price" className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold">
+                    {details?.price ? <>$ {details?.price}</> : "No Price Available"}
                   </Paragraph>
                   {isAvailableForSale && <Text type="danger" strong> Sold Out </Text>}
                 </div>
@@ -736,7 +735,7 @@ const ProductDetails = ({ user, users }) => {
               </div>
             ) : (
               <>
-                {(priceHistory?.originRecords?.length > 1 && priceHistory?.records) && (
+                {(priceHistory?.originRecords?.length !== 0 && priceHistory?.records) && (
                   <div className="w-full h-full">
                     <h2 className='w-full text-center font-bold text-2xl'>Price History</h2>
                     <TimeRangeTabs onChange={handleTimeFilterChange} activeKey={timeFilter} />
@@ -744,7 +743,7 @@ const ProductDetails = ({ user, users }) => {
                   </div>
                 )}
                 <div>
-                  {(priceHistory?.originRecords?.length > 1 || priceHistory?.records > 1) && (
+                  {(priceHistory?.originRecords?.length !== 0) && (
                     <>
                   <h2 className='w-full text-center font-bold text-2xl'>12-Month Historical Data</h2>
 
