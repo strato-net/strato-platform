@@ -100,7 +100,7 @@ debugShowCtx = do
 newContext :: Checkpoint -> Maybe Address -> Bool -> Maybe ChainMemberParsedSet -> BlockstanbulContext
 newContext (Checkpoint v as) addr valB chainm =
   let valSet = S.fromList as
-      prop = fromMaybe emptyValidator . S.lookupMin $ valSet
+      prop = fromMaybe (error "you need at least one validator in the network") . S.lookupMin $ valSet
    in BlockstanbulContext
         { _view = v,
           _productionAuth = True,

@@ -34,7 +34,5 @@ addRemoveValidator (remove, add) = do
             )
   where
     components = \case
-      Org o True -> (o, "", "")
-      OrgUnit o u True -> (o, u, "")
       CommonName o u c True -> (o, u, c)
       _ -> ("", "", "")

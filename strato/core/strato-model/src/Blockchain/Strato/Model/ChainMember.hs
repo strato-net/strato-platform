@@ -576,7 +576,7 @@ instance DPS.PersistFieldSql ChainMemberParsedSet where
   sqlType _ = DPS.SqlString
 
 chainMemberParsedSetToValidator :: ChainMemberParsedSet -> Validator
-chainMemberParsedSetToValidator (Everyone a) = Validator.Everyone a
-chainMemberParsedSetToValidator (Org o a) = Validator.Org o a
-chainMemberParsedSetToValidator (OrgUnit o u a) = Validator.OrgUnit o u a
+chainMemberParsedSetToValidator (Everyone a) = Validator.CommonName "" "" "" a
+chainMemberParsedSetToValidator (Org o a) = Validator.CommonName o "" "" a
+chainMemberParsedSetToValidator (OrgUnit o u a) = Validator.CommonName o u "" a
 chainMemberParsedSetToValidator (CommonName o u c a) = Validator.CommonName o u c a
