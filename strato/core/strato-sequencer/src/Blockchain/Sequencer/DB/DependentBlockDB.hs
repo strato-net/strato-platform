@@ -9,7 +9,7 @@
 module Blockchain.Sequencer.DB.DependentBlockDB where
 
 import BlockApps.Logging
-import Blockchain.Data.DataDefs
+import Blockchain.Data.BlockHeader
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Model.Keccak256
 import Control.Monad (join)
@@ -80,14 +80,14 @@ bootstrapGenesisBlock hash' = insert Proxy hash' . Emitted
 appendChildFailure :: (Keccak256 `Alters` DependentBlockEntry) m => SequencedBlock -> m ()
 appendChildFailure b =
   --do
-  let parentHash = blockDataParentHash $ sbBlockData b
-   in repsert_ Proxy parentHash $ \case
+  let parentHash' = parentHash $ sbBlockData b
+   in repsert_ Proxy parentHash' $ \case
         Just (Emitted t) -> pure $ ChildFailedConsensus t [b]
         Just (ChildFailedConsensus t bs) -> pure $ ChildFailedConsensus t (b : bs)
         _ -> error "appendChildFailure: Parent hasn't been emitted yet. This should never happen"
 
 existingParent :: (Keccak256 `Alters` DependentBlockEntry) m => SequencedBlock -> m (Maybe DependentBlockEntry)
-existingParent = lookup Proxy . blockDataParentHash . sbBlockData
+existingParent = lookup Proxy . parentHash . sbBlockData
 
 readyToEmit :: (Keccak256 `Alters` DependentBlockEntry) m => SequencedBlock -> m Bool
 readyToEmit b = do
@@ -104,13 +104,13 @@ enqueueIfParentNotEmitted b =
       return $ ReadyToEmit totalDifficulty'
     Just (DependentBlocks existingDeps) | b `elem` existingDeps -> return NotReadyToEmit -- case of duplicate seen
     Just (DependentBlocks existingDeps) -> do
-      insert Proxy (blockDataParentHash $ sbBlockData b) $ DependentBlocks (b : existingDeps)
+      insert Proxy (parentHash $ sbBlockData b) $ DependentBlocks (b : existingDeps)
       return NotReadyToEmit
     Just (ChildFailedConsensus _ existingDeps) | b `elem` existingDeps -> return NotReadyToEmit -- case of duplicate seen
     Just (ChildFailedConsensus totalDifficulty' _) ->
       return $ ReadyToEmit totalDifficulty'
     Nothing -> do
-      insert Proxy (blockDataParentHash $ sbBlockData b) $ DependentBlocks [b]
+      insert Proxy (parentHash $ sbBlockData b) $ DependentBlocks [b]
       return NotReadyToEmit
 
 insertEmitted :: (Keccak256 `Alters` DependentBlockEntry) m => SequencedBlock -> m (Maybe OutputBlock)

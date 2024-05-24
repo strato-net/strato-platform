@@ -11,8 +11,8 @@ module Blockchain.Sequencer.Event where
 import BlockApps.X509.Certificate
 import qualified Blockchain.Blockstanbul as PBFT
 import qualified Blockchain.Data.Block as BDB
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.ChainInfo
-import qualified Blockchain.Data.DataDefs as DD
 import Blockchain.Data.Json
 import Blockchain.Data.RLP
 import qualified Blockchain.Data.TXOrigin as TO
@@ -160,9 +160,9 @@ data IngestTx = IngestTx
 
 data IngestBlock = IngestBlock
   { ibOrigin :: TO.TXOrigin,
-    ibBlockData :: DD.BlockData,
+    ibBlockData :: BlockHeader,
     ibReceiptTransactions :: [TX.Transaction],
-    ibBlockUncles :: [DD.BlockData]
+    ibBlockUncles :: [BlockHeader]
   }
   deriving (Eq, Read, Show, GHCG.Generic)
 
@@ -175,9 +175,9 @@ data IngestGenesis = IngestGenesis
 data SequencedBlock = SequencedBlock
   { sbOrigin :: TO.TXOrigin,
     sbHash :: Keccak256,
-    sbBlockData :: DD.BlockData,
+    sbBlockData :: BlockHeader,
     sbReceiptTransactions :: [OutputTx],
-    sbBlockUncles :: [DD.BlockData]
+    sbBlockUncles :: [BlockHeader]
   }
   deriving (Read, Show, GHCG.Generic)
 
@@ -287,9 +287,9 @@ otxPrimeToOtx (OutputTx' o h s b mp) = OutputTx o h s (unTransaction' b) (unTran
 data OutputBlock = OutputBlock
   { obOrigin :: TO.TXOrigin,
     obTotalDifficulty :: Integer,
-    obBlockData :: DD.BlockData,
+    obBlockData :: BlockHeader,
     obReceiptTransactions :: [OutputTx],
-    obBlockUncles :: [DD.BlockData]
+    obBlockUncles :: [BlockHeader]
   }
   deriving (Eq, Read, Show, GHCG.Generic, Data)
 
@@ -364,7 +364,7 @@ sequencedBlockToBlock sb = BDB.Block (sbBlockData sb) (map otBaseTx $ sbReceiptT
 
 sequencedBlockShortName :: SequencedBlock -> String
 sequencedBlockShortName SequencedBlock {sbBlockData = d, sbHash = theHash} =
-  "Block #" ++ CL.yellow (show . DD.blockDataNumber $ d) ++ "/" ++ CL.blue (format theHash)
+  "Block #" ++ CL.yellow (show . number $ d) ++ "/" ++ CL.blue (format theHash)
 
 wrapTransaction :: Monad m => IngestTx -> m (Maybe OutputTx)
 wrapTransaction tx@IngestTx {} = do
@@ -426,7 +426,7 @@ wrapIngestBlockTransactionUnanchored hash tx =
           }
 
 parentHashBS :: SequencedBlock -> BS.ByteString
-parentHashBS = B.toStrict . encode . DD.blockDataParentHash . sbBlockData
+parentHashBS = B.toStrict . encode . parentHash . sbBlockData
 
 ingestBlockHash :: IngestBlock -> Keccak256
 ingestBlockHash = blockHeaderHash . ibBlockData
@@ -435,13 +435,13 @@ ingestBlockHashBS :: IngestBlock -> BS.ByteString
 ingestBlockHashBS = B.toStrict . encode . ingestBlockHash
 
 ingestBlockDifficulty :: IngestBlock -> Integer
-ingestBlockDifficulty = DD.blockDataDifficulty . ibBlockData
+ingestBlockDifficulty = difficulty . ibBlockData
 
 blockHashBS :: SequencedBlock -> BS.ByteString
 blockHashBS = B.toStrict . encode . sbHash
 
 sequencedBlockDifficulty :: SequencedBlock -> Integer
-sequencedBlockDifficulty = DD.blockDataDifficulty . sbBlockData
+sequencedBlockDifficulty = difficulty . sbBlockData
 
 outputBlockHash :: OutputBlock -> Keccak256
 outputBlockHash = blockHeaderHash . obBlockData
@@ -521,7 +521,7 @@ instance Format IngestBlock where
         ibReceiptTransactions = receipts,
         ibBlockUncles = uncles
       } =
-      CL.blue ("Block #" ++ show (DD.blockDataNumber bd)) ++ " (via " ++ format origin ++ ") "
+      CL.blue ("Block #" ++ show (number bd)) ++ " (via " ++ format origin ++ ") "
         ++ tab'
           ( format (ingestBlockHash b) ++ "\n"
               ++ format bd
@@ -544,7 +544,7 @@ instance Format OutputBlock where
         obReceiptTransactions = receipts,
         obBlockUncles = uncles
       } =
-      CL.blue ("OutputBlock #" ++ show (DD.blockDataNumber bd) ++ "; total diff " ++ show totDiff) ++ " (via " ++ format origin ++ ") "
+      CL.blue ("OutputBlock #" ++ show (number bd) ++ "; total diff " ++ show totDiff) ++ " (via " ++ format origin ++ ") "
         ++ tab'
           ( format (outputBlockHash b) ++ "\n"
               ++ format bd
@@ -612,12 +612,12 @@ instance RLPSerializable OutputBlock where
   rlpEncode = rlpEncode . (morphBlock :: OutputBlock -> BDB.Block)
   rlpDecode = morphBlock . (rlpDecode :: RLPObject -> BDB.Block)
 
-instance BlockLike DD.BlockData OutputTx OutputBlock where
+instance BlockLike BlockHeader OutputTx OutputBlock where
   blockHeader = obBlockData
   blockTransactions = obReceiptTransactions
   blockUncleHeaders = obBlockUncles
 
-  blockOrdering = DD.blockDataNumber . obBlockData
+  blockOrdering = number . obBlockData
   buildBlock = OutputBlock TO.Morphism 0
 
 instance Arbitrary IngestEvent where

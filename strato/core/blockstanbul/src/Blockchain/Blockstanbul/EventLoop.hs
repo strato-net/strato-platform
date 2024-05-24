@@ -19,7 +19,7 @@ import Blockchain.Blockstanbul.Messages
 import Blockchain.Blockstanbul.Metrics
 import Blockchain.Blockstanbul.StateMachine
 import Blockchain.Data.Block
-import Blockchain.Data.DataDefs
+import Blockchain.Data.BlockHeader
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class (blockHash)
@@ -110,8 +110,8 @@ isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ 
 assertChainConsistency :: Word256 -> Maybe Keccak256 -> Block -> Either T.Text ()
 assertChainConsistency seqNo wantParent blk = do
   let blkData = blockBlockData blk
-      blkNo = fromIntegral . blockDataNumber $ blkData
-      gotParent = blockDataParentHash blkData
+      blkNo = fromIntegral . number $ blkData
+      gotParent = parentHash blkData
   unless (seqNo + 1 == blkNo)
     . Left
     . T.pack
@@ -128,8 +128,8 @@ hasSameHash di = uses proposal $ maybe False ((== di) . blockHash)
 
 createRoundChangeMessage :: MonadIO m => View -> m TrustedMessage
 createRoundChangeMessage vw = do
-  nonce <- bytesToWord256 <$> liftIO (getEntropy 32)
-  pure $ RoundChange vw nonce
+  nonce' <- bytesToWord256 <$> liftIO (getEntropy 32)
+  pure $ RoundChange vw nonce'
 
 roundChange :: (StateMachineM m) => ConduitM InEvent EOutEvent m ()
 roundChange = do
@@ -246,7 +246,7 @@ eventLoop ctx = execStateC ctx $
           realValidators <- use validators
           seqNo <- use $ view . sequence
           eNextSeqNo <- lift . lift $ replayHistoricBlock realValidators seqNo blk
-          let blockNo = blockDataNumber . blockBlockData $ blk
+          let blockNo = number . blockBlockData $ blk
           recordMaxBlockNumber "pbft_previousblock" blockNo
           case eNextSeqNo of
             Left err -> do
@@ -361,7 +361,7 @@ eventLoop ctx = execStateC ctx $
               Nothing -> error "TODO(tim): Decide how to handle this"
               Just blk -> do
                 let seals = map snd . M.elems $ cs
-                let blockNo = blockDataNumber . blockBlockData $ blk
+                let blockNo = number . blockBlockData $ blk
                 recordMaxBlockNumber "pbft_commit" blockNo
                 yieldR . ToCommit . addCommitmentSeals seals $ blk
         IMsg auth (RoundChange vn _) -> when (_round v < _round vn) $ do
