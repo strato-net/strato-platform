@@ -19,7 +19,7 @@ import { actions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import routes from "../../helpers/routes";
 import classNames from "classnames";
-import { getStringDate } from "../../helpers/utils";
+import { getStringDate, removeSpecialCharacters } from "../../helpers/utils";
 import { useNavigate } from "react-router-dom";
 import DataTableComponent from "../DataTableComponent";
 import { getStatus, getStatusByName } from "./constant";
@@ -327,9 +327,8 @@ const SoldOrderDetails = ({ user, users }) => {
       key: "productName",
       render: (text) => (
         <p
-          // href={routes.BoughtOrderDetails.url}
           className="text-primary text-[17px] cursor-pointer"
-          onClick={() => { navigate(`${routes.MarketplaceProductDetail.url.replace(":address", text.address).replace(":name", text.name)}`) }}
+          onClick={() => { navigate(`${routes.MarketplaceProductDetail.url.replace(":address", text.address).replace(":name", removeSpecialCharacters(text.name))}`) }}
         >
           {decodeURIComponent(text.name)}
         </p>

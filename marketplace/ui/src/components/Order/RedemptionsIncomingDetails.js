@@ -20,6 +20,7 @@ import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemp
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import routes from "../../helpers/routes";
 import { REDEMPTION_STATUS } from "../../helpers/constants";
+import { removeSpecialCharacters } from "../../helpers/utils";
 import classNames from "classnames";
 import { useNavigate } from "react-router-dom";
 import DataTableComponent from "../DataTableComponent";
@@ -134,7 +135,7 @@ const RedemptionsIncomingDetails = ({ user }) => {
             render: (text, record) => (
                 <p
                     className="text-primary text-[17px] cursor-pointer"
-                    onClick={() => { navigate(`${routes.MarketplaceProductDetail.url.replace(":address", record.address).replace(":name", record.name)}`) }}
+                    onClick={() => { navigate(`${routes.MarketplaceProductDetail.url.replace(":address", record.address).replace(":name", removeSpecialCharacters(record.name))}`) }}
                 >
                     {decodeURIComponent(record?.name)}
                 </p>

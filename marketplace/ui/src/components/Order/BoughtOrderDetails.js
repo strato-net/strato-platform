@@ -21,7 +21,7 @@ import routes from "../../helpers/routes";
 import classNames from "classnames";
 import { EyeOutlined } from "@ant-design/icons";
 import DataTableComponent from "../DataTableComponent";
-import { getStringDate } from "../../helpers/utils";
+import { getStringDate, removeSpecialCharacters } from "../../helpers/utils";
 import { getStatus, getStatusByName } from "./constant";
 import { useNavigate } from "react-router-dom";
 import { US_DATE_FORMAT } from "../../helpers/constants";
@@ -332,7 +332,7 @@ const BoughtOrderDetails = ({ user, users }) => {
           // href={routes.BoughtOrderDetails.url}
           id="detail-productName"
           className="text-primary text-[17px] cursor-pointer"
-          onClick={() => { navigate(`${routes.MarketplaceProductDetail.url.replace(":address", text.address).replace(":name", text.name)}`) }}
+          onClick={() => { navigate(`${routes.MarketplaceProductDetail.url.replace(":address", text.address).replace(":name", removeSpecialCharacters(text.name))}`) }}
         >
           {decodeURIComponent(text.name)}
         </p>

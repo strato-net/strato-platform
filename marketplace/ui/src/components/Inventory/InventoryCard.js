@@ -18,6 +18,7 @@ import TransferModal from "./TransferModal";
 import RedeemModal from "./RedeemModal";
 import routes from "../../helpers/routes";
 import { ASSET_STATUS } from "../../helpers/constants";
+import { removeSpecialCharacters } from "../../helpers/utils";
 import image_placeholder from "../../images/resources/image_placeholder.png";
 import "react-responsive-carousel/lib/styles/carousel.min.css";
 import { SEO } from "../../helpers/seoConstant";
@@ -100,7 +101,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
   };
 
   const callDetailPage = () => {
-    navigate(`${naviroute.replace(":id", inventory.address).replace(":name", inventory.name)}`, {
+    navigate(`${naviroute.replace(":id", inventory.address).replace(":name", removeSpecialCharacters(inventory.name))}`, {
       state: { isCalledFromInventory: true },
     });
   };

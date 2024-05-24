@@ -14,7 +14,7 @@ export function arrayToStr(arr) {
   let valueString = "";
   arr.map((value) => (valueString += value + ","));
   valueString = valueString.slice(0, valueString.length - 1);
-  
+
   return valueString;
 }
 export function arrayToCsv(data) {
@@ -48,4 +48,8 @@ export const downloadSample = () => {
 
 export function epochToDate(epoch) {
   return dayjs.unix(epoch).format(US_DATE_FORMAT);
+}
+
+export function removeSpecialCharacters(str) {
+  return str.replace(/[^a-zA-Z0-9 ]/g, '');
 }
