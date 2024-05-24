@@ -147,6 +147,11 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
             return dayjs(value).format('MMMM D, YYYY');
           }
         }
+      },
+      y: {
+        formatter: function(value) {
+          return `$${value} (${value * 100} STRATS)`;
+        }
       }
     },
     

@@ -262,7 +262,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
           </div>
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Price</p>
-            <p className="text-[#202020] font-semibold">{inventory?.price || "N/A"}</p>
+            <p className="text-[#202020] font-semibold">{inventory?.price ? `$${inventory?.price} | ${inventory?.price*100} STRATS` : "N/A"}</p>
           </div>
 
         </div>

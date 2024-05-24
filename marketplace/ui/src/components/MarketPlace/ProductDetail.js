@@ -431,10 +431,6 @@ const ProductDetails = ({ user, users }) => {
                     {decodeURIComponent(details?.name)}
                   </Title>
                   <div className="flex pt-[6px] ">
-                    {/* <Text className="text-[#202020] text-xs  font-medium">Owned By: {details?.ownerCommonName}</Text>
-                     */}
-                    {/* <Text className="text-[#202020] text-xs font-medium">Owned By: </Text> 
-                      */}
                     <span className="text-xs  self-center">Owned By:&nbsp;</span>
                     <div
                       style={{ cursor: details?.ownerCommonName && details.ownerCommonName !== 'N/A' ? 'pointer' : 'default', color: 'black', textDecoration: details?.ownerCommonName && details.ownerCommonName !== 'N/A' ? 'underline' : 'none' }}
@@ -463,7 +459,7 @@ const ProductDetails = ({ user, users }) => {
                 <div className=" pt-4 lg:pt-[22px]">
 
                   <Paragraph level={4} id="price" className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold">
-                    {details?.price ? <>$ {details?.price}</> : "No Price Available"}
+                    {details?.price ? <>$ {details?.price} | {details?.price * 100} STRATS</> : "No Price Available"}
                   </Paragraph>
                   {isAvailableForSale && <Text type="danger" strong> Sold Out </Text>}
                 </div>

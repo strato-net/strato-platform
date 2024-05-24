@@ -129,12 +129,26 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                     <img alt={imgMeta} title={imgMeta} className='w-4 h-4' src={Images.Verified} />
                 </div>
             </a>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            {topSellingProduct?.price && <Typography className='font-normal text-black'>{ `$ ${topSellingProduct?.price}`}</Typography>}
-            {isAvailableForSale && <Text type="danger" strong> Sold Out </Text>}
-                 {topSellingProduct?.contract_name.toLowerCase().includes("clothing") && (
-                    <Typography className='font-normal text-black'>Size: { topSellingProduct?.data?.size ? topSellingProduct?.data?.size : "N/A"}</Typography>
-                )}
+            <div className="flex justify-between">
+            {topSellingProduct?.price && 
+                <div className="flex justify-between space-x-2">
+                <Typography className="font-normal text-black">
+                    {`$ ${topSellingProduct?.price}`}
+                </Typography>
+                <Typography className="font-normal text-black">
+                    |
+                </Typography>
+                <Typography className="font-normal text-black">
+                    {`${topSellingProduct?.price * 100} STRATS`}
+                </Typography>
+                </div>
+            }
+            {isAvailableForSale && <Text type="danger" strong>Sold Out</Text>}
+            {topSellingProduct?.contract_name.toLowerCase().includes("clothing") && (
+                <Typography className="font-normal text-black">
+                Size: {topSellingProduct?.data?.size ? topSellingProduct?.data?.size : "N/A"}
+                </Typography>
+            )}
             </div>
             <div style={customStyle} className="custom-typography">
                 <div
