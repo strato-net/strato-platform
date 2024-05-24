@@ -1,3 +1,28 @@
+const selectedOptions = [];
+
+function handleAccountsChanged(accts) {
+    // If a user selects multiple addresses (because they're a jerk)
+    // then just take the first one from the list
+    fetch(`${window.location.href}&address=${accts[0]}` , {
+        method: "POST",
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ supported_tokens: selectedOptions })
+    })
+    .then(res => {
+        if (res.status === 204) {
+            console.log(`success - user's metamask account has been onboarded with tokens ${selectedOptions}`)
+        } else {
+            console.log("error - something has gone wrong")
+        }
+        const queryParams = new URLSearchParams(window.location.search)
+        window.location.replace(queryParams.get('redirectUrl'))
+    })
+}
+
+window.ethereum.on("accountsChanged", handleAccountsChanged);
+
 document.getElementById('tokenSelection').addEventListener('submit', event => {
     const onboarding = new MetaMaskOnboarding();
     let accounts;
@@ -6,7 +31,6 @@ document.getElementById('tokenSelection').addEventListener('submit', event => {
         event.preventDefault();
         
         const formData = new FormData(event.target);
-        const selectedOptions = [];
         
         formData.forEach((value, key) => {
             if (key === 'option') {
@@ -18,26 +42,11 @@ document.getElementById('tokenSelection').addEventListener('submit', event => {
             await window.ethereum.request({
                 method: 'eth_requestAccounts',
                 params: []
-            }).then(window.ethereum.on("accountsChanged", (accts) => {
-                // If a user selects multiple addresses (because they're a jerk)
-                // then just take the first one from the list
-                fetch(`${window.location.href}&address=${accts[0]}` , {
-                    method: "POST",
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ supported_tokens: selectedOptions })
-                })
-                .then(res => {
-                    if (res.status === 204) {
-                        console.log(`success - user's metamask account has been onboarded with tokens ${selectedOptions}`)
-                    } else {
-                        console.log("error - something has gone wrong")
-                    }
-                    const queryParams = new URLSearchParams(window.location.search)
-                    window.location.replace(queryParams.get('redirectUrl'))
-                })
-            }))
+            })
+            .then(handleAccountsChanged)
+            .catch((err) => {
+                console.log(err);
+            })
         } else {
             alert('Must select at least 1 token.')
         }

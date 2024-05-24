@@ -1,4 +1,4 @@
-FROM node:14.21.3-alpine3.17
+FROM node:18-alpine3.17
 
 RUN apk add --no-cache yarn curl git lsof && \
     mkdir -p /usr/src/payment-server
