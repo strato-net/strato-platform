@@ -80,9 +80,7 @@ isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ 
     IMsg _ (Preprepare _ pp) -> do
       vals <- use validators -- this is _validators from bloctanbul context?
       let valSet = unValidatorSet vals
-      let payloadVals = getValidatorList pp -- getvalslsit::Block -> [Address] to word256 x 2
-          validatorsMatch = vals == payloadVals -- if validators match perform getvalslist
-          mSignatory = verifyProposerSeal pp =<< getProposerSeal pp -- same convention getProposerSeal :: Block -> Maybe Signature
+      let mSignatory = verifyProposerSeal pp =<< getProposerSeal pp -- same convention getProposerSeal :: Block -> Maybe Signature
       case mSignatory of
         Nothing -> raiseInProd "Rejecting Preprepare; proposer seal could not be verified"
         Just signatory -> do
@@ -92,18 +90,18 @@ isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ 
             raiseInProd $
               "Rejecting Preprepare; signer " ++ formatAddressWithoutColor signatory
                 ++ " is not a known validator"
-          unless validatorsMatch $
-            raiseInProd $
-              "Rejecting Preprepare; payload validators "
-                ++ show (S.map format $ unValidatorSet payloadVals)
-                ++ " are not expected validators "
-                ++ show (S.map format valSet)
-    IMsg (MsgAuth addr _) (Commit _ di seal) -> case verifyCommitmentSeal di seal of
-      Nothing -> raiseInProd $ "Rejecting Commit; signature could not be recovered"
-      Just signatory -> do
-        mChainMember <- lift $ fmap getChainMemberFromX509 <$> getX509FromAddress signatory
-        let ret = Just addr == mChainMember
-        unless ret . raiseInProd $ "Rejecting Commit; bad seal"
+    IMsg (MsgAuth addr _) (Commit _ di seal) -> do
+      csOrError <- runExceptT $ verifyCommitmentSeal di seal 
+      case csOrError of
+        Left _ -> raiseInProd $ "Rejecting Commit; signature could not be recovered"
+        Right signatory -> do
+          mChainMember <- lift $ runExceptT $ fmap getChainMemberFromX509 <$> getX509FromAddress signatory
+          let ret =
+                case mChainMember of
+                  Left (_ :: String) -> False
+                  Right Nothing -> False
+                  Right (Just val) -> val == addr
+          unless ret . raiseInProd $ "Rejecting Commit; bad seal"
     _ -> return () -- No specific auth for any other messages
 
 -- I need to change most of the authentication.hs file becase it either uses block -> address or address -> signature
@@ -190,6 +188,11 @@ nextRound nt = do
 instance A.Selectable Address X509CertInfoState m => A.Selectable Address X509CertInfoState (StateT BlockstanbulContext m) where
   select p = lift . A.select p
 
+instance A.Selectable Address X509CertInfoState m => A.Selectable Address X509CertInfoState (ExceptT String  m) where
+  select p = lift . A.select p
+
+
+
 eventLoop ::
   ( MonadIO m,
     MonadLogger m,
@@ -246,7 +249,7 @@ eventLoop ctx = execStateC ctx $
         PreviousBlock blk -> do
           realValidators <- use validators
           seqNo <- use $ view . sequence
-          eNextSeqNo <- lift . lift $ replayHistoricBlock realValidators seqNo blk
+          eNextSeqNo <- lift $ lift $ runExceptT $ replayHistoricBlock realValidators seqNo blk
           let blockNo = number . blockBlockData $ blk
           recordMaxBlockNumber "pbft_previousblock" blockNo
           case eNextSeqNo of
@@ -266,8 +269,7 @@ eventLoop ctx = execStateC ctx $
           leader <- use proposer
           self <- use selfCert
           when (isNothing ppl && Just leader == fmap chainMemberParsedSetToValidator self) $ do
-            vs <- use validators
-            let blockWithVs = addValidators vs blk
+            let blockWithVs = blk -- addValidators vs blk
             pseal <- proposerSeal blockWithVs
             let sealedBlk = addProposerSeal pseal blockWithVs
             mLocked <- use blockLock
