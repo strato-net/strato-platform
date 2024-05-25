@@ -37,6 +37,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.Either.Extra
 import Data.Maybe (catMaybes, fromJust)
+import Data.Set (Set)
 import qualified Data.Set as S
 import Test.QuickCheck
 import Text.Printf
@@ -178,8 +179,8 @@ getX509FromAddress' address = do
     Just v -> return v
 
 replayHistoricBlock :: (MonadError String m, A.Selectable Address X509CertInfoState m) =>
-                       ValidatorSet -> Word256 -> Block -> m (Word256, Validator)
-replayHistoricBlock (ValidatorSet chainWorkAround) seqNo blk = do
+                       Set Validator -> Word256 -> Block -> m (Word256, Validator)
+replayHistoricBlock chainWorkAround seqNo blk = do
   let ExtraData {..} = cookRawExtra . L.view extraLens $ blk
   IstanbulExtra {..} <- liftEither $ maybeToEither "no istanbul metadata" _istanbul
   let mProp = verifyProposerSeal blk =<< _proposedSig

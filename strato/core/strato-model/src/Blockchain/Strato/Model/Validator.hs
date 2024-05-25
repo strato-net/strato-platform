@@ -4,7 +4,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Blockchain.Strato.Model.Validator
-  ( ValidatorSet (..),
+  ( 
     Validator (..),
   )
 where
@@ -13,9 +13,7 @@ import Control.DeepSeq
 import Data.Aeson hiding (Array, String)
 import Data.Binary
 import Data.Data
-import Data.List
 import Data.Maybe (fromMaybe)
-import qualified Data.Set as S
 import Data.String
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -24,11 +22,6 @@ import qualified Generic.Random as GR
 import Test.QuickCheck.Arbitrary
 import Test.QuickCheck.Instances.Text ()
 import Text.Format
-
-newtype ValidatorSet = ValidatorSet {unValidatorSet :: S.Set Validator} deriving (Generic, Eq, Data, Show, Ord)
-
-instance Format ValidatorSet where
-  format (ValidatorSet validators) = "[" ++ intercalate ","  (map format $ S.toList validators) ++ "]"
 
 newtype Validator = Validator Text deriving (Generic, Eq, Data, Show, Ord, Read, IsString)
 

@@ -23,6 +23,7 @@ import Control.Monad
 import Control.Monad.State.Class
 import qualified Data.Map.Strict as M
 import Data.Maybe
+import Data.Set (Set)
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Text.Format
@@ -51,7 +52,7 @@ data BlockstanbulContext = BlockstanbulContext
     -- The designated participant to suggest a block for this round
     _proposer :: Validator,
     -- The total group of participants
-    _validators :: ValidatorSet,
+    _validators :: Set Validator,
     -- Validators who have sent us a prepare for this round
     _prepared :: M.Map Validator Keccak256,
     -- Validators who have sent us a commitment seal for this round
@@ -87,7 +88,7 @@ debugShowCtx = do
       debugLog loc lns f = join . uses lns $ $logDebugS loc . T.pack . f
   infoLog "showctx/view" view format
   infoLog "showctx/proposer" proposer ((++ "\n") . format)
-  infoLog "showctx/validators" validators (show . map ((++ "\n") . format) . S.toList . unValidatorSet)
+  infoLog "showctx/validators" validators (show . map format . S.toList)
   infoLog "showctx/mBlockNumber" proposal (show . fmap (number . blockBlockData))
   infoLog "showctx/mLockedBlockNo" blockLock (show . fmap (number . blockBlockData))
   infoLog "showctx/mLockedSender" lockSender (show . fmap format)
@@ -106,7 +107,7 @@ newContext (Checkpoint v as) addr valB chainm =
           _productionAuth = True,
           _proposal = Nothing,
           _proposer = prop,
-          _validators = ValidatorSet valSet,
+          _validators = valSet,
           _prepared = M.empty,
           _committed = M.empty,
           _hasPreprepared = False,
@@ -127,7 +128,7 @@ generateNonceMap :: [Validator] -> M.Map Validator Int
 generateNonceMap = M.fromList . flip zip (repeat 0)
 
 poolSize :: (StateMachineM m) => m Int
-poolSize = uses validators (S.size . unValidatorSet)
+poolSize = uses validators S.size
 
 clearLock :: (StateMachineM m) => m ()
 clearLock = do

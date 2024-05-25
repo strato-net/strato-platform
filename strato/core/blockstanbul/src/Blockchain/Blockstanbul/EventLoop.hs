@@ -26,7 +26,6 @@ import Blockchain.Strato.Model.Class (blockHash)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
-import Blockchain.Strato.Model.Validator
 import Conduit
 import Control.Lens hiding (view)
 import Control.Monad hiding (sequence)
@@ -35,6 +34,7 @@ import Control.Monad.Extra (whenM)
 import Control.Monad.State.Strict
 import Control.Monad.Trans.Except
 import Crypto.Random.Entropy (getEntropy)
+import Data.List
 import qualified Data.Map.Strict as M
 import Data.Maybe
 import qualified Data.Set as S
@@ -57,7 +57,7 @@ yieldManyR = yieldMany . map Right
 authorize :: (StateMachineM m) => InEvent -> ExceptT String m ()
 authorize = \case
   IMsg (MsgAuth addr _) _ -> do
-    ret <- uses validators (S.member (chainMemberParsedSetToValidator addr) . unValidatorSet)
+    ret <- uses validators $ S.member (chainMemberParsedSetToValidator addr)
     unless ret $ do
       let reason = "Rejecting message; sender not a validator: " ++ show addr
       $logWarnS "blockstanbul/auth" . T.pack $ reason
@@ -78,8 +78,7 @@ isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ 
   -- TODO(tim): RoundChange a Preprepare correctly signed by the proposer,
   -- but with incorrect extraData.
     IMsg _ (Preprepare _ pp) -> do
-      vals <- use validators -- this is _validators from bloctanbul context?
-      let valSet = unValidatorSet vals
+      valSet <- use validators -- this is _validators from bloctanbul context?
       let mSignatory = verifyProposerSeal pp =<< getProposerSeal pp -- same convention getProposerSeal :: Block -> Maybe Signature
       case mSignatory of
         Nothing -> raiseInProd "Rejecting Preprepare; proposer seal could not be verified"
@@ -149,7 +148,7 @@ nextRound nt = do
       view . round .= r
       yieldR $ ResetTimer r
   use view >>= recordView
-  vals <- unValidatorSet <$> use validators
+  vals <- use validators
   thisR <- use $ view . round
   when (S.null vals) . liftIO $
     die "All participants voted out, consensus is stuck."
@@ -183,7 +182,7 @@ nextRound nt = do
     =<< liftA2
       Checkpoint
       (use view)
-      (uses validators (S.toList . unValidatorSet))
+      (uses validators S.toList)
 
 instance A.Selectable Address X509CertInfoState m => A.Selectable Address X509CertInfoState (StateT BlockstanbulContext m) where
   select p = lift . A.select p
@@ -218,8 +217,8 @@ eventLoop ctx = execStateC ctx $
         ValidatorChange val dir -> do
           modify' $
             validators
-              %~ ( \(ValidatorSet cm) ->
-                     let cm' = (if dir then S.insert else S.delete) val cm in ValidatorSet cm'
+              %~ ( \cm ->
+                     let cm' = (if dir then S.insert else S.delete) val cm in cm'
                  )
           vals' <- use validators
           $logInfoLS "blockstanbul/ValidatorChange" . T.pack $
@@ -229,7 +228,7 @@ eventLoop ctx = execStateC ctx $
                 " was ",
                 if dir then "added" else "removed",
                 ". New validator set: ",
-                format vals'
+                show . map format . S.toList $ vals'
               ]
         ForcedConfigChange cc -> do
           $logWarnLS "blockstanbul/config_change" cc
