@@ -34,8 +34,7 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.ExtendedWord
-import Blockchain.Strato.Model.Validator (Validator)
-import qualified Blockchain.Strato.Model.Validator as Validator
+import Blockchain.Strato.Model.Validator (Validator(..))
 import qualified Blockchain.Strato.Model.Keccak256 as KECCAK256
 import Blockchain.Strato.Model.UserRegistry
 import qualified Data.Aeson as Ae
@@ -225,15 +224,10 @@ readValidatorsFromGenesisInfo gi = catMaybes . flip map (genesisInfoAccountInfo 
   SolidVMContractWithStorage _ _ (SolidVMCode "MercataValidator" _) storage -> do
     let storageMap = M.fromList storage
         rlpUnwrap = rlpDecode . rlpDeserialize
-    o <- rlpUnwrap <$> M.lookup ".org" storageMap
-    u <- rlpUnwrap <$> M.lookup ".orgUnit" storageMap
     c <- rlpUnwrap <$> M.lookup ".commonName" storageMap
-    case (o, u, c) of
-      (BString o', BString u', BString c') -> do
-        let o'' = decodeUtf8 o'
-            u'' = decodeUtf8 u'
-            c'' = decodeUtf8 c'
-        pure $ (Validator.CommonName o'' u'' c'' True)
+    case c of
+      BString c' -> do
+        pure $ (Validator $ decodeUtf8 c')
       _ -> Nothing
   _ -> Nothing
 

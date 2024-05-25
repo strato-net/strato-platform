@@ -29,8 +29,7 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.Validator (Validator)
-import qualified Blockchain.Strato.Model.Validator as Validator
+import Blockchain.Strato.Model.Validator (Validator(..))
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import Conduit
 import Control.Monad
@@ -154,8 +153,8 @@ indexEventToTxrResults = \case
       (Address 0x100, Just chainId, "OrgRemoved", [o]) -> Just . RemoveOrgName chainId $ Org (T.pack o) False
       (Address 0x100, Just chainId, "OrgUnitRemoved", [o, u]) -> Just . RemoveOrgName chainId $ OrgUnit (T.pack o) (T.pack u) False
       (Address 0x100, Just chainId, "CommonNameRemoved", [o, u, c]) -> Just . RemoveOrgName chainId $ CommonName (T.pack o) (T.pack u) (T.pack c) False
-      (Address 0x100, Nothing, "ValidatorAdded", [o, u, c]) -> Just . ValidatorAdded (eventDBBlockHash ev) $ Validator.CommonName (T.pack o) (T.pack u) (T.pack c) True
-      (Address 0x100, Nothing, "ValidatorRemoved", [o, u, c]) -> Just . ValidatorRemoved (eventDBBlockHash ev) $ Validator.CommonName (T.pack o) (T.pack u) (T.pack c) True
+      (Address 0x100, Nothing, "ValidatorAdded", [_, _, c]) -> Just . ValidatorAdded (eventDBBlockHash ev) $ Validator $ T.pack c
+      (Address 0x100, Nothing, "ValidatorRemoved", [_, _, c]) -> Just . ValidatorRemoved (eventDBBlockHash ev) $ Validator $ T.pack c
       (Address 0x509, Nothing, "CertificateRegistered", [certString]) ->
         let cert = bsToCert . C8.pack $ certString
             userAddress = fmap (fromPublicKey . subPub) $ getCertSubject =<< eitherToMaybe cert

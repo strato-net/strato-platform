@@ -43,8 +43,7 @@ where
 
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.ExtendedWord
-import Blockchain.Strato.Model.Validator (Validator)
-import qualified Blockchain.Strato.Model.Validator as Validator
+import Blockchain.Strato.Model.Validator (Validator(..))
 import Control.DeepSeq
 import Control.Lens hiding ((.=))
 import Data.Aeson hiding (Array, String)
@@ -576,7 +575,7 @@ instance DPS.PersistFieldSql ChainMemberParsedSet where
   sqlType _ = DPS.SqlString
 
 chainMemberParsedSetToValidator :: ChainMemberParsedSet -> Validator
-chainMemberParsedSetToValidator (Everyone a) = Validator.CommonName "" "" "" a
-chainMemberParsedSetToValidator (Org o a) = Validator.CommonName o "" "" a
-chainMemberParsedSetToValidator (OrgUnit o u a) = Validator.CommonName o u "" a
-chainMemberParsedSetToValidator (CommonName o u c a) = Validator.CommonName o u c a
+chainMemberParsedSetToValidator (Everyone _) = ""
+chainMemberParsedSetToValidator (Org _ _) = ""
+chainMemberParsedSetToValidator (OrgUnit _ _ _) = ""
+chainMemberParsedSetToValidator (CommonName _ _ c _) = Validator c
