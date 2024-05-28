@@ -128,7 +128,7 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
           </UsersProvider>
         }
       />
-      <Route
+      {user?.organization === 'BlockApps' && (<Route
         exact
         path={routes.Admin.url}
         element={
@@ -138,7 +138,7 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
             </IssuerStatusProvider>
           </UsersProvider>
         }
-      />
+      />)}
       <Route
         exact
         path={routes.MarketplaceProductDetail.url}
