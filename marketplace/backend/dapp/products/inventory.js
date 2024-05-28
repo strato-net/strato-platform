@@ -477,16 +477,30 @@ async function getAll(admin, args = {}, defaultOptions) {
                         }
                     }
 
-                    // Combine the inventories with sales data.
-                    finalInventory.push({
-                        ...inventory,
-                        price: sales[0]?.price,
-                        saleAddress: sales[0]?.address,
-                        saleQuantity: sales[0]?.quantity,
-                        saleDate: sales[0]?.block_timestamp,
-                        totalLockedQuantity: sales[0]?.totalLockedQuantity,
-                        'BlockApps-Mercata-Sale': undefined  // Removing the nested sale data to avoid redundancy
-                    });
+                    // Combine the inventories with sales data if there are valid sales for user profile route
+                    if (userProfile) {
+                        if (sales.length > 0 && (sales.price !== null || undefined)) { // Only combine if there are sales. We don't list unpublished items for this route. 
+                            finalInventory.push({
+                                ...inventory,
+                                price: sales[0]?.price,
+                                saleAddress: sales[0]?.address,
+                                saleQuantity: sales[0]?.quantity,
+                                saleDate: sales[0]?.block_timestamp,
+                                totalLockedQuantity: sales[0]?.totalLockedQuantity,
+                                'BlockApps-Mercata-Sale': undefined  // Removing the nested sale data to avoid redundancy
+                            });
+                        }
+                    } else { // Just combine the data if userProfile is not present
+                        finalInventory.push({
+                            ...inventory,
+                            price: sales[0]?.price,
+                            saleAddress: sales[0]?.address,
+                            saleQuantity: sales[0]?.quantity,
+                            saleDate: sales[0]?.block_timestamp,
+                            totalLockedQuantity: sales[0]?.totalLockedQuantity,
+                            'BlockApps-Mercata-Sale': undefined  // Removing the nested sale data to avoid redundancy
+                        });
+                    }
                 } else if (isMarketplaceSearch && isNullPriceRange) {
                     finalInventory.push({
                         ...inventory,
