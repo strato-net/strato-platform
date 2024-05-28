@@ -434,6 +434,7 @@ async function getAll(admin, args = {}, defaultOptions) {
     } else {
         // Fetch all Inventories and join sales table.
         if (ownerCommonName) {
+            console.log("checking-args", restArgs);
             inventories = await searchAllWithQueryArgs(contractName,
                 {
                     ...restArgs,
@@ -459,7 +460,7 @@ async function getAll(admin, args = {}, defaultOptions) {
         // Sales only has price and quantity fields to filter, so better to join sales on asset table (asset has multiple filters for each route). 
         if (inventories) {
             inventories.forEach(inventory => {
-                if (inventory['BlockApps-Mercata-Sale']) {
+                if (inventory['BlockApps-Mercata-Sale'] && inventory['BlockApps-Mercata-Sale'].length > 0) {
                     let sales = inventory['BlockApps-Mercata-Sale']
                         .filter(sale => sale.isOpen === true);
 
@@ -476,16 +477,15 @@ async function getAll(admin, args = {}, defaultOptions) {
                         }
                     }
 
-                    sales.forEach(itemSale => {
-                        finalInventory.push({
-                            ...inventory,
-                            price: itemSale.price,
-                            saleAddress: itemSale.address,
-                            saleQuantity: itemSale.quantity,
-                            saleDate: itemSale.block_timestamp,
-                            totalLockedQuantity: itemSale.totalLockedQuantity,
-                            'BlockApps-Mercata-Sale': undefined  // Removing the nested sale data to avoid redundancy
-                        });
+                    // Combine the inventories with sales data.
+                    finalInventory.push({
+                        ...inventory,
+                        price: sales[0]?.price,
+                        saleAddress: sales[0]?.address,
+                        saleQuantity: sales[0]?.quantity,
+                        saleDate: sales[0]?.block_timestamp,
+                        totalLockedQuantity: sales[0]?.totalLockedQuantity,
+                        'BlockApps-Mercata-Sale': undefined  // Removing the nested sale data to avoid redundancy
                     });
                 } else if (isMarketplaceSearch && isNullPriceRange) {
                     finalInventory.push({
@@ -500,9 +500,8 @@ async function getAll(admin, args = {}, defaultOptions) {
                     finalInventory.push(inventory);
                 }
             });
-        }
+        } 
     }
-
     return finalInventory ? finalInventory.map((inventory) => marshalOut(inventory)) : undefined;
 }
 
