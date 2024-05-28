@@ -2,6 +2,7 @@ import React from 'react';
 import ReactApexChart from 'react-apexcharts';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
+import {STRATS_CONVERSION} from '../../helpers/constants';
 
 dayjs.extend(utc);
 
@@ -150,7 +151,7 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
       },
       y: {
         formatter: function(value) {
-          return `$${value} (${value * 100} STRATS)`;
+          return `$${value} (${value * STRATS_CONVERSION} STRATS)`;
         }
       }
     },

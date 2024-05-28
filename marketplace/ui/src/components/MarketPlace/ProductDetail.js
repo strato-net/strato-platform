@@ -44,6 +44,7 @@ import { Images } from "../../images";
 import ProductItemDetails from "./ProductItemDetails";
 import HelmetComponent from "../Helmet/HelmetComponent";
 import { SEO } from "../../helpers/seoConstant";
+import { STRATS_CONVERSION } from "../../helpers/constants";
 import PreviewMode from "../RichEditor/PreviewMode";
 import PriceChartAndStats from "./PriceChartAndStats";
 import Statistics from "./Statistics";
@@ -459,7 +460,7 @@ const ProductDetails = ({ user, users }) => {
                 <div className=" pt-4 lg:pt-[22px]">
 
                   <Paragraph level={4} id="price" className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold">
-                    {details?.price ? <>$ {details?.price} | {details?.price * 100} STRATS</> : "No Price Available"}
+                    {details?.price ? <>$ {details?.price} | {details?.price * STRATS_CONVERSION} STRATS</> : "No Price Available"}
                   </Paragraph>
                   {isAvailableForSale && <Text type="danger" strong> Sold Out </Text>}
                 </div>

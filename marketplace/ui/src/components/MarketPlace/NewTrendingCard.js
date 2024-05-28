@@ -13,6 +13,7 @@ import TagManager from "react-gtm-module";
 import { Images } from '../../images';
 import images_placeholder from "../../images/resources/image_placeholder.png"
 import { SEO } from '../../helpers/seoConstant';
+import { STRATS_CONVERSION } from '../../helpers/constants';
 import DOMPurify from 'dompurify';
 import { setCookie } from "../../helpers/cookie";
 import LoginModal from './LoginModal';
@@ -139,7 +140,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                     |
                 </Typography>
                 <Typography className="font-normal text-black">
-                    {`${topSellingProduct?.price * 100} STRATS`}
+                    {`${topSellingProduct?.price * STRATS_CONVERSION} STRATS`}
                 </Typography>
                 </div>
             }
