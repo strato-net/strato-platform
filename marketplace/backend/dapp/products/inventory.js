@@ -434,7 +434,6 @@ async function getAll(admin, args = {}, defaultOptions) {
     } else {
         // Fetch all Inventories and join sales table.
         if (ownerCommonName) {
-            console.log("checking-args", restArgs);
             inventories = await searchAllWithQueryArgs(contractName,
                 {
                     ...restArgs,
