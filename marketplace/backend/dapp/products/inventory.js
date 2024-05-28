@@ -402,15 +402,11 @@ async function getAll(admin, args = {}, defaultOptions) {
     const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' };
 
     if (isTrendingSearch) {
-        // If it's a trending search, first search the sales
-        // Order them by creation date and set limit here
-
-        // added greater than query to make sure we only take the sales with quantity thats available to sell. 
-        // If the sale has 0 quantity it will throw an error when checking out, we will not show thee items for the trending search.
+        // Fetch the sales first
         sales = await saleJs.getAll(admin, { range, isOpen: true, order: 'block_timestamp.desc', offset: '0', gtField: args.gtField, gtValue: args.gtValue }, options);
         const trendingAssetAddresses = sales.map(sale => sale.assetToBeSold);
 
-        // Match the inventory with the sales
+        // Fetch the inventories matching the sales
         inventories = await searchAllWithQueryArgs(contractName,
             {
                 ...restArgs,
@@ -418,9 +414,25 @@ async function getAll(admin, args = {}, defaultOptions) {
                 order: 'block_timestamp.desc',
                 limit: '25',
             }, options, admin);
-    }
-    else {
-        // Original logic
+
+        // Combine the inventories and sales data
+        if (inventories) {
+            inventories.forEach(inventory => {
+                const itemSale = sales.find(sale => sale.assetToBeSold == inventory.address && sale.isOpen);
+                if (itemSale) {
+                    finalInventory.push({
+                        ...inventory,
+                        price: itemSale?.price,
+                        saleAddress: itemSale?.address,
+                        saleQuantity: itemSale?.quantity,
+                        saleDate: itemSale?.block_timestamp,
+                        totalLockedQuantity: itemSale?.totalLockedQuantity
+                    });
+                }
+            });
+        }
+    } else {
+        // Fetch all Inventories and join sales table.
         if (ownerCommonName) {
             inventories = await searchAllWithQueryArgs(contractName,
                 {
@@ -442,18 +454,20 @@ async function getAll(admin, args = {}, defaultOptions) {
                     queryOptions: { select: "*,BlockApps-Mercata-Sale!BlockApps-Mercata-Sale_BlockApps-Mercata-Asset_fk(*)" }
                 }, options, admin);
         }
-    
+
+        // Currently can't filter on second table, so filtering sales fields here. 
+        // Sales only has price and quantity fields to filter, so better to join sales on asset table (asset has multiple filters for each route). 
         if (inventories) {
             inventories.forEach(inventory => {
                 if (inventory['BlockApps-Mercata-Sale']) {
                     let sales = inventory['BlockApps-Mercata-Sale']
                         .filter(sale => sale.isOpen === true);
-    
+
                     // Filter by quantity if userProfile is present
                     if (userProfile) {
                         sales = sales.filter(sale => sale.quantity > 0);
                     }
-    
+
                     // Filter by price range if range is specified
                     if (range && range.length > 0) {
                         const [field, min, max] = range[0].split(",");
@@ -461,7 +475,7 @@ async function getAll(admin, args = {}, defaultOptions) {
                             sales = sales.filter(sale => sale.price >= parseFloat(min) && sale.price <= parseFloat(max));
                         }
                     }
-    
+
                     sales.forEach(itemSale => {
                         finalInventory.push({
                             ...inventory,
@@ -491,6 +505,7 @@ async function getAll(admin, args = {}, defaultOptions) {
 
     return finalInventory ? finalInventory.map((inventory) => marshalOut(inventory)) : undefined;
 }
+
 
 
 async function getAllItemTransferEvents(admin, args = {}, defaultOptions) {
