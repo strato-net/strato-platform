@@ -1382,14 +1382,12 @@ def spinUpFileServer() {
 
 def spinUpPaymentServer() {
   withCredentials([
-    string(credentialsId: 'STRIPE_PUBLISHABLE_KEY_TESTNET2', variable:'STRIPE_PUBLISHABLE_KEY_TESTNET2'),
     string(credentialsId: 'STRIPE_SECRET_KEY_TESTNET2', variable:'STRIPE_SECRET_KEY_TESTNET2'),
     usernamePassword(credentialsId: 'AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV', passwordVariable: 'AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV_PASSWORD', usernameVariable: 'AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV_USER'),
     string(credentialsId: 'AWS_RDS_PAYMENT_SERVER_URL_DEV', variable:'AWS_RDS_PAYMENT_SERVER_URL_DEV'),
   ]) {
     writeFile file: "run-payment-server.sh", text: """#!/bin/bash
       sudo \\
-        STRIPE_PUBLISHABLE_KEY='${STRIPE_PUBLISHABLE_KEY_TESTNET2}' \\
         STRIPE_SECRET_KEY='${STRIPE_SECRET_KEY_TESTNET2}' \\
         ssl=true \\
         HTTPS_PORT=44301 \\
@@ -1398,7 +1396,8 @@ def spinUpPaymentServer() {
         POSTGRESQL_USER='${AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV_USER}' \\
         POSTGRESQL_PASSWORD='${AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV_PASSWORD}' \\
         POSTGRESQL_DBNAME=postgres \\
-        ./payment-server
+        CONTRACT_ADDRESS='${PAYMENT_SERVER_CONTRACT_ADDRESS}' \\
+        ./stripe-ps
     """
   }
 
