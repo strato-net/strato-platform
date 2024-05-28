@@ -426,47 +426,54 @@ async function getAll(admin, args = {}, defaultOptions) {
                 {
                     ...restArgs,
                     ownerCommonName: ownerCommonName,
+                    queryOptions: { select: "*,BlockApps-Mercata-Sale!BlockApps-Mercata-Sale_BlockApps-Mercata-Asset_fk(*)" }
                 }, options, admin);
-        }
-        else if (assetAddresses) {
+        } else if (assetAddresses) {
             inventories = await searchAllWithQueryArgs(contractName,
                 {
                     ...restArgs,
                     address: assetAddresses,
+                    queryOptions: { select: "*,BlockApps-Mercata-Sale!BlockApps-Mercata-Sale_BlockApps-Mercata-Asset_fk(*)" }
                 }, options, admin);
-        }
-        else {
+        } else {
             inventories = await searchAllWithQueryArgs(contractName,
                 {
                     ...restArgs,
+                    queryOptions: { select: "*,BlockApps-Mercata-Sale!BlockApps-Mercata-Sale_BlockApps-Mercata-Asset_fk(*)" }
                 }, options, admin);
         }
-        if (inventories && userProfile) {
-            const assetAddresses = inventories.map((inventory) => inventory.address);
-            // (sale.js): `getAll` method needs to be refactored as it has logic specific to passing `assetAddresses`
-            sales = await saleJs.getAll(admin, { assetAddresses, range, saleGtField: userProfileGtField, saleGtValue: userProfileGtValue, isOpen: true, order: 'block_timestamp.desc' }, options);
-        }
-        else if (inventories) {
-            const assetAddresses = inventories.map((inventory) => inventory.address);
-            sales = await saleJs.getAll(admin, { assetAddresses, range, isOpen: true }, options);
-        }
-    }
-
-    if (inventories) {
-        inventories.forEach(inventory => {
-            const itemSale = sales.find(sale => sale.assetToBeSold == inventory.address && sale.isOpen);
-            if (itemSale) {
-                finalInventory.push({
-                    ...inventory,
-                    price: itemSale?.price,
-                    saleAddress: itemSale?.address,
-                    saleQuantity: itemSale?.quantity,
-                    saleDate: itemSale?.block_timestamp,
-                    totalLockedQuantity: itemSale?.totalLockedQuantity
-                });
-            }
-            else if (isMarketplaceSearch) {
-                if (isNullPriceRange) {
+    
+        if (inventories) {
+            inventories.forEach(inventory => {
+                if (inventory['BlockApps-Mercata-Sale']) {
+                    let sales = inventory['BlockApps-Mercata-Sale']
+                        .filter(sale => sale.isOpen === true);
+    
+                    // Filter by quantity if userProfile is present
+                    if (userProfile) {
+                        sales = sales.filter(sale => sale.quantity > 0);
+                    }
+    
+                    // Filter by price range if range is specified
+                    if (range && range.length > 0) {
+                        const [field, min, max] = range[0].split(",");
+                        if (field === 'price') {
+                            sales = sales.filter(sale => sale.price >= parseFloat(min) && sale.price <= parseFloat(max));
+                        }
+                    }
+    
+                    sales.forEach(itemSale => {
+                        finalInventory.push({
+                            ...inventory,
+                            price: itemSale.price,
+                            saleAddress: itemSale.address,
+                            saleQuantity: itemSale.quantity,
+                            saleDate: itemSale.block_timestamp,
+                            totalLockedQuantity: itemSale.totalLockedQuantity,
+                            'BlockApps-Mercata-Sale': undefined  // Removing the nested sale data to avoid redundancy
+                        });
+                    });
+                } else if (isMarketplaceSearch && isNullPriceRange) {
                     finalInventory.push({
                         ...inventory,
                         price: null,
@@ -474,13 +481,12 @@ async function getAll(admin, args = {}, defaultOptions) {
                         saleQuantity: null,
                         saleDate: null,
                         totalLockedQuantity: null
-                    })
+                    });
+                } else {
+                    finalInventory.push(inventory);
                 }
-            }
-            else {
-                finalInventory.push(inventory);
-            }
-        });
+            });
+        }
     }
 
     return finalInventory ? finalInventory.map((inventory) => marshalOut(inventory)) : undefined;
