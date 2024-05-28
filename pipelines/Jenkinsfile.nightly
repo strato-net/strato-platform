@@ -393,7 +393,7 @@ pipeline {
               POSTGRESQL_PASSWORD=${PS_POSTGRESQL_PASSWORD}
               POSTGRESQL_DBNAME=postgres
               STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
-              CONTRACT_ADDRESS=${PAYMENT_SERVER_CONTRACT_ADDRESS}
+              CONTRACT_ADDRESS=97d263744002e580d393fd013cc66d5177204f90
               TEST_ACCOUNT_ID=${PS_TEST_ACCOUNT_ID}
               TEST_SESSION_ID=${PS_TEST_SESSION_ID} # tests optional
               rm -rf node_modules
