@@ -134,7 +134,7 @@ const RedemptionsIncomingDetails = ({ user }) => {
             render: (text, record) => (
                 <p
                     className="text-primary text-[17px] cursor-pointer"
-                    onClick={() => { navigate(`${routes.MarketplaceProductDetail.url.replace(":address", record.address).replace(":name", record.name)}`) }}
+                    onClick={() => { navigate(`${routes.MarketplaceProductDetail.url.replace(":address", record.address).replace(":name", encodeURIComponent(record.name))}`) }}
                 >
                     {decodeURIComponent(record?.name)}
                 </p>
