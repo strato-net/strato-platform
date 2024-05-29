@@ -1,17 +1,49 @@
 #payment-server-version:<VERSION>
 #strato-getting-started-min-version:4.4.0
 version: '3'
+volumes:
+  paymentserverconfig:
+    driver: local
+  paymentpgdata:
+    driver: local
 services:
   payment-server:
+    depends_on:
+    - postgres
     environment:
+    - SERVER_HOST=${SERVER_HOST}
     - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
-    - POSTGRESQL_SERVER_URL=${POSTGRESQL_SERVER_URL}
-    - POSTGRESQL_PORT=${POSTGRESQL_PORT}
-    - POSTGRESQL_USER=${POSTGRESQL_USER}
-    - POSTGRESQL_PASSWORD=${POSTGRESQL_PASSWORD}
-    - POSTGRESQL_DBNAME=${POSTGRESQL_DBNAME}
+    - POSTGRES_PASSWORD=${postgres_password:-api}
+    - STRATO_HOST=${STRATO_HOST}
+    - STRIPE_CONTRACT_ADDRESS=${STRIPE_CONTRACT_ADDRESS}
+    - METAMASK_CONTRACT_ADDRESS=${METAMASK_CONTRACT_ADDRESS}
+    - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
+    - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
+    - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+    - OAUTH_SCOPE=${OAUTH_SCOPE}
+    - OAUTH_SERVICE_OAUTH_FLOW=${OAUTH_SERVICE_OAUTH_FLOW}
     build: .
     image: ${PAYMENT_SERVER_IMAGE:-<REPO_URL>payment-server:<VERSION>}
+    volumes:
+       - paymentserverconfig:/config:rw
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+  postgres:
+    environment:
+      - POSTGRES_PASSWORD=${postgres_password:-api}
+    image: postgres:9.6
+    volumes:
+      - paymentpgdata:/var/lib/postgresql/data
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=300"
+      - "-c"
+      - "shared_buffers=512MB"
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -20,7 +52,7 @@ services:
         max-file: "3"
   nginx:
     depends_on:
-    - payment-server-backend
+    - payment-server
     environment:
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}

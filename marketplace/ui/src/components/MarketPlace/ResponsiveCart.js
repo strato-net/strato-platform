@@ -111,17 +111,8 @@ const ResponsiveCart = ({
             && checkoutRoute
             && checkoutRoute !== ''
          ) {
-          try {
-            const checkoutUrl = await fetch(
-              `${serviceURL}${checkoutRoute}?token=${token}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`,
-              {
-                method: HTTP_METHODS.GET,
-              });
-            const res = await checkoutUrl.json();
-            window.location.replace(res);
-          } catch (err) {
-            openToastOrder("bottom", err.message ? err.message : "Unable to checkout.");
-          }
+        const url = `${serviceURL}${checkoutRoute}?token=${token}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
+        window.location.replace(url);
       } else {
         window.location.replace(`/order/status?assets=${assets}`);
       }

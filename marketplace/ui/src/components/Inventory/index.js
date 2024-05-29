@@ -68,8 +68,10 @@ const Inventory = ({ user }) => {
   const paymentServiceDispatch = usePaymentServiceDispatch();
 
   useEffect(() => {
-    paymentServiceActions.getPaymentServices(paymentServiceDispatch);
-    paymentServiceActions.getNotOnboarded(paymentServiceDispatch, user?.commonName, 10, 0);
+    if (user && user.commonName) {
+      paymentServiceActions.getPaymentServices(paymentServiceDispatch);
+      paymentServiceActions.getNotOnboarded(paymentServiceDispatch, user.commonName, 10, 0);
+    }
   }, [paymentServiceDispatch, user]);
 
   useEffect(() => {
@@ -117,16 +119,13 @@ const Inventory = ({ user }) => {
     } else {
       const serviceURL = e.serviceURL || e.data.serviceURL;
       const onboardingRoute = e.onboardingRoute || e.data.onboardingRoute;
-      try {
-        const onboardUrl = await fetch(
-          `${serviceURL}${onboardingRoute}?username=${user.commonName}&redirectUrl=${window.location.protocol}//${window.location.host}${window.location.pathname}`,
-          {
-            method: HTTP_METHODS.GET,
-          });
-        const res = await onboardUrl.json();
-        window.location.replace(res);
-      } catch(err) {
-        actions.setMessage(dispatch, err.message ? err.message : "Unable to onboard.");
+      if (serviceURL
+            && serviceURL !== ''
+            && onboardingRoute
+            && onboardingRoute !== ''
+         ) {
+        const url = `${serviceURL}${onboardingRoute}?username=${user.commonName}&redirectUrl=${window.location.protocol}//${window.location.host}${window.location.pathname}`;
+        window.location.replace(url);
       }
     }
   }
