@@ -13,9 +13,10 @@ const STRIPE_ENV = {
 
 const DEFAULT_OPTIONS = { ...OPTIONS, chainIds: [], cacheNonce: true };
 
-const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS;
+const STRIPE_CONTRACT_ADDRESS = process.env.STRIPE_CONTRACT_ADDRESS;
+const METAMASK_CONTRACT_ADDRESS = process.env.METAMASK_CONTRACT_ADDRESS;
 
-const SERVER_URL = `${config.serverHost}:${process.env.PORT ? process.env.PORT : 8018}`;
+const SERVER_URL = `${config.serverHost}`;
 
 const SERVER_CONFIRM_URL = `${SERVER_URL}/stripe/checkout/confirm`;
 
@@ -33,7 +34,8 @@ export {
   STRIPE_ENV,
   SERVER_CONFIRM_URL,
   SERVER_CANCEL_URL,
-  CONTRACT_ADDRESS,
+  STRIPE_CONTRACT_ADDRESS,
+  METAMASK_CONTRACT_ADDRESS,
   SERVER_URL,
   DEFAULT_OPTIONS,
   PAYMENT_EVENT_TABLE,

@@ -1,6 +1,6 @@
 import client from '../db/index.js';
 import { rest, util } from "blockapps-rest";
-import { CONTRACT_ADDRESS, DEFAULT_OPTIONS, PAYMENT_EVENT_TABLE } from "./constants.js";
+import { DEFAULT_OPTIONS, PAYMENT_EVENT_TABLE } from "./constants.js";
 import ADMIN from './oauth.js';
 import lodash from 'lodash';
 const { get } = lodash;
@@ -11,7 +11,6 @@ const clientErrorHandler = (err, req, res, next) => {
   if (statusCode) {
     const message = get(err, 'raw.message');
     console.log(`Unhandled API error. Status: ${JSON.stringify(statusCode)}. Message: ${JSON.stringify(message)}`);
-    console.log(`Request: ${JSON.stringify(req)}`);
     return res.status(statusCode).json({ success: false, error: message });
   }
 
@@ -91,19 +90,19 @@ const updateStripePayment = async (token, status) => {
   return updateResult;
 }
 
-const validatePaymentServiceContract = async () => {
+const validatePaymentServiceContract = async (address) => {
   try {
-    const contract = { name: "PaymentService", address: CONTRACT_ADDRESS };
+    const contract = { name: "PaymentService", address };
     const res = await rest.getState(ADMIN.getUser(), contract, DEFAULT_OPTIONS);
   } catch (e) {
-    console.error(`Contract could not be found at address ${CONTRACT_ADDRESS}. Now exiting...`);
+    console.error(`Contract could not be found at address ${address}. Now exiting...`);
     process.exit(1);
   }
 }
 
-const emitOnboardSeller = async (args) => {
+const emitOnboardSeller = async (address, args) => {
   // Make the call and return results
-  const contract = { name: "PaymentService", address: CONTRACT_ADDRESS };
+  const contract = { name: "PaymentService", address };
   const callArgs = {
     contract,
     method: "onboardSeller",
@@ -180,9 +179,9 @@ const validateAndGetOrderDetails = async (quantities, saleAddresses) => {
   }
 }
 
-const completeOrder = async (args) => {
+const completeOrder = async (address, args) => {
   // Make the call and return results
-  const contract = { name: "PaymentService", address: CONTRACT_ADDRESS };
+  const contract = { name: "PaymentService", address };
   const callArgs = {
     contract,
     method: "completeOrder",
@@ -192,9 +191,9 @@ const completeOrder = async (args) => {
   return completeOrderStatus;
 }
 
-const initializePayment = async (args) => {
+const initializePayment = async (address, args) => {
   // Make the call and return results
-  const contract = { name: "PaymentService", address: CONTRACT_ADDRESS };
+  const contract = { name: "PaymentService", address };
   const callArgs = {
     contract,
     method: "initializePayment",
@@ -204,9 +203,9 @@ const initializePayment = async (args) => {
   return completeOrderStatus;
 }
 
-const cancelOrder = async (args) => {
+const cancelOrder = async (address, args) => {
   // Make the call and return results
-  const contract = { name: "PaymentService", address: CONTRACT_ADDRESS };
+  const contract = { name: "PaymentService", address };
   const callArgs = {
     contract,
     method: "cancelOrder",
