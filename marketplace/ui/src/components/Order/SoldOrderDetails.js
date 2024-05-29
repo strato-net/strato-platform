@@ -264,9 +264,8 @@ const SoldOrderDetails = ({ user, users }) => {
       key: "productName",
       render: (text) => (
         <p
-          // href={routes.BoughtOrderDetails.url}
           className="text-primary text-[17px] cursor-pointer"
-          onClick={() => { navigate(`${routes.MarketplaceProductDetail.url.replace(":address", text.address).replace(":name", text.name)}`) }}
+          onClick={() => { navigate(`${routes.MarketplaceProductDetail.url.replace(":address", text.address).replace(":name", encodeURIComponent(text.name))}`) }}
         >
           {decodeURIComponent(text.name)}
         </p>

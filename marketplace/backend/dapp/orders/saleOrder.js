@@ -198,7 +198,7 @@ async function getAll(admin, args = {}, options) {
   const { order, ...restArgs } = args;
   const { offset, limit } = args;
   const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
-  const countArgs = {
+  const newCountArgs = {
     ...args,
     limit: undefined,
     offset: 0,
@@ -208,17 +208,27 @@ async function getAll(admin, args = {}, options) {
     }
   };
 
+  const countArgs = {
+    ...args,
+    limit: undefined,
+    offset: 0,
+    order: undefined,
+    queryOptions: {
+      select: 'count',
+    }
+  };
+
   const newCount = await searchAllWithQueryArgs(
     paymentTableName,
-    countArgs,
+    newCountArgs,
     newOptions,
     admin
   );
 
-  let totalCount = newCount[0].count;
+  let totalCount = newCount[0] ? newCount[0].count : 0;
 
   // Get the latest payment event for each sale token
-  if (totalCount && !(offset && (totalCount < offset))) {
+  if (totalCount !== 0 && !(offset && (totalCount < offset))) {
     const uniqueOrderArgs = {
       ...restArgs,
       queryOptions: {
@@ -285,7 +295,7 @@ async function getAll(admin, args = {}, options) {
         oldOffset = offset - (saleOrders ? saleOrders.length : 0);
       let oldArgs = { ...args, limit: oldLimit, offset: oldOffset };
       const oldSaleOrders = await searchAllWithQueryArgs(constants.orderTableName, oldArgs, newOptions, admin);
-      saleOrders = [...saleOrders, ...oldSaleOrders];
+      saleOrders = saleOrders ? [...saleOrders, ...oldSaleOrders] : [...oldSaleOrders];
     }
 
     oldCount = await searchAllWithQueryArgs(
@@ -295,7 +305,7 @@ async function getAll(admin, args = {}, options) {
       admin
     );
   } catch(err) {
-    console.log("Legacy order table does not exist.");
+    console.log("Legacy order table does not exist.", err, JSON.stringify(err));
   }
 
   totalCount += oldCount[0] ? oldCount[0].count : 0;

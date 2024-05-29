@@ -422,6 +422,7 @@ pipeline {
               POSTGRES_DBNAME=postgres
               STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
               STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+              CONTRACT_ADDRESS=97d263744002e580d393fd013cc66d5177204f90
               TEST_ACCOUNT_ID=${PS_TEST_ACCOUNT_ID}
               TEST_SESSION_ID=${PS_TEST_SESSION_ID} # tests optional
               rm -rf node_modules
