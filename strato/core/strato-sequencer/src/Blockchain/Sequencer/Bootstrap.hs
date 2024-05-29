@@ -16,6 +16,7 @@ import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.Constants
 import Blockchain.Sequencer.DB.DependentBlockDB
 import Blockchain.Sequencer.Event
+import Blockchain.Sequencer.ExtraCertsHack
 import Blockchain.Sequencer.Gregor
 import Blockchain.Sequencer.Monad
 import Blockchain.Strato.Model.Address
@@ -90,7 +91,7 @@ bootstrapSequencer
         runLoggingT . runSequencerM dummySequencerCfg Nothing $ do
           bootstrapGenesisBlock hash difficulty'
           A.insert (A.Proxy @EmittedBlock) hash alreadyEmittedBlock
-          for_ extraCerts . uncurry $ A.insert (A.Proxy @X509CertInfoState)
+          for_ (extraCerts ++ extraCertsHack) . uncurry $ A.insert (A.Proxy @X509CertInfoState)
           flushLdbBatchOps
       initKafka :: CablePackage -> IO ()
       initKafka pkg = do

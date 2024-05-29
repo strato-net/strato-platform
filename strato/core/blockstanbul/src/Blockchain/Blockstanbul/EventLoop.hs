@@ -259,6 +259,7 @@ eventLoop ctx = execStateC ctx $
                 $ err
               yieldR $ FailedHistoric blk
             Right _ -> do
+              validatorTimingHack $ number (blockBlockData blk)
               acceptHistoric
               $logInfoS "blockstanbul" . T.pack . printf "Accepting historical block #%d" $ blockNo
               yieldR . ToCommit $ blk
@@ -504,3 +505,31 @@ recordOutEvent eev =
         GapFound {} -> inc "gap_found"
         LeadFound {} -> inc "lead_found"
         NewCheckpoint {} -> inc "new_checkpoint"
+
+
+validatorTimingHack :: (MonadState BlockstanbulContext m)  =>
+                       Integer -> m ()
+validatorTimingHack blockNumber = do
+  when (blockNumber == 5255) $
+    modify' $ validators %~ S.insert "service-account-io-stratomercata-dnorwood"
+  when (blockNumber == 5256) $
+    modify' $ validators %~ S.insert "service-account-io-stratomercata-witmk"
+  when (blockNumber == 5257) $
+    modify' $ validators %~ S.insert "service-account-io-stratomercata-jpowell"
+  when (blockNumber == 5258) $
+    modify' $ validators %~ S.insert "service-account-io-stratomercata-ChessGM9"
+  when (blockNumber == 5259) $
+    modify' $ validators %~ S.insert "service-account-io-stratomercata-aaa"
+  when (blockNumber == 5261) $
+    modify' $ validators %~ S.insert "service-account-io-stratomercata-dsnallapu"
+  when (blockNumber == 5271) $
+    modify' $ validators %~ S.insert "dustin-node"
+  when (blockNumber == 5276) $
+    modify' $ validators %~ S.insert "service-account-io-stratomercata-kierensnode"
+  when (blockNumber == 5277) $
+    modify' $ validators %~ S.insert "service-account-io-stratomercata-wongway"
+  when (blockNumber == 5288) $
+    modify' $ validators %~ S.delete "service-account-io-stratomercata-dnorwood"
+  when (blockNumber == 6099) $
+    modify' $ validators %~ S.insert "service-account-io-stratomercata-tyson"
+    
