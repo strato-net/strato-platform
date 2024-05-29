@@ -20,6 +20,7 @@ so that they could be properly moved to their respective version's subsection.
 - Upgraded PostgREST to version 12.0
 
 ### Changed
+- Allow public keys to be passed to x509-generator in PEM format
 
 ### Fixed
 
