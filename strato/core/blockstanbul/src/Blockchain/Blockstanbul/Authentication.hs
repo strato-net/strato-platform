@@ -26,7 +26,7 @@ import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
-import Control.Applicative ((<|>))
+--import Control.Applicative ((<|>))
 import Control.Lens as L
 import Control.Monad (liftM2, liftM3, unless)
 import qualified Control.Monad.Change.Alter as A
@@ -68,7 +68,7 @@ addProposerSeal sig =
         istanbul
         ( \i ->
             fmap (set proposedSig (Just sig)) i
-              <|> error "must set validators before proposer seal"
+--              <|> error "must set validators before proposer seal"
         )
       . cookRawExtra
 
@@ -80,7 +80,7 @@ addCommitmentSeals sigs =
         istanbul
         ( \i ->
             fmap (set commitment sigs) i
-              <|> error "must set validators before commitment seals"
+--              <|> error "must set validators before commitment seals"
         )
       . cookRawExtra
 
