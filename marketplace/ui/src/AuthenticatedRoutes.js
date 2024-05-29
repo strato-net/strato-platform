@@ -19,7 +19,6 @@ import RedemptionsIncomingDetails from "./components/Order/RedemptionsIncomingDe
 import { OrdersProvider } from "./contexts/order";
 import { UsersProvider } from "./contexts/users";
 import { UserActivityProvider } from "./contexts/userActivity";
-import Certifier from "./components/Certifier";
 import ProductDetails from "./components/MarketPlace/ProductDetail";
 import Checkout from "./components/MarketPlace/Checkout";
 import ConfirmOrder from "./components/MarketPlace/ConfirmOrder";
@@ -170,27 +169,25 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
         path={routes.MyItems.url}
         element={
           <UsersProvider>
-            <CertifiersProvider>
-              <CategorysProvider>
-                <SubCategorysProvider>
-                  <EventTypesProvider>
-                    <EventsProvider>
-                      <ItemsProvider>
-                        <ProductsProvider>
-                          <InventoriesProvider>
-                            <RedemptionsProvider>
-                              <PaymentServicesProvider>
-                                <Inventory user={user} users={users} />
-                              </PaymentServicesProvider>
-                            </RedemptionsProvider>
-                          </InventoriesProvider>
-                        </ProductsProvider>
-                      </ItemsProvider>
-                    </EventsProvider>
-                  </EventTypesProvider>
-                </SubCategorysProvider>
-              </CategorysProvider>
-            </CertifiersProvider>
+            <CategorysProvider>
+              <SubCategorysProvider>
+                <EventTypesProvider>
+                  <EventsProvider>
+                    <ItemsProvider>
+                      <ProductsProvider>
+                        <InventoriesProvider>
+                          <RedemptionsProvider>
+                            <PaymentServicesProvider>
+                              <Inventory user={user} users={users} />
+                            </PaymentServicesProvider>
+                          </RedemptionsProvider>
+                        </InventoriesProvider>
+                      </ProductsProvider>
+                    </ItemsProvider>
+                  </EventsProvider>
+                </EventTypesProvider>
+              </SubCategorysProvider>
+            </CategorysProvider>
           </UsersProvider>
         }
       />
