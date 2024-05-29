@@ -262,7 +262,15 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
           </div>
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Price</p>
-            <p className="text-[#202020] font-semibold">{inventory?.price ? `US$${inventory?.price} (${inventory?.price * STRATS_CONVERSION} STRATS)` : "N/A"}</p>
+            <p className="text-[#202020] font-semibold">
+              {inventory?.price ? (
+                <>
+                  ${inventory?.price} <span className="text-xs">({inventory?.price * STRATS_CONVERSION} STRATS)</span>
+                </>
+              ) : (
+                "N/A"
+              )}
+            </p>
           </div>
 
         </div>

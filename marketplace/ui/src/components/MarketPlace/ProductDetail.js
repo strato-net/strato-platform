@@ -460,7 +460,13 @@ const ProductDetails = ({ user, users }) => {
                 <div className=" pt-4 lg:pt-[22px]">
 
                   <Paragraph level={4} id="price" className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold">
-                    {details?.price ? <> US${details?.price} ({details?.price * STRATS_CONVERSION} STRATS)</> : "No Price Available"}
+                    {details?.price ? (
+                      <>
+                        ${details?.price} <span className="text-xs">({details?.price * STRATS_CONVERSION} STRATS)</span>
+                      </>
+                    ) : (
+                      "No Price Available"
+                    )}
                   </Paragraph>
                   {isAvailableForSale && <Text type="danger" strong> Sold Out </Text>}
                 </div>

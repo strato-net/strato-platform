@@ -129,7 +129,7 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
     yaxis: {
       labels: {
         formatter: function(value) {
-          return `US$${value}`
+          return `$${value}`
         }
       }
     },
