@@ -128,7 +128,7 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
           </UsersProvider>
         }
       />
-      {user?.organization === 'BlockApps' && (<Route
+      {user?.isMercataAdmin && (<Route
         exact
         path={routes.Admin.url}
         element={
