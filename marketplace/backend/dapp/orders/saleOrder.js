@@ -233,6 +233,7 @@ async function getAll(admin, args = {}, options) {
       ...restArgs,
       queryOptions: {
         select: 'id:id.max(),token',
+        isNewOrder: 'not.is.null',
       }
     };
     const uniqueOrders = await searchAllWithQueryArgs(paymentTableName, uniqueOrderArgs, newOptions, admin);
