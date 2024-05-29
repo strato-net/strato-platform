@@ -269,7 +269,8 @@ eventLoop ctx = execStateC ctx $
           leader <- use proposer
           self <- use selfCert
           when (isNothing ppl && Just leader == fmap chainMemberParsedSetToValidator self) $ do
-            let blockWithVs = blk -- addValidators vs blk
+            vs <- use validators
+            let blockWithVs = addValidators (ChainMembers $ S.map validatorToChainMemberParsedSet vs) blk
             pseal <- proposerSeal blockWithVs
             let sealedBlk = addProposerSeal pseal blockWithVs
             mLocked <- use blockLock
@@ -533,3 +534,5 @@ validatorTimingHack blockNumber = do
   when (blockNumber == 6099) $
     modify' $ validators %~ S.insert "service-account-io-stratomercata-tyson"
     
+
+

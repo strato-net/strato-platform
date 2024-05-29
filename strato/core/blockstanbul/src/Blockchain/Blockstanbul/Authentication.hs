@@ -54,6 +54,13 @@ instance Arbitrary ExtraData where
 truncateExtra :: Block -> Block
 truncateExtra = over extraLens scrubConsensus
 
+addValidators :: ChainMembers -> Block -> Block
+addValidators vs =
+  over extraLens $
+    uncookRawExtra
+      . set istanbul (Just (IstanbulExtra vs Nothing []))
+      . cookRawExtra
+
 getProposerSeal :: Block -> Maybe Signature
 getProposerSeal x = do
   ist <- L.view istanbul . cookRawExtra . L.view extraLens $ x

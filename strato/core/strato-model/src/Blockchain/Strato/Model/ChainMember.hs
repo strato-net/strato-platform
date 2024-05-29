@@ -37,7 +37,8 @@ module Blockchain.Strato.Model.ChainMember
     ChainMemberParsedSet (..),
     TrueOrgNameChains (..),
     FalseOrgNameChains (..),
-    chainMemberParsedSetToValidator
+    chainMemberParsedSetToValidator,
+    validatorToChainMemberParsedSet
   )
 where
 
@@ -579,3 +580,6 @@ chainMemberParsedSetToValidator (Everyone _) = ""
 chainMemberParsedSetToValidator (Org _ _) = ""
 chainMemberParsedSetToValidator (OrgUnit _ _ _) = ""
 chainMemberParsedSetToValidator (CommonName _ _ c _) = Validator c
+
+validatorToChainMemberParsedSet :: Validator -> ChainMemberParsedSet
+validatorToChainMemberParsedSet (Validator v) = CommonName "" "" v True
