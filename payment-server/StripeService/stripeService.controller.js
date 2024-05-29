@@ -14,7 +14,7 @@ import {
   initializePayment,
   cancelOrder
 } from '../helpers/utils.js';
-import { PAYMENT_STATUS } from '../helpers/constants.js';
+import { PAYMENT_STATUS, STRIPE_CONTRACT_ADDRESS } from '../helpers/constants.js';
 
 class StripeServiceController {
 
@@ -60,7 +60,7 @@ class StripeServiceController {
         sellersCommonName: username,
         isActive: true,
       }
-      const onboardSellerStatus = await emitOnboardSeller(callArgs);
+      const onboardSellerStatus = await emitOnboardSeller(STRIPE_CONTRACT_ADDRESS, callArgs);
       console.log("onboardSellerStatus", onboardSellerStatus);
 
       // Redirect back to marketplace
@@ -175,7 +175,7 @@ class StripeServiceController {
           saleAddresses: paymentEvent[0].saleAddresses,
           quantities: paymentEvent[0].quantities,
         } 
-        returnStatus = await completeOrder(callArgs);
+        returnStatus = await completeOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
 
         // Update payment status in DB
         const updateResult = await updateStripePayment(token, "PAID");
@@ -192,7 +192,7 @@ class StripeServiceController {
           saleAddresses: paymentEvent[0].saleAddresses,
           quantities: paymentEvent[0].quantities,
         } 
-        returnStatus = await initializePayment(callArgs);
+        returnStatus = await initializePayment(STRIPE_CONTRACT_ADDRESS, callArgs);
 
         // Update payment status in DB
         const updateResult = await updateStripePayment(token, "INITIALIZED");
@@ -229,7 +229,7 @@ class StripeServiceController {
         quantities: paymentEvent[0].quantities,
       } 
 
-      const cancelOrderStatus = await cancelOrder(callArgs);
+      const cancelOrderStatus = await cancelOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
       console.log("cancelOrderStatus", cancelOrderStatus);
 
       // Update payment status in DB
@@ -266,7 +266,7 @@ class StripeServiceController {
               saleAddresses: paymentEvent[0].saleAddresses,
               quantities: paymentEvent[0].quantities,
             } 
-            const returnStatus = await completeOrder(callArgs);
+            const returnStatus = await completeOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
 
             // Update payment status in DB
             const updateResult = await updateStripePayment(p.token, 'PAID');

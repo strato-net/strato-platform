@@ -8,4 +8,5 @@ contract Utils {
             commonName = "Contract " + string(addr);
         }
         return commonName;
+    }
 }

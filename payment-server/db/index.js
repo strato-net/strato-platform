@@ -70,6 +70,12 @@ if (host && password) {
                     status TEXT,
                     createdDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP 
                 );
+
+                CREATE TABLE IF NOT EXISTS metamask (
+                    username TEXT PRIMARY KEY,
+                    eth_address TEXT,
+                    supported_tokens TEXT[]
+                );
             `;
 
             return client.query(query);

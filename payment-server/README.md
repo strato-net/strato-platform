@@ -121,13 +121,10 @@ Report and update dependencies if needed.
 
 The server **requires** the following environmental variables to run in non-dockerized mode:
 ```
-`POSTGRES_SERVER_URL` Default: postgres (for dockerized mode)
-`POSTGRES_PORT` Default: 5432
-`POSTGRES_USER` Default: postgres
 `POSTGRES_PASSWORD`
-`POSTGRES_DBNAME` Default: postgres
 `STRIPE_SECRET_KEY` for Stripe API
-`CONTRACT_ADDRESS` to the ExternalPaymentService contract
+`STRIPE_CONTRACT_ADDRESS` to the Stripe ExternalPaymentService contract
+`METAMASK_CONTRACT_ADDRESS` to the MetaMask ExternalPaymentService contract
 ```
 
 If running non-dockerized, use `npm run start` or `npm run dev`.  
@@ -144,7 +141,8 @@ The payment server uses `jest` as its testing framework. In order to run the tes
 `POSTGRES_PASSWORD`
 `POSTGRES_DBNAME` Default: postgres
 `STRIPE_SECRET_KEY` for Stripe API
-`CONTRACT_ADDRESS` to the ExternalPaymentService contract
+`STRIPE_CONTRACT_ADDRESS` to the Stripe ExternalPaymentService contract
+`METAMASK_CONTRACT_ADDRESS` to the MetaMask ExternalPaymentService contract
 
 <!-- OPTIONAL ENV -->
 `TEST_ACCOUNT_ID` for Stripe API Tests
