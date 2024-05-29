@@ -235,13 +235,16 @@ const CategoryProductList = ({ user }) => {
   };
 
   const handleClearFilter = () => {
-    const isFilter = selectedSubCategories.length != 0
-      || minPrice !== 0 || maxPrice !== MAX_PRICE || selectedAvailability.length !== 2
+    const isFilter = 
+       minPrice !== 0 || maxPrice !== MAX_PRICE || selectedAvailability.length !== 2
     if (isFilter) {
-      const baseUrl = new URL(`/c/All`, window.location.origin);
+      const baseUrl = new URL(`/c/${category}`, window.location.origin);
+      if(subCategoryQueryValue){
+        baseUrl.searchParams.set('sc', subCategoryQueryValue);
+      }
       const url = baseUrl.pathname + baseUrl.search;
       navigate(url)
-      clearSelection()
+      // clearSelection()
       setMinPrice(0)
       setMaxPrice(MAX_PRICE)
       setSelectedAvailability(['forSale', 'soldOut'])
@@ -440,7 +443,7 @@ const AvailabilityFilter = () =>
         value={selectedSubCategories}
       >
         <div className="flex flex-col gap-3">
-          {subCategories.map(({name,contract}, index) => (
+          {subCategories?.map(({name,contract}, index) => (
             <Checkbox value={contract} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
               {name}
             </Checkbox>
@@ -453,7 +456,7 @@ const AvailabilityFilter = () =>
     {ClearFilterComponent()}
     <div className="bg-white border border-solid border-[#E9E9E9] my-6 mb-24">
 
-      {subCategories?.length > 1 && category === 'Carbon' && (
+      {subCategories?.length !== 0 && category === 'Carbon' && (
         <>
           {DesktopCollapseComponent(
             SubCategoryFilterComponent()

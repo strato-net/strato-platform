@@ -9,7 +9,6 @@ import {
   SwapOutlined
 } from "@ant-design/icons";
 import PreviewInventoryModal from "./PreviewInventoryModal";
-import AddEventModal from "./AddEventModal";
 import { useNavigate } from "react-router-dom";
 import ListForSaleModal from "./ListForSaleModal";
 import UnlistModal from "./UnlistModal";
@@ -25,9 +24,7 @@ import { SEO } from "../../helpers/seoConstant";
 const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcategories, limit, offset, user }) => {
   const textRef = useRef(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
-  const [openPop, setOpenPop] = useState(false);
   const [open, setOpen] = useState(false);
-  const [openEdit, setOpenEdit] = useState(false);
   const [listModalOpen, setListModalOpen] = useState(false);
   const [unlistModalOpen, setUnlistModalOpen] = useState(false);
   const [resellModalOpen, setResellModalOpen] = useState(false);
@@ -43,19 +40,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
     setOpen(false);
   };
 
-  const handleCancelEdit = () => {
-    setOpenEdit(false);
-  };
-
-  const hide = () => {
-    setOpenPop(false);
-  };
-  const handleOpenChange = (newOpen) => {
-    setOpenPop(newOpen);
-  };
-
   const showListModal = () => {
-    hide();
     setListModalOpen(true);
   };
 
@@ -64,7 +49,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
   };
 
   const showUnlistModal = () => {
-    hide();
     setUnlistModalOpen(true);
   };
 
@@ -73,7 +57,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
   };
 
   const showResellModal = () => {
-    hide();
     setResellModalOpen(true);
   };
 
@@ -82,7 +65,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
   };
 
   const showTransferModal = () => {
-    hide();
     setTransferModalOpen(true);
   };
 
@@ -91,7 +73,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
   };
 
   const showRedeemModal = () => {
-    hide();
     setRedeemModalOpen(true);
   };
 
@@ -100,7 +81,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
   };
 
   const callDetailPage = () => {
-    navigate(`${naviroute.replace(":id", inventory.address).replace(":name", inventory.name)}`, {
+    navigate(`${naviroute.replace(":id", inventory.address).replace(":name", encodeURIComponent(inventory.name))}`, {
       state: { isCalledFromInventory: true },
     });
   };
@@ -293,14 +274,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
           handleCancel={handleCancel}
           inventory={inventory}
           category={category}
-        />
-      )}
-      {openEdit && (
-        <AddEventModal
-          open={openEdit}
-          handleCancel={handleCancelEdit}
-          inventoryId={inventory.address}
-          productId={inventory.productId}
         />
       )}
       {listModalOpen && (
