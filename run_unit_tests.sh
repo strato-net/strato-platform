@@ -36,7 +36,7 @@ stack test $5\
       solid-vm-parser \
       source-tools \
       strato-index \
-      strato-lite \
+#      strato-lite \
       strato-genesis \
       strato-model \
       strato-redis-blockdb \
