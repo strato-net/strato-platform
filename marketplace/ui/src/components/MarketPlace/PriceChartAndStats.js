@@ -2,7 +2,6 @@ import React from 'react';
 import ReactApexChart from 'react-apexcharts';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import {STRATS_CONVERSION} from '../../helpers/constants';
 
 dayjs.extend(utc);
 
@@ -130,7 +129,7 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
     yaxis: {
       labels: {
         formatter: function(value) {
-          return `$${value}`
+          return `US$${value}`
         }
       }
     },
@@ -147,11 +146,6 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
             // Directly use the value for datetime type since it's already formatted
             return dayjs(value).format('MMMM D, YYYY');
           }
-        }
-      },
-      y: {
-        formatter: function(value) {
-          return `$${value} (${value * STRATS_CONVERSION} STRATS)`;
         }
       }
     },

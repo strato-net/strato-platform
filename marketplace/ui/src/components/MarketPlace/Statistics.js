@@ -1,6 +1,5 @@
 import React from 'react';
 import './Statistics.css';
-import { STRATS_CONVERSION } from '../../helpers/constants';
 const Statistics = ({ priceHistory }) => {
 
 // Origin Asset Statistics
@@ -30,7 +29,7 @@ return (
     {/* Tile for Average Price */}
     <div className="tileWrapper p-2 flex-auto md:max-w-[calc(33.333%-1.5rem)] w-full">
       <div className="tile bg-gray-200 p-4 rounded-lg shadow-md text-center">
-        <p className="title text-2xl font-semibold">${originAveragePrice} | {originAveragePrice * STRATS_CONVERSION} STRATS</p>
+        <p className="title text-2xl font-semibold">US${originAveragePrice}</p>
         <p className="subtitle text-gray-600">Average Sale Price</p>
       </div>
     </div>
