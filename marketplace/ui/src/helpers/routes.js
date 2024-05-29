@@ -1,6 +1,5 @@
 // eslint-disable-next-line import/no-anonymous-default-export
 export default {
-  Certifier: { label: "Certifier", url: "/certifier" },
   Marketplace: { label: "Marketplace", url: "/" },
   MarketplaceProductList: {
     label: "Marketplace Product List",
@@ -25,7 +24,6 @@ export default {
   ProductDetail: { label: "Product Detail", url: "/products/:id" },
   MyItems: { label: "Inventory", url: "/myitems" },
   InventoryDetail: { label: "Inventory Detail", url: "/inventories/:id/:name" },
-  InventoryEventSerialNumberList: { label: "Inventory Event Serial Numbers", url: "/inventories/events/serialNumbers" },
   Items: { label: "Item", url: "/items" },
   Orders: { label: "Order", url: "/order/:type" },
   RedemptionsOutgoingDetails: { label: "Redemption Outgoing Detail", url: "/redemptions-outgoing/:id" },
@@ -47,19 +45,7 @@ export default {
     label: "Order Item Detail",
     url: "/bought-orders-details/:id",
   },
-  OrderItemEventsList: {
-    label: "Order Item Event List",
-    url: "/orders/events/:itemId",
-  },
-  Events: { label: "Event", url: "/events" },
-  EventDetail: { label: "Event Detail", url: "/events/:id" },
-  EventList: { label: "Event List", url: "/inventories/events/:id" },
-  InventoryEventDetail: {
-    label: "Event Detail",
-    url: "/inventories/events/:inventoryId/:eventTypeId",
-  },
   Admin: { label: "Admin ", url: "/admin" },
-  EventSerialNumberList: { label: "Event Serial Numbers", url: "/events/serialNumbers" },
   ProcessingOrder: { label: "Processing Order", url: "/order/status" },
   Invoice: { label: "Invoice", url: "/orders/invoice/:id" },
   OnboardingSellerToStripe: { label: "Onboarding Seller to Stripe", url: "/myItems/stripe/onboarding" },
