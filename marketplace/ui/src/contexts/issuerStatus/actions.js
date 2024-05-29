@@ -25,7 +25,6 @@ const actions = {
     requestReview: async (dispatch, payload) => {
         dispatch({type: actionDescriptors.requestReview});
         try {
-            console.log('AYAS LOGS - payload in actions', payload);
             const response = await fetch(`${apiUrl}/issuerstatus/requestReview`, {
                 method: HTTP_METHODS.POST,
                 credentials: "same-origin",

@@ -8,13 +8,11 @@ export default function AuthorizeSeller(){
     const dispatch = useIssuerStatusDispatch();
     const onFinish = async (values) => {
         const { commonName, setStatusTo } = values;
-        let resp;
         if (setStatusTo === 'Authorized') {
-            resp = await actions.authorizeIssuer(dispatch, { commonName });
+            await actions.authorizeIssuer(dispatch, { commonName });
         } else {
-            resp = await actions.deauthorizeIssuer(dispatch, { commonName });
+            await actions.deauthorizeIssuer(dispatch, { commonName });
         }
-        console.log(resp);
     }
 
     const [api, contextHolder] = notification.useNotification();

@@ -21,7 +21,6 @@ enum IssuerStatus {
 }
 
 contract UserRegistry {
-    error userError (string message);
     function createUser(string _commonName) public returns (address) {
         User newUser = new User{salt: _commonName}(_commonName);
         return address(newUser);
