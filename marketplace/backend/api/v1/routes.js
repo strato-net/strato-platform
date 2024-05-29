@@ -18,8 +18,6 @@ import membership from './Membership'
 import carbonDAO from './CarbonDAO'
 import collectibles from './Collectibles'
 import order from './Order'
-import eventType from './EventType'
-import event from './Event'
 import authentication from './authentication'
 import users from './users'
 import marketplace from './Marketplace'
@@ -45,8 +43,6 @@ import {
   CarbonDAO,
   Collectibles,
   Order,
-  EventType,
-  Event,
   Marketplace,
   PaymentService,
   UserActivity,
@@ -73,8 +69,6 @@ router.use(Collectibles.prefix, collectibles)
 router.use(Metals.prefix, metals)
 router.use(Spirits.prefix, spirits)
 router.use(Order.prefix, order)
-router.use(EventType.prefix, eventType)
-router.use(Event.prefix, event)
 router.use(Marketplace.prefix, marketplace)
 router.use(PaymentService.prefix, paymentService)
 router.use(UserActivity.prefix, userActivity)
