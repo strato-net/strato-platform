@@ -13,6 +13,7 @@ import TagManager from "react-gtm-module";
 import { Images } from '../../images';
 import images_placeholder from "../../images/resources/image_placeholder.png"
 import { SEO } from '../../helpers/seoConstant';
+import { STRATS_CONVERSION } from '../../helpers/constants';
 import DOMPurify from 'dompurify';
 import { setCookie } from "../../helpers/cookie";
 import LoginModal from './LoginModal';
@@ -130,7 +131,11 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                     </div>
                 </a>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    {topSellingProduct?.price && <Typography className='font-normal text-black'>{`$ ${topSellingProduct?.price}`}</Typography>}
+                    {topSellingProduct?.price && 
+                        <Typography className="font-semibold">
+                            {`$${topSellingProduct?.price} `}
+                            <span className="font-normal text-xs mr-2">{`(${topSellingProduct?.price * STRATS_CONVERSION} STRATS)`}</span>
+                        </Typography>}
                     {isAvailableForSale && <Text type="danger" strong> Sold Out </Text>}
                     {topSellingProduct?.contract_name.toLowerCase().includes("clothing") && (
                         <Typography className='font-normal text-black'>Size: {topSellingProduct?.data?.size ? topSellingProduct?.data?.size : "N/A"}</Typography>
