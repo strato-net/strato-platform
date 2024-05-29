@@ -132,9 +132,9 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                 </a>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     {topSellingProduct?.price && 
-                        <Typography className="font-normal text-black">
+                        <Typography className="font-semibold">
                             {`$${topSellingProduct?.price} `}
-                            <span className="text-xs">{`(${topSellingProduct?.price * STRATS_CONVERSION} STRATS)`}</span>
+                            <span className="font-normal text-xs mr-2">{`(${topSellingProduct?.price * STRATS_CONVERSION} STRATS)`}</span>
                         </Typography>}
                     {isAvailableForSale && <Text type="danger" strong> Sold Out </Text>}
                     {topSellingProduct?.contract_name.toLowerCase().includes("clothing") && (
