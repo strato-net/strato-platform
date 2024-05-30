@@ -204,3 +204,5 @@ export const REDEMPTION_STATUS = {
 }
 
 export const PAYMENT_LIST = ['card','us_bank_account']
+
+export const STRATS_CONVERSION = 100;
