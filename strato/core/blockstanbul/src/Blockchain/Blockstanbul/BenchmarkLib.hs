@@ -49,7 +49,7 @@ benchChainMember :: ChainMemberParsedSet
 benchChainMember = CommonName "BlockApps" "Engineering" "Admin" True
 
 benchContext :: BlockstanbulContext
-benchContext = newContext (Checkpoint (View 200 40) [chainMemberParsedSetToValidator benchChainMember]) Nothing True (Just benchChainMember)
+benchContext = newContext "" (Checkpoint (View 200 40) [chainMemberParsedSetToValidator benchChainMember]) Nothing True (Just benchChainMember)
 
 makeBlock :: Int -> Int -> Block
 makeBlock txcount txsize =

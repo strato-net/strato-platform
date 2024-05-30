@@ -76,7 +76,8 @@ data BlockstanbulContext = BlockstanbulContext
     _lastParent :: Maybe Keccak256,
     -- Validator characteristics
     _validatorBehavior :: Bool,
-    _isValidator :: Bool
+    _isValidator :: Bool,
+    _network :: String
   }
 
 makeLenses ''BlockstanbulContext
@@ -98,8 +99,8 @@ debugShowCtx = do
   debugLog "showctx/hasPrepared" hasPrepared show
   debugLog "showctx/roundChanged" roundChanged show
 
-newContext :: Checkpoint -> Maybe Address -> Bool -> Maybe ChainMemberParsedSet -> BlockstanbulContext
-newContext (Checkpoint v as) addr valB chainm =
+newContext :: String -> Checkpoint -> Maybe Address -> Bool -> Maybe ChainMemberParsedSet -> BlockstanbulContext
+newContext network' (Checkpoint v as) addr valB chainm =
   let valSet = S.fromList as
       prop = fromMaybe (error "you need at least one validator in the network") . S.lookupMin $ valSet
    in BlockstanbulContext
@@ -121,7 +122,8 @@ newContext (Checkpoint v as) addr valB chainm =
           _lockSender = Nothing,
           _lastParent = Nothing,
           _validatorBehavior = valB,
-          _isValidator = False
+          _isValidator = False,
+          _network = network'
         }
 
 generateNonceMap :: [Validator] -> M.Map Validator Int

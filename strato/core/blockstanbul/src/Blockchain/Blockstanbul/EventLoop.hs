@@ -259,7 +259,8 @@ eventLoop ctx = execStateC ctx $
                 $ err
               yieldR $ FailedHistoric blk
             Right _ -> do
-              validatorTimingHack $ number (blockBlockData blk)
+              network' <- use network
+              validatorTimingHack network' $ number (blockBlockData blk)
               acceptHistoric
               $logInfoS "blockstanbul" . T.pack . printf "Accepting historical block #%d" $ blockNo
               yieldR . ToCommit $ blk
@@ -509,8 +510,16 @@ recordOutEvent eev =
 
 
 validatorTimingHack :: (MonadState BlockstanbulContext m)  =>
-                       Integer -> m ()
-validatorTimingHack blockNumber = do
+                       String -> Integer -> m ()
+validatorTimingHack "mercata" blockNumber = validatorTimingHackMercata blockNumber
+validatorTimingHack "mercata-hydrogen" blockNumber = validatorTimingHackMercataHydrogen blockNumber
+validatorTimingHack _ _ = do
+  return ()
+
+
+validatorTimingHackMercata :: (MonadState BlockstanbulContext m)  =>
+                              Integer -> m ()
+validatorTimingHackMercata blockNumber = do
   when (blockNumber == 5255) $
     modify' $ validators %~ S.insert "service-account-io-stratomercata-dnorwood"
   when (blockNumber == 5256) $
@@ -535,4 +544,8 @@ validatorTimingHack blockNumber = do
     modify' $ validators %~ S.insert "service-account-io-stratomercata-tyson"
     
 
+validatorTimingHackMercataHydrogen :: (MonadState BlockstanbulContext m)  =>
+                               Integer -> m ()
+validatorTimingHackMercataHydrogen _ = do
+  return ()
 

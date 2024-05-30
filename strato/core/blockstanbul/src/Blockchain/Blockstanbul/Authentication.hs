@@ -228,7 +228,9 @@ replayHistoricBlock realValidators seqNo blk = do
 --  let expectedValidatorList = [c | CommonName _ _ c _ <- S.toList (unChainMembers _validatorList)]
 
   unless (expectedValidatorList == realValidators) $
-    error $ "real validator list doesn't match expected validator list for block #" ++ show (number . blockBlockData $ blk)
+    throwError $
+--    error $ --will make this stricter once the full soln is in
+      "real validator list doesn't match expected validator list for block #" ++ show (number . blockBlockData $ blk)
       ++ "\nreal validator list: " ++ show (map format $ S.toList realValidators)
       ++ "\nblock validator list: " ++ show (map format $ S.toList expectedValidatorList)
         
