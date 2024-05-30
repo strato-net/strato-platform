@@ -21,6 +21,7 @@ import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.Validator (Validator)
 import Data.Binary
 import qualified Data.ByteString.Base16 as SB16
 import qualified Data.ByteString.Char8 as S8
@@ -94,6 +95,13 @@ instance RedisDBValuable ChainMemberParsedSet where
     fromValue = decode . fromStrict
 
 instance RedisDBKeyable ChainMemberParsedSet where
+  toKey = toStrict . encode
+
+instance RedisDBValuable Validator where
+    toValue = toStrict . encode
+    fromValue = decode . fromStrict
+
+instance RedisDBKeyable Validator where
   toKey = toStrict . encode
 
 instance RedisDBValuable Keccak256 where

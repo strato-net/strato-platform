@@ -10,19 +10,14 @@ module Blockchain.Data.Block
     WorldBestBlock (..),
     Canonical (..),
     Private (..),
-    blockHeaderLens,
     extraLens,
     setBlockNo,
-    nextDifficulty,
-    homesteadNextDifficulty,
     createBlockFromHeaderAndBody,
   )
 where
 
-import Blockchain.Constants
 import Blockchain.Data.BlockHeader (BlockHeader)
 import qualified Blockchain.Data.BlockHeader as BlockHeader
-import Blockchain.Data.DataDefs
 import Blockchain.Data.RLP
 import Blockchain.Data.Transaction
 import Blockchain.Strato.Model.Class
@@ -30,12 +25,9 @@ import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq
 import Control.Lens
 import Data.Binary
-import Data.Bits
 import qualified Data.ByteString as BS
 import Data.Data
 import Data.List
-import Data.Time.Clock
-import Data.Time.Clock.POSIX
 import GHC.Generics
 import qualified Text.Colors as CL
 import Text.Format
@@ -87,38 +79,6 @@ instance BlockLike BlockHeader Transaction Block where
   blockUncleHeaders = blockBlockUncles
 
   buildBlock bd txs us = Block bd txs us
-
--- if useDiffBomb is False then the expAdjustment is not added.
-nextDifficulty :: Bool -> Bool -> Integer -> Difficulty -> UTCTime -> UTCTime -> Difficulty
-nextDifficulty useDiffBomb useTestnet parentNumber oldDifficulty oldTime newTime =
-  if True
-    then 1
-    else max nextDiff' minimumDifficulty + if not useDiffBomb then 0 else expAdjustment
-  where
-    nextDiff' =
-      if round (utcTimeToPOSIXSeconds newTime)
-        >= (round (utcTimeToPOSIXSeconds oldTime) + difficultyDurationLimit useTestnet :: Integer)
-        then oldDifficulty - oldDifficulty `shiftR` difficultyAdjustment
-        else oldDifficulty + oldDifficulty `shiftR` difficultyAdjustment
-    periodCount = (parentNumber + 1) `quot` difficultyExpDiffPeriod
-    expAdjustment =
-      if periodCount > 1
-        then 2 ^ (periodCount - 2)
-        else 0
-
--- if useDiffBomb is False then the expAdjustment is not added
-homesteadNextDifficulty :: Bool -> Bool -> Integer -> Difficulty -> UTCTime -> UTCTime -> Difficulty
-homesteadNextDifficulty useDiffBomb _useTestnet parentNumber oldDifficulty oldTime newTime =
-  max nextDiff' minimumDifficulty + if not useDiffBomb then 0 else expAdjustment
-  where
-    block_timestamp = round (utcTimeToPOSIXSeconds newTime) :: Integer
-    parent_timestamp = round (utcTimeToPOSIXSeconds oldTime) :: Integer
-    nextDiff' = oldDifficulty + oldDifficulty `quot` 2048 * max (1 - (block_timestamp - parent_timestamp) `quot` 10) (-99)
-    periodCount = (parentNumber + 1) `quot` difficultyExpDiffPeriod
-    expAdjustment =
-      if periodCount > 1
-        then 2 ^ (periodCount - 2)
-        else 0
 
 data BestBlock = BestBlock
   { bestBlockHash :: Keccak256,

@@ -29,6 +29,7 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.Validator (Validator(..))
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import Conduit
 import Control.Monad
@@ -93,7 +94,7 @@ doRevokeCertificate userAddress = do
   void . execKafka $ writeUnseqEvents [IECertRevoked userAddress]
 
 doValidatorAdded :: (MonadLogger m, HasKafka m, HasRedis m, HasSQL m) =>
-                    Keccak256 -> ChainMemberParsedSet -> m ()
+                    Keccak256 -> Validator -> m ()
 doValidatorAdded bHash cm = do
   logF
     [ "Adding validator ",
@@ -106,7 +107,7 @@ doValidatorAdded bHash cm = do
   void . execKafka $ writeUnseqEvents [IEValidatorAdded bHash cm]
 
 doValidatorRemoved :: (MonadLogger m, HasKafka m, HasRedis m, HasSQL m) =>
-                      Keccak256 -> ChainMemberParsedSet -> m ()
+                      Keccak256 -> Validator -> m ()
 doValidatorRemoved bHash cm = do
   logF
     [ "Removing validator ",
@@ -133,8 +134,8 @@ data TxrResult
   | RemoveOrgName Word256 ChainMemberParsedSet
   | RegisterCertificate Address X509CertInfoState
   | CertificateRevoked Address
-  | ValidatorAdded Keccak256 ChainMemberParsedSet
-  | ValidatorRemoved Keccak256 ChainMemberParsedSet
+  | ValidatorAdded Keccak256 Validator
+  | ValidatorRemoved Keccak256 Validator
   | TerminateChain Word256
   | PutLogDB LogDB
   | PutEventDB EventDB
@@ -152,8 +153,8 @@ indexEventToTxrResults = \case
       (Address 0x100, Just chainId, "OrgRemoved", [o]) -> Just . RemoveOrgName chainId $ Org (T.pack o) False
       (Address 0x100, Just chainId, "OrgUnitRemoved", [o, u]) -> Just . RemoveOrgName chainId $ OrgUnit (T.pack o) (T.pack u) False
       (Address 0x100, Just chainId, "CommonNameRemoved", [o, u, c]) -> Just . RemoveOrgName chainId $ CommonName (T.pack o) (T.pack u) (T.pack c) False
-      (Address 0x100, Nothing, "ValidatorAdded", [o, u, c]) -> Just . ValidatorAdded (eventDBBlockHash ev) $ CommonName (T.pack o) (T.pack u) (T.pack c) True
-      (Address 0x100, Nothing, "ValidatorRemoved", [o, u, c]) -> Just . ValidatorRemoved (eventDBBlockHash ev) $ CommonName (T.pack o) (T.pack u) (T.pack c) True
+      (Address 0x100, Nothing, "ValidatorAdded", [_, _, c]) -> Just . ValidatorAdded (eventDBBlockHash ev) $ Validator $ T.pack c
+      (Address 0x100, Nothing, "ValidatorRemoved", [_, _, c]) -> Just . ValidatorRemoved (eventDBBlockHash ev) $ Validator $ T.pack c
       (Address 0x509, Nothing, "CertificateRegistered", [certString]) ->
         let cert = bsToCert . C8.pack $ certString
             userAddress = fmap (fromPublicKey . subPub) $ getCertSubject =<< eitherToMaybe cert

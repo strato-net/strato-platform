@@ -55,6 +55,7 @@ import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Util
+import Blockchain.Strato.Model.Validator
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import Blockchain.Strato.StateDiff hiding (StateDiff (blockHash, chainId, stateRoot))
 import qualified Blockchain.Strato.StateDiff as StateDiff (StateDiff (blockHash, chainId, stateRoot))
@@ -124,7 +125,7 @@ getGenesisBlockAndPopulateInitialMPs ::
     HasRedis m
   ) =>
   String ->
-  m ([(Ad.Address, X509CertInfoState)], [ChainMemberParsedSet], ([(AccountInfo, CodeInfo)], Block))
+  m ([(Ad.Address, X509CertInfoState)], [Validator], ([(AccountInfo, CodeInfo)], Block))
 getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
   genesisInfo <- getGenesisInfoFromFile genesisBlockName
   let certs = readCertsFromGenesisInfo genesisInfo
