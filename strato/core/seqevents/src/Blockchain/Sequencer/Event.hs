@@ -74,13 +74,13 @@ data IngestEvent
   | IEGetMPNodesRequest TO.TXOrigin [StateRoot]
   | IEMPNodesResponse TO.TXOrigin [NodeData]
   | IEMPNodesReceived [NodeData]
-  | IEAcceptPreprepare Keccak256
+  | IEPreprepareResponse PBFT.PreprepareDecision
   deriving (Eq, Show, GHCG.Generic)
 
 data IngestEventType
   = IETTransaction
   | IETBlock
-  | IETAcceptPreprepare
+  | IETPreprepareResponse
   | IETGenesis
   | IETNewCertRegistered
   | IETCertRevoked
@@ -115,7 +115,7 @@ iEventType = \case
   IEGetMPNodesRequest {} -> IETGetMPNodesRequest
   IEMPNodesResponse {} -> IETMPNodesResponse
   IEMPNodesReceived {} -> IETMPNodesReceived
-  IEAcceptPreprepare {} -> IETAcceptPreprepare
+  IEPreprepareResponse {} -> IETPreprepareResponse
 
 instance Format IngestEvent where
   format (IETx ts o) = show ts ++ " " ++ format o
@@ -134,7 +134,7 @@ instance Format IngestEvent where
   format (IEGetMPNodesRequest o s) = format o ++ "requested: " ++ format s
   format (IEMPNodesResponse o n) = "Response to " ++ format o ++ ": " ++ show n
   format (IEMPNodesReceived o) = show o
-  format (IEAcceptPreprepare h) = format h
+  format (IEPreprepareResponse d) = format d
 
 instance ShowConstructor IngestEvent where
   showConstructor IETx{} = "IETx"
@@ -153,7 +153,7 @@ instance ShowConstructor IngestEvent where
   showConstructor IEGetMPNodesRequest{} = "IEGetMPNodesRequest"
   showConstructor IEMPNodesResponse{} = "IEMPNodesResponse"
   showConstructor IEMPNodesReceived{} = "IEMPNodesReceived"
-  showConstructor IEAcceptPreprepare{} = "IEAcceptPreprepare"
+  showConstructor IEPreprepareResponse{} = "IEPreprepareResponse"
 
 type Timestamp = Microtime
 

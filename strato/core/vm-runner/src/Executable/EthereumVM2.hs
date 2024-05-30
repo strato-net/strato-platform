@@ -22,6 +22,7 @@ import BlockApps.Logging
 import qualified Blockchain.Bagger as Bagger
 import qualified Blockchain.Bagger.BaggerState as B
 import Blockchain.BlockChain
+import Blockchain.Blockstanbul (PreprepareDecision(..))
 import Blockchain.DB.BlockSummaryDB
 import Blockchain.DB.ChainDB
 import Blockchain.DB.CodeDB (CodeKind (..), getCode)
@@ -104,11 +105,10 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
   yieldMany $ outputPrivateTransactions privateTxs
   processBlocksAndNewChains blocksAndNewChains
 
-  mBHash <- lift $ do
+  mPreDec <- lift $ do
     case preprepareBlock of
       Nothing -> pure Nothing
       Just block -> do
-        $logInfoS "handleVmEvents" "Got a preprepare block to run!"
         let bHeader = blockBlockData block
             bHash = blockHeaderHash bHeader
             -- bro if there are any maybes in this list thaz BAD
@@ -117,11 +117,21 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
         case mSumm of 
           Nothing -> pure Nothing
           Just summ -> do
-            res <- Bagger.runFromStateRoot mineTransactions (gasLimit bHeader) bHeader{stateRoot=bSumStateRoot summ} otxs 
+            res <- Bagger.runFromStateRoot 
+              mineTransactions 
+              (gasLimit bHeader) 
+              bHeader { -- immitate parent block as closely as possible (most important is the stateroot)
+                parentHash = bSumParentHash summ,
+                stateRoot = bSumStateRoot summ,
+                number = bSumNumber summ,
+                gasLimit = bSumGasLimit summ,
+                timestamp = bSumTimestamp summ
+              } 
+              otxs 
             case res of 
-              Right (sr, _, _) | sr == stateRoot bHeader -> pure $ Just bHash
-              _ -> pure Nothing
-  traverse_ (yield . OutAcceptPreprepare) mBHash
+              Right (sr, _, _) | sr == stateRoot bHeader -> pure . Just $ AcceptPreprepare bHash
+              _ -> pure $ Just RejectPreprepare
+  traverse_ (yield . OutPreprepareResponse) mPreDec
 
   mNewBlock <- lift $ do
     Mod.modify_ (Mod.Proxy @ContextState) $ pure . (blockRequested ||~ createBlock)

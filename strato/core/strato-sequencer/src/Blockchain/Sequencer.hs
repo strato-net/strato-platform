@@ -711,9 +711,9 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
         IETMPNodesReceived -> do
           record "inevent_type_mp_nodes_received" "MPNodesReceived"
           yieldMany $ map (\(IEMPNodesReceived nds) -> ToVm $ VmMPNodesReceived nds) events
-        IETAcceptPreprepare -> do
-          record "inevent_type_accept_preprepare" "AcceptPreprepare"
-          blockstanbulSend $ map (\(IEAcceptPreprepare bh) -> AcceptPreprepare bh) events
+        IETPreprepareResponse -> do
+          record "inevent_type_preprepare_response" "PreprepareResponse"
+          blockstanbulSend $ map (\(IEPreprepareResponse decis) -> PreprepareResponse decis) events
 
 prettyIBlock :: IngestBlock -> String
 prettyIBlock IngestBlock {ibOrigin = o, ibBlockData = bd, ibReceiptTransactions = txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"

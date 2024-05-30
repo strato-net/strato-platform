@@ -18,6 +18,7 @@ module Blockchain.Event
   )
 where
 
+import Blockchain.Blockstanbul (PreprepareDecision(..))
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.Data.Block (Block(..))
 import Blockchain.Data.ChainInfo
@@ -83,7 +84,7 @@ data VmOutEvent
   | OutStateRootMismatch StateRootMismatch
   | OutGetMPNodes [StateRoot]
   | OutMPNodesResponse TXOrigin [NodeData]
-  | OutAcceptPreprepare Keccak256
+  | OutPreprepareResponse PreprepareDecision
 
 data VmOutEventBatch = OutBatch
   { outActions :: DL.DList Action,
@@ -124,7 +125,7 @@ insertOutBatch :: VmOutEvent -> VmOutEventBatch -> VmOutEventBatch
 insertOutBatch e b = case e of
   OutAction a -> b {outActions = outActions b `DL.snoc` a}
   OutBlock a -> b {outBlocks = outBlocks b `DL.snoc` a}
-  OutAcceptPreprepare _ -> b --todo: add to batch?
+  OutPreprepareResponse _ -> b
   OutIndexEvent a -> b {outIndexEvents = outIndexEvents b `DL.snoc` a}
   OutToStateDiff v w x y z -> b {outToStateDiffs = outToStateDiffs b `DL.snoc` (v, w, x, y, z)}
   OutStateDiff a -> b {outStateDiffs = outStateDiffs b `DL.snoc` a}

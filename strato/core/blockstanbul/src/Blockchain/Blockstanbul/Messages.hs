@@ -110,6 +110,12 @@ data ForcedValidatorChange = ForcedValidator ValidatorRestriction
 instance Format ForcedValidatorChange where
   format = show
 
+data PreprepareDecision = AcceptPreprepare Keccak256 | RejectPreprepare
+  deriving (Eq, Show, Generic, Binary, NFData, Data)
+
+instance Format PreprepareDecision where
+  format = show
+
 blockstanbulSender :: WireMessage -> ChainMemberParsedSet
 blockstanbulSender (WireMessage a _) = sender a
 
@@ -131,6 +137,9 @@ instance Arbitrary ForcedConfigChange where
 instance Arbitrary ForcedValidatorChange where
   arbitrary = genericArbitrary
 
+instance Arbitrary PreprepareDecision where
+  arbitrary = genericArbitrary
+
 instance Format WireMessage where
   format (WireMessage (MsgAuth s _) msg) = format msg ++ " " ++ format s
 
@@ -147,7 +156,7 @@ data InEvent
     CommitResult (Either Text Keccak256)
   | UnannouncedBlock Block
   | PreviousBlock Block
-  | AcceptPreprepare Keccak256
+  | PreprepareResponse PreprepareDecision
   | ForcedConfigChange ForcedConfigChange
   | ValidatorBehaviorChange ForcedValidatorChange
   | ValidatorChange ChainMemberParsedSet Bool
@@ -159,7 +168,7 @@ instance Format InEvent where
   format (CommitResult (Left text)) = unpack $ "CommitResult Error: " <> text
   format (CommitResult (Right sha)) = "CommitResult Success: " ++ format sha
   format (UnannouncedBlock blk) = "UnannouncedBlock " ++ format (blockHash blk)
-  format (AcceptPreprepare bhsh) = "Accept Preprepare " ++ format bhsh
+  format (PreprepareResponse rspns) = "Preprepare Response " ++ format rspns
   format (PreviousBlock blk) = "PreviousBlock " ++ format (blockHash blk)
   format (ForcedConfigChange cc) = "ForcedConfigChange " ++ format cc
   format (ValidatorBehaviorChange theBool) = "ValidatorBehaviorChange " ++ format theBool
@@ -212,7 +221,7 @@ inShortLog loc iev = $logInfoS loc . pack $
     CommitResult (Left err) -> CL.red "COMMIT_RESULT " ++ show err
     CommitResult (Right hsh) -> CL.blue "COMMIT_RESULT " ++ format hsh
     UnannouncedBlock blk -> CL.blue "UNANNOUNCED_BLOCK " ++ blkNum blk
-    AcceptPreprepare hsh -> CL.blue "ACCEPT_PRE_PREPARE " ++ format hsh
+    PreprepareResponse rspns -> CL.blue "PRE_PREPARE_RESPONSE " ++ format rspns
     PreviousBlock blk -> CL.blue "PREVIOUS_BLOCK " ++ blkNum blk
     ForcedConfigChange cc -> CL.blue "FORCED_CONFIG_CHANGE " ++ format cc
     ValidatorBehaviorChange vc -> CL.blue "VALIDATOR_BEHAVIOR_CHANGE " ++ show vc

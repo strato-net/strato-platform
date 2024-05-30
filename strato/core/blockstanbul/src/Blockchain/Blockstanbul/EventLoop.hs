@@ -289,12 +289,15 @@ eventLoop ctx = execStateC ctx $
                 when (isJust self && valB) $ do
                   msg <- signMessage (Preprepare v realSealed)
                   yieldR msg
-        AcceptPreprepare bh -> do
-          self <- use selfCert
-          valB <- use validatorBehavior
-          when (isJust self && valB) $ do
-            msg <- signMessage (Prepare v bh)
-            yieldR msg
+                  yieldR $ RunPreprepare realSealed
+        PreprepareResponse decision -> case decision of 
+            AcceptPreprepare bh -> do 
+              self <- use selfCert
+              valB <- use validatorBehavior
+              when (isJust self && valB) $ do
+                msg <- signMessage (Prepare v bh)
+                yieldR msg
+            RejectPreprepare -> roundChange
         IMsg auth ppp@(Preprepare v' pp) -> do
           pr <- use proposer
           mBlockLock <- use blockLock
@@ -327,13 +330,13 @@ eventLoop ctx = execStateC ctx $
                     roundChange
                   Right () -> do
                     wasProposed <- isJust <$> use proposal
-                    unless wasProposed . yieldL $ OMsg auth ppp
-                    proposal .= Just pp
-                    self <- use selfCert
-                    valB <- use validatorBehavior
-                    when (isJust self && valB) $ do
+                    unless wasProposed $ do
+                      yieldL $ OMsg auth ppp
+                      proposal .= Just pp
+                      self <- use selfCert
+                      valB <- use validatorBehavior
                       -- run in vm before sending prepare
-                      yieldR $ RunPreprepare pp
+                      when (isJust self && valB) . yieldR $ RunPreprepare pp
         IMsg auth ppp@(Prepare v' di) -> when (v <= v') $ do
           preparers <- use prepared
           unless (M.member (sender auth) preparers) . yieldL $ OMsg auth ppp
@@ -489,7 +492,7 @@ recordInEvent ev =
         CommitResult {} -> inc "commit_result"
         UnannouncedBlock {} -> inc "unannounced_block"
         PreviousBlock {} -> inc "previous_block"
-        AcceptPreprepare {} -> inc "accept_preprepare"
+        PreprepareResponse {} -> inc "preprepare_response"
         ForcedConfigChange {} -> inc "forced_config_change"
         ValidatorBehaviorChange {} -> inc "validator_behavior_change"
         ValidatorChange {} -> inc "validator_change"

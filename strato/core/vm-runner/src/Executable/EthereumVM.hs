@@ -233,7 +233,7 @@ sendOutEvent (OutBlock o) = void . execKafka $ writeUnseqEvents [IEBlock $ block
 sendOutEvent (OutStateRootMismatch _) = pure ()
 sendOutEvent (OutGetMPNodes mpNodes) = void . execKafka $ writeUnseqEvents [IEGetMPNodes mpNodes]
 sendOutEvent (OutMPNodesResponse o nds) = void . execKafka $ writeUnseqEvents [IEMPNodesResponse o nds]
-sendOutEvent (OutAcceptPreprepare bh) = void . execKafka $ writeUnseqEvents [IEAcceptPreprepare bh]
+sendOutEvent (OutPreprepareResponse dec) = void . execKafka $ writeUnseqEvents [IEPreprepareResponse dec]
 
 consumerGroup :: KP.ConsumerGroup
 consumerGroup = lookupConsumerGroup "ethereum-vm"
