@@ -24,14 +24,6 @@ class MetaMaskController {
 
             const { supported_tokens } = req.body;
 
-            const query = `INSERT INTO metamask (
-                username,
-                eth_address,
-                supported_tokens
-            ) VALUES ($1, $2, $3);`
-
-            await client.query(query, [req.query.username, req.query.address, supported_tokens])
-
             // Call onboardSeller
             const callArgs = {
               sellersCommonName: username,
@@ -39,6 +31,14 @@ class MetaMaskController {
             }
             const onboardSellerStatus = await emitOnboardSeller(METAMASK_CONTRACT_ADDRESS, callArgs);
             console.log("onboardSellerStatus", onboardSellerStatus);
+
+            const query = `INSERT INTO metamask (
+                username,
+                eth_address,
+                supported_tokens
+            ) VALUES ($1, $2, $3);`
+
+            await client.query(query, [req.query.username, req.query.address, supported_tokens])
 
             res.status(204); // Success without content
 
