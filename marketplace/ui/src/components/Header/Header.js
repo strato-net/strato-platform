@@ -31,6 +31,7 @@ import { SEO } from "../../helpers/seoConstant";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
 import LoginModal from "../MarketPlace/LoginModal"
 import { setCookie } from "../../helpers/cookie";
+import TransferStratsModal from "../MarketPlace/TransferStratsModal";
 
 const { Header } = Layout;
 
@@ -83,6 +84,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(categoryQueryValue);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isTransferStratsModalVisible, setIsTransferStratsModalVisible] = useState(false);
 
   const stratsBalance = (Object.keys(strats).length > 0) ? strats : 0
 
@@ -310,6 +312,10 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     setIsModalVisible(false);
   };
 
+  const handleCloseTransferStratsModal = () => {
+    setIsTransferStratsModalVisible(false);
+  };
+
   return (
     <>
       <Header className={`fixed z-[100] !bg-[#ffffff] !pl-2 w-full !pr-4 md:px-12 flex md:!mb-10 ${showMenu ? '' : 'shadow-header'} items-center justify-between md:justify-start`}>
@@ -419,7 +425,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
 
           {(roleIndex !== undefined && roleIndex !== 1)
             && <Dropdown menu={{ items: stratsItem }} placement="bottomRight" trigger={["hover", "click"]} className="xs:mt-5 md:mt-0" overlayStyle={{ position: 'fixed' }}>
-              <a onClick={(e) => e.preventDefault()} className="md:flex mx-1 text-base text-white" id="strats-dropdown">
+              <a onClick={(e) => { e.preventDefault(); setIsTransferStratsModalVisible(true); }} className="md:flex mx-1 text-base text-white" id="strats-dropdown">
                 <Badge
                   style={{ backgroundColor: "#13188A" }}
                   className="cursor-pointer mt-7 md:mt-0 mx-2"
@@ -471,6 +477,11 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
         visible={isModalVisible}
         onCancel={handleClose}
         onLogin={handleLogin}
+      />
+      <TransferStratsModal
+        visible={isTransferStratsModalVisible}
+        onCancel={handleCloseTransferStratsModal}
+        balance={stratsBalance}
       />
     </>
 
