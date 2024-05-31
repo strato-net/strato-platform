@@ -9,6 +9,10 @@ const app = new express();
 app.use(bodyParser.json());
 app.use('/customer', customerAddress);
 
+if (process.env.TEST_MODE !== 'true') {
+  throw new Error(`TEST_MODE must be set to true.`);
+}
+
 describe('Customer Address Database Tests', function () {
   let testId;
 

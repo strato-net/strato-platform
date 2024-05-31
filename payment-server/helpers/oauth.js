@@ -69,8 +69,9 @@ class Admin {
   }
 }
 
-const ADMIN = new Admin();
+const ADMIN = process.env.TEST_MODE !== 'true' ? new Admin() : undefined;
 
-await ADMIN.bootstrap();
+if (process.env.TEST_MODE !== 'true')
+  await ADMIN.bootstrap();
 
 export default ADMIN;
