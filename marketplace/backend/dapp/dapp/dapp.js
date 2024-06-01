@@ -27,6 +27,7 @@ import artJs from "/dapp/items/art";
 import tokensJs from "/dapp/items/tokens";
 import carbonOffsetJs from "/dapp/items/carbonOffset";
 import metalsJs from "/dapp/items/metals";
+import spiritsJs from "/dapp/items/spirits";
 import clothingJs from "/dapp/items/clothing";
 import membershipJs from "/dapp/items/membership";
 import carbonDAOJs from "/dapp/items/carbonDAO";
@@ -221,19 +222,19 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   // -------------------------- INVENTORY --------------------------------
 
   contract.getInventory = async function (args, options = optionsNoChainIds) {
-    const getOptions = { ...options };
+    const getOptions = { ...options, app: contractName, };
     return await inventoryJs.get(rawAdmin, { ...args }, getOptions);
   };
 
   contract.getInventories = async function (args, options = optionsNoChainIds) {
-    const getOptions = { ...options };
+    const getOptions = { ...options, app: contractName };
     const inventories = await inventoryJs.getAll(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
     const inventoryCount = await inventoryJs.inventoryCount(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
     return { inventories: inventories, inventoryCount: inventoryCount }
   };
 
   contract.getInventoriesForUser = async function (args, options = optionsNoChainIds) {
-    const getOptions = { ...options };
+    const getOptions = { ...options, app: contractName };
     const { ownerCommonName, ...restArgs } = args;
     const newArgs = { ...restArgs, ownerCommonName: ownerCommonName, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, userProfile: true }//'0000000000000000000000000000000000000000'
     return marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
@@ -269,7 +270,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   contract.getAllItemTransferEvents = function (args, options = defaultOptions) {
-    const getOptions = { ...options };
+    const getOptions = { ...options, app: contractName, };
     return inventoryJs.getAllItemTransferEvents(rawAdmin, args, getOptions);
   };
 
@@ -286,38 +287,39 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   contract.requestRedemption = async function (args, options = defaultOptions) {
-    const getOptions = { ...options, app: contractName, };
-    const { originAssetAddress, assetAddresses, quantity, ...restArgs } = args;
+    try {
+      const { assetAddresses, quantity, ...restArgs } = args;
 
-    const contract = { address: assetAddresses[0] };
-    const [requestRedemptionStatus, assetAddress] = await inventoryJs.requestRedemption(rawAdmin, contract, { quantity: quantity }, options);
+      const contract = { address: assetAddresses[0] };
+      const [requestRedemptionStatus, assetAddress] = await inventoryJs.requestRedemption(rawAdmin, contract, { quantity: quantity }, options);
 
-    const originAsset = await inventoryJs.get(rawAdmin, { address: originAssetAddress }, getOptions);
-    const issuerCommonName = originAsset.ownerCommonName;
-    const finalArgs = { redemption_id: parseInt(util.uid()), issuerCommonName, assetAddresses: [assetAddress], quantity, ...restArgs }
+      const finalArgs = { redemption_id: parseInt(util.uid()), assetAddresses: [assetAddress], quantity, ...restArgs }
 
-    if (requestRedemptionStatus) {
-      try {
-        await axios.post(new URL(`/redemption/create`, STRIPE_PAYMENT_SERVER_URL).href, { ...finalArgs })
-          .then(function (res) {
-            if (res.status === 200) {
-              console.log(res.data);
-            } else {
-              throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
-            }
-          });
-        return {}
-      } catch (error) {
-        // The AssetStaus is initially switched to PENDING_REDEMPTION but must be reverted if Redemption creation fails
-        const [updateStatus] = await inventoryJs.updateAssetStatus(rawAdmin, { address: assetAddress }, { status: ASSET_STATUS.ACTIVE }, options);
+      if (requestRedemptionStatus) {
+        try {
+          await axios.post(new URL(`/redemption/create`, STRIPE_PAYMENT_SERVER_URL).href, { ...finalArgs })
+            .then(function (res) {
+              if (res.status === 200) {
+                console.log(res.data);
+              } else {
+                throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+              }
+            });
+          return {}
+        } catch (error) {
+          // The AssetStaus is initially switched to PENDING_REDEMPTION but must be reverted if Redemption creation fails
+          const [updateStatus] = await inventoryJs.updateAssetStatus(rawAdmin, { address: assetAddress }, { status: ASSET_STATUS.ACTIVE }, options);
 
-        if (error.response) {
-          throw new rest.RestError(error.response.status, error.response.statusText);
+          if (error.response) {
+            throw new rest.RestError(error.response.status, error.response.statusText);
+          }
+          throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while creating redemption record: ${JSON.stringify(error)} `);
         }
-        throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while creating redemption record: ${JSON.stringify(error)} `);
+      } else {
+        throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while requesting redemption");
       }
-    } else {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while requesting redemption");
+    } catch (error) {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, "Please contact sales@blockapps.net to redeem this item")
     }
   }
 
@@ -427,7 +429,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   // ------------------------------ INVENTORY ENDS--------------------------------
 
   contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options };
+    const getOptions = { ...options, app: contractName };
     //for ba sellers, get all assets - display For Sale and Sold Out
     const newArgs = { ...args, ownerCommonName: constants.baUserNames }
     const all = await marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
@@ -440,7 +442,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getMarketplaceInventoriesLoggedIn = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options };
+    const getOptions = { ...options, app: contractName };
     let usersArr = constants.baUserNames.filter(user => user !== userCommonName)
     const newArgs = { ...args, ownerCommonName: usersArr }
     const all = await marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
@@ -457,7 +459,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   contract.getTopSellingProductsLoggedIn = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options }
+    const getOptions = { ...options, app: contractName }
     const newArgs = {
       ...args, notEqualsField: ['sale', 'ownerCommonName'],
       notEqualsValue: [constants.zeroAddress, userCommonName],
@@ -465,24 +467,28 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions)
   }
 
-  contract.getPriceHistory = async function (args, options = defaultOptions) {
+  contract.getPriceHistory = async function (args, options = defaultOptions) {  
     try {
       const { assetAddress, timeFilter } = args;
 
       const assetWithoutQuantity = await inventoryJs.get(rawAdmin, { address: assetAddress }, options);
       const originAddress = assetWithoutQuantity.originAddress;
+      const assetsOfOriginAsset = await inventoryJs.getAll(rawAdmin,{ originAddress: originAddress}, options);
+      const assetsAddressArr = assetsOfOriginAsset.map(item=>item.address);
+      // Aggregate sales for all associated assets
+
+        const allAssetSales = await saleJs.getAll(rawAdmin, { 
+          assetToBeSold: assetsAddressArr,
+          order: "block_timestamp.asc",
+          gtField: "block_timestamp",
+          gtValue: getOneYearAgoTime()
+        }, options);
 
       // Fetch sales (12 months) for stats
-      const originSalesForStats = await saleJs.getAll(rawAdmin, {
-        assetToBeSold: originAddress,
-        order: "block_timestamp.asc",
-        gtField: "block_timestamp",
-        gtValue: getOneYearAgoTime()
-      }, options);
-      console.log("Fetched origin yearly sales:", originSalesForStats.length, "sales");
-
-      let salesFilter = { assetToBeSold: originAddress, order: "block_timestamp.asc" };
-
+      console.log("Fetched origin yearly sales:", allAssetSales.length, "sales");
+  
+      let salesFilter = { order: "block_timestamp.asc" };
+  
       // Sales Filter modification based on timeFilter
       if (timeFilter === timeFilterForSixMonths()) {
         // Applying 6-month filter
@@ -498,12 +504,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         console.log('Invalid timeFilter');
         return;
       }
+        const timeRangeSales = await saleJs.getAll(rawAdmin, {
+          assetToBeSold: assetsAddressArr,
+          ...salesFilter
+        }, options);
+
       // Fetch sales based on filter
-      const originTimeRangeSales = await saleJs.getAll(rawAdmin, {
-        ...salesFilter
-      }, options);
-
-
 
       // Process records such that for a given date the most recent sale price is fetched
       // This method processes sales passed, drills down into history table for each sale
@@ -512,13 +518,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         //Fetch histories for each sale
         const historyPromises = sales.map(sale => {
           //Fetch saleHistory
-          if (filter.assetToBeSold) {
-            //if timeFilter is applied, also add those filters
-            return saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, ...filter }, options);
-          } else {
+          if(filter.assetToBeSold) 
+          {
+            //If timeFilter is applied, also add those filters
+            return saleJs.getAllSaleHistory(rawAdmin, { assetToBeSold: sale.assetToBeSold, ...filter  }, options);
+          }else{
             //If historical data is fetched, apply 12 month timeFilter
 
-            return saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, assetToBeSold: originAddress, order: "block_timestamp.asc", gtField: "block_timestamp", gtValue: getOneYearAgoTime() }, options);
+            return saleJs.getAllSaleHistory(rawAdmin, { assetToBeSold: sale.assetToBeSold, order: "block_timestamp.asc", gtField: "block_timestamp", gtValue: getOneYearAgoTime() }, options); 
           }
         });
         const histories = await Promise.all(historyPromises);
@@ -545,8 +552,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       // Get the histories
       // Driver to fetch history sales for- plotting data points, stats
       const processedSalesResults = await Promise.allSettled([
-        processSalesHistory(originTimeRangeSales, salesFilter),// for data points to be plotted
-        processSalesHistory(originSalesForStats) // for 12-month historical data
+        processSalesHistory(timeRangeSales, salesFilter),// for data points to be plotted
+        processSalesHistory(allAssetSales) // for 12-month historical data
       ]);
 
       // Handling Promise.allSettled results (Logging purposes)
@@ -563,16 +570,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         Object.values(processedSalesResults[0].value).sort((a, b) => new Date(a.block_timestamp) - new Date(b.block_timestamp)) : [];
       // Only send price, timestamp as a part of the record
       const originRecords = originRecordsSorted ? Object.values(originRecordsSorted).map(({ price, block_timestamp }) => ({ price, block_timestamp })) : [];
-      // Append a record for the current date with the last known price
-      if (originRecords.length > 0) {
-        const lastKnownRecord = originRecords[originRecords.length - 1];
-        const currentDateTime = dayjs().utc().format('YYYY-MM-DD HH:mm:ss') + ' UTC';
-        originRecords.push({
-          price: lastKnownRecord.price,
-          block_timestamp: currentDateTime
-        });
-      }
-
+      //  Append a record for the current date with the last known price
+      //  if (originRecords.length > 0) {
+      //    const lastKnownRecord = originRecords[originRecords.length - 1];
+      //    const currentDateTime = dayjs().utc().format('YYYY-MM-DD HH:mm:ss') + ' UTC';
+      //    originRecords.push({
+      //      price: lastKnownRecord.price,
+      //      block_timestamp: currentDateTime
+      //    });
+      //  }
 
       // 12 month historical data
       const twelveMonthHistoryRecords = processedSalesResults[1].status === 'fulfilled' ?
@@ -605,7 +611,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getArts = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options };
+    const getOptions = { ...options, app: contractName, };
     return artJs.getAll(rawAdmin, args, getOptions);
   };
 
@@ -617,7 +623,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const createdDate = Math.floor(Date.now() / 1000);
     const newArgs = {
       ...args.itemArgs,
-      createdDate
+      createdDate,
+      status: ASSET_STATUS.ACTIVE
     };
     return tokensJs.uploadContract(rawAdmin, newArgs, options);
   };
@@ -642,7 +649,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getCarbonOffsets = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options };
+    const getOptions = { ...options, app: contractName, };
     return carbonOffsetJs.getAll(rawAdmin, args, getOptions);
   };
 
@@ -662,11 +669,31 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getMetals = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options };
+    const getOptions = { ...options, app: contractName, };
     return metalsJs.getAll(rawAdmin, args, getOptions);
   };
 
-  // ------------------------------ MATERIALS ENDS--------------------------------
+  // ------------------------------ METALS ENDS--------------------------------
+
+  // ------------------------------ SPIRITS STARTS------------------------------
+
+  contract.createSpirits = async function (args, options = defaultOptions) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const newArgs = {
+      ...args.itemArgs,
+      createdDate,
+      owner: rawAdmin.address,
+      status: ASSET_STATUS.ACTIVE
+    };
+    return spiritsJs.uploadContract(rawAdmin, newArgs, options);
+  };
+
+  contract.getSpirits = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options };
+    return spiritsJs.getAll(rawAdmin, args, getOptions);
+  };
+
+  // ------------------------------ SPIRITS ENDS--------------------------------
 
   // ------------------------------ CLOTHING STARTS------------------------------
 
@@ -681,7 +708,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getClothings = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options };
+    const getOptions = { ...options, app: contractName, };
     return clothingJs.getAll(rawAdmin, args, getOptions);
   };
 
@@ -702,7 +729,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getMemberships = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options };
+    const getOptions = { ...options, app: contractName, };
     return membershipJs.getAll(rawAdmin, args, getOptions);
   };
 
@@ -722,7 +749,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getCarbonDAOs = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options };
+    const getOptions = { ...options, app: contractName, };
     return carbonDAOJs.getAll(rawAdmin, args, getOptions);
   };
 
@@ -741,7 +768,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getCollectibles = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options };
+    const getOptions = { ...options, app: contractName, };
     return collectibleJs.getAll(rawAdmin, args, getOptions);
   };
 
@@ -783,12 +810,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   contract.getSaleOrders = async function (args, options = defaultOptions) {
-    const getOptions = { ...options };
+    const getOptions = { ...options, app: contractName, };
     return saleOrderJs.getAll(rawAdmin, args, getOptions);
   }
 
   contract.checkSaleQuantity = async function (args, options = defaultOptions) {
-    const getOptions = { ...options }
+    const getOptions = { ...options, app: contractName }
     return inventoryJs.checkSaleQuantity(rawAdmin, args, getOptions)
   }
 
@@ -842,7 +869,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.export = async function (options = defaultOptions) {
-    const getOptions = { ...options };
+    const getOptions = { ...options, app: contractName };
 
     const processOrders = async (orderArg) => {
       const orders = await saleOrderJs.getAll(rawAdmin, orderArg, getOptions);
@@ -912,7 +939,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   /* ------------------------ User Activity Starts ------------------------ */
   contract.getAllUserActivity = async function (args, options = defaultOptions) {
-    const getOptions = { ...options };
+    const getOptions = { ...options, app: contractName };
     const { sellersCommonName, purchasersCommonName, newOwnerCommonName } = args
 
     const currentDate = dayjs(); // Get the current date with dayjs
@@ -951,7 +978,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   /* ------------------------ Stripe account connect starts here ------------------------ */
   contract.stripeOnboarding = async function (args, options = defaultOptions) {
     try {
-      const getOptions = { ...options };
+      const getOptions = { ...options, app: contractName };
       let userStripeAccount, connectLink;
       // get user paymentProvider details from cirrus
       const sellerStripeDetails = await paymentProviderJs.get(rawAdmin, { name: 'STRIPE', accountDeauthorized: false, ownerCommonName: userCert.commonName }, getOptions)
@@ -986,7 +1013,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getStripeOnboardingStatus = async function (args, options = defaultOptions) {
     try {
-      const getOptions = { ...options };
+      const getOptions = { ...options, app: contractName };
 
       // get user paymentProvider details from cirrus
       const paymentProviders = await paymentProviderJs.get(rawAdmin, { name: 'STRIPE', accountDeauthorized: false, ...args }, getOptions);
@@ -1055,7 +1082,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       // get user paymentProvider details from cirrus
       const { accountId, ...restArgs } = args
 
-      const getOptions = { ...options };
+      const getOptions = { ...options, app: contractName };
       const chainOptions = { ...options, chainIds: [contract.chainId] };
 
       const paymentProvider = await paymentProviderJs.get(rawAdmin, { name: 'STRIPE', accountId }, getOptions);
@@ -1297,7 +1324,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getStratsBalance = async function (args, options = defaultOptions) {
     const { userAddress } = args;
-    const getOptions = { ...options, org: "TestCompany" };
+    const getOptions = { ...options, org: "TestCompany", app: '' };
     let address;
 
     if (process.env.networkID === constants.prodNetworkId) {

@@ -104,6 +104,12 @@ export const Metals = {
   create: '/'
 }
 
+export const Spirits = {
+  prefix: '/spirits',
+  getAll: '/',
+  create: '/'
+}
+
 export const Clothing = {
   prefix: '/clothing',
   getAll: '/',
@@ -161,23 +167,6 @@ export const OrderLineItem = {
   getAll: '/',
   create: '/',
   update: '/update',
-  audit: '/:address/:chainId/audit',
-  transferOwnership: '/transferOwnership',
-}
-
-export const EventType = {
-  prefix: '/eventType',
-  getAll: '/',
-  create: '/'
-}
-
-export const Event = {
-  prefix: '/event',
-  getInventoryEventTypes: '/:inventoryId',
-  getInventoryEventTypeDetails: '/:inventoryId/:eventTypeId',
-  getAll: '/',
-  create: '/',
-  certifyEvent: '/update',
   audit: '/:address/:chainId/audit',
   transferOwnership: '/transferOwnership',
 }

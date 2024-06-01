@@ -7,12 +7,8 @@ import Blockchain.Data.Block
 import Blockchain.Data.DataDefs
 import Blockchain.Data.TXOrigin ()
 import Blockchain.Data.Transaction
-import Blockchain.Database.MerklePatricia
 import Blockchain.Strato.Model.PositiveInteger
 import Blockchain.Strato.Model.Secp256k1 ()
-import qualified Data.ByteString as B
-import Data.ByteString.Arbitrary
-import Data.Time.Clock.POSIX
 import System.IO.Unsafe (unsafePerformIO)
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
@@ -22,44 +18,6 @@ data HaskoinPrvKey = HaskoinPrvKey H.PrvKey
 unboxPK :: HaskoinPrvKey -> H.PrvKey
 unboxPK (HaskoinPrvKey pk) = pk
 -}
-
-instance Arbitrary BlockData where
-  arbitrary = do
-    parentHash <- arbitrary
-    uncleHash <- arbitrary
-    coinbase <- arbitrary
-    stateRoot <- arbitrary
-    transactionsRoot <- arbitrary
-    receiptsRoot <- arbitrary
-    logBloom <- fastRandBs 256 -- 2048-bit bloom filter
-    difficulty <- unboxPI <$> arbitrary
-    number <- unboxPI <$> arbitrary
-    gasLimit <- unboxPI <$> arbitrary
-    gasUsed <- unboxPI <$> arbitrary `suchThat` (<= PositiveInteger gasLimit)
-    timestamp <- posixSecondsToUTCTime . fromInteger . unboxPI <$> arbitrary
-    -- TODO(tim): Rather than making an artificial dependent type, guard Block against
-    -- rogue long bytestrings.
-    extraData <- B.take 32 <$> arbitrary
-    nonce <- arbitrary
-    mixHash <- arbitrary
-    return
-      BlockData
-        { blockDataParentHash = parentHash,
-          blockDataUnclesHash = uncleHash,
-          blockDataCoinbase = coinbase,
-          blockDataStateRoot = stateRoot,
-          blockDataTransactionsRoot = transactionsRoot,
-          blockDataReceiptsRoot = receiptsRoot,
-          blockDataLogBloom = logBloom,
-          blockDataDifficulty = difficulty,
-          blockDataNumber = number,
-          blockDataGasLimit = gasLimit,
-          blockDataGasUsed = gasUsed,
-          blockDataTimestamp = timestamp,
-          blockDataExtraData = extraData,
-          blockDataNonce = nonce,
-          blockDataMixHash = mixHash
-        }
 
 instance Arbitrary Block where
   arbitrary = do
@@ -106,5 +64,3 @@ instance Arbitrary RawTransaction where
       <*> arbitrary
       <*> arbitrary
 
-instance Arbitrary StateRoot where
-  arbitrary = StateRoot <$> fastRandBs 32

@@ -603,7 +603,7 @@ getTypeOfName' s (CC.CodeCollection ccs _ _ enms strcts _ _ _) =
           ]
       ctrs = map ContractTypo $ M.keys ccs
    in case concatMap lookInContract ccs ++ ctrs of
-        [] -> internalError "getTypeOfName" s
+        [] -> internalError "getTypeOfName' " s
         (typo : _) -> typo
 
 getTypeOfName :: MonadSM m => SolidString -> m Typo
@@ -885,15 +885,16 @@ initializeAction :: MonadSM m
                  => Account
                  -> String
                  -> String
+                 -> String
+                 -> String
                  -> Keccak256
                  -> CC.CodeCollection
-                 -> Map (Account, T.Text) T.Text
+                 -> Map (Account, T.Text) (T.Text, T.Text)
                  -> [T.Text]
                  -> [T.Text]
                  -> m ()
-initializeAction acct name cn hsh cc ab maps arrs = do
-  -- org name to be set later, b/c the lookup is complex
-  let newData = Action.ActionData (SolidVMCode name hsh) cc (T.pack cn) SolidVM (Action.SolidVMDiff M.empty) ab maps arrs []
+initializeAction acct name crtr root appName hsh cc ab maps arrs = do
+  let newData = Action.ActionData (SolidVMCode name hsh) cc (T.pack crtr) (T.pack root) (T.pack appName) SolidVM (Action.SolidVMDiff M.empty) ab maps arrs []
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapInsertWith Action.mergeActionData acct newData
 
@@ -993,26 +994,27 @@ resolveNameParts ::
   MonadSM m =>
   Account ->
   T.Text ->
+  T.Text ->
   CC.Contract ->
-  m ((Account, T.Text), T.Text)
-resolveNameParts to' cn c = do
+  m ((Account, T.Text), (T.Text, T.Text))
+resolveNameParts to' crtr app c = do
   let tName = T.pack . CC._contractName
   case c ^. CC.importedFrom of
-    Nothing -> pure ((to', tName c), cn)
+    Nothing -> pure ((to', tName c), (crtr, app))
     Just acct ->
       A.select (A.Proxy @AddressState) acct >>= \case
         Nothing -> do
           $logWarnS "processTheMessages/resolveNameParts" . T.pack $
             "Could not find address state for account " ++ show acct
-          pure ((acct, tName c), cn)
+          pure ((acct, tName c), (crtr, app))
         Just s ->
           resolveCodePtr (acct ^. accountChainId) (addressStateCodeHash s) >>= \case
             Just (SolidVMCode appName _) -> do
               appCreator <- getSolidStorageKeyVal' acct $ MS.StoragePath [MS.Field ":creator"]
               case appCreator of
-                MS.BString cn' -> pure ((acct, tName c), T.pack $ BC.unpack cn')
-                _ -> pure ((acct, tName c), T.pack appName)
+                MS.BString cn' -> pure ((acct, tName c), (T.pack $ BC.unpack cn', T.pack appName))
+                _ -> pure ((acct, tName c), (crtr, T.pack appName))
             _ -> do
               $logWarnS "resolveNameParts" . T.pack $
                 "Could not resolve code for account " ++ show acct
-              pure ((acct, tName c), cn)
+              pure ((acct, tName c), (crtr, app))

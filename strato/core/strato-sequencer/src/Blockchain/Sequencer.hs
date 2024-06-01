@@ -20,8 +20,8 @@ import BlockApps.Logging
 import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul
 import qualified Blockchain.Data.Block as BDB
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.ChainInfo (chainInfo, creationBlock, parentChains)
-import qualified Blockchain.Data.DataDefs as BDB
 import qualified Blockchain.Data.RLP as RL
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.TransactionDef as TD
@@ -40,6 +40,7 @@ import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class as BDB
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
+import Blockchain.Strato.Model.Validator
 import ClassyPrelude (atomically)
 import Conduit
 import Control.Concurrent hiding (yield)
@@ -131,7 +132,7 @@ type MonadSequencer m =
     HasVault m
   )
 
-sequencer :: [ChainMemberParsedSet] -> SequencerM ()
+sequencer :: [Validator] -> SequencerM ()
 sequencer validators = do
   let logF = logFF "sequencer"
   hasPBFT <- isJust <$> getBlockstanbulContext
@@ -142,7 +143,7 @@ sequencer validators = do
       Just cert -> do
         let chainm = getChainMemberFromX509 cert
         logF $ "Node identity verified: " ++ show chainm
-        case chainm `elem` validators of
+        case chainMemberParsedSetToValidator chainm `elem` validators of
           True -> do
             putBlockstanbulContext $ ctx { _selfCert = Just chainm, _isValidator = True }
             logF "You are a validator in this network!"
@@ -714,20 +715,20 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
 prettyIBlock :: IngestBlock -> String
 prettyIBlock IngestBlock {ibOrigin = o, ibBlockData = bd, ibReceiptTransactions = txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"
   where
-    blockNonce = show . BDB.blockDataNumber $ bd
+    blockNonce = show . number $ bd
     bHash = format . BDB.blockHeaderHash $ bd
 
 prettyOBlock :: OutputBlock -> String
 prettyOBlock OutputBlock {obOrigin = o, obBlockData = bd, obReceiptTransactions = txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"
   where
-    blockNonce = show . BDB.blockDataNumber $ bd
+    blockNonce = show . number $ bd
     bHash = format . BDB.blockHeaderHash $ bd
 
 prettyBlock :: SequencedBlock -> String
 prettyBlock SequencedBlock {sbOrigin = o, sbBlockData = bd, sbReceiptTransactions = txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"
   where
-    blockNonce = show . BDB.blockDataNumber $ bd
-    bHash = format . BDB.blockHeaderHash $ bd
+    blockNonce = show . number $ bd
+    bHash = format . blockHeaderHash $ bd
 
 prettyTx :: IngestTx -> String
 prettyTx IngestTx {itOrigin = o, itTransaction = t} = prefix t ++ " via " ++ shortOrigin o

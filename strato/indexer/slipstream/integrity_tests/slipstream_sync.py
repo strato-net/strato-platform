@@ -12,8 +12,8 @@ def wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attemp
     while True:
         attempt += 1
         try:
-            response1 = requests.get(node1_url + "/cirrus/search/BlockApps-Asset", headers=headers1, params={'order':'block_timestamp.desc', 'limit':1})
-            response2 = requests.get(node2_url + "/cirrus/search/BlockApps-Asset", headers=headers2, params={'order':'block_timestamp.desc', 'limit':1})
+            response1 = requests.get(node1_url + "/cirrus/search/BlockApps-Mercata-Asset", headers=headers1, params={'order':'block_timestamp.desc', 'limit':1})
+            response2 = requests.get(node2_url + "/cirrus/search/BlockApps-Mercata-Asset", headers=headers2, params={'order':'block_timestamp.desc', 'limit':1})
             if response1.ok and response2.ok and response1:
                 response1_json = response1.json()
                 response2_json = response2.json()
@@ -87,7 +87,7 @@ def check_table(table):
         else:
             if assets1[a] != assets2[a]:
                 print("inconsistency at ", a)
-                for k in assets1[a].keys():
+                for k in assets2[a].keys():
                     if assets1[a][k] != assets2[a][k]:
                         #Only on contract name for now
                         if k=='contract_name':
@@ -129,9 +129,9 @@ if __name__ == "__main__":
     # Wait until both nodes have the same latest block indexed in Slipstream
     wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time)
 
-    discrepancies_asset, count_asset_discrepancy = check_table("BlockApps-Asset")
-    discrepancies_sale, count_sale_discrepancy = check_table("BlockApps-Order")
-    discrepancies_order, count_order_discrepancy = check_table("BlockApps-Sale")
+    discrepancies_asset, count_asset_discrepancy = check_table("BlockApps-Mercata-Asset")
+    discrepancies_sale, count_sale_discrepancy = check_table("BlockApps-Mercata-Order")
+    discrepancies_order, count_order_discrepancy = check_table("BlockApps-Mercata-Sale")
 
     # Print the results
     print("\nFinal check summary:")

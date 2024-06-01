@@ -21,7 +21,9 @@ data Detail = Incremental | Eventual
 data ProcessedContract = ProcessedContract
   { address :: Address,
     codehash :: CodePtr,
-    commonName :: Text,
+    creator :: Text,
+    root :: Text,
+    application :: Text,
     contractName :: Text,
     chain :: Text,
     blockHash :: Keccak256,

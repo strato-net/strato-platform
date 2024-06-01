@@ -1,23 +1,23 @@
 import express from "express";
-import EventTypeController from "./eventType.controller";
-import { EventType } from "../endpoints";
+import { Spirits } from "../endpoints";
 import authHandler from "../../middleware/authHandler";
 import loadDapp from "../../middleware/loadDappHandler";
+import SpiritsController from "./spirits.controller";
 
 const router = express.Router();
 
 router.get(
-  EventType.getAll,
+  Spirits.getAll,
   authHandler.authorizeRequest(true),
   loadDapp,
-  EventTypeController.getAll
+  SpiritsController.getAll
 );
 
 router.post(
-  EventType.create,
+  Spirits.create,
   authHandler.authorizeRequest(),
   loadDapp,
-  EventTypeController.create
+  SpiritsController.create
 );
 
 export default router;

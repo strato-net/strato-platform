@@ -29,7 +29,7 @@ return (
     {/* Tile for Average Price */}
     <div className="tileWrapper p-2 flex-auto md:max-w-[calc(33.333%-1.5rem)] w-full">
       <div className="tile bg-gray-200 p-4 rounded-lg shadow-md text-center">
-        <p className="title text-2xl font-semibold">${originAveragePrice.toFixed(2)}</p>
+        <p className="title text-2xl font-semibold">${originAveragePrice}</p>
         <p className="subtitle text-gray-600">Average Sale Price</p>
       </div>
     </div>

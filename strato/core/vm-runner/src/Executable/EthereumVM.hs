@@ -26,8 +26,7 @@ import Blockchain.DB.ChainDB
 import qualified Blockchain.DB.MemAddressStateDB as Mem
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.AddressStateRef (updateSQLBalanceAndNonce)
-import Blockchain.Data.BlockHeader (extraData2TxsLen)
-import Blockchain.Data.DataDefs (BlockData (..), blockDataExtraData)
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.GenesisBlock
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Database.MerklePatricia as MP
@@ -142,7 +141,7 @@ outputBlockToEvmCheckpoint block =
       txL = length txs
       uncL = length (obBlockUncles block)
       cbbi = ContextBestBlockInfo sha header td txL uncL
-      sr = blockDataStateRoot header
+      sr = stateRoot header
    in EVMCheckpoint sha header cbbi sr
 
 logEventSummaries :: MonadLogger m => [VmEvent] -> m ()
@@ -197,7 +196,8 @@ sendOutEvent (OutAction act) = do
                   CodeCollectionAdded
                     { codeCollection = const () <$> cc,
                       codePtr = cp,
-                      commonName = cn,
+                      creator = cn,
+                      application = n,
                       historyList =
                         case join $ fmap (M.lookup "history") (a ^. Action.metadata) of
                           Nothing -> []
@@ -213,7 +213,7 @@ sendOutEvent (OutAction act) = do
       vmes = ccEvents ++ dcEvents ++ actionEvents
   void . produceVMEvents $ toList vmes
 sendOutEvent (OutIndexEvent e) = void $ produceIndexEvents [e]
-sendOutEvent (OutToStateDiff cId cInfo bHash cn) = withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo cn
+sendOutEvent (OutToStateDiff cId cInfo bHash cn app) = withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo cn app
 sendOutEvent (OutStateDiff diff) = commitSqlDiffs diff
 sendOutEvent (OutLog l) = loopTimeit "flushLogEntries" $ void $ produceIndexEvents [LogDBEntry l]
 sendOutEvent (OutEvent e) = loopTimeit "flushEventEntries" $ void $ produceIndexEvents (EventDBEntry <$> e)
@@ -293,7 +293,7 @@ getUnprocessedKafkaEvents offset = do
         VmBlock OutputBlock {..} ->
           fromMaybe (length obReceiptTransactions)
             . extraData2TxsLen
-            $ blockDataExtraData obBlockData
+            $ extraData obBlockData
         _ -> 1
 
       !ret' = eventLimit . countLimit $ ret

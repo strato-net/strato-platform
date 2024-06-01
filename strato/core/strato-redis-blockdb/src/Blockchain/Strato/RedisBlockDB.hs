@@ -102,8 +102,8 @@ where
 
 import BlockApps.Logging
 import BlockApps.X509.Certificate
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.ChainInfo
-import Blockchain.Data.DataDefs
 import Blockchain.EthConf (lookupRedisBlockDBConfig)
 import Blockchain.Partitioner (partitionWith)
 import Blockchain.Sequencer.Event
@@ -114,6 +114,7 @@ import Blockchain.Strato.Model.ExtendedWord (Word256)
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.RedisBlockDB.Models as Models
+import Blockchain.Strato.Model.Validator (Validator)
 import Control.Arrow (second, (&&&), (***))
 import Control.Concurrent (threadDelay)
 import Control.Monad
@@ -242,7 +243,7 @@ getValidatorAddresses = do
     Right keysBS -> (fmap userAddress . catMaybes) <$> (sequence $ (getCertFromParsedSet . fromValue) <$> keysBS)
 
 addValidators ::
-  [CM.ChainMemberParsedSet] ->
+  [Validator] ->
   Redis (Either Reply Status)
 addValidators [] = pure $ Right Ok
 addValidators vals =
@@ -251,7 +252,7 @@ addValidators vals =
     Left reply -> pure $ Left reply
 
 removeValidators ::
-  [CM.ChainMemberParsedSet] ->
+  [Validator] ->
   Redis (Either Reply Status)
 removeValidators [] = pure $ Right Ok
 removeValidators vals =
@@ -651,7 +652,7 @@ getSHAsByNumber n =
 
 getHeader ::
   Keccak256 ->
-  Redis (Maybe BlockData)
+  Redis (Maybe BlockHeader)
 getHeader sha =
   getInNamespace Headers sha >>= \case
     Left _ -> return Nothing
@@ -662,12 +663,12 @@ getHeader sha =
 
 getHeaders ::
   [Keccak256] ->
-  Redis [(Keccak256, Maybe BlockData)]
+  Redis [(Keccak256, Maybe BlockHeader)]
 getHeaders = zipMapM getHeader
 
 getHeadersByNumber ::
   Integer ->
-  Redis [(Keccak256, Maybe BlockData)]
+  Redis [(Keccak256, Maybe BlockHeader)]
 getHeadersByNumber n =
   getMembersInNamespace Numbers n >>= \case
     Left _ -> return []
@@ -675,7 +676,7 @@ getHeadersByNumber n =
 
 getHeadersByNumbers ::
   [Integer] ->
-  Redis [(Integer, [(Keccak256, Maybe BlockData)])]
+  Redis [(Integer, [(Keccak256, Maybe BlockHeader)])]
 getHeadersByNumbers = zipMapM getHeadersByNumber
 
 getTransactions ::
@@ -715,7 +716,7 @@ addPrivateTransactions ptxs = do
 
 getUncles ::
   Keccak256 ->
-  Redis (Maybe [BlockData])
+  Redis (Maybe [BlockHeader])
 getUncles sha =
   getInNamespace Uncles sha >>= \case
     Left _ -> return Nothing
@@ -770,7 +771,7 @@ getZippedParentChain mapper start limit = do
 getHeaderChain ::
   Keccak256 ->
   Int ->
-  Redis [(Keccak256, BlockData)]
+  Redis [(Keccak256, BlockHeader)]
 getHeaderChain = getZippedParentChain getHeader
 
 getBlockChain ::
@@ -790,7 +791,7 @@ getCanonical n =
 
 getCanonicalHeader ::
   Integer ->
-  Redis (Maybe BlockData)
+  Redis (Maybe BlockHeader)
 getCanonicalHeader n =
   getCanonical n >>= \case
     Nothing -> return Nothing
@@ -817,7 +818,7 @@ getZippedCanonicalChain mapper start limit = do
 getCanonicalHeaderChain ::
   Integer ->
   Int ->
-  Redis [(Keccak256, BlockData)]
+  Redis [(Keccak256, BlockHeader)]
 getCanonicalHeaderChain = getZippedCanonicalChain getHeader
 
 getChildren ::
@@ -868,19 +869,19 @@ getBlocksByNumbers ::
 getBlocksByNumbers = zipMapM getBlocksByNumber
 
 putHeader ::
-  BlockData ->
+  BlockHeader ->
   Redis (Either Reply Status)
 putHeader = uncurry insertHeader . (blockHeaderHash &&& id)
 
 putHeaders ::
   Traversable t =>
-  t BlockData ->
+  t BlockHeader ->
   Redis (t (Either Reply Status))
 putHeaders = mapM putHeader
 
 insertHeader ::
   Keccak256 ->
-  BlockData ->
+  BlockHeader ->
   Redis (Either Reply Status)
 insertHeader sha h = do
   let parent = blockHeaderParentHash h
@@ -899,7 +900,7 @@ insertHeader sha h = do
     TxError e -> pure . Left $ SingleLine (S8.pack $ "insertHeader - Error" ++ e)
 
 insertHeaders ::
-  M.Map Keccak256 BlockData ->
+  M.Map Keccak256 BlockHeader ->
   Redis (M.Map Keccak256 (Either Reply Status))
 insertHeaders = sequenceA . M.mapWithKey insertHeader
 

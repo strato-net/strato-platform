@@ -28,9 +28,10 @@ import Blockchain.DB.CodeDB (CodeKind (..), getCode)
 import qualified Blockchain.DB.MemAddressStateDB as Mem
 import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.ChainInfo
-import Blockchain.Data.DataDefs (BlockData (..), TransactionResult (..), blockDataNumber)
+import Blockchain.Data.DataDefs (TransactionResult (..))
 import Blockchain.Data.ExecResults
 import Blockchain.Data.GenesisBlock
 import Blockchain.Data.TransactionResultStatus
@@ -202,9 +203,9 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis {..} -> do
           [] -> do
             yieldMany . concat $! map (OutLog . mkLogEntry bHash tHash (Just cId)) . erLogs <$> mExecResults
             yield . OutEvent . concat $! map (mkEventEntry (Just cId)) . erEvents <$> mExecResults
-            let commonName = case mExecResults of
-                  [] -> ""
-                  x : _ -> erCreator x
+            let (creator, appName) = case mExecResults of
+                  [] -> ("", "")
+                  x : _ -> (erCreator x, erAppName x)
             yield . OutTXR $
               TransactionResult
                 { transactionResultBlockHash = cBlock,
@@ -225,7 +226,8 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis {..} -> do
                   transactionResultStatus = Just Success,
                   transactionResultChainId = Just cId,
                   transactionResultKind = Just kind,
-                  transactionResultCommonName = commonName
+                  transactionResultCreator = creator,
+                  transactionResultAppName = appName
                 }
             Just (cId, cInfo, bHash, mExecResults) <$ putChainGenesisInfo (Just cId) cBlock sr pChains
           x : _ -> do
@@ -250,19 +252,25 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis {..} -> do
                   transactionResultStatus = Just $ Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt),
                   transactionResultChainId = Just cId,
                   transactionResultKind = Just kind,
-                  transactionResultCommonName = ""
+                  transactionResultCreator = "",
+                  transactionResultAppName = ""
                 }
             return Nothing
 
 outputNewChains :: VMBase m => [(Word256, ChainInfo, Keccak256, [ExecResults])] -> ConduitT a VmOutEvent m ()
 outputNewChains = traverse_ $ \(cId, cInfo, bHash, execr) -> do
   yield . OutIndexEvent $! NewChainInfo cId cInfo
-  let cn = fromMaybe "" $ do
+  let crtr = fromMaybe "" $ do
         e <- listToMaybe execr
         a <- erAction e
         d <- listToMaybe . OMap.assocs $ a ^. Action.actionData
         pure $ d ^. _2 . Action.actionDataCreator
-  yield $ OutToStateDiff cId cInfo bHash cn
+      app = fromMaybe "" $ do
+        e <- listToMaybe execr
+        a <- erAction e
+        d <- listToMaybe . OMap.assocs $ a ^. Action.actionData
+        pure $ d ^. _2 . Action.actionDataApplication
+  yield $ OutToStateDiff cId cInfo bHash crtr app
   for_ (catMaybes $ erAction <$> execr) $ yield . OutAction
   yield . OutEvent $ flip map (concatMap erEvents execr) $ mkEventEntry (Just cId)
 
@@ -283,13 +291,13 @@ processBlockSummaries ::
   [OutputBlock] ->
   m ()
 processBlockSummaries = mapM_ $ \b -> do
-  let number = blockDataNumber $ obBlockData b
+  let number' = number $ obBlockData b
       txCount = length $ obReceiptTransactions b
-  recordMaxBlockNumber "vm_seqevents" number
+  recordMaxBlockNumber "vm_seqevents" number'
   $logDebugS "evm/processBlockSummaries" . T.pack $
     concat
       [ "Received block number ",
-        show number,
+        show number',
         " with ",
         show txCount,
         " transactions from seqEvents"
@@ -369,7 +377,7 @@ runChainConstructors cId cInfo = do
           False --noValueTransfer
           True -- isRunChainConstructors
           S.empty --pre-existing suicide list
-          ( BlockData
+          ( BlockHeader
               (Keccak256.unsafeCreateKeccak256FromWord256 0)
               (Keccak256.unsafeCreateKeccak256FromWord256 0)
               emptyChainMember
@@ -383,8 +391,8 @@ runChainConstructors cId cInfo = do
               0
               (bSumTimestamp curBlockSummary)
               ""
-              0
               (Keccak256.unsafeCreateKeccak256FromWord256 0)
+              0
           )
           0 --callDepth
           (Account 0 $ Just cId) --receiveAddress

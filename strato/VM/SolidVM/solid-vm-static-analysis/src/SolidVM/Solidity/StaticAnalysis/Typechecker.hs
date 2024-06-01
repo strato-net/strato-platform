@@ -728,6 +728,7 @@ typecheckMember (Static e@(SVMType.Enum _ enum mNames) x) n = do
 -- Static: argType, ContextType
 typecheckMember (Static (SVMType.Account True) x) "transfer" = pure $ Function (Static (SVMType.Int Nothing Nothing) x) (Product [] x) x [] [] False
 typecheckMember (Static (SVMType.Account True) x) "send" = pure $ Function (Static (SVMType.Int Nothing Nothing) x) (Static (SVMType.Bool) x) x [] [] False
+typecheckMember (Static (SVMType.Account _) x) "nonce" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Account _) x) "balance" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Account _) x) "code" =
   pure . Sum $
@@ -745,6 +746,8 @@ typecheckMember (Static (SVMType.Account _) x) "chainId" = pure $ Static (SVMTyp
 typecheckMember (Static (SVMType.Account _) x) "chainIdString" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.Account _) x) "creator" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.Address _) x) "creator" = pure $ Static (SVMType.String Nothing) x
+typecheckMember (Static (SVMType.Account _) x) "root" = pure $ Static (SVMType.Account False) x
+typecheckMember (Static (SVMType.Address _) x) "root" = pure $ Static (SVMType.Account False) x
 typecheckMember (Static (SVMType.Struct _ struct) x) n = do
   names <- M.fromList <$> lookupStruct struct
   pure $ case M.lookup n names of
@@ -760,6 +763,7 @@ typecheckMember (Static (SVMType.Struct _ struct) x) n = do
         )
           <$ x
 -- I'm intentionally leaving out send and transfer for Contract types, since we don't have a payable flag for them yet
+typecheckMember (Static (SVMType.Contract _) x) "nonce" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Contract _) x) "balance" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Contract _) x) "code" =
   pure . Sum $
@@ -776,6 +780,7 @@ typecheckMember (Static (SVMType.Contract _) x) "code" =
 -- typecheckMember (Static (SVMType.Contract _) x) "searchcode" = pure $ Function (Static (SVMType.String Nothing) x) (Static (SVMType.String Nothing) x) x
 typecheckMember (Static (SVMType.Contract _) x) "codehash" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.Contract _) x) "chainId" = pure $ Static (SVMType.Int Nothing Nothing) x
+typecheckMember (Static (SVMType.Contract _) x) "root" = pure $ Static (SVMType.Account False) x
 typecheckMember (Static (SVMType.Contract c) x) n = lookupContractFunction x c n
 typecheckMember (Static (SVMType.UnknownLabel c _) x) n = do
   e <- typecheckMember (Static (SVMType.Enum Nothing c Nothing) x) n

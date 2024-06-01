@@ -12,14 +12,13 @@ import art from './Art'
 import tokens from './Tokens'
 import carbonOffset from './CarbonOffset'
 import metals from './Metals'
+import spirits from './Spirits'
 import clothing from './Clothing'
 import membership from './Membership'
 import carbonDAO from './CarbonDAO'
 import collectibles from './Collectibles'
 import order from './Order'
 import orderLineItem from './OrderLineItem'
-import eventType from './EventType'
-import event from './Event'
 import authentication from './authentication'
 import users from './users'
 import marketplace from './Marketplace'
@@ -40,14 +39,13 @@ import {
   Tokens,
   CarbonOffset,
   Metals,
+  Spirits,
   Clothing,
   Membership,
   CarbonDAO,
   Collectibles,
   Order,
   OrderLineItem,
-  EventType,
-  Event,
   Marketplace,
   OrderLine,
   PaymentService,
@@ -73,10 +71,9 @@ router.use(Membership.prefix, membership)
 router.use(CarbonDAO.prefix, carbonDAO)
 router.use(Collectibles.prefix, collectibles)
 router.use(Metals.prefix, metals)
+router.use(Spirits.prefix, spirits)
 router.use(Order.prefix, order)
 router.use(OrderLineItem.prefix, orderLineItem)
-router.use(EventType.prefix, eventType)
-router.use(Event.prefix, event)
 router.use(Marketplace.prefix, marketplace)
 router.use(OrderLine.prefix, orderLine)
 router.use(PaymentService.prefix, paymentService)

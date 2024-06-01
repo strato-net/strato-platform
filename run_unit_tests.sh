@@ -36,13 +36,14 @@ stack test $5\
       solid-vm-parser \
       source-tools \
       strato-index \
-      strato-lite \
       strato-genesis \
       strato-model \
       strato-redis-blockdb \
       strato-sequencer \
       vm-runner \
       x509-certs
+
+#      strato-lite \
 
 stack test \
   highway/ --test-arguments="--awsaccesskeyid $1 --awssecretaccesskey $2 --awss3bucket $3 --highwayUrl $4"

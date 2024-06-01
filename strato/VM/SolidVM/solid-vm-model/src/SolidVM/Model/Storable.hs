@@ -201,6 +201,7 @@ parseField = do
     )
     <|> ((string ":creator") *> pathParser)
     <|> ((string ":creatorAddress") *> pathParser)
+    <|> ((string ":originAddress") *> pathParser)
 
 parsePath :: B.ByteString -> Either String StoragePath
 parsePath = fmap StoragePath . parseOnly pathParser

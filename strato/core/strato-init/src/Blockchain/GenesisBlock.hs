@@ -23,9 +23,9 @@ import Blockchain.DB.StateDB
 import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockDB
 import Blockchain.Data.ChainInfo
-import Blockchain.Data.DataDefs
 import Blockchain.Data.Extra
 import Blockchain.Data.GenesisBlock
 import Blockchain.Data.GenesisInfo
@@ -55,6 +55,7 @@ import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Util
+import Blockchain.Strato.Model.Validator
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import Blockchain.Strato.StateDiff hiding (StateDiff (blockHash, chainId, stateRoot))
 import qualified Blockchain.Strato.StateDiff as StateDiff (StateDiff (blockHash, chainId, stateRoot))
@@ -124,7 +125,7 @@ getGenesisBlockAndPopulateInitialMPs ::
     HasRedis m
   ) =>
   String ->
-  m ([(Ad.Address, X509CertInfoState)], [ChainMemberParsedSet], ([(AccountInfo, CodeInfo)], Block))
+  m ([(Ad.Address, X509CertInfoState)], [Validator], ([(AccountInfo, CodeInfo)], Block))
 getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
   genesisInfo <- getGenesisInfoFromFile genesisBlockName
   let certs = readCertsFromGenesisInfo genesisInfo
@@ -177,7 +178,7 @@ initializeGenesisBlock genesisBlockName = do
   obGB <- liftIO $ bootstrapSequencer extraCertInfoStates genesisBlock
   putGenesisHash $ blockHash genesisBlock
   $logInfoS "initgen" "Initial merkle patricia tries successfully created"
-  void $ putBlocks [(genesisBlock, blockDataDifficulty (blockBlockData genesisBlock))] False
+  void $ putBlocks [(genesisBlock, difficulty (blockBlockData genesisBlock))] False
   $logInfoS "initgen" "Genesis Block put"
   $logInfoS "initgen" "State diff has been generated"
 
@@ -188,8 +189,8 @@ initializeGenesisBlock genesisBlockName = do
   void . execRedis $
     RBDB.forceBestBlockInfo
       (blockHash genesisBlock)
-      (blockDataNumber . blockBlockData $ genesisBlock)
-      (blockDataDifficulty . blockBlockData $ genesisBlock)
+      (number . blockBlockData $ genesisBlock)
+      (difficulty . blockBlockData $ genesisBlock)
   $logInfoS "initgen" "best block info inserted"
   liftIO $ bootstrapIndexer obGB
   $logInfoS "initgen" "indexer has been bootstrapped"
@@ -258,6 +259,8 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
                     (codeHash d)
                     emptyCodeCollection
                     ""
+                    ""
+                    ""
                     ( case codeHash d of
                         ExternallyOwned _ -> EVM
                         SolidVMCode _ _ -> SolidVM
@@ -302,7 +305,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
     forM_ (map (fromMaybe Map.empty . A._metadata) filteredActions) $ \md ->
       case (Map.lookup "src" md, Map.lookup "name" md) of
         (Just src, Just n) -> case runIdentity . runMemCompilerT $ compileSource False $ Map.singleton "" src of
-          Right cc -> void $ produceVMEvents [CodeCollectionAdded (const () <$> cc) (SolidVMCode (T.unpack n) $ hash $ BC.pack $ T.unpack src) "" [] Map.empty []]
+          Right cc -> void $ produceVMEvents [CodeCollectionAdded (const () <$> cc) (SolidVMCode (T.unpack n) $ hash $ BC.pack $ T.unpack src) "" "" [] Map.empty []]
           Left _ -> pure ()
         _ -> return ()
 
