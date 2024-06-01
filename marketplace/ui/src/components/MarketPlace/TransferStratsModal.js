@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Button, Card, Col, Input, InputNumber, Modal, Row, Select, Spin } from 'antd';
+import React, { useState } from 'react';
+import { Button, Card, InputNumber, Modal, Select } from 'antd';
 import {
   useMarketplaceDispatch,
   useMarketplaceState
@@ -8,7 +8,6 @@ import { actions } from "../../contexts/marketplace/actions";
 import { actions as userActions } from "../../contexts/users/actions";
 import { useUsersDispatch, useUsersState } from "../../contexts/users";
 import { useAuthenticateState } from "../../contexts/authentication";
-import Column from 'antd/es/table/Column';
 
 const TransferStratsModal = ({ visible, onCancel }) => {
   
