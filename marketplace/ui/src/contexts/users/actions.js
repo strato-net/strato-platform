@@ -8,11 +8,12 @@ const actionDescriptors = {
 };
 
 const actions = {
-  fetchUsers: async (dispatch) => {
+  fetchUsers: async (dispatch, search) => {
     dispatch({ type: actionDescriptors.fetchUsers });
 
     try {
-      const response = await fetch(`${apiUrl}/users`, {
+      const query = search ? `&queryFields=commonName&queryValue=${search}` : ''
+      const response = await fetch(`${apiUrl}/users?limit=10&${query}`, {
         method: HTTP_METHODS.GET,
       });
 

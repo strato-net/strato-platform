@@ -54,7 +54,6 @@ async function getStratsBalance(admin, args = {}, options) {
 }
 
 async function transferStrats(admin, args, options = defaultOptions) {
-  console.log(`###### TRANSFER ARGS: ${JSON.stringify(args)}`)
   const address = getStratsAddress();
   const contract = {
     name: contractName,

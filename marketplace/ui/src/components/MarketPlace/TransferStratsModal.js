@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Button, Card, Col, Input, InputNumber, Modal, Row, Spin } from 'antd';
+import { Button, Card, Col, Input, InputNumber, Modal, Row, Select, Spin } from 'antd';
 import {
   useMarketplaceDispatch,
   useMarketplaceState
 } from "../../contexts/marketplace";
 import { actions } from "../../contexts/marketplace/actions";
+import { actions as userActions } from "../../contexts/users/actions";
+import { useUsersDispatch, useUsersState } from "../../contexts/users";
+import { useAuthenticateState } from "../../contexts/authentication";
 import Column from 'antd/es/table/Column';
 
 const TransferStratsModal = ({ visible, onCancel }) => {
@@ -20,30 +23,52 @@ const TransferStratsModal = ({ visible, onCancel }) => {
     setAmount(value);
   }
 
-  const handleSelect = (value, option) => {
-    setReceiverAddress(value)
+  const userDispatch = useUsersDispatch();
+  const {
+      user
+  } = useAuthenticateState();
+  const {
+      users
+  } = useUsersState();
+  const usersList = (users || []).map((record) => ((user || {}).commonName !== record.commonName ? { label: `${record.commonName} - ${record.organization}`, value: record.userAddress } : {}));
+  const filterDuplicateUserAddresses = (arr) => {
+      return [...new Map(arr.map((u) => [u.value, u])).values()];
+  };
+  const filteredUsersList = filterDuplicateUserAddresses(usersList);
+
+  let timeout
+  const onSearch = (e) => {
+    if (e && e !== '') {
+      clearTimeout(timeout)
+      timeout = setTimeout(() => userActions.fetchUsers(userDispatch, e), 500)
+    }
   }
 
-  const onChange = (e) => {
-    setReceiverAddress(e.target.value)
+  const handleSelect = (e) => {
+    setReceiverAddress(e);
   }
   
-  const handleSubmit = async () => {
+  const handleSubmit = async (e) => {
     const payload = {
       to: receiverAddress,
       value: amount !== undefined ? amount * 100 : 0
     }
     await actions.transferStrats(marketplaceDispatch, payload);
-    onCancel();
+    actions.fetchStratsBalance(marketplaceDispatch);
+    handleCancel(e);
   };
+
+  const handleCancel = (e) => {
+    onCancel(e);
+  }
 
   return (
       <Modal
           title="Transfer STRATs"
           open={visible}
-          onCancel={onCancel}
+          onCancel={handleCancel}
           footer={[
-              <Button key="back" onClick={onCancel}>
+              <Button key="back" onClick={handleCancel}>
                   Cancel
               </Button>,
               <Button key="submit" type="primary" onClick={handleSubmit} disabled={isTransferringStrats}>
@@ -53,24 +78,24 @@ const TransferStratsModal = ({ visible, onCancel }) => {
       >
         <Card style={{ height: 200 }}>
           <div style={{ display: 'flex', alignItems: 'center', flexDirection: 'column', justifyContent: 'center' }}>
-            <Row>
-              To
-              <Input onChange={onChange} placeholder='Recipient address' />
-              {/* <Select
+            <div>
+              <p className="text-[#202020] font-medium text-sm">Recipient</p>
+              <Select
                 style={{ width: '20rem', marginBottom: '10px' }}
                 placeholder={'Select Recipient'}
                 showSearch
                 size="large"
+                onSearch={onSearch}
                 onSelect={handleSelect}
-                options={filteredDupUsersList}
+                options={filteredUsersList}
                 optionFilterProp="value"
                 filterOption={(input, option) =>
                   (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
                 }
-              /> */ }
-            </Row>
-            <Row>
-              Amount
+              />
+            </div>
+            <div>
+              <p className="text-[#202020] font-medium text-sm">Amount</p>
               <InputNumber
                 style={{ width: '20rem', marginBottom: '10px' }}
                 controls={false}
@@ -81,7 +106,7 @@ const TransferStratsModal = ({ visible, onCancel }) => {
                 onChange={(e) => handleChange(e)}
                 value={amount}
               />
-            </Row>
+            </div>
           </div>
         </Card>
       </Modal>
