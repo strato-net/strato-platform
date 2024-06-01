@@ -12,8 +12,8 @@ const actions = {
     dispatch({ type: actionDescriptors.fetchUsers });
 
     try {
-      const query = search ? `&queryFields=commonName&queryValue=${search}` : ''
-      const response = await fetch(`${apiUrl}/users?limit=10&${query}`, {
+      const query = search ? `?limit=10&queryFields=commonName&queryValue=${search}` : ''
+      const response = await fetch(`${apiUrl}/users${query}`, {
         method: HTTP_METHODS.GET,
       });
 
