@@ -25,7 +25,7 @@ module IdentityProvider.Server (identityProviderApp) where
 
 import Bloc.API.Transaction
 import Bloc.API.Users
-import Bloc.Client (postBlocTransactionParallelExternal)
+import Bloc.Client (postBlocTransactionParallel)
 import BlockApps.Logging
 import BlockApps.Solidity.ArgValue
 import BlockApps.X509 hiding (isValid)
@@ -459,7 +459,7 @@ registerCert cert token RealmDetails {associatedNodeUrl = nurl, associatedFallba
               functionpayloadMetadata = Nothing
             }
       txRequest = PostBlocTransactionRequest Nothing [txPayload] Nothing Nothing
-      postBlocTx = runClientM (postBlocTransactionParallelExternal (Just $ "Bearer " <> access_token token) Nothing Nothing True False txRequest)
+      postBlocTx = runClientM (postBlocTransactionParallel (Just $ "Bearer " <> access_token token) Nothing Nothing True False txRequest)
   eresponse <- liftIO $ postBlocTx clientEnv
   case eresponse of
     Right response ->
@@ -538,7 +538,7 @@ registerUserWallet
                 functionpayloadMetadata = Nothing
               }
         txRequest = PostBlocTransactionRequest Nothing [txPayload] Nothing Nothing
-        postBlocTx = runClientM (postBlocTransactionParallelExternal (Just $ "Bearer " <> access_token token) Nothing Nothing True False txRequest)
+        postBlocTx = runClientM (postBlocTransactionParallel (Just $ "Bearer " <> access_token token) Nothing Nothing True False txRequest)
     eresponse <- liftIO $ postBlocTx clientEnv
     case eresponse of
       Right response ->

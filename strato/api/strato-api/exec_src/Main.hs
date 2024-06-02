@@ -13,6 +13,7 @@
 
 module Main where
 
+import API.Parametric
 import Bloc.API
 -- hiding (handleRuntimeError)
 import Bloc.Database.Queries
@@ -166,7 +167,9 @@ type CoreAPI =
            :<|> TxLast.API
        )
 
-type FullAPI = CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI
+type FullAPI' r hs = CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI r hs
+type FullAPI = FullAPI' '[Required, Strict] InternalHeaders
+type FullAPIExternal = FullAPI' '[Optional, Strict] ExternalHeaders
 
 coreServer ::
   ( MonadLogger m,
@@ -274,7 +277,7 @@ main = do
   _ <- traverseWithKey (\service url' -> putStrLn $ "The url for " <>  service <> " is " <> url') urlMap
 
   let theDoc =
-        toSwagger (Proxy :: Proxy FullAPI)
+        toSwagger (Proxy :: Proxy FullAPIExternal)
           & info . title .~ "Strato API"
           & info . description
             ?~ "This is the great Strato API, which let's \
@@ -331,7 +334,7 @@ addPathsTo404 baseApp req respond' =
                 ++ tab ("\n" ++ unlines allPaths)
                 ++ "\n"
   where
-    allPaths = H.keys $ _swaggerPaths $ toSwagger (Proxy :: Proxy FullAPI)
+    allPaths = H.keys $ _swaggerPaths $ toSwagger (Proxy :: Proxy FullAPIExternal)
 
 ----------
 

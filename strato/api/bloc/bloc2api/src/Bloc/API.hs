@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -16,6 +17,7 @@ module Bloc.API
   )
 where
 
+import API.Parametric
 import Bloc.API.Chain
 import Bloc.API.Contracts
 import Bloc.API.Git
@@ -27,7 +29,7 @@ import Data.Text
 import Servant
 import Servant.Docs
 
-type BlocAPI =
+type BlocAPI r hs =
   -- / endpoint, for smoke test. Also exports git details.
   GetGitInfo
     -- /contracts endpoints
@@ -48,17 +50,16 @@ type BlocAPI =
     :<|> GetBlocTransactionResult
     :<|> PostBlocTransactionResults
     -- /chain endpoints
-    :<|> PostChainInfo
+    :<|> PostChainInfo r hs
     :<|> GetSingleChainInfo
     -- /chains endpoints
-    :<|> PostChainInfos
+    :<|> PostChainInfos r hs
     :<|> GetChainInfo
     -- /transaction endpoints
-    :<|> PostBlocTransactionParallel
-    :<|> PostBlocTransactionBody
-    :<|> PostBlocTransactionUnsigned
-    :<|> PostBlocTransaction
-    :<|> PostBlocTransactionParallelExternal
+    :<|> PostBlocTransactionParallel r hs
+    :<|> PostBlocTransactionBody r hs
+    :<|> PostBlocTransactionUnsigned r hs
+    :<|> PostBlocTransaction r hs
 
 --Unsure what this will break if anything but remove later
 instance ToSample Text where
@@ -70,5 +71,5 @@ markdownBloc = markdown $ docs blocApi
 layoutBloc :: Text
 layoutBloc = layout blocApi
 
-blocApi :: Proxy BlocAPI
+blocApi :: Proxy (BlocAPI '[Optional, Strict] ExternalHeaders)
 blocApi = Proxy

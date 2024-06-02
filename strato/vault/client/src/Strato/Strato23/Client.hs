@@ -26,23 +26,23 @@ import           Strato.Strato23.API
 getPing :: ClientM Version
 getPing = client (Proxy @GetPing)
 
-getKey :: ClientEmbedOptional ClientHeaders (Maybe Text -> ClientM AddressAndKey)
-getKey = client (Proxy @(GetKey '[Optional, Strict] ClientHeaders))
+getKey :: ClientEmbed ExternalHeaders (Maybe Text -> ClientM AddressAndKey)
+getKey = client (Proxy @(GetKey '[Optional, Strict] ExternalHeaders))
 
-getKeys :: ClientEmbedOptional ClientHeaders (Maybe Text -> ClientM [AddressAndKey])
-getKeys = client (Proxy @(GetKeys '[Optional, Strict] ClientHeaders))
+getKeys :: ClientEmbed ExternalHeaders (Maybe Text -> ClientM [AddressAndKey])
+getKeys = client (Proxy @(GetKeys '[Optional, Strict] ExternalHeaders))
 
-postKey :: ClientEmbedOptional ClientHeaders (ClientM AddressAndKey)
-postKey = client (Proxy @(PostKey '[Optional, Strict] ClientHeaders))
+postKey :: ClientEmbed ExternalHeaders (ClientM AddressAndKey)
+postKey = client (Proxy @(PostKey '[Optional, Strict] ExternalHeaders))
 
-getSharedKey :: ClientEmbedOptional ClientHeaders (PublicKey -> ClientM SharedKey)
-getSharedKey = client (Proxy @(GetSharedKey '[Optional, Strict] ClientHeaders))
+getSharedKey :: ClientEmbed ExternalHeaders (PublicKey -> ClientM SharedKey)
+getSharedKey = client (Proxy @(GetSharedKey '[Optional, Strict] ExternalHeaders))
 
-getUsers :: ClientEmbedOptional ClientHeaders (Maybe Address -> Maybe Int -> Maybe Int -> ClientM [User]) -- External Vault
-getUsers = client (Proxy @(GetUsers '[Optional, Strict] ClientHeaders))
+getUsers :: ClientEmbed ExternalHeaders (Maybe Address -> Maybe Int -> Maybe Int -> ClientM [User]) -- External Vault
+getUsers = client (Proxy @(GetUsers '[Optional, Strict] ExternalHeaders))
 
-postSignature :: ClientEmbedOptional ClientHeaders (MsgHash -> ClientM Signature)
-postSignature = client (Proxy @(PostSignature '[Optional, Strict] ClientHeaders))
+postSignature :: ClientEmbed ExternalHeaders (MsgHash -> ClientM Signature)
+postSignature = client (Proxy @(PostSignature '[Optional, Strict] ExternalHeaders))
 
 postPassword :: Text -> ClientM ()
 postPassword = client (Proxy @PostPassword)

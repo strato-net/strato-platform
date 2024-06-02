@@ -64,6 +64,7 @@ packages:
 - libs/kafka/milena-tools
 - libs/monad-alter
 - libs/nibblestring
+- libs/parametric-apis
 - libs/partitioner
 - libs/prometheus/blockapps-init
 - libs/prometheus/cross-monitoring

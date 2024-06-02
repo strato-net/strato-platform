@@ -1,9 +1,9 @@
-name:                blockapps-vault-wrapper-api
+name:                parametric-apis
 version:             0.1.0.0
 github:              "githubuser/API"
-author:              "Author name here"
-maintainer:          "example@example.com"
-copyright:           "2018 Author name here"
+author:              "Dustin Norwood"
+maintainer:          "dustin@blockapps.net"
+copyright:           "2024 BlockApps"
 
 extra-source-files:
 - README.md
@@ -24,18 +24,6 @@ dependencies:
 library:
   source-dirs: src
   dependencies:
-  - aeson
-  - aeson-casing
-  - base16-bytestring
-  - bytestring
-  - cryptonite
-  - labeled-error
-  - lens
-  - parametric-apis
-  - saltine
   - servant
-  - servant-server
-  - strato-model
-  - swagger2
   - text
 

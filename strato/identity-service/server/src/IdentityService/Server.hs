@@ -28,7 +28,7 @@ module IdentityService.Server
 
 import Bloc.API.Transaction
 import Bloc.API.Users
-import Bloc.Client (postBlocTransactionParallelExternal)
+import Bloc.Client (postBlocTransactionParallel)
 import BlockApps.Logging
 import BlockApps.Solidity.ArgValue
 import BlockApps.X509 hiding (isValid)
@@ -240,7 +240,7 @@ registerCert cert = do
               functionpayloadMetadata = Nothing
             }
       txRequest = PostBlocTransactionRequest Nothing [txPayload] Nothing Nothing
-      postBlocTx = runClientM (postBlocTransactionParallelExternal Nothing Nothing Nothing True False txRequest)
+      postBlocTx = runClientM (postBlocTransactionParallel Nothing Nothing Nothing True False txRequest)
   eresponse <- liftIO $ postBlocTx clientEnv
   case eresponse of
     Right response ->

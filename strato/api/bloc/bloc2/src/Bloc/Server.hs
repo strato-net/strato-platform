@@ -8,6 +8,7 @@
 
 module Bloc.Server where
 
+import API.Parametric
 import Bloc.API
 import Bloc.Monad
 import Bloc.Server.Chain
@@ -43,7 +44,7 @@ bloc ::
     HasCodeDB m,
     (Keccak256 `Selectable` SourceMap) m
   ) =>
-  ServerT BlocAPI m
+  ServerT (BlocAPI '[Required, Strict] InternalHeaders) m
 bloc =
   return gitInfo
     :<|> getContracts
@@ -69,11 +70,10 @@ bloc =
     :<|> postBlocTransactionBody
     :<|> postBlocTransactionUnsigned
     :<|> postBlocTransaction
-    :<|> postBlocTransactionParallelExternal
 
 blocSwagger :: Swagger
 blocSwagger =
-  toSwagger (Proxy @BlocAPI)
+  toSwagger (Proxy @(BlocAPI '[Required, Strict] InternalHeaders))
     & info . title .~ "Bloc API"
     & info . version .~ "2.2"
     & info . description ?~ "This is the V2.2 API for the BlocH"

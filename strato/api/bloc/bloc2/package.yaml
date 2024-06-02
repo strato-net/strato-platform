@@ -42,6 +42,7 @@ library:
     - monad-alter
     - monad-logger
     - mtl
+    - parametric-apis
     - parsec
     - secp256k1-haskell
     - servant-client

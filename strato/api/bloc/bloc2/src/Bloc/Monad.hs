@@ -58,7 +58,7 @@ data BlocEnv = BlocEnv
     accountNonceLimit :: Integer,
     gasLimit :: Integer,
     globalNonceCounter :: Cache Account Nonce,
-    txTBQueue :: TBQueue (Maybe Text, Maybe ChainId, Maybe Bool, Bool, PostBlocTransactionRequest),
+    txTBQueue :: TBQueue (Text, Maybe ChainId, Maybe Bool, Bool, PostBlocTransactionRequest),
     userRegistryAddress :: Address,
     userRegistryCodeHash :: Maybe Keccak256,
     useWalletsByDefault :: Bool

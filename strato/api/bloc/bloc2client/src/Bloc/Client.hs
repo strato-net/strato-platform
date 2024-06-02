@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeApplications #-}
 
 module Bloc.Client
@@ -18,7 +19,6 @@ module Bloc.Client
     getBlocTransactionResult,
     postBlocTransactionResults,
     postBlocTransaction,
-    postBlocTransactionParallelExternal,
     postChainInfo,
     getSingleChainInfo,
     postChainInfos,
@@ -29,12 +29,14 @@ module Bloc.Client
   )
 where
 
+import API.Parametric
 import Bloc.API
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
 import Data.Proxy
 import Data.Text
+import Servant.API
 import Servant.Client
 import SolidVM.Model.CodeCollection.Contract
 
@@ -127,14 +129,14 @@ postBlocTransactionResults :: Bool -> [Keccak256] -> ClientM [BlocTransactionRes
 postBlocTransactionResults = client (Proxy @PostBlocTransactionResults)
 
 ------------- /chain(s) endpoints -------------
-postChainInfo :: Maybe Text -> ChainInput -> ClientM ChainId
-postChainInfo = client (Proxy @PostChainInfo)
+postChainInfo :: ClientEmbed ExternalHeaders (ChainInput -> ClientM ChainId)
+postChainInfo = client (Proxy @(PostChainInfo '[Optional, Strict] ExternalHeaders))
 
 getSingleChainInfo :: ChainId -> ClientM ChainIdChainOutput
 getSingleChainInfo = client (Proxy @GetSingleChainInfo)
 
-postChainInfos :: Maybe Text -> [ChainInput] -> ClientM [ChainId]
-postChainInfos = client (Proxy @PostChainInfos)
+postChainInfos :: ClientEmbed ExternalHeaders ([ChainInput] -> ClientM [ChainId])
+postChainInfos = client (Proxy @(PostChainInfos '[Optional, Strict] ExternalHeaders))
 
 getChainInfo ::
   [ChainId] ->
@@ -146,44 +148,34 @@ getChainInfo = client (Proxy @GetChainInfo)
 
 ------------- /transaction endpoints -------------
 postBlocTransactionParallel ::
-  Maybe Text ->
-  Maybe ChainId ->
+  ClientEmbed ExternalHeaders
+  (Maybe ChainId ->
   Maybe Bool ->
   Bool ->
   Bool ->
   PostBlocTransactionRequest ->
-  ClientM [BlocChainOrTransactionResult]
-postBlocTransactionParallel = client (Proxy @PostBlocTransactionParallel)
-
-postBlocTransactionParallelExternal ::
-  Maybe Text ->
-  Maybe ChainId ->
-  Maybe Bool ->
-  Bool ->
-  Bool ->
-  PostBlocTransactionRequest ->
-  ClientM [BlocChainOrTransactionResult]
-postBlocTransactionParallelExternal = client (Proxy @PostBlocTransactionParallelExternal)
+  ClientM [BlocChainOrTransactionResult])
+postBlocTransactionParallel = client (Proxy @(PostBlocTransactionParallel '[Optional, Strict] ExternalHeaders))
 
 postBlocTransactionBody ::
-  Maybe Text ->
-  Maybe ChainId ->
+  ClientEmbed ExternalHeaders
+  (Maybe ChainId ->
   PostBlocTransactionRequest ->
-  ClientM [BlocTransactionBodyResult]
-postBlocTransactionBody = client (Proxy @PostBlocTransactionBody)
+  ClientM [BlocTransactionBodyResult])
+postBlocTransactionBody = client (Proxy @(PostBlocTransactionBody '[Optional, Strict] ExternalHeaders))
 
 postBlocTransactionUnsigned ::
-  Maybe Text ->
-  Maybe ChainId ->
+  ClientEmbed ExternalHeaders
+  (Maybe ChainId ->
   PostBlocTransactionRequest ->
-  ClientM [BlocTransactionUnsignedResult]
-postBlocTransactionUnsigned = client (Proxy @PostBlocTransactionUnsigned)
+  ClientM [BlocTransactionUnsignedResult])
+postBlocTransactionUnsigned = client (Proxy @(PostBlocTransactionUnsigned '[Optional, Strict] ExternalHeaders))
 
 postBlocTransaction ::
-  Maybe Text ->
-  Maybe ChainId ->
+  ClientEmbed ExternalHeaders
+  (Maybe ChainId ->
   Maybe Bool ->
   Bool ->
   PostBlocTransactionRequest ->
-  ClientM [BlocChainOrTransactionResult]
-postBlocTransaction = client (Proxy @PostBlocTransaction)
+  ClientM [BlocChainOrTransactionResult])
+postBlocTransaction = client (Proxy @(PostBlocTransaction '[Optional, Strict] ExternalHeaders))

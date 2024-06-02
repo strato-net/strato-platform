@@ -7,13 +7,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-missing-methods #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Bloc.API.Chain where
 
+import API.Parametric
 import Bloc.API.SwaggerSchema
 import BlockApps.Solidity.ArgValue
 import Blockchain.Data.AlternateTransaction ()
@@ -244,11 +247,13 @@ instance ToSchema ChainIdChainOutput where
 
 -- POST /chain
 
-type PostChainInfo =
-  "chain"
-    :> Servant.API.Header "X-USER-ACCESS-TOKEN" Text
-    :> ReqBody '[JSON] ChainInput
-    :> Post '[JSON] ChainId
+type family PostChainInfo r hs where
+  PostChainInfo r hs =
+    "chain"
+      :> ApiEmbed r hs
+       ( ReqBody '[JSON] ChainInput
+      :> Post '[JSON] ChainId
+       )
 
 -- GET /chain
 
@@ -259,11 +264,13 @@ type GetSingleChainInfo =
 
 -- POST /chains
 
-type PostChainInfos =
-  "chains"
-    :> Servant.API.Header "X-USER-ACCESS-TOKEN" Text
-    :> ReqBody '[JSON] [ChainInput]
-    :> Post '[JSON] [ChainId]
+type family PostChainInfos r hs where
+  PostChainInfos r hs =
+    "chains"
+      :> ApiEmbed r hs
+       ( ReqBody '[JSON] [ChainInput]
+      :> Post '[JSON] [ChainId]
+       )
 
 -- GET /chains
 

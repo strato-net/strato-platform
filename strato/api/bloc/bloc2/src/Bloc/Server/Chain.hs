@@ -13,6 +13,7 @@
 
 module Bloc.Server.Chain where
 
+import API.Parametric
 import Bloc.API.Chain
 import Bloc.Database.Queries
 import Bloc.Monad
@@ -168,13 +169,11 @@ postChainInfo ::
     HasSQL m,
     HasVault m
   ) =>
-  Maybe Text ->
-  ChainInput ->
-  m ChainId
-postChainInfo mJwtToken chainInput = case mJwtToken of
-  Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-ACCESS-TOKEN in the header"
-  Just jwtToken -> withLastBlockHash $ \bHash -> do
-      chainInfo' <- createChainInfo jwtToken bHash chainInput
+  ServerEmbed InternalHeaders
+  (ChainInput ->
+  m ChainId)
+postChainInfo userName chainInput = withLastBlockHash $ \bHash -> do
+      chainInfo' <- createChainInfo userName bHash chainInput
       chainId <- CORE.postChain chainInfo'
       let isAsync = fromMaybe False $ chaininputAsync chainInput
       unless isAsync $ do
@@ -195,12 +194,10 @@ postChainInfos ::
     HasSQL m,
     HasVault m
   ) =>
-  Maybe Text ->
-  [ChainInput] ->
-  m [ChainId]
-postChainInfos mJwtToken chainInputs = case mJwtToken of
-  Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-ACCESS-TOKEN in the header"
-  Just userName -> withLastBlockHash $ \bHash -> do
+  ServerEmbed InternalHeaders
+  ([ChainInput] ->
+  m [ChainId])
+postChainInfos userName chainInputs = withLastBlockHash $ \bHash -> do
     chainInfos <- traverse (createChainInfo userName bHash) chainInputs
     chainIds <- postChains chainInfos
     let asyncInputs = fromMaybe False . chaininputAsync <$> chainInputs
