@@ -6,6 +6,7 @@ module IdentityService.Server.Types where
 
 import BlockApps.X509 hiding (isValid)
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.Secp256k1
 import Control.Monad.Change.Modify
 import Control.Monad.Reader
 import Data.Text (Text)
@@ -20,6 +21,7 @@ data IdentityError
 data IdentityServerData = IdentityServerData
   { issuer :: Issuer, -- issuer of signing cert
     issuerCert :: X509Certificate, -- the signing cert
+    issuerPrivKey :: PrivateKey,
     nodeUrl :: BaseUrl,
     userRegAddr :: Address,
     userRegCodeHash :: Maybe Keccak256,

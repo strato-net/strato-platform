@@ -268,6 +268,23 @@ instance ToSchema Subject where
             subPub = fromMaybe undefined $ importPublicKey "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEGOKeu5dSCBFHVQuy/q1A8BeTb99G83tD\nVecvHHne6sKfmBZN1AIjhpHGKO22vBfdq3dMn/QBqb2TdR9w3WvMXQ==\n-----END PUBLIC KEY-----\n"
           }
 
+instance RLPSerializable Subject where
+  rlpEncode (Subject cn o u c p) = RLPArray [
+    rlpEncode cn,
+    rlpEncode o,
+    rlpEncode u,
+    rlpEncode c,
+    rlpEncode p
+    ]
+
+  rlpDecode (RLPArray [cn, o, u, c, p]) = Subject
+    (rlpDecode cn)
+    (rlpDecode o)
+    (rlpDecode u)
+    (rlpDecode c)
+    (rlpDecode p)
+  rlpDecode x = error $ "rlpDecode for Subject failed: expected RLPArray of 5 elements, got " ++ show x
+
 instance RLPSerializable X509Certificate where
   rlpEncode = RLPString . certToBytes
 

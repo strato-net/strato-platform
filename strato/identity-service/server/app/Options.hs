@@ -3,15 +3,19 @@
 
 module Options
   ( flags_port,
+    flags_nodeUrl,
     flags_vaultProxyUrl,
-    flags_SENDGRID_APIKEY,
-    flags_cacheSize
+    flags_userRegistryAddress,
+    flags_userRegistryCodeHash,
+    flags_userContractName
   )
 where
 
 import HFlags
 
 defineFlag "port" (8014 :: Int) "Port to run identity server on"
+defineFlag "nodeUrl" ("http://localhost" :: String) "URL to STRATO node"
 defineFlag "vaultProxyUrl" ("http://localhost:8013/strato/v2.3" :: String) "URL to Vault"
-defineFlag "SENDGRID_APIKEY" ("" :: String) "The api key for sendgrid to automatically send the welcome email"
-defineFlag "cacheSize" (200 :: Int) "default size for each network's cache"
+defineFlag "userRegistryAddress" ("" :: String) "UserRegistry contract address"
+defineFlag "userRegistryCodeHash" ("92a723ccc17f51f4de1ce7e51792fed70d59e50f0bf58579df25fd343120d745" :: String) "UserRegistry contract code collection hash"
+defineFlag "userContractName" ("BlockApps-UserRegistry-User" :: String) "Name of on-chain wallet contract"

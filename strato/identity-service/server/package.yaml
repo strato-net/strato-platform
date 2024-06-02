@@ -36,6 +36,7 @@ library:
   - common-log
   - containers
   - evm-solidity
+  - format
   - http-client
   - http-client-tls
   - http-types
@@ -55,24 +56,26 @@ library:
   - x509-certs
 
 executables:
-  identity-provider-server:
+  identity-service-server:
     main:                Main.hs
     source-dirs:         app
     other-modules: [Options]
     ghc-options:
     - -threaded
     dependencies:
-    - blockapps-identity-provider-server
+    - blockapps-identity-service-server
     - bytestring
     - common-log
     - containers
     - hflags
+    - servant-client
+    - strato-model
     - warp
     - x509-certs
     - yaml
 
 tests:
-  identity-provider-test:
+  identity-service-test:
     main:                Spec.hs
     source-dirs:         test
     ghc-options:

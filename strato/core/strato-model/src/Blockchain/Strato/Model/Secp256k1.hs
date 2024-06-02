@@ -149,6 +149,12 @@ instance ASN1Object PrivateKey where
       Just pk -> Right (pk, xs)
   fromASN1 _ = Left "no ASN1 decoding for this kind of EC private key"
 
+instance RLPSerializable PublicKey where
+  rlpEncode = rlpEncode . B16.encode . exportPublicKey False
+  rlpDecode s = case importPublicKey . LabeledError.b16Decode "rlpDecode<PublicKey>" $ rlpDecode s of
+    Just pk -> pk
+    Nothing -> error $ "rlpDecode<PublicKey> failed: " ++ show s
+
 instance ToJSON PublicKey where
   toJSON = String . T.pack . C8.unpack . B16.encode . exportPublicKey False
 

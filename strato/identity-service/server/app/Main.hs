@@ -9,14 +9,14 @@ module Main (main) where
 
 import BlockApps.Logging ()
 import BlockApps.X509
+import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Keccak256
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as C8
-import qualified Data.Map as Map (null)
-import Data.Yaml
+import Data.Maybe (fromMaybe)
 import HFlags
-import IdentityService.Email (SendgridAPIKey (..))
 import IdentityService.Server
 import Network.Wai.Handler.Warp (run)
+import Servant.Client
 import Options
 
 -- Import the --minLogLevel flag
@@ -39,20 +39,17 @@ main = do
   privk <- case bsToPriv privBS of
     Left err -> error $ "Error parsing issuer private key: " <> err
     Right privk -> return privk
+  nurl <- parseBaseUrl flags_nodeUrl
 
   putStrLn "Initializing identity server..."
   let p = flags_port
-      vp = flags_vaultProxyUrl
-      mEmailK =
-        if null flags_SENDGRID_APIKEY
-          then Nothing
-          else Just (SendgridAPIKey (C8.pack flags_SENDGRID_APIKEY))
       idData = IdentityServerData
-      { nodeUrl = nurl,
-        userRegAddr = fromMaybe (Address 0x720) $ userRegistryAddress realmInfo,
-        userRegCodeHash = userRegistryCodeHash realmInfo,
-        userTableName = fromMaybe "User" $ userTableName realmInfo,
-        cacheRef = cRef,
-        accessTokenRef = tRef
-      }
-  run p $ identityServiceApp vp idData
+                 { issuer = iss,
+                   issuerCert = crt,
+                   issuerPrivKey = privk,
+                   nodeUrl = nurl,
+                   userRegAddr = fromMaybe (Address 0x720) . stringAddress $ flags_userRegistryAddress,
+                   userRegCodeHash = stringKeccak256 $ flags_userRegistryCodeHash,
+                   userTableName = flags_userContractName
+                 }
+  run p $ identityServiceApp idData
