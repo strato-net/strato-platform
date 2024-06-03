@@ -9,22 +9,17 @@ const port = process.env.POSTGRES_PORT || '5432';
 const user = process.env.POSTGRES_USER || 'postgres';
 const password = process.env.POSTGRES_PASSWORD;
 const database = process.env.POSTGRES_DBNAME || 'postgres';
-const ssl = host === 'postgres' ? {
-    require: true,
-    rejectUnauthorized: true,
-    ca: fs.readFileSync('./dbCert/us-east-1-bundle.cer').toString(),
-} : undefined;
 
-const client = new Client({
-    host,
-    port,
-    user,
-    password,
-    database,
-    ssl
-});
+let client;
 
-if (host && password) {
+const connectToDB = async () => {
+    client = new Client({
+        host,
+        port,
+        user,
+        password,
+        database
+    });
     await client.connect()
         .then(() => {
             console.log(`Connected to the PostgreSQL database. Database name: ${client.database}`);
@@ -83,9 +78,20 @@ if (host && password) {
         .then(() => {
             console.log('Table created or already exists.');
         })
-        .catch(error => {
+        .catch(async (error) => {
             console.error('Error creating table:', error);
+            client.end();
+            if (error.code === 'ECONNREFUSED') {
+                console.log('Attempting to reconnect to DB after 3 seconds...');
+                const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+                await sleep(3000);
+                connectToDB();
+            }
         })
+} 
+
+if (host && password) {
+    connectToDB();
 } else {
     console.error('CRITICAL ERROR: Missing Postgres URL and/or password');
     process.exit(1)

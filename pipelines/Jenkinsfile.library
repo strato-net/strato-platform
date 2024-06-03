@@ -1385,8 +1385,8 @@ def spinUpPaymentServer() {
   ]) {
     writeFile file: "run-payment-server.sh", text: """#!/bin/bash
       sudo \\
-        SERVER_HOST=http://localhost:8081 \\
-        HTTP_PORT=8081 \\
+        SERVER_HOST=http://localhost:8018 \\
+        HTTP_PORT=8018 \\
         HTTPS_PORT=44301 \\
         OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata-testnet2/.well-known/openid-configuration \\
         OAUTH_CLIENT_ID="mercata-testnet2-payments" \\
@@ -1396,11 +1396,6 @@ def spinUpPaymentServer() {
         STRATO_HOST="http://localhost" \\
         STRIPE_SECRET_KEY='${STRIPE_SECRET_KEY_TESTNET2}' \\
         ssl=true \\
-        POSTGRES_SERVER_URL='${AWS_RDS_PAYMENT_SERVER_URL_DEV}' \\
-        POSTGRES_PORT=5432 \\
-        POSTGRES_USER='${AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV_USER}' \\
-        POSTGRES_PASSWORD='${AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV_PASSWORD}' \\
-        POSTGRES_DBNAME=postgres \\
         ./payment-server
     """
   }

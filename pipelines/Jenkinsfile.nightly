@@ -387,13 +387,9 @@ pipeline {
               set -x
               echo "Running payment server tests"
               cd payment-server
-              POSTGRES_SERVER_URL=${PS_POSTGRES_SERVER_URL}
-              POSTGRES_PORT=5432
-              POSTGRES_USER=postgres
-              POSTGRES_PASSWORD=${PS_POSTGRES_PASSWORD}
-              POSTGRES_DBNAME=postgres
               STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
               STRIPE_CONTRACT_ADDRESS=97d263744002e580d393fd013cc66d5177204f90
+              TEST_MODE=true
               rm -rf node_modules
               npm install
               npm run test
