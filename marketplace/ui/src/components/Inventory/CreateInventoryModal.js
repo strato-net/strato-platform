@@ -8,16 +8,18 @@ import {
   Upload,
   notification,
 } from "antd";
+import TagManager from "react-gtm-module";
+
 import {
   useInventoryDispatch,
   useInventoryState,
 } from "../../contexts/inventory";
 import { actions } from "../../contexts/inventory/actions";
 import TextArea from "antd/es/input/TextArea";
-import TagManager from "react-gtm-module";
-import { unitOfMeasures, unitOfSpiritMeasures } from "../../helpers/constants";
+import { INVENTORY_MODAL_INITIAL_VALUES, SIZES, unitOfMeasures, unitOfSpiritMeasures } from "../../helpers/constants";
 import { categoricalProperties } from "./CategoryFields";
 import RichEditor from "../RichEditor";
+import { UPLOAD_ERROR } from "../../helpers/msgConstants";
 
 const { Option } = Select;
 
@@ -33,9 +35,10 @@ const CreateInventoryModal = ({
   const [form] = Form.useForm();
   const dispatch = useInventoryDispatch();
   const [api, contextHolder] = notification.useNotification();
-  const [uploadErr, setUploadErr] = useState("");
   const { isCreateInventorySubmitting, isUploadImageSubmitting } =
     useInventoryState();
+
+  const [uploadErr, setUploadErr] = useState("");
   const [selectedImages, setSelectedImages] = useState(null);
   const [selectedFiles, setSelectedFiles] = useState(null);
   const [clothingType, setClothingType] = useState(null);
@@ -46,47 +49,46 @@ const CreateInventoryModal = ({
 
   const beforeImageUpload = (file) => {
     const isJpgOrPng = file.type === "image/jpeg" || file.type === "image/png";
-    if (!isJpgOrPng) {
-      setUploadErr("Image must be of jpeg or png format");
-      return Upload.LIST_IGNORE;
-    }
     const isLt5M = file.size / 1024 / 1024 < 5;
-    if (!isLt5M) {
-      setUploadErr("Cannot upload image files of total size more than 5mb");
+    const isNameLengthValid = file.name.length <= 100;
+
+    if (!isJpgOrPng) {
+      setUploadErr(UPLOAD_ERROR.formatErr);
       return Upload.LIST_IGNORE;
     }
+    if (!isLt5M || !isNameLengthValid) {
+      setUploadErr(UPLOAD_ERROR.sizeErr);
+      return Upload.LIST_IGNORE;
+    }
+
+    setUploadErr("");
+    return false;
+  };
+
+  const beforeFileUpload = (file) => {
+    const isPdf = file.type === "application/pdf";
+    const isLt5M = file.size / 1024 / 1024 < 5; // Check if the file size is less than 6 MB
     const isNameLengthValid = file.name.length <= 100;
+
+    if (!isPdf) {
+      setUploadErr(UPLOAD_ERROR.formatErr);
+      return Upload.LIST_IGNORE;
+    }
+    if (!isLt5M) {
+      setUploadErr(UPLOAD_ERROR.sizeErr);
+      return Upload.LIST_IGNORE;
+    }
     if (!isNameLengthValid) {
-      setUploadErr("File name must be less than 100 characters");
+      setUploadErr(UPLOAD_ERROR.nameErr);
       return Upload.LIST_IGNORE;
     }
     setUploadErr("");
-    return false
+    return false;
   };
 
   const handleImageChange = (info) => {
     setSelectedImages(info.fileList);
     form.setFieldValue("images", info.fileList.map((e) => e.originFileObj))
-  };
-
-  const beforeFileUpload = (file) => {
-    const isPdf = file.type === "application/pdf";
-    if (!isPdf) {
-      setUploadErr("File must be PDF format");
-      return Upload.LIST_IGNORE;
-    }
-    const isLt5M = file.size / 1024 / 1024 < 5; // Check if the file size is less than 6 MB
-    if (!isLt5M) {
-      setUploadErr("Cannot upload a PDF of size more than 5 MB");
-      return Upload.LIST_IGNORE;
-    }
-    const isNameLengthValid = file.name.length <= 100;
-    if (!isNameLengthValid) {
-      setUploadErr("File name must be less than 100 characters");
-      return Upload.LIST_IGNORE;
-    }
-    setUploadErr("");
-    return false;
   };
 
   const handleFileChange = (info) => {
@@ -182,9 +184,9 @@ const CreateInventoryModal = ({
 
   const updateSizeOptions = (type) => {
     if (type === "Shoes") {
-      setSizeOptions(["3.5", "4", "4.5", "5", "5.5", "6", "6.5", "7", "7.5", "8", "8.5", "9", "9.5", "10", "10.5", "11", "11.5", "12", "12.5", "13", "13.5", "14", "14.5", "15", "16", "17", "18"]);
+      setSizeOptions(SIZES.shoes);
     } else {
-      setSizeOptions(["OS (One Size)", "XXS", "XS", "S", "M", "L", "XL", "XXL"]);
+      setSizeOptions(SIZES.other);
     }
   };
 
@@ -207,6 +209,44 @@ const CreateInventoryModal = ({
       setSubCategoryValue(subCat);
     }
   }
+
+  const UploadFormItem = ({ label, name, fileList, accept, multiple, maxCount, beforeUpload, onChange }) => (
+    <Form.Item
+      label={label}
+      name={name}
+      className="w-full sm:w-[200px] md:w-72"
+      rules={[
+        {
+          required: true,
+          message: `Please upload ${label.toLowerCase()}`,
+        },
+      ]}
+    >
+      <div className="p-4 border-secondryD border rounded flex flex-col justify-around">
+        <Upload
+          onChange={onChange}
+          fileList={fileList}
+          accept={accept}
+          multiple={multiple}
+          maxCount={maxCount}
+          beforeUpload={beforeUpload}
+          listType="picture"
+        >
+          <div className="text-primary border border-primary rounded px-4 py-2 text-center hover:text-white hover:bg-primary cursor-pointer">
+            {`Browse ${label}`}
+          </div>
+        </Upload>
+      </div>
+      <div className="flex items-start">
+        <p className="mt-1 text-xs italic font-medium">Note:</p>
+        <p className="mt-1 text-xs italic ml-1 mr-4">
+          {accept === "image/png, image/jpeg"
+            ? 'Use jpg, png format of size less than 5mb. Limit of 10.'
+            : 'Use pdf files with total size of less than 5mb. Limit of 10 files.'}
+        </p>
+      </div>
+    </Form.Item>
+  );
 
   return (
     <>
@@ -242,26 +282,7 @@ const CreateInventoryModal = ({
           form={form}
           layout="vertical"
           className="mt-5 inventory_modal"
-          initialValues={{
-            name: "",
-            description: "",
-            artist: "",
-            source: "",
-            leastSellableUnits: 1,
-            unitOfMeasurement: 1,
-            purity: "",
-            quantity: 1,
-            expirationPeriodInMonths: 1,
-            clothingType: null,
-            images: [],
-            files: [],
-            category: "Art",
-            subCategory: null,
-            size: null,
-            skuNumber: null,
-            condition: null,
-            brand: null,
-          }}
+          initialValues={INVENTORY_MODAL_INITIAL_VALUES}
         >
           <div className="w-full mb-3">
             <div className="flex flex-wrap sm:flex-nowrap justify-between gap-4 mt-4">
@@ -361,68 +382,26 @@ const CreateInventoryModal = ({
               </Form.Item>
             </div>
             <div className="mt-4 flex-wrap gap-5 sm:flex-nowrap flex justify-between">
-              <Form.Item
+              <UploadFormItem
                 label="Upload Images"
                 name="images"
-                className="w-full sm:w-[200px] md:w-72"
-                rules={[
-                  {
-                    required: true,
-                    message: 'Please upload an image',
-                  },
-                ]}
-              >
-                <div className="p-4 border-secondryD border rounded flex flex-col justify-around">
-                  <Upload
-                    id="imageUpload"
-                    onChange={handleImageChange}
-                    fileList={selectedImages}
-                    accept="image/png, image/jpeg"
-                    multiple={true}
-                    maxCount={10}
-                    beforeUpload={beforeImageUpload}
-                    listType="picture"
-                  >
-                    <div className="text-primary border border-primary rounded px-4 py-2 text-center hover:text-white hover:bg-primary cursor-pointer">
-                      Browse Images
-                    </div>
-                  </Upload>
-                </div>
-
-                <div className="flex items-start">
-                  <p className="mt-1 text-xs italic font-medium ">Note:</p>
-                  <p className="mt-1 text-xs italic ml-1 mr-4">
-                    use jpg, png format of size less than 5mb. Limit of 10.
-                  </p>
-                </div>
-              </Form.Item>
-              <Form.Item
+                fileList={selectedImages}
+                accept="image/png, image/jpeg"
+                multiple={true}
+                maxCount={10}
+                beforeUpload={beforeImageUpload}
+                onChange={handleImageChange}
+              />
+              <UploadFormItem
                 label="Upload Files"
                 name="files"
-                className="w-full sm:w-[200px] md:w-72"
-              >
-                <div className="p-4 border-secondryD border rounded flex flex-col justify-around">
-                  <Upload
-                    onChange={handleFileChange}
-                    fileList={selectedFiles}
-                    accept="application/pdf"
-                    multiple={true}
-                    maxCount={10}
-                    beforeUpload={beforeFileUpload}
-                  >
-                    <div className="text-primary border border-primary rounded px-4 py-2 text-center hover:text-white hover:bg-primary cursor-pointer">
-                      Browse Files
-                    </div>
-                  </Upload>
-                </div>
-
-                <div className="flex items-start">
-                  <p className="mt-1 text-xs italic font-medium ">Note:</p>
-                  <p className="mt-1 text-xs italic ml-1 mr-4">
-                    use pdf files with total size of less than 5mb. Limit of 10 files.
-                  </p>
-                </div>
-              </Form.Item>
+                fileList={selectedFiles}
+                accept="application/pdf"
+                multiple={true}
+                maxCount={10}
+                beforeUpload={beforeFileUpload}
+                onChange={handleFileChange}
+              />
             </div>
           </div>
         </Form>

@@ -1,93 +1,82 @@
 import React, { useState, useEffect } from "react";
-import {
-  Row,
-  Breadcrumb,
-  Button,
-  Typography,
-  Tabs,
-  Space,
-  Spin,
-  notification,
-  InputNumber,
-  List,
-} from "antd";
+import { Row, Breadcrumb, Button, Typography, Tabs, Space, Spin, notification, InputNumber, List, } from "antd";
 import { HeartTwoTone, HeartFilled } from '@ant-design/icons';
-import { useMatch } from "react-router-dom";
-import { actions } from "../../contexts/inventory/actions";
-import {
-  useInventoryDispatch,
-  useInventoryState,
-} from "../../contexts/inventory";
-import routes from "../../helpers/routes";
-//categories
+import { useMatch, useNavigate, useLocation } from "react-router-dom";
+import { Carousel } from "react-responsive-carousel"
+import TagManager from "react-gtm-module";
+//actions
+
+import { actions as inventoryActions } from "../../contexts/inventory/actions";
+import { useInventoryDispatch, useInventoryState, } from "../../contexts/inventory";
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { actions as marketPlaceActions } from "../../contexts/marketplace/actions";
 import { actions as orderActions } from "../../contexts/order/actions"
-import {
-  useMarketplaceDispatch,
-  useMarketplaceState,
-} from "../../contexts/marketplace";
+// dispatch & state
+import { useMarketplaceDispatch, useMarketplaceState, } from "../../contexts/marketplace";
 import { useOrderDispatch } from "../../contexts/order";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
-import { useNavigate, useLocation } from "react-router-dom";
-//Items - ownership history
-import DataTableComponent from "../DataTableComponent";
-import ClickableCell from "../ClickableCell";
-import "./index.css";
 import { useAuthenticateState } from "../../contexts/authentication";
-import TagManager from "react-gtm-module";
+//Items - ownership history
+// components
+import HelmetComponent from "../Helmet/HelmetComponent";
+import DataTableComponent from "../DataTableComponent";
+import ProductItemDetails from "./ProductItemDetails";
+import PriceChartAndStats from "./PriceChartAndStats";
+import PreviewMode from "../RichEditor/PreviewMode";
+import ClickableCell from "../ClickableCell";
+import TimeRangeTabs from "./TimeRangeTabs";
+import Statistics from "./Statistics";
+import LoginModal from './LoginModal';
+// other
 import { setCookie } from "../../helpers/cookie";
+import routes from "../../helpers/routes";
+import "./index.css";
+
 import image_placeholder from "../../images/resources/image_placeholder.png";
 import "react-responsive-carousel/lib/styles/carousel.min.css"; // requires a loader
-import { Carousel } from "react-responsive-carousel"
+
 import { Images } from "../../images";
-import ProductItemDetails from "./ProductItemDetails";
-import HelmetComponent from "../Helmet/HelmetComponent";
 import { SEO } from "../../helpers/seoConstant";
 import { STRATS_CONVERSION } from "../../helpers/constants";
-import PreviewMode from "../RichEditor/PreviewMode";
-import PriceChartAndStats from "./PriceChartAndStats";
-import Statistics from "./Statistics";
-import TimeRangeTabs from "./TimeRangeTabs";
-import LoginModal from './LoginModal';
+import { TOAST_MSG } from "../../helpers/msgConstants";
+
 
 const ProductDetails = ({ user, users }) => {
+  const [api, contextHolder] = notification.useNotification();
+  const { Text, Paragraph, Title } = Typography;
   const { state, pathname } = useLocation();
+  const navigate = useNavigate();
+
+  const { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
+  // dispatch
+  const dispatch = useInventoryDispatch();
+  const categoryDispatch = useCategoryDispatch();
+  const orderDispatch = useOrderDispatch();
+  const marketplaceDispatch = useMarketplaceDispatch();
+  // state
+  const { categorys, iscategorysLoading } = useCategoryState();
+  const { inventoryDetails, isInventoryDetailsLoading, isInventoryOwnershipHistoryLoading,
+    inventoryOwnershipHistory, priceHistory, isFetchingPriceHistory
+  } = useInventoryState();
+  const { cartList } = useMarketplaceState();
+  // ----------
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [timeFilter, setTimeFilter] = useState('1');
+  const [itemData, setItemData] = useState({});
+  const [Id, setId] = useState(undefined);
+  const [qty, setQty] = useState(1);
+  // const [categoryName, setCategoryName] = useState("");
+  // For Wishlist Icon Rendering
+  const [isWishlisted, setIsWishlisted] = useState(false);
+  const [availableQuantity, setAvailableQuantity] = useState(1);
 
   let isCalledFromInventory = false;
-
   if (state !== null && state !== undefined) {
     isCalledFromInventory = state.isCalledFromInventory
   }
   else if (pathname.includes("inventories")) {
     isCalledFromInventory = true
   }
-
-  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
-
-  const { Text, Paragraph, Title } = Typography;
-  const [Id, setId] = useState(undefined);
-  const [itemData, setItemData] = useState({});
-  const [timeFilter, setTimeFilter] = useState('1');
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [qty, setQty] = useState(1);
-  const dispatch = useInventoryDispatch();
-  const categoryDispatch = useCategoryDispatch();
-  const orderDispatch = useOrderDispatch();
-  const [categoryName, setCategoryName] = useState("");
-  const [api, contextHolder] = notification.useNotification();
-  const { categorys, iscategorysLoading } = useCategoryState();
-  const {
-    inventoryDetails,
-    isInventoryDetailsLoading,
-    isInventoryOwnershipHistoryLoading,
-    inventoryOwnershipHistory,
-    priceHistory,
-    isFetchingPriceHistory
-  } = useInventoryState();
-  const marketplaceDispatch = useMarketplaceDispatch();
-  const { cartList } = useMarketplaceState();
-  const navigate = useNavigate();
 
   const routeMatch = useMatch({
     path: routes.MarketplaceProductDetail.url,
@@ -107,9 +96,7 @@ const ProductDetails = ({ user, users }) => {
     return false;
   }
 
-  // For Wishlist Icon Rendering
-  const [isWishlisted, setIsWishlisted] = useState(false);
-  const [availableQuantity, setAvailableQuantity] = useState(1);
+
   const shouldShowWishlistIcon = isAuthenticated && user && !ownerSameAsUser();
 
   useEffect(() => {
@@ -123,7 +110,7 @@ const ProductDetails = ({ user, users }) => {
 
   useEffect(() => {
     if (Id !== undefined) {
-      actions.fetchInventoryDetail(dispatch, Id);
+      inventoryActions.fetchInventoryDetail(dispatch, Id);
       // TODO: Uncomment this when we have serial numbers working
       // if (user) {
       //   itemsActions.fetchSerialNumbers(itemDispatch, Id);
@@ -133,7 +120,7 @@ const ProductDetails = ({ user, users }) => {
 
   useEffect(() => {
     if (Id !== undefined) {
-      actions.fetchPriceHistory(dispatch,Id,10,0,timeFilter);
+      inventoryActions.fetchPriceHistory(dispatch, Id, 10, 0, timeFilter);
     }
   }, [Id, dispatch, timeFilter]);
 
@@ -143,7 +130,7 @@ const ProductDetails = ({ user, users }) => {
 
   useEffect(() => {
     if (inventoryDetails) {
-      actions.fetchInventoryOwnershipHistory(
+      inventoryActions.fetchInventoryOwnershipHistory(
         dispatch,
         {
           originAddress: inventoryDetails.originAddress,
@@ -165,7 +152,7 @@ const ProductDetails = ({ user, users }) => {
       const prodCategory = categorys.find(
         (c) => c.name === details.category
       );
-      setCategoryName(prodCategory?.name);
+      // setCategoryName(prodCategory?.name);
       const detailsData = details.data;
       setItemData(detailsData);
       if (details.saleQuantity) {
@@ -199,17 +186,17 @@ const ProductDetails = ({ user, users }) => {
       }
     }
   };
-  
+
   const handleCancel = () => {
     setIsModalVisible(false);
   };
 
   const handleLogin = () => {
-      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-          setCookie("returnUrl", window.location.pathname, 10);
-          window.location.href = loginUrl;
-      }
-      setIsModalVisible(false);
+    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+      setCookie("returnUrl", window.location.pathname, 10);
+      window.location.href = loginUrl;
+    }
+    setIsModalVisible(false);
   };
 
   const subtract = () => {
@@ -257,7 +244,7 @@ const ProductDetails = ({ user, users }) => {
 
       marketPlaceActions.addItemToCart(marketplaceDispatch, items);
       setQty(1);
-      openToast("bottom", false, "Item added to cart");
+      openToast("bottom", false, TOAST_MSG.ITEM_ADDED_TO_CART);
     } else {
       items = [...cartList];
       cartList.forEach((element, index) => {
@@ -265,7 +252,7 @@ const ProductDetails = ({ user, users }) => {
           items[index].qty += qty;
           marketPlaceActions.addItemToCart(marketplaceDispatch, items);
           setQty(1);
-          openToast("bottom", false, "Item updated in cart");
+          openToast("bottom", false, TOAST_MSG.ITEM_UPDATED_IN_CART);
         }
       });
     }
@@ -279,12 +266,12 @@ const ProductDetails = ({ user, users }) => {
       align: "center",
       // render: (text) => <p>{text}</p>,
       render: (text) => (
-        <a 
+        <a
           href={`${window.location.origin}/profile/${encodeURIComponent(text)}`}
           onClick={(e) => {
             e.preventDefault();
             const userProfileUrl = `/profile/${encodeURIComponent(text)}`;
-      
+
             if (e.ctrlKey || e.metaKey) {
               // Open in a new tab if Ctrl/Cmd is pressed
               window.open(`${window.location.origin}${userProfileUrl}`, '_blank');
@@ -306,12 +293,12 @@ const ProductDetails = ({ user, users }) => {
       align: "center",
       // render: (text) => <p>{text}</p>,
       render: (text) => (
-        <a 
+        <a
           href={`${window.location.origin}/profile/${encodeURIComponent(text)}`}
           onClick={(e) => {
             e.preventDefault();
             const userProfileUrl = `/profile/${encodeURIComponent(text)}`;
-      
+
             if (e.ctrlKey || e.metaKey) {
               // Open in a new tab if Ctrl/Cmd is pressed
               window.open(`${window.location.origin}${userProfileUrl}`, '_blank');
@@ -344,7 +331,7 @@ const ProductDetails = ({ user, users }) => {
     return parts[parts.length - 1];
   };
 
-  const isAvailableForSale = (!details?.saleQuantity || details?.saleQuantity==0) 
+  const isAvailableForSale = (!details?.saleQuantity || details?.saleQuantity == 0)
   function getCategoryName(str) {
     const lastIndex = str.lastIndexOf('-');
     if (lastIndex !== -1) {
@@ -369,10 +356,10 @@ const ProductDetails = ({ user, users }) => {
         </div>
       ) : (
         <div>
-          <HelmetComponent 
-          title={`${assetName} | ${contractName} | ${SEO.TITLE_META}`}
-          description={details?.description} 
-          link={linkUrl} />
+          <HelmetComponent
+            title={`${assetName} | ${contractName} | ${SEO.TITLE_META}`}
+            description={details?.description}
+            link={linkUrl} />
           <Row>
             <Breadcrumb className="text-xs   mb-4 md:mt-5  md:mb-6 lg:mb-[44px] ml-4 lg:ml-16">
               <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
@@ -396,7 +383,7 @@ const ProductDetails = ({ user, users }) => {
                     </ClickableCell>
                   </Breadcrumb.Item> : null
               }
-               <Breadcrumb.Item className="text-[#202020]  text-sm font-semibold ">
+              <Breadcrumb.Item className="text-[#202020]  text-sm font-semibold ">
                 Product Detail
               </Breadcrumb.Item>
               <Breadcrumb.Item className="text-[#202020]  text-sm font-semibold ">
@@ -428,7 +415,7 @@ const ProductDetails = ({ user, users }) => {
                   {isWishlisted ? <HeartFilled className="cursor-pointer" onClick={toggleWishlist} style={{ fontSize: "20px", color: "#A15E49" }} /> : <HeartTwoTone className="cursor-pointer" onClick={toggleWishlist} style={{ fontSize: "20px" }} twoToneColor="#A15E49" />}
                 </div>
                 <div className=" lg:border-b lg:border-[#E9E9E9] pb-[6px]">
-                  <Title style={{fontSize:'30px'}} className="font-semibold text-base lg:text-3xl text-[#202020]">
+                  <Title style={{ fontSize: '30px' }} className="font-semibold text-base lg:text-3xl text-[#202020]">
                     {decodeURIComponent(details?.name)}
                   </Title>
                   <div className="flex pt-[6px] ">
@@ -502,7 +489,7 @@ const ProductDetails = ({ user, users }) => {
                   <div className="flex gap-4 justify-between lg:justify-start  pt-4 w-full">
                     <Button
                       type="primary"
-                      className={`w-[90%] md:w-[365px] h-9  ${isAvailableForSale? '!bg-[#808080]':'!bg-[#13188A]'} !hover:bg-primaryHover !text-white`}
+                      className={`w-[90%] md:w-[365px] h-9  ${isAvailableForSale ? '!bg-[#808080]' : '!bg-[#13188A]'} !hover:bg-primaryHover !text-white`}
                       onClick={async () => {
                         window.LOQ.push(['ready', async LO => {
                           // Track an event
@@ -528,9 +515,9 @@ const ProductDetails = ({ user, users }) => {
                           navigate("/checkout");
                         } else {
                           if (checkQuantity[0].availableQuantity === 0) {
-                            openToast("bottom", true, `Unfortunately, ${details.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
+                            openToast("bottom", true, TOAST_MSG.OUT_OF_STOCK(details));
                           } else { // Case 2: We are trying to add too much quantity
-                            openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${details.name} are available. Please update your cart quantity accordingly.`);
+                            openToast("bottom", true, TOAST_MSG.TOO_MUCH_QUANTITY(checkQuantity, details));
                           }
                         }
                       }}
@@ -545,7 +532,7 @@ const ProductDetails = ({ user, users }) => {
                         icon={<div className="flex justify-center items-center">
                           <img src={Images.Cart} alt={`${assetName} | Image`} title={`${assetName} | Image`} width={18} height={18} className="object-contain" />
                         </div>}
-                        className={`!w-9 h-9 border border-primary ${isAvailableForSale? '!bg-[#808080]':'!bg-[#13188A]'} rounded-md`}
+                        className={`!w-9 h-9 border border-primary ${isAvailableForSale ? '!bg-[#808080]' : '!bg-[#13188A]'} rounded-md`}
                         disabled={true}
                         id="addToCart"
                         onClick={async () => {
@@ -571,9 +558,9 @@ const ProductDetails = ({ user, users }) => {
                             addItemToCart();
                           } else {
                             if (checkQuantity[0].availableQuantity === 0) {
-                              openToast("bottom", true, `Unfortunately, ${details.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
+                              openToast("bottom", true, TOAST_MSG.OUT_OF_STOCK(details));
                             } else { // Case 2: We are trying to add too much quantity
-                              openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${details.name} are available. Please update your cart quantity accordingly.`);
+                              openToast("bottom", true, TOAST_MSG.TOO_MUCH_QUANTITY(checkQuantity, details));
                             }
                           }
                         }}
@@ -583,7 +570,7 @@ const ProductDetails = ({ user, users }) => {
                         icon={<div className="flex justify-center items-center">
                           <img src={Images.Cart} alt={`${assetName} | Image`} title={`${assetName} | Image`} width={18} height={18} className="object-contain" />
                         </div>}
-                        className={`!w-9 h-9 rounded-md  ${isAvailableForSale? '!bg-[#808080]':'!bg-[#13188A]'}  `}
+                        className={`!w-9 h-9 rounded-md  ${isAvailableForSale ? '!bg-[#808080]' : '!bg-[#13188A]'}  `}
                         disabled={isAvailableForSale}
                         onClick={async () => {
                           window.LOQ.push(['ready', async LO => {
@@ -608,9 +595,9 @@ const ProductDetails = ({ user, users }) => {
                             addItemToCart();
                           } else {
                             if (checkQuantity[0].availableQuantity === 0) {
-                              openToast("bottom", true, `Unfortunately, ${details.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`);
+                              openToast("bottom", true, TOAST_MSG.OUT_OF_STOCK(details));
                             } else { // Case 2: We are trying to add too much quantity
-                              openToast("bottom", true, `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${details.name} are available. Please update your cart quantity accordingly.`);
+                              openToast("bottom", true, TOAST_MSG.TOO_MUCH_QUANTITY(checkQuantity, details));
                             }
                           }
                         }}
@@ -695,7 +682,7 @@ const ProductDetails = ({ user, users }) => {
                       ) : (
                         <div className="text-center p-4">
                           <p>Please{' '}
-                            <span 
+                            <span
                               className="text-blue hover:text-blue cursor-pointer hover:underline"
                               onClick={() => {
                                 setCookie("returnUrl", window.location.pathname, 10);
@@ -703,7 +690,7 @@ const ProductDetails = ({ user, users }) => {
                               }}
                             >
                               login
-                            </span> 
+                            </span>
                             {' '}to view ownership history.
                           </p>
                         </div>
@@ -732,31 +719,31 @@ const ProductDetails = ({ user, users }) => {
               />
             </div>
             {
-            isFetchingPriceHistory ? (
-              <div className="flex justify-center items-center h-full w-full">
-                <Spin spinning={true} size="large" /> 
-              </div>
-            ) : (
-              <>
-                {(priceHistory?.originRecords?.length !== 0 && priceHistory?.records) && (
-                  <div className="w-full h-full">
-                    <h2 className='w-full text-center font-bold text-2xl'>Price History</h2>
-                    <TimeRangeTabs onChange={handleTimeFilterChange} activeKey={timeFilter} />
-                    <PriceChartAndStats priceHistory={priceHistory} />
-                  </div>
-                )}
-                <div>
-                  {(priceHistory?.originRecords?.length !== 0) && (
-                    <>
-                  <h2 className='w-full text-center font-bold text-2xl'>12-Month Historical Data</h2>
-
-                    <Statistics priceHistory={priceHistory} />
-                    </>
-                  )}
+              isFetchingPriceHistory ? (
+                <div className="flex justify-center items-center h-full w-full">
+                  <Spin spinning={true} size="large" />
                 </div>
-              </>
-            )
-          }
+              ) : (
+                <>
+                  {(priceHistory?.originRecords?.length !== 0 && priceHistory?.records) && (
+                    <div className="w-full h-full">
+                      <h2 className='w-full text-center font-bold text-2xl'>Price History</h2>
+                      <TimeRangeTabs onChange={handleTimeFilterChange} activeKey={timeFilter} />
+                      <PriceChartAndStats priceHistory={priceHistory} />
+                    </div>
+                  )}
+                  <div>
+                    {(priceHistory?.originRecords?.length !== 0) && (
+                      <>
+                        <h2 className='w-full text-center font-bold text-2xl'>12-Month Historical Data</h2>
+
+                        <Statistics priceHistory={priceHistory} />
+                      </>
+                    )}
+                  </div>
+                </>
+              )
+            }
           </div>
         </div>
       )}

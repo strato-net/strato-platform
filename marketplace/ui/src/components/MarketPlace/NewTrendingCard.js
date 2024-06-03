@@ -1,29 +1,32 @@
-import { HeartFilled, HeartTwoTone } from '@ant-design/icons'
-import { useAuthenticateState } from "../../contexts/authentication";
 import React, { useState, useEffect } from "react";
-import {
-    Typography,
-    Button,
-    InputNumber,
-    Tooltip
-} from "antd";
+import { Typography, Button, InputNumber, Tooltip } from "antd";
 import { useLocation, useNavigate } from "react-router-dom";
-import routes from "../../helpers/routes";
+import { HeartFilled, HeartTwoTone } from '@ant-design/icons'
 import TagManager from "react-gtm-module";
-import { Images } from '../../images';
-import images_placeholder from "../../images/resources/image_placeholder.png"
-import { SEO } from '../../helpers/seoConstant';
-import { STRATS_CONVERSION } from '../../helpers/constants';
 import DOMPurify from 'dompurify';
+// State
+import { useAuthenticateState } from "../../contexts/authentication";
+// Assets
+import images_placeholder from "../../images/resources/image_placeholder.png";
+import { Images } from '../../images';
+// other
+import { STRATS_CONVERSION } from '../../helpers/constants';
 import { setCookie } from "../../helpers/cookie";
+import { SEO } from '../../helpers/seoConstant';
+import routes from "../../helpers/routes";
 import LoginModal from './LoginModal';
 
 const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, contextHolder, isUserProfile = false }) => {
+    const navigate = useNavigate();
+    const location = useLocation();
     const { Text } = Typography;
-    const [quantity, setQuantity] = useState(1)
-    const [isModalVisible, setIsModalVisible] = useState(false);
 
-    let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
+    const { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
+
+    const [isModalVisible, setIsModalVisible] = useState(false);
+    const [isWishlisted, setIsWishlisted] = useState(false);
+    const [quantity, setQuantity] = useState(1);
+
     const ownerSameAsUser = () => {
         if (user?.commonName === topSellingProduct?.ownerCommonName) {
             return true;
@@ -32,18 +35,15 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
     }
 
     // For Wishlist Icon Rendering
-    const [isWishlisted, setIsWishlisted] = useState(false);
     const shouldShowWishlistIcon = isAuthenticated && user && !ownerSameAsUser();
 
     const naviroute = routes.MarketplaceProductDetail.url;
     const isAvailableForSale = (!topSellingProduct.price || topSellingProduct.saleQuantity === 0)
-    const navigate = useNavigate();
-    const location = useLocation();
 
     const queryParams = new URLSearchParams(location.search);
     const categoryQueryValue = queryParams.get('category');
-    const categoryQueryValueArr = categoryQueryValue ? categoryQueryValue.split(',') : []
-    const imgMeta = categoryQueryValueArr.length === 1 ? categoryQueryValueArr[0] : SEO.IMAGE_META
+    const categoryQueryValueArr = categoryQueryValue ? categoryQueryValue.split(',') : [];
+    const imgMeta = categoryQueryValueArr.length === 1 ? categoryQueryValueArr[0] : SEO.IMAGE_META;
 
     const sanitizedDescription = DOMPurify.sanitize(topSellingProduct?.description || "N/A");
     const customStyle = {
@@ -93,7 +93,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
 
     return (
         <>
-            <div id='productCard' className={`relative trending_cards_container_card bg-white p-3 ${parent == 'Marketplace' ? 'min-w-[300px] w-auto' : 'min-w-[230px]'}  min-w-[320px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}>
+            <div id='productCard' className={`relative trending_cards_container_card bg-white p-3 ${parent === 'Marketplace' ? 'min-w-[300px] w-auto' : 'min-w-[230px]'}  min-w-[320px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}>
                 {contextHolder}
                 <div onClick={toggleWishlist} className="absolute top-2 right-2 cursor-pointer hover:scale-110 transition-transform duration-200">
                     {isWishlisted ? <HeartFilled style={{ fontSize: "20px", color: "#A15E49" }} /> : <HeartTwoTone style={{ fontSize: "20px" }} twoToneColor="#A15E49" />}
@@ -151,7 +151,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                     <Typography>Quantity:</Typography>
                     <div className='flex gap-3 p-1 bg-white'>
                         <Typography className={`px-2 bg-[#EEEFFA] rounded-sm ${quantity === 1 ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`} onClick={() => {
-                            setQuantity(quantity == 1 ? quantity : quantity - 1)
+                            setQuantity(quantity === 1 ? quantity : quantity - 1)
                         }}>
                             -
                         </Typography>

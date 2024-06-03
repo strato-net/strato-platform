@@ -14,23 +14,25 @@ import {
   Col
 } from "antd";
 import { ArrowLeftOutlined, LogoutOutlined } from "@ant-design/icons";
-import { Images } from "../../images";
-import "./header.css";
 import { useLocation, useNavigate } from "react-router-dom";
-import routes from "../../helpers/routes";
-import {
-  useMarketplaceState,
-  useMarketplaceDispatch,
-} from "../../contexts/marketplace";
-import { actions } from "../../contexts/marketplace/actions";
+import TagManager from "react-gtm-module";
+// actions
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { actions as userActions } from "../../contexts/authentication/actions";
+// Dispatches
+import { useMarketplaceState, useMarketplaceDispatch, } from "../../contexts/marketplace";
 import { useAuthenticateDispatch, useAuthenticateState } from "../../contexts/authentication";
-import TagManager from "react-gtm-module";
-import { SEO } from "../../helpers/seoConstant";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
+// other
+import { SEO } from "../../helpers/seoConstant";
 import LoginModal from "../MarketPlace/LoginModal"
 import { setCookie } from "../../helpers/cookie";
+
+import { navItems } from "../../helpers/constants";
+import routes from "../../helpers/routes";
+import { Images } from "../../images";
+import "./header.css";
 
 const { Header } = Layout;
 
@@ -68,16 +70,16 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
 
   useEffect(() => {
     if (user) {
-      actions.fetchStratsBalance(marketplaceDispatch);
+      marketplaceActions.fetchStratsBalance(marketplaceDispatch);
     }
   }, [user]);
 
   useEffect(() => {
-    actions.fetchCartItems(marketplaceDispatch, storedData);
+    marketplaceActions.fetchCartItems(marketplaceDispatch, storedData);
   }, [marketplaceDispatch, storedData]);
 
   const [selectedTab, setSelectedTab] = useState("0");
-  const [initials, setInitials] = useState("");
+  // const [initials, setInitials] = useState("");
   const [roleIndex, setRoleIndex] = useState();
   const [showSearch, setShowSearch] = useState(false);
   const [categories, setCategories] = useState([]);
@@ -89,11 +91,6 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   useEffect(() => {
     setSelectedCategory(categoryQueryValue)
   }, [categoryQueryValue])
-
-  const navItems = [
-    { label: <div id="Orders">Orders</div>, key: '0' },
-    { label: <div id="Inventory">My Items</div>, key: '1' }
-  ];
 
   const navUrls = [
     routes.Orders.url.replace(':type', 'sold'),
@@ -196,17 +193,17 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     ),
   }]
 
-  useEffect(() => {
-    let temp = "";
-    if (user != null) {
-      if (user.commonName.split(" ").length > 1) {
-        temp = user.commonName.split(" ")[0].substring(0, 1) + user.commonName.split(" ")[1].substring(0, 1);
-      } else {
-        temp = user.commonName.split(" ")[0].substring(0, 1);
-      }
-    }
-    setInitials(temp);
-  }, [user])
+  // useEffect(() => {
+  //   let temp = "";
+  //   if (user != null) {
+  //     if (user.commonName.split(" ").length > 1) {
+  //       temp = user.commonName.split(" ")[0].substring(0, 1) + user.commonName.split(" ")[1].substring(0, 1);
+  //     } else {
+  //       temp = user.commonName.split(" ")[0].substring(0, 1);
+  //     }
+  //   }
+  //   setInitials(temp);
+  // }, [user])
 
   useEffect(() => {
     if (user) setRoleIndex(0)
@@ -219,11 +216,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     user ? {
       value: "my-profile",
       path: routes.MarketplaceUserProfile.url.replace(':commonName', user.commonName),
-      label: (
-        <div>
-          <p className="!mb-0">My Profile</p>
-        </div>
-      )
+      label: (<div> <p className="!mb-0"> My Profile </p> </div>)
     } : null,
     user ? {
       value: "logout",
@@ -242,10 +235,10 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const handleIntMenuTab = (data) => {
     if (roleIndex === 1) {
       // User is not logged in
-      data.value == 'orders' ? setSelectedTab(0) : setSelectedTab(1)
+      data.value === 'orders' ? setSelectedTab(0) : setSelectedTab(1)
       setIsModalVisible(true);
     } else {
-      data.value == 'logout' ? logout() : data.value == 'orders' ? navigate(routes.Orders.url.replace(':type', 'sold'), { state: { defaultKey: "Sold" } }) : navigate(data.path)
+      data.value === 'logout' ? logout() : data.value === 'orders' ? navigate(routes.Orders.url.replace(':type', 'sold'), { state: { defaultKey: "Sold" } }) : navigate(data.path)
       handleMenuTab(data)
     }
   }
