@@ -19,9 +19,12 @@ data ClientP
 data ServerP
 
 type family Embed (d :: Type) (hs :: [Type]) (ns :: [Symbol]) (r :: Type) :: Type where
+  Embed APIP _ '[] rest = rest
   Embed APIP r '[x] rest = Header' r x Text :> rest
+  Embed ClientP _ '[] rest = rest
   Embed ClientP '[Required, Strict] '[x] rest = Text -> rest
   Embed ClientP r '[x] rest = Maybe Text -> rest
+  Embed ServerP _ '[] rest = rest
   Embed ServerP '[Required, Strict] '[x] rest = Text -> rest
   Embed ServerP r '[x] rest = Maybe Text -> rest
   Embed APIP r (x ': ns) rest = Header' r x Text :> Embed APIP r ns rest

@@ -132,6 +132,7 @@ services:
     - addBootnodes=${addBootnodes}
     - API_DEBUG_LOG=${API_DEBUG_LOG:-false}
     - appFetchLimit=${appFetchLimit}
+    - AUTH_MODE=${AUTH_MODE:-OAUTH}
     - averageTxsPerBlock=${averageTxsPerBlock}
     - blockstanbul=${blockstanbul}
     - blockstanbulBlockPeriodMs=${blockstanbulBlockPeriodMs}
@@ -215,6 +216,7 @@ services:
     volumes:
       - stratodata:/var/lib/strato
       - ./genesis-block.json:/var/lib/strato/${genesis:-gettingStarted}Genesis.json
+      - ${PEM_FILE:-./genesis-block.json}:/var/lib/strato/priv.pem
   postgrest:
     depends_on:
     - postgres
@@ -262,6 +264,7 @@ services:
     - strato
     environment:
     - APEX_HOST=${APEX_HOST}
+    - AUTH_MODE=${AUTH_MODE:-OAUTH}
     - blockstanbul=${blockstanbul}
     - blockTime=${blockTime}
     - debugPort=${debugPort}

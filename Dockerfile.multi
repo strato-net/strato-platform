@@ -38,6 +38,7 @@ ENV LANG="en_US.UTF-8" \
 
 FROM base as strato
 COPY \
+  ./usr/local/bin/blockapps-pem-vault-wrapper-server \
   ./usr/local/bin/blockapps-vault-proxy-server \
   ./usr/local/bin/ethereum-discover \
   ./usr/local/bin/forced-config-change \

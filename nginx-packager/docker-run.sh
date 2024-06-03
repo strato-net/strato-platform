@@ -7,7 +7,7 @@ BLOCK_TIME_MULTIPLIER_FOR_TIMEOUT=10
 blockTime=${blockTime:-13} # keep default the same as strato
 ssl=${ssl:-false}
 sslCertFileType=${sslCertFileType:-pem}
-NON_OAUTH_MODE=${NON_OAUTH_MODE:-false}
+AUTH_MODE=${AUTH_MODE:-OAUTH}
 OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-NULL}
 OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
 OAUTH_SCOPE=${OAUTH_SCOPE:-openid email profile}
@@ -36,7 +36,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ########
   ### Check the validity of variables combination
   ########
-  if [ ${NON_OAUTH_MODE} = false ]; then
+  if [ "${AUTH_MODE}" = "OAUTH" ]; then
     if [[ ${OAUTH_CLIENT_ID} = NULL || ${OAUTH_CLIENT_SECRET} = NULL ]] ; then
       echo 'OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET are required for OAuth. Exit'
       exit 4
@@ -51,7 +51,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     sleep 1
   done
   echo "Strato api is available"
-  if [ ${NON_OAUTH_MODE} = false ]; then
+  if [ "${AUTH_MODE}" = "OAUTH" ]; then
     OAUTH_DISCOVERY_URL=$(curl --silent --fail ${ETH_ENDPOINT}/metadata | jq -r .urls.oauthDiscovery)
     if [ -z "${OAUTH_DISCOVERY_URL}" ]; then
       echo "Could not get OAuth discovery url from strato api, but it is a required value"
@@ -77,7 +77,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
 
   # This is used to remove lines from the nginx.conf
   # without having to put the entire replacement string in this file
-  if [ "$NON_OAUTH_MODE" = true ]; then
+  if [ "${AUTH_MODE}" != "OAUTH" ]; then
     sed -i '/#TEMPLATE_NON_OAUTH_MODE/d' /tmp/nginx.conf
   fi
 

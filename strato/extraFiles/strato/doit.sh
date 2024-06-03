@@ -52,30 +52,40 @@ function newnode {
   mkdir -p logs
 
   echo "trying to see if the alternative OAUTH parameters are available"
-  if [[ -z ${OAUTH_VAULT_PROXY_ALT_CLIENT_ID:-${OAUTH_CLIENT_ID}} || -z ${OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET:-${OAUTH_CLIENT_SECRET}} ]]; then
-    echo "Could not obtain OAUTH parameters for Vault Proxy"
-    exit 2
-  elif [[ -z ${OAUTH_DISCOVERY_URL} ]]; then
-    if [ "${network}" == "mercata-hydrogen" ] || [ "${networkID}" == "7596898649924658542" ]; then # connecting to testnet
-      OAUTH_DISCOVERY_URL="https://keycloak.blockapps.net/auth/realms/mercata-testnet2/.well-known/openid-configuration"
-    elif [ -n "${network}" -a "${network}" != "mercata" ] || [ -n "${networkID}" -a "${networkID}" != "6909499098523985262" ]; then # connecting to...not prod
-      echo "OAUTH_DISCOVERY_URL was not provided and could not be derived"
-      exit 3
+  if [ "${AUTH_MODE}" = "OAUTH" ]; then
+    if [[ -z ${OAUTH_VAULT_PROXY_ALT_CLIENT_ID:-${OAUTH_CLIENT_ID}} || -z ${OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET:-${OAUTH_CLIENT_SECRET}} ]]; then
+      echo "Could not obtain OAUTH parameters for Vault Proxy"
+      exit 2
+    elif [[ -z ${OAUTH_DISCOVERY_URL} ]]; then
+      if [ "${network}" == "mercata-hydrogen" ] || [ "${networkID}" == "7596898649924658542" ]; then # connecting to testnet
+        OAUTH_DISCOVERY_URL="https://keycloak.blockapps.net/auth/realms/mercata-testnet2/.well-known/openid-configuration"
+      elif [ -n "${network}" -a "${network}" != "mercata" ] || [ -n "${networkID}" -a "${networkID}" != "6909499098523985262" ]; then # connecting to...not prod
+        echo "OAUTH_DISCOVERY_URL was not provided and could not be derived"
+        exit 3
+      else
+        OAUTH_DISCOVERY_URL="https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration"
+      fi
     else
-      OAUTH_DISCOVERY_URL="https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration"
+      echo "OAUTH parameters for Vault Proxy are available"
     fi
-  else
-    echo "OAUTH parameters for Vault Proxy are available"
-  fi
 
-  runBackgroundProcess blockapps-vault-proxy-server \
-    --OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL} \
-    --OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID} \
-    --OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET} \
-    --OAUTH_RESERVE_SECONDS=${OAUTH_RESERVE_SECONDS:-13} \
-    --VAULT_URL=${VAULT_URL} \
-    --VAULT_PROXY_PORT=8013 \
-    --VAULT_PROXY_DEBUG=${VAULT_PROXY_DEBUG:-false} &>> logs/vault-proxy
+    runBackgroundProcess blockapps-vault-proxy-server \
+      --OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL} \
+      --OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID} \
+      --OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET} \
+      --OAUTH_RESERVE_SECONDS=${OAUTH_RESERVE_SECONDS:-13} \
+      --VAULT_URL=${VAULT_URL} \
+      --VAULT_PROXY_PORT=8013 \
+      --VAULT_PROXY_DEBUG=${VAULT_PROXY_DEBUG:-false} &>> logs/vault-proxy
+
+  else
+    echo "OAUTH mode is disabled; using ${AUTH_MODE} instead"
+
+    runBackgroundProcess blockapps-pem-vault-wrapper-server \
+      --port=8013 \
+      --PEM_FILE=priv.pem &>> logs/vault-proxy
+
+  fi
 
   set +x
   echo 'Waiting for vault-proxy to rise and shine at http://localhost:8013...'
