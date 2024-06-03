@@ -166,6 +166,9 @@ async function get(user, args, options) {
     key: "address",
     value: address,
   });
+  searchArgs.queryOptions.select = "*,BlockApps-Mercata-Order-saleAddresses(*),BlockApps-Mercata-Order-quantities(*),BlockApps-Mercata-Order-completedSales(*)";
+  console.log("HERE IS THE ORDER:",searchArgs,"\n",constants.orderTableName)
+
   order = await searchOne(constants.orderTableName, searchArgs, newOptions, user);
 
   if (!order) {
@@ -179,9 +182,8 @@ async function get(user, args, options) {
 
 async function getAll(admin, args = {}, options) {
   let saleOrders;
-  const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
-  saleOrders = await searchAllWithQueryArgs(constants.orderTableName, args, newOptions, admin);
-
+  const newOptions = { ...options,  org: 'BlockApps', app: 'Mercata' }
+  saleOrders = await searchAllWithQueryArgs(constants.orderTableName, {...args,queryOptions: {select:"*,BlockApps-Mercata-Order-saleAddresses(*),BlockApps-Mercata-Order-quantities(*),BlockApps-Mercata-Order-completedSales(*)"}}, newOptions, admin);
   const count = await searchAllWithQueryArgs(
     constants.orderTableName,
     {

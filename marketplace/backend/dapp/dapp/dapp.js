@@ -822,7 +822,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getOrder = async function (args, options = defaultOptions) {
     try {
       const order = await saleOrderJs.get(rawAdmin, args, options);
-      const sales = await saleJs.getAll(rawAdmin, { saleAddresses: order.saleAddresses }, options);
+
+      // Extracting the sale addresses
+      const saleAddresses = order["BlockApps-Mercata-Order-saleAddresses"].map(item => item.value);
+      const sales = await saleJs.getAll(rawAdmin, { saleAddresses: saleAddresses }, options);
       let assets = [];
 
       for (const sale of sales) {
