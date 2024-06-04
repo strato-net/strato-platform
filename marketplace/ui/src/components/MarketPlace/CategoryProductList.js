@@ -21,7 +21,6 @@ import { actions as marketplaceActions } from "../../contexts/marketplace/action
 import { actions as orderActions } from "../../contexts/order/actions"
 // Dispatch and states
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
-// import { useSubCategoryDispatch, useSubCategoryState } from "../../contexts/subCategory";
 import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/marketplace";
 import { useAuthenticateState } from "../../contexts/authentication";
 import { useOrderDispatch } from "../../contexts/order";
@@ -466,8 +465,6 @@ const AvailabilityFilter = () =>
           <Avatar icon={<CloseOutlined />} style={{ color: "#202020" }} className="flex items-center pr-12" onClick={handleFilterClick} />
         </div>
         <Divider className="m-0 mt-3" />
-
-        {/* Panel - Sub Category */}
         <>
           {subCategories?.length > 1 && category === 'Carbon' && MobileCollapseComponent(
             SubCategoryFilterComponent()
@@ -535,7 +532,6 @@ const AvailabilityFilter = () =>
                           />
                         );
                       })}
-
                   </div>
                 ) : (
                   <div className="h-96 flex justify-center items-center" id="product-list">

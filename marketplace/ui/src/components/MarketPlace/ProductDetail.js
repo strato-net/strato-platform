@@ -5,7 +5,6 @@ import { useMatch, useNavigate, useLocation } from "react-router-dom";
 import { Carousel } from "react-responsive-carousel"
 import TagManager from "react-gtm-module";
 //actions
-
 import { actions as inventoryActions } from "../../contexts/inventory/actions";
 import { useInventoryDispatch, useInventoryState, } from "../../contexts/inventory";
 import { actions as categoryActions } from "../../contexts/category/actions";
@@ -16,7 +15,6 @@ import { useMarketplaceDispatch, useMarketplaceState, } from "../../contexts/mar
 import { useOrderDispatch } from "../../contexts/order";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
 import { useAuthenticateState } from "../../contexts/authentication";
-//Items - ownership history
 // components
 import HelmetComponent from "../Helmet/HelmetComponent";
 import DataTableComponent from "../DataTableComponent";
@@ -59,13 +57,13 @@ const ProductDetails = ({ user, users }) => {
     inventoryOwnershipHistory, priceHistory, isFetchingPriceHistory
   } = useInventoryState();
   const { cartList } = useMarketplaceState();
-  // ----------
+  
+
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [timeFilter, setTimeFilter] = useState('1');
   const [itemData, setItemData] = useState({});
   const [Id, setId] = useState(undefined);
   const [qty, setQty] = useState(1);
-  // const [categoryName, setCategoryName] = useState("");
   // For Wishlist Icon Rendering
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [availableQuantity, setAvailableQuantity] = useState(1);
@@ -152,7 +150,6 @@ const ProductDetails = ({ user, users }) => {
       const prodCategory = categorys.find(
         (c) => c.name === details.category
       );
-      // setCategoryName(prodCategory?.name);
       const detailsData = details.data;
       setItemData(detailsData);
       if (details.saleQuantity) {
@@ -264,7 +261,6 @@ const ProductDetails = ({ user, users }) => {
       dataIndex: "sellerCommonName",
       key: "sellerCommonName",
       align: "center",
-      // render: (text) => <p>{text}</p>,
       render: (text) => (
         <a
           href={`${window.location.origin}/profile/${encodeURIComponent(text)}`}
@@ -291,7 +287,6 @@ const ProductDetails = ({ user, users }) => {
       dataIndex: "purchaserCommonName",
       key: "purchaserCommonName",
       align: "center",
-      // render: (text) => <p>{text}</p>,
       render: (text) => (
         <a
           href={`${window.location.origin}/profile/${encodeURIComponent(text)}`}
@@ -736,7 +731,6 @@ const ProductDetails = ({ user, users }) => {
                     {(priceHistory?.originRecords?.length !== 0) && (
                       <>
                         <h2 className='w-full text-center font-bold text-2xl'>12-Month Historical Data</h2>
-
                         <Statistics priceHistory={priceHistory} />
                       </>
                     )}

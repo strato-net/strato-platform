@@ -79,7 +79,6 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   }, [marketplaceDispatch, storedData]);
 
   const [selectedTab, setSelectedTab] = useState("0");
-  // const [initials, setInitials] = useState("");
   const [roleIndex, setRoleIndex] = useState();
   const [showSearch, setShowSearch] = useState(false);
   const [categories, setCategories] = useState([]);
@@ -192,18 +191,6 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
       </div>
     ),
   }]
-
-  // useEffect(() => {
-  //   let temp = "";
-  //   if (user != null) {
-  //     if (user.commonName.split(" ").length > 1) {
-  //       temp = user.commonName.split(" ")[0].substring(0, 1) + user.commonName.split(" ")[1].substring(0, 1);
-  //     } else {
-  //       temp = user.commonName.split(" ")[0].substring(0, 1);
-  //     }
-  //   }
-  //   setInitials(temp);
-  // }, [user])
 
   useEffect(() => {
     if (user) setRoleIndex(0)
