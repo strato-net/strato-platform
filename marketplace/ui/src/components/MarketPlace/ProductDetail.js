@@ -158,7 +158,11 @@ const ProductDetails = ({ user, users }) => {
   }, [marketplaceDispatch, cartList]);
 
   const details = inventoryDetails;
-  const filesOfTheAsset = details["BlockApps-Mercata-Asset-files"];
+  let fileValues=[]
+  // Check if details and BlockApps-Mercata-Asset-files are not null or undefined
+  if (details && Array.isArray(details['BlockApps-Mercata-Asset-files'])) {
+    fileValues = details['BlockApps-Mercata-Asset-files'].map(file => file.value);
+  }
 
 
   useEffect(() => {
@@ -370,7 +374,6 @@ const ProductDetails = ({ user, users }) => {
         </div>
       ) : (
         <div>
-          {console.log(details)}
           <HelmetComponent 
           title={`${assetName} | ${contractName} | ${SEO.TITLE_META}`}
           description={details?.description} 
@@ -717,11 +720,11 @@ const ProductDetails = ({ user, users }) => {
                           <List
                             size="small"
                             boardered
-                            dataSource={filesOfTheAsset?.length>0 ? filesOfTheAsset: 0}
+                            dataSource={fileValues?.length>0 ? fileValues: []}
                             renderItem={(item) =>
                               <List.Item>
-                                <a href={item.value} rel="noreferrer" target="_blank" className="hover:underline break-all text-[#1e40af]">
-                                  {item.value}
+                                <a href={item} rel="noreferrer" target="_blank" className="hover:underline break-all text-[#1e40af]">
+                                  {item}
                                 </a>
                               </List.Item>}
                           />

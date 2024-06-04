@@ -370,8 +370,7 @@ async function get(user, args, options) {
             value: address,
         },
     ]);
-    searchArgs.queryOptions.select="*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*)";
-    console.log("INSIDE GET INV")
+    searchArgs.queryOptions.select= constants.attachImagesAndFiles;
     inventory = await searchOne(contractName, searchArgs, newOptions, user);
 
     if (!inventory) {
@@ -414,7 +413,7 @@ async function getAll(admin, args = {}, defaultOptions) {
         inventories = await searchAllWithQueryArgs(contractName,
             {
                 ...restArgs,
-                queryOptions: {"select":"*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*)"},
+                queryOptions: {"select":constants.attachImagesAndFiles},
                 address: trendingAssetAddresses,
                 order: 'block_timestamp.desc',
                 limit: '25',
@@ -443,20 +442,20 @@ async function getAll(admin, args = {}, defaultOptions) {
                 {
                     ...restArgs,
                     ownerCommonName: ownerCommonName,
-                    queryOptions: { select: "*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Sale!BlockApps-Mercata-Sale_BlockApps-Mercata-Asset_fk(*)" }
+                    queryOptions: { select: constants.attachSalesAndImagesAndFiles }
                 }, options, admin);
         } else if (assetAddresses) {
             inventories = await searchAllWithQueryArgs(contractName,
                 {
                     ...restArgs,
                     address: assetAddresses,
-                    queryOptions: { select: "*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Sale!BlockApps-Mercata-Sale_BlockApps-Mercata-Asset_fk(*)" }
+                    queryOptions: { select: constants.attachSalesAndImagesAndFiles }
                 }, options, admin);
         } else {
             inventories = await searchAllWithQueryArgs(contractName,
                 {
                     ...restArgs,
-                    queryOptions: { select: "*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Sale!BlockApps-Mercata-Sale_BlockApps-Mercata-Asset_fk(*)" }
+                    queryOptions: { select: constants.attachSalesAndImagesAndFiles }
                 }, options, admin);
         }
 

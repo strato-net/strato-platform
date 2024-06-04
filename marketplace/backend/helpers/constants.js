@@ -35,6 +35,9 @@ export default {
   prodStratsAddress: "b220195543f652f735b7847c4af399d0323e1ff6",
   testnetStratsAddress: "488cd3909d94606051e0684cf6caa5763fb78613",
   baUserNames: ['blockapps_carbon', 'blockapps_metals', 'blockapps_clothing', 'blockapps_collectibles', 'blockapps_memberships', 'blockapps_art'],
+  attachImagesAndFiles: "*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*)",
+  attachSalesAndImagesAndFiles: "*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Sale!BlockApps-Mercata-Sale_BlockApps-Mercata-Asset_fk(*)",
+  attach_saleAddresses_Quantities_completedSales_onOrder: "*,BlockApps-Mercata-Order-saleAddresses(*),BlockApps-Mercata-Order-quantities(*),BlockApps-Mercata-Order-completedSales(*)",
   localHost: 'http://localhost'
 };
 
