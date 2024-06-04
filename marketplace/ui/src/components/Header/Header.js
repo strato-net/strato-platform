@@ -478,11 +478,11 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
         onCancel={handleClose}
         onLogin={handleLogin}
       />
-      <TransferStratsModal
+      {isTransferStratsModalVisible && <TransferStratsModal
         visible={isTransferStratsModalVisible}
         onCancel={handleCloseTransferStratsModal}
         balance={stratsBalance}
-      />
+      />}
     </>
 
   );
