@@ -510,8 +510,9 @@ const actions = {
       if (response.status === RestStatus.UNAUTHORIZED || response.status === RestStatus.FORBIDDEN) {
         dispatch({
           type: actionDescriptors.transferStratsFailed,
-          payload: "Error while transferring STRATS",
+          error: "Error while transferring STRATS",
         });
+        actions.setMessage(dispatch, "Error while transferring STRATS");
         return;
       }
       if (response.status === RestStatus.OK) {
@@ -519,11 +520,14 @@ const actions = {
           type: actionDescriptors.transferStratsSuccessful,
           payload: body.data
         });
+        actions.setMessage(dispatch, "STRATs transferred successfully");
         return;
       }
-      dispatch({ type: actionDescriptors.transferStratsFailed, payload: "Error while transferring STRATS" });
+      dispatch({ type: actionDescriptors.transferStratsFailed, error: "Error while transferring STRATS" });
+      actions.setMessage(dispatch, "Error while transferring STRATS");
     } catch (err) {
-      dispatch({ type: actionDescriptors.transferStratsFailed, payload: "Error while transferring STRATS" });
+      dispatch({ type: actionDescriptors.transferStratsFailed, error: "Error while transferring STRATS" });
+      actions.setMessage(dispatch, "Error while transferring STRATS");
     }
   },
 

@@ -185,18 +185,33 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     },
   ];
 
-  const stratsItem = [{
-    key: '2',
-    label: (
-      <div>
-        {user &&
-          <p className="text-xs mt-1">
-            STRATs: {stratsBalance}
-          </p>
-        }
-      </div>
-    ),
-  }]
+  const stratsItem = [
+    {
+      key: '1',
+      label: (
+        <div>
+          {user &&
+            <p className="text-xs mt-1">
+              STRATs: {stratsBalance}
+            </p>
+          }
+        </div>
+      ),
+    },
+    {
+      key: '2',
+      onClick: () => setIsTransferStratsModalVisible(true),
+      label: (
+        <div>
+          {user &&
+            <p className="text-xs mt-1">
+              Transfer
+            </p>
+          }
+        </div>
+      ),
+    }
+  ]
 
   useEffect(() => {
     let temp = "";
@@ -425,7 +440,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
 
           {(roleIndex !== undefined && roleIndex !== 1)
             && <Dropdown menu={{ items: stratsItem }} placement="bottomRight" trigger={["hover", "click"]} className="xs:mt-5 md:mt-0" overlayStyle={{ position: 'fixed' }}>
-              <a onClick={(e) => { e.preventDefault(); setIsTransferStratsModalVisible(true); }} className="md:flex mx-1 text-base text-white" id="strats-dropdown">
+              <a className="md:flex mx-1 text-base text-white" id="strats-dropdown">
                 <Badge
                   style={{ backgroundColor: "#13188A" }}
                   className="cursor-pointer mt-7 md:mt-0 mx-2"
@@ -478,11 +493,12 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
         onCancel={handleClose}
         onLogin={handleLogin}
       />
-      {isTransferStratsModalVisible && <TransferStratsModal
-        visible={isTransferStratsModalVisible}
-        onCancel={handleCloseTransferStratsModal}
-        balance={stratsBalance}
-      />}
+      {isTransferStratsModalVisible &&
+        <TransferStratsModal
+          visible={isTransferStratsModalVisible}
+          onCancel={handleCloseTransferStratsModal}
+          balance={stratsBalance}
+        />}
     </>
 
   );
