@@ -100,7 +100,7 @@ export const unitOfMeasures = [
 ];
 
 export const unitOfSpiritMeasures = [
-  { name: "Barrell", value: 1 },
+  { name: "Barrel", value: 1 },
   { name: "Bottle", value: 2 }
 ];
 
@@ -204,3 +204,5 @@ export const REDEMPTION_STATUS = {
 }
 
 export const PAYMENT_LIST = ['card','us_bank_account']
+
+export const STRATS_CONVERSION = 100;

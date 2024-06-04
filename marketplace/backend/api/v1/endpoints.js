@@ -171,23 +171,6 @@ export const OrderLineItem = {
   transferOwnership: '/transferOwnership',
 }
 
-export const EventType = {
-  prefix: '/eventType',
-  getAll: '/',
-  create: '/'
-}
-
-export const Event = {
-  prefix: '/event',
-  getInventoryEventTypes: '/:inventoryId',
-  getInventoryEventTypeDetails: '/:inventoryId/:eventTypeId',
-  getAll: '/',
-  create: '/',
-  certifyEvent: '/update',
-  audit: '/:address/:chainId/audit',
-  transferOwnership: '/transferOwnership',
-}
-
 export const Marketplace = {
   prefix: '/marketplace',
   getAll: '/',

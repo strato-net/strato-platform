@@ -6,7 +6,7 @@ module Blockchain.Bagger.BaggerState where
 
 import Blockchain.Bagger.TransactionList
 import Blockchain.Bagger.Transactions
-import qualified Blockchain.Data.DataDefs as DD
+import Blockchain.Data.BlockHeader
 import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.Database.MerklePatricia (StateRoot (..), blankStateRoot)
 import Blockchain.Sequencer.Event (OutputTx (..))
@@ -28,7 +28,7 @@ type ATL = M.Map Address TransactionList
 
 data MiningCache = MiningCache
   { bestBlockSHA :: Keccak256,
-    bestBlockHeader :: DD.BlockData,
+    bestBlockHeader :: BlockHeader,
     bestBlockTxHashes :: [Keccak256],
     lastExecutedStateRoot :: StateRoot,
     remainingGas :: Integer,
@@ -86,7 +86,7 @@ defaultMiningCache =
   MiningCache
     { bestBlockSHA = unsafeCreateKeccak256FromWord256 0,
       bestBlockHeader =
-        ( DD.BlockData
+        ( BlockHeader
             (unsafeCreateKeccak256FromWord256 0)
             (unsafeCreateKeccak256FromWord256 0)
             (Everyone False)
@@ -100,8 +100,8 @@ defaultMiningCache =
             100
             (posixSecondsToUTCTime 0)
             ""
-            137
             (unsafeCreateKeccak256FromWord256 30)
+            137
         ),
       bestBlockTxHashes = [],
       lastExecutedStateRoot = blankStateRoot,
@@ -132,9 +132,9 @@ modifyATL f address atl = case M.lookup address atl of
           else (poppedTx, M.insert address newTL atl)
 
 purgeFromATL :: Address -> Integer -> ATL -> ATL
-purgeFromATL address nonce atl = case M.lookup address atl of
+purgeFromATL address nonce' atl = case M.lookup address atl of
   Nothing -> atl
-  Just tl -> let newTL = M.delete nonce tl in M.insert address newTL atl
+  Just tl -> let newTL = M.delete nonce' tl in M.insert address newTL atl
 
 calculateIntrinsicTxFee :: BaggerState -> (OutputTx -> Integer)
 calculateIntrinsicTxFee bs t@OutputTx {otBaseTx = bt} =
@@ -142,7 +142,7 @@ calculateIntrinsicTxFee bs t@OutputTx {otBaseTx = bt} =
 
 calculateIntrinsicGasAtNextBlock :: BaggerState -> OutputTx -> Integer
 calculateIntrinsicGasAtNextBlock BaggerState {miningCache = MiningCache {bestBlockHeader = bh}, calculateIntrinsicGas = cig} =
-  cig (DD.blockDataNumber bh + 1)
+  cig (number bh + 1)
 
 addToPending :: OutputTx -> BaggerState -> (Maybe OutputTx, OutputTx, BaggerState)
 addToPending t s@BaggerState {pending = p} =
@@ -161,12 +161,12 @@ removeFromSeen :: OutputTx -> BaggerState -> BaggerState
 removeFromSeen OutputTx {otHash = sha} s@BaggerState {seen = seen'} = s {seen = S.delete sha seen'}
 
 trimBelowNonceFromQueued :: Address -> Integer -> BaggerState -> ([OutputTx], BaggerState)
-trimBelowNonceFromQueued a nonce s@BaggerState {queued = q} =
-  let (oldTX, newATL) = modifyATL (trimBelowNonce nonce) a q in (oldTX, s {queued = newATL})
+trimBelowNonceFromQueued a nonce' s@BaggerState {queued = q} =
+  let (oldTX, newATL) = modifyATL (trimBelowNonce nonce') a q in (oldTX, s {queued = newATL})
 
 trimBelowNonceFromPending :: Address -> Integer -> BaggerState -> ([OutputTx], BaggerState)
-trimBelowNonceFromPending a nonce s@BaggerState {pending = p} =
-  let (oldTX, newATL) = modifyATL (trimBelowNonce nonce) a p in (oldTX, s {pending = newATL})
+trimBelowNonceFromPending a nonce' s@BaggerState {pending = p} =
+  let (oldTX, newATL) = modifyATL (trimBelowNonce nonce') a p in (oldTX, s {pending = newATL})
 
 trimAboveCostFromQueued :: Address -> Integer -> BaggerState -> ([OutputTx], BaggerState)
 trimAboveCostFromQueued a maxCost s@BaggerState {queued = q} =
@@ -179,8 +179,8 @@ trimAboveCostFromPending a maxCost s@BaggerState {pending = p} =
    in (oldTX, s {pending = newATL})
 
 popSequentialFromQueued :: Address -> Integer -> BaggerState -> ([OutputTx], BaggerState)
-popSequentialFromQueued a nonce s@BaggerState {queued = q} =
-  let (popped, newATL) = modifyATL (popSequential nonce) a q in (popped, s {queued = newATL})
+popSequentialFromQueued a nonce' s@BaggerState {queued = q} =
+  let (popped, newATL) = modifyATL (popSequential nonce') a q in (popped, s {queued = newATL})
 
 popAllPending :: BaggerState -> ([OutputTx], BaggerState)
 popAllPending s@BaggerState {pending = p} = (popped, s {pending = M.empty})
@@ -204,6 +204,6 @@ addToPromotionCache tx s@BaggerState {miningCache = mc@MiningCache {promotedTran
 upsertPT :: OutputTx -> [OutputTx] -> [OutputTx]
 upsertPT tx@OutputTx {otSigner = addr, otBaseTx = bt} pt = ret
   where
-    filtered = filter (not . (\t -> otSigner t == addr && nonce (otBaseTx t) <= nonce bt)) pt
-    nonce = TD.transactionNonce
+    filtered = filter (not . (\t -> otSigner t == addr && nonce' (otBaseTx t) <= nonce' bt)) pt
+    nonce' = TD.transactionNonce
     !ret = tx : filtered

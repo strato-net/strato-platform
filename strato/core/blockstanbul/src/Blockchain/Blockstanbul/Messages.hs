@@ -13,13 +13,14 @@ module Blockchain.Blockstanbul.Messages where
 import BlockApps.Logging
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.Block
-import Blockchain.Data.DataDefs
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class (blockHash)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
+import Blockchain.Strato.Model.Validator
 import Control.DeepSeq
 import Control.Lens
 import Control.Monad (liftM2)
@@ -149,7 +150,7 @@ data InEvent
   | PreviousBlock Block
   | ForcedConfigChange ForcedConfigChange
   | ValidatorBehaviorChange ForcedValidatorChange
-  | ValidatorChange ChainMemberParsedSet Bool
+  | ValidatorChange Validator Bool
   deriving (Eq, Show)
 
 instance Format InEvent where
@@ -193,7 +194,7 @@ instance Format OutEvent where
   format (NewCheckpoint ckpt) = "NewCheckpoint " ++ show ckpt
 
 blkNum :: Block -> String
-blkNum = show . blockDataNumber . blockBlockData
+blkNum = show . number . blockBlockData
 
 shortFormat :: WireMessage -> String
 shortFormat (WireMessage (MsgAuth s _) (Preprepare v blk)) =
@@ -332,7 +333,7 @@ data AuthResult = AuthSuccess | AuthFailure String deriving (Show, Eq)
 
 data Checkpoint = Checkpoint
   { checkpointView :: View,
-    checkpointValidators :: [ChainMemberParsedSet]
+    checkpointValidators :: [Validator]
   }
   deriving (Show, Eq, Generic, NFData, Ae.ToJSON, Ae.FromJSON, Data)
 

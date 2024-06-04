@@ -21,11 +21,13 @@ import Data.Aeson
 import Data.Binary
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
+import Data.ByteString.Arbitrary
 import qualified Data.ByteString.Char8 as BC
 import Data.Data
 import Data.Default
 import Data.String
 import GHC.Generics
+import Test.QuickCheck
 import qualified Text.Colors as CL
 import Text.Format
 
@@ -69,3 +71,6 @@ sha2StateRoot x = StateRoot $ keccak256ToByteString x
 
 unboxStateRoot :: StateRoot -> B.ByteString
 unboxStateRoot (StateRoot b) = b
+
+instance Arbitrary StateRoot where
+  arbitrary = StateRoot <$> fastRandBs 32

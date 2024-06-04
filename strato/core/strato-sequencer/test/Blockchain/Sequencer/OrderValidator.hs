@@ -6,7 +6,7 @@ module Blockchain.Sequencer.OrderValidator
   )
 where
 
-import Blockchain.Data.DataDefs
+import Blockchain.Data.BlockHeader
 import qualified Blockchain.Sequencer.Event as SE
 import Blockchain.Strato.Model.Class (blockHeaderHash)
 import Blockchain.Strato.Model.Keccak256
@@ -89,10 +89,10 @@ validateOrder = runValidatorM validator
 
 instance OrderValidateable SE.IngestBlock where
   getBlockHash = blockHeaderHash . SE.ibBlockData
-  getParentHash = blockDataParentHash . SE.ibBlockData
-  getBlockNumber = blockDataNumber . SE.ibBlockData
+  getParentHash = parentHash . SE.ibBlockData
+  getBlockNumber = number . SE.ibBlockData
 
 instance OrderValidateable SE.OutputBlock where
   getBlockHash = blockHeaderHash . SE.obBlockData
-  getParentHash = blockDataParentHash . SE.obBlockData
-  getBlockNumber = blockDataNumber . SE.obBlockData
+  getParentHash = parentHash . SE.obBlockData
+  getBlockNumber = number . SE.obBlockData

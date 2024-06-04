@@ -27,6 +27,7 @@ export default {
   sellerOrgName: "blockapps",
   assetTableName: "Asset",
   saleTableName: "Sale",
+  saleAllTableName: "BlockApps-Mercata-Sale",
   orderTableName: "Order",
   blockAppsOrg: "BlockApps",
   prodNetworkId: "6909499098523985262",
@@ -101,10 +102,12 @@ Object.freeze(SERVICE_PROVIDERS)
 
 // Helpers to calculate average price, range, units sold for Pirce History Stats
 export const calculateAveragePrice = (records) => {
-  return records.reduce((sum, record) => sum + record.price, 0) / records.length;
+  const total = records.reduce((sum, record) => sum + Number(record.price), 0);
+  return (total / records.length).toFixed(2);
 }
 
-export const calculatePriceFluctuation = (records) => {
+
+export const calculatePriceFluctuation =(records)=> {
   const prices = records.map(record => record.price);
   return { min: Math.min(...prices), max: Math.max(...prices) };
 }

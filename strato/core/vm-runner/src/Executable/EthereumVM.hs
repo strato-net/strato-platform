@@ -26,8 +26,7 @@ import Blockchain.DB.ChainDB
 import qualified Blockchain.DB.MemAddressStateDB as Mem
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.AddressStateRef (updateSQLBalanceAndNonce)
-import Blockchain.Data.BlockHeader (extraData2TxsLen)
-import Blockchain.Data.DataDefs (BlockData (..), blockDataExtraData)
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.GenesisBlock
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Database.MerklePatricia as MP
@@ -142,7 +141,7 @@ outputBlockToEvmCheckpoint block =
       txL = length txs
       uncL = length (obBlockUncles block)
       cbbi = ContextBestBlockInfo sha header td txL uncL
-      sr = blockDataStateRoot header
+      sr = stateRoot header
    in EVMCheckpoint sha header cbbi sr
 
 logEventSummaries :: MonadLogger m => [VmEvent] -> m ()
@@ -294,7 +293,7 @@ getUnprocessedKafkaEvents offset = do
         VmBlock OutputBlock {..} ->
           fromMaybe (length obReceiptTransactions)
             . extraData2TxsLen
-            $ blockDataExtraData obBlockData
+            $ extraData obBlockData
         _ -> 1
 
       !ret' = eventLimit . countLimit $ ret

@@ -9,7 +9,6 @@ import {
   SwapOutlined
 } from "@ant-design/icons";
 import PreviewInventoryModal from "./PreviewInventoryModal";
-import AddEventModal from "./AddEventModal";
 import { useNavigate } from "react-router-dom";
 import ListForSaleModal from "./ListForSaleModal";
 import UnlistModal from "./UnlistModal";
@@ -17,7 +16,7 @@ import ResellModal from "./ResellModal";
 import TransferModal from "./TransferModal";
 import RedeemModal from "./RedeemModal";
 import routes from "../../helpers/routes";
-import { ASSET_STATUS } from "../../helpers/constants";
+import { ASSET_STATUS, STRATS_CONVERSION } from "../../helpers/constants";
 import image_placeholder from "../../images/resources/image_placeholder.png";
 import "react-responsive-carousel/lib/styles/carousel.min.css";
 import { SEO } from "../../helpers/seoConstant";
@@ -25,9 +24,7 @@ import { SEO } from "../../helpers/seoConstant";
 const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentProviderAddress, allSubcategories, limit, offset }) => {
   const textRef = useRef(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
-  const [openPop, setOpenPop] = useState(false);
   const [open, setOpen] = useState(false);
-  const [openEdit, setOpenEdit] = useState(false);
   const [listModalOpen, setListModalOpen] = useState(false);
   const [unlistModalOpen, setUnlistModalOpen] = useState(false);
   const [resellModalOpen, setResellModalOpen] = useState(false);
@@ -43,19 +40,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
     setOpen(false);
   };
 
-  const handleCancelEdit = () => {
-    setOpenEdit(false);
-  };
-
-  const hide = () => {
-    setOpenPop(false);
-  };
-  const handleOpenChange = (newOpen) => {
-    setOpenPop(newOpen);
-  };
-
   const showListModal = () => {
-    hide();
     setListModalOpen(true);
   };
 
@@ -64,7 +49,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
   };
 
   const showUnlistModal = () => {
-    hide();
     setUnlistModalOpen(true);
   };
 
@@ -73,7 +57,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
   };
 
   const showResellModal = () => {
-    hide();
     setResellModalOpen(true);
   };
 
@@ -82,7 +65,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
   };
 
   const showTransferModal = () => {
-    hide();
     setTransferModalOpen(true);
   };
 
@@ -91,7 +73,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
   };
 
   const showRedeemModal = () => {
-    hide();
     setRedeemModalOpen(true);
   };
 
@@ -100,7 +81,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
   };
 
   const callDetailPage = () => {
-    navigate(`${naviroute.replace(":id", inventory.address).replace(":name", inventory.name)}`, {
+    navigate(`${naviroute.replace(":id", inventory.address).replace(":name", encodeURIComponent(inventory.name))}`, {
       state: { isCalledFromInventory: true },
     });
   };
@@ -281,7 +262,15 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
           </div>
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Price</p>
-            <p className="text-[#202020] font-semibold">{inventory?.price || "N/A"}</p>
+            <p className="text-[#202020] font-semibold">
+              {inventory?.price ? (
+                <>
+                  ${inventory?.price} <span className="text-xs">({inventory?.price * STRATS_CONVERSION} STRATS)</span>
+                </>
+              ) : (
+                "N/A"
+              )}
+            </p>
           </div>
 
         </div>
@@ -293,14 +282,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
           handleCancel={handleCancel}
           inventory={inventory}
           category={category}
-        />
-      )}
-      {openEdit && (
-        <AddEventModal
-          open={openEdit}
-          handleCancel={handleCancelEdit}
-          inventoryId={inventory.address}
-          productId={inventory.productId}
         />
       )}
       {listModalOpen && (

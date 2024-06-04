@@ -3,7 +3,7 @@
 
 module Blockchain.EVM.Environment where
 
-import Blockchain.Data.DataDefs
+import Blockchain.Data.BlockHeader
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
@@ -24,7 +24,7 @@ data Environment = Environment
     envValue :: Integer,
     envCode :: Code,
     envJumpDests :: I.IntSet,
-    envBlockHeader :: BlockData,
+    envBlockHeader :: BlockHeader,
     envTxHash :: Keccak256,
     envChainId :: Maybe Word256,
     envMetadata :: Maybe (Map Text Text)
