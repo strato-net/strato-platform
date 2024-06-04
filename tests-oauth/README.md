@@ -1,5 +1,11 @@
 # Oauth test cases
 
+
+## NOTICE: a work has been done to make this tests run on Mercata 11.2. The tests don't pass due to the API-related changes since they were created, but the suite itself can be started and can be used for future tests
+
+
+
+
 Demo app that uses STRATO to track products through a supply chain using OAuth and Private chains.
 
 ## STRATO
