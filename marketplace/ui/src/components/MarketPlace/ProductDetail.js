@@ -340,6 +340,10 @@ const ProductDetails = ({ user, users }) => {
   const contractName = getCategoryName(decodeURIComponent(details?.contract_name))
   const linkUrl = window.location.href;
 
+  const googleFormBaseURL = "https://docs.google.com/forms/d/e/1FAIpQLSfEWqALizqd-Rg3OPTwxD5O6xJKqT0xEgHeKpSpnaWzZ7tn1Q/viewform?usp=pp_url";
+  const preFilledFormURL = `${googleFormBaseURL}&entry.8090980=${encodeURIComponent(details?.name)}&entry.1160788377=${encodeURIComponent(details?.ownerCommonName)}&entry.1571372307=${encodeURIComponent(user?.email)}`;  
+
+
   return (
     <>
       {contextHolder}
@@ -444,7 +448,7 @@ const ProductDetails = ({ user, users }) => {
                   <Paragraph level={4} id="price" className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold">
                     {details?.price ? (
                       <>
-                        ${details?.price} <span className="text-xs">({details?.price * STRATS_CONVERSION} STRATS)</span>
+                        ${details?.price} <a className="text-xs" href={preFilledFormURL} target="_blank" rel="noreferrer noopener">({details?.price * STRATS_CONVERSION} STRATS)</a>
                       </>
                     ) : (
                       "No Price Available"

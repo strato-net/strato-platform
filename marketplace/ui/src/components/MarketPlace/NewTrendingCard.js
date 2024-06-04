@@ -90,6 +90,9 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
         }
         setIsModalVisible(false);
     };
+    
+    const googleFormBaseURL = "https://docs.google.com/forms/d/e/1FAIpQLSfEWqALizqd-Rg3OPTwxD5O6xJKqT0xEgHeKpSpnaWzZ7tn1Q/viewform?usp=pp_url";
+    const preFilledFormURL = `${googleFormBaseURL}&entry.8090980=${encodeURIComponent(topSellingProduct?.name)}&entry.1160788377=${encodeURIComponent(topSellingProduct?.ownerCommonName)}&entry.1571372307=${encodeURIComponent(user?.email)}`;  
 
     return (
         <>
@@ -134,7 +137,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                     {topSellingProduct?.price && 
                         <Typography className="font-semibold">
                             {`$${topSellingProduct?.price} `}
-                            <span className="font-normal text-xs mr-2">{`(${topSellingProduct?.price * STRATS_CONVERSION} STRATS)`}</span>
+                            <a href={preFilledFormURL} target="_blank" rel="noreferrer noopener" className="font-normal text-xs mr-2">{`(${topSellingProduct?.price * STRATS_CONVERSION} STRATS)`}</a>
                         </Typography>}
                     {isAvailableForSale && <Text type="danger" strong> Sold Out </Text>}
                     {topSellingProduct?.contract_name.toLowerCase().includes("clothing") && (
