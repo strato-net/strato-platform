@@ -520,7 +520,7 @@ const actions = {
           type: actionDescriptors.transferStratsSuccessful,
           payload: body.data
         });
-        actions.setMessage(dispatch, "STRATs transferred successfully");
+        actions.setMessage(dispatch, "STRATs transferred successfully", true);
         return;
       }
       dispatch({ type: actionDescriptors.transferStratsFailed, error: "Error while transferring STRATS" });
