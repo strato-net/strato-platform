@@ -21,6 +21,7 @@ so that they could be properly moved to their respective version's subsection.
 
 ### Changed
 - Allow public keys to be passed to x509-generator in PEM format
+- default `accountNonceLimit` is 2,000
 
 ### Fixed
 
