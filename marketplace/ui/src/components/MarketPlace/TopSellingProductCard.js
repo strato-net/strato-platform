@@ -242,7 +242,12 @@ const TopSellingProductCard = () => {
           </div>
         </Fade>
       )}
+      <h3 className="text-center text-gray-500 mt-8">
+        Is there an item you would like to see on the marketplace? 
+        <a href="https://forms.gle/biuEtUHrFdLpX1d36" rel="noreferrer" target="_blank" className="text-blue"> Let us know!</a>
+      </h3>
     </div>
+
   );
 };
 
