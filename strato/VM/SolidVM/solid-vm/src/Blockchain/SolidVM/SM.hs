@@ -982,13 +982,13 @@ getMapNamesFromContract c =
       listOfMappingsWithRecords = filter (\(_, vd) -> CC._isRecord vd) listOfMappings
    in T.pack . fst <$> listOfMappingsWithRecords
 
+--also needs to be changed for testnet3 to be only record
 getArrayNamesFromContract :: CC.Contract -> [T.Text]
 getArrayNamesFromContract c =
   let storageDefs' = c ^. CC.storageDefs
       storageDefsList = M.toList storageDefs'
       listOfArrays = filter (\(_, vd) -> case (CC._varType vd) of SVMType.Array _ _ -> True; _ -> False) storageDefsList
-      listOfArraysWithRecords = filter (\(_, vd) -> CC._isRecord vd) listOfArrays
-   in T.pack . fst <$> listOfArraysWithRecords
+   in T.pack . fst <$> listOfArrays -- we need to change this to filter on _isRecord on testnet3
 
 resolveNameParts ::
   MonadSM m =>
