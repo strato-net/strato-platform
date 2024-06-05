@@ -66,6 +66,8 @@ import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Keccak256         as Keccak256
 import           Blockchain.Strato.Model.Secp256k1
+import           Blockchain.Strato.Model.Validator (Validator)
+import qualified Blockchain.Strato.Model.Validator as Validator
 import qualified Data.ByteString.Char8               as C8
 import qualified LabeledError
 import           Network.Wai.Handler.Warp
@@ -144,7 +146,7 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
                                }
         myAddr = fromPrivateKey myPriv
         myCM = CommonName "BlockApps" "Engineering" "Admin" True
-        vals = [myCM]
+        vals = [chainMemberParsedSetToValidator myCM]
         ctx = newContext (Checkpoint (View 0 0) vals) Nothing True (Just myCM)
         mCtx = if pbft then Just ctx else Nothing
         hsh = blockHash . ingestBlockToBlock $ genesisBlock
