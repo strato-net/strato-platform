@@ -47,7 +47,7 @@ main = do
       "   :      :   : :  : :  :  : :: : :  :          :: :  : :    :   : :  :   : :  :        :       : :: ::   :   : :"
     ]
   _ <- $initHFlags "Setup Vault Wrapper DBs"
-  pkBS <- B.readFile "priv.pem"
+  pkBS <- B.readFile flags_PEM_FILE
   putStrLn $ C8.unpack pkBS
   let ePK = bsToPriv pkBS
   case ePK of
