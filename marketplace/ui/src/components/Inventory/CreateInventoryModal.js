@@ -217,8 +217,8 @@ const CreateInventoryModal = ({
       className="w-full sm:w-[200px] md:w-72"
       rules={[
         {
-          required: true,
-          message: `Please upload ${label.toLowerCase()}`,
+          required: label==="Upload Images"? true : false,
+          message: `Please ${label.toLowerCase()}`,
         },
       ]}
     >
