@@ -44,7 +44,7 @@ function marshalOut(_args) {
 }
 
 async function getStratsBalance(admin, args = {}, options) {
-    const stratsBalance = await searchAllWithQueryArgs(`ERC20Dapp.balances`, args, options, admin)
+    const stratsBalance = await searchAllWithQueryArgs(`ERC20Dapp-balances`, args, options, admin)
     if (stratsBalance.length > 0) {
         return parseFloat(stratsBalance[0].value / 100).toFixed(2)
     }
