@@ -61,13 +61,13 @@ tableNameToText (IndexTableName c a n) =
         | T.null a = c <> tableSeparator
         | otherwise = c <> tableSeparator <> a <> tableSeparator
    in prefix <> n
-tableNameToText (MappingTableName c a n m) =
+tableNameToText (CollectionTableName c a n m) =
   let prefix
         | T.null c = ""
         | T.null a = c <> tableSeparator
         | otherwise = c <> tableSeparator <> a <> tableSeparator
-      contractAndMapping = n <> "." <> m
-   in prefix <> contractAndMapping
+      contractAndCollection = n <> "-" <> m
+   in prefix <> contractAndCollection
 tableNameToText (HistoryTableName c a n) =
   let prefix
         | T.null c = ""
