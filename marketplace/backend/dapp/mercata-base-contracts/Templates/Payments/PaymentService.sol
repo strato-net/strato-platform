@@ -323,7 +323,8 @@ abstract contract PaymentService is Utils {
         string _orderId,
         address _purchaser,
         address[] _saleAddresses,
-        uint[] _quantities
+        uint[] _quantities,
+        string _createdDate
     ) requireActive("cancel order") external {
         require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
         string _purchasersCommonName = getCommonName(_purchaser);
