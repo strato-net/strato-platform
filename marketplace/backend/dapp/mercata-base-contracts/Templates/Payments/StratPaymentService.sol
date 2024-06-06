@@ -11,18 +11,19 @@ contract StratPaymentService is PaymentService {
         address _stratAddress,
         uint _stratsPerDollar,
         string _imageURL
-    ) PaymentService("STRAT", _imageURL, "Checkout with STRAT") public {
+    ) PaymentService("STRAT", _imageURL, "Checkout with STRAT", "STRAT") public {
         stratAddress = _stratAddress;
         stratsPerDollar = _stratsPerDollar;
     }
 
     function _createOrder (
-        string token,
+        string _orderHash,
         string _orderId,
         address _purchaser,
         string _purchasersCommonName,
         address[] _saleAddresses,
-        uint[] _quantities
+        uint[] _quantities,
+        string _createdDate
     ) internal override returns (string, address[]) {
         address[] assets;
         uint totalAmount = 0;
@@ -53,7 +54,7 @@ contract StratPaymentService is PaymentService {
             }
         }
         emit Payment(
-            token,
+            _orderHash,
             _orderId,
             _purchaser,
             _purchasersCommonName,
@@ -63,44 +64,47 @@ contract StratPaymentService is PaymentService {
             totalAmount,
             0,
             _unitsPerDollar(),
-            1,
-            PaymentStatus.ORDER_COMPLETED
+            PaymentStatus.ORDER_COMPLETED,
+            _createdDate
         );
         purchasersAddress = address(0); // Support for legacy sales
         purchasersCommonName = "";
-        return (token, assets);
+        return (_orderHash, assets);
     }
 
     function _initializePayment (
-        string token,
+        string _orderHash,
         string _orderId,
         address _purchaser,
         string _purchaserCommonName,
         address[] _saleAddresses,
-        uint[] _quantities
+        uint[] _quantities,
+        string _createdDate
     ) internal override {
         require(false, "Cannot call initializePayment for STRAT payments.");
     }
 
     function _completeOrder (
-        string token,
+        string _orderHash,
         string _orderId,
         address _purchaser,
         string _purchaserCommonName,
         address[] _saleAddresses,
-        uint[] _quantities
+        uint[] _quantities,
+        string _createdDate
     ) internal override returns (address[]) {
         require(false, "Cannot call completeOrder for STRAT payments.");
         return [];
     }
 
     function _cancelOrder (
-        string token,
+        string _orderHash,
         string _orderId,
         address _purchaser,
         string _purchaserCommonName,
         address[] _saleAddresses,
-        uint[] _quantities
+        uint[] _quantities,
+        string _createdDate
     ) internal override {
         require(false, "Cannot call cancelOrder for STRAT payments.");
     }

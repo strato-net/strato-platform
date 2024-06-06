@@ -23,8 +23,9 @@ contract TokenPaymentService is PaymentService {
         uint _decimals,
         uint _tokensPerDollar,
         string _imageURL,
-        string _checkoutText
-    ) PaymentService(_serviceName, _imageURL, _checkoutText) public {
+        string _checkoutText,
+        string _currency
+    ) PaymentService(_serviceName, _imageURL, _checkoutText, _currency) public {
         decimals = _decimals;
         reserve = _supply * (10 ** decimals);
         tokensPerDollar = _tokensPerDollar;
@@ -70,12 +71,13 @@ contract TokenPaymentService is PaymentService {
     }
 
     function _createOrder (
-        string token,
+        string _orderHash,
         string _orderId,
         address _purchaser,
         string _purchasersCommonName,
         address[] _saleAddresses,
-        uint[] _quantities
+        uint[] _quantities,
+        string _createdDate
     ) internal override returns (string, address[]) {
         address[] assets;
         uint totalAmount = 0;
@@ -105,7 +107,7 @@ contract TokenPaymentService is PaymentService {
             }
         }
         emit Payment(
-            token,
+            _orderHash,
             _orderId,
             _purchaser,
             _purchasersCommonName,
@@ -115,44 +117,47 @@ contract TokenPaymentService is PaymentService {
             totalAmount,
             0,
             _unitsPerDollar(),
-            1,
-            PaymentStatus.ORDER_COMPLETED
+            PaymentStatus.ORDER_COMPLETED,
+            _createdDate
         );
         purchasersAddress = address(0); // Support for legacy sales
         purchasersCommonName = "";
-        return (token, assets);
+        return (_orderHash, assets);
     }
 
     function _initializePayment (
-        string token,
+        string _orderHash,
         string _orderId,
         address _purchaser,
         string _purchaserCommonName,
         address[] _saleAddresses,
-        uint[] _quantities
+        uint[] _quantities,
+        string _createdDate
     ) internal override {
         require(false, "Cannot call initializePayment for token payments.");
     }
 
     function _completeOrder (
-        string token,
+        string _orderHash,
         string _orderId,
         address _purchaser,
         string _purchaserCommonName,
         address[] _saleAddresses,
-        uint[] _quantities
+        uint[] _quantities,
+        string _createdDate
     ) internal override returns (address[]) {
         require(false, "Cannot call completeOrder for token payments.");
         return [];
     }
 
     function _cancelOrder (
-        string token,
+        string _orderHash,
         string _orderId,
         address _purchaser,
         string _purchaserCommonName,
         address[] _saleAddresses,
-        uint[] _quantities
+        uint[] _quantities,
+        string _createdDate
     ) internal override {
         require(false, "Cannot call cancelOrder for token payments.");
     }

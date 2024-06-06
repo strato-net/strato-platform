@@ -6,7 +6,6 @@ import "../Sales/Sale.sol";
 import "../Enums/RestStatus.sol";
 import "../Utils/Utils.sol";
 
-/// @title A representation of PaymentProvider_1 assets
 abstract contract PaymentService is Utils {
     address public owner;
     string public ownerCommonName;
@@ -16,6 +15,7 @@ abstract contract PaymentService is Utils {
     string public serviceName;
     string public imageURL;
     string public checkoutText;
+    string public currency;
 
     event SellerOnboarded (
         string sellersCommonName,
@@ -25,18 +25,19 @@ abstract contract PaymentService is Utils {
     enum PaymentStatus { NULL, ORDER_CREATED, PAYMENT_INITIALIZED, ORDER_COMPLETED, ORDER_CANCELLED }
 
     event Payment (
-        string token,
-        string orderId,
-        address purchaser,
-        string purchasersCommonName,
-        string sellersCommonName,
-        address[] saleAddresses,
-        uint[] quantities,
-        uint amount,
-        uint tax,
-        uint unitsPerDollar,
-        uint isNewOrder,
-        PaymentStatus status
+        string orderHash,             /* Unique hash of the order details for payment server lookup to 
+                                         avoid having to send all the order details in the request. */
+        string orderId,               // Same orderId funtionality as the current marketplace
+        address purchaser,            // Purchaser address on the blockchain for ownershipTransfer
+        string purchasersCommonName,  // Purchaser common name for lookup purposes
+        string sellersCommonName,     // Seller common name for lookup purposes
+        address[] saleAddresses,      // List of the sale contracts for the assets in the order
+        uint[] quantities,            // List of quantities for each asset being bought
+        uint amount,                  // Total price of the order
+        uint tax,                     // Tax
+        uint unitsPerDollar,          // Amount of units per dollar for the currency (Ex: STRAT is 100 units per dollar)
+        PaymentStatus status,         // Status of the payment
+        string createdDate            // Date at the time of fresh order creation
     );
 
     address public purchasersAddress;   // ONLY USED FOR BACKWARDS COMPATIBILITY WITH SALE. DELETE ONCE ALL SALES USE NEW LOGIC!!!
@@ -45,7 +46,8 @@ abstract contract PaymentService is Utils {
     constructor (
         string _serviceName,
         string _imageURL,
-        string _checkoutText
+        string _checkoutText,
+        string _currency
     ) public {
         owner = msg.sender;
         ownerCommonName = getCommonName(msg.sender);
@@ -54,6 +56,7 @@ abstract contract PaymentService is Utils {
 
         serviceName = _serviceName;
         imageURL = _imageURL;
+        currency = _currency;
         if (_checkoutText != "") {
             checkoutText = _checkoutText;
         } else {
@@ -86,7 +89,7 @@ abstract contract PaymentService is Utils {
         isActive = false;
     }
 
-    function getToken (
+    function getOrderHash (
         string _orderId,
         string _purchasersCommonName,
         address[] _saleAddresses,
@@ -104,14 +107,14 @@ abstract contract PaymentService is Utils {
         }
         salesString += "]";
         quantitiesString += "]";
-        string token = keccak256(
+        string orderHash = keccak256(
             string(this),
             _purchasersCommonName,
             _orderId,
             salesString,
             quantitiesString
         );
-        return token;
+        return orderHash;
     }
 
     function onboardSeller(
@@ -122,31 +125,41 @@ abstract contract PaymentService is Utils {
         return RestStatus.OK;
     }
 
+    function offboardSeller(
+        string _sellersCommonName
+    ) requireOwner("offboard sellers") public returns (uint) {
+        emit SellerOnboard(_sellersCommonName, false);
+        return RestStatus.OK;
+    }
+
     function createOrder (
         string _orderId,
         address[] _saleAddresses,
-        uint[] _quantities
+        uint[] _quantities,
+        string _createdDate
     ) requireActive("create order") external returns (string, address[]) {
         require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
         string _purchasersCommonName = getCommonName(msg.sender);
-        string token = getToken(_orderId, _purchasersCommonName, _saleAddresses, _quantities);
+        string orderHash = getOrderHash(_orderId, _purchasersCommonName, _saleAddresses, _quantities);
         return _createOrder(
-            token,
+            orderHash,
             _orderId,
             msg.sender,
             _purchasersCommonName,
             _saleAddresses,
-            _quantities
+            _quantities,
+            _createdDate
         );
     }
 
     function _createOrder (
-        string token,
+        string _orderHash,
         string _orderId,
         address _purchaser,
         string _purchasersCommonName,
         address[] _saleAddresses,
-        uint[] _quantities
+        uint[] _quantities,
+        string _createdDate
     ) internal virtual returns (string, address[]) {
         address[] assets;
         uint totalAmount = 0;
@@ -166,7 +179,7 @@ abstract contract PaymentService is Utils {
             }
         }
         emit Payment(
-            token,
+            _orderHash,
             _orderId,
             _purchaser,
             _purchasersCommonName,
@@ -176,40 +189,43 @@ abstract contract PaymentService is Utils {
             totalAmount,
             0,
             _unitsPerDollar(),
-            1,
-            PaymentStatus.ORDER_CREATED
+            PaymentStatus.ORDER_CREATED,
+            _createdDate
         );
-        return (token, assets);
+        return (orderHash, assets);
     }
 
     function initializePayment (
-        string _token,
+        string _orderHash,
         string _orderId,
         address _purchaser,
         address[] _saleAddresses,
-        uint[] _quantities
+        uint[] _quantities,
+        string _createdDate
     ) requireActive("initialize payment") requireOwner("initialize payment") external returns (address[]){
         require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
         string _purchasersCommonName = getCommonName(_purchaser);
-        string token = getToken(_orderId, _purchasersCommonName, _saleAddresses, _quantities);
-        require(token == _token, "Invalid order data");
+        string orderHash = getOrderHash(_orderId, _purchasersCommonName, _saleAddresses, _quantities);
+        require(orderHash == _orderHash, "Invalid order data");
         return _initializePayment(
-            _token,
+            _orderHash,
             _orderId,
             _purchaser,
             _purchasersCommonName,
             _saleAddresses,
-            _quantities
+            _quantities,
+            _createdDate
         );
     }
 
     function _initializePayment (
-        string token,
+        string _orderHash,
         string _orderId,
         address _purchaser,
         string _purchasersCommonName,
         address[] _saleAddresses,
-        uint[] _quantities
+        uint[] _quantities,
+        string _createdDate
     ) internal virtual returns (address[]){
         uint totalAmount = 0;
         address[] assets;
@@ -222,7 +238,7 @@ abstract contract PaymentService is Utils {
             totalAmount += s.price() * _quantities[i];
         }
         emit Payment(
-            token,
+            _orderHash,
             _orderId,
             _purchaser,
             _purchasersCommonName,
@@ -232,40 +248,43 @@ abstract contract PaymentService is Utils {
             totalAmount,
             0,
             _unitsPerDollar(),
-            0,
-            PaymentStatus.PAYMENT_INITIALIZED
+            PaymentStatus.PAYMENT_INITIALIZED,
+            _createdDate
         );
         return assets;
     }
 
     function completeOrder (
-        string _token,
+        string _orderHash,
         string _orderId,
         address _purchaser,
         address[] _saleAddresses,
-        uint[] _quantities
+        uint[] _quantities,
+        string _createdDate
     ) requireActive("complete order") requireOwner("complete order") external returns (address[]) {
         require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
         string _purchasersCommonName = getCommonName(_purchaser);
-        string token = getToken(_orderId, _purchasersCommonName, _saleAddresses, _quantities);
-        require(token == _token, "Invalid order data");
+        string orderHash = getOrderHash(_orderId, _purchasersCommonName, _saleAddresses, _quantities);
+        require(orderHash == _orderHash, "Invalid order data");
         return _completeOrder(
-            _token,
+            _orderHash,
             _orderId,
             _purchaser,
             _purchasersCommonName,
             _saleAddresses,
-            _quantities
+            _quantities,
+            _createdDate
         );
     }
 
     function _completeOrder (
-        string token,
+        string _orderHash,
         string _orderId,
         address _purchaser,
         string _purchasersCommonName,
         address[] _saleAddresses,
-        uint[] _quantities
+        uint[] _quantities,
+        string _createdDate
     ) internal virtual returns (address[]) {
         uint totalAmount = 0;
         address[] assets;
@@ -293,14 +312,14 @@ abstract contract PaymentService is Utils {
             totalAmount,
             0,
             _unitsPerDollar(),
-            0,
-            PaymentStatus.ORDER_COMPLETED
+            PaymentStatus.ORDER_COMPLETED,
+            _createdDate
         );
         return assets;
     }
 
     function cancelOrder (
-        string _token,
+        string _orderHash,
         string _orderId,
         address _purchaser,
         address[] _saleAddresses,
@@ -308,8 +327,8 @@ abstract contract PaymentService is Utils {
     ) requireActive("cancel order") external {
         require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
         string _purchasersCommonName = getCommonName(_purchaser);
-        string token = getToken(_orderId, _purchasersCommonName, _saleAddresses, _quantities);
-        require(token == _token, "Invalid order data");
+        string orderHash = getOrderHash(_orderId, _purchasersCommonName, _saleAddresses, _quantities);
+        require(orderHash == _orderHash, "Invalid order data");
         string err = "Only the purchaser or owner can cancel the order.";
         string commonName = getCommonName(msg.sender);
         require(commonName == ownerCommonName || commonName == _purchasersCommonName, err);
@@ -319,17 +338,19 @@ abstract contract PaymentService is Utils {
             _purchaser,
             _purchasersCommonName,
             _saleAddresses,
-            _quantities
+            _quantities,
+            _createdDate
         );
     }
 
     function _cancelOrder (
-        string token,
+        string _orderHash,
         string _orderId,
         address _purchaser,
         string _purchasersCommonName,
         address[] _saleAddresses,
-        uint[] _quantities
+        uint[] _quantities,
+        string _createdDate
     ) internal virtual {
         uint totalAmount = 0;
         string seller;
@@ -347,7 +368,7 @@ abstract contract PaymentService is Utils {
             }
         }
         emit Payment(
-            token,
+            _orderHash,
             _orderId,
             _purchaser,
             _purchasersCommonName,
@@ -357,8 +378,8 @@ abstract contract PaymentService is Utils {
             totalAmount,
             0,
             _unitsPerDollar(),
-            0,
-            PaymentStatus.ORDER_CANCELLED
+            PaymentStatus.ORDER_CANCELLED,
+            _createdDate
         );
     }
 
@@ -369,6 +390,7 @@ abstract contract PaymentService is Utils {
     function update(
         string _imageURL
     ,   string _checkoutText
+    ,   string _currency
     ,   uint   _scheme
     ) requireOwner("update the payment service") public returns (uint) {
       if (_scheme == 0) {
@@ -380,6 +402,9 @@ abstract contract PaymentService is Utils {
       }
       if ((_scheme & (1 << 1)) == (1 << 1)) {
         checkoutText = _checkoutText;
+      }
+      if ((_scheme & (1 << 2)) == (1 << 2)) {
+        currency = _currency;
       }
 
       return RestStatus.OK;
