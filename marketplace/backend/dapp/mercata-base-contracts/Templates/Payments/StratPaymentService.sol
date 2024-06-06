@@ -11,7 +11,7 @@ contract StratPaymentService is PaymentService {
         address _stratAddress,
         uint _stratsPerDollar,
         string _imageURL
-    ) PaymentService("STRAT", _imageURL, "Checkout with STRAT", "STRAT") public {
+    ) PaymentService("STRAT", _imageURL, "Checkout with STRAT") public {
         stratAddress = _stratAddress;
         stratsPerDollar = _stratsPerDollar;
     }
@@ -53,7 +53,7 @@ contract StratPaymentService is PaymentService {
                 address(s).call("completeSale");
             }
         }
-        emit Payment(
+        emit Order(
             _orderHash,
             _orderId,
             _purchaser,
@@ -64,6 +64,7 @@ contract StratPaymentService is PaymentService {
             totalAmount,
             0,
             _unitsPerDollar(),
+            "STRAT",
             PaymentStatus.ORDER_COMPLETED,
             _createdDate
         );
@@ -79,6 +80,7 @@ contract StratPaymentService is PaymentService {
         string _purchaserCommonName,
         address[] _saleAddresses,
         uint[] _quantities,
+        string _currency,
         uint _createdDate
     ) internal override {
         require(false, "Cannot call initializePayment for STRAT payments.");
@@ -91,6 +93,7 @@ contract StratPaymentService is PaymentService {
         string _purchaserCommonName,
         address[] _saleAddresses,
         uint[] _quantities,
+        string _currency,
         uint _createdDate
     ) internal override returns (address[]) {
         require(false, "Cannot call completeOrder for STRAT payments.");
@@ -104,6 +107,7 @@ contract StratPaymentService is PaymentService {
         string _purchaserCommonName,
         address[] _saleAddresses,
         uint[] _quantities,
+        string _currency,
         uint _createdDate
     ) internal override {
         require(false, "Cannot call cancelOrder for STRAT payments.");

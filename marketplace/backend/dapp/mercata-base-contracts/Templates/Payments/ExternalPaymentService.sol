@@ -31,13 +31,11 @@ contract ExternalPaymentService is PaymentService {
         string _orderStatusRoute,
         string _imageURL,
         string _onboardingText,
-        string _checkoutText,
-        string _currency
+        string _checkoutText
     ) public PaymentService(
         _serviceName,
         _imageURL,
-        _checkoutText,
-        _currency
+        _checkoutText
     ) {
         serviceURL = _serviceURL;
         onboardingRoute = _onboardingRoute;

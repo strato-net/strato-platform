@@ -23,9 +23,8 @@ contract TokenPaymentService is PaymentService {
         uint _decimals,
         uint _tokensPerDollar,
         string _imageURL,
-        string _checkoutText,
-        string _currency
-    ) PaymentService(_serviceName, _imageURL, _checkoutText, _currency) public {
+        string _checkoutText
+    ) PaymentService(_serviceName, _imageURL, _checkoutText) public {
         decimals = _decimals;
         reserve = _supply * (10 ** decimals);
         tokensPerDollar = _tokensPerDollar;
@@ -106,7 +105,7 @@ contract TokenPaymentService is PaymentService {
                 address(s).call("completeSale");
             }
         }
-        emit Payment(
+        emit Order(
             _orderHash,
             _orderId,
             _purchaser,
@@ -117,6 +116,7 @@ contract TokenPaymentService is PaymentService {
             totalAmount,
             0,
             _unitsPerDollar(),
+            serviceName,
             PaymentStatus.ORDER_COMPLETED,
             _createdDate
         );
@@ -132,6 +132,7 @@ contract TokenPaymentService is PaymentService {
         string _purchaserCommonName,
         address[] _saleAddresses,
         uint[] _quantities,
+        string _currency,
         uint _createdDate
     ) internal override {
         require(false, "Cannot call initializePayment for token payments.");
@@ -144,6 +145,7 @@ contract TokenPaymentService is PaymentService {
         string _purchaserCommonName,
         address[] _saleAddresses,
         uint[] _quantities,
+        string _currency,
         uint _createdDate
     ) internal override returns (address[]) {
         require(false, "Cannot call completeOrder for token payments.");
@@ -157,6 +159,7 @@ contract TokenPaymentService is PaymentService {
         string _purchaserCommonName,
         address[] _saleAddresses,
         uint[] _quantities,
+        string _currency,
         uint _createdDate
     ) internal override {
         require(false, "Cannot call cancelOrder for token payments.");

@@ -15,7 +15,6 @@ abstract contract PaymentService is Utils {
     string public serviceName;
     string public imageURL;
     string public checkoutText;
-    string public currency;
 
     event SellerOnboarded (
         string sellersCommonName,
@@ -24,7 +23,7 @@ abstract contract PaymentService is Utils {
 
     enum PaymentStatus { NULL, ORDER_CREATED, PAYMENT_INITIALIZED, ORDER_COMPLETED, ORDER_CANCELLED }
 
-    event Payment (
+    event Order (
         string orderHash,             /* Unique hash of the order details for payment server lookup to 
                                          avoid having to send all the order details in the request. */
         string orderId,               // Same orderId funtionality as the current marketplace
@@ -36,8 +35,9 @@ abstract contract PaymentService is Utils {
         uint amount,                  // Total price of the order
         uint tax,                     // Tax
         uint unitsPerDollar,          // Amount of units per dollar for the currency (Ex: STRAT is 100 units per dollar)
+        string currency,              // The type of currency used for the purchase
         PaymentStatus status,         // Status of the payment
-        uint createdDate            // Date at the time of fresh order creation
+        uint createdDate              // Date at the time of fresh order creation
     );
 
     address public purchasersAddress;   // ONLY USED FOR BACKWARDS COMPATIBILITY WITH SALE. DELETE ONCE ALL SALES USE NEW LOGIC!!!
@@ -46,8 +46,7 @@ abstract contract PaymentService is Utils {
     constructor (
         string _serviceName,
         string _imageURL,
-        string _checkoutText,
-        string _currency
+        string _checkoutText
     ) public {
         owner = msg.sender;
         ownerCommonName = getCommonName(msg.sender);
@@ -56,7 +55,6 @@ abstract contract PaymentService is Utils {
 
         serviceName = _serviceName;
         imageURL = _imageURL;
-        currency = _currency;
         if (_checkoutText != "") {
             checkoutText = _checkoutText;
         } else {
@@ -178,7 +176,7 @@ abstract contract PaymentService is Utils {
                 _saleAddresses[i].call("lockQuantity", quantity);
             }
         }
-        emit Payment(
+        emit Order(
             _orderHash,
             _orderId,
             _purchaser,
@@ -189,6 +187,7 @@ abstract contract PaymentService is Utils {
             totalAmount,
             0,
             _unitsPerDollar(),
+            "",
             PaymentStatus.ORDER_CREATED,
             _createdDate
         );
@@ -201,6 +200,7 @@ abstract contract PaymentService is Utils {
         address _purchaser,
         address[] _saleAddresses,
         uint[] _quantities,
+        string _currency,
         uint _createdDate
     ) requireActive("initialize payment") requireOwner("initialize payment") external returns (address[]){
         require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
@@ -214,6 +214,7 @@ abstract contract PaymentService is Utils {
             _purchasersCommonName,
             _saleAddresses,
             _quantities,
+            _currency,
             _createdDate
         );
     }
@@ -225,6 +226,7 @@ abstract contract PaymentService is Utils {
         string _purchasersCommonName,
         address[] _saleAddresses,
         uint[] _quantities,
+        string _currency,
         uint _createdDate
     ) internal virtual returns (address[]){
         uint totalAmount = 0;
@@ -237,7 +239,7 @@ abstract contract PaymentService is Utils {
             seller = getCommonName(a.owner());
             totalAmount += s.price() * _quantities[i];
         }
-        emit Payment(
+        emit Order(
             _orderHash,
             _orderId,
             _purchaser,
@@ -248,6 +250,7 @@ abstract contract PaymentService is Utils {
             totalAmount,
             0,
             _unitsPerDollar(),
+            _currency,
             PaymentStatus.PAYMENT_INITIALIZED,
             _createdDate
         );
@@ -260,6 +263,7 @@ abstract contract PaymentService is Utils {
         address _purchaser,
         address[] _saleAddresses,
         uint[] _quantities,
+        string _currency,
         uint _createdDate
     ) requireActive("complete order") requireOwner("complete order") external returns (address[]) {
         require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
@@ -273,6 +277,7 @@ abstract contract PaymentService is Utils {
             _purchasersCommonName,
             _saleAddresses,
             _quantities,
+            _currency,
             _createdDate
         );
     }
@@ -284,6 +289,7 @@ abstract contract PaymentService is Utils {
         string _purchasersCommonName,
         address[] _saleAddresses,
         uint[] _quantities,
+        string _currency,
         uint _createdDate
     ) internal virtual returns (address[]) {
         uint totalAmount = 0;
@@ -301,7 +307,7 @@ abstract contract PaymentService is Utils {
                 address(s).call("completeSale");
             }
         }
-        emit Payment(
+        emit Order(
             _orderHash,
             _orderId,
             _purchaser,
@@ -312,6 +318,7 @@ abstract contract PaymentService is Utils {
             totalAmount,
             0,
             _unitsPerDollar(),
+            _currency,
             PaymentStatus.ORDER_COMPLETED,
             _createdDate
         );
@@ -324,6 +331,7 @@ abstract contract PaymentService is Utils {
         address _purchaser,
         address[] _saleAddresses,
         uint[] _quantities,
+        string _currency,
         uint _createdDate
     ) requireActive("cancel order") external {
         require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
@@ -340,6 +348,7 @@ abstract contract PaymentService is Utils {
             _purchasersCommonName,
             _saleAddresses,
             _quantities,
+            _currency,
             _createdDate
         );
     }
@@ -351,6 +360,7 @@ abstract contract PaymentService is Utils {
         string _purchasersCommonName,
         address[] _saleAddresses,
         uint[] _quantities,
+        string _currency,
         uint _createdDate
     ) internal virtual {
         uint totalAmount = 0;
@@ -368,7 +378,7 @@ abstract contract PaymentService is Utils {
                 address(s).call("unlockQuantity");
             }
         }
-        emit Payment(
+        emit Order(
             _orderHash,
             _orderId,
             _purchaser,
@@ -379,6 +389,7 @@ abstract contract PaymentService is Utils {
             totalAmount,
             0,
             _unitsPerDollar(),
+            _currency,
             PaymentStatus.ORDER_CANCELLED,
             _createdDate
         );
@@ -391,7 +402,6 @@ abstract contract PaymentService is Utils {
     function update(
         string _imageURL
     ,   string _checkoutText
-    ,   string _currency
     ,   uint   _scheme
     ) requireOwner("update the payment service") public returns (uint) {
       if (_scheme == 0) {
@@ -403,9 +413,6 @@ abstract contract PaymentService is Utils {
       }
       if ((_scheme & (1 << 1)) == (1 << 1)) {
         checkoutText = _checkoutText;
-      }
-      if ((_scheme & (1 << 2)) == (1 << 2)) {
-        currency = _currency;
       }
 
       return RestStatus.OK;
