@@ -42,7 +42,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const selectedOption = form.querySelector('input[name="option"]:checked');
 
             if (selectedOption) {
-                fetch(`${window.location.protocol}//${window.location.host}/metamask/tx/params?checkout_total=${orderInfo?.paymentEvent?.amount}&currency=${selectedOption.value}&username=${orderInfo.sellerCommonName || ''}`, {
+                fetch(`${window.location.protocol}//${window.location.host}/metamask/tx/params?checkout_total=${orderInfo?.orderEvent?.amount}&currency=${selectedOption.value}&username=${orderInfo.sellerCommonName || ''}`, {
                     method: 'GET'
                 })
                 .then(response => response.json())
@@ -65,7 +65,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         },
                         body: JSON.stringify({ 
                             currency: selectedOption.value,
-                            currency_amount 
+                            token: token, 
                         })
                     })
                     .then(response => response.json())

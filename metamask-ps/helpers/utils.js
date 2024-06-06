@@ -1,6 +1,6 @@
 import { rest, util } from 'blockapps-rest';
 import ADMIN from './oauth.js'
-import { DEFAULT_OPTIONS, PAYMENT_EVENT_TABLE } from './constants.js';
+import { DEFAULT_OPTIONS, ORDER_EVENT_TABLE } from './constants.js';
 import lodash from 'lodash';
 const { get } = lodash;
 
@@ -23,16 +23,16 @@ const commonErrorHandler = (err, req, res, next) => {
   return next(err);
 }
 
-const getPaymentEvent = async (token) => {
+const getOrderEvent = async (orderHash) => {
   const tableArgs = {
-    name: PAYMENT_EVENT_TABLE,
+    name: ORDER_EVENT_TABLE,
   };
   
   const searchOptions = {
     ...DEFAULT_OPTIONS,
     query: {
       limit: 1,
-      ['token']: `eq.${token}`,
+      ['orderHash']: `eq.${orderHash}`,
     }
   };
 
@@ -113,7 +113,7 @@ export {
   clientErrorHandler,
   commonErrorHandler,
   completeOrder,
-  getPaymentEvent,
+  getOrderEvent,
   getMetaMaskAccountForUser,
   validateAndGetOrderDetails
 }

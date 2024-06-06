@@ -3,7 +3,7 @@ import { ethers } from 'ethers';
 import Joi from '@hapi/joi';
 import { 
   completeOrder,
-  getPaymentEvent,
+  getOrderEvent,
   getMetaMaskAccountForUser,
   validateAndGetOrderDetails
 } from '../helpers/utils.js'
@@ -137,22 +137,24 @@ class MetaMaskController {
         try {
             MetaMaskController.validateMetaMaskCheckoutArgs(req.query)
 
-            const { token, redirectUrl } = req.query;
+            const { currency, token, redirectUrl } = req.query;
 
-            const paymentEvent = await getPaymentEvent(token)
+            const orderEvent = await getOrderEvent(token)
 
             // Get and validate the order details
-            const saleAddresses = paymentEvent[0].saleAddresses;
-            const quantities = paymentEvent[0].quantities;
+            const saleAddresses = orderEvent[0].saleAddresses;
+            const quantities = orderEvent[0].quantities;
             const { sellerCommonName, orderDetails } = await validateAndGetOrderDetails(quantities, saleAddresses);
             
             // Call completeOrder
             const callArgs = {
-                token: paymentEvent[0].token,
-                orderId: paymentEvent[0].orderId,
-                purchaser: paymentEvent[0].purchaser,
-                saleAddresses: paymentEvent[0].saleAddresses,
-                quantities: paymentEvent[0].quantities,
+                token: orderEvent[0].token,
+                orderId: orderEvent[0].orderId,
+                purchaser: orderEvent[0].purchaser,
+                saleAddresses: orderEvent[0].saleAddresses,
+                quantities: orderEvent[0].quantities,
+                currency: currency,
+                createdDate: orderEvent[0].createdDate,
             } 
             const returnStatus = await completeOrder(callArgs);
             console.log("returnStatus", returnStatus);
@@ -168,6 +170,7 @@ class MetaMaskController {
 
     static validateMetaMaskCheckoutArgs(args) {
         const metamaskCheckoutSchema = Joi.object({
+            currency: Joi.string().required(),
             token: Joi.string().required(),
             redirectUrl: Joi.string().required(),
         });

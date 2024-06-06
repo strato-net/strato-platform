@@ -1,6 +1,6 @@
 import client from '../db/index.js';
 import { rest, util } from "blockapps-rest";
-import { DEFAULT_OPTIONS, PAYMENT_EVENT_TABLE } from "./constants.js";
+import { DEFAULT_OPTIONS, ORDER_EVENT_TABLE } from "./constants.js";
 import ADMIN from './oauth.js';
 import lodash from 'lodash';
 const { get } = lodash;
@@ -112,9 +112,9 @@ const emitOnboardSeller = async (address, args) => {
   return onboardSellerStatus;
 }
 
-const getPaymentEvent = async (orderHash) => {
+const getOrderEvent = async (orderHash) => {
   const tableArgs = {
-    name: PAYMENT_EVENT_TABLE,
+    name: ORDER_EVENT_TABLE,
   };
   
   const searchOptions = {
@@ -225,7 +225,7 @@ export {
   updateStripePayment,
   validatePaymentServiceContract,
   emitOnboardSeller,
-  getPaymentEvent,
+  getOrderEvent,
   validateAndGetOrderDetails,
   completeOrder,
   initializePayment,

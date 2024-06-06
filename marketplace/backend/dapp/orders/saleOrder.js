@@ -14,7 +14,7 @@ import paymentProvider from "../payments/paymentProvider";
 const contractName = "SimpleOrder";
 const contractFilename = `${util.cwd}/dapp/mercata-base-contracts/Templates/Orders/SimpleOrder.sol`;
 const paymentServiceContractName = "PaymentService";
-const paymentTableName = "PaymentService.Payment";
+const paymentTableName = "PaymentService.Order";
 
 /**
  * Upload a new Sale Order

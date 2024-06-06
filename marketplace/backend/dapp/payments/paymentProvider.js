@@ -8,7 +8,6 @@ import { setSearchQueryOptions, search, searchOne, searchAll, searchAllWithQuery
 const tablePrefix = 'BlockApps-Mercata-';
 const contractName = 'PaymentService';
 const externalContractName = 'ExternalPaymentService';
-const paymentEventName = 'PaymentService.Payment';
 const onboardedEventName = 'PaymentService.SellerOnboarded';
 const contractFilename = `${util.cwd}/dapp/mercata-base-contracts/Templates/Payments/ExternalPaymentService.sol`;
 

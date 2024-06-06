@@ -2,6 +2,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const form = document.getElementById('paymentSelection');
 
     // Fetch options from the API
+    const queryParams = new URLSearchParams(window.location.search)
+    const token = queryParams.get('token') || ''
     const seller = "dave@blockapps.net" // TODO dynamic
     fetch(`http://${window.location.host}/metamask/checkout/options?seller=${seller}`, {
             method: "GET",
@@ -43,7 +45,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({ 
-                        token: selectedOption.value,
+                        currency: selectedOption.value,
+                        token: token,
                         checkout_total: 10 // TODO this should come from the checkout page
                     })
                 })

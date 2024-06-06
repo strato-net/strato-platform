@@ -8,7 +8,7 @@ import {
   insertStripePayment,
   updateStripePayment,
   emitOnboardSeller,
-  getPaymentEvent, 
+  getOrderEvent, 
   validateAndGetOrderDetails ,
   completeOrder,
   initializePayment,
@@ -120,11 +120,11 @@ class StripeServiceController {
       }
 
       // Get the payment event from Cirrus
-      const paymentEvent = await getPaymentEvent(orderHash);
+      const orderEvent = await getOrderEvent(orderHash);
 
       // Get and validate the order details
-      const saleAddresses = paymentEvent[0].saleAddresses;
-      const quantities = paymentEvent[0].quantities;
+      const saleAddresses = orderEvent[0].saleAddresses;
+      const quantities = orderEvent[0].quantities;
       const { sellerCommonName, orderDetails } = await validateAndGetOrderDetails(quantities, saleAddresses);
 
       // Seller account verification
@@ -171,16 +171,17 @@ class StripeServiceController {
       let returnStatus;
       if (session.payment_status === 'paid') {
         // Get the payment event from Cirrus
-        const paymentEvent = await getPaymentEvent(orderHash);
+        const orderEvent = await getOrderEvent(orderHash);
 
         // Call completeOrder
         const callArgs = {
-          orderHash: paymentEvent[0].orderHash,
-          orderId: paymentEvent[0].orderId,
-          purchaser: paymentEvent[0].purchaser,
-          saleAddresses: paymentEvent[0].saleAddresses,
-          quantities: paymentEvent[0].quantities,
-          createdDate: paymentEvent[0].createdDate,
+          orderHash: orderEvent[0].orderHash,
+          orderId: orderEvent[0].orderId,
+          purchaser: orderEvent[0].purchaser,
+          saleAddresses: orderEvent[0].saleAddresses,
+          quantities: orderEvent[0].quantities,
+          currency: 'USD',
+          createdDate: orderEvent[0].createdDate,
         } 
         returnStatus = await completeOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
 
@@ -189,16 +190,17 @@ class StripeServiceController {
       } else if (session.payment_status === 'unpaid' && session.status === 'complete') {
         // ACH payment
         // Get the payment event from Cirrus
-        const paymentEvent = await getPaymentEvent(orderHash);
+        const orderEvent = await getOrderEvent(orderHash);
 
         // Call initializePayment
         const callArgs = {
-          orderHash: paymentEvent[0].orderHash,
-          orderId: paymentEvent[0].orderId,
-          purchaser: paymentEvent[0].purchaser,
-          saleAddresses: paymentEvent[0].saleAddresses,
-          quantities: paymentEvent[0].quantities,
-          createdDate: paymentEvent[0].createdDate
+          orderHash: orderEvent[0].orderHash,
+          orderId: orderEvent[0].orderId,
+          purchaser: orderEvent[0].purchaser,
+          saleAddresses: orderEvent[0].saleAddresses,
+          quantities: orderEvent[0].quantities,
+          currency: 'USD',
+          createdDate: orderEvent[0].createdDate
         } 
         returnStatus = await initializePayment(STRIPE_CONTRACT_ADDRESS, callArgs);
 
@@ -229,16 +231,17 @@ class StripeServiceController {
       const { redirectUrl } = req.query;
 
       // Get the payment event from Cirrus
-      const paymentEvent = await getPaymentEvent(orderHash);
+      const orderEvent = await getOrderEvent(orderHash);
 
       // Construct completeOrder args
       const callArgs = {
-        orderHash: paymentEvent[0].orderHash,
-        orderId: paymentEvent[0].orderId,
-        purchaser: paymentEvent[0].purchaser,
-        saleAddresses: paymentEvent[0].saleAddresses,
-        quantities: paymentEvent[0].quantities,
-        createdDate: paymentEvent[0].createdDate
+        orderHash: orderEvent[0].orderHash,
+        orderId: orderEvent[0].orderId,
+        purchaser: orderEvent[0].purchaser,
+        saleAddresses: orderEvent[0].saleAddresses,
+        quantities: orderEvent[0].quantities,
+        currency: 'USD',
+        createdDate: orderEvent[0].createdDate
       } 
 
       const cancelOrderStatus = await cancelOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
@@ -268,16 +271,17 @@ class StripeServiceController {
           const session = await stripeService.getPaymentSession(p.paymentsessionid, p.accountid);
           if (session.payment_status === 'paid') {
             // Get the payment event from Cirrus
-            const paymentEvent = await getPaymentEvent(p.orderhash);
+            const orderEvent = await getOrderEvent(p.orderhash);
 
             // Call completeOrder
             const callArgs = {
-              orderHash: paymentEvent[0].orderHash,
-              orderId: paymentEvent[0].orderId,
-              purchaser: paymentEvent[0].purchaser,
-              saleAddresses: paymentEvent[0].saleAddresses,
-              quantities: paymentEvent[0].quantities,
-              createdDate: paymentEvent[0].createdDate
+              orderHash: orderEvent[0].orderHash,
+              orderId: orderEvent[0].orderId,
+              purchaser: orderEvent[0].purchaser,
+              saleAddresses: orderEvent[0].saleAddresses,
+              quantities: orderEvent[0].quantities,
+              currency: 'USD',
+              createdDate: orderEvent[0].createdDate
             } 
             const returnStatus = await completeOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
 

@@ -22,7 +22,7 @@ const SERVER_CONFIRM_URL = `${SERVER_URL}/stripe/checkout/confirm`;
 
 const SERVER_CANCEL_URL = `${SERVER_URL}/stripe/checkout/cancel`;
 
-const PAYMENT_EVENT_TABLE = 'BlockApps-Mercata-PaymentService.Payment';
+const ORDER_EVENT_TABLE = 'BlockApps-Mercata-PaymentService.Order';
 
 const PAYMENT_STATUS = {
   'INITIALIZED': '2',
@@ -38,6 +38,6 @@ export {
   METAMASK_CONTRACT_ADDRESS,
   SERVER_URL,
   DEFAULT_OPTIONS,
-  PAYMENT_EVENT_TABLE,
+  ORDER_EVENT_TABLE,
   PAYMENT_STATUS,
 }

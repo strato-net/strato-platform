@@ -1,5 +1,5 @@
 import client from '../db/index.js';
-import { completeOrder, getPaymentEvent, emitOnboardSeller, validateAndGetOrderDetails } from '../helpers/utils.js';
+import { completeOrder, getOrderEvent, emitOnboardSeller, validateAndGetOrderDetails } from '../helpers/utils.js';
 import { METAMASK_CONTRACT_ADDRESS } from '../helpers/constants.js';
 import { Interface, parseEther, parseUnits } from 'ethers';
 
@@ -146,15 +146,17 @@ class MetaMaskController {
 
     static async completeCheckout(req, res, next) {
         const { checkout_total, currency, token } = req.query; 
-        const paymentEvent = await getPaymentEvent(token);
+        const orderEvent = await getOrderEvent(token);
 
         // Call completeOrder
         const callArgs = {
-          token: paymentEvent[0].token,
-          orderId: paymentEvent[0].orderId,
-          purchaser: paymentEvent[0].purchaser,
-          saleAddresses: paymentEvent[0].saleAddresses,
-          quantities: paymentEvent[0].quantities,
+          token: orderEvent[0].token,
+          orderId: orderEvent[0].orderId,
+          purchaser: orderEvent[0].purchaser,
+          saleAddresses: orderEvent[0].saleAddresses,
+          quantities: orderEvent[0].quantities,
+          currency: currency,
+          createdDate: orderEvent[0].createdDate,
         } 
         const returnStatus = await completeOrder(METAMASK_CONTRACT_ADDRESS, callArgs);
         res.status(200).json({
@@ -170,18 +172,18 @@ class MetaMaskController {
         try {
             const { token } = req.query;
             // Get the payment event from Cirrus
-            const paymentEvent = await getPaymentEvent(token);
+            const orderEvent = await getOrderEvent(token);
 
             // Get and validate the order details
-            const saleAddresses = paymentEvent[0].saleAddresses;
-            const quantities = paymentEvent[0].quantities;
+            const saleAddresses = orderEvent[0].saleAddresses;
+            const quantities = orderEvent[0].quantities;
             const { sellerCommonName, orderDetails } = await validateAndGetOrderDetails(quantities, saleAddresses);
             const query = 'SELECT supported_tokens FROM metamask WHERE username = $1';
             const query_result = await client.query(query, [sellerCommonName])
             res.status(200).json({
                 sellerCommonName,
                 orderDetails,
-                paymentEvent: paymentEvent[0],
+                orderEvent: orderEvent[0],
                 supported_tokens: query_result.rows[0].supported_tokens
             });
         } catch (error) {
