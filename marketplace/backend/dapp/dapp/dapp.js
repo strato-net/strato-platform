@@ -504,6 +504,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         console.log('Invalid timeFilter');
         return;
       }
+        console.log(getSixMonthsAgoTime()," months ago")
+
         const timeRangeSales = await saleJs.getAll(rawAdmin, {
           assetToBeSold: assetsAddressArr,
           ...salesFilter
@@ -521,7 +523,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           if(filter.assetToBeSold) 
           {
             //If timeFilter is applied, also add those filters
-            return saleJs.getAllSaleHistory(rawAdmin, { assetToBeSold: sale.assetToBeSold, ...filter  }, options);
+            return saleJs.getAllSaleHistory(rawAdmin, { ...filter, assetToBeSold: sale.assetToBeSold  }, options);
           }else{
             //If historical data is fetched, apply 12 month timeFilter
 
@@ -879,7 +881,18 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       if (orders.orders.length === 0) {
         return [];
       }
-      const saleAddresses = orders.orders.flatMap(order => order.saleAddresses);
+      let saleAddresses = [];
+
+      orders.orders.forEach(order => {
+        if (order['BlockApps-Mercata-Order-saleAddresses'] && Array.isArray(order['BlockApps-Mercata-Order-saleAddresses'])) {
+          order['BlockApps-Mercata-Order-saleAddresses'].forEach(saleAddress => {
+            if (saleAddress.value) {
+              saleAddresses.push(saleAddress.value);
+            }
+          });
+        }
+      });
+      
       const sales = await saleJs.getAll(rawAdmin, { saleAddresses }, options);
 
       const uniqueAssetAddresses = [...new Set(sales.map(sale => sale.assetToBeSold))];
@@ -887,12 +900,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const assetLookup = new Map(assets.map(asset => [asset.address, asset]));
 
       for (const order of orders.orders) {
-        const assetsPromises = order.saleAddresses.map(async (saleAddress) => {
+        const assetsPromises = saleAddresses.map(async (saleAddress) => {
           const sale = sales.find(sale => sale.address === saleAddress);
           if (!sale) return undefined;
 
-          const history = await saleJs.getSaleHistory(rawAdmin, {
-            contract: sale.contract_name,
+          const history = await saleJs.getAllSaleHistory(rawAdmin, {
             transaction_hash: order.transaction_hash,
             assetToBeSold: sale.assetToBeSold
           }, options);
