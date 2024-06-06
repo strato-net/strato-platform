@@ -84,8 +84,8 @@ const TransferStratsModal = ({ visible, onCancel }) => {
     if (amount > 0 && amount <= strats && receiverAddress) {
       let isDone = await actions.transferStrats(marketplaceDispatch, payload);
       if (isDone) {
-        await actions.fetchStratsBalance(marketplaceDispatch);
         handleCancel();
+        await actions.fetchStratsBalance(marketplaceDispatch);
       }
     }
   };

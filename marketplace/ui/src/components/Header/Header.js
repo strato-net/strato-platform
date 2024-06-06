@@ -439,7 +439,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
           </Badge>
 
           {(roleIndex !== undefined && roleIndex !== 1)
-            && <Dropdown menu={{ items: stratsItem }} placement="bottomRight" trigger={["hover", "click"]} className="xs:mt-5 md:mt-0" overlayStyle={{ position: 'fixed' }}>
+            && <Dropdown menu={{ items: stratsItem }} placement="bottomRight" trigger={["click"]} className="xs:mt-5 md:mt-0" overlayStyle={{ position: 'fixed' }}>
               <a className="md:flex mx-1 text-base text-white" id="strats-dropdown">
                 <Badge
                   style={{ backgroundColor: "#13188A" }}
