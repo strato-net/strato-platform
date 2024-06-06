@@ -192,7 +192,7 @@ abstract contract PaymentService is Utils {
             PaymentStatus.ORDER_CREATED,
             _createdDate
         );
-        return (orderHash, assets);
+        return (_orderHash, assets);
     }
 
     function initializePayment (
@@ -333,7 +333,7 @@ abstract contract PaymentService is Utils {
         string commonName = getCommonName(msg.sender);
         require(commonName == ownerCommonName || commonName == _purchasersCommonName, err);
         return _cancelOrder(
-            _token,
+            _orderHash,
             _orderId,
             _purchaser,
             _purchasersCommonName,
