@@ -23,6 +23,7 @@ const MarketplaceProvider = ({ children }) => {
     userAddresses:[],
     isLoadingUserAddresses:false,
     isFetchingStrats: false,
+    isTransferringStrats: false,
     strats: 0
   };
 
