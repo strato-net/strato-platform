@@ -302,7 +302,7 @@ abstract contract PaymentService is Utils {
             }
         }
         emit Payment(
-            token,
+            _orderHash,
             _orderId,
             _purchaser,
             _purchasersCommonName,
