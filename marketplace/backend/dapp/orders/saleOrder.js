@@ -209,8 +209,6 @@ async function getAll(admin, args = {}, options) {
     }
   };
 
-  console.log("DEBUG", newCount);
-
   const countArgs = {
     ...args,
     limit: undefined,

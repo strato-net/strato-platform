@@ -268,7 +268,7 @@ class StripeServiceController {
           const session = await stripeService.getPaymentSession(p.paymentsessionid, p.accountid);
           if (session.payment_status === 'paid') {
             // Get the payment event from Cirrus
-            const paymentEvent = await getPaymentEvent(p.orderHash);
+            const paymentEvent = await getPaymentEvent(p.orderhash);
 
             // Call completeOrder
             const callArgs = {
@@ -282,11 +282,11 @@ class StripeServiceController {
             const returnStatus = await completeOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
 
             // Update payment status in DB
-            const updateResult = await updateStripePayment(p.orderHash, 'PAID');
-            statuses[p.orderHash] = PAYMENT_STATUS['PAID'];
+            const updateResult = await updateStripePayment(p.orderhash, 'PAID');
+            statuses[p.orderhash] = PAYMENT_STATUS['PAID'];
           }
         }
-        statuses[p.orderHash] = PAYMENT_STATUS[p.status];
+        statuses[p.orderhash] = PAYMENT_STATUS[p.status];
       });
 
       res.status(200).json(statuses);
