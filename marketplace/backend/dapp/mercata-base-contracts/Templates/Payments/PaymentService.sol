@@ -37,7 +37,7 @@ abstract contract PaymentService is Utils {
         uint tax,                     // Tax
         uint unitsPerDollar,          // Amount of units per dollar for the currency (Ex: STRAT is 100 units per dollar)
         PaymentStatus status,         // Status of the payment
-        string createdDate            // Date at the time of fresh order creation
+        uint createdDate            // Date at the time of fresh order creation
     );
 
     address public purchasersAddress;   // ONLY USED FOR BACKWARDS COMPATIBILITY WITH SALE. DELETE ONCE ALL SALES USE NEW LOGIC!!!
@@ -136,7 +136,7 @@ abstract contract PaymentService is Utils {
         string _orderId,
         address[] _saleAddresses,
         uint[] _quantities,
-        string _createdDate
+        uint _createdDate
     ) requireActive("create order") external returns (string, address[]) {
         require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
         string _purchasersCommonName = getCommonName(msg.sender);
@@ -159,7 +159,7 @@ abstract contract PaymentService is Utils {
         string _purchasersCommonName,
         address[] _saleAddresses,
         uint[] _quantities,
-        string _createdDate
+        uint _createdDate
     ) internal virtual returns (string, address[]) {
         address[] assets;
         uint totalAmount = 0;
@@ -201,7 +201,7 @@ abstract contract PaymentService is Utils {
         address _purchaser,
         address[] _saleAddresses,
         uint[] _quantities,
-        string _createdDate
+        uint _createdDate
     ) requireActive("initialize payment") requireOwner("initialize payment") external returns (address[]){
         require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
         string _purchasersCommonName = getCommonName(_purchaser);
@@ -225,7 +225,7 @@ abstract contract PaymentService is Utils {
         string _purchasersCommonName,
         address[] _saleAddresses,
         uint[] _quantities,
-        string _createdDate
+        uint _createdDate
     ) internal virtual returns (address[]){
         uint totalAmount = 0;
         address[] assets;
@@ -260,7 +260,7 @@ abstract contract PaymentService is Utils {
         address _purchaser,
         address[] _saleAddresses,
         uint[] _quantities,
-        string _createdDate
+        uint _createdDate
     ) requireActive("complete order") requireOwner("complete order") external returns (address[]) {
         require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
         string _purchasersCommonName = getCommonName(_purchaser);
@@ -284,7 +284,7 @@ abstract contract PaymentService is Utils {
         string _purchasersCommonName,
         address[] _saleAddresses,
         uint[] _quantities,
-        string _createdDate
+        uint _createdDate
     ) internal virtual returns (address[]) {
         uint totalAmount = 0;
         address[] assets;
@@ -324,7 +324,7 @@ abstract contract PaymentService is Utils {
         address _purchaser,
         address[] _saleAddresses,
         uint[] _quantities,
-        string _createdDate
+        uint _createdDate
     ) requireActive("cancel order") external {
         require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
         string _purchasersCommonName = getCommonName(_purchaser);
@@ -351,7 +351,7 @@ abstract contract PaymentService is Utils {
         string _purchasersCommonName,
         address[] _saleAddresses,
         uint[] _quantities,
-        string _createdDate
+        uint _createdDate
     ) internal virtual {
         uint totalAmount = 0;
         string seller;

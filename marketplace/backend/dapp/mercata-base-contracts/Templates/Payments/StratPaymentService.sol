@@ -23,7 +23,7 @@ contract StratPaymentService is PaymentService {
         string _purchasersCommonName,
         address[] _saleAddresses,
         uint[] _quantities,
-        string _createdDate
+        uint _createdDate
     ) internal override returns (string, address[]) {
         address[] assets;
         uint totalAmount = 0;
@@ -79,7 +79,7 @@ contract StratPaymentService is PaymentService {
         string _purchaserCommonName,
         address[] _saleAddresses,
         uint[] _quantities,
-        string _createdDate
+        uint _createdDate
     ) internal override {
         require(false, "Cannot call initializePayment for STRAT payments.");
     }
@@ -91,7 +91,7 @@ contract StratPaymentService is PaymentService {
         string _purchaserCommonName,
         address[] _saleAddresses,
         uint[] _quantities,
-        string _createdDate
+        uint _createdDate
     ) internal override returns (address[]) {
         require(false, "Cannot call completeOrder for STRAT payments.");
         return [];
@@ -104,7 +104,7 @@ contract StratPaymentService is PaymentService {
         string _purchaserCommonName,
         address[] _saleAddresses,
         uint[] _quantities,
-        string _createdDate
+        uint _createdDate
     ) internal override {
         require(false, "Cannot call cancelOrder for STRAT payments.");
     }

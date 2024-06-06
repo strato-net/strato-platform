@@ -77,7 +77,7 @@ contract TokenPaymentService is PaymentService {
         string _purchasersCommonName,
         address[] _saleAddresses,
         uint[] _quantities,
-        string _createdDate
+        uint _createdDate
     ) internal override returns (string, address[]) {
         address[] assets;
         uint totalAmount = 0;
@@ -132,7 +132,7 @@ contract TokenPaymentService is PaymentService {
         string _purchaserCommonName,
         address[] _saleAddresses,
         uint[] _quantities,
-        string _createdDate
+        uint _createdDate
     ) internal override {
         require(false, "Cannot call initializePayment for token payments.");
     }
@@ -144,7 +144,7 @@ contract TokenPaymentService is PaymentService {
         string _purchaserCommonName,
         address[] _saleAddresses,
         uint[] _quantities,
-        string _createdDate
+        uint _createdDate
     ) internal override returns (address[]) {
         require(false, "Cannot call completeOrder for token payments.");
         return [];
@@ -157,7 +157,7 @@ contract TokenPaymentService is PaymentService {
         string _purchaserCommonName,
         address[] _saleAddresses,
         uint[] _quantities,
-        string _createdDate
+        uint _createdDate
     ) internal override {
         require(false, "Cannot call cancelOrder for token payments.");
     }
