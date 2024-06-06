@@ -101,9 +101,9 @@ const ResponsiveCart = ({
         event: 'pay_now_button',
       },
     });
-    let tokenAndAssets = await orderActions.createPayment(orderDispatch, body);
-    if (tokenAndAssets && tokenAndAssets !== false) {
-      const [token, assets] = tokenAndAssets;
+    let orderHashAndAssets = await orderActions.createPayment(orderDispatch, body);
+    if (orderHashAndAssets && orderHashAndAssets !== false) {
+      const [orderHash, assets] = orderHashAndAssets;
       let serviceURL = paymentProvider.serviceURL || paymentProvider.data.serviceURL;
       let checkoutRoute = paymentProvider.checkoutRoute || paymentProvider.data.checkoutRoute;
       if (serviceURL
@@ -111,7 +111,7 @@ const ResponsiveCart = ({
             && checkoutRoute
             && checkoutRoute !== ''
          ) {
-        const url = `${serviceURL}${checkoutRoute}?token=${token}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
+        const url = `${serviceURL}${checkoutRoute}/${orderHash}?redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
         window.location.replace(url);
       } else {
         window.location.replace(`/order/status?assets=${assets}`);

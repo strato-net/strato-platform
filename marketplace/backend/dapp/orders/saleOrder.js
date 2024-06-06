@@ -200,13 +200,16 @@ async function getAll(admin, args = {}, options) {
   const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
   const newCountArgs = {
     ...args,
+    status: '1',
     limit: undefined,
     offset: 0,
     order: undefined,
     queryOptions: {
-      select: 'count:isNewOrder.sum(),sellersCommonName',
+      select: 'count',
     }
   };
+
+  console.log("DEBUG", newCount);
 
   const countArgs = {
     ...args,
@@ -232,8 +235,7 @@ async function getAll(admin, args = {}, options) {
     const uniqueOrderArgs = {
       ...restArgs,
       queryOptions: {
-        select: 'id:id.max(),token',
-        isNewOrder: 'not.is.null',
+        select: 'id:id.max(),orderHash',
       }
     };
     const uniqueOrders = await searchAllWithQueryArgs(paymentTableName, uniqueOrderArgs, newOptions, admin);
@@ -244,32 +246,32 @@ async function getAll(admin, args = {}, options) {
   }
 
   // ACH status updates
-  let tokensToIndicies = {};
-  let paymentProvidersToTokens = {};
+  let orderHashesToIndicies = {};
+  let paymentProvidersToOrderHashes = {};
   let paymentServiceRes = {};
 
   if (saleOrders) {
     for (let i = 0; i < saleOrders.length; i++) {
       const order = saleOrders[i];
       if (order.status === '2') {
-        if (paymentProvidersToTokens[order.address]) {
-          paymentProvidersToTokens[order.address].push(order.token);
+        if (paymentProvidersToOrderHashes[order.address]) {
+          paymentProvidersToOrderHashes[order.address].push(order.orderHash);
         }
         else {
-          paymentProvidersToTokens[order.address] = [order.token];
+          paymentProvidersToOrderHashes[order.address] = [order.orderHash];
         }
-        tokensToIndicies[order.token] = i;
+        orderHashesToIndicies[order.orderHash] = i;
       }
     }
   }
-  if (Object.keys(paymentProvidersToTokens).length > 0) {
-    const paymentProviderAddresses = Object.keys(paymentProvidersToTokens);
+  if (Object.keys(paymentProvidersToOrderHashes).length > 0) {
+    const paymentProviderAddresses = Object.keys(paymentProvidersToOrderHashes);
     const paymentProviders = await paymentProvider.getAll(admin, { address: paymentProviderAddresses }, options);
     paymentProviders.map(async (ppro) => {
       const serviceUrl = ppro.serviceURL || ppro.data.serviceURL;
       const statusRoute = ppro.orderStatusRoute || ppro.data.orderStatusRoute;
-      const tokens = encodeURIComponent(JSON.stringify(paymentProvidersToTokens[ppro.address]));
-      const statusRes = await axios.get(new URL(`${serviceUrl}${statusRoute}?tokens=${tokens}`).href).then(function (res) {
+      const tokens = encodeURIComponent(JSON.stringify(paymentProvidersToOrderHashes[ppro.address]));
+      const statusRes = await axios.get(new URL(`${serviceUrl}${statusRoute}?orderHashes=${tokens}`).href).then(function (res) {
         if (res.status === 200) {
           paymentServiceRes = { ...paymentServiceRes, ...res.data }
         }
@@ -279,7 +281,7 @@ async function getAll(admin, args = {}, options) {
   if (Object.keys(paymentServiceRes).length > 0) {
     Object.keys(paymentServiceRes)
       .forEach(function (key) {
-        const index = tokensToIndicies[key];
+        const index = orderHashesToIndicies[key];
         saleOrders[index] = {
           ...saleOrders[index],
           status: paymentServiceRes[key],

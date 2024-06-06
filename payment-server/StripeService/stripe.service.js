@@ -4,7 +4,7 @@ const stripe = Stripe(STRIPE_ENV.CREDENTIALS.STRIPE_SECRET_KEY);
 
 class StripeService {
     // TODO implement orderDetail to create actual order line items 
-    static initiatePayment(marketplaceUrl, token, orderDetails, CONNECTED_ACCOUNT_ID = '') {
+    static initiatePayment(marketplaceUrl, orderHash, orderDetails, CONNECTED_ACCOUNT_ID = '') {
         try {
             // Create a checkout session with Stripe
             return stripe.checkout.sessions.create({
@@ -36,8 +36,8 @@ class StripeService {
                     // },
                 },
                 mode: "payment",
-                success_url: `${SERVER_CONFIRM_URL}?token=${token}&redirectUrl=${marketplaceUrl}`,
-                cancel_url: `${SERVER_CANCEL_URL}?token=${token}&redirectUrl=${marketplaceUrl}`,
+                success_url: `${SERVER_CONFIRM_URL}/${orderHash}?redirectUrl=${marketplaceUrl}`,
+                cancel_url: `${SERVER_CANCEL_URL}/${orderHash}?redirectUrl=${marketplaceUrl}`,
             }, {
                 stripeAccount: CONNECTED_ACCOUNT_ID
             })

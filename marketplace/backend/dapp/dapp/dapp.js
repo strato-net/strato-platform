@@ -967,14 +967,16 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           throw new rest.RestError(RestStatus.BAD_REQUEST, "Cannot buy products from multiple sellers in the same Order/Checkout",);
         }
       }
+      const createdDate = Math.floor(Date.now() / 1000);
       const paymentParameters = {
         address: paymentProvider.address,
         orderId: util.uid(),
         saleAddresses,
         quantities,
+        createdDate
       }
-      const tokenAndAssets = await paymentProviderJs.createPayment(rawAdmin, paymentParameters, options);
-      return tokenAndAssets;
+      const orderHashAndAssets = await paymentProviderJs.createPayment(rawAdmin, paymentParameters, options);
+      return orderHashAndAssets;
 
     } catch (error) {
       console.log(error);

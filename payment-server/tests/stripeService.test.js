@@ -66,7 +66,7 @@ describe('Stripe Endpoint Tests', function() {
 
   it('Should return an error when trying to checkout with a bad token', async () => {
     const res = await request(app)
-      .get('/stripe/checkout?token=badtoken&redirectUrl=http://localhost');
+      .get('/stripe/checkout/badtoken?redirectUrl=http://localhost');
     expect(res.statusCode).toBe(500);
   });
 

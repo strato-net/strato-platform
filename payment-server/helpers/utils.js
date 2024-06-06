@@ -30,24 +30,24 @@ const getStripeAccountForUser = async (commonName) => {
   return result.rows.length === 0 ? undefined : result.rows[0].accountid;
 }
 
-const getStripePaymentFromToken = async (token) => {
+const getStripePaymentFromToken = async (orderHash) => {
   const query = `
     SELECT sa.accountId, sp.paymentSessionId, sp.status
     FROM stripe_payments sp 
     JOIN stripe_accounts sa ON sa.commonName = sp.sellerCommonName
-    WHERE token = $1`;
-  const values = [ token ];
+    WHERE orderHash = $1`;
+  const values = [ orderHash ];
   const result = await client.query(query, values);
   return result.rows.length === 0 ? undefined : result.rows[0];
 }
 
-const getStripePaymentsFromTokens = async (tokens) => {
+const getStripePaymentsFromTokens = async (orderHashes) => {
   const query = `
-    SELECT sa.accountId, sp.token, sp.paymentSessionId, sp.status
+    SELECT sa.accountId, sp.orderHash, sp.paymentSessionId, sp.status
     FROM stripe_payments sp 
     JOIN stripe_accounts sa ON sa.commonName = sp.sellerCommonName
-    WHERE token = ANY ($1)`;
-  const values = [ tokens ];
+    WHERE orderHash = ANY ($1)`;
+  const values = [ orderHashes ];
   const result = await client.query(query, values);
   return result.rows.length === 0 ? undefined : result.rows;
 }
@@ -65,27 +65,27 @@ const insertStripeAccount = async (commonName, accountId) => {
   return insertResult;
 }
 
-const insertStripePayment = async (token, sessionId, sellerCommonName) => {
+const insertStripePayment = async (orderHash, sessionId, sellerCommonName) => {
   const insertQuery = `
     INSERT INTO stripe_payments (
-      token,
+      orderHash,
       paymentSessionId,
       sellerCommonName,
       status
     ) VALUES (
       $1, $2, $3, $4
     )`;
-  const insertValues = [ token, sessionId, sellerCommonName, "OPEN" ];
+  const insertValues = [ orderHash, sessionId, sellerCommonName, "OPEN" ];
   const insertResult = await client.query(insertQuery, insertValues);
   return insertResult;
 }
 
-const updateStripePayment = async (token, status) => {
+const updateStripePayment = async (orderHash, status) => {
   const updateQuery = `
     UPDATE stripe_payments
     SET status = $1
-    WHERE token = $2`;
-  const updateValues = [ status, token ];
+    WHERE orderHash = $2`;
+  const updateValues = [ status, orderHash ];
   const updateResult = await client.query(updateQuery, updateValues);
   return updateResult;
 }
@@ -112,7 +112,7 @@ const emitOnboardSeller = async (address, args) => {
   return onboardSellerStatus;
 }
 
-const getPaymentEvent = async (token) => {
+const getPaymentEvent = async (orderHash) => {
   const tableArgs = {
     name: PAYMENT_EVENT_TABLE,
   };
@@ -121,7 +121,7 @@ const getPaymentEvent = async (token) => {
     ...DEFAULT_OPTIONS,
     query: {
       limit: 1,
-      ['token']: `eq.${token}`,
+      ['orderHash']: `eq.${orderHash}`,
     }
   };
 
@@ -129,7 +129,6 @@ const getPaymentEvent = async (token) => {
 }
 
 const validateAndGetOrderDetails = async (quantities, saleAddresses) => {
-  console.log(quantities, saleAddresses);
   // Get Sale Contracts
   const saleAddressQuery = saleAddresses.map(addr => `address.eq.${addr}`);
   const saleContracts = await rest.search(

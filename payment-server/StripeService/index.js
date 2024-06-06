@@ -20,17 +20,17 @@ router.get(
 );
 
 router.get(
-  '/checkout',
+  '/checkout/:orderHash',
   StripeServiceController.stripeCheckout
 );
 
 router.get(
-  '/checkout/confirm',
+  '/checkout/confirm/:orderHash',
   StripeServiceController.stripeCheckoutConfirm
 );
 
 router.get(
-  '/checkout/cancel',
+  '/checkout/cancel/:orderHash',
   StripeServiceController.stripeCheckoutCancel
 );
 

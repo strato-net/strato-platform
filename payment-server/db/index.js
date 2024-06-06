@@ -59,7 +59,7 @@ const connectToDB = async () => {
                 );
 
                 CREATE TABLE IF NOT EXISTS stripe_payments (
-                    token TEXT PRIMARY KEY,
+                    orderHash TEXT PRIMARY KEY,
                     paymentSessionId TEXT,
                     sellerCommonName TEXT REFERENCES stripe_accounts(commonName),
                     status TEXT,
