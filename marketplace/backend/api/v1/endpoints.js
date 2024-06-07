@@ -8,7 +8,8 @@ export const IssuerStatus = {
   prefix: '/issuerstatus',
   requestReview: '/requestReview',
   authorizeIssuer: '/authorizeIssuer',
-  deauthorizeIssuer: '/deauthorizeIssuer'
+  deauthorizeIssuer: '/deauthorizeIssuer',
+  admin: '/admin',
 }
 
 export const Users = {

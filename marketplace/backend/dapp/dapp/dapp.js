@@ -227,6 +227,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.deauthorizeIssuer = async function (args) {
     return certificateJs.deauthorizeIssuer(admin, args);
   };
+  contract.setIsAdmin = async function (args) {
+    return certificateJs.setIsAdmin(admin, args);
+  }
 
   // -------------------------- INVENTORY --------------------------------
 

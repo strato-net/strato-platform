@@ -116,6 +116,33 @@ async function deauthorizeIssuer(admin, args, options=defaultOptions) {
     }
 }
 
+async function setIsAdmin(token, args, options=defaultOptions) {
+    const {commonName, b} = args;
+    const searchOptions = { commonName: commonName, ...userSearchOptions };
+    const user = await searchAllWithQueryArgs(constants.userContractName, searchOptions, options, token);
+
+    if (user[0]) {
+        try {
+            const callArgs = {
+                contract: {address: user[0].owner},
+                method: "setIsAdmin",
+                args: { _commonName: user[0].commonName , b}
+            };
+            await rest.call(token, callArgs, options);
+        } catch {
+            throw new rest.RestError(
+                RestStatus.FORBIDDEN,
+                "Only admins can change another admin's status"
+            );
+        }
+    } else {
+        throw new rest.RestError(
+            RestStatus.BAD_REQUEST,
+            "No user found with that username"
+        );
+    }
+}
+
 export default {
     getCertificate,
     getCertificateMe,
@@ -123,4 +150,5 @@ export default {
     requestReview,
     authorizeIssuer,
     deauthorizeIssuer,
+    setIsAdmin
 }

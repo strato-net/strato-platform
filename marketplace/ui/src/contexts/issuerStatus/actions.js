@@ -13,6 +13,9 @@ const actionDescriptors = {
     deauthorizeIssuer: "deauthorize_issuer",
     deauthorizeIssuerSuccessful: "deauthorize_issuer_success",
     deauthorizeIssuerFailed: "deathorize_issuer_failed",  
+    modifyAdmin: "modify_admin",
+    modifyAdminSuccessful: "modify_admin_successful",
+    modifyAdminFailed: "modify_admin_failed"
 };
 
 const actions = {
@@ -49,7 +52,7 @@ const actions = {
         }
     },
     authorizeIssuer: async (dispatch, payload) => {
-        dispatch({ type: actionDescriptors.authorizeIssuer,});
+        dispatch({ type: actionDescriptors.authorizeIssuer});
         try {
             const response = await fetch(`${apiUrl}/issuerstatus/authorizeIssuer`, {
                 method: HTTP_METHODS.POST,
@@ -75,7 +78,7 @@ const actions = {
         }
     },
     deauthorizeIssuer: async (dispatch, payload) => {
-        dispatch({ type: actionDescriptors.deauthorizeIssuer,});
+        dispatch({ type: actionDescriptors.deauthorizeIssuer});
         try {
             const response = await fetch(`${apiUrl}/issuerstatus/deauthorizeIssuer`, {
                 method: HTTP_METHODS.POST,
@@ -100,6 +103,32 @@ const actions = {
             actions.setMessage(dispatch, err.message, false);
         }
     },
+    modifyAdmin: async (dispatch, payload) => {
+        dispatch({ type: actionDescriptors.modifyAdmin});
+        try {
+            const response = await fetch(`${apiUrl}/issuerstatus/admin`, {
+                method: HTTP_METHODS.POST,
+                credentials: "same-origin",
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+            const body = await response.json();
+            if (response.status === RestStatus.OK) {
+                dispatch({ type: actionDescriptors.modifyAdminSuccessful, payload: body.data });
+                actions.setMessage(dispatch, "Successfully updated user's admin status", true);
+                return body;
+            } else {
+                dispatch({ type: actionDescriptors.modifyAdminFailed });
+                actions.setMessage(dispatch, body.error, false);
+            }
+        } catch (err) {
+            dispatch({ type: actionDescriptors.modifyAdminFailed });
+            actions.setMessage(dispatch, err.message, false);
+        }
+    }
 }
 
 export { actionDescriptors, actions };

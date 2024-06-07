@@ -12,6 +12,7 @@ const IssuerStatusProvider = ({children}) => {
         issuerStatus: ISSUER_STATUS.NULL,
         changingIssuerStatus: false,
         requestingReview: false,
+        changingAdminStatus: false,
     }
     const [state, dispatch] = useReducer(reducer, initialState);
 

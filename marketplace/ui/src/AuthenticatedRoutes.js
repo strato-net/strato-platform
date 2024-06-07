@@ -18,7 +18,7 @@ import RedemptionsIncomingDetails from "./components/Order/RedemptionsIncomingDe
 import { OrdersProvider } from "./contexts/order";
 import { UsersProvider } from "./contexts/users";
 import { UserActivityProvider } from "./contexts/userActivity";
-import AuthorizeSeller from "./components/AuthorizeSeller";
+import AuthorizeIssuer from "./components/AuthorizeIssuer";
 import { IssuerStatusProvider } from "./contexts/issuerStatus";
 import OnboardingIntermediate from "./components/Inventory/OnboardingIntermediate";
 import ProductDetails from "./components/MarketPlace/ProductDetail";
@@ -134,7 +134,7 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
         element={
           <UsersProvider>
             <IssuerStatusProvider>
-              <AuthorizeSeller/>
+              <AuthorizeIssuer/>
             </IssuerStatusProvider>
           </UsersProvider>
         }

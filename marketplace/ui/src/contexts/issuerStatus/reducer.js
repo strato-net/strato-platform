@@ -59,6 +59,21 @@ const reducer = (state, action) => {
                 ...state,
                 changingIssuerStatus: false,
             };
+        case actionDescriptors.modifyAdmin:
+            return {
+                ...state,
+                changingAdminStatus: true,
+            };
+        case actionDescriptors.modifyAdminSuccessful:
+            return {
+                ...state,
+                changingAdminStatus: false,
+            }
+        case actionDescriptors.modifyAdminFailed:
+            return {
+                ...state,
+                changingAdminStatus: false,
+            }
         default:
             throw new Error(`Unhandled action: '${action.type}'`);
     }

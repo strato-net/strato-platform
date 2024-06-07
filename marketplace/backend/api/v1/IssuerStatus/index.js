@@ -21,10 +21,17 @@ router.post(
 )
 
 router.post(
-    IssuerStatus.deauthorizeIssuer,
-    authHandler.authorizeRequest(),
-    loadDapp,
-    IssuerStatusController.deauthorizeIssuer
-  )
+  IssuerStatus.deauthorizeIssuer,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  IssuerStatusController.deauthorizeIssuer
+)
+
+router.post(
+  IssuerStatus.admin,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  IssuerStatusController.setIsAdmin
+)
   
 export default router

@@ -45,6 +45,17 @@ class IssuerStatusController {
       return next(e);
     }
   }
+
+  static async setIsAdmin(req, res, next){
+    try {
+      const {dapp, body} = req;
+      await dapp.setIsAdmin(body);
+      rest.response.status200(res);
+      return next();
+    } catch (e) {
+      return next(e);
+    }
+  }
 }
 
 export default IssuerStatusController;
