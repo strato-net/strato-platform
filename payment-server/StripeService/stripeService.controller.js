@@ -55,6 +55,12 @@ class StripeServiceController {
 
       const { username, redirectUrl } = req.query;
 
+      const userAccount = await getStripeAccountForUser(username);
+      
+      if (!userAccount) {
+        throw new Error(`User has not onboarded to this payment server yet.`);
+      }
+
       // Call onboardSeller
       const callArgs = {
         sellersCommonName: username,
@@ -81,7 +87,7 @@ class StripeServiceController {
       const userAccount = await getStripeAccountForUser(username);
 
       if (!userAccount) {
-        throw new Error(`User not onboarded to Stripe yet.`);
+        throw new Error(`User has not onboarded to this payment server yet.`);
       }
 
       // Get and return account connection status from Stripe
