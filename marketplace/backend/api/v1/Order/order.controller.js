@@ -211,7 +211,7 @@ class OrderController {
       paymentProvider: Joi.object({
         address: Joi.string().required(),
       }).required(),
-      token: Joi.string().required(),
+      orderHash: Joi.string().required(),
       orderId: Joi.string().required(),
       purchaser: Joi.string().required(),
       saleAddresses: Joi.array().min(1).items(Joi.string().required()).required(),

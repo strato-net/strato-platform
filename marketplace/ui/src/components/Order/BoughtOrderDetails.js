@@ -326,7 +326,7 @@ const BoughtOrderDetails = ({ user, users }) => {
       paymentProvider: {
         address: details.order.address,
       },
-      token: details.order.token,
+      orderHash: details.order.orderHash,
       orderId: details.order.orderId,
       purchaser: details.order.purchaser,
       saleAddresses: details.order.saleAddresses,
