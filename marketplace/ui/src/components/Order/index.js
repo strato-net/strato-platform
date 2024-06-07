@@ -83,9 +83,14 @@ const Order = ({ user }) => {
 
   function mapOrderData(orders) {
     try {
-      return orders.flatMap(order =>
-        order.assets.map((asset, index) => {
+      return orders.flatMap(order => {
+        // Extract Quantities
+        const orderQuantities = order["BlockApps-Mercata-Order-quantities"].map(item => item.value);
+  
+        
+        return order.assets.map((asset, index) => {
           const { category, subCategory } = getCategoryAndSubcategory(asset.contract_name);
+  
           return formatDataObject({
             orderNumber: order.orderId,
             purchaserName: order.purchasersCommonName,
@@ -93,7 +98,7 @@ const Order = ({ user }) => {
             subCategory,
             assetName: asset.name,
             assetPrice: asset.salePrice,
-            quantity: order.quantities[index],
+            quantity: orderQuantities[index],
             totalOrderAmount: order.totalPrice,
             orderDate: order.createdDate,
             orderFulfillmentDate: order.fulfillmentDate,
@@ -101,12 +106,15 @@ const Order = ({ user }) => {
             comments: order.comments,
             blockchainAddress: order.address
           });
-        })
-      );
+        });
+      });
     } catch (error) {
+      // logging the actual error for better debugging
+      console.error("Error during mapping order data:", error);
       throw new Error("Failed to map order data");
     }
   }
+  
 
   function mapTransfersData(transfers) {
     try {

@@ -144,6 +144,12 @@ const ProductDetails = ({ user, users }) => {
   }, [marketplaceDispatch, cartList]);
 
   const details = inventoryDetails;
+  let fileValues=[]
+  // Check if details and BlockApps-Mercata-Asset-files are not null or undefined
+  if (details && Array.isArray(details['BlockApps-Mercata-Asset-files'])) {
+    fileValues = details['BlockApps-Mercata-Asset-files'].map(file => file.value);
+  }
+
 
   useEffect(() => {
     if (categorys.length && details) {
@@ -393,14 +399,14 @@ const ProductDetails = ({ user, users }) => {
           <div className="flex w-full flex-col lg:leading-12 px-4 sm:px-8 md:px-0  items-center lg:items-start  md:w-[750px] lg:w-[835px] xl:w-[858px]  md:mx-auto ">
             <div className="flex md:justify-center gap-[15px] lg:gap-6 flex-col lg:flex-row   ">
               <Carousel showIndicators={
-                details?.images?.length > 1 ? true : false
+                details["BlockApps-Mercata-Asset-images"].length > 1 ? true : false
               } className="product_detail w-full  sm:w-[417px]   lg:h-[348px] md:w-[343px] lg:w-[417px]" showStatus={false} showArrows swipeable emulateTouch infiniteLoop >
-                {details?.images?.length > 0 ? details?.images?.map((element, index) => {
+                {details["BlockApps-Mercata-Asset-images"].length > 0 ? details["BlockApps-Mercata-Asset-images"].map((element, index) => {
                   return (<><div key={index} className="sm:w-[343px ] h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
                     <img width={"100%"}
                       alt={`${assetName} | Image ${index}`}
                       title={`${assetName} | Image ${index}`}
-                      className="object-contain rounded-md h-full " src={element ? element : image_placeholder} />
+                      className="object-contain rounded-md h-full " src={element.value ? element.value : image_placeholder} />
                   </div></>)
                 }) : <><div className="sm:w-[343px ] sm:h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
                   <img width={"100%"}
@@ -703,7 +709,7 @@ const ProductDetails = ({ user, users }) => {
                           <List
                             size="small"
                             boardered
-                            dataSource={!details.files ? [] : details.files}
+                            dataSource={fileValues?.length>0 ? fileValues: []}
                             renderItem={(item) =>
                               <List.Item>
                                 <a href={item} rel="noreferrer" target="_blank" className="hover:underline break-all text-[#1e40af]">
