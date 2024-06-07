@@ -21,24 +21,61 @@ enum IssuerStatus {
 }
 
 contract UserRegistry {
+    constructor() { 
+        // create the first issuer approver
+        string _commonName = getUserCert(msg.sender)["commonName"];
+        User newUser = new User{salt: _commonName}(_commonName);
+        newUser.setIsAdmin(true);
+    }
+        
     function createUser(string _commonName) public returns (address) {
         User newUser = new User{salt: _commonName}(_commonName);
         return address(newUser);
     }
+
+    modifier cameFromAdmin() {
+        string _commonName = getUserCert(msg.sender)["commonName"];
+        User user = User(this.derive(_commonName, _commonName));
+        bool isActiveAdmin;
+        try {
+            isActiveAdmin = user.isAdmin();
+        } catch {
+            isActiveAdmin = false;
+        }
+        require (isActiveAdmin, "Only an admin can call this function");
+        _;
+    }
+
+    function setIsAdmin(string _commonName, bool b) cameFromAdmin {
+        User user = User( this.derive(_commonName, _commonName) );
+        user.setIsAdmin(b);
+    }
+
+    function authorizeIssuer(string _commonName) cameFromAdmin {
+        User user = User( this.derive(_commonName, _commonName) );
+        user.authorizeIssuer();
+    }
+
+    function deauthorizeIssuer(string _commonName) cameFromAdmin {
+        User user = User( this.derive(_commonName, _commonName) );
+        user.deauthorizeIssuer();
+    }
 }
 
 contract User {
+    address private owner;
     string public commonName;
     IssuerStatus public issuerStatus;
+    bool public isAdmin;
 
     constructor(string _commonName) {
         commonName = _commonName;
         issuerStatus = IssuerStatus.UNAUTHORIZED;
+        owner = msg.sender;
     }
 
-    modifier onlyAdmins() {
-        mapping(string => string) cert = getUserCert(msg.sender);
-        require(cert["organization"] == "BlockApps");
+    modifier onlyOwner() {
+        require(msg.sender == owner);
         _;
     }
 
@@ -72,11 +109,15 @@ contract User {
         issuerStatus = IssuerStatus.PENDING_REVIEW;
     }
     
-    function authorizeIssuer() public onlyAdmins {
+    function authorizeIssuer() public onlyOwner {
         issuerStatus = IssuerStatus.AUTHORIZED;
     }
 
-    function deauthorizeIssuer() public onlyAdmins {
+    function deauthorizeIssuer() public onlyOwner {
         issuerStatus = IssuerStatus.UNAUTHORIZED;
+    }
+
+    function setIsAdmin(bool b) onlyOwner {
+        isAdmin = b;
     }
 }|]

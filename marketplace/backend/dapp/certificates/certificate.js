@@ -70,9 +70,9 @@ async function authorizeIssuer(admin, args, options=defaultOptions) {
     if (user[0]) {
         try {
             const callArgs = {
-                contract: {address: user[0].address},
+                contract: {address: user[0].owner},
                 method: "authorizeIssuer",
-                args: {}
+                args: { _commonName: user[0].commonName }
             };    
             await rest.call(admin, callArgs, options);
         } catch (e) {
@@ -97,9 +97,9 @@ async function deauthorizeIssuer(admin, args, options=defaultOptions) {
     if (user[0]) {
         try {
             const callArgs = {
-                contract: {address: user[0].address},
+                contract: {address: user[0].owner},
                 method: "deauthorizeIssuer",
-                args: {}
+                args: { _commonName: user[0].commonName }
             };     
             await rest.call(admin, callArgs, options);
         } catch {

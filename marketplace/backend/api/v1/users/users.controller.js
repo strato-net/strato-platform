@@ -25,15 +25,12 @@ class UsersController {
         const walletSearchOptions = {commonName: user.commonName, notEqualsField: 'issuerStatus', notEqualsValue: 'null', sort: '-block_timestamp', limit: 1};
         const walletResp = await searchAllWithQueryArgs(constants.userContractName, walletSearchOptions, options, accessToken);
         
-        const adminSearchOptions = {commonName: user.commonName, org: user.organization, orgUnit: user.organizationalUnit, sort: '-block_timestamp', limit: 1};
-        const adminResp = await searchAllWithQueryArgs(constants.mercataAdminContractName, adminSearchOptions, options, accessToken);
-        
         rest.response.status200(res, {
           ...user,
           email: decodedToken.email,
           preferred_username: decodedToken.preferred_username,
           issuerStatus: (walletResp[0] ? walletResp[0].issuerStatus : ISSUER_STATUS.UNAUTHORIZED),
-          isMercataAdmin: (adminResp[0] ? adminResp[0].isActive : false)
+          isAdmin: (walletResp[0] ? walletResp[0].isAdmin : false)
         })
       }
       return next()
