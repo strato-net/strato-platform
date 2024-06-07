@@ -100,12 +100,8 @@ class StripeServiceController {
   static async stripeCheckout(req, res, next) {
     try {
       // Validation
-      if (!req.params.orderHash) {
-        throw new Error(`'orderHash' is a required parameter.`);
-      }
-      const orderHash = req.params.orderHash;
       StripeServiceController.validateStripeCheckoutArgs(req.query);
-      const { redirectUrl } = req.query;
+      const { orderHash, redirectUrl } = req.query;
 
       // Check if the payment session already exists for the token
       const paymentDetails = await getStripePaymentFromToken(orderHash);
@@ -156,12 +152,8 @@ class StripeServiceController {
   static async stripeCheckoutConfirm(req, res, next) {
     try {
       // Validation
-      if (!req.params.orderHash) {
-        throw new Error(`'orderHash' is a required parameter.`);
-      }
-      const orderHash = req.params.orderHash;
       StripeServiceController.validateStripeCheckoutConfirmArgs(req.query);
-      const { redirectUrl } = req.query;
+      const { orderHash, redirectUrl } = req.query;
 
       // Retrieve the session
       const paymentDetails = await getStripePaymentFromToken(orderHash);
@@ -223,12 +215,8 @@ class StripeServiceController {
   static async stripeCheckoutCancel(req, res, next) {
     try {
       // Validation
-      if (!req.params.orderHash) {
-        throw new Error(`'orderHash' is a required parameter.`);
-      }
-      const orderHash = req.params.orderHash;
       StripeServiceController.validateStripeCheckoutCancelArgs(req.query);
-      const { redirectUrl } = req.query;
+      const { orderHash, redirectUrl } = req.query;
 
       // Get the payment event from Cirrus
       const orderEvent = await getOrderEvent(orderHash);
@@ -341,6 +329,7 @@ class StripeServiceController {
 
   static validateStripeCheckoutArgs(args) {
     const stripeCheckoutSchema = Joi.object({
+      orderHash: Joi.string().required(),
       redirectUrl: Joi.string().required(),
     });
 
@@ -353,6 +342,7 @@ class StripeServiceController {
 
   static validateStripeCheckoutConfirmArgs(args) {
     const stripeCheckoutConfirmSchema = Joi.object({
+      orderHash: Joi.string().required(),
       redirectUrl: Joi.string().required(),
     });
 
@@ -365,6 +355,7 @@ class StripeServiceController {
 
   static validateStripeCheckoutCancelArgs(args) {
     const stripeCheckoutCancelSchema = Joi.object({
+      orderHash: Joi.string().required(),
       redirectUrl: Joi.string().required(),
     });
 

@@ -2,12 +2,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const form = document.getElementById('paymentSelection');
 
     // Fetch options from the API
-    const queryParams = new URLSearchParams(window.location.search)
-    const { orderHash } = useParams();
+    const queryParams = new URLSearchParams(window.location.search);
+    const orderHash = queryParams.get('orderHash') || '';
     const redirectUrl = queryParams.get('redirectUrl') || ''
     let orderInfo = {}
     let currency_amount = 0
-    fetch(`${window.location.protocol}//${window.location.host}/metamask/order/${orderHash}`, {
+    fetch(`${window.location.protocol}//${window.location.host}/metamask/order?orderHash=${orderHash}`, {
             method: "GET",
         })
         .then(response => response.json())
