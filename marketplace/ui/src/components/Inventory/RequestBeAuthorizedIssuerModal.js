@@ -25,7 +25,7 @@ const RequestBeAuthorizedIssuerModal = ({
     handleCancel();
   }
 
-  const requestReviewText = <p>Thank you for interest in being an issuer of new products for sale on Mercata! To keep our platform safe, we must first verify you as an issuer. Click the button to request a review, and our team will get back to you shortly with our response!;</p>
+  const requestReviewText = <p>Thank you for interest in being an issuer of new products for sale on Mercata! To keep our platform safe, we must first verify you as an issuer. Click the button to request a review, and our team will get back to you shortly with our response!</p>;
   const alreadyRequestedReviewText = <p>Thank you for interest in being an issuer of new products for sale on Mercata! You have already requested to be reviewed as an issuer. Our team will get back to you shortly with a response. If you have questions, please feel free to reach out to <a href="mailto:sales@blockapps.net">sales@blockapps.net</a></p>;
   
   return (
