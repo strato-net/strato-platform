@@ -145,12 +145,12 @@ class MetaMaskController {
     }
 
     static async completeCheckout(req, res, next) {
-        const { checkout_total, currency, token } = req.query; 
-        const orderEvent = await getOrderEvent(token);
+        const { checkout_total, currency, orderHash } = req.query; 
+        const orderEvent = await getOrderEvent(orderHash);
 
         // Call completeOrder
         const callArgs = {
-          token: orderEvent[0].token,
+          orderHash: orderEvent[0].orderHash,
           orderId: orderEvent[0].orderId,
           purchaser: orderEvent[0].purchaser,
           saleAddresses: orderEvent[0].saleAddresses,
@@ -170,9 +170,12 @@ class MetaMaskController {
 
     static async orderInfo(req, res, next) {
         try {
-            const { token } = req.query;
-            // Get the payment event from Cirrus
-            const orderEvent = await getOrderEvent(token);
+            // Validation
+            if (!req.params.orderHash) {
+                throw new Error(`'orderHash' is a required parameter.`);
+            }
+            const orderHash = req.params.orderHash;
+            const orderEvent = await getOrderEvent(orderHash);
 
             // Get and validate the order details
             const saleAddresses = orderEvent[0].saleAddresses;

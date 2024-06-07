@@ -22,7 +22,7 @@ router.get(
 )
 
 router.get(
-    '/checkout',
+    '/checkout/:orderHash',
     MetaMaskController.checkout
 )
 
@@ -37,7 +37,7 @@ router.get(
 )
 
 router.get(
-    '/order/info',
+    '/order/info/:orderHash',
     MetaMaskController.orderInfo
 )
 

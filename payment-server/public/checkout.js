@@ -3,11 +3,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Fetch options from the API
     const queryParams = new URLSearchParams(window.location.search)
-    const token = queryParams.get('token') || ''
+    const { orderHash } = useParams();
     const redirectUrl = queryParams.get('redirectUrl') || ''
     let orderInfo = {}
     let currency_amount = 0
-    fetch(`${window.location.protocol}//${window.location.host}/metamask/order/info?token=${token}`, {
+    fetch(`${window.location.protocol}//${window.location.host}/metamask/order/${orderHash}`, {
             method: "GET",
         })
         .then(response => response.json())
@@ -65,7 +65,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         },
                         body: JSON.stringify({ 
                             currency: selectedOption.value,
-                            token: token, 
+                            orderHash: orderHash, 
                         })
                     })
                     .then(response => response.json())
