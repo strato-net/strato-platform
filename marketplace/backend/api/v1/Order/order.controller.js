@@ -216,7 +216,7 @@ class OrderController {
       purchaser: Joi.string().required(),
       saleAddresses: Joi.array().min(1).items(Joi.string().required()).required(),
       quantities: Joi.array().min(1).items(Joi.number().required()).required(),
-      currency: Joi.string().required(),
+      currency: Joi.string().allow('').required(),
       createdDate: Joi.number().required(),
     }).required();
 

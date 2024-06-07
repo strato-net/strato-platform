@@ -145,7 +145,7 @@ class MetaMaskController {
     }
 
     static async completeCheckout(req, res, next) {
-        const { checkout_total, currency, orderHash } = req.query; 
+        const { checkout_total, currency, orderHash } = req.body; 
         const orderEvent = await getOrderEvent(orderHash);
 
         // Call completeOrder

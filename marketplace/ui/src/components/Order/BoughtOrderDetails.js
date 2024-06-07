@@ -331,7 +331,7 @@ const BoughtOrderDetails = ({ user, users }) => {
       purchaser: details.order.purchaser,
       saleAddresses: details.order.saleAddresses,
       quantities: details.order.quantities,
-      currency: '',
+      currency: details.order.currency,
       createdDate: details.order.createdDate,
     };
     let isDone = await actions.cancelSale(dispatch, body);
