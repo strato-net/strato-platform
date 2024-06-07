@@ -96,8 +96,8 @@ class MetaMaskController {
                     error: "This user has not been onboarded through MetaMask yet."
                 });
             } else {
-                // TODO: specify network ID for mainnet vs testnets
                 const seller_address = query_result.rows[0].eth_address;
+                const networkId = process.env.NODE_ENV === 'production' ? '0x1' : '0xaa36a7' // Sepolia network ID
                 switch (currency) {
                     case 'ETH':
                         const url = 'https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd';
@@ -113,7 +113,7 @@ class MetaMaskController {
                         console.log(`eth_usd_price: ${eth_usd_price}`)
                         const eth_amount = (Math.round((checkout_total * 100000000) / eth_usd_price)/1000000000).toString() // amount in ether
                         console.log(`eth_amount: ${eth_amount}`)
-                        const amount_in_wei = parseEther(eth_amount).toString() // amount in wei
+                        const amount_in_wei = parseEther(eth_amount).toString(16) // amount in wei, hex-encoded
                         console.log(`amount_in_wei: ${amount_in_wei}`)
 
                         console.log(eth_amount)
@@ -121,7 +121,8 @@ class MetaMaskController {
                         
                         res.status(200).json({
                             to: seller_address,
-                            value: amount_in_wei
+                            value: amount_in_wei,
+                            networkId
                         });
                         break;
                     case 'USDC':
@@ -133,7 +134,8 @@ class MetaMaskController {
 
                         res.status(200).json({
                             to: to,
-                            data: data
+                            data: data,
+                            networkId
                         })
                         break;
                 }

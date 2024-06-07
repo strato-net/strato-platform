@@ -55,6 +55,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 console.log(txParams)
                 const accounts = await window.ethereum.request({ method: "eth_requestAccounts"})
                 await window.ethereum.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: txParams.networkId }]
+                })
+                await window.ethereum.request({
                     method: "eth_sendTransaction",
                     params: [{
                         from: accounts[0],
