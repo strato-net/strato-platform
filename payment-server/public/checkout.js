@@ -7,15 +7,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     const redirectUrl = queryParams.get('redirectUrl') || ''
     let orderInfo = {}
     let currency_amount = 0
-    fetch(`${window.location.protocol}//${window.location.host}/metamask/order?orderHash=${orderHash}`, {
+    fetch(`${window.location.protocol}//${window.location.host}/metamask/order/info?orderHash=${orderHash}`, {
             method: "GET",
         })
-        .then(response => { 
-            console.log(response);
+        .then(response => {
             response.json();
         })
         .then(data => {
-            console.log(data);
             // Assuming the API returns an array of options
             orderInfo = data;
             const { supported_tokens } = data; // TODO return address as well?

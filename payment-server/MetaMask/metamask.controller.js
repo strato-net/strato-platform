@@ -171,10 +171,7 @@ class MetaMaskController {
     static async orderInfo(req, res, next) {
         try {
             // Validation
-            if (!req.params.orderHash) {
-                throw new Error(`'orderHash' is a required parameter.`);
-            }
-            const orderHash = req.params.orderHash;
+            const { orderHash } = req.query;
             const orderEvent = await getOrderEvent(orderHash);
 
             // Get and validate the order details
