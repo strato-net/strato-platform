@@ -742,7 +742,7 @@ spec = do
           application = "",
           contractname = "SwissArmy",
           collectionname = "SwissArmyMapping",
-          collectiontype = "Mappings",
+          collectiontype = "Mapping",
           blockHash = hash "<BLOCKHASH>",
           blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
           blockNumber = 123,
@@ -756,7 +756,7 @@ spec = do
     [swissArmyMappingCreate, swissArmyMappingRowInsert] <-
         runLoggingT . runConduit $ createInsertsCollection g input .| sinkList
 
-    swissArmyMappingCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy.SwissArmyMapping" (address text,
+    swissArmyMappingCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy-SwissArmyMapping" (address text,
     block_hash text,
     block_timestamp text,
     block_number text,
@@ -766,11 +766,12 @@ spec = do
     root text,
     contract_name text,
     collectionname text,
+    collectiontype text,
     key text,
     value text,
   PRIMARY KEY (address, key));|]
 
-    swissArmyMappingRowInsert `shouldBe` [r|INSERT INTO "SwissArmy.SwissArmyMapping" ("address",
+    swissArmyMappingRowInsert `shouldBe` [r|INSERT INTO "SwissArmy-SwissArmyMapping" ("address",
     "block_hash",
     "block_timestamp",
     "block_number",
@@ -778,6 +779,7 @@ spec = do
     "transaction_sender",
     "contract_name",
     "collectionname",
+    "collectiontype",
     "key",
     "value")
   VALUES ('000000000000000000000000000000098eaddede',
@@ -788,6 +790,7 @@ spec = do
     '000000000000000000000000000000098eaddede',
     'SwissArmy',
     'SwissArmyMapping',
+    'Mapping',
     'hi-key',
     'hi-value')
   ON CONFLICT (address, key) DO UPDATE SET
@@ -799,6 +802,7 @@ spec = do
     transaction_sender = excluded.transaction_sender,
     contract_name = excluded.contract_name,
     collectionname = excluded.collectionname,
+    collectiontype = excluded.collectiontype,
     value = excluded.value;|]
 
   -- it "can create and insert into abstract tables" $ do
