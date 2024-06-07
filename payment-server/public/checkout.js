@@ -10,8 +10,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     fetch(`${window.location.protocol}//${window.location.host}/metamask/order?orderHash=${orderHash}`, {
             method: "GET",
         })
-        .then(response => response.json())
+        .then(response => { 
+            console.log(response);
+            response.json();
+        })
         .then(data => {
+            console.log(data);
             // Assuming the API returns an array of options
             orderInfo = data;
             const { supported_tokens } = data; // TODO return address as well?
