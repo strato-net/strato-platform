@@ -63,9 +63,9 @@ class UsersController {
 
   static async getAll(req, res, next) {
     try {
-      const { dapp } = req
+      const { dapp, query } = req
 
-      const users = await dapp.getCertificates();
+      const users = await dapp.getCertificates(query);
       return rest.response.status200(res, users)
     } catch (e) {
       return next(e)

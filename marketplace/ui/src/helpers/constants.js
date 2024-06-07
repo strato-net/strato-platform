@@ -63,10 +63,10 @@ export const getUnitNameByIndex = (index) => {
         return matches[1];
       }
     }
-    
+
     return unit.name;
   }
-  
+
   return null;
 };
 
@@ -81,10 +81,10 @@ export const getSpiritUnitNameByIndex = (index) => {
         return matches[1];
       }
     }
-    
+
     return unit.name;
   }
-  
+
   return null;
 };
 
@@ -167,18 +167,44 @@ export const spiritTypes = [
 ]
 
 export const PAYMENT_TYPE = [
-  { 
-    name: "Credit Card / ACH", 
-    value: 1, 
+  {
+    name: "Credit Card / ACH",
+    value: 1,
     options: [
-      <AMEX width="30px" height="20px"/>,
-      <Discover width="30px" height="20px"/>,
-      <Mastercard width="30px" height="20px"/>,
-      <VISA width="30px" height="20px"/>,
-      <BANK width="30px" height="20px"/>
+      <AMEX width="30px" height="20px" />,
+      <Discover width="30px" height="20px" />,
+      <Mastercard width="30px" height="20px" />,
+      <VISA width="30px" height="20px" />,
+      <BANK width="30px" height="20px" />
     ]
   }
 ]
+
+export const SIZES = {
+  shoes: ["3.5", "4", "4.5", "5", "5.5", "6", "6.5", "7", "7.5", "8", "8.5", "9", "9.5", "10", "10.5", "11", "11.5", "12", "12.5", "13", "13.5", "14", "14.5", "15", "16", "17", "18"],
+  other: ["OS (One Size)", "XXS", "XS", "S", "M", "L", "XL", "XXL"]
+}
+
+export const INVENTORY_MODAL_INITIAL_VALUES = {
+  name: "",
+  description: "",
+  artist: "",
+  source: "",
+  leastSellableUnits: 1,
+  unitOfMeasurement: 1,
+  purity: "",
+  quantity: 1,
+  expirationPeriodInMonths: 1,
+  clothingType: null,
+  images: [],
+  files: [],
+  category: "Art",
+  subCategory: null,
+  size: null,
+  skuNumber: null,
+  condition: null,
+  brand: null,
+}
 
 export const ORDER_STATUS = {
   "AWAITING_FULFILLMENT": 1,
@@ -209,4 +235,15 @@ export const ISSUER_STATUS = {
   "AUTHORIZED": "3" 
  }
 
-export const PAYMENT_LIST = ['card','us_bank_account']
+export const availabilityOptions = [
+  { label: 'For Sale', value: 'forSale' },
+  { label: 'Sold Out', value: 'soldOut' }]
+
+export const PAYMENT_LIST = ['card', 'us_bank_account']
+
+export const STRATS_CONVERSION = 100;
+
+export const navItems = [
+  { label: <div id="Orders">Orders</div>, key: '0' },
+  { label: <div id="Inventory">My Items</div>, key: '1' }
+];

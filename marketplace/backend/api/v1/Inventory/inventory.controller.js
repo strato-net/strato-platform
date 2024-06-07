@@ -49,11 +49,14 @@ class InventoryController {
       const { gtField, gtValue, ...restQuery } = query;
 
       const inventories = await dapp.getInventoriesForUser({ userProfileGtField: gtField, userProfileGtValue: gtValue, ...restQuery });
-      const productsWithImageUrl = inventories?.inventoryResults.sort((a, b) => {
-        return b.saleDate.localeCompare(a.saleDate);
+      const sortedInventories = inventories?.inventoryResults.sort((a, b) => {
+        if (a.saleDate && b.saleDate) {
+          return b.saleDate.localeCompare(a.saleDate);
+        }
+        return a.saleDate ? -1 : 1; // Move items without saleDate to the end
       });
 
-      rest.response.status200(res, { inventoriesWithImageUrl: productsWithImageUrl, count: productsWithImageUrl.length })
+      rest.response.status200(res, { inventoriesWithImageUrl: sortedInventories, count: sortedInventories.length })
 
 
       return next()

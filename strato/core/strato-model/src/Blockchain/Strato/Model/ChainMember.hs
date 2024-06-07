@@ -37,11 +37,14 @@ module Blockchain.Strato.Model.ChainMember
     ChainMemberParsedSet (..),
     TrueOrgNameChains (..),
     FalseOrgNameChains (..),
+    chainMemberParsedSetToValidator,
+    validatorToChainMemberParsedSet
   )
 where
 
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.ExtendedWord
+import Blockchain.Strato.Model.Validator (Validator(..))
 import Control.DeepSeq
 import Control.Lens hiding ((.=))
 import Data.Aeson hiding (Array, String)
@@ -571,3 +574,12 @@ instance DPS.PersistField ChainMemberParsedSet where
 
 instance DPS.PersistFieldSql ChainMemberParsedSet where
   sqlType _ = DPS.SqlString
+
+chainMemberParsedSetToValidator :: ChainMemberParsedSet -> Validator
+chainMemberParsedSetToValidator (Everyone _) = ""
+chainMemberParsedSetToValidator (Org _ _) = ""
+chainMemberParsedSetToValidator (OrgUnit _ _ _) = ""
+chainMemberParsedSetToValidator (CommonName _ _ c _) = Validator c
+
+validatorToChainMemberParsedSet :: Validator -> ChainMemberParsedSet
+validatorToChainMemberParsedSet (Validator v) = CommonName "" "" v True

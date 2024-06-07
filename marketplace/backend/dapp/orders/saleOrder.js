@@ -166,6 +166,8 @@ async function get(user, args, options) {
     key: "address",
     value: address,
   });
+  searchArgs.queryOptions.select = constants.attach_saleAddresses_Quantities_completedSales_onOrder;
+
   order = await searchOne(constants.orderTableName, searchArgs, newOptions, user);
 
   if (!order) {
@@ -179,9 +181,8 @@ async function get(user, args, options) {
 
 async function getAll(admin, args = {}, options) {
   let saleOrders;
-  const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
-  saleOrders = await searchAllWithQueryArgs(constants.orderTableName, args, newOptions, admin);
-
+  const newOptions = { ...options,  org: 'BlockApps', app: 'Mercata' }
+  saleOrders = await searchAllWithQueryArgs(constants.orderTableName, {...args,queryOptions: {select:constants.attach_saleAddresses_Quantities_completedSales_onOrder}}, newOptions, admin);
   const count = await searchAllWithQueryArgs(
     constants.orderTableName,
     {

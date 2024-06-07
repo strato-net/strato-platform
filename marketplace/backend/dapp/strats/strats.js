@@ -1,4 +1,6 @@
+import { rest, util } from "blockapps-rest";
 import { searchAllWithQueryArgs } from '/helpers/utils';
+import constants from "/helpers/constants";
 
 const contractName = 'ERC20Dapp';
 
@@ -44,16 +46,42 @@ function marshalOut(_args) {
 }
 
 async function getStratsBalance(admin, args = {}, options) {
-    const stratsBalance = await searchAllWithQueryArgs(`ERC20Dapp.balances`, args, options, admin)
+    const stratsBalance = await searchAllWithQueryArgs(`ERC20Dapp-balances`, args, options, admin)
     if (stratsBalance.length > 0) {
         return parseFloat(stratsBalance[0].value / 100).toFixed(2)
     }
     return 0
 }
 
+async function transferStrats(admin, args, options = defaultOptions) {
+  const address = getStratsAddress();
+  const contract = {
+    name: contractName,
+    address,
+  }
+  const callArgs = {
+    contract,
+    method: 'transfer',
+    args: util.usc(args),
+  };
+  return rest.call(admin, callArgs, options);
+}
+
+function getStratsAddress() {
+  if (process.env.networkID === constants.prodNetworkId) {
+    return constants.prodStratsAddress
+  } else if (process.env.networkID === constants.testnetNetworkId) {
+    return constants.testnetStratsAddress
+  } else {
+    return constants.prodStratsAddress
+  }
+}
+
 
 export default {
     getStratsBalance,
+    transferStrats,
+    getStratsAddress,
     marshalIn,
     marshalOut
 }

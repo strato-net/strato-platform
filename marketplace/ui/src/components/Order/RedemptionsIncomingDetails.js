@@ -43,7 +43,7 @@ const RedemptionsIncomingDetails = ({ user }) => {
     const { TextArea } = Input;
     const [api, contextHolder] = notification.useNotification();
     const { redemption, isFetchingRedemptionDetails, isClosingRedemption, message, success, } = useRedemptionState();
-    const { inventoryDetails, isInventoryDetailsLoading } = useInventoryState();
+    let { inventoryDetails, isInventoryDetailsLoading } = useInventoryState();
 
     const routeMatch = useMatch({
         path: routes.RedemptionsIncomingDetails.url,
@@ -120,6 +120,7 @@ const RedemptionsIncomingDetails = ({ user }) => {
     };
 
 
+    inventoryDetails={...inventoryDetails, images: inventoryDetails && Array.isArray(inventoryDetails["BlockApps-Mercata-Asset-images"]) ? inventoryDetails["BlockApps-Mercata-Asset-images"][0].value: []}
     let column = [
         {
             title: "",
@@ -134,7 +135,7 @@ const RedemptionsIncomingDetails = ({ user }) => {
             render: (text, record) => (
                 <p
                     className="text-primary text-[17px] cursor-pointer"
-                    onClick={() => { navigate(`${routes.MarketplaceProductDetail.url.replace(":address", record.address).replace(":name", record.name)}`) }}
+                    onClick={() => { navigate(`${routes.MarketplaceProductDetail.url.replace(":address", record.address).replace(":name", encodeURIComponent(record.name))}`) }}
                 >
                     {decodeURIComponent(record?.name)}
                 </p>
