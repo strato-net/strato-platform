@@ -1004,6 +1004,7 @@ insertCollectionTableQuery ms =
     transaction_sender = excluded.transaction_sender,
     contract_name = excluded.contract_name,
     collectionname = excluded.collectionname,
+    collectiontype = excluded.collectiontype,
     value = excluded.value|],
                       ";"
                     ]
