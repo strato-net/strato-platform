@@ -113,11 +113,8 @@ class MetaMaskController {
                         console.log(`eth_usd_price: ${eth_usd_price}`)
                         const eth_amount = (Math.round((checkout_total * 100000000) / eth_usd_price)/1000000000).toString() // amount in ether
                         console.log(`eth_amount: ${eth_amount}`)
-                        const amount_in_wei = parseEther(eth_amount).toString(16) // amount in wei, hex-encoded
+                        const amount_in_wei = parseEther(eth_amount).toHexString() // amount in wei, hex-encoded
                         console.log(`amount_in_wei: ${amount_in_wei}`)
-
-                        console.log(eth_amount)
-                        console.log(amount_in_wei)
                         
                         res.status(200).json({
                             to: seller_address,
