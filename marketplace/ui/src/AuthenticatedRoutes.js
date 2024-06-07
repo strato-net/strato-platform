@@ -315,7 +315,6 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
         }
       />
       <Route exact path={routes.FAQ.url} element={<FAQ />} />
-      <Route path="/" element={<Navigate to={"/marketplace"} replace />} />
       <Route path="*" element={<Error />} />
     </Routes>
   );

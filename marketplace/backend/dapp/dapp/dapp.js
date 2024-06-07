@@ -1340,15 +1340,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getStratsBalance = async function (args, options = defaultOptions) {
     const { userAddress } = args;
     const getOptions = { ...options, org: "TestCompany", app: '' };
-    let address;
-
-    if (process.env.networkID === constants.prodNetworkId) {
-      address = constants.prodStratsAddress
-    } else if (process.env.networkID === constants.testnetNetworkId) {
-      address = constants.testnetStratsAddress
-    } else {
-      address = constants.prodStratsAddress
-    }
+    const address = strats.getStratsAddress();
 
     const newArgs = {
       address: address,
@@ -1357,6 +1349,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
     const balance = await strats.getStratsBalance(rawAdmin, newArgs, getOptions);
     return balance;
+  }
+
+  contract.transferStrats = async function (args, options = defaultOptions) {
+    const res = await strats.transferStrats(rawAdmin, args, options)
+    return res;
   }
 
   return contract;
