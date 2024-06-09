@@ -14,23 +14,26 @@ import {
   Col
 } from "antd";
 import { ArrowLeftOutlined, LogoutOutlined } from "@ant-design/icons";
-import { Images } from "../../images";
-import "./header.css";
 import { useLocation, useNavigate } from "react-router-dom";
-import routes from "../../helpers/routes";
-import {
-  useMarketplaceState,
-  useMarketplaceDispatch,
-} from "../../contexts/marketplace";
-import { actions } from "../../contexts/marketplace/actions";
+import TagManager from "react-gtm-module";
+// actions
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { actions as userActions } from "../../contexts/authentication/actions";
+// Dispatches
+import { useMarketplaceState, useMarketplaceDispatch, } from "../../contexts/marketplace";
 import { useAuthenticateDispatch, useAuthenticateState } from "../../contexts/authentication";
-import TagManager from "react-gtm-module";
-import { SEO } from "../../helpers/seoConstant";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
+// other
+import { SEO } from "../../helpers/seoConstant";
 import LoginModal from "../MarketPlace/LoginModal"
 import { setCookie } from "../../helpers/cookie";
+import TransferStratsModal from "../MarketPlace/TransferStratsModal";
+
+import { navItems } from "../../helpers/constants";
+import routes from "../../helpers/routes";
+import { Images } from "../../images";
+import "./header.css";
 
 const { Header } = Layout;
 
@@ -68,32 +71,27 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
 
   useEffect(() => {
     if (user) {
-      actions.fetchStratsBalance(marketplaceDispatch);
+      marketplaceActions.fetchStratsBalance(marketplaceDispatch);
     }
   }, [user]);
 
   useEffect(() => {
-    actions.fetchCartItems(marketplaceDispatch, storedData);
+    marketplaceActions.fetchCartItems(marketplaceDispatch, storedData);
   }, [marketplaceDispatch, storedData]);
 
   const [selectedTab, setSelectedTab] = useState("0");
-  const [initials, setInitials] = useState("");
   const [roleIndex, setRoleIndex] = useState();
   const [showSearch, setShowSearch] = useState(false);
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(categoryQueryValue);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isTransferStratsModalVisible, setIsTransferStratsModalVisible] = useState(false);
 
   const stratsBalance = (Object.keys(strats).length > 0) ? strats : 0
 
   useEffect(() => {
     setSelectedCategory(categoryQueryValue)
   }, [categoryQueryValue])
-
-  const navItems = [
-    { label: <div id="Orders">Orders</div>, key: '0' },
-    { label: <div id="Inventory">My Items</div>, key: '1' }
-  ];
 
   const navUrls = [
     routes.Orders.url.replace(':type', 'sold'),
@@ -183,30 +181,33 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     },
   ];
 
-  const stratsItem = [{
-    key: '2',
-    label: (
-      <div>
-        {user &&
-          <p className="text-xs mt-1">
-            STRATs: {stratsBalance}
-          </p>
-        }
-      </div>
-    ),
-  }]
-
-  useEffect(() => {
-    let temp = "";
-    if (user != null) {
-      if (user.commonName.split(" ").length > 1) {
-        temp = user.commonName.split(" ")[0].substring(0, 1) + user.commonName.split(" ")[1].substring(0, 1);
-      } else {
-        temp = user.commonName.split(" ")[0].substring(0, 1);
-      }
+  const stratsItem = [
+    {
+      key: '1',
+      label: (
+        <div>
+          {user &&
+            <p className="text-xs mt-1">
+              STRATs: {stratsBalance}
+            </p>
+          }
+        </div>
+      ),
+    },
+    {
+      key: '2',
+      onClick: () => setIsTransferStratsModalVisible(true),
+      label: (
+        <div>
+          {user &&
+            <p className="text-xs mt-1">
+              Transfer
+            </p>
+          }
+        </div>
+      ),
     }
-    setInitials(temp);
-  }, [user])
+  ]
 
   useEffect(() => {
     if (user) setRoleIndex(0)
@@ -219,11 +220,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     user ? {
       value: "my-profile",
       path: routes.MarketplaceUserProfile.url.replace(':commonName', user.commonName),
-      label: (
-        <div>
-          <p className="!mb-0">My Profile</p>
-        </div>
-      )
+      label: (<div> <p className="!mb-0"> My Profile </p> </div>)
     } : null,
     user ? {
       value: "logout",
@@ -242,10 +239,10 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const handleIntMenuTab = (data) => {
     if (roleIndex === 1) {
       // User is not logged in
-      data.value == 'orders' ? setSelectedTab(0) : setSelectedTab(1)
+      data.value === 'orders' ? setSelectedTab(0) : setSelectedTab(1)
       setIsModalVisible(true);
     } else {
-      data.value == 'logout' ? logout() : data.value == 'orders' ? navigate(routes.Orders.url.replace(':type', 'sold'), { state: { defaultKey: "Sold" } }) : navigate(data.path)
+      data.value === 'logout' ? logout() : data.value === 'orders' ? navigate(routes.Orders.url.replace(':type', 'sold'), { state: { defaultKey: "Sold" } }) : navigate(data.path)
       handleMenuTab(data)
     }
   }
@@ -308,6 +305,10 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
 
   const handleClose = () => {
     setIsModalVisible(false);
+  };
+
+  const handleCloseTransferStratsModal = () => {
+    setIsTransferStratsModalVisible(false);
   };
 
   return (
@@ -418,8 +419,8 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
           </Badge>
 
           {(roleIndex !== undefined && roleIndex !== 1)
-            && <Dropdown menu={{ items: stratsItem }} placement="bottomRight" trigger={["hover", "click"]} className="xs:mt-5 md:mt-0" overlayStyle={{ position: 'fixed' }}>
-              <a onClick={(e) => e.preventDefault()} className="md:flex mx-1 text-base text-white" id="strats-dropdown">
+            && <Dropdown menu={{ items: stratsItem }} placement="bottomRight" trigger={["click"]} className="xs:mt-5 md:mt-0" overlayStyle={{ position: 'fixed' }}>
+              <a className="md:flex mx-1 text-base text-white" id="strats-dropdown">
                 <Badge
                   style={{ backgroundColor: "#13188A" }}
                   className="cursor-pointer mt-7 md:mt-0 mx-2"
@@ -472,6 +473,12 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
         onCancel={handleClose}
         onLogin={handleLogin}
       />
+      {isTransferStratsModalVisible &&
+        <TransferStratsModal
+          visible={isTransferStratsModalVisible}
+          onCancel={handleCloseTransferStratsModal}
+          balance={stratsBalance}
+        />}
     </>
 
   );

@@ -523,9 +523,9 @@ isValidForPool t@OutputTx {otSigner = address, otBaseTx = bt} = runExceptT $ do
   when (addressBalance < txFee)
     . throwE
     $ BalanceTooLow Validation Incoming txFee addressBalance t
-  when (txSize >= flags_txSizeLimit)
+  when (txSize >= toInteger flags_txSizeLimit)
     . throwE
-    $ TXSizeLimitExceeded Validation Incoming txSize flags_txSizeLimit t
+    $ TXSizeLimitExceeded Validation Incoming txSize (toInteger flags_txSizeLimit) t
   when (otHash t `S.member` knownFailedTxs)
     . throwE
     $ KnownFailedTX Validation Incoming t

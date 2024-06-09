@@ -77,17 +77,18 @@ const SoldOrderDetails = ({ user, users }) => {
       }
 
       let items = [];
+      const orderQuantities = orderDetails.order["BlockApps-Mercata-Order-quantities"].map(item => item.value);
       orderDetails.assets.forEach((prod, index) => {
         items.push({
           address: prod.address,
           chainId: prod.chainId,
           key: prod.address,
-          productImage: prod.images && prod.images.length > 0 ? prod.images[0] : image_placeholder,
+          productImage: prod["BlockApps-Mercata-Asset-images"].length > 0 ? prod["BlockApps-Mercata-Asset-images"][0].value : image_placeholder,
           productName: prod,
           name: prod.name,
           unitPrice: prod.price,
-          quantity: parseInt(orderDetails.order.quantities[index]),
-          amount: prod.price * parseInt(orderDetails.order.quantities[index]),
+          quantity: parseInt(orderQuantities[index]),
+          amount: prod.price * parseInt(orderQuantities[index]),
           serialNumber: prod,
           tax: prod.tax ? prod.tax : 0,
         });

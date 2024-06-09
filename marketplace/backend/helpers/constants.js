@@ -27,14 +27,17 @@ export default {
   sellerOrgName: "blockapps",
   assetTableName: "Asset",
   saleTableName: "Sale",
-  saleAllTableName: "BlockApps-Mercata-Sale",
   orderTableName: "Order",
+  saleAllTableName: "BlockApps-Mercata-Sale",
   blockAppsOrg: "BlockApps",
   prodNetworkId: "6909499098523985262",
   testnetNetworkId: "7596898649924658542",
   prodStratsAddress: "b220195543f652f735b7847c4af399d0323e1ff6",
   testnetStratsAddress: "488cd3909d94606051e0684cf6caa5763fb78613",
-  baUserNames: ['blockapps_carbon', 'blockapps_metals', 'blockapps_clothing', 'blockapps_collectibles', 'blockapps_memberships', 'blockapps_art'],
+  attachImagesAndFiles: "*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*)",
+  attachSalesAndImagesAndFiles: "*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Sale!BlockApps-Mercata-Sale_BlockApps-Mercata-Asset_fk(*)",
+  attach_saleAddresses_Quantities_completedSales_onOrder: "*,BlockApps-Mercata-Order-saleAddresses(*),BlockApps-Mercata-Order-quantities(*),BlockApps-Mercata-Order-completedSales(*)",
+  baUserNames: ['blockapps_carbon', 'blockapps_metals', 'blockapps_clothing', 'blockapps_collectibles', 'blockapps_memberships', 'blockapps_art', 'blockapps_spirits'],
   localHost: 'http://localhost'
 };
 
@@ -102,12 +105,10 @@ Object.freeze(SERVICE_PROVIDERS)
 
 // Helpers to calculate average price, range, units sold for Pirce History Stats
 export const calculateAveragePrice = (records) => {
-  const total = records.reduce((sum, record) => sum + Number(record.price), 0);
-  return (total / records.length).toFixed(2);
+  return records.reduce((sum, record) => sum + record.price, 0) / records.length;
 }
 
-
-export const calculatePriceFluctuation =(records)=> {
+export const calculatePriceFluctuation = (records) => {
   const prices = records.map(record => record.price);
   return { min: Math.min(...prices), max: Math.max(...prices) };
 }

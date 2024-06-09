@@ -47,35 +47,6 @@ const MarketPlace = ({ user, isAuthenticated }) => {
             borderRadius: '12px',
           },
         });
-        notification.open({
-          description: "Is there a product you don't see? Let us know!",
-          icon: null,
-          btn: (
-            <a
-            href="https://forms.gle/biuEtUHrFdLpX1d36"
-            rel="noreferrer noopener"
-            target="_blank"
-            style={{
-              textDecoration: 'none',
-            }}
-            >
-              <Button
-                type="primary"
-                style={{
-                  borderRadius: '20px',
-                  color: '#fff',
-                  marginLeft: "2px"
-                }}
-              >
-                Contact Us
-              </Button>
-            </a>
-          ),
-          placement: 'bottomRight',
-          style: {
-            borderRadius: '12px',
-          },
-        });
         // Set loginCount to 1 to indicate the user has logged in at least once
         localStorage.setItem('loginCount', '1');
       }
