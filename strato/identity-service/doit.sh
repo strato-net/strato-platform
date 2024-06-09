@@ -5,7 +5,11 @@ set -ex
 echo 'export PS1="⛓ \w> "' >> /root/.bashrc
 
 PROCESS_MONITORING=${PROCESS_MONITORING:-true}
-identityProviderPort=${identityProviderPort:-8014}
+identityServicePort=${identityServicePort:-8014}
+NODE_URL=${NODE_URL:-http://localhost:8080}
+USER_REGISTRY_ADDRESS=${USER_REGISTRY_ADDRESS}
+USER_REGISTRY_CODEHASH=${USER_REGISTRY_CODEHASH}
+USER_CONTRACT_NAME=${USER_CONTRACT_NAME}
 declare -A MONITORED_PIDS
 MONITORING_TIMER=5;
 
@@ -17,62 +21,29 @@ function runIdentityServer {
   mkdir -p logs
   
   minLogLevel=LevelInfo
-  if [ "${IDENTITYPROVIDER_DEBUG:-false}" == true ]; then
+  if [ "${IDENTITYSERVICE_DEBUG:-false}" == true ]; then
     minLogLevel=LevelDebug
   fi
   
   echo "Environment variables:
-  identity-provider:
-  --minLogLevel="${minLogLevel}" \
-  --port="${identityProviderPort}"
-  --vaultProxyUrl="${vaultProxyUrl}"
+  identity-service:
+  --minLogLevel=${minLogLevel} \
+  --port="${identityServicePort}" \
+  --nodeUrl=${NODE_URL} \
+  --userRegistryAddress=${USER_REGISTRY_ADDRESS} \
+  --userRegistryCodeHash=${USER_REGISTRY_CODEHASH} \
+  --userContractName=${USER_CONTRACT_NAME}
   "
-  
-  if [ -n "${vaultProxyUrl}" ]; then
-      vpFlag="--vaultProxyUrl=${vaultProxyUrl}"
-  fi
-  if [ -n "${SENDGRID_APIKEY}" ]; then
-      sgFlag="--SENDGRID_APIKEY=${SENDGRID_APIKEY}"
-  fi
-  if [ -n "${cacheSize}" ]; then
-      csFlag="--cacheSize=${cacheSize}"
-  fi  
   RED='\033[0;31m'
   NC='\033[0m' # No Color
-  OAUTH_DISCOVERY_URL=$(yq '.[0].discoveryUrl // "" ' /identity-provider/idconf.yaml )
-  OAUTH_CLIENT_ID=$(yq '.[0].clientId // "" ' /identity-provider/idconf.yaml )
-  OAUTH_CLIENT_SECRET=$(yq '.[0].clientSecret // "" ' /identity-provider/idconf.yaml )
-
-  if [[ -z ${OAUTH_DISCOVERY_URL} || -z ${OAUTH_CLIENT_ID} || -z ${OAUTH_CLIENT_SECRET} ]]; then
-    echo "FATAL ERROR: You MUST provide details for at least one OAuth realm in idconf.yaml, including the discoveryUrl, clientId, and clientSecret"
-    exit 1
-  fi
-
-  runBackgroundProcess blockapps-vault-proxy-server \
-    --OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL} --OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID} \
-    --OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET} ${vporsFlag} --VAULT_URL=${VAULT_URL} \
-    --VAULT_PROXY_PORT=8013 --VAULT_PROXY_DEBUG=${VAULT_PROXY_DEBUG:-false} &>> logs/vault-proxy
   
-  set +x
-  echo 'Waiting for vault-proxy to rise and shine at http://localhost:8013...'
-  started=$(date +%s)
-  timeout=30
-  while ! curl --silent --output /dev/null --fail --max-time 0.2 --location http://localhost:8013; do
-    if [[ $(date +%s) -ge ${started}+${timeout} ]]; then
-      echo -e "\n tail -n40 logs/vault-proxy"
-      tail -n40 logs/vault-proxy
-      echo -e "\n${Red}vault-proxy takes too long to start. It most probably failed. Check the tail of the vault-proxy log above. Sleeping now.${NC}"
-      sleep 60
-    fi
-    sleep 0.3
-  done
-  echo 'vault-proxy is available'
-  set -x
-  
-  echo "Running identity-provider-server..."
-  runBackgroundProcess identity-provider-server \
-    --minLogLevel=${minLogLevel} --port="${identityProviderPort}" \
-    "${vpFlag}" "${sgFlag}" "${csFlag}" &>> logs/identity-provider-server
+  echo "Running identity-service-server..."
+  runBackgroundProcess identity-service-server \
+    --minLogLevel=${minLogLevel} --port="${identityServicePort}" \
+    --nodeUrl=${NODE_URL} \
+    --userRegistryAddress=${USER_REGISTRY_ADDRESS} \
+    --userRegistryCodeHash=${USER_REGISTRY_CODEHASH} \
+    --userContractName=${USER_CONTRACT_NAME} &>> logs/identity-service-server
   
   echo "Configuring log rotation..."
   runBackgroundProcess logRotation
@@ -110,7 +81,7 @@ function runIdentityServer {
           echo "+tail -n 20 ${FILE_NAME}"
           tail -n 20 $FILE_NAME
           echo "End of logs."
-          echo -e "${Red}IDENTITY PROVIDER IS DOWN: Process with pid ${monitored_pid} crashed so all background processes were killed. Check /var/lib/identity/logs/ in the container${NC}"
+          echo -e "${Red}IDENTITY SERVICE IS DOWN: Process with pid ${monitored_pid} crashed so all background processes were killed. Check /var/lib/identity/logs/ in the container${NC}"
           # Keep container running idle
           tail -f /dev/null
         fi

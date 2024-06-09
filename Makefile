@@ -15,6 +15,7 @@ HIGHWAYDIR=${FAKEROOT}/highway
 STRATODIR=${FAKEROOT}/strato
 VAULTDIR=${FAKEROOT}/vault-wrapper
 IDENTITYDIR=${FAKEROOT}/identity-provider
+IDENTITYSERVICEDIR=${FAKEROOT}/identity-service
 
 ifndef VERSION
   ifeq ($(REPO),public)
@@ -33,11 +34,11 @@ all: build_all docker-compose eks
 
 all_develop: build_develop docker-compose eks
 
-build_all: strato apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx stripe-ps stripe-ps-nginx
+build_all: strato apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-service identity-nginx stripe-ps stripe-ps-nginx
 
-build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx stripe-ps stripe-ps-nginx
+build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-service identity-nginx stripe-ps stripe-ps-nginx
 
-.PHONY: strato apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx stripe-ps stripe-ps-nginx build_buildbase build_common build_common_profiled eks
+.PHONY: strato apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-service identity-nginx stripe-ps stripe-ps-nginx build_buildbase build_common build_common_profiled eks
 
 apex:
 	@echo Now building apex...
@@ -94,6 +95,7 @@ build_common: build_buildbase
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
 	mkdir -p ${IDENTITYDIR}
+	mkdir -p ${IDENTITYSERVICEDIR}
 	cd strato && stack build \
 		--test --no-run-tests \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
@@ -104,6 +106,7 @@ build_common_profiled: build_buildbase
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
 	mkdir -p ${IDENTITYDIR}
+	mkdir -p ${IDENTITYSERVICEDIR}
 	cd strato && stack build \
 		--profile --work-dir .stack-work-profile \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
@@ -113,6 +116,7 @@ build_common_fast: build_buildbase
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
 	mkdir -p ${IDENTITYDIR}
+	mkdir -p ${IDENTITYSERVICEDIR}
 	cd strato && stack build \
 		--fast --no-run-tests \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
@@ -174,6 +178,12 @@ identity-provider: build_common
 	docker build --target identity-provider --tag ${REPO_URL}identity-provider:${VERSION} --file Dockerfile.multi ${FAKEROOT}
 	docker tag ${REPO_URL}identity-provider:${VERSION} ${REPO_AWS_ECR_URL}identity-provider:${VERSION}
 
+identity-service: build_common
+	@echo Now building OAuth-less Identity Server...
+	cp strato/identity-service/doit.sh ${IDENTITYSERVICEDIR}
+	docker build --target identity-service --tag ${REPO_URL}identity-service:${VERSION} --file Dockerfile.multi ${FAKEROOT}
+	docker tag ${REPO_URL}identity-service:${VERSION} ${REPO_AWS_ECR_URL}identity-service:${VERSION}
+
 identity-nginx:
 	@echo Now building identity-nginx...
 	BASIL_DOCKER_TAG=${REPO_URL}identity-nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}identity-nginx:${VERSION} make --directory=identity-nginx/
@@ -187,6 +197,8 @@ docker-compose:
 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.vault.tpl.yml > docker-compose.vault.push.ecr.yml
 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.identity.tpl.yml > docker-compose.identity.push.yml
 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.identity.tpl.yml > docker-compose.identity.push.ecr.yml
+	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.identity-service.tpl.yml > docker-compose.identity-service.push.yml
+	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.identity-service.tpl.yml > docker-compose.identity-service.push.ecr.yml
 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.highway.tpl.yml > docker-compose.highway.push.yml
 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.highway.tpl.yml > docker-compose.highway.push.ecr.yml
 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.stripe-ps.tpl.yml > docker-compose.stripe-ps.push.yml
@@ -199,6 +211,8 @@ docker-compose:
 	awk '/build: ./{getline} 1' docker-compose.vault.push.ecr.yml > docker-compose.vault.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.identity.push.yml > docker-compose.identity.yml
 	awk '/build: ./{getline} 1' docker-compose.identity.push.ecr.yml > docker-compose.identity.ecr.yml
+	awk '/build: ./{getline} 1' docker-compose.identity-service.push.yml > docker-compose.identity-service.yml
+	awk '/build: ./{getline} 1' docker-compose.identity-service.push.ecr.yml > docker-compose.identity-service.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.highway.push.yml > docker-compose.highway.yml
 	awk '/build: ./{getline} 1' docker-compose.highway.push.ecr.yml > docker-compose.highway.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.stripe-ps.push.yml > docker-compose.stripe-ps.yml

@@ -11,7 +11,6 @@ import BlockApps.X509.Keys (bsToPriv)
 import Blockchain.Strato.Model.Secp256k1
 import Control.Monad
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as C8
 import HFlags
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Cors
@@ -48,7 +47,6 @@ main = do
     ]
   _ <- $initHFlags "Setup Vault Wrapper DBs"
   pkBS <- B.readFile flags_PEM_FILE
-  putStrLn $ C8.unpack pkBS
   let ePK = bsToPriv pkBS
   case ePK of
     Left err -> error $ "Could not decode private key: " ++ err

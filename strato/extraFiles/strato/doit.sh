@@ -80,6 +80,15 @@ function newnode {
 
   else
     echo "OAUTH mode is disabled; using ${AUTH_MODE} instead"
+    backup=$(cat backup_priv.pem)
+    if [ "${backup}" = "" ]; then
+        x509-sign-subject -k priv.pem -n ${USERNAME} > subject.json
+    else
+        x509-sign-subject -k priv.pem -v backup_priv.pem -n ${USERNAME} > subject.json
+    fi
+
+    subject=$(cat subject.json)
+    curl -X POST "${idServerUrl}/identity" -H 'Content-Type: application/json' -d ''${subject}'' || echo 'Warning: posting identity failed'
 
     runBackgroundProcess blockapps-pem-vault-wrapper-server \
       --port=8013 \

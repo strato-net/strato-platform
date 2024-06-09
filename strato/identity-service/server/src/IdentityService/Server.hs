@@ -57,6 +57,8 @@ import Servant.Client hiding (manager, responseBody)
 import Text.Format
 import UnliftIO hiding (Handler)
 
+data BinaryOp a b = First a | Second b | Sum (a, b) | Product (a, b)
+
 instance Monad m => HasVault (ReaderT IdentityServerData m) where
   sign msg = do
     pk <- asks issuerPrivKey
@@ -95,15 +97,27 @@ postIdentity (PostIdentityRequest eMsg) = do
 
   cert <- case eMsg of
     Left s@(Signed _ _) -> case recoverAddress s of -- new identity
-      Just a | a == fromPublicKey (subPub sub) -> certInCirrus a >>= \case
+      Just a | a == fromPublicKey (subPub sub) -> certInCirrus (Sum (subCommonName sub, a)) >>= \case
         -- User has no cert, create cert
         [] -> do
           cert <- createAndRegisterCert sub
           pure cert
-        [cert] -> pure cert
-        _ -> do
-          $logErrorS "postIdentity" "Yikes! How can we have multiple certs if we're only limiting the search to one?"
-          throwIO $ IdentityError "Something is wrong. Have a network administrator look into this."
+        (cert:_) -> do
+          let sub' = getCertSubject cert
+              err =
+                if (T.pack . subCommonName <$> sub') == Just username
+                  then "A cert already exists for username " <> username
+                    <> ". Please register using a different username"
+                    <> ", or sign the cert subject information with a private key "
+                    <> "tied to an existing cert tied to that username."
+                  else
+                    if (fromPublicKey . subPub <$> sub') == Just addr
+                      then "A cert already exists for user address " <> T.pack (show addr)
+                        <> ". Please register using a different key pair."
+                      else "A cert already exists, but does not match the username "
+                        <> "or address of the provided Subject information."
+          $logErrorS "postIdentity" err
+          throwIO $ ExistingIdentity err
       Nothing -> do
         let err = "Could not recover address from signature"
         $logErrorS "postIdentity" err
@@ -113,8 +127,8 @@ postIdentity (PostIdentityRequest eMsg) = do
         $logErrorS "postIdentity" err
         throwIO $ IdentityError err
     Right s'@(Signed s@(Signed _ _) _) -> case (,) <$> (recoverAddress s) <*> (recoverAddress s') of -- existing identity
-      Just (existingA, newA) | newA == fromPublicKey (subPub sub) -> certInCirrus newA >>= \case
-        [] -> certInCirrus existingA >>= \case
+      Just (existingA, newA) | newA == fromPublicKey (subPub sub) -> certInCirrus (Second newA) >>= \case
+        [] -> certInCirrus (Product (subCommonName sub, existingA)) >>= \case
           (c:_) -> do
             let existingCN = (subCommonName <$> getCertSubject c)
                 newCN = subCommonName sub
@@ -127,7 +141,7 @@ postIdentity (PostIdentityRequest eMsg) = do
                        <> (T.pack newCN)
                        <> " in the subject info"
                 $logErrorS "postIdentity" err
-                throwIO $ IdentityError err
+                throwIO $ ExistingIdentity err
           _ -> do
             let err = "There is no existing cert for address " <> T.pack (format existingA)
             $logErrorS "postIdentity" err
@@ -135,7 +149,7 @@ postIdentity (PostIdentityRequest eMsg) = do
         _ -> do
           let err = "A cert already exists for address " <> T.pack (format newA)
           $logErrorS "postIdentity" err
-          throwIO $ IdentityError err
+          throwIO $ ExistingIdentity err
       Nothing -> do
         let err = "Could not recover address from signature"
         $logErrorS "postIdentity" err
@@ -154,9 +168,9 @@ certInCirrus ::
   , MonadLogger m
   , Accessible IdentityServerData m
   ) =>
-  Address ->
+  BinaryOp String Address ->
   m [X509Certificate]
-certInCirrus a = do
+certInCirrus op = do
   nurl1 <- nodeUrl <$> access (Proxy @IdentityServerData)
   response1 <- callCirrus nurl1
   mCerts :: Maybe [X509Certificate] <-
@@ -165,6 +179,7 @@ certInCirrus a = do
       else do
         let err = "Cirrus did not return a 200 status code when requesting certs"
         $logErrorS "certInCirrus" err
+        $logErrorS "certInCirrus" . T.pack . show $ statusCode (responseStatus response1)
         throwIO $ IdentityError err
   case mCerts of
     Just certs -> do
@@ -174,14 +189,33 @@ certInCirrus a = do
       $logErrorS "certInCirrus" "Unexpected response from cirrus query. This should never happen"
       throwIO $ IdentityError "Unable to decode cirrus query for user's cert. Something went very wrong"
   where
-    cirrusSearchPath :: Address -> String
-    cirrusSearchPath address =
-      "/cirrus/search/Certificate?userAddress=eq." <> show address <> "&order=block_timestamp.desc&limit=1"
+    cirrusBasePath = "/cirrus/search/Certificate"
+    restOfQuery = "&order=block_timestamp.desc&limit=1"
+    cirrusSearchPath :: BinaryOp String Address -> String
+    cirrusSearchPath (First username) =
+      cirrusBasePath <> "?commonName=eq." <> username <> restOfQuery
+    cirrusSearchPath (Second address) =
+      cirrusBasePath <> "?userAddress=eq." <> show address <> restOfQuery
+    cirrusSearchPath (Sum (username, address)) = jointQuery "or" username address
+    cirrusSearchPath (Product (username, address)) = jointQuery "and" username address
+    jointQuery opStr username address = concat
+      [ cirrusBasePath
+      , "?"
+      , opStr
+      , "=(commonName.eq."
+      , username
+      , ",userAddress.eq."
+      , show address
+      , ")"
+      , restOfQuery
+      ]
 
-    callCirrus :: MonadIO m => BaseUrl -> m (HTTP.Response BL.ByteString)
+    callCirrus :: (MonadIO m, MonadLogger m) => BaseUrl -> m (HTTP.Response BL.ByteString)
     callCirrus nurl = do
-      let cirrusEndpoint = cirrusSearchPath a
+      let cirrusEndpoint = cirrusSearchPath op
           url = showBaseUrl nurl {baseUrlPath = baseUrlPath nurl <> cirrusEndpoint}
+      $logErrorS "callCirrus" . T.pack $ cirrusEndpoint
+      $logErrorS "callCirrus" . T.pack $ url
       mgr <- liftIO $ case baseUrlScheme nurl of
         Http -> newManager defaultManagerSettings
         Https -> newManager tlsManagerSettings
@@ -281,13 +315,18 @@ hoistCoreServer idData =
       eRes <- liftIO . try $ r x
       case eRes of
         Right a -> return a
-        Left e -> throwE $ reThrowError e
+        Left e -> do
+          liftIO . putStrLn $
+              "Error thrown: "
+                ++ show e
+          throwE $ reThrowError e
     runM' :: ReaderT IdentityServerData (LoggingT IO) x -> IO x
     runM' = runLoggingT . flip runReaderT idData
     reThrowError :: IdentityError -> ServerError
     reThrowError =
       \case
         IdentityError err -> err400 {errBody = BL.fromStrict $ encodeUtf8 err}
+        ExistingIdentity err -> err422 {errBody = BL.fromStrict $ encodeUtf8 err}
 
 identityServiceApp ::
   IdentityServerData ->

@@ -16,6 +16,7 @@ import UnliftIO hiding (Handler)
 
 data IdentityError
   = IdentityError Text
+  | ExistingIdentity Text
   deriving (Show, Exception)
 
 data IdentityServerData = IdentityServerData

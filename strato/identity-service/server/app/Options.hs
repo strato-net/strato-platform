@@ -4,7 +4,6 @@
 module Options
   ( flags_port,
     flags_nodeUrl,
-    flags_vaultProxyUrl,
     flags_userRegistryAddress,
     flags_userRegistryCodeHash,
     flags_userContractName
@@ -15,7 +14,6 @@ import HFlags
 
 defineFlag "port" (8014 :: Int) "Port to run identity server on"
 defineFlag "nodeUrl" ("http://localhost" :: String) "URL to STRATO node"
-defineFlag "vaultProxyUrl" ("http://localhost:8013/strato/v2.3" :: String) "URL to Vault"
 defineFlag "userRegistryAddress" ("" :: String) "UserRegistry contract address"
 defineFlag "userRegistryCodeHash" ("92a723ccc17f51f4de1ce7e51792fed70d59e50f0bf58579df25fd343120d745" :: String) "UserRegistry contract code collection hash"
 defineFlag "userContractName" ("BlockApps-UserRegistry-User" :: String) "Name of on-chain wallet contract"

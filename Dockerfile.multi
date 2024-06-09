@@ -57,6 +57,7 @@ COPY \
   ./usr/local/bin/vm-runner \
   ./usr/local/bin/x509-generator \
   ./usr/local/bin/x509-keygen \
+  ./usr/local/bin/x509-sign-subject \
     /usr/local/bin/
 COPY ./strato /
 RUN ln -s /usr/local/bin/strato-barometer /usr/local/bin/queryStrato
@@ -99,3 +100,19 @@ HEALTHCHECK --interval=5s --timeout=1s --start-period=180s \
   CMD curl --silent --output /dev/null --fail localhost:8014/ping || exit 1
 WORKDIR /var/lib/identity
 ENTRYPOINT ["/identity-provider/doit.sh"]
+
+FROM base as identity-service
+COPY \
+  usr/local/bin/identity-service-server \
+    /usr/local/bin/
+RUN apt-get -y update \
+  && apt-get install -y wget \
+  && apt-get autoremove \
+  && apt-get clean \
+  && wget https://github.com/mikefarah/yq/releases/download/v4.35.1/yq_linux_amd64 -O /usr/local/bin/yq && chmod +x /usr/local/bin/yq 
+COPY ./identity-service /identity-service
+EXPOSE 8014
+HEALTHCHECK --interval=5s --timeout=1s --start-period=180s \
+  CMD curl --silent --output /dev/null --fail localhost:8014/ping || exit 1
+WORKDIR /var/lib/identity
+ENTRYPOINT ["/identity-service/doit.sh"]
