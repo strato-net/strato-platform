@@ -112,7 +112,8 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
         let bHeader = blockBlockData block
             bHash = blockHeaderHash bHeader
             -- bro if there are any maybes in this list thaz BAD
-            otxs = catMaybes $ wrapIngestBlockTransaction  bHash <$> (blockReceiptTransactions block)
+            -- private txs don't affect stateroot we compute
+            otxs = catMaybes $ wrapIngestBlockTransaction  bHash <$> [t | t <- blockReceiptTransactions block, txType t /= PrivateHash]
         mSumm <- A.lookup (A.Proxy @BlockSummary) (parentHash bHeader)
         case mSumm of 
           Nothing -> pure Nothing
