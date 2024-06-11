@@ -60,7 +60,6 @@ const actions = {
   fetchCartItems: (dispatch, cartList) => {
     dispatch({ type: actionDescriptors.fetchCartItems });
     try {
-      // let cartItems = window.localStorage.getItem("cartList") ?? [];
       dispatch({
         type: actionDescriptors.fetchCartItemsSuccessful,
         payload: cartList,
@@ -109,7 +108,6 @@ const actions = {
   fetchConfirmOrderItems: (dispatch, cartList) => {
     dispatch({ type: actionDescriptors.fetchConfirmOrderItems });
     try {
-      // let cartItems = window.localStorage.getItem("cartList") ?? [];
       dispatch({
         type: actionDescriptors.fetchConfirmOrderItemsSuccessful,
         payload: cartList,
@@ -253,6 +251,12 @@ const actions = {
           type: actionDescriptors.fetchMarketplaceLoggedInFailed,
           error: "Error while fetching marketplace products",
         });
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.fetchMarketplaceLoggedInFailed, 
+          error: "Unauthorized while fetching marketplace products" 
+        });
+        window.location.reload(true);
       }
 
 
@@ -319,7 +323,13 @@ const actions = {
           payload: body.data,
         });
         return;
-      } 
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.fetchTopSellingProductsLoggedInFailed, 
+          error: "Unauthorized while fetching trending items" 
+        });
+        window.location.reload(true);
+      }
       dispatch({
         type: actionDescriptors.fetchTopSellingProductsLoggedInFailed,
         error: undefined,
@@ -410,7 +420,13 @@ const actions = {
         });
         actions.setMessage(dispatch, "Error while getting Shipping address");
         return false;
-      } 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchUserAddressFailed,
+          error: "Unauthorized while fetching Shipping address"
+        });
+        window.location.href = body.error.loginUrl;
+      }
       dispatch({
         type: actionDescriptors.fetchUserAddressFailed,
         error: body.error,
@@ -452,7 +468,13 @@ const actions = {
         });
         actions.setMessage(dispatch, "Error while getting Shipping address");
         return false;
-      } 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchUserAddressesFailed,
+          error: "Unauthorized while fetching Shipping addresses"
+        });
+        window.location.href = body.error.loginUrl;
+      }
       dispatch({
         type: actionDescriptors.fetchUserAddressesFailed,
         error: body.error,
@@ -480,7 +502,7 @@ const actions = {
           type: actionDescriptors.fetchStratsBalanceFailed,
           payload: "Error while fetching STRATS",
         });
-        return;
+        window.location.href = body.error.loginUrl;
       }
       if (response.status === RestStatus.OK) {
         dispatch({
@@ -512,8 +534,7 @@ const actions = {
           type: actionDescriptors.transferStratsFailed,
           error: "Error while transferring STRATS",
         });
-        actions.setMessage(dispatch, "Error while transferring STRATS");
-        return;
+        window.location.href = body.error.loginUrl;
       }
       if (response.status === RestStatus.OK) {
         dispatch({

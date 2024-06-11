@@ -443,6 +443,12 @@ const actions = {
         });
 
         return body.data;
+      }  else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.fetchSaleQuantityFailed, 
+          error: "Unauthorized while fetching sales" 
+        });
+        window.location.reload(true);
       }
 
       dispatch({
@@ -573,6 +579,12 @@ const actions = {
         });
         actions.setMessage(dispatch, "Order fulfilled successfully", true);
         return body.data;
+      }  else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.executeSaleFailed, 
+          error: "Unauthorized while fetching users" 
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -613,6 +625,12 @@ const actions = {
         });
         actions.setMessage(dispatch, "Comment updated successfully", true);
         return body.data;
+      }  else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.updateOrderCommentFailed, 
+          error: "Unauthorized while fetching users" 
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -653,6 +671,12 @@ const actions = {
         });
         actions.setMessage(dispatch, "Sale canceled successfully", true);
         return body.data;
+      }  else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.cancelSaleFailed, 
+          error: "Unauthorized while cancelling Sale" 
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -693,6 +717,12 @@ const actions = {
         });
         actions.setMessage(dispatch, "Order created successfully", true);
         return body.data;
+      }  else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.createSaleOrderFailed, 
+          error: "Unauthorized while fetching users" 
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -733,6 +763,12 @@ const actions = {
         });
         actions.setMessage(dispatch, "Order Updated Successfully", true);
         return body.data;
+      }  else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.updateOrderStatusFailed, 
+          error: "Unauthorized while updating order status" 
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({

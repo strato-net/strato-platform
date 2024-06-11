@@ -30,7 +30,7 @@ const actions = {
           type: actionDescriptors.fetchUsersFailed, 
           error: "Unauthorized while fetching users" 
         });
-        window.location.href = body.error.loginUrl;
+        window.location.reload(true);
       }
       dispatch({ type: actionDescriptors.fetchUsersFailed, payload: 'users request failed' });
     } catch (err) {

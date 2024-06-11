@@ -703,6 +703,8 @@ const actions = {
           type: actionDescriptors.fetchInventoryOwnershipHistoryFailed,
           error: "Unauthorized while fetching ownership history"
         });
+
+        window.location.reload(true);
       }
 
       dispatch({
@@ -781,6 +783,12 @@ const actions = {
           payload: body.data,
         });
         return body.data;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.sellerStripeStatusFailed,
+          error: "Unauthorized while trying to get Stripe status"
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -826,6 +834,12 @@ const actions = {
         });
         actions.setMessage(dispatch, "Error while uploading Image");
         return false;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.uploadImageFailed,
+          error: "Unauthorized while trying to upload image"
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -874,6 +888,12 @@ const actions = {
         dispatch({ type: actionDescriptors.createItemFailed, error: "Error while creating Item" });
         actions.setMessage(dispatch, "Error while creating Item")
         return false;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.createItemFailed,
+          error: "Unauthorized while trying to create Item"
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -905,7 +925,7 @@ const actions = {
           type: actionDescriptors.fetchPriceHistoryFailed,
           payload: "Error while fetching price history",
         });
-        return;
+        window.location.href = body.error.loginUrl;
       }
       if (response.status === RestStatus.OK) {
         dispatch({
