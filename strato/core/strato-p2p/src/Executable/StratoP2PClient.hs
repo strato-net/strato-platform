@@ -180,7 +180,8 @@ stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main l
         $logErrorS "stratoP2PClient" . T.pack $ "Could not fetch peers: " ++ show err
         liftIO $ threadDelay 1000000
       Right peers -> do
-        forM_ (filter ((== 0) . pPeerActiveState) peers) $ \peer -> do
+        numActivePeers <- liftIO $ fmap length getPeersByThreads
+        forM_ (take (flags_maxConn - numActivePeers) $ filter ((== 0) . pPeerActiveState) peers) $ \peer -> do
           _ <- liftIO . forkIO . runLoggingT . runner $ \_ -> do
               result <- try . liftIO . runLoggingT . runner $ runPeerInList peer
               handleRunPeerResult peer result

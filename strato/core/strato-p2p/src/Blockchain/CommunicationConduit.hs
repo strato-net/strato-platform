@@ -32,6 +32,7 @@ import Blockchain.Sequencer.Event
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Model.Options (computeNetworkID)
 import Blockchain.Strato.Model.Util
+import Blockchain.Threads
 import Conduit
 import Control.Monad (forever, when)
 import qualified Control.Monad.Change.Modify as Mod
@@ -132,6 +133,13 @@ handleMsgServerConduit ::
   ConduitM Event (Either P2PCNC Message) m ()
 handleMsgServerConduit myPubkey peer = do
   $logDebugS "handleMsgServerConduit" $ T.pack $ "about to parse message"
+
+  numActivePeers <- liftIO $ fmap length getPeersByThreads
+
+  when (numActivePeers > flags_maxConn) $ do
+    yield $ Right $ Disconnect TooManyPeers
+    throwIO CurrentlyTooManyPeers
+    
   awaitMsg >>= \case
     Just Hello {} -> do
       $logInfoS "handshake/Hello{}" "received hello"
