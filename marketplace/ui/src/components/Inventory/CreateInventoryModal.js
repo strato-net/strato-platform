@@ -233,7 +233,7 @@ const CreateInventoryModal = ({
           listType="picture"
         >
           <div className="text-primary border border-primary rounded px-4 py-2 text-center hover:text-white hover:bg-primary cursor-pointer">
-            {`Browse ${label}`}
+            {label}
           </div>
         </Upload>
       </div>
