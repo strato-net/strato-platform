@@ -70,7 +70,7 @@ tableNameToText (CollectionTableName c a n m) =
    in prefix <> contractAndCollection
 tableNameToText (HistoryTableName c a n) =
   let prefix
-        | T.null c = ""
+        | T.null c = "" 
         | T.null a = c <> tableSeparator
         | otherwise = c <> tableSeparator <> a <> tableSeparator
    in "history@" <> prefix <> n
@@ -79,7 +79,7 @@ tableNameToText (EventTableName c a n e) =
         | T.null c = ""
         | T.null a = c <> tableSeparator
         | otherwise = c <> tableSeparator <> a <> tableSeparator
-      contractAndEvent = n <> "." <> e
+      contractAndEvent = n <> "-" <> e
    in prefix <> contractAndEvent
 tableNameToText (AbstractTableName c a n) =
   let prefix

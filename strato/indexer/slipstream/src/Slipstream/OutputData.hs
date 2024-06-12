@@ -58,7 +58,7 @@ import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Lazy            as BL
 import qualified Data.Map.Strict                 as Map
-import           Data.Maybe                      (catMaybes)
+import           Data.Maybe                      (fromMaybe, catMaybes)
 import           Data.Text                       (Text)
 import qualified Data.Text                       as T
 import           Data.Traversable                (for)
@@ -66,12 +66,10 @@ import           Bloc.Server.Utils               (partitionWith)
 import           BlockApps.Logging
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.CodePtr
 import qualified Blockchain.Strato.Model.Event   as Action
+import qualified Data.Text.Encoding as TE
 import           Blockchain.Strato.Model.Keccak256
-import           Data.Bifunctor                  (first)
--- import           Data.Function                   (on)
-import           Data.List                       (groupBy, nubBy, sortBy)
+import           Data.List                       ((\\), groupBy, nubBy, sortBy)
 import           Data.Ord (comparing)
 import           Data.Text.Encoding              (decodeUtf8, decodeUtf8', encodeUtf8)
 import           Data.Time
@@ -102,9 +100,7 @@ instance Functor (First b) where
 
 data ProcessedCollectionRow = ProcessedCollectionRow
   { address :: Address,
-    codehash :: CodePtr,
     creator :: Text,
-    root :: Text,
     application :: Text,
     contractname :: Text,
     collectionname :: Text,
@@ -832,6 +828,17 @@ baseColumnsQuery =
     "root text"
   ]
 
+baseColumnsQueryForCollections :: [Text]
+baseColumnsQueryForCollections = 
+  [ 
+    "address text",
+    "block_hash text",
+    "block_timestamp text",
+    "block_number text",
+    "transaction_hash text",
+    "transaction_sender text"
+  ]
+
 abstractBaseColumnsQuery :: [Text]
 abstractBaseColumnsQuery = 
   baseColumnsQuery ++ 
@@ -858,7 +865,7 @@ createCollectionTableQuery (creator, a, n, m) =
         [ "CREATE TABLE IF NOT EXISTS ",
           tableNameToDoubleQuoteText tableName,
           " (",
-          csv $ baseColumnsQuery ++
+          csv $ baseColumnsQueryForCollections ++
             [ "contract_name text",
               "collectionname text",
               "collectiontype text",
@@ -1180,12 +1187,13 @@ createExpandEventTables ::
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text, Text) ->
-  ConduitM () Text m ()
-createExpandEventTables globalsIORef c cc nameParts = mapM_ go . Map.toList $ c ^. events
+  ConduitM () Text m [ForeignKeyInfo]
+createExpandEventTables globalsIORef c cc nameParts = fmap concat . mapM go . Map.toList $ c ^. events
   where
     go (evName, ev) = do
-      createEventTable globalsIORef nameParts evName ev cc
+      fkInfo <- createEventTable globalsIORef nameParts evName ev cc
       expandEventTable globalsIORef nameParts evName ev cc
+      return fkInfo
 
 createEventTable ::
   OutputM m =>
@@ -1194,16 +1202,30 @@ createEventTable ::
   SolidString ->
   EventF () ->
   CodeCollectionF () ->
-  ConduitM () Text m ()
+  ConduitM () Text m [ForeignKeyInfo]
 createEventTable globalsIORef (creator, a, n) evName ev cc = do
+  $logInfoS "createEventTable" . T.pack $ show ev
+
   let (crtr, app, cname) = constructTableNameParameters creator a n
       eventTable = EventTableName crtr app cname (escapeQuotes $ labelToText evName)
       cols = getTableColumnAndType cc [(x, indexedTypeType y) | (x, y) <- fillFirstEmptyEntries $ ev ^. eventLogs]
+      arrayKeys = [key | (key, IndexedType _ SVMType.Array{}) <- ev ^. eventLogs]
       colsCombined = map (\(x,y)-> x <> " " <> y) cols
+      colsCombinedWithoutArrays = colsCombined \\ arrayKeys
+  
+  $logInfoS "createEventTable/eventTable" . T.pack $ show eventTable
+  $logInfoS "createEventTable/arrayKeys" . T.pack $ show arrayKeys
+  
   eventAlreadyCreated <- isTableCreated globalsIORef eventTable
-  unless eventAlreadyCreated $ do
-    setTableCreated globalsIORef eventTable $ colsCombined
-    yield $ createEventTableQuery eventTable colsCombined
+  if eventAlreadyCreated
+    then return []
+    else do
+      setTableCreated globalsIORef eventTable $ colsCombinedWithoutArrays
+      eventArrayFkeys <- fmap concat . forM arrayKeys $ \key -> do
+        $logInfoS "createEventTable/biggie" . T.pack $ show $ (n <> (T.pack "-") <> (escapeQuotes $ labelToText evName))
+        createCollectionTable globalsIORef (crtr, app, (cname <> (T.pack "-") <> (escapeQuotes $ labelToText evName))) key
+      yield $ createEventTableQuery eventTable colsCombined
+      return $ eventArrayFkeys
 
 createEventTableQuery :: TableName -> TableColumns -> Text
 createEventTableQuery tableName cols =
@@ -1221,7 +1243,7 @@ createEventTableQuery tableName cols =
               "transaction_sender text"
             ]
               ++ cols,
-          ");"
+         ",\n  PRIMARY KEY (address));"
         ]
 
 expandEventTable ::
@@ -1249,6 +1271,42 @@ expandEventTable globalsIORef (creator, a, n) evName ev cc = do
         ]
     yield $ expandTableQuery tableName allTableColsCombined
 
+getArraysFromEvents :: [(String, String, String)] -> (String, [(Value, Value)])
+getArraysFromEvents evArgs =
+  let (arrayName, arrayStr) = head [(a, b) | (a, b, c) <- evArgs, c == "Array"]
+      elements = fromMaybe [] (Aeson.decode (BL.fromStrict $ TE.encodeUtf8 $ T.pack arrayStr) :: Maybe [String])
+  in (arrayName, zip (map (SimpleValue . ValueString . T.pack . show) [0 :: Int ..]) (map (SimpleValue . ValueString . T.pack) elements))
+
+aggEventToCollectionRow :: AggregateEvent -> Action.Event -> Text -> (Value, Value) -> ProcessedCollectionRow
+aggEventToCollectionRow ae ev arrayName (index, value) =
+  ProcessedCollectionRow
+    { address = (_accountAddress . Action.evContractAccount) ev,
+      creator = T.pack $ Action.evContractCreator ev,
+      application = T.pack $ Action.evContractApplication ev,
+      contractname = (T.pack $ Action.evContractName ev) <> "-" <> (T.pack $ Action.evName ev),
+      collectionname = arrayName,
+      collectiontype = "Event Array",
+      blockHash = eventBlockHash ae,
+      blockTimestamp = eventBlockTimestamp ae,
+      blockNumber = eventBlockNumber ae,
+      transactionHash = eventTxHash ae,
+      transactionSender = _accountAddress $ eventTxSender ae,
+      collectionDataKey = index,
+      collectionDataValue = value
+    }
+
+-- Function to convert AggregateEvent to ProcessedCollectionRow
+aggEventToCollectionRows :: AggregateEvent -> [ProcessedCollectionRow]
+aggEventToCollectionRows ae =
+  let (arrayName, arrayElements) = getArraysFromEvents $ Action.evArgs ev
+  in map (aggEventToCollectionRow ae ev (T.pack arrayName)) arrayElements
+  where
+    ev = eventEvent ae
+
+-- Function to remove array evArgs
+removeArrayEvArgs :: Action.Event -> Action.Event
+removeArrayEvArgs ev = ev { Action.evArgs = filter (\(_, _, c) -> c /= "Array") (Action.evArgs ev) }
+
 insertEventTables :: 
   OutputM m =>
   IORef Globals ->
@@ -1256,7 +1314,14 @@ insertEventTables ::
   ConduitM () Text m ()
 insertEventTables globalsIORef evs = do
   let processedEvents = concatMap getAllEvents evs
-  yieldMany . catMaybes =<< lift (mapM (insertEventTable globalsIORef) processedEvents)
+      processedEventArrays = concatMap aggEventToCollectionRows processedEvents
+      processedEventsWithoutArrays = map (\ae -> ae { eventEvent = removeArrayEvArgs (eventEvent ae) }) processedEvents
+  $logInfoS "createEventTable/ags" . T.pack $ show $ evs
+  $logInfoS "createEventTable/processedEvents" . T.pack $ show $ processedEvents 
+  $logInfoS "createEventTable/processedEventsWithoutArrays" . T.pack $ show $ processedEventsWithoutArrays 
+  $logInfoS "createEventTable/processedEventArrays" . T.pack $ show $ processedEventArrays
+  yieldMany . catMaybes =<< lift (mapM (insertEventTable globalsIORef) processedEventsWithoutArrays)
+  insertCollectionTable processedEventArrays
   where
     getAllEvents :: 
       AggregateEvent -> 
@@ -1307,7 +1372,7 @@ insertEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
           (T.pack $ Action.evContractApplication ev)
           (T.pack $ Action.evContractName ev)
       tableName = EventTableName creator a cname (escapeQuotes $ T.pack $ Action.evName ev)
-      filledArgs = map fst . fillFirstEmptyEntries . map (first T.pack) $ Action.evArgs ev
+      filledArgs = map fst . fillFirstEmptyEntries . map (\(aa, bb, _) -> (T.pack aa, bb)) $ Action.evArgs ev
       keySt = wrapAndEscapeDouble . map escapeQuotes $ ("id" : baseTableColumnsForEvent) ++ filledArgs
       baseVals =
         [ tshow . _accountAddress . Action.evContractAccount . eventEvent,
@@ -1317,7 +1382,8 @@ insertEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
           T.pack . keccak256ToHex . eventTxHash,
           tshow . eventTxSender
         ]
-      vals = csv $ map (wrapSingleQuotes . escapeQuotes . ($ agEv)) baseVals ++ map (wrapSingleQuotes . escapeSingleQuotes . T.pack . snd) (Action.evArgs ev)
+      vals = csv $ map (wrapSingleQuotes . escapeQuotes . ($ agEv)) baseVals ++ map (wrapSingleQuotes . escapeSingleQuotes . T.pack . (\(_, x, _) -> x)) (Action.evArgs ev)
+
    in T.concat $
         [ "INSERT INTO ",
           tableNameToDoubleQuoteText tableName,

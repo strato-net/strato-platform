@@ -82,3 +82,7 @@ instance ToSchema FieldType where
       & mapped . name ?~ "FieldType"
       & mapped . schema . description ?~ "Represents a Solidity Field Type"
       & mapped . schema . example ?~ toJSON (FieldType 32 (Account False))
+
+isTypeArray :: Type -> Bool
+isTypeArray (SolidVM.Model.Type.Array _ _) = True
+isTypeArray _     = False

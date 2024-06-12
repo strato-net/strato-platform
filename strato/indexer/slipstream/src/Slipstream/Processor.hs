@@ -159,7 +159,7 @@ rowToInsert gref abiid row cont oldState = do
   let newState = case actionStorage row of
         Action.EVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp) oldState
         Action.SolidVMDiff mp -> SolidVM.decodeCacheValues mp oldState
-  setContractState gref (actionAccount row) newState
+  setContractState gref (actionAccount row) newState --compare old and new state
   return $ processedContract abiid (Map.fromList $ newState) row
 
 rowToCollections :: MonadIO m => AggregateAction -> m (Map.Map Text Value)
@@ -217,9 +217,7 @@ processedCollectionRow :: Text -> Text -> AggregateAction -> ABIID -> Value -> V
 processedCollectionRow collection ttype AggregateAction {..} ABIID {..} k v =
   ProcessedCollectionRow
     { address = actionAccount ^. accountAddress,
-      codehash = actionCodeHash,
       creator = actionCreator,
-      root = actionRoot,
       application = actionApplication,
       contractname = aiName,
       collectionname = collection,
@@ -356,9 +354,9 @@ processTheMessages env conn messages = do
             $logInfoS "processTheMessages/deferredForeignKeys" $ T.pack $ show deferredForeignKeys
 
 
-            outputData conn $ createExpandEventTables g c cc nameParts
+            deferredForeignKeysForEvents <- outputData conn $ createExpandEventTables g c cc nameParts
 
-            return $ deferredForeignKeys ++ deferredForeignKeysForCollections
+            return $ deferredForeignKeys ++ deferredForeignKeysForCollections ++ deferredForeignKeysForEvents
 
         -- forM_ deferredForeignKeys $ \deferredForeignKey -> do
         --   outputData conn $ createForeignIndexesForJoins deferredForeignKey

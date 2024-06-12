@@ -27,7 +27,7 @@ import BlockApps.Logging
 import qualified BlockApps.Solidity.Value as V
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.CodePtr
+-- import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256 (hash)
 -- import qualified Slipstream.Events as SE
 import Slipstream.Globals
@@ -736,9 +736,9 @@ spec = do
     let testAdd = Address 0x98eaddede
         input = [ProcessedCollectionRow {
           address = testAdd,
-          codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- $ hash "<CODEHASH>",
+          -- codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- $ hash "<CODEHASH>",
           creator = "",
-          root = "",
+          -- root = "",
           application = "",
           contractname = "SwissArmy",
           collectionname = "SwissArmyMapping",
