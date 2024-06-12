@@ -43,6 +43,9 @@ const actionDescriptors = {
   fetchStratsBalance: "fetch_strats_balance",
   fetchStratsBalanceSuccessful: "fetch_strats_balance_successful",
   fetchStratsBalanceFailed: "fetch_strats_balance_failed",
+  fetchStratsTransactionHistory: "fetch_strats_transaction_history",
+  fetchStratsTransactionHistorySuccessful: "fetch_strats_transaction_history_successful",
+  fetchStratsTransactionHistoryFailed: "fetch_strats_transaction_history_failed",
   transferStrats: "transfer_strats",
   transferStratsSuccessful: "transfer_strats_successful",
   transferStratsFailed: "transfer_strats_failed"
@@ -287,7 +290,7 @@ const actions = {
           payload: body.data,
         });
         return;
-      } 
+      }
       dispatch({
         type: actionDescriptors.fetchTopSellingProductsFailed,
         error: undefined,
@@ -319,7 +322,7 @@ const actions = {
           payload: body.data,
         });
         return;
-      } 
+      }
       dispatch({
         type: actionDescriptors.fetchTopSellingProductsLoggedInFailed,
         error: undefined,
@@ -410,7 +413,7 @@ const actions = {
         });
         actions.setMessage(dispatch, "Error while getting Shipping address");
         return false;
-      } 
+      }
       dispatch({
         type: actionDescriptors.fetchUserAddressFailed,
         error: body.error,
@@ -452,7 +455,7 @@ const actions = {
         });
         actions.setMessage(dispatch, "Error while getting Shipping address");
         return false;
-      } 
+      }
       dispatch({
         type: actionDescriptors.fetchUserAddressesFailed,
         error: body.error,
@@ -478,7 +481,7 @@ const actions = {
       if (response.status === RestStatus.UNAUTHORIZED || response.status === RestStatus.FORBIDDEN) {
         dispatch({
           type: actionDescriptors.fetchStratsBalanceFailed,
-          payload: "Error while fetching STRATS",
+          payload: "Error while fetching STRATs",
         });
         return;
       }
@@ -489,9 +492,36 @@ const actions = {
         });
         return;
       }
-      dispatch({ type: actionDescriptors.fetchStratsBalanceFailed, payload: "Error while fetching STRATS" });
+      dispatch({ type: actionDescriptors.fetchStratsBalanceFailed, payload: "Error while fetching STRATs" });
     } catch (err) {
-      dispatch({ type: actionDescriptors.fetchStratsBalanceFailed, payload: "Error while fetching STRATS" });
+      dispatch({ type: actionDescriptors.fetchStratsBalanceFailed, payload: "Error while fetching STRATs" });
+    }
+  },
+  fetchStratsTransactionHistory: async (dispatch) => {
+    dispatch({ type: actionDescriptors.fetchStratsTransactionHistory });
+    try {
+      let response = await fetch(`${apiUrl}/marketplace/strats/history`, {
+        method: HTTP_METHODS.GET,
+        credentials: "same-origin",
+      });
+      const body = await response.json();
+      if (response.status === RestStatus.UNAUTHORIZED || response.status === RestStatus.FORBIDDEN) {
+        dispatch({
+          type: actionDescriptors.fetchStratsTransactionHistoryFailed,
+          payload: "Error while fetching STRATs Transaction History",
+        });
+        window.location.href = body.error.loginUrl;
+      }
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchStratsTransactionHistorySuccessful,
+          payload: body.data
+        });
+        return;
+      }
+      dispatch({ type: actionDescriptors.fetchStratsTransactionHistoryFailed, payload: "Error while fetching STRATs Transaction History" });
+    } catch (err) {
+      dispatch({ type: actionDescriptors.fetchStratsTransactionHistoryFailed, payload: "Error while fetching STRATs Transaction History" });
     }
   },
   transferStrats: async (dispatch, payload) => {
