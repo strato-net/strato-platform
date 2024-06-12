@@ -1213,16 +1213,12 @@ createEventTable globalsIORef (creator, a, n) evName ev cc = do
       colsCombined = map (\(x,y)-> x <> " " <> y) cols
       colsCombinedWithoutArrays = colsCombined \\ arrayKeys
   
-  $logInfoS "createEventTable/eventTable" . T.pack $ show eventTable
-  $logInfoS "createEventTable/arrayKeys" . T.pack $ show arrayKeys
-  
   eventAlreadyCreated <- isTableCreated globalsIORef eventTable
   if eventAlreadyCreated
     then return []
     else do
       setTableCreated globalsIORef eventTable $ colsCombinedWithoutArrays
       eventArrayFkeys <- fmap concat . forM arrayKeys $ \key -> do
-        $logInfoS "createEventTable/biggie" . T.pack $ show $ (n <> (T.pack "-") <> (escapeQuotes $ labelToText evName))
         createCollectionTable globalsIORef (crtr, app, (cname <> (T.pack "-") <> (escapeQuotes $ labelToText evName))) key
       yield $ createEventTableQuery eventTable colsCombined
       return $ eventArrayFkeys
@@ -1316,10 +1312,6 @@ insertEventTables globalsIORef evs = do
   let processedEvents = concatMap getAllEvents evs
       processedEventArrays = concatMap aggEventToCollectionRows processedEvents
       processedEventsWithoutArrays = map (\ae -> ae { eventEvent = removeArrayEvArgs (eventEvent ae) }) processedEvents
-  $logInfoS "createEventTable/ags" . T.pack $ show $ evs
-  $logInfoS "createEventTable/processedEvents" . T.pack $ show $ processedEvents 
-  $logInfoS "createEventTable/processedEventsWithoutArrays" . T.pack $ show $ processedEventsWithoutArrays 
-  $logInfoS "createEventTable/processedEventArrays" . T.pack $ show $ processedEventArrays
   yieldMany . catMaybes =<< lift (mapM (insertEventTable globalsIORef) processedEventsWithoutArrays)
   insertCollectionTable processedEventArrays
   where
