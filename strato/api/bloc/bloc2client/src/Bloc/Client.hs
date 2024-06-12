@@ -34,7 +34,6 @@ import Bloc.API
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
-import Data.Proxy
 import Data.Text
 import Servant.API
 import Servant.Client

@@ -151,15 +151,16 @@ postBlocTransactionBody ::
     HasSQL m,
     HasVault m
   ) =>
-  ServerEmbed InternalHeaders
-  (-- | shard id
+  HeaderList ->
+  -- | shard id
   Maybe ChainId ->
   -- | SolidVM transactions
   PostBlocTransactionRequest ->
   -- | tx hash & raw tx data
-  m [BlocTransactionBodyResult])
+  m [BlocTransactionBodyResult]
 postBlocTransactionBody _ _ (PostBlocTransactionRequest _ [] _ _) = return []
-postBlocTransactionBody jwt cid (PostBlocTransactionRequest mAddr txList txParams msrcs) = do
+postBlocTransactionBody headers cid (PostBlocTransactionRequest mAddr txList txParams msrcs) = do
+  let jwt = fromMaybe "" $ getHeader "X-USER-ACCESS-TOKEN" headers
   addr <- case mAddr of
     Nothing -> fmap unAddress . blocVaultWrapper $ getKey (Just jwt) Nothing
     Just addr' -> return addr'
@@ -297,15 +298,16 @@ postBlocTransactionUnsigned ::
     HasSQL m,
     HasVault m
   ) =>
-  ServerEmbed InternalHeaders
+  HeaderList ->
   -- | shard id
-  (Maybe ChainId ->
+  Maybe ChainId ->
   -- | SolidVM transactions
   PostBlocTransactionRequest ->
   -- | tx hash & raw tx data
-  m [BlocTransactionUnsignedResult])
+  m [BlocTransactionUnsignedResult]
 postBlocTransactionUnsigned _ _ (PostBlocTransactionRequest _ [] _ _) = return []
-postBlocTransactionUnsigned jwt cid (PostBlocTransactionRequest mAddr txList txParams msrcs) = do
+postBlocTransactionUnsigned headers cid (PostBlocTransactionRequest mAddr txList txParams msrcs) = do
+  let jwt = fromMaybe "" $ getHeader "X-USER-ACCESS-TOKEN" headers
   addr <- case mAddr of -- This is just to get the user's nonce if they didn't supply one
     Nothing -> fmap unAddress . blocVaultWrapper $ getKey (Just jwt) Nothing
     Just addr' -> return addr'
@@ -440,21 +442,21 @@ postBlocTransactionParallel ::
     HasVault m,
     HasSQL m
   ) =>
-  ServerEmbed InternalHeaders
-  (Maybe ChainId ->
+  HeaderList ->
+  Maybe ChainId ->
   Maybe Bool -> -- use_wallet
   Bool -> -- resolve
   Bool -> -- queue
   PostBlocTransactionRequest ->
-  m [BlocChainOrTransactionResult])
-postBlocTransactionParallel jwtToken b mUseWallet resolve queue c =
+  m [BlocChainOrTransactionResult]
+postBlocTransactionParallel headers b mUseWallet resolve queue c =
   if queue && not resolve
     then do
       checkIsSynced
       tbqueue <- fmap txTBQueue getBlocEnv
-      atomically $ writeTBQueue tbqueue (jwtToken, b, mUseWallet, resolve, c)
+      atomically $ writeTBQueue tbqueue (headers, b, mUseWallet, resolve, c)
       pure []
-    else postBlocTransaction' (Do CacheNonce) jwtToken b mUseWallet resolve c
+    else postBlocTransaction' (Do CacheNonce) headers b mUseWallet resolve c
 
 postBlocTransaction ::
   ( MonadLogger m,
@@ -467,12 +469,12 @@ postBlocTransaction ::
     HasVault m,
     HasSQL m
   ) =>
-  ServerEmbed InternalHeaders
-  (Maybe ChainId ->
+  HeaderList ->
+  Maybe ChainId ->
   Maybe Bool -> -- use_wallet
   Bool ->
   PostBlocTransactionRequest ->
-  m [BlocChainOrTransactionResult])
+  m [BlocChainOrTransactionResult]
 postBlocTransaction = postBlocTransaction' (Don't CacheNonce)
 
 postBlocTransaction' ::
@@ -487,13 +489,14 @@ postBlocTransaction' ::
     HasSQL m
   ) =>
   Should CacheNonce ->
-  ServerEmbed InternalHeaders
-  (Maybe ChainId ->
+  HeaderList ->
+  Maybe ChainId ->
   Maybe Bool -> -- use_wallet
   Bool ->
   PostBlocTransactionRequest ->
-  m [BlocChainOrTransactionResult])
-postBlocTransaction' cacheNonce jwtToken chainId mUseWallet resolve (PostBlocTransactionRequest mAddr txs' txParams msrcs) = do
+  m [BlocChainOrTransactionResult]
+postBlocTransaction' cacheNonce headers chainId mUseWallet resolve (PostBlocTransactionRequest mAddr txs' txParams msrcs) = do
+  let jwtToken = fromMaybe "" $ getHeader "X-USER-ACCESS-TOKEN" headers
   checkIsSynced
   accountNonceLimit <- fmap accountNonceLimit getBlocEnv
   userRegistry <- fmap userRegistryAddress getBlocEnv
@@ -736,7 +739,7 @@ postBlocTransaction' cacheNonce jwtToken chainId mUseWallet resolve (PostBlocTra
             chainInputSrcMap :: ChainInput -> Maybe SourceMap
             chainInputSrcMap p = join $ liftA2 Map.lookup (chaininputContract p) msrcs
             hydrate p = p {chaininputSrc = fromMaybe mempty $ chainInputSrc p <|> chainInputSrcMap p}
-        fmap (fmap BlocChainResult) . postChainInfos jwtToken $ hydrate <$> chainInputs
+        fmap (fmap BlocChainResult) . postChainInfos headers $ hydrate <$> chainInputs
   where
     fromTransfer = \case
       BlocTransfer t -> return t

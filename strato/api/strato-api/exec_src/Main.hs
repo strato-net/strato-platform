@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -168,7 +169,8 @@ type CoreAPI =
        )
 
 type FullAPI' r hs = CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI r hs
-type FullAPI = FullAPI' '[Required, Strict] InternalHeaders
+type FullAPI = FullAPI' '[Required, Strict] '[]
+type FullAPIOAuth = FullAPI' '[Required, Strict] InternalHeaders
 type FullAPIExternal = FullAPI' '[Optional, Strict] ExternalHeaders
 
 coreServer ::
@@ -212,7 +214,23 @@ fullServer ::
     Selectable Keccak256 SourceMap m
   ) =>
   ServerT FullAPI m
-fullServer = coreServer :<|> bloc
+fullServer = coreServer :<|> blocSimple (Proxy :: Proxy ('[] :: [Symbol]))
+
+fullServerOauth ::
+  ( MonadLogger m,
+    HasSQL m,
+    HasBlocEnv m,
+    HasIdentity m,
+    HasVault m,
+    Accessible Metadata.UrlMap m,
+    Selectable Account Contract m,
+    Selectable Account AddressState m,
+    Selectable Address Certificate m,
+    HasCodeDB m,
+    Selectable Keccak256 SourceMap m
+  ) =>
+  ServerT FullAPIOAuth m
+fullServerOauth = coreServer :<|> blocOauth (Proxy :: Proxy InternalHeaders)
 
 ----------------
 
@@ -234,8 +252,29 @@ hoistCoreServer blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPI) (convertEr
         . runIdentitytM getIdentityServerUrl
         $ f
 
+hoistCoreServerOauth :: BlocEnv -> Metadata.UrlMap -> Server FullAPIOAuth
+hoistCoreServerOauth blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPIOAuth) (convertErrors runM) fullServerOauth
+  where
+    convertErrors r x = Handler $ do
+      y <- liftIO . try . r $ x `catch` handleRuntimeError `catch` handleApiError
+      case y of
+        Right a -> pure a
+        Left e -> throwE $ apiErrorToServantErr e
+    runM f =
+      runLoggingT
+        . runSQLM
+        . runCirrusM
+        . flip runReaderT blocEnv
+        . flip runReaderT urlMap
+        . runVaultM ("http://localhost:8013/strato/v2.3")
+        . runIdentitytM getIdentityServerUrl
+        $ f
+
 fullAPI :: Proxy FullAPI
 fullAPI = Proxy
+
+fullAPIOauth :: Proxy FullAPIOAuth
+fullAPIOauth = Proxy
 
 main :: IO ()
 main = do
@@ -319,8 +358,11 @@ app blocEnv theDoc urlMap =
         --  $ serve (Proxy :: Proxy (CoreAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $ (coreServer pool :<|> swaggerSchemaUIServer theDoc)
         $
           addPathsTo404 $
-            serve (Proxy :: Proxy (FullAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $
-              hoistCoreServer blocEnv urlMap :<|> swaggerSchemaUIServer theDoc
+            if flags_authMode == "OAUTH"
+              then serve (Proxy :: Proxy (FullAPIOAuth :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $
+                     hoistCoreServerOauth blocEnv urlMap :<|> swaggerSchemaUIServer theDoc
+              else serve (Proxy :: Proxy (FullAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $
+                     hoistCoreServer blocEnv urlMap :<|> swaggerSchemaUIServer theDoc
 
 addPathsTo404 :: Middleware
 addPathsTo404 baseApp req respond' =

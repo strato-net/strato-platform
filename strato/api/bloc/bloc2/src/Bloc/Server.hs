@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -33,7 +34,7 @@ import Servant
 import Servant.Swagger
 import SolidVM.Model.CodeCollection.Contract
 
-bloc ::
+blocOauth ::
   ( MonadLogger m,
     HasBlocEnv m,
     HasVault m,
@@ -44,8 +45,8 @@ bloc ::
     HasCodeDB m,
     (Keccak256 `Selectable` SourceMap) m
   ) =>
-  ServerT (BlocAPI '[Required, Strict] InternalHeaders) m
-bloc =
+  Proxy InternalHeaders -> ServerT (BlocAPI '[Required, Strict] InternalHeaders) m
+blocOauth p =
   return gitInfo
     :<|> getContracts
     :<|> postContractsBatchStates
@@ -62,14 +63,52 @@ bloc =
     :<|> postContractsXabi
     :<|> getBlocTransactionResult
     :<|> postBlocTransactionResults
-    :<|> postChainInfo
+    :<|> embedServer p postChainInfo
     :<|> getSingleChainInfo
-    :<|> postChainInfos
+    :<|> embedServer p postChainInfos
     :<|> getChainInfo
-    :<|> postBlocTransactionParallel
-    :<|> postBlocTransactionBody
-    :<|> postBlocTransactionUnsigned
-    :<|> postBlocTransaction
+    :<|> embedServer p postBlocTransactionParallel
+    :<|> embedServer p postBlocTransactionBody
+    :<|> embedServer p postBlocTransactionUnsigned
+    :<|> embedServer p postBlocTransaction
+
+blocSimple ::
+  ( MonadLogger m,
+    HasBlocEnv m,
+    HasVault m,
+    HasSQL m,
+    Selectable Account Contract m,
+    Selectable Account AddressState m,
+    Selectable Address Certificate m,
+    HasCodeDB m,
+    (Keccak256 `Selectable` SourceMap) m
+  ) =>
+  Proxy ('[] :: [Symbol]) -> ServerT (BlocAPI '[Required, Strict] '[]) m
+blocSimple p =
+  return gitInfo
+    :<|> getContracts
+    :<|> postContractsBatchStates
+    :<|> getContractsData
+    :<|> getContractsContract
+    :<|> getContractsState
+    :<|> getContractsDetails
+    :<|> getContractsFunctions
+    :<|> getContractsSymbols
+    :<|> getContractsStateMapping
+    :<|> getContractsStates
+    :<|> getContractsEnum
+    :<|> postContractsCompile
+    :<|> postContractsXabi
+    :<|> getBlocTransactionResult
+    :<|> postBlocTransactionResults
+    :<|> embedServer p postChainInfo
+    :<|> getSingleChainInfo
+    :<|> embedServer p postChainInfos
+    :<|> getChainInfo
+    :<|> embedServer p postBlocTransactionParallel
+    :<|> embedServer p postBlocTransactionBody
+    :<|> embedServer p postBlocTransactionUnsigned
+    :<|> embedServer p postBlocTransaction
 
 blocSwagger :: Swagger
 blocSwagger =

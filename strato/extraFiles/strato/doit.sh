@@ -258,6 +258,7 @@ function newnode {
     --networkID=${networkID:--1} \
     --vaultUrl=${VAULT_URL} \
     --oauthDiscoveryUrl=${OAUTH_DISCOVERY_URL} \
+    --authMode=${AUTH_MODE} \
     "${networkFlag}" \
     "${aclFlag}" \
     "${txsFlag}" \

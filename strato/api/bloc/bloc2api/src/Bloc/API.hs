@@ -24,7 +24,6 @@ import Bloc.API.Git
 import Bloc.API.Transaction
 import Bloc.API.Users
 import Bloc.API.Utils
-import Data.Proxy
 import Data.Text
 import Servant
 import Servant.Docs

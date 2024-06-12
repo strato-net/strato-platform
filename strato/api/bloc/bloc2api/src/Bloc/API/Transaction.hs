@@ -42,7 +42,6 @@ import Data.Text (Text)
 import Data.Word
 import GHC.Generics
 import qualified Generic.Random as GR
-import Numeric.Natural
 import Servant.API as S
 import Servant.Docs
 import Test.QuickCheck hiding (Success)

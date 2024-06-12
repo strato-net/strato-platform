@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE Arrows #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -85,11 +86,11 @@ createChainInfo ::
     HasVault m,
     HasSQL m
   ) =>
-  Text ->
+  HeaderList ->
   Keccak256 ->
   ChainInput ->
   m ChainInfo
-createChainInfo userName creationBlockHash (ChainInput src mCodePtr cname lbl balances chaininputArgs members pChains mmd _) = do
+createChainInfo headers creationBlockHash (ChainInput src mCodePtr cname lbl balances chaininputArgs members pChains mmd _) = do
   when (null (unChainMembers members)) $ throwIO $ UserError "Private chains must include at least one member"
   when (sum (nmap2' balances) == 0) $ throwIO $ UserError "At least one account must have a non-zero balance"
 
@@ -135,7 +136,8 @@ createChainInfo userName creationBlockHash (ChainInput src mCodePtr cname lbl ba
             metaData
         )
       msgHash = keccak256ToByteString $ rlpHash unsigned
-  sig <- blocVaultWrapper $ postSignature (Just userName) (MsgHash msgHash)
+  let userName = getHeader "X-USER-ACCESS-TOKEN" headers
+  sig <- blocVaultWrapper $ postSignature userName (MsgHash msgHash)
   let (r, s, v) = getSigVals sig
       chainInfo = ChainInfo unsigned (ChainSignature r s v)
   return chainInfo
@@ -169,11 +171,11 @@ postChainInfo ::
     HasSQL m,
     HasVault m
   ) =>
-  ServerEmbed InternalHeaders
-  (ChainInput ->
-  m ChainId)
-postChainInfo userName chainInput = withLastBlockHash $ \bHash -> do
-      chainInfo' <- createChainInfo userName bHash chainInput
+  HeaderList ->
+  ChainInput ->
+  m ChainId
+postChainInfo headers chainInput = withLastBlockHash $ \bHash -> do
+      chainInfo' <- createChainInfo headers bHash chainInput
       chainId <- CORE.postChain chainInfo'
       let isAsync = fromMaybe False $ chaininputAsync chainInput
       unless isAsync $ do
@@ -194,11 +196,11 @@ postChainInfos ::
     HasSQL m,
     HasVault m
   ) =>
-  ServerEmbed InternalHeaders
-  ([ChainInput] ->
-  m [ChainId])
-postChainInfos userName chainInputs = withLastBlockHash $ \bHash -> do
-    chainInfos <- traverse (createChainInfo userName bHash) chainInputs
+  HeaderList ->
+  [ChainInput] ->
+  m [ChainId]
+postChainInfos headers chainInputs = withLastBlockHash $ \bHash -> do
+    chainInfos <- traverse (createChainInfo headers bHash) chainInputs
     chainIds <- postChains chainInfos
     let asyncInputs = fromMaybe False . chaininputAsync <$> chainInputs
         asyncChains = map snd . filter (not . fst) $ zip asyncInputs chainIds

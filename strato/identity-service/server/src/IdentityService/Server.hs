@@ -40,10 +40,11 @@ import Control.Monad.Trans.Except
 import Data.Aeson hiding (Success)
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Map as M
-import Data.Maybe (fromMaybe)
+import Data.Maybe (catMaybes, fromMaybe)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Data.Time (getCurrentTime)
+import GHC.Generics
 import IdentityService.API
 import IdentityService.API.Types
 import IdentityService.Server.Types
@@ -163,6 +164,22 @@ postIdentity (PostIdentityRequest eMsg) = do
 blocEndpoint :: String
 blocEndpoint = "/bloc/v2.2"
 
+data CertificateInCirrus = CertificateInCirrus
+  { certCommonName :: T.Text,
+    certificateString :: T.Text,
+    isValid :: Bool
+  }
+  deriving (Show, Generic)
+
+instance FromJSON CertificateInCirrus where
+  parseJSON = withObject "CertificateInCirrus" $ \v -> do
+    commonName <- v .: "commonName"
+    certString <- v .: "certificateString"
+    valid <- v .: "isValid"
+    return $ CertificateInCirrus commonName certString valid
+
+instance ToJSON CertificateInCirrus
+
 certInCirrus ::
   ( MonadIO m
   , MonadLogger m
@@ -173,21 +190,22 @@ certInCirrus ::
 certInCirrus op = do
   nurl1 <- nodeUrl <$> access (Proxy @IdentityServerData)
   response1 <- callCirrus nurl1
-  mCerts :: Maybe [X509Certificate] <-
+  mCerts :: Either String [CertificateInCirrus] <-
     if statusCode (responseStatus response1) == 200
-      then return . decode $ responseBody response1
+      then return . eitherDecode $ responseBody response1
       else do
         let err = "Cirrus did not return a 200 status code when requesting certs"
         $logErrorS "certInCirrus" err
         $logErrorS "certInCirrus" . T.pack . show $ statusCode (responseStatus response1)
         throwIO $ IdentityError err
   case mCerts of
-    Just certs -> do
+    Right certs -> do
       $logInfoS "certInCirrus" $ T.pack $ "Checked for user's cert in Cirrus; response was: " <> show certs
-      return certs -- maybe can also check if cert is valid and matches user attributes
-    Nothing -> do
-      $logErrorS "certInCirrus" "Unexpected response from cirrus query. This should never happen"
-      throwIO $ IdentityError "Unable to decode cirrus query for user's cert. Something went very wrong"
+      let getCert = either (const Nothing) Just . bsToCert . encodeUtf8 . certificateString
+      return . catMaybes $ getCert <$> certs
+    Left str -> do
+      $logErrorS "certInCirrus" . T.pack $ "Unexpected response from cirrus query: " ++ str
+      throwIO $ IdentityError . T.pack $ "Unexpected response from cirrus query: " ++ str
   where
     cirrusBasePath = "/cirrus/search/Certificate"
     restOfQuery = "&order=block_timestamp.desc&limit=1"

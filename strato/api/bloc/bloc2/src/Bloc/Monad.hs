@@ -27,6 +27,7 @@ module Bloc.Monad
   )
 where
 
+import API.Parametric
 import Bloc.API.Transaction
 import BlockApps.Logging
 import Blockchain.Strato.Model.Account
@@ -58,7 +59,7 @@ data BlocEnv = BlocEnv
     accountNonceLimit :: Integer,
     gasLimit :: Integer,
     globalNonceCounter :: Cache Account Nonce,
-    txTBQueue :: TBQueue (Text, Maybe ChainId, Maybe Bool, Bool, PostBlocTransactionRequest),
+    txTBQueue :: TBQueue (HeaderList, Maybe ChainId, Maybe Bool, Bool, PostBlocTransactionRequest),
     userRegistryAddress :: Address,
     userRegistryCodeHash :: Maybe Keccak256,
     useWalletsByDefault :: Bool
