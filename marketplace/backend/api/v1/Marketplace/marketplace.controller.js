@@ -93,6 +93,20 @@ class MarketplaceController {
     }
   }
 
+  static async transferStrats(req, res, next) {
+    try {
+      const { dapp, body } = req
+      const { to, value } = body
+
+      await dapp.transferStrats({ to, value });
+
+      return rest.response.status200(res)
+    } catch (e) {
+      console.log("Couldn't transfer STRATS");
+      return next(e)
+    }
+  }
+
   static getFinalInventory(inventories, forSale, soldOut) {
     let unlisted = []
     let listed = inventories?.inventoryResults?.filter((item, index) => {

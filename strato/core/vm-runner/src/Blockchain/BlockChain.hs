@@ -381,9 +381,9 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
   unless nonceValid $ throwE $ TFNonceMismatch (transactionNonce bt) acctNonce t
   when (acctNonce >= flags_accountNonceLimit) $ throwE $ TFNonceLimitExceeded flags_accountNonceLimit acctNonce t
   let txSize = toInteger $ B.length $ BL.toStrict $ Bin.encode $ otBaseTx t
-  when (txSize >= flags_txSizeLimit)
+  when (txSize >= toInteger flags_txSizeLimit)
     . throwE
-    $ TFTXSizeLimitExceeded txSize flags_txSizeLimit t
+    $ TFTXSizeLimitExceeded txSize (toInteger flags_txSizeLimit) t
 
   lift $ incrementNonce tAcct
 
