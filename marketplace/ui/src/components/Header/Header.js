@@ -190,7 +190,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
         <div>
           {user &&
             <p className="text-xs mt-1">
-              STRATs: {stratsBalance}
+              STRATS: {stratsBalance}
             </p>
           }
         </div>

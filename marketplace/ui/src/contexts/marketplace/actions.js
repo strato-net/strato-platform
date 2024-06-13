@@ -481,7 +481,7 @@ const actions = {
       if (response.status === RestStatus.UNAUTHORIZED || response.status === RestStatus.FORBIDDEN) {
         dispatch({
           type: actionDescriptors.fetchStratsBalanceFailed,
-          payload: "Error while fetching STRATs",
+          payload: "Error while fetching STRATS",
         });
         return;
       }
@@ -492,9 +492,9 @@ const actions = {
         });
         return;
       }
-      dispatch({ type: actionDescriptors.fetchStratsBalanceFailed, payload: "Error while fetching STRATs" });
+      dispatch({ type: actionDescriptors.fetchStratsBalanceFailed, payload: "Error while fetching STRATS" });
     } catch (err) {
-      dispatch({ type: actionDescriptors.fetchStratsBalanceFailed, payload: "Error while fetching STRATs" });
+      dispatch({ type: actionDescriptors.fetchStratsBalanceFailed, payload: "Error while fetching STRATS" });
     }
   },
   fetchStratsTransactionHistory: async (dispatch) => {
@@ -508,7 +508,7 @@ const actions = {
       if (response.status === RestStatus.UNAUTHORIZED || response.status === RestStatus.FORBIDDEN) {
         dispatch({
           type: actionDescriptors.fetchStratsTransactionHistoryFailed,
-          payload: "Error while fetching STRATs Transaction History",
+          payload: "Error while fetching STRATS Transaction History",
         });
         window.location.href = body.error.loginUrl;
       }
@@ -519,9 +519,9 @@ const actions = {
         });
         return;
       }
-      dispatch({ type: actionDescriptors.fetchStratsTransactionHistoryFailed, payload: "Error while fetching STRATs Transaction History" });
+      dispatch({ type: actionDescriptors.fetchStratsTransactionHistoryFailed, payload: "Error while fetching STRATS Transaction History" });
     } catch (err) {
-      dispatch({ type: actionDescriptors.fetchStratsTransactionHistoryFailed, payload: "Error while fetching STRATs Transaction History" });
+      dispatch({ type: actionDescriptors.fetchStratsTransactionHistoryFailed, payload: "Error while fetching STRATS Transaction History" });
     }
   },
   transferStrats: async (dispatch, payload) => {
@@ -550,7 +550,7 @@ const actions = {
           type: actionDescriptors.transferStratsSuccessful,
           payload: body.data
         });
-        actions.setMessage(dispatch, "STRATs transferred successfully", true);
+        actions.setMessage(dispatch, "STRATS transferred successfully", true);
         return;
       }
       dispatch({ type: actionDescriptors.transferStratsFailed, error: "Error while transferring STRATS" });

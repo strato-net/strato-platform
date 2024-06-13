@@ -72,7 +72,7 @@ const StratsTransactionHistoryModal = ({ visible, onCancel }) => {
 
     return (
         <Modal
-            title="STRATs Transaction History"
+            title="STRATS Transaction History"
             open={visible}
             centered
             onCancel={onCancel}
