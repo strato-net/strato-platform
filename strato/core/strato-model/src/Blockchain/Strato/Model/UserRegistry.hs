@@ -33,7 +33,7 @@ contract UserRegistry {
         return address(newUser);
     }
 
-    modifier cameFromAdmin() {
+    modifier cameFromAdmin() { // note to self: update this logic once governance tokens are established
         string _commonName = getUserCert(msg.sender)["commonName"];
         User user = User(this.derive(_commonName, _commonName));
         bool isActiveAdmin;
