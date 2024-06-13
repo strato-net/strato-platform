@@ -100,7 +100,8 @@ data VmOutEventBatch = OutBatch
     outJSONRPCs :: DL.DList (String, B.ByteString),
     outStateRootMismatch :: Maybe StateRootMismatch,
     outGetMPNodes :: DL.DList [StateRoot],
-    outMPNodesResponses :: DL.DList (TXOrigin, [NodeData])
+    outMPNodesResponses :: DL.DList (TXOrigin, [NodeData]),
+    outPreprepareResponses :: DL.DList (PreprepareDecision)
   }
 
 newOutBatch :: VmOutEventBatch
@@ -120,12 +121,12 @@ newOutBatch =
     Nothing
     DL.empty
     DL.empty
+    DL.empty
 
 insertOutBatch :: VmOutEvent -> VmOutEventBatch -> VmOutEventBatch
 insertOutBatch e b = case e of
   OutAction a -> b {outActions = outActions b `DL.snoc` a}
   OutBlock a -> b {outBlocks = outBlocks b `DL.snoc` a}
-  OutPreprepareResponse _ -> b
   OutIndexEvent a -> b {outIndexEvents = outIndexEvents b `DL.snoc` a}
   OutToStateDiff v w x y z -> b {outToStateDiffs = outToStateDiffs b `DL.snoc` (v, w, x, y, z)}
   OutStateDiff a -> b {outStateDiffs = outStateDiffs b `DL.snoc` a}
@@ -137,3 +138,4 @@ insertOutBatch e b = case e of
   OutStateRootMismatch srm -> b {outStateRootMismatch = Just srm}
   OutGetMPNodes srs -> b {outGetMPNodes = outGetMPNodes b `DL.snoc` srs}
   OutMPNodesResponse o nds -> b {outMPNodesResponses = outMPNodesResponses b `DL.snoc` (o, nds)}
+  OutPreprepareResponse p -> b {outPreprepareResponses = outPreprepareResponses b `DL.snoc` p}

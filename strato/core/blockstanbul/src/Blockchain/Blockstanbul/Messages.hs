@@ -114,7 +114,8 @@ data PreprepareDecision = AcceptPreprepare Keccak256 | RejectPreprepare
   deriving (Eq, Show, Generic, Binary, NFData, Data)
 
 instance Format PreprepareDecision where
-  format = show
+  format (AcceptPreprepare h) = "AcceptPreprepare " <> format h
+  format dec = show dec
 
 blockstanbulSender :: WireMessage -> ChainMemberParsedSet
 blockstanbulSender (WireMessage a _) = sender a

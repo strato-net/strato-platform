@@ -1420,6 +1420,7 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAs
                    $logInfoS (name <> "/vm") . T.pack $ show $ toList (VMEvent.outEvents b)
                    atomically $ do
                      writeTQueue unseqSource $ UnseqEvent . IEBlock . blockToIngestBlock Origin.Quarry . outputBlockToBlock <$> toList (VMEvent.outBlocks b)
+                     writeTQueue unseqSource $ UnseqEvent . IEPreprepareResponse <$> toList (VMEvent.outPreprepareResponses b)
                      writeTQueue apiIndexerSource $ toList (VMEvent.outIndexEvents b)
                      writeTQueue p2pIndexerSource $ toList (VMEvent.outIndexEvents b)
                      traverse_ (writeTQueue txrIndexerSource) $ toList (EventDBEntry <$> toList (VMEvent.outEvents b))

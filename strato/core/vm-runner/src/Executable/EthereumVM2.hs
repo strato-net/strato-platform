@@ -120,18 +120,24 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
           Just summ -> do
             res <- Bagger.runFromStateRoot 
               mineTransactions 
-              (gasLimit bHeader) 
+              (bSumGasLimit summ) 
               bHeader { -- immitate parent block as closely as possible (most important is the stateroot)
                 parentHash = bSumParentHash summ,
                 stateRoot = bSumStateRoot summ,
                 number = bSumNumber summ,
-                gasLimit = bSumGasLimit summ,
-                timestamp = bSumTimestamp summ
+                gasLimit = bSumGasLimit summ
               } 
               otxs 
             case res of 
-              Right (sr, _, _) | sr == stateRoot bHeader -> pure . Just $ AcceptPreprepare bHash
+              Right (sr, _, _) -> do 
+                let  desiredSR = stateRoot bHeader
+                $logDebugS "handleVmEvents/preprepareBlock" . T.pack $ "Stateroot we got: " <> format sr
+                $logDebugS "handleVmEvents/preprepareBlock" . T.pack $ "Stateroot in block: " <> format desiredSR
+                if sr == desiredSR 
+                  then pure . Just $ AcceptPreprepare bHash
+                  else pure $ Just RejectPreprepare
               _ -> pure $ Just RejectPreprepare
+  $logDebugS "handleVmEvents/mPreDec" . T.pack $ format mPreDec
   traverse_ (yield . OutPreprepareResponse) mPreDec
 
   mNewBlock <- lift $ do
