@@ -186,6 +186,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const stratsItem = [
     {
       key: '1',
+      type: 'group',
       label: (
         <div>
           {user &&
@@ -195,32 +196,34 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
           }
         </div>
       ),
-    },
-    {
-      key: '2',
-      onClick: () => setIsTransferStratsModalVisible(true),
-      label: (
-        <div>
-          {user &&
-            <p className="text-xs mt-1">
-              Transfer
-            </p>
-          }
-        </div>
-      ),
-    },
-    {
-      key: '3',
-      onClick: () => setIsStratsTransactionHistoryModalVisible(true),
-      label: (
-        <div>
-          {user &&
-            <p className="text-xs mt-1">
-              Transaction History
-            </p>
-          }
-        </div>
-      ),
+      children: [
+        {
+          key: '2',
+          onClick: () => setIsTransferStratsModalVisible(true),
+          label: (
+            <div>
+              {user &&
+                <p className="text-xs mt-1">
+                  Transfer
+                </p>
+              }
+            </div>
+          ),
+        },
+        {
+          key: '3',
+          onClick: () => setIsStratsTransactionHistoryModalVisible(true),
+          label: (
+            <div>
+              {user &&
+                <p className="text-xs mt-1">
+                  Transaction History
+                </p>
+              }
+            </div>
+          ),
+        }
+      ],
     }
   ]
 
