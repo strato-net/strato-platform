@@ -32,11 +32,11 @@ instance HasVirginTokenCall (ReaderT Sock IO) where
       VaultToken
         { accessToken = "",
           expiresIn = 300,
-          refreshExpiresIn = 0,
-          refreshToken = "",
+          refreshExpiresIn = Just 0,
+          refreshToken = Just "",
           tokenType = "",
-          notBeforePolicy = 0,
-          sessionState = "",
+          notBeforePolicy = Just 0,
+          sessionState = Just "",
           scone = ""
         }
 
