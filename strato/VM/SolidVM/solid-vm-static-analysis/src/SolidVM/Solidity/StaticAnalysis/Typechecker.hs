@@ -321,6 +321,9 @@ unlessBottom t' f = f t'
 intType' :: SourceAnnotation Text -> Type'
 intType' = Static (SVMType.Int Nothing Nothing)
 
+fixedType' :: SourceAnnotation Text -> Type'
+fixedType' = Static (SVMType.Fixed Nothing Nothing)
+
 stringType' :: SourceAnnotation Text -> Type'
 stringType' = Static (SVMType.String Nothing)
 
@@ -1799,6 +1802,7 @@ tcExpr (Ternary x a b c) =
   boolType' x ~> tcExpr a !> tcExpr b <~> tcExpr c
 tcExpr (BoolLiteral x _) = pure $ boolType' x
 tcExpr (NumberLiteral x _ _) = pure $ intType' x
+tcExpr (FixedLiteral x _) = pure $ fixedType' x
 tcExpr (StringLiteral x _) = pure $ stringType' x
 tcExpr (AccountLiteral x _) = pure $ accountType' x
 tcExpr (HexaLiteral x _) = pure $ stringType' x

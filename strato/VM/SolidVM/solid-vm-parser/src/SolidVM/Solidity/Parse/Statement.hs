@@ -4,6 +4,7 @@ module SolidVM.Solidity.Parse.Statement where
 
 import Blockchain.Strato.Model.Account
 import Control.Monad
+import Data.Decimal
 import Data.Foldable (asum, foldl')
 import Data.Functor.Identity
 import qualified Data.Map.Strict as Map
@@ -388,6 +389,15 @@ primaryExpression = do
     <|> (uncurry BoolLiteral <$> res' "false" False)
     <|> (uncurry BoolLiteral <$> res' "true" True)
     <|> (uncurry NewExpression <$> withPosition (reserved "new" >> simpleTypeExpression))
+    <|> ( do
+            ~(a, decimalNum) <- withPosition $ do
+              num <- lexeme $ integer
+              period <- string "."
+              fraction <- integer
+              let decimalNum = read (show num ++ period ++ show fraction) :: Decimal
+              pure (decimalNum)
+            pure $ FixedLiteral a $ WrappedDecimal decimalNum
+          )
     <|> (uncurry Variable <$> withPosition (stringToLabel <$> identifier))
     <|> ( do
             ~(a, (val, nu)) <- withPosition $ do

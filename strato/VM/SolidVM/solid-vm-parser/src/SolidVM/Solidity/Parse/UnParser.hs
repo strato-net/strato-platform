@@ -345,6 +345,7 @@ unparseExpression (NumberLiteral _ x _) = show x
 --unparseExpression (NumberLiteral _ x (Just _)) = show x
 unparseExpression (BoolLiteral _ False) = "false"
 unparseExpression (BoolLiteral _ True) = "true"
+unparseExpression (FixedLiteral _ v) = show v
 unparseExpression (StringLiteral _ s) = ('"' :) . (++ "\"") $ s
 unparseExpression (AccountLiteral _ a) = ('<' :) . (++ ">") $ show a
 unparseExpression (HexaLiteral _ a) = "hex\"" ++ (labelToString a) ++ "\""
