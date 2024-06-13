@@ -4,6 +4,14 @@ export const Authentication = {
   logout: '/logout',
 }
 
+export const IssuerStatus = {
+  prefix: '/issuerstatus',
+  requestReview: '/requestReview',
+  authorizeIssuer: '/authorizeIssuer',
+  deauthorizeIssuer: '/deauthorizeIssuer',
+  admin: '/admin',
+}
+
 export const Users = {
   prefix: '/users',
   me: '/me',

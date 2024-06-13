@@ -218,6 +218,18 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getCertificates = async function (args) {
     return certificateJs.getCertificates(admin, args);
   };
+  contract.requestReview = async function (args) {
+    return certificateJs.requestReview(admin, args);
+  };
+  contract.authorizeIssuer = async function (args) {
+    return certificateJs.authorizeIssuer(admin, args);
+  };
+  contract.deauthorizeIssuer = async function (args) {
+    return certificateJs.deauthorizeIssuer(admin, args);
+  };
+  contract.setIsAdmin = async function (args) {
+    return certificateJs.setIsAdmin(admin, args);
+  }
 
   // -------------------------- INVENTORY --------------------------------
 
