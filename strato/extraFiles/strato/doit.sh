@@ -80,15 +80,19 @@ function newnode {
 
   else
     echo "OAUTH mode is disabled; using ${AUTH_MODE} instead"
-    backup=$(cat backup_priv.pem)
-    if [ "${backup}" = "" ]; then
-        x509-sign-subject -k priv.pem -n ${USERNAME} > subject.json
+    if [ "${SKIP_IDENTITY}" = true ]; then
+        echo "SKIP_IDENTITY is true, skipping node cert registration"
     else
-        x509-sign-subject -k priv.pem -v backup_priv.pem -n ${USERNAME} > subject.json
-    fi
+        backup=$(cat backup_priv.pem)
+        if [ "${backup}" = "" ]; then
+            x509-sign-subject -k priv.pem -n ${USERNAME} > subject.json
+        else
+            x509-sign-subject -k priv.pem -v backup_priv.pem -n ${USERNAME} > subject.json
+        fi
 
-    subject=$(cat subject.json)
-    curl -X POST "${idServerUrl}/identity" -H 'Content-Type: application/json' -d ''${subject}'' || echo 'Warning: posting identity failed'
+        subject=$(cat subject.json)
+        curl -i -X POST "${idServerUrl}/identity" -H 'Content-Type: application/json' -d ''${subject}''
+    fi
 
     runBackgroundProcess blockapps-pem-vault-wrapper-server \
       --port=8013 \
