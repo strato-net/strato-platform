@@ -389,7 +389,7 @@ primaryExpression = do
     <|> (uncurry BoolLiteral <$> res' "false" False)
     <|> (uncurry BoolLiteral <$> res' "true" True)
     <|> (uncurry NewExpression <$> withPosition (reserved "new" >> simpleTypeExpression))
-    <|> ( do
+    <|> ( try $ do
             ~(a, decimalNum) <- withPosition $ do
               num <- lexeme $ integer
               period <- string "."
