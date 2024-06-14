@@ -1454,6 +1454,7 @@ expToVar' (CC.NumberLiteral _ v (Just nu)) =
     CC.Finney -> return . Constant $ SInteger (v * (10 ^ (15 :: Integer)))
     CC.Ether -> return . Constant $ SInteger (v * (10 ^ (18 :: Integer)))
 expToVar' (CC.StringLiteral _ s) = return $ Constant $ SString s
+expToVar' (CC.FixedLiteral _ v) = return $ Constant $ SFixed v
 expToVar' (CC.AccountLiteral _ a) = return $ Constant $ SAccount a False
 expToVar' (CC.BoolLiteral _ b) = return $ Constant $ SBool b
 expToVar' (CC.HexaLiteral _ a) = return $ Constant $ SString $ BC.unpack . either (parseError "Couldn't parse hexadecimal literal: ") id . B16.decode $ BC.pack a

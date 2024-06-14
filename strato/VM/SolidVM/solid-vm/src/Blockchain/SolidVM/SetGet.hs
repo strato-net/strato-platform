@@ -32,6 +32,7 @@ import Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.UTF8 as UTF8
 import Data.Bool (bool)
+import Data.Decimal
 import Data.Foldable (for_)
 import Data.List
 import qualified Data.Map as M
@@ -49,6 +50,7 @@ fromBasic :: MS.BasicValue -> Value
 fromBasic = \case
   MS.BInteger i -> SInteger i
   MS.BString s -> SString . BC.unpack $ s
+  MS.BFixed v -> SFixed $ CC.WrappedDecimal (read (BC.unpack v) :: Decimal)
   MS.BBool b -> SBool b
   MS.BAccount a -> SAccount a False
   MS.BContract n a -> SContract n a
@@ -60,6 +62,7 @@ findDefault :: BasicType -> Value
 findDefault = \case
   TInteger -> SInteger 0
   TString -> SString ""
+  TFixed -> SFixed $ CC.WrappedDecimal 0
   TBool -> SBool False
   TAccount -> (SAccount $ unspecifiedChain 0x0) False
   TContract n -> SContract n $ unspecifiedChain 0x0
@@ -72,6 +75,7 @@ toBasic :: Value -> Maybe MS.BasicValue
 toBasic = \case
   SInteger i -> Just $ MS.BInteger i
   SString s -> Just $ MS.BString (BC.pack s)
+  SFixed v -> Just $ MS.BFixed $ BC.pack $ show $ CC.unwrapDecimal v
   SBool b -> Just $ MS.BBool b
   SAccount a _ -> Just $ MS.BAccount a
   SContract n a -> Just $ MS.BContract n a

@@ -270,7 +270,7 @@ instance Arbitrary a => Arbitrary (VarDefEntryF a) where
   arbitrary = GR.genericArbitrary GR.uniform
 
 newtype WrappedDecimal = WrappedDecimal { unwrapDecimal :: DecimalRaw Integer }
-    deriving (Show, Eq, Generic, NFData)
+    deriving (Show, Eq, Ord, Generic, NFData)
 
 instance Binary WrappedDecimal where
     put (WrappedDecimal (Decimal places mantissa)) = do
