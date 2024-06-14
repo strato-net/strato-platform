@@ -187,6 +187,7 @@ export const Marketplace = {
   getTopSellingProductsLoggedIn: '/user/topselling',
   transferStrats: '/strats/transfer',
   getStratsBalance: '/strats',
+  getStratsTransactionHistory: '/strats/history'
 }
 
 export const PaymentService = {

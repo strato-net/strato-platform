@@ -223,7 +223,23 @@ const reducer = (state, action) => {
       return {
         ...state,
         isFetchingStrats: false,
-      };     
+      };
+    case actionDescriptors.fetchStratsTransactionHistory:
+      return {
+        ...state,
+        isFetchingStratsTransactionHistory: true,
+      };
+    case actionDescriptors.fetchStratsTransactionHistorySuccessful:
+      return {
+        ...state,
+        isFetchingStratsTransactionHistory: false,
+        stratsTransactionHistory: action.payload,
+      };
+    case actionDescriptors.fetchStratsTransactionHistoryFailed:
+      return {
+        ...state,
+        isFetchingStratsTransactionHistory: false,
+      };
     case actionDescriptors.transferStrats:
       return {
         ...state,
@@ -240,7 +256,7 @@ const reducer = (state, action) => {
         ...state,
         isTransferringStrats: false,
         error: action.error
-      };     
+      };
     default:
       throw new Error(`Unhandled action: '${action.type}'`);
   }
