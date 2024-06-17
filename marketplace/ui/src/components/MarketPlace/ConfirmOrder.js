@@ -3,7 +3,6 @@ import {
   notification,
   Spin,
   Modal,
-  Select,
   Button
 } from "antd";
 import {
@@ -26,14 +25,12 @@ import { HTTP_METHODS, PAYMENT_LIST } from "../../helpers/constants";
 import TagManager from "react-gtm-module";
 import { setCookie } from "../../helpers/cookie";
 
-const { Option } = Select;
-
 const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const orderDispatch = useOrderDispatch();
   const [api, contextHolder] = notification.useNotification();
   const { user, hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
-  const userOrganization = user?.organization;
+  const userOrganization = user?.organization
   const { isCreateOrderSubmitting, message, success, isCreatePaymentSubmitting } = useOrderState();
   const [tax, setTax] = useState(0);
   const [total, setTotal] = useState(0);
@@ -41,7 +38,6 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   const { success: marketplaceSuccess, message: marketplaceMessage } = useMarketplaceState();
   const [modal, contextHolderForModal] = Modal.useModal();
   const [cartData, setCartData] = useState(data);
-  const [selectedProvider, setSelectedProvider] = useState(paymentProviders.find(provider => provider.serviceName === 'Stripe') || paymentProviders[0]);
 
   useEffect(() => {
     setCartData(data);
@@ -168,11 +164,21 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
     }
   };
 
-  const handleChange = value => {
-    const provider = paymentProviders.find(provider => provider.serviceName === value);
-    setSelectedProvider(provider);
-  };
-
+  console.log("paymentProviders", paymentProviders)
+  paymentProviders = [
+    {
+      serviceName: "Stripe",
+      imageURL: "https://stripe.com/img/v3/home/social.png",
+    },
+    {
+      serviceName: "Meta Mask",
+      imageURL: "https://www.paypalobjects.com/webstatic/icon/pp258.png",
+    },
+    {
+      serviceName: "Coinbase",
+      imageURL: "https://www.coinbase.com/assets/coinbase-og.6e3d4e3e3e4e3"
+    }
+  ]
   return (
     <>
       <div>
@@ -198,88 +204,77 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
                 pagination={false}
               />
             </div>
-            <div className="flex justify-between bg-[#EEEFFA]">
-              <div className="rounded-b-md py-[15px] px-4 ml-4 hidden lg:flex lg:justify-end ">
+            <div className="flex flex-col bg-[#EEEFFA]">
+              <div className="rounded-b-md py-[15px] px-4 ml-4 ">
                 <div className="w-[235px] flex flex-col gap-[10px]">
                   <Row className="justify-between ">
-                    <p className="text-base text-[#6A6A6A]">Sub Total:</p>
-                    <p className="text-xl text-[#202020]   text-right">${total}</p>
+                    <p className="text-[#6A6A6A]">Sub Total:</p>
+                    <p className="text-[#202020] font-semibold text-right">${total}</p>
                   </Row>
                   <Row className="justify-between ">
-                    <p className="text-base text-[#6A6A6A]">Tax:</p>
-                    <p className="text-xl text-[#202020]   text-right">${tax}</p>
+                    <p className=" text-[#6A6A6A]">Tax:</p>
+                    <p className="text-[#202020] font-semibold text-right">${tax}</p>
                   </Row>
                   <Row className="justify-between">
-                    <p className="text-base text-[#6A6A6A]">Total:</p>
-                    <p id="totalPrice" className="text-xl text-[#202020] text-right">
+                    <p className=" text-[#6A6A6A]">Total:</p>
+                    <p id="totalPrice" className="text-[#202020] font-semibold text-right">
                       ${total + tax}
                     </p>
                   </Row>
                 </div>
               </div>
-              <div id="review-and-submit" className="flex md:pb-2 items-center mr-4">
-                <div className="mr-4">
-                  <Select
-                    defaultValue={selectedProvider.serviceName}
-                    style={{ width: 200 }}
-                    onChange={handleChange}
-                  >
-                    {paymentProviders.map(provider => (
-                      <Option key={provider.serviceName} value={provider.serviceName}>
-                        {provider.checkoutText}
-                      </Option>
-                    ))}
-                  </Select>
-                </div>
-                <Button
-                  id="pay-now-button"
-                  className="p-1 md:p-3 h-max rounded-lg border border-primary bg-primary hover:bg-primaryHover text-white"
-                  onClick={async () => {
-                    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                      countDown();
-                    } else {
-                        const saleAddresses = [];
-                        const quantities = [];
-                        cartData.forEach((item) => {
-                          saleAddresses.push(item.saleAddress);
-                          quantities.push(item.qty);
-                        });
-                        const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities);
-                        if (checkQuantity === true) {
-                          handlePaymentConfirm(selectedProvider);
+              <div className="flex flex-row justify-end">
+                {paymentProviders.map((paymentProvider) => (
+                  <div id="review-and-submit" className="flex md:pb-2 items-center mr-4 w-[150px]">
+                    <Button 
+                      id="pay-now-button" 
+                      type="primary"
+                      className="flex justify-center p-1 md:p-3 h-max w-full text-[#FFFFFF] font-semibold"
+                      onClick={async () => {
+                        if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                          countDown();
                         } else {
-                          let insufficientQuantityMessage = "";
-                          let outOfStockMessage = "";
-
-                          checkQuantity.forEach(detail => {
-                            if (detail.availableQuantity === 0) {
-                              outOfStockMessage += `Product ${detail.assetName}\n`;
+                            const saleAddresses = [];
+                            const quantities = [];
+                            cartData.forEach((item) => {
+                              saleAddresses.push(item.saleAddress)
+                              quantities.push(item.qty)
+                            })
+                            const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities)
+                            if (checkQuantity === true) {
+                              handlePaymentConfirm(paymentProvider);
                             } else {
-                              insufficientQuantityMessage += `Product ${detail.assetName}: ${detail.availableQuantity}\n`;
-                            }
-                          });
+                              let insufficientQuantityMessage = "";
+                              let outOfStockMessage = "";
 
-                          let errorMessage = "";
-                          if (insufficientQuantityMessage) {
-                            errorMessage += `The following item(s) in your cart have limited quantity available and will need to be adjusted. Please reduce the quantity to proceed:\n${insufficientQuantityMessage}`;
+                              checkQuantity.forEach(detail => {
+                                if (detail.availableQuantity === 0) {
+                                  outOfStockMessage += `Product ${detail.assetName}\n`;
+                                } else {
+                                  insufficientQuantityMessage += `Product ${detail.assetName}: ${detail.availableQuantity}\n`;
+                                }
+                              });
+
+                              let errorMessage = "";
+                              if (insufficientQuantityMessage) {
+                                errorMessage += `The following item(s) in your cart have limited quantity available and will need to be adjusted. Please reduce the quantity to proceed:\n${insufficientQuantityMessage}`;
+                              }
+                              if (outOfStockMessage) {
+                                if (errorMessage) errorMessage += "\n"; // Add a new line if there's already an error message
+                                errorMessage += `The following item(s) are temporarily out of stock and should be removed:\n${outOfStockMessage}`;
+                              }
+                              openToastOrder("bottom", errorMessage);
+                            }
                           }
-                          if (outOfStockMessage) {
-                            if (errorMessage) errorMessage += "\n"; // Add a new line if there's already an error message
-                            errorMessage += `The following item(s) are temporarily out of stock and should be removed:\n${outOfStockMessage}`;
-                          }
-                          openToastOrder("bottom", errorMessage);
                         }
                       }
-                    }
-                  }
-                >
-                  <div className="flex items-center mr-1">
-                    {selectedProvider.checkoutText}&nbsp; 
-                    {selectedProvider.imageURL && selectedProvider.imageURL !== '' ? (
-                      <img src={selectedProvider.imageURL} alt={selectedProvider.serviceName} height="16px" width="16px" />
-                    ) : ''}
-                  </div>
-                </Button>
+                    >
+                      <div className="flex items-center mr-1">
+                        {paymentProvider && paymentProvider.serviceName}&nbsp; 
+                        {paymentProvider && paymentProvider.imageURL && paymentProvider.imageURL !== '' ? <img src={paymentProvider.imageURL} alt={paymentProvider.serviceName} height="16px" width="16px"/> : ''}
+                      </div>
+                    </Button>
+                  </div>))}
               </div>
             </div>
           </div>
@@ -290,5 +285,6 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
     </>
   );
 };
+
 
 export default ConfirmOrder;
