@@ -21,7 +21,7 @@ import { UserActivityProvider } from "./contexts/userActivity";
 import AuthorizeIssuer from "./components/AuthorizeIssuer";
 import { IssuerStatusProvider } from "./contexts/issuerStatus";
 import OnboardingIntermediate from "./components/Inventory/OnboardingIntermediate";
-import ProductDetails from "./components/MarketPlace/ProductDetail";
+import ProductDetails from "./components/MarketPlace/ProductDetails";
 import Checkout from "./components/MarketPlace/Checkout";
 import ConfirmOrder from "./components/MarketPlace/ConfirmOrder";
 import ProcessingOrder from "./components/MarketPlace/ProcessingOrder";

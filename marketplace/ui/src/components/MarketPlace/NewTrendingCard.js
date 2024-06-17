@@ -34,9 +34,6 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
         return false;
     }
 
-    // For Wishlist Icon Rendering
-    const shouldShowWishlistIcon = isAuthenticated && user && !ownerSameAsUser();
-
     const naviroute = routes.MarketplaceProductDetail.url;
     const isAvailableForSale = (!topSellingProduct.price || topSellingProduct.saleQuantity === 0)
 
@@ -61,7 +58,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
     }, [topSellingProduct]);
 
     const toggleWishlist = () => {
-        if (!shouldShowWishlistIcon) {
+        if (!isAuthenticated || !user) {
             setIsModalVisible(true);
         } else {
             const wishList = JSON.parse(localStorage.getItem('wishList')) || [];
@@ -90,17 +87,19 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
         }
         setIsModalVisible(false);
     };
-    
+
     const googleFormBaseURL = "https://docs.google.com/forms/d/e/1FAIpQLSfEWqALizqd-Rg3OPTwxD5O6xJKqT0xEgHeKpSpnaWzZ7tn1Q/viewform?usp=pp_url";
-    const preFilledFormURL = `${googleFormBaseURL}&entry.8090980=${encodeURIComponent(topSellingProduct?.name)}&entry.1160788377=${encodeURIComponent(topSellingProduct?.ownerCommonName)}&entry.1571372307=${encodeURIComponent(user?.commonName)}`;  
+    const preFilledFormURL = `${googleFormBaseURL}&entry.8090980=${encodeURIComponent(topSellingProduct?.name)}&entry.1160788377=${encodeURIComponent(topSellingProduct?.ownerCommonName)}&entry.1571372307=${encodeURIComponent(user?.commonName)}`;
 
     return (
         <>
             <div id='productCard' className={`relative trending_cards_container_card bg-white p-3 ${parent === 'Marketplace' ? 'min-w-[300px] w-auto' : 'min-w-[230px]'}  min-w-[320px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}>
                 {contextHolder}
-                <div onClick={toggleWishlist} className="absolute top-2 right-2 cursor-pointer hover:scale-110 transition-transform duration-200">
-                    {isWishlisted ? <HeartFilled style={{ fontSize: "20px", color: "#A15E49" }} /> : <HeartTwoTone style={{ fontSize: "20px" }} twoToneColor="#A15E49" />}
-                </div>
+                {!ownerSameAsUser() &&
+                    <div onClick={toggleWishlist} className="absolute top-2 right-2 cursor-pointer hover:scale-110 transition-transform duration-200">
+                        {isWishlisted ? <HeartFilled style={{ fontSize: "20px", color: "#A15E49" }} /> : <HeartTwoTone style={{ fontSize: "20px" }} twoToneColor="#A15E49" />}
+                    </div>
+                }
                 <a
                     href={`${naviroute.replace(":address", topSellingProduct.address).replace(":name", topSellingProduct.name)}`}
                     onClick={(e) => {
@@ -116,7 +115,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                 >
                     <img
                         className='md:h-[200px] md:w-[40vw] h-[150px] w-full object-contain rounded-md cursor-pointer mb-2'
-                        src={topSellingProduct["BlockApps-Mercata-Asset-images"]?.length>0 ? topSellingProduct["BlockApps-Mercata-Asset-images"][0].value : images_placeholder}
+                        src={topSellingProduct["BlockApps-Mercata-Asset-images"]?.length > 0 ? topSellingProduct["BlockApps-Mercata-Asset-images"][0].value : images_placeholder}
                         alt={imgMeta} title={imgMeta}
                     />
                     <div className='flex justify-between items-center'>
@@ -134,7 +133,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                     </div>
                 </a>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    {topSellingProduct?.price && 
+                    {topSellingProduct?.price &&
                         <Typography className="font-semibold">
                             {`$${topSellingProduct?.price} `}
                             <a href={preFilledFormURL} target="_blank" rel="noreferrer noopener" className="font-normal text-xs mr-2">{`(${topSellingProduct?.price * STRATS_CONVERSION} STRATS)`}</a>

@@ -57,7 +57,7 @@ const ProductDetails = ({ user, users }) => {
     inventoryOwnershipHistory, priceHistory, isFetchingPriceHistory
   } = useInventoryState();
   const { cartList } = useMarketplaceState();
-  
+
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [timeFilter, setTimeFilter] = useState('1');
@@ -93,9 +93,6 @@ const ProductDetails = ({ user, users }) => {
     }
     return false;
   }
-
-
-  const shouldShowWishlistIcon = isAuthenticated && user && !ownerSameAsUser();
 
   useEffect(() => {
     if (isCalledFromInventory) setId(routeMatch1?.params?.id);
@@ -144,7 +141,7 @@ const ProductDetails = ({ user, users }) => {
   }, [marketplaceDispatch, cartList]);
 
   const details = inventoryDetails;
-  let fileValues=[]
+  let fileValues = []
   // Check if details and BlockApps-Mercata-Asset-files are not null or undefined
   if (details && Array.isArray(details['BlockApps-Mercata-Asset-files'])) {
     fileValues = details['BlockApps-Mercata-Asset-files'].map(file => file.value);
@@ -172,7 +169,7 @@ const ProductDetails = ({ user, users }) => {
   }, [details]);
 
   const toggleWishlist = () => {
-    if (!shouldShowWishlistIcon) {
+    if (!isAuthenticated || !user) {
       setIsModalVisible(true);
     } else {
       const wishList = JSON.parse(localStorage.getItem('wishList')) || [];
@@ -347,7 +344,7 @@ const ProductDetails = ({ user, users }) => {
   const linkUrl = window.location.href;
 
   const googleFormBaseURL = "https://docs.google.com/forms/d/e/1FAIpQLSfEWqALizqd-Rg3OPTwxD5O6xJKqT0xEgHeKpSpnaWzZ7tn1Q/viewform?usp=pp_url";
-  const preFilledFormURL = `${googleFormBaseURL}&entry.8090980=${encodeURIComponent(details?.name)}&entry.1160788377=${encodeURIComponent(details?.ownerCommonName)}&entry.1571372307=${encodeURIComponent(user?.commonName)}`;  
+  const preFilledFormURL = `${googleFormBaseURL}&entry.8090980=${encodeURIComponent(details?.name)}&entry.1160788377=${encodeURIComponent(details?.ownerCommonName)}&entry.1571372307=${encodeURIComponent(user?.commonName)}`;
 
 
   return (
@@ -416,9 +413,11 @@ const ProductDetails = ({ user, users }) => {
                 </div></>}
               </Carousel>
               <div className=" w-full lg:w-1/2">
-                <div className="flex justify-end">
-                  {isWishlisted ? <HeartFilled className="cursor-pointer" onClick={toggleWishlist} style={{ fontSize: "20px", color: "#A15E49" }} /> : <HeartTwoTone className="cursor-pointer" onClick={toggleWishlist} style={{ fontSize: "20px" }} twoToneColor="#A15E49" />}
-                </div>
+                {!ownerSameAsUser() &&
+                  <div className="flex justify-end">
+                    {isWishlisted ? <HeartFilled className="cursor-pointer" onClick={toggleWishlist} style={{ fontSize: "20px", color: "#A15E49" }} /> : <HeartTwoTone className="cursor-pointer" onClick={toggleWishlist} style={{ fontSize: "20px" }} twoToneColor="#A15E49" />}
+                  </div>
+                }
                 <div className=" lg:border-b lg:border-[#E9E9E9] pb-[6px]">
                   <Title style={{ fontSize: '30px' }} className="font-semibold text-base lg:text-3xl text-[#202020]">
                     {decodeURIComponent(details?.name)}
@@ -709,7 +708,7 @@ const ProductDetails = ({ user, users }) => {
                           <List
                             size="small"
                             boardered
-                            dataSource={fileValues?.length>0 ? fileValues: []}
+                            dataSource={fileValues?.length > 0 ? fileValues : []}
                             renderItem={(item) =>
                               <List.Item>
                                 <a href={item} rel="noreferrer" target="_blank" className="hover:underline break-all text-[#1e40af]">
