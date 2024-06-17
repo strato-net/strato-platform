@@ -34,6 +34,7 @@ abstract contract PaymentService is Utils {
         uint[] quantities,            // List of quantities for each asset being bought
         uint amount,                  // Total price of the order
         uint tax,                     // Tax
+        int grossMargin,             // Gross margin used to calcualte cost basis
         uint unitsPerDollar,          // Amount of units per dollar for the currency (Ex: STRAT is 100 units per dollar)
         string currency,              // The type of currency used for the purchase
         PaymentStatus status,         // Status of the payment
