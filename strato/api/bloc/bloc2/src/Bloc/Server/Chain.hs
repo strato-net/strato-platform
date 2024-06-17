@@ -24,10 +24,12 @@ import BlockApps.Logging
 import BlockApps.Solidity.XabiContract
 import BlockApps.SolidityVarReader
 import Blockchain.DB.CodeDB
-import Blockchain.DB.SQLDB
 import Blockchain.Data.AddressStateDB
+import Blockchain.Data.Block
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.ChainInfo
 import Blockchain.Data.DataDefs
+import Blockchain.Data.Json
 import Blockchain.Data.TransactionResultStatus
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
@@ -37,9 +39,8 @@ import Blockchain.TypeLits
 import Control.Arrow ((***))
 import Control.Lens (at, (?~))
 import Control.Monad (join, unless, when)
-import Control.Monad.Change.Alter
 import qualified Control.Monad.Change.Alter as A
-import Control.Monad.Composable.SQL
+import Control.Monad.Composable.Strato
 import Control.Monad.Composable.Vault
 import Crypto.Random.Entropy
 import qualified Data.Map.Strict as Map
@@ -47,8 +48,9 @@ import Data.Maybe (catMaybes, fromMaybe, listToMaybe)
 import Data.Source.Map
 import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Database.Esqueleto.Legacy as E
+import GHC.Stack
 import Handlers.Chain
+import qualified Handlers.BlkLast as CORE
 import qualified Handlers.Chain as CORE
 import SQLM
 import SolidVM.Model.CodeCollection.Contract hiding (errors)
@@ -82,9 +84,9 @@ createChainInfo ::
   ( A.Selectable Account AddressState m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
+    MonadIO m,
     MonadLogger m,
-    HasVault m,
-    HasSQL m
+    HasVault m
   ) =>
   HeaderList ->
   Keccak256 ->
@@ -143,7 +145,7 @@ createChainInfo headers creationBlockHash (ChainInput src mCodePtr cname lbl bal
   return chainInfo
 
 withLastBlockHash ::
-  (HasSQL m) =>
+  (MonadIO m, MonadLogger m, HasStrato m, HasCallStack) =>
   (Keccak256 -> m b) ->
   m b
 withLastBlockHash f = do
@@ -152,31 +154,29 @@ withLastBlockHash f = do
     Just blkHash -> f blkHash
     _ -> throwIO . UserError $ Text.pack "STRATO has not been initialized yet"
 
-getLastBlockHash :: (HasSQL m) => m (Maybe Keccak256)
+getLastBlockHash :: (MonadIO m, MonadLogger m, HasStrato m, HasCallStack) => m (Maybe Keccak256)
 getLastBlockHash = do
-  blks <- fmap (map (E.entityVal)) . sqlQuery $
-    E.select $
-      E.from $ \a -> do
-        E.limit 1
-        E.orderBy [E.desc (a E.^. BlockDataRefNumber)]
-        return a
-
-  return $ fmap blockDataRefHash $ listToMaybe blks
+  blk <- blocStrato $ CORE.getBlkLastClient 1
+  case blk of
+    (Block' b _ : _) -> pure . Just . headerHash . blockBlockData $ b
+    [] -> pure Nothing
 
 postChainInfo ::
   ( A.Selectable Account AddressState m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     MonadLogger m,
-    HasSQL m,
-    HasVault m
+    HasStrato m,
+    HasVault m,
+    MonadUnliftIO m,
+    HasCallStack
   ) =>
   HeaderList ->
   ChainInput ->
   m ChainId
 postChainInfo headers chainInput = withLastBlockHash $ \bHash -> do
       chainInfo' <- createChainInfo headers bHash chainInput
-      chainId <- CORE.postChain chainInfo'
+      chainId <- blocStrato $ CORE.postChainClient chainInfo'
       let isAsync = fromMaybe False $ chaininputAsync chainInput
       unless isAsync $ do
         info <- waitForChainInfo chainId
@@ -193,7 +193,8 @@ postChainInfos ::
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     MonadLogger m,
-    HasSQL m,
+    MonadUnliftIO m,
+    HasStrato m,
     HasVault m
   ) =>
   HeaderList ->
@@ -217,7 +218,9 @@ postChainInfos headers chainInputs = withLastBlockHash $ \bHash -> do
 
 waitForChainInfo ::
   ( MonadLogger m,
-    HasSQL m
+    HasStrato m,
+    MonadUnliftIO m,
+    HasCallStack
   ) =>
   ChainId ->
   m (Maybe (TransactionResult, Maybe ChainInfo))
@@ -232,7 +235,9 @@ waitForChainInfo chainId = do
 
 waitForChainInfos ::
   ( MonadLogger m,
-    HasSQL m
+    MonadUnliftIO m,
+    HasStrato m,
+    HasCallStack
   ) =>
   [ChainId] ->
   m (Maybe [(TransactionResult, Maybe ChainInfo)])
@@ -245,13 +250,21 @@ waitForChainInfos chainIds = waitFor go
       return (length infos == length chainIds, infos)
 
 getSingleChainInfo ::
-  (MonadIO m, Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m) =>
+  ( MonadLogger m,
+    MonadUnliftIO m,
+    HasStrato m,
+    HasCallStack
+  ) =>
   ChainId ->
   m ChainIdChainOutput
 getSingleChainInfo chainId = join $ maybe (liftIO . throwIO $ CouldNotFind "chain not found") pure . listToMaybe <$> getChainInfo [chainId] Nothing Nothing Nothing
 
 getChainInfo ::
-  Selectable ChainFilterParams (NamedMap "id" "info" ChainId ChainInfo) m =>
+  ( MonadLogger m,
+    MonadUnliftIO m,
+    HasStrato m,
+    HasCallStack
+  ) =>
   [ChainId] ->
   Maybe Text ->
   Maybe Integer ->
@@ -259,7 +272,7 @@ getChainInfo ::
   m [ChainIdChainOutput]
 getChainInfo chainIds mChainLabel lim off =
   --do
-  (getChain chainIds mChainLabel lim off) >>= (\chainIdChainInfos -> return $ map convertChainInfo chainIdChainInfos)
+  (blocStrato $ getChainClient chainIds mChainLabel lim off) >>= (\chainIdChainInfos -> return $ map convertChainInfo chainIdChainInfos)
   where
     convertChainInfo :: NamedTuple "id" "info" ChainId ChainInfo -> ChainIdChainOutput
     convertChainInfo chp = do

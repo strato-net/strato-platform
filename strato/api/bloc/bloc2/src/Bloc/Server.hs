@@ -24,21 +24,25 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import Control.Lens (makeLenses, over, (&), (.~), (?~))
 import Control.Monad.Change.Alter
-import Control.Monad.Composable.SQL
+import Control.Monad.Composable.Strato
 import Control.Monad.Composable.Vault
 import Control.Monad.Logger
 import Data.HashMap.Strict.InsOrd
 import Data.Source.Map
 import Data.Swagger
+import GHC.Stack
 import Servant
 import Servant.Swagger
 import SolidVM.Model.CodeCollection.Contract
+import UnliftIO
 
 blocOauth ::
-  ( MonadLogger m,
+  ( MonadUnliftIO m,
+    MonadLogger m,
     HasBlocEnv m,
     HasVault m,
-    HasSQL m,
+    HasStrato m,
+    HasCallStack,
     Selectable Account Contract m,
     Selectable Account AddressState m,
     Selectable Address Certificate m,
@@ -73,10 +77,12 @@ blocOauth p =
     :<|> embedServer p postBlocTransaction
 
 blocSimple ::
-  ( MonadLogger m,
+  ( MonadUnliftIO m,
+    MonadLogger m,
     HasBlocEnv m,
     HasVault m,
-    HasSQL m,
+    HasStrato m,
+    HasCallStack,
     Selectable Account Contract m,
     Selectable Account AddressState m,
     Selectable Address Certificate m,

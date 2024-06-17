@@ -22,6 +22,7 @@ module Bloc.Monad
     HasBlocEnv,
     blocMaybe,
     getBlocEnv,
+    blocStrato,
     blocVaultWrapper,
     BlocEnv (..),
   )
@@ -36,6 +37,7 @@ import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Nonce
 import Control.Monad.Change.Modify hiding (modify)
+import Control.Monad.Composable.Strato hiding (httpManager)
 import Control.Monad.Composable.Vault hiding (httpManager)
 import Control.Monad.Reader
 import Data.Cache
@@ -66,6 +68,17 @@ data BlocEnv = BlocEnv
   }
 
 --------------------------------------------------------------------------------
+
+blocStrato ::
+  (MonadIO m, MonadLogger m, HasStrato m, HasCallStack) =>
+  ClientM x ->
+  m x
+blocStrato client' = do
+  logInfoCS callStack "Querying STRATO"
+  StratoData url mgr <- access Proxy
+  resultEither <-
+    liftIO $ runClientM client' (mkClientEnv mgr url)
+  either (blocError . StratoError) return resultEither
 
 blocVaultWrapper ::
   (MonadIO m, MonadLogger m, HasVault m, HasCallStack) =>

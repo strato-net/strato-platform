@@ -43,7 +43,6 @@ import BlockApps.Solidity.Value
 import qualified BlockApps.Solidity.Xabi.Type as Xabi
 import BlockApps.Solidity.XabiContract
 import Blockchain.DB.CodeDB
-import qualified Blockchain.DB.SQLDB as SQLDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.AlternateTransaction
 import Blockchain.Data.CirrusDefs
@@ -60,14 +59,12 @@ import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256 hiding (rlpHash)
 import Blockchain.Strato.Model.Nonce
 import Blockchain.Strato.Model.Wei
-import Blockchain.Strato.RedisBlockDB (getBestBlockInfo, getSyncStatus, getWorldBestBlockInfo, runStratoRedisIO)
-import Blockchain.Strato.RedisBlockDB.Models (RedisBestBlock (..))
 import Control.Applicative ((<|>))
 import Control.Arrow
 import Control.Lens hiding (from, ix)
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
-import Control.Monad.Composable.SQL
+import Control.Monad.Composable.Strato
 import Control.Monad.Composable.Vault
 import Control.Monad.Extra
 import Control.Monad.Reader
@@ -96,8 +93,9 @@ import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Data.Time.Clock
 import qualified Data.Vector as V
-import qualified Database.Esqueleto.Legacy as E
-import Handlers.AccountInfo ()
+import GHC.Stack
+import Handlers.AccountInfo
+import Handlers.SyncStatus
 import Handlers.Transaction
 import SQLM
 import SolidVM.Model.CodeCollection.Contract
@@ -126,7 +124,7 @@ txWorker ::
     (Keccak256 `A.Selectable` SourceMap) m,
     HasBlocEnv m,
     HasVault m,
-    HasSQL m
+    MonadUnliftIO m, HasStrato m, HasCallStack
   ) =>
   m ()
 txWorker = forever $ do
@@ -148,7 +146,7 @@ postBlocTransactionBody ::
     A.Selectable Account AddressState m,
     HasCodeDB m,
     HasBlocEnv m,
-    HasSQL m,
+    MonadIO m, HasStrato m, HasCallStack,
     HasVault m
   ) =>
   HeaderList ->
@@ -295,7 +293,7 @@ postBlocTransactionUnsigned ::
     A.Selectable Account AddressState m,
     HasCodeDB m,
     HasBlocEnv m,
-    HasSQL m,
+    MonadIO m, HasStrato m, HasCallStack,
     HasVault m
   ) =>
   HeaderList ->
@@ -440,7 +438,7 @@ postBlocTransactionParallel ::
     (Keccak256 `A.Selectable` SourceMap) m,
     HasBlocEnv m,
     HasVault m,
-    HasSQL m
+    MonadUnliftIO m, HasStrato m, HasCallStack
   ) =>
   HeaderList ->
   Maybe ChainId ->
@@ -467,7 +465,7 @@ postBlocTransaction ::
     (Keccak256 `A.Selectable` SourceMap) m,
     HasBlocEnv m,
     HasVault m,
-    HasSQL m
+    MonadUnliftIO m, HasStrato m, HasCallStack
   ) =>
   HeaderList ->
   Maybe ChainId ->
@@ -486,7 +484,7 @@ postBlocTransaction' ::
     (Keccak256 `A.Selectable` SourceMap) m,
     HasBlocEnv m,
     HasVault m,
-    HasSQL m
+    MonadUnliftIO m, HasStrato m, HasCallStack
   ) =>
   Should CacheNonce ->
   HeaderList ->
@@ -792,10 +790,9 @@ postUsersSend' ::
   ( A.Selectable Account AddressState m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasCodeDB m,
-    MonadLogger m,
     HasBlocEnv m,
     HasVault m,
-    HasSQL m
+    MonadUnliftIO m, MonadLogger m, HasStrato m, HasCallStack
   ) =>
   Should CacheNonce ->
   TransferParameters ->
@@ -823,7 +820,7 @@ postUsersContractSolidVM' ::
     HasCodeDB m,
     HasBlocEnv m,
     HasVault m,
-    HasSQL m
+    MonadUnliftIO m, HasStrato m, HasCallStack
   ) =>
   Should CacheNonce ->
   ContractParameters ->
@@ -867,7 +864,7 @@ postUsersUploadListSolidVM' ::
     HasCodeDB m,
     HasBlocEnv m,
     HasVault m,
-    HasSQL m
+    MonadIO m, HasStrato m, HasCallStack
   ) =>
   Should CacheNonce ->
   ContractListParameters ->
@@ -913,7 +910,7 @@ postUsersSendList' ::
     (Keccak256 `A.Selectable` SourceMap) m,
     HasBlocEnv m,
     HasVault m,
-    HasSQL m
+    MonadIO m, HasStrato m, HasCallStack
   ) =>
   Should CacheNonce ->
   TransferListParameters ->
@@ -948,7 +945,7 @@ postUsersContractMethodList' ::
     (Keccak256 `A.Selectable` SourceMap) m,
     HasBlocEnv m,
     HasVault m,
-    HasSQL m
+    MonadIO m, HasStrato m, HasCallStack
   ) =>
   Should CacheNonce ->
   FunctionListParameters ->
@@ -1008,7 +1005,7 @@ postUsersContractMethod' ::
     (Keccak256 `A.Selectable` SourceMap) m,
     HasBlocEnv m,
     HasVault m,
-    HasSQL m
+    MonadUnliftIO m, HasStrato m, HasCallStack
   ) =>
   Should CacheNonce ->
   FunctionParameters ->
@@ -1191,7 +1188,7 @@ constructArgValuesAndSource args argNamesTypes = do
         )
 
 getAccountTxParams ::
-  (MonadLogger m, HasBlocEnv m, HasSQL m) =>
+  (MonadLogger m, HasBlocEnv m, MonadIO m, HasStrato m, HasCallStack) =>
   Should CacheNonce ->
   Address ->
   Maybe ChainId ->
@@ -1232,7 +1229,7 @@ cacheLookup c t k = do
   Cache.lookupSTM True k c t
 
 genNonces ::
-  (MonadLogger m, HasBlocEnv m, HasSQL m) =>
+  (MonadLogger m, HasBlocEnv m, MonadIO m, HasStrato m, HasCallStack) =>
   Show a =>
   Should CacheNonce ->
   Address ->
@@ -1289,24 +1286,22 @@ genNonces cacheNonce fromAddr chainLens l unindexedAs = do
       pure (chainId, txs)
 
 getAccountNonce ::
-  (MonadLogger m, HasSQL m, HasBlocEnv m) =>
+  (MonadLogger m, MonadIO m, HasStrato m, HasCallStack, HasBlocEnv m) =>
   Address ->
   S.Set (Maybe ChainId) ->
   m (Map (Maybe ChainId) Nonce)
 getAccountNonce addr chainIds = do
   let chainIds' = map (fromMaybe (ChainId 0)) $ S.toList chainIds
   let chainIds'' = map (\(ChainId c) -> c) chainIds'
-  let actions = E.select . E.from $ \accStateRef -> do
-        E.where_ (accStateRef E.^. AddressStateRefAddress E.==. E.val addr)
-        E.where_ (accStateRef E.^. AddressStateRefChainId `E.in_` E.valList chainIds'')
-        return accStateRef
-  mAccts <- SQLDB.sqlQuery actions
+  mAccts <- blocStrato . getAccountsClient $
+    accountsFilterParams & qaAddress ?~ addr
+                         & qaChainId .~ chainIds'
   $logInfoLS "getAccountNonce lookup" (chainIds'', addr)
   $logInfoLS "getAccountNonce results" mAccts
   case mAccts of
     [] -> return $ Map.fromList [(Nothing, Nonce $ fromInteger 0)]
     accts -> do
-      let acts = map E.entityVal accts
+      let acts = map asrPrimeToAsr accts
       let mkCid AddressStateRef {..} = ChainId <$> toMaybe 0 addressStateRefChainId
           mkNonce AddressStateRef {..} = Nonce $ fromInteger addressStateRefNonce
       return . Map.fromList $ map (mkCid &&& mkNonce) acts
@@ -1380,8 +1375,7 @@ getResultAndRespond ::
   ( A.Selectable Account AddressState m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
-    MonadLogger m,
-    HasSQL m
+    MonadUnliftIO m, MonadLogger m, HasStrato m, HasCallStack
   ) =>
   [Keccak256] ->
   Bool ->
@@ -1394,14 +1388,7 @@ getResultAndRespond txHashes resolve = do
     (Failure, Just tr, _) -> throwIO (VMError $ Text.pack $ "Error running the transaction: " ++ transactionResultMessage tr)
     (Pending, _, _) -> return result
 
-checkIsSynced :: (HasSQL m) => m ()
-checkIsSynced = do
-  status <- runStratoRedisIO getSyncStatus
-  nodeBestBlock <- runStratoRedisIO getBestBlockInfo
-  worldBestBlock <- runStratoRedisIO getWorldBestBlockInfo
-  let nodeTotalDiff = bestBlockTotalDifficulty <$> nodeBestBlock
-      worldTotalDiff = bestBlockTotalDifficulty <$> worldBestBlock
-
-  case (status, worldTotalDiff, nodeTotalDiff) of
-    (Just False, Just wtd, Just ntd) -> throwIO $ NotYetSynced ntd wtd
-    _ -> pure ()
+checkIsSynced :: (MonadIO m, MonadLogger m, HasStrato m, HasCallStack) => m ()
+checkIsSynced = blocStrato getSyncStatusClient >>= \case
+  SyncStatus (Just False) (Just wtd) (Just ntd) -> throwIO $ NotYetSynced ntd wtd
+  _ -> pure ()

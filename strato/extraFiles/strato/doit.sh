@@ -116,20 +116,22 @@ function newnode {
   echo 'vault-proxy is available'
   set -x
 
-  if [[ ! -f .initialized ]] ; then
-    # if node is being updated from the earlier version that did not have `.initialized` flag implemented (pre-7.0):
-    if [[ -d .ethereumH && -d config && ! -f .initNotFinished ]]; then
-      touch .initialized
-      sleep 10
-    else
-      touch .initNotFinished
-      cleanupDB
-      doInit
-      touch .initialized
-      rm .initNotFinished
-    fi
-  else
-    sleep 10
+  if [ -z "${EXTERNAL_NODE_URL}" ]; then
+      if [[ ! -f .initialized ]] ; then
+        # if node is being updated from the earlier version that did not have `.initialized` flag implemented (pre-7.0):
+        if [[ -d .ethereumH && -d config && ! -f .initNotFinished ]]; then
+          touch .initialized
+          sleep 10
+        else
+          touch .initNotFinished
+          cleanupDB
+          doInit
+          touch .initialized
+          rm .initNotFinished
+        fi
+      else
+        sleep 10
+      fi
   fi
 
   echo "Starting Strato processes. All output is logged to $PWD/logs."
@@ -156,42 +158,44 @@ function newnode {
   then vmMinLogLevel=LevelDebug
   fi
 
-  echo "Starting ethereum-discover"
-  runBackgroundProcess ethereum-discover  &>> logs/ethereum-discover
+  if [ -z "${EXTERNAL_NODE_URL}" ]; then
+      echo "Starting ethereum-discover"
+      runBackgroundProcess ethereum-discover  &>> logs/ethereum-discover
 
-  echo "Starting strato-p2p"
-  runBackgroundProcess strato-p2p \
-     --averageTxsPerBlock=${averageTxsPerBlock:-40} \
-     --connectionTimeout=${connectionTimeout:-30} \
-     --debugFail=${debugFail:-true}  \
-     --maxConn=${maxConn:-1000} \
-     --maxReturnedHeaders=${maxReturnedHeaders:-500} \
-     --networkID=${networkID:--1} \
-     --sqlPeers=true \
-     --txGossipFanout=${txGossipFanount:-3} \
-     ${networkFlag} &>> logs/strato-p2p
+      echo "Starting strato-p2p"
+      runBackgroundProcess strato-p2p \
+         --averageTxsPerBlock=${averageTxsPerBlock:-40} \
+         --connectionTimeout=${connectionTimeout:-30} \
+         --debugFail=${debugFail:-true}  \
+         --maxConn=${maxConn:-1000} \
+         --maxReturnedHeaders=${maxReturnedHeaders:-500} \
+         --networkID=${networkID:--1} \
+         --sqlPeers=true \
+         --txGossipFanout=${txGossipFanount:-3} \
+         ${networkFlag} &>> logs/strato-p2p
 
-  echo "Starting strato-sequencer"
-  runBackgroundProcess strato-sequencer \
-    --blockstanbul=true \
-    --blockstanbul_block_period_ms=${blockstanbulBlockPeriodMs:-1000} \
-    --blockstanbul_round_period_s=${blockstanbulRoundPeriodS:-10} \
-    --genesisBlockName=${genesis:-gettingStarted} \
-    --minLogLevel=$seqMinLogLevel \
-    --seq_max_events_per_iter=${seqMaxEventsPerIter:-500} \
-    --seq_max_us_per_iter=${seqMaxUsPerIter:-50000} \
-    --validatorBehavior=${validatorBehavior:-true} \
-    "${networkFlag}" \
-    +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
+      echo "Starting strato-sequencer"
+      runBackgroundProcess strato-sequencer \
+        --blockstanbul=true \
+        --blockstanbul_block_period_ms=${blockstanbulBlockPeriodMs:-1000} \
+        --blockstanbul_round_period_s=${blockstanbulRoundPeriodS:-10} \
+        --genesisBlockName=${genesis:-gettingStarted} \
+        --minLogLevel=$seqMinLogLevel \
+        --seq_max_events_per_iter=${seqMaxEventsPerIter:-500} \
+        --seq_max_us_per_iter=${seqMaxUsPerIter:-50000} \
+        --validatorBehavior=${validatorBehavior:-true} \
+        "${networkFlag}" \
+        +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
 
-  echo "Starting strato-api-indexer"
-  runBackgroundProcess strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1
+      echo "Starting strato-api-indexer"
+      runBackgroundProcess strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1
 
-  echo "Starting strato-p2p-indexer"
-  runBackgroundProcess strato-p2p-indexer +RTS -N1 >> logs/strato-p2p-indexer 2>&1
+      echo "Starting strato-p2p-indexer"
+      runBackgroundProcess strato-p2p-indexer +RTS -N1 >> logs/strato-p2p-indexer 2>&1
 
-  echo "Starting strato-txr-indexer"
-  runBackgroundProcess strato-txr-indexer +RTS -N1 >> logs/strato-txr-indexer 2>&1
+      echo "Starting strato-txr-indexer"
+      runBackgroundProcess strato-txr-indexer +RTS -N1 >> logs/strato-txr-indexer 2>&1
+  fi
 
   if [ -n "${svmDev}" ]; then
     svdFlag="--svmDev=${svmDev}"
@@ -230,31 +234,36 @@ function newnode {
       psFlag="--paymentServerUrl=${STRIPE_PAYMENT_SERVER_URL}"
   fi
 
-  echo "Starting vm-runner"
-  runBackgroundProcess vm-runner \
-    --blockstanbul=true \
-    --debug=${evmDebugMode:-false} \
-    --debugEnabled=${VM_DEBUGGER:-false} \
-    --debugPort=${debugPort:-8051} \
-    --debugWSHost=${debugWSHost:-strato} \
-    --debugWSPort=${debugWSPort:-8052} \
-    --diffPublish=${diffPublish:-true} \
-    --maxTxsPerBlock=${maxTxsPerBlock:-500} \
-    --minLogLevel=${vmMinLogLevel} \
-    --networkID=${networkID:--1} \
-    --seqEventsBatchSize=${seqEventsBatchSize:--1} \
-    --seqEventsCostHeuristic=${seqEventsCostHeuristic:-20000} \
-    --sqlDiff=${sqlDiff:-true} \
-    --svmDev=${svmDev:-false} \
-    --svmTrace=${svmTrace:-false} \
-    --requireCerts=${requireCerts:-true} \
-    ${networkFlag} \
-    "${aclFlag}" \
-    "${txsFlag}" \
-    "${gasFlag}" \
-    "${creatorFlag}" \
-    +RTS "${vmRunnerRTSOPTs:-}" -I2 -N1 &>> logs/vm-runner
+  if [ -z "${EXTERNAL_NODE_URL}" ]; then
+      echo "Starting vm-runner"
+      runBackgroundProcess vm-runner \
+        --blockstanbul=true \
+        --debug=${evmDebugMode:-false} \
+        --debugEnabled=${VM_DEBUGGER:-false} \
+        --debugPort=${debugPort:-8051} \
+        --debugWSHost=${debugWSHost:-strato} \
+        --debugWSPort=${debugWSPort:-8052} \
+        --diffPublish=${diffPublish:-true} \
+        --maxTxsPerBlock=${maxTxsPerBlock:-500} \
+        --minLogLevel=${vmMinLogLevel} \
+        --networkID=${networkID:--1} \
+        --seqEventsBatchSize=${seqEventsBatchSize:--1} \
+        --seqEventsCostHeuristic=${seqEventsCostHeuristic:-20000} \
+        --sqlDiff=${sqlDiff:-true} \
+        --svmDev=${svmDev:-false} \
+        --svmTrace=${svmTrace:-false} \
+        --requireCerts=${requireCerts:-true} \
+        ${networkFlag} \
+        "${aclFlag}" \
+        "${txsFlag}" \
+        "${gasFlag}" \
+        "${creatorFlag}" \
+        +RTS "${vmRunnerRTSOPTs:-}" -I2 -N1 &>> logs/vm-runner
+  fi
 
+  if [ -n "${EXTERNAL_NODE_URL}" ]; then
+      apiFlag="--stratoUrl=${EXTERNAL_NODE_URL}/strato-api"
+  fi
   # Leave the +RTS -N1, it is important
   echo "Starting strato-api"
   runBackgroundProcess strato-api \
@@ -273,24 +282,27 @@ function newnode {
     "${ubFlag}" \
     "${udFlag}" \
     "${fsFlag}" \
+    "${apiFlag}" \
     "${psFlag}" +RTS -N1 >> logs/strato-api 2>&1
 
-  SLIPSTREAM_CMD="slipstream \
-  --database=${postgres_slipstream_db} \
-  --kafkahost=${kafkaHost} \
-  --kafkaport=${kafkaPort} \
-  --minLogLevel=${slipMinLogLevel} \
-  --pghost=${postgres_host} \
-  --pgport=${postgres_port} \
-  --pguser=${postgres_user} \
-  --password=${postgres_password} \
-  --stratourl=http://localhost:3000/eth/v1.2"
+  if [ -z "${EXTERNAL_NODE_URL}" ]; then
+      SLIPSTREAM_CMD="slipstream \
+      --database=${postgres_slipstream_db} \
+      --kafkahost=${kafkaHost} \
+      --kafkaport=${kafkaPort} \
+      --minLogLevel=${slipMinLogLevel} \
+      --pghost=${postgres_host} \
+      --pgport=${postgres_port} \
+      --pguser=${postgres_user} \
+      --password=${postgres_password} \
+      --stratourl=http://localhost:3000/eth/v1.2"
 
-  echo "Starting slipstream"
-  if [ "${SLIPSTREAM_OPTIONAL}" = true ]; then
-      $SLIPSTREAM_CMD &>> logs/slipstream &
-  else
-      runBackgroundProcess $SLIPSTREAM_CMD &>> logs/slipstream
+      echo "Starting slipstream"
+      if [ "${SLIPSTREAM_OPTIONAL}" = true ]; then
+          $SLIPSTREAM_CMD &>> logs/slipstream &
+      else
+          runBackgroundProcess $SLIPSTREAM_CMD &>> logs/slipstream
+      fi
   fi
 
   echo "Configuring log rotation..."

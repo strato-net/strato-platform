@@ -39,6 +39,7 @@ import Control.Monad.Change.Alter
 import Control.Monad.Change.Modify (Accessible)
 import Control.Monad.Composable.Identity
 import Control.Monad.Composable.SQL
+import Control.Monad.Composable.Strato hiding (httpManager)
 import Control.Monad.Composable.Vault hiding (httpManager)
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
@@ -67,6 +68,7 @@ import qualified Handlers.Peers as Peers
 import qualified Handlers.QueuedTransactions as QueuedTransactions
 import qualified Handlers.Stats as Stats
 import qualified Handlers.Storage as Storage
+import qualified Handlers.SyncStatus as SyncStatus
 import qualified Handlers.Transaction as Transaction
 import qualified Handlers.TransactionResult as TransactionResult
 import qualified Handlers.TxLast as TxLast
@@ -163,6 +165,7 @@ type CoreAPI =
            :<|> QueuedTransactions.API
            :<|> Stats.API
            :<|> Storage.API
+           :<|> SyncStatus.API
            :<|> Transaction.API
            :<|> TransactionResult.API
            :<|> TxLast.API
@@ -196,6 +199,7 @@ coreServer =
     :<|> QueuedTransactions.server
     :<|> Stats.server
     :<|> Storage.server
+    :<|> SyncStatus.server
     :<|> Transaction.server flags_txSizeLimit
     :<|> TransactionResult.server
     :<|> TxLast.server
@@ -206,6 +210,7 @@ fullServer ::
     HasBlocEnv m,
     HasIdentity m,
     HasVault m,
+    HasStrato m,
     Accessible Metadata.UrlMap m,
     Selectable Account Contract m,
     Selectable Account AddressState m,
@@ -222,6 +227,7 @@ fullServerOauth ::
     HasBlocEnv m,
     HasIdentity m,
     HasVault m,
+    HasStrato m,
     Accessible Metadata.UrlMap m,
     Selectable Account Contract m,
     Selectable Account AddressState m,
@@ -248,6 +254,7 @@ hoistCoreServer blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPI) (convertEr
         . runCirrusM
         . flip runReaderT blocEnv
         . flip runReaderT urlMap
+        . runStratoM (flags_stratoUrl ++ "/eth/v1.2")
         . runVaultM ("http://localhost:8013/strato/v2.3")
         . runIdentitytM getIdentityServerUrl
         $ f
@@ -266,6 +273,7 @@ hoistCoreServerOauth blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPIOAuth) 
         . runCirrusM
         . flip runReaderT blocEnv
         . flip runReaderT urlMap
+        . runStratoM (flags_stratoUrl ++ "/eth/v1.2")
         . runVaultM ("http://localhost:8013/strato/v2.3")
         . runIdentitytM getIdentityServerUrl
         $ f

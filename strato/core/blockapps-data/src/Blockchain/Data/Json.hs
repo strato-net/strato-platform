@@ -532,6 +532,9 @@ asrToAsrPrime (s, x) = AddressStateRef' x s
 asrToAsrPrime' :: AddressStateRef -> AddressStateRef'
 asrToAsrPrime' x = AddressStateRef' x ""
 
+asrPrimeToAsr :: AddressStateRef' -> AddressStateRef
+asrPrimeToAsr (AddressStateRef' x _) = x
+
 data Address' = Address' Address String deriving (Eq, Show)
 
 adToAdPrime :: Address -> Address'

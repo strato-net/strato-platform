@@ -41,6 +41,7 @@ executables:
     - solid-vm-model
     - sql-monad
     - strato-model
+    - strato-monad
     - swagger2
     - transformers
     - unliftio

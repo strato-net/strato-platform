@@ -17,7 +17,11 @@
 module Handlers.Transaction
   ( TxsFilterParams (..),
     txsFilterParams,
+    GetTransaction,
+    PostTransaction,
     API,
+    getTransactionClient,
+    getTransactionClient',
     getTransaction,
     getTransaction',
     postTransaction,
@@ -26,7 +30,7 @@ module Handlers.Transaction
   )
 where
 
--- import           Servant.Client
+import           Servant.Client
 
 import BlockApps.Logging
 import Blockchain.DB.SQLDB
@@ -67,8 +71,10 @@ import System.Clock
 import Text.Format
 import UnliftIO
 
-type API =
-  "transaction" :> QueryParam "address" Address
+type API = GetTransaction :<|> PostTransaction
+
+type GetTransaction = "transaction"
+    :> QueryParam "address" Address
     :> QueryParam "from" Address
     :> QueryParam "to" Address
     :> QueryParam "hash" Keccak256
@@ -86,9 +92,35 @@ type API =
     :> QueryParams "chainids" ChainId
     :> QueryParam "sortby" Sortby
     :> Get '[JSON] [RawTransaction']
-    :<|> "transaction"
+
+type PostTransaction = "transaction"
     :> ReqBody '[JSON] RawTransaction'
     :> Post '[JSON, PlainText] Keccak256
+
+getTransactionClient ::
+  Maybe Address ->
+  Maybe Address ->
+  Maybe Address ->
+  Maybe Keccak256 ->
+  Maybe Natural ->
+  Maybe Natural ->
+  Maybe Natural ->
+  Maybe Natural ->
+  Maybe Natural ->
+  Maybe Natural ->
+  Maybe Natural ->
+  Maybe Natural ->
+  Maybe Natural ->
+  Maybe Natural ->
+  Maybe (MaybeNamed ChainId) ->
+  [ChainId] ->
+  Maybe Sortby ->
+  ClientM [RawTransaction']
+getTransactionClient = client (Proxy @GetTransaction)
+
+getTransactionClient' :: TxsFilterParams -> ClientM [RawTransaction']
+getTransactionClient' (TxsFilterParams a b c d e f g h i j k l m n o p q) =
+  getTransactionClient a b c d e f g h i j k l m n o p q
 
 data TxsFilterParams = TxsFilterParams
   { qtAddress :: Maybe Address,

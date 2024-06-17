@@ -13,6 +13,7 @@ module Bloc.Server.Contracts where
 
 import Bloc.API.Contracts
 import Bloc.API.Utils
+import Bloc.Monad
 import Bloc.Database.Queries
 import Bloc.Server.Utils (getBlockTimestamp)
 import Bloc.XabiHelper
@@ -40,7 +41,7 @@ import Blockchain.Strato.Model.Keccak256
 import Control.Arrow ((&&&), (***))
 import Control.Monad ((<=<))
 import qualified Control.Monad.Change.Alter as A
-import Control.Monad.Composable.SQL
+import Control.Monad.Composable.Strato
 import Data.Bifunctor (first)
 import Data.Foldable
 import qualified Data.Map.Strict as Map
@@ -49,6 +50,7 @@ import Data.Source.Map (SourceMap)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
+import GHC.Stack
 import Handlers.AccountInfo
 import Handlers.Storage
 import qualified MaybeNamed
@@ -61,9 +63,7 @@ hexStorageToWord256 :: HexStorage -> Word256
 hexStorageToWord256 (HexStorage bs) = bytesToWord256 bs
 
 getContracts ::
-  ( MonadLogger m,
-    HasSQL m
-  ) =>
+  (MonadIO m, MonadLogger m, HasStrato m, HasCallStack) =>
   Maybe Text ->
   Maybe Integer ->
   Maybe Integer ->
@@ -81,7 +81,7 @@ getContracts mName mOffset mLimit chainId = do
           )
           Map.empty
   addrStateRefs <-
-    getAccount'
+    blocStrato . getAccountsClient $
       accountsFilterParams
         { _qaChainId = maybeToList chainId,
           _qaExternal = Just False,
@@ -93,14 +93,12 @@ getContracts mName mOffset mLimit chainId = do
   return . GetContractsResponse $ reducedResponseMap
 
 getContractsData ::
-  ( MonadLogger m,
-    HasSQL m
-  ) =>
+  (MonadIO m, MonadLogger m, HasStrato m, HasCallStack) =>
   ContractName ->
   m [Address]
 getContractsData (ContractName cName) = do
   svmRefs <-
-    getAccount'
+    blocStrato . getAccountsClient $
       accountsFilterParams
         { _qaContractName = Just cName,
           _qaIgnoreChain = Just True
@@ -111,7 +109,7 @@ getContractsContract ::
   ( A.Selectable Account AddressState m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
-    HasSQL m
+    MonadIO m, MonadLogger m, HasStrato m, HasCallStack
   ) =>
   ContractName ->
   Address ->
@@ -129,8 +127,7 @@ getContractsContract name addr chainId = do
               maybe "Main" (Text.pack . show) chainId
             ]
   mAddrStateRef <-
-    listToMaybe
-      <$> getAccount'
+    fmap listToMaybe . blocStrato . getAccountsClient $
         accountsFilterParams
           { _qaChainId = maybeToList chainId,
             _qaAddress = Just addr,
@@ -159,7 +156,7 @@ getContractsState ::
     A.Selectable Account AddressState m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
-    HasSQL m
+    MonadIO m, HasStrato m, HasCallStack
   ) =>
   ContractName ->
   Address ->
@@ -174,7 +171,7 @@ getContractsState _ address chainId mName mCount mOffset _ = do
 
   storage' <- case mName of
     Nothing ->
-      getStorage'
+      blocStrato . getStorageClient $
         storageFilterParams
           { qsAddress = Just address,
             qsChainId = MaybeNamed.Unnamed <$> chainId,
@@ -233,7 +230,7 @@ postContractsBatchStates ::
     A.Selectable Account AddressState m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
-    HasSQL m
+    MonadIO m, HasStrato m, HasCallStack
   ) =>
   [PostContractsBatchStatesRequest] ->
   m [GetContractsStateResponses]
@@ -253,7 +250,7 @@ getContractsDetails' ::
   ( A.Selectable Account AddressState m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
-    HasSQL m
+    MonadIO m, MonadLogger m, HasStrato m, HasCallStack
   ) =>
   Address ->
   Maybe ChainId ->
@@ -268,8 +265,7 @@ getContractsDetails' contractAddress chainId = do
               maybe "Main" (Text.pack . show) chainId
             ]
   mAddrStateRef <-
-    listToMaybe
-      <$> getAccount'
+    fmap listToMaybe . blocStrato . getAccountsClient $
         accountsFilterParams
           { _qaChainId = maybeToList chainId,
             _qaAddress = Just contractAddress,
@@ -289,7 +285,7 @@ getContractsDetails ::
   ( A.Selectable Account AddressState m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
-    HasSQL m
+    MonadIO m, MonadLogger m, HasStrato m, HasCallStack
   ) =>
   Address ->
   Maybe ChainId ->
@@ -300,7 +296,7 @@ getContractsFunctions ::
   ( A.Selectable Account AddressState m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
-    HasSQL m
+    MonadIO m, MonadLogger m, HasStrato m, HasCallStack
   ) =>
   ContractName ->
   Address ->
@@ -314,7 +310,7 @@ getContractsSymbols ::
   ( A.Selectable Account AddressState m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
-    HasSQL m
+    MonadIO m, MonadLogger m, HasStrato m, HasCallStack
   ) =>
   ContractName ->
   Address ->
@@ -328,7 +324,7 @@ getContractsEnum ::
   ( A.Selectable Account AddressState m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
-    HasSQL m
+    MonadIO m, MonadLogger m, HasStrato m, HasCallStack
   ) =>
   ContractName ->
   Address ->
@@ -342,8 +338,8 @@ getContractsEnum _ contractId (EnumName enumName) chainId = do
 getContractsStateMapping :: -- ( A.Selectable Account AddressState m
 -- , (Keccak256 `A.Selectable` SourceMap) m
 -- , MonadLogger m
--- , HasSQL m
 -- , HasBlocEnv m
+-- , MonadIO m, HasStrato m, HasCallStack
 -- )
   Monad m =>
   ContractName ->
@@ -357,7 +353,7 @@ getContractsStateMapping _ _ _ _ _ =
   -- address (SymbolName mappingName) keyName chainId = do
   -- contract' <- getContractsDetails address chainId
 
-  -- storage' <- getStorage'
+  -- storage' <- blocStrato . getStorageClient $
   --   storageFilterParams{qsAddress = Just address}
 
   -- fetchLimit <- fromInteger <$> fmap stateFetchLimit getBlocEnv

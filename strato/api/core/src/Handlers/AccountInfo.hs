@@ -116,8 +116,8 @@ accountsFilterParams =
     Nothing
     Nothing
 
-getAccountsFilter :: AccountsFilterParams -> ClientM [AddressStateRef']
-getAccountsFilter = uncurryAccountsFilterParams (client $ Proxy @API)
+getAccountsClient :: AccountsFilterParams -> ClientM [AddressStateRef']
+getAccountsClient = uncurryAccountsFilterParams (client $ Proxy @API)
 
 uncurryAccountsFilterParams ::
   ( Maybe Address ->

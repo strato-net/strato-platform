@@ -55,6 +55,7 @@ library:
     - sql-monad
     - stm-conduit
     - strato-model
+    - strato-monad
     - strato-redis-blockdb
     - swagger2
     - text
