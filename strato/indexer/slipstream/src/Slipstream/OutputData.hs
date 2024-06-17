@@ -1313,7 +1313,7 @@ insertEventTables globalsIORef evs = do
       processedEventArrays = concatMap aggEventToCollectionRows processedEvents
       processedEventsWithoutArrays = map (\ae -> ae { eventEvent = removeArrayEvArgs (eventEvent ae) }) processedEvents
   yieldMany . catMaybes =<< lift (mapM (insertEventTable globalsIORef) processedEventsWithoutArrays)
-  insertCollectionTable processedEventArrays
+  when (not (null processedEventArrays)) $ insertCollectionTable processedEventArrays
   where
     getAllEvents :: 
       AggregateEvent -> 
