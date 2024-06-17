@@ -170,13 +170,19 @@ async function get(user, args, options) {
   const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
   let order;
 
-  const searchArgs = setSearchQueryOptions(restArgs, {
-    key: "address",
+  let searchArgs = setSearchQueryOptions( { ...restArgs, token: orderId }, {
+    key: "transaction_hash",
     value: address,
   });
-  searchArgs.queryOptions.select = constants.attach_saleAddresses_Quantities_completedSales_onOrder;
+  order = await searchOne(paymentTableName, searchArgs, newOptions, user);
 
-  order = await searchOne(constants.orderTableName, searchArgs, newOptions, user);
+  if (!order) {
+    searchArgs = setSearchQueryOptions(restArgs, {
+      key: "address",
+      value: address,
+    });
+    order = await searchOne(constants.orderTableName, searchArgs, newOptions, user);
+  }
 
   if (!order) {
     return undefined;
