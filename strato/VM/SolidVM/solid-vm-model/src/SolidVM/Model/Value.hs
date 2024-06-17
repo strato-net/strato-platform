@@ -31,6 +31,7 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
+import Data.Decimal
 import Data.Foldable (asum)
 import Data.IORef
 import Data.Map (Map)
@@ -97,7 +98,7 @@ instance Show Variable where
 
 data Value
   = SInteger Integer
-  | SFixed CC.WrappedDecimal
+  | SFixed Decimal
   | SString String
   | SBool Bool
   | SAccount NamedAccount Bool --isPayable
@@ -229,7 +230,7 @@ defaultValue _ (SVMType.Address _) = (SAccount $ unspecifiedChain (Address 0)) F
 defaultValue _ (SVMType.Account _) = (SAccount $ unspecifiedChain (Address 0)) False
 defaultValue _ (SVMType.String _) = SString ""
 defaultValue _ (SVMType.Bytes _ _) = SString ""
-defaultValue _ (SVMType.Fixed _ _) = SFixed $ CC.WrappedDecimal 0
+defaultValue _ (SVMType.Fixed _ _) = SFixed 0
 defaultValue ctract (SVMType.UnknownLabel name _) =
   fromMaybe (SContract name $ unspecifiedChain 0x0) $
     asum
@@ -259,7 +260,7 @@ createDefaultValue _ _ (SVMType.Address _) = return $ (SAccount $ unspecifiedCha
 createDefaultValue _ _ (SVMType.Account _) = return $ (SAccount $ unspecifiedChain (Address 0)) False
 createDefaultValue _ _ (SVMType.String _) = return $ SString ""
 createDefaultValue _ _ (SVMType.Bytes _ _) = return $ SString ""
-createDefaultValue _ _ (SVMType.Fixed _ _) = return $ SFixed $ CC.WrappedDecimal 0
+createDefaultValue _ _ (SVMType.Fixed _ _) = return $ SFixed 0
 createDefaultValue cc ctract (SVMType.UnknownLabel name _) =
   case (M.lookup name $ CC._enums ctract, M.lookup name $ CC._structs ctract) of
     (Just ((val : _), _), _) -> return $ SEnumVal name val 0x0

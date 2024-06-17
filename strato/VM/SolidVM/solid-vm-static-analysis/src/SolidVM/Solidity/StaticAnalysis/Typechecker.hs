@@ -369,6 +369,15 @@ sumType' (Sum t1) t2 = Sum (t1 <> (t2 :| []))
 sumType' t1 (Sum t2) = Sum ((t1 :| []) <> t2)
 sumType' t1 t2 = Sum (t1 :| [t2])
 
+sumType :: Type' -> Type' -> Type' -> Type'
+sumType (Sum t1) (Sum t2) (Sum t3) = Sum (t1 <> t2 <> t3)
+sumType (Sum t1) (Sum t2) t3 = Sum (t1 <> t2 <> (t3 :| []))
+sumType (Sum t1) t2 t3 = Sum (t1 <> (t2 :| [t3]))
+sumType t1 (Sum t2) (Sum t3) = Sum ((t1 :| []) <> t2 <> t3)
+sumType t1 (Sum t2) t3 = Sum ((t1 :| [t3]) <> t2)
+sumType t1 t2 (Sum t3) = Sum ((t1 :| [t2]) <> t3)
+sumType t1 t2 t3 = Sum (t1 :| [t2, t3])
+
 pickType' :: SourceAnnotation Text -> [Type'] -> Type'
 pickType' x [] = bottom x
 pickType' _ [t] = t
@@ -1614,13 +1623,13 @@ checkIfImmuteOperationValid a = tcExpr a
 
 tcExpr :: Annotated ExpressionF -> SSS Type'
 tcExpr (Binary x "+" a b) =
-  sumType' (intType' x) (stringType' x) ~> tcExpr a <~> tcExpr b
+  sumType (intType' x) (stringType' x) (fixedType' x) ~> tcExpr a <~> tcExpr b
 tcExpr (Binary x "-" a b) =
-  intType' x ~> tcExpr a <~> tcExpr b
+  sumType' (intType' x) (fixedType' x) ~> tcExpr a <~> tcExpr b
 tcExpr (Binary x "*" a b) =
-  intType' x ~> tcExpr a <~> tcExpr b
+  sumType' (intType' x) (fixedType' x) ~> tcExpr a <~> tcExpr b
 tcExpr (Binary x "/" a b) =
-  intType' x ~> tcExpr a <~> tcExpr b
+  sumType' (intType' x) (fixedType' x) ~> tcExpr a <~> tcExpr b
 tcExpr (Binary x "%" a b) =
   intType' x ~> tcExpr a <~> tcExpr b
 tcExpr (Binary x "|" a b) =
@@ -1644,13 +1653,13 @@ tcExpr (Binary x ">>=" a b) =
 tcExpr (Binary x "<<=" a b) =
   intType' x ~> tcExpr a <~> tcExpr b
 tcExpr (Binary x "+=" a b) =
-  sumType' (intType' x) (stringType' x) ~> (checkIfImmuteOperationValid a) <~> tcExpr b
+  sumType (intType' x) (stringType' x) (fixedType' x) ~> (checkIfImmuteOperationValid a) <~> tcExpr b
 tcExpr (Binary x "-=" a b) =
-  intType' x ~> (checkIfImmuteOperationValid a) <~> tcExpr b
+  sumType' (intType' x) (fixedType' x) ~> (checkIfImmuteOperationValid a) <~> tcExpr b
 tcExpr (Binary x "*=" a b) =
-  intType' x ~> (checkIfImmuteOperationValid a) <~> tcExpr b
+  sumType' (intType' x) (fixedType' x) ~> (checkIfImmuteOperationValid a) <~> tcExpr b
 tcExpr (Binary x "/=" a b) =
-  intType' x ~> (checkIfImmuteOperationValid a) <~> tcExpr b
+  sumType' (intType' x) (fixedType' x) ~> (checkIfImmuteOperationValid a) <~> tcExpr b
 tcExpr (Binary x "%=" a b) =
   intType' x ~> (checkIfImmuteOperationValid a) <~> tcExpr b
 tcExpr (Binary x "|=" a b) =
@@ -1792,7 +1801,7 @@ tcExpr (FunctionCall x expr args) = do
   case args of
     NamedArgs es -> apply e a $ Just (fst <$> es)
     _ -> apply e a Nothing
-tcExpr (Unitary x "-" a) = intType' x ~> tcExpr a
+tcExpr (Unitary x "-" a) = sumType' (intType' x) (fixedType' x) ~> tcExpr a
 tcExpr (Unitary x "++" a) = intType' x ~> tcExpr a
 tcExpr (Unitary x "--" a) = intType' x ~> tcExpr a
 tcExpr (Unitary x "!" a) = boolType' x ~> tcExpr a

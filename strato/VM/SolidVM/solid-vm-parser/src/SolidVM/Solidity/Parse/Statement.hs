@@ -393,8 +393,8 @@ primaryExpression = do
             ~(a, decimalNum) <- withPosition $ do
               num <- lexeme $ integer
               period <- string "."
-              fraction <- integer
-              let decimalNum = read (show num ++ period ++ show fraction) :: Decimal
+              fraction <- many1 digit
+              let decimalNum = read (show num ++ period ++ fraction) :: Decimal
               pure (decimalNum)
             pure $ FixedLiteral a $ WrappedDecimal decimalNum
           )

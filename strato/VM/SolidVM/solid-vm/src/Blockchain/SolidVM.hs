@@ -1454,7 +1454,7 @@ expToVar' (CC.NumberLiteral _ v (Just nu)) =
     CC.Finney -> return . Constant $ SInteger (v * (10 ^ (15 :: Integer)))
     CC.Ether -> return . Constant $ SInteger (v * (10 ^ (18 :: Integer)))
 expToVar' (CC.StringLiteral _ s) = return $ Constant $ SString s
-expToVar' (CC.FixedLiteral _ v) = return $ Constant $ SFixed v
+expToVar' (CC.FixedLiteral _ v) = return $ Constant $ SFixed $ CC.unwrapDecimal v
 expToVar' (CC.AccountLiteral _ a) = return $ Constant $ SAccount a False
 expToVar' (CC.BoolLiteral _ b) = return $ Constant $ SBool b
 expToVar' (CC.HexaLiteral _ a) = return $ Constant $ SString $ BC.unpack . either (parseError "Couldn't parse hexadecimal literal: ") id . B16.decode $ BC.pack a
@@ -1465,8 +1465,10 @@ expToVar' (CC.Variable _ "now") = Constant . SInteger . round . utcTimeToPOSIXSe
 expToVar' (CC.Variable _ name) = getVariableOfName name
 expToVar' (CC.Unitary _ "-" e) = do
   var <- expToVar e
-  value <- getInt var
-  return $ Constant $ SInteger (value * (-1))
+  value <- getRealNum var
+  case value of
+    Left v -> return $ Constant $ SInteger (v * (-1))
+    Right v -> return $ Constant $ SFixed $ v * (-1)
 expToVar' (CC.PlusPlus _ e) = do
   var <- expToVar e
   value <- getInt var
@@ -1496,9 +1498,14 @@ expToVar' (CC.Unitary _ "--" e) = do
   setVar var next
   return $ Constant next
 expToVar' (CC.Binary _ "+=" lhs rhs) = addAndAssign lhs rhs
-expToVar' (CC.Binary _ "-=" lhs rhs) = binopAssign (-) lhs rhs
-expToVar' (CC.Binary _ "*=" lhs rhs) = binopAssign (*) lhs rhs
-expToVar' (CC.Binary _ "/=" lhs rhs) = binopAssign mod lhs rhs
+expToVar' (CC.Binary _ "-=" lhs rhs) = subtractAndAssign lhs rhs
+expToVar' (CC.Binary _ "*=" lhs rhs) = multiplyAndAssign lhs rhs
+expToVar' ex@(CC.Binary _ "/=" lhs rhs) = do
+  rhs' <- getRealNum =<< expToVar rhs
+  case rhs' of
+    Left 0 -> divideByZero $ unparseExpression ex
+    Right 0 -> divideByZero $ unparseExpression ex
+    _ -> divideAndAssign lhs rhs
 expToVar' (CC.Binary _ "%=" lhs rhs) = binopAssign rem lhs rhs
 expToVar' (CC.Binary _ "|=" lhs rhs) = binopAssign (.|.) lhs rhs
 expToVar' (CC.Binary _ "&=" lhs rhs) = binopAssign (.&.) lhs rhs
@@ -1675,13 +1682,14 @@ expToVar' x@(CC.IndexAccess _ parent (Just mIndex)) = do
 --    _ -> error $ "unknown case in expToVar' for IndexAccess: " ++ show var
 
 expToVar' (CC.Binary _ "+" expr1 expr2) = expToVarAdd expr1 expr2
-expToVar' (CC.Binary _ "-" expr1 expr2) = expToVarInteger expr1 (-) expr2 SInteger
-expToVar' (CC.Binary _ "*" expr1 expr2) = expToVarInteger expr1 (*) expr2 SInteger
+expToVar' (CC.Binary _ "-" expr1 expr2) = expToVarSubtract expr1 expr2
+expToVar' (CC.Binary _ "*" expr1 expr2) = expToVarMultiply expr1 expr2
 expToVar' ex@(CC.Binary _ "/" expr1 expr2) = do
-  rhs <- getInt =<< expToVar expr2
+  rhs <- getRealNum =<< expToVar expr2
   case rhs of
-    0 -> divideByZero $ unparseExpression ex
-    _ -> expToVarInteger expr1 div expr2 SInteger
+    Left 0 -> divideByZero $ unparseExpression ex
+    Right 0 -> divideByZero $ unparseExpression ex
+    _ -> expToVarDivide expr1 expr2
 expToVar' (CC.Binary _ "%" expr1 expr2) = expToVarInteger expr1 rem expr2 SInteger
 expToVar' (CC.Binary _ "|" expr1 expr2) = expToVarInteger expr1 (.|.) expr2 SInteger
 expToVar' (CC.Binary _ "&" expr1 expr2) = expToVarInteger expr1 (.&.) expr2 SInteger
@@ -2387,7 +2395,35 @@ expToVarAdd expr1 expr2 = do
   case (i1, i2) of
     (SInteger a, SInteger b) -> return . Constant . SInteger $ a + b
     (SString a, SString b) -> return . Constant . SString $ a ++ b
+    (SFixed a, SFixed b) -> return . Constant . SFixed $ a + b
     _ -> typeError "expToVarAdd" (i1, i2)
+
+expToVarSubtract :: MonadSM m => CC.Expression -> CC.Expression -> m Variable
+expToVarSubtract expr1 expr2 = do
+  i1 <- getVar =<< expToVar expr1
+  i2 <- getVar =<< expToVar expr2
+  case (i1, i2) of
+    (SInteger a, SInteger b) -> return . Constant . SInteger $ a - b
+    (SFixed a, SFixed b) -> return . Constant . SFixed $ a - b
+    _ -> typeError "expToVarSubtract" (i1, i2)
+
+expToVarMultiply :: MonadSM m => CC.Expression -> CC.Expression -> m Variable
+expToVarMultiply expr1 expr2 = do
+  i1 <- getVar =<< expToVar expr1
+  i2 <- getVar =<< expToVar expr2
+  case (i1, i2) of
+    (SInteger a, SInteger b) -> return . Constant . SInteger $ a * b
+    (SFixed a, SFixed b) -> return . Constant . SFixed $ a * b
+    _ -> typeError "expToVarMultiply" (i1, i2)
+
+expToVarDivide :: MonadSM m => CC.Expression -> CC.Expression -> m Variable
+expToVarDivide expr1 expr2 = do
+  i1 <- getVar =<< expToVar expr1
+  i2 <- getVar =<< expToVar expr2
+  case (i1, i2) of
+    (SInteger a, SInteger b) -> return . Constant . SInteger $ a `div` b
+    (SFixed a, SFixed b) -> return . Constant . SFixed $ a / b
+    _ -> typeError "expToVarDivide" (i1, i2)
 
 expToVarInteger :: MonadSM m => CC.Expression -> (Integer -> Integer -> a) -> CC.Expression -> (a -> Value) -> m Variable
 expToVarInteger expr1 o expr2 retType = do
@@ -2404,7 +2440,47 @@ addAndAssign lhs rhs = do
   next <- case (curValue, delta) of
     (SInteger c, SInteger d) -> pure . SInteger $ c + d
     (SString c, SString d) -> pure . SString $ c ++ d
+    (SFixed c, SFixed d) -> pure . SFixed $ c + d
     _ -> typeError "addAndAssign" (curValue, delta)
+  setVar varToAssign next
+  return $ Constant next
+
+subtractAndAssign :: MonadSM m => CC.Expression -> CC.Expression -> m Variable
+subtractAndAssign lhs rhs = do
+  let readVal e = getVar =<< expToVar e
+  delta <- readVal rhs
+  curValue <- readVal lhs
+  varToAssign <- expToVar lhs
+  next <- case (curValue, delta) of
+    (SInteger c, SInteger d) -> pure . SInteger $ c - d
+    (SFixed c, SFixed d) -> pure . SFixed $ c - d
+    _ -> typeError "subtractAndAssign" (curValue, delta)
+  setVar varToAssign next
+  return $ Constant next
+
+multiplyAndAssign :: MonadSM m => CC.Expression -> CC.Expression -> m Variable
+multiplyAndAssign lhs rhs = do
+  let readVal e = getVar =<< expToVar e
+  delta <- readVal rhs
+  curValue <- readVal lhs
+  varToAssign <- expToVar lhs
+  next <- case (curValue, delta) of
+    (SInteger c, SInteger d) -> pure . SInteger $ c * d
+    (SFixed c, SFixed d) -> pure . SFixed $ c * d
+    _ -> typeError "multiplyAndAssign" (curValue, delta)
+  setVar varToAssign next
+  return $ Constant next
+
+divideAndAssign :: MonadSM m => CC.Expression -> CC.Expression -> m Variable
+divideAndAssign lhs rhs = do
+  let readVal e = getVar =<< expToVar e
+  delta <- readVal rhs
+  curValue <- readVal lhs
+  varToAssign <- expToVar lhs
+  next <- case (curValue, delta) of
+    (SInteger c, SInteger d) -> pure . SInteger $ c `mod` d
+    (SFixed c, SFixed d) -> pure . SFixed $ c / d
+    _ -> typeError "divideAndAssign" (curValue, delta)
   setVar varToAssign next
   return $ Constant next
 

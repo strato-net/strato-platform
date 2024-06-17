@@ -8574,3 +8574,94 @@ contract qq {
   string hsh = blockhash(900000);
   constructor() {}
 }|]) `shouldThrow` anyInvalidArgumentsError
+
+  it "can use fixed point numbers" $ runTest ( do
+    runBS [r|
+contract qq {
+  fixed x = 1.123123;
+  fixed negativeX = -1.123123;
+  fixed256x80 y = 0.0000003;
+  fixed z;
+  fixed copyOfX;
+  
+  constructor() {
+    copyOfX = x;
+  }
+}
+|]
+    getFields ["x", "negativeX", "y", "z", "copyOfX"]
+      `shouldReturn` [BFixed "1.123123",
+                      BFixed "-1.123123",
+                      BFixed "0.0000003",
+                      BDefault,
+                      BFixed "1.123123"
+                    ])
+
+  it "can use fixed point numbers with arithemetic operators" $ runTest ( do
+    runBS [r|
+contract qq {
+  fixed x = 1.123123;
+  fixed y = 2.0;
+  fixed sum;
+  fixed diff;
+  fixed product;
+  fixed quotient;
+  fixed negative;
+
+  constructor() {
+    sum = x + y;
+    diff = x - y;
+    product = x * y;
+    quotient = x / y;
+    negative = -y;
+  }
+}
+|]
+    getFields ["x", "y", "sum", "diff", "product", "quotient", "negative"] 
+      `shouldReturn` [BFixed "1.123123",
+                      BFixed "2.0",
+                      BFixed "3.123123",
+                      BFixed "-0.876877",
+                      BFixed "2.246246",
+                      BFixed "0.5615615",
+                      BFixed "-2"
+                     ])
+
+  it "can use fixed point numbers with assignment operators" $ runTest ( do
+    runBS [r|
+contract qq {
+  fixed x = 2.0;
+  fixed sum = 3.3;
+  fixed diff = 3.3;
+  fixed product = 3.3;
+  fixed quotient = 3.3;
+
+  constructor() {
+    sum += x;
+    diff -= x;
+    product *= x;
+    quotient /= x;
+  }
+}
+|]
+    getFields ["x", "sum", "diff", "product", "quotient"] 
+      `shouldReturn` [BFixed "2.0",
+                      BFixed "5.3",
+                      BFixed "1.3",
+                      BFixed "6.6",
+                      BFixed "1.65"
+                     ])
+
+  it "cannot divide by zero using fixed point numbers" $ runTest ( do
+    runBS [r|
+contract qq {
+  fixed x = 2.0;
+  fixed y;
+
+  constructor() {
+    x /= 0.0;
+    // y = 3.0 / 0.0;
+  }
+}
+|])
+    `shouldThrow` anyDivideByZeroError

@@ -14,6 +14,7 @@ module Blockchain.SolidVM.SetGet
     weakGetVar,
     getVar,
     getInt,
+    getRealNum,
     getBool,
     deleteVar,
     toBasic,
@@ -50,7 +51,7 @@ fromBasic :: MS.BasicValue -> Value
 fromBasic = \case
   MS.BInteger i -> SInteger i
   MS.BString s -> SString . BC.unpack $ s
-  MS.BFixed v -> SFixed $ CC.WrappedDecimal (read (BC.unpack v) :: Decimal)
+  MS.BFixed v -> SFixed $ read $ BC.unpack v
   MS.BBool b -> SBool b
   MS.BAccount a -> SAccount a False
   MS.BContract n a -> SContract n a
@@ -62,7 +63,7 @@ findDefault :: BasicType -> Value
 findDefault = \case
   TInteger -> SInteger 0
   TString -> SString ""
-  TFixed -> SFixed $ CC.WrappedDecimal 0
+  TFixed -> SFixed 0
   TBool -> SBool False
   TAccount -> (SAccount $ unspecifiedChain 0x0) False
   TContract n -> SContract n $ unspecifiedChain 0x0
@@ -75,7 +76,7 @@ toBasic :: Value -> Maybe MS.BasicValue
 toBasic = \case
   SInteger i -> Just $ MS.BInteger i
   SString s -> Just $ MS.BString (BC.pack s)
-  SFixed v -> Just $ MS.BFixed $ BC.pack $ show $ CC.unwrapDecimal v
+  SFixed v -> Just $ MS.BFixed $ BC.pack $ show v
   SBool b -> Just $ MS.BBool b
   SAccount a _ -> Just $ MS.BAccount a
   SContract n a -> Just $ MS.BContract n a
@@ -216,6 +217,14 @@ getInt p = do
     SInteger s -> return s
     _ -> typeError "getInt" (p, v)
 
+getRealNum :: MonadSM m => Variable -> m (Either Integer Decimal)
+getRealNum p = do
+  v <- getVar p
+  case v of
+    SInteger s -> return $ Left s
+    SFixed s -> return $ Right s
+    _ -> typeError "getRealNum" (p, v)
+
 getBool :: MonadSM m => Variable -> m Bool
 getBool p = do
   v <- getVar p
@@ -246,6 +255,7 @@ showSM :: MonadSM m => Value -> m String
 showSM SNULL = return "NULL"
 showSM (SInteger v) = return $ show v
 showSM (SString v) = return v
+showSM (SFixed v) = return $ show v
 showSM (SBool v) = return $ show v
 showSM (SEnumVal enumName valName num) =
   return $
