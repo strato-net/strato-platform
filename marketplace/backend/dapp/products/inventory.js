@@ -472,57 +472,26 @@ async function getAll(admin, args = {}, defaultOptions) {
 
     if (inventories) {
         inventories.forEach(inventory => {
-            const itemSale = sales.find(sale => sale.assetToBeSold == inventory.address && sale.isOpen);
-            if (itemSale) {
-                finalInventory.push({
-                    ...inventory,
-                    price: itemSale?.price,
-                    saleAddress: itemSale?.address,
-                    saleQuantity: itemSale?.quantity,
-                    saleDate: itemSale?.block_timestamp,
-                    totalLockedQuantity: itemSale?.totalLockedQuantity,
-                    paymentProviders: itemSale?.paymentProviders
-                });
-            }
-            else if (isMarketplaceSearch) {
-                if (isNullPriceRange) {
+            if (inventory['BlockApps-Mercata-Sale'] && inventory['BlockApps-Mercata-Sale'].length > 0) {
+                let sales = inventory['BlockApps-Mercata-Sale']
+                    .filter(sale => sale.isOpen === true);
 
-        // Currently can't filter on second table, so filtering sales fields here. 
-        // Sales only has price and quantity fields to filter, so better to join sales on asset table (asset has multiple filters for each route). 
-        if (inventories) {
-            inventories.forEach(inventory => {
-                if (inventory['BlockApps-Mercata-Sale'] && inventory['BlockApps-Mercata-Sale'].length > 0) {
-                    let sales = inventory['BlockApps-Mercata-Sale']
-                        .filter(sale => sale.isOpen === true);
+                // Filter by quantity if userProfile is present
+                if (userProfile) {
+                    sales = sales.filter(sale => sale.quantity > 0);
+                }
 
-                    // Filter by quantity if userProfile is present
-                    if (userProfile) {
-                        sales = sales.filter(sale => sale.quantity > 0);
+                // Filter by price range if range is specified
+                if (range && range.length > 0) {
+                    const [field, min, max] = range[0].split(",");
+                    if (field === 'price') {
+                        sales = sales.filter(sale => sale.price >= parseFloat(min) && sale.price <= parseFloat(max));
                     }
+                }
 
-                    // Filter by price range if range is specified
-                    if (range && range.length > 0) {
-                        const [field, min, max] = range[0].split(",");
-                        if (field === 'price') {
-                            sales = sales.filter(sale => sale.price >= parseFloat(min) && sale.price <= parseFloat(max));
-                        }
-                    }
-
-                    // Combine the inventories with sales data if there are valid sales for user profile route
-                    if (userProfile) {
-                        if (sales.length > 0 && (sales.price !== null || undefined)) { // Only combine if there are sales. We don't list unpublished items for this route. 
-                            finalInventory.push({
-                                ...inventory,
-                                price: sales[0]?.price,
-                                saleAddress: sales[0]?.address,
-                                saleQuantity: sales[0]?.quantity,
-                                saleDate: sales[0]?.block_timestamp,
-                                totalLockedQuantity: sales[0]?.totalLockedQuantity,
-                                paymentProviders: itemSale?.paymentProviders,
-                                'BlockApps-Mercata-Sale': undefined  // Removing the nested sale data to avoid redundancy
-                            });
-                        }
-                    } else { // Just combine the data if userProfile is not present
+                // Combine the inventories with sales data if there are valid sales for user profile route
+                if (userProfile) {
+                    if (sales.length > 0 && (sales.price !== null || undefined)) { // Only combine if there are sales. We don't list unpublished items for this route. 
                         finalInventory.push({
                             ...inventory,
                             price: sales[0]?.price,
@@ -534,21 +503,32 @@ async function getAll(admin, args = {}, defaultOptions) {
                             'BlockApps-Mercata-Sale': undefined  // Removing the nested sale data to avoid redundancy
                         });
                     }
-                } else if (isMarketplaceSearch && isNullPriceRange) {
+                } else { // Just combine the data if userProfile is not present
                     finalInventory.push({
                         ...inventory,
-                        price: null,
-                        saleAddress: null,
-                        saleQuantity: null,
-                        saleDate: null,
-                        totalLockedQuantity: null,
-                        paymentProviders: null
+                        price: sales[0]?.price,
+                        saleAddress: sales[0]?.address,
+                        saleQuantity: sales[0]?.quantity,
+                        saleDate: sales[0]?.block_timestamp,
+                        totalLockedQuantity: sales[0]?.totalLockedQuantity,
+                        paymentProviders: itemSale?.paymentProviders,
+                        'BlockApps-Mercata-Sale': undefined  // Removing the nested sale data to avoid redundancy
                     });
-                } else {
-                    finalInventory.push(inventory);
                 }
-            });
-        } 
+            } else if (isMarketplaceSearch && isNullPriceRange) {
+                finalInventory.push({
+                    ...inventory,
+                    price: null,
+                    saleAddress: null,
+                    saleQuantity: null,
+                    saleDate: null,
+                    totalLockedQuantity: null,
+                    paymentProviders: null,
+                });
+            } else {
+                finalInventory.push(inventory);
+            }
+        });
     }
     return finalInventory ? finalInventory.map((inventory) => marshalOut(inventory)) : undefined;
 }
