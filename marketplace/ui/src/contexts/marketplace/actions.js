@@ -431,7 +431,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/order/userAddresses/user?redemptionService=${redemptionService}`,
+        `${apiUrl}/order/userAddresses/user`,
         {
           method: HTTP_METHODS.GET,
         }
