@@ -189,19 +189,33 @@ async function get(user, args, options) {
 
 async function getAll(admin, args = {}, options) {
   let saleOrders;
-  const newOptions = { ...options,  org: 'BlockApps', app: 'Mercata' }
-  saleOrders = await searchAllWithQueryArgs(constants.orderTableName, {...args,queryOptions: {select:constants.attach_saleAddresses_Quantities_completedSales_onOrder}}, newOptions, admin);
-  const count = await searchAllWithQueryArgs(
-    constants.orderTableName,
-    {
-      ...args,
-      limit: undefined,
-      offset: 0,
-      order: undefined,
-      queryOptions: {
-        select: "count",
-      }
-    },
+  const { order, ...restArgs } = args;
+  const { offset, limit } = args;
+  const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
+  const newCountArgs = {
+    ...args,
+    status: '1',
+    limit: undefined,
+    offset: 0,
+    order: undefined,
+    queryOptions: {
+      select: 'count',
+    }
+  };
+
+  const countArgs = {
+    ...args,
+    limit: undefined,
+    offset: 0,
+    order: undefined,
+    queryOptions: {
+      select: 'count',
+    }
+  };
+
+  const newCount = await searchAllWithQueryArgs(
+    paymentTableName,
+    newCountArgs,
     newOptions,
     admin
   );
