@@ -3,7 +3,7 @@
 
 module Options where
 
-import Blockchain.Strato.Model.Options (computeNetworkID)
+import Blockchain.Strato.Model.Options
 import HFlags
 
 --defineFlag "u:pguser" ("postgres" :: String) "Postgres user"
@@ -18,9 +18,6 @@ import HFlags
 --defineFlag "nonceCounterTimeout" (10::Integer) "The number of seconds nonces are held in the global nonce counter cache"
 --defineFlag "sourceCacheTimeout" (60::Integer) "The number of seconds nonces are held in the global source code cache"
 --defineFlag "txQueueSize" (4096::Integer) "The maximum number of requests to queue"
-defineFlag "txSizeLimit" (150000 :: Int) "The maximum length of a valid RLP encoded transaction bytestring"
-defineFlag "accountNonceLimit" (1000 :: Integer) "The maximum number of transactions an account can make"
-defineFlag "gasLimit" (1000000 :: Integer) "The maximum amount of gas a transaction can use"
 defineFlag "identityServerUrl" ("" :: String) "The URL of the identity server" -- This could be used during the strato-getting started or default use with network flag
 defineFlag "vaultProxyPort" ("8013" :: String) "URL to Vault"
 defineFlag "userRegistryAddress" ("4be508b4b59039cbacf5f18ccd9b67ab48e86e6d" :: String) "Address of the User Registry contract" -- TODO: Change back to 720 once we start deploying networks with UserRegistry in the genesis block

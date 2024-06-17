@@ -95,10 +95,9 @@ const Checkout = () => {
           key: item.product.address,
           item: {
             name: item.product.name,
-            image:
-              item.product.images && item.product.images.length > 0
-                ? item.product.images[0]
-                : image_placeholder,
+            image: (item.product["BlockApps-Mercata-Asset-images"] && item.product["BlockApps-Mercata-Asset-images"].length > 0)
+            ? item.product["BlockApps-Mercata-Asset-images"][0].value
+            : image_placeholder,
             status: "Active",
           },
           category: parts[parts.length - 1],

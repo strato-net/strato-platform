@@ -170,19 +170,13 @@ async function get(user, args, options) {
   const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
   let order;
 
-  let searchArgs = setSearchQueryOptions( { ...restArgs, token: orderId }, {
-    key: "transaction_hash",
+  const searchArgs = setSearchQueryOptions(restArgs, {
+    key: "address",
     value: address,
   });
-  order = await searchOne(paymentTableName, searchArgs, newOptions, user);
+  searchArgs.queryOptions.select = constants.attach_saleAddresses_Quantities_completedSales_onOrder;
 
-  if (!order) {
-    searchArgs = setSearchQueryOptions(restArgs, {
-      key: "address",
-      value: address,
-    });
-    order = await searchOne(constants.orderTableName, searchArgs, newOptions, user);
-  }
+  order = await searchOne(constants.orderTableName, searchArgs, newOptions, user);
 
   if (!order) {
     return undefined;
@@ -195,33 +189,19 @@ async function get(user, args, options) {
 
 async function getAll(admin, args = {}, options) {
   let saleOrders;
-  const { order, ...restArgs } = args;
-  const { offset, limit } = args;
-  const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
-  const newCountArgs = {
-    ...args,
-    status: '1',
-    limit: undefined,
-    offset: 0,
-    order: undefined,
-    queryOptions: {
-      select: 'count',
-    }
-  };
-
-  const countArgs = {
-    ...args,
-    limit: undefined,
-    offset: 0,
-    order: undefined,
-    queryOptions: {
-      select: 'count',
-    }
-  };
-
-  const newCount = await searchAllWithQueryArgs(
-    paymentTableName,
-    newCountArgs,
+  const newOptions = { ...options,  org: 'BlockApps', app: 'Mercata' }
+  saleOrders = await searchAllWithQueryArgs(constants.orderTableName, {...args,queryOptions: {select:constants.attach_saleAddresses_Quantities_completedSales_onOrder}}, newOptions, admin);
+  const count = await searchAllWithQueryArgs(
+    constants.orderTableName,
+    {
+      ...args,
+      limit: undefined,
+      offset: 0,
+      order: undefined,
+      queryOptions: {
+        select: "count",
+      }
+    },
     newOptions,
     admin
   );

@@ -19,6 +19,9 @@ import RedemptionsIncomingDetails from "./components/Order/RedemptionsIncomingDe
 import { OrdersProvider } from "./contexts/order";
 import { UsersProvider } from "./contexts/users";
 import { UserActivityProvider } from "./contexts/userActivity";
+import AuthorizeIssuer from "./components/AuthorizeIssuer";
+import { IssuerStatusProvider } from "./contexts/issuerStatus";
+import OnboardingIntermediate from "./components/Inventory/OnboardingIntermediate";
 import ProductDetails from "./components/MarketPlace/ProductDetail";
 import Checkout from "./components/MarketPlace/Checkout";
 import ConfirmOrder from "./components/MarketPlace/ConfirmOrder";
@@ -130,6 +133,17 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
           </UsersProvider>
         }
       />
+      {user?.isAdmin && (<Route
+        exact
+        path={routes.Admin.url}
+        element={
+          <UsersProvider>
+            <IssuerStatusProvider>
+              <AuthorizeIssuer/>
+            </IssuerStatusProvider>
+          </UsersProvider>
+        }
+      />)}
       <Route
         exact
         path={routes.MarketplaceProductDetail.url}
@@ -176,7 +190,9 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
                     <InventoriesProvider>
                       <RedemptionsProvider>
                         <PaymentServicesProvider>
-                          <Inventory user={user} users={users} />
+                          <IssuerStatusProvider>
+                            <Inventory user={user} users={users} />
+                          </IssuerStatusProvider>
                         </PaymentServicesProvider>
                       </RedemptionsProvider>
                     </InventoriesProvider>
@@ -310,7 +326,6 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
         }
       />
       <Route exact path={routes.FAQ.url} element={<FAQ />} />
-      <Route path="/" element={<Navigate to={"/marketplace"} replace />} />
       <Route path="*" element={<Error />} />
     </Routes>
   );

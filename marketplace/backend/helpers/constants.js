@@ -10,6 +10,8 @@ export default {
   zeroAddress: '0000000000000000000000000000000000000000',
   certificateRegistryContractName: "OfficialCertificateRegistry",
   certificateContractName: "Certificate",
+  userContractName: 'BlockApps-UserRegistry-User',
+  mercataAdminContractName: 'MercataAdmin',
   emptyCert: '-----BEGIN CERTIFICATE-----\nMIIBVDCB+aADAgECAhBPjHUswOXtDsbDeQIsdepkMAwGCCqGSM49BAMCBQAwLDEJ\nMAcGA1UEAwwAMQkwBwYDVQQKDAAxCTAHBgNVBAsMADEJMAcGA1UEBgwAMB4XDTIx\nMDUyNTE1MzQxNVoXDTIyMDUyNTE1MzQxNVowLDEJMAcGA1UEAwwAMQkwBwYDVQQK\nDAAxCTAHBgNVBAsMADEJMAcGA1UEBgwAMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAE\n4X1p4KE8cB6vYqKzSHIl+V5fDUC9p0j8OfOQOUhCfkjG1ALuRyP68tTohz9TLPLk\nYCVKrCiueuZJbejnGsp21TAMBggqhkjOPQQDAgUAA0gAMEUCIQCVtizg/N3MBdLi\nfHto7tqu1ia6cZpMI/G2bLWSPErK9AIgcBw+S8iVqSjh61CkgBAS066Z7M/W9eeY\n+sm9OKHDfQQ=\n-----END CERTIFICATE-----',
   testCert1: '-----BEGIN CERTIFICATE-----\nMIIB0jCCAXegAwIBAgIQeEdWygiiwHQ9e5bfkQVdVTAMBggqhkjOPQQDAgUAMGsx\nEjAQBgNVBAMMCUJsb2NrQXBwczExMC8GA1UECgwoM2JhMzA0YjhlODc0MDViYmYy\nMzg4NzQzYjM5NmEyODEzMTcwYzAwZjEUMBIGA1UECwwLZW5naW5lZXJpbmcxDDAK\nBgNVBAYMA1VTQTAeFw0yMTEwMTkxNTE2MzZaFw0yMjEwMTkxNTE2MzZaMGsxEjAQ\nBgNVBAMMCUJsb2NrQXBwczExMC8GA1UECgwoM2JhMzA0YjhlODc0MDViYmYyMzg4\nNzQzYjM5NmEyODEzMTcwYzAwZjEUMBIGA1UECwwLZW5naW5lZXJpbmcxDDAKBgNV\nBAYMA1VTQTBWMBAGByqGSM49AgEGBSuBBAAKA0IABLsHOfw6jXFjQRAoLVDLwsmr\nKtHn5O6Cisa47lzxV0NfXVJXCcVP2N95GAB5/pmLsmE8rcdLQVBQFLWPjhGoCQ4w\nDAYIKoZIzj0EAwIFAANHADBEAiAChH6dQTLS/F/lNt7JkjMpC0uo6MEFI+zV5hCB\noNnc1gIgaMpLif4qKPRfAFjQJCJR8ORV1PEXf9xBK7XtPONqDQ0=\n-----END CERTIFICATE-----',
   testOrg1: '3ba304b8e87405bbf2388743b396a2813170c00f',
@@ -27,14 +29,17 @@ export default {
   sellerOrgName: "blockapps",
   assetTableName: "Asset",
   saleTableName: "Sale",
-  saleAllTableName: "BlockApps-Mercata-Sale",
   orderTableName: "Order",
+  saleAllTableName: "BlockApps-Mercata-Sale",
   blockAppsOrg: "BlockApps",
   prodNetworkId: "6909499098523985262",
   testnetNetworkId: "7596898649924658542",
   prodStratsAddress: "b220195543f652f735b7847c4af399d0323e1ff6",
   testnetStratsAddress: "488cd3909d94606051e0684cf6caa5763fb78613",
-  baUserNames: ['blockapps_carbon', 'blockapps_metals', 'blockapps_clothing', 'blockapps_collectibles', 'blockapps_memberships', 'blockapps_art'],
+  attachImagesAndFiles: "*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*)",
+  attachSalesAndImagesAndFiles: "*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Sale!BlockApps-Mercata-Sale_BlockApps-Mercata-Asset_fk(*)",
+  attach_saleAddresses_Quantities_completedSales_onOrder: "*,BlockApps-Mercata-Order-saleAddresses(*),BlockApps-Mercata-Order-quantities(*),BlockApps-Mercata-Order-completedSales(*)",
+  baUserNames: ['blockapps_carbon', 'blockapps_metals', 'blockapps_clothing', 'blockapps_collectibles', 'blockapps_memberships', 'blockapps_art', 'blockapps_spirits'],
   localHost: 'http://localhost'
 };
 
@@ -84,6 +89,12 @@ export const ITEM_STATUS = {
   "SOLD": 4
 }
 
+export const ISSUER_STATUS = {
+ "UNAUTHORIZED": "1",
+ "PENDING_REVIEW": "2",
+ "AUTHORIZED": "3" 
+}
+
 export const PAYMENT_TYPES = {
   "amex": "1",
   "discover": "2",
@@ -99,12 +110,10 @@ Object.freeze(SERVICE_PROVIDERS)
 
 // Helpers to calculate average price, range, units sold for Pirce History Stats
 export const calculateAveragePrice = (records) => {
-  const total = records.reduce((sum, record) => sum + Number(record.price), 0);
-  return (total / records.length).toFixed(2);
+  return records.reduce((sum, record) => sum + record.price, 0) / records.length;
 }
 
-
-export const calculatePriceFluctuation =(records)=> {
+export const calculatePriceFluctuation = (records) => {
   const prices = records.map(record => record.price);
   return { min: Math.min(...prices), max: Math.max(...prices) };
 }

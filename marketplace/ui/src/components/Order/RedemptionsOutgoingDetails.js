@@ -43,7 +43,7 @@ const RedemptionsOutgoingDetails = ({ user }) => {
     const [api, contextHolder] = notification.useNotification();
     const { redemption, isFetchingRedemptionDetails } = useRedemptionState();
     const inventoryDispatch = useInventoryDispatch();
-    const { inventoryDetails, isInventoryDetailsLoading } = useInventoryState();
+    let { inventoryDetails, isInventoryDetailsLoading } = useInventoryState();
 
     const routeMatch = useMatch({
         path: routes.RedemptionsOutgoingDetails.url,
@@ -121,6 +121,8 @@ const RedemptionsOutgoingDetails = ({ user }) => {
     };
 
     const navigate = useNavigate();
+
+    inventoryDetails={...inventoryDetails, images: inventoryDetails && Array.isArray(inventoryDetails["BlockApps-Mercata-Asset-images"]) ? inventoryDetails["BlockApps-Mercata-Asset-images"][0].value: []}
 
     let column = [
         {
