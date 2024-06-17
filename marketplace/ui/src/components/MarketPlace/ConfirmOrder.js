@@ -2,7 +2,9 @@ import {
   Row,
   notification,
   Spin,
-  Modal
+  Modal,
+  Select,
+  Button
 } from "antd";
 import {
   useMarketplaceState,
@@ -24,12 +26,14 @@ import { HTTP_METHODS, PAYMENT_LIST } from "../../helpers/constants";
 import TagManager from "react-gtm-module";
 import { setCookie } from "../../helpers/cookie";
 
+const { Option } = Select;
+
 const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const orderDispatch = useOrderDispatch();
   const [api, contextHolder] = notification.useNotification();
   const { user, hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
-  const userOrganization = user?.organization
+  const userOrganization = user?.organization;
   const { isCreateOrderSubmitting, message, success, isCreatePaymentSubmitting } = useOrderState();
   const [tax, setTax] = useState(0);
   const [total, setTotal] = useState(0);
@@ -37,6 +41,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   const { success: marketplaceSuccess, message: marketplaceMessage } = useMarketplaceState();
   const [modal, contextHolderForModal] = Modal.useModal();
   const [cartData, setCartData] = useState(data);
+  const [selectedProvider, setSelectedProvider] = useState(paymentProviders.find(provider => provider.serviceName === 'Stripe') || paymentProviders[0]);
 
   useEffect(() => {
     setCartData(data);
@@ -163,6 +168,11 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
     }
   };
 
+  const handleChange = value => {
+    const provider = paymentProviders.find(provider => provider.serviceName === value);
+    setSelectedProvider(provider);
+  };
+
   return (
     <>
       <div>
@@ -207,8 +217,23 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
                   </Row>
                 </div>
               </div>
-              {paymentProviders.map((paymentProvider) => (<div id="review-and-submit" className="flex md:pb-2 items-center mr-4">
-                <button id="pay-now-button" className={`p-1 md:p-3 h-max rounded-lg border border-primary bg-primary hover:bg-primaryHover text-white`}
+              <div id="review-and-submit" className="flex md:pb-2 items-center mr-4">
+                <div className="mr-4">
+                  <Select
+                    defaultValue={selectedProvider.serviceName}
+                    style={{ width: 200 }}
+                    onChange={handleChange}
+                  >
+                    {paymentProviders.map(provider => (
+                      <Option key={provider.serviceName} value={provider.serviceName}>
+                        {provider.checkoutText}
+                      </Option>
+                    ))}
+                  </Select>
+                </div>
+                <Button
+                  id="pay-now-button"
+                  className="p-1 md:p-3 h-max rounded-lg border border-primary bg-primary hover:bg-primaryHover text-white"
                   onClick={async () => {
                     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                       countDown();
@@ -216,12 +241,12 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
                         const saleAddresses = [];
                         const quantities = [];
                         cartData.forEach((item) => {
-                          saleAddresses.push(item.saleAddress)
-                          quantities.push(item.qty)
-                        })
-                        const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities)
+                          saleAddresses.push(item.saleAddress);
+                          quantities.push(item.qty);
+                        });
+                        const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities);
                         if (checkQuantity === true) {
-                          handlePaymentConfirm(paymentProvider);
+                          handlePaymentConfirm(selectedProvider);
                         } else {
                           let insufficientQuantityMessage = "";
                           let outOfStockMessage = "";
@@ -249,11 +274,13 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
                   }
                 >
                   <div className="flex items-center mr-1">
-                    {paymentProvider && paymentProvider.checkoutText}&nbsp; 
-                    {paymentProvider && paymentProvider.imageURL && paymentProvider.imageURL !== '' ? <img src={paymentProvider.imageURL} alt={paymentProvider.serviceName} height="16px" width="16px"/> : ''}
+                    {selectedProvider.checkoutText}&nbsp; 
+                    {selectedProvider.imageURL && selectedProvider.imageURL !== '' ? (
+                      <img src={selectedProvider.imageURL} alt={selectedProvider.serviceName} height="16px" width="16px" />
+                    ) : ''}
                   </div>
-                </button>
-              </div>))}
+                </Button>
+              </div>
             </div>
           </div>
         )}
@@ -263,6 +290,5 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
     </>
   );
 };
-
 
 export default ConfirmOrder;
