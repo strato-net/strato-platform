@@ -20,6 +20,7 @@ import Blockchain.Strato.Model.Class (blockHash)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
+import Blockchain.Strato.Model.Validator
 import Control.DeepSeq
 import Control.Lens
 import Control.Monad (liftM2)
@@ -160,7 +161,7 @@ data InEvent
   | PreprepareResponse PreprepareDecision
   | ForcedConfigChange ForcedConfigChange
   | ValidatorBehaviorChange ForcedValidatorChange
-  | ValidatorChange ChainMemberParsedSet Bool
+  | ValidatorChange Validator Bool
   deriving (Eq, Show)
 
 instance Format InEvent where
@@ -348,7 +349,7 @@ data AuthResult = AuthSuccess | AuthFailure String deriving (Show, Eq)
 
 data Checkpoint = Checkpoint
   { checkpointView :: View,
-    checkpointValidators :: [ChainMemberParsedSet]
+    checkpointValidators :: [Validator]
   }
   deriving (Show, Eq, Generic, NFData, Ae.ToJSON, Ae.FromJSON, Data)
 

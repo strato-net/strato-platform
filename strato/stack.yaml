@@ -67,7 +67,8 @@ packages:
 - libs/type-lits
 - libs/x509-certs
 
-- simulator/strato-lite
+#removing for now, too hard to keep this up to date when making large changes elsewhere
+#- simulator/strato-lite
 
 - tools/blockapps-tools
 - tools/debugger-tools

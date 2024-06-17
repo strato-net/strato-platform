@@ -4,6 +4,14 @@ export const Authentication = {
   logout: '/logout',
 }
 
+export const IssuerStatus = {
+  prefix: '/issuerstatus',
+  requestReview: '/requestReview',
+  authorizeIssuer: '/authorizeIssuer',
+  deauthorizeIssuer: '/deauthorizeIssuer',
+  admin: '/admin',
+}
+
 export const Users = {
   prefix: '/users',
   me: '/me',
@@ -177,7 +185,9 @@ export const Marketplace = {
   getAllLoggedIn: '/all',
   getTopSellingProducts: '/topselling',
   getTopSellingProductsLoggedIn: '/user/topselling',
-  getStratsBalance: '/strats'
+  transferStrats: '/strats/transfer',
+  getStratsBalance: '/strats',
+  getStratsTransactionHistory: '/strats/history'
 }
 
 export const PaymentService = {

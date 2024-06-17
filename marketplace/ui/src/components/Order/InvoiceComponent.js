@@ -93,7 +93,7 @@ const InvoiceComponent = ({ invoice }) => {
     settotalTax(tax);
     setSubtotal(invoice.order.totalPrice - tax);
   }, [invoice])
-
+  const orderQuantities = invoice.order["BlockApps-Mercata-Order-quantities"].map(item => item.value);
   return (
     <Document>
       <Page size="A4" style={styles.page}>
@@ -121,9 +121,9 @@ const InvoiceComponent = ({ invoice }) => {
             <View style={styles.tableRow} key={asset.address}>
               <Text style={[styles.value, styles.tableRowColumn]}>{decodeURIComponent(asset.name)}</Text>
               <Text style={[styles.value, styles.tableRowColumn]}>${asset.price}</Text>
-              <Text style={[styles.value, styles.tableRowColumn]}>{invoice.order.quantities[index]}</Text>
+              <Text style={[styles.value, styles.tableRowColumn]}>{orderQuantities[index]}</Text>
               <Text style={[styles.value, styles.tableRowColumn]}>${asset.tax ? asset.tax : 0}</Text>
-              <Text style={[styles.value, styles.tableRowColumn]}>${asset.price * invoice.order.quantities[index]}</Text>
+              <Text style={[styles.value, styles.tableRowColumn]}>${asset.price * orderQuantities[index]}</Text>
             </View>
           ))}
         </View>

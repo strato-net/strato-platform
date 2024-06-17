@@ -114,6 +114,7 @@ import Blockchain.Strato.Model.ExtendedWord (Word256)
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.RedisBlockDB.Models as Models
+import Blockchain.Strato.Model.Validator (Validator)
 import Control.Arrow (second, (&&&), (***))
 import Control.Concurrent (threadDelay)
 import Control.Monad
@@ -242,7 +243,7 @@ getValidatorAddresses = do
     Right keysBS -> (fmap userAddress . catMaybes) <$> (sequence $ (getCertFromParsedSet . fromValue) <$> keysBS)
 
 addValidators ::
-  [CM.ChainMemberParsedSet] ->
+  [Validator] ->
   Redis (Either Reply Status)
 addValidators [] = pure $ Right Ok
 addValidators vals =
@@ -251,7 +252,7 @@ addValidators vals =
     Left reply -> pure $ Left reply
 
 removeValidators ::
-  [CM.ChainMemberParsedSet] ->
+  [Validator] ->
   Redis (Either Reply Status)
 removeValidators [] = pure $ Right Ok
 removeValidators vals =

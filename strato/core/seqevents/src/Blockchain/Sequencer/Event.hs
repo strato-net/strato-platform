@@ -27,6 +27,7 @@ import Blockchain.Strato.Model.ExtendedWord (Word256)
 import Blockchain.Strato.Model.Keccak256 (Keccak256)
 import Blockchain.Strato.Model.MicroTime
 import Blockchain.Strato.Model.StateRoot
+import Blockchain.Strato.Model.Validator
 import Control.DeepSeq
 import Control.Lens
 import Data.Aeson hiding (encode)
@@ -64,8 +65,8 @@ data IngestEvent
   | IENewCertRegistered A.Address X509CertInfoState
   | IECertRevoked A.Address
   | IENewChainOrgName Word256 ChainMemberParsedSet
-  | IEValidatorAdded Keccak256 ChainMemberParsedSet
-  | IEValidatorRemoved Keccak256 ChainMemberParsedSet
+  | IEValidatorAdded Keccak256 Validator
+  | IEValidatorRemoved Keccak256 Validator
   | IEBlockstanbul PBFT.WireMessage
   | IEForcedConfigChange PBFT.ForcedConfigChange
   | IEValidatorBehavior PBFT.ForcedValidatorChange

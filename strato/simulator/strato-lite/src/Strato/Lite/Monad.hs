@@ -1105,7 +1105,6 @@ newSequencerContext bc = do
         _chainHashRegistry = M.empty,
         _chainIdRegistry = M.empty,
         _chainInfoRegistry = M.empty,
-        _x509certRegistry = M.empty,
         _x509certInfoState = M.empty,
         _getChainsDB = emptyGetChainsDB,
         _getTransactionsDB = emptyGetTransactionsDB,

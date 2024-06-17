@@ -207,8 +207,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
               alt={imgMeta}
               title={imgMeta}
               src={
-                inventory.images && inventory.images.length > 0
-                  ? inventory.images[0]
+                inventory["BlockApps-Mercata-Asset-images"] && inventory["BlockApps-Mercata-Asset-images"].length > 0
+                  ? inventory["BlockApps-Mercata-Asset-images"][0].value
                   : image_placeholder}
 
             />

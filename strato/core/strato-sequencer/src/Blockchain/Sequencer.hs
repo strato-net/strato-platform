@@ -40,6 +40,7 @@ import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class as BDB
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
+import Blockchain.Strato.Model.Validator
 import ClassyPrelude (atomically)
 import Conduit
 import Control.Concurrent hiding (yield)
@@ -131,7 +132,7 @@ type MonadSequencer m =
     HasVault m
   )
 
-sequencer :: [ChainMemberParsedSet] -> SequencerM ()
+sequencer :: [Validator] -> SequencerM ()
 sequencer validators = do
   let logF = logFF "sequencer"
   hasPBFT <- isJust <$> getBlockstanbulContext
@@ -142,7 +143,7 @@ sequencer validators = do
       Just cert -> do
         let chainm = getChainMemberFromX509 cert
         logF $ "Node identity verified: " ++ show chainm
-        case chainm `elem` validators of
+        case chainMemberParsedSetToValidator chainm `elem` validators of
           True -> do
             putBlockstanbulContext $ ctx { _selfCert = Just chainm, _isValidator = True }
             logF "You are a validator in this network!"
