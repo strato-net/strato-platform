@@ -13,6 +13,9 @@
 
 module Handlers.Faucet
   ( API,
+    PostFaucet,
+    PostFaucetMultipart,
+    PostDataFaucet,
     server,
     postFaucet,
     postFaucetMultipart,
@@ -57,12 +60,12 @@ import Text.Format
 import Text.Printf
 import UnliftIO
 
-type API =
-  "faucet" :> ReqBody '[FormUrlEncoded] Address
+type API = PostFaucet :<|> PostFaucetMultipart :<|> PostDataFaucet
+type PostFaucet = "faucet" :> ReqBody '[FormUrlEncoded] Address
     :> Post '[JSON] [Keccak256]
-    :<|> "faucet" :> MultipartForm Mem (MultipartData Mem)
+type PostFaucetMultipart = "faucet" :> MultipartForm Mem (MultipartData Mem)
       :> Post '[JSON] [Keccak256]
-    :<|> "dataFaucet" :> QueryParam "size" Int
+type PostDataFaucet = "dataFaucet" :> QueryParam "size" Int
       :> QueryParam "count" Int
       :> Get '[JSON] [Keccak256]
 

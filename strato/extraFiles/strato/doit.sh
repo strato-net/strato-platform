@@ -13,26 +13,30 @@ echo 'export PS1="⛓ \w> "' >> /root/.bashrc
 
 declare -A MONITORED_PIDS
 MONITORING_TIMER=5;
-PSQL_CONNECTION_PARAMS="-h ${postgres_host} -p ${postgres_port} -U ${postgres_user}"
-
-echo 'Waiting for Postgres to be available...'
-until pg_isready ${PSQL_CONNECTION_PARAMS}
-do
-  echo "Check at $(date)"
-  sleep 0.5
-done
-echo 'Postgres is available'
+if [ -z "${EXTERNAL_NODE_URL}" ]; then
+  PSQL_CONNECTION_PARAMS="-h ${postgres_host} -p ${postgres_port} -U ${postgres_user}"
+  
+  echo 'Waiting for Postgres to be available...'
+  until pg_isready ${PSQL_CONNECTION_PARAMS}
+  do
+    echo "Check at $(date)"
+    sleep 0.5
+  done
+  echo 'Postgres is available'
+fi
 # Check if this container was initialized before
 if [ ! -f _container_initialized ]; then
-  # Check if need to wipe slipstream ("cirrus") db (NOT REQUIRED if in-place update with containers re-created and all volumes intact; REQUIRED in case of re-sync after --drop-chains)
-  if [ ! -f /volume_data/_volume_initialized ]; then
-    # drop slipstream db if already exists
-    PGPASSWORD=${postgres_password} dropdb ${PSQL_CONNECTION_PARAMS} --if-exists ${postgres_slipstream_db}
-    # Create the database for slipstream
-    PGPASSWORD=${postgres_password} createdb ${PSQL_CONNECTION_PARAMS} ${postgres_slipstream_db}
-    # Make sure the volume dir exists
-    mkdir -p /volume_data
-    date '+%Y-%m-%d %H:%M:%S' >  /volume_data/_volume_initialized
+  if [ -z "${EXTERNAL_NODE_URL}" ]; then
+    # Check if need to wipe slipstream ("cirrus") db (NOT REQUIRED if in-place update with containers re-created and all volumes intact; REQUIRED in case of re-sync after --drop-chains)
+    if [ ! -f /volume_data/_volume_initialized ]; then
+      # drop slipstream db if already exists
+      PGPASSWORD=${postgres_password} dropdb ${PSQL_CONNECTION_PARAMS} --if-exists ${postgres_slipstream_db}
+      # Create the database for slipstream
+      PGPASSWORD=${postgres_password} createdb ${PSQL_CONNECTION_PARAMS} ${postgres_slipstream_db}
+      # Make sure the volume dir exists
+      mkdir -p /volume_data
+      date '+%Y-%m-%d %H:%M:%S' >  /volume_data/_volume_initialized
+    fi
   fi
   # Create logs directory
   mkdir /logs
@@ -467,24 +471,26 @@ stratoBootnode=${bootnode:+--stratoBootnode=$bootnode}
 mkdir -p /var/lib/strato
 cd /var/lib/strato
 
-if [[ -n $genesisBlock ]]
-then echo "$genesisBlock" > ${genesis:-gettingStarted}Genesis.json
+if [ -z "${EXTERNAL_NODE_URL}" ]; then
+  if [[ -n $genesisBlock ]]
+  then echo "$genesisBlock" > ${genesis:-gettingStarted}Genesis.json
+  fi
+  
+  until nc -z $zkHost 2181 >&/dev/null
+  do  echo "Waiting for Zookeeper to become available"
+      sleep 1
+  done
+  
+  until nc -z $kafkaHost 9092 >&/dev/null
+  do  echo "Waiting for Kafka to become available"
+      sleep 1
+  done
+  
+  until PGPASSWORD=$pgPass psql -h "$pgHost" -U "$pgUser" -c '\l'; do
+    >&2 echo "Waiting for Postgres to become available"
+    sleep 1
+  done
 fi
-
-until nc -z $zkHost 2181 >&/dev/null
-do  echo "Waiting for Zookeeper to become available"
-    sleep 1
-done
-
-until nc -z $kafkaHost 9092 >&/dev/null
-do  echo "Waiting for Kafka to become available"
-    sleep 1
-done
-
-until PGPASSWORD=$pgPass psql -h "$pgHost" -U "$pgUser" -c '\l'; do
-  >&2 echo "Waiting for Postgres to become available"
-  sleep 1
-done
 
 # Main entry point
 newnode

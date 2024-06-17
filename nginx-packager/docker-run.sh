@@ -85,6 +85,13 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     sed -i '/#TEMPLATE_VAULTLESS_MODE/d' /tmp/nginx.conf
   fi
 
+  if [ -z "${EXTERNAL_NODE_URL}" ]; then
+    sed -i '/#TEMPLATE_SERVER_MODE/d' /tmp/nginx.conf
+  else
+    sed -i '/#TEMPLATE_CLIENT_MODE/d' /tmp/nginx.conf
+    sed -i 's|__EXTERNAL_NODE_URL__|'"$EXTERNAL_NODE_URL"'|g' /tmp/nginx.conf
+  fi
+
   if [ "$SMD_DEV_MODE" != true ]; then
     sed -i '/#TEMPLATE_SMD_DEV_MODE/d' /tmp/nginx.conf
 
@@ -160,12 +167,14 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   fi
 fi
 
-echo 'Waiting for apex to be available...'
-until curl --silent --output /dev/null --fail --location http://${APEX_HOST}/_ping
-do
-  sleep 0.5
-done
-echo 'apex is available'
+if [ -z "${EXTERNAL_NODE_URL}" ]; then
+  echo 'Waiting for apex to be available...'
+  until curl --silent --output /dev/null --fail --location http://${APEX_HOST}/_ping
+  do
+    sleep 0.5
+  done
+  echo 'apex is available'
+fi
 
 echo 'Waiting for VaultProxy to be available with node key added to Vault...'
 until curl --silent --output /dev/null --fail --location http://${STRATO_HOSTNAME}:${STRATO_PORT_VAULT_PROXY}/strato/v2.3/key

@@ -17,6 +17,7 @@ library:
   - blockapps-data
   - blockapps-datadefs
   - bytestring
+  - base16-bytestring
   - clock
   - common-log
   - conduit
@@ -58,3 +59,4 @@ library:
   - identity-monad
   - strato-redis-blockdb
   - evm-solidity
+  - x509-certs

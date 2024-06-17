@@ -20,6 +20,7 @@ executables:
     - blockapps-mpdbs
     - blockapps-init
     - bytestring
+    - base16-bytestring
     - cache
     - clock
     - common-log
@@ -33,8 +34,10 @@ executables:
     - monad-alter
     - parametric-apis
     - regex-compat
+    - servant-client
     - servant-client-core
     - servant-multipart
+    - servant-multipart-client  
     - servant-server
     - servant-swagger
     - servant-swagger-ui
@@ -43,6 +46,7 @@ executables:
     - strato-model
     - strato-monad
     - swagger2
+    - text
     - transformers
     - unliftio
     - vault-monad
@@ -51,6 +55,7 @@ executables:
     - wai-extra
     - wai-middleware-prometheus
     - warp
+    - x509-certs
     # Don't touch this next setting, leave -threaded, otherwise it WILL NOT WORK
     # https://blockappsdev.slack.com/archives/G5E7K3ETX/p1645104924934129
     ghc-options: -threaded

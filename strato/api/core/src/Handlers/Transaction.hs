@@ -22,6 +22,7 @@ module Handlers.Transaction
     API,
     getTransactionClient,
     getTransactionClient',
+    postTransactionClient,
     getTransaction,
     getTransaction',
     postTransaction,
@@ -121,6 +122,9 @@ getTransactionClient = client (Proxy @GetTransaction)
 getTransactionClient' :: TxsFilterParams -> ClientM [RawTransaction']
 getTransactionClient' (TxsFilterParams a b c d e f g h i j k l m n o p q) =
   getTransactionClient a b c d e f g h i j k l m n o p q
+
+postTransactionClient :: RawTransaction' -> ClientM Keccak256
+postTransactionClient = client (Proxy @PostTransaction)
 
 data TxsFilterParams = TxsFilterParams
   { qtAddress :: Maybe Address,

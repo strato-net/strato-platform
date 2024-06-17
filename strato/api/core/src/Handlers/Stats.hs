@@ -11,6 +11,8 @@
 
 module Handlers.Stats
   ( API,
+    TotalTxAPI,
+    TotalDifficultyAPI,
     server,
   )
 where
@@ -53,9 +55,9 @@ instance ToSchema TransactionCount where
     return $
       NamedSchema (Just "TransactionCount") mempty
 
-type API =
-  "stats" :> "totaltx" :> Get '[JSON] TransactionCount
-    :<|> "stats" :> "difficulty" :> Get '[JSON] TotalDifficulty
+type API = TotalTxAPI :<|> TotalDifficultyAPI
+type TotalTxAPI = "stats" :> "totaltx" :> Get '[JSON] TransactionCount
+type TotalDifficultyAPI = "stats" :> "difficulty" :> Get '[JSON] TotalDifficulty
 
 server :: HasSQL m => ServerT API m
 server = getStatTx :<|> getStatDiff

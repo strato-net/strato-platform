@@ -41,11 +41,11 @@ import Control.Monad.Composable.Identity
 import Control.Monad.Composable.SQL
 import Control.Monad.Composable.Strato hiding (httpManager)
 import Control.Monad.Composable.Vault hiding (httpManager)
-import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Reader
 import Data.Aeson
+import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy.Char8 as BLC
 import qualified Data.Cache as Cache
@@ -54,6 +54,9 @@ import Data.Map (fromList, traverseWithKey)
 import Data.Maybe (fromJust, isJust, listToMaybe, maybeToList)
 import Data.Source.Map
 import Data.Swagger hiding (Http, delete)
+import Data.Text (Text)
+import Data.Text.Encoding (encodeUtf8)
+import GHC.Stack
 import HFlags
 import qualified Handlers.AccountInfo as Account
 import qualified Handlers.BatchTransactionResult as BatchTransactionResult
@@ -81,8 +84,9 @@ import Network.Wai.Middleware.RequestLogger
 import Options
 import SQLM
 import Servant
-import Servant.Client.Core hiding (requestMethod)
+import Servant.Client
 import Servant.Multipart
+import Servant.Multipart.Client ()
 import Servant.Swagger
 import Servant.Swagger.UI
 import SolidVM.Model.CodeCollection.Contract
@@ -92,43 +96,45 @@ import Text.Tools
 import UnliftIO hiding (Handler)
 import Prelude hiding (lookup)
 
-instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Account Contract (SQLM m) where
+instance (MonadUnliftIO m, MonadLogger m, HasStrato m) => Selectable Account Contract (ReaderT r m) where
   select _ a = runMaybeT $ do
     (AddressStateRef' r _) <-
       MaybeT
         . fmap listToMaybe
-        . Account.getAccount'
+        . blocStrato
+        . Account.getAccountsClient
         $ Account.accountsFilterParams
           & Account.qaAddress ?~ (a ^. accountAddress)
           & Account.qaChainId .~ (fmap ChainId . maybeToList $ a ^. accountChainId)
     codePtr <- MaybeT . pure $ addressStateRefCodePtr r
     MaybeT $ either (const Nothing) (Just . snd) <$> getContractDetailsByCodeHash codePtr
 
-instance Selectable Account Contract m => Selectable Account Contract (ReaderT a m) where
-  select p = lift . select p
+instance (MonadUnliftIO m, MonadLogger m, HasStrato m) => (Keccak256 `Selectable` SourceMap) (ReaderT r m) where
+  select _ k = do
+    (eSrc :: Either SomeException SourceMap) <- try . blocStrato $ client (Proxy @Account.CodeAPI) k
+    case eSrc of
+      Left _ -> pure Nothing
+      Right r -> pure $ Just r
 
-instance {-# OVERLAPPING #-} MonadUnliftIO m => (Keccak256 `Selectable` SourceMap) (SQLM m) where
-  select _ = Account.getCodeFromPostgres
+-- eitherToMaybe
+e2m :: Either a b -> Maybe b
+e2m (Right b) = Just b
+e2m _         = Nothing
 
-instance (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceMap) (ReaderT a m) where
-  select p = lift . select p
-
-instance {-# OVERLAPPING #-} MonadUnliftIO m => (Keccak256 `Alters` DBCode) (SQLM m) where
-  lookup _ k = fmap (SolidVM,) <$> Account.getCodeByteStringFromPostgres k
+instance (MonadUnliftIO m, MonadLogger m, HasStrato m) => (Keccak256 `Alters` DBCode) (ReaderT r m) where
+  lookup _ k = do
+    (eRaw :: Either SomeException Text) <- try . blocStrato $ client (Proxy @Account.RawCodeAPI) k
+    pure . fmap (SolidVM,) $ e2m . B16.decode . encodeUtf8 =<< e2m eRaw
   insert _ _ _ = error "API: Keccak256 `Alters` DBCode insert"
   delete _ _ = error "API: Keccak256 `Alters` DBCode delete"
 
-instance (Keccak256 `Alters` DBCode) m => (Keccak256 `Alters` DBCode) (ReaderT a m) where
-  lookup p = lift . lookup p
-  insert p k = lift . insert p k
-  delete p = lift . delete p
-
-instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Account AddressState (SQLM m) where
+instance (MonadUnliftIO m, MonadLogger m, HasStrato m) => Selectable Account AddressState (ReaderT r m) where
   select _ a = runMaybeT $ do
     (AddressStateRef' r _) <-
       MaybeT
         . fmap listToMaybe
-        . Account.getAccount'
+        . blocStrato
+        . Account.getAccountsClient
         $ Account.accountsFilterParams
           & Account.qaAddress ?~ (a ^. accountAddress)
           & Account.qaChainId .~ (fmap ChainId . maybeToList $ a ^. accountChainId)
@@ -141,19 +147,19 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Account AddressState 
         codePtr
         (toMaybe 0 $ addressStateRefChainId r)
 
-instance Selectable Account AddressState m => Selectable Account AddressState (ReaderT a m) where
-  select p = lift . select p
-
-instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address Certificate (CirrusM m) where
-  select _ = Account.getX509CertForAccount
-
-instance Selectable Address Certificate m => Selectable Address Certificate (ReaderT a m) where
-  select p = lift . select p
+instance (MonadUnliftIO m, MonadLogger m, HasStrato m) => Selectable Address Certificate (ReaderT r m) where
+  select _ k = do
+    (eCert :: Either SomeException Certificate)  <- try . blocStrato $ client (Proxy @Account.GetX509) k
+    case eCert of
+      Left _ -> pure Nothing
+      Right r -> pure $ Just r
 
 type CoreAPI =
   "eth" :> "v1.2"
     :> ( Account.API
            :<|> Account.CodeAPI
+           :<|> Account.RawCodeAPI
+           :<|> Account.GetX509
            :<|> BatchTransactionResult.API
            :<|> BlkLast.API
            :<|> Block.API
@@ -179,15 +185,17 @@ type FullAPIExternal = FullAPI' '[Optional, Strict] ExternalHeaders
 coreServer ::
   ( MonadLogger m,
     HasSQL m,
+    HasCirrus m,
     Accessible Metadata.UrlMap m,
     Accessible IdentityData m,
-    Accessible VaultData m,
-    Selectable Keccak256 SourceMap m
+    Accessible VaultData m
   ) =>
   ServerT CoreAPI m
 coreServer =
   Account.server
     :<|> Account.codeServer
+    :<|> Account.rawCodeServer
+    :<|> Account.getX509Server
     :<|> BatchTransactionResult.server
     :<|> BlkLast.server
     :<|> Block.server
@@ -204,9 +212,45 @@ coreServer =
     :<|> TransactionResult.server
     :<|> TxLast.server
 
+coreProxyServer ::
+  ( MonadIO m,
+    MonadLogger m,
+    HasStrato m,
+    HasCallStack,
+    Selectable Keccak256 SourceMap m
+  ) =>
+  ServerT CoreAPI m
+coreProxyServer =
+    (\a b c d e f g h i j k l m n o p q -> blocStrato $ (client (Proxy @Account.API) a b c d e f g h i j k l m n o p q))
+    :<|> (\a -> blocStrato $ client (Proxy @Account.CodeAPI) a)
+    :<|> (\a -> blocStrato $ client (Proxy @Account.RawCodeAPI) a)
+    :<|> (\a -> blocStrato $ client (Proxy @Account.GetX509) a)
+    :<|> (\a -> blocStrato $ client (Proxy @BatchTransactionResult.API) a)
+    :<|> (\a -> blocStrato $ client (Proxy @BlkLast.API) a)
+    :<|> (\a b c d e f g h i j k l m n o p q r s t u v -> blocStrato $ client (Proxy @Block.API) a b c d e f g h i j k l m n o p q r s t u v)
+    :<|> ((\a b c d -> blocStrato $ Chain.getChainClient a b c d)
+      :<|> (\a -> blocStrato $ Chain.postChainClient a)
+      :<|> (\a -> blocStrato $ Chain.postChainsClient a))
+    :<|> ((\a -> blocStrato $ client (Proxy @Faucet.PostFaucet) a)
+      :<|> (error "PostFaucetMultipart") -- (\_ -> blocStrato $ client (Proxy @Faucet.PostFaucetMultipart)) -- TODO
+      :<|> (\a b -> blocStrato $ client (Proxy @Faucet.PostDataFaucet) a b))
+    :<|> (\a -> blocStrato $ client (Proxy @Identity.API) a)
+    :<|> (blocStrato $ client (Proxy @Metadata.API))
+    :<|> (blocStrato $ client (Proxy @Peers.API))
+    :<|> (blocStrato $ client (Proxy @QueuedTransactions.API))
+    :<|> ((blocStrato $ client (Proxy @Stats.TotalTxAPI))
+      :<|> (blocStrato $ client (Proxy @Stats.TotalDifficultyAPI)))
+    :<|> (\a b c d e f g h i j k -> blocStrato $ client (Proxy @Storage.API) a b c d e f g h i j k)
+    :<|> (blocStrato $ client (Proxy @SyncStatus.API))
+    :<|> ((\a b c d e f g h i j k l m n o p q -> blocStrato $ client (Proxy @Transaction.GetTransaction) a b c d e f g h i j k l m n o p q)
+      :<|> (\a -> blocStrato $ client (Proxy @Transaction.PostTransaction) a))
+    :<|> (\a -> blocStrato $ client (Proxy @TransactionResult.API) a)
+    :<|> (\a b -> blocStrato $ client (Proxy @TxLast.API) a b)
+
 fullServer ::
   ( MonadLogger m,
     HasSQL m,
+    HasCirrus m,
     HasBlocEnv m,
     HasIdentity m,
     HasVault m,
@@ -221,9 +265,25 @@ fullServer ::
   ServerT FullAPI m
 fullServer = coreServer :<|> blocSimple (Proxy :: Proxy ('[] :: [Symbol]))
 
+fullServerProxyCore ::
+  ( MonadLogger m,
+    MonadUnliftIO m,
+    HasBlocEnv m,
+    HasVault m,
+    HasStrato m,
+    Selectable Account Contract m,
+    Selectable Account AddressState m,
+    Selectable Address Certificate m,
+    HasCodeDB m,
+    Selectable Keccak256 SourceMap m
+  ) =>
+  ServerT FullAPI m
+fullServerProxyCore = coreProxyServer :<|> blocSimple (Proxy :: Proxy ('[] :: [Symbol]))
+
 fullServerOauth ::
   ( MonadLogger m,
     HasSQL m,
+    HasCirrus m,
     HasBlocEnv m,
     HasIdentity m,
     HasVault m,
@@ -252,6 +312,23 @@ hoistCoreServer blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPI) (convertEr
       runLoggingT
         . runSQLM
         . runCirrusM
+        . flip runReaderT blocEnv
+        . flip runReaderT urlMap
+        . runStratoM (flags_stratoUrl ++ "/eth/v1.2")
+        . runVaultM ("http://localhost:8013/strato/v2.3")
+        . runIdentitytM getIdentityServerUrl
+        $ f
+
+hoistCoreServerProxyCore :: BlocEnv -> Metadata.UrlMap -> Server FullAPI
+hoistCoreServerProxyCore blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPI) (convertErrors runM) fullServerProxyCore
+  where
+    convertErrors r x = Handler $ do
+      y <- liftIO . try . r $ x `catch` handleRuntimeError `catch` handleApiError
+      case y of
+        Right a -> pure a
+        Left e -> throwE $ apiErrorToServantErr e
+    runM f =
+      runLoggingT
         . flip runReaderT blocEnv
         . flip runReaderT urlMap
         . runStratoM (flags_stratoUrl ++ "/eth/v1.2")
@@ -365,12 +442,13 @@ app blocEnv theDoc urlMap =
         cors (const $ Just simpleCorsResourcePolicy {corsRequestHeaders = ["Content-Type"]})
         --  $ serve (Proxy :: Proxy (CoreAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $ (coreServer pool :<|> swaggerSchemaUIServer theDoc)
         $
-          addPathsTo404 $
-            if flags_authMode == "OAUTH"
-              then serve (Proxy :: Proxy (FullAPIOAuth :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $
-                     hoistCoreServerOauth blocEnv urlMap :<|> swaggerSchemaUIServer theDoc
-              else serve (Proxy :: Proxy (FullAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $
-                     hoistCoreServer blocEnv urlMap :<|> swaggerSchemaUIServer theDoc
+          addPathsTo404 $ case flags_authMode of
+            "OAUTH" -> serve (Proxy :: Proxy (FullAPIOAuth :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $
+              hoistCoreServerOauth blocEnv urlMap :<|> swaggerSchemaUIServer theDoc
+            "PEM_CLIENT" -> serve (Proxy :: Proxy (FullAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $
+              hoistCoreServerProxyCore blocEnv urlMap :<|> swaggerSchemaUIServer theDoc
+            _ -> serve (Proxy :: Proxy (FullAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $
+              hoistCoreServer blocEnv urlMap :<|> swaggerSchemaUIServer theDoc
 
 addPathsTo404 :: Middleware
 addPathsTo404 baseApp req respond' =

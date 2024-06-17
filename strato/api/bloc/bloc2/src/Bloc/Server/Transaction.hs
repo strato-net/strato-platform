@@ -800,7 +800,6 @@ postUsersSend' ::
   m BlocTransactionResult
 postUsersSend' cacheNonce TransferParameters {..} jwtToken = do
   params <- getAccountTxParams cacheNonce fromAddress chainId txParams
-  txSizeLimit <- fmap txSizeLimit getBlocEnv
   tx <-
     signAndPrepare jwtToken fromAddress metadata $
       TransactionHeader
@@ -810,7 +809,7 @@ postUsersSend' cacheNonce TransferParameters {..} jwtToken = do
         (Wei (fromIntegral $ unStrung value))
         (Code ByteString.empty)
         chainId
-  txHash <- postTransaction (Just txSizeLimit) tx
+  txHash <- blocStrato $ postTransactionClient tx
   getResultAndRespond [txHash] resolve
 
 postUsersContractSolidVM' ::
@@ -828,7 +827,6 @@ postUsersContractSolidVM' ::
   m BlocTransactionResult
 postUsersContractSolidVM' cacheNonce ContractParameters {..} jwtToken = do
   params <- getAccountTxParams cacheNonce fromAddr chainId txParams
-  txSizeLimit <- fmap txSizeLimit getBlocEnv
   --We might be able to get rid of the metadata for SolidVM, but that will require a change in the API, and needs to be discussed
   $logInfoLS "postUsersContractSolidVM'/args" args
   (_, Contract {..}) <-
@@ -853,7 +851,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters {..} jwtToken = do
         chainId
   $logDebugLS "postUsersContractSolidVM'/tx" tx
 
-  txHash <- postTransaction (Just txSizeLimit) tx
+  txHash <- blocStrato $ postTransactionClient tx
   $logInfoLS "postUsersContractSolidVM'/hash" txHash
   getResultAndRespond [txHash] resolve
 
@@ -872,7 +870,6 @@ postUsersUploadListSolidVM' ::
   m [BlocTransactionResult]
 postUsersUploadListSolidVM' cacheNonce ContractListParameters {..} jwtToken = do
   let contracts' = map (uploadlistcontractChainid %~ (<|> chainId)) contracts
-  txSizeLimit <- fmap txSizeLimit getBlocEnv
   txsWithParams <- genNonces cacheNonce fromAddr uploadlistcontractChainid uploadlistcontractTxParams contracts'
   namesTxs <- forStateT Map.empty txsWithParams $
     \(UploadListContract name srcs args params value cid md) -> do
@@ -900,7 +897,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters {..} jwtToken = do
             cid
       return (name, tx)
   let txs = map snd namesTxs
-  hashes <- postTransactionList (Just txSizeLimit) txs
+  hashes <- traverse (blocStrato . postTransactionClient) txs
   getBatchBlocTransactionResult' hashes resolve
 
 postUsersSendList' ::
@@ -919,7 +916,6 @@ postUsersSendList' ::
 postUsersSendList' cacheNonce TransferListParameters {..} jwtToken = do
   let txsWithChainids = map (sendtransactionChainid %~ (<|> chainId)) txs
   txsWithParams <- genNonces cacheNonce fromAddr sendtransactionChainid sendtransactionTxParams txsWithChainids
-  txSizeLimit <- fmap txSizeLimit getBlocEnv
   txs'' <-
     mapM
       ( \(SendTransaction toAddr (Strung value) params cid md) -> do
@@ -934,7 +930,7 @@ postUsersSendList' cacheNonce TransferListParameters {..} jwtToken = do
           signAndPrepare jwtToken fromAddr md header
       )
       txsWithParams
-  hashes <- postTransactionList (Just txSizeLimit) txs''
+  hashes <- traverse (blocStrato . postTransactionClient) txs''
   getBatchBlocTransactionResult' hashes resolve
 
 postUsersContractMethodList' ::
@@ -957,7 +953,6 @@ postUsersContractMethodList' cacheNonce FunctionListParameters {..} jwtToken = d
     else do
       let txsWithChainids = map (methodcallChainid %~ (<|> chainId)) txs
       txsWithParams <- genNonces cacheNonce fromAddr methodcallChainid methodcallTxParams txsWithChainids
-      txSizeLimit <- fmap txSizeLimit getBlocEnv
       txsFuncNames <- forStateT Map.empty txsWithParams $
         \(MethodCall {..}) -> do
           let theAccount = Account methodcallContractAddress $ fmap unChainId _methodcallChainid
@@ -993,7 +988,7 @@ postUsersContractMethodList' cacheNonce FunctionListParameters {..} jwtToken = d
           return (tx, methodcallMethodName)
       let finalTxs = fst <$> txsFuncNames
       mapM_ ($logDebugLS "postUsersContractMethodList'/txs") finalTxs
-      hashes <- postTransactionList (Just txSizeLimit) finalTxs
+      hashes <- traverse (blocStrato . postTransactionClient) finalTxs
       mapM_ ($logInfoLS "postUsersContractMethodList'/hashes") hashes
       getBatchBlocTransactionResult' hashes resolve
 
@@ -1013,7 +1008,6 @@ postUsersContractMethod' ::
   m BlocTransactionResult
 postUsersContractMethod' cacheNonce FunctionParameters {..} jwtToken = do
   params <- getAccountTxParams cacheNonce fromAddr chainId txParams
-  txSizeLimit <- fmap txSizeLimit getBlocEnv
 
   let err =
         CouldNotFind $
@@ -1048,7 +1042,7 @@ postUsersContractMethod' cacheNonce FunctionParameters {..} jwtToken = do
         (Code $ (sel::ByteString) <> (argsBin::ByteString))
         chainId
   $logDebugLS "postUsersContractMethod'/tx" tx
-  txHash <- postTransaction (Just txSizeLimit) tx
+  txHash <- blocStrato $ postTransactionClient tx
   $logInfoLS "postUsersContractMethod'/hash" txHash
   getResultAndRespond [txHash] resolve
 
