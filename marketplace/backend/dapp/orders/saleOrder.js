@@ -181,6 +181,11 @@ async function get(user, args, options) {
       key: "address",
       value: address,
     });
+
+    // Legacy orders need to join array tables. 
+    searchArgs.queryOptions = {
+      select: constants.attach_saleAddresses_Quantities_completedSales_onOrder
+    }
     order = await searchOne(constants.orderTableName, searchArgs, newOptions, user);
   }
 
@@ -294,11 +299,11 @@ async function getAll(admin, args = {}, options) {
       let oldOffset = 0;
       if (offset)
         oldOffset = offset - (saleOrders ? saleOrders.length : 0);
-      let oldArgs = { ...args, limit: oldLimit, offset: oldOffset };
+      // Legacy orders need to join array tables.
+      let oldArgs = { ...args, limit: oldLimit, offset: oldOffset, queryOptions: { select: constants.attach_saleAddresses_Quantities_completedSales_onOrder }};
       const oldSaleOrders = await searchAllWithQueryArgs(constants.orderTableName, oldArgs, newOptions, admin);
       saleOrders = saleOrders ? [...saleOrders, ...oldSaleOrders] : [...oldSaleOrders];
     }
-
     oldCount = await searchAllWithQueryArgs(
       constants.orderTableName,
       countArgs,
