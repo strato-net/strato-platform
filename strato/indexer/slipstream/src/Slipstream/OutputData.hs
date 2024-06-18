@@ -27,6 +27,7 @@ module Slipstream.OutputData (
   insertHistoryAbstractTable,
   createIndexTable,
   createCollectionTable,
+  createAbstractTable,
   insertHistoryTable,
   createExpandEventTables,
   createExpandIndexTable,
