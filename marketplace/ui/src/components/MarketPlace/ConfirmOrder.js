@@ -164,21 +164,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
     }
   };
 
-  console.log("paymentProviders", paymentProviders)
-  paymentProviders = [
-    {
-      serviceName: "Stripe",
-      imageURL: "https://stripe.com/img/v3/home/social.png",
-    },
-    {
-      serviceName: "Meta Mask",
-      imageURL: "https://www.paypalobjects.com/webstatic/icon/pp258.png",
-    },
-    {
-      serviceName: "Coinbase",
-      imageURL: "https://www.coinbase.com/assets/coinbase-og.6e3d4e3e3e4e3"
-    }
-  ]
+
   return (
     <>
       <div>
