@@ -22,8 +22,10 @@ so that they could be properly moved to their respective version's subsection.
 ### Changed
 - Allow public keys to be passed to x509-generator in PEM format
 - default `accountNonceLimit` is 2,000
+- max kafka bytes returned to 32MB
 
 ### Fixed
+- fixed logic for how p2p calculates if it is missing parents blocks and needs to backtrack its sync
 
 ### Removed
 
