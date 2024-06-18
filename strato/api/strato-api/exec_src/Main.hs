@@ -36,7 +36,7 @@ import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Options
 import Control.Lens.Operators
 import Control.Monad.Change.Alter
-import Control.Monad.Change.Modify (Accessible)
+import Control.Monad.Change.Modify (Accessible(..))
 import Control.Monad.Composable.Identity
 import Control.Monad.Composable.SQL
 import Control.Monad.Composable.Strato hiding (httpManager)
@@ -213,10 +213,12 @@ coreServer =
     :<|> TxLast.server
 
 coreProxyServer ::
-  ( MonadIO m,
+  ( MonadUnliftIO m,
     MonadLogger m,
+    HasIdentity m,
     HasStrato m,
     HasCallStack,
+    Accessible Metadata.UrlMap m,
     Selectable Keccak256 SourceMap m
   ) =>
   ServerT CoreAPI m
@@ -234,8 +236,12 @@ coreProxyServer =
     :<|> ((\a -> blocStrato $ client (Proxy @Faucet.PostFaucet) a)
       :<|> (error "PostFaucetMultipart") -- (\_ -> blocStrato $ client (Proxy @Faucet.PostFaucetMultipart)) -- TODO
       :<|> (\a b -> blocStrato $ client (Proxy @Faucet.PostDataFaucet) a b))
-    :<|> (\a -> blocStrato $ client (Proxy @Identity.API) a)
-    :<|> (blocStrato $ client (Proxy @Metadata.API))
+    :<|> Identity.server
+    :<|> (do
+          md <- blocStrato $ client (Proxy @Metadata.API)
+          urlMap <- access (Proxy @Metadata.UrlMap)
+          pure $ md{Metadata.urls = urlMap}
+         )
     :<|> (blocStrato $ client (Proxy @Peers.API))
     :<|> (blocStrato $ client (Proxy @QueuedTransactions.API))
     :<|> ((blocStrato $ client (Proxy @Stats.TotalTxAPI))
@@ -269,8 +275,10 @@ fullServerProxyCore ::
   ( MonadLogger m,
     MonadUnliftIO m,
     HasBlocEnv m,
+    HasIdentity m,
     HasVault m,
     HasStrato m,
+    Accessible Metadata.UrlMap m,
     Selectable Account Contract m,
     Selectable Account AddressState m,
     Selectable Address Certificate m,
@@ -297,6 +305,23 @@ fullServerOauth ::
   ) =>
   ServerT FullAPIOAuth m
 fullServerOauth = coreServer :<|> blocOauth (Proxy :: Proxy InternalHeaders)
+
+fullServerOauthProxyCore ::
+  ( MonadLogger m,
+    MonadUnliftIO m,
+    HasBlocEnv m,
+    HasIdentity m,
+    HasVault m,
+    HasStrato m,
+    Accessible Metadata.UrlMap m,
+    Selectable Account Contract m,
+    Selectable Account AddressState m,
+    Selectable Address Certificate m,
+    HasCodeDB m,
+    Selectable Keccak256 SourceMap m
+  ) =>
+  ServerT FullAPIOAuth m
+fullServerOauthProxyCore = coreProxyServer :<|> blocOauth (Proxy :: Proxy InternalHeaders)
 
 ----------------
 
@@ -348,6 +373,23 @@ hoistCoreServerOauth blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPIOAuth) 
       runLoggingT
         . runSQLM
         . runCirrusM
+        . flip runReaderT blocEnv
+        . flip runReaderT urlMap
+        . runStratoM (flags_stratoUrl ++ "/eth/v1.2")
+        . runVaultM ("http://localhost:8013/strato/v2.3")
+        . runIdentitytM getIdentityServerUrl
+        $ f
+
+hoistCoreServerOauthProxyCore :: BlocEnv -> Metadata.UrlMap -> Server FullAPIOAuth
+hoistCoreServerOauthProxyCore blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPIOAuth) (convertErrors runM) fullServerOauthProxyCore
+  where
+    convertErrors r x = Handler $ do
+      y <- liftIO . try . r $ x `catch` handleRuntimeError `catch` handleApiError
+      case y of
+        Right a -> pure a
+        Left e -> throwE $ apiErrorToServantErr e
+    runM f =
+      runLoggingT
         . flip runReaderT blocEnv
         . flip runReaderT urlMap
         . runStratoM (flags_stratoUrl ++ "/eth/v1.2")
@@ -443,12 +485,16 @@ app blocEnv theDoc urlMap =
         --  $ serve (Proxy :: Proxy (CoreAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $ (coreServer pool :<|> swaggerSchemaUIServer theDoc)
         $
           addPathsTo404 $ case flags_authMode of
-            "OAUTH" -> serve (Proxy :: Proxy (FullAPIOAuth :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $
-              hoistCoreServerOauth blocEnv urlMap :<|> swaggerSchemaUIServer theDoc
-            "PEM_CLIENT" -> serve (Proxy :: Proxy (FullAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $
-              hoistCoreServerProxyCore blocEnv urlMap :<|> swaggerSchemaUIServer theDoc
-            _ -> serve (Proxy :: Proxy (FullAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $
-              hoistCoreServer blocEnv urlMap :<|> swaggerSchemaUIServer theDoc
+            "PEM" -> case flags_stratoMode of
+              "CLIENT" -> serve (Proxy :: Proxy (FullAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $
+                hoistCoreServerProxyCore blocEnv urlMap :<|> swaggerSchemaUIServer theDoc
+              _ -> serve (Proxy :: Proxy (FullAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $
+                hoistCoreServer blocEnv urlMap :<|> swaggerSchemaUIServer theDoc
+            _ -> case flags_stratoMode of
+              "CLIENT" -> serve (Proxy :: Proxy (FullAPIOAuth :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $
+                hoistCoreServerOauthProxyCore blocEnv urlMap :<|> swaggerSchemaUIServer theDoc
+              _ -> serve (Proxy :: Proxy (FullAPIOAuth :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $
+                hoistCoreServerOauth blocEnv urlMap :<|> swaggerSchemaUIServer theDoc
 
 addPathsTo404 :: Middleware
 addPathsTo404 baseApp req respond' =

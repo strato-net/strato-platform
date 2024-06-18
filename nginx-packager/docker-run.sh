@@ -8,6 +8,7 @@ blockTime=${blockTime:-13} # keep default the same as strato
 ssl=${ssl:-false}
 sslCertFileType=${sslCertFileType:-pem}
 AUTH_MODE=${AUTH_MODE:-OAUTH}
+STRATO_MODE=${STRATO_MODE:-FULL}
 OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-NULL}
 OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
 OAUTH_SCOPE=${OAUTH_SCOPE:-openid email profile}
@@ -77,19 +78,17 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
 
   # This is used to remove lines from the nginx.conf
   # without having to put the entire replacement string in this file
-  if [ "${AUTH_MODE}" != "OAUTH" ]; then
-    sed -i '/#TEMPLATE_NON_OAUTH_MODE/d' /tmp/nginx.conf
+  if [ "${AUTH_MODE}" = "PEM" ]; then
+    sed -i '/#TEMPLATE_PEM_MODE/d' /tmp/nginx.conf
   fi
 
-  if [ "${AUTH_MODE}" = "PEM_SERVER" ]; then
-    sed -i '/#TEMPLATE_VAULTLESS_MODE/d' /tmp/nginx.conf
-  fi
-
-  if [ -z "${EXTERNAL_NODE_URL}" ]; then
+  if [ "${STRATO_MODE}" = "SERVER" ]; then
     sed -i '/#TEMPLATE_SERVER_MODE/d' /tmp/nginx.conf
-  else
+  elif [ "${STRATO_MODE}" = "CLIENT" ]; then
     sed -i '/#TEMPLATE_CLIENT_MODE/d' /tmp/nginx.conf
-    sed -i 's|__EXTERNAL_NODE_URL__|'"$EXTERNAL_NODE_URL"'|g' /tmp/nginx.conf
+    sed -i 's|__SERVER_NODE_URL__|'"$SERVER_NODE_URL"'|g' /tmp/nginx.conf
+  else
+    sed -i '/#TEMPLATE_FULL_MODE/d' /tmp/nginx.conf
   fi
 
   if [ "$SMD_DEV_MODE" != true ]; then
@@ -167,7 +166,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   fi
 fi
 
-if [ -z "${EXTERNAL_NODE_URL}" ]; then
+if [ -z "${SERVER_NODE_URL}" ]; then
   echo 'Waiting for apex to be available...'
   until curl --silent --output /dev/null --fail --location http://${APEX_HOST}/_ping
   do

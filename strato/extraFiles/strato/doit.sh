@@ -13,7 +13,7 @@ echo 'export PS1="⛓ \w> "' >> /root/.bashrc
 
 declare -A MONITORED_PIDS
 MONITORING_TIMER=5;
-if [ -z "${EXTERNAL_NODE_URL}" ]; then
+if [ "${STRATO_MODE}" != "CLIENT" ]; then
   PSQL_CONNECTION_PARAMS="-h ${postgres_host} -p ${postgres_port} -U ${postgres_user}"
   
   echo 'Waiting for Postgres to be available...'
@@ -26,7 +26,7 @@ if [ -z "${EXTERNAL_NODE_URL}" ]; then
 fi
 # Check if this container was initialized before
 if [ ! -f _container_initialized ]; then
-  if [ -z "${EXTERNAL_NODE_URL}" ]; then
+  if [ "${STRATO_MODE}" != "CLIENT" ]; then
     # Check if need to wipe slipstream ("cirrus") db (NOT REQUIRED if in-place update with containers re-created and all volumes intact; REQUIRED in case of re-sync after --drop-chains)
     if [ ! -f /volume_data/_volume_initialized ]; then
       # drop slipstream db if already exists
@@ -120,7 +120,7 @@ function newnode {
   echo 'vault-proxy is available'
   set -x
 
-  if [ -z "${EXTERNAL_NODE_URL}" ]; then
+  if [ "${STRATO_MODE}" != "CLIENT" ]; then
       if [[ ! -f .initialized ]] ; then
         # if node is being updated from the earlier version that did not have `.initialized` flag implemented (pre-7.0):
         if [[ -d .ethereumH && -d config && ! -f .initNotFinished ]]; then
@@ -162,7 +162,7 @@ function newnode {
   then vmMinLogLevel=LevelDebug
   fi
 
-  if [ -z "${EXTERNAL_NODE_URL}" ]; then
+  if [ "${STRATO_MODE}" != "CLIENT" ]; then
       echo "Starting ethereum-discover"
       runBackgroundProcess ethereum-discover  &>> logs/ethereum-discover
 
@@ -238,7 +238,7 @@ function newnode {
       psFlag="--paymentServerUrl=${STRIPE_PAYMENT_SERVER_URL}"
   fi
 
-  if [ -z "${EXTERNAL_NODE_URL}" ]; then
+  if [ "${STRATO_MODE}" != "CLIENT" ]; then
       echo "Starting vm-runner"
       runBackgroundProcess vm-runner \
         --blockstanbul=true \
@@ -265,8 +265,8 @@ function newnode {
         +RTS "${vmRunnerRTSOPTs:-}" -I2 -N1 &>> logs/vm-runner
   fi
 
-  if [ -n "${EXTERNAL_NODE_URL}" ]; then
-      apiFlag="--stratoUrl=${EXTERNAL_NODE_URL}/strato-api"
+  if [ "${STRATO_MODE}" = "CLIENT" ]; then
+      apiFlag="--stratoUrl=${SERVER_NODE_URL}/strato-api"
   fi
   # Leave the +RTS -N1, it is important
   echo "Starting strato-api"
@@ -276,6 +276,7 @@ function newnode {
     --vaultUrl=${VAULT_URL} \
     --oauthDiscoveryUrl=${OAUTH_DISCOVERY_URL} \
     --authMode=${AUTH_MODE} \
+    --stratoMode=${STRATO_MODE} \
     "${networkFlag}" \
     "${aclFlag}" \
     "${txsFlag}" \
@@ -289,7 +290,7 @@ function newnode {
     "${apiFlag}" \
     "${psFlag}" +RTS -N1 >> logs/strato-api 2>&1
 
-  if [ -z "${EXTERNAL_NODE_URL}" ]; then
+  if [ "${STRATO_MODE}" != "CLIENT" ]; then
       SLIPSTREAM_CMD="slipstream \
       --database=${postgres_slipstream_db} \
       --kafkahost=${kafkaHost} \
@@ -471,7 +472,7 @@ stratoBootnode=${bootnode:+--stratoBootnode=$bootnode}
 mkdir -p /var/lib/strato
 cd /var/lib/strato
 
-if [ -z "${EXTERNAL_NODE_URL}" ]; then
+if [ "${STRATO_MODE}" != "CLIENT" ]; then
   if [[ -n $genesisBlock ]]
   then echo "$genesisBlock" > ${genesis:-gettingStarted}Genesis.json
   fi

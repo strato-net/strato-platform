@@ -94,7 +94,6 @@ services:
     - debugWSPort=${debugWSPort}
     - validatorBehavior=${validatorBehavior:-true}
     - evmDebugMode=${evmDebugMode}
-    - EXTERNAL_NODE_URL=${EXTERNAL_NODE_URL}
     - FILE_SERVER_URL=${FILE_SERVER_URL}
     - FULL_DEBUG_LOG=${FULL_DEBUG_LOG:-false}
     - gasLimit=${gasLimit}
@@ -133,9 +132,11 @@ services:
     - seqMaxUsPerIter=${seqMaxUsPerIter}
     - seqRTSOPTs=${seqRTSOPTs}
     - SEQUENCER_DEBUG_LOG=${SEQUENCER_DEBUG_LOG:-false}
+    - SERVER_NODE_URL=${SERVER_NODE_URL}
     - SKIP_IDENTITY=${SKIP_IDENTITY:-false}
     - SLIPSTREAM_DEBUG_LOG=${SLIPSTREAM_DEBUG_LOG:-false}
     - SLIPSTREAM_OPTIONAL=${SLIPSTREAM_OPTIONAL}
+    - STRATO_MODE=${STRATO_MODE:-FULL}
     - STRIPE_PAYMENT_SERVER_URL=${STRIPE_PAYMENT_SERVER_URL}
     - svmTrace=${svmTrace}
     - sqlDiff=${sqlDiff}
@@ -178,7 +179,6 @@ services:
     - debugPort=${debugPort}
     - debugWSPort=${debugWSPort}
     - DOCS_HOST=${DOCS_HOST}
-    - EXTERNAL_NODE_URL=${EXTERNAL_NODE_URL}
     - MARKETPLACE_BACKEND_HOST=${MARKETPLACE_BACKEND_HOST}
     - MARKETPLACE_UI_HOST=${MARKETPLACE_UI_HOST}
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
@@ -187,6 +187,7 @@ services:
     - POSTGREST_HOST=${POSTGREST_HOST}
     - PROMETHEUS_HOST=${PROMETHEUS_HOST}
     - SERVE_LOGS=${SERVE_LOGS}
+    - SERVER_NODE_URL=${SERVER_NODE_URL}
     - SMD_DEV_MODE=${SMD_DEV_MODE}
     - SMD_DEV_MODE_HOST_IP=${SMD_DEV_MODE_HOST_IP}
     - SMD_HOST=${SMD_HOST}
@@ -198,6 +199,7 @@ services:
     - STRATO_PORT_API2=${STRATO_PORT_API2}
     - STRATO_PORT_LOGS=${STRATO_PORT_LOGS}
     - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
+    - STRATO_MODE=${STRATO_MODE:-FULL}
     - VM_DEBUGGER=${VM_DEBUGGER}
     build: .
     image: ${NGINX_IMAGE:-<REPO_URL>nginx:<VERSION>}
