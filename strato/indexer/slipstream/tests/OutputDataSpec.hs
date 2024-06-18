@@ -5,12 +5,13 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module OutputDataSpec where
 
 import Conduit
 import Control.Monad
--- import           Control.Monad.Change.Alter
+import           Control.Monad.Change.Alter
 -- import qualified Handlers.Storage as HS
 import qualified Data.ByteString as B
 import qualified Data.IntMap as I
@@ -18,7 +19,7 @@ import qualified Data.Map as M
 import qualified Data.Text as T
 import Data.Time
 -- import Data.Default
--- import Numeric
+import Numeric
 import Test.Hspec
 import Text.RawString.QQ
 import UnliftIO.IORef
@@ -29,7 +30,7 @@ import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256 (hash)
--- import qualified Slipstream.Events as SE
+import qualified Slipstream.Events as SE
 import Slipstream.Globals
 import Slipstream.GlobalsColdStorage (fakeHandle)
 import Slipstream.OutputData
@@ -38,7 +39,7 @@ import Slipstream.SolidityValue
 import SolidVM.Model.CodeCollection hiding (contractName, contracts)
 import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType
--- import Blockchain.Data.AddressStateDB
+import Blockchain.Data.AddressStateDB
 -- import Network.Haskoin.Crypto.BigWord
 -- import Blockchain.Data.ChainInfo
 -- import Blockchain.DB.CodeDB
@@ -56,27 +57,23 @@ bytes = V.SimpleValue . V.valueBytes
 int :: Integer -> V.Value
 int = V.SimpleValue . V.valueInt
 
--- instance Selectable Account AddressState (LoggingT IO) where
---   select _ _ = return Nothing
+instance Selectable Account AddressState (LoggingT IO) where
+  select _ _ = return Nothing
 
 
--- createInserts ::( OutputM m,
---     Selectable Account AddressState m,
---     Selectable Word256 ParentChainIds m,
---     Selectable HS.StorageFilterParams [HS.StorageAddress] m)
---               => IORef Globals
---               -> [(SE.ProcessedContract, Contract)]
---               -> ConduitM () T.Text m ()
--- createInserts globalsIORef contracts = do
---   unless (null contracts) $ do
---     let contract = head contracts
---     _ <- createIndexTable globalsIORef (snd contract) (SE.organization $ fst contract, SE.application $ fst contract, SE.contractName $ fst contract) def
---     createHistoryTable globalsIORef (snd contract) (SE.organization $ fst contract, SE.application $ fst contract, SE.contractName $ fst contract)
---     insertIndexTable $ map fst contracts
---     insertHistoryTable $ map fst contracts
+createInserts :: OutputM m
+              => IORef Globals
+              -> (SE.ProcessedContract, ContractF())
+              -> ConduitM () T.Text m ()
+createInserts globalsIORef (a,b) = do
+    let cc = createDummyCodeCollection b 
+    _ <- createIndexTable globalsIORef b cc (SE.creator $ a, SE.application $ a, SE.contractName $ a)
+    createHistoryTable False globalsIORef b cc (SE.creator $ a, SE.application $ a, SE.contractName $ a)
+    insertIndexTable $ (a,[])
+    insertHistoryTable $ [a]
 
 createInsertsCollection :: OutputM m
-              => IORef Globals
+            => IORef Globals
               -> [ProcessedCollectionRow]
               -> ConduitM () T.Text m ()
 createInsertsCollection globalsIORef collections = do
@@ -85,21 +82,18 @@ createInsertsCollection globalsIORef collections = do
     _ <- createCollectionTable globalsIORef (creator collection, application collection, contractname collection) (collectionname collection)
     insertCollectionTable collections
 
--- createInsertsAbstract :: (OutputM m,
---     Selectable Account AddressState m,
---     Selectable Word256 ParentChainIds m,
---     Selectable HS.StorageFilterParams [HS.StorageAddress] m)
+-- createInsertsAbstract :: OutputM m
 --               => IORef Globals
---               -> (SE.ProcessedContract, Contract)
+--               -> (SE.ProcessedContract, ContractF())
 --               -> [(SE.ProcessedContract, T.Text, TableColumns)]
 --               -> ConduitM () T.Text m ()
 -- createInsertsAbstract globalsIORef abstract inherited = do
---     let contract =snd abstract
---     _ <- createAbstractTable globalsIORef (contract) (SE.organization $ fst abstract, SE.application $ fst abstract, SE.contractName $ fst abstract) def
+--     let contract = snd abstract
+--     _ <- createAbstractTable globalsIORef (contract) (SE.creator $ fst abstract, SE.application $ fst abstract, SE.contractName $ fst abstract) def
 --     unless (null inherited) $ do 
 --       insertAbstractTable inherited
 
-createDummyContract :: [(T.Text, SVMType.Type)] -> Contract
+createDummyContract :: [(T.Text, SVMType.Type)] -> ContractF()
 createDummyContract v = 
   let createVariableDecl t = VariableDecl{
         _varType=t,
@@ -129,6 +123,18 @@ createDummyContract v =
       _contractContext=undefined
     }
 
+createDummyCodeCollection :: ContractF() -> CodeCollectionF ()
+createDummyCodeCollection contract = CodeCollection
+  { _contracts = M.singleton "DummyContract" contract,
+    _flFuncs = M.empty,
+    _flConstants = M.empty,
+    _flEnums = M.empty,
+    _flStructs = M.empty,
+    _flErrors = M.empty,
+    _pragmas = [],
+    _imports = []
+  }
+
 fakeCirrusHandle :: CirrusHandle
 fakeCirrusHandle = FakeCirrusHandle
 
@@ -138,607 +144,604 @@ spec = do
     valueToSolidityValue (V.ValueArrayDynamic $ I.singleton 2 (V.ValueArraySentinel 2))
       `shouldBe` SolidityArray [SolidityNum 0, SolidityNum 0]
 
-  -- describe "Array serialization" $ do
-  --   it "should create JSON entries" $ do
-  --     let testAdd = Address $ fst . head . readHex $ "ADDRESS"
-  --     let input =
-  --           [ ( SE.ProcessedContract
-  --                 { SE.address = testAdd,
-  --                   SE.codehash = SolidVMCode "Vehicle" $ hash "<CODEHASH>",
-  --                   SE.organization = "",
-  --                   SE.application = "",
-  --                   SE.contractName = "Vehicle",
-  --                   SE.chain = "<CHAIN>",
-  --                   SE.blockHash = hash "<BLOCKHASH>",
-  --                   SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC") :: UTCTime,
-  --                   SE.blockNumber = 123,
-  --                   SE.transactionHash = hash "<TRANSACTIONHASH>",
-  --                   SE.transactionSender = testAdd,
-  --                   SE.contractData =
-  --                     M.singleton "owners" . V.ValueArrayDynamic $
-  --                       V.tosparse
-  --                         [ V.ValueStruct $
-  --                             M.fromList
-  --                               [ ("number", V.SimpleValue $ V.valueUInt 18199984780605),
-  --                                 ("hash", V.SimpleValue $ V.ValueString "Owner_hash_181999847806006")
-  --                               ]
-  --                         ]
-  --                 },
-  --               createDummyContract
-  --                 [ ("owners", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
-  --                 ]
-  --             )
-  --           ]
+  describe "Array serialization" $ do
+    it "should create JSON entries" $ do
+      let testAdd = Address $ fst . head . readHex $ "ADDRESS"
+      let input =
+             ( SE.ProcessedContract
+                  { SE.address = testAdd,
+                    SE.codehash = SolidVMCode "Vehicle" $ hash "<CODEHASH>",
+                    SE.creator = "",
+                    SE.root = "",
+                    SE.application = "",
+                    SE.contractName = "Vehicle",
+                    SE.chain = "<CHAIN>",
+                    SE.blockHash = hash "<BLOCKHASH>",
+                    SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC") :: UTCTime,
+                    SE.blockNumber = 123,
+                    SE.transactionHash = hash "<TRANSACTIONHASH>",
+                    SE.transactionSender = testAdd,
+                    SE.contractData =
+                      M.singleton "owners" . V.ValueArrayDynamic $
+                        V.tosparse
+                          [ V.ValueStruct $
+                              M.fromList
+                                [ ("number", V.SimpleValue $ V.valueUInt 18199984780605),
+                                  ("hash", V.SimpleValue $ V.ValueString "Owner_hash_181999847806006")
+                                ]
+                          ]
+                  },
+                createDummyContract
+                  [ ("owners", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
+                  ]
+              )
+            
 
-  --     g <- newGlobals fakeHandle fakeCirrusHandle
-  --     [vehicleCreate, _, _, _, vehicleInsert, _] <- runLoggingT . runMainChainT . runConduit $ createInserts g input .| sinkList
-  --     vehicleCreate
-  --       `shouldBe` [r|CREATE TABLE IF NOT EXISTS "Vehicle" (record_id text,
-  --   address text,
-  --   "chainId" text,
-  --   block_hash text,
-  --   block_timestamp text,
-  --   block_number text,
-  --   transaction_hash text,
-  --   transaction_sender text,
-  -- PRIMARY KEY (record_id) );|]
+      g <- newGlobals fakeHandle fakeCirrusHandle
+      [vehicleCreate, _, _, _, vehicleInsert, _] <- runLoggingT . runConduit $ createInserts g input .| sinkList
+      vehicleCreate
+        `shouldBe` [r|CREATE TABLE IF NOT EXISTS "Vehicle" (address text,
+    block_hash text,
+    block_timestamp text,
+    block_number text,
+    transaction_hash text,
+    transaction_sender text,
+    creator text,
+    root text,
+  PRIMARY KEY (address) );|]
 
-  --     vehicleInsert
-  --       `shouldBe` [r|INSERT INTO "Vehicle" ("record_id",
-  --   "address",
-  --   "chainId",
-  --   "block_hash",
-  --   "block_timestamp",
-  --   "block_number",
-  --   "transaction_hash",
-  --   "transaction_sender")
-  -- VALUES ('0000000000000000000000000000000000000add:<CHAIN>',
-  --   '0000000000000000000000000000000000000add',
-  --   '<CHAIN>',
-  --   '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
-  --   '2018-09-16 18:28:52.607875 UTC',
-  --   '123',
-  --   '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
-  --   '0000000000000000000000000000000000000add')
-  -- ON CONFLICT (record_id) DO UPDATE SET
-  --   record_id = excluded.record_id,
-  --   address = excluded.address,
-  --   "chainId" = excluded."chainId",
-  --   block_hash = excluded.block_hash,
-  --   block_timestamp = excluded.block_timestamp,
-  --   block_number = excluded.block_number,
-  --   transaction_hash = excluded.transaction_hash,
-  --   transaction_sender = excluded.transaction_sender;|]
+      vehicleInsert
+        `shouldBe` [r|INSERT INTO "Vehicle" ("address",
+    "block_hash",
+    "block_timestamp",
+    "block_number",
+    "transaction_hash",
+    "transaction_sender",
+    "creator",
+    "root")
+  VALUES ('0000000000000000000000000000000000000add',
+    '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
+    '2018-09-16 18:28:52.607875 UTC',
+    '123',
+    '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
+    '0000000000000000000000000000000000000add',
+    '',
+    '')
+  ON CONFLICT (address) DO UPDATE SET
+    address = excluded.address,
+    block_hash = excluded.block_hash,
+    block_timestamp = excluded.block_timestamp,
+    block_number = excluded.block_number,
+    transaction_hash = excluded.transaction_hash,
+    transaction_sender = excluded.transaction_sender;|]
 
-  -- describe "Array serialization with history enabled" $ do
-  --   it "should create JSON entries" $ do
-  --     let testAdd = Address $ fst . head . readHex $ "ADDRESS"
-  --         cHash = SolidVMCode "Vehicle2" $ hash "<CODEHASH>"
-  --     let input =
-  --           [ ( SE.ProcessedContract
-  --                 { SE.address = testAdd,
-  --                   SE.codehash = cHash,
-  --                   SE.organization = "",
-  --                   SE.application = "",
-  --                   SE.contractName = "Vehicle2",
-  --                   SE.chain = "<CHAIN>",
-  --                   SE.blockHash = hash "<BLOCKHASH>",
-  --                   SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC") :: UTCTime,
-  --                   SE.blockNumber = 123,
-  --                   SE.transactionHash = hash "<TRANSACTIONHASH>",
-  --                   SE.transactionSender = testAdd,
-  --                   SE.contractData =
-  --                     M.singleton "owners" . V.ValueArrayDynamic $
-  --                       V.tosparse
-  --                         [ V.ValueStruct $
-  --                             M.fromList
-  --                               [ ("number", V.SimpleValue $ V.valueUInt 18199984780605),
-  --                                 ("hash", V.SimpleValue $ V.ValueString "Owner_hash_181999847806006")
-  --                               ]
-  --                         ]
-  --                 },
-  --               createDummyContract
-  --                 [ ("owners", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
-  --                 ]
-  --             )
-  --           ]
-  --     g <- newGlobals fakeHandle fakeCirrusHandle
+  describe "Array serialization with history enabled" $ do
+    it "should create JSON entries" $ do
+      let testAdd = Address $ fst . head . readHex $ "ADDRESS"
+          cHash = SolidVMCode "Vehicle2" $ hash "<CODEHASH>"
+      let input =
+             ( SE.ProcessedContract
+                  { SE.address = testAdd,
+                    SE.codehash = cHash,
+                    SE.creator = "",
+                    SE.root = "",
+                    SE.application = "",
+                    SE.contractName = "Vehicle2",
+                    SE.chain = "<CHAIN>",
+                    SE.blockHash = hash "<BLOCKHASH>",
+                    SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC") :: UTCTime,
+                    SE.blockNumber = 123,
+                    SE.transactionHash = hash "<TRANSACTIONHASH>",
+                    SE.transactionSender = testAdd,
+                    SE.contractData =
+                      M.singleton "owners" . V.ValueArrayDynamic $
+                        V.tosparse
+                          [ V.ValueStruct $
+                              M.fromList
+                                [ ("number", V.SimpleValue $ V.valueUInt 18199984780605),
+                                  ("hash", V.SimpleValue $ V.ValueString "Owner_hash_181999847806006")
+                                ]
+                          ]
+                  },
+                createDummyContract
+                  [ ("owners", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
+                  ]
+              )
+            
+      g <- newGlobals fakeHandle fakeCirrusHandle
 
-  --     [vehicleCreate, historyCreate, historyIndex, historyAlter, vehicleInsert, historyInsert] <-
-  --       runLoggingT . runConduit $ createInserts g input .| sinkList
+      [vehicleCreate, historyCreate, historyIndex, historyAlter, vehicleInsert, historyInsert] <-
+        runLoggingT . runConduit $ createInserts g input .| sinkList
 
-  --     vehicleCreate
-  --       `shouldBe` [r|CREATE TABLE IF NOT EXISTS "Vehicle2" (record_id text,
-  --   address text,
-  --   "chainId" text,
-  --   block_hash text,
-  --   block_timestamp text,
-  --   block_number text,
-  --   transaction_hash text,
-  --   transaction_sender text,
-  -- PRIMARY KEY (record_id) );|]
+      vehicleCreate
+        `shouldBe` [r|CREATE TABLE IF NOT EXISTS "Vehicle2" (address text,
+    block_hash text,
+    block_timestamp text,
+    block_number text,
+    transaction_hash text,
+    transaction_sender text,
+    creator text,
+    root text,
+  PRIMARY KEY (address) );|]
 
-  --     historyCreate
-  --       `shouldBe` [r|CREATE TABLE IF NOT EXISTS "history@Vehicle2" (record_id text,
-  --   address text NOT NULL,
-  --   "chainId" text NOT NULL,
-  --   block_hash text NOT NULL,
-  --   block_timestamp text,
-  --   block_number text,
-  --   transaction_hash text NOT NULL,
-  --   transaction_sender text);|]
+      historyCreate
+        `shouldBe` [r|CREATE TABLE IF NOT EXISTS "history@Vehicle2" (address text,
+    block_hash text,
+    block_timestamp text,
+    block_number text,
+    transaction_hash text,
+    transaction_sender text,
+    creator text,
+    root text);|]
 
-  --     historyIndex
-  --       `shouldBe` [r|CREATE UNIQUE INDEX IF NOT EXISTS "index_history@Vehicle2"
-  -- ON "history@Vehicle2" (address, "chainId", block_hash, transaction_hash);|]
-  --     historyAlter
-  --       `shouldBe` [r|ALTER TABLE "history@Vehicle2" ADD PRIMARY KEY USING INDEX "index_history@Vehicle2";|]
+      historyIndex
+        `shouldBe` [r|CREATE UNIQUE INDEX IF NOT EXISTS "index_history@Vehicle2"
+  ON "history@Vehicle2" (address, block_hash, transaction_hash);|]
+      historyAlter
+        `shouldBe` [r|ALTER TABLE "history@Vehicle2" ADD PRIMARY KEY USING INDEX "index_history@Vehicle2";|]
 
-  --     vehicleInsert
-  --       `shouldBe` [r|INSERT INTO "Vehicle2" ("record_id",
-  --   "address",
-  --   "chainId",
-  --   "block_hash",
-  --   "block_timestamp",
-  --   "block_number",
-  --   "transaction_hash",
-  --   "transaction_sender")
-  -- VALUES ('0000000000000000000000000000000000000add:<CHAIN>',
-  --   '0000000000000000000000000000000000000add',
-  --   '<CHAIN>',
-  --   '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
-  --   '2018-09-16 18:28:52.607875 UTC',
-  --   '123',
-  --   '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
-  --   '0000000000000000000000000000000000000add')
-  -- ON CONFLICT (record_id) DO UPDATE SET
-  --   record_id = excluded.record_id,
-  --   address = excluded.address,
-  --   "chainId" = excluded."chainId",
-  --   block_hash = excluded.block_hash,
-  --   block_timestamp = excluded.block_timestamp,
-  --   block_number = excluded.block_number,
-  --   transaction_hash = excluded.transaction_hash,
-  --   transaction_sender = excluded.transaction_sender;|]
+      vehicleInsert
+        `shouldBe` [r|INSERT INTO "Vehicle2" ("address",
+    "block_hash",
+    "block_timestamp",
+    "block_number",
+    "transaction_hash",
+    "transaction_sender",
+    "creator",
+    "root")
+  VALUES ('0000000000000000000000000000000000000add',
+    '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
+    '2018-09-16 18:28:52.607875 UTC',
+    '123',
+    '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
+    '0000000000000000000000000000000000000add',
+    '',
+    '')
+  ON CONFLICT (address) DO UPDATE SET
+    address = excluded.address,
+    block_hash = excluded.block_hash,
+    block_timestamp = excluded.block_timestamp,
+    block_number = excluded.block_number,
+    transaction_hash = excluded.transaction_hash,
+    transaction_sender = excluded.transaction_sender;|]
 
-  --     historyInsert
-  --       `shouldBe` [r|INSERT INTO "history@Vehicle2" ("record_id",
-  --   "address",
-  --   "chainId",
-  --   "block_hash",
-  --   "block_timestamp",
-  --   "block_number",
-  --   "transaction_hash",
-  --   "transaction_sender")
-  -- VALUES ('0000000000000000000000000000000000000add:<CHAIN>',
-  --   '0000000000000000000000000000000000000add',
-  --   '<CHAIN>',
-  --   '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
-  --   '2018-09-16 18:28:52.607875 UTC',
-  --   '123',
-  --   '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
-  --   '0000000000000000000000000000000000000add')
-  -- ON CONFLICT DO NOTHING;|]
+      historyInsert
+        `shouldBe` [r|INSERT INTO "history@Vehicle2" ("address",
+    "block_hash",
+    "block_timestamp",
+    "block_number",
+    "transaction_hash",
+    "transaction_sender",
+    "creator",
+    "root")
+  VALUES ('0000000000000000000000000000000000000add',
+    '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
+    '2018-09-16 18:28:52.607875 UTC',
+    '123',
+    '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
+    '0000000000000000000000000000000000000add',
+    '',
+    '')
+  ON CONFLICT DO NOTHING;|]
 
-  -- describe "String escaping" $ do
-  --   it "should create JSON entries with quotes escaped" $ do
-  --     let testAdd = Address $ fst . head . readHex $ "ADDRESS"
-  --     let input =
-  --           [ ( SE.ProcessedContract
-  --                 { SE.address = testAdd,
-  --                   SE.codehash = SolidVMCode "\"Vehicle''" $ hash "<CODEHASH>",
-  --                   SE.organization = "",
-  --                   SE.application = "",
-  --                   SE.contractName = "\"Vehicle''",
-  --                   SE.chain = "<CHAIN>",
-  --                   SE.blockHash = hash "<BLOCKHASH>",
-  --                   SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC") :: UTCTime,
-  --                   SE.blockNumber = 123,
-  --                   SE.transactionHash = hash "<TRANSACTIONHASH>",
-  --                   SE.transactionSender = testAdd,
-  --                   SE.contractData =
-  --                     M.singleton "\"owners\"" . V.ValueArrayDynamic $
-  --                       V.tosparse
-  --                         [ V.ValueStruct $
-  --                             M.fromList
-  --                               [ ("number\"", V.SimpleValue $ V.valueUInt 18199984780605),
-  --                                 ("h'a\"'sh", V.SimpleValue $ V.ValueString "''Owner_hash_181999847806006")
-  --                               ]
-  --                         ]
-  --                 },
-  --               createDummyContract
-  --                 [ ("\"owners\"", SVMType.Array (SVMType.Struct Nothing "") Nothing)
-  --                 ]
-  --             )
-  --           ]
+  describe "String escaping" $ do
+    it "should create JSON entries with quotes escaped" $ do
+      let testAdd = Address $ fst . head . readHex $ "ADDRESS"
+      let input =
+             ( SE.ProcessedContract
+                  { SE.address = testAdd,
+                    SE.codehash = SolidVMCode "\"Vehicle''" $ hash "<CODEHASH>",
+                    SE.creator = "",
+                    SE.root = "",
+                    SE.application = "",
+                    SE.contractName = "\"Vehicle''",
+                    SE.chain = "<CHAIN>",
+                    SE.blockHash = hash "<BLOCKHASH>",
+                    SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC") :: UTCTime,
+                    SE.blockNumber = 123,
+                    SE.transactionHash = hash "<TRANSACTIONHASH>",
+                    SE.transactionSender = testAdd,
+                    SE.contractData =
+                      M.singleton "\"owners\"" . V.ValueArrayDynamic $
+                        V.tosparse
+                          [ V.ValueStruct $
+                              M.fromList
+                                [ ("number\"", V.SimpleValue $ V.valueUInt 18199984780605),
+                                  ("h'a\"'sh", V.SimpleValue $ V.ValueString "''Owner_hash_181999847806006")
+                                ]
+                          ]
+                  },
+                createDummyContract
+                  [ ("\"owners\"", SVMType.Array (SVMType.Struct Nothing "") Nothing)
+                  ]
+              )
+            
 
-  --     g <- newGlobals fakeHandle fakeCirrusHandle
-  --     [vehicleCreate, _, _, _, vehicleInsert, _] <-
-  --       runLoggingT . runConduit $ createInserts g input .| sinkList
-  --     vehicleCreate
-  --       `shouldBe` [r|CREATE TABLE IF NOT EXISTS "\"Vehicle''''" (record_id text,
-  --   address text,
-  --   "chainId" text,
-  --   block_hash text,
-  --   block_timestamp text,
-  --   block_number text,
-  --   transaction_hash text,
-  --   transaction_sender text,
-  -- PRIMARY KEY (record_id) );|]
+      g <- newGlobals fakeHandle fakeCirrusHandle
+      [vehicleCreate, _, _, _, vehicleInsert, _] <-
+        runLoggingT . runConduit $ createInserts g input .| sinkList
+      vehicleCreate
+        `shouldBe` [r|CREATE TABLE IF NOT EXISTS "\"Vehicle''''" (address text,
+    block_hash text,
+    block_timestamp text,
+    block_number text,
+    transaction_hash text,
+    transaction_sender text,
+    creator text,
+    root text,
+  PRIMARY KEY (address) );|]
 
-  --     vehicleInsert
-  --       `shouldBe` [r|INSERT INTO "\"Vehicle''''" ("record_id",
-  --   "address",
-  --   "chainId",
-  --   "block_hash",
-  --   "block_timestamp",
-  --   "block_number",
-  --   "transaction_hash",
-  --   "transaction_sender")
-  -- VALUES ('0000000000000000000000000000000000000add:<CHAIN>',
-  --   '0000000000000000000000000000000000000add',
-  --   '<CHAIN>',
-  --   '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
-  --   '2018-09-16 18:28:52.607875 UTC',
-  --   '123',
-  --   '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
-  --   '0000000000000000000000000000000000000add')
-  -- ON CONFLICT (record_id) DO UPDATE SET
-  --   record_id = excluded.record_id,
-  --   address = excluded.address,
-  --   "chainId" = excluded."chainId",
-  --   block_hash = excluded.block_hash,
-  --   block_timestamp = excluded.block_timestamp,
-  --   block_number = excluded.block_number,
-  --   transaction_hash = excluded.transaction_hash,
-  --   transaction_sender = excluded.transaction_sender;|]
+      vehicleInsert
+        `shouldBe` [r|INSERT INTO "\"Vehicle''''" ("address",
+    "block_hash",
+    "block_timestamp",
+    "block_number",
+    "transaction_hash",
+    "transaction_sender",
+    "creator",
+    "root")
+  VALUES ('0000000000000000000000000000000000000add',
+    '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
+    '2018-09-16 18:28:52.607875 UTC',
+    '123',
+    '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
+    '0000000000000000000000000000000000000add',
+    '',
+    '')
+  ON CONFLICT (address) DO UPDATE SET
+    address = excluded.address,
+    block_hash = excluded.block_hash,
+    block_timestamp = excluded.block_timestamp,
+    block_number = excluded.block_number,
+    transaction_hash = excluded.transaction_hash,
+    transaction_sender = excluded.transaction_sender;|]
 
-  -- it "can unparse all solidvm value types" $ do
-  --   let testAdd = Address 0x98eaddede
-  --       input =
-  --         [ ( SE.ProcessedContract
-  --               { SE.address = testAdd,
-  --                 SE.codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
-  --                 SE.organization = "MyOrg",
-  --                 SE.application = "MyApp",
-  --                 SE.contractName = "SwissArmy",
-  --                 SE.chain = "<CHAIN>",
-  --                 SE.blockHash = hash "<BLOCKHASH>",
-  --                 SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC") :: UTCTime,
-  --                 SE.blockNumber = 123,
-  --                 SE.transactionHash = hash "<TRANSACTIONHASH>",
-  --                 SE.transactionSender = testAdd,
-  --                 SE.contractData =
-  --                   M.fromList
-  --                     [ ("addr", addr 0xdeadbeef),
-  --                       ("boolean", bool True),
-  --                       ("contract", V.ValueContract $ unspecifiedChain 0x999),
-  --                       ("number", int 77714314),
-  --                       ("str", bytes "Hello, World!"),
-  --                       ("enum_val", V.ValueEnum "E" "C" 0x234),
-  --                       ( "array_nums",
-  --                         V.ValueArrayDynamic . I.fromList $
-  --                           zip [1 ..] [int 20, int 40, int 77, V.ValueArraySentinel 5]
-  --                       ),
-  --                       ( "strukt",
-  --                         V.ValueStruct $
-  --                           M.fromList
-  --                             [ ("first_field", int 887),
-  --                               ("second_field", bytes "CLOROX DISINFECTING WIPES")
-  --                             ]
-  --                       ),
-  --                       ( "set",
-  --                         V.ValueMapping $
-  --                           M.fromList
-  --                             [ (V.valueInt 22, bool True),
-  --                               (V.valueInt 23, bool True),
-  --                               (V.valueInt 46, bool True)
-  --                             ]
-  --                       )
-  --                     ]
-  --               },
-  --             createDummyContract
-  --               [ ("addr", SVMType.Address False),
-  --                 ("boolean", SVMType.Bool),
-  --                 ("contract", SVMType.Contract ""),
-  --                 ("number", SVMType.Int Nothing Nothing),
-  --                 ("str", SVMType.Bytes Nothing Nothing),
-  --                 ("enum_val", SVMType.Enum Nothing "" Nothing),
-  --                 ("array_nums", SVMType.Array (SVMType.Int Nothing Nothing) Nothing),
-  --                 ("strukt", SVMType.Struct Nothing ""),
-  --                 ("set", SVMType.Mapping Nothing (SVMType.Int Nothing Nothing) (SVMType.Bool))
-  --               ]
-  --           )
-  --         ]
+  it "can unparse all solidvm value types" $ do
+    let testAdd = Address 0x98eaddede
+        input =
+           ( SE.ProcessedContract
+                { SE.address = testAdd,
+                  SE.codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
+                  SE.creator = "MyOrg",
+                  SE.root = "",
+                  SE.application = "MyApp",
+                  SE.contractName = "SwissArmy",
+                  SE.chain = "<CHAIN>",
+                  SE.blockHash = hash "<BLOCKHASH>",
+                  SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC") :: UTCTime,
+                  SE.blockNumber = 123,
+                  SE.transactionHash = hash "<TRANSACTIONHASH>",
+                  SE.transactionSender = testAdd,
+                  SE.contractData =
+                    M.fromList
+                      [ ("addr", addr 0xdeadbeef),
+                        ("boolean", bool True),
+                        ("contract", V.ValueContract $ unspecifiedChain 0x999),
+                        ("number", int 77714314),
+                        ("str", bytes "Hello, World!"),
+                        ("enum_val", V.ValueEnum "E" "C" 0x234),
+                        ( "array_nums",
+                          V.ValueArrayDynamic . I.fromList $
+                            zip [1 ..] [int 20, int 40, int 77, V.ValueArraySentinel 5]
+                        ),
+                        ( "strukt",
+                          V.ValueStruct $
+                            M.fromList
+                              [ ("first_field", int 887),
+                                ("second_field", bytes "CLOROX DISINFECTING WIPES")
+                              ]
+                        ),
+                        ( "set",
+                          V.ValueMapping $
+                            M.fromList
+                              [ (V.valueInt 22, bool True),
+                                (V.valueInt 23, bool True),
+                                (V.valueInt 46, bool True)
+                              ]
+                        )
+                      ]
+                },
+              createDummyContract
+                [ ("addr", SVMType.Address False),
+                  ("boolean", SVMType.Bool),
+                  ("contract", SVMType.Contract ""),
+                  ("number", SVMType.Int Nothing Nothing),
+                  ("str", SVMType.Bytes Nothing Nothing),
+                  ("enum_val", SVMType.Enum Nothing "" Nothing),
+                  ("array_nums", SVMType.Array (SVMType.Int Nothing Nothing) Nothing),
+                  ("strukt", SVMType.Struct Nothing ""),
+                  ("set", SVMType.Mapping Nothing (SVMType.Int Nothing Nothing) (SVMType.Bool))
+                ]
+            )
+          
 
-  --   g <- newGlobals fakeHandle fakeCirrusHandle
-  --   [swissArmyCreate, _, _, _, swissArmyInsert, _] <-
-  --     runLoggingT . runConduit $ createInserts g input .| sinkList
+    g <- newGlobals fakeHandle fakeCirrusHandle
+    [swissArmyCreate, _, _, _, swissArmyInsert, _] <-
+      runLoggingT . runConduit $ createInserts g input .| sinkList
 
-  --   swissArmyCreate
-  --     `shouldBe` [r|CREATE TABLE IF NOT EXISTS "MyOrg-MyApp-SwissArmy" (record_id text,
-  --   address text,
-  --   "chainId" text,
-  --   block_hash text,
-  --   block_timestamp text,
-  --   block_number text,
-  --   transaction_hash text,
-  --   transaction_sender text,
-  --   "addr" text,
-  --   "boolean" bool,
-  --   "contract" text,
-  --   "enum_val" text,
-  --   "number" decimal,
-  --   "str" text,
-  --   "strukt" jsonb,
-  -- PRIMARY KEY (record_id) );|]
+    swissArmyCreate
+      `shouldBe` [r|CREATE TABLE IF NOT EXISTS "MyOrg-MyApp-SwissArmy" (address text,
+    block_hash text,
+    block_timestamp text,
+    block_number text,
+    transaction_hash text,
+    transaction_sender text,
+    creator text,
+    root text,
+    "addr" text,
+    "boolean" bool,
+    "contract" text,
+    "enum_val" text,
+    "number" decimal,
+    "str" text,
+    "strukt" jsonb,
+  PRIMARY KEY (address) );|]
 
-  --   swissArmyInsert
-  --     `shouldBe` [r|INSERT INTO "MyOrg-MyApp-SwissArmy" ("record_id",
-  --   "address",
-  --   "chainId",
-  --   "block_hash",
-  --   "block_timestamp",
-  --   "block_number",
-  --   "transaction_hash",
-  --   "transaction_sender",
-  --   "addr",
-  --   "boolean",
-  --   "contract",
-  --   "enum_val",
-  --   "number",
-  --   "str",
-  --   "strukt")
-  -- VALUES ('000000000000000000000000000000098eaddede:<CHAIN>',
-  --   '000000000000000000000000000000098eaddede',
-  --   '<CHAIN>',
-  --   '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
-  --   '2018-09-16 18:28:52.607875 UTC',
-  --   '123',
-  --   '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
-  --   '000000000000000000000000000000098eaddede',
-  --   '00000000000000000000000000000000deadbeef',
-  --   'True',
-  --   NULL,
-  --   '564',
-  --   '77714314',
-  --   'Hello, World!',
-  --   '[["first_field","887"],["second_field","CLOROX DISINFECTING WIPES"]]')
-  -- ON CONFLICT (record_id) DO UPDATE SET
-  --   record_id = excluded.record_id,
-  --   address = excluded.address,
-  --   "chainId" = excluded."chainId",
-  --   block_hash = excluded.block_hash,
-  --   block_timestamp = excluded.block_timestamp,
-  --   block_number = excluded.block_number,
-  --   transaction_hash = excluded.transaction_hash,
-  --   transaction_sender = excluded.transaction_sender,
-  --   "addr" = excluded."addr",
-  --   "boolean" = excluded."boolean",
-  --   "contract" = excluded."contract",
-  --   "enum_val" = excluded."enum_val",
-  --   "number" = excluded."number",
-  --   "str" = excluded."str",
-  --   "strukt" = excluded."strukt";|]
-  -- {-
-  --   it "can createInserts an empty array" $ do
-  --     let testAdd = Address 0x22222222
-  --         input = [(ProcessedContract {
-  --           address = testAdd,
-  --           codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
-  --           organization = "MyOrg",
-  --           application = "MyApp",
-  --           contractName = "SwissArmy",
-  --           chain = "<CHAIN>",
-  --           blockHash = hash "<BLOCKHASH>",
-  --           blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
-  --           blockNumber = 146,
-  --           transactionHash = hash "<TRANSACTIONHASH>",
-  --           transactionSender = testAdd,
-  --           contractData = M.singleton "array_nums" . V.ValueArrayDynamic
-  --                        . I.singleton 1 $ V.ValueArraySentinel 1
-  --           }, createDummyContract [
-  --                      ("array_nums", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
-  --                      ])]
-  --     g <- newGlobals M.empty fakeHandle
+    swissArmyInsert
+      `shouldBe` [r|INSERT INTO "MyOrg-MyApp-SwissArmy" ("address",
+    "block_hash",
+    "block_timestamp",
+    "block_number",
+    "transaction_hash",
+    "transaction_sender",
+    "creator",
+    "root",
+    "addr",
+    "boolean",
+    "contract",
+    "enum_val",
+    "number",
+    "str",
+    "strukt")
+  VALUES ('000000000000000000000000000000098eaddede',
+    '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
+    '2018-09-16 18:28:52.607875 UTC',
+    '123',
+    '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
+    '000000000000000000000000000000098eaddede',
+    'MyOrg',
+    '',
+    '00000000000000000000000000000000deadbeef',
+    'True',
+    '0000000000000000000000000000000000000999',
+    '564',
+    '77714314',
+    'Hello, World!',
+    '{"first_field":"887","second_field":"CLOROX DISINFECTING WIPES"}')
+  ON CONFLICT (address) DO UPDATE SET
+    address = excluded.address,
+    block_hash = excluded.block_hash,
+    block_timestamp = excluded.block_timestamp,
+    block_number = excluded.block_number,
+    transaction_hash = excluded.transaction_hash,
+    transaction_sender = excluded.transaction_sender,
+    "addr" = excluded."addr",
+    "boolean" = excluded."boolean",
+    "contract" = excluded."contract",
+    "enum_val" = excluded."enum_val",
+    "number" = excluded."number",
+    "str" = excluded."str",
+    "strukt" = excluded."strukt";|]
+  {-
+    it "can createInserts an empty array" $ do
+      let testAdd = Address 0x22222222
+          input = [(ProcessedContract {
+            address = testAdd,
+            codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
+            organization = "MyOrg",
+            application = "MyApp",
+            contractName = "SwissArmy",
+            chain = "<CHAIN>",
+            blockHash = hash "<BLOCKHASH>",
+            blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
+            blockNumber = 146,
+            transactionHash = hash "<TRANSACTIONHASH>",
+            transactionSender = testAdd,
+            contractData = M.singleton "array_nums" . V.ValueArrayDynamic
+                         . I.singleton 1 $ V.ValueArraySentinel 1
+            }, createDummyContract [
+                       ("array_nums", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
+                       ])]
+      g <- newGlobals M.empty fakeHandle
 
-  --     [_, swissArmyCreate, swissArmyInsert] <-
-  --         runLoggingT . runConduit $ createInserts g [] input .| sinkList
+      [_, swissArmyCreate, swissArmyInsert] <-
+          runLoggingT . runConduit $ createInserts g [] input .| sinkList
 
-  --     T.unpack swissArmyCreate `shouldContain` "\"array_nums\" jsonb,"
-  --     T.unpack swissArmyInsert `shouldContain` [r|'["0"]')|]
-  -- -}
-  -- it "can createInsertsIndexTable an empty array" $ do
-  --   let testAdd = Address 0x22222222
-  --       input =
-  --         ( SE.ProcessedContract
-  --             { SE.address = testAdd,
-  --               SE.codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
-  --               SE.organization = "MyOrg",
-  --               SE.application = "MyApp",
-  --               SE.contractName = "SwissArmy",
-  --               SE.chain = "<CHAIN>",
-  --               SE.blockHash = hash "<BLOCKHASH>",
-  --               SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC") :: UTCTime,
-  --               SE.blockNumber = 146,
-  --               SE.transactionHash = hash "<TRANSACTIONHASH>",
-  --               SE.transactionSender = testAdd,
-  --               SE.contractData =
-  --                 M.fromList
-  --                   [ ("isIterable", bool False),
-  --                     ( "keyMap",
-  --                       V.ValueMapping $
-  --                         M.fromList
-  --                           [ (V.valueBytes "4517546854860", int 1)
-  --                           ]
-  --                     ),
-  --                     ("keys", V.ValueArraySentinel 1),
-  --                     ( "owner",
-  --                       V.SimpleValue $
-  --                         V.ValueAccount $
-  --                           unspecifiedChain
-  --                             0xf5c1df0fd1015bb6ed5c966ad58a0f66af59b130
-  --                     ),
-  --                     ( "values",
-  --                       V.ValueArrayDynamic . I.singleton 1
-  --                         . V.ValueArraySentinel
-  --                         $ 1
-  --                     )
-  --                   ]
-  --             },
-  --           createDummyContract
-  --             [ ("isIterable", SVMType.Bool),
-  --               ( "keyMap",
-  --                 SVMType.Mapping
-  --                   Nothing
-  --                   (SVMType.Bytes Nothing Nothing)
-  --                   (SVMType.Int Nothing Nothing)
-  --               ),
-  --               ("owner", (SVMType.Account False)),
-  --               ("values", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
-  --             ]
-  --         )
-  --   g <- newGlobals fakeHandle fakeCirrusHandle
+      T.unpack swissArmyCreate `shouldContain` "\"array_nums\" jsonb,"
+      T.unpack swissArmyInsert `shouldContain` [r|'["0"]')|]
+  -}
+  it "can createInsertsIndexTable an empty array" $ do
+    let testAdd = Address 0x22222222
+        input =
+          ( SE.ProcessedContract
+              { SE.address = testAdd,
+                SE.codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
+                SE.creator = "MyOrg",
+                SE.root = "",
+                SE.application = "MyApp",
+                SE.contractName = "SwissArmy",
+                SE.chain = "<CHAIN>",
+                SE.blockHash = hash "<BLOCKHASH>",
+                SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC") :: UTCTime,
+                SE.blockNumber = 146,
+                SE.transactionHash = hash "<TRANSACTIONHASH>",
+                SE.transactionSender = testAdd,
+                SE.contractData =
+                  M.fromList
+                    [ ("isIterable", bool False),
+                      ( "keyMap",
+                        V.ValueMapping $
+                          M.fromList
+                            [ (V.valueBytes "4517546854860", int 1)
+                            ]
+                      ),
+                      ("keys", V.ValueArraySentinel 1),
+                      ( "owner",
+                        V.SimpleValue $
+                          V.ValueAccount $
+                            unspecifiedChain
+                              0xf5c1df0fd1015bb6ed5c966ad58a0f66af59b130
+                      ),
+                      ( "values",
+                        V.ValueArrayDynamic . I.singleton 1
+                          . V.ValueArraySentinel
+                          $ 1
+                      )
+                    ]
+              },
+            createDummyContract
+              [ ("isIterable", SVMType.Bool),
+                ( "keyMap",
+                  SVMType.Mapping
+                    Nothing
+                    (SVMType.Bytes Nothing Nothing)
+                    (SVMType.Int Nothing Nothing)
+                ),
+                ("owner", (SVMType.Account False)),
+                ("values", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
+              ]
+          )
+        cc =  createDummyCodeCollection (snd input)
+    g <- newGlobals fakeHandle fakeCirrusHandle
 
-  --   (_, cs1) <- runLoggingT . runConduit $ createExpandIndexTable g (snd input) (SE.organization $ fst input, SE.application $ fst input, SE.contractName $ fst input) def `fuseBoth` sinkList
-  --   cs2 <- runLoggingT . runConduit $ insertIndexTable [fst input] .| sinkList
-  --   (cs1 ++ cs2) `shouldNotBe` []
+    (_, cs1) <- runLoggingT . runConduit $ createExpandIndexTable g (snd input) cc (SE.creator $ fst input, SE.application $ fst input, SE.contractName $ fst input) `fuseBoth` sinkList
+    cs2 <- runLoggingT . runConduit $ insertIndexTable (fst input, []) .| sinkList
+    (cs1 ++ cs2) `shouldNotBe` []
 
-  -- it "can use solidvm without application nor organization" $ do
-  --   let testAdd = Address 0x98eaddede
-  --       input =
-  --         [ ( SE.ProcessedContract
-  --               { SE.address = testAdd,
-  --                 SE.codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- hash "<CODEHASH>",
-  --                 SE.organization = "",
-  --                 SE.application = "",
-  --                 SE.contractName = "SwissArmy",
-  --                 SE.chain = "<CHAIN>",
-  --                 SE.blockHash = hash "<BLOCKHASH>",
-  --                 SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC") :: UTCTime,
-  --                 SE.blockNumber = 123,
-  --                 SE.transactionHash = hash "<TRANSACTIONHASH>",
-  --                 SE.transactionSender = testAdd,
-  --                 SE.contractData =
-  --                   M.fromList
-  --                     [ ("addr", addr 0xdeadbeef),
-  --                       ("boolean", bool True),
-  --                       ("contract", V.ValueContract $ unspecifiedChain 0x999),
-  --                       ("number", int 77714314),
-  --                       ("str", bytes "Hello, World!"),
-  --                       ("enum_val", V.ValueEnum "E" "C" 0x234),
-  --                       ( "array_nums",
-  --                         V.ValueArrayDynamic . I.fromList $
-  --                           zip [1 ..] [int 20, int 40, int 77, V.ValueArraySentinel 5]
-  --                       ),
-  --                       ( "strukt",
-  --                         V.ValueStruct $
-  --                           M.fromList
-  --                             [ ("first_field", int 887),
-  --                               ("second_field", bytes "CLOROX DISINFECTING WIPES")
-  --                             ]
-  --                       ),
-  --                       ( "set",
-  --                         V.ValueMapping $
-  --                           M.fromList
-  --                             [ (V.valueInt 22, bool True),
-  --                               (V.valueInt 23, bool True),
-  --                               (V.valueInt 46, bool True)
-  --                             ]
-  --                       )
-  --                     ]
-  --               },
-  --             createDummyContract
-  --               [ ("addr", SVMType.Address False),
-  --                 ("boolean", SVMType.Bool),
-  --                 ("contract", SVMType.Contract ""),
-  --                 ("number", SVMType.Int Nothing Nothing),
-  --                 ("str", SVMType.String Nothing),
-  --                 ("enum_val", SVMType.Enum Nothing "" Nothing),
-  --                 ("array_nums", SVMType.Array (SVMType.Int Nothing Nothing) Nothing),
-  --                 ("strukt", SVMType.Struct Nothing ""),
-  --                 ("set", SVMType.Mapping Nothing (SVMType.Int Nothing Nothing) (SVMType.Bool))
-  --               ]
-  --           )
-  --         ]
+  it "can use solidvm without application nor organization" $ do
+    let testAdd = Address 0x98eaddede
+        input =
+           ( SE.ProcessedContract
+                { SE.address = testAdd,
+                  SE.codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- hash "<CODEHASH>",
+                  SE.creator = "",
+                  SE.root = "",
+                  SE.application = "",
+                  SE.contractName = "SwissArmy",
+                  SE.chain = "<CHAIN>",
+                  SE.blockHash = hash "<BLOCKHASH>",
+                  SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC") :: UTCTime,
+                  SE.blockNumber = 123,
+                  SE.transactionHash = hash "<TRANSACTIONHASH>",
+                  SE.transactionSender = testAdd,
+                  SE.contractData =
+                    M.fromList
+                      [ ("addr", addr 0xdeadbeef),
+                        ("boolean", bool True),
+                        ("contract", V.ValueContract $ unspecifiedChain 0x999),
+                        ("number", int 77714314),
+                        ("str", bytes "Hello, World!"),
+                        ("enum_val", V.ValueEnum "E" "C" 0x234),
+                        ( "array_nums",
+                          V.ValueArrayDynamic . I.fromList $
+                            zip [1 ..] [int 20, int 40, int 77, V.ValueArraySentinel 5]
+                        ),
+                        ( "strukt",
+                          V.ValueStruct $
+                            M.fromList
+                              [ ("first_field", int 887),
+                                ("second_field", bytes "CLOROX DISINFECTING WIPES")
+                              ]
+                        ),
+                        ( "set",
+                          V.ValueMapping $
+                            M.fromList
+                              [ (V.valueInt 22, bool True),
+                                (V.valueInt 23, bool True),
+                                (V.valueInt 46, bool True)
+                              ]
+                        )
+                      ]
+                },
+              createDummyContract
+                [ ("addr", SVMType.Address False),
+                  ("boolean", SVMType.Bool),
+                  ("contract", SVMType.Contract ""),
+                  ("number", SVMType.Int Nothing Nothing),
+                  ("str", SVMType.String Nothing),
+                  ("enum_val", SVMType.Enum Nothing "" Nothing),
+                  ("array_nums", SVMType.Array (SVMType.Int Nothing Nothing) Nothing),
+                  ("strukt", SVMType.Struct Nothing ""),
+                  ("set", SVMType.Mapping Nothing (SVMType.Int Nothing Nothing) (SVMType.Bool))
+                ]
+            )
+          
 
-  --   g <- newGlobals fakeHandle fakeCirrusHandle
-  --   [swissArmyCreate, _, _, _, swissArmyInsert, _] <-
-  --     runLoggingT . runConduit $ createInserts g input .| sinkList
+    g <- newGlobals fakeHandle fakeCirrusHandle
+    [swissArmyCreate, _, _, _, swissArmyInsert, _] <-
+      runLoggingT . runConduit $ createInserts g input .| sinkList
 
-  --   swissArmyCreate
-  --     `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy" (record_id text,
-  --   address text,
-  --   "chainId" text,
-  --   block_hash text,
-  --   block_timestamp text,
-  --   block_number text,
-  --   transaction_hash text,
-  --   transaction_sender text,
-  --   "addr" text,
-  --   "boolean" bool,
-  --   "contract" text,
-  --   "enum_val" text,
-  --   "number" decimal,
-  --   "str" text,
-  --   "strukt" jsonb,
-  -- PRIMARY KEY (record_id) );|]
+    swissArmyCreate
+      `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy" (address text,
+    block_hash text,
+    block_timestamp text,
+    block_number text,
+    transaction_hash text,
+    transaction_sender text,
+    creator text,
+    root text,
+    "addr" text,
+    "boolean" bool,
+    "contract" text,
+    "enum_val" text,
+    "number" decimal,
+    "str" text,
+    "strukt" jsonb,
+  PRIMARY KEY (address) );|]
 
-  --   swissArmyInsert
-  --     `shouldBe` [r|INSERT INTO "SwissArmy" ("record_id",
-  --   "address",
-  --   "chainId",
-  --   "block_hash",
-  --   "block_timestamp",
-  --   "block_number",
-  --   "transaction_hash",
-  --   "transaction_sender",
-  --   "addr",
-  --   "boolean",
-  --   "contract",
-  --   "enum_val",
-  --   "number",
-  --   "str",
-  --   "strukt")
-  -- VALUES ('000000000000000000000000000000098eaddede:<CHAIN>',
-  --   '000000000000000000000000000000098eaddede',
-  --   '<CHAIN>',
-  --   '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
-  --   '2018-09-16 18:28:52.607875 UTC',
-  --   '123',
-  --   '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
-  --   '000000000000000000000000000000098eaddede',
-  --   '00000000000000000000000000000000deadbeef',
-  --   'True',
-  --   NULL,
-  --   '564',
-  --   '77714314',
-  --   'Hello, World!',
-  --   '[["first_field","887"],["second_field","CLOROX DISINFECTING WIPES"]]')
-  -- ON CONFLICT (record_id) DO UPDATE SET
-  --   record_id = excluded.record_id,
-  --   address = excluded.address,
-  --   "chainId" = excluded."chainId",
-  --   block_hash = excluded.block_hash,
-  --   block_timestamp = excluded.block_timestamp,
-  --   block_number = excluded.block_number,
-  --   transaction_hash = excluded.transaction_hash,
-  --   transaction_sender = excluded.transaction_sender,
-  --   "addr" = excluded."addr",
-  --   "boolean" = excluded."boolean",
-  --   "contract" = excluded."contract",
-  --   "enum_val" = excluded."enum_val",
-  --   "number" = excluded."number",
-  --   "str" = excluded."str",
-  --   "strukt" = excluded."strukt";|]
+    swissArmyInsert
+      `shouldBe` [r|INSERT INTO "SwissArmy" ("address",
+    "block_hash",
+    "block_timestamp",
+    "block_number",
+    "transaction_hash",
+    "transaction_sender",
+    "creator",
+    "root",
+    "addr",
+    "boolean",
+    "contract",
+    "enum_val",
+    "number",
+    "str",
+    "strukt")
+  VALUES ('000000000000000000000000000000098eaddede',
+    '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
+    '2018-09-16 18:28:52.607875 UTC',
+    '123',
+    '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
+    '000000000000000000000000000000098eaddede',
+    '',
+    '',
+    '00000000000000000000000000000000deadbeef',
+    'True',
+    '0000000000000000000000000000000000000999',
+    '564',
+    '77714314',
+    'Hello, World!',
+    '{"first_field":"887","second_field":"CLOROX DISINFECTING WIPES"}')
+  ON CONFLICT (address) DO UPDATE SET
+    address = excluded.address,
+    block_hash = excluded.block_hash,
+    block_timestamp = excluded.block_timestamp,
+    block_number = excluded.block_number,
+    transaction_hash = excluded.transaction_hash,
+    transaction_sender = excluded.transaction_sender,
+    "addr" = excluded."addr",
+    "boolean" = excluded."boolean",
+    "contract" = excluded."contract",
+    "enum_val" = excluded."enum_val",
+    "number" = excluded."number",
+    "str" = excluded."str",
+    "strukt" = excluded."strukt";|]
 
   it "can create and insert into mapping tables" $ do
     let testAdd = Address 0x98eaddede
         input = [ProcessedCollectionRow {
           address = testAdd,
           codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- $ hash "<CODEHASH>",
-          creator = "",
-          root = "",
+          creator = "creator",
+          root = "groot",
           application = "",
           contractname = "SwissArmy",
           collectionname = "SwissArmyMapping",
@@ -756,7 +759,7 @@ spec = do
     [swissArmyMappingCreate, swissArmyMappingRowInsert] <-
         runLoggingT . runConduit $ createInsertsCollection g input .| sinkList
 
-    swissArmyMappingCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy-SwissArmyMapping" (address text,
+    swissArmyMappingCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "creator-SwissArmy-SwissArmyMapping" (address text,
     block_hash text,
     block_timestamp text,
     block_number text,
@@ -771,12 +774,14 @@ spec = do
     value text,
   PRIMARY KEY (address, key));|]
 
-    swissArmyMappingRowInsert `shouldBe` [r|INSERT INTO "SwissArmy-SwissArmyMapping" ("address",
+    swissArmyMappingRowInsert `shouldBe` [r|INSERT INTO "creator-SwissArmy-SwissArmyMapping" ("address",
     "block_hash",
     "block_timestamp",
     "block_number",
     "transaction_hash",
     "transaction_sender",
+    "creator",
+    "root",
     "contract_name",
     "collectionname",
     "collectiontype",
@@ -788,6 +793,8 @@ spec = do
     '123',
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
     '000000000000000000000000000000098eaddede',
+    'creator',
+    'groot',
     'SwissArmy',
     'SwissArmyMapping',
     'Mapping',
@@ -810,7 +817,8 @@ spec = do
   --       input = (SE.ProcessedContract {
   --         SE.address = testAdd,
   --         SE.codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- $ hash "<CODEHASH>",
-  --         SE.organization = "",
+  --         SE.creator = "",
+ -- SE.root = "",
   --         SE.application = "",
   --         SE.contractName = "SwissArmy",
   --         SE.chain = "<CHAIN>",
@@ -828,7 +836,7 @@ spec = do
   --       inherited = [(SE.ProcessedContract {
   --         SE.address = testAdd,
   --         SE.codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmyz", -- $ hash "<CODEHASH>",
-  --         SE.organization = "",
+  --         SE.creator = "",
   --         SE.application = "",
   --         SE.contractName = "SwissArmyz",
   --         SE.chain = "<CHAIN>",
@@ -844,7 +852,7 @@ spec = do
 
 
   --   g <- newGlobals fakeHandle fakeCirrusHandle
-  --   [swissArmyCreateAbstract, swissArmynsertAbstract] <-
+  --   [swissArmyCreateAbstract, swissArmyInsertAbstract] <-
   --       runLoggingT . runConduit $ createInsertsAbstract g input inherited .| sinkList
 
   --   swissArmyCreateAbstract `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy" (record_id text,
@@ -896,7 +904,7 @@ spec = do
   --       input = (SE.ProcessedContract {
   --         SE.address = testAdd,
   --         SE.codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- $ hash "<CODEHASH>",
-  --         SE.organization = "",
+  --         SE.creator = "",
   --         SE.application = "",
   --         SE.contractName = "SwissArmy",
   --         SE.chain = "<CHAIN>",
@@ -915,7 +923,7 @@ spec = do
   --       inherited = [(SE.ProcessedContract {
   --         SE.address = testAdd,
   --         SE.codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmyz", -- $ hash "<CODEHASH>",
-  --         SE.organization = "",
+  --         SE.creator = "",
   --         SE.application = "",
   --         SE.contractName = "SwissArmyz",
   --         SE.chain = "<CHAIN>",
@@ -932,7 +940,7 @@ spec = do
   --       expand = [(SE.ProcessedContract {
   --         SE.address = testAdd,
   --         SE.codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- $ hash "<CODEHASH>",
-  --         SE.organization = "",
+  --         SE.creator = "",
   --         SE.application = "",
   --         SE.contractName = "SwissArmy",
   --         SE.chain = "<CHAIN>",
@@ -954,7 +962,7 @@ spec = do
   --   g <- newGlobals fakeHandle fakeCirrusHandle
   --   [swissArmyCreateAbstract, swissArmynsertAbstract] <-
   --       runLoggingT . runConduit $ createInsertsAbstract g input inherited .| sinkList
-  --   expand <- runLoggingT . runConduit $ (expandAbstractTable g expand (SE.organization $ head expand, SE.application $ head  expand, SE.contractName $ head expand)) .| sinkList
+  --   expand <- runLoggingT . runConduit $ (expandAbstractTable g expand (SE.creator $ head expand, SE.application $ head  expand, SE.contractName $ head expand)) .| sinkList
 
   --   swissArmyCreateAbstract `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy" (record_id text,
   --   address text,
