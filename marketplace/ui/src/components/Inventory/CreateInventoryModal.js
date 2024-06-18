@@ -49,6 +49,10 @@ const CreateInventoryModal = ({
   const [subCategoryValue, setSubCategoryValue] = useState(form.getFieldValue("subCategory"));
   const [measureUnit, setMeasureUnit] = useState(unitOfMeasures);
 
+
+  const redemptionDispatch = useRedemptionDispatch();
+  const { redemptionServices, isFetchingRedemptionServices } = useRedemptionState();
+
   useEffect(() => {
     redemptionActions.fetchRedemptionServices(redemptionDispatch);
   }, [redemptionDispatch]);
