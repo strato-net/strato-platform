@@ -207,6 +207,14 @@ abstract contract Asset is Utils {
     }
 
     function updateStatus(AssetStatus _status) public returns (uint) {
+        if (status == AssetStatus.ACTIVE) {
+            require(getCommonName(msg.sender) == ownerCommonName, "Only the owner can update the asset's status");
+        } else if (status == AssetStatus.PENDING_REDEMPTION) {
+            string cn = getCommonName(msg.sender);
+            require(cn == ownerCommonName || cn == this.creator, "Only the owner or issuer can update the asset's status");
+        } else {
+            require(false, "The asset's status can no longer be updated");
+        }
         status = _status;
         return RestStatus.OK;
     }

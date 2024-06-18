@@ -203,9 +203,6 @@ function newnode {
   if [ -n "${FILE_SERVER_URL}" ]; then
       fsFlag="--fileServerUrl=${FILE_SERVER_URL}"
   fi
-  if [ -n "${STRIPE_PAYMENT_SERVER_URL}" ]; then
-      psFlag="--paymentServerUrl=${STRIPE_PAYMENT_SERVER_URL}"
-  fi
 
   echo "Starting vm-runner"
   runBackgroundProcess vm-runner \
@@ -248,8 +245,7 @@ function newnode {
     "${ucFlag}" \
     "${ubFlag}" \
     "${udFlag}" \
-    "${fsFlag}" \
-    "${psFlag}" +RTS -N1 >> logs/strato-api 2>&1
+    "${fsFlag}" +RTS -N1 >> logs/strato-api 2>&1
 
   SLIPSTREAM_CMD="slipstream \
   --database=${postgres_slipstream_db} \

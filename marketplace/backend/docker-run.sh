@@ -23,15 +23,9 @@ METADATA=$(curl --silent --fail ${ETH_ENDPOINT}/metadata)
 # Set env vars with values from metadata (exporting and declaring separately - see https://github.com/koalaman/shellcheck/wiki/SC2155)
 networkID=$(echo ${METADATA} | jq -r .networkID)
 export networkID
-STRIPE_PAYMENT_SERVER_URL=$(echo ${METADATA} | jq -r .urls.paymentServer)
-export STRIPE_PAYMENT_SERVER_URL
 if [ -z "${networkID}" ]; then
   echo "Could not get networkID from strato api, but it is a required value"
   exit 19
-fi
-if [ -z "${STRIPE_PAYMENT_SERVER_URL}" ]; then
-  echo "Could not get payment server url from strato api, but it is a required value"
-  exit 20
 fi
 
 # Validate configuration

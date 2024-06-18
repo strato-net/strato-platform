@@ -2,7 +2,8 @@ import {
   Row,
   notification,
   Spin,
-  Modal
+  Modal,
+  Button
 } from "antd";
 import {
   useMarketplaceState,
@@ -20,11 +21,11 @@ import {
 } from "../../contexts/inventory";
 import DataTableComponent from "../DataTableComponent";
 import "./index.css";
-import { PAYMENT_LIST } from "../../helpers/constants";
+import { HTTP_METHODS, PAYMENT_LIST } from "../../helpers/constants";
 import TagManager from "react-gtm-module";
 import { setCookie } from "../../helpers/cookie";
 
-const ConfirmOrder = ({ data, columns }) => {
+const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const orderDispatch = useOrderDispatch();
   const [api, contextHolder] = notification.useNotification();
@@ -34,7 +35,6 @@ const ConfirmOrder = ({ data, columns }) => {
   const [tax, setTax] = useState(0);
   const [total, setTotal] = useState(0);
   const inventoryDispatch = useInventoryDispatch();
-  const { stripeStatus } = useInventoryState();
   const { success: marketplaceSuccess, message: marketplaceMessage } = useMarketplaceState();
   const [modal, contextHolderForModal] = Modal.useModal();
   const [cartData, setCartData] = useState(data);
@@ -114,7 +114,7 @@ const ConfirmOrder = ({ data, columns }) => {
     }
   };
 
-  const handlePaymentConfirm = async () => {
+  const handlePaymentConfirm = async (paymentProvider) => {
     actions.addItemToConfirmOrder(marketplaceDispatch, cartData);
     let orderList = [];
     cartData.forEach((item) => {
@@ -125,9 +125,9 @@ const ConfirmOrder = ({ data, columns }) => {
         unitPrice: item.unitPrice
       });
     });
-    // These additional fields need to be sent to form the request after stripe. 
+
     let body = {
-      paymentList: PAYMENT_LIST,
+      paymentProvider: { address: paymentProvider.address },
       buyerOrganization: userOrganization,
       orderList,
       orderTotal: total + tax,
@@ -146,17 +146,24 @@ const ConfirmOrder = ({ data, columns }) => {
         event: 'pay_now_button',
       },
     });
-    let data = await orderActions.createPayment(orderDispatch, body);
-    if (data != null && data.url !== undefined) {
-      window.location.replace(data.url);
+    let orderHashAndAssets = await orderActions.createPayment(orderDispatch, body);
+    if (orderHashAndAssets && orderHashAndAssets !== false) {
+      const [orderHash, assets] = orderHashAndAssets;
+      let serviceURL = paymentProvider.serviceURL || paymentProvider.data.serviceURL;
+      let checkoutRoute = paymentProvider.checkoutRoute || paymentProvider.data.checkoutRoute;
+      if (serviceURL
+            && serviceURL !== ''
+            && checkoutRoute
+            && checkoutRoute !== ''
+         ) {
+        const url = `${serviceURL}${checkoutRoute}?orderHash=${orderHash}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
+        window.location.replace(url);
+      } else {
+        window.location.replace(`/order/status?assets=${assets}`);
+      }
     }
   };
 
-  useEffect(() => {
-    if (cartData.length !== 0) {
-      inventoryAction.sellerStripeStatus(inventoryDispatch, cartData[0]["sellersCommonName"]);
-    }
-  }, [inventoryDispatch, cartData]);
 
   return (
     <>
@@ -183,69 +190,77 @@ const ConfirmOrder = ({ data, columns }) => {
                 pagination={false}
               />
             </div>
-            <div className="flex justify-between bg-[#EEEFFA]">
-              <div className="rounded-b-md py-[15px] px-4 ml-4 hidden lg:flex lg:justify-end ">
+            <div className="flex flex-col bg-[#EEEFFA]">
+              <div className="rounded-b-md py-[15px] px-4 ml-4 ">
                 <div className="w-[235px] flex flex-col gap-[10px]">
                   <Row className="justify-between ">
-                    <p className="text-base text-[#6A6A6A]">Sub Total:</p>
-                    <p className="text-xl text-[#202020]   text-right">${total}</p>
+                    <p className="text-[#6A6A6A]">Sub Total:</p>
+                    <p className="text-[#202020] font-semibold text-right">${total}</p>
                   </Row>
                   <Row className="justify-between ">
-                    <p className="text-base text-[#6A6A6A]">Tax:</p>
-                    <p className="text-xl text-[#202020]   text-right">${tax}</p>
+                    <p className=" text-[#6A6A6A]">Tax:</p>
+                    <p className="text-[#202020] font-semibold text-right">${tax}</p>
                   </Row>
                   <Row className="justify-between">
-                    <p className="text-base text-[#6A6A6A]">Total:</p>
-                    <p id="totalPrice" className="text-xl text-[#202020] text-right">
+                    <p className=" text-[#6A6A6A]">Total:</p>
+                    <p id="totalPrice" className="text-[#202020] font-semibold text-right">
                       ${total + tax}
                     </p>
                   </Row>
                 </div>
               </div>
-              <div id="review-and-submit" className="flex md:pb-2 items-center mr-4">
-                {stripeStatus && <button id="pay-now-button" className={`p-1 md:p-3 h-max rounded-lg border ${stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled ? 'border-primary bg-primary hover:bg-primaryHover text-white' : 'cursor-not-allowed border-[#999999] rounded bg-[#cccccc] text-[#666666]'}`}
-                  onClick={async () => {
-                    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                      countDown();
-                    } else {
-                      if (stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled) {
-                        const saleAddresses = [];
-                        const quantities = [];
-                        cartData.forEach((item) => {
-                          saleAddresses.push(item.saleAddress)
-                          quantities.push(item.qty)
-                        })
-                        const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities)
-                        if (checkQuantity === true) {
-                          handlePaymentConfirm();
+              <div className="flex flex-row justify-end">
+                {paymentProviders.map((paymentProvider) => (
+                  <div id="review-and-submit" className="flex md:pb-2 items-center mr-4 w-[150px]">
+                    <Button 
+                      id="pay-now-button" 
+                      type="primary"
+                      className="flex justify-center p-1 md:p-3 h-max w-full text-[#FFFFFF] font-semibold"
+                      onClick={async () => {
+                        if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                          countDown();
                         } else {
-                          let insufficientQuantityMessage = "";
-                          let outOfStockMessage = "";
-
-                          checkQuantity.forEach(detail => {
-                            if (detail.availableQuantity === 0) {
-                              outOfStockMessage += `Product ${detail.assetName}\n`;
+                            const saleAddresses = [];
+                            const quantities = [];
+                            cartData.forEach((item) => {
+                              saleAddresses.push(item.saleAddress)
+                              quantities.push(item.qty)
+                            })
+                            const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities)
+                            if (checkQuantity === true) {
+                              handlePaymentConfirm(paymentProvider);
                             } else {
-                              insufficientQuantityMessage += `Product ${detail.assetName}: ${detail.availableQuantity}\n`;
-                            }
-                          });
+                              let insufficientQuantityMessage = "";
+                              let outOfStockMessage = "";
 
-                          let errorMessage = "";
-                          if (insufficientQuantityMessage) {
-                            errorMessage += `The following item(s) in your cart have limited quantity available and will need to be adjusted. Please reduce the quantity to proceed:\n${insufficientQuantityMessage}`;
+                              checkQuantity.forEach(detail => {
+                                if (detail.availableQuantity === 0) {
+                                  outOfStockMessage += `Product ${detail.assetName}\n`;
+                                } else {
+                                  insufficientQuantityMessage += `Product ${detail.assetName}: ${detail.availableQuantity}\n`;
+                                }
+                              });
+
+                              let errorMessage = "";
+                              if (insufficientQuantityMessage) {
+                                errorMessage += `The following item(s) in your cart have limited quantity available and will need to be adjusted. Please reduce the quantity to proceed:\n${insufficientQuantityMessage}`;
+                              }
+                              if (outOfStockMessage) {
+                                if (errorMessage) errorMessage += "\n"; // Add a new line if there's already an error message
+                                errorMessage += `The following item(s) are temporarily out of stock and should be removed:\n${outOfStockMessage}`;
+                              }
+                              openToastOrder("bottom", errorMessage);
+                            }
                           }
-                          if (outOfStockMessage) {
-                            if (errorMessage) errorMessage += "\n"; // Add a new line if there's already an error message
-                            errorMessage += `The following item(s) are temporarily out of stock and should be removed:\n${outOfStockMessage}`;
-                          }
-                          openToastOrder("bottom", errorMessage);
                         }
                       }
-                    }
-                  }}
-                >
-                  Review and Submit
-                </button>}
+                    >
+                      <div className="flex items-center mr-1">
+                        {paymentProvider && paymentProvider.serviceName}&nbsp; 
+                        {paymentProvider && paymentProvider.imageURL && paymentProvider.imageURL !== '' ? <img src={paymentProvider.imageURL} alt={paymentProvider.serviceName} height="16px" width="16px"/> : ''}
+                      </div>
+                    </Button>
+                  </div>))}
               </div>
             </div>
           </div>
