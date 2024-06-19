@@ -69,9 +69,12 @@ pipeline {
           rm -rf strato-getting-started
           git clone https://github.com/blockapps/strato-getting-started -b develop
           cp docker-compose.yml strato-getting-started/
+          cp docker-compose.server.yml strato-getting-started/
+          cp docker-compose.client.yml strato-getting-started/
           cp docker-compose.vault.yml strato-getting-started/
           cp docker-compose.highway.yml strato-getting-started/
           cp docker-compose.identity.yml strato-getting-started/
+          cp docker-compose.identity-service.yml strato-getting-started/
           cp docker-compose.stripe-ps.yml strato-getting-started/
         '''
 
@@ -249,7 +252,7 @@ pipeline {
                 }
                 
                 // Push docker-compose files to Jenkins artifacts and AWS S3
-                archiveArtifacts artifacts: "docker-compose.yml, docker-compose.vault.yml, docker-compose.identity.yml, docker-compose.highway.yml, docker-compose.stripe-ps.yml, docker-compose.ecr.yml, docker-compose.vault.ecr.yml, docker-compose.identity.ecr.yml, docker-compose.highway.ecr.yml, docker-compose.stripe-ps.ecr.yml, devops/**"
+                archiveArtifacts artifacts: "docker-compose.yml, docker-compose.server.yml, docker-compose.client.yml, docker-compose.vault.yml, docker-compose.identity.yml, docker-compose.identity-service.yml, docker-compose.highway.yml, docker-compose.stripe-ps.yml, docker-compose.ecr.yml, docker-compose.server.ecr.yml, docker-compose.client.ecr.yml, docker-compose.vault.ecr.yml, docker-compose.identity.ecr.yml, docker-compose.identity-service.ecr.yml, docker-compose.highway.ecr.yml, docker-compose.stripe-ps.ecr.yml, devops/**"
                 withCredentials([
                     usernamePassword(credentialsId: 'block-apps-jenkins-s3',  passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
                 ]) {
