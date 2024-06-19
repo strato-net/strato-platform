@@ -227,7 +227,7 @@ class MenuBar extends Component {
             text={
               this.props.userCertificate
                 ? this.props.userCertificate.commonName +
-                  ", " +
+                  (this.props.userCertificate.organization && this.props.userCertificate.organization !== "" ? ", " : "") +
                   this.props.userCertificate.organization +
                   (this.props.userCertificate.organizationalUnit
                     ? " | " + this.props.userCertificate.organizationalUnit
