@@ -1419,6 +1419,7 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAs
                    $logInfoS (name <> "/vm") . T.pack $ show $ toList (VMEvent.outEvents b)
                    atomically $ do
                      writeTQueue unseqSource $ UnseqEvent . IEBlock . blockToIngestBlock Origin.Quarry . outputBlockToBlock <$> toList (VMEvent.outBlocks b)
+                     writeTQueue unseqSource $ UnseqEvent . IEPreprepareResponse <$> toList (VMEvent.outPreprepareResponses b)
                      writeTQueue apiIndexerSource $ toList (VMEvent.outIndexEvents b)
                      writeTQueue p2pIndexerSource $ toList (VMEvent.outIndexEvents b)
                      traverse_ (writeTQueue txrIndexerSource) $ toList (EventDBEntry <$> toList (VMEvent.outEvents b))
@@ -1556,7 +1557,15 @@ createConnection ::
   P2PPeer ->
   P2PPeer ->
   IO P2PConnection
-createConnection server' client' = do
+createConnection server' client' = createConnectionWithModifications server' client' id id
+
+createConnectionWithModifications ::
+  P2PPeer ->
+  P2PPeer ->
+  (P2pEvent -> P2pEvent) ->
+  (P2pEvent -> P2pEvent) ->
+  IO P2PConnection
+createConnectionWithModifications server' client' modifyServerMsgs modifyClientMsgs = do
   serverToClientTQueue <- newTQueueIO
   clientToServerTQueue <- newTQueueIO
   serverSeqSource <- atomically . dupTMChan $ _p2pPeerSeqP2pSource server'
@@ -1569,13 +1578,13 @@ createConnection server' client' = do
                   (_p2pPeerPPeer client')             
                   (sourceTQueue clientToServerTQueue) 
                   (sinkTQueue serverToClientTQueue)   
-                  (sourceTMChan serverSeqSource .| (awaitForever $ either (const $ pure ()) yield))
+                  (sourceTMChan serverSeqSource .| (awaitForever $ either (const $ pure ()) (yield . modifyServerMsgs) ))
                   ("Me: " ++ _p2pPeerName server' ++ ", Them: " ++ _p2pPeerName client')
   let rClient = runEthClientConduit         
                   (_p2pPeerPPeer server')   
                   (sourceTQueue serverToClientTQueue)
                   (sinkTQueue clientToServerTQueue)
-                  (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
+                  (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) (yield . modifyClientMsgs) ))
                   ("Me: " ++ _p2pPeerName client' ++ ", Them: " ++ _p2pPeerName server')
   pure $
     P2PConnection

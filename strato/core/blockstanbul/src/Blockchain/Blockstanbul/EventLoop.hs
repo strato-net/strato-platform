@@ -294,6 +294,15 @@ eventLoop ctx = execStateC ctx $
                 when (isJust self && valB) $ do
                   msg <- signMessage (Preprepare v realSealed)
                   yieldR msg
+                  yieldR $ RunPreprepare realSealed
+        PreprepareResponse decision -> case decision of 
+            AcceptPreprepare bh -> do 
+              self <- use selfCert
+              valB <- use validatorBehavior
+              when (isJust self && valB) $ do
+                msg <- signMessage (Prepare v bh)
+                yieldR msg
+            RejectPreprepare -> roundChange
         IMsg auth ppp@(Preprepare v' pp) -> do
           pr <- use proposer
           mBlockLock <- use blockLock
@@ -326,13 +335,13 @@ eventLoop ctx = execStateC ctx $
                     roundChange
                   Right () -> do
                     wasProposed <- isJust <$> use proposal
-                    unless wasProposed . yieldL $ OMsg auth ppp
-                    proposal .= Just pp
-                    self <- use selfCert
-                    valB <- use validatorBehavior
-                    when (isJust self && valB) $ do
-                      msg <- signMessage (Prepare v (blockHash pp))
-                      yieldR msg
+                    unless wasProposed $ do
+                      yieldL $ OMsg auth ppp
+                      proposal .= Just pp
+                      self <- use selfCert
+                      valB <- use validatorBehavior
+                      -- run in vm before sending prepare
+                      when (isJust self && valB) . yieldR $ RunPreprepare pp
         IMsg auth ppp@(Prepare v' di) -> when (v <= v') $ do
           preparers <- use prepared
           unless (M.member (chainMemberParsedSetToValidator $ sender auth) preparers) . yieldL $ OMsg auth ppp
@@ -488,6 +497,7 @@ recordInEvent ev =
         CommitResult {} -> inc "commit_result"
         UnannouncedBlock {} -> inc "unannounced_block"
         PreviousBlock {} -> inc "previous_block"
+        PreprepareResponse {} -> inc "preprepare_response"
         ForcedConfigChange {} -> inc "forced_config_change"
         ValidatorBehaviorChange {} -> inc "validator_behavior_change"
         ValidatorChange {} -> inc "validator_change"
@@ -507,6 +517,7 @@ recordOutEvent eev =
         GapFound {} -> inc "gap_found"
         LeadFound {} -> inc "lead_found"
         NewCheckpoint {} -> inc "new_checkpoint"
+        RunPreprepare {} -> inc "run_preprepare"
 
 
 validatorTimingHack :: (MonadState BlockstanbulContext m)  =>
