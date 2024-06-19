@@ -23,19 +23,24 @@ import { Images } from "../../images";
 //items
 import { actions as itemActions } from "../../contexts/item/actions";
 import { actions as redemptionActions } from "../../contexts/redemption/actions";
+import { actions as issuerStatusActions } from "../../contexts/issuerStatus/actions";
 import { useItemDispatch, useItemState } from "../../contexts/item";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
 import { useAuthenticateState } from "../../contexts/authentication";
-import CategoryCard from "../MarketPlace/CategoryCard";
 import HelmetComponent from "../Helmet/HelmetComponent";
 import { SEO } from "../../helpers/seoConstant";
 import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
+//authorized issuer
+import RequestBeAuthorizedIssuerModal from "./RequestBeAuthorizedIssuerModal";
+import { ISSUER_STATUS } from '../../helpers/constants';
+import { useIssuerStatusState , useIssuerStatusDispatch } from "../../contexts/issuerStatus";
 
 
 const Inventory = ({ user }) => {
   const [open, setOpen] = useState(false);
+  const [reqModOpen, setReqModOpen] = useState(false);
   const [queryValue, setQueryValue] = useState("");
   const debouncedSearchTerm = useDebounce(queryValue, 1000);
   const limit = 10;
@@ -68,6 +73,17 @@ const Inventory = ({ user }) => {
     message: redemptionMsg,
     success: redemptionSuccess
   } = useRedemptionState();
+
+  //issuer status
+  const [issuerStatus, setIssuerStatus] = useState(user?.issuerStatus);
+  useEffect(() => {
+    setIssuerStatus(user?.issuerStatus);
+  }, [user]);
+  const issuerStatusDipatch = useIssuerStatusDispatch();
+  const {
+    message: issuerStatusMsg,
+    success: issuerStatusSuccess
+  } = useIssuerStatusState();
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
@@ -116,6 +132,13 @@ const Inventory = ({ user }) => {
     setOpen(false);
   };
 
+  const showReqModModal = () => {
+    setReqModOpen(true);
+  };
+
+  const handleReqModCancel = () => {
+    setReqModOpen(false);
+  };
 
   const openToast = (placement) => {
     if (success) {
@@ -183,6 +206,24 @@ const Inventory = ({ user }) => {
         onClose: redemptionActions.resetMessage(redemptionDispatch),
         placement,
         key: 6,
+      });
+    }
+  };
+
+  const issuerStatusToast = (placement) => {
+    if (issuerStatusSuccess) {
+      api.success({
+        message: issuerStatusMsg,
+        onClose: issuerStatusActions.resetMessage(issuerStatusDipatch),
+        placement,
+        key: 7,
+      });
+    } else {
+      api.error({
+        message: issuerStatusMsg,
+        onClose: issuerStatusActions.resetMessage(issuerStatusDipatch),
+        placement,
+        key: 8,
       });
     }
   };
@@ -280,7 +321,10 @@ const metaImg = category ? category : SEO.IMAGE_META
                   onClick={() => {
                     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                       window.location.href = loginUrl;
-                    } else {
+                    } else if (issuerStatus != ISSUER_STATUS.AUTHORIZED) {
+                      showReqModModal()
+                    }
+                    else {
                       showModal()
                     }
                   }}
@@ -391,9 +435,22 @@ const metaImg = category ? category : SEO.IMAGE_META
           />
         )
       }
+      {
+        reqModOpen && (
+          <RequestBeAuthorizedIssuerModal
+            open={reqModOpen}
+            handleCancel={handleReqModCancel}
+            commonName={user.commonName}
+            emailAddr={user.email}
+            issuerStatus={issuerStatus}
+            setIssuerStatus={setIssuerStatus}
+          />
+        )
+      }
       {message && openToast("bottom")}
       {itemMsg && itemToast("bottom")}
       {redemptionMsg && redemptionToast("bottom")}
+      {issuerStatusMsg && issuerStatusToast("bottom")}
     </>
   );
 };

@@ -218,6 +218,18 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getCertificates = async function (args) {
     return certificateJs.getCertificates(admin, args);
   };
+  contract.requestReview = async function (args) {
+    return certificateJs.requestReview(admin, args);
+  };
+  contract.authorizeIssuer = async function (args) {
+    return certificateJs.authorizeIssuer(admin, args);
+  };
+  contract.deauthorizeIssuer = async function (args) {
+    return certificateJs.deauthorizeIssuer(admin, args);
+  };
+  contract.setIsAdmin = async function (args) {
+    return certificateJs.setIsAdmin(admin, args);
+  }
 
   // -------------------------- INVENTORY --------------------------------
 
@@ -467,28 +479,28 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions)
   }
 
-  contract.getPriceHistory = async function (args, options = defaultOptions) {  
+  contract.getPriceHistory = async function (args, options = defaultOptions) {
     try {
       const { assetAddress, timeFilter } = args;
 
       const assetWithoutQuantity = await inventoryJs.get(rawAdmin, { address: assetAddress }, options);
       const originAddress = assetWithoutQuantity.originAddress;
-      const assetsOfOriginAsset = await inventoryJs.getAll(rawAdmin,{ originAddress: originAddress}, options);
-      const assetsAddressArr = assetsOfOriginAsset.map(item=>item.address);
+      const assetsOfOriginAsset = await inventoryJs.getAll(rawAdmin, { originAddress: originAddress }, options);
+      const assetsAddressArr = assetsOfOriginAsset.map(item => item.address);
       // Aggregate sales for all associated assets
 
-        const allAssetSales = await saleJs.getAll(rawAdmin, { 
-          assetToBeSold: assetsAddressArr,
-          order: "block_timestamp.asc",
-          gtField: "block_timestamp",
-          gtValue: getOneYearAgoTime()
-        }, options);
+      const allAssetSales = await saleJs.getAll(rawAdmin, {
+        assetToBeSold: assetsAddressArr,
+        order: "block_timestamp.asc",
+        gtField: "block_timestamp",
+        gtValue: getOneYearAgoTime()
+      }, options);
 
       // Fetch sales (12 months) for stats
       console.log("Fetched origin yearly sales:", allAssetSales.length, "sales");
-  
+
       let salesFilter = { order: "block_timestamp.asc" };
-  
+
       // Sales Filter modification based on timeFilter
       if (timeFilter === timeFilterForSixMonths()) {
         // Applying 6-month filter
@@ -504,12 +516,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         console.log('Invalid timeFilter');
         return;
       }
-        console.log(getSixMonthsAgoTime()," months ago")
+      console.log(getSixMonthsAgoTime(), " months ago")
 
-        const timeRangeSales = await saleJs.getAll(rawAdmin, {
-          assetToBeSold: assetsAddressArr,
-          ...salesFilter
-        }, options);
+      const timeRangeSales = await saleJs.getAll(rawAdmin, {
+        assetToBeSold: assetsAddressArr,
+        ...salesFilter
+      }, options);
 
       // Fetch sales based on filter
 
@@ -520,14 +532,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         //Fetch histories for each sale
         const historyPromises = sales.map(sale => {
           //Fetch saleHistory
-          if(filter.assetToBeSold) 
-          {
+          if (filter.assetToBeSold) {
             //If timeFilter is applied, also add those filters
-            return saleJs.getAllSaleHistory(rawAdmin, { ...filter, assetToBeSold: sale.assetToBeSold  }, options);
-          }else{
+            return saleJs.getAllSaleHistory(rawAdmin, { ...filter, assetToBeSold: sale.assetToBeSold }, options);
+          } else {
             //If historical data is fetched, apply 12 month timeFilter
 
-            return saleJs.getAllSaleHistory(rawAdmin, { assetToBeSold: sale.assetToBeSold, order: "block_timestamp.asc", gtField: "block_timestamp", gtValue: getOneYearAgoTime() }, options); 
+            return saleJs.getAllSaleHistory(rawAdmin, { assetToBeSold: sale.assetToBeSold, order: "block_timestamp.asc", gtField: "block_timestamp", gtValue: getOneYearAgoTime() }, options);
           }
         });
         const histories = await Promise.all(historyPromises);
@@ -892,7 +903,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           });
         }
       });
-      
+
       const sales = await saleJs.getAll(rawAdmin, { saleAddresses }, options);
 
       const uniqueAssetAddresses = [...new Set(sales.map(sale => sale.assetToBeSold))];
@@ -1351,6 +1362,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return balance;
   }
 
+  contract.getStratsTransactionHistory = async function (args, options = defaultOptions) {
+    const getOptions = { ...options, org: "TestCompany", app: '' };
+    const transactionHistory = await strats.getStratsTransactionHistory(rawAdmin, args, getOptions);
+
+    return transactionHistory;
+  }
+
   contract.transferStrats = async function (args, options = defaultOptions) {
     const res = await strats.transferStrats(rawAdmin, args, options)
     return res;
@@ -1358,6 +1376,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   return contract;
 };
+
 
 /**
  * Add a new organization to a tCommerce contract/chain.

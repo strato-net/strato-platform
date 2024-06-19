@@ -20,6 +20,7 @@ import collectibles from './Collectibles'
 import order from './Order'
 import orderLineItem from './OrderLineItem'
 import authentication from './authentication'
+import issuerStatus from './IssuerStatus'
 import users from './users'
 import marketplace from './Marketplace'
 import paymentService from './PaymentService'
@@ -29,6 +30,7 @@ import redemption from './Redemption'
 
 import {
   Authentication,
+  IssuerStatus,
   Users,
   Category,
   SubCategory,
@@ -57,6 +59,7 @@ import {
 const router = express.Router()
 
 router.use(Authentication.prefix, authentication)
+router.use(IssuerStatus.prefix, issuerStatus)
 router.use(Users.prefix, users)
 router.use(Category.prefix, category)
 router.use(SubCategory.prefix, subCategory)

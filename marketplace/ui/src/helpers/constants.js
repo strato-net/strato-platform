@@ -214,12 +214,6 @@ export const ORDER_STATUS = {
   "PAYMENT_PENDING": 5
 }
 
-export const ASSET_STATUS = {
-  "ACTIVE": 1,
-  "PENDING_REDEMPTION": 2,
-  "RETIRED": 3
-}
-
 export const REDEMPTION_STATUS = {
   "PENDING": 1,
   "FULFILLED": 2,
@@ -228,6 +222,18 @@ export const REDEMPTION_STATUS = {
   "2": "Fulfilled",
   "3": "Rejected"
 }
+
+export const ASSET_STATUS = {
+  "ACTIVE": 1,
+  "PENDING_REDEMPTION": 2,
+  "RETIRED": 3
+}
+
+export const ISSUER_STATUS = {
+  "UNAUTHORIZED": "1",
+  "PENDING_REVIEW": "2",
+  "AUTHORIZED": "3" 
+ }
 
 export const availabilityOptions = [
   { label: 'For Sale', value: 'forSale' },
@@ -241,4 +247,3 @@ export const navItems = [
   { label: <div id="Orders">Orders</div>, key: '0' },
   { label: <div id="Inventory">My Items</div>, key: '1' }
 ];
-

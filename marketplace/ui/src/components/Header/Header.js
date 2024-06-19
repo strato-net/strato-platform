@@ -29,6 +29,7 @@ import { SEO } from "../../helpers/seoConstant";
 import LoginModal from "../MarketPlace/LoginModal"
 import { setCookie } from "../../helpers/cookie";
 import TransferStratsModal from "../MarketPlace/TransferStratsModal";
+import StratsTransactionHistoryModal from "../MarketPlace/StratsTransactionHistoryModal";
 
 import { navItems } from "../../helpers/constants";
 import routes from "../../helpers/routes";
@@ -86,6 +87,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const [selectedCategory, setSelectedCategory] = useState(categoryQueryValue);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isTransferStratsModalVisible, setIsTransferStratsModalVisible] = useState(false);
+  const [isStratsTransactionHistoryModalVisible, setIsStratsTransactionHistoryModalVisible] = useState(false);
 
   const stratsBalance = (Object.keys(strats).length > 0) ? strats : 0
 
@@ -184,28 +186,44 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const stratsItem = [
     {
       key: '1',
+      type: 'group',
       label: (
         <div>
           {user &&
             <p className="text-xs mt-1">
-              STRATs: {stratsBalance}
+              STRATS: {stratsBalance}
             </p>
           }
         </div>
       ),
-    },
-    {
-      key: '2',
-      onClick: () => setIsTransferStratsModalVisible(true),
-      label: (
-        <div>
-          {user &&
-            <p className="text-xs mt-1">
-              Transfer
-            </p>
-          }
-        </div>
-      ),
+      children: [
+        {
+          key: '2',
+          onClick: () => setIsTransferStratsModalVisible(true),
+          label: (
+            <div>
+              {user &&
+                <p className="text-xs mt-1">
+                  Transfer
+                </p>
+              }
+            </div>
+          ),
+        },
+        {
+          key: '3',
+          onClick: () => setIsStratsTransactionHistoryModalVisible(true),
+          label: (
+            <div>
+              {user &&
+                <p className="text-xs mt-1">
+                  Transaction History
+                </p>
+              }
+            </div>
+          ),
+        }
+      ],
     }
   ]
 
@@ -309,6 +327,10 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
 
   const handleCloseTransferStratsModal = () => {
     setIsTransferStratsModalVisible(false);
+  };
+
+  const handleCloseStratsTransactionHistoryModal = () => {
+    setIsStratsTransactionHistoryModalVisible(false);
   };
 
   return (
@@ -478,6 +500,11 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
           visible={isTransferStratsModalVisible}
           onCancel={handleCloseTransferStratsModal}
           balance={stratsBalance}
+        />}
+      {isStratsTransactionHistoryModalVisible &&
+        <StratsTransactionHistoryModal
+          visible={isStratsTransactionHistoryModalVisible}
+          onCancel={handleCloseStratsTransactionHistoryModal}
         />}
     </>
 

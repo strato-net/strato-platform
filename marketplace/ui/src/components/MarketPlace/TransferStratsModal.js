@@ -105,7 +105,7 @@ const TransferStratsModal = ({ visible, onCancel }) => {
 
   return (
     <Modal
-      title="Transfer STRATs"
+      title="Transfer STRATS"
       open={visible}
       onCancel={handleCancel}
       footer={[
