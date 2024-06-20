@@ -26,6 +26,8 @@ so that they could be properly moved to their respective version's subsection.
 
 ### Fixed
 - fixed logic for how p2p calculates if it is missing parents blocks and needs to backtrack its sync
+- `creator` and `root` get populated in collection tables
+- validators run block before voting for it
 
 ### Removed
 
