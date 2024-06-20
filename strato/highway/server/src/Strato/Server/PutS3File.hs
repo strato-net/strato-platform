@@ -17,7 +17,7 @@ import           Control.Monad.Reader
 import           Control.Monad.Trans.Resource
 import           Data.ByteString as DB
 import           Data.Text as T
-import           Data.Time.Clock.POSIX (getPOSIXTime)
+import           Data.Time.Clock.POSIX (getPOSIXTime, POSIXTime)
 import           Network.HTTP.Conduit (RequestBody(..))
 import           Servant.Multipart
 import           System.FilePath (takeExtension, takeBaseName)
