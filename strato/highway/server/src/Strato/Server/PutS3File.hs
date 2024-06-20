@@ -34,10 +34,10 @@ putS3File multipartdata =
       --Derive hash (Keccak256?) based on the file contents.
       $logInfoS "highway/putS3File" $ T.pack $ "Getting current Unix timestamp."
       unixTime <- liftIO getPOSIXTime
-          let timestamp = T.pack . show . (round :: POSIXTime -> Integer) $ unixTime :: Text
-          baseName = T.pack . takeBaseName . T.unpack $ fdFileName file
-          extension = T.pack . takeExtension . T.unpack $ fdFileName file
-          uploadFileName = timestamp <> "-" <> baseName <> extension
+      let timestamp = T.pack . show . (round :: POSIXTime -> Integer) $ unixTime :: Text
+      let baseName = T.pack . takeBaseName . T.unpack $ fdFileName file
+      let extension = T.pack . takeExtension . T.unpack $ fdFileName file
+      let uploadFileName = timestamp <> "-" <> baseName <> extension
       --Set up AWS credentials and the default configuration.
       $logInfoS "highway/putS3File" $ T.pack $ "Setting up AWS credentials and the default AWS configuration."
       mgr    <- asks httpManager
