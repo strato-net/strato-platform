@@ -22,7 +22,9 @@ type HasStrato m = Accessible StratoData m
 
 runStratoM :: MonadIO m => String -> StratoM m a -> m a
 runStratoM url f = do
-  mgr <- liftIO $ newManager tlsManagerSettings
   stratoUrl <- liftIO $ parseBaseUrl url
+  mgr <- liftIO $ case baseUrlScheme stratoUrl of
+    Http -> newManager defaultManagerSettings
+    Https -> newManager tlsManagerSettings
 
   runReaderT f $ StratoData stratoUrl mgr
