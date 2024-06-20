@@ -81,7 +81,7 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrde
         return {
           address: order.id ? order.transaction_hash : order.address,
           chainId: order.chainId,
-          key: order.address,
+          key: order.id ? order.transaction_hash : order.address,
           orderNumber: order,
           buyersCommonName: order.purchasersCommonName,
           orderTotal: order.totalPrice,

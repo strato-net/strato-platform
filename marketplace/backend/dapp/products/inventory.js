@@ -423,7 +423,6 @@ async function getAll(admin, args = {}, defaultOptions) {
         if (inventories) {
             inventories.forEach(inventory => {
                 const itemSale = sales.find(sale => sale.assetToBeSold == inventory.address && sale.isOpen);
-                console.log(itemSale);
                 if (itemSale) {
                     finalInventory.push({
                         ...inventory,
