@@ -349,7 +349,7 @@ const ProductDetails = ({ user, users }) => {
   function handleFileName(filename) {
     const partToRemove = 'https://fileserver.mercata-testnet2.blockapps.net/highway/';
     let modifiedFilename = filename.replace(partToRemove, '');
-    return modifiedFilename.replace(/^\d+/, '');
+    return modifiedFilename.replace(/^\d+-/, '');
   }
 
   return (
