@@ -17,12 +17,13 @@ import           Control.Monad.Reader
 import           Control.Monad.Trans.Resource
 import           Data.ByteString as DB
 import           Data.Text as T
+import           Data.Time.Clock.POSIX (getPOSIXTime)
 import           Network.HTTP.Conduit (RequestBody(..))
 import           Servant.Multipart
-import           System.FilePath (takeExtension)
+import           System.FilePath (takeExtension, takeBaseName)
 
 import           Strato.Monad
-import           Blockchain.Strato.Model.Keccak256
+-- import           Blockchain.Strato.Model.Keccak256
 
 putS3File :: MultipartData Mem 
           -> HighwayM Text
@@ -31,13 +32,12 @@ putS3File multipartdata =
   case files multipartdata of
     [file] -> do
       --Derive hash (Keccak256?) based on the file contents.
-      $logInfoS "highway/putS3File" $ T.pack $ "Deriving hash based on the file contents."
-      let content     = toStrict     $
-                        fdPayload    $
-                        file
-      let contentHash = T.pack . keccak256ToHex $ hash content
+      $logInfoS "highway/putS3File" $ T.pack $ "Getting current Unix timestamp."
+      unixTime <- liftIO getPOSIXTime
+      let timestamp = T.pack . show . round $ unixTime :: Text
+          baseName = T.pack . takeBaseName . T.unpack $ fdFileName file
           extension = T.pack . takeExtension . T.unpack $ fdFileName file
-          uploadFileName = contentHash <> extension
+          uploadFileName = timestamp <> baseName <> extension
       --Set up AWS credentials and the default configuration.
       $logInfoS "highway/putS3File" $ T.pack $ "Setting up AWS credentials and the default AWS configuration."
       mgr    <- asks httpManager
@@ -54,6 +54,7 @@ putS3File multipartdata =
       $logInfoS "highway/putS3File" $ T.pack $ "Setting up a ResourceT region with an available HTTP manager."
       st  <- askUnliftIO
       liftIO $ runResourceT $ do
+        let content = toStrict $ fdPayload file
         let body = RequestBodyBS content
         --Create a request object with S3.getObject and run the request with pureAws.
         liftIO $ unliftIO st $ $logInfoS "highway/putS3File" $ T.pack $ "Creating request object with getObject and running request via pureAws."
