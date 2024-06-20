@@ -8,6 +8,7 @@ library:
   source-dirs: src
   dependencies:
   - http-client
+  - http-client-tls
   - monad-alter
   - mtl
   - servant-client

@@ -8,6 +8,7 @@ module Control.Monad.Composable.Strato where
 import Control.Monad.Change.Modify
 import Control.Monad.Reader
 import Network.HTTP.Client
+import Network.HTTP.Client.TLS
 import Servant.Client
 
 data StratoData = StratoData
@@ -21,7 +22,7 @@ type HasStrato m = Accessible StratoData m
 
 runStratoM :: MonadIO m => String -> StratoM m a -> m a
 runStratoM url f = do
-  mgr <- liftIO $ newManager defaultManagerSettings
+  mgr <- liftIO $ newManager tlsManagerSettings
   stratoUrl <- liftIO $ parseBaseUrl url
 
   runReaderT f $ StratoData stratoUrl mgr
