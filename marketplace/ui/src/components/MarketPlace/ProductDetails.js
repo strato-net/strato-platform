@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Row, Breadcrumb, Button, Typography, Tabs, Space, Spin, notification, InputNumber, List, } from "antd";
-import { HeartTwoTone, HeartFilled } from '@ant-design/icons';
+import { HeartTwoTone, HeartFilled, FilePdfOutlined } from '@ant-design/icons';
 import { useMatch, useNavigate, useLocation } from "react-router-dom";
 import { Carousel } from "react-responsive-carousel"
 import TagManager from "react-gtm-module";
@@ -346,6 +346,11 @@ const ProductDetails = ({ user, users }) => {
   const googleFormBaseURL = "https://docs.google.com/forms/d/e/1FAIpQLSfEWqALizqd-Rg3OPTwxD5O6xJKqT0xEgHeKpSpnaWzZ7tn1Q/viewform?usp=pp_url";
   const preFilledFormURL = `${googleFormBaseURL}&entry.8090980=${encodeURIComponent(details?.name)}&entry.1160788377=${encodeURIComponent(details?.ownerCommonName)}&entry.1571372307=${encodeURIComponent(user?.commonName)}`;
 
+  function handleFileName(filename) {
+    const partToRemove = 'https://fileserver.mercata-testnet2.blockapps.net/highway/';
+    let modifiedFilename = filename.replace(partToRemove, '');
+    return modifiedFilename.replace(/^\d+/, '');
+  }
 
   return (
     <>
@@ -709,10 +714,10 @@ const ProductDetails = ({ user, users }) => {
                             size="small"
                             boardered
                             dataSource={fileValues?.length > 0 ? fileValues : []}
-                            renderItem={(item) =>
+                            renderItem={(item,index) =>
                               <List.Item>
                                 <a href={item} rel="noreferrer" target="_blank" className="hover:underline break-all text-[#1e40af]">
-                                  {item}
+                                  <Button link icon={<FilePdfOutlined />} className="!text-blue">  {`${handleFileName(item)}`}</Button>
                                 </a>
                               </List.Item>}
                           />
