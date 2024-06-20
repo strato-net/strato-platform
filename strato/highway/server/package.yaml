@@ -46,6 +46,7 @@ library:
     - text
     - unliftio-core
     - wai-extra
+    - time
 
 executables:
   blockapps-highway-server:
@@ -74,6 +75,7 @@ executables:
       - wai-extra
       - wai-middleware-prometheus
       - warp
+      - time
     ghc-options: -threaded 
 
 tests:
@@ -111,3 +113,4 @@ tests:
       - wai-extra
       - warp
       - word8
+      - time
