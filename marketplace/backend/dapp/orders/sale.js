@@ -188,11 +188,17 @@ async function getAll(admin, args = {}, defaultOptions) {
             gtField: saleGtField,
             gtValue: saleGtValue,
             isOpen: isOpen,
-            range: range
+            range: range,
+            queryOptions: {'select': '*,BlockApps-Mercata-Sale-paymentProviders(*)'}
         }, options, admin);
     }
     else {
-        sales = await searchAllWithQueryArgs(contractName, { address: saleAddresses, isOpen: isOpen, ...restArgs }, options, admin);
+        sales = await searchAllWithQueryArgs(contractName, { 
+            address: saleAddresses, 
+            isOpen: isOpen, 
+            queryOptions: {'select': '*,BlockApps-Mercata-Sale-paymentProviders(*)'},
+            ...restArgs, 
+        }, options, admin);
     }
 
     return sales ? sales.map((sale) => marshalOut(sale)) : undefined;

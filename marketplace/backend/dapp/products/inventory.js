@@ -423,6 +423,7 @@ async function getAll(admin, args = {}, defaultOptions) {
         if (inventories) {
             inventories.forEach(inventory => {
                 const itemSale = sales.find(sale => sale.assetToBeSold == inventory.address && sale.isOpen);
+                console.log(itemSale);
                 if (itemSale) {
                     finalInventory.push({
                         ...inventory,
@@ -430,7 +431,7 @@ async function getAll(admin, args = {}, defaultOptions) {
                         saleAddress: itemSale?.address,
                         saleQuantity: itemSale?.quantity,
                         saleDate: itemSale?.block_timestamp,
-                        paymentProviders: itemSale?.paymentProviders,
+                        paymentProviders: itemSale['BlockApps-Mercata-Sale-paymentProviders'],
                         totalLockedQuantity: itemSale?.totalLockedQuantity
                     });
                 }

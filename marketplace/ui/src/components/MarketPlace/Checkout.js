@@ -356,7 +356,7 @@ const Checkout = () => {
   ];
 
   const filterPaymentServices = (es) => {
-    const ps = es.map(p => paymentServices.find(s => s.address === p)).filter((p) => p);
+    const ps = es.map(p => paymentServices.find(s => s.address === p.value));
     if (ps.length === 0) {
       return paymentServices.filter((p) => p && p.serviceName === 'Stripe');
     } else {
