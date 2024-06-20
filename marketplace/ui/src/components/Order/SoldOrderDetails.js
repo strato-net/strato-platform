@@ -82,9 +82,8 @@ const SoldOrderDetails = ({ user, users }) => {
       }
 
       let items = [];
-      const orderQuantities = orderDetails.order["BlockApps-Mercata-Order-quantities"].map(item => item.value);
+      const orderQuantities = orderDetails.order.quantities ? orderDetails.order.quantities : orderDetails.order["BlockApps-Mercata-Order-quantities"].map(item => item.value);
       orderDetails.assets.forEach((prod, index) => {
-        const quantity = orderDetails.order.quantities ? parseInt(orderDetails.order.quantities[index]) : 1;
         items.push({
           address: prod.address,
           chainId: prod.chainId,
@@ -570,7 +569,6 @@ const SoldOrderDetails = ({ user, users }) => {
           />
 
         </div>
-      )}
       {message && openToastOrder("bottom")}
     </div>
   );

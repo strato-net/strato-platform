@@ -112,10 +112,9 @@ const BoughtOrderDetails = ({ user, users }) => {
         setPaid("Canceled");
       }
       setcomment(orderDetails.order.comments);
-      const orderQuantities = orderDetails.order["BlockApps-Mercata-Order-quantities"].map(item => item.value);
+      const orderQuantities = orderDetails.order.quantities ? orderDetails.order.quantities : orderDetails.order["BlockApps-Mercata-Order-quantities"].map(item => item.value);
       let items = [];
       orderDetails.assets.forEach((prod, index) => {
-        const quantity = orderDetails.order.quantities ? parseInt(orderDetails.order.quantities[index]) : 1;
         items.push({
           address: prod.address,
           chainId: prod.chainId,

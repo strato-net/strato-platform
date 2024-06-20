@@ -492,7 +492,7 @@ async function getAll(admin, args = {}, defaultOptions) {
                                 saleQuantity: sales[0]?.quantity,
                                 saleDate: sales[0]?.block_timestamp,
                                 totalLockedQuantity: sales[0]?.totalLockedQuantity,
-                                paymentProviders: sales[0]?.paymentProviders,
+                                paymentProviders: sales[0]['BlockApps-Mercata-Sale-paymentProviders'],
                                 'BlockApps-Mercata-Sale': undefined  // Removing the nested sale data to avoid redundancy
                             });
                         }
@@ -504,7 +504,7 @@ async function getAll(admin, args = {}, defaultOptions) {
                             saleQuantity: sales[0]?.quantity,
                             saleDate: sales[0]?.block_timestamp,
                             totalLockedQuantity: sales[0]?.totalLockedQuantity,
-                            paymentProviders: sales[0]?.paymentProviders,
+                            paymentProviders: sales[0]['BlockApps-Mercata-Sale-paymentProviders'],
                             'BlockApps-Mercata-Sale': undefined  // Removing the nested sale data to avoid redundancy
                         });
                     }
