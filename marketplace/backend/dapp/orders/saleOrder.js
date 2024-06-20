@@ -166,11 +166,11 @@ function bindAddress(user, address, options) {
  */
 
 async function get(user, args, options) {
-  const { address, orderId, ...restArgs } = args;
+  const { address, ...restArgs } = args;
   const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
   let order;
 
-  let searchArgs = setSearchQueryOptions( { ...restArgs, token: orderId }, {
+  let searchArgs = setSearchQueryOptions( { ...restArgs }, {
     key: "transaction_hash",
     value: address,
   });
