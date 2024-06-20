@@ -438,7 +438,10 @@ handleEvents peer = awaitForever $ \case
                 " does not have a registered certificate"
               ]
         Just cm ->
-          maybe False unIsValidator <$> lift (select (Proxy @IsValidator) cm) >>= \case
+          let cm' = case cm of 
+                CommonName _ _ name b -> CommonName "" "" name b
+                x -> x
+          in maybe False unIsValidator <$> lift (select (Proxy @IsValidator) cm') >>= \case
             False ->
               $logDebugS "handleEvents/P2pBlockstanbul" . T.pack $
                 concat
