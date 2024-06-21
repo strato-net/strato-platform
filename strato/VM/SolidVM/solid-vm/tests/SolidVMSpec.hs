@@ -8575,7 +8575,7 @@ contract qq {
   constructor() {}
 }|]) `shouldThrow` anyInvalidArgumentsError
 
-  it "can use fixed point numbers" $ runTest ( do
+  fit "can use fixed point numbers" $ runTest ( do
     runBS [r|
 contract qq {
   fixed x = 1.123123;
@@ -8583,17 +8583,24 @@ contract qq {
   fixed256x80 y = 0.0000003;
   fixed z;
   fixed copyOfX;
+  fixed funcResult;
   
   constructor() {
     copyOfX = x;
+    funcResult = test(x);
+  }
+
+  function test(fixed _x) returns (fixed) {
+    return _x;
   }
 }
 |]
-    getFields ["x", "negativeX", "y", "z", "copyOfX"]
+    getFields ["x", "negativeX", "y", "z", "copyOfX", "funcResult"]
       `shouldReturn` [BFixed "1.123123",
                       BFixed "-1.123123",
                       BFixed "0.0000003",
                       BDefault,
+                      BFixed "1.123123",
                       BFixed "1.123123"
                     ])
 
