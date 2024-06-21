@@ -74,7 +74,7 @@ executables:
   blockapps-pem-vault-wrapper-server:
     source-dirs: app
     main: PemMain.hs
-    other-modules: [PemOptions]
+    other-modules: [Options, PemOptions]
     dependencies:
       - blockapps-vault-wrapper-api
       - blockapps-vault-wrapper-server

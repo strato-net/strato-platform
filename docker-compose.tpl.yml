@@ -195,7 +195,7 @@ services:
     - sqlDiff=${sqlDiff}
     - svmDev=${svmDev}
     - txSizeLimit=${txSizeLimit}
-    - USERNAME=${USERNAME}
+    - MERCATA_USERNAME=${MERCATA_USERNAME}
     - userRegistryAddress=${userRegistryAddress}
     - userRegistryCodeHash=${userRegistryCodeHash}
     - useBuiltinUserRegistry=${useBuiltinUserRegistry}

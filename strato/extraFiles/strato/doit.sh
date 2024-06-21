@@ -89,9 +89,9 @@ function newnode {
     else
         backup=$(cat backup_priv.pem)
         if [ "${backup}" = "" ]; then
-            x509-sign-subject -k priv.pem -n ${USERNAME} > subject.json
+            x509-sign-subject -k priv.pem -n "${MERCATA_USERNAME}" > subject.json
         else
-            x509-sign-subject -k priv.pem -v backup_priv.pem -n ${USERNAME} > subject.json
+            x509-sign-subject -k priv.pem -v backup_priv.pem -n "${MERCATA_USERNAME}" > subject.json
         fi
 
         subject=$(cat subject.json)
