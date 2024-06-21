@@ -53,11 +53,11 @@ putS3File multipartdata =
       --Set up a ResourceT region with an available HTTP manager.
       $logInfoS "highway/putS3File" $ T.pack $ "Setting up a ResourceT region with an available HTTP manager."
       st  <- askUnliftIO
-      liftIO $ runResourceT $ do
+      runResourceT $ do
         let content = toStrict $ fdPayload file
         let body = RequestBodyBS content
         --Create a request object with S3.getObject and run the request with pureAws.
-          liftIO $ unliftIO st $ $logInfoS "highway/putS3File" $ T.pack $ "Creating request object with getObject and running request via pureAws."
+        liftIO $ unliftIO st $ $logInfoS "highway/putS3File" $ T.pack $ "Creating request object with getObject and running request via pureAws."
         _ <- Aws.pureAws cfg s3cfg mgr $
                S3.putObject awss3b uploadFileName body
         return $ hwUrl <> "/highway/" <> uploadFileName
