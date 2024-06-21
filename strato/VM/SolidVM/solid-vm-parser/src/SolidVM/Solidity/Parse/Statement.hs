@@ -394,6 +394,7 @@ primaryExpression = do
               num <- lexeme $ integer
               period <- string "."
               fraction <- many1 digit
+              skipMany space
               let decimalNum = read (show num ++ period ++ fraction) :: Decimal
               pure (decimalNum)
             pure $ FixedLiteral a $ WrappedDecimal decimalNum

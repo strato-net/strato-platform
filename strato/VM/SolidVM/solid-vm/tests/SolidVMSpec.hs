@@ -8652,15 +8652,56 @@ contract qq {
                       BFixed "1.65"
                      ])
 
-  it "cannot divide by zero using fixed point numbers" $ runTest ( do
+  it "can use fixed point literals in expressions" $ runTest ( do
     runBS [r|
 contract qq {
   fixed x = 2.0;
-  fixed y;
+  fixed sum;
+  fixed sumTwo;
+  fixed sumThree;
+  fixed diff;
+  fixed diffTwo;
+  fixed product;
+  fixed productTwo;
+  fixed quotient;
+  fixed quotientTwo;
+  fixed quotientThree;
 
   constructor() {
-    x /= 0.0;
-    // y = 3.0 / 0.0;
+    sum = x + 3.3;
+    sumTwo = 1.0 + 3.3;
+    sumThree += 2.8;
+    diff = x - 1.2;
+    diffTwo = 3.3 - 1.2;
+    product = x * 3.2;
+    productTwo = -1.2 * 2.3;
+    quotient = x / 2.3;
+    quotientTwo = 4.6 / 2.3;
+    quotientThree = quotientTwo / 0.32;
+  }
+}
+|]
+    getFields ["x", "sum", "sumTwo", "sumThree", "diff", "diffTwo", "product", "productTwo", "quotient", "quotientTwo", "quotientThree"] 
+      `shouldReturn` [BFixed "2.0",
+                      BFixed "5.3",
+                      BFixed "4.3",
+                      BFixed "2.8",
+                      BFixed "0.8",
+                      BFixed "2.1",
+                      BFixed "6.4",
+                      BFixed "-2.76",
+                      BFixed "0.869565217391304347826086956521739130434782608695652173913043478260869565217391304347826086956521739130434782608695652173913043478260869565217391304347826086956521739130434782608695652173913043478260869565217391304347826086956521739130434782608695652173913",
+                      BFixed "2",
+                      BFixed "6.25"
+                     ])
+
+  it "cannot divide by zero using fixed point numbers" $ runTest ( do
+    runBS [r|
+contract qq {
+  fixed x;
+
+  constructor() {
+    x = 3.0 / 0.0;
   }
 }
 |])
