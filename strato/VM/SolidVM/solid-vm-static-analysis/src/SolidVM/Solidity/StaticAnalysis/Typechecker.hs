@@ -1677,13 +1677,13 @@ tcExpr (Binary x "!=" a b) =
 tcExpr (Binary x "==" a b) =
   tcExpr a <~> tcExpr b !> pure (boolType' x)
 tcExpr (Binary x "<" a b) =
-  intType' x ~> tcExpr a <~> tcExpr b !> pure (boolType' x)
+  sumType' (intType' x) (fixedType' x) ~> tcExpr a <~> tcExpr b !> pure (boolType' x)
 tcExpr (Binary x ">" a b) =
-  intType' x ~> tcExpr a <~> tcExpr b !> pure (boolType' x)
+  sumType' (intType' x) (fixedType' x) ~> tcExpr a <~> tcExpr b !> pure (boolType' x)
 tcExpr (Binary x ">=" a b) =
-  intType' x ~> tcExpr a <~> tcExpr b !> pure (boolType' x)
+  sumType' (intType' x) (fixedType' x) ~> tcExpr a <~> tcExpr b !> pure (boolType' x)
 tcExpr (Binary x "<=" a b) =
-  intType' x ~> tcExpr a <~> tcExpr b !> pure (boolType' x)
+  sumType' (intType' x) (fixedType' x) ~> tcExpr a <~> tcExpr b !> pure (boolType' x)
 tcExpr (Binary _ "=" a b) =
   (checkIfImmuteOperationValid a) <~> tcExpr b
 tcExpr (Binary _ _ a b) =

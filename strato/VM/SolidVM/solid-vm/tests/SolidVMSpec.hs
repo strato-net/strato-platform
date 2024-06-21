@@ -8695,6 +8695,39 @@ contract qq {
                       BFixed "6.25"
                      ])
 
+  it "can use comparison operators with fixed point numbers" $ runTest ( do
+    runBS [r|
+contract qq {
+  fixed x = 2.1;
+  fixed y = 3.2;
+  bool testOne;
+  bool testTwo;
+  bool testThree;
+  bool testFour;
+  bool testFive;
+  bool testSix;
+
+  constructor() {
+    testOne = x <= y;
+    testTwo = x < y;
+    testThree = x == y;
+    testFour = x != y;
+    testFive = x >= y;
+    testSix = x > y;
+  }
+}
+|]
+    getFields ["x", "y", "testOne", "testTwo", "testThree", "testFour", "testFive", "testSix"] 
+      `shouldReturn` [BFixed "2.1",
+                      BFixed "3.2",
+                      BBool True,
+                      BBool True,
+                      BDefault,
+                      BBool True,
+                      BDefault,
+                      BDefault
+                     ])
+
   it "cannot divide by zero using fixed point numbers" $ runTest ( do
     runBS [r|
 contract qq {
