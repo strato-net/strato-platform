@@ -8575,7 +8575,7 @@ contract qq {
   constructor() {}
 }|]) `shouldThrow` anyInvalidArgumentsError
 
-  fit "can use fixed point numbers" $ runTest ( do
+  it "can use fixed point numbers" $ runTest ( do
     runBS [r|
 contract qq {
   fixed x = 1.123123;
@@ -8584,10 +8584,17 @@ contract qq {
   fixed z;
   fixed copyOfX;
   fixed funcResult;
+  fixed[] fixedArray;
+  fixed elementOne;
+  fixed elementTwo;
   
   constructor() {
     copyOfX = x;
     funcResult = test(x);
+    fixedArray.push(3.2);
+    fixedArray.push(2.1);
+    elementOne = fixedArray[0];
+    elementTwo = fixedArray[1];
   }
 
   function test(fixed _x) returns (fixed) {
@@ -8595,13 +8602,15 @@ contract qq {
   }
 }
 |]
-    getFields ["x", "negativeX", "y", "z", "copyOfX", "funcResult"]
+    getFields ["x", "negativeX", "y", "z", "copyOfX", "funcResult", "elementOne", "elementTwo"]
       `shouldReturn` [BFixed "1.123123",
                       BFixed "-1.123123",
                       BFixed "0.0000003",
                       BDefault,
                       BFixed "1.123123",
-                      BFixed "1.123123"
+                      BFixed "1.123123",
+                      BFixed "3.2",
+                      BFixed "3.1"
                     ])
 
   it "can use fixed point numbers with arithemetic operators" $ runTest ( do
