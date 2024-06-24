@@ -259,6 +259,7 @@ decodeCacheValue' typeDefs'@TypeDefs {..} cache position@Storage.Position {..} v
           Just (SimpleValue (ValueBytes Nothing bytes)) -> Just . SimpleValue . ValueString $ Text.decodeUtf8 bytes
           Just (s@(SimpleValue (ValueString _))) -> Just s
           o -> error $ "decodeCacheValue': Expected ValueBytes or ValueString, but got: " ++ show o
+  SimpleType (TypeDecimal _) -> Nothing
   TypeFunction selector args returns -> Just $ ValueFunction selector args returns
   TypeArrayFixed _ _ -> Nothing
   {-
@@ -435,6 +436,7 @@ decodeValue' typeDefs'@TypeDefs {..} storage ofs cnt len position@Storage.Positi
           Just (SimpleValue (ValueBytes Nothing bytes')) -> bytes'
           _ -> error "decodeValue': Expected ValueBytes Nothing" -- ++ show v
      in Just $ SimpleValue $ ValueString $ Text.decodeUtf8 bytes
+  SimpleType (TypeDecimal _) -> Nothing
   TypeFunction selector args returns -> Just $ ValueFunction selector args returns
   TypeArrayFixed _ _ -> Nothing
   {-

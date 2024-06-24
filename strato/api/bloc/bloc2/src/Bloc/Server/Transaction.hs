@@ -1399,6 +1399,8 @@ getSolidityType av (Xabi.Array _ _) = Left $ Text.pack $ "Expected Array but got
 getSolidityType (ArgObject _) Xabi.Mapping {} = Right $ TypeStruct "s"
 getSolidityType av Xabi.Mapping {} = Left $ Text.pack $ "Expected Object for Mapping type, but got " ++ show av
 getSolidityType _ Xabi.Variadic = Right $ TypeVariadic
+getSolidityType _ (Xabi.Decimal (Just True)) = Right . SimpleType $ TypeDecimal True
+getSolidityType _ (Xabi.Decimal _) = Right . SimpleType $ TypeDecimal False
 
 getResultAndRespond ::
   ( A.Selectable Account AddressState m,

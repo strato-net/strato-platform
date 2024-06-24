@@ -111,6 +111,7 @@ bytesToSimpleValue bs = \case
   TypeString -> Just $ ValueString (Text.decodeUtf8 bs)
   TypeInt s b -> Just . ValueInt s b $ bytesToNum s b
   TypeBytes b -> Just $ ValueBytes b bs
+  TypeDecimal s -> Just $ ValueDecimal s bs
   where
     bytesToNum :: Bool -> Maybe Integer -> Integer
     bytesToNum signed' bytes' =
@@ -328,6 +329,7 @@ textToSimpleValue str = \case
   TypeInt s b -> ValueInt s b <$> readNum
   TypeBytes (Just n) -> ValueBytes (Just n) <$> readBytes n
   TypeBytes Nothing -> ValueBytes Nothing <$> readBytesDyn
+  TypeDecimal s -> Right $ ValueDecimal s (Text.encodeUtf8 str)
   where
     readNum :: Either Text Integer
     readNum = case readMaybe (Text.unpack str) of
@@ -338,7 +340,6 @@ textToSimpleValue str = \case
       case Base16.decode (Text.encodeUtf8 str) of
         Right bytes' | ByteString.length bytes' == fromInteger n -> return bytes'
         _ -> Left $ "textToSimpleValue: could not decode as statically sized bytes: " <> str <> ", expected a Base16 encoded string of length " <> Text.pack (show $ 2 * n) <> ", which represents a bytestring of length " <> Text.pack (show n)
-
     readBytesDyn :: Either Text ByteString
     readBytesDyn =
       case Base16.decode (Text.encodeUtf8 str) of

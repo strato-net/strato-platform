@@ -268,6 +268,7 @@ simpleTypeToXabiType TypeAddress = Xabi.Address
 simpleTypeToXabiType TypeAccount = Xabi.Account
 simpleTypeToXabiType TypeString = Xabi.String $ Just True
 simpleTypeToXabiType (TypeBytes b) = Xabi.Bytes Nothing $ fmap fromInteger b
+simpleTypeToXabiType (TypeDecimal s) = Xabi.Decimal (Just s)
 
 argToIndexedTypes :: TypeDefs -> Int32 -> (Text, Type) -> (Text, Xabi.IndexedType)
 argToIndexedTypes typeDefs i (name, theType) = (name, Xabi.IndexedType i $ typeToXabiType typeDefs theType)

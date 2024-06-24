@@ -444,6 +444,8 @@ getArgValues argsMap argNamesTypes = do
               Xabi.Int (Just True) b -> Right . SimpleType . TypeInt True $ fmap toInteger b
               Xabi.Int _ b -> Right . SimpleType . TypeInt False $ fmap toInteger b
               Xabi.String _ -> Right . SimpleType $ TypeString
+              Xabi.Decimal (Just True) -> Right . SimpleType $ TypeDecimal True
+              Xabi.Decimal _ -> Right . SimpleType $ TypeDecimal False
               Xabi.Bytes _ b -> Right . SimpleType . TypeBytes $ fmap toInteger b
               Xabi.Bool -> Right . SimpleType $ TypeBool
               Xabi.Address -> Right . SimpleType $ TypeAddress
@@ -455,6 +457,8 @@ getArgValues argsMap argNamesTypes = do
                       Xabi.Int (Just True) b -> Right . SimpleType . TypeInt True $ fmap toInteger b
                       Xabi.Int _ b -> Right . SimpleType . TypeInt False $ fmap toInteger b
                       Xabi.String _ -> Right . SimpleType $ TypeString
+                      Xabi.Decimal (Just True) -> Right . SimpleType $ TypeDecimal True
+                      Xabi.Decimal _ -> Right . SimpleType $ TypeDecimal False
                       Xabi.Bytes _ b -> Right . SimpleType . TypeBytes $ fmap toInteger b
                       Xabi.Bool -> Right . SimpleType $ TypeBool
                       Xabi.Address -> Right . SimpleType $ TypeAddress
