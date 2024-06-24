@@ -208,6 +208,7 @@ argValueToSimpleValue theType argVal = case theType of
     o -> Left . Text.pack $ "argValueToSimpleValue: Expected TypeBytes to be a string, but got " ++ show o
   TypeDecimal s -> case argVal of
     ArgDecimal i -> Right $ ValueDecimal s (Text.encodeUtf8 $ Text.pack $ show i)
+    ArgInt i -> Right $ ValueDecimal s (Text.encodeUtf8 $ Text.pack $ show i)
     o -> Left . Text.pack $ "argValueToSimpleValue: Expected TypeDecimal to be an decimal, but got " ++ show o
 
   where
