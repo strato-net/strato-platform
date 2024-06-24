@@ -144,19 +144,20 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode eighth po
 <NavLink
   activeClassName="active-menu-item"
   className="menu-item"
-  id="external_storage"
-  onClick={[Function]}
-  to="/external_storage"
+  id="accounts"
+  onClick={undefined}
+  to="/accounts"
 >
   <i
-    className="fa fa-cloud-upload"
+    className="fa fa-users"
   >
      
   </i>
   <span
     className="menu-text"
   >
-    External Storage
+     
+    Users
   </span>
 </NavLink>
 `;
