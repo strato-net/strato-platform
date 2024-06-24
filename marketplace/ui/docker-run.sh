@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+if [ "${AUTH_MODE}" = "OAUTH" ]; then
 SITE_ID=${SITE_ID:-}
 
 export STRATO_HOSTNAME=${STRATO_HOSTNAME:-strato}
@@ -24,3 +25,9 @@ sed -i "s|__FILE_SERVER_URL__|$FILE_SERVER_URL|g" build/index.html
 echo 'Starting ui server...'
 
 serve --single -l 3003 build
+else
+while [ 1 ]
+do
+    sleep 60
+done
+fi
