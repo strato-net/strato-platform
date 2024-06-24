@@ -1194,6 +1194,12 @@ intArgs x =
            stringType' x,
            Product [stringType' x, intType' x] x
          ]
+    
+decimalArgs :: SourceAnnotation Text -> Type'
+decimalArgs x =
+  Sum $
+    intType' x
+      :| [ stringType' x ]
 
 stringArgs :: SourceAnnotation Text -> Type'
 stringArgs x =
@@ -1326,6 +1332,8 @@ getVarType' "address" ctx = pure $ Function (addressArgs ctx) (Static (SVMType.A
 getVarType' "account" ctx = pure $ Function (accountArgs ctx) (Static (SVMType.Account False) ctx) ctx [] [] False
 --This is either the string() function or the string.member() function
 getVarType' "string" ctx = pure $ Sum $ (Function (stringArgs ctx) (stringType' ctx) ctx [] [] False) :| [Static (SVMType.UnknownLabel "string" Nothing) ctx]
+getVarType' "decimal" ctx = pure $ Function (decimalArgs ctx) (Static (SVMType.Decimal (Just True) Nothing) ctx) ctx [] [] False
+getVarType' "udecimal" ctx = pure $ Function (decimalArgs ctx) (Static (SVMType.Decimal (Just False) Nothing) ctx) ctx [] [] False
 getVarType' "bool" ctx = pure $ Function (boolArgs ctx) (boolType' ctx) ctx [] [] False
 getVarType' s@('b' : 'y' : 't' : 'e' : 's' : n) ctx = case n of
   [] -> pure $ Function (byteArgs ctx) (Static (SVMType.Bytes Nothing Nothing) ctx) ctx [] [] False

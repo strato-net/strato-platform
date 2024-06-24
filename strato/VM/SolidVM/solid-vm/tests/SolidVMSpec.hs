@@ -8613,7 +8613,7 @@ contract qq {
                       BDecimal "2.1"
                     ])
 
-  it "can use decimal numbers with arithemetic operators" $ runTest ( do
+  it "can use decimal numbers with arithmetic operators" $ runTest ( do
     runBS [r|
 contract qq {
   decimal x = 1.123123;
@@ -8755,3 +8755,17 @@ contract qq {
 }
 |])
     `shouldThrow` anyDivideByZeroError
+
+  it "can do arithmetics with decimal and ints" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal x;
+  uint y = 6;
+
+  constructor() {
+    x = 3.2 * decimal(6);
+  }
+}
+|]
+    getFields ["x"] 
+      `shouldReturn` [BDecimal "19.2"])

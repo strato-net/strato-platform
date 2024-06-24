@@ -2469,6 +2469,13 @@ integerToValue :: Either String Integer -> Value
 integerToValue (Right n) = SInteger n
 integerToValue (Left err) = typeError err ("" :: String)
 
+decimalBuiltin :: [Value] -> Value
+decimalBuiltin [SInteger n] = SDecimal $ Decimal 0 n
+decimalBuiltin [SString dec] = case parseBaseInt dec 10 of
+  Right n -> SDecimal $ Decimal 0 n
+  Left err -> typeError err ("" :: String)
+decimalBuiltin args = typeError "numeric cast - invalid args" args
+
 parseBaseInt :: String -> Integer -> Either String Integer
 parseBaseInt s n =
   case n of
@@ -2573,6 +2580,8 @@ callBuiltin "byte" [SInteger n] _ = return $ SInteger (n .&. 0xff)
 callBuiltin "byte" vs _ = typeError "byte cast" vs
 callBuiltin "uint" args _ = return $ intBuiltin args
 callBuiltin "int" args _ = return $ intBuiltin args
+callBuiltin "decimal" args _ = return $ decimalBuiltin args
+callBuiltin "udecimal" args _ = return $ decimalBuiltin args
 callBuiltin "push" [v] (Just o) = typeError "push (called as func, not as method)" (v, o)
 callBuiltin "call" [v] (Just o) = typeError "call (called as a function, not as a method)" (v, o)
 callBuiltin "identity" [v] Nothing = return v

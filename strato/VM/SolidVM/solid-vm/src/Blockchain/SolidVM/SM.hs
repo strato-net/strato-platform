@@ -484,6 +484,8 @@ getVariableOfName name = do
                        "account",
                        "uint",
                        "int",
+                       "decimal",
+                       "udecimal",
                        "bool",
                        "byte",
                        "bytes",
