@@ -551,7 +551,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
         if(shouldAggregate)
         {
-          // Faltten records, process them using accumulator hash map such that for a given date we fetch latest timestamp's sale record from history table
+          // Flatten records, process them using accumulator hash map such that for a given date we fetch latest timestamp's sale record from history table
           return histories.flat().reduce((acc, recordContainer) => {
             Object.values(recordContainer).forEach(record => {
               const date = getDate(record);
