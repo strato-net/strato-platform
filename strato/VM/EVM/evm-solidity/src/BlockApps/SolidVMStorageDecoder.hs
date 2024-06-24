@@ -85,7 +85,7 @@ valueToSolidityValue = \case
     ValueBytes _ b -> Just . SolidityValueAsString <$> (first show . decodeUtf8') b
     ValueBool b -> Right . Just $ SolidityBool b
     ValueInt _ _ n -> fromShowable n
-    ValueDecimal _ n -> fromShowable n
+    ValueDecimal _ n -> Right . Just $ SolidityValueAsString $ decodeUtf8 n
     ValueAddress a -> fromShowable a
     ValueAccount a -> fromShowable a
     ValueString s -> fromText s
