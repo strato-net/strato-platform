@@ -165,12 +165,12 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode fifth pos
 <NavLink
   activeClassName="active-menu-item"
   className="menu-item"
-  id="contracts"
+  id="blocks"
   onClick={undefined}
-  to="/contracts"
+  to="/blocks"
 >
   <i
-    className="fa fa-file-contract"
+    className="fa fa-cube"
   >
      
   </i>
@@ -178,7 +178,7 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode fifth pos
     className="menu-text"
   >
      
-    Contracts
+    Blocks
   </span>
 </NavLink>
 `;
@@ -205,17 +205,16 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode first pos
 </NavLink>
 `;
 
-
-exports[`SideBar: index sequence of links for oauth and non-oauth mode secound position /chains 1`] = `
+exports[`SideBar: index sequence of links for oauth and non-oauth mode fourth position /transactions 1`] = `
 <NavLink
   activeClassName="active-menu-item"
   className="menu-item"
-  id="accounts"
+  id="contracts"
   onClick={undefined}
-  to="/accounts"
+  to="/contracts"
 >
   <i
-    className="fa fa-users"
+    className="fa fa-file-contract"
   >
      
   </i>
@@ -223,12 +222,33 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode secound p
     className="menu-text"
   >
      
-    Users
+    Contracts
   </span>
 </NavLink>
 `;
 
 exports[`SideBar: index sequence of links for oauth and non-oauth mode seventh position /code_editor 1`] = `
+<NavLink
+  activeClassName="active-menu-item"
+  className="menu-item"
+  id="external_storage"
+  onClick={[Function]}
+  to="/external_storage"
+>
+  <i
+    className="fa fa-cloud-upload"
+  >
+     
+  </i>
+  <span
+    className="menu-text"
+  >
+    External Storage
+  </span>
+</NavLink>
+`;
+
+exports[`SideBar: index sequence of links for oauth and non-oauth mode sixth position /contracts 1`] = `
 <NavLink
   activeClassName="active-menu-item"
   className="menu-item"
@@ -246,28 +266,6 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode seventh p
   >
      
     Contract Editor
-  </span>
-</NavLink>
-`;
-
-exports[`SideBar: index sequence of links for oauth and non-oauth mode sixth position /contracts 1`] = `
-<NavLink
-  activeClassName="active-menu-item"
-  className="menu-item"
-  id="blocks"
-  onClick={undefined}
-  to="/blocks"
->
-  <i
-    className="fa fa-cube"
-  >
-     
-  </i>
-  <span
-    className="menu-text"
-  >
-     
-    Blocks
   </span>
 </NavLink>
 `;
