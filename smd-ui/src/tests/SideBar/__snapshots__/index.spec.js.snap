@@ -205,8 +205,6 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode first pos
 </NavLink>
 `;
 
-exports[`SideBar: index sequence of links for oauth and non-oauth mode fourth position /transactions 1`] = `
-`;
 
 exports[`SideBar: index sequence of links for oauth and non-oauth mode secound position /chains 1`] = `
 <NavLink
