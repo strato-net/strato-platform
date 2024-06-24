@@ -61,7 +61,7 @@ class StripeServiceController {
         throw new Error(`User has not onboarded to this payment server yet.`);
       }
 
-      const userDetails = await getStripeConnectAccountDetail(userAccount.id);
+      const userDetails = await getStripeConnectAccountDetail(userAccount);
 
       if (!userDetails.charges_enabled || !userDetails.details_submitted || !userDetails.payouts_enabled) {
         throw new Error (`User's Stripe account is not suitable for receiving payments.`);
