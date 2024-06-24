@@ -122,25 +122,28 @@ export const calculatePriceFluctuation = (records) => {
 }
 
 export const calculateVolumeTraded = (records) => {
-  return records.reduce((acc, record, index, array) => {
-    // Skip the first element as there's no previous element to compare with
-    if (index === 0) return acc;
+  // Create a map to track the latest quantity for each address
+  const addressQuantityMap = new Map();
 
-    // Check if the current record and the previous record have the same address
-    // We shouldn't track quantity decreased for a new sale contract created
-    // (when user uses list for sale) as the lesser quantity can be listed for sale 
-    if (record.address === array[index - 1].address) {
-      const quantityDecrease = array[index - 1].quantity - record.quantity;
+  return records.reduce((acc, record) => {
+    // Get the previous quantity for this address, if any
+    const previousQuantity = addressQuantityMap.get(record.address) || record.quantity;
 
-      // Only add to the accumulator if there's a decrease in quantity
-      if (quantityDecrease > 0) {
-        acc += quantityDecrease;
-      }
+    // Update the map with the current quantity
+    addressQuantityMap.set(record.address, record.quantity);
+
+    // Calculate the quantity decrease
+    const quantityDecrease = previousQuantity - record.quantity;
+
+    // Only add to the accumulator if there's a decrease in quantity
+    if (quantityDecrease > 0) {
+      acc += quantityDecrease;
     }
 
     return acc;
   }, 0);
 };
+
 
 
 // Helpers to get time `x` months/years ago and date
