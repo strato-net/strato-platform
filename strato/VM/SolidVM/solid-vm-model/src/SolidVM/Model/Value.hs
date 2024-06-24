@@ -198,6 +198,7 @@ coerceType ct xt = \case
     SVMType.Bytes {} -> case B16.decode (BC.pack s) of
       Right bs -> SString . BC.unpack $ B.takeWhile (/= 0) bs
       _ -> SString s
+    SVMType.Decimal {} -> SDecimal (read s :: Decimal)
     _ -> typeError "string literal must be string or bytes" (xt, s)
   v -> v
 
