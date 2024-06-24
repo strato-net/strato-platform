@@ -8610,7 +8610,7 @@ contract qq {
                       BFixed "1.123123",
                       BFixed "1.123123",
                       BFixed "3.2",
-                      BFixed "3.1"
+                      BFixed "2.1"
                     ])
 
   it "can use fixed point numbers with arithemetic operators" $ runTest ( do
