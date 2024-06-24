@@ -85,7 +85,7 @@ valueToSolidityValue = \case
     ValueBytes _ b -> Just . SolidityValueAsString <$> (first show . decodeUtf8') b
     ValueBool b -> Right . Just $ SolidityBool b
     ValueInt _ _ n -> fromShowable n
-    ValueFixed _ n -> fromShowable n
+    ValueDecimal _ n -> fromShowable n
     ValueAddress a -> fromShowable a
     ValueAccount a -> fromShowable a
     ValueString s -> fromText s
@@ -108,7 +108,7 @@ valueToSolidityValue = \case
     tshowIdx :: SimpleValue -> Either String T.Text
     tshowIdx = \case
       ValueInt _ _ n -> Right . T.pack . show $ n
-      ValueFixed _ n -> Right . T.pack . show $ n
+      ValueDecimal _ n -> Right . T.pack . show $ n
       ValueAddress a -> Right . T.pack . show $ a
       ValueAccount a -> Right . T.pack . show $ a
       ValueString t -> Right t
@@ -213,7 +213,7 @@ fromBasic = \case
   BBool b -> SimpleValue $ ValueBool b
   BInteger n -> SimpleValue $! valueInt n
   BString bs -> SimpleValue $! valueBytes bs
-  BFixed v -> SimpleValue $! ValueFixed True v
+  BDecimal v -> SimpleValue $! ValueDecimal True v
   BAccount a -> SimpleValue $! ValueAccount a
   BContract _ c -> ValueContract c
   BEnumVal tipe name num -> ValueEnum (labelToText tipe) (labelToText name) (fromIntegral num)

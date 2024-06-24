@@ -397,7 +397,7 @@ primaryExpression = do
               skipMany space
               let decimalNum = read (show num ++ period ++ fraction) :: Decimal
               pure (decimalNum)
-            pure $ FixedLiteral a $ WrappedDecimal decimalNum
+            pure $ DecimalLiteral a $ WrappedDecimal decimalNum
           )
     <|> (uncurry Variable <$> withPosition (stringToLabel <$> identifier))
     <|> ( do

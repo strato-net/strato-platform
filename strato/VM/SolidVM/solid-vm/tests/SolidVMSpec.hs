@@ -8575,54 +8575,54 @@ contract qq {
   constructor() {}
 }|]) `shouldThrow` anyInvalidArgumentsError
 
-  it "can use fixed point numbers" $ runTest ( do
+  it "can use decimal numbers" $ runTest ( do
     runBS [r|
 contract qq {
-  fixed x = 1.123123;
-  fixed negativeX = -1.123123;
-  fixed256x80 y = 0.0000003;
-  fixed z;
-  fixed copyOfX;
-  fixed funcResult;
-  fixed[] fixedArray;
-  fixed elementOne;
-  fixed elementTwo;
+  decimal x = 1.123123;
+  decimal negativeX = -1.123123;
+  decimal y = 0.0000003;
+  decimal z;
+  decimal copyOfX;
+  decimal funcResult;
+  decimal[] decimalArray;
+  decimal elementOne;
+  decimal elementTwo;
   
   constructor() {
     copyOfX = x;
     funcResult = test(x);
-    fixedArray.push(3.2);
-    fixedArray.push(2.1);
-    elementOne = fixedArray[0];
-    elementTwo = fixedArray[1];
+    decimalArray.push(3.2);
+    decimalArray.push(2.1);
+    elementOne = decimalArray[0];
+    elementTwo = decimalArray[1];
   }
 
-  function test(fixed _x) returns (fixed) {
+  function test(decimal _x) returns (decimal) {
     return _x;
   }
 }
 |]
     getFields ["x", "negativeX", "y", "z", "copyOfX", "funcResult", "elementOne", "elementTwo"]
-      `shouldReturn` [BFixed "1.123123",
-                      BFixed "-1.123123",
-                      BFixed "0.0000003",
+      `shouldReturn` [BDecimal "1.123123",
+                      BDecimal "-1.123123",
+                      BDecimal "0.0000003",
                       BDefault,
-                      BFixed "1.123123",
-                      BFixed "1.123123",
-                      BFixed "3.2",
-                      BFixed "2.1"
+                      BDecimal "1.123123",
+                      BDecimal "1.123123",
+                      BDecimal "3.2",
+                      BDecimal "2.1"
                     ])
 
-  it "can use fixed point numbers with arithemetic operators" $ runTest ( do
+  it "can use decimal numbers with arithemetic operators" $ runTest ( do
     runBS [r|
 contract qq {
-  fixed x = 1.123123;
-  fixed y = 2.0;
-  fixed sum;
-  fixed diff;
-  fixed product;
-  fixed quotient;
-  fixed negative;
+  decimal x = 1.123123;
+  decimal y = 2.0;
+  decimal sum;
+  decimal diff;
+  decimal product;
+  decimal quotient;
+  decimal negative;
 
   constructor() {
     sum = x + y;
@@ -8634,23 +8634,23 @@ contract qq {
 }
 |]
     getFields ["x", "y", "sum", "diff", "product", "quotient", "negative"] 
-      `shouldReturn` [BFixed "1.123123",
-                      BFixed "2.0",
-                      BFixed "3.123123",
-                      BFixed "-0.876877",
-                      BFixed "2.246246",
-                      BFixed "0.5615615",
-                      BFixed "-2"
+      `shouldReturn` [BDecimal "1.123123",
+                      BDecimal "2.0",
+                      BDecimal "3.123123",
+                      BDecimal "-0.876877",
+                      BDecimal "2.246246",
+                      BDecimal "0.5615615",
+                      BDecimal "-2"
                      ])
 
-  it "can use fixed point numbers with assignment operators" $ runTest ( do
+  it "can use decimal numbers with assignment operators" $ runTest ( do
     runBS [r|
 contract qq {
-  fixed x = 2.0;
-  fixed sum = 3.3;
-  fixed diff = 3.3;
-  fixed product = 3.3;
-  fixed quotient = 3.3;
+  decimal x = 2.0;
+  decimal sum = 3.3;
+  decimal diff = 3.3;
+  decimal product = 3.3;
+  decimal quotient = 3.3;
 
   constructor() {
     sum += x;
@@ -8661,27 +8661,27 @@ contract qq {
 }
 |]
     getFields ["x", "sum", "diff", "product", "quotient"] 
-      `shouldReturn` [BFixed "2.0",
-                      BFixed "5.3",
-                      BFixed "1.3",
-                      BFixed "6.6",
-                      BFixed "1.65"
+      `shouldReturn` [BDecimal "2.0",
+                      BDecimal "5.3",
+                      BDecimal "1.3",
+                      BDecimal "6.6",
+                      BDecimal "1.65"
                      ])
 
-  it "can use fixed point literals in expressions" $ runTest ( do
+  it "can use decimal literals in expressions" $ runTest ( do
     runBS [r|
 contract qq {
-  fixed x = 2.0;
-  fixed sum;
-  fixed sumTwo;
-  fixed sumThree;
-  fixed diff;
-  fixed diffTwo;
-  fixed product;
-  fixed productTwo;
-  fixed quotient;
-  fixed quotientTwo;
-  fixed quotientThree;
+  decimal x = 2.0;
+  decimal sum;
+  decimal sumTwo;
+  decimal sumThree;
+  decimal diff;
+  decimal diffTwo;
+  decimal product;
+  decimal productTwo;
+  decimal quotient;
+  decimal quotientTwo;
+  decimal quotientThree;
 
   constructor() {
     sum = x + 3.3;
@@ -8698,24 +8698,24 @@ contract qq {
 }
 |]
     getFields ["x", "sum", "sumTwo", "sumThree", "diff", "diffTwo", "product", "productTwo", "quotient", "quotientTwo", "quotientThree"] 
-      `shouldReturn` [BFixed "2.0",
-                      BFixed "5.3",
-                      BFixed "4.3",
-                      BFixed "2.8",
-                      BFixed "0.8",
-                      BFixed "2.1",
-                      BFixed "6.4",
-                      BFixed "-2.76",
-                      BFixed "0.869565217391304347826086956521739130434782608695652173913043478260869565217391304347826086956521739130434782608695652173913043478260869565217391304347826086956521739130434782608695652173913043478260869565217391304347826086956521739130434782608695652173913",
-                      BFixed "2",
-                      BFixed "6.25"
+      `shouldReturn` [BDecimal "2.0",
+                      BDecimal "5.3",
+                      BDecimal "4.3",
+                      BDecimal "2.8",
+                      BDecimal "0.8",
+                      BDecimal "2.1",
+                      BDecimal "6.4",
+                      BDecimal "-2.76",
+                      BDecimal "0.869565217391304347826086956521739130434782608695652173913043478260869565217391304347826086956521739130434782608695652173913043478260869565217391304347826086956521739130434782608695652173913043478260869565217391304347826086956521739130434782608695652173913",
+                      BDecimal "2",
+                      BDecimal "6.25"
                      ])
 
-  it "can use comparison operators with fixed point numbers" $ runTest ( do
+  it "can use comparison operators with decimal numbers" $ runTest ( do
     runBS [r|
 contract qq {
-  fixed x = 2.1;
-  fixed y = 3.2;
+  decimal x = 2.1;
+  decimal y = 3.2;
   bool testOne;
   bool testTwo;
   bool testThree;
@@ -8734,8 +8734,8 @@ contract qq {
 }
 |]
     getFields ["x", "y", "testOne", "testTwo", "testThree", "testFour", "testFive", "testSix"] 
-      `shouldReturn` [BFixed "2.1",
-                      BFixed "3.2",
+      `shouldReturn` [BDecimal "2.1",
+                      BDecimal "3.2",
                       BBool True,
                       BBool True,
                       BDefault,
@@ -8744,10 +8744,10 @@ contract qq {
                       BDefault
                      ])
 
-  it "cannot divide by zero using fixed point numbers" $ runTest ( do
+  it "cannot divide by zero using decimal numbers" $ runTest ( do
     runBS [r|
 contract qq {
-  fixed x;
+  decimal x;
 
   constructor() {
     x = 3.0 / 0.0;

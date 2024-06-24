@@ -96,9 +96,9 @@ showType (SVMType.String _) = "string"
 showType (SVMType.Bytes _ b) =
   "bytes"
     <> (maybe "" (T.pack . show) b)
-showType (SVMType.Fixed s b) =
+showType (SVMType.Decimal s b) =
   (if fromMaybe False s then "" else "u")
-    <> "fixed"
+    <> "decimal"
     <> maybe "" (T.pack . show) b
 showType SVMType.Bool = "bool"
 showType (SVMType.Address _) = "address"
@@ -321,8 +321,8 @@ unlessBottom t' f = f t'
 intType' :: SourceAnnotation Text -> Type'
 intType' = Static (SVMType.Int Nothing Nothing)
 
-fixedType' :: SourceAnnotation Text -> Type'
-fixedType' = Static (SVMType.Fixed Nothing Nothing)
+decimalType' :: SourceAnnotation Text -> Type'
+decimalType' = Static (SVMType.Decimal Nothing Nothing)
 
 stringType' :: SourceAnnotation Text -> Type'
 stringType' = Static (SVMType.String Nothing)
@@ -542,12 +542,12 @@ typecheckStatic (SVMType.Bytes d1 b1) (SVMType.Bytes d2 b2) =
     _ -> case (b1, b2) of
       (Just a, Just b) | a /= b -> Left "Mismatched length between bytes values"
       _ -> Right $ SVMType.Bytes (d1 <|> d2) (b1 <|> b2)
-typecheckStatic (SVMType.Fixed s1 d1) (SVMType.Fixed s2 d2) =
+typecheckStatic (SVMType.Decimal s1 d1) (SVMType.Decimal s2 d2) =
   case (s1, s2) of
-    (Just a, Just b) | a /= b -> Left "Mismatched dynamicity between fixed-point values"
+    (Just a, Just b) | a /= b -> Left "Mismatched dynamicity between decimal values"
     _ -> case (d1, d2) of
-      (Just a, Just b) | a /= b -> Left "Mismatched dynamicity between fixed-point values"
-      _ -> Right $ SVMType.Fixed (s1 <|> s2) (d1 <|> d2)
+      (Just a, Just b) | a /= b -> Left "Mismatched dynamicity between decimal values"
+      _ -> Right $ SVMType.Decimal (s1 <|> s2) (d1 <|> d2)
 typecheckStatic SVMType.Bool SVMType.Bool = Right SVMType.Bool
 typecheckStatic (SVMType.Address a) (SVMType.Address b) = Right $ SVMType.Account (a && b)
 typecheckStatic (SVMType.Address a) (SVMType.Account b) = Right $ SVMType.Account (a && b)
@@ -1623,13 +1623,13 @@ checkIfImmuteOperationValid a = tcExpr a
 
 tcExpr :: Annotated ExpressionF -> SSS Type'
 tcExpr (Binary x "+" a b) =
-  sumType (intType' x) (stringType' x) (fixedType' x) ~> tcExpr a <~> tcExpr b
+  sumType (intType' x) (stringType' x) (decimalType' x) ~> tcExpr a <~> tcExpr b
 tcExpr (Binary x "-" a b) =
-  sumType' (intType' x) (fixedType' x) ~> tcExpr a <~> tcExpr b
+  sumType' (intType' x) (decimalType' x) ~> tcExpr a <~> tcExpr b
 tcExpr (Binary x "*" a b) =
-  sumType' (intType' x) (fixedType' x) ~> tcExpr a <~> tcExpr b
+  sumType' (intType' x) (decimalType' x) ~> tcExpr a <~> tcExpr b
 tcExpr (Binary x "/" a b) =
-  sumType' (intType' x) (fixedType' x) ~> tcExpr a <~> tcExpr b
+  sumType' (intType' x) (decimalType' x) ~> tcExpr a <~> tcExpr b
 tcExpr (Binary x "%" a b) =
   intType' x ~> tcExpr a <~> tcExpr b
 tcExpr (Binary x "|" a b) =
@@ -1653,13 +1653,13 @@ tcExpr (Binary x ">>=" a b) =
 tcExpr (Binary x "<<=" a b) =
   intType' x ~> tcExpr a <~> tcExpr b
 tcExpr (Binary x "+=" a b) =
-  sumType (intType' x) (stringType' x) (fixedType' x) ~> (checkIfImmuteOperationValid a) <~> tcExpr b
+  sumType (intType' x) (stringType' x) (decimalType' x) ~> (checkIfImmuteOperationValid a) <~> tcExpr b
 tcExpr (Binary x "-=" a b) =
-  sumType' (intType' x) (fixedType' x) ~> (checkIfImmuteOperationValid a) <~> tcExpr b
+  sumType' (intType' x) (decimalType' x) ~> (checkIfImmuteOperationValid a) <~> tcExpr b
 tcExpr (Binary x "*=" a b) =
-  sumType' (intType' x) (fixedType' x) ~> (checkIfImmuteOperationValid a) <~> tcExpr b
+  sumType' (intType' x) (decimalType' x) ~> (checkIfImmuteOperationValid a) <~> tcExpr b
 tcExpr (Binary x "/=" a b) =
-  sumType' (intType' x) (fixedType' x) ~> (checkIfImmuteOperationValid a) <~> tcExpr b
+  sumType' (intType' x) (decimalType' x) ~> (checkIfImmuteOperationValid a) <~> tcExpr b
 tcExpr (Binary x "%=" a b) =
   intType' x ~> (checkIfImmuteOperationValid a) <~> tcExpr b
 tcExpr (Binary x "|=" a b) =
@@ -1677,13 +1677,13 @@ tcExpr (Binary x "!=" a b) =
 tcExpr (Binary x "==" a b) =
   tcExpr a <~> tcExpr b !> pure (boolType' x)
 tcExpr (Binary x "<" a b) =
-  sumType' (intType' x) (fixedType' x) ~> tcExpr a <~> tcExpr b !> pure (boolType' x)
+  sumType' (intType' x) (decimalType' x) ~> tcExpr a <~> tcExpr b !> pure (boolType' x)
 tcExpr (Binary x ">" a b) =
-  sumType' (intType' x) (fixedType' x) ~> tcExpr a <~> tcExpr b !> pure (boolType' x)
+  sumType' (intType' x) (decimalType' x) ~> tcExpr a <~> tcExpr b !> pure (boolType' x)
 tcExpr (Binary x ">=" a b) =
-  sumType' (intType' x) (fixedType' x) ~> tcExpr a <~> tcExpr b !> pure (boolType' x)
+  sumType' (intType' x) (decimalType' x) ~> tcExpr a <~> tcExpr b !> pure (boolType' x)
 tcExpr (Binary x "<=" a b) =
-  sumType' (intType' x) (fixedType' x) ~> tcExpr a <~> tcExpr b !> pure (boolType' x)
+  sumType' (intType' x) (decimalType' x) ~> tcExpr a <~> tcExpr b !> pure (boolType' x)
 tcExpr (Binary _ "=" a b) =
   (checkIfImmuteOperationValid a) <~> tcExpr b
 tcExpr (Binary _ _ a b) =
@@ -1801,7 +1801,7 @@ tcExpr (FunctionCall x expr args) = do
   case args of
     NamedArgs es -> apply e a $ Just (fst <$> es)
     _ -> apply e a Nothing
-tcExpr (Unitary x "-" a) = sumType' (intType' x) (fixedType' x) ~> tcExpr a
+tcExpr (Unitary x "-" a) = sumType' (intType' x) (decimalType' x) ~> tcExpr a
 tcExpr (Unitary x "++" a) = intType' x ~> tcExpr a
 tcExpr (Unitary x "--" a) = intType' x ~> tcExpr a
 tcExpr (Unitary x "!" a) = boolType' x ~> tcExpr a
@@ -1811,7 +1811,7 @@ tcExpr (Ternary x a b c) =
   boolType' x ~> tcExpr a !> tcExpr b <~> tcExpr c
 tcExpr (BoolLiteral x _) = pure $ boolType' x
 tcExpr (NumberLiteral x _ _) = pure $ intType' x
-tcExpr (FixedLiteral x _) = pure $ fixedType' x
+tcExpr (DecimalLiteral x _) = pure $ decimalType' x
 tcExpr (StringLiteral x _) = pure $ stringType' x
 tcExpr (AccountLiteral x _) = pure $ accountType' x
 tcExpr (HexaLiteral x _) = pure $ stringType' x

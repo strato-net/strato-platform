@@ -33,8 +33,8 @@ simpleType =
     <|> simple "account" (SVMType.Account False)
     <|> simple "string" (SVMType.String $ Just True)
     <|> bytes'
-    <|> fixedSuffixed "fixed" (SVMType.Fixed (Just True))
-    <|> fixedSuffixed "ufixed" (SVMType.Fixed (Just False))
+    <|> decimalSuffixed "decimal" (SVMType.Decimal (Just True))
+    <|> decimalSuffixed "udecimal" (SVMType.Decimal (Just False))
     <|> intSuffixed "uint" (SVMType.Int (Just False))
     <|> intSuffixed "int" (SVMType.Int (Just True))
     <|> simple "variadic" SVMType.Variadic
@@ -101,7 +101,7 @@ simpleType =
 
         return $ baseType number
 
-    fixedSuffixed base baseType = lexeme $
+    decimalSuffixed base baseType = lexeme $
       try $ do
         chars <- many1 alphaNum
         unless (base `isPrefixOf` chars) $ fail "missing base"

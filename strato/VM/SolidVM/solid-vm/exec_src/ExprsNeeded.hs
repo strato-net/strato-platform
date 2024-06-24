@@ -84,7 +84,7 @@ expressionCrawler = \case
   BoolLiteral {} -> ["BoolLiteral"]
   HexaLiteral {} -> ["HexaLiteral"]
   NumberLiteral {} -> ["NumberLiteral"]
-  FixedLiteral {} -> ["FixedLiteral"]
+  DecimalLiteral {} -> ["DecimalLiteral"]
   StringLiteral {} -> ["StringLiteral"]
   AccountLiteral {} -> ["AccountLiteral"]
   TupleExpression _ subexprs ->

@@ -576,7 +576,7 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
                             (SString _, SVMType.Bytes _ _) -> True
                             (SString _, SVMType.Address _) -> True
                             (SString _, SVMType.Account _) -> True
-                            (SFixed _, SVMType.Fixed _ _) -> True
+                            (SDecimal _, SVMType.Decimal _ _) -> True
                             (SBool _, SVMType.Bool) -> True
                             (SAccount _ _, SVMType.Address _) -> True
                             (SAccount _ _, SVMType.Account _) -> True
@@ -1456,7 +1456,7 @@ expToVar' (CC.NumberLiteral _ v (Just nu)) =
     CC.Finney -> return . Constant $ SInteger (v * (10 ^ (15 :: Integer)))
     CC.Ether -> return . Constant $ SInteger (v * (10 ^ (18 :: Integer)))
 expToVar' (CC.StringLiteral _ s) = return $ Constant $ SString s
-expToVar' (CC.FixedLiteral _ v) = return $ Constant $ SFixed $ CC.unwrapDecimal v
+expToVar' (CC.DecimalLiteral _ v) = return $ Constant $ SDecimal $ CC.unwrapDecimal v
 expToVar' (CC.AccountLiteral _ a) = return $ Constant $ SAccount a False
 expToVar' (CC.BoolLiteral _ b) = return $ Constant $ SBool b
 expToVar' (CC.HexaLiteral _ a) = return $ Constant $ SString $ BC.unpack . either (parseError "Couldn't parse hexadecimal literal: ") id . B16.decode $ BC.pack a
@@ -1470,7 +1470,7 @@ expToVar' (CC.Unitary _ "-" e) = do
   value <- getRealNum var
   case value of
     Left v -> return $ Constant $ SInteger (v * (-1))
-    Right v -> return $ Constant $ SFixed $ v * (-1)
+    Right v -> return $ Constant $ SDecimal $ v * (-1)
 expToVar' (CC.PlusPlus _ e) = do
   var <- expToVar e
   value <- getInt var
@@ -1728,7 +1728,7 @@ expToVar' (CC.Binary _ "<" expr1 expr2) = do
   logVals val1 val2
   case (val1, val2) of
     (SInteger i1, SInteger i2) -> return $ Constant $ SBool $ i1 < i2
-    (SFixed v1, SFixed v2) -> return $ Constant $ SBool $ v1 < v2
+    (SDecimal v1, SDecimal v2) -> return $ Constant $ SBool $ v1 < v2
     _ -> typeError "binary '<' on non-ints" (val1, val2)
 expToVar' (CC.Binary _ ">" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
@@ -1737,7 +1737,7 @@ expToVar' (CC.Binary _ ">" expr1 expr2) = do
   logVals val1 val2
   case (val1, val2) of
     (SInteger i1, SInteger i2) -> return $ Constant $ SBool $ i1 > i2
-    (SFixed v1, SFixed v2) -> return $ Constant $ SBool $ v1 > v2
+    (SDecimal v1, SDecimal v2) -> return $ Constant $ SBool $ v1 > v2
     _ -> typeError "binary '>' on non-ints" (val1, val2)
 expToVar' (CC.Binary _ ">=" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
@@ -1746,7 +1746,7 @@ expToVar' (CC.Binary _ ">=" expr1 expr2) = do
   logVals val1 val2
   case (val1, val2) of
     (SInteger i1, SInteger i2) -> return $ Constant $ SBool $ i1 >= i2
-    (SFixed v1, SFixed v2) -> return $ Constant $ SBool $ v1 >= v2
+    (SDecimal v1, SDecimal v2) -> return $ Constant $ SBool $ v1 >= v2
     _ -> typeError "binary '>=' used on non-ints" (val1, val2)
 expToVar' (CC.Binary _ "<=" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
@@ -1755,7 +1755,7 @@ expToVar' (CC.Binary _ "<=" expr1 expr2) = do
   logVals val1 val2
   case (val1, val2) of
     (SInteger i1, SInteger i2) -> return $ Constant $ SBool $ i1 <= i2
-    (SFixed v1, SFixed v2) -> return $ Constant $ SBool $ v1 <= v2
+    (SDecimal v1, SDecimal v2) -> return $ Constant $ SBool $ v1 <= v2
     _ -> typeError "binary '<=' used on non-ints" (val1, val2)
 expToVar' (CC.Binary _ "&&" expr1 expr2) = do
   b1 <- getBool =<< expToVar expr1
@@ -2032,7 +2032,7 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
                     (SString _, SVMType.Bytes _ _) -> pure True
                     (SString _, SVMType.Address _) -> pure True
                     (SString _, SVMType.Account _) -> pure True
-                    (SFixed _, SVMType.Fixed _ _) -> pure True
+                    (SDecimal _, SVMType.Decimal _ _) -> pure True
                     (SBool _, SVMType.Bool) -> pure True
                     (SAccount _ _, SVMType.Address _) -> pure True
                     (SAccount _ _, SVMType.Account _) -> pure True
@@ -2402,7 +2402,7 @@ expToVarAdd expr1 expr2 = do
   case (i1, i2) of
     (SInteger a, SInteger b) -> return . Constant . SInteger $ a + b
     (SString a, SString b) -> return . Constant . SString $ a ++ b
-    (SFixed a, SFixed b) -> return . Constant . SFixed $ a + b
+    (SDecimal a, SDecimal b) -> return . Constant . SDecimal $ a + b
     _ -> typeError "expToVarAdd" (i1, i2)
   
 expToVarArith :: MonadSM m => (Integer -> Integer -> Integer) -> (Decimal -> Decimal -> Decimal) -> CC.Expression -> CC.Expression -> m Variable
@@ -2411,7 +2411,7 @@ expToVarArith intOp decOp expr1 expr2 = do
   i2 <- getVar =<< expToVar expr2
   case (i1, i2) of
     (SInteger a, SInteger b) -> return . Constant . SInteger $ a `intOp` b
-    (SFixed a, SFixed b) -> return . Constant . SFixed $ a `decOp` b
+    (SDecimal a, SDecimal b) -> return . Constant . SDecimal $ a `decOp` b
     _ -> typeError "expToVarArith" (i1, i2)
 
 expToVarInteger :: MonadSM m => CC.Expression -> (Integer -> Integer -> a) -> CC.Expression -> (a -> Value) -> m Variable
@@ -2428,7 +2428,7 @@ binopAssign' intOp decOp lhs rhs = do
   varToAssign <- expToVar lhs
   next <- case (curValue, delta) of
     (SInteger c, SInteger d) -> pure . SInteger $ c `intOp` d
-    (SFixed c, SFixed d) -> pure . SFixed $ c `decOp` d
+    (SDecimal c, SDecimal d) -> pure . SDecimal $ c `decOp` d
     _ -> typeError "binopAssign'" (curValue, delta)
   setVar varToAssign next
   return $ Constant next
@@ -2442,7 +2442,7 @@ addAndAssign lhs rhs = do
   next <- case (curValue, delta) of
     (SInteger c, SInteger d) -> pure . SInteger $ c + d
     (SString c, SString d) -> pure . SString $ c ++ d
-    (SFixed c, SFixed d) -> pure . SFixed $ c + d
+    (SDecimal c, SDecimal d) -> pure . SDecimal $ c + d
     _ -> typeError "addAndAssign" (curValue, delta)
   setVar varToAssign next
   return $ Constant next

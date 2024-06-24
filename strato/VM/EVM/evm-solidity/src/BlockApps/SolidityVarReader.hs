@@ -74,7 +74,7 @@ valueToSolidityValue :: Value -> SolidityValue
 valueToSolidityValue = \case
   SimpleValue (ValueBool x) -> SolidityBool x
   SimpleValue (ValueInt _ _ v) -> SolidityValueAsString $ Text.pack $ show v
-  SimpleValue (ValueFixed _ v) -> SolidityValueAsString $ Text.pack $ show v
+  SimpleValue (ValueDecimal _ v) -> SolidityValueAsString $ Text.pack $ show v
   SimpleValue (ValueString s) -> SolidityValueAsString s
   SimpleValue (ValueAddress (Address addr)) ->
     SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr :: Integer)
@@ -565,7 +565,7 @@ encodeValue' ::
 encodeValue' typeDefs'@TypeDefs {} position@Storage.Position {..} ty = \case
   SimpleValue (ValueBool v) -> encodeInt offset byte ((if v then 1 else 0) :: Word8)
   SimpleValue (ValueInt _ _ v) -> encodeInt offset byte v
-  SimpleValue (ValueFixed _ v) -> [(offset, byteStringToWord256 v)]
+  SimpleValue (ValueDecimal _ v) -> [(offset, byteStringToWord256 v)]
   SimpleValue (ValueAddress (Address a)) -> encodeValue' typeDefs' position ty . SimpleValue $ ValueInt False (Just 20) $ toInteger a
   SimpleValue (ValueAccount (NamedAccount a _)) -> encodeValue' typeDefs' position ty . SimpleValue $ ValueInt False (Just 20) $ toInteger a
   ValueContract (NamedAccount a _) -> encodeValue' typeDefs' position ty . SimpleValue $ ValueInt False (Just 20) $ toInteger a

@@ -70,7 +70,7 @@ data SimpleValue
         intSize :: Maybe Integer,
         intVal :: Integer
       }
-  | ValueFixed
+  | ValueDecimal
       { fixedSigned :: Bool,
         fixedVal :: ByteString
       }
@@ -88,7 +88,7 @@ zeroOf = \case
     ValueAccount {} -> ValueAccount $ unspecifiedChain 0x0
     ValueString {} -> ValueString ""
     ValueInt sign size _ -> ValueInt sign size 0
-    ValueFixed sign _ -> ValueFixed sign "0.0"
+    ValueDecimal sign _ -> ValueDecimal sign "0.0"
     ValueBytes size _ -> ValueBytes size ""
   ValueContract {} -> ValueContract $ unspecifiedChain 0x0
   ValueArrayDynamic {} -> ValueArrayDynamic I.empty
@@ -273,7 +273,7 @@ simpleValueToText sv = case sv of
   ValueString tx -> '"' `Text.cons` escapeStringValue tx `Text.snoc` '"'
   ValueInt _ _ v -> Text.pack $ show v
   ValueBytes _ b -> Text.pack $ show . Base16.encode $ b
-  ValueFixed _ v -> Text.pack $ show v 
+  ValueDecimal _ v -> Text.pack $ show v 
 
 textToValue :: Maybe TypeDefs -> Text -> Type -> Either Text Value
 textToValue defs str = \case

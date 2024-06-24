@@ -43,7 +43,7 @@ import qualified Data.Text as T
 import GHC.Generics
 import qualified Generic.Random as GR
 import SolidVM.Model.SolidString
-import SolidVM.Model.Type
+import SolidVM.Model.Type hiding (Decimal)
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 
@@ -173,7 +173,7 @@ data ExpressionF a
   | Ternary a (ExpressionF a) (ExpressionF a) (ExpressionF a)
   | BoolLiteral a Bool
   | NumberLiteral a Integer (Maybe NumberUnit)
-  | FixedLiteral a WrappedDecimal
+  | DecimalLiteral a WrappedDecimal
   | StringLiteral a String
   | AccountLiteral a NamedAccount
   | TupleExpression a [Maybe (ExpressionF a)]
@@ -195,7 +195,7 @@ extractExpression (Binary a _ _ _) = a
 extractExpression (Ternary a _ _ _) = a
 extractExpression (BoolLiteral a _) = a
 extractExpression (NumberLiteral a _ _) = a
-extractExpression (FixedLiteral a _) = a
+extractExpression (DecimalLiteral a _) = a
 extractExpression (StringLiteral a _) = a
 extractExpression (AccountLiteral a _) = a
 extractExpression (TupleExpression a _) = a
