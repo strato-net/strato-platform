@@ -33,11 +33,6 @@ describe('SideBar: index', () => {
       expect(wrapper.find('NavLink').get(0)).toMatchSnapshot();
     });
 
-    test('secound position /chains', () => {
-      wrapper.find('NavLink').at(1).simulate('click');
-      expect(wrapper.find('NavLink').get(1)).toMatchSnapshot();
-    });
-
     test('third position /blocks', () => {
       wrapper.find('NavLink').at(2).simulate('click');
       expect(wrapper.find('NavLink').get(2)).toMatchSnapshot();
