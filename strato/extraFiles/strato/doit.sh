@@ -145,6 +145,7 @@ function newnode {
   seqMinLogLevel=LevelInfo
   slipMinLogLevel=LevelInfo
   vmMinLogLevel=LevelInfo
+  p2pMinLogLevel=LevelInfo
 
   if ${API_DEBUG_LOG:-false} || ${FULL_DEBUG_LOG:-false}; 
   then apiDebugMode=LevelDebug
@@ -163,42 +164,47 @@ function newnode {
   fi
 
   if [ "${STRATO_MODE}" != "CLIENT" ]; then
-      echo "Starting ethereum-discover"
-      runBackgroundProcess ethereum-discover  &>> logs/ethereum-discover
+    if ${P2P_DEBUG_LOG:-false} || ${FULL_DEBUG_LOG:-false}; 
+    then p2pMinLogLevel=LevelDebug
+    fi
 
-      echo "Starting strato-p2p"
-      runBackgroundProcess strato-p2p \
-         --averageTxsPerBlock=${averageTxsPerBlock:-40} \
-         --connectionTimeout=${connectionTimeout:-30} \
-         --debugFail=${debugFail:-true}  \
-         --maxConn=${maxConn:-1000} \
-         --maxReturnedHeaders=${maxReturnedHeaders:-500} \
-         --networkID=${networkID:--1} \
-         --sqlPeers=true \
-         --txGossipFanout=${txGossipFanount:-3} \
-         ${networkFlag} &>> logs/strato-p2p
+    echo "Starting ethereum-discover"
+    runBackgroundProcess ethereum-discover  &>> logs/ethereum-discover
 
-      echo "Starting strato-sequencer"
-      runBackgroundProcess strato-sequencer \
-        --blockstanbul=true \
-        --blockstanbul_block_period_ms=${blockstanbulBlockPeriodMs:-1000} \
-        --blockstanbul_round_period_s=${blockstanbulRoundPeriodS:-10} \
-        --genesisBlockName=${genesis:-gettingStarted} \
-        --minLogLevel=$seqMinLogLevel \
-        --seq_max_events_per_iter=${seqMaxEventsPerIter:-500} \
-        --seq_max_us_per_iter=${seqMaxUsPerIter:-50000} \
-        --validatorBehavior=${validatorBehavior:-true} \
-        "${networkFlag}" \
-        +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
+    echo "Starting strato-p2p"
+    runBackgroundProcess strato-p2p \
+       --averageTxsPerBlock=${averageTxsPerBlock:-40} \
+       --connectionTimeout=${connectionTimeout:-30} \
+       --debugFail=${debugFail:-true}  \
+       --maxConn=${maxConn:-1000} \
+       --maxReturnedHeaders=${maxReturnedHeaders:-500} \
+       --networkID=${networkID:--1} \
+       --sqlPeers=true \
+       --txGossipFanout=${txGossipFanount:-3} \
+       --minLogLevel=$p2pMinLogLevel \
+       ${networkFlag} &>> logs/strato-p2p
 
-      echo "Starting strato-api-indexer"
-      runBackgroundProcess strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1
+    echo "Starting strato-sequencer"
+    runBackgroundProcess strato-sequencer \
+      --blockstanbul=true \
+      --blockstanbul_block_period_ms=${blockstanbulBlockPeriodMs:-1000} \
+      --blockstanbul_round_period_s=${blockstanbulRoundPeriodS:-10} \
+      --genesisBlockName=${genesis:-gettingStarted} \
+      --minLogLevel=$seqMinLogLevel \
+      --seq_max_events_per_iter=${seqMaxEventsPerIter:-500} \
+      --seq_max_us_per_iter=${seqMaxUsPerIter:-50000} \
+      --validatorBehavior=${validatorBehavior:-true} \
+      "${networkFlag}" \
+      +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
 
-      echo "Starting strato-p2p-indexer"
-      runBackgroundProcess strato-p2p-indexer +RTS -N1 >> logs/strato-p2p-indexer 2>&1
+    echo "Starting strato-api-indexer"
+    runBackgroundProcess strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1
 
-      echo "Starting strato-txr-indexer"
-      runBackgroundProcess strato-txr-indexer +RTS -N1 >> logs/strato-txr-indexer 2>&1
+    echo "Starting strato-p2p-indexer"
+    runBackgroundProcess strato-p2p-indexer +RTS -N1 >> logs/strato-p2p-indexer 2>&1
+
+    echo "Starting strato-txr-indexer"
+    runBackgroundProcess strato-txr-indexer +RTS -N1 >> logs/strato-txr-indexer 2>&1
   fi
 
   if [ -n "${svmDev}" ]; then
