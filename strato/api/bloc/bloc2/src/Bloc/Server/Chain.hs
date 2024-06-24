@@ -25,8 +25,8 @@ import BlockApps.Solidity.XabiContract
 import BlockApps.SolidityVarReader
 import Blockchain.DB.CodeDB
 import Blockchain.Data.AddressStateDB
-import Blockchain.Data.Block
-import Blockchain.Data.BlockHeader
+-- import Blockchain.Data.Block
+-- import Blockchain.Data.BlockHeader
 import Blockchain.Data.ChainInfo
 import Blockchain.Data.DataDefs
 import Blockchain.Data.Json
@@ -158,7 +158,8 @@ getLastBlockHash :: (MonadIO m, MonadLogger m, HasStrato m, HasCallStack) => m (
 getLastBlockHash = do
   blk <- blocStrato $ CORE.getBlkLastClient 1
   case blk of
-    (Block' b _ : _) -> pure . Just . headerHash . blockBlockData $ b
+    (Block' _ _ : _) -> pure . Just $ unsafeCreateKeccak256FromWord256 0
+    -- (Block' b _ : _) -> pure . Just . headerHash . blockBlockData $ b
     [] -> pure Nothing
 
 postChainInfo ::
@@ -202,7 +203,7 @@ postChainInfos ::
   m [ChainId]
 postChainInfos headers chainInputs = withLastBlockHash $ \bHash -> do
     chainInfos <- traverse (createChainInfo headers bHash) chainInputs
-    chainIds <- postChains chainInfos
+    chainIds <- blocStrato $ CORE.postChainsClient chainInfos
     let asyncInputs = fromMaybe False . chaininputAsync <$> chainInputs
         asyncChains = map snd . filter (not . fst) $ zip asyncInputs chainIds
     unless (null asyncChains) $ do
