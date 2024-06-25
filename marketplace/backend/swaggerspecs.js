@@ -35,8 +35,6 @@ const options = {
     './api/v1/Inventory/inventory.yaml',
     './api/v1/Item/item.yaml',
     './api/v1/Order/order.yaml',
-    './api/v1/OrderLineItem/orderLineItem.yaml',
-    './api/v1/EventType/eventType.yaml',
     './api/v1/Event/event.yaml',
   ],
 };

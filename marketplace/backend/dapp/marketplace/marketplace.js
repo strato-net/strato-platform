@@ -4,7 +4,6 @@ import RestStatus from 'http-status-codes';
 import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } from '/helpers/utils';
 import dayjs from 'dayjs';
 
-import productJs from '/dapp/products/product'
 import inventoryJs from '/dapp/products/inventory'
 import constants, { inventoryStatus } from '/helpers/constants'
 
