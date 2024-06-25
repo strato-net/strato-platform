@@ -1507,7 +1507,7 @@ expToVar' ex@(CC.Binary _ "/=" lhs rhs) = do
   case rhs' of
     Left 0 -> divideByZero $ unparseExpression ex
     Right 0 -> divideByZero $ unparseExpression ex
-    _ -> binopAssign' (mod) (/) lhs rhs
+    _ -> binopAssign' (div) (/) lhs rhs
 expToVar' (CC.Binary _ "%=" lhs rhs) = binopAssign (rem) lhs rhs
 expToVar' (CC.Binary _ "|=" lhs rhs) = binopAssign (.|.) lhs rhs
 expToVar' (CC.Binary _ "&=" lhs rhs) = binopAssign (.&.) lhs rhs
