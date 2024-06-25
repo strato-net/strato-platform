@@ -596,7 +596,7 @@ createHistoryTable isAbstract globalsIORef contract cc (creator, a, n) = do
 
   when (not tableExists) $ do
     incNumHistoryTables
-    let list = getTableColumnAndType cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
+    let list = getTableColumnAndType False cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
         listCombined = map (\(x,y)-> x <> " " <> y) list
     yield $ (createHistoryTableQuery isAbstract (creator, a, n) listCombined)
     yieldMany $ addHistoryUnique (creator, a, n)
