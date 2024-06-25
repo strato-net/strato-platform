@@ -34,7 +34,7 @@ class TokensController {
     }
   }
 
-  // ----------------------- ARG VALIDATION ------------------------
+  // ----------------------- ARG VALIDATION ------------------------  
 
   static validateCreateTokensArgs(args) {
     const createTokensSchema = Joi.object({
@@ -44,7 +44,7 @@ class TokensController {
         quantity: Joi.number().integer().min(1).required(),
         images: Joi.array().items(Joi.string()).required(),
         files: Joi.array().items(Joi.string()).required(),
-        fileNames: Joi.array().items(Joi.string().allow(null)).required()
+        fileNames: Joi.array().items(Joi.string()).required(),
       }).required()
     });
 
