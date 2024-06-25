@@ -2403,6 +2403,8 @@ expToVarAdd expr1 expr2 = do
     (SInteger a, SInteger b) -> return . Constant . SInteger $ a + b
     (SString a, SString b) -> return . Constant . SString $ a ++ b
     (SDecimal a, SDecimal b) -> return . Constant . SDecimal $ a + b
+    (SDecimal a, SInteger b) -> return . Constant . SDecimal $ a + (Decimal 0 b)
+    (SInteger a, SDecimal b) -> return . Constant . SDecimal $ (Decimal 0 a) + b
     _ -> typeError "expToVarAdd" (i1, i2)
   
 expToVarArith :: MonadSM m => (Integer -> Integer -> Integer) -> (Decimal -> Decimal -> Decimal) -> CC.Expression -> CC.Expression -> m Variable
@@ -2412,6 +2414,8 @@ expToVarArith intOp decOp expr1 expr2 = do
   case (i1, i2) of
     (SInteger a, SInteger b) -> return . Constant . SInteger $ a `intOp` b
     (SDecimal a, SDecimal b) -> return . Constant . SDecimal $ a `decOp` b
+    (SDecimal a, SInteger b) -> return . Constant . SDecimal $ a `decOp` (Decimal 0 b)
+    (SInteger a, SDecimal b) -> return . Constant . SDecimal $ (Decimal 0 a) `decOp` b
     _ -> typeError "expToVarArith" (i1, i2)
 
 expToVarInteger :: MonadSM m => CC.Expression -> (Integer -> Integer -> a) -> CC.Expression -> (a -> Value) -> m Variable
@@ -2429,6 +2433,8 @@ binopAssign' intOp decOp lhs rhs = do
   next <- case (curValue, delta) of
     (SInteger c, SInteger d) -> pure . SInteger $ c `intOp` d
     (SDecimal c, SDecimal d) -> pure . SDecimal $ c `decOp` d
+    (SDecimal a, SInteger b) -> pure . SDecimal $ a `decOp` (Decimal 0 b)
+    (SInteger a, SDecimal b) -> pure . SDecimal $ (Decimal 0 a) `decOp` b
     _ -> typeError "binopAssign'" (curValue, delta)
   setVar varToAssign next
   return $ Constant next
@@ -2443,6 +2449,8 @@ addAndAssign lhs rhs = do
     (SInteger c, SInteger d) -> pure . SInteger $ c + d
     (SString c, SString d) -> pure . SString $ c ++ d
     (SDecimal c, SDecimal d) -> pure . SDecimal $ c + d
+    (SDecimal a, SInteger b) -> pure . SDecimal $ a + (Decimal 0 b)
+    (SInteger a, SDecimal b) -> pure . SDecimal $ (Decimal 0 a) + b
     _ -> typeError "addAndAssign" (curValue, delta)
   setVar varToAssign next
   return $ Constant next

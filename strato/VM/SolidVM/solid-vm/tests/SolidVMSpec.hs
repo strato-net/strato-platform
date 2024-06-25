@@ -8671,7 +8671,7 @@ contract qq {
   it "can use decimal literals in expressions" $ runTest ( do
     runBS [r|
 contract qq {
-  decimal x = 2.0;
+  decimal x = 2;
   decimal sum;
   decimal sumTwo;
   decimal sumThree;
@@ -8698,7 +8698,7 @@ contract qq {
 }
 |]
     getFields ["x", "sum", "sumTwo", "sumThree", "diff", "diffTwo", "product", "productTwo", "quotient", "quotientTwo", "quotientThree"] 
-      `shouldReturn` [BDecimal "2.0",
+      `shouldReturn` [BInteger 2,
                       BDecimal "5.3",
                       BDecimal "4.3",
                       BDecimal "2.8",
@@ -8756,16 +8756,42 @@ contract qq {
 |])
     `shouldThrow` anyDivideByZeroError
 
-  it "can do arithmetics with decimal and ints" $ runTest ( do
+  it "can do arithmetics with decimal and integer literals" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal x;
+
+  constructor() {
+    x = 3.2 + 6 + 6.2;
+  }
+}
+|]
+    getFields ["x"] 
+      `shouldReturn` [BDecimal "15.4"])
+
+  it "cannot use int without casting in arithmetic expressions involving decimals" $ runTest ( do
     runBS [r|
 contract qq {
   decimal x;
   uint y = 6;
 
   constructor() {
-    x = 3.2 * decimal(6);
+    x = 5.2 + y;
+  }
+}
+|])
+    `shouldThrow` anyTypeError
+
+  it "can use int with casting in arithmetic expressions involving decimals" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal x;
+  uint y = 6;
+
+  constructor() {
+    x = 5.2 + decimal(y);
   }
 }
 |]
-    getFields ["x"] 
-      `shouldReturn` [BDecimal "19.2"])
+    getFields ["x"]
+      `shouldReturn` [BDecimal "11.2"])
