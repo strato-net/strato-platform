@@ -78,7 +78,7 @@ argValueToType :: ArgValue -> Type
 argValueToType (ArgInt _) = SimpleType typeInt
 argValueToType (ArgBool _) = SimpleType TypeBool
 argValueToType (ArgString _) = SimpleType TypeString
-argValueToType (ArgDecimal _) = SimpleType $ TypeDecimal True
+argValueToType (ArgDecimal _) = SimpleType TypeDecimal
 argValueToType (ArgArray v) = TypeArrayDynamic $ argValueToType $ V.head v
 argValueToType (ArgObject _) = TypeStruct ""
 
@@ -206,9 +206,9 @@ argValueToSimpleValue theType argVal = case theType of
   TypeBytes Nothing -> case argVal of
     ArgString str -> ValueBytes Nothing <$> readBytesDyn str
     o -> Left . Text.pack $ "argValueToSimpleValue: Expected TypeBytes to be a string, but got " ++ show o
-  TypeDecimal s -> case argVal of
-    ArgDecimal i -> Right $ ValueDecimal s (Text.encodeUtf8 $ Text.pack $ show i)
-    ArgInt i -> Right $ ValueDecimal s (Text.encodeUtf8 $ Text.pack $ show i)
+  TypeDecimal -> case argVal of
+    ArgDecimal i -> Right $ ValueDecimal (Text.encodeUtf8 $ Text.pack $ show i)
+    ArgInt i -> Right $ ValueDecimal (Text.encodeUtf8 $ Text.pack $ show i)
     o -> Left . Text.pack $ "argValueToSimpleValue: Expected TypeDecimal to be an decimal, but got " ++ show o
 
   where

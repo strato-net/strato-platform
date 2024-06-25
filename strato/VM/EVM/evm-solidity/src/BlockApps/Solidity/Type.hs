@@ -50,9 +50,6 @@ data SimpleType
         intSize :: Maybe Integer
       }
   | TypeDecimal
-      {
-        signed :: Bool
-      }
   | TypeBytes
       { bytesSize :: Maybe Integer
       }
@@ -86,8 +83,7 @@ formatSimpleType TypeBool = "bool"
 formatSimpleType TypeAddress = "address"
 formatSimpleType TypeAccount = "account"
 formatSimpleType TypeString = "string"
-formatSimpleType (TypeDecimal True) = "decimal"
-formatSimpleType (TypeDecimal False) = "udecimal"
+formatSimpleType TypeDecimal = "decimal"
 
 formatType :: Type -> String
 formatType (SimpleType x) = formatSimpleType x

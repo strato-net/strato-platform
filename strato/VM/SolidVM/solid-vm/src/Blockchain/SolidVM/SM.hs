@@ -485,7 +485,6 @@ getVariableOfName name = do
                        "uint",
                        "int",
                        "decimal",
-                       "udecimal",
                        "bool",
                        "byte",
                        "bytes",

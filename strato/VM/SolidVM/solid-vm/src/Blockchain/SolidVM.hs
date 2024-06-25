@@ -576,7 +576,7 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
                             (SString _, SVMType.Bytes _ _) -> True
                             (SString _, SVMType.Address _) -> True
                             (SString _, SVMType.Account _) -> True
-                            (SDecimal _, SVMType.Decimal _ _) -> True
+                            (SDecimal _, SVMType.Decimal) -> True
                             (SBool _, SVMType.Bool) -> True
                             (SAccount _ _, SVMType.Address _) -> True
                             (SAccount _ _, SVMType.Account _) -> True
@@ -2032,7 +2032,7 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
                     (SString _, SVMType.Bytes _ _) -> pure True
                     (SString _, SVMType.Address _) -> pure True
                     (SString _, SVMType.Account _) -> pure True
-                    (SDecimal _, SVMType.Decimal _ _) -> pure True
+                    (SDecimal _, SVMType.Decimal) -> pure True
                     (SBool _, SVMType.Bool) -> pure True
                     (SAccount _ _, SVMType.Address _) -> pure True
                     (SAccount _ _, SVMType.Account _) -> pure True
@@ -2581,7 +2581,6 @@ callBuiltin "byte" vs _ = typeError "byte cast" vs
 callBuiltin "uint" args _ = return $ intBuiltin args
 callBuiltin "int" args _ = return $ intBuiltin args
 callBuiltin "decimal" args _ = return $ decimalBuiltin args
-callBuiltin "udecimal" args _ = return $ decimalBuiltin args
 callBuiltin "push" [v] (Just o) = typeError "push (called as func, not as method)" (v, o)
 callBuiltin "call" [v] (Just o) = typeError "call (called as a function, not as a method)" (v, o)
 callBuiltin "identity" [v] Nothing = return v

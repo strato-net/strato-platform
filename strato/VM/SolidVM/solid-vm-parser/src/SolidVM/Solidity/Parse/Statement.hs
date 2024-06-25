@@ -384,7 +384,6 @@ primaryExpression = do
     <|> (uncurry Variable . fmap stringToLabel <$> res "uint")
     <|> (uncurry Variable . fmap stringToLabel <$> res "int")
     <|> (uncurry Variable . fmap stringToLabel <$> res "decimal")
-    <|> (uncurry Variable . fmap stringToLabel <$> res "udecimal")
     <|> (uncurry Variable . fmap stringToLabel <$> res "byte")
     <|> (uncurry Variable . fmap stringToLabel <$> res "bytes")
     <|> (uncurry Variable . fmap stringToLabel <$> res "string")

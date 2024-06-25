@@ -74,7 +74,7 @@ valueToSolidityValue :: Value -> SolidityValue
 valueToSolidityValue = \case
   SimpleValue (ValueBool x) -> SolidityBool x
   SimpleValue (ValueInt _ _ v) -> SolidityValueAsString $ Text.pack $ show v
-  SimpleValue (ValueDecimal _ v) -> SolidityValueAsString $ Text.pack $ show v
+  SimpleValue (ValueDecimal v) -> SolidityValueAsString $ Text.pack $ show v
   SimpleValue (ValueString s) -> SolidityValueAsString s
   SimpleValue (ValueAddress (Address addr)) ->
     SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr :: Integer)
@@ -259,7 +259,7 @@ decodeCacheValue' typeDefs'@TypeDefs {..} cache position@Storage.Position {..} v
           Just (SimpleValue (ValueBytes Nothing bytes)) -> Just . SimpleValue . ValueString $ Text.decodeUtf8 bytes
           Just (s@(SimpleValue (ValueString _))) -> Just s
           o -> error $ "decodeCacheValue': Expected ValueBytes or ValueString, but got: " ++ show o
-  SimpleType (TypeDecimal _) -> Nothing
+  SimpleType TypeDecimal -> Nothing
   TypeFunction selector args returns -> Just $ ValueFunction selector args returns
   TypeArrayFixed _ _ -> Nothing
   {-
@@ -436,7 +436,7 @@ decodeValue' typeDefs'@TypeDefs {..} storage ofs cnt len position@Storage.Positi
           Just (SimpleValue (ValueBytes Nothing bytes')) -> bytes'
           _ -> error "decodeValue': Expected ValueBytes Nothing" -- ++ show v
      in Just $ SimpleValue $ ValueString $ Text.decodeUtf8 bytes
-  SimpleType (TypeDecimal _) -> Nothing
+  SimpleType TypeDecimal -> Nothing
   TypeFunction selector args returns -> Just $ ValueFunction selector args returns
   TypeArrayFixed _ _ -> Nothing
   {-
@@ -567,7 +567,7 @@ encodeValue' ::
 encodeValue' typeDefs'@TypeDefs {} position@Storage.Position {..} ty = \case
   SimpleValue (ValueBool v) -> encodeInt offset byte ((if v then 1 else 0) :: Word8)
   SimpleValue (ValueInt _ _ v) -> encodeInt offset byte v
-  SimpleValue (ValueDecimal _ v) -> [(offset, byteStringToWord256 v)]
+  SimpleValue (ValueDecimal v) -> [(offset, byteStringToWord256 v)]
   SimpleValue (ValueAddress (Address a)) -> encodeValue' typeDefs' position ty . SimpleValue $ ValueInt False (Just 20) $ toInteger a
   SimpleValue (ValueAccount (NamedAccount a _)) -> encodeValue' typeDefs' position ty . SimpleValue $ ValueInt False (Just 20) $ toInteger a
   ValueContract (NamedAccount a _) -> encodeValue' typeDefs' position ty . SimpleValue $ ValueInt False (Just 20) $ toInteger a

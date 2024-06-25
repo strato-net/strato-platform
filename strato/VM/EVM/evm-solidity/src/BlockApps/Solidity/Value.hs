@@ -70,10 +70,7 @@ data SimpleValue
         intSize :: Maybe Integer,
         intVal :: Integer
       }
-  | ValueDecimal
-      { fixedSigned :: Bool,
-        fixedVal :: ByteString
-      }
+  | ValueDecimal ByteString
   | ValueBytes
       { bytesSize :: Maybe Integer,
         bytesVal :: ByteString
@@ -88,7 +85,7 @@ zeroOf = \case
     ValueAccount {} -> ValueAccount $ unspecifiedChain 0x0
     ValueString {} -> ValueString ""
     ValueInt sign size _ -> ValueInt sign size 0
-    ValueDecimal sign _ -> ValueDecimal sign "0.0"
+    ValueDecimal _ -> ValueDecimal "0"
     ValueBytes size _ -> ValueBytes size ""
   ValueContract {} -> ValueContract $ unspecifiedChain 0x0
   ValueArrayDynamic {} -> ValueArrayDynamic I.empty
@@ -111,7 +108,7 @@ bytesToSimpleValue bs = \case
   TypeString -> Just $ ValueString (Text.decodeUtf8 bs)
   TypeInt s b -> Just . ValueInt s b $ bytesToNum s b
   TypeBytes b -> Just $ ValueBytes b bs
-  TypeDecimal s -> Just $ ValueDecimal s bs
+  TypeDecimal -> Just $ ValueDecimal bs
   where
     bytesToNum :: Bool -> Maybe Integer -> Integer
     bytesToNum signed' bytes' =
@@ -274,7 +271,7 @@ simpleValueToText sv = case sv of
   ValueString tx -> '"' `Text.cons` escapeStringValue tx `Text.snoc` '"'
   ValueInt _ _ v -> Text.pack $ show v
   ValueBytes _ b -> Text.pack $ show . Base16.encode $ b
-  ValueDecimal _ v -> Text.pack $ show v 
+  ValueDecimal v -> Text.pack $ show v 
 
 textToValue :: Maybe TypeDefs -> Text -> Type -> Either Text Value
 textToValue defs str = \case
@@ -329,7 +326,7 @@ textToSimpleValue str = \case
   TypeInt s b -> ValueInt s b <$> readNum
   TypeBytes (Just n) -> ValueBytes (Just n) <$> readBytes n
   TypeBytes Nothing -> ValueBytes Nothing <$> readBytesDyn
-  TypeDecimal s -> Right $ ValueDecimal s (Text.encodeUtf8 str)
+  TypeDecimal -> Right $ ValueDecimal (Text.encodeUtf8 str)
   where
     readNum :: Either Text Integer
     readNum = case readMaybe (Text.unpack str) of

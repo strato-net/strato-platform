@@ -96,10 +96,7 @@ showType (SVMType.String _) = "string"
 showType (SVMType.Bytes _ b) =
   "bytes"
     <> (maybe "" (T.pack . show) b)
-showType (SVMType.Decimal s b) =
-  (if fromMaybe False s then "" else "u")
-    <> "decimal"
-    <> maybe "" (T.pack . show) b
+showType SVMType.Decimal = "decimal"
 showType SVMType.Bool = "bool"
 showType (SVMType.Address _) = "address"
 showType (SVMType.Account _) = "account"
@@ -322,7 +319,7 @@ intType' :: SourceAnnotation Text -> Type'
 intType' = Static (SVMType.Int Nothing Nothing)
 
 decimalType' :: SourceAnnotation Text -> Type'
-decimalType' = Static (SVMType.Decimal Nothing Nothing)
+decimalType' = Static SVMType.Decimal
 
 stringType' :: SourceAnnotation Text -> Type'
 stringType' = Static (SVMType.String Nothing)
@@ -542,12 +539,7 @@ typecheckStatic (SVMType.Bytes d1 b1) (SVMType.Bytes d2 b2) =
     _ -> case (b1, b2) of
       (Just a, Just b) | a /= b -> Left "Mismatched length between bytes values"
       _ -> Right $ SVMType.Bytes (d1 <|> d2) (b1 <|> b2)
-typecheckStatic (SVMType.Decimal s1 d1) (SVMType.Decimal s2 d2) =
-  case (s1, s2) of
-    (Just a, Just b) | a /= b -> Left "Mismatched dynamicity between decimal values"
-    _ -> case (d1, d2) of
-      (Just a, Just b) | a /= b -> Left "Mismatched dynamicity between decimal values"
-      _ -> Right $ SVMType.Decimal (s1 <|> s2) (d1 <|> d2)
+typecheckStatic SVMType.Decimal SVMType.Decimal = Right $ SVMType.Decimal
 typecheckStatic SVMType.Bool SVMType.Bool = Right SVMType.Bool
 typecheckStatic (SVMType.Address a) (SVMType.Address b) = Right $ SVMType.Account (a && b)
 typecheckStatic (SVMType.Address a) (SVMType.Account b) = Right $ SVMType.Account (a && b)
@@ -1332,8 +1324,7 @@ getVarType' "address" ctx = pure $ Function (addressArgs ctx) (Static (SVMType.A
 getVarType' "account" ctx = pure $ Function (accountArgs ctx) (Static (SVMType.Account False) ctx) ctx [] [] False
 --This is either the string() function or the string.member() function
 getVarType' "string" ctx = pure $ Sum $ (Function (stringArgs ctx) (stringType' ctx) ctx [] [] False) :| [Static (SVMType.UnknownLabel "string" Nothing) ctx]
-getVarType' "decimal" ctx = pure $ Function (decimalArgs ctx) (Static (SVMType.Decimal (Just True) Nothing) ctx) ctx [] [] False
-getVarType' "udecimal" ctx = pure $ Function (decimalArgs ctx) (Static (SVMType.Decimal (Just False) Nothing) ctx) ctx [] [] False
+getVarType' "decimal" ctx = pure $ Function (decimalArgs ctx) (Static (SVMType.Decimal) ctx) ctx [] [] False
 getVarType' "bool" ctx = pure $ Function (boolArgs ctx) (boolType' ctx) ctx [] [] False
 getVarType' s@('b' : 'y' : 't' : 'e' : 's' : n) ctx = case n of
   [] -> pure $ Function (byteArgs ctx) (Static (SVMType.Bytes Nothing Nothing) ctx) ctx [] [] False

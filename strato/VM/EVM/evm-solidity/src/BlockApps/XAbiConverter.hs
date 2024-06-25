@@ -57,10 +57,7 @@ xabiTypeToSimpleType Xabi.Int {Xabi.signed = signed, Xabi.bytes = b} =
     _ -> TypeInt False $ fmap toInteger b
 xabiTypeToSimpleType (Xabi.Bytes _ b) = TypeBytes $ fmap toInteger b
 xabiTypeToSimpleType Xabi.Bool = TypeBool
-xabiTypeToSimpleType (Xabi.Decimal s) =
-  case s of
-    Just True -> TypeDecimal True
-    _ -> TypeDecimal False 
+xabiTypeToSimpleType Xabi.Decimal = TypeDecimal
 xabiTypeToSimpleType v = error $ "undefined var in xabiTypeToSimpleType: " ++ show v -- show (Xabi.xabiTypeType v) ++ ":" ++ show (xabiTypeBytes v)
 
 xabiTypeToType :: Xabi.Type -> Either String Type
@@ -272,7 +269,7 @@ simpleTypeToXabiType TypeAddress = Xabi.Address
 simpleTypeToXabiType TypeAccount = Xabi.Account
 simpleTypeToXabiType TypeString = Xabi.String $ Just True
 simpleTypeToXabiType (TypeBytes b) = Xabi.Bytes Nothing $ fmap fromInteger b
-simpleTypeToXabiType (TypeDecimal s) = Xabi.Decimal (Just s)
+simpleTypeToXabiType TypeDecimal = Xabi.Decimal
 
 argToIndexedTypes :: TypeDefs -> Int32 -> (Text, Type) -> (Text, Xabi.IndexedType)
 argToIndexedTypes typeDefs i (name, theType) = (name, Xabi.IndexedType i $ typeToXabiType typeDefs theType)
