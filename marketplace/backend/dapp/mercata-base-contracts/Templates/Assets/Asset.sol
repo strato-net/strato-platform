@@ -202,10 +202,12 @@ abstract contract Asset is Utils {
 
     function updateAsset(
         string[] _images,
-        string[] _files
+        string[] _files,
+        string[] _fileNames
     ) public requireOwner("update asset") returns (uint) {
         images = _images;
         files = _files;
+        fileNames = _fileNames;
         return RestStatus.OK;
     }
 
