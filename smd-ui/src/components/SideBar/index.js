@@ -19,7 +19,6 @@ class SideBar extends Component {
         { path: '/home', label: 'Network Stats', id: 'network_stats', icon: "fa-chart-simple" },
         { path: '/accounts', label: 'Users', id: 'accounts', icon: "fa-users" },
         { path: '/transactions', label: 'Transactions', id: 'transactions', icon: "fa-exchange" },
-        { path: '/shards', label: 'Private Shards', id: 'shards', icon: "fa-diagram-project" },
         { path: '/contracts', label: 'Contracts', id: 'contracts', icon: "fa-file-contract" },
         { path: '/blocks', label: 'Blocks', id: 'blocks', icon: "fa-cube" },
         { path: '/code_editor', label: 'Contract Editor', id: 'code_editor', icon: "fa-code" },

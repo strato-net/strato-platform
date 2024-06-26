@@ -253,6 +253,12 @@ const actions = {
           type: actionDescriptors.fetchMarketplaceLoggedInFailed,
           error: "Error while fetching marketplace products",
         });
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.fetchMarketplaceLoggedInFailed, 
+          error: "Unauthorized while fetching marketplace products" 
+        });
+        window.location.href = body.error.loginUrl;
       }
 
 
@@ -319,6 +325,12 @@ const actions = {
           payload: body.data,
         });
         return;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.fetchTopSellingProductsLoggedInFailed, 
+          error: "Unauthorized while fetching trending items" 
+        });
+        window.location.href = body.error.loginUrl;
       }
       dispatch({
         type: actionDescriptors.fetchTopSellingProductsLoggedInFailed,
@@ -410,6 +422,12 @@ const actions = {
         });
         actions.setMessage(dispatch, "Error while getting Shipping address");
         return false;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchUserAddressFailed,
+          error: "Unauthorized while fetching Shipping address"
+        });
+        window.location.href = body.error.loginUrl;
       }
       dispatch({
         type: actionDescriptors.fetchUserAddressFailed,
@@ -452,6 +470,12 @@ const actions = {
         });
         actions.setMessage(dispatch, "Error while getting Shipping address");
         return false;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchUserAddressesFailed,
+          error: "Unauthorized while fetching Shipping addresses"
+        });
+        window.location.href = body.error.loginUrl;
       }
       dispatch({
         type: actionDescriptors.fetchUserAddressesFailed,
@@ -480,7 +504,7 @@ const actions = {
           type: actionDescriptors.fetchStratsBalanceFailed,
           payload: "Error while fetching STRATS",
         });
-        return;
+        window.location.href = body.error.loginUrl;
       }
       if (response.status === RestStatus.OK) {
         dispatch({
@@ -540,7 +564,7 @@ const actions = {
           error: "Error while transferring STRATS",
         });
         actions.setMessage(dispatch, "Error while transferring STRATS");
-        return;
+        window.location.href = body.error.loginUrl;
       }
       if (response.status === RestStatus.OK) {
         dispatch({

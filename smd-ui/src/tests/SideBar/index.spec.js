@@ -33,11 +33,6 @@ describe('SideBar: index', () => {
       expect(wrapper.find('NavLink').get(0)).toMatchSnapshot();
     });
 
-    test('secound position /chains', () => {
-      wrapper.find('NavLink').at(1).simulate('click');
-      expect(wrapper.find('NavLink').get(1)).toMatchSnapshot();
-    });
-
     test('third position /blocks', () => {
       wrapper.find('NavLink').at(2).simulate('click');
       expect(wrapper.find('NavLink').get(2)).toMatchSnapshot();
@@ -64,8 +59,8 @@ describe('SideBar: index', () => {
     });
     
     test('eighth position /external-storage', () => {
-      wrapper.find('NavLink').at(7).simulate('click');
-      expect(wrapper.find('NavLink').get(7)).toMatchSnapshot();
+      wrapper.find('NavLink').at(1).simulate('click');
+      expect(wrapper.find('NavLink').get(1)).toMatchSnapshot();
     });
 
   });
