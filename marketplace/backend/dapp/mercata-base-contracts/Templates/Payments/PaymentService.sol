@@ -167,9 +167,8 @@ abstract contract PaymentService is Utils {
             Sale s = Sale(_saleAddresses[i]);
             Asset a = s.assetToBeSold();
             assets.push(address(a));
-            uint amount = s.price();
             uint quantity = _quantities[i];
-            totalAmount += amount * quantity;
+            totalAmount += s.price() * quantity;
             seller = getCommonName(a.owner());
             try {
                 s.lockQuantity(quantity, _purchaser);
@@ -372,7 +371,7 @@ abstract contract PaymentService is Utils {
         address[] assets;
         for (uint i = 0; i < _saleAddresses.length; i++) {
             Sale s = Sale(_saleAddresses[i]);
-            totalAmount += s.price();
+            totalAmount += s.price() * _quantities[i];
             Asset a = s.assetToBeSold();
             assets.push(address(a));
             seller = getCommonName(a.owner());
