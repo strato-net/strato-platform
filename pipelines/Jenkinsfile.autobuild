@@ -206,8 +206,10 @@ pipeline {
             sh 'docker exec strato-marketplace-backend-1 rm -f _deploy_blocked_while_I_exist'
           }
 
-          script {
-            lib.spinUpPaymentServer()
+          dir("strato-getting-started") {
+            script {
+              lib.spinUpPaymentServer()
+            }
           }
         }
 
