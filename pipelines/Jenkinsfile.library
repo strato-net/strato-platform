@@ -1397,7 +1397,7 @@ def spinUpPaymentServer() {
         STRIPE_SECRET_KEY='${STRIPE_SECRET_KEY_TESTNET2}' \\
         ssl=true \\
         TABLE_PREFIX="Test-Mercata-" \\
-        SKIP_CONTRACT_VALIDATION=true \\
+        SKIP_CONTRACT_VALIDATION="true" \\
         ./payment-server
     """
   }
