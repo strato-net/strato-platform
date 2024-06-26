@@ -1090,6 +1090,11 @@ functionHelper cc c funcName f@Func {..} =
                       )
                         <$ _funcContext
                   _ -> bottom $ "Function `fallback` must be External, but has not been declared so " <$ _funcContext
+            else
+              if (funcName == "modifier")
+
+
+    
                 else
                   let r =
                         R cc c (Just f) funcName $
