@@ -17,12 +17,13 @@ const STRIPE_CONTRACT_ADDRESS = process.env.STRIPE_CONTRACT_ADDRESS;
 const METAMASK_CONTRACT_ADDRESS = process.env.METAMASK_CONTRACT_ADDRESS;
 
 const SERVER_URL = `${config.serverHost}`;
+const TABLE_PREFIX = `${process.env.TABLE_PREFIX ? process.env.TABLE_PREFIX : 'BlockApps-Mercata-'}`;
 
 const SERVER_CONFIRM_URL = `${SERVER_URL}/stripe/checkout/confirm`;
 
 const SERVER_CANCEL_URL = `${SERVER_URL}/stripe/checkout/cancel`;
 
-const ORDER_EVENT_TABLE = 'BlockApps-Mercata-PaymentService.Order';
+const ORDER_EVENT_TABLE = `${TABLE_PREFIX}PaymentService-Order`;
 
 const PAYMENT_STATUS = {
   'INITIALIZED': '2',
@@ -40,4 +41,5 @@ export {
   DEFAULT_OPTIONS,
   ORDER_EVENT_TABLE,
   PAYMENT_STATUS,
+  TABLE_PREFIX,
 }

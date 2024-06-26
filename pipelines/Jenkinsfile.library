@@ -1396,6 +1396,8 @@ def spinUpPaymentServer() {
         STRATO_HOST="http://172.17.0.1" \\
         STRIPE_SECRET_KEY='${STRIPE_SECRET_KEY_TESTNET2}' \\
         ssl=true \\
+        TABLE_PREFIX="Test-Mercata-" \\
+        SKIP_CONTRACT_VALIDATION=true \\
         ./payment-server
     """
   }

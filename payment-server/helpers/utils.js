@@ -1,6 +1,6 @@
 import client from '../db/index.js';
 import { rest, util } from "blockapps-rest";
-import { DEFAULT_OPTIONS, ORDER_EVENT_TABLE } from "./constants.js";
+import { DEFAULT_OPTIONS, ORDER_EVENT_TABLE, TABLE_PREFIX } from "./constants.js";
 import ADMIN from './oauth.js';
 import lodash from 'lodash';
 const { get } = lodash;
@@ -134,7 +134,7 @@ const validateAndGetOrderDetails = async (quantities, saleAddresses) => {
   const saleContracts = await rest.search(
     ADMIN.getUser(), 
     { 
-      name: 'BlockApps-Mercata-Sale' 
+      name: `${TABLE_PREFIX}Sale` 
     }, 
     {
       ...DEFAULT_OPTIONS,
@@ -148,7 +148,7 @@ const validateAndGetOrderDetails = async (quantities, saleAddresses) => {
   const assetContracts = await rest.search(
     ADMIN.getUser(), 
     { 
-      name: 'BlockApps-Mercata-Asset' 
+      name: `${TABLE_PREFIX}Asset`
     }, 
     {
       ...DEFAULT_OPTIONS,

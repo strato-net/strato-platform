@@ -97,6 +97,8 @@ app.listen(config.port, async (e) => {
                                         
   `)
   console.log(`Listening on port ${config.port}...`);
-  await validatePaymentServiceContract(STRIPE_CONTRACT_ADDRESS);
-  await validatePaymentServiceContract(METAMASK_CONTRACT_ADDRESS);
+  if (!process.env.SKIP_CONTRACT_VALIDATION) {
+    await validatePaymentServiceContract(STRIPE_CONTRACT_ADDRESS);
+    await validatePaymentServiceContract(METAMASK_CONTRACT_ADDRESS);
+  }
 });
