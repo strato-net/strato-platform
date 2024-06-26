@@ -63,17 +63,15 @@ class StripeServiceController {
 
       const userDetails = await stripeService.getStripeConnectAccountDetail(userAccount);
 
-      if (!userDetails.charges_enabled || !userDetails.details_submitted || !userDetails.payouts_enabled) {
-        throw new Error (`User's Stripe account is not suitable for receiving payments.`);
+      if (userDetails.charges_enabled && userDetails.details_submitted && userDetails.payouts_enabled) {
+        // Call onboardSeller
+        const callArgs = {
+          sellersCommonName: username,
+          isActive: true,
+        }
+        const onboardSellerStatus = await emitOnboardSeller(STRIPE_CONTRACT_ADDRESS, callArgs);
+        console.log("onboardSellerStatus", onboardSellerStatus);
       }
-
-      // Call onboardSeller
-      const callArgs = {
-        sellersCommonName: username,
-        isActive: true,
-      }
-      const onboardSellerStatus = await emitOnboardSeller(STRIPE_CONTRACT_ADDRESS, callArgs);
-      console.log("onboardSellerStatus", onboardSellerStatus);
 
       // Redirect back to marketplace
       res.redirect(`${redirectUrl}`);
