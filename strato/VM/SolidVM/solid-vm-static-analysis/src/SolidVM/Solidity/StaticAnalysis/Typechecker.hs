@@ -1186,6 +1186,7 @@ intArgs x =
     enumType' x
       :| [ intType' x,
            stringType' x,
+           decimalType' x,
            Product [stringType' x, intType' x] x
          ]
     
