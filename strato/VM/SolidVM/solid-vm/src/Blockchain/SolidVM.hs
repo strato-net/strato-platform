@@ -1508,10 +1508,6 @@ expToVar' ex@(CC.Binary _ "/=" lhs rhs) = do
     Left 0 -> divideByZero $ unparseExpression ex
     Right 0 -> divideByZero $ unparseExpression ex
     _ -> binopAssign' (div) (/) lhs rhs
-
--- needs replacement with proper function that replaces rem w decimal op    
---expToVar' (CC.Binary _ "%=" lhs rhs) = binopAssign (rem) lhs rhs
---used binopAssign' instead of binopAssign
 expToVar' (CC.Binary _ "%=" lhs rhs) = binopAssign' rem decMod lhs rhs
 expToVar' (CC.Binary _ "|=" lhs rhs) = binopAssign (.|.) lhs rhs
 expToVar' (CC.Binary _ "&=" lhs rhs) = binopAssign (.&.) lhs rhs
@@ -1696,14 +1692,8 @@ expToVar' ex@(CC.Binary _ "/" expr1 expr2) = do
     Left 0 -> divideByZero $ unparseExpression ex
     Right 0 -> divideByZero $ unparseExpression ex
     _ -> expToVarArith (div) (/) expr1 expr2
-
-
 --modified to use decimal division
 expToVar' (CC.Binary _ "%" expr1 expr2) = expToVarArith rem decMod expr1 expr2
-
-
---need to replace rem w decimal op
---expToVar' (CC.Binary _ "%" expr1 expr2) = expToVarInteger expr1 rem expr2 SInteger
 expToVar' (CC.Binary _ "|" expr1 expr2) = expToVarInteger expr1 (.|.) expr2 SInteger
 expToVar' (CC.Binary _ "&" expr1 expr2) = expToVarInteger expr1 (.&.) expr2 SInteger
 expToVar' (CC.Binary _ "^" expr1 expr2) = expToVarInteger expr1 xor expr2 SInteger

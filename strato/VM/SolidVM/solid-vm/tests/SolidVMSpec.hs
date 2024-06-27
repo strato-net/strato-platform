@@ -80,7 +80,7 @@ import qualified LabeledError
 import qualified Numeric (readHex, showHex)
 import SolidVM.Model.SolidString
 import SolidVM.Model.Storable as MS
-import Test.Hspec (Selector, Spec, anyException, fit, it, pendingWith, shouldThrow, xdescribe, xit)
+import Test.Hspec (Selector, Spec, anyException, it, pendingWith, shouldThrow, xdescribe, xit)
 import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
@@ -8838,7 +8838,7 @@ contract qq {
                       BInteger 3,
                       BInteger 1])
 --test for modulo assign                      
-  fit "can use different numbers with the modulo assign operator" $ runTest ( do
+  it "can use different numbers with the modulo assign operator" $ runTest ( do
     runBS [r|
 contract qq {
   decimal xDec = 5.75;
