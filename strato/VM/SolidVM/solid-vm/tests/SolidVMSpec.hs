@@ -8796,6 +8796,7 @@ contract qq {
     getFields ["x"]
       `shouldReturn` [BDecimal "11.2"])
 
+
   it "can use decimal numbers with the modulo operator" $ runTest ( do
     runBS [r|
 contract qq {
@@ -8864,3 +8865,29 @@ contract qq {
                       BInteger 1,
                       BInteger 3,
                       BInteger 1])
+                      
+  it "can cast decimals to int or uint" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal x = 5.2;
+  uint y;
+  int z;
+
+  constructor() {
+    y = uint(x);
+    z = int(x);
+  }
+}
+|]
+    getFields ["y", "z"]
+      `shouldReturn` [BInteger 5, BInteger 5])
+
+  it "can't assign decimals to int or uint" $ runTest ( do
+    runBS [r|
+contract qq {
+  constructor() {
+    int d = 5.5 + 5;
+  }
+}
+|]) `shouldThrow` anyTypeError
+
