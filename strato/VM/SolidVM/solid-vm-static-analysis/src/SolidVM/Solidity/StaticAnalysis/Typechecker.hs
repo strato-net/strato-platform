@@ -85,6 +85,7 @@ data TypeF' a
       }
   | Modifier
       { modifierArgType :: TypeF' a,
+        modifierContext :: a,
         modifierArgNames :: [Maybe SolidString]
       }
   deriving (Eq, Show, Functor)
@@ -875,11 +876,13 @@ contractHelper ::
 contractHelper cc c =
   let constr = maybe M.empty (M.singleton "constructor") $ _constructor c
       funcsAndConstr = constr <> _functions c
+      modifiersAndConstr = constr <> _modifiers cc
       varTypes' = reduceType' (_contractContext c) $ varDeclHelper cc c <$> M.elems (_storageDefs c)
       constTypes' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_constants c)
       constTypes'' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_flConstants cc)
       funcTypes' = reduceType' (_contractContext c) $ uncurry (functionHelper cc c) <$> M.toList funcsAndConstr
-   in reduceType' (_contractContext c) [varTypes', constTypes', funcTypes', constTypes'']
+      modifierTypes' = reduceType' (_contractContext c) $ uncurry (modifierHelper cc c) <$> M.toList modifiersAndConstr
+   in reduceType' (_contractContext c) [varTypes', constTypes', funcTypes', constTypes'', modifierTypes']
 
 varDeclHelper ::
   Annotated CodeCollectionF ->
@@ -994,6 +997,56 @@ checkOverrides cc c funcName f =
                             <> bool vMsg "" (null vs)
                             <> bool eMsg "" (null es)
                             <$ ctx
+
+modifierHelper ::
+  Annotated CodeCollectionF ->
+  Annotated ContractF ->
+  String ->
+  Annotated ModifierF ->
+  Type'
+modifierHelper cc c modifierName m@Modifier {..} =
+   in unlessBottom check $ \t' -> case f ^. funcContents of
+        Nothing -> t'
+        Just stmts ->
+          if (funcName == "modifier")
+            then case (_funcArgs, _funcVals, _funcVisibility) of
+              (_, [fVal], _) ->
+                bottom $
+                  ( T.concat
+                      [ "Function `modifier` must have no return values, but has been given ",
+                        T.pack $ show fVal
+                      ]
+                  )
+                    <$ _funcContext
+                                
+
+
+
+
+
+            else
+              let r =
+                    R cc c (Just f) funcName $
+                      map
+                        (fmap $ isJust . _varInitialVal)
+                        (filter (_isImmutable . snd) . M.toList $ _storageDefs c)
+                  swap = uncurry $ flip (,)
+                  args =
+                    ( \(it, n) ->
+                        ( n,
+                          VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
+                        )
+                    )
+                      <$> (catMaybes $ sequence . swap <$> _funcArgs)
+                  vals =
+                    ( \(it, n) ->
+                        ( n,
+                          VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
+                        )
+                    )
+                      <$> (catMaybes $ sequence . swap <$> _funcVals)
+                  argVals = M.fromList $ args ++ vals
+               in runReader (statementsHelper argVals stmts) r
 
 functionHelper ::
   Annotated CodeCollectionF ->
