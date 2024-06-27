@@ -132,7 +132,7 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOr
           id={order.orderId}
           onClick={() => {
             navigate(
-              `${routes.BoughtOrderDetails.url.replace(":id", order.id ? order.transaction_hash : order.address)}`
+              `${routes.BoughtOrderDetails.url.replace(":id", order.address)}`
             );
           }}
           className="text-primary hover:text-primaryHover cursor-pointer"

@@ -127,7 +127,7 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrde
           id={order.orderId}
           onClick={() => {
             navigate(
-              `${routes.SoldOrderDetails.url.replace(":id", order.id ? order.transaction_hash : order.address)}`
+              `${routes.SoldOrderDetails.url.replace(":id", order.address)}`
             );
           }}
           className="text-[#13188A] hover:text-primaryHover cursor-pointer"
