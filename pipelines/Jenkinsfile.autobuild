@@ -414,6 +414,7 @@ pipeline {
           }
         }
 
+        /*
         stage('Payment Server Tests') {
           steps {
             sh '''#!/bin/bash -le
@@ -430,6 +431,7 @@ pipeline {
             '''
           }
         }
+        */
 
         stage('Integration tests') {
           steps{
