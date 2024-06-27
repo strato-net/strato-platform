@@ -635,6 +635,7 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                         )
                         (contractpayloadChainid p <|> chainId)
                         resolve
+                        "HARDCODED PTR TO SRC CODE"
                 fmap ((: []) . BlocTxResult) $ postUsersContractSolidVM' cacheNonce bcp jwtToken
           xs -> do
             ps <- mapM fromContract xs
