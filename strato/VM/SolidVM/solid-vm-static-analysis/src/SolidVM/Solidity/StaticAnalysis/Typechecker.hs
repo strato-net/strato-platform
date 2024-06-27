@@ -84,9 +84,10 @@ data TypeF' a
         functionArrayGetter :: Bool
       }
   | Modifier
-      { modifierArgType :: TypeF' a,
+      { modifierArgs:: Map Text SolidVM.IndexedType,
         modifierContext :: a,
-        modifierArgNames :: [Maybe SolidString]
+        modifierSelector :: Text,
+        modifierContents :: Maybe [StatementF a]
       }
   deriving (Eq, Show, Functor)
 
