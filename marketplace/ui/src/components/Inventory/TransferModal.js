@@ -1,5 +1,5 @@
-import { Button, Select, InputNumber, Modal, Table } from "antd";
-import { useEffect, useState } from "react";
+import { Button, Select, InputNumber, Modal, Table, Input, Typography, Progress, Spin } from "antd";
+import React, { useState, useEffect } from "react";
 import { actions } from "../../contexts/inventory/actions";
 import { actions as userActions } from "../../contexts/users/actions";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
@@ -8,13 +8,15 @@ import { useAuthenticateState } from "../../contexts/authentication";
 import { SearchOutlined } from '@ant-design/icons';
 
 const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, offset }) => {
-    const [data, setData] = useState([inventory]);
+    const [view, setView] = useState("options");
     const [quantity, setQuantity] = useState(1);
     const [price, setPrice] = useState(0);
     const [userAddress, setUserAddress] = useState("");
+    const [bridgeAddress, setBridgeAddress] = useState("");
     const inventoryDispatch = useInventoryDispatch();
     const userDispatch = useUsersDispatch();
     const [canTransfer, setCanTransfer] = useState(true);
+    const [canBridge, setCanBridge] = useState(true);
     const {
         user
     } = useAuthenticateState();
@@ -66,50 +68,102 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
     : [];
 
 
-    const columns = [
-        {
-            title: "Quantity Available",
-            dataIndex: "quantity",
-            align: "center"
-        },
-        {
-            title: "Set Quantity",
-            align: "center",
-            render: () => (
-                <InputNumber value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
-            )
-        },
-        {
-            title: "Set Price",
-            align: "center",
-            render: () => (
-                <InputNumber value={price} controls={false} min={1} onChange={(value) => setPrice(value)} />
-            )
-        },
-        {
-            title: "Select recipient",
-            align: "center",
-            render: () => (
-                <Select
-                    className="w-[390px]"
-                    showSearch
-                    onSelect={handleSelect}
-                    onSearch={handleSearchChange}
-                    options={filteredOptions}
-                    optionFilterProp="value"
-                    filterOption={(input, option) =>
-                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+    const renderTransfer = () => (
+        <>
+            <Table
+                columns={[
+                    {
+                        title: "Quantity Available",
+                        dataIndex: "quantity",
+                        align: "center"
+                    },
+                    {
+                        title: "Set Quantity",
+                        align: "center",
+                        render: () => (
+                            <InputNumber value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
+                        )
+                    },
+                    {
+                        title: "Set Price",
+                        align: "center",
+                        render: () => (
+                            <InputNumber value={price} controls={false} min={1} onChange={(value) => setPrice(value)} />
+                        )
+                    },
+                    {
+                        title: "Select recipient",
+                        align: "center",
+                        render: () => (
+                            <Select
+                                className="w-[390px]"
+                                showSearch
+                                onSelect={handleSelect}
+                                onSearch={handleSearchChange}
+                                options={filteredOptions}
+                                optionFilterProp="value"
+                                filterOption={(input, option) =>
+                                    (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                                }
+                                open={dropdownOpen}
+                                suffixIcon={<SearchOutlined />}
+                                onFocus={() => setDropdownOpen(!!searchInput)}
+                                onBlur={() => setDropdownOpen(false)}
+                                popupClassName="custom-select-dropdown"
+                            />
+                        )
                     }
-                    open={dropdownOpen}
-                    suffixIcon={<SearchOutlined />}
-                    onFocus={() => setDropdownOpen(!!searchInput)} // Open dropdown on focus if there is any input
-                    onBlur={() => setDropdownOpen(false)} // Close dropdown on blur
-                    popupClassName="custom-select-dropdown" // Add this line
-                />
-            )
-        }
-    ];
-
+                ]}
+                dataSource={[inventory]}
+                pagination={false}
+            />
+            <div className="flex justify-center md:block">
+                <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canTransfer} loading={isTransferring}>
+                    Transfer
+                </Button>
+            </div>
+        </>
+    );
+    
+    const renderBridge = () => (
+        <>
+            <Table
+                columns={[
+                    {
+                        title: "Quantity Available",
+                        dataIndex: "quantity",
+                        align: "center"
+                    },
+                    {
+                        title: "Set Quantity",
+                        align: "center",
+                        render: () => (
+                            <InputNumber value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
+                        )
+                    },
+                    {
+                        title: "Base Chain Address",
+                        align: "center",
+                        render: () => (
+                            <Input 
+                                placeholder="Base Chain address" 
+                                value={bridgeAddress} 
+                                onChange={(e) => setBridgeAddress(e.target.value)} 
+                                className="mt-2"
+                            />
+                        )
+                    }
+                ]}
+                dataSource={[inventory]}
+                pagination={false}
+            />
+            <div className="flex justify-center md:block">
+                <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canBridge} loading={isTransferring}>
+                    Bridge
+                </Button>
+            </div>
+        </>
+    );
 
     const handleSubmit = async () => {
         const body = {
@@ -128,6 +182,13 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
             }
         }
     }
+    
+    const renderOptions = () => (
+        <div className="flex justify-around">
+            <Button type="primary" onClick={() => setView("transfer")}>Transfer</Button>
+            <Button type="primary" onClick={() => setView("bridge")}>Bridge</Button>
+        </div>
+    );
 
     return (
         <Modal
@@ -135,62 +196,13 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
             onCancel={handleCancel}
             title={`Transfer - ${decodeURIComponent(inventory.name)}`}
             width={825}
-            footer={[
-                <div className="flex justify-center md:block">
-                    <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canTransfer} loading={isTransferring}>
-                        Transfer
-                    </Button>
-                </div>
-            ]}
+            footer={null}
         >
-            <div className="head hidden md:block">
-
-                <Table
-                    columns={columns}
-                    dataSource={data}
-                    pagination={false}
-                />
-            </div>
-            <div className="flex flex-col gap-[18px] md:hidden mt-5">
-                <div> <p className="text-[#202020] font-medium text-sm">Quantity Available</p>
-                    <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center ">
-
-                        <p className="px-5 "> {inventory?.quantity}</p>
-                    </div>
-                </div>
-                <div>
-                    <p className="text-[#202020] font-medium text-sm">Set Quantity</p>
-                    <div className="inventory_card">
-                        <InputNumber className="w-full pl-5" value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
-                    </div>
-                </div>
-                <div>
-                    <p className="text-[#202020] font-medium text-sm">Set Price</p>
-                    <div className="inventory_card">
-                        <InputNumber className="w-full pl-5" value={price} controls={false} min={1} onChange={(value) => setPrice(value)} />
-                    </div>
-                </div>
-                <div>
-                    <p className="text-[#202020] font-medium text-sm">Select recipient</p>
-                    <Select
-                        className="w-full"
-                        showSearch
-                        onSelect={handleSelect}
-                        onSearch={handleSearchChange}
-                        options={filteredOptions}
-                        optionFilterProp="value"
-                        filterOption={(input, option) =>
-                            (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-                        }
-                        open={dropdownOpen}
-                        suffixIcon={<SearchOutlined />}
-                        onFocus={() => setDropdownOpen(!!searchInput)} // Open dropdown on focus if there is any input
-                        onBlur={() => setDropdownOpen(false)} // Close dropdown on blur
-                        popupClassName="custom-select-dropdown"
-                    />
-                </div>
-
-            </div>
+            {inventory.name === "Demo Day Token" ? (
+                view === "options" ? renderOptions() : view === "transfer" ? renderTransfer() : renderBridge()
+            ) : (
+                renderTransfer()
+            )}
         </Modal>
     )
 }
