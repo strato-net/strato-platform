@@ -1963,7 +1963,7 @@ contract qq is Parent {
     try {
       myPublicFunc();
     } catch {
-      x = 9;
+      x = 9;expr
     }
   }
 }
@@ -2137,7 +2137,7 @@ contract Child is Base { }
 contract qq {
   constructor() {
       Base b = Base(new Child());
-      Child c = new Child();
+      Child c = new Child();*
       // Base d = c;
       Base e = Base(c);
       Child f = Child(b);
