@@ -183,19 +183,22 @@ async function get(user, args, options) {
     });
 
     // Legacy orders need to join array tables. 
-    searchArgs.queryOptions = {
-      select: constants.attach_saleAddresses_Quantities_completedSales_onOrder
+    let legacyArgs = {
+      address: address,
+      limit: 1,
+      queryOptions: {
+        select: constants.attach_saleAddresses_Quantities_completedSales_onOrder
+      }
     }
-    order = await searchOne(constants.orderTableName, searchArgs, newOptions, user);
+    order = await searchOne(constants.orderTableName, legacyArgs, newOptions, user);
   }
 
   if (!order) {
     return undefined;
   }
 
-  return marshalOut({
-    ...order,
-  });
+  // Flatten the order object
+  return marshalOut(order['0'] ? { ...order['0'] } : { ...order });
 }
 
 async function getAll(admin, args = {}, options) {
