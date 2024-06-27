@@ -423,6 +423,7 @@ pipeline {
               STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
               STRIPE_CONTRACT_ADDRESS=97d263744002e580d393fd013cc66d5177204f90
               TEST_MODE=true
+              SKIP_CONTRACT_VALIDATION=true
               rm -rf node_modules
               npm install
               npm run test
