@@ -71,6 +71,7 @@ import Numeric.Natural
 import Servant.API
 import Servant.Docs
 import Test.QuickCheck hiding (Failure, Success)
+import Blockchain.Strato.Model.Code (Code)
 
 --------------------------------------------------------------------------------
 
@@ -357,7 +358,7 @@ data ContractParameters = ContractParameters
     metadata :: Maybe (Map Text Text),
     chainId :: Maybe ChainId,
     resolve :: Bool,
-    contractSrcCodePtr :: Text
+    sourceCode :: Maybe Code
   }
 
 --------------------------------------------------------------------------------

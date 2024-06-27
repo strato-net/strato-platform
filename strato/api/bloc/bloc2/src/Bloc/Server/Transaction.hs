@@ -91,7 +91,7 @@ import Data.Semigroup (Max (..))
 import Data.Set (isSubsetOf)
 import qualified Data.Set as S
 import Data.Source.Map
-import Data.Text (Text)
+import Data.Text (Text, unpack)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Data.Time.Clock
@@ -635,7 +635,14 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                         )
                         (contractpayloadChainid p <|> chainId)
                         resolve
-                        "HARDCODED PTR TO SRC CODE"
+                        (Just (PtrToCode -- is a CodePtr which takes two things. technically PtrToCode is CodeAtAccount Account String
+                          (CodeAtAccount 
+                            (case contractpayloadCodePtr p of
+                              Just xxx -> Account xxx Nothing
+                              Nothing   -> error "Address is required but was not provided."
+                            )
+                            (unpack (fromMaybe (error "Contract is required but was not provided.") (contractpayloadContract p)))
+                        )))
                 fmap ((: []) . BlocTxResult) $ postUsersContractSolidVM' cacheNonce bcp jwtToken
           xs -> do
             ps <- mapM fromContract xs
