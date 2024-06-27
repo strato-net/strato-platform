@@ -8811,3 +8811,14 @@ contract qq {
 |]
     getFields ["y", "z"]
       `shouldReturn` [BInteger 5, BInteger 5])
+
+  it "can't assign decimals to int or uint" $ runTest ( do
+    runBS [r|
+contract qq {
+  int d;
+
+  constructor() {
+    int d = 5.5 + 5;
+  }
+}
+|]) `shouldThrow` anyTypeError
