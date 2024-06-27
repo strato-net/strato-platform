@@ -1092,6 +1092,18 @@ functionHelper cc c funcName f@Func {..} =
                   _ -> bottom $ "Function `fallback` must be External, but has not been declared so " <$ _funcContext
             else
               if (funcName == "modifier")
+                then case (_funcArgs, _funcVals, _funcVisibility) of
+                  (_, [fVal], _) ->
+                    bottom $
+                      ( T.concat
+                          [ "Function `modifier` must have no return values, but has been given ",
+                            T.pack $ show fVal
+                          ]
+                      )
+                        <$ _funcContext
+                                    
+
+
 
 
     
