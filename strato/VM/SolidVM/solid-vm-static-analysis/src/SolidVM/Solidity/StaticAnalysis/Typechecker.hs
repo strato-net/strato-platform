@@ -83,6 +83,10 @@ data TypeF' a
         functionArgNames :: [Maybe SolidString],
         functionArrayGetter :: Bool
       }
+  | Modifier
+      { modifierArgType :: TypeF' a,
+        modifierArgNames :: [Maybe SolidString]
+      }
   deriving (Eq, Show, Functor)
 
 type Type' = Annotated TypeF'
