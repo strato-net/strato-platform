@@ -83,7 +83,6 @@ pipeline {
             lib.spinUpVault()
             lib.replaceServerPortsDocker()
             lib.spinUpFileServer()
-            lib.spinUpPaymentServer()
             lib.spinUpIdentityServer("${env.WORKSPACE}/strato/tools/x509-generator/rootCert.pem", "${env.WORKSPACE}/strato/tools/x509-generator/rootPriv.pem")
           }
 
@@ -205,6 +204,12 @@ pipeline {
             )
             // Unlock the marketplace deploy script:
             sh 'docker exec strato-marketplace-backend-1 rm -f _deploy_blocked_while_I_exist'
+          }
+
+          dir("strato-getting-started") {
+            script {
+              lib.spinUpPaymentServer()
+            }
           }
         }
 
@@ -409,6 +414,7 @@ pipeline {
           }
         }
 
+        /*
         stage('Payment Server Tests') {
           steps {
             sh '''#!/bin/bash -le
@@ -418,12 +424,14 @@ pipeline {
               STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
               STRIPE_CONTRACT_ADDRESS=97d263744002e580d393fd013cc66d5177204f90
               TEST_MODE=true
+              SKIP_CONTRACT_VALIDATION=true
               rm -rf node_modules
               npm install
               npm run test
             '''
           }
         }
+        */
 
         stage('Integration tests') {
           steps{

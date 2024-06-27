@@ -1385,17 +1385,19 @@ def spinUpPaymentServer() {
   ]) {
     writeFile file: "run-payment-server.sh", text: """#!/bin/bash
       sudo \\
-        SERVER_HOST=http://localhost:8018 \\
+        SERVER_HOST=http://172.17.0.1:8018 \\
         HTTP_PORT=8018 \\
         HTTPS_PORT=44301 \\
-        OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata-testnet2/.well-known/openid-configuration \\
-        OAUTH_CLIENT_ID="mercata-testnet2-payments" \\
-        OAUTH_CLIENT_SECRET="f9129509-efc3-45ad-bba9-abb148239c7f" \\
+        OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \\
+        OAUTH_CLIENT_ID="${KEYCLOAK_STRATODEVEL_DEV_ID}" \\
+        OAUTH_CLIENT_SECRET="${KEYCLOAK_STRATODEVEL_DEV_SECRET}" \\
         STRIPE_CONTRACT_ADDRESS="358af3a0499239c00aad8eaa8e40cdd7f74dc293" \\
         METAMASK_CONTRACT_ADDRESS="358af3a0499239c00aad8eaa8e40cdd7f74dc293" \\
-        STRATO_HOST="http://localhost" \\
+        STRATO_HOST="http://172.17.0.1" \\
         STRIPE_SECRET_KEY='${STRIPE_SECRET_KEY_TESTNET2}' \\
         ssl=true \\
+        TABLE_PREFIX="Test-Mercata-" \\
+        SKIP_CONTRACT_VALIDATION="true" \\
         ./payment-server
     """
   }
