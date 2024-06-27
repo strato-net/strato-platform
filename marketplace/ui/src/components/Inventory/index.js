@@ -5,12 +5,11 @@ import {
   Pagination,
   notification,
   Spin,
-  Tooltip, 
+  Select,
   Tabs
 } from "antd";
 import InventoryCard from "./InventoryCard";
 import CreateInventoryModal from "./CreateInventoryModal";
-//categories
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
 import useDebounce from "../UseDebounce";
@@ -22,23 +21,22 @@ import {
 import { usePaymentServiceDispatch, usePaymentServiceState } from "../../contexts/payment";
 import { actions as paymentServiceActions } from "../../contexts/payment/actions";
 import { Images } from "../../images";
-//items
+import { useItemDispatch, useItemState } from "../../contexts/item";
 import { actions as itemActions } from "../../contexts/item/actions";
 import { actions as redemptionActions } from "../../contexts/redemption/actions";
 import { actions as issuerStatusActions } from "../../contexts/issuerStatus/actions";
-import { useItemDispatch, useItemState } from "../../contexts/item";
+import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
+import { useIssuerStatusState, useIssuerStatusDispatch } from "../../contexts/issuerStatus";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
 import { useAuthenticateState } from "../../contexts/authentication";
 import HelmetComponent from "../Helmet/HelmetComponent";
 import { SEO } from "../../helpers/seoConstant";
-import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
-//authorized issuer
 import RequestBeAuthorizedIssuerModal from "./RequestBeAuthorizedIssuerModal";
 import { ISSUER_STATUS } from '../../helpers/constants';
-import { useIssuerStatusState , useIssuerStatusDispatch } from "../../contexts/issuerStatus";
 
+const { Option } = Select;
 
 const Inventory = ({ user }) => {
   const [open, setOpen] = useState(false);
@@ -48,7 +46,7 @@ const Inventory = ({ user }) => {
   const limit = 10;
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState(1);
-  const [availablePaymentProviders, setAvailablePaymentProviders] = useState([]);
+  const [selectedService, setSelectedService] = useState(null);
   const dispatch = useInventoryDispatch();
   const [api, contextHolder] = notification.useNotification();
   const [isSearch, setIsSearch] = useState(false);
@@ -56,13 +54,10 @@ const Inventory = ({ user }) => {
   const linkUrl = window.location.href;
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
-  //Categories
   const categoryDispatch = useCategoryDispatch();
-
   const { categorys } = useCategoryState();
   const { inventories, isInventoriesLoading, message, success, inventoriesTotal } =
     useInventoryState();
-  
   const {
       paymentServices,
       arePaymentServicesLoading,
@@ -79,36 +74,33 @@ const Inventory = ({ user }) => {
   }, [paymentServiceDispatch, user]);
 
   useEffect(() => {
-    const diff = paymentServices.filter(ps => 
-      !notOnboarded.some(x => x.address === ps.address)
+    let filteredServices = paymentServices.filter(ps => 
+      !notOnboarded.some(x => x.address === ps.address) && 
+      ps.serviceName !== 'Sad Dog Adoption Club' && ps.serviceName !== 'STRAT'
     );
-    setAvailablePaymentProviders(diff);
+
+    const stripeService = filteredServices.find(ps => ps.serviceName === 'Stripe');
+    if (stripeService) {
+      filteredServices = [stripeService, ...filteredServices.filter(ps => ps.serviceName !== 'Stripe')];
+    }
+    if (filteredServices.length > 0) {
+      setSelectedService(filteredServices[0]);
+    }
   }, [paymentServices, notOnboarded]);
 
-  //items
+
   const itemDispatch = useItemDispatch();
-  const {
-    message: itemMsg,
-    success: itemSuccess
-  } = useItemState();
-
-  //redemptions
+  const { message: itemMsg, success: itemSuccess } = useItemState();
   const redemptionDispatch = useRedemptionDispatch();
-  const {
-    message: redemptionMsg,
-    success: redemptionSuccess
-  } = useRedemptionState();
-
-  //issuer status
+  const { message: redemptionMsg, success: redemptionSuccess } = useRedemptionState();
   const [issuerStatus, setIssuerStatus] = useState(user?.issuerStatus);
+
   useEffect(() => {
     setIssuerStatus(user?.issuerStatus);
   }, [user]);
-  const issuerStatusDipatch = useIssuerStatusDispatch();
-  const {
-    message: issuerStatusMsg,
-    success: issuerStatusSuccess
-  } = useIssuerStatusState();
+
+  const issuerStatusDispatch = useIssuerStatusDispatch();
+  const { message: issuerStatusMsg, success: issuerStatusSuccess } = useIssuerStatusState();
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
@@ -128,23 +120,23 @@ const Inventory = ({ user }) => {
     setOpen(false);
   };
 
-  const handleOnboard = async (e) => {
+  const handleOnboard = async (service) => {
     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
       window.location.href = loginUrl;
     } else {
-      const serviceURL = e.serviceURL || e.data.serviceURL;
-      const onboardingRoute = e.onboardingRoute || e.data.onboardingRoute;
-      if (serviceURL
-            && serviceURL !== ''
-            && onboardingRoute
-            && onboardingRoute !== ''
-         ) {
+      const serviceURL = service.serviceURL || service.data.serviceURL;
+      const onboardingRoute = service.onboardingRoute || service.data.onboardingRoute;
+      if (serviceURL && onboardingRoute) {
         const url = `${serviceURL}${onboardingRoute}?username=${user.commonName}&redirectUrl=${window.location.protocol}//${window.location.host}${window.location.pathname}`;
         window.location.replace(url);
       }
     }
-  }
+  };
 
+  const handleChange = value => {
+    const service = notOnboarded.find(service => service.serviceName === value);
+    setSelectedService(service);
+  };
 
   const showReqModModal = () => {
     setReqModOpen(true);
@@ -173,11 +165,7 @@ const Inventory = ({ user }) => {
   };
 
   const queryHandle = (e) => {
-    if (e.length === 0 || e === "") {
-      setIsSearch(false)
-    } else {
-      setIsSearch(true)
-    }
+    setIsSearch(e.length > 0);
     setQueryValue(e);
     setOffset(0);
     setPage(1);
@@ -228,14 +216,14 @@ const Inventory = ({ user }) => {
     if (issuerStatusSuccess) {
       api.success({
         message: issuerStatusMsg,
-        onClose: issuerStatusActions.resetMessage(issuerStatusDipatch),
+        onClose: issuerStatusActions.resetMessage(issuerStatusDispatch),
         placement,
         key: 7,
       });
     } else {
       api.error({
         message: issuerStatusMsg,
-        onClose: issuerStatusActions.resetMessage(issuerStatusDipatch),
+        onClose: issuerStatusActions.resetMessage(issuerStatusDispatch),
         placement,
         key: 8,
       });
@@ -244,113 +232,122 @@ const Inventory = ({ user }) => {
 
   const navigate = useNavigate();
 
-const getAllSubcategories = (categories) => {
-  let subcategories = [];
-  categories.forEach(category => {
-      if (category.subCategories && category.subCategories.length > 0) {
-          subcategories = subcategories.concat(category.subCategories);
-      }
-  });
-  return subcategories;
-}
+  const getAllSubcategories = (categories) => {
+    let subcategories = [];
+    categories.forEach(category => {
+        if (category.subCategories && category.subCategories.length > 0) {
+            subcategories = subcategories.concat(category.subCategories);
+        }
+    });
+    return subcategories;
+  }
 
-const allSubcategories = getAllSubcategories(categorys);
-  
-  // ------------------ Tabs Start------------------
+  const allSubcategories = getAllSubcategories(categorys);
+
   const handleTabSelect = (key) => {
     setCategory(key);
     setOffset(0);
     setPage(1);
     return;
   };
-  // ------------------ Tabs END------------------
-const metaImg = category ? category : SEO.IMAGE_META
 
-const renderImg = (service) => {
+  const metaImg = category ? category : SEO.IMAGE_META;
+
+  const renderImg = (service) => {
     return service.imageURL && service.imageURL !== ''
         ? <img src={service.imageURL} alt={service.serviceName} height="16px" width="16px"/>
         : ''
-}
+  };
 
   return (
     <>
-     <HelmetComponent 
-          title={`${category ? `${category} |` :''} ${SEO.TITLE_META} `}
-          description={SEO.DESCRIPTION_META} 
-          link={linkUrl} />
+      <HelmetComponent 
+        title={`${category ? `${category} |` :''} ${SEO.TITLE_META} `}
+        description={SEO.DESCRIPTION_META} 
+        link={linkUrl} 
+      />
       {contextHolder}
-        <>
-          <Breadcrumb className="mx-5 md:mx-14 mt-2 lg:mt-4">
-            <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-              <ClickableCell href={routes.Marketplace.url}>
-                <p className="text-sm text-[#13188A] font-semibold">
-                  Home
-                </p>
-              </ClickableCell>
-            </Breadcrumb.Item>
-            <Breadcrumb.Item>
-              <p className="text-sm text-[#202020] font-medium">
-                My Items
+      <>
+        <Breadcrumb className="mx-5 md:mx-14 mt-2 lg:mt-4">
+          <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+            <ClickableCell href={routes.Marketplace.url}>
+              <p className="text-sm text-[#13188A] font-semibold">
+                Home
               </p>
-            </Breadcrumb.Item>
-          </Breadcrumb>
-          <div className="w-full h-[116px] py-4 px-4 md:h-[96px] bg-[#F6F6F6] flex flex-col md:flex-row md:px-14  justify-between items-center mt-6 lg:mt-8">
-            <div className="flex justify-between w-full">
-              <Button className="!px-1 md:!px-0 flex items-center flex-row-reverse gap-[6px] text-lg md:text-2xl font-semibold !text-[#13188A] " 
+            </ClickableCell>
+          </Breadcrumb.Item>
+          <Breadcrumb.Item>
+            <p className="text-sm text-[#202020] font-medium">
+              My Items
+            </p>
+          </Breadcrumb.Item>
+        </Breadcrumb>
+        <div className="w-full h-[116px] py-4 px-4 md:h-[96px] bg-[#F6F6F6] flex flex-col md:flex-row md:px-14 justify-between items-center mt-6 lg:mt-8">
+          <div className="flex justify-between w-full">
+            <Button className="!px-1 md:!px-0 flex items-center flex-row-reverse gap-[6px] text-lg md:text-2xl font-semibold !text-[#13188A] " 
               type="link" 
               icon={<img src={Images.ForwardIcon} 
               alt={metaImg} 
               title={metaImg}
               className="hidden md:block w-6 h-6" />}> My Items
-              </Button>
-            </div>
-            <div className="flex gap-3">
-              {!areNotOnboardedLoading ? (
-                (notOnboarded || []).filter((p) => (
-                  p &&
-                  p.data &&
-                  (p.serviceURL || p.data.serviceURL) &&
-                  (p.onboardingRoute || p.data.onboardingRoute)
-                )).map((e) => (
-                  <Button type="primary" className="w-44 h-9 items-center justify-center"
-                      onClick={() => handleOnboard(e)}
-                  >
-                    <div className="flex items-center justify-center mr-1">
-                      {`${e.onboardingText || e.data.onboardingText}`}&nbsp;
-                      {renderImg(e)}
-                    </div>
-                  </Button>
-                ))
-                ) : (
-                  <div className="absolute left-[50%] md:top-4">
-                    <Spin size="large" />
-                  </div>
-                )
-              }
-              <Button
-                type="primary"
-                id="createItem"
-                className="w-40 h-9 flex items-center justify-center gap-[6px]"
-                disabled={availablePaymentProviders.length === 0}
-                onClick={() => {
-                  if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                    window.location.href = loginUrl;
-                  } else {
-                    showModal()
-                  }
-                }}
+            </Button>
+          </div>
+          <div className="flex gap-3 items-center">
+            {!areNotOnboardedLoading ? (
+              <Select
+                style={{ width: 200, height: 40 }}
+                onChange={handleChange}
+                defaultValue={notOnboarded[0]?.serviceName}
+                value={selectedService?.serviceName}
+                disabled={notOnboarded.length === 0}
               >
-                <div className="flex items-center justify-center gap-[6px]">
-                  <img src={Images.CreateInventory} 
+                {paymentServices.map(service => (
+                  <Option 
+                    key={service.serviceName} 
+                    value={service.serviceName}
+                    disabled={!notOnboarded.some(n => n.serviceName === service.serviceName)}
+                  >
+                    {service.onboardingText || service.data.onboardingText}
+                  </Option>
+                ))}
+              </Select>
+            ) : (
+              <Spin size="large" />
+            )}
+            <Button
+              type="primary"
+              style={{ height: 40 }}
+              disabled={!selectedService}
+              onClick={() => handleOnboard(selectedService)}
+            >
+              {selectedService ? `Connect to ${selectedService.serviceName}` : "Select a service"}
+            </Button>
+            <Button
+              type="primary"
+              id="createItem"
+              className="w-40 flex items-center justify-center gap-[6px]"
+              style={{ height: 40 }}
+              disabled={notOnboarded.length === paymentServices.length - 2} // Subtract two to account for STRATS and Sad Dogs
+              onClick={() => {
+                if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                  window.location.href = loginUrl;
+                } else {
+                  showModal();
+                }
+              }}
+            >
+              <div className="flex items-center justify-center gap-[6px]">
+                <img src={Images.CreateInventory} 
                   alt={metaImg}
                   title={metaImg}
-                  className="w-[18px] h-[18px]" />
-                  Create Item
-                </div>
-              </Button>
-            </div>
+                  className="w-[18px] h-[18px]" 
+                />
+                Create Item
+              </div>
+            </Button>
           </div>
-          <div className="pt-6 mx-6 md:mx-5 md:px-10 mb-5 ">
+        </div>
+        <div className="pt-6 mx-6 md:mx-5 md:px-10 mb-5">
           <Tabs
             defaultActiveKey={category ? category : "All"}
             className="items"
@@ -360,27 +357,23 @@ const renderImg = (service) => {
                 label: "All",
                 key: undefined,
                 children: (
-                  <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 sm:place-items-center md:place-items-start  inventoryCard max-w-full">
+                  <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 sm:place-items-center md:place-items-start inventoryCard max-w-full">
                     {!isInventoriesLoading ? (
-                      inventories.map((inventory, index) => {
-                        return (
-                          <InventoryCard
-                            id={index}
-                            limit={limit}
-                            offset={offset}
-                            inventory={inventory}
-                            category={category}
-                            key={index}
-                            debouncedSearchTerm={debouncedSearchTerm}
-                            allSubcategories={allSubcategories}
-                            user={user}
-                          />
-                        );
-                      })
+                      inventories.map((inventory, index) => (
+                        <InventoryCard
+                          id={index}
+                          limit={limit}
+                          offset={offset}
+                          inventory={inventory}
+                          category={category}
+                          key={index}
+                          debouncedSearchTerm={debouncedSearchTerm}
+                          allSubcategories={allSubcategories}
+                          user={user}
+                        />
+                      ))
                     ) : (
-                      <div className="absolute left-[50%] md:top-4">
-                        <Spin size="large" />
-                      </div>
+                      <Spin size="large" />
                     )}
                   </div>
                 ),
@@ -391,65 +384,56 @@ const renderImg = (service) => {
                 children: (
                   <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 inventoryCard max-w-full">
                     {!isInventoriesLoading ? (
-                      inventories.map((inventory, index) => {
-                        return (
-                          <InventoryCard
-                            id={index}
-                            inventory={inventory}
-                            category={category}
-                            key={index}
-                            debouncedSearchTerm={debouncedSearchTerm}
-                            allSubcategories={allSubcategories}
-                          />
-                        );
-                      })
+                      inventories.map((inventory, index) => (
+                        <InventoryCard
+                          id={index}
+                          inventory={inventory}
+                          category={category}
+                          key={index}
+                          debouncedSearchTerm={debouncedSearchTerm}
+                          allSubcategories={allSubcategories}
+                        />
+                      ))
                     ) : (
-                      <div className="absolute left-[50%] md:top-4">
-                        <Spin size="large" />
-                      </div>
+                      <Spin size="large" />
                     )}
                   </div>
                 ),
               })),
             ]}
           />
-
-            <div className="flex justify-center pt-6">
-              <Pagination
-                current={page}
-                onChange={onPageChange}
-                total={inventoriesTotal}
-                showSizeChanger={false}
-                className="flex justify-center my-5 "
-              />
-            </div>
+          <div className="flex justify-center pt-6">
+            <Pagination
+              current={page}
+              onChange={onPageChange}
+              total={inventoriesTotal}
+              showSizeChanger={false}
+              className="flex justify-center my-5"
+            />
           </div>
-        </>
-      {
-        open && (
-          <CreateInventoryModal
-            open={open}
-            handleCancel={handleCancel}
-            categorys={categorys}
-            debouncedSearchTerm={debouncedSearchTerm}
-            resetPage={onPageChange}
-            page={page}
-            categoryName={category}
-          />
-        )
-      }
-      {
-        reqModOpen && (
-          <RequestBeAuthorizedIssuerModal
-            open={reqModOpen}
-            handleCancel={handleReqModCancel}
-            commonName={user.commonName}
-            emailAddr={user.email}
-            issuerStatus={issuerStatus}
-            setIssuerStatus={setIssuerStatus}
-          />
-        )
-      }
+        </div>
+      </>
+      {open && (
+        <CreateInventoryModal
+          open={open}
+          handleCancel={handleCancel}
+          categorys={categorys}
+          debouncedSearchTerm={debouncedSearchTerm}
+          resetPage={onPageChange}
+          page={page}
+          categoryName={category}
+        />
+      )}
+      {reqModOpen && (
+        <RequestBeAuthorizedIssuerModal
+          open={reqModOpen}
+          handleCancel={handleReqModCancel}
+          commonName={user.commonName}
+          emailAddr={user.email}
+          issuerStatus={issuerStatus}
+          setIssuerStatus={setIssuerStatus}
+        />
+      )}
       {message && openToast("bottom")}
       {itemMsg && itemToast("bottom")}
       {redemptionMsg && redemptionToast("bottom")}
