@@ -58,7 +58,7 @@ import Servant.Client hiding (manager, responseBody)
 import Text.Format
 import UnliftIO hiding (Handler)
 
-data BinaryOp a b = First a | Second b | Sum (a, b) | Product (a, b)
+data BinaryOp a b = First a | Second b | Sum a b | Product a b
 
 instance Monad m => HasVault (ReaderT IdentityServerData m) where
   sign msg = do
@@ -98,7 +98,7 @@ postIdentity (PostIdentityRequest eMsg) = do
 
   cert <- case eMsg of
     Left s@(Signed _ _) -> case recoverAddress s of -- new identity
-      Just a | a == fromPublicKey (subPub sub) -> certInCirrus (Sum (subCommonName sub, a)) >>= \case
+      Just a | a == fromPublicKey (subPub sub) -> certInCirrus (Sum (subCommonName sub) a) >>= \case
         -- User has no cert, create cert
         [] -> do
           cert <- createAndRegisterCert sub
@@ -129,7 +129,7 @@ postIdentity (PostIdentityRequest eMsg) = do
         throwIO $ IdentityError err
     Right s'@(Signed s@(Signed _ _) _) -> case (,) <$> (recoverAddress s) <*> (recoverAddress s') of -- existing identity
       Just (existingA, newA) | newA == fromPublicKey (subPub sub) -> certInCirrus (Second newA) >>= \case
-        [] -> certInCirrus (Product (subCommonName sub, existingA)) >>= \case
+        [] -> certInCirrus (Product (subCommonName sub) existingA) >>= \case
           (c:_) -> do
             let existingCN = (subCommonName <$> getCertSubject c)
                 newCN = subCommonName sub
@@ -214,8 +214,8 @@ certInCirrus op = do
       cirrusBasePath <> "?commonName=eq." <> username <> restOfQuery
     cirrusSearchPath (Second address) =
       cirrusBasePath <> "?userAddress=eq." <> show address <> restOfQuery
-    cirrusSearchPath (Sum (username, address)) = jointQuery "or" username address
-    cirrusSearchPath (Product (username, address)) = jointQuery "and" username address
+    cirrusSearchPath (Sum username address) = jointQuery "or" username address
+    cirrusSearchPath (Product username address) = jointQuery "and" username address
     jointQuery opStr username address = concat
       [ cirrusBasePath
       , "?"
