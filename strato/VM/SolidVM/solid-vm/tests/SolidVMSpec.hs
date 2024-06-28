@@ -8803,7 +8803,7 @@ contract qq {
       [r|
 contract qq {
   function f() returns (decimal) {
-    uint k = 0.5;
+    decimal k = 0.5;
     return k;
   }
 }|]
