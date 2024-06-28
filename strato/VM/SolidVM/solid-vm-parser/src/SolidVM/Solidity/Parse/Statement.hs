@@ -494,7 +494,17 @@ accountLiteral = do
 literal :: SolidityParser Expression
 literal =
   asum
-    [ do
+    [ ( try $ do
+            ~(a, decimalNum) <- withPosition $ do
+              num <- lexeme $ integer
+              period <- string "."
+              fraction <- many1 digit
+              skipMany space
+              let decimalNum = read (show num ++ period ++ fraction) :: Decimal
+              pure (decimalNum)
+            pure $ DecimalLiteral a $ WrappedDecimal decimalNum
+      ),
+      do
         ~(a, (n, u)) <- withPosition $ (,) <$> integer <*> optionMaybe numberUnit
         pure $ NumberLiteral a n u,
       uncurry StringLiteral <$> withPosition stringLiteral,

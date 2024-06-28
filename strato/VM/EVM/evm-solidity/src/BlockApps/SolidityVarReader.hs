@@ -74,7 +74,7 @@ valueToSolidityValue :: Value -> SolidityValue
 valueToSolidityValue = \case
   SimpleValue (ValueBool x) -> SolidityBool x
   SimpleValue (ValueInt _ _ v) -> SolidityValueAsString $ Text.pack $ show v
-  SimpleValue (ValueDecimal v) -> SolidityValueAsString $ Text.pack $ show v
+  SimpleValue (ValueDecimal v) -> SolidityValueAsString $ Text.decodeUtf8 v
   SimpleValue (ValueString s) -> SolidityValueAsString s
   SimpleValue (ValueAddress (Address addr)) ->
     SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr :: Integer)
