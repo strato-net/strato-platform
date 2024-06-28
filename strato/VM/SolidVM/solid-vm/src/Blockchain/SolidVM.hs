@@ -577,6 +577,7 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
                             (SString _, SVMType.Address _) -> True
                             (SString _, SVMType.Account _) -> True
                             (SDecimal _, SVMType.Decimal) -> True
+                            (SInteger _, SVMType.Decimal) -> True
                             (SBool _, SVMType.Bool) -> True
                             (SAccount _ _, SVMType.Address _) -> True
                             (SAccount _ _, SVMType.Account _) -> True
