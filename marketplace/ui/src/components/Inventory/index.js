@@ -74,17 +74,11 @@ const Inventory = ({ user }) => {
   }, [paymentServiceDispatch, user]);
 
   useEffect(() => {
-    let filteredServices = paymentServices.filter(ps => 
-      !notOnboarded.some(x => x.address === ps.address) && 
-      ps.serviceName !== 'Sad Dog Adoption Club' && ps.serviceName !== 'STRAT'
-    );
-
-    const stripeService = filteredServices.find(ps => ps.serviceName === 'Stripe');
-    if (stripeService) {
-      filteredServices = [stripeService, ...filteredServices.filter(ps => ps.serviceName !== 'Stripe')];
-    }
-    if (filteredServices.length > 0) {
-      setSelectedService(filteredServices[0]);
+    const stripeServiec = notOnboarded.some(service => service.serviceName === 'Stripe');
+    if (stripeServiec) {
+      setSelectedService(notOnboarded.find(service => service.serviceName === 'Stripe'));
+    } else {
+      setSelectedService(notOnboarded[0]);
     }
   }, [paymentServices, notOnboarded]);
 
@@ -282,7 +276,7 @@ const Inventory = ({ user }) => {
             </p>
           </Breadcrumb.Item>
         </Breadcrumb>
-        <div className="w-full h-[116px] py-4 px-4 md:h-[96px] bg-[#F6F6F6] flex flex-col md:flex-row md:px-14 justify-between items-center mt-6 lg:mt-8">
+        <div className="w-full h-[160px] py-4 px-4 md:h-[96px] bg-[#F6F6F6] flex flex-col md:flex-row md:px-14 justify-between items-center mt-6 lg:mt-8">
           <div className="flex justify-between w-full">
             <Button className="!px-1 md:!px-0 flex items-center flex-row-reverse gap-[6px] text-lg md:text-2xl font-semibold !text-[#13188A] " 
               type="link" 
@@ -292,59 +286,63 @@ const Inventory = ({ user }) => {
               className="hidden md:block w-6 h-6" />}> My Items
             </Button>
           </div>
-          <div className="flex gap-3 items-center">
-            {!areNotOnboardedLoading ? (
-              <Select
-                style={{ width: 200, height: 40 }}
-                onChange={handleChange}
-                defaultValue={notOnboarded[0]?.serviceName}
-                value={selectedService?.serviceName}
-                disabled={notOnboarded.length === 0}
+          <div className="flex flex-col md:flex-row gap-3 items-center my-2 md:my-0">
+            <div className="flex gap-3 items-center">
+              {!areNotOnboardedLoading ? (
+                <Select
+                  style={{ width: 200, height: 40 }}
+                  onChange={handleChange}
+                  defaultValue={notOnboarded[0]?.serviceName}
+                  value={selectedService?.serviceName}
+                  disabled={notOnboarded.length === 0}
+                >
+                  {paymentServices.map(service => (
+                    <Option 
+                      key={service.serviceName} 
+                      value={service.serviceName}
+                      disabled={!notOnboarded.some(n => n.serviceName === service.serviceName)}
+                    >
+                      {service.onboardingText || service.data.onboardingText}
+                    </Option>
+                  ))}
+                </Select>
+              ) : (
+                <Spin size="large" />
+              )}
+              <Button
+                type="primary"
+                style={{ height: 40 }}
+                disabled={!selectedService}
+                onClick={() => handleOnboard(selectedService)}
               >
-                {paymentServices.map(service => (
-                  <Option 
-                    key={service.serviceName} 
-                    value={service.serviceName}
-                    disabled={!notOnboarded.some(n => n.serviceName === service.serviceName)}
-                  >
-                    {service.onboardingText || service.data.onboardingText}
-                  </Option>
-                ))}
-              </Select>
-            ) : (
-              <Spin size="large" />
-            )}
-            <Button
-              type="primary"
-              style={{ height: 40 }}
-              disabled={!selectedService}
-              onClick={() => handleOnboard(selectedService)}
-            >
-              {selectedService ? `Connect to ${selectedService.serviceName}` : "Select a service"}
-            </Button>
-            <Button
-              type="primary"
-              id="createItem"
-              className="w-40 flex items-center justify-center gap-[6px]"
-              style={{ height: 40 }}
-              disabled={notOnboarded.length === paymentServices.length - 2} // Subtract two to account for STRATS and Sad Dogs
-              onClick={() => {
-                if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                  window.location.href = loginUrl;
-                } else {
-                  showModal();
-                }
-              }}
-            >
-              <div className="flex items-center justify-center gap-[6px]">
-                <img src={Images.CreateInventory} 
-                  alt={metaImg}
-                  title={metaImg}
-                  className="w-[18px] h-[18px]" 
-                />
-                Create Item
-              </div>
-            </Button>
+                {selectedService ? `Connect to ${selectedService.serviceName}` : "Select a service"}
+              </Button>
+            </div>
+            <div className="flex gap-3 items-center">
+              <Button
+                type="primary"
+                id="createItem"
+                className="w-40 flex items-center justify-center gap-[6px]"
+                style={{ height: 40 }}
+                disabled={notOnboarded.length === paymentServices.length - 2} // Subtract two to account for STRATS and Sad Dogs
+                onClick={() => {
+                  if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                    window.location.href = loginUrl;
+                  } else {
+                    showModal();
+                  }
+                }}
+              >
+                <div className="flex items-center justify-center gap-[6px]">
+                  <img src={Images.CreateInventory} 
+                    alt={metaImg}
+                    title={metaImg}
+                    className="w-[18px] h-[18px]" 
+                  />
+                  Create Item
+                </div>
+              </Button>
+            </div>
           </div>
         </div>
         <div className="pt-6 mx-6 md:mx-5 md:px-10 mb-5">
