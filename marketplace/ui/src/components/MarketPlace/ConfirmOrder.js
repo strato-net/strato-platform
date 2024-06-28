@@ -221,7 +221,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
                 <div className="mr-4">
                   <Select
                     defaultValue={selectedProvider.serviceName}
-                    style={{ width: 200 }}
+                    style={{ width: 200, height: 40 }}
                     onChange={handleChange}
                   >
                     {paymentProviders.map(provider => (
@@ -233,45 +233,46 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
                 </div>
                 <Button
                   id="pay-now-button"
-                  className="p-1 md:p-3 h-max rounded-lg border border-primary bg-primary hover:bg-primaryHover text-white"
+                  style={{ height: 40, padding: '0 16px' }}
+                  className="rounded-lg border border-primary bg-primary hover:bg-primaryHover text-white flex items-center"
+                  loading={isCreatePaymentSubmitting}
                   onClick={async () => {
                     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                       countDown();
                     } else {
-                        const saleAddresses = [];
-                        const quantities = [];
-                        cartData.forEach((item) => {
-                          saleAddresses.push(item.saleAddress);
-                          quantities.push(item.qty);
+                      const saleAddresses = [];
+                      const quantities = [];
+                      cartData.forEach((item) => {
+                        saleAddresses.push(item.saleAddress);
+                        quantities.push(item.qty);
+                      });
+                      const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities);
+                      if (checkQuantity === true) {
+                        handlePaymentConfirm(selectedProvider);
+                      } else {
+                        let insufficientQuantityMessage = "";
+                        let outOfStockMessage = "";
+
+                        checkQuantity.forEach(detail => {
+                          if (detail.availableQuantity === 0) {
+                            outOfStockMessage += `Product ${detail.assetName}\n`;
+                          } else {
+                            insufficientQuantityMessage += `Product ${detail.assetName}: ${detail.availableQuantity}\n`;
+                          }
                         });
-                        const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities);
-                        if (checkQuantity === true) {
-                          handlePaymentConfirm(selectedProvider);
-                        } else {
-                          let insufficientQuantityMessage = "";
-                          let outOfStockMessage = "";
 
-                          checkQuantity.forEach(detail => {
-                            if (detail.availableQuantity === 0) {
-                              outOfStockMessage += `Product ${detail.assetName}\n`;
-                            } else {
-                              insufficientQuantityMessage += `Product ${detail.assetName}: ${detail.availableQuantity}\n`;
-                            }
-                          });
-
-                          let errorMessage = "";
-                          if (insufficientQuantityMessage) {
-                            errorMessage += `The following item(s) in your cart have limited quantity available and will need to be adjusted. Please reduce the quantity to proceed:\n${insufficientQuantityMessage}`;
-                          }
-                          if (outOfStockMessage) {
-                            if (errorMessage) errorMessage += "\n"; // Add a new line if there's already an error message
-                            errorMessage += `The following item(s) are temporarily out of stock and should be removed:\n${outOfStockMessage}`;
-                          }
-                          openToastOrder("bottom", errorMessage);
+                        let errorMessage = "";
+                        if (insufficientQuantityMessage) {
+                          errorMessage += `The following item(s) in your cart have limited quantity available and will need to be adjusted. Please reduce the quantity to proceed:\n${insufficientQuantityMessage}`;
                         }
+                        if (outOfStockMessage) {
+                          if (errorMessage) errorMessage += "\n"; // Add a new line if there's already an error message
+                          errorMessage += `The following item(s) are temporarily out of stock and should be removed:\n${outOfStockMessage}`;
+                        }
+                        openToastOrder("bottom", errorMessage);
                       }
                     }
-                  }
+                  }}
                 >
                   <div className="flex items-center mr-1">
                     {selectedProvider.checkoutText}&nbsp; 

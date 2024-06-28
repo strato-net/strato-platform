@@ -260,8 +260,9 @@ const ResponsiveCart = ({
               <Button
                 type="primary"
                 id="submit-order-button"
-                className="w-full sm:w-52 h-9 !bg-[#13188A]"
-                loading={isCreatePaymentSubmitting && selectedProvider.serviceName === selectedProvider.serviceName}
+                style={{ width: "210px", height: "40px" }}
+                className="!bg-[#13188A] flex items-center justify-center"
+                loading={isCreatePaymentSubmitting}
                 onClick={async () => {
                   if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                     window.location.href = loginUrl;
@@ -322,19 +323,18 @@ const ResponsiveCart = ({
                 </div>
               </Button>
             </Row>
-            <Row className="justify-center mt-4">
-                <Select
-                  defaultValue={selectedProvider.serviceName}
-                  style={{ width: 200 }}
-                  onChange={handleChange}
-                >
-                  {paymentProviders.map(provider => (
-                    <Option key={provider.serviceName} value={provider.serviceName}>
-                      {provider.checkoutText}
-                    </Option>
-                  ))}
-                </Select>
-
+            <Row className="flex justify-center mt-4">
+              <Select
+                defaultValue={selectedProvider.serviceName}
+                style={{ width: "210px", height: "40px"}}
+                onChange={handleChange}
+              >
+                {paymentProviders.map(provider => (
+                  <Option key={provider.serviceName} value={provider.serviceName}>
+                    {provider.checkoutText}
+                  </Option>
+                ))}
+              </Select>
             </Row>
           </>
         )}
