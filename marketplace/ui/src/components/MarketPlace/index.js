@@ -74,7 +74,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
     <Fade triggerOnce>
       <Carousel autoPlay centerSlidePercentage={95} showArrows={false} infiniteLoop showStatus={false} swipeable emulateTouch autoFocus centerMode>
         <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2 md:mt-6 lg:mx-3">
-          <div  className="flex flex-col gap-3 backdrop-blur-2xl text-left p-4 px-3 md:px-8 h-[67%] sm:h-32 md:h-40 w-[92%] sm:w-[70%] md:w-[500px] rounded-md md:rounded-2xl absolute left-2 md:left-10 top-10 sm:top-20 md:top-44 bg-[rgba(256,256,256,0.17)] z-50">
+          {/* <div  className="flex flex-col gap-3 backdrop-blur-2xl text-left p-4 px-3 md:px-8 h-[67%] sm:h-32 md:h-40 w-[92%] sm:w-[70%] md:w-[500px] rounded-md md:rounded-2xl absolute left-2 md:left-10 top-10 sm:top-20 md:top-44 bg-[rgba(256,256,256,0.17)] z-50">
             <Typography.Text className="text-base md:text-2xl md:leading-[40px] text-white font-semibold">
               Welcome to Mercata Marketplace!
             </Typography.Text>
@@ -92,15 +92,15 @@ const MarketPlace = ({ user, isAuthenticated }) => {
                 View More
               </div>
             </Button>
-          </div>
+          </div> */}
           <img 
           alt={metaImg}
           title={metaImg}
-          className="absolute inset-0 z-10 h-[222px] md:h-[380px] md:w-[90%] rounded-md md:rounded-[14px]" 
-          height={380} width="100%" src={Images.art_card} preview={false} />
+          className="absolute inset-0 z-10 h-[222px] md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md" 
+          height={380} width="100%" src={Images.carousel_desktop_one} preview={false} />
         </div>
         <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2  md:mt-6 lg:mx-3">
-          <div  className="flex flex-col gap-3 backdrop-blur-2xl text-left p-4 px-3 md:px-8 h-[67%] sm:h-32 md:h-40 w-[92%] sm:w-[70%] md:w-[500px] rounded-md md:rounded-2xl absolute left-2 md:left-10 top-10 sm:top-20 md:top-44 bg-[rgba(256,256,256,0.17)] z-50">
+          {/* <div  className="flex flex-col gap-3 backdrop-blur-2xl text-left p-4 px-3 md:px-8 h-[67%] sm:h-32 md:h-40 w-[92%] sm:w-[70%] md:w-[500px] rounded-md md:rounded-2xl absolute left-2 md:left-10 top-10 sm:top-20 md:top-44 bg-[rgba(256,256,256,0.17)] z-50">
             <Typography.Text className="text-base md:text-2xl md:leading-[40px] text-white font-semibold">
               Welcome to Mercata Marketplace!
             </Typography.Text>
@@ -118,14 +118,14 @@ const MarketPlace = ({ user, isAuthenticated }) => {
                 View More
               </div>
             </Button>
-          </div>
+          </div> */}
           <img 
           alt={metaImg}
           title={metaImg}
-          className="absolute inset-0 z-10 h-[222px] md:h-[380px] md:w-[90%] rounded-md md:rounded-[14px]" height={380} width="100%" src={Images.carousel_first} preview={false} />
+          className="absolute inset-0 z-10 h-[222px] md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md" height={380} width="100%" src={Images.carousel_desktop_two} preview={false} />
         </div>
         <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2  md:mt-6 lg:mx-3">
-          <div  className="flex flex-col gap-3 backdrop-blur-2xl text-left p-4 px-3 md:px-8 h-[67%] sm:h-32 md:h-40 w-[92%] sm:w-[70%] md:w-[500px] rounded-md md:rounded-2xl absolute left-2 md:left-10 top-10 sm:top-20 md:top-44 bg-[rgba(256,256,256,0.17)] z-50">
+          {/* <div  className="flex flex-col gap-3 backdrop-blur-2xl text-left p-4 px-3 md:px-8 h-[67%] sm:h-32 md:h-40 w-[92%] sm:w-[70%] md:w-[500px] rounded-md md:rounded-2xl absolute left-2 md:left-10 top-10 sm:top-20 md:top-44 bg-[rgba(256,256,256,0.17)] z-50">
             <Typography.Text className="text-base md:text-2xl md:leading-[40px] text-white font-semibold">
               Welcome to Mercata Marketplace!
             </Typography.Text>
@@ -143,14 +143,14 @@ const MarketPlace = ({ user, isAuthenticated }) => {
                 View More
               </div>
             </Button>
-          </div>
+          </div> */}
           <img 
           alt={metaImg}
           title={metaImg}
-          className="absolute inset-0 z-10 h-[222px] md:h-[380px] md:w-[90%] rounded-md md:rounded-[14px]" height={380} width="100%" src={Images.carbon_card} preview={false} />
+          className="absolute inset-0 z-10 h-[222px] md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md" height={380} width="100%" src={Images.carousel_desktop_three} preview={false} />
         </div>
         <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2  md:mt-6 lg:mx-3">
-          <div  className="flex flex-col gap-3 backdrop-blur-2xl text-left p-4 px-3 md:px-8 h-[67%] sm:h-32 md:h-40 w-[92%] sm:w-[70%] md:w-[500px] rounded-md md:rounded-2xl absolute left-2 md:left-10 top-10 sm:top-20 md:top-44 bg-[rgba(256,256,256,0.17)] z-50">
+          {/* <div  className="flex flex-col gap-3 backdrop-blur-2xl text-left p-4 px-3 md:px-8 h-[67%] sm:h-32 md:h-40 w-[92%] sm:w-[70%] md:w-[500px] rounded-md md:rounded-2xl absolute left-2 md:left-10 top-10 sm:top-20 md:top-44 bg-[rgba(256,256,256,0.17)] z-50">
             <Typography.Text className="text-base md:text-2xl md:leading-[40px] text-white font-semibold">
               Welcome to Mercata Marketplace!
             </Typography.Text>
@@ -168,14 +168,14 @@ const MarketPlace = ({ user, isAuthenticated }) => {
                 View More
               </div>
             </Button>
-          </div>
+          </div> */}
           <img 
           alt={metaImg}
           title={metaImg}
-          className="absolute inset-0 object-cover z-10 h-[222px] md:h-[380px] md:w-[90%] rounded-md md:rounded-[14px]" height={380} width="100%" src={Images.Metal_card} preview={false} />
+          className="absolute inset-0 object-cover z-10 h-[222px] md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md" height={380} width="100%" src={Images.carousel_desktop_four} preview={false} />
         </div>
         <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2  md:mt-6 lg:mx-3">
-          <div  className="flex flex-col gap-3 backdrop-blur-2xl text-left p-4 px-3 md:px-8 h-[67%] sm:h-32 md:h-40 w-[92%] sm:w-[70%] md:w-[500px] rounded-md md:rounded-2xl absolute left-2 md:left-10 top-10 sm:top-20 md:top-44 bg-[rgba(256,256,256,0.17)] z-50">
+          {/* <div  className="flex flex-col gap-3 backdrop-blur-2xl text-left p-4 px-3 md:px-8 h-[67%] sm:h-32 md:h-40 w-[92%] sm:w-[70%] md:w-[500px] rounded-md md:rounded-2xl absolute left-2 md:left-10 top-10 sm:top-20 md:top-44 bg-[rgba(256,256,256,0.17)] z-50">
             <Typography.Text className="text-base md:text-2xl md:leading-[40px] text-white font-semibold">
               Welcome to Mercata Marketplace!
             </Typography.Text>
@@ -193,11 +193,11 @@ const MarketPlace = ({ user, isAuthenticated }) => {
                 View More
               </div>
             </Button>
-          </div>
+          </div> */}
           <img 
           alt={metaImg}
           title={metaImg}
-          className="absolute inset-0 object-cover z-10 h-[222px] md:h-[380px] md:w-[90%] rounded-md md:rounded-[14px]" height={380} width="100%" src={Images.collectibles} preview={false} />
+          className="absolute inset-0 object-cover z-10 h-[222px] md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md" height={380} width="100%" src={Images.carousel_desktop_five} preview={false} />
         </div>
       </Carousel>
       </Fade>
