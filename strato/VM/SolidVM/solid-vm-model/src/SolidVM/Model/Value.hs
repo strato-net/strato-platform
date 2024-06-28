@@ -179,6 +179,7 @@ coerceFromInt _ SInteger {} n = SInteger n
 coerceFromInt _ (SAccount a b) n = (SAccount $ (namedAccountAddress .~ fromIntegral n) a) b
 coerceFromInt _ SString {} 0 = SString ""
 coerceFromInt _ SString {} n = SString $ showHex n ""
+coerceFromInt _ SDecimal {} n = SDecimal $ Decimal 0 n
 coerceFromInt _ (SContract c a) n = SContract c $ (namedAccountAddress .~ fromIntegral n) a
 coerceFromInt ct (SEnumVal tipe _ _) n' =
   fromMaybe (typeError "missing enum val" (tipe, n')) $ do
