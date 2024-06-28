@@ -23,7 +23,7 @@ const SERVER_CONFIRM_URL = `${SERVER_URL}/stripe/checkout/confirm`;
 
 const SERVER_CANCEL_URL = `${SERVER_URL}/stripe/checkout/cancel`;
 
-const ORDER_EVENT_TABLE = `${TABLE_PREFIX}PaymentService-Order`;
+const ORDER_EVENT_TABLE = `${TABLE_PREFIX}PaymentService.Order`;
 
 const PAYMENT_STATUS = {
   'INITIALIZED': '2',
