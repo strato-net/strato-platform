@@ -1508,7 +1508,8 @@ expToVar' ex@(CC.Binary _ "/=" lhs rhs) = do
     Left 0 -> divideByZero $ unparseExpression ex
     Right 0 -> divideByZero $ unparseExpression ex
     _ -> binopAssign' (div) (/) lhs rhs
-expToVar' (CC.Binary _ "%=" lhs rhs) = binopAssign (rem) lhs rhs
+
+expToVar' (CC.Binary _ "%=" lhs rhs) = binopAssign' rem decMod lhs rhs
 expToVar' (CC.Binary _ "|=" lhs rhs) = binopAssign (.|.) lhs rhs
 expToVar' (CC.Binary _ "&=" lhs rhs) = binopAssign (.&.) lhs rhs
 expToVar' (CC.Binary _ "^=" lhs rhs) = binopAssign xor lhs rhs
@@ -1692,7 +1693,8 @@ expToVar' ex@(CC.Binary _ "/" expr1 expr2) = do
     Left 0 -> divideByZero $ unparseExpression ex
     Right 0 -> divideByZero $ unparseExpression ex
     _ -> expToVarArith (div) (/) expr1 expr2
-expToVar' (CC.Binary _ "%" expr1 expr2) = expToVarInteger expr1 rem expr2 SInteger
+--modified to use decimal division
+expToVar' (CC.Binary _ "%" expr1 expr2) = expToVarArith rem decMod expr1 expr2
 expToVar' (CC.Binary _ "|" expr1 expr2) = expToVarInteger expr1 (.|.) expr2 SInteger
 expToVar' (CC.Binary _ "&" expr1 expr2) = expToVarInteger expr1 (.&.) expr2 SInteger
 expToVar' (CC.Binary _ "^" expr1 expr2) = expToVarInteger expr1 xor expr2 SInteger
@@ -2406,7 +2408,13 @@ expToVarAdd expr1 expr2 = do
     (SDecimal a, SInteger b) -> return . Constant . SDecimal $ a + (Decimal 0 b)
     (SInteger a, SDecimal b) -> return . Constant . SDecimal $ (Decimal 0 a) + b
     _ -> typeError "expToVarAdd" (i1, i2)
-  
+
+--decMod operation, implements % w Data.Decimal library functions
+decMod :: Decimal -> Decimal -> Decimal
+decMod a b = fromRational (toRational a `mod'` toRational b)
+  where
+    mod' x y = x - (fromIntegral (floor (x / y) :: Integer)) * y
+
 expToVarArith :: MonadSM m => (Integer -> Integer -> Integer) -> (Decimal -> Decimal -> Decimal) -> CC.Expression -> CC.Expression -> m Variable
 expToVarArith intOp decOp expr1 expr2 = do
   i1 <- getVar =<< expToVar expr1
@@ -3208,6 +3216,7 @@ encodeForReturn' (STuple items) = do
   encodedItems <- mapM (encodeForReturn' <=< getVar) $ V.toList items
 
   return $ "(" ++ (intercalate "," encodedItems) ++ ")"
+encodeForReturn' (SDecimal d) = return $ show d 
 encodeForReturn' x = todo "Cannot encode this return type: " x
 
 --formatAddressWithoutColor : padded the address with 40 bytes

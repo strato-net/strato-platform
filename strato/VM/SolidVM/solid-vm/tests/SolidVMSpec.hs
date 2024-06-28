@@ -80,7 +80,7 @@ import qualified LabeledError
 import qualified Numeric (readHex, showHex)
 import SolidVM.Model.SolidString
 import SolidVM.Model.Storable as MS
-import Test.Hspec (Selector, Spec, anyException, it, pendingWith, shouldThrow, xdescribe, xit)
+import Test.Hspec (Selector, Spec, anyException, fit, it, pendingWith, shouldThrow, xdescribe, xit)
 import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
@@ -8732,7 +8732,18 @@ contract qq {
     testSix = x > y;
   }
 }
-|]
+|]  fit "can externally return locals" . runTest $ do
+    runCall'
+      "f"
+      "()"
+      [r|
+contract qq {
+  function f() returns (decimal) {
+    decimal k = 0.5;
+    return k;
+  }
+}|]
+      `shouldReturn` Just "(0.5)"
     getFields ["x", "y", "testOne", "testTwo", "testThree", "testFour", "testFive", "testSix"] 
       `shouldReturn` [BDecimal "2.1",
                       BDecimal "3.2",
@@ -8795,3 +8806,16 @@ contract qq {
 |]
     getFields ["x"]
       `shouldReturn` [BDecimal "11.2"])
+
+  fit "can externally return locals" . runTest $ do
+    runCall'
+      "f"
+      "()"
+      [r|
+contract qq {
+  function f() returns (decimal) {
+    decimal k = 0.5;
+    return k;
+  }
+}|]
+      `shouldReturn` Just "(0.5)"
