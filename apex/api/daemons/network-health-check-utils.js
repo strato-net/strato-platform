@@ -69,7 +69,7 @@ async function updateNetworkHealthStatus(status, statusMessage) {
   let [stat, created] = await models.CurrentHealth.findOrCreate({
     where: { processName: "NetworkHealthStat" },
     defaults: {
-      latestHealthStatus: !status.needsAttention,
+      latestHealthStatus: status.healthPublicInfo.latestHealthStatus,
       latestCheckTimestamp: currentTime,
       lastFailureTimestamp: currentTime, //default first time marked as failure
       additionalInfo: JSON.stringify({ ...status, statusMessage }),
@@ -79,8 +79,8 @@ async function updateNetworkHealthStatus(status, statusMessage) {
     await stat.update(
       {
         latestCheckTimestamp: currentTime,
-        latestHealthStatus: !status.needsAttention,
-        lastFailureTimestamp: !status.needsAttention
+        latestHealthStatus: status.healthPublicInfo.latestHealthStatus,
+        lastFailureTimestamp: status.healthPublicInfo.latestHealthStatus
           ? stat.lastFailureTimestamp
           : currentTime,
         additionalInfo: JSON.stringify({ ...status, statusMessage }),
