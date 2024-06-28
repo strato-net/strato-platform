@@ -95,7 +95,7 @@ const validatePaymentServiceContract = async (address) => {
     const contract = { name: "PaymentService", address };
     const res = await rest.getState(ADMIN.getUser(), contract, DEFAULT_OPTIONS);
   } catch (e) {
-    console.error(`Contract could not be found at address ${address}. Now exiting...`);
+    console.error(`Contract could not be found at address ${address}. Now exiting...\nMessage: ${e}`);
     process.exit(1);
   }
 }
