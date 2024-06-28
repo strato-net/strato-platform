@@ -1508,7 +1508,6 @@ expToVar' ex@(CC.Binary _ "/=" lhs rhs) = do
     Left 0 -> divideByZero $ unparseExpression ex
     Right 0 -> divideByZero $ unparseExpression ex
     _ -> binopAssign' (div) (/) lhs rhs
-
 expToVar' (CC.Binary _ "%=" lhs rhs) = binopAssign' rem decMod lhs rhs
 expToVar' (CC.Binary _ "|=" lhs rhs) = binopAssign (.|.) lhs rhs
 expToVar' (CC.Binary _ "&=" lhs rhs) = binopAssign (.&.) lhs rhs
@@ -2476,6 +2475,7 @@ binopAssign oper lhs rhs = do
 intBuiltin :: [Value] -> Value
 intBuiltin [SEnumVal _ _ enumNum] = SInteger $ fromIntegral enumNum
 intBuiltin [SInteger n] = SInteger n
+intBuiltin [SDecimal v] = SInteger (decimalMantissa $ roundTo 0 v)
 intBuiltin [SString hex] = integerToValue $ parseBaseInt hex 16
 intBuiltin [SString hex, SInteger 16] = integerToValue $ parseBaseInt hex 16
 intBuiltin [SString dec, SInteger 10] = integerToValue $ parseBaseInt dec 10

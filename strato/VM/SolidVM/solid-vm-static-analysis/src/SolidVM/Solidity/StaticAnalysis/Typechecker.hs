@@ -541,7 +541,6 @@ typecheckStatic (SVMType.Bytes d1 b1) (SVMType.Bytes d2 b2) =
       _ -> Right $ SVMType.Bytes (d1 <|> d2) (b1 <|> b2)
 typecheckStatic SVMType.Decimal SVMType.Decimal = Right $ SVMType.Decimal
 typecheckStatic SVMType.Decimal (SVMType.Int _ _) = Right $ SVMType.Decimal
-typecheckStatic (SVMType.Int _ _) SVMType.Decimal = Right $ SVMType.Decimal 
 typecheckStatic SVMType.Bool SVMType.Bool = Right SVMType.Bool
 typecheckStatic (SVMType.Address a) (SVMType.Address b) = Right $ SVMType.Account (a && b)
 typecheckStatic (SVMType.Address a) (SVMType.Account b) = Right $ SVMType.Account (a && b)
@@ -1186,6 +1185,7 @@ intArgs x =
     enumType' x
       :| [ intType' x,
            stringType' x,
+           decimalType' x,
            Product [stringType' x, intType' x] x
          ]
     
@@ -1651,8 +1651,20 @@ tcExpr (Binary x "/" a b) = do
     (((Static (SVMType.Int _ _) _), (Variable _ _)), ((Static (SVMType.Decimal) _), _)) -> pure . bottom $ ("Cannot perform arithmetic with explicit 'decimal' and 'int' types") <$ x
     (((Static (SVMType.Decimal) _), _), ((Static (SVMType.Int _ _) _), (Variable _ _))) -> pure . bottom $ ("Cannot perform arithmetic with explicit 'decimal' and 'int' types") <$ x
     _ -> sumType' (intType' x) (decimalType' x) ~> tcExpr a <~> tcExpr b
-tcExpr (Binary x "%" a b) =
-  intType' x ~> tcExpr a <~> tcExpr b
+tcExpr (Binary x "%" a b) = do
+  typeOne <- tcExpr a
+  typeTwo <- tcExpr b
+  case ((typeOne, a), (typeTwo, b)) of
+    -- Int % Decimal
+    (((Static (SVMType.Int _ _) _), (Variable _ _)), ((Static (SVMType.Decimal) _), _)) ->
+      pure . bottom $ ("Cannot perform arithmetic with explicit 'decimal' and 'int' types") <$ x
+    -- Decimal % Int
+    (((Static (SVMType.Decimal) _), _), ((Static (SVMType.Int _ _) _), (Variable _ _))) ->
+      pure . bottom $ ("Cannot perform arithmetic with explicit 'decimal' and 'int' types") <$ x
+    -- Default: Int % Int or Decimal % Decimal
+    _ -> sumType' (intType' x) (decimalType' x) ~> tcExpr a <~> tcExpr b
+
+
 tcExpr (Binary x "|" a b) =
   intType' x ~> tcExpr a <~> tcExpr b
 tcExpr (Binary x "&" a b) =
@@ -1701,8 +1713,16 @@ tcExpr (Binary x "/=" a b) = do
     (((Static (SVMType.Int _ _) _), (Variable _ _)), ((Static (SVMType.Decimal) _), _)) -> pure . bottom $ ("Cannot perform arithmetic with explicit 'decimal' and 'int' types") <$ x
     (((Static (SVMType.Decimal) _), _), ((Static (SVMType.Int _ _) _), (Variable _ _))) -> pure . bottom $ ("Cannot perform arithmetic with explicit 'decimal' and 'int' types") <$ x
     _ -> sumType' (intType' x) (decimalType' x) ~> (checkIfImmuteOperationValid a) <~> tcExpr b
-tcExpr (Binary x "%=" a b) =
-  intType' x ~> (checkIfImmuteOperationValid a) <~> tcExpr b
+tcExpr (Binary x "%=" a b) = do
+  typeOne <- tcExpr a
+  typeTwo <- tcExpr b
+  case ((typeOne, a), (typeTwo, b)) of
+    (((Static (SVMType.Int _ _) _), (Variable _ _)), ((Static (SVMType.Decimal) _), _)) ->
+      pure . bottom $ ("Cannot perform arithmetic with explicit 'decimal' and 'int' types") <$ x
+    (((Static (SVMType.Decimal) _), _), ((Static (SVMType.Int _ _) _), (Variable _ _))) ->
+      pure . bottom $ ("Cannot perform arithmetic with explicit 'decimal' and 'int' types") <$ x
+    _ -> sumType' (intType' x) (decimalType' x) ~> (checkIfImmuteOperationValid a) <~> tcExpr b
+
 tcExpr (Binary x "|=" a b) =
   intType' x ~> tcExpr a <~> tcExpr b
 tcExpr (Binary x "&=" a b) =
