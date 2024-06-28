@@ -13,6 +13,6 @@ services:
         max-size: "100m"
         max-file: "3"
     volumes:
-      - ${PEM_FILE}:/priv.pem
-      - ${BACKUP_PEM_FILE}:/backup_priv.pem
-      - ${SSL_CERT}:/ssl.pem
+      - ${PEM_FILE:-./priv.pem}:/priv.pem
+      - ${BACKUP_PEM_FILE:-./priv.pem}:/backup_priv.pem
+      - ${SSL_CERT:-./priv.pem}:/ssl.pem
