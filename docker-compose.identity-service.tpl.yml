@@ -24,3 +24,23 @@ services:
       options:
         max-size: "100m"
         max-file: "3"
+  nginx:
+    depends_on:
+    - identity-service
+    environment:
+    - ssl=${ssl}
+    - sslCertFileType=${sslCertFileType}
+    - IDENTITY_PROVIDER_HOSTNAME=identity-service
+    build: .
+    image: ${IDENTITYNGINX_IMAGE:-<REPO_URL>identity-nginx:<VERSION>}
+    ports:
+    - ${HTTP_PORT:-8000}:80 #TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT
+    - ${HTTPS_PORT:-8001}:443 #TAG_REMOVE_WHEN_NO_SSL
+    volumes:
+    - ./ssl:/tmp/ssl:ro
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
