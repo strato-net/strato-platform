@@ -88,7 +88,7 @@ postIdentity (PostIdentityRequest eMsg) = do
 
   sub <- case sac of
     SubjectAndCert s Nothing -> pure s
-    SubjectAndCert s (Just c) -> case getCertSubject c of
+    SubjectAndCert s (Just c) -> case unsafeGetCertSubjectUndefinedPubKey c of
       Nothing -> throwIO $ IdentityError "Could not decode subject of supplied SSL cert"
       Just s' -> if subCommonName s == subCommonName s'
         then pure s
