@@ -635,14 +635,19 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                         )
                         (contractpayloadChainid p <|> chainId)
                         resolve
-                        (Just (PtrToCode -- is a CodePtr which takes two things. technically PtrToCode is CodeAtAccount Account String
-                          (CodeAtAccount 
-                            (case contractpayloadCodePtr p of
-                              Just xxx -> Account xxx Nothing
-                              Nothing   -> error "Address is required but was not provided."
+                        (case contractpayloadCodePtr p of
+                          Just p' -> 
+                            Just $ PtrToCode (
+                              CodeAtAccount
+                                (Account p' Nothing)
+                                (case contractpayloadContract p of
+                                  Just contract -> unpack contract
+                                  Nothing -> ""
+                                )
                             )
-                            (unpack (fromMaybe (error "Contract is required but was not provided.") (contractpayloadContract p)))
-                        )))
+                        
+                          Nothing -> Nothing
+                        )
                 fmap ((: []) . BlocTxResult) $ postUsersContractSolidVM' cacheNonce bcp jwtToken
           xs -> do
             ps <- mapM fromContract xs

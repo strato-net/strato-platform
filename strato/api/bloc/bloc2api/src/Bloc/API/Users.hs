@@ -358,7 +358,7 @@ data ContractParameters = ContractParameters
     metadata :: Maybe (Map Text Text),
     chainId :: Maybe ChainId,
     resolve :: Bool,
-    sourceCode :: Maybe Code
+    ptr2Code :: Maybe Code
   }
 
 --------------------------------------------------------------------------------
