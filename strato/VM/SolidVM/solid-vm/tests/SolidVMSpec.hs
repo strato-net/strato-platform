@@ -8796,6 +8796,30 @@ contract qq {
     getFields ["x"]
       `shouldReturn` [BDecimal "11.2"])
 
+  it "can cast string to decimal" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal x;
+
+  constructor() {
+    x = decimal("3.5");
+  }
+}
+|]
+    getFields ["x"]
+      `shouldReturn` [BDecimal "3.5"])
+
+  it "should throw an error when casting bad string to decimal" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal x;
+
+  constructor() {
+    x = decimal("hey");
+  }
+}
+|]) `shouldThrow` anyTypeError
+
 
   it "can externally return decimals" . runTest $ do
     runCall'

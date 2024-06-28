@@ -2488,10 +2488,12 @@ integerToValue (Left err) = typeError err ("" :: String)
 
 decimalBuiltin :: [Value] -> Value
 decimalBuiltin [SInteger n] = SDecimal $ Decimal 0 n
-decimalBuiltin [SString dec] = case parseBaseInt dec 10 of
-  Right n -> SDecimal $ Decimal 0 n
-  Left err -> typeError err ("" :: String)
-decimalBuiltin args = typeError "numeric cast - invalid args" args
+decimalBuiltin [SString str] =
+  let stringToDecimal = (readEither str :: Either String Decimal)
+  in case stringToDecimal of
+    Right deci -> SDecimal deci
+    Left e -> typeError e str
+decimalBuiltin args = typeError "decimal cast - invalid args" args
 
 parseBaseInt :: String -> Integer -> Either String Integer
 parseBaseInt s n =
