@@ -637,15 +637,14 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                         resolve
                         (case contractpayloadCodePtr p of
                           Just p' -> 
-                            Just $ PtrToCode (
-                              CodeAtAccount
-                                (Account p' Nothing)
-                                (case contractpayloadContract p of
-                                  Just contract -> unpack contract
-                                  Nothing -> ""
+                            case contractpayloadContract p of
+                              Just contract -> 
+                                Just $ PtrToCode (
+                                  CodeAtAccount
+                                    (Account p' Nothing)
+                                    (unpack contract)
                                 )
-                            )
-                        
+                              Nothing -> Nothing
                           Nothing -> Nothing
                         )
                 fmap ((: []) . BlocTxResult) $ postUsersContractSolidVM' cacheNonce bcp jwtToken
