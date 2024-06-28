@@ -3519,6 +3519,7 @@ solidVMExceptionHandler catchBlockMap ex = case ex of
             else pure $ [()]
         res <- runStatementBlock block
         return res
+  --
   _ -> error "unhandled solid exception" (show ex)
 
 specialUsingChecker :: MonadSM m => CC.Expression -> m (Maybe Variable)
