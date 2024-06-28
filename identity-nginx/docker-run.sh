@@ -13,7 +13,9 @@ IDENTITY_PORT=${IDENTITY_PORT:-8014}
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
-  python3 createRealmConfig.py #TODO: error handling?
+  if [ "$IDENTITY_PROVIDER_HOSTNAME" != "identity-service" ]; then
+    python3 createRealmConfig.py #TODO: error handling?
+  fi
 
   ########
   ### Generate nginx.conf from template according to configuration provided
@@ -43,7 +45,9 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ########
   ### Generate .lua scripts from templates according to configuration provided
   ########
-  cp /tmp/openid.tpl.lua /tmp/openid.lua
+  if [ "$IDENTITY_PROVIDER_HOSTNAME" != "identity-service" ]; then
+    cp /tmp/openid.tpl.lua /tmp/openid.lua
+  fi
 
   if [ "$ssl" = true ] ; then
     sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/openid.lua
