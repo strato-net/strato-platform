@@ -62,7 +62,12 @@ abstract contract Mintable is Redeemable {
             owner,
             ownerCommonName,
             itemNumber + quantity,
-            itemNumber + quantity + _quantity - 1
+            itemNumber + quantity + _quantity - 1,
+            address(0),
+            0,
+            _quantity,
+            false,
+            0
         );
         quantity += _quantity;
         return RestStatus.OK;

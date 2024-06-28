@@ -59,6 +59,8 @@ abstract contract UTXO is Asset {
                     );
             }
 
+            address newAssetAddress = _callMint(_newOwner, _quantity);
+
             emit OwnershipTransfer(
                 originAddress,
                 owner,
@@ -66,9 +68,14 @@ abstract contract UTXO is Asset {
                 _newOwner,
                 getCommonName(_newOwner),
                 itemNumber,
-                itemNumber + _quantity - 1
+                itemNumber + _quantity - 1,
+                newAssetAddress,
+                _price,
+                _quantity,
+                !_isUserTransfer,
+                _transferNumber
             );
-            _callMint(_newOwner, _quantity);
+
             quantity -= _quantity;
             itemNumber += _quantity;
         }
@@ -77,6 +84,7 @@ abstract contract UTXO is Asset {
     function _callMint(address _newOwner, uint _quantity) internal virtual{
         UTXO newAsset = mint(_quantity);
         Asset(newAsset).transferOwnership(_newOwner, _quantity, false, 0, 0);
+        return Asset(newAsset).originAddress();
     }
 
     function checkCondition() internal virtual returns (bool){

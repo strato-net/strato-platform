@@ -110,7 +110,7 @@ abstract contract Sale is Utils {
         uint orderQuantity = takeLockedQuantity(orderHash, purchaser);
         // regular transfer - isUserTransfer: false, transferNumber: 0, transferPrice: 0
         try {
-            assetToBeSold.transferOwnership(purchaser, orderQuantity, false, 0, 0);
+            assetToBeSold.transferOwnership(purchaser, orderQuantity, false, order.orderId(), 0);
         } catch { // Backwards compatibility for old assets
             address(assetToBeSold).call("transferOwnership", purchaser, orderQuantity, false, 0);
         }

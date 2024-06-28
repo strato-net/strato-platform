@@ -235,7 +235,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
             open={open}
             onCancel={handleCancel}
             title={`${inventory.saleAddress ? 'Update' : 'List'} - ${decodeURIComponent(inventory.name)}`}
-            width={650}
+            width={700}
             footer={[
                 <div className="flex justify-center md:block">
                     <Button id="asset-update-list" type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canList} loading={inventory.saleAddress ? issaleUpdating : isListing}>

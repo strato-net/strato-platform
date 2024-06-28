@@ -37,7 +37,12 @@ abstract contract Asset is Utils {
         address purchaserAddress,
         string purchaserCommonName,
         uint minItemNumber,
-        uint maxItemNumber
+        uint maxItemNumber,
+        address newAssetAddress,
+        uint price,
+        uint quantity,
+        bool isPurchase,
+        uint referenceNumber
     );
 
     event ItemTransfers(
@@ -83,15 +88,15 @@ abstract contract Asset is Utils {
         } catch {
             originAddress = address(this);
             itemNumber = 1;
-            emit OwnershipTransfer(
-                originAddress,
-                address(0),
-                "",
-                owner,
-                ownerCommonName,
-                itemNumber,
-                itemNumber + _quantity - 1
-            );
+            // emit OwnershipTransfer(
+            //     originAddress,
+            //     address(0),
+            //     "",
+            //     owner,
+            //     ownerCommonName,
+            //     itemNumber,
+            //     itemNumber + _quantity - 1
+            // );
         }
     }
 
@@ -172,7 +177,12 @@ abstract contract Asset is Utils {
             _newOwner,
             newOwnerCommonName,
             itemNumber,
-            itemNumber + _quantity - 1
+            itemNumber + _quantity - 1,
+            originAddress,
+            _price,
+            _quantity,
+            !_isUserTransfer,
+            _transferNumber
         );
         owner = _newOwner;
         ownerCommonName = newOwnerCommonName;
