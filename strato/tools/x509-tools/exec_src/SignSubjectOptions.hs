@@ -12,3 +12,4 @@ defineFlag "u:organizationUnit" ("" :: String) "The desired subject's organizati
 defineFlag "n:commonName" ("" :: String) "The desired subject's common name"
 defineFlag "c:country" ("" :: String) "The desired subject's country"
 defineFlag "p:public_key" ("" :: String) "The desired subject's public key (if blank, public key is derived from --key)"
+defineFlag "s:ssl_cert_file" ("" :: String) "The name of the SSL cert pointing to the subject's domain name"

@@ -34,11 +34,11 @@ all: build_all docker-compose eks
 
 all_develop: build_develop docker-compose eks
 
-build_all: strato apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-service identity-nginx stripe-ps stripe-ps-nginx
+build_all: strato apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-service identity-nginx stripe-ps stripe-ps-nginx subject-signing-tool
 
-build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-service identity-nginx stripe-ps stripe-ps-nginx
+build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-service identity-nginx stripe-ps stripe-ps-nginx subject-signing-tool
 
-.PHONY: strato apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-service identity-nginx stripe-ps stripe-ps-nginx build_buildbase build_common build_common_profiled eks
+.PHONY: strato apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-service identity-nginx stripe-ps stripe-ps-nginx subject-signing-tool build_buildbase build_common build_common_profiled eks
 
 apex:
 	@echo Now building apex...
@@ -149,6 +149,12 @@ strato: build_common
 	cp -fr strato/extraFiles/* ${STRATODIR}
 	docker build --target strato --tag ${REPO_URL}strato:${VERSION} --file Dockerfile.multi ${FAKEROOT}
 	docker tag ${REPO_URL}strato:${VERSION} ${REPO_AWS_ECR_URL}strato:${VERSION}
+
+subject-signing-tool: build_common
+	@echo Now building core-strato...
+	cp -fr strato/extraFiles/* ${STRATODIR}
+	docker build --target subject-signing-tool --tag ${REPO_URL}subject-signing-tool:${VERSION} --file Dockerfile.multi ${FAKEROOT}
+	docker tag ${REPO_URL}subject-signing-tool:${VERSION} ${REPO_AWS_ECR_URL}subject-signing-tool:${VERSION}
 
 develop: build_common_fast
 	@echo Now building core-strato using --fast...

@@ -82,10 +82,19 @@ postIdentity ::
   m PostIdentityResponse
 postIdentity (PostIdentityRequest eMsg) = do
   time' <- liftIO getCurrentTime
-  let sub = case eMsg of
+  let sac = case eMsg of
               Left s -> unsigned s
               Right s -> unsigned $ unsigned s
-      username = T.pack $ subCommonName sub
+
+  sub <- case sac of
+    SubjectAndCert s Nothing -> pure s
+    SubjectAndCert s (Just c) -> case getCertSubject c of
+      Nothing -> throwIO $ IdentityError "Could not decode subject of supplied SSL cert"
+      Just s' -> if subCommonName s == subCommonName s'
+        then pure s
+        else throwIO $ IdentityError "Common name of subject info did not match common name of supplied SSL cert"
+
+  let username = T.pack $ subCommonName sub
       addr = fromPublicKey $ subPub sub
   $logInfoS "postIdentity" $ "User " <> (T.pack $ format addr) <> " called POST /identity with username " <> username
   let csvLogMsg =

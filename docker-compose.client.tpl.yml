@@ -168,6 +168,7 @@ services:
       - ./genesis-block.json:/var/lib/strato/${genesis:-gettingStarted}Genesis.json
       - ${PEM_FILE:-./blank.pem}:/var/lib/strato/priv.pem
       - ${BACKUP_PEM_FILE:-./blank.pem}:/var/lib/strato/backup_priv.pem
+      - ${SSL_CERT:-./blank.cert}:/var/lib/strato/ssl.pem
   nginx:
     depends_on:
     - docs

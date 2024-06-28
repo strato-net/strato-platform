@@ -13,7 +13,7 @@ import Blockchain.Strato.Model.Secp256k1
 import Control.Applicative ((<|>))
 import Data.Aeson
 
-newtype PostIdentityRequest = PostIdentityRequest (Either (Signed Subject) (Signed (Signed Subject)))
+newtype PostIdentityRequest = PostIdentityRequest (Either (Signed SubjectAndCert) (Signed (Signed SubjectAndCert)))
 
 newtype PostIdentityResponse = PostIdentityResponse X509Certificate
 

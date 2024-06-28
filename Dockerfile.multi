@@ -116,3 +116,11 @@ HEALTHCHECK --interval=5s --timeout=1s --start-period=180s \
   CMD curl --silent --output /dev/null --fail localhost:8014/ping || exit 1
 WORKDIR /var/lib/identity
 ENTRYPOINT ["/identity-service/doit.sh"]
+
+FROM base as subject-signing-tool
+COPY \
+  ./usr/local/bin/x509-sign-subject \
+    /usr/local/bin/
+COPY ./strato /
+WORKDIR /var/lib/strato
+ENTRYPOINT ["/strato/subject-signing-tool.sh"]

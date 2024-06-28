@@ -19,6 +19,7 @@ module BlockApps.X509.Certificate
     SignedCertificate,
     Issuer (..),
     Subject (..),
+    SubjectAndCert(..),
     x509CertToCertInfoState,
     HasSelectX509CertDB,
     HasSelectX509FieldDB,
@@ -36,6 +37,8 @@ module BlockApps.X509.Certificate
     makeSignedCertSigF,
     getCertSubject,
     getCertSubjects,
+    unsafeGetCertSubjectUndefinedPubKey,
+    unsafeGetCertSubjectsUndefinedPubKey,
     getCertValidity,
     getCertIssuer,
     getCertIssuers,
@@ -337,6 +340,28 @@ instance ToSample X509Certificate where
           "-----END CERTIFICATE-----"
         ]
 
+data SubjectAndCert = SubjectAndCert
+  { sacSubject     :: Subject
+  , sacCertificate :: Maybe X509Certificate
+  } deriving (Eq, Show)
+
+instance ToJSON SubjectAndCert where
+  toJSON (SubjectAndCert s c) = object
+    [ "subject" .= s
+    , "certificate" .= c
+    ]
+
+instance FromJSON SubjectAndCert where
+  parseJSON = withObject "SubjectAndCert" $ \o -> SubjectAndCert
+    <$> (o .: "subject")
+    <*> (o .:? "certificate")
+
+instance RLPSerializable SubjectAndCert where
+  rlpEncode (SubjectAndCert s Nothing)  = rlpEncode s
+  rlpEncode (SubjectAndCert s (Just c)) = RLPArray [rlpEncode s, rlpEncode c]
+  rlpDecode (RLPArray [s, c])           = SubjectAndCert (rlpDecode s) (Just $ rlpDecode c)
+  rlpDecode s                           = SubjectAndCert (rlpDecode s) Nothing
+
 ----------------------------------------------------------------------------------------------
 ---------------------------------------- ROOT CERT -------------------------------------------
 ----------------------------------------------------------------------------------------------
@@ -519,6 +544,27 @@ getCertSubjects certs = for (x509ToSigneds certs) $ \cert -> do
         subUnit = extractDn cert DnOrganizationUnit,
         subCountry = extractDn cert DnCountry,
         subPub = pubKey
+      }
+  where
+    extractDn :: SignedCertificate -> DnElement -> Maybe String
+    extractDn cert dn = fmap fromASN1CS . getDnElement dn . certSubjectDN $ getCertificate cert
+
+-- Get the (first) subject of the certificate
+unsafeGetCertSubjectUndefinedPubKey :: X509Certificate -> Maybe Subject
+unsafeGetCertSubjectUndefinedPubKey cert = listToMaybe =<< unsafeGetCertSubjectsUndefinedPubKey cert
+
+-- without cn and org, subject and issuer are invalid, but the other fields can be Nothing
+unsafeGetCertSubjectsUndefinedPubKey :: X509Certificate -> Maybe [Subject]
+unsafeGetCertSubjectsUndefinedPubKey certs = for (x509ToSigneds certs) $ \cert -> do
+  cn <- extractDn cert DnCommonName
+  org <- extractDn cert DnOrganization
+  return $
+    Subject
+      { subCommonName = cn,
+        subOrg = org,
+        subUnit = extractDn cert DnOrganizationUnit,
+        subCountry = extractDn cert DnCountry,
+        subPub = error "You called a function named 'unsafeGetCertSubjectsUndefinedPubKey' and evaluated the PubKey... what did you expect to happen?!"
       }
   where
     extractDn :: SignedCertificate -> DnElement -> Maybe String
