@@ -62,7 +62,9 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ########
   mv /tmp/nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
 
-  mv /tmp/openid.lua /usr/local/openresty/nginx/lua/openid.lua
+  if [ "$IDENTITY_PROVIDER_HOSTNAME" != "identity-service" ]; then
+    mv /tmp/openid.lua /usr/local/openresty/nginx/lua/openid.lua
+  fi
 
   if [ "$ssl" = true ] ; then
     cp -r /tmp/ssl/* /etc/ssl/
