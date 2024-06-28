@@ -8797,6 +8797,19 @@ contract qq {
       `shouldReturn` [BDecimal "11.2"])
 
 
+  it "can externally return decimals" . runTest $ do
+    runCall'
+      "f"
+      "()"
+      [r|
+contract qq {
+  function f() returns (decimal) {
+    decimal k = 0.5;
+    return k;
+  }
+}|]
+      `shouldReturn` Just "(0.5)"
+      
   it "can use decimal numbers with the modulo operator" $ runTest ( do
     runBS [r|
 contract qq {
@@ -8890,4 +8903,3 @@ contract qq {
   }
 }
 |]) `shouldThrow` anyTypeError
-
