@@ -122,5 +122,5 @@ COPY \
   ./usr/local/bin/x509-sign-subject \
     /usr/local/bin/
 COPY ./strato /
-WORKDIR /var/lib/strato
+WORKDIR /
 ENTRYPOINT ["/strato/subject-signing-tool.sh"]

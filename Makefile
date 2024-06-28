@@ -209,6 +209,8 @@ docker-compose:
 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.identity.tpl.yml > docker-compose.identity.push.ecr.yml
 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.identity-service.tpl.yml > docker-compose.identity-service.push.yml
 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.identity-service.tpl.yml > docker-compose.identity-service.push.ecr.yml
+	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.subject-signing-tool.tpl.yml > docker-compose.subject-signing-tool.push.yml
+	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.subject-signing-tool.tpl.yml > docker-compose.subject-signing-tool.push.ecr.yml
 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.highway.tpl.yml > docker-compose.highway.push.yml
 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.highway.tpl.yml > docker-compose.highway.push.ecr.yml
 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.stripe-ps.tpl.yml > docker-compose.stripe-ps.push.yml
@@ -227,6 +229,8 @@ docker-compose:
 	awk '/build: ./{getline} 1' docker-compose.identity.push.ecr.yml > docker-compose.identity.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.identity-service.push.yml > docker-compose.identity-service.yml
 	awk '/build: ./{getline} 1' docker-compose.identity-service.push.ecr.yml > docker-compose.identity-service.ecr.yml
+	awk '/build: ./{getline} 1' docker-compose.subject-signing-tool.push.yml > docker-compose.subject-signing-tool.yml
+	awk '/build: ./{getline} 1' docker-compose.subject-signing-tool.push.ecr.yml > docker-compose.subject-signing-tool.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.highway.push.yml > docker-compose.highway.yml
 	awk '/build: ./{getline} 1' docker-compose.highway.push.ecr.yml > docker-compose.highway.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.stripe-ps.push.yml > docker-compose.stripe-ps.yml
