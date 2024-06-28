@@ -433,6 +433,20 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
 
 ---------------------------------- REGULAR TRANSACTIONS ---------------------------------------
 
+getMaybeCodeFromContractPayload :: ContractPayload -> Maybe Code
+getMaybeCodeFromContractPayload p = 
+  case contractpayloadCodePtr p of
+    Just p' -> 
+      case contractpayloadContract p of
+        Just contract -> 
+          Just $ PtrToCode (
+            CodeAtAccount
+              (Account p' Nothing)
+              (unpack contract)
+          )
+        Nothing -> Nothing
+    Nothing -> Nothing
+
 postBlocTransactionParallel ::
   ( MonadLogger m,
     A.Selectable Account Contract m,
@@ -635,18 +649,7 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                         )
                         (contractpayloadChainid p <|> chainId)
                         resolve
-                        (case contractpayloadCodePtr p of
-                          Just p' -> 
-                            case contractpayloadContract p of
-                              Just contract -> 
-                                Just $ PtrToCode (
-                                  CodeAtAccount
-                                    (Account p' Nothing)
-                                    (unpack contract)
-                                )
-                              Nothing -> Nothing
-                          Nothing -> Nothing
-                        )
+                        (getMaybeCodeFromContractPayload p)
                 fmap ((: []) . BlocTxResult) $ postUsersContractSolidVM' cacheNonce bcp jwtToken
           xs -> do
             ps <- mapM fromContract xs
