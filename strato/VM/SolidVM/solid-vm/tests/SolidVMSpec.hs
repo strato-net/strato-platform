@@ -8732,18 +8732,7 @@ contract qq {
     testSix = x > y;
   }
 }
-|]  fit "can externally return locals" . runTest $ do
-    runCall'
-      "f"
-      "()"
-      [r|
-contract qq {
-  function f() returns (decimal) {
-    decimal k = 0.5;
-    return k;
-  }
-}|]
-      `shouldReturn` Just "(0.5)"
+|]
     getFields ["x", "y", "testOne", "testTwo", "testThree", "testFour", "testFive", "testSix"] 
       `shouldReturn` [BDecimal "2.1",
                       BDecimal "3.2",
@@ -8807,14 +8796,14 @@ contract qq {
     getFields ["x"]
       `shouldReturn` [BDecimal "11.2"])
 
-  it "can externally return locals" . runTest $ do
+  it "can externally return decimals" . runTest $ do
     runCall'
       "f"
       "()"
       [r|
 contract qq {
   function f() returns (decimal) {
-    decimal k = 0.5;
+    uint k = 0.5;
     return k;
   }
 }|]
