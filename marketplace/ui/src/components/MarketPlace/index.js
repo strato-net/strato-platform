@@ -20,7 +20,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
   const dispatch = useCategoryDispatch();
   const debouncedSearchTerm = useDebounce("", 1000);
   const { iscategorysLoading } = useCategoryState();
-  
+
   useEffect(() => {
     if (isAuthenticated) {
       const loginCount = localStorage.getItem('loginCount');
@@ -35,7 +35,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
               type="primary"
               onClick={() => navigateToUserProfile()}
               style={{
-                borderRadius: '20px', 
+                borderRadius: '20px',
                 color: '#fff',
               }}
             >
@@ -64,142 +64,206 @@ const MarketPlace = ({ user, isAuthenticated }) => {
   const linkUrl = window.location.href;
   const metaImg = SEO.IMAGE_META
   const navRoute = routes.MarketplaceCategoryProductList.url.replace(':category', 'All');
-  
+
   return (
     <>
-    <HelmetComponent 
-          title={SEO.TITLE_META}
-          description={SEO.DESCRIPTION_META} 
-          link={linkUrl} />
-    <Fade triggerOnce>
-      <Carousel autoPlay centerSlidePercentage={95} showArrows={false} infiniteLoop showStatus={false} swipeable emulateTouch autoFocus centerMode>
-        <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2 md:mt-6 lg:mx-3">
-          {/* <div  className="flex flex-col gap-3 backdrop-blur-2xl text-left p-4 px-3 md:px-8 h-[67%] sm:h-32 md:h-40 w-[92%] sm:w-[70%] md:w-[500px] rounded-md md:rounded-2xl absolute left-2 md:left-10 top-10 sm:top-20 md:top-44 bg-[rgba(256,256,256,0.17)] z-50">
-            <Typography.Text className="text-base md:text-2xl md:leading-[40px] text-white font-semibold">
-              Welcome to Mercata Marketplace!
-            </Typography.Text>
-            <Typography.Text className="md:text-sm text-white pr-0">
-              Explore trending real-world assets
-            </Typography.Text>
-            <Button
-              id="viewMore"
-              onClick={() => {
-                navigate(navRoute);
-                sessionStorage.setItem('scrollPosition', 0);
-              }}
-              className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
-              <div className="text-primary font-semibold md:text-lg">
-                View More
-              </div>
-            </Button>
-          </div> */}
-          <img 
-          alt={metaImg}
-          title={metaImg}
-          className="absolute inset-0 z-10 h-[222px] md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md" 
-          height={380} width="100%" src={Images.carousel_desktop_one} preview={false} />
-        </div>
-        <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2  md:mt-6 lg:mx-3">
-          {/* <div  className="flex flex-col gap-3 backdrop-blur-2xl text-left p-4 px-3 md:px-8 h-[67%] sm:h-32 md:h-40 w-[92%] sm:w-[70%] md:w-[500px] rounded-md md:rounded-2xl absolute left-2 md:left-10 top-10 sm:top-20 md:top-44 bg-[rgba(256,256,256,0.17)] z-50">
-            <Typography.Text className="text-base md:text-2xl md:leading-[40px] text-white font-semibold">
-              Welcome to Mercata Marketplace!
-            </Typography.Text>
-            <Typography.Text className="md:text-sm text-white pr-0">
-              Explore trending real-world assets
-            </Typography.Text>
-            <Button
-              id="viewMore"
-              onClick={() => {
-                navigate(navRoute);
-                sessionStorage.setItem('scrollPosition', 0);              
-              }}
-              className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
-              <div className="text-primary font-semibold md:text-lg">
-                View More
-              </div>
-            </Button>
-          </div> */}
-          <img 
-          alt={metaImg}
-          title={metaImg}
-          className="absolute inset-0 z-10 h-[222px] md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md" height={380} width="100%" src={Images.carousel_desktop_two} preview={false} />
-        </div>
-        <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2  md:mt-6 lg:mx-3">
-          {/* <div  className="flex flex-col gap-3 backdrop-blur-2xl text-left p-4 px-3 md:px-8 h-[67%] sm:h-32 md:h-40 w-[92%] sm:w-[70%] md:w-[500px] rounded-md md:rounded-2xl absolute left-2 md:left-10 top-10 sm:top-20 md:top-44 bg-[rgba(256,256,256,0.17)] z-50">
-            <Typography.Text className="text-base md:text-2xl md:leading-[40px] text-white font-semibold">
-              Welcome to Mercata Marketplace!
-            </Typography.Text>
-            <Typography.Text className="md:text-sm text-white pr-0">
-              Explore trending real-world assets
-            </Typography.Text>
-            <Button
-              id="viewMore"
-              onClick={() => {
-                navigate(navRoute);
-                sessionStorage.setItem('scrollPosition', 0);              
-              }}
-              className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
-              <div className="text-primary font-semibold md:text-lg">
-                View More
-              </div>
-            </Button>
-          </div> */}
-          <img 
-          alt={metaImg}
-          title={metaImg}
-          className="absolute inset-0 z-10 h-[222px] md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md" height={380} width="100%" src={Images.carousel_desktop_three} preview={false} />
-        </div>
-        <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2  md:mt-6 lg:mx-3">
-          {/* <div  className="flex flex-col gap-3 backdrop-blur-2xl text-left p-4 px-3 md:px-8 h-[67%] sm:h-32 md:h-40 w-[92%] sm:w-[70%] md:w-[500px] rounded-md md:rounded-2xl absolute left-2 md:left-10 top-10 sm:top-20 md:top-44 bg-[rgba(256,256,256,0.17)] z-50">
-            <Typography.Text className="text-base md:text-2xl md:leading-[40px] text-white font-semibold">
-              Welcome to Mercata Marketplace!
-            </Typography.Text>
-            <Typography.Text className="md:text-sm text-white pr-0">
-              Explore trending real-world assets
-            </Typography.Text>
-            <Button
-              id="viewMore"
-              onClick={() => {
-                navigate(navRoute);
-                sessionStorage.setItem('scrollPosition', 0);              
-              }}
-              className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
-              <div className="text-primary font-semibold md:text-lg">
-                View More
-              </div>
-            </Button>
-          </div> */}
-          <img 
-          alt={metaImg}
-          title={metaImg}
-          className="absolute inset-0 object-cover z-10 h-[222px] md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md" height={380} width="100%" src={Images.carousel_desktop_four} preview={false} />
-        </div>
-        <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2  md:mt-6 lg:mx-3">
-          {/* <div  className="flex flex-col gap-3 backdrop-blur-2xl text-left p-4 px-3 md:px-8 h-[67%] sm:h-32 md:h-40 w-[92%] sm:w-[70%] md:w-[500px] rounded-md md:rounded-2xl absolute left-2 md:left-10 top-10 sm:top-20 md:top-44 bg-[rgba(256,256,256,0.17)] z-50">
-            <Typography.Text className="text-base md:text-2xl md:leading-[40px] text-white font-semibold">
-              Welcome to Mercata Marketplace!
-            </Typography.Text>
-            <Typography.Text className="md:text-sm text-white pr-0">
-              Explore trending real-world assets
-            </Typography.Text>
-            <Button
-              id="viewMore"
-              onClick={() => {
-                navigate(navRoute);
-                sessionStorage.setItem('scrollPosition', 0);              
-              }}
-              className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
-              <div className="text-primary font-semibold md:text-lg">
-                View More
-              </div>
-            </Button>
-          </div> */}
-          <img 
-          alt={metaImg}
-          title={metaImg}
-          className="absolute inset-0 object-cover z-10 h-[222px] md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md" height={380} width="100%" src={Images.carousel_desktop_five} preview={false} />
-        </div>
-      </Carousel>
+      <HelmetComponent
+        title={SEO.TITLE_META}
+        description={SEO.DESCRIPTION_META}
+        link={linkUrl} />
+      <Fade triggerOnce>
+        <Carousel autoPlay centerSlidePercentage={95} showArrows={false} infiniteLoop showStatus={false} swipeable emulateTouch autoFocus centerMode>
+          <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2 md:mt-6 lg:mx-3">
+            <div className="absolute top-40 left-8 md:left-24 md:top-60 z-50">
+              <Button
+                id="viewMore"
+                onClick={() => {
+                  navigate(navRoute);
+                  sessionStorage.setItem('scrollPosition', 0);
+                }}
+                className="gradient-button h-auto md:h-11 border-primary bg-white text-primary hover:text-white"
+              >
+                <div className="flex items-center">
+                  <div className="hidden md:block font-semibold text-lg">
+                    Explore More
+                  </div>
+                  <div className="md:hidden font-semibold text-base">
+                    Explore
+                  </div>
+                  <img src={Images.button_arrow} />
+                </div>
+              </Button>
+            </div>
+            <div className="hidden md:block ">
+              <img
+                alt={metaImg}
+                title={metaImg}
+                className="absolute inset-0 z-10 h-[222px] md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+                height={380} width="100%" src={Images.carousel_desktop_one} preview={false}
+              />
+            </div>
+            <div className="md:hidden ">
+              <img
+                alt={metaImg}
+                title={metaImg}
+                className="absolute inset-0 z-10 h-[222px] md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+                height={380} width="100%" src={Images.carousel_mobile_one} preview={false}
+              />
+            </div>
+          </div>
+          <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2  md:mt-6 lg:mx-3">
+            <div className="absolute top-40 left-8 md:left-24 md:top-60 z-50">
+              <Button
+                id="viewMore"
+                onClick={() => {
+                  navigate(navRoute);
+                  sessionStorage.setItem('scrollPosition', 0);
+                }}
+                className="gradient-button h-auto md:h-11 border-primary bg-white text-primary hover:text-white"
+              >
+                <div className="flex items-center">
+                  <div className="hidden md:block font-semibold text-lg">
+                    Explore More
+                  </div>
+                  <div className="md:hidden font-semibold text-base">
+                    Explore
+                  </div>
+                  <img src={Images.button_arrow} />
+                </div>
+              </Button>
+            </div>
+            <div className="hidden md:block ">
+              <img
+                alt={metaImg}
+                title={metaImg}
+                className="absolute inset-0 z-10 h-[222px] md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+                height={380} width="100%" src={Images.carousel_desktop_two} preview={false}
+              />
+            </div>
+            <div className="md:hidden ">
+              <img
+                alt={metaImg}
+                title={metaImg}
+                className="absolute inset-0 z-10 h-[222px] md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+                height={380} width="100%" src={Images.carousel_mobile_two} preview={false}
+              />
+            </div>
+          </div>
+          <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2  md:mt-6 lg:mx-3">
+            <div className="absolute top-40 left-8 md:left-24 md:top-60 z-50">
+              <Button
+                id="viewMore"
+                onClick={() => {
+                  navigate(navRoute);
+                  sessionStorage.setItem('scrollPosition', 0);
+                }}
+                className="gradient-button h-auto md:h-11 border-primary bg-white text-primary hover:text-white"
+              >
+                <div className="flex items-center">
+                  <div className="hidden md:block font-semibold text-lg">
+                    Explore More
+                  </div>
+                  <div className="md:hidden font-semibold text-base">
+                    Explore
+                  </div>
+                  <img src={Images.button_arrow} />
+                </div>
+              </Button>
+            </div>
+            <div className="hidden md:block ">
+              <img
+                alt={metaImg}
+                title={metaImg}
+                className="absolute inset-0 z-10 h-[222px] md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+                height={380} width="100%" src={Images.carousel_desktop_three} preview={false}
+              />
+            </div>
+            <div className="md:hidden ">
+              <img
+                alt={metaImg}
+                title={metaImg}
+                className="absolute inset-0 z-10 h-[222px] md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+                height={380} width="100%" src={Images.carousel_mobile_three} preview={false}
+              />
+            </div>
+          </div>
+          <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2  md:mt-6 lg:mx-3">
+            <div className="absolute top-40 left-8 md:left-24 md:top-60 z-50">
+              <Button
+                id="viewMore"
+                onClick={() => {
+                  navigate(navRoute);
+                  sessionStorage.setItem('scrollPosition', 0);
+                }}
+                className="gradient-button h-auto md:h-11 border-primary bg-white text-primary hover:text-white"
+              >
+                <div className="flex items-center">
+                  <div className="hidden md:block font-semibold text-lg">
+                    Explore More
+                  </div>
+                  <div className="md:hidden font-semibold text-base">
+                    Explore
+                  </div>
+                  <img src={Images.button_arrow} />
+                </div>
+              </Button>
+            </div>
+            <div className="hidden md:block ">
+              <img
+                alt={metaImg}
+                title={metaImg}
+                className="absolute inset-0 z-10 h-[222px] md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+                height={380} width="100%" src={Images.carousel_desktop_four} preview={false}
+              />
+            </div>
+            <div className="md:hidden ">
+              <img
+                alt={metaImg}
+                title={metaImg}
+                className="absolute inset-0 z-10 h-[222px] md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+                height={380} width="100%" src={Images.carousel_mobile_four} preview={false}
+              />
+            </div>
+          </div>
+          <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2  md:mt-6 lg:mx-3">
+            <div className="absolute top-40 left-8 md:left-24 md:top-60 z-50">
+              <Button
+                id="viewMore"
+                onClick={() => {
+                  navigate(navRoute);
+                  sessionStorage.setItem('scrollPosition', 0);
+                }}
+                className="gradient-button h-auto md:h-11 border-primary bg-white text-primary hover:text-white"
+              >
+                <div className="flex items-center">
+                  <div className="hidden md:block font-semibold text-lg">
+                    Explore More
+                  </div>
+                  <div className="md:hidden font-semibold text-base">
+                    Explore
+                  </div>
+                  <img src={Images.button_arrow} />
+                </div>
+              </Button>
+            </div>
+            <div className="hidden md:block ">
+              <img
+                alt={metaImg}
+                title={metaImg}
+                className="absolute inset-0 z-10 h-[222px] md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+                height={380} width="100%" src={Images.carousel_desktop_five} preview={false}
+              />
+            </div>
+            <div className="md:hidden ">
+              <img
+                alt={metaImg}
+                title={metaImg}
+                className="absolute inset-0 z-10 h-[222px] md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+                height={380} width="100%" src={Images.carousel_mobile_five} preview={false}
+              />
+            </div>
+          </div>
+        </Carousel>
       </Fade>
       {iscategorysLoading ? (
         <div className="h-96 flex justify-center items-center">

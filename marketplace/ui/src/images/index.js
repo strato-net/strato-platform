@@ -63,5 +63,11 @@ export const Images = {
   'carousel_desktop_two': require("./resources/carousel_desktop_two.png"),
   'carousel_desktop_three': require("./resources/carousel_desktop_three.png"),
   'carousel_desktop_four': require("./resources/carousel_desktop_four.png"),
-  'carousel_desktop_five': require("./resources/carousel_desktop_five.png")
+  'carousel_desktop_five': require("./resources/carousel_desktop_five.png"),
+  'carousel_mobile_one': require("./resources/carousel_mobile_one.png"),
+  'carousel_mobile_two': require("./resources/carousel_mobile_two.png"),
+  'carousel_mobile_three': require("./resources/carousel_mobile_three.png"),
+  'carousel_mobile_four': require("./resources/carousel_mobile_four.png"),
+  'carousel_mobile_five': require("./resources/carousel_mobile_five.png"),
+  'button_arrow': require("./resources/button_arrow.png")
 };
