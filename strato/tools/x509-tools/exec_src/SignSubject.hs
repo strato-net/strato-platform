@@ -46,7 +46,7 @@ main = do
           mSslSub = unsafeGetCertSubjectUndefinedPubKey =<< mSslCert
           sub = Subject
                   (maybe flags_commonName subCommonName mSslSub)
-                  (maybe flags_organization subCommonName mSslSub)
+                  (maybe flags_organization subOrg mSslSub)
                   (maybe ou subUnit mSslSub)
                   (maybe c subCountry mSslSub)
                   pub
