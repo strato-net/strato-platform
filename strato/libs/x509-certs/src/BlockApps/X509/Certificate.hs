@@ -557,7 +557,7 @@ unsafeGetCertSubjectUndefinedPubKey cert = listToMaybe =<< unsafeGetCertSubjects
 unsafeGetCertSubjectsUndefinedPubKey :: X509Certificate -> Maybe [Subject]
 unsafeGetCertSubjectsUndefinedPubKey certs = for (x509ToSigneds certs) $ \cert -> do
   cn <- extractDn cert DnCommonName
-  org <- extractDn cert DnOrganization
+  let org = fromMaybe "" $ extractDn cert DnOrganization -- domain-level SSL certs often don't have an organization field
   return $
     Subject
       { subCommonName = cn,
