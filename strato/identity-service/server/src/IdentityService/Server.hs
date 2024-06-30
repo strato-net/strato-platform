@@ -92,7 +92,7 @@ postIdentity (PostIdentityRequest eMsg) = do
       Nothing -> throwIO $ IdentityError "Could not decode subject of supplied SSL cert"
       Just s' -> if subCommonName s == subCommonName s'
         then pure s
-        else throwIO $ IdentityError "Common name of subject info did not match common name of supplied SSL cert"
+        else throwIO . IdentityError $ "Common name of subject info did not match common name of supplied SSL cert: " <> T.pack (subCommonName s) <> ", " <> T.pack (subCommonName s')
 
   let username = T.pack $ subCommonName sub
       addr = fromPublicKey $ subPub sub
