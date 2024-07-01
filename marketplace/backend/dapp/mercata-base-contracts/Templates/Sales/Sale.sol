@@ -11,6 +11,7 @@ abstract contract Sale is Utils {
     decimal public price;
     uint public quantity;
     address[] public paymentProviders;
+    uint public cost;
     mapping (address => uint) paymentProvidersMap;
     mapping (string => uint) lockedQuantity;
     uint totalLockedQuantity;
@@ -20,10 +21,12 @@ abstract contract Sale is Utils {
         address _assetToBeSold,
         decimal _price,
         uint _quantity,
-        address[] _paymentProviders
+        address[] _paymentProviders,
+        uint _cost
     ) {    
         assetToBeSold = Asset(_assetToBeSold);
         price = _price;
+        cost = _cost;
         require(assetToBeSold.quantity() >= _quantity, "Cannot sell more units than what are owned.");
         quantity = _quantity;
         totalLockedQuantity = 0;

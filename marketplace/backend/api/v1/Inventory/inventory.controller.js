@@ -31,15 +31,15 @@ class InventoryController {
 
   static async getAll(req, res, next) {
     try {
-      const { dapp, query } = req
+      const { dapp, query } = req;
 
-      const inventories = await dapp.getInventories({ ...query })
-      const inventoriesWithImageUrl = inventories?.inventories
-      rest.response.status200(res, { inventoriesWithImageUrl: inventoriesWithImageUrl, count: inventories.inventoryCount })
+      const inventories = await dapp.getInventories({ ...query });
+      const inventoriesWithImageUrl = inventories?.inventories;
+      rest.response.status200(res, { inventoriesWithImageUrl: inventoriesWithImageUrl, count: inventories.inventoryCount });
 
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
@@ -285,6 +285,7 @@ class InventoryController {
       ).required(),
       price: Joi.number().greater(0).precision(2).required(),
       quantity: Joi.number().integer().greater(0).optional(),
+      cost: Joi.number().integer().min(0).required(),
     });
 
     const validation = listItemSchema.validate(args);

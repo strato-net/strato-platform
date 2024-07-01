@@ -369,6 +369,7 @@ const actions = {
     dispatch({ type: actionDescriptors.listInventory });
 
     try {
+      console.log(payload);
       const response = await fetch(`${apiUrl}/inventory/list`, {
         method: HTTP_METHODS.POST,
         credentials: "same-origin",

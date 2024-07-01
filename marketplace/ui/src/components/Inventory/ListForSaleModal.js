@@ -14,6 +14,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
     const [paymentTypes, setPaymentTypes] = useState([]);
     const [availablePaymentProviders, setAvailablePaymentProviders] = useState([]);
     const [pricePerUnit, setpricePerUnit] = useState(inventory.price ? inventory.price : inventory.pricePerUnit);
+    const [costPerUnit, setCostPerUnit] = useState(0);
     const inventoryDispatch = useInventoryDispatch();
     const [canList, setCanList] = useState(true);
     const {
@@ -207,6 +208,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
         let body = {
             paymentProviders: paymentTypes.filter((p) => availablePaymentProviders[p]).map((p) => availablePaymentProviders[p].address),
             price: pricePerUnit,
+            cost: costPerUnit,
         };
         if (inventory.saleAddress) {
             body = { ...body, saleAddress: inventory.saleAddress }

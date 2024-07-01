@@ -421,12 +421,14 @@ async function getAll(admin, args = {}, defaultOptions) {
 
         // Combine the inventories and sales data
         if (inventories) {
+            console.log(inventories);
             inventories.forEach(inventory => {
                 const itemSale = sales.find(sale => sale.assetToBeSold == inventory.address && sale.isOpen);
                 if (itemSale) {
                     finalInventory.push({
                         ...inventory,
                         price: itemSale?.price,
+                        cost: itemSale?.cost,
                         saleAddress: itemSale?.address,
                         saleQuantity: itemSale?.quantity,
                         saleDate: itemSale?.block_timestamp,
