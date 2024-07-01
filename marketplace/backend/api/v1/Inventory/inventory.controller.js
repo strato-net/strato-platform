@@ -155,6 +155,43 @@ class InventoryController {
       return next(e)
     }
   }
+  
+  static async bridge(req, res, next) {
+    try {
+      const { dapp, body } = req
+
+      InventoryController.validateTransferItemArgs(body)
+      
+      const result = await dapp.transferItem(body)
+      // if bridge is successful, call remote server
+      console.log("result123: ", result)
+      console.log("body: ", body)
+      const payload = {
+        tokenSymbol: body.assetAddress,
+        quantity: body.quantity,
+        baseAddress: '0xf1f02E027cBaa72869649Df2C9B56C61C61675fF',
+      }
+      // api call to token bridge
+      const response = await fetch(
+        `http://localhost:3001/api/bridgeMercata`,
+        {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+      console.log("response: ", response)
+      
+      rest.response.status200(res, response)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
 
   static async getAllItemTransferEvents(req, res, next) {
     try {

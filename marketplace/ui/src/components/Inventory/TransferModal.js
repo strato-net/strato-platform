@@ -158,7 +158,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
                 pagination={false}
             />
             <div className="flex justify-center md:block">
-                <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canBridge} loading={isTransferring}>
+                <Button type="primary" className="w-32 h-9" onClick={handleBridge} disabled={!canBridge} loading={isTransferring}>
                     Bridge
                 </Button>
             </div>
@@ -183,6 +183,34 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
         }
     }
     
+    const handleBridge = async () => {
+        console.log("bridge");
+        const body = {
+            assetAddress: inventory.address,
+            newOwner: '6ec8bbe4a5b87be18d443408df43a45e5972fa1b',
+            quantity,
+            price
+        };
+
+        if (quantity > 0 && quantity <= inventory.quantity && '6ec8bbe4a5b87be18d443408df43a45e5972fa1b') {
+            const isDone = await fetch(`http://localhost/api/v1/inventory/bridge`, {
+                method: 'POST',
+                credentials: "same-origin",
+                headers: {
+                Accept: "application/json",
+                "Content-Type": "application/json",
+                },
+                body: JSON.stringify(body),
+            });
+            console.log(isDone);
+            if (isDone) {
+                await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
+                await actions.fetchInventoryForUser(inventoryDispatch, user.commonName);
+                handleCancel();
+            }
+        }
+    }
+    
     const renderOptions = () => (
         <div className="flex justify-around">
             <Button type="primary" onClick={() => setView("transfer")}>Transfer</Button>
@@ -198,7 +226,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
             width={825}
             footer={null}
         >
-            {inventory.name === "Demo Day Token" ? (
+            {inventory.name === "token test 2" ? (
                 view === "options" ? renderOptions() : view === "transfer" ? renderTransfer() : renderBridge()
             ) : (
                 renderTransfer()
