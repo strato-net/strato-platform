@@ -1,0 +1,6 @@
+.collectible-row{
+  background-image: url('../../images/bannerImages/CollectiblesBackground.png');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}

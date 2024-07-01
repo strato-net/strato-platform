@@ -1,4 +1,4 @@
-import { Button, Image, Typography, Spin, notification } from "antd";
+import { Button, Image, Typography, Spin, notification, Row, Col } from "antd";
 import CategoryCard from "./CategoryCard";
 import TopSellingProductCard from "./TopSellingProductCard";
 import { Images } from "../../images";
@@ -13,6 +13,13 @@ import { Carousel } from "react-responsive-carousel";
 import { Fade } from "react-awesome-reveal";
 import HelmetComponent from "../Helmet/HelmetComponent";
 import { SEO } from "../../helpers/seoConstant";
+import Banner1 from "../Banner/Banner1";
+
+import "./index.css";
+import Banner3 from "../Banner/Banner3";
+import Banner4 from "../Banner/Banner4";
+import Banner2 from "../Banner/Banner2";
+import Banner5 from "../Banner/Banner5";
 
 const MarketPlace = ({ user, isAuthenticated }) => {
   const limit = 10, offset = 0;
@@ -73,7 +80,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
           link={linkUrl} />
     <Fade triggerOnce>
       <Carousel autoPlay centerSlidePercentage={95} showArrows={false} infiniteLoop showStatus={false} swipeable emulateTouch autoFocus centerMode>
-        <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2 md:mt-6 lg:mx-3">
+        {/* <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2 md:mt-6 lg:mx-3">
           <div  className="flex flex-col gap-3 backdrop-blur-2xl text-left p-4 px-3 md:px-8 h-[67%] sm:h-32 md:h-40 w-[92%] sm:w-[70%] md:w-[500px] rounded-md md:rounded-2xl absolute left-2 md:left-10 top-10 sm:top-20 md:top-44 bg-[rgba(256,256,256,0.17)] z-50">
             <Typography.Text className="text-base md:text-2xl md:leading-[40px] text-white font-semibold">
               Welcome to Mercata Marketplace!
@@ -198,7 +205,12 @@ const MarketPlace = ({ user, isAuthenticated }) => {
           alt={metaImg}
           title={metaImg}
           className="absolute inset-0 object-cover z-10 h-[222px] md:h-[380px] md:w-[90%] rounded-md md:rounded-[14px]" height={380} width="100%" src={Images.collectibles} preview={false} />
-        </div>
+        </div> */}
+        <Banner1 />
+        <Banner2 />
+        <Banner3 />
+        <Banner4 />
+        <Banner5 />
       </Carousel>
       </Fade>
       {iscategorysLoading ? (
