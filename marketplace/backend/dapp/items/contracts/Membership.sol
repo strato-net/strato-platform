@@ -12,11 +12,12 @@ contract Membership is SemiFungible {
         string _description,
         string[] _images,
         string[] _files,
+        string[] _fileNames,
         uint _createdDate,
         uint _quantity,
         uint _expirationPeriodInMonths,
         AssetStatus _status
-    ) public SemiFungible(_name, _description, _images, _files, _createdDate, _quantity, _status) {
+    ) public SemiFungible(_name, _description, _images, _files, _fileNames, _createdDate, _quantity, _status) {
         expirationPeriodInMonths = _expirationPeriodInMonths;
         expirationDate = block.timestamp + (expirationPeriodInMonths*2592000);
     }
@@ -27,6 +28,7 @@ contract Membership is SemiFungible {
             description,
             images,
             files,
+            fileNames,
             createdDate,
             _quantity,
             expirationPeriodInMonths,
