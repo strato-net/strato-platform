@@ -18,7 +18,9 @@ async function singleCheck() {
     } else {
       updateNetworkHealthStatus(
         {
-          needsAttention: true,
+          healthPublicInfo: {
+            latestHealthStatus: false,
+          }
         },
         "UNKNOWN"
       );
@@ -29,7 +31,9 @@ async function singleCheck() {
     winston.error("Network health status error: " + err.message);
     updateNetworkHealthStatus(
       {
-        needsAttention: true,
+        healthPublicInfo: {
+          latestHealthStatus: false,
+        }
       },
       "UNKNOWN"
     );
@@ -44,12 +48,12 @@ function queryNetworkHealthStatus() {
       );
       const status = await getNetworkStatus();
       winston.debug(
-        `Network is ${status.needsAttention ? "unhealthy" : "healthy"}`
+        `Network is ${!status.healthPublicInfo.latestHealthStatus ? "unhealthy" : "healthy"}`
       );
       winston.info("Updating network health");
       await updateNetworkHealthStatus(
         status,
-        `${status.needsAttention ? "UNHEALTHY" : "HEALTHY"}`
+        `${!status.healthPublicInfo.latestHealthStatus ? "UNHEALTHY" : "HEALTHY"}`
       );
       winston.info("Network health updated");
       return resolve();
