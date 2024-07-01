@@ -94,3 +94,6 @@ img.ant-image-preview-img {
   background: linear-gradient(90deg, #4F46E5 0%, #FB7185 100%); 
 }
 
+#viewMore{
+  box-shadow: 0px 3px 5px darkgrey;;
+}
