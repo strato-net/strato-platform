@@ -25,6 +25,8 @@ const SERVER_CANCEL_URL = `${SERVER_URL}/stripe/checkout/cancel`;
 
 const ORDER_EVENT_TABLE = `${TABLE_PREFIX}PaymentService.Order`;
 
+const SELLER_ONBOARDED_TABLE = `${TABLE_PREFIX}PaymentService.SellerOnboarded`;
+
 const PAYMENT_STATUS = {
   'INITIALIZED': '2',
   'PAID': '3',
@@ -40,6 +42,7 @@ export {
   SERVER_URL,
   DEFAULT_OPTIONS,
   ORDER_EVENT_TABLE,
+  SELLER_ONBOARDED_TABLE,
   PAYMENT_STATUS,
   TABLE_PREFIX,
 }

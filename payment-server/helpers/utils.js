@@ -1,6 +1,6 @@
 import client from '../db/index.js';
 import { rest, util } from "blockapps-rest";
-import { DEFAULT_OPTIONS, ORDER_EVENT_TABLE, TABLE_PREFIX } from "./constants.js";
+import { DEFAULT_OPTIONS, ORDER_EVENT_TABLE, SELLER_ONBOARDED_TABLE, TABLE_PREFIX, STRIPE_CONTRACT_ADDRESS } from "./constants.js";
 import ADMIN from './oauth.js';
 import lodash from 'lodash';
 const { get } = lodash;
@@ -128,6 +128,23 @@ const getOrderEvent = async (orderHash) => {
   return await rest.search(ADMIN.getUser(), tableArgs, searchOptions);
 }
 
+const checkSellerOnboarded = async (commonName) => {
+  const tableArgs = {
+    name: SELLER_ONBOARDED_TABLE,
+  };
+
+  const searchOptions = {
+    ...DEFAULT_OPTIONS,
+    query: {
+      limit: 1,
+      ['sellersCommonName']: `eq.${commonName}`,
+      ['address']: `eq.${STRIPE_CONTRACT_ADDRESS}`,
+    }
+  }
+
+  return await rest.search(ADMIN.getUser(), tableArgs, searchOptions);
+}
+
 const validateAndGetOrderDetails = async (quantities, saleAddresses) => {
   // Get Sale Contracts
   const saleAddressQuery = saleAddresses.map(addr => `address.eq.${addr}`);
@@ -226,6 +243,7 @@ export {
   validatePaymentServiceContract,
   emitOnboardSeller,
   getOrderEvent,
+  checkSellerOnboarded,
   validateAndGetOrderDetails,
   completeOrder,
   initializePayment,

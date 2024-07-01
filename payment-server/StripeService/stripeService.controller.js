@@ -9,6 +9,7 @@ import {
   updateStripePayment,
   emitOnboardSeller,
   getOrderEvent, 
+  checkSellerOnboarded,
   validateAndGetOrderDetails ,
   completeOrder,
   initializePayment,
@@ -61,16 +62,20 @@ class StripeServiceController {
         throw new Error(`User has not onboarded to this payment server yet.`);
       }
 
-      const userDetails = await stripeService.getStripeConnectAccountDetail(userAccount);
+      const hasSellerOnboarded = await checkSellerOnboarded(username);
 
-      if (userDetails.charges_enabled && userDetails.details_submitted && userDetails.payouts_enabled) {
-        // Call onboardSeller
-        const callArgs = {
-          sellersCommonName: username,
-          isActive: true,
+      if (!hasSellerOnboarded) {
+        const userDetails = await stripeService.getStripeConnectAccountDetail(userAccount);
+
+        if (userDetails.charges_enabled && userDetails.details_submitted && userDetails.payouts_enabled) {
+          // Call onboardSeller
+          const callArgs = {
+            sellersCommonName: username,
+            isActive: true,
+          }
+          const onboardSellerStatus = await emitOnboardSeller(STRIPE_CONTRACT_ADDRESS, callArgs);
+          console.log("onboardSellerStatus", onboardSellerStatus);
         }
-        const onboardSellerStatus = await emitOnboardSeller(STRIPE_CONTRACT_ADDRESS, callArgs);
-        console.log("onboardSellerStatus", onboardSellerStatus);
       }
 
       // Redirect back to marketplace
@@ -127,6 +132,10 @@ class StripeServiceController {
 
       // Get the payment event from Cirrus
       const orderEvent = await getOrderEvent(orderHash);
+
+      if (!orderEvent) {
+        throw new Error(`Cannot find order with hash ${orderHash}.`);
+      }
 
       // Get and validate the order details
       const saleAddresses = orderEvent[0].saleAddresses;
