@@ -240,7 +240,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
                     Explore More
                   </div>
                   <div className="md:hidden font-semibold text-base">
-                    Explore
+                    Save Dog Now
                   </div>
                   <img src={Images.button_arrow} />
                 </div>
