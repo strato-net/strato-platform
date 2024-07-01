@@ -132,12 +132,12 @@ instance TransactionLike Transaction where
       md = txMetadata t
 
 rawTX2TX :: RawTransaction -> Transaction
-rawTX2TX (RawTransaction _ _ nonce' gp gl (Just to') val (Code dat) cid r s v md _ _ _) =
+rawTX2TX (RawTransaction _ _ nonce' gp gl (Just to') val (Code dat) _ _ _ cid r s v md _ _ _) =
   MessageTX nonce' gp gl to' val dat (if (0 == cid) then Nothing else Just cid) r s v (M.fromList <$> md)
-rawTX2TX (RawTransaction _ _ 0 0 0 Nothing 0 init' 0 h ch 0 Nothing _ _ _)
+rawTX2TX (RawTransaction _ _ 0 0 0 Nothing 0 init' _ _ _ 0 h ch 0 Nothing _ _ _)
   | init' == Code B.empty =
     PrivateHashTX (unsafeCreateKeccak256FromWord256 $ fromInteger h) (unsafeCreateKeccak256FromWord256 $ fromInteger ch)
-rawTX2TX (RawTransaction _ _ nonce' gp gl Nothing val init' cid r s v md _ _ _) =
+rawTX2TX (RawTransaction _ _ nonce' gp gl Nothing val init' _ _ _ cid r s v md _ _ _) =
   ContractCreationTX nonce' gp gl val init' (if (0 == cid) then Nothing else Just cid) r s v (M.fromList <$> md)
 rawTX2TX rt = error $ "rawTX2TX: " ++ show rt
 

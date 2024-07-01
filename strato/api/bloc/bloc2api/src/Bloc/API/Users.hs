@@ -55,6 +55,7 @@ import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Nonce
 import Blockchain.Strato.Model.Wei
+import Blockchain.Strato.Model.Code (Code)
 import Control.Lens (mapped)
 import Control.Lens.Operators hiding ((.=))
 import Control.Lens.TH
@@ -356,18 +357,20 @@ data ContractParameters = ContractParameters
     txParams :: Maybe TxParams,
     metadata :: Maybe (Map Text Text),
     chainId :: Maybe ChainId,
-    resolve :: Bool
+    resolve :: Bool,
+    hasCodePtr :: Maybe Code
   }
 
 --------------------------------------------------------------------------------
-data UploadListContract = UploadListContract
+data UploadListContract = UploadListContract --add here too
   { uploadlistcontractContractName :: Text,
     uploadlistcontractSrc :: SourceMap,
     uploadlistcontractArgs :: Map Text ArgValue,
     _uploadlistcontractTxParams :: Maybe TxParams,
     uploadlistcontractValue :: Maybe (Strung Natural),
     _uploadlistcontractChainid :: Maybe ChainId,
-    uploadlistcontractMetadata :: Maybe (Map Text Text)
+    uploadlistcontractMetadata :: Maybe (Map Text Text),
+    uploadlistcontractHasCodePtr :: Maybe Code
   }
   deriving (Eq, Show, Generic)
 
@@ -384,7 +387,8 @@ instance ToJSON UploadListContract where
         "txParams" .= _uploadlistcontractTxParams,
         "value" .= uploadlistcontractValue,
         "chainid" .= _uploadlistcontractChainid,
-        "metadata" .= uploadlistcontractMetadata
+        "metadata" .= uploadlistcontractMetadata,
+        "code" .= uploadlistcontractHasCodePtr
       ]
 
 instance FromJSON UploadListContract where
@@ -397,6 +401,7 @@ instance FromJSON UploadListContract where
       <*> (o .:? "value")
       <*> (o .:? "chainid")
       <*> (o .:? "metadata")
+      <*> (o .:? "code")
   parseJSON o = fail $ "parseJSON UploadListContract: Expected Object, got " ++ show o
 
 instance ToSchema UploadListContract where
@@ -414,7 +419,8 @@ instance ToSchema UploadListContract where
             _uploadlistcontractTxParams = Just $ TxParams (Just $ Gas 123) (Just $ Wei 345) Nothing,
             uploadlistcontractValue = Nothing,
             _uploadlistcontractChainid = Nothing,
-            uploadlistcontractMetadata = Nothing
+            uploadlistcontractMetadata = Nothing,
+            uploadlistcontractHasCodePtr = Nothing
           }
 
 data ContractListParameters = ContractListParameters

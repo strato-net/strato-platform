@@ -108,6 +108,19 @@ import Strato.Strato23.Client
 import System.Clock
 import UnliftIO
 
+-- Function to get Maybe Code from ContractPayload
+getMaybeCodeFromContractPayLoad :: ContractPayload -> Maybe Code
+getMaybeCodeFromContractPayLoad p =
+  let isCodePtr = case contractpayloadCodePtr p of
+                    Just cpr -> Just $ Account cpr Nothing
+                    Nothing  -> Nothing
+
+      cName = contractpayloadContract p
+
+  in case (isCodePtr, cName) of
+       (Just acc, Just cName') -> Just $ PtrToCode (CodeAtAccount acc (Text.unpack cName'))
+       _ -> Nothing
+       
 mergeTxParams :: Maybe TxParams -> Maybe TxParams -> Maybe TxParams
 mergeTxParams (Just inner) (Just outer) =
   Just $
@@ -211,12 +224,14 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
                         Nothing -> Just $ Map.singleton "history" cn
                         Just h -> Just $ Map.insert "history" cn h
                     )
+                    (getMaybeCodeFromContractPayLoad p)
+
               )
               ps
           contracts' = map (uploadlistcontractChainid %~ (<|> cid)) mapUploadList
       txsWithParams <- genNonces (Don't CacheNonce) addr uploadlistcontractChainid uploadlistcontractTxParams contracts'
       forStateT Map.empty txsWithParams $
-        \(UploadListContract name srcs args params value cid' md) -> do
+        \(UploadListContract name srcs args params value cid' md hasCodePtr) -> do
           (src, contract) <- do
             cd <-
               fmap snd . lift $
@@ -228,7 +243,9 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
           let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
               xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) $ _constructor contract
           (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just args) xabiArgs
-
+          let codeOrCodePtr = case hasCodePtr of
+                                Just x -> x 
+                                Nothing -> (Code $ Text.encodeUtf8 $ serializeSourceMap src)
           let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("name", name), ("args", argsAsSource)]
           tx <- lift . signAndPrepare jwt addr metadata' $
               TransactionHeader
@@ -236,7 +253,7 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
                 addr
                 (fromMaybe emptyTxParams params)
                 (Wei (maybe 0 fromIntegral $ fmap unStrung value))
-                (Code $ Text.encodeUtf8 $ serializeSourceMap src)
+                codeOrCodePtr
                 cid'
           return $ BlocTransactionBodyResult (hash' tx) (Just tx)
     FUNCTION -> do
@@ -356,12 +373,13 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
                       Nothing -> Just $ Map.singleton "history" cn
                       Just h -> Just $ Map.insert "history" cn h
                   )
+                  (getMaybeCodeFromContractPayLoad p)
             )
               ps
           contract' = (uploadlistcontractChainid %~ (<|> cid)) upload
       txsWithParams <- genNonces (Don't CacheNonce) addr uploadlistcontractChainid uploadlistcontractTxParams [contract']
       forStateT Map.empty txsWithParams $
-        \(UploadListContract name srcs args params value cid' md) -> do
+        \(UploadListContract name srcs args params value cid' md hasCodePtr) -> do
           (src, contract) <- do
             cd <-
               fmap snd . lift $
@@ -373,15 +391,17 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
           let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
               xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) $ _constructor contract
           (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just args) xabiArgs
-
+          let codeOrCodePtr = case hasCodePtr of
+                                Just x -> x 
+                                Nothing -> (Code $ Text.encodeUtf8 $ serializeSourceMap src)
           let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("name", name), ("args", argsAsSource)]
           lift . prepareUnsignedRawTx metadata' $
               TransactionHeader
                 Nothing
-                addr
+                addr  
                 (fromMaybe emptyTxParams params)
                 (Wei (maybe 0 fromIntegral $ fmap unStrung value))
-                (Code $ Text.encodeUtf8 $ serializeSourceMap src)
+                codeOrCodePtr
                 cid'
     FUNCTION -> do
       p <- fromFunction tx
@@ -635,6 +655,8 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                         )
                         (contractpayloadChainid p <|> chainId)
                         resolve
+                        (getMaybeCodeFromContractPayLoad p)
+
                 fmap ((: []) . BlocTxResult) $ postUsersContractSolidVM' cacheNonce bcp jwtToken
           xs -> do
             ps <- mapM fromContract xs
@@ -691,6 +713,7 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                                   Nothing -> Just $ Map.insert "VM" "SolidVM" (Map.singleton "history" cn)
                                   Just h -> Just $ Map.insert "VM" "SolidVM" (Map.insert "history" cn h)
                               )
+                              (getMaybeCodeFromContractPayLoad p)
                       )
                       ps
                 let bclp = 
@@ -868,7 +891,9 @@ postUsersContractSolidVM' cacheNonce ContractParameters {..} jwtToken = do
   (_, argsAsSource) <- constructArgValuesAndSource args xabiArgs
 
   let metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("name", Text.pack _contractName), ("args", argsAsSource)]
-
+  let codeOrCodePtr = case hasCodePtr of
+                                Just x -> x 
+                                Nothing -> (Code $ Text.encodeUtf8 $ serializeSourceMap src)
   tx <-
     signAndPrepare jwtToken fromAddr metadata' $
       TransactionHeader
@@ -876,7 +901,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters {..} jwtToken = do
         fromAddr
         params
         (Wei (fromIntegral (maybe 0 unStrung value)))
-        (Code $ Text.encodeUtf8 $ serializeSourceMap src)
+        codeOrCodePtr
         chainId
   $logDebugLS "postUsersContractSolidVM'/tx" tx
 
@@ -902,7 +927,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters {..} jwtToken = do
   txSizeLimit <- fmap txSizeLimit getBlocEnv
   txsWithParams <- genNonces cacheNonce fromAddr uploadlistcontractChainid uploadlistcontractTxParams contracts'
   namesTxs <- forStateT Map.empty txsWithParams $
-    \(UploadListContract name srcs args params value cid md) -> do
+    \(UploadListContract name srcs args params value cid md hasCodePtr) -> do
       (src, contract) <- do
         cd <-
           fmap snd . lift $
@@ -914,7 +939,9 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters {..} jwtToken = do
       let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
           xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) $ _constructor contract
       (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just args) xabiArgs
-
+      let codeOrCodePtr = case hasCodePtr of
+                                Just x -> x 
+                                Nothing -> (Code $ Text.encodeUtf8 $ serializeSourceMap src)
       let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("name", name), ("args", argsAsSource)]
       tx <-
         lift . signAndPrepare jwtToken fromAddr metadata' $
@@ -923,7 +950,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters {..} jwtToken = do
             fromAddr
             (fromMaybe emptyTxParams params)
             (Wei (maybe 0 fromIntegral $ fmap unStrung value))
-            (Code $ Text.encodeUtf8 $ serializeSourceMap src)
+            codeOrCodePtr
             cid
       return (name, tx)
   let txs = map snd namesTxs
