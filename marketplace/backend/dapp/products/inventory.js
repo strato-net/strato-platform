@@ -330,10 +330,12 @@ async function updateSale(admin, contract, _args, options) {
                 return agg | (base << 1)
             case 'paymentProviders':
                 return agg | (base << 2)
+            case 'cost':
+                return agg | (base << 3)
             default:
                 return agg
         }
-    }, 0)
+    }, 0);
 
     const callArgs = {
         contract,
@@ -344,10 +346,10 @@ async function updateSale(admin, contract, _args, options) {
         }),
     }
 
-    const restStatus = await rest.call(admin, callArgs, options)
+    const restStatus = await rest.call(admin, callArgs, options);
 
     if (parseInt(restStatus, 10) !== RestStatus.OK) {
-        throw new rest.RestError(restStatus, 0, { callArgs })
+        throw new rest.RestError(restStatus, 0, { callArgs });
     }
 
     return restStatus;
@@ -382,6 +384,7 @@ async function get(user, args, options) {
     if (sale) {
         inventory = {
             ...inventory,
+            cost: sale?.cost,
             price: sale.price,
             saleAddress: sale.address,
             saleQuantity: sale.quantity,
@@ -420,8 +423,8 @@ async function getAll(admin, args = {}, defaultOptions) {
             }, options, admin);
 
         // Combine the inventories and sales data
+    
         if (inventories) {
-            console.log(inventories);
             inventories.forEach(inventory => {
                 const itemSale = sales.find(sale => sale.assetToBeSold == inventory.address && sale.isOpen);
                 if (itemSale) {
@@ -488,6 +491,7 @@ async function getAll(admin, args = {}, defaultOptions) {
                         if (sales.length > 0 && (sales.price !== null || undefined)) { // Only combine if there are sales. We don't list unpublished items for this route. 
                             finalInventory.push({
                                 ...inventory,
+                                cost: sales[0]?.cost,
                                 price: sales[0]?.price,
                                 saleAddress: sales[0]?.address,
                                 saleQuantity: sales[0]?.quantity,
@@ -500,6 +504,7 @@ async function getAll(admin, args = {}, defaultOptions) {
                     } else { // Just combine the data if userProfile is not present
                         finalInventory.push({
                             ...inventory,
+                            cost: sales[0]?.cost,
                             price: sales[0]?.price,
                             saleAddress: sales[0]?.address,
                             saleQuantity: sales[0]?.quantity,
@@ -512,6 +517,7 @@ async function getAll(admin, args = {}, defaultOptions) {
                 } else if (isMarketplaceSearch && isNullPriceRange) {
                     finalInventory.push({
                         ...inventory,
+                        cost: null,
                         price: null,
                         saleAddress: null,
                         saleQuantity: null,

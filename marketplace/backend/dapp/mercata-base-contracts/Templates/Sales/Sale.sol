@@ -208,6 +208,7 @@ abstract contract Sale is Utils {
         uint _quantity,
         decimal _price,
         address[] _paymentProviders,
+        uint _cost,
         uint _scheme
     ) returns (uint) {
 
@@ -225,6 +226,9 @@ abstract contract Sale is Utils {
       if ((_scheme & (1 << 2)) == (1 << 2)) {
         clearPaymentProviders();
         addPaymentProviders(_paymentProviders);
+      }
+      if ((_scheme & (1 << 3)) == (1 << 3)) {
+        cost = _cost;
       }
       return RestStatus.OK;
     }

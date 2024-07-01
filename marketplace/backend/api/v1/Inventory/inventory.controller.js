@@ -175,8 +175,8 @@ class InventoryController {
 
       InventoryController.validateUpdateSaleArgs(body)
 
-      const result = await dapp.updateSale(body, options)
-      rest.response.status200(res, result)
+      const result = await dapp.updateSale(body, options);
+      rest.response.status200(res, result);
 
       return next()
     } catch (e) {
@@ -264,7 +264,8 @@ class InventoryController {
       itemAddress: Joi.string().required(),
       updates: Joi.object({
         status: Joi.number().min(1).required(),
-        price: Joi.number().positive().min(1).required()
+        price: Joi.number().positive().min(1).required(),
+        cost: Joi.number().positive().min(0).required()
       }).required()
     });
 
@@ -355,6 +356,7 @@ class InventoryController {
       newOwner: Joi.string().required(),
       quantity: Joi.number().integer().greater(0).required(),
       price: Joi.number().greater(0).precision(2).required(),
+      cost: Joi.number().greater(0).precision(2).required(),
     });
 
     const validation = transferItemSchema.validate(args);
@@ -375,6 +377,7 @@ class InventoryController {
       ).optional(),
       price: Joi.number().greater(0).precision(2).optional(),
       quantity: Joi.number().integer().greater(0).optional(),
+      cost: Joi.number().integer().min(0).optional(),
     });
 
     const validation = updateSaleItemSchema.validate(args);

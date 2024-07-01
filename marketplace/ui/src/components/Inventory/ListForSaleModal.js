@@ -14,7 +14,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
     const [paymentTypes, setPaymentTypes] = useState([]);
     const [availablePaymentProviders, setAvailablePaymentProviders] = useState([]);
     const [pricePerUnit, setpricePerUnit] = useState(inventory.price ? inventory.price : inventory.pricePerUnit);
-    const [costPerUnit, setCostPerUnit] = useState(0);
+    const [costPerUnit, setCostPerUnit] = useState(inventory.cost ? inventory.cost : inventory.costPerUnit);
     const inventoryDispatch = useInventoryDispatch();
     const [canList, setCanList] = useState(true);
     const {
