@@ -74,14 +74,14 @@ const MarketPlace = ({ user, isAuthenticated }) => {
       <Fade triggerOnce>
         <Carousel autoPlay centerSlidePercentage={95} showArrows={false} infiniteLoop showStatus={false} swipeable emulateTouch autoFocus centerMode>
           <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2 md:mt-6 lg:mx-3">
-            <div className="absolute top-40 left-8 md:left-24 md:top-60 z-50">
+            <div className="relative flex top-[156px] left-[4%] md:left-[7%] md:top-60 z-50">
               <Button
                 id="viewMore"
                 onClick={() => {
                   navigate(navRoute);
                   sessionStorage.setItem('scrollPosition', 0);
                 }}
-                className="gradient-button h-auto md:h-11 border-primary bg-white text-primary hover:text-white"
+                className="gradient-button border-0 h-auto md:h-11 border-primary bg-white text-primary hover:text-white"
               >
                 <div className="flex items-center">
                   <div className="hidden md:block font-semibold text-lg">
@@ -98,7 +98,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
               <img
                 alt={metaImg}
                 title={metaImg}
-                className="absolute inset-0 z-10 h-[222px] md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+                className="absolute inset-0 z-10 h-[222px] md:h-[365px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
                 height={380} width="100%" src={Images.carousel_desktop_one} preview={false}
               />
             </div>
@@ -106,20 +106,20 @@ const MarketPlace = ({ user, isAuthenticated }) => {
               <img
                 alt={metaImg}
                 title={metaImg}
-                className="absolute inset-0 z-10 h-[222px] md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+                className="absolute inset-0 z-10 h-[222px] md:h-[365px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
                 height={380} width="100%" src={Images.carousel_mobile_one} preview={false}
               />
             </div>
           </div>
           <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2  md:mt-6 lg:mx-3">
-            <div className="absolute top-40 left-8 md:left-24 md:top-60 z-50">
+            <div className="relative flex top-[156px] left-[4%] md:left-[7%] md:top-60 z-50">
               <Button
                 id="viewMore"
                 onClick={() => {
                   navigate(navRoute);
                   sessionStorage.setItem('scrollPosition', 0);
                 }}
-                className="gradient-button h-auto md:h-11 border-primary bg-white text-primary hover:text-white"
+                className="gradient-button border-0 h-auto md:h-11 border-primary bg-white text-primary hover:text-white"
               >
                 <div className="flex items-center">
                   <div className="hidden md:block font-semibold text-lg">
@@ -136,7 +136,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
               <img
                 alt={metaImg}
                 title={metaImg}
-                className="absolute inset-0 z-10 h-[222px] md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+                className="absolute inset-0 z-10 h-[222px] md:h-[365px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
                 height={380} width="100%" src={Images.carousel_desktop_two} preview={false}
               />
             </div>
@@ -144,20 +144,20 @@ const MarketPlace = ({ user, isAuthenticated }) => {
               <img
                 alt={metaImg}
                 title={metaImg}
-                className="absolute inset-0 z-10 h-[222px] md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+                className="absolute inset-0 z-10 h-[222px] md:h-[365px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
                 height={380} width="100%" src={Images.carousel_mobile_two} preview={false}
               />
             </div>
           </div>
           <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2  md:mt-6 lg:mx-3">
-            <div className="absolute top-40 left-8 md:left-24 md:top-60 z-50">
+            <div className="relative flex top-[156px] left-[4%] md:left-[7%] md:top-60 z-50">
               <Button
                 id="viewMore"
                 onClick={() => {
                   navigate(navRoute);
                   sessionStorage.setItem('scrollPosition', 0);
                 }}
-                className="gradient-button h-auto md:h-11 border-primary bg-white text-primary hover:text-white"
+                className="gradient-button border-0 h-auto md:h-11 border-primary bg-white text-primary hover:text-white"
               >
                 <div className="flex items-center">
                   <div className="hidden md:block font-semibold text-lg">
@@ -174,7 +174,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
               <img
                 alt={metaImg}
                 title={metaImg}
-                className="absolute inset-0 z-10 h-[222px] md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+                className="absolute inset-0 z-10 h-[222px] md:h-[365px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
                 height={380} width="100%" src={Images.carousel_desktop_three} preview={false}
               />
             </div>
@@ -182,24 +182,24 @@ const MarketPlace = ({ user, isAuthenticated }) => {
               <img
                 alt={metaImg}
                 title={metaImg}
-                className="absolute inset-0 z-10 h-[222px] md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+                className="absolute inset-0 z-10 h-[222px] md:h-[365px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
                 height={380} width="100%" src={Images.carousel_mobile_three} preview={false}
               />
             </div>
           </div>
           <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2  md:mt-6 lg:mx-3">
-            <div className="absolute top-40 left-8 md:left-24 md:top-60 z-50">
+            <div className="relative flex top-[156px] left-[4%] md:left-[7%] md:top-60 z-50">
               <Button
                 id="viewMore"
                 onClick={() => {
                   navigate(navRoute);
                   sessionStorage.setItem('scrollPosition', 0);
                 }}
-                className="gradient-button h-auto md:h-11 border-primary bg-white text-primary hover:text-white"
+                className="gradient-button border-0 h-auto md:h-11 border-primary bg-white text-primary hover:text-white"
               >
                 <div className="flex items-center">
                   <div className="hidden md:block font-semibold text-lg">
-                    Explore More
+                  Save Dogs Now
                   </div>
                   <div className="md:hidden font-semibold text-base">
                     Explore
@@ -212,7 +212,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
               <img
                 alt={metaImg}
                 title={metaImg}
-                className="absolute inset-0 z-10 h-[222px] md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+                className="absolute inset-0 z-10 h-[222px] md:h-[365px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
                 height={380} width="100%" src={Images.carousel_desktop_four} preview={false}
               />
             </div>
@@ -220,20 +220,20 @@ const MarketPlace = ({ user, isAuthenticated }) => {
               <img
                 alt={metaImg}
                 title={metaImg}
-                className="absolute inset-0 z-10 h-[222px] md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+                className="absolute inset-0 z-10 h-[222px] md:h-[365px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
                 height={380} width="100%" src={Images.carousel_mobile_four} preview={false}
               />
             </div>
           </div>
           <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2  md:mt-6 lg:mx-3">
-            <div className="absolute top-40 left-8 md:left-24 md:top-60 z-50">
+            <div className="relative flex top-[156px] left-[4%] md:left-[7%] md:top-60 z-50">
               <Button
                 id="viewMore"
                 onClick={() => {
                   navigate(navRoute);
                   sessionStorage.setItem('scrollPosition', 0);
                 }}
-                className="gradient-button h-auto md:h-11 border-primary bg-white text-primary hover:text-white"
+                className="gradient-button border-0 h-auto md:h-11 border-primary bg-white text-primary hover:text-white"
               >
                 <div className="flex items-center">
                   <div className="hidden md:block font-semibold text-lg">
@@ -250,7 +250,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
               <img
                 alt={metaImg}
                 title={metaImg}
-                className="absolute inset-0 z-10 h-[222px] md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+                className="absolute inset-0 z-10 h-[222px] md:h-[365px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
                 height={380} width="100%" src={Images.carousel_desktop_five} preview={false}
               />
             </div>
@@ -258,7 +258,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
               <img
                 alt={metaImg}
                 title={metaImg}
-                className="absolute inset-0 z-10 h-[222px] md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+                className="absolute inset-0 z-10 h-[222px] md:h-[365px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
                 height={380} width="100%" src={Images.carousel_mobile_five} preview={false}
               />
             </div>
