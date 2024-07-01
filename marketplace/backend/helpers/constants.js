@@ -36,8 +36,8 @@ export default {
   testnetNetworkId: "7596898649924658542",
   prodStratsAddress: "b220195543f652f735b7847c4af399d0323e1ff6",
   testnetStratsAddress: "488cd3909d94606051e0684cf6caa5763fb78613",
-  attachImagesAndFiles: "*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*)",
-  attachSalesAndImagesAndFiles: "*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Sale!BlockApps-Mercata-Sale_BlockApps-Mercata-Asset_fk(*)",
+  attachImagesAndFiles: "*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Asset-fileNames(*)",
+  attachSalesAndImagesAndFiles: "*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Asset-fileNames(*),BlockApps-Mercata-Sale!BlockApps-Mercata-Sale_BlockApps-Mercata-Asset_fk(*)",
   attach_saleAddresses_Quantities_completedSales_onOrder: "*,BlockApps-Mercata-Order-saleAddresses(*),BlockApps-Mercata-Order-quantities(*),BlockApps-Mercata-Order-completedSales(*)",
   baUserNames: ['blockapps_carbon', 'blockapps_metals', 'blockapps_clothing', 'blockapps_collectibles', 'blockapps_memberships', 'blockapps_art', 'blockapps_spirits'],
   localHost: 'http://localhost'
@@ -122,25 +122,28 @@ export const calculatePriceFluctuation = (records) => {
 }
 
 export const calculateVolumeTraded = (records) => {
-  return records.reduce((acc, record, index, array) => {
-    // Skip the first element as there's no previous element to compare with
-    if (index === 0) return acc;
+  // Create a map to track the latest quantity for each address
+  const addressQuantityMap = new Map();
 
-    // Check if the current record and the previous record have the same address
-    // We shouldn't track quantity decreased for a new sale contract created
-    // (when user uses list for sale) as the lesser quantity can be listed for sale 
-    if (record.address === array[index - 1].address) {
-      const quantityDecrease = array[index - 1].quantity - record.quantity;
+  return records.reduce((acc, record) => {
+    // Get the previous quantity for this address, if any
+    const previousQuantity = addressQuantityMap.get(record.address) || record.quantity;
 
-      // Only add to the accumulator if there's a decrease in quantity
-      if (quantityDecrease > 0) {
-        acc += quantityDecrease;
-      }
+    // Update the map with the current quantity
+    addressQuantityMap.set(record.address, record.quantity);
+
+    // Calculate the quantity decrease
+    const quantityDecrease = previousQuantity - record.quantity;
+
+    // Only add to the accumulator if there's a decrease in quantity
+    if (quantityDecrease > 0) {
+      acc += quantityDecrease;
     }
 
     return acc;
   }, 0);
 };
+
 
 
 // Helpers to get time `x` months/years ago and date
