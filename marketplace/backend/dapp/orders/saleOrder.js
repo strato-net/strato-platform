@@ -177,10 +177,6 @@ async function get(user, args, options) {
   order = await searchOne(paymentTableName, searchArgs, newOptions, user);
 
   if (!order) {
-    searchArgs = setSearchQueryOptions(restArgs, {
-      key: "address",
-      value: address,
-    });
 
     // Legacy orders need to join array tables. 
     let legacyArgs = {
@@ -190,7 +186,7 @@ async function get(user, args, options) {
         select: constants.attach_saleAddresses_Quantities_completedSales_onOrder
       }
     }
-    order = await searchOne(constants.orderTableName, legacyArgs, newOptions, user);
+    order = await searchAllWithQueryArgs(constants.orderTableName, legacyArgs, newOptions, user);
   }
 
   if (!order) {
