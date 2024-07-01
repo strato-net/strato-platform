@@ -3340,7 +3340,7 @@ solidityExceptionHandler catchBlockMap ex = do
     (MissingCertificate s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 16 missingCertificate
       return res
-    _ -> error "unhandled solid exception" (show ex)
+    _ -> error $ "Debug B: unhandled solid exception" <> (show ex)
 
 solidVMExceptionHelper :: (MonadSM m) => M.Map String (Maybe [String], [CC.Statement]) -> m (Maybe Value) -> m (Maybe Value)
 solidVMExceptionHelper x y = case M.lookup "" x of
@@ -3519,8 +3519,129 @@ solidVMExceptionHandler catchBlockMap ex = case ex of
             else pure $ [()]
         res <- runStatementBlock block
         return res
-  --
-  _ -> error "unhandled solid exception" (show ex)
+  (TypeError s1 s2) -> do
+    case M.lookup "TypeError" catchBlockMap of
+      Nothing -> solidVMExceptionHelper catchBlockMap $ typeError s1 s2
+      Just (_, block) -> do
+        liftIO $ print ("This is TypeError" :: String)
+        res <- runStatementBlock block
+        return res
+  
+  (TODO s1 s2) -> do
+    case M.lookup "TODO" catchBlockMap of
+      Nothing -> solidVMExceptionHelper catchBlockMap $ todo s1 s2
+      Just (_, block) -> do
+        liftIO $ print ("This is TODO" :: String)
+        res <- runStatementBlock block
+        return res
+  
+  (MissingField s1 s2) -> do
+    case M.lookup "MissingField" catchBlockMap of
+      Nothing -> solidVMExceptionHelper catchBlockMap $ missingField s1 s2
+      Just (_, block) -> do
+        liftIO $ print ("This is MissingField" :: String)
+        res <- runStatementBlock block
+        return res
+  
+  (RevertError s1 s2) -> do
+    case M.lookup "RevertError" catchBlockMap of
+      Nothing -> solidVMExceptionHelper catchBlockMap $ revertError s1 s2
+      Just (_, block) -> do
+        liftIO $ print ("This is RevertError" :: String)
+        res <- runStatementBlock block
+        return res
+  
+  (MissingType s1 s2) -> do
+    case M.lookup "MissingType" catchBlockMap of
+      Nothing -> solidVMExceptionHelper catchBlockMap $ missingType s1 s2
+      Just (_, block) -> do
+        liftIO $ print ("This is MissingType" :: String)
+        res <- runStatementBlock block
+        return res
+  
+  (DuplicateDefinition s1 s2) -> do
+    case M.lookup "DuplicateDefinition" catchBlockMap of
+      Nothing -> solidVMExceptionHelper catchBlockMap $ duplicateDefinition s1 s2
+      Just (_, block) -> do
+        liftIO $ print ("This is DuplicateDefinition" :: String)
+        res <- runStatementBlock block
+        return res
+  
+  (DuplicateContract s1) -> do
+    case M.lookup "DuplicateContract" catchBlockMap of
+      Nothing -> solidVMExceptionHelper catchBlockMap $ duplicateContract s1
+      Just (_, block) -> do
+        liftIO $ print ("This is DuplicateContract" :: String)
+        res <- runStatementBlock block
+        return res
+  
+  (ArityMismatch s1 i1 i2) -> do
+    case M.lookup "DuplicateContract" catchBlockMap of
+      Nothing -> solidVMExceptionHelper catchBlockMap $ arityMismatch s1 i1 i2
+      Just (_, block) -> do
+        liftIO $ print ("This is ArityMismatch" :: String)
+        res <- runStatementBlock block
+        return res
+      
+
+  (ModifierError s1 s2) -> do
+    case M.lookup "ModifierError" catchBlockMap of
+      Nothing -> solidVMExceptionHelper catchBlockMap $ modifierError s1 s2
+      Just (_, block) -> do
+        liftIO $ print ("This is ModifierError" :: String)
+        res <- runStatementBlock block
+        return res
+
+  (ReservedWordError s1 s2) -> do
+    case M.lookup "ReservedWordError" catchBlockMap of
+      Nothing -> solidVMExceptionHelper catchBlockMap $ reservedWordError s1 s2
+      Just (_, block) -> do
+        liftIO $ print ("This is ReservedWordError" :: String)
+        res <- runStatementBlock block
+        return res
+
+
+  (ImmutableError s1 s2) -> do
+    case M.lookup "ImmutableError" catchBlockMap of
+      Nothing -> solidVMExceptionHelper catchBlockMap $ immutableError s1 s2
+      Just (_, block) -> do
+        liftIO $ print ("This is ImmutableError" :: String)
+        res <- runStatementBlock block
+        return res
+
+  (FailedToAttainRunTimCode s1 s2) -> do
+    case M.lookup "FailedToAttainRunTimCode" catchBlockMap of
+      Nothing -> solidVMExceptionHelper catchBlockMap $ getRunTimeCodeError s1 s2
+      Just (_, block) -> do
+        liftIO $ print ("This is FailedToAttainRunTimCode" :: String)
+        res <- runStatementBlock block
+        return res
+  
+  (OldForeignPragmaError s1 s2) -> do
+    case M.lookup "OldForeignPragmaError" catchBlockMap of
+      Nothing -> solidVMExceptionHelper catchBlockMap $ oldForeignPragmaError s1 s2
+      Just (_, block) -> do
+        liftIO $ print ("This is OldForeignPragmaError" :: String)
+        res <- runStatementBlock block
+        return res
+  
+  (UserDefinedError s1 s2) -> do
+    case M.lookup "UserDefinedError" catchBlockMap of
+      Nothing -> solidVMExceptionHelper catchBlockMap $ userDefinedError s1 s2
+      Just (_, block) -> do
+        liftIO $ print ("This is UserDefinedError" :: String)
+        res <- runStatementBlock block
+        return res
+      
+  (MissingCertificate s1 s2) -> do
+    case M.lookup "MissingCertificate" catchBlockMap of
+      Nothing -> solidVMExceptionHelper catchBlockMap $ missingCertificate s1 s2
+      Just (_, block) -> do
+        liftIO $ print ("This is MissingCertificate" :: String)
+        res <- runStatementBlock block
+        return res
+
+  -- _ -> error $ "Debug A: unhandled solid exception" <> (show ex)
 
 specialUsingChecker :: MonadSM m => CC.Expression -> m (Maybe Variable)
 specialUsingChecker (CC.FunctionCall _ (CC.MemberAccess _ (CC.Variable firstPos firstArgVar) usingFuncName) (CC.OrderedArgs xs)) = do
