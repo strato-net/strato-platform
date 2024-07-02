@@ -77,13 +77,14 @@ contract StratPaymentService is PaymentService {
         string _orderHash,
         string _orderId,
         address _purchaser,
-        string _purchaserCommonName,
+        string _purchasersCommonName,
         address[] _saleAddresses,
         uint[] _quantities,
         string _currency,
         uint _createdDate
-    ) internal override {
+    ) internal override returns (address[]) {
         require(false, "Cannot call initializePayment for STRAT payments.");
+        return [];
     }
 
     function _completeOrder (
