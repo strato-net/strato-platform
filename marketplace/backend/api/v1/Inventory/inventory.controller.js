@@ -148,7 +148,7 @@ class InventoryController {
       InventoryController.validateTransferItemArgs(body)
 
       const result = await dapp.transferItem(body)
-      rest.response.status200(res, result)
+      rest.response.status200(res, result.transferStatus)
 
       return next()
     } catch (e) {
@@ -158,38 +158,47 @@ class InventoryController {
   
   static async bridge(req, res, next) {
     try {
-      const { dapp, body } = req
+        const { dapp, body } = req;
 
-      InventoryController.validateBridgeItemArgs(body)
-      const transferPayload = {
-        assetAddress: body.assetAddress,
-        newOwner: body.newOwner,
-        quantity: body.quantity,
-        price: body.price,
-      }
-      await dapp.transferItem(transferPayload)
-      
-      const payload = {
-        tokenSymbol: body.assetAddress,
-        quantity: body.quantity,
-        baseAddress: body.baseAddress,
-      }
-      const response = await fetch(
-        `http://localhost:3001/api/bridgeMercata`,
-        {
-          method: "POST",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
+        InventoryController.validateBridgeItemArgs(body);
+        const transferPayload = {
+            assetAddress: body.assetAddress,
+            newOwner: body.newOwner,
+            quantity: body.quantity,
+            price: body.price,
+        };
+
+        const result = await dapp.transferItem(transferPayload);
+
+        if (result.transferStatus[0] !== '200') {
+            throw new Error(`Transfer failed with status: ${result.transferStatus[0]}`);
         }
-      );
-      rest.response.status200(res, response)
 
-      return next()
+        const payload = {
+            tokenSymbol: body.assetAddress,
+            quantity: body.quantity,
+            baseAddress: body.baseAddress,
+            transferNumber: result.transferNumber,
+        };
+
+        const response = await fetch(`http://localhost:3001/api/bridgeMercata`, {
+            method: "POST",
+            headers: {
+                Accept: "application/json",
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+            throw new Error("Bridge API call failed");
+        }
+
+        rest.response.status200(res, await response.json());
+
+        return next();
     } catch (e) {
-      return next(e)
+        return next(e);
     }
   }
 

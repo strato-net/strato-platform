@@ -275,7 +275,7 @@ async function transferItem(user, contract, args, options) {
 
     await waitForAddress(user, { name: transferContractName }, searchOptions);
 
-    return transferStatus;
+    return { transferStatus, transferNumber: args.transferNumber };
 }
 
 async function updateAssetStatus(user, contract, args, options) {
