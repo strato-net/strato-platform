@@ -211,12 +211,13 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
                         Nothing -> Just $ Map.singleton "history" cn
                         Just h -> Just $ Map.insert "history" cn h
                     )
+                    (getMaybeCodeFromContractPayload p)
               )
               ps
           contracts' = map (uploadlistcontractChainid %~ (<|> cid)) mapUploadList
       txsWithParams <- genNonces (Don't CacheNonce) addr uploadlistcontractChainid uploadlistcontractTxParams contracts'
       forStateT Map.empty txsWithParams $
-        \(UploadListContract name srcs args params value cid' md) -> do
+        \(UploadListContract name srcs args params value cid' md cPtr) -> do
           (src, contract) <- do
             cd <-
               fmap snd . lift $
@@ -236,7 +237,11 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
                 addr
                 (fromMaybe emptyTxParams params)
                 (Wei (maybe 0 fromIntegral $ fmap unStrung value))
-                (Code $ Text.encodeUtf8 $ serializeSourceMap src)
+                -- (Code $ Text.encodeUtf8 $ serializeSourceMap src)
+                (case cPtr of
+                  Just cp -> cp
+                  Nothing -> (Code $ Text.encodeUtf8 $ serializeSourceMap src)
+                )
                 cid'
           return $ BlocTransactionBodyResult (hash' tx) (Just tx)
     FUNCTION -> do
@@ -274,6 +279,10 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
               (fromMaybe emptyTxParams _methodcallTxParams)
               (Wei (fromIntegral $ unStrung methodcallValue))
               (Code $ sel <> argsBin)
+              -- (case ptr of
+              --   Just ptr -> ptr
+              --   Nothing -> (Code $ sel <> argsBin)
+              -- )
               _methodcallChainid
           return $ BlocTransactionBodyResult (hash' tx) (Just tx)
     GENESIS -> throwIO . UserError . Text.pack $ "ERROR! Only TRANSFER, CONTRACT, and FUNCTION calls are allowed."
@@ -356,12 +365,13 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
                       Nothing -> Just $ Map.singleton "history" cn
                       Just h -> Just $ Map.insert "history" cn h
                   )
+                  (getMaybeCodeFromContractPayload p)
             )
               ps
           contract' = (uploadlistcontractChainid %~ (<|> cid)) upload
       txsWithParams <- genNonces (Don't CacheNonce) addr uploadlistcontractChainid uploadlistcontractTxParams [contract']
       forStateT Map.empty txsWithParams $
-        \(UploadListContract name srcs args params value cid' md) -> do
+        \(UploadListContract name srcs args params value cid' md cPtr) -> do
           (src, contract) <- do
             cd <-
               fmap snd . lift $
@@ -381,7 +391,11 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
                 addr
                 (fromMaybe emptyTxParams params)
                 (Wei (maybe 0 fromIntegral $ fmap unStrung value))
-                (Code $ Text.encodeUtf8 $ serializeSourceMap src)
+                -- (Code $ Text.encodeUtf8 $ serializeSourceMap src)
+                (case cPtr of
+                  Just cp -> cp
+                  Nothing -> (Code $ Text.encodeUtf8 $ serializeSourceMap src)
+                )
                 cid'
     FUNCTION -> do
       p <- fromFunction tx
@@ -433,7 +447,7 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
 
 ---------------------------------- REGULAR TRANSACTIONS ---------------------------------------
 
-getMaybeCodeFromContractPayload :: ContractPayload -> Maybe Code
+getMaybeCodeFromContractPayload :: ContractPayload -> Maybe Code --TODO: Add logic for returning serialized source map
 getMaybeCodeFromContractPayload p = 
   case contractpayloadCodePtr p of
     Just p' -> 
@@ -706,6 +720,7 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                                   Nothing -> Just $ Map.insert "VM" "SolidVM" (Map.singleton "history" cn)
                                   Just h -> Just $ Map.insert "VM" "SolidVM" (Map.insert "history" cn h)
                               )
+                              (getMaybeCodeFromContractPayload p)
                       )
                       ps
                 let bclp = 
@@ -891,6 +906,10 @@ postUsersContractSolidVM' cacheNonce ContractParameters {..} jwtToken = do
         fromAddr
         params
         (Wei (fromIntegral (maybe 0 unStrung value)))
+        -- (case ptr of
+        --   Just ptr -> ptr
+        --   Nothing -> (Code $ Text.encodeUtf8 $ serializeSourceMap src)
+        -- )
         (Code $ Text.encodeUtf8 $ serializeSourceMap src)
         chainId
   $logDebugLS "postUsersContractSolidVM'/tx" tx
@@ -917,7 +936,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters {..} jwtToken = do
   txSizeLimit <- fmap txSizeLimit getBlocEnv
   txsWithParams <- genNonces cacheNonce fromAddr uploadlistcontractChainid uploadlistcontractTxParams contracts'
   namesTxs <- forStateT Map.empty txsWithParams $
-    \(UploadListContract name srcs args params value cid md) -> do
+    \(UploadListContract name srcs args params value cid md cPtr) -> do
       (src, contract) <- do
         cd <-
           fmap snd . lift $
@@ -938,7 +957,11 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters {..} jwtToken = do
             fromAddr
             (fromMaybe emptyTxParams params)
             (Wei (maybe 0 fromIntegral $ fmap unStrung value))
-            (Code $ Text.encodeUtf8 $ serializeSourceMap src)
+            -- (Code $ Text.encodeUtf8 $ serializeSourceMap src)
+            (case cPtr of
+              Just cp -> cp
+              Nothing -> (Code $ Text.encodeUtf8 $ serializeSourceMap src)
+            )
             cid
       return (name, tx)
   let txs = map snd namesTxs
