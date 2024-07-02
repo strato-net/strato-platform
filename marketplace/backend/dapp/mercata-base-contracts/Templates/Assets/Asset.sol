@@ -52,7 +52,7 @@ abstract contract Asset is Utils {
         uint quantity,
         uint transferNumber,
         uint transferDate,
-        uint price
+        decimal price
     );
 
     constructor(
@@ -141,7 +141,7 @@ abstract contract Asset is Utils {
         sale = address(0);
     }
 
-    function _transfer(address _newOwner, uint _quantity, bool _isUserTransfer, uint _transferNumber, uint _price) internal virtual {
+    function _transfer(address _newOwner, uint _quantity, bool _isUserTransfer, uint _transferNumber, decimal _price) internal virtual {
         require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
         require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
         string newOwnerCommonName = getCommonName(_newOwner);
@@ -179,14 +179,14 @@ abstract contract Asset is Utils {
         close();
     }
     
-    function transferOwnership(address _newOwner, uint _quantity, bool _isUserTransfer, uint _transferNumber, uint _price) public fromSale("transfer ownership") {
+    function transferOwnership(address _newOwner, uint _quantity, bool _isUserTransfer, uint _transferNumber, decimal _price) public fromSale("transfer ownership") {
         require(_quantity <= quantity, "Cannot transfer more than available quantity.");
         // regular transfer - isUserTransfer: false, transferNumber: 0
         // transfer feature - isUserTransfer: true, transferNumber: >0
         _transfer(_newOwner, _quantity, _isUserTransfer, _transferNumber, _price);
     }
 
-    function automaticTransfer(address _newOwner, uint _price, uint _quantity, uint _transferNumber) public requireOwner("automatic transfer") returns (uint) {
+    function automaticTransfer(address _newOwner, decimal _price, uint _quantity, uint _transferNumber) public requireOwner("automatic transfer") returns (uint) {
         require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
         require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
         require(_quantity <= quantity, "Cannot transfer more than available quantity.");
