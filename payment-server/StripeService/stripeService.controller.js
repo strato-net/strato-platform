@@ -64,7 +64,7 @@ class StripeServiceController {
 
       const hasSellerOnboarded = await checkSellerOnboarded(username);
 
-      if (!hasSellerOnboarded) {
+      if (!hasSellerOnboarded || hasSellerOnboarded.length === 0){
         const userDetails = await stripeService.getStripeConnectAccountDetail(userAccount);
 
         if (userDetails.charges_enabled && userDetails.details_submitted && userDetails.payouts_enabled) {
@@ -288,13 +288,45 @@ class StripeServiceController {
               saleAddresses: orderEvent[0].saleAddresses,
               quantities: orderEvent[0].quantities,
               currency: 'USD',
-              createdDate: orderEvent[0].createdDate
+              createdDate: orderEvent[0].createdDate,
+              // comments: "Thank you for your payment."
             } 
             const returnStatus = await completeOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
 
             // Update payment status in DB
             const updateResult = await updateStripePayment(p.orderhash, 'PAID');
             statuses[p.orderhash] = PAYMENT_STATUS['PAID'];
+          }
+          else{
+          /////////////////////////////////// ACH Cancellation Flow ////////////////////////////////////////////////////////////////
+          const session = await stripeService.getPaymentSession(p.paymentsessionid, p.accountid);
+          const intent = await stripeService.getPaymentIntent(session.payment_intent, p.accountid);
+          const paymentErrorAndRequiresMethod = intent.last_payment_error?.message && intent.status === 'requires_payment_method';
+          console.log("Reason for payment failure(to be added as comments):",intent.last_payment_error?.message)
+
+
+          if(paymentErrorAndRequiresMethod)
+            {
+              const orderEvent = await getOrderEvent(p.orderhash);
+              
+
+              const callArgs = {
+                orderHash: orderEvent[0].orderHash,
+                orderId: orderEvent[0].orderId,
+                purchaser: orderEvent[0].purchaser,
+                saleAddresses: orderEvent[0].saleAddresses,
+                quantities: orderEvent[0].quantities,
+                currency: 'USD',
+                createdDate: orderEvent[0].createdDate,
+                // comments: intentBody.data.last_payment_error?.message,
+              } 
+        
+              const cancelOrderStatus = await cancelOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
+              console.log("cancelOrderStatus", cancelOrderStatus);
+        
+              // Update payment status in DB
+              const updateResult = await updateStripePayment(p.orderHash, "CANCELED");
+            }
           }
         }
         statuses[p.orderhash] = PAYMENT_STATUS[p.status];

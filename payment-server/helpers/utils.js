@@ -186,7 +186,8 @@ const validateAndGetOrderDetails = async (quantities, saleAddresses) => {
       orderDetails.push({ 
         productName: assetContracts[i].name, 
         unitPrice: saleContracts[i].price, 
-        quantity: quantities[i] 
+        quantity: quantities[i],
+        firstSale: assetContracts[i].address === assetContracts[i].originAddress ? true : false 
       });
     }
     return { sellerCommonName, orderDetails };

@@ -29,7 +29,7 @@ class StripeService {
                 metadata: {},
                 payment_intent_data: {
                     // Calculation of Application Fee
-                    // application_fee_amount: this.calculateApplicationFee(cartData.orderList),
+                    application_fee_amount: this.calculateApplicationFee(orderDetails),
                     /* To be used in case of destination charge */
                     // transfer_data: {
                     //     destination: CONNECTED_ACCOUNT_ID
@@ -47,15 +47,15 @@ class StripeService {
         }
     }
 
-    static calculateApplicationFee(orderList) {
+    static calculateApplicationFee(orderDetailsList) {
         try {
         /* Based on the Type of Sale, this helper method is used to calculate application fee using the unit price and the item quantity */
-            return orderList.map(order => {
+            return orderDetailsList.map(order => {
                     const applicationFeePercentage = order.firstSale ? 10 : 3;
                     return Math.round(applicationFeePercentage * order.unitPrice * order.quantity);
                     }).reduce((acc, currentValue) => acc + currentValue, 0);
         } catch (e) {
-            throw new Error(`Stripe error: ${e.message}`)
+            throw new Error(`Stripe Application Fee (Tx Fee) Calculation error: ${e.message}`)
         }
     }
 
@@ -68,6 +68,17 @@ class StripeService {
             throw new Error(`Stripe error: ${e.message}`)
         }
     }
+
+    static async getPaymentIntent(paymentIntentId, CONNECTED_ACCOUNT_ID) {
+        try {
+          const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, {
+            stripeAccount: CONNECTED_ACCOUNT_ID
+          });
+          return paymentIntent;
+        } catch (error) {
+          throw new Error(`Stripe error: ${error.message}`);
+        }
+      }
 
     static generateStripeAccountId(type = 'standard') {
         try {
