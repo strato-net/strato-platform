@@ -63,10 +63,8 @@ RawTransaction
     toAddress Address Maybe
     value Integer sqltype=numeric(1000,0)
     codeOrData BS.ByteString Maybe
-    codeHash Keccak256 Maybe
     contractName String Maybe
     codePtrAddress Address Maybe
-    codePtrChainId Word256 Maybe
     chainId Word256
     r Integer
     s Integer

@@ -1136,7 +1136,9 @@ preparePostTx time from tx =
       (fromIntegral gasLimit)
       toAddr
       (fromIntegral value)
-      code
+      codeBytes
+      cName
+      cpa
       chainId
       (fromIntegral r)
       (fromIntegral s)
@@ -1154,7 +1156,15 @@ preparePostTx time from tx =
     Wei gasPrice = transactionGasPrice tx
     Nonce nonce' = transactionNonce tx
     Wei value = transactionValue tx
-    code = transactionInitOrData tx
+    codeBytes = case transactionInitOrData tx of
+      Code bytes -> Just bytes
+      _ -> Nothing
+    cName = case transactionInitOrData tx of
+      PtrToCode (CodeAtAccount (Account _ _) codePtrName) -> Just codePtrName
+      _ -> Nothing
+    cpa = case transactionInitOrData tx of
+      PtrToCode (CodeAtAccount (Account codePtrAddress _) _) -> Just codePtrAddress
+      _ -> Nothing
     toAddr = transactionTo tx
     chainId = fromMaybe 0 . fmap (\(ChainId c) -> c) $ transactionChainId tx
     metadata = Map.toList <$> transactionMetadata tx
@@ -1174,7 +1184,9 @@ preparePostUnsignedRawTx time tx md =
       (fromIntegral gasLimit)
       toAddr
       (fromIntegral value)
-      code
+      codeBytes
+      cName
+      cpa
       chainId
       0
       0
@@ -1188,7 +1200,15 @@ preparePostUnsignedRawTx time tx md =
     Wei gasPrice = unsignedTransactionGasPrice tx
     Nonce nonce' = unsignedTransactionNonce tx
     Wei value = unsignedTransactionValue tx
-    code = unsignedTransactionInitOrData tx
+    codeBytes = case unsignedTransactionInitOrData tx of
+      Code bytes -> Just bytes
+      _ -> Nothing
+    cName = case unsignedTransactionInitOrData tx of
+      PtrToCode (CodeAtAccount (Account _ _) codePtrName) -> Just codePtrName
+      _ -> Nothing
+    cpa = case unsignedTransactionInitOrData tx of
+      PtrToCode (CodeAtAccount (Account codePtrAddress _) _) -> Just codePtrAddress
+      _ -> Nothing
     toAddr = unsignedTransactionTo tx
     chainId = fromMaybe 0 . fmap (\(ChainId c) -> c) $ unsignedTransactionChainId tx
     metadata = Map.toList <$> md

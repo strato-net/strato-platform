@@ -2706,6 +2706,7 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
   case erNewContractAccount execResults of
     Just nca -> do
       when (not isRunningTests) $ 
+      
         void $ VME.produceVMEvents [ VME.CodeCollectionAdded 
                                      (const () <$> cc)
                                      (SolidVMCode contractName' hsh) 

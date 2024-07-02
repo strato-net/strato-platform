@@ -48,7 +48,6 @@ import Blockchain.Data.AddressStateDB
 import Blockchain.Data.DataDefs
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.ChainId
-import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.Keccak256
 import Control.Arrow
 import Control.Concurrent
@@ -251,7 +250,7 @@ evalAndReturn list = forStateT emptyBatchState list $
       Nothing -> return $ BlocTransactionResult Pending txHash Nothing Nothing
       Just (r@RawTransaction {..}, txr) -> case (rawTransactionToAddress, rawTransactionCodeOrData) of
         (Nothing, _) -> contractResult i txHash txr (Map.fromList <$> rawTransactionMetadata)
-        (_, Code "") -> return $ BlocTransactionResult Success txHash (Just txr) (Just . Send $ rawTx2PostTx r)
+        (_, Just bs) | bs == ByteString.empty -> return $ BlocTransactionResult Success txHash (Just txr) (Just . Send $ rawTx2PostTx r)
         (Just addr, _) -> functionResult i txHash txr (Map.fromList <$> rawTransactionMetadata) (Account addr $ toMaybe 0 rawTransactionChainId)
 
 nth :: Integer -> Text
