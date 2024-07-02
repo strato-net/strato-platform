@@ -13,6 +13,9 @@ import { Carousel } from "react-responsive-carousel";
 import { Fade } from "react-awesome-reveal";
 import HelmetComponent from "../Helmet/HelmetComponent";
 import { SEO } from "../../helpers/seoConstant";
+import { BANNER } from "../../helpers/constants";
+import { bannerArrow } from "../../images/SVGComponents";
+
 
 const MarketPlace = ({ user, isAuthenticated }) => {
   const limit = 10, offset = 0;
@@ -62,8 +65,28 @@ const MarketPlace = ({ user, isAuthenticated }) => {
   }, [dispatch, limit, offset, debouncedSearchTerm]);
 
   const linkUrl = window.location.href;
-  const metaImg = SEO.IMAGE_META
   const navRoute = routes.MarketplaceCategoryProductList.url.replace(':category', 'All');
+
+  const ButtonElement = ({ desktopText, mobileText }) => <div className="relative flex top-[156px] sm:top-[250px] left-[4%] sm:left-[7.5%] md:left-[7%] md:top-60 z-50">
+    <Button
+      id="viewMore"
+      onClick={() => {
+        navigate(navRoute);
+        sessionStorage.setItem('scrollPosition', 0);
+      }}
+      className="gradient-button border-0 h-auto md:h-11 border-primary bg-white text-primary hover:text-white"
+    >
+      <div className="flex items-center">
+        <div className="hidden sm:block font-semibold text-lg">
+          {desktopText}
+        </div>
+        <div className="sm:hidden font-semibold text-base">
+          {mobileText}
+        </div>
+        <span className="ml-1">{bannerArrow}</span>
+      </div>
+    </Button>
+  </div>
 
   return (
     <>
@@ -73,196 +96,55 @@ const MarketPlace = ({ user, isAuthenticated }) => {
         link={linkUrl} />
       <Fade triggerOnce>
         <Carousel autoPlay centerSlidePercentage={95} showArrows={false} infiniteLoop showStatus={false} swipeable emulateTouch autoFocus centerMode>
-          <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2 md:mt-6 lg:mx-3">
-            <div className="relative flex top-[156px] left-[4%] md:left-[7%] md:top-60 z-50">
-              <Button
-                id="viewMore"
-                onClick={() => {
-                  navigate(navRoute);
-                  sessionStorage.setItem('scrollPosition', 0);
-                }}
-                className="gradient-button border-0 h-auto md:h-11 border-primary bg-white text-primary hover:text-white"
-              >
-                <div className="flex items-center">
-                  <div className="hidden md:block font-semibold text-lg">
-                    Explore More
-                  </div>
-                  <div className="md:hidden font-semibold text-base">
-                    Explore
-                  </div>
-                  <img src={Images.button_arrow} />
-                </div>
-              </Button>
+          {BANNER.map((item, index) => (
+            <div key={index} className="relative p-2 h-[222px] sm:h-[380px] mx-1 md:mx-2 md:mt-6 lg:mx-3">
+              <ButtonElement desktopText={item.desktopText} mobileText={item.mobileText} />
+              <div className="sm:hidden">
+                <img
+                  alt={item.alt}
+                  title={item.title}
+                  className="absolute inset-0 z-10 h-[222px] md:h-[365px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+                  height={380}
+                  width="100%"
+                  src={item.mobileImg}
+                  preview={false}
+                />
+              </div>
+              <div className="hidden sm:block md:hidden">
+                <img
+                  alt={item.alt}
+                  title={item.title}
+                  className="absolute inset-0 z-10 h-[380px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+                  height={380}
+                  width="100%"
+                  src={item.tabletImg}
+                  preview={false}
+                />
+              </div>
+              <div className="hidden md:block lg:hidden">
+                <img
+                  alt={item.alt}
+                  title={item.title}
+                  className="absolute inset-0 z-10 md:h-[380px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+                  height={380}
+                  width="100%"
+                  src={item.laptopImg}
+                  preview={false}
+                />
+              </div>
+              <div className="hidden lg:block">
+                <img
+                  alt={item.alt}
+                  title={item.title}
+                  className="absolute inset-0 z-10 md:h-[380px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+                  height={380}
+                  width="100%"
+                  src={item.desktopImg}
+                  preview={false}
+                />
+              </div>
             </div>
-            <div className="hidden md:block ">
-              <img
-                alt={metaImg}
-                title={metaImg}
-                className="absolute inset-0 z-10 h-[222px] md:h-[365px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
-                height={380} width="100%" src={Images.carousel_desktop_one} preview={false}
-              />
-            </div>
-            <div className="md:hidden ">
-              <img
-                alt={metaImg}
-                title={metaImg}
-                className="absolute inset-0 z-10 h-[222px] md:h-[365px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
-                height={380} width="100%" src={Images.carousel_mobile_one} preview={false}
-              />
-            </div>
-          </div>
-          <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2  md:mt-6 lg:mx-3">
-            <div className="relative flex top-[156px] left-[4%] md:left-[7%] md:top-60 z-50">
-              <Button
-                id="viewMore"
-                onClick={() => {
-                  navigate(navRoute);
-                  sessionStorage.setItem('scrollPosition', 0);
-                }}
-                className="gradient-button border-0 h-auto md:h-11 border-primary bg-white text-primary hover:text-white"
-              >
-                <div className="flex items-center">
-                  <div className="hidden md:block font-semibold text-lg">
-                    Explore More
-                  </div>
-                  <div className="md:hidden font-semibold text-base">
-                    Explore
-                  </div>
-                  <img src={Images.button_arrow} />
-                </div>
-              </Button>
-            </div>
-            <div className="hidden md:block ">
-              <img
-                alt={metaImg}
-                title={metaImg}
-                className="absolute inset-0 z-10 h-[222px] md:h-[365px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
-                height={380} width="100%" src={Images.carousel_desktop_two} preview={false}
-              />
-            </div>
-            <div className="md:hidden ">
-              <img
-                alt={metaImg}
-                title={metaImg}
-                className="absolute inset-0 z-10 h-[222px] md:h-[365px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
-                height={380} width="100%" src={Images.carousel_mobile_two} preview={false}
-              />
-            </div>
-          </div>
-          <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2  md:mt-6 lg:mx-3">
-            <div className="relative flex top-[156px] left-[4%] md:left-[7%] md:top-60 z-50">
-              <Button
-                id="viewMore"
-                onClick={() => {
-                  navigate(navRoute);
-                  sessionStorage.setItem('scrollPosition', 0);
-                }}
-                className="gradient-button border-0 h-auto md:h-11 border-primary bg-white text-primary hover:text-white"
-              >
-                <div className="flex items-center">
-                  <div className="hidden md:block font-semibold text-lg">
-                    Explore More
-                  </div>
-                  <div className="md:hidden font-semibold text-base">
-                    Explore
-                  </div>
-                  <img src={Images.button_arrow} />
-                </div>
-              </Button>
-            </div>
-            <div className="hidden md:block ">
-              <img
-                alt={metaImg}
-                title={metaImg}
-                className="absolute inset-0 z-10 h-[222px] md:h-[365px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
-                height={380} width="100%" src={Images.carousel_desktop_three} preview={false}
-              />
-            </div>
-            <div className="md:hidden ">
-              <img
-                alt={metaImg}
-                title={metaImg}
-                className="absolute inset-0 z-10 h-[222px] md:h-[365px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
-                height={380} width="100%" src={Images.carousel_mobile_three} preview={false}
-              />
-            </div>
-          </div>
-          <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2  md:mt-6 lg:mx-3">
-            <div className="relative flex top-[156px] left-[4%] md:left-[7%] md:top-60 z-50">
-              <Button
-                id="viewMore"
-                onClick={() => {
-                  navigate(navRoute);
-                  sessionStorage.setItem('scrollPosition', 0);
-                }}
-                className="gradient-button border-0 h-auto md:h-11 border-primary bg-white text-primary hover:text-white"
-              >
-                <div className="flex items-center">
-                  <div className="hidden md:block font-semibold text-lg">
-                  Save Dogs Now
-                  </div>
-                  <div className="md:hidden font-semibold text-base">
-                    Explore
-                  </div>
-                  <img src={Images.button_arrow} />
-                </div>
-              </Button>
-            </div>
-            <div className="hidden md:block ">
-              <img
-                alt={metaImg}
-                title={metaImg}
-                className="absolute inset-0 z-10 h-[222px] md:h-[365px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
-                height={380} width="100%" src={Images.carousel_desktop_four} preview={false}
-              />
-            </div>
-            <div className="md:hidden ">
-              <img
-                alt={metaImg}
-                title={metaImg}
-                className="absolute inset-0 z-10 h-[222px] md:h-[365px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
-                height={380} width="100%" src={Images.carousel_mobile_four} preview={false}
-              />
-            </div>
-          </div>
-          <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2  md:mt-6 lg:mx-3">
-            <div className="relative flex top-[156px] left-[4%] md:left-[7%] md:top-60 z-50">
-              <Button
-                id="viewMore"
-                onClick={() => {
-                  navigate(navRoute);
-                  sessionStorage.setItem('scrollPosition', 0);
-                }}
-                className="gradient-button border-0 h-auto md:h-11 border-primary bg-white text-primary hover:text-white"
-              >
-                <div className="flex items-center">
-                  <div className="hidden md:block font-semibold text-lg">
-                    Explore More
-                  </div>
-                  <div className="md:hidden font-semibold text-base">
-                    Save Dog Now
-                  </div>
-                  <img src={Images.button_arrow} />
-                </div>
-              </Button>
-            </div>
-            <div className="hidden md:block ">
-              <img
-                alt={metaImg}
-                title={metaImg}
-                className="absolute inset-0 z-10 h-[222px] md:h-[365px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
-                height={380} width="100%" src={Images.carousel_desktop_five} preview={false}
-              />
-            </div>
-            <div className="md:hidden ">
-              <img
-                alt={metaImg}
-                title={metaImg}
-                className="absolute inset-0 z-10 h-[222px] md:h-[365px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
-                height={380} width="100%" src={Images.carousel_mobile_five} preview={false}
-              />
-            </div>
-          </div>
+          ))}
         </Carousel>
       </Fade>
       {iscategorysLoading ? (
