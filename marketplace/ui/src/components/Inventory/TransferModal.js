@@ -189,7 +189,8 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
             newOwner: '6ec8bbe4a5b87be18d443408df43a45e5972fa1b',
             quantity,
             price,
-            baseAddress: bridgeAddress
+            baseAddress: bridgeAddress,
+            mercataAddress: inventory.owner
         };
 
         if (quantity > 0 && quantity <= inventory.quantity && bridgeAddress) {

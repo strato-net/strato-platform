@@ -179,6 +179,7 @@ class InventoryController {
             quantity: body.quantity,
             baseAddress: body.baseAddress,
             transferNumber: result.transferNumber,
+            mercataAddress: body.mercataAddress,
         };
 
         const response = await fetch(`http://localhost:3001/api/bridgeMercata`, {
@@ -419,6 +420,7 @@ class InventoryController {
       quantity: Joi.number().integer().greater(0).required(),
       price: Joi.number().integer().min(0).required(),
       baseAddress: Joi.string().required(),
+      mercataAddress: Joi.string().required(),
     });
 
     const validation = bridgeItemSchema.validate(args);
