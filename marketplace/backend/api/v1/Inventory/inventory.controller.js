@@ -2,6 +2,7 @@ import { rest } from 'blockapps-rest'
 import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
+import { base } from 'viem/chains'
 
 const options = { config, cacheNonce: true }
 
@@ -160,18 +161,20 @@ class InventoryController {
     try {
       const { dapp, body } = req
 
-      InventoryController.validateTransferItemArgs(body)
+      InventoryController.validateBridgeItemArgs(body)
+      const transferPayload = {
+        assetAddress: body.assetAddress,
+        newOwner: body.newOwner,
+        quantity: body.quantity,
+        price: body.price,
+      }
+      await dapp.transferItem(transferPayload)
       
-      const result = await dapp.transferItem(body)
-      // if bridge is successful, call remote server
-      console.log("result123: ", result)
-      console.log("body: ", body)
       const payload = {
         tokenSymbol: body.assetAddress,
         quantity: body.quantity,
-        baseAddress: '0xf1f02E027cBaa72869649Df2C9B56C61C61675fF',
+        baseAddress: body.baseAddress,
       }
-      // api call to token bridge
       const response = await fetch(
         `http://localhost:3001/api/bridgeMercata`,
         {
@@ -183,8 +186,6 @@ class InventoryController {
           body: JSON.stringify(payload),
         }
       );
-      console.log("response: ", response)
-      
       rest.response.status200(res, response)
 
       return next()
@@ -394,6 +395,25 @@ class InventoryController {
     });
 
     const validation = transferItemSchema.validate(args);
+
+    if (validation.error) {
+      console.log('validation error: ', validation.error)
+      throw new rest.RestError(RestStatus.BAD_REQUEST, validation.error.message, {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      })
+    }
+  }
+  
+  static validateBridgeItemArgs(args) {
+    const bridgeItemSchema = Joi.object({
+      assetAddress: Joi.string().required(),
+      newOwner: Joi.string().required(),
+      quantity: Joi.number().integer().greater(0).required(),
+      price: Joi.number().integer().min(0).required(),
+      baseAddress: Joi.string().required(),
+    });
+
+    const validation = bridgeItemSchema.validate(args);
 
     if (validation.error) {
       console.log('validation error: ', validation.error)

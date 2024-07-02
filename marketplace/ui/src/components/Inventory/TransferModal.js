@@ -184,25 +184,16 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
     }
     
     const handleBridge = async () => {
-        console.log("bridge");
         const body = {
             assetAddress: inventory.address,
             newOwner: '6ec8bbe4a5b87be18d443408df43a45e5972fa1b',
             quantity,
-            price
+            price,
+            baseAddress: bridgeAddress
         };
 
-        if (quantity > 0 && quantity <= inventory.quantity && '6ec8bbe4a5b87be18d443408df43a45e5972fa1b') {
-            const isDone = await fetch(`http://localhost/api/v1/inventory/bridge`, {
-                method: 'POST',
-                credentials: "same-origin",
-                headers: {
-                Accept: "application/json",
-                "Content-Type": "application/json",
-                },
-                body: JSON.stringify(body),
-            });
-            console.log(isDone);
+        if (quantity > 0 && quantity <= inventory.quantity && bridgeAddress) {
+            let isDone = await actions.bridgeInventory(inventoryDispatch, body);
             if (isDone) {
                 await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
                 await actions.fetchInventoryForUser(inventoryDispatch, user.commonName);

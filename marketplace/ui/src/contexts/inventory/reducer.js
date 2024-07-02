@@ -170,6 +170,23 @@ const reducer = (state, action) => {
         error: action.error,
         isReselling: false
       };
+    case actionDescriptors.bridgeInventory:
+      return {
+        ...state,
+        isBridging: true
+      };
+    case actionDescriptors.bridgeInventorySuccessful:
+      return {
+        ...state,
+        inventory: action.payload,
+        isBridging: false
+      };
+    case actionDescriptors.bridgeInventoryFailed:
+      return {
+        ...state,
+        error: action.error,
+        isBridging: false
+      };
     case actionDescriptors.transferInventory:
       return {
         ...state,

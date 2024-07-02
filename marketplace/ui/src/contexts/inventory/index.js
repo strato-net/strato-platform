@@ -20,6 +20,7 @@ const InventoriesProvider = ({ children }) => {
     userInventoriesTotal: 0,
     isUserInventoriesLoading: false,
     isTransferring: false,
+    isBridging: false,
     inventoryDetails: null,
     inventoryOwnershipHistory: [],
     isInventoryDetailsLoading: false,
