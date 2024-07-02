@@ -2,7 +2,6 @@ import { rest } from 'blockapps-rest'
 import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
-import { base } from 'viem/chains'
 
 const options = { config, cacheNonce: true }
 
