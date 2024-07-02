@@ -22,6 +22,7 @@ library:
   - cryptohash
   - data-default
   - debugger
+  - Decimal
   - deepseq
   - ethereum-rlp
   - exceptions
