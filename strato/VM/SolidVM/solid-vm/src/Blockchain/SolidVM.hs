@@ -70,7 +70,7 @@ import Control.Monad
 import qualified Control.Monad.Catch as EUnsafe
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
-import Control.Monad.Extra (findM, fromMaybeM)
+import Control.Monad.Extra (findM, fromMaybeM, unlessM)
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Maybe
 import qualified Crypto.Hash.RIPEMD160 as RIPEMD160
@@ -1940,9 +1940,6 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
           argVals <- case args of
             CC.OrderedArgs as -> OrderedVals <$> mapM (getVar <=< expToVar) as
             CC.NamedArgs ns -> NamedVals <$> mapM (mapM $ getVar <=< expToVar) ns
-          let argCount = case args of
-                CC.OrderedArgs as -> length as
-                CC.NamedArgs ns -> length ns
           case var of
             Constant (SReference (AccountPath address (MS.StoragePath pieces))) -> do
               val' <- getVar $ Constant $ SReference $ AccountPath address $ MS.StoragePath $ init pieces
@@ -1974,23 +1971,23 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
               res <- do
                 if (CC._funcIsFree func)
                   then do
-                    matchingOverload <- findM testMatch $ CC._funcOverload func
-                    doesFunctionMatch <- testMatch func
+                    matchingOverload <- findM (flip validateFunctionArguments argVals) $ CC._funcOverload func
+                    doesFunctionMatch <- validateFunctionArguments func argVals
                     if (doesFunctionMatch)
                       then runTheCall address contract' funcName hsh cc func argVals ro True
                       else case matchingOverload of
                         Nothing -> runTheCall address contract' funcName hsh cc func argVals ro True
                         Just mo -> runTheCall address contract' funcName hsh cc mo argVals ro True
                   else do
-                    matchingOverload <- findM testMatch $ CC._funcOverload func
-                    doesFunctionMatch <- testMatch func
+                    matchingOverload <- findM (flip validateFunctionArguments argVals) $ CC._funcOverload func
+                    doesFunctionMatch <- validateFunctionArguments func argVals
                     if (doesFunctionMatch)
                       then runTheCall address contract' funcName hsh cc func argVals ro False
                       else case matchingOverload of
                         Nothing -> case M.lookup funcName $ cc ^. CC.flFuncs of
                           Just ff -> do
-                            matchingFreeOverload <- findM testMatch $ CC._funcOverload ff
-                            doesFreeFunctionMatch <- testMatch ff
+                            matchingFreeOverload <- findM (flip validateFunctionArguments argVals) $ CC._funcOverload ff
+                            doesFreeFunctionMatch <- validateFunctionArguments ff argVals
                             if (doesFreeFunctionMatch)
                               then runTheCall address contract' funcName hsh cc ff argVals ro True
                               else case matchingFreeOverload of
@@ -1999,61 +1996,6 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
                           Nothing -> runTheCall address contract' funcName hsh cc func argVals ro False
                         Just mo -> runTheCall address contract' funcName hsh cc mo argVals ro False
               return . Constant . fromMaybe SNULL $ res
-              where
-                testMatch :: MonadSM m => CC.Func -> m Bool
-                testMatch tf = do
-                  let argMapping = mapArgs tf
-                  doArgsMatch <- mapM testNameAndTypes argMapping
-                  pure $
-                    ((length argMapping) == (length $ CC._funcArgs tf))
-                      && ((length argMapping) == (argCount))
-                      && (all (== True) doArgsMatch)
-                testNameAndTypes :: MonadSM m => (String, (SVMType.Type, Value)) -> m Bool
-                testNameAndTypes (_, (t, v)) =
-                  -- These cases might not be all inclusive of all valid combinations.
-                  case (v, t) of
-                    (SInteger _, SVMType.Int _ _) -> pure True
-                    (SString _, SVMType.String _) -> pure True
-                    (SString _, SVMType.Bytes _ _) -> pure True
-                    (SString _, SVMType.Address _) -> pure True
-                    (SString _, SVMType.Account _) -> pure True
-                    (SBool _, SVMType.Bool) -> pure True
-                    (SAccount _ _, SVMType.Address _) -> pure True
-                    (SAccount _ _, SVMType.Account _) -> pure True
-                    (SStruct _ _, SVMType.UnknownLabel _ _) -> pure True
-                    (SContract x _, SVMType.UnknownLabel y _) -> pure $ x == y
-                    (SArray x _, y@(SVMType.Array _ _)) -> pure $ x == y
-                    (_, SVMType.Variadic) -> pure True
-                    (SReference addressedPath, _) -> do
-                      refType <- getXabiValueType addressedPath
-                      if (refType == t)
-                        then pure $ True
-                        else case (refType, t) of
-                          (SVMType.UnknownLabel x _, SVMType.UnknownLabel y _) -> pure $ x == y
-                          (SVMType.Array x _, SVMType.Array y _) -> pure $ x == y
-                          _ -> pure $ False
-                    _ -> pure $ False
-                mapArgs :: CC.FuncF a -> [(String, (SVMType.Type, Value))]
-                mapArgs theFunc = case argVals of
-                  OrderedVals vs ->
-                    let argMeta =
-                          map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t)) $
-                            CC._funcArgs theFunc
-                     in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
-                  NamedVals ns ->
-                    let strTypes = M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ CC._funcArgs theFunc
-                        typeAndVal =
-                          M.merge
-                            (M.dropMissing)
-                            (M.dropMissing)
-                            (M.zipWithMatched $ \_k t v -> (t, v))
-                            strTypes
-                            $ M.fromList ns
-                        sortedArgs =
-                          map snd . sortWith fst
-                            . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
-                            $ M.toList typeAndVal
-                     in sortedArgs
             Constant (SStructDef structName) -> do
               contract' <- getCurrentContract
               case M.lookup structName $ contract' ^. CC.structs of
@@ -2982,13 +2924,17 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
 
   -- new pragma
   -- (_, parentCC) <- getCurrentCodeCollection
-  -- let pragmaCheck = isJust $ find ((== "strict") . fst) $ CC._pragmas parentCC
+  -- let pragmaCheck = return . isJust $ find ((== "strict") . fst) $ CC._pragmas parentCC
+
+  let valList' = case argVals of OrderedVals xs -> xs; NamedVals ys -> map snd ys
 
   -- check the signature
-  sigCheck <- matchFunctionSignature theFunction argVals
-
-  -- throw an error
-  when (sigCheck == False) $ internalError "Failed to typecheck: " theFunction
+  unlessM (validateFunctionArguments theFunction argVals) $ do
+    internalError 
+      "the argument values do not match up with the function signature: " 
+      (show $ zip (map (CC.indexedTypeType . snd) (CC._funcArgs theFunction)) (valList'))
+      -- (concat ["expected: ", show . map (CC.indexedTypeType . snd) $ CC._funcArgs theFunction, "\n but got: ", show argVals])
+      
 
   let !args = case argVals of
         OrderedVals vs ->
@@ -3584,8 +3530,9 @@ specialUsingChecker (CC.FunctionCall _ (CC.MemberAccess _ (CC.Variable firstPos 
       return $ Just theResult
 specialUsingChecker _ = return $ Nothing
 
-matchFunctionSignature :: MonadSM m => CC.Func -> ValList -> m Bool
-matchFunctionSignature func argVals = do
+-- checks if an argument list is valid for a given function signature
+validateFunctionArguments:: MonadSM m => CC.Func -> ValList -> m Bool
+validateFunctionArguments func argVals = do
   testMatch func
   where
     argValsLength = case argVals of
@@ -3604,6 +3551,8 @@ matchFunctionSignature func argVals = do
       -- These cases might not be all inclusive of all valid combinations.
       case (v, t) of
         (SInteger _, SVMType.Int _ _) -> pure True
+        (SInteger _, SVMType.String _) -> pure True
+        (SInteger _, SVMType.UnknownLabel _ _) -> pure True
         (SString _, SVMType.String _) -> pure True
         (SString _, SVMType.Bytes _ _) -> pure True
         (SString _, SVMType.Address _) -> pure True
@@ -3611,6 +3560,7 @@ matchFunctionSignature func argVals = do
         (SBool _, SVMType.Bool) -> pure True
         (SAccount _ _, SVMType.Address _) -> pure True
         (SAccount _ _, SVMType.Account _) -> pure True
+        (SEnumVal _ _ _, SVMType.UnknownLabel _ _) -> pure True
         (SStruct _ _, SVMType.UnknownLabel _ _) -> pure True
         (SContract x _, SVMType.UnknownLabel y _) -> pure $ x == y
         (SArray x _, y@(SVMType.Array _ _)) -> pure $ x == y
