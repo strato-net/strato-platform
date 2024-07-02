@@ -23,6 +23,7 @@ contract Clothing is Mintable {
         string _description,
         string[] _images,
         string[] _files,
+        string[] _fileNames,
         uint _createdDate,
         uint _quantity,
         string _clothingType,
@@ -32,7 +33,7 @@ contract Clothing is Mintable {
         string _brand,
         AssetStatus _status,
         address _redemptionService
-    ) public Mintable(_name, _description, _images, _files, _createdDate, _quantity, _status, _redemptionService) {
+    ) public Mintable(_name, _description, _images, _files, _fileNames, _createdDate, _quantity, _status, _redemptionService) {
         clothingType = _clothingType;
         size = _size;
         skuNumber = _skuNumber;
@@ -46,6 +47,7 @@ contract Clothing is Mintable {
             description,
             images,
             files,
+            fileNames,
             createdDate,
             _quantity,
             clothingType,
@@ -62,11 +64,12 @@ contract Clothing is Mintable {
     // TODO: Finish the update function. 
     function updateClothing(
         string[] _images, 
-        string[] _files, 
+        string[] _files,
+        string[] _fileNames, 
         string _clothingType
     ) public requireOwner("update clothing") returns (uint) {
         clothingType = _clothingType;
-        updateAsset(_images, _files);
+        updateAsset(_images, _files, _fileNames);
         return RestStatus.OK;
     }
 }

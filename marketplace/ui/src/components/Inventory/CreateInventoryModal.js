@@ -122,6 +122,7 @@ const CreateInventoryModal = ({
     }
 
     let fileKeys = []
+    let fileNamesArr = []
     if (values.files && values.files.length > 0) {
       for (const file of values.files) {
         const formData = new FormData();
@@ -129,6 +130,7 @@ const CreateInventoryModal = ({
         const fileData = await actions.uploadImage(dispatch, formData);
         if (fileData) {
           fileKeys.push(fileData);
+          fileNamesArr.push(file.name);
         } else {
           throw new Error("File upload failed");
         }
@@ -141,6 +143,7 @@ const CreateInventoryModal = ({
       itemArgs: {
         images: imageKeys || [],
         files: fileKeys || [],
+        fileNames: fileNamesArr || [],
         redemptionService,
         ...body
       },

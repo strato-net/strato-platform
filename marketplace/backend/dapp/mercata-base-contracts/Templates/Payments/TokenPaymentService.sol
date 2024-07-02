@@ -134,8 +134,9 @@ contract TokenPaymentService is PaymentService {
         uint[] _quantities,
         string _currency,
         uint _createdDate
-    ) internal override {
+    ) internal override returns (address[]) {
         require(false, "Cannot call initializePayment for token payments.");
+        return [];
     }
 
     function _completeOrder (
