@@ -465,10 +465,19 @@ async function getAll(admin, args = {}, defaultOptions) {
                 }, options, admin);
         }
 
+        
+
         // Currently can't filter on second table, so filtering sales fields here. 
         // Sales only has price and quantity fields to filter, so better to join sales on asset table (asset has multiple filters for each route). 
         if (inventories) {
-            inventories.forEach(inventory => {
+            for (const inventory of inventories) {
+                const ownershipTransferEvent = await searchAllWithQueryArgs(
+                    `${contractName}.OwnershipTransfer`, 
+                    {newAssetAddress: inventory.address}, 
+                    options, 
+                    admin
+                );
+
                 if (inventory['BlockApps-Mercata-Sale'] && inventory['BlockApps-Mercata-Sale'].length > 0) {
                     let sales = inventory['BlockApps-Mercata-Sale']
                         .filter(sale => sale.isOpen === true);
@@ -491,7 +500,7 @@ async function getAll(admin, args = {}, defaultOptions) {
                         if (sales.length > 0 && (sales.price !== null || undefined)) { // Only combine if there are sales. We don't list unpublished items for this route. 
                             finalInventory.push({
                                 ...inventory,
-                                cost: sales[0]?.cost,
+                                cost: sales[0]?.data?.cost,
                                 price: sales[0]?.price,
                                 saleAddress: sales[0]?.address,
                                 saleQuantity: sales[0]?.quantity,
@@ -504,7 +513,7 @@ async function getAll(admin, args = {}, defaultOptions) {
                     } else { // Just combine the data if userProfile is not present
                         finalInventory.push({
                             ...inventory,
-                            cost: sales[0]?.cost,
+                            cost: sales[0]?.data?.cost,
                             price: sales[0]?.price,
                             saleAddress: sales[0]?.address,
                             saleQuantity: sales[0]?.quantity,
@@ -528,7 +537,14 @@ async function getAll(admin, args = {}, defaultOptions) {
                 } else {
                     finalInventory.push(inventory);
                 }
-            });
+
+                if (ownershipTransferEvent && ownershipTransferEvent.length > 0) {
+                    finalInventory[finalInventory.length-1] = {
+                        ...inventory,
+                        cost: ownershipTransferEvent[0]?.price
+                    };
+                }
+            }
         } 
     }
     return finalInventory ? finalInventory.map((inventory) => marshalOut(inventory)) : undefined;

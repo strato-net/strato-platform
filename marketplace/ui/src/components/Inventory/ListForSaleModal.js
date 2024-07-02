@@ -129,6 +129,8 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
         setPaymentTypes(values);
     };
 
+    const isCostFieldDisabled = inventory.creator !== inventory.ownerCommonName;
+
     const columns = () => {
         let finalColumns = [
             {
@@ -208,7 +210,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
         let body = {
             paymentProviders: paymentTypes.filter((p) => availablePaymentProviders[p]).map((p) => availablePaymentProviders[p].address),
             price: pricePerUnit,
-            cost: costPerUnit,
+            cost: costPerUnit || 0,
         };
         if (inventory.saleAddress) {
             body = { ...body, saleAddress: inventory.saleAddress }

@@ -98,12 +98,12 @@ class InventoryController {
 
   static async list(req, res, next) {
     try {
-      const { dapp, body } = req
+      const { dapp, body } = req;
 
-      InventoryController.validateListItemArgs(body)
+      InventoryController.validateListItemArgs(body);
 
-      const result = await dapp.listItem(body)
-      rest.response.status200(res, result)
+      const result = await dapp.listItem(body);
+      rest.response.status200(res, result);
 
       return next()
     } catch (e) {

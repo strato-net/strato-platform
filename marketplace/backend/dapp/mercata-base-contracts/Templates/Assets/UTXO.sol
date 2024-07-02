@@ -84,7 +84,7 @@ abstract contract UTXO is Asset {
     function _callMint(address _newOwner, uint _quantity) internal virtual returns (address){
         UTXO newAsset = mint(_quantity);
         Asset(newAsset).transferOwnership(_newOwner, _quantity, false, 0, 0);
-        return Asset(newAsset).originAddress();
+        return address(newAsset);
     }
 
     function checkCondition() internal virtual returns (bool){

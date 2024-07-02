@@ -5,6 +5,7 @@ import <509>;
 import "../Assets/Asset.sol";
 import "../Enums/RestStatus.sol";
 import "../Utils/Utils.sol";
+import "../Orders/Order.sol";
 
 abstract contract Sale is Utils { 
     Asset public assetToBeSold;
