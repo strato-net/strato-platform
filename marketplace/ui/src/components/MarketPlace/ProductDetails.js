@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Row, Breadcrumb, Button, Typography, Tabs, Space, Spin, notification, InputNumber, List, } from "antd";
-import { HeartTwoTone, HeartFilled } from '@ant-design/icons';
+import { HeartTwoTone, HeartFilled, FilePdfOutlined } from '@ant-design/icons';
 import { useMatch, useNavigate, useLocation } from "react-router-dom";
 import { Carousel } from "react-responsive-carousel"
 import TagManager from "react-gtm-module";
@@ -141,12 +141,20 @@ const ProductDetails = ({ user, users }) => {
   }, [marketplaceDispatch, cartList]);
 
   const details = inventoryDetails;
-  let fileValues = []
-  // Check if details and BlockApps-Mercata-Asset-files are not null or undefined
-  if (details && Array.isArray(details['BlockApps-Mercata-Asset-files'])) {
-    fileValues = details['BlockApps-Mercata-Asset-files'].map(file => file.value);
+  let fileValues = [];
+  let fileNames = [];
+  
+  if (details && Array.isArray(details['BlockApps-Mercata-Asset-fileNames'])) {
+    fileNames = details['BlockApps-Mercata-Asset-fileNames'];
   }
-
+  
+  if (details && Array.isArray(details['BlockApps-Mercata-Asset-files'])) {
+    fileValues = details['BlockApps-Mercata-Asset-files'].map((file, index) => {
+      let name = fileNames[index]?.value ? fileNames[index]?.value : `Information-${index+1}.pdf`;
+      name = name.replace(/ /g, "-");
+      return { url: file.value, name };
+    });
+  }
 
   useEffect(() => {
     if (categorys.length && details) {
@@ -711,8 +719,8 @@ const ProductDetails = ({ user, users }) => {
                             dataSource={fileValues?.length > 0 ? fileValues : []}
                             renderItem={(item) =>
                               <List.Item>
-                                <a href={item} rel="noreferrer" target="_blank" className="hover:underline break-all text-[#1e40af]">
-                                  {item}
+                                <a href={item.url} rel="noreferrer" target="_blank" className="hover:underline break-all text-[#1e40af]">
+                                  <Button className="!text-blue border-blue" icon={<FilePdfOutlined />} >{item.name}</Button>
                                 </a>
                               </List.Item>}
                           />

@@ -511,7 +511,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       // Process records such that for a given date the most recent sale price is fetched
       // This method processes sales passed, drills down into history table for each sale
       // This needs to be done as a 2 step process, i.e. a single query to fetch sale & saleHistory can't be done because the contract name is dependent on the sale
-      const processSalesHistory = async (sales, filter = {}) => {
+      const processSalesHistory = async (sales, filter = {}, shouldAggregate = true) => {
         //Fetch histories for each sale
         const historyPromises = sales.map(sale => {
           //Fetch saleHistory
@@ -532,24 +532,30 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           }
         });
 
-        // Faltten records, process them using accumulator hash map such that for a given date we fetch latest timestamp's sale record from history table
-        return histories.flat().reduce((acc, recordContainer) => {
-          Object.values(recordContainer).forEach(record => {
-            const date = getDate(record);
-            if (!date) return;
-            if (!acc[date] || acc[date].block_timestamp < record.block_timestamp) {
-              acc[date] = record;
-            }
-          });
-          return acc;
-        }, {});
+        if(shouldAggregate)
+        {
+          // Flatten records, process them using accumulator hash map such that for a given date we fetch latest timestamp's sale record from history table
+          return histories.flat().reduce((acc, recordContainer) => {
+            Object.values(recordContainer).forEach(record => {
+              const date = getDate(record);
+              if (!date) return;
+              if (!acc[date] || acc[date].block_timestamp < record.block_timestamp) {
+                acc[date] = record;
+              }
+            });
+            return acc;
+          }, {});
+        }else{
+          //send the history data without processing
+          return histories.flat().map(recordContainer => Object.values(recordContainer)).flat();
+        }
       };
 
       // Get the histories
       // Driver to fetch history sales for- plotting data points, stats
       const processedSalesResults = await Promise.allSettled([
-        processSalesHistory(timeRangeSales, salesFilter),// for data points to be plotted
-        processSalesHistory(allAssetSales) // for 12-month historical data
+        processSalesHistory(timeRangeSales, salesFilter, true),// for data points to be plotted
+        processSalesHistory(allAssetSales, {}, false) // for 12-month historical data
       ]);
 
       // Handling Promise.allSettled results (Logging purposes)
@@ -566,15 +572,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         Object.values(processedSalesResults[0].value).sort((a, b) => new Date(a.block_timestamp) - new Date(b.block_timestamp)) : [];
       // Only send price, timestamp as a part of the record
       const originRecords = originRecordsSorted ? Object.values(originRecordsSorted).map(({ price, block_timestamp }) => ({ price, block_timestamp })) : [];
-      //  Append a record for the current date with the last known price
-      //  if (originRecords.length > 0) {
-      //    const lastKnownRecord = originRecords[originRecords.length - 1];
-      //    const currentDateTime = dayjs().utc().format('YYYY-MM-DD HH:mm:ss') + ' UTC';
-      //    originRecords.push({
-      //      price: lastKnownRecord.price,
-      //      block_timestamp: currentDateTime
-      //    });
-      //  }
 
       // 12 month historical data
       const twelveMonthHistoryRecords = processedSalesResults[1].status === 'fulfilled' ?

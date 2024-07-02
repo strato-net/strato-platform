@@ -338,7 +338,7 @@ const CategoryProductList = ({ user }) => {
     </Breadcrumb>
 
   const ClearFilterComponent = () =>
-    <div className="flex justify-between m-2 max-[768px]:px-7 max-[768px]:py-4">
+    <div className="flex justify-between flex-wrap m-2 max-[768px]:px-7 max-[768px]:py-4">
       <div className="flex items-center">
         <div className="w-2 h-2 bg-[#13188A] rounded-md"></div>
         <Text className="text-xl font-semibold pr-7 ml-1">Filters</Text>

@@ -16,6 +16,7 @@ abstract contract Mintable is Redeemable {
         string _description,
         string[] _images,
         string[] _files,
+        string[] _fileNames,
         uint _createdDate,
         uint _quantity,
         AssetStatus _status,
@@ -25,6 +26,7 @@ abstract contract Mintable is Redeemable {
         _description,
         _images,
         _files,
+        _fileNames,
         _createdDate,
         _quantity,
         _status,
@@ -44,7 +46,7 @@ abstract contract Mintable is Redeemable {
     }
 
     function mint(uint _quantity) internal virtual override returns (UTXO) {
-        Mintable m = new Mintable(name, description, images, files, createdDate, _quantity, status, address(redemptionService));
+        Mintable m = new Mintable(name, description, images, files, fileNames, createdDate, _quantity, status, address(redemptionService));
         return UTXO(address(m));
     }
 
