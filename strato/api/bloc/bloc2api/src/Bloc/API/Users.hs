@@ -369,7 +369,8 @@ data UploadListContract = UploadListContract
     _uploadlistcontractTxParams :: Maybe TxParams,
     uploadlistcontractValue :: Maybe (Strung Natural),
     _uploadlistcontractChainid :: Maybe ChainId,
-    uploadlistcontractMetadata :: Maybe (Map Text Text)
+    uploadlistcontractMetadata :: Maybe (Map Text Text),
+    uploadlistcontractPtr2Code :: Maybe Code
   }
   deriving (Eq, Show, Generic)
 
@@ -386,7 +387,8 @@ instance ToJSON UploadListContract where
         "txParams" .= _uploadlistcontractTxParams,
         "value" .= uploadlistcontractValue,
         "chainid" .= _uploadlistcontractChainid,
-        "metadata" .= uploadlistcontractMetadata
+        "metadata" .= uploadlistcontractMetadata,
+        "ptr2code" .= uploadlistcontractPtr2Code
       ]
 
 instance FromJSON UploadListContract where
@@ -399,6 +401,7 @@ instance FromJSON UploadListContract where
       <*> (o .:? "value")
       <*> (o .:? "chainid")
       <*> (o .:? "metadata")
+      <*> (o .:? "ptr2Code")
   parseJSON o = fail $ "parseJSON UploadListContract: Expected Object, got " ++ show o
 
 instance ToSchema UploadListContract where
@@ -416,7 +419,8 @@ instance ToSchema UploadListContract where
             _uploadlistcontractTxParams = Just $ TxParams (Just $ Gas 123) (Just $ Wei 345) Nothing,
             uploadlistcontractValue = Nothing,
             _uploadlistcontractChainid = Nothing,
-            uploadlistcontractMetadata = Nothing
+            uploadlistcontractMetadata = Nothing,
+            uploadlistcontractPtr2Code = Nothing
           }
 
 data ContractListParameters = ContractListParameters
