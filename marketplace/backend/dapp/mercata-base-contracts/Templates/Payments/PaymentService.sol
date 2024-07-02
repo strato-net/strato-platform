@@ -32,10 +32,10 @@ abstract contract PaymentService is Utils {
         string sellersCommonName,     // Seller common name for lookup purposes
         address[] saleAddresses,      // List of the sale contracts for the assets in the order
         uint[] quantities,            // List of quantities for each asset being bought
-        uint amount,                  // Total price of the order
-        uint tax,                     // Tax
+        decimal amount,               // Total price of the order
+        decimal tax,                  // Tax
         int grossMargin,             // Gross margin used to calcualte cost basis
-        uint unitsPerDollar,          // Amount of units per dollar for the currency (Ex: STRAT is 100 units per dollar)
+        decimal unitsPerDollar,       // Amount of units per dollar for the currency (Ex: STRAT is 100 units per dollar)
         string currency,              // The type of currency used for the purchase
         PaymentStatus status,         // Status of the payment
         uint createdDate              // Date at the time of fresh order creation
@@ -161,14 +161,14 @@ abstract contract PaymentService is Utils {
         uint _createdDate
     ) internal virtual returns (string, address[]) {
         address[] assets;
-        uint totalAmount = 0;
+        decimal totalAmount = 0;
         string seller;
         for (uint i = 0; i < _saleAddresses.length; i++) {
             Sale s = Sale(_saleAddresses[i]);
             Asset a = s.assetToBeSold();
             assets.push(address(a));
             uint quantity = _quantities[i];
-            totalAmount += s.price() * quantity;
+            totalAmount += s.price() * decimal(quantity);
             seller = getCommonName(a.owner());
             try {
                 s.lockQuantity(quantity, _purchaser);
@@ -230,7 +230,7 @@ abstract contract PaymentService is Utils {
         string _currency,
         uint _createdDate
     ) internal virtual returns (address[]){
-        uint totalAmount = 0;
+        decimal totalAmount = 0;
         address[] assets;
         string seller;
         for (uint i = 0; i < _saleAddresses.length; i++) {
@@ -238,7 +238,7 @@ abstract contract PaymentService is Utils {
             Asset a = s.assetToBeSold();
             assets.push(address(a));
             seller = getCommonName(a.owner());
-            totalAmount += s.price() * _quantities[i];
+            totalAmount += s.price() * decimal(_quantities[i]);
         }
         emit Order(
             _orderHash,
@@ -294,7 +294,7 @@ abstract contract PaymentService is Utils {
         string _currency,
         uint _createdDate
     ) internal virtual returns (address[]) {
-        uint totalAmount = 0;
+        decimal totalAmount = 0;
         address[] assets;
         string seller;
         for (uint i = 0; i < _saleAddresses.length; i++) {
@@ -366,7 +366,7 @@ abstract contract PaymentService is Utils {
         string _currency,
         uint _createdDate
     ) internal virtual {
-        uint totalAmount = 0;
+        decimal totalAmount = 0;
         string seller;
         address[] assets;
         for (uint i = 0; i < _saleAddresses.length; i++) {
@@ -399,8 +399,8 @@ abstract contract PaymentService is Utils {
         );
     }
 
-    function _unitsPerDollar() internal virtual returns (uint) {
-        return 1;
+    function _unitsPerDollar() internal virtual returns (decimal) {
+        return 1.0;
     }
 
     function update(

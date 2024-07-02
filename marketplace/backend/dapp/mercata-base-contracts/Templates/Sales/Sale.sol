@@ -8,7 +8,7 @@ import "../Utils/Utils.sol";
 
 abstract contract Sale is Utils { 
     Asset public assetToBeSold;
-    uint public price;
+    decimal public price;
     uint public quantity;
     address[] public paymentProviders;
     mapping (address => uint) paymentProvidersMap;
@@ -18,7 +18,7 @@ abstract contract Sale is Utils {
 
     constructor(
         address _assetToBeSold,
-        uint _price,
+        decimal _price,
         uint _quantity,
         address[] _paymentProviders
     ) {    
@@ -57,7 +57,7 @@ abstract contract Sale is Utils {
         _;
     }
 
-    function changePrice(uint _price) public requireSeller("change price"){
+    function changePrice(decimal _price) public requireSeller("change price"){
         price=_price;
     }
 
@@ -106,7 +106,7 @@ abstract contract Sale is Utils {
         return RestStatus.OK;
     }
 
-    function automaticTransfer(address _newOwner, uint _price, uint _quantity, uint _transferNumber) public returns (uint) {
+    function automaticTransfer(address _newOwner, decimal _price, uint _quantity, uint _transferNumber) public returns (uint) {
         require(msg.sender == address(assetToBeSold), "Only the underlying Asset can call automaticTransfer.");
         uint assetQuantity = assetToBeSold.quantity();
         require(_quantity <= assetQuantity - totalLockedQuantity, "Cannot transfer more units than are available.");
@@ -185,7 +185,7 @@ abstract contract Sale is Utils {
 
     function update(
         uint _quantity,
-        uint _price,
+        decimal _price,
         address[] _paymentProviders,
         uint _scheme
     ) returns (uint) {
