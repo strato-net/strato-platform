@@ -19,12 +19,13 @@ contract Collectibles is Mintable {
         string _description,
         string[] _images,
         string[] _files,
+        string[] _fileNames,
         uint _createdDate,
         uint _quantity,
         string _condition,
         AssetStatus _status,
         address _redemptionService
-    ) public Mintable(_name, _description, _images, _files, _createdDate, _quantity, _status, _redemptionService) {
+    ) public Mintable(_name, _description, _images, _files, _fileNames, _createdDate, _quantity, _status, _redemptionService) {
         condition = _condition;
     }
 
@@ -34,6 +35,7 @@ contract Collectibles is Mintable {
             description,
             images,
             files,
+            fileNames,
             createdDate,
             _quantity,
             condition,
@@ -46,9 +48,10 @@ contract Collectibles is Mintable {
     // TODO: Finish the update function. 
     function updateCollectible(
         string[] _images, 
-        string[] _files
+        string[] _files,
+        string[] _fileNames
     ) public requireOwner("update collectible") returns (uint) {
-        updateAsset(_images, _files);
+        updateAsset(_images, _files, _fileNames);
         return RestStatus.OK;
     }
 }

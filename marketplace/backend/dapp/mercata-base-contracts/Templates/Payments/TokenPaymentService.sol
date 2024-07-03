@@ -14,7 +14,7 @@ contract TokenPaymentService is PaymentService {
     // token data
     uint public reserve;
     uint public decimals;
-    uint public tokensPerDollar;
+    decimal public tokensPerDollar;
     mapping (string => uint) public record balances;
 
     constructor (
@@ -79,7 +79,7 @@ contract TokenPaymentService is PaymentService {
         uint _createdDate
     ) internal override returns (string, address[]) {
         address[] assets;
-        uint totalAmount = 0;
+        decimal totalAmount = 0;
         string seller;
         string err = "Your " + serviceName + " balance is not high enough to cover the purchase.";
         purchasersAddress = msg.sender; // Support for legacy sales
@@ -89,8 +89,8 @@ contract TokenPaymentService is PaymentService {
             Asset a = s.assetToBeSold();
             assets.push(address(a));
             uint quantity = _quantities[i];
-            uint amount = s.price() * quantity * tokensPerDollar * (10 ** decimals);
-            totalAmount += amount;
+            uint amount = uint(s.price() * decimal(quantity) * tokensPerDollar * (10 ** decimals));
+            totalAmount += decimal(amount);
             seller = getCommonName(a.owner());
             try {
                 Sale(_saleAddresses[i]).lockQuantity(quantity, _purchaser);
@@ -134,8 +134,9 @@ contract TokenPaymentService is PaymentService {
         uint[] _quantities,
         string _currency,
         uint _createdDate
-    ) internal override {
+    ) internal override returns (address[]) {
         require(false, "Cannot call initializePayment for token payments.");
+        return [];
     }
 
     function _completeOrder (
@@ -165,11 +166,11 @@ contract TokenPaymentService is PaymentService {
         require(false, "Cannot call cancelOrder for token payments.");
     }
 
-    function _unitsPerDollar() internal override returns (uint) {
+    function _unitsPerDollar() internal override returns (decimal) {
         return tokensPerDollar * (10 ** decimals);
     }
 
-    function updateTokensPerDollar(uint _tokensPerDollar) requireOwner() public returns (uint) {
+    function updateTokensPerDollar(decimal _tokensPerDollar) requireOwner() public returns (uint) {
       tokensPerDollar = _tokensPerDollar;
       return RestStatus.OK;
     }

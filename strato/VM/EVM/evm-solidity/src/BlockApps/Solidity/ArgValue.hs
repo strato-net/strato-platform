@@ -19,8 +19,10 @@ import qualified Data.Bimap as Bimap
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Base16 as Base16
+import Data.Decimal
 import Data.Either
 import qualified Data.Map.Strict as Map
+import Data.Scientific
 import Data.Swagger
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -33,17 +35,20 @@ data ArgValue
   = ArgInt Integer
   | ArgBool Bool
   | ArgString Text
+  | ArgDecimal Decimal
   | ArgArray (V.Vector ArgValue)
   | ArgObject (KM.KeyMap ArgValue)
   deriving (Eq, Show)
 
 instance Arbitrary ArgValue where
-  arbitrary = elements [ArgInt 5, ArgBool True, ArgBool False, ArgString "arggg"]
+  arbitrary = elements [ArgInt 5, ArgBool True, ArgBool False, ArgString "arggg", ArgDecimal 3.3]
 
 instance A.FromJSON ArgValue where
   parseJSON = \case
     A.Bool x -> return $ ArgBool x
-    A.Number x -> return $ ArgInt (round x)
+    A.Number x -> case isFloating x of
+      True -> return $ ArgDecimal (read $ show x :: Decimal)
+      False -> return $ ArgInt (round x)
     A.String x -> return $ ArgString x
     A.Array xs -> ArgArray <$> traverse A.parseJSON xs
     A.Null -> fail "parsing JSON for ArgValue: encountered Null"
@@ -56,6 +61,7 @@ instance A.ToJSON ArgValue where
     ArgInt x -> A.Number (fromIntegral x)
     ArgBool x -> A.Bool x
     ArgString x -> A.String x
+    ArgDecimal (Decimal p m) -> A.Number (scientific m $ fromIntegral p)
     ArgArray xs -> A.Array (fmap A.toJSON xs)
     ArgObject o -> A.Object (fmap A.toJSON o)
 
@@ -72,6 +78,7 @@ argValueToType :: ArgValue -> Type
 argValueToType (ArgInt _) = SimpleType typeInt
 argValueToType (ArgBool _) = SimpleType TypeBool
 argValueToType (ArgString _) = SimpleType TypeString
+argValueToType (ArgDecimal _) = SimpleType TypeDecimal
 argValueToType (ArgArray v) = TypeArrayDynamic $ argValueToType $ V.head v
 argValueToType (ArgObject _) = TypeStruct ""
 
@@ -199,6 +206,11 @@ argValueToSimpleValue theType argVal = case theType of
   TypeBytes Nothing -> case argVal of
     ArgString str -> ValueBytes Nothing <$> readBytesDyn str
     o -> Left . Text.pack $ "argValueToSimpleValue: Expected TypeBytes to be a string, but got " ++ show o
+  TypeDecimal -> case argVal of
+    ArgDecimal i -> Right $ ValueDecimal (Text.encodeUtf8 $ Text.pack $ show i)
+    ArgInt i -> Right $ ValueDecimal (Text.encodeUtf8 $ Text.pack $ show i)
+    o -> Left . Text.pack $ "argValueToSimpleValue: Expected TypeDecimal to be an decimal, but got " ++ show o
+
   where
     readBytes :: Integer -> Text -> Either Text ByteString
     readBytes n str =

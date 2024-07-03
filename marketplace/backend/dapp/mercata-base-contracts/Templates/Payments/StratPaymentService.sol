@@ -5,7 +5,7 @@ import <BASE_CODE_COLLECTION>;
 
 contract StratPaymentService is PaymentService {
     address public stratAddress;
-    uint public stratsPerDollar;
+    decimal public stratsPerDollar;
 
     constructor (
         address _stratAddress,
@@ -26,7 +26,7 @@ contract StratPaymentService is PaymentService {
         uint _createdDate
     ) internal override returns (string, address[]) {
         address[] assets;
-        uint totalAmount = 0;
+        decimal totalAmount = 0;
         string seller;
         string err = "Your STRAT balance is not high enough to cover the purchase.";
         purchasersAddress = msg.sender; // Support for legacy sales
@@ -36,8 +36,8 @@ contract StratPaymentService is PaymentService {
             Asset a = s.assetToBeSold();
             assets.push(address(a));
             uint quantity = _quantities[i];
-            uint amount = s.price() * quantity * stratsPerDollar * 100;
-            totalAmount += amount;
+            uint amount = uint(s.price() * decimal(quantity) * stratsPerDollar * 100);
+            totalAmount += decimal(amount);
             address sellerAddress = a.owner();
             seller = getCommonName(sellerAddress);
             try {
@@ -77,13 +77,14 @@ contract StratPaymentService is PaymentService {
         string _orderHash,
         string _orderId,
         address _purchaser,
-        string _purchaserCommonName,
+        string _purchasersCommonName,
         address[] _saleAddresses,
         uint[] _quantities,
         string _currency,
         uint _createdDate
-    ) internal override {
+    ) internal override returns (address[]) {
         require(false, "Cannot call initializePayment for STRAT payments.");
+        return [];
     }
 
     function _completeOrder (
@@ -113,11 +114,11 @@ contract StratPaymentService is PaymentService {
         require(false, "Cannot call cancelOrder for STRAT payments.");
     }
 
-    function _unitsPerDollar() internal override returns (uint) {
+    function _unitsPerDollar() internal override returns (decimal) {
         return stratsPerDollar * 100;
     }
 
-    function updateStratsPerDollar(uint _stratsPerDollar) requireOwner() public returns (uint) {
+    function updateStratsPerDollar(decimal _stratsPerDollar) requireOwner() public returns (uint) {
       stratsPerDollar = _stratsPerDollar;
       return RestStatus.OK;
     }
