@@ -2,6 +2,7 @@ import { rest } from 'blockapps-rest'
 import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
+import constants, { TOKEN_SERVER_URL } from "/helpers/constants";
 
 const options = { config, cacheNonce: true }
 
@@ -158,48 +159,47 @@ class InventoryController {
   
   static async bridge(req, res, next) {
     try {
-        const { dapp, body } = req;
+      const { dapp, body } = req;
 
-        InventoryController.validateBridgeItemArgs(body);
-        const transferPayload = {
-            assetAddress: body.assetAddress,
-            newOwner: '6ec8bbe4a5b87be18d443408df43a45e5972fa1b',
-            quantity: body.quantity,
-            price: body.price,
-        };
+      InventoryController.validateBridgeItemArgs(body);
+      const transferPayload = {
+          assetAddress: body.assetAddress,
+          newOwner: constants.burnAddress,
+          quantity: body.quantity,
+          price: body.price,
+      };
 
-        const result = await dapp.transferItem(transferPayload);
+      const result = await dapp.transferItem(transferPayload);
 
-        if (result.transferStatus[0] !== '200') {
-            throw new Error(`Transfer failed with status: ${result.transferStatus[0]}`);
-        }
+      if (result.transferStatus[0] !== '200') {
+          throw new Error(`Transfer failed with status: ${result.transferStatus[0]}`);
+      }
 
-        const payload = {
-            tokenSymbol: body.assetAddress,
-            quantity: body.quantity,
-            baseAddress: body.baseAddress,
-            transferNumber: result.transferNumber,
-            mercataAddress: body.mercataAddress,
-        };
+      const payload = {
+          tokenSymbol: body.assetAddress,
+          quantity: body.quantity,
+          baseAddress: body.baseAddress,
+          transferNumber: result.transferNumber,
+          mercataAddress: body.mercataAddress,
+      };
+      const response = await fetch(`${TOKEN_SERVER_URL}/api/bridgeMercata`, {
+          method: "POST",
+          headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+      });
 
-        const response = await fetch(`http://localhost:3001/api/bridgeMercata`, {
-            method: "POST",
-            headers: {
-                Accept: "application/json",
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify(payload),
-        });
+      if (!response.ok) {
+          throw new Error("Bridge API call failed");
+      }
 
-        if (!response.ok) {
-            throw new Error("Bridge API call failed");
-        }
+      rest.response.status200(res, await response.json());
 
-        rest.response.status200(res, await response.json());
-
-        return next();
+      return next();
     } catch (e) {
-        return next(e);
+      return next(e);
     }
   }
 
