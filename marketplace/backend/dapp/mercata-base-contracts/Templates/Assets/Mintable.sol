@@ -79,7 +79,7 @@ abstract contract Mintable is Redeemable {
         UTXO newAsset = mint(_quantity);
         // regular transfer - isUserTransfer: false, transferNumber: 0, transferPrice: 0
         Asset(newAsset).transferOwnership(_newOwner, _quantity, false, 0, 0);
-        return Asset(newAsset).originAddress();
+        return address(newAsset);
     }
     
     function checkCondition() internal virtual override returns (bool){

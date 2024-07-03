@@ -178,7 +178,7 @@ abstract contract Asset is Utils {
             newOwnerCommonName,
             itemNumber,
             itemNumber + _quantity - 1,
-            originAddress,
+            address(this),
             _price,
             _quantity,
             !_isUserTransfer,

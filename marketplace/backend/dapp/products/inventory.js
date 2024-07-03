@@ -500,7 +500,7 @@ async function getAll(admin, args = {}, defaultOptions) {
                         if (sales.length > 0 && (sales.price !== null || undefined)) { // Only combine if there are sales. We don't list unpublished items for this route. 
                             finalInventory.push({
                                 ...inventory,
-                                cost: sales[0]?.data?.cost,
+                                cost: sales[0]?.cost || sales[0]?.data?.cost,
                                 price: sales[0]?.price,
                                 saleAddress: sales[0]?.address,
                                 saleQuantity: sales[0]?.quantity,
@@ -513,7 +513,7 @@ async function getAll(admin, args = {}, defaultOptions) {
                     } else { // Just combine the data if userProfile is not present
                         finalInventory.push({
                             ...inventory,
-                            cost: sales[0]?.data?.cost,
+                            cost: sales[0]?.cost || sales[0]?.data?.cost,
                             price: sales[0]?.price,
                             saleAddress: sales[0]?.address,
                             saleQuantity: sales[0]?.quantity,
@@ -540,8 +540,9 @@ async function getAll(admin, args = {}, defaultOptions) {
 
                 if (ownershipTransferEvent && ownershipTransferEvent.length > 0) {
                     finalInventory[finalInventory.length-1] = {
-                        ...inventory,
-                        cost: ownershipTransferEvent[0]?.price
+                        ...finalInventory[finalInventory.length-1],
+                        cost: ownershipTransferEvent[0]?.price,
+                        'BlockApps-Mercata-Sale': undefined
                     };
                 }
             }
