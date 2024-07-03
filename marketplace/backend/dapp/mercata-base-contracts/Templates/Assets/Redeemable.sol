@@ -42,6 +42,17 @@ abstract contract Redeemable is UTXO {
         return true;   
     }
 
+    function getRedemptionService() internal returns (RedemptionService) {
+        redemptionService = Redeemable(this.root).redemptionService();
+        return redemptionService;
+    }
+
+    function updateRedemptionService(address _redemptionService) public {
+        require(address(this) == this.root, "Only the root asset can have its redemption service updated.");
+        require(getCommonName(msg.sender) == this.creator, "Only the issuer can update the redemption service.");
+        redemptionService = RedemptionService(_redemptionService);
+    }
+
     function requestRedemption(string _redemptionId, uint _quantity) requireOwner("request redemption") public returns (uint, address) {
         require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
         require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
@@ -58,7 +69,7 @@ abstract contract Redeemable is UTXO {
         require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
 
         _transfer(_newOwner, quantity, false, 0, 0);
-        redemptionService.redemptionRequested(_redemptionId);
+        RedemptionService(getRedemptionService()).redemptionRequested(_redemptionId);
         status = AssetStatus.PENDING_REDEMPTION;
 
         return RestStatus.OK;
