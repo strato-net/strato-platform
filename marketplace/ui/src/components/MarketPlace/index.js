@@ -103,7 +103,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
                 <img
                   alt={item.alt}
                   title={item.title}
-                  className="absolute inset-0 z-10 h-[222px] md:h-[365px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+                  className="absolute inset-0 z-10 h-[222px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
                   height={380}
                   width="100%"
                   src={item.mobileImg}
@@ -125,7 +125,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
                 <img
                   alt={item.alt}
                   title={item.title}
-                  className="absolute inset-0 z-10 md:h-[380px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+                  className="absolute inset-0 z-10 md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
                   height={380}
                   width="100%"
                   src={item.laptopImg}
@@ -136,7 +136,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
                 <img
                   alt={item.alt}
                   title={item.title}
-                  className="absolute inset-0 z-10 md:h-[380px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+                  className="absolute inset-0 z-10 lg:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
                   height={380}
                   width="100%"
                   src={item.desktopImg}
