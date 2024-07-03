@@ -255,7 +255,7 @@ create _ _ _ blockData _ sender' origin' _ _ availableGas newAddress code txHash
       hsh <- codePtrToSHA chainId' cp
       fromMaybe "" . fmap snd . join <$> traverse getCode hsh
 
-  fmap (either solidvmErrorResults id) . runSM (Just initCode) env' gasInfo' chainId' $ do
+  fmap (either solidvmErrorResults id) . runSM (Just code) env' gasInfo' chainId' $ do
     requireOriginCert origin'
     let maybeContractName = M.lookup "name" =<< metadata
         !contractName' = textToLabel $ fromMaybe (missingField "TX is missing a metadata parameter called 'name'" $ show metadata) maybeContractName
@@ -267,22 +267,36 @@ create _ _ _ blockData _ sender' origin' _ _ availableGas newAddress code txHash
 
     (hsh, cc) <- codeCollectionFromSource True initCode
     (issuerAcct, _, issuerName) <- getCreator origin'
-    create' sender' (accountToNamedAccount' newAddress) issuerAcct issuerName newAddress hsh cc contractName' args False
+    create' sender' (Just code) (accountToNamedAccount' newAddress) issuerAcct issuerName newAddress hsh cc contractName' args False
 
-create' :: MonadSM m => Account -> NamedAccount -> Account -> String -> Account -> Keccak256 -> CC.CodeCollection -> SolidString -> CC.ArgList -> Bool -> m ExecResults
-create' creator originAddress issuerAcct issuerName newAccount ch cc contractName' argExps createBuiltinCall = do
-  parentName <-
-    fromMaybeM (return "") $
-      runMaybeT $
-        pure creator -- Creator's address
-          >>= MaybeT . A.lookup (A.Proxy @AddressState) -- Address's state
-          >>= pure . addressStateCodeHash -- state's codehash/CodePtr
-          >>= MaybeT . resolveCodePtrParent (creator ^. accountChainId) -- CodePtr's parent
-          >>= ( \case
-                  SolidVMCode name _ -> pure name -- Name of the parent
-                  _ -> pure ""
-              )
+create' :: MonadSM m => Account -> Maybe Code -> NamedAccount -> Account -> String -> Account -> Keccak256 -> CC.CodeCollection -> SolidString -> CC.ArgList -> Bool -> m ExecResults
+create' creator maybeCodePtr originAddress issuerAcct issuerName newAccount ch cc contractName' argExps createBuiltinCall = do
 
+  --check if codeptr tx and then pass in codeptr acc instead of creator
+  parentName <- case maybeCodePtr of
+                  (Just(PtrToCode (CodeAtAccount codePtrAcc _))) -> do
+                      fromMaybeM (return "") $
+                        runMaybeT $
+                          pure codePtrAcc -- Creator's address
+                            >>= MaybeT . A.lookup (A.Proxy @AddressState) -- Address's state
+                            >>= pure . addressStateCodeHash -- state's Acodehash/CodePtr
+                            >>= MaybeT . resolveCodePtrParent (codePtrcc ^. accountChainId) -- CodePtr's parent
+                            >>= ( \case
+                                    SolidVMCode name _ -> pure name -- Name of the parent
+                                    _ -> pure ""
+                            )
+                  _ -> do
+                      fromMaybeM (return "") $
+                        runMaybeT $
+                          pure creator -- Creator's address
+                            >>= MaybeT . A.lookup (A.Proxy @AddressState) -- Address's state
+                            >>= pure . addressStateCodeHash -- state's codehash/CodePtr
+                            >>= MaybeT . resolveCodePtrParent (creator ^. accountChainId) -- CodePtr's parent
+                            >>= ( \case
+                                    SolidVMCode name _ -> pure name -- Name of the parent
+                                    _ -> pure ""
+                            )
+                  
   let !contract' = fromMaybe (missingType "create'/contract" contractName') (cc ^. CC.contracts . at contractName')
       !abstracts' = getAbstractParentsFromContract contract' cc
       !mappings = getMapNamesFromContract contract'
@@ -1797,7 +1811,7 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   (hsh, cc) <- getCurrentCodeCollection
   newAddress <- getNewAddress creator
   (issuerAcct, originAddress, issuerName) <- getCreator creator
-  execResults <- create' creator originAddress issuerAcct issuerName newAddress hsh cc contractName' args False
+  execResults <- create' creator Nothing originAddress issuerAcct issuerName newAddress hsh cc contractName' args False
   return $
     Constant $
       SContract contractName' $
@@ -1816,7 +1830,7 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   newAddress <- getNewAddressWithSalt creator salt hsh $ show args'
   $logDebugS "DEBUG" $ T.pack $ (show hsh) ++ "  " ++ show newAddress
   (issuerAcct, originAddress, issuerName) <- getCreator creator
-  execResults <- create' creator originAddress issuerAcct issuerName newAddress hsh cc contractName' args False
+  execResults <- create' creator Nothing originAddress issuerAcct issuerName newAddress hsh cc contractName' args False
   onTraced $ do
     liftIO $
       putStrLn $
@@ -2702,7 +2716,7 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
       maybeUseWallet = M.lookup "useWallet" =<< metadata
       !useWallet = maybe False (const True) maybeUseWallet
   (ctr, _, ctrName) <- getCreator origin --not sure if this should be there instead
-  execResults <- create' creator (accountToNamedAccount' newAddress) ctr ctrName newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) pragmaCheck
+  execResults <- create' creator Nothing (accountToNamedAccount' newAddress) ctr ctrName newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) pragmaCheck
   case erNewContractAccount execResults of
     Just nca -> do
       when (not isRunningTests) $ 
@@ -2748,7 +2762,7 @@ callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SS
       maybeUseWallet = M.lookup "useWallet" =<< metadata
       !useWallet = maybe False (const True) maybeUseWallet
   (ctr, originAddress, ctrName) <- getCreator creator
-  execResults <- create' creator originAddress ctr ctrName newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) pragmaCheck
+  execResults <- create' creator Nothing originAddress ctr ctrName newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) pragmaCheck
   case erNewContractAccount execResults of
     Just nca -> do
       when (not isRunningTests) $ 
