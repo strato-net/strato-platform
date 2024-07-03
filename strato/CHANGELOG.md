@@ -16,6 +16,15 @@ so that they could be properly moved to their respective version's subsection.
 
 ## [Unreleased] 
 ### Added
+
+### Changed
+
+### Fixed
+
+### Removed
+
+## [11.3.0] - 7/2/2024
+### Added
 - <address>.nonce accessor in SolidVM
 - Upgraded PostgREST to version 12.0
 - Support for `decimal` numbers type
