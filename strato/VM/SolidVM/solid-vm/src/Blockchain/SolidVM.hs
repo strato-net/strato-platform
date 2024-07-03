@@ -2931,10 +2931,8 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
   -- check the signature
   unlessM (validateFunctionArguments theFunction argVals) $ do
     internalError 
-      "the argument values do not match up with the function signature: " 
-      (show $ zip (map (CC.indexedTypeType . snd) (CC._funcArgs theFunction)) (valList'))
-      -- (concat ["expected: ", show . map (CC.indexedTypeType . snd) $ CC._funcArgs theFunction, "\n but got: ", show argVals])
-      
+      "the argument values do not match up with the function signature" 
+      (show $ zip (valList') (map (CC.indexedTypeType . snd) (CC._funcArgs theFunction)))
 
   let !args = case argVals of
         OrderedVals vs ->
@@ -3563,10 +3561,12 @@ validateFunctionArguments func argVals = do
         (SEnumVal _ _ _, SVMType.UnknownLabel _ _) -> pure True
         (SStruct _ _, SVMType.UnknownLabel _ _) -> pure True
         (SContract x _, SVMType.UnknownLabel y _) -> pure $ x == y
+        (SArray (SVMType.Int _ _) _, SVMType.Array (SVMType.UnknownLabel _ _) _) -> pure True
         (SArray x _, y@(SVMType.Array _ _)) -> pure $ x == y
         (_, SVMType.Variadic) -> pure True
         (SReference addressedPath, _) -> do
           refType <- getXabiValueType addressedPath
+          $logInfoS "testNameAndTypes" . T.pack $ (printf "refType: %s, t: %s" (show refType) (show t))
           if (refType == t)
             then pure $ True
             else case (refType, t) of
