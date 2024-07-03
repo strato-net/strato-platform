@@ -26,7 +26,7 @@ const RedemptionsIncomingTable = ({ user, download, isAllOrdersLoading }) => {
     const limit = 10;
     const offset = ((pageNo - 1) * limit);
     const { incomingRedemptions, isFetchingIncomingRedemptions } = useRedemptionState();
-    const [order, setOrder] = useState("DESC");
+    const [order, setOrder] = useState("block_timestamp.desc");
     const [search, setSearch] = useState("");
     const [data, setData] = useState([]);
     const [dataMap, setDataMap] = useState({});
@@ -154,10 +154,10 @@ const RedemptionsIncomingTable = ({ user, download, isAllOrdersLoading }) => {
                 <div style={{ display: "flex" }}>
                     <div className="mt-1.5">{"Date"}</div>
                     <div>
-                        {order === "DESC" ? (
-                            <UpOutlined className="icon-container icon-hover" onClick={() => setOrder("ASC")} />
+                        {order === "block_timestamp.desc" ? (
+                            <UpOutlined className="icon-container icon-hover" onClick={() => setOrder("block_timestamp.asc")} />
                         ) : (
-                            <DownOutlined className="icon-container icon-hover" onClick={() => setOrder("DESC")} />
+                            <DownOutlined className="icon-container icon-hover" onClick={() => setOrder("block_timestamp.desc")} />
                         )}
                     </div>
                 </div>
@@ -199,10 +199,10 @@ const RedemptionsIncomingTable = ({ user, download, isAllOrdersLoading }) => {
     };
 
     const onChange = (pagination, filters, sorter) => {
-        if (order === "DESC") {
-            setOrder("ASC")
+        if (order === "block_timestamp.desc") {
+            setOrder("block_timestamp.asc")
         } else {
-            setOrder("DESC")
+            setOrder("block_timestamp.desc")
         }
     };
 

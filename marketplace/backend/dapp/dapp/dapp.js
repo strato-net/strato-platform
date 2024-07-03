@@ -340,7 +340,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getOutgoingRedemptionRequests = async function (args, options = optionsNoChainIds) {
 
     try {
-      const redemptions = await redemptionServiceJs.getRedemptions(rawAdmin, { owner: userCert.commonName }, options);
+      const redemptions = await redemptionServiceJs.getRedemptions(rawAdmin, { owner: userCert.commonName, ...args }, options);
       return redemptions;
     } catch (error) {
       if (error.response) {
@@ -353,7 +353,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getIncomingRedemptionRequests = async function (args, options = optionsNoChainIds) {
 
     try {
-      const redemptions = await redemptionServiceJs.getRedemptions(rawAdmin, { issuer: userCert.commonName }, options);
+      const redemptions = await redemptionServiceJs.getRedemptions(rawAdmin, { issuer: userCert.commonName, ...args }, options);
       return redemptions;
     } catch (error) {
       if (error.response) {
