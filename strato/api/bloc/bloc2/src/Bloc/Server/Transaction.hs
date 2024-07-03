@@ -279,10 +279,6 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
               (fromMaybe emptyTxParams _methodcallTxParams)
               (Wei (fromIntegral $ unStrung methodcallValue))
               (Code $ sel <> argsBin)
-              -- (case ptr of
-              --   Just ptr -> ptr
-              --   Nothing -> (Code $ sel <> argsBin)
-              -- )
               _methodcallChainid
           return $ BlocTransactionBodyResult (hash' tx) (Just tx)
     GENESIS -> throwIO . UserError . Text.pack $ "ERROR! Only TRANSFER, CONTRACT, and FUNCTION calls are allowed."
@@ -906,11 +902,11 @@ postUsersContractSolidVM' cacheNonce ContractParameters {..} jwtToken = do
         fromAddr
         params
         (Wei (fromIntegral (maybe 0 unStrung value)))
-        -- (case ptr of
-        --   Just ptr -> ptr
-        --   Nothing -> (Code $ Text.encodeUtf8 $ serializeSourceMap src)
-        -- )
-        (Code $ Text.encodeUtf8 $ serializeSourceMap src)
+        (case ptr2Code of
+          Just ptr -> ptr
+          Nothing -> (Code $ Text.encodeUtf8 $ serializeSourceMap src)
+        )
+        -- (Code $ Text.encodeUtf8 $ serializeSourceMap src)
         chainId
   $logDebugLS "postUsersContractSolidVM'/tx" tx
 
