@@ -338,9 +338,41 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   contract.getOutgoingRedemptionRequests = async function (args, options = optionsNoChainIds) {
+    const { order, search } = args;
+    const queryParams = new URLSearchParams({
+      redemptionId: search,
+      order: order
+    }).toString();
 
     try {
-      const redemptions = await redemptionServiceJs.getRedemptions(rawAdmin, { owner: userCert.commonName, ...args }, options);
+      let redemptions = [];
+      let redemptionServiceAddresses = [];
+      const redemptionEvents = await redemptionServiceJs.getRedemptions(rawAdmin, { owner: userCert.commonName }, options);
+      redemptionEvents.map(r => {
+        if (!redemptionServiceAddresses.includes(r.address)) {
+          redemptionServiceAddresses.push(r.address);
+        }
+      });
+      const redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { address: redemptionServiceAddresses }, options);
+      
+      const redemptionPromises = redemptionServices.map(async (rs) => {
+        const serviceUrl = rs.serviceURL || rs.data.serviceURL;
+        const getOutgoingRedemptionRoute = rs.outgoingRedemptionsRoute || rs.data.outgoingRedemptionsRoute;
+        const res = await axios.get(new URL(`${serviceUrl}${getOutgoingRedemptionRoute}/${userCert.commonName}?${queryParams}`).href);
+        if (res.status === 200)
+          return res.data.data;
+        else
+          return [];
+      });
+
+      const allRedemptions = await Promise.all(redemptionPromises);
+      redemptions = allRedemptions.flat();
+
+      if (order && order === 'ASC')
+        redemptions.sort((a, b) => a.createdDate - b.createdDate);
+      else
+        redemptions.sort((a, b) => b.createdDate - a.createdDate);
+      
       return redemptions;
     } catch (error) {
       if (error.response) {
@@ -351,9 +383,38 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getIncomingRedemptionRequests = async function (args, options = optionsNoChainIds) {
+    const { order, search } = args;
+    const queryParams = new URLSearchParams({
+      redemptionId: search,
+      order: order
+    }).toString();
 
     try {
-      const redemptions = await redemptionServiceJs.getRedemptions(rawAdmin, { issuer: userCert.commonName, ...args }, options);
+      let redemptions = [];
+      const redemptionEvents = await redemptionServiceJs.getRedemptions(rawAdmin, { issuer: userCert.commonName }, options);
+      const redemptionServiceAddresses = redemptionEvents.map(r => r.address);
+      const redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { address: redemptionServiceAddresses }, options);
+      
+      const redemptionPromises = redemptionServices.map(async (rs) => {
+        const serviceUrl = rs.serviceURL || rs.data.serviceURL;
+        const getIncomingRedemptionRoute = rs.incomingRedemptionsRoute || rs.data.incomingRedemptionsRoute;
+        const res = await axios.get(new URL(`${serviceUrl}${getIncomingRedemptionRoute}/${userCert.commonName}?${queryParams}`).href);
+        if (res.status === 200) {
+          return res.data.data;
+        } else {
+          return [];
+        }
+      });
+
+      const allRedemptions = await Promise.all(redemptionPromises);
+      redemptions = allRedemptions.flat();
+
+      if (order && order === 'ASC')
+        redemptions.sort((a, b) => a.createdDate - b.createdDate);
+      else
+        redemptions.sort((a, b) => b.createdDate - a.createdDate);
+      
+
       return redemptions;
     } catch (error) {
       if (error.response) {

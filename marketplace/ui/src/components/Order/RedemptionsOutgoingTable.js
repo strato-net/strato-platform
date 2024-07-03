@@ -26,7 +26,7 @@ const RedemptionsOutgoingTable = ({ user, download, isAllOrdersLoading }) => {
     const limit = 10;
     const offset = ((pageNo - 1) * limit);
     const { outgoingRedemptions, isFetchingOutgoingRedemptions } = useRedemptionState();
-    const [order, setOrder] = useState("block_timestamp.desc");
+    const [order, setOrder] = useState("DESC");
     const [search, setSearch] = useState("");
     const [data, setData] = useState([]);
     const [dataMap, setDataMap] = useState({});
@@ -56,19 +56,19 @@ const RedemptionsOutgoingTable = ({ user, download, isAllOrdersLoading }) => {
         if (outgoingRedemptions) {
             outgoingRedemptions.forEach((redemption) => {
                 const item = {
-                    key: redemption.redemptionId,
+                    key: redemption.redemption_id,
                     assetAddress: redemption.asset,
                     assetName: redemption.assetName,
-                    requestor: redemption.owner,
-                    issuer: redemption.issuer,
+                    requestor: redemption.ownerCommonName,
+                    issuer: redemption.issuerCommonName,
                     quantity: redemption.quantity,
-                    redemptionDate: redemption.block_timestamp,
-                    redemptionNumber: redemption.redemptionId,
+                    redemptionDate: redemption.createdDate,
+                    redemptionNumber: redemption.redemption_id,
                     status: redemption.status,
-                    redemptionService: redemption.address,
+                    redemptionService: redemption.redemptionService,
                 };
                 items.push(item);
-                itemMap[redemption.redemptionId] = item;
+                itemMap[redemption.redemption_id] = item;
             });
         }
         setData(items);
@@ -154,10 +154,10 @@ const RedemptionsOutgoingTable = ({ user, download, isAllOrdersLoading }) => {
                 <div style={{ display: "flex" }}>
                     <div className="mt-1.5">{"Date"}</div>
                     <div>
-                        {order === "block_timestamp.desc" ? (
-                            <UpOutlined className="icon-container icon-hover" onClick={() => setOrder("block_timestamp.asc")} />
+                        {order === "DESC" ? (
+                            <UpOutlined className="icon-container icon-hover" onClick={() => setOrder("ASC")} />
                         ) : (
-                            <DownOutlined className="icon-container icon-hover" onClick={() => setOrder("block_timestamp.desc")} />
+                            <DownOutlined className="icon-container icon-hover" onClick={() => setOrder("DESC")} />
                         )}
                     </div>
                 </div>
@@ -199,10 +199,10 @@ const RedemptionsOutgoingTable = ({ user, download, isAllOrdersLoading }) => {
     };
 
     const onChange = (pagination, filters, sorter) => {
-        if (order === "block_timestamp.desc") {
-            setOrder("block_timestamp.asc")
+        if (order === "DESC") {
+            setOrder("ASC")
         } else {
-            setOrder("block_timestamp.desc")
+            setOrder("DESC")
         }
     };
 
