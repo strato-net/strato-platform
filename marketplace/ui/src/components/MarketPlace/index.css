@@ -85,3 +85,12 @@ img.ant-image-preview-img {
   width: 90%;
 }
 
+.gradient-button {
+  color: white; 
+  background: linear-gradient(270deg, #4F46E5 0%, #FB7185 100%);
+}
+
+.gradient-button:hover {
+  background: linear-gradient(90deg, #4F46E5 0%, #FB7185 100%); 
+}
+

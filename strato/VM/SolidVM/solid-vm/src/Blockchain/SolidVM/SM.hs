@@ -485,6 +485,7 @@ getVariableOfName name = do
                        "account",
                        "uint",
                        "int",
+                       "decimal",
                        "bool",
                        "byte",
                        "bytes",
@@ -802,6 +803,7 @@ hintFromType = \case
   SVMType.Bytes {} -> return TString
   SVMType.Int {} -> return TInteger
   SVMType.String {} -> return TString
+  SVMType.Decimal {} -> return TDecimal
   (SVMType.UserDefined _ SVMType.Bool {}) -> return TBool
   (SVMType.UserDefined _ SVMType.Int {}) -> return TString
   SVMType.UnknownLabel s _ -> do
