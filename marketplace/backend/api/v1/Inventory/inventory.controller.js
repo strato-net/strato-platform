@@ -176,7 +176,7 @@ class InventoryController {
       }
 
       const payload = {
-          tokenSymbol: body.assetAddress,
+          tokenSymbol: body.rootAddress,
           quantity: body.quantity,
           baseAddress: body.baseAddress,
           transferNumber: result.transferNumber,
@@ -415,6 +415,7 @@ class InventoryController {
   
   static validateBridgeItemArgs(args) {
     const bridgeItemSchema = Joi.object({
+      rootAddress: Joi.string().required(),
       assetAddress: Joi.string().required(),
       quantity: Joi.number().integer().greater(0).required(),
       price: Joi.number().integer().min(0).required(),

@@ -185,6 +185,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
     
     const handleBridge = async () => {
         const body = {
+            rootAddress: inventory.root,
             assetAddress: inventory.address,
             quantity,
             price,
