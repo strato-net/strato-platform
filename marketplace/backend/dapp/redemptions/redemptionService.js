@@ -84,7 +84,7 @@ async function get(user, args, defaultOptions) {
     if (address) {
         searchArgs = setSearchQueryOptions(restArgs, [{ key: 'address', value: address }, {key: 'isActive', value: 'true'}]);
     } else {
-        searchArgs = setSearchQueryOptions(restArgs, [{ key: 'serviceName', value: 'BlockApps Redemptions' }, {key: 'isActive', value: 'true'}]);
+        searchArgs = setSearchQueryOptions(restArgs, [{ key: 'ownerCommonName', value: 'BlockApps' }, {key: 'isActive', value: 'true'}]);
     }
   
     redemptionService = await searchOne(contractName, searchArgs, options, user);
