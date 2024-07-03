@@ -2013,61 +2013,6 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
                           Nothing -> runTheCall address contract' funcName hsh cc func argVals ro False
                         Just mo -> runTheCall address contract' funcName hsh cc mo argVals ro False
               return . Constant . fromMaybe SNULL $ res
-              where
-                testMatch :: MonadSM m => CC.Func -> m Bool
-                testMatch tf = do
-                  let argMapping = mapArgs tf
-                  doArgsMatch <- mapM testNameAndTypes argMapping
-                  pure $
-                    ((length argMapping) == (length $ CC._funcArgs tf))
-                      && ((length argMapping) == (argCount))
-                      && (all (== True) doArgsMatch)
-                testNameAndTypes :: MonadSM m => (String, (SVMType.Type, Value)) -> m Bool
-                testNameAndTypes (_, (t, v)) =
-                  -- These cases might not be all inclusive of all valid combinations.
-                  case (v, t) of
-                    (SInteger _, SVMType.Int _ _) -> pure True
-                    (SString _, SVMType.String _) -> pure True
-                    (SString _, SVMType.Bytes _ _) -> pure True
-                    (SString _, SVMType.Address _) -> pure True
-                    (SString _, SVMType.Account _) -> pure True
-                    (SBool _, SVMType.Bool) -> pure True
-                    (SAccount _ _, SVMType.Address _) -> pure True
-                    (SAccount _ _, SVMType.Account _) -> pure True
-                    (SStruct _ _, SVMType.UnknownLabel _ _) -> pure True
-                    (SContract x _, SVMType.UnknownLabel y _) -> pure $ x == y
-                    (SArray x _, y@(SVMType.Array _ _)) -> pure $ x == y
-                    (_, SVMType.Variadic) -> pure True
-                    (SReference addressedPath, _) -> do
-                      refType <- getXabiValueType addressedPath
-                      if (refType == t)
-                        then pure $ True
-                        else case (refType, t) of
-                          (SVMType.UnknownLabel x _, SVMType.UnknownLabel y _) -> pure $ x == y
-                          (SVMType.Array x _, SVMType.Array y _) -> pure $ x == y
-                          _ -> pure $ False
-                    _ -> pure $ False
-                mapArgs :: CC.FuncF a -> [(String, (SVMType.Type, Value))]
-                mapArgs theFunc = case argVals of
-                  OrderedVals vs ->
-                    let argMeta =
-                          map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t)) $
-                            CC._funcArgs theFunc
-                     in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
-                  NamedVals ns ->
-                    let strTypes = M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ CC._funcArgs theFunc
-                        typeAndVal =
-                          M.merge
-                            (M.dropMissing)
-                            (M.dropMissing)
-                            (M.zipWithMatched $ \_k t v -> (t, v))
-                            strTypes
-                            $ M.fromList ns
-                        sortedArgs =
-                          map snd . sortWith fst
-                            . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
-                            $ M.toList typeAndVal
-                     in sortedArgs
             Constant (SStructDef structName) -> do
               contract' <- getCurrentContract
               case M.lookup structName $ contract' ^. CC.structs of
@@ -3673,6 +3618,7 @@ validateFunctionArguments func argVals = do
         (SInteger _, SVMType.Int _ _) -> pure True
         (SInteger _, SVMType.String _) -> pure True
         (SInteger _, SVMType.UnknownLabel _ _) -> pure True
+        (SInteger _, SVMType.Decimal) -> pure True
         (SDecimal _, SVMType.Decimal) -> pure True
         (SString _, SVMType.String _) -> pure True
         (SString _, SVMType.Bytes _ _) -> pure True
