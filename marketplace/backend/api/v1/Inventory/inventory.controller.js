@@ -230,7 +230,7 @@ class InventoryController {
     const createInventorySchema = Joi.object({
       productAddress: Joi.string().required(),
       quantity: Joi.number().integer().min(0).required(),
-      pricePerUnit: Joi.number().integer().greater(0).required(),
+      pricePerUnit: Joi.number().greater(0).required(),
       batchId: Joi.string().required(),
       status: Joi.number().integer().min(1).max(2).required(),
       inventoryType: Joi.string().required(),
@@ -283,7 +283,7 @@ class InventoryController {
       paymentProviders: Joi.array().min(1).items(
         Joi.string().min(0).required(),
       ).required(),
-      price: Joi.number().integer().greater(0).required(),
+      price: Joi.number().greater(0).required(),
       quantity: Joi.number().integer().greater(0).optional(),
     });
 
@@ -353,7 +353,7 @@ class InventoryController {
       assetAddress: Joi.string().required(),
       newOwner: Joi.string().required(),
       quantity: Joi.number().integer().greater(0).required(),
-      price: Joi.number().integer().min(0).required(),
+      price: Joi.number().min(0).required(),
     });
 
     const validation = transferItemSchema.validate(args);
@@ -372,7 +372,7 @@ class InventoryController {
       paymentProviders: Joi.array().min(1).items(
         Joi.string().min(0).required(),
       ).optional(),
-      price: Joi.number().integer().greater(0).optional(),
+      price: Joi.number().greater(0).optional(),
       quantity: Joi.number().integer().greater(0).optional(),
     });
 
