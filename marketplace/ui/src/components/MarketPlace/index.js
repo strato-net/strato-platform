@@ -97,13 +97,13 @@ const MarketPlace = ({ user, isAuthenticated }) => {
       <Fade triggerOnce>
         <Carousel autoPlay centerSlidePercentage={95} showArrows={false} infiniteLoop showStatus={false} swipeable emulateTouch autoFocus centerMode>
           {BANNER.map((item, index) => (
-            <div key={index} className="relative p-2 h-[222px] sm:h-[380px] mx-1 md:mx-2 md:mt-6 lg:mx-3">
+            <div key={index} className="no-select p-2 h-[222px] sm:h-[380px] mx-1 md:mx-2 md:mt-6 lg:mx-3">
               <ButtonElement desktopText={item.desktopText} mobileText={item.mobileText} />
               <div className="sm:hidden">
                 <img
                   alt={item.alt}
                   title={item.title}
-                  className="absolute inset-0 z-10 h-[222px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+                  className="no-select absolute inset-0 z-10 h-[222px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
                   height={380}
                   width="100%"
                   src={item.mobileImg}
@@ -114,7 +114,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
                 <img
                   alt={item.alt}
                   title={item.title}
-                  className="absolute inset-0 z-10 h-[380px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+                  className="no-select absolute inset-0 z-10 h-[380px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
                   height={380}
                   width="100%"
                   src={item.tabletImg}
@@ -125,7 +125,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
                 <img
                   alt={item.alt}
                   title={item.title}
-                  className="absolute inset-0 z-10 md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+                  className="no-select absolute inset-0 z-10 md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
                   height={380}
                   width="100%"
                   src={item.laptopImg}
@@ -136,7 +136,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
                 <img
                   alt={item.alt}
                   title={item.title}
-                  className="absolute inset-0 z-10 lg:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+                  className="no-select absolute inset-0 z-10 lg:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
                   height={380}
                   width="100%"
                   src={item.desktopImg}
