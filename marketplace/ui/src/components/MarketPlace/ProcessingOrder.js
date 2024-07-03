@@ -74,13 +74,13 @@ const ProcessingOrder = ({ user }) => {
       } else {
         setTimeout(() => {
           navigate(routes.Checkout.url);
-        }, 500);
+        }, 3000);
       }
     } catch (err) {
       setError(err);
       setTimeout(() => {
-        navigate(routes.Checkout.url); 
-      }, 3000); // Adding a delay before redirecting to Checkout so user can read error message
+        navigate(routes.Checkout.url);
+      }, 3000);
     }
   }
 
