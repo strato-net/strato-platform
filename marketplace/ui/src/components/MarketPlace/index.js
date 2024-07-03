@@ -67,7 +67,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
   const linkUrl = window.location.href;
   const navRoute = routes.MarketplaceCategoryProductList.url.replace(':category', 'All');
 
-  const ButtonElement = ({ desktopText, mobileText }) => <div className="relative flex top-[156px] sm:top-[250px] left-[4%] sm:left-[7.5%] md:left-[7%] md:top-60 z-50">
+  const ButtonElement = ({ desktopText, mobileText }) => <div className="relative flex top-[156px] sm:top-[250px] 3xl:top-[70%] left-[4%] sm:left-[7.5%] md:left-[7%] md:top-60 z-50">
     <Button
       id="viewMore"
       onClick={() => {
@@ -88,6 +88,61 @@ const MarketPlace = ({ user, isAuthenticated }) => {
     </Button>
   </div>
 
+  const CarouselElement = ({ scrollT }) =>
+    <Carousel autoPlay centerSlidePercentage={95} showArrows={false} infiniteLoop showStatus={false} swipeable emulateTouch autoFocus centerMode
+      preventMovementUntilSwipeScrollTolerance={true} swipeScrollTolerance={scrollT}
+    >
+      {BANNER.map((item, index) => (
+        <div key={index} className="no-select relative p-2 h-[222px] sm:h-[380px] 3xl:h-[480px] mx-1 md:mx-2 md:mt-6 lg:mx-3">
+          <ButtonElement desktopText={item.desktopText} mobileText={item.mobileText} />
+          <div className="sm:hidden">
+            <img
+              alt={item.alt}
+              title={item.title}
+              className="no-select absolute inset-0 z-10 h-[222px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+              height={380}
+              width="100%"
+              src={item.mobileImg}
+              preview={false}
+            />
+          </div>
+          <div className="hidden sm:block md:hidden">
+            <img
+              alt={item.alt}
+              title={item.title}
+              className="no-select absolute inset-0 z-10 h-[380px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+              height={380}
+              width="100%"
+              src={item.tabletImg}
+              preview={false}
+            />
+          </div>
+          <div className="hidden md:block lg:hidden">
+            <img
+              alt={item.alt}
+              title={item.title}
+              className="no-select absolute inset-0 z-10 md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+              height={380}
+              width="100%"
+              src={item.laptopImg}
+              preview={false}
+            />
+          </div>
+          <div className="hidden lg:block">
+            <img
+              alt={item.alt}
+              title={item.title}
+              className="no-select absolute inset-0 z-10 lg:h-[330px] 3xl:h-[480px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+              height={380}
+              width="100%"
+              src={item.desktopImg}
+              preview={false}
+            />
+          </div>
+        </div>
+      ))}
+    </Carousel>
+
   return (
     <>
       <HelmetComponent
@@ -95,57 +150,12 @@ const MarketPlace = ({ user, isAuthenticated }) => {
         description={SEO.DESCRIPTION_META}
         link={linkUrl} />
       <Fade triggerOnce>
-        <Carousel autoPlay centerSlidePercentage={95} showArrows={false} infiniteLoop showStatus={false} swipeable emulateTouch autoFocus centerMode>
-          {BANNER.map((item, index) => (
-            <div key={index} className="no-select p-2 h-[222px] sm:h-[380px] mx-1 md:mx-2 md:mt-6 lg:mx-3">
-              <ButtonElement desktopText={item.desktopText} mobileText={item.mobileText} />
-              <div className="sm:hidden">
-                <img
-                  alt={item.alt}
-                  title={item.title}
-                  className="no-select absolute inset-0 z-10 h-[222px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
-                  height={380}
-                  width="100%"
-                  src={item.mobileImg}
-                  preview={false}
-                />
-              </div>
-              <div className="hidden sm:block md:hidden">
-                <img
-                  alt={item.alt}
-                  title={item.title}
-                  className="no-select absolute inset-0 z-10 h-[380px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
-                  height={380}
-                  width="100%"
-                  src={item.tabletImg}
-                  preview={false}
-                />
-              </div>
-              <div className="hidden md:block lg:hidden">
-                <img
-                  alt={item.alt}
-                  title={item.title}
-                  className="no-select absolute inset-0 z-10 md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
-                  height={380}
-                  width="100%"
-                  src={item.laptopImg}
-                  preview={false}
-                />
-              </div>
-              <div className="hidden lg:block">
-                <img
-                  alt={item.alt}
-                  title={item.title}
-                  className="no-select absolute inset-0 z-10 lg:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
-                  height={380}
-                  width="100%"
-                  src={item.desktopImg}
-                  preview={false}
-                />
-              </div>
-            </div>
-          ))}
-        </Carousel>
+        <div className="hidden md:block">
+          <CarouselElement scrollT={130} />
+        </div>
+        <div className="md:hidden">
+          <CarouselElement scrollT={50} />
+        </div>
       </Fade>
       {iscategorysLoading ? (
         <div className="h-96 flex justify-center items-center">
