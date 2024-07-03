@@ -78,9 +78,6 @@ const ProcessingOrder = ({ user }) => {
       }
     } catch (err) {
       setError(err);
-      setTimeout(() => {
-        navigate(routes.Checkout.url);
-      }, 3000);
     }
   }
 
