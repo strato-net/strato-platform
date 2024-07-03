@@ -98,6 +98,7 @@ solidityLanguage =
           "true",
           "false",
           "uint",
+          "decimal",
           "int",
           "bytes",
           "byte",

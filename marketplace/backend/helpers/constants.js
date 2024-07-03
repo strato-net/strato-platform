@@ -10,6 +10,8 @@ export default {
   zeroAddress: '0000000000000000000000000000000000000000',
   certificateRegistryContractName: "OfficialCertificateRegistry",
   certificateContractName: "Certificate",
+  userContractName: 'BlockApps-UserRegistry-User',
+  mercataAdminContractName: 'MercataAdmin',
   emptyCert: '-----BEGIN CERTIFICATE-----\nMIIBVDCB+aADAgECAhBPjHUswOXtDsbDeQIsdepkMAwGCCqGSM49BAMCBQAwLDEJ\nMAcGA1UEAwwAMQkwBwYDVQQKDAAxCTAHBgNVBAsMADEJMAcGA1UEBgwAMB4XDTIx\nMDUyNTE1MzQxNVoXDTIyMDUyNTE1MzQxNVowLDEJMAcGA1UEAwwAMQkwBwYDVQQK\nDAAxCTAHBgNVBAsMADEJMAcGA1UEBgwAMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAE\n4X1p4KE8cB6vYqKzSHIl+V5fDUC9p0j8OfOQOUhCfkjG1ALuRyP68tTohz9TLPLk\nYCVKrCiueuZJbejnGsp21TAMBggqhkjOPQQDAgUAA0gAMEUCIQCVtizg/N3MBdLi\nfHto7tqu1ia6cZpMI/G2bLWSPErK9AIgcBw+S8iVqSjh61CkgBAS066Z7M/W9eeY\n+sm9OKHDfQQ=\n-----END CERTIFICATE-----',
   testCert1: '-----BEGIN CERTIFICATE-----\nMIIB0jCCAXegAwIBAgIQeEdWygiiwHQ9e5bfkQVdVTAMBggqhkjOPQQDAgUAMGsx\nEjAQBgNVBAMMCUJsb2NrQXBwczExMC8GA1UECgwoM2JhMzA0YjhlODc0MDViYmYy\nMzg4NzQzYjM5NmEyODEzMTcwYzAwZjEUMBIGA1UECwwLZW5naW5lZXJpbmcxDDAK\nBgNVBAYMA1VTQTAeFw0yMTEwMTkxNTE2MzZaFw0yMjEwMTkxNTE2MzZaMGsxEjAQ\nBgNVBAMMCUJsb2NrQXBwczExMC8GA1UECgwoM2JhMzA0YjhlODc0MDViYmYyMzg4\nNzQzYjM5NmEyODEzMTcwYzAwZjEUMBIGA1UECwwLZW5naW5lZXJpbmcxDDAKBgNV\nBAYMA1VTQTBWMBAGByqGSM49AgEGBSuBBAAKA0IABLsHOfw6jXFjQRAoLVDLwsmr\nKtHn5O6Cisa47lzxV0NfXVJXCcVP2N95GAB5/pmLsmE8rcdLQVBQFLWPjhGoCQ4w\nDAYIKoZIzj0EAwIFAANHADBEAiAChH6dQTLS/F/lNt7JkjMpC0uo6MEFI+zV5hCB\noNnc1gIgaMpLif4qKPRfAFjQJCJR8ORV1PEXf9xBK7XtPONqDQ0=\n-----END CERTIFICATE-----',
   testOrg1: '3ba304b8e87405bbf2388743b396a2813170c00f',
@@ -34,8 +36,8 @@ export default {
   testnetNetworkId: "7596898649924658542",
   prodStratsAddress: "b220195543f652f735b7847c4af399d0323e1ff6",
   testnetStratsAddress: "488cd3909d94606051e0684cf6caa5763fb78613",
-  attachImagesAndFiles: "*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*)",
-  attachSalesAndImagesAndFiles: "*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Sale!BlockApps-Mercata-Sale_BlockApps-Mercata-Asset_fk(*)",
+  attachImagesAndFiles: "*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Asset-fileNames(*)",
+  attachSalesAndImagesAndFiles: "*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Asset-fileNames(*),BlockApps-Mercata-Sale!BlockApps-Mercata-Sale_BlockApps-Mercata-Asset_fk(*)",
   attach_saleAddresses_Quantities_completedSales_onOrder: "*,BlockApps-Mercata-Order-saleAddresses(*),BlockApps-Mercata-Order-quantities(*),BlockApps-Mercata-Order-completedSales(*)",
   baUserNames: ['blockapps_carbon', 'blockapps_metals', 'blockapps_clothing', 'blockapps_collectibles', 'blockapps_memberships', 'blockapps_art', 'blockapps_spirits'],
   localHost: 'http://localhost'
@@ -90,6 +92,12 @@ export const ITEM_STATUS = {
   "SOLD": 4
 }
 
+export const ISSUER_STATUS = {
+ "UNAUTHORIZED": "1",
+ "PENDING_REVIEW": "2",
+ "AUTHORIZED": "3" 
+}
+
 export const PAYMENT_TYPES = {
   "amex": "1",
   "discover": "2",
@@ -114,25 +122,28 @@ export const calculatePriceFluctuation = (records) => {
 }
 
 export const calculateVolumeTraded = (records) => {
-  return records.reduce((acc, record, index, array) => {
-    // Skip the first element as there's no previous element to compare with
-    if (index === 0) return acc;
+  // Create a map to track the latest quantity for each address
+  const addressQuantityMap = new Map();
 
-    // Check if the current record and the previous record have the same address
-    // We shouldn't track quantity decreased for a new sale contract created
-    // (when user uses list for sale) as the lesser quantity can be listed for sale 
-    if (record.address === array[index - 1].address) {
-      const quantityDecrease = array[index - 1].quantity - record.quantity;
+  return records.reduce((acc, record) => {
+    // Get the previous quantity for this address, if any
+    const previousQuantity = addressQuantityMap.get(record.address) || record.quantity;
 
-      // Only add to the accumulator if there's a decrease in quantity
-      if (quantityDecrease > 0) {
-        acc += quantityDecrease;
-      }
+    // Update the map with the current quantity
+    addressQuantityMap.set(record.address, record.quantity);
+
+    // Calculate the quantity decrease
+    const quantityDecrease = previousQuantity - record.quantity;
+
+    // Only add to the accumulator if there's a decrease in quantity
+    if (quantityDecrease > 0) {
+      acc += quantityDecrease;
     }
 
     return acc;
   }, 0);
 };
+
 
 
 // Helpers to get time `x` months/years ago and date

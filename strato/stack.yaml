@@ -109,6 +109,7 @@ extra-deps:
 - contra-tracer-0.2.0.0
 - dom-lt-0.2.3
 - wai-extra-3.1.14@sha256:1b093366842dc0057cebb4a23dbf9a29269321d70fd242c7695ce0bbd80d32fb,8056
+- Decimal-0.5.2
 
 
 #- git: https://github.com/blockapps/milena

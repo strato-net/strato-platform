@@ -22,6 +22,7 @@ abstract contract Asset is Utils {
     string public description;
     string[] public images;
     string[] public files;
+    string[] public fileNames;
     uint public createdDate;
     uint public quantity;
     uint public itemNumber;
@@ -59,6 +60,7 @@ abstract contract Asset is Utils {
         string _description,
         string[] _images,
         string[] _files,
+        string[] _fileNames,
         uint _createdDate,
         uint _quantity,
         AssetStatus _status
@@ -70,6 +72,7 @@ abstract contract Asset is Utils {
         description = _description;
         images = _images;
         files = _files;
+        fileNames = _fileNames;
         createdDate = _createdDate;
         quantity = _quantity;
         status = _status;
@@ -199,10 +202,12 @@ abstract contract Asset is Utils {
 
     function updateAsset(
         string[] _images,
-        string[] _files
+        string[] _files,
+        string[] _fileNames
     ) public requireOwner("update asset") returns (uint) {
         images = _images;
         files = _files;
+        fileNames = _fileNames;
         return RestStatus.OK;
     }
 

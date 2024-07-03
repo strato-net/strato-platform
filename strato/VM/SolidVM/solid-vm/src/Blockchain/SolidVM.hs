@@ -82,6 +82,7 @@ import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.UTF8 as UTF8
 import Data.Char as CHAR
+import Data.Decimal
 import Data.Either.Extra (eitherToMaybe)
 import Data.Foldable (for_)
 import Data.List
@@ -575,6 +576,8 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
                             (SString _, SVMType.Bytes _ _) -> True
                             (SString _, SVMType.Address _) -> True
                             (SString _, SVMType.Account _) -> True
+                            (SDecimal _, SVMType.Decimal) -> True
+                            (SInteger _, SVMType.Decimal) -> True
                             (SBool _, SVMType.Bool) -> True
                             (SAccount _ _, SVMType.Address _) -> True
                             (SAccount _ _, SVMType.Account _) -> True
@@ -1454,6 +1457,7 @@ expToVar' (CC.NumberLiteral _ v (Just nu)) =
     CC.Finney -> return . Constant $ SInteger (v * (10 ^ (15 :: Integer)))
     CC.Ether -> return . Constant $ SInteger (v * (10 ^ (18 :: Integer)))
 expToVar' (CC.StringLiteral _ s) = return $ Constant $ SString s
+expToVar' (CC.DecimalLiteral _ v) = return $ Constant $ SDecimal $ CC.unwrapDecimal v
 expToVar' (CC.AccountLiteral _ a) = return $ Constant $ SAccount a False
 expToVar' (CC.BoolLiteral _ b) = return $ Constant $ SBool b
 expToVar' (CC.HexaLiteral _ a) = return $ Constant $ SString $ BC.unpack . either (parseError "Couldn't parse hexadecimal literal: ") id . B16.decode $ BC.pack a
@@ -1464,8 +1468,10 @@ expToVar' (CC.Variable _ "now") = Constant . SInteger . round . utcTimeToPOSIXSe
 expToVar' (CC.Variable _ name) = getVariableOfName name
 expToVar' (CC.Unitary _ "-" e) = do
   var <- expToVar e
-  value <- getInt var
-  return $ Constant $ SInteger (value * (-1))
+  value <- getRealNum var
+  case value of
+    Left v -> return $ Constant $ SInteger (v * (-1))
+    Right v -> return $ Constant $ SDecimal $ v * (-1)
 expToVar' (CC.PlusPlus _ e) = do
   var <- expToVar e
   value <- getInt var
@@ -1495,10 +1501,15 @@ expToVar' (CC.Unitary _ "--" e) = do
   setVar var next
   return $ Constant next
 expToVar' (CC.Binary _ "+=" lhs rhs) = addAndAssign lhs rhs
-expToVar' (CC.Binary _ "-=" lhs rhs) = binopAssign (-) lhs rhs
-expToVar' (CC.Binary _ "*=" lhs rhs) = binopAssign (*) lhs rhs
-expToVar' (CC.Binary _ "/=" lhs rhs) = binopAssign mod lhs rhs
-expToVar' (CC.Binary _ "%=" lhs rhs) = binopAssign rem lhs rhs
+expToVar' (CC.Binary _ "-=" lhs rhs) = binopAssign' (-) (-) lhs rhs
+expToVar' (CC.Binary _ "*=" lhs rhs) = binopAssign' (*) (*) lhs rhs
+expToVar' ex@(CC.Binary _ "/=" lhs rhs) = do
+  rhs' <- getRealNum =<< expToVar rhs
+  case rhs' of
+    Left 0 -> divideByZero $ unparseExpression ex
+    Right 0 -> divideByZero $ unparseExpression ex
+    _ -> binopAssign' (div) (/) lhs rhs
+expToVar' (CC.Binary _ "%=" lhs rhs) = binopAssign' rem decMod lhs rhs
 expToVar' (CC.Binary _ "|=" lhs rhs) = binopAssign (.|.) lhs rhs
 expToVar' (CC.Binary _ "&=" lhs rhs) = binopAssign (.&.) lhs rhs
 expToVar' (CC.Binary _ "^=" lhs rhs) = binopAssign xor lhs rhs
@@ -1674,14 +1685,16 @@ expToVar' x@(CC.IndexAccess _ parent (Just mIndex)) = do
 --    _ -> error $ "unknown case in expToVar' for IndexAccess: " ++ show var
 
 expToVar' (CC.Binary _ "+" expr1 expr2) = expToVarAdd expr1 expr2
-expToVar' (CC.Binary _ "-" expr1 expr2) = expToVarInteger expr1 (-) expr2 SInteger
-expToVar' (CC.Binary _ "*" expr1 expr2) = expToVarInteger expr1 (*) expr2 SInteger
+expToVar' (CC.Binary _ "-" expr1 expr2) = expToVarArith (-) (-) expr1 expr2
+expToVar' (CC.Binary _ "*" expr1 expr2) = expToVarArith (*) (*) expr1 expr2
 expToVar' ex@(CC.Binary _ "/" expr1 expr2) = do
-  rhs <- getInt =<< expToVar expr2
+  rhs <- getRealNum =<< expToVar expr2
   case rhs of
-    0 -> divideByZero $ unparseExpression ex
-    _ -> expToVarInteger expr1 div expr2 SInteger
-expToVar' (CC.Binary _ "%" expr1 expr2) = expToVarInteger expr1 rem expr2 SInteger
+    Left 0 -> divideByZero $ unparseExpression ex
+    Right 0 -> divideByZero $ unparseExpression ex
+    _ -> expToVarArith (div) (/) expr1 expr2
+--modified to use decimal division
+expToVar' (CC.Binary _ "%" expr1 expr2) = expToVarArith rem decMod expr1 expr2
 expToVar' (CC.Binary _ "|" expr1 expr2) = expToVarInteger expr1 (.|.) expr2 SInteger
 expToVar' (CC.Binary _ "&" expr1 expr2) = expToVarInteger expr1 (.&.) expr2 SInteger
 expToVar' (CC.Binary _ "^" expr1 expr2) = expToVarInteger expr1 xor expr2 SInteger
@@ -1717,6 +1730,7 @@ expToVar' (CC.Binary _ "<" expr1 expr2) = do
   logVals val1 val2
   case (val1, val2) of
     (SInteger i1, SInteger i2) -> return $ Constant $ SBool $ i1 < i2
+    (SDecimal v1, SDecimal v2) -> return $ Constant $ SBool $ v1 < v2
     _ -> typeError "binary '<' on non-ints" (val1, val2)
 expToVar' (CC.Binary _ ">" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
@@ -1725,6 +1739,7 @@ expToVar' (CC.Binary _ ">" expr1 expr2) = do
   logVals val1 val2
   case (val1, val2) of
     (SInteger i1, SInteger i2) -> return $ Constant $ SBool $ i1 > i2
+    (SDecimal v1, SDecimal v2) -> return $ Constant $ SBool $ v1 > v2
     _ -> typeError "binary '>' on non-ints" (val1, val2)
 expToVar' (CC.Binary _ ">=" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
@@ -1733,6 +1748,7 @@ expToVar' (CC.Binary _ ">=" expr1 expr2) = do
   logVals val1 val2
   case (val1, val2) of
     (SInteger i1, SInteger i2) -> return $ Constant $ SBool $ i1 >= i2
+    (SDecimal v1, SDecimal v2) -> return $ Constant $ SBool $ v1 >= v2
     _ -> typeError "binary '>=' used on non-ints" (val1, val2)
 expToVar' (CC.Binary _ "<=" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
@@ -1741,6 +1757,7 @@ expToVar' (CC.Binary _ "<=" expr1 expr2) = do
   logVals val1 val2
   case (val1, val2) of
     (SInteger i1, SInteger i2) -> return $ Constant $ SBool $ i1 <= i2
+    (SDecimal v1, SDecimal v2) -> return $ Constant $ SBool $ v1 <= v2
     _ -> typeError "binary '<=' used on non-ints" (val1, val2)
 expToVar' (CC.Binary _ "&&" expr1 expr2) = do
   b1 <- getBool =<< expToVar expr1
@@ -1996,6 +2013,61 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
                           Nothing -> runTheCall address contract' funcName hsh cc func argVals ro False
                         Just mo -> runTheCall address contract' funcName hsh cc mo argVals ro False
               return . Constant . fromMaybe SNULL $ res
+              where
+                testMatch :: MonadSM m => CC.Func -> m Bool
+                testMatch tf = do
+                  let argMapping = mapArgs tf
+                  doArgsMatch <- mapM testNameAndTypes argMapping
+                  pure $
+                    ((length argMapping) == (length $ CC._funcArgs tf))
+                      && ((length argMapping) == (argCount))
+                      && (all (== True) doArgsMatch)
+                testNameAndTypes :: MonadSM m => (String, (SVMType.Type, Value)) -> m Bool
+                testNameAndTypes (_, (t, v)) =
+                  -- These cases might not be all inclusive of all valid combinations.
+                  case (v, t) of
+                    (SInteger _, SVMType.Int _ _) -> pure True
+                    (SString _, SVMType.String _) -> pure True
+                    (SString _, SVMType.Bytes _ _) -> pure True
+                    (SString _, SVMType.Address _) -> pure True
+                    (SString _, SVMType.Account _) -> pure True
+                    (SBool _, SVMType.Bool) -> pure True
+                    (SAccount _ _, SVMType.Address _) -> pure True
+                    (SAccount _ _, SVMType.Account _) -> pure True
+                    (SStruct _ _, SVMType.UnknownLabel _ _) -> pure True
+                    (SContract x _, SVMType.UnknownLabel y _) -> pure $ x == y
+                    (SArray x _, y@(SVMType.Array _ _)) -> pure $ x == y
+                    (_, SVMType.Variadic) -> pure True
+                    (SReference addressedPath, _) -> do
+                      refType <- getXabiValueType addressedPath
+                      if (refType == t)
+                        then pure $ True
+                        else case (refType, t) of
+                          (SVMType.UnknownLabel x _, SVMType.UnknownLabel y _) -> pure $ x == y
+                          (SVMType.Array x _, SVMType.Array y _) -> pure $ x == y
+                          _ -> pure $ False
+                    _ -> pure $ False
+                mapArgs :: CC.FuncF a -> [(String, (SVMType.Type, Value))]
+                mapArgs theFunc = case argVals of
+                  OrderedVals vs ->
+                    let argMeta =
+                          map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t)) $
+                            CC._funcArgs theFunc
+                     in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
+                  NamedVals ns ->
+                    let strTypes = M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ CC._funcArgs theFunc
+                        typeAndVal =
+                          M.merge
+                            (M.dropMissing)
+                            (M.dropMissing)
+                            (M.zipWithMatched $ \_k t v -> (t, v))
+                            strTypes
+                            $ M.fromList ns
+                        sortedArgs =
+                          map snd . sortWith fst
+                            . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
+                            $ M.toList typeAndVal
+                     in sortedArgs
             Constant (SStructDef structName) -> do
               contract' <- getCurrentContract
               case M.lookup structName $ contract' ^. CC.structs of
@@ -2328,13 +2400,48 @@ expToVarAdd expr1 expr2 = do
   case (i1, i2) of
     (SInteger a, SInteger b) -> return . Constant . SInteger $ a + b
     (SString a, SString b) -> return . Constant . SString $ a ++ b
+    (SDecimal a, SDecimal b) -> return . Constant . SDecimal $ a + b
+    (SDecimal a, SInteger b) -> return . Constant . SDecimal $ a + (Decimal 0 b)
+    (SInteger a, SDecimal b) -> return . Constant . SDecimal $ (Decimal 0 a) + b
     _ -> typeError "expToVarAdd" (i1, i2)
+
+--decMod operation, implements % w Data.Decimal library functions
+decMod :: Decimal -> Decimal -> Decimal
+decMod a b = fromRational (toRational a `mod'` toRational b)
+  where
+    mod' x y = x - (fromIntegral (floor (x / y) :: Integer)) * y
+
+expToVarArith :: MonadSM m => (Integer -> Integer -> Integer) -> (Decimal -> Decimal -> Decimal) -> CC.Expression -> CC.Expression -> m Variable
+expToVarArith intOp decOp expr1 expr2 = do
+  i1 <- getVar =<< expToVar expr1
+  i2 <- getVar =<< expToVar expr2
+  case (i1, i2) of
+    (SInteger a, SInteger b) -> return . Constant . SInteger $ a `intOp` b
+    (SDecimal a, SDecimal b) -> return . Constant . SDecimal $ a `decOp` b
+    (SDecimal a, SInteger b) -> return . Constant . SDecimal $ a `decOp` (Decimal 0 b)
+    (SInteger a, SDecimal b) -> return . Constant . SDecimal $ (Decimal 0 a) `decOp` b
+    _ -> typeError "expToVarArith" (i1, i2)
 
 expToVarInteger :: MonadSM m => CC.Expression -> (Integer -> Integer -> a) -> CC.Expression -> (a -> Value) -> m Variable
 expToVarInteger expr1 o expr2 retType = do
   i1 <- getInt =<< expToVar expr1
   i2 <- getInt =<< expToVar expr2
   return . Constant . retType $ i1 `o` i2
+
+binopAssign' :: MonadSM m => (Integer -> Integer -> Integer) -> (Decimal -> Decimal -> Decimal) -> CC.Expression -> CC.Expression -> m Variable
+binopAssign' intOp decOp lhs rhs = do
+  let readVal e = getVar =<< expToVar e
+  delta <- readVal rhs
+  curValue <- readVal lhs
+  varToAssign <- expToVar lhs
+  next <- case (curValue, delta) of
+    (SInteger c, SInteger d) -> pure . SInteger $ c `intOp` d
+    (SDecimal c, SDecimal d) -> pure . SDecimal $ c `decOp` d
+    (SDecimal a, SInteger b) -> pure . SDecimal $ a `decOp` (Decimal 0 b)
+    (SInteger a, SDecimal b) -> pure . SDecimal $ (Decimal 0 a) `decOp` b
+    _ -> typeError "binopAssign'" (curValue, delta)
+  setVar varToAssign next
+  return $ Constant next
 
 addAndAssign :: MonadSM m => CC.Expression -> CC.Expression -> m Variable
 addAndAssign lhs rhs = do
@@ -2345,6 +2452,9 @@ addAndAssign lhs rhs = do
   next <- case (curValue, delta) of
     (SInteger c, SInteger d) -> pure . SInteger $ c + d
     (SString c, SString d) -> pure . SString $ c ++ d
+    (SDecimal c, SDecimal d) -> pure . SDecimal $ c + d
+    (SDecimal a, SInteger b) -> pure . SDecimal $ a + (Decimal 0 b)
+    (SInteger a, SDecimal b) -> pure . SDecimal $ (Decimal 0 a) + b
     _ -> typeError "addAndAssign" (curValue, delta)
   setVar varToAssign next
   return $ Constant next
@@ -2362,6 +2472,7 @@ binopAssign oper lhs rhs = do
 intBuiltin :: [Value] -> Value
 intBuiltin [SEnumVal _ _ enumNum] = SInteger $ fromIntegral enumNum
 intBuiltin [SInteger n] = SInteger n
+intBuiltin [SDecimal v] = SInteger (decimalMantissa $ roundTo 0 v)
 intBuiltin [SString hex] = integerToValue $ parseBaseInt hex 16
 intBuiltin [SString hex, SInteger 16] = integerToValue $ parseBaseInt hex 16
 intBuiltin [SString dec, SInteger 10] = integerToValue $ parseBaseInt dec 10
@@ -2370,6 +2481,15 @@ intBuiltin args = typeError "numeric cast - invalid args" args
 integerToValue :: Either String Integer -> Value
 integerToValue (Right n) = SInteger n
 integerToValue (Left err) = typeError err ("" :: String)
+
+decimalBuiltin :: [Value] -> Value
+decimalBuiltin [SInteger n] = SDecimal $ Decimal 0 n
+decimalBuiltin [SString str] =
+  let stringToDecimal = (readEither str :: Either String Decimal)
+  in case stringToDecimal of
+    Right deci -> SDecimal deci
+    Left e -> typeError e str
+decimalBuiltin args = typeError "decimal cast - invalid args" args
 
 parseBaseInt :: String -> Integer -> Either String Integer
 parseBaseInt s n =
@@ -2475,6 +2595,7 @@ callBuiltin "byte" [SInteger n] _ = return $ SInteger (n .&. 0xff)
 callBuiltin "byte" vs _ = typeError "byte cast" vs
 callBuiltin "uint" args _ = return $ intBuiltin args
 callBuiltin "int" args _ = return $ intBuiltin args
+callBuiltin "decimal" args _ = return $ decimalBuiltin args
 callBuiltin "push" [v] (Just o) = typeError "push (called as func, not as method)" (v, o)
 callBuiltin "call" [v] (Just o) = typeError "call (called as a function, not as a method)" (v, o)
 callBuiltin "identity" [v] Nothing = return v
@@ -3106,6 +3227,7 @@ encodeForReturn' (STuple items) = do
   encodedItems <- mapM (encodeForReturn' <=< getVar) $ V.toList items
 
   return $ "(" ++ (intercalate "," encodedItems) ++ ")"
+encodeForReturn' (SDecimal d) = return $ show d 
 encodeForReturn' x = todo "Cannot encode this return type: " x
 
 --formatAddressWithoutColor : padded the address with 40 bytes
@@ -3551,6 +3673,7 @@ validateFunctionArguments func argVals = do
         (SInteger _, SVMType.Int _ _) -> pure True
         (SInteger _, SVMType.String _) -> pure True
         (SInteger _, SVMType.UnknownLabel _ _) -> pure True
+        (SDecimal _, SVMType.Decimal) -> pure True
         (SString _, SVMType.String _) -> pure True
         (SString _, SVMType.Bytes _ _) -> pure True
         (SString _, SVMType.Address _) -> pure True

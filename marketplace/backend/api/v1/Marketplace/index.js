@@ -48,4 +48,11 @@ router.get(
   MarketplaceController.getStratsBalance
 );
 
+router.get(
+  Marketplace.getStratsTransactionHistory,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  MarketplaceController.getStratsTransactionHistory
+);
+
 export default router;

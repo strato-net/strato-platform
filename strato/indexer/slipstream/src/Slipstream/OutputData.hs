@@ -27,12 +27,14 @@ module Slipstream.OutputData (
   insertHistoryAbstractTable,
   createIndexTable,
   createCollectionTable,
+  createAbstractTable,
   insertHistoryTable,
   createExpandEventTables,
   createExpandIndexTable,
   createForeignIndexesForJoins,
   createExpandAbstractTable,
   createHistoryTable',
+  createHistoryTable,
   expandAbstractTable,
   expandAbstractContractTable,
   notifyPostgREST,
@@ -256,6 +258,8 @@ baseMappingColumns =
     "block_number",
     "transaction_hash",
     "transaction_sender",
+    "creator",
+    "root",
     "contract_name",
     "collectionname",
     "collectiontype"
@@ -571,6 +575,28 @@ createHistoryTable' isAbstract globalsIORef contract cc (creator, a, n) = do
         listCombined = map (\(x,y)-> x <> " " <> y) list
     yield $ ((createHistoryTableQuery isAbstract (creator, a, n) listCombined), Nothing)
     yieldMany $ map (\x -> (x, Nothing)) (addHistoryUnique (creator, a, n))
+    setTableCreated globalsIORef tableName listCombined
+
+createHistoryTable ::
+  OutputM m =>
+  Bool ->
+  IORef Globals ->
+  ContractF () ->
+  CodeCollectionF () ->
+  (Text, Text, Text) ->
+  ConduitM () Text m ()
+createHistoryTable isAbstract globalsIORef contract cc (creator, a, n) = do
+  let tableName = historyTableName creator a n
+  tableExists <- isTableCreated globalsIORef tableName
+
+  $logDebugLS "createHistoryTable/tableExists" ("Table Name: " ++ show tableName ++ ", table exists: " ++ formatBool tableExists)
+
+  when (not tableExists) $ do
+    incNumHistoryTables
+    let list = getTableColumnAndType cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
+        listCombined = map (\(x,y)-> x <> " " <> y) list
+    yield $ (createHistoryTableQuery isAbstract (creator, a, n) listCombined)
+    yieldMany $ addHistoryUnique (creator, a, n)
     setTableCreated globalsIORef tableName listCombined
 
 -- Runs ALTER TABLE <name> [ADD COLUMN <column>] for any new fields added to a contract definition
@@ -979,6 +1005,8 @@ insertCollectionTableQuery ms =
                     tshow . blockNumber,
                     T.pack . keccak256ToHex . transactionHash,
                     tshow . transactionSender,
+                    creator,
+                    root,
                     contractname,
                     collectionname,
                     collectiontype
@@ -1337,7 +1365,7 @@ solidityTypeToSQLType (SVMType.Int _ _) = Just "decimal"
 solidityTypeToSQLType (SVMType.String _) = Just "text"
 solidityTypeToSQLType (SVMType.Bytes _ _) = Just "text"
 solidityTypeToSQLType (SVMType.UserDefined _ _) = Just "text"
-solidityTypeToSQLType (SVMType.Fixed _ _) = Just "fixed"
+solidityTypeToSQLType SVMType.Decimal = Just "decimal"
 solidityTypeToSQLType (SVMType.Address _) = Just "text"
 solidityTypeToSQLType (SVMType.Account _) = Just "text"
 solidityTypeToSQLType (SVMType.Array _ _) = Nothing

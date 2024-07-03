@@ -73,6 +73,7 @@ import Data.Set (isSubsetOf)
 import Data.Source.Map
 import Data.Text (Text)
 import qualified Data.Text as Text
+import Data.Text.Encoding (encodeUtf8)
 import Data.Traversable
 import Handlers.AccountInfo
 import SQLM
@@ -402,6 +403,7 @@ expressionToValue :: Expression -> Maybe Value
 expressionToValue (NumberLiteral _ n _) = Just $ SimpleValue $ ValueInt False Nothing n
 expressionToValue (BoolLiteral _ n) = Just $ SimpleValue $ ValueBool n
 expressionToValue (StringLiteral _ n) = Just $ SimpleValue $ ValueString $ Text.pack n
+expressionToValue (DecimalLiteral _ n) = Just $ SimpleValue $ ValueDecimal (encodeUtf8 $ Text.pack $ show $ unwrapDecimal n)
 expressionToValue (ArrayExpression _ n) = ValueArrayFixed (fromIntegral $ length n) <$> traverse expressionToValue n
 expressionToValue _ = Nothing
 
@@ -444,6 +446,7 @@ getArgValues argsMap argNamesTypes = do
               Xabi.Int (Just True) b -> Right . SimpleType . TypeInt True $ fmap toInteger b
               Xabi.Int _ b -> Right . SimpleType . TypeInt False $ fmap toInteger b
               Xabi.String _ -> Right . SimpleType $ TypeString
+              Xabi.Decimal -> Right . SimpleType $ TypeDecimal
               Xabi.Bytes _ b -> Right . SimpleType . TypeBytes $ fmap toInteger b
               Xabi.Bool -> Right . SimpleType $ TypeBool
               Xabi.Address -> Right . SimpleType $ TypeAddress
@@ -455,6 +458,7 @@ getArgValues argsMap argNamesTypes = do
                       Xabi.Int (Just True) b -> Right . SimpleType . TypeInt True $ fmap toInteger b
                       Xabi.Int _ b -> Right . SimpleType . TypeInt False $ fmap toInteger b
                       Xabi.String _ -> Right . SimpleType $ TypeString
+                      Xabi.Decimal -> Right . SimpleType $ TypeDecimal
                       Xabi.Bytes _ b -> Right . SimpleType . TypeBytes $ fmap toInteger b
                       Xabi.Bool -> Right . SimpleType $ TypeBool
                       Xabi.Address -> Right . SimpleType $ TypeAddress

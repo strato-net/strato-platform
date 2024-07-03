@@ -16,14 +16,28 @@ so that they could be properly moved to their respective version's subsection.
 
 ## [Unreleased] 
 ### Added
+
+### Changed
+
+### Fixed
+
+### Removed
+
+## [11.3.0] - 7/2/2024
+### Added
 - <address>.nonce accessor in SolidVM
 - Upgraded PostgREST to version 12.0
+- Support for `decimal` numbers type
 
 ### Changed
 - Allow public keys to be passed to x509-generator in PEM format
 - default `accountNonceLimit` is 2,000
+- max kafka bytes returned to 32MB
 
 ### Fixed
+- fixed logic for how p2p calculates if it is missing parents blocks and needs to backtrack its sync
+- `creator` and `root` get populated in collection tables
+- validators run block before voting for it
 
 ### Removed
 
