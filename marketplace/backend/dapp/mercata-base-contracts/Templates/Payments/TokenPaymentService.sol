@@ -117,7 +117,7 @@ contract TokenPaymentService is PaymentService {
             0,
             _unitsPerDollar(),
             serviceName,
-            PaymentStatus.ORDER_COMPLETED,
+            PaymentStatus.CLOSED,
             _createdDate
         );
         purchasersAddress = address(0); // Support for legacy sales

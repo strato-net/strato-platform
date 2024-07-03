@@ -21,7 +21,7 @@ abstract contract PaymentService is Utils {
         bool isActive
     );
 
-    enum PaymentStatus { NULL, ORDER_CREATED, PAYMENT_INITIALIZED, ORDER_COMPLETED, ORDER_CANCELLED }
+    enum PaymentStatus { NULL, AWAITING_FULFILLMENT, PAYMENT_PENDING, CLOSED, CANCELED }
 
     event Order (
         string orderHash,             /* Unique hash of the order details for payment server lookup to 
@@ -38,7 +38,8 @@ abstract contract PaymentService is Utils {
         decimal unitsPerDollar,       // Amount of units per dollar for the currency (Ex: STRAT is 100 units per dollar)
         string currency,              // The type of currency used for the purchase
         PaymentStatus status,         // Status of the payment
-        uint createdDate              // Date at the time of fresh order creation
+        uint createdDate,              // Date at the time of fresh order creation
+        string comments               // Comments for the order
     );
 
     address public purchasersAddress;   // ONLY USED FOR BACKWARDS COMPATIBILITY WITH SALE. DELETE ONCE ALL SALES USE NEW LOGIC!!!
@@ -135,7 +136,8 @@ abstract contract PaymentService is Utils {
         string _orderId,
         address[] _saleAddresses,
         uint[] _quantities,
-        uint _createdDate
+        uint _createdDate,
+        string _comments
     ) requireActive("create order") external returns (string, address[]) {
         require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
         string _purchasersCommonName = getCommonName(msg.sender);
@@ -147,7 +149,8 @@ abstract contract PaymentService is Utils {
             _purchasersCommonName,
             _saleAddresses,
             _quantities,
-            _createdDate
+            _createdDate,
+            _comments
         );
     }
 
@@ -158,7 +161,8 @@ abstract contract PaymentService is Utils {
         string _purchasersCommonName,
         address[] _saleAddresses,
         uint[] _quantities,
-        uint _createdDate
+        uint _createdDate,
+        string _comments
     ) internal virtual returns (string, address[]) {
         address[] assets;
         decimal totalAmount = 0;
@@ -189,8 +193,9 @@ abstract contract PaymentService is Utils {
             0,
             _unitsPerDollar(),
             "",
-            PaymentStatus.ORDER_CREATED,
-            _createdDate
+            PaymentStatus.AWAITING_FULFILLMENT,
+            _createdDate,
+            ""
         );
         return (_orderHash, assets);
     }
@@ -202,7 +207,8 @@ abstract contract PaymentService is Utils {
         address[] _saleAddresses,
         uint[] _quantities,
         string _currency,
-        uint _createdDate
+        uint _createdDate,
+        string _comments
     ) requireActive("initialize payment") requireOwner("initialize payment") external returns (address[]){
         require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
         string _purchasersCommonName = getCommonName(_purchaser);
@@ -216,7 +222,8 @@ abstract contract PaymentService is Utils {
             _saleAddresses,
             _quantities,
             _currency,
-            _createdDate
+            _createdDate,
+            _comments
         );
     }
 
@@ -228,7 +235,8 @@ abstract contract PaymentService is Utils {
         address[] _saleAddresses,
         uint[] _quantities,
         string _currency,
-        uint _createdDate
+        uint _createdDate,
+        string _comments
     ) internal virtual returns (address[]){
         decimal totalAmount = 0;
         address[] assets;
@@ -253,8 +261,9 @@ abstract contract PaymentService is Utils {
             0,
             _unitsPerDollar(),
             _currency,
-            PaymentStatus.PAYMENT_INITIALIZED,
-            _createdDate
+            PaymentStatus.PAYMENT_PENDING,
+            _createdDate,
+            ""
         );
         return assets;
     }
@@ -266,7 +275,8 @@ abstract contract PaymentService is Utils {
         address[] _saleAddresses,
         uint[] _quantities,
         string _currency,
-        uint _createdDate
+        uint _createdDate,
+        string _comments
     ) requireActive("complete order") requireOwner("complete order") external returns (address[]) {
         require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
         string _purchasersCommonName = getCommonName(_purchaser);
@@ -280,7 +290,8 @@ abstract contract PaymentService is Utils {
             _saleAddresses,
             _quantities,
             _currency,
-            _createdDate
+            _createdDate,
+            _comments
         );
     }
 
@@ -292,7 +303,8 @@ abstract contract PaymentService is Utils {
         address[] _saleAddresses,
         uint[] _quantities,
         string _currency,
-        uint _createdDate
+        uint _createdDate,
+        string _comments
     ) internal virtual returns (address[]) {
         decimal totalAmount = 0;
         address[] assets;
@@ -322,8 +334,9 @@ abstract contract PaymentService is Utils {
             0,
             _unitsPerDollar(),
             _currency,
-            PaymentStatus.ORDER_COMPLETED,
-            _createdDate
+            PaymentStatus.CLOSED,
+            _createdDate,
+            _comments
         );
         return assets;
     }
@@ -335,7 +348,8 @@ abstract contract PaymentService is Utils {
         address[] _saleAddresses,
         uint[] _quantities,
         string _currency,
-        uint _createdDate
+        uint _createdDate,
+        string _comments
     ) requireActive("cancel order") external {
         require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
         string _purchasersCommonName = getCommonName(_purchaser);
@@ -352,7 +366,8 @@ abstract contract PaymentService is Utils {
             _saleAddresses,
             _quantities,
             _currency,
-            _createdDate
+            _createdDate,
+            _comments
         );
     }
 
@@ -364,7 +379,8 @@ abstract contract PaymentService is Utils {
         address[] _saleAddresses,
         uint[] _quantities,
         string _currency,
-        uint _createdDate
+        uint _createdDate,
+        string _comments
     ) internal virtual {
         decimal totalAmount = 0;
         string seller;
@@ -394,8 +410,9 @@ abstract contract PaymentService is Utils {
             0,
             _unitsPerDollar(),
             _currency,
-            PaymentStatus.ORDER_CANCELLED,
-            _createdDate
+            PaymentStatus.CANCELED,
+            _createdDate,
+            _comments
         );
     }
 
