@@ -1,5 +1,11 @@
-:where(.css-dev-only-do-not-override-9ntgx0).ant-table-wrapper .ant-table-thead>tr>th,
-:where(.css-dev-only-do-not-override-9ntgx0).ant-table-wrapper .ant-table-thead>tr>td {
+:where(.css-dev-only-do-not-override-9ntgx0).ant-table-wrapper
+  .ant-table-thead
+  > tr
+  > th,
+:where(.css-dev-only-do-not-override-9ntgx0).ant-table-wrapper
+  .ant-table-thead
+  > tr
+  > td {
   padding: 14px;
 }
 
@@ -26,7 +32,7 @@ img.ant-image-preview-img {
   border-radius: 0px !important;
   height: 3px !important;
   width: 60px !important;
-  background-color: #BABABA !important;
+  background-color: #bababa !important;
   border: none !important;
   opacity: 1 !important;
 }
@@ -38,8 +44,8 @@ img.ant-image-preview-img {
 .trending_cards::-webkit-scrollbar {
   display: none;
 }
-.trending_cards{
-  scrollbar-width: none; 
+.trending_cards {
+  scrollbar-width: none;
 }
 
 @media (max-width: 525px) {
@@ -48,21 +54,27 @@ img.ant-image-preview-img {
     width: 10% !important;
   }
 }
-:where(.css-dev-only-do-not-override-9ntgx0).ant-checkbox-wrapper:not(.ant-checkbox-wrapper-disabled):hover .ant-checkbox-checked:not(.ant-checkbox-disabled) .ant-checkbox-inner{
+:where(.css-dev-only-do-not-override-9ntgx0).ant-checkbox-wrapper:not(
+    .ant-checkbox-wrapper-disabled
+  ):hover
+  .ant-checkbox-checked:not(.ant-checkbox-disabled)
+  .ant-checkbox-inner {
   background-color: #181eac;
   border-color: #181eac;
 }
 
-:where(.css-dev-only-do-not-override-9ntgx0).ant-checkbox-checked .ant-checkbox-inner{
+:where(.css-dev-only-do-not-override-9ntgx0).ant-checkbox-checked
+  .ant-checkbox-inner {
   background-color: #181eac;
   border-color: #181eac;
 }
 
-:where(.css-dev-only-do-not-override-9ntgx0).ant-checkbox-checked:after{
+:where(.css-dev-only-do-not-override-9ntgx0).ant-checkbox-checked:after {
   border: 2px solid #181eac;
 }
 
-:where(.css-dev-only-do-not-override-9ntgx0).ant-input-number .ant-input-number-input{
+:where(.css-dev-only-do-not-override-9ntgx0).ant-input-number
+  .ant-input-number-input {
   padding: 0;
 }
 
@@ -71,7 +83,7 @@ img.ant-image-preview-img {
   top: 200px;
 }
 
-.fixed-component{
+.fixed-component {
   position: fixed;
   z-index: 90;
   background-color: white;
@@ -80,24 +92,455 @@ img.ant-image-preview-img {
   margin-top: -25px;
 }
 
-.fixed-component-child{
+.fixed-component-child {
   margin-top: 15px;
   width: 90%;
 }
 
 .gradient-button {
-  color: white; 
-  background: linear-gradient(270deg, #4F46E5 0%, #FB7185 100%);
+  color: white;
+  background: linear-gradient(270deg, #4f46e5 0%, #fb7185 100%);
 }
 
 .gradient-button:hover {
-  background: linear-gradient(90deg, #4F46E5 0%, #FB7185 100%); 
+  background: linear-gradient(90deg, #4f46e5 0%, #fb7185 100%);
 }
 
 .gradient-button:hover .bannerArrow path {
   fill: white;
 }
 
-#viewMore{
-  box-shadow: 0 0 4px rgba(185, 185, 187, 0.25);
+#viewMore {
+  box-shadow: 0px 5px 10px rgba(185, 185, 187, 1);
+}
+
+.font-Bricolage {
+  font-family: "Bricolage Grotesque", sans-serif !important;
+}
+
+.banner-text > h1 {
+  font-family: "Bricolage Grotesque", sans-serif !important;
+}
+
+.banner-text {
+  position: relative;
+  text-align: left;
+  z-index: 11;
+  color: white;
+  /* background-color: black; */
+}
+
+.collectible_banner_text {
+  font-weight: 900;
+  line-height: 52px;
+  background: linear-gradient(90deg, #4f46e5 0%, #fb7185 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.clothing_banner_text {
+  font-weight: 900;
+  text-shadow: 0px 2px 6px darkgrey;
+}
+
+.metal_banner_text {
+  font-weight: 900;
+  text-shadow: 0px 2px 6px darkgrey;
+}
+
+.token_banner_text_box {
+  font-weight: 900;
+}
+
+.how_banner_text_box {
+  text-shadow: 0px 2px 6px darkgrey;
+  font-weight: 900;
+}
+
+.token_banner_text1 {
+  color: #4b63d3;
+  font-weight: 400;
+}
+
+.token_banner_text2 {
+  background: linear-gradient(90deg, #FFA010 0%, #5D10FF 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 900;
+}
+
+@media (min-width: 1200px) {
+  .collectible_banner_text {
+    width: 360px;
+    font-size: 48px;
+    left: 7%;
+    top: 5%;
+    
+  }
+
+  .clothing_banner_text {
+    width: 485px;
+    font-size: 48px;
+    left: 7%;
+    top: 15%;
+    line-height: 52px;
+  }
+
+  .metal_banner_text {
+    width: 485px;
+    font-size: 48px;
+    left: 7%;
+    top: 15%;
+    line-height: 52px;
+  }
+
+  .token_banner_text_box {
+    top: 5%;
+    left: 7%;
+    width: 80%;
+  }
+
+  .token_banner_text1 {
+    width: 100%;
+    font-size: 20px;
+  }
+
+  .token_banner_text2 {
+    width: 450px;
+    font-size: 48px;
+    margin-top: 20px;
+    line-height: 52px;
+  }
+
+  .how_banner_text_box {
+    top: 15%;
+    left: 5%;
+    font-size: 44px;
+    font-weight: 900;
+  }
+}
+
+@media (min-width: 1000px) and (max-width: 1199px) {
+  .collectible_banner_text {
+    width: 360px;
+    font-size: 44px;
+    left: 7%;
+    top: 5%;
+  }
+
+  .clothing_banner_text {
+    width: 420px;
+    font-size: 48px;
+    left: 7%;
+    top: 5%;
+    line-height: 52px;
+  }
+
+  .metal_banner_text {
+     width: 420px;
+    font-size: 48px;
+    left: 7%;
+    top: 10%;
+    line-height: 52px;
+  }
+
+  .token_banner_text_box {
+    top: 5%;
+    left: 6%;
+    width: 80%;
+  }
+
+  .token_banner_text1 {
+    width: 100%;
+    font-size: 20px;
+  }
+
+  .token_banner_text2 {
+    width: 450px;
+    font-size: 48px;
+    margin-top: 20px;
+    line-height: 52px;
+  }
+
+  .how_banner_text_box {
+    top: 15%;
+    left: 5%;
+    font-size: 36px;
+    font-weight: 900;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 999px) {
+  .collectible_banner_text {
+    width: 360px;
+    font-size: 40px;
+    left: 7%;
+    top: 5%;
+  }
+
+  .clothing_banner_text {
+    width: 360px;
+    font-size: 44px;
+    left: 7%;
+    top: 8%;
+    line-height: 42px;
+  }
+
+  .metal_banner_text {
+    width: 400px;
+    font-size: 44px;
+    left: 7%;
+    top: 15%;
+    line-height: 42px;
+  }
+
+  .token_banner_text_box {
+    top: 5%;
+    left: 6%;
+    width: 80%;
+  }
+
+  .token_banner_text1 {
+    width: 100%;
+    font-size: 20px;
+  }
+
+  .token_banner_text2 {
+    width: 450px;
+    font-size: 48px;
+    margin-top: 20px;
+    line-height: 52px;
+  }
+
+  .how_banner_text_box {
+    top: 15%;
+    left: 5%;
+    font-size: 32px;
+    font-weight: 900;
+  }
+}
+
+@media (min-width: 600px) and (max-width: 768px) {
+  .collectible_banner_text {
+    width: 300px;
+    font-size: 40px;
+    left: 7%;
+    top: 8%;
+  }
+
+  .clothing_banner_text {
+    width: 400px;
+    font-size: 40px;
+    left: 7%;
+    top: 10%;
+    line-height: 44px;
+  }
+
+  .metal_banner_text {
+    width: 400px;
+    font-size: 40px;
+    left: 7%;
+    top: 15%;
+    line-height: 44px;
+  }
+
+  .token_banner_text_box {
+    top: 10%;
+    left: 8%;
+    width: 80%;
+  }
+
+  .token_banner_text1 {
+    width: 100%;
+    font-size: 20px;
+  }
+
+  .token_banner_text2 {
+    width: 300px;
+    font-size: 30px;
+    margin-top: 20px;
+    line-height: 36px;
+  }
+
+  .how_banner_text_box {
+    top: 10px;
+    left: 5%;
+    font-size: 48px;
+    font-weight: 900;
+  }
+}
+
+@media (min-width: 481px) and (max-width: 599px) {
+  .collectible_banner_text {
+    width: 250px;
+    font-size: 36px;
+    left: 7%;
+    top: 20%;
+    line-height: 36px;
+  }
+
+  .clothing_banner_text {
+    width: 300px;
+    font-size: 32px;
+    left: 7%;
+    top: 20%;
+    line-height: 36px;
+  }
+
+  .metal_banner_text {
+    width: 300px;
+    font-size: 32px;
+    left: 7%;
+    top: 20%;
+    line-height: 36px;
+  }
+
+  .metal_banner_text > h1:first-child{
+    width: 120px;
+  }
+
+  .token_banner_text_box {
+    top: 5%;
+    left: 8%;
+    width: 80%;
+  }
+
+  .token_banner_text1 {
+    width: 240px;
+    font-size: 18px;
+    line-height: 24px;
+  }
+
+  .token_banner_text2 {
+    width: 260px;
+    font-size: 28px;
+    line-height: 32px;
+    margin-top: 15px;
+  }
+
+  .how_banner_text_box {
+    top: 10px;
+    left: 4%;
+    font-size: 36px;
+    font-weight: 900;
+  }
+}
+
+@media (min-width: 400px) and (max-width: 480px) {
+  .collectible_banner_text {
+    width: 180px;
+    font-size: 24px;
+    left: 4%;
+    top: 5%;
+    line-height: 24px;
+  }
+
+  .clothing_banner_text {
+    width: 220px;
+    font-size: 24px;
+    left: 4%;
+    top: 10%;
+    line-height: 24px;
+  }
+
+  .metal_banner_text {
+    width: 220px;
+    font-size: 24px;
+    left: 4%;
+    top: 10%;
+    line-height: 24px;
+  }
+
+  .metal_banner_text > h1:first-child{
+    width: 120px;
+  }
+
+  .token_banner_text_box {
+    top: 0%;
+    left: 5%;
+    width: 80%;
+  }
+
+  .token_banner_text1 {
+    width: 170px;
+    font-size: 12px;
+    left: 4%;
+    top: -10%;
+    line-height: 16px;
+  }
+
+  .token_banner_text2 {
+    width: 200px;
+    font-size: 22px;
+    left: 4%;
+    top: -10%;
+    line-height: 20px;
+    margin-top: 5px;
+  }
+
+  .how_banner_text_box {
+    top: -10px;
+    left: 4%;
+    font-size: 20px;
+    font-weight: 900;
+  }
+}
+
+@media (max-width: 399px) {
+  .collectible_banner_text {
+    width: 180px;
+    font-size: 24px;
+    left: 4%;
+    top: 8%;
+    line-height: 24px;
+  }
+
+  .clothing_banner_text {
+    width: 220px;
+    font-size: 24px;
+    left: 4%;
+    top: 10%;
+    line-height: 30px;
+  }
+
+  .metal_banner_text {
+    width: 220px;
+    font-size: 24px;
+    left: 4%;
+    top: 5%;
+    line-height: 30px;
+  }
+
+  .metal_banner_text > h1:first-child{
+    width: 120px;
+  }
+
+  .token_banner_text_box {
+    top: 0%;
+    left: 5%;
+    width: 80%;
+  }
+
+  .token_banner_text1 {
+    width: 170px;
+    font-size: 12px;
+    left: 4%;
+    top: -10%;
+    line-height: 16px;
+  }
+
+  .token_banner_text2 {
+    width: 200px;
+    font-size: 22px;
+    left: 4%;
+    top: -10%;
+    line-height: 20px;
+    margin-top: 5px;
+  }
+
+  .how_banner_text_box {
+    top: -10px;
+    left: 4%;
+    font-size: 20px;
+  }
 }
