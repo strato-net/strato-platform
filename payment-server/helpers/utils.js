@@ -10,6 +10,8 @@ const clientErrorHandler = (err, req, res, next) => {
 
   if (statusCode) {
     const message = get(err, 'raw.message');
+    res.redirect(`${req.query.redirectUrl}?error=${encodeURIComponent(err.message)}`);
+
     console.log(`Unhandled API error. Status: ${JSON.stringify(statusCode)}. Message: ${JSON.stringify(message)}`);
     return res.status(statusCode).json({ success: false, error: message });
   }
@@ -19,6 +21,7 @@ const clientErrorHandler = (err, req, res, next) => {
 
 const commonErrorHandler = (err, req, res, next) => {
   console.log(err.stack);
+  res.redirect(`${req.query.redirectUrl}?error=${encodeURIComponent(err.message)}`);
   res.status(400).json({ success: false, error: err.message });
   return next(err);
 }

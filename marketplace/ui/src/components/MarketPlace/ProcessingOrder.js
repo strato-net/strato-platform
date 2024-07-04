@@ -1,17 +1,11 @@
 import { Spin, notification } from "antd";
 import React, { useEffect, useState, useMemo } from "react";
-import RestStatus from "http-status-codes";
-import { apiUrl, HTTP_METHODS, ORDER_STATUS } from "../../helpers/constants";
 import { useNavigate, useMatch, useLocation } from "react-router-dom";
 import routes from "../../helpers/routes";
-import { generateHtmlContent } from "../../helpers/emailTemplate";
 import { actions as orderActions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import { actions } from "../../contexts/marketplace/actions";
-import {
-  useMarketplaceDispatch,
-} from "../../contexts/marketplace";
-
+import { useMarketplaceDispatch } from "../../contexts/marketplace";
 
 function useQuery() {
   const { search } = useLocation();
@@ -55,9 +49,14 @@ const ProcessingOrder = ({ user }) => {
       setCalled(true);
       getCartData();
     }
+  }, [assetAddresses, user]);
 
-  }, [assetAddresses, user])
-
+  useEffect(() => {
+    const errorMsg = query.get("error");
+    if (errorMsg) {
+      setError(new Error(errorMsg));
+    }
+  }, [query]);
 
   const getCartData = async () => {
     try {
@@ -75,7 +74,7 @@ const ProcessingOrder = ({ user }) => {
       } else {
         setTimeout(() => {
           navigate(routes.Checkout.url);
-        }, 500);
+        }, 3000);
       }
     } catch (err) {
       setError(err);
@@ -123,7 +122,7 @@ const ProcessingOrder = ({ user }) => {
       {error && openToastMarketplace("bottom")}
       {message && openToastOrder("bottom")}
     </div>
-  )
+  );
 };
 
 export default ProcessingOrder;

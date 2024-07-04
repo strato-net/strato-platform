@@ -65,7 +65,7 @@ contract StratPaymentService is PaymentService {
             0,
             _unitsPerDollar(),
             "STRAT",
-            PaymentStatus.ORDER_COMPLETED,
+            PaymentStatus.CLOSED,
             _createdDate
         );
         purchasersAddress = address(0); // Support for legacy sales
