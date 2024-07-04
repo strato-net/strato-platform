@@ -2,6 +2,7 @@ import { Images } from "../images";
 import { AMEX, Discover, Mastercard, VISA, BANK } from "../images/SVGComponents";
 import { SEO } from "./seoConstant";
 
+
 export const apiUrl = process.env.REACT_APP_URL
   ? process.env.REACT_APP_URL + "/api/v1"
   : "/api/v1";
@@ -256,6 +257,10 @@ export const BANNER = [
   {
     label: "Collectibles",
     link: '/c/Collectibles?sc=Collectibles',
+    text: <div className="collectible_banner_text banner-text ">
+      <h1> Own Digital </h1>
+      <h1>Tokenized Collectibles!</h1>
+    </div>,
     desktopText: "Explore More",
     mobileText: "Explore",
     alt: metaImg,
@@ -268,6 +273,10 @@ export const BANNER = [
   {
     label: "Clothing",
     link: '/c/Clothing?sc=Clothing',
+    text: <div className="clothing_banner_text banner-text">
+      <h1> Step into Future 
+      With Tokenized Clothing </h1>
+    </div>,
     desktopText: "Explore More",
     mobileText: "Explore",
     alt: metaImg,
@@ -280,6 +289,10 @@ export const BANNER = [
   {
     label: "Metal",
     link: "/c/Metals?sc=Metals",
+    text: <div className="metal_banner_text banner-text">
+      <h1>Tokenized Metals</h1>
+      <h1>Vault-Secure</h1>
+    </div>,
     desktopText: "Explore More",
     mobileText: "Explore",
     alt: metaImg,
@@ -292,6 +305,10 @@ export const BANNER = [
   {
     label: "Token",
     link: "/c/Tokens?sc=Tokens",
+    text: <div className="token_banner_text_box banner-text">
+      <h1 className="token_banner_text1">The Coin with Real Stakes for <span style={{color:'#FFA011'}}>Real Dogs</span> </h1>
+      <h1 className="token_banner_text2"> Save Dog Lives with $SADDOGS Token </h1>
+    </div>,
     desktopText: "Save Dogs Now",
     mobileText: "Save Dogs Now",
     alt: metaImg,
@@ -304,6 +321,7 @@ export const BANNER = [
   {
     label: "How",
     link: "/c/All",
+    text: <h1 className="how_banner_text_box banner-text"> How It Works </h1>,
     desktopText: "Explore More",
     mobileText: "Explore",
     alt: metaImg,

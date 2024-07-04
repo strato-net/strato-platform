@@ -95,6 +95,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
       {BANNER.map((item, index) => (
         <div key={index} className="no-select relative p-2 h-[222px] sm:h-[380px] 3xl:h-[480px] mx-1 md:mx-2 md:mt-6 lg:mx-3">
           <ButtonElement desktopText={item.desktopText} mobileText={item.mobileText} />
+            {item.text}
           <div className="sm:hidden">
             <img
               alt={item.alt}
