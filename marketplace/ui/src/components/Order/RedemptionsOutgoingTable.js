@@ -56,19 +56,19 @@ const RedemptionsOutgoingTable = ({ user, download, isAllOrdersLoading }) => {
         if (outgoingRedemptions) {
             outgoingRedemptions.forEach((redemption) => {
                 const item = {
-                    key: redemption.redemptionId,
+                    key: redemption.redemption_id,
                     assetAddress: redemption.asset,
                     assetName: redemption.assetName,
-                    requestor: redemption.owner,
-                    issuer: redemption.issuer,
+                    requestor: redemption.ownerCommonName,
+                    issuer: redemption.issuerCommonName,
                     quantity: redemption.quantity,
-                    redemptionDate: redemption.block_timestamp,
-                    redemptionNumber: redemption.redemptionId,
+                    redemptionDate: redemption.createdDate,
+                    redemptionNumber: redemption.redemption_id,
                     status: redemption.status,
-                    redemptionService: redemption.address,
+                    redemptionService: redemption.redemptionService,
                 };
                 items.push(item);
-                itemMap[redemption.redemptionId] = item;
+                itemMap[redemption.redemption_id] = item;
             });
         }
         setData(items);

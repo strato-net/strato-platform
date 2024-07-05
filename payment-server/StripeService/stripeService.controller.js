@@ -64,7 +64,7 @@ class StripeServiceController {
 
       const hasSellerOnboarded = await checkSellerOnboarded(username);
 
-      if (!hasSellerOnboarded || hasSellerOnboarded.length === 0){
+      if (!hasSellerOnboarded || hasSellerOnboarded.length === 0) {
         const userDetails = await stripeService.getStripeConnectAccountDetail(userAccount);
 
         if (userDetails.charges_enabled && userDetails.details_submitted && userDetails.payouts_enabled) {

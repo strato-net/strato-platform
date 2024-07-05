@@ -199,8 +199,7 @@ async function get(user, args, options) {
 
 async function getAll(admin, args = {}, options) {
   let saleOrders;
-  const { order, ...restArgs } = args;
-  const { offset, limit } = args;
+  const { offset, limit, order } = args;
   const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
   const newCountArgs = {
     ...args,
@@ -235,15 +234,16 @@ async function getAll(admin, args = {}, options) {
   // Get the latest payment event for each sale token
   if (totalCount !== 0 && !(offset && (totalCount < offset))) {
     const uniqueOrderArgs = {
-      ...restArgs,
+      ...args,
       queryOptions: {
         status: 'not.in.(1,5)',
-        select: 'id:id.max(),orderHash',
+        select: 'id:id.max(),orderHash,createdDate',
       }
     };
     const uniqueOrders = await searchAllWithQueryArgs(paymentTableName, uniqueOrderArgs, newOptions, admin);
     const idArgs = {
       id: uniqueOrders.map((uo) => uo.id),
+      order: order,
     }
     saleOrders = await searchAllWithQueryArgs(paymentTableName, idArgs, newOptions, admin);
   }
@@ -315,6 +315,11 @@ async function getAll(admin, args = {}, options) {
   }
 
   totalCount += oldCount[0] ? oldCount[0].count : 0;
+
+  if (order && order === 'createdDate.asc')
+    saleOrders.sort((a, b) => a.createdDate - b.createdDate);
+  else
+    saleOrders.sort((a, b) => b.createdDate - a.createdDate);
 
   return saleOrders ? { orders: saleOrders.map((order) => marshalOut(order)), total: totalCount } : undefined;
 }

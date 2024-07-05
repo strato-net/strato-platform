@@ -1,6 +1,11 @@
 import client from '../db/index.js';
 import { rest, util } from "blockapps-rest";
-import { DEFAULT_OPTIONS, ORDER_EVENT_TABLE, SELLER_ONBOARDED_TABLE, TABLE_PREFIX, STRIPE_CONTRACT_ADDRESS } from "./constants.js";
+import { 
+  DEFAULT_OPTIONS, 
+  ORDER_EVENT_TABLE, 
+  SELLER_ONBOARDED_TABLE, 
+  TABLE_PREFIX, 
+  STRIPE_CONTRACT_ADDRESS } from "./constants.js";
 import ADMIN from './oauth.js';
 import lodash from 'lodash';
 const { get } = lodash;
@@ -96,6 +101,16 @@ const updateStripePayment = async (orderHash, status) => {
 const validatePaymentServiceContract = async (address) => {
   try {
     const contract = { name: "PaymentService", address };
+    const res = await rest.getState(ADMIN.getUser(), contract, DEFAULT_OPTIONS);
+  } catch (e) {
+    console.error(`Contract could not be found at address ${address}. Now exiting...\nMessage: ${e}`);
+    process.exit(1);
+  }
+}
+
+const validateRedemptionServiceContract = async (address) => {
+  try {
+    const contract = { name: "RedemptionService", address };
     const res = await rest.getState(ADMIN.getUser(), contract, DEFAULT_OPTIONS);
   } catch (e) {
     console.error(`Contract could not be found at address ${address}. Now exiting...\nMessage: ${e}`);
@@ -245,6 +260,7 @@ export {
   insertStripePayment,
   updateStripePayment,
   validatePaymentServiceContract,
+  validateRedemptionServiceContract,
   emitOnboardSeller,
   getOrderEvent,
   checkSellerOnboarded,
