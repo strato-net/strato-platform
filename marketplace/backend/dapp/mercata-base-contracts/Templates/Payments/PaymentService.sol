@@ -21,7 +21,7 @@ abstract contract PaymentService is Utils {
         bool isActive
     );
 
-    enum PaymentStatus { NULL, AWAITING_FULFILLMENT, PAYMENT_PENDING, CLOSED, CANCELED }
+    enum PaymentStatus { NULL, AWAITING_FULFILLMENT, PAYMENT_PENDING, CLOSED, CANCELED, DISCARDED }
 
     event Order (
         string orderHash,             /* Unique hash of the order details for payment server lookup to 
@@ -410,7 +410,7 @@ abstract contract PaymentService is Utils {
             0,
             _unitsPerDollar(),
             _currency,
-            PaymentStatus.CANCELED,
+            _isOrderDiscardedOrCanceled(_comments),
             _createdDate,
             _comments
         );
@@ -418,6 +418,10 @@ abstract contract PaymentService is Utils {
 
     function _unitsPerDollar() internal virtual returns (decimal) {
         return 1.0;
+    }
+
+    function _isOrderDiscardedOrCanceled(string _comments) internal virtual returns (PaymentStatus){
+        return _comments == "" ? PaymentStatus.DISCARDED : PaymentStatus.CANCELED;
     }
 
     function update(
