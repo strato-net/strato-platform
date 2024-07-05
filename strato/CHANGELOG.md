@@ -29,6 +29,7 @@ so that they could be properly moved to their respective version's subsection.
 - <address>.nonce accessor in SolidVM
 - Upgraded PostgREST to version 12.0
 - Support for `decimal` numbers type
+- Arrays in events are stored as is i.e without tables
 
 ### Changed
 - Allow public keys to be passed to x509-generator in PEM format
