@@ -100,6 +100,7 @@ img.ant-image-preview-img {
 .gradient-button {
   color: white;
   background: linear-gradient(270deg, #4f46e5 0%, #fb7185 100%);
+  box-shadow: 0 0 4px rgba(185, 185, 187, 0.75);
 }
 
 .gradient-button:hover {
@@ -108,10 +109,6 @@ img.ant-image-preview-img {
 
 .gradient-button:hover .bannerArrow path {
   fill: white;
-}
-
-#viewMore {
-  box-shadow: 0px 5px 10px rgba(185, 185, 187, 1);
 }
 
 .font-Bricolage {
@@ -154,12 +151,13 @@ img.ant-image-preview-img {
 
 .how_banner_text_box {
   text-shadow: 0px 2px 6px darkgrey;
+  font-family: "Bricolage Grotesque", sans-serif !important;
   font-weight: 900;
 }
 
 .token_banner_text1 {
   color: #4b63d3;
-  font-weight: 400;
+  font-weight: 600;
 }
 
 .token_banner_text2 {
@@ -171,10 +169,10 @@ img.ant-image-preview-img {
 
 @media (min-width: 1200px) {
   .collectible_banner_text {
-    width: 360px;
+    width: 520px;
     font-size: 48px;
     left: 7%;
-    top: 5%;
+    top: 15%;
     
   }
 
@@ -214,7 +212,7 @@ img.ant-image-preview-img {
 
   .how_banner_text_box {
     top: 15%;
-    left: 5%;
+    left: 7%;
     font-size: 44px;
     font-weight: 900;
   }
@@ -226,6 +224,7 @@ img.ant-image-preview-img {
     font-size: 44px;
     left: 7%;
     top: 5%;
+    line-height: 42px;
   }
 
   .clothing_banner_text {
@@ -264,7 +263,7 @@ img.ant-image-preview-img {
 
   .how_banner_text_box {
     top: 15%;
-    left: 5%;
+    left: 7%;
     font-size: 36px;
     font-weight: 900;
   }
@@ -275,7 +274,8 @@ img.ant-image-preview-img {
     width: 360px;
     font-size: 40px;
     left: 7%;
-    top: 5%;
+    top: 10%;
+    line-height: 42px;
   }
 
   .clothing_banner_text {
@@ -314,7 +314,7 @@ img.ant-image-preview-img {
 
   .how_banner_text_box {
     top: 15%;
-    left: 5%;
+    left: 6%;
     font-size: 32px;
     font-weight: 900;
   }
@@ -325,7 +325,8 @@ img.ant-image-preview-img {
     width: 300px;
     font-size: 40px;
     left: 7%;
-    top: 8%;
+    top: 10%;
+    line-height: 44px;
   }
 
   .clothing_banner_text {
@@ -337,10 +338,10 @@ img.ant-image-preview-img {
   }
 
   .metal_banner_text {
-    width: 400px;
+    width: 320px;
     font-size: 40px;
     left: 7%;
-    top: 15%;
+    top: 10%;
     line-height: 44px;
   }
 
@@ -364,7 +365,7 @@ img.ant-image-preview-img {
 
   .how_banner_text_box {
     top: 10px;
-    left: 5%;
+    left: 6%;
     font-size: 48px;
     font-weight: 900;
   }
@@ -420,7 +421,7 @@ img.ant-image-preview-img {
 
   .how_banner_text_box {
     top: 10px;
-    left: 4%;
+    left: 6%;
     font-size: 36px;
     font-weight: 900;
   }
@@ -439,7 +440,7 @@ img.ant-image-preview-img {
     width: 220px;
     font-size: 24px;
     left: 4%;
-    top: 10%;
+    top: 5%;
     line-height: 24px;
   }
 
@@ -447,7 +448,7 @@ img.ant-image-preview-img {
     width: 220px;
     font-size: 24px;
     left: 4%;
-    top: 10%;
+    top: 5%;
     line-height: 24px;
   }
 
@@ -500,15 +501,15 @@ img.ant-image-preview-img {
     font-size: 24px;
     left: 4%;
     top: 10%;
-    line-height: 30px;
+    line-height: 24px;
   }
 
   .metal_banner_text {
     width: 220px;
     font-size: 24px;
     left: 4%;
-    top: 5%;
-    line-height: 30px;
+    top: 10%;
+    line-height: 24px;
   }
 
   .metal_banner_text > h1:first-child{
