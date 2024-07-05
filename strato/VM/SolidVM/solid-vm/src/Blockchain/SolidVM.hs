@@ -2988,17 +2988,12 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
       Nothing -> if name `elem` contract' ^. CC.parents then return Nothing else missingField "modifier not found" name
   let !theModifiers = catMaybes theModifiers'
 
-  -- new pragma
-  -- (_, parentCC) <- getCurrentCodeCollection
-  -- let pragmaCheck = return . isJust $ find ((== "strict") . fst) $ CC._pragmas parentCC
-
-  let valList' = case argVals of OrderedVals xs -> xs; NamedVals ys -> map snd ys
-
   -- check the signature
   unlessM (validateFunctionArguments theFunction argVals) $ do
-    internalError 
+    typeError
       "the argument values do not match up with the function signature" 
-      (show $ zip (valList') (map (CC.indexedTypeType . snd) (CC._funcArgs theFunction)))
+      (let valList' = case argVals of OrderedVals xs -> xs; NamedVals ys -> map snd ys 
+       in show $ zip (valList') (map (CC.indexedTypeType . snd) (CC._funcArgs theFunction)))
 
   let !args = case argVals of
         OrderedVals vs ->
@@ -3608,9 +3603,16 @@ validateFunctionArguments func argVals = do
       let argMapping = mapArgs tf
       doArgsMatch <- mapM testNameAndTypes argMapping
       pure $
-        ((length argMapping) == (length $ CC._funcArgs tf))
-          && ((length argMapping) == argValsLength)
-          && (all (== True) doArgsMatch)
+        (testValidVariadic tf) ||
+        ((length argMapping) == (length $ CC._funcArgs tf)) && 
+        ((length argMapping) == argValsLength) && 
+        (all (== True) doArgsMatch)
+    testValidVariadic :: CC.Func -> Bool
+    testValidVariadic tf =
+      case unsnoc (map snd (CC._funcArgs tf)) of
+        Just ([], x) | CC.indexedTypeType x == SVMType.Variadic -> True  
+        Just (xs, x) | CC.indexedTypeType x == SVMType.Variadic -> argValsLength >= length xs
+        _ -> False
     testNameAndTypes :: MonadSM m => (String, (SVMType.Type, Value)) -> m Bool
     testNameAndTypes (_, (t, v)) =
       -- These cases might not be all inclusive of all valid combinations.
@@ -3630,6 +3632,7 @@ validateFunctionArguments func argVals = do
         (SEnumVal _ _ _, SVMType.UnknownLabel _ _) -> pure True
         (SStruct _ _, SVMType.UnknownLabel _ _) -> pure True
         (SContract x _, SVMType.UnknownLabel y _) -> pure $ x == y
+        (SArray (SVMType.Int _ _) _, SVMType.Array (SVMType.Array _ _) _) -> pure True
         (SArray (SVMType.Int _ _) _, SVMType.Array (SVMType.UnknownLabel _ _) _) -> pure True
         (SArray x _, y@(SVMType.Array _ _)) -> pure $ x == y
         (_, SVMType.Variadic) -> pure True

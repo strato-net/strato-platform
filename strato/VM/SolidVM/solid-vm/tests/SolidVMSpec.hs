@@ -8941,9 +8941,8 @@ contract qq {
   }|]
 
     case getAddressFromResult res of
-            
-            Nothing -> error "No address returned"
-            Just address -> runCall' "changeMyValOfTest" (T.pack $ "(0x"++ formatAddressWithoutColor address ++", 3 )" ) [r|
+      Nothing -> error "No address returned"
+      Just address -> runCall' "changeMyValOfTest" (T.pack $ "(0x"++ formatAddressWithoutColor address ++", 3 )" ) [r|
 
   contract Test{
       int public myVal;
@@ -8958,4 +8957,4 @@ contract qq {
           return Test(a).myVal();
 
       }
-}|]) `shouldThrow` anyInternalError
+}|]) `shouldThrow` anyTypeError
