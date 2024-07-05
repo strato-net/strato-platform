@@ -52,6 +52,34 @@ abstract contract Sale is Utils {
         _;
     }
 
+    modifier requireCreator(string action) {
+        string ownerCommonName = assetToBeSold.ownerCommonName();
+        string err = "Only "
+                   + ownerCommonName
+                   + " can perform "
+                   + action
+                   + ".";
+        string creatorCommonName = address(assetToBeSold).creator;
+        require(ownerCommonName == creatorCommonName, err);
+    }
+
+    modifier requireSellerOrBuyer(string action) {
+        string sellersCommonName = assetToBeSold.ownerCommonName();
+        Order order = Order(msg.sender);
+        string purchasersCommonName = order.purchasersCommonName();
+        string err = "Only "
+                   + sellersCommonName
+                   + ","
+                   + purchasersCommonName
+                   + " can perform "
+                   + action
+                   + ".";
+        string commonName = getCommonName(tx.origin);
+
+        require((commonName == purchasersCommonName || commonName == sellersCommonName), err);
+
+    }
+
     modifier requireSellerOrPaymentProvider(string action) {
         string sellersCommonName = assetToBeSold.ownerCommonName();
         string commonName = getCommonName(msg.sender);
@@ -74,6 +102,11 @@ abstract contract Sale is Utils {
 
     function changePrice(decimal _price) public requireSeller("change price"){
         price=_price;
+    }
+
+    function changeCost(uint _cost) public requireCreator("change cost") returns (uint) {
+        cost=_cost;
+        return RestStatus.OK;
     }
 
     function addPaymentProviders(address[] _paymentProviders) public requireSeller("add payment providers") {
@@ -209,9 +242,9 @@ abstract contract Sale is Utils {
         uint _quantity,
         decimal _price,
         address[] _paymentProviders,
-        uint _cost,
         uint _scheme
     ) returns (uint) {
+        
 
       if (_scheme == 0) {
         return RestStatus.OK;
@@ -227,9 +260,6 @@ abstract contract Sale is Utils {
       if ((_scheme & (1 << 2)) == (1 << 2)) {
         clearPaymentProviders();
         addPaymentProviders(_paymentProviders);
-      }
-      if ((_scheme & (1 << 3)) == (1 << 3)) {
-        cost = _cost;
       }
       return RestStatus.OK;
     }

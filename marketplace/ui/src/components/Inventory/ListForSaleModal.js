@@ -38,6 +38,8 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
         paymentServiceActions.getNotOnboarded(paymentServiceDispatch, user?.commonName, 10, 0);
     }, [paymentServiceDispatch, user]);
 
+    const initialCost = inventory.cost ? inventory.cost : inventory.costPerUnit;
+
     useEffect(() => {
         if (inventory.saleAddress ? quantity > (inventory.quantity - inventory.totalLockedQuantity) : quantity > inventory.quantity) {
             setCanList(false);
@@ -210,8 +212,10 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
         let body = {
             paymentProviders: paymentTypes.filter((p) => availablePaymentProviders[p]).map((p) => availablePaymentProviders[p].address),
             price: pricePerUnit,
-            cost: costPerUnit || 0,
         };
+        if (costPerUnit !== initialCost) {
+            body = { ...body, cost: costPerUnit };
+        }
         if (inventory.saleAddress) {
             body = { ...body, saleAddress: inventory.saleAddress }
         } else {
@@ -226,6 +230,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
         if (inventory.saleAddress) {
             isDone = await actions.updateSale(inventoryDispatch, body);
         } else {
+            body = { ...body, cost: costPerUnit || 0 };
             isDone = await actions.listInventory(inventoryDispatch, body);
         }
         if (isDone) {

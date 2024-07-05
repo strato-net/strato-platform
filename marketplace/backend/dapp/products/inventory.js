@@ -320,7 +320,8 @@ async function updateInventory(user, contract, args, options) {
 
 async function updateSale(admin, contract, _args, options) {
     // const args = paymentJs.marshalIn(_args)
-    const args = { ..._args }
+    const { cost, ...args } = _args;
+
     const scheme = Object.keys(_args).reduce((agg, key) => {
         const base = 1
         switch (key) {
@@ -330,12 +331,22 @@ async function updateSale(admin, contract, _args, options) {
                 return agg | (base << 1)
             case 'paymentProviders':
                 return agg | (base << 2)
-            case 'cost':
-                return agg | (base << 3)
             default:
                 return agg
         }
     }, 0);
+
+    if (cost > 0) {
+        const callCostArgs = {
+            contract,
+            method: 'changeCost',
+            args: util.usc({ cost }),
+        }
+        const status = await rest.call(admin, callCostArgs, options);
+        if (parseInt(status, 10) !== RestStatus.OK) {
+            throw new rest.RestError(status, 0, { callCostArgs });
+        }    
+    }
 
     const callArgs = {
         contract,
