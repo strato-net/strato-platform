@@ -281,7 +281,7 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAccount ch c
                           pure codePtrAcc -- Creator's address
                             >>= MaybeT . A.lookup (A.Proxy @AddressState) -- Address's state
                             >>= pure . addressStateCodeHash -- state's Acodehash/CodePtr
-                            >>= MaybeT . resolveCodePtrParent (codePtrcc ^. accountChainId) -- CodePtr's parent
+                            >>= MaybeT . resolveCodePtrParent (codePtrAcc ^. accountChainId) -- CodePtr's parent
                             >>= ( \case
                                     SolidVMCode name _ -> pure name -- Name of the parent
                                     _ -> pure ""

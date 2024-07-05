@@ -72,7 +72,6 @@ import Numeric.Natural
 import Servant.API
 import Servant.Docs
 import Test.QuickCheck hiding (Failure, Success)
-import Blockchain.Strato.Model.Code (Code)
 
 --------------------------------------------------------------------------------
 

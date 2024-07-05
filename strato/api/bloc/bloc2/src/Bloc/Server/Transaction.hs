@@ -229,9 +229,7 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
           let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
               xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) $ _constructor contract
           (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just args) xabiArgs
-          let codeOrCodePtr = case hasCodePtr of
-                                Just x -> x 
-                                Nothing -> (Code $ Text.encodeUtf8 $ serializeSourceMap src)
+          
           let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("name", name), ("args", argsAsSource)]
           tx <- lift . signAndPrepare jwt addr metadata' $
               TransactionHeader
@@ -381,9 +379,7 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
           let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
               xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) $ _constructor contract
           (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just args) xabiArgs
-          let codeOrCodePtr = case hasCodePtr of
-                                Just x -> x 
-                                Nothing -> (Code $ Text.encodeUtf8 $ serializeSourceMap src)
+          
           let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("name", name), ("args", argsAsSource)]
           lift . prepareUnsignedRawTx metadata' $
               TransactionHeader
@@ -898,9 +894,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters {..} jwtToken = do
   (_, argsAsSource) <- constructArgValuesAndSource args xabiArgs
 
   let metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("name", Text.pack _contractName), ("args", argsAsSource)]
-  let codeOrCodePtr = case hasCodePtr of
-                                Just x -> x 
-                                Nothing -> (Code $ Text.encodeUtf8 $ serializeSourceMap src)
+  
   tx <-
     signAndPrepare jwtToken fromAddr metadata' $
       TransactionHeader
@@ -950,9 +944,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters {..} jwtToken = do
       let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
           xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) $ _constructor contract
       (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just args) xabiArgs
-      let codeOrCodePtr = case hasCodePtr of
-                                Just x -> x 
-                                Nothing -> (Code $ Text.encodeUtf8 $ serializeSourceMap src)
+      
       let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("name", name), ("args", argsAsSource)]
       tx <-
         lift . signAndPrepare jwtToken fromAddr metadata' $
@@ -961,7 +953,6 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters {..} jwtToken = do
             fromAddr
             (fromMaybe emptyTxParams params)
             (Wei (maybe 0 fromIntegral $ fmap unStrung value))
-            -- (Code $ Text.encodeUtf8 $ serializeSourceMap src)
             (case cPtr of
               Just cp -> cp
               Nothing -> (Code $ Text.encodeUtf8 $ serializeSourceMap src)

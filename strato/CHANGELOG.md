@@ -16,7 +16,8 @@ so that they could be properly moved to their respective version's subsection.
 
 ## [Unreleased] 
 ### Added
-
+- CodePtr transactions can be made
+- RawTransaction now stores CodePtr information
 ### Changed
 
 ### Fixed
