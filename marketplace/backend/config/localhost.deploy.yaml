@@ -1,5 +1,5 @@
-url: https://marketplace.mercata-testnet2.blockapps.net/
+url: https://multinode302.ci.blockapps.net:8080/
 dapp:
   contract:
     name: Mercata
-    address: f49fa650f2ec7a2a1a2159b2a235a77fd0dc8cbc
+    address: cd235eaf107376a96907a7a7a207a4a0afde34e5
