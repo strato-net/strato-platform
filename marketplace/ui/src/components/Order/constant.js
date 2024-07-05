@@ -3,6 +3,7 @@ export const status = {
   2: "Payment Pending",
   3: "Closed",
   4: "Canceled",
+  5: "Discarded"
 };
 
 export const statusByName = {
