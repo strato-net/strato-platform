@@ -1,6 +1,6 @@
 import client from '../db/index.js';
 import { completeOrder, getOrderEvent, emitOnboardSeller, validateAndGetOrderDetails } from '../helpers/utils.js';
-import { METAMASK_CONTRACT_ADDRESS } from '../helpers/constants.js';
+import { METAMASK_CONTRACT_ADDRESS, PAYMENT_RECEIVED_MESSAGE } from '../helpers/constants.js';
 import { Interface, parseEther, parseUnits } from 'ethers';
 
 class MetaMaskController {
@@ -156,6 +156,7 @@ class MetaMaskController {
           quantities: orderEvent[0].quantities,
           currency: currency,
           createdDate: orderEvent[0].createdDate,
+          comments: PAYMENT_RECEIVED_MESSAGE,
         } 
         const returnStatus = await completeOrder(METAMASK_CONTRACT_ADDRESS, callArgs);
         res.status(200).json({
