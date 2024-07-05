@@ -67,7 +67,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
   const linkUrl = window.location.href;
   const navRoute = routes.MarketplaceCategoryProductList.url.replace(':category', 'All');
 
-  const ButtonElement = ({ desktopText, mobileText }) => <div className="relative flex top-[156px] sm:top-[250px] 3xl:top-[70%] left-[4%] sm:left-[7.5%] md:left-[7%] md:top-60 z-50">
+  const ButtonElement = ({ desktopText, mobileText }) => <div className="relative flex top-[156px] sm:top-[250px] xl:top-[65%] 3xl:top-[70%] left-[4%] sm:left-[7.5%] md:left-[7%] md:top-60 z-50">
     <Button
       id="viewMore"
       onClick={() => {
