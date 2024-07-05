@@ -55,6 +55,7 @@ import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Nonce
 import Blockchain.Strato.Model.Wei
+import Blockchain.Strato.Model.Code (Code)
 import Control.Lens (mapped)
 import Control.Lens.Operators hiding ((.=))
 import Control.Lens.TH

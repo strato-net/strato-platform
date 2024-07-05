@@ -82,6 +82,7 @@ import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.UTF8 as UTF8
 import Data.Char as CHAR
+import Data.Decimal
 import Data.Either.Extra (eitherToMaybe)
 import Data.Foldable (for_)
 import Data.List
@@ -255,7 +256,7 @@ create _ _ _ blockData _ sender' origin' _ _ availableGas newAddress code txHash
       hsh <- codePtrToSHA chainId' cp
       fromMaybe "" . fmap snd . join <$> traverse getCode hsh
 
-  fmap (either solidvmErrorResults id) . runSM (Just initCode) env' gasInfo' chainId' $ do
+  fmap (either solidvmErrorResults id) . runSM (Just code) env' gasInfo' chainId' $ do
     requireOriginCert origin'
     let maybeContractName = M.lookup "name" =<< metadata
         !contractName' = textToLabel $ fromMaybe (missingField "TX is missing a metadata parameter called 'name'" $ show metadata) maybeContractName
@@ -267,22 +268,36 @@ create _ _ _ blockData _ sender' origin' _ _ availableGas newAddress code txHash
 
     (hsh, cc) <- codeCollectionFromSource True initCode
     (issuerAcct, _, issuerName) <- getCreator origin'
-    create' sender' (accountToNamedAccount' newAddress) issuerAcct issuerName newAddress hsh cc contractName' args False
+    create' sender' (Just code) (accountToNamedAccount' newAddress) issuerAcct issuerName newAddress hsh cc contractName' args False
 
-create' :: MonadSM m => Account -> NamedAccount -> Account -> String -> Account -> Keccak256 -> CC.CodeCollection -> SolidString -> CC.ArgList -> Bool -> m ExecResults
-create' creator originAddress issuerAcct issuerName newAccount ch cc contractName' argExps createBuiltinCall = do
-  parentName <-
-    fromMaybeM (return "") $
-      runMaybeT $
-        pure creator -- Creator's address
-          >>= MaybeT . A.lookup (A.Proxy @AddressState) -- Address's state
-          >>= pure . addressStateCodeHash -- state's codehash/CodePtr
-          >>= MaybeT . resolveCodePtrParent (creator ^. accountChainId) -- CodePtr's parent
-          >>= ( \case
-                  SolidVMCode name _ -> pure name -- Name of the parent
-                  _ -> pure ""
-              )
+create' :: MonadSM m => Account -> Maybe Code -> NamedAccount -> Account -> String -> Account -> Keccak256 -> CC.CodeCollection -> SolidString -> CC.ArgList -> Bool -> m ExecResults
+create' creator maybeCodePtr originAddress issuerAcct issuerName newAccount ch cc contractName' argExps createBuiltinCall = do
 
+  --check if codeptr tx and then pass in codeptr acc instead of creator
+  parentName <- case maybeCodePtr of
+                  (Just(PtrToCode (CodeAtAccount codePtrAcc _))) -> do
+                      fromMaybeM (return "") $
+                        runMaybeT $
+                          pure codePtrAcc -- Creator's address
+                            >>= MaybeT . A.lookup (A.Proxy @AddressState) -- Address's state
+                            >>= pure . addressStateCodeHash -- state's Acodehash/CodePtr
+                            >>= MaybeT . resolveCodePtrParent (codePtrcc ^. accountChainId) -- CodePtr's parent
+                            >>= ( \case
+                                    SolidVMCode name _ -> pure name -- Name of the parent
+                                    _ -> pure ""
+                            )
+                  _ -> do
+                      fromMaybeM (return "") $
+                        runMaybeT $
+                          pure creator -- Creator's address
+                            >>= MaybeT . A.lookup (A.Proxy @AddressState) -- Address's state
+                            >>= pure . addressStateCodeHash -- state's codehash/CodePtr
+                            >>= MaybeT . resolveCodePtrParent (creator ^. accountChainId) -- CodePtr's parent
+                            >>= ( \case
+                                    SolidVMCode name _ -> pure name -- Name of the parent
+                                    _ -> pure ""
+                            )
+                  
   let !contract' = fromMaybe (missingType "create'/contract" contractName') (cc ^. CC.contracts . at contractName')
       !abstracts' = getAbstractParentsFromContract contract' cc
       !mappings = getMapNamesFromContract contract'
@@ -575,6 +590,8 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
                             (SString _, SVMType.Bytes _ _) -> True
                             (SString _, SVMType.Address _) -> True
                             (SString _, SVMType.Account _) -> True
+                            (SDecimal _, SVMType.Decimal) -> True
+                            (SInteger _, SVMType.Decimal) -> True
                             (SBool _, SVMType.Bool) -> True
                             (SAccount _ _, SVMType.Address _) -> True
                             (SAccount _ _, SVMType.Account _) -> True
@@ -1454,6 +1471,7 @@ expToVar' (CC.NumberLiteral _ v (Just nu)) =
     CC.Finney -> return . Constant $ SInteger (v * (10 ^ (15 :: Integer)))
     CC.Ether -> return . Constant $ SInteger (v * (10 ^ (18 :: Integer)))
 expToVar' (CC.StringLiteral _ s) = return $ Constant $ SString s
+expToVar' (CC.DecimalLiteral _ v) = return $ Constant $ SDecimal $ CC.unwrapDecimal v
 expToVar' (CC.AccountLiteral _ a) = return $ Constant $ SAccount a False
 expToVar' (CC.BoolLiteral _ b) = return $ Constant $ SBool b
 expToVar' (CC.HexaLiteral _ a) = return $ Constant $ SString $ BC.unpack . either (parseError "Couldn't parse hexadecimal literal: ") id . B16.decode $ BC.pack a
@@ -1464,8 +1482,10 @@ expToVar' (CC.Variable _ "now") = Constant . SInteger . round . utcTimeToPOSIXSe
 expToVar' (CC.Variable _ name) = getVariableOfName name
 expToVar' (CC.Unitary _ "-" e) = do
   var <- expToVar e
-  value <- getInt var
-  return $ Constant $ SInteger (value * (-1))
+  value <- getRealNum var
+  case value of
+    Left v -> return $ Constant $ SInteger (v * (-1))
+    Right v -> return $ Constant $ SDecimal $ v * (-1)
 expToVar' (CC.PlusPlus _ e) = do
   var <- expToVar e
   value <- getInt var
@@ -1495,10 +1515,15 @@ expToVar' (CC.Unitary _ "--" e) = do
   setVar var next
   return $ Constant next
 expToVar' (CC.Binary _ "+=" lhs rhs) = addAndAssign lhs rhs
-expToVar' (CC.Binary _ "-=" lhs rhs) = binopAssign (-) lhs rhs
-expToVar' (CC.Binary _ "*=" lhs rhs) = binopAssign (*) lhs rhs
-expToVar' (CC.Binary _ "/=" lhs rhs) = binopAssign mod lhs rhs
-expToVar' (CC.Binary _ "%=" lhs rhs) = binopAssign rem lhs rhs
+expToVar' (CC.Binary _ "-=" lhs rhs) = binopAssign' (-) (-) lhs rhs
+expToVar' (CC.Binary _ "*=" lhs rhs) = binopAssign' (*) (*) lhs rhs
+expToVar' ex@(CC.Binary _ "/=" lhs rhs) = do
+  rhs' <- getRealNum =<< expToVar rhs
+  case rhs' of
+    Left 0 -> divideByZero $ unparseExpression ex
+    Right 0 -> divideByZero $ unparseExpression ex
+    _ -> binopAssign' (div) (/) lhs rhs
+expToVar' (CC.Binary _ "%=" lhs rhs) = binopAssign' rem decMod lhs rhs
 expToVar' (CC.Binary _ "|=" lhs rhs) = binopAssign (.|.) lhs rhs
 expToVar' (CC.Binary _ "&=" lhs rhs) = binopAssign (.&.) lhs rhs
 expToVar' (CC.Binary _ "^=" lhs rhs) = binopAssign xor lhs rhs
@@ -1674,14 +1699,16 @@ expToVar' x@(CC.IndexAccess _ parent (Just mIndex)) = do
 --    _ -> error $ "unknown case in expToVar' for IndexAccess: " ++ show var
 
 expToVar' (CC.Binary _ "+" expr1 expr2) = expToVarAdd expr1 expr2
-expToVar' (CC.Binary _ "-" expr1 expr2) = expToVarInteger expr1 (-) expr2 SInteger
-expToVar' (CC.Binary _ "*" expr1 expr2) = expToVarInteger expr1 (*) expr2 SInteger
+expToVar' (CC.Binary _ "-" expr1 expr2) = expToVarArith (-) (-) expr1 expr2
+expToVar' (CC.Binary _ "*" expr1 expr2) = expToVarArith (*) (*) expr1 expr2
 expToVar' ex@(CC.Binary _ "/" expr1 expr2) = do
-  rhs <- getInt =<< expToVar expr2
+  rhs <- getRealNum =<< expToVar expr2
   case rhs of
-    0 -> divideByZero $ unparseExpression ex
-    _ -> expToVarInteger expr1 div expr2 SInteger
-expToVar' (CC.Binary _ "%" expr1 expr2) = expToVarInteger expr1 rem expr2 SInteger
+    Left 0 -> divideByZero $ unparseExpression ex
+    Right 0 -> divideByZero $ unparseExpression ex
+    _ -> expToVarArith (div) (/) expr1 expr2
+--modified to use decimal division
+expToVar' (CC.Binary _ "%" expr1 expr2) = expToVarArith rem decMod expr1 expr2
 expToVar' (CC.Binary _ "|" expr1 expr2) = expToVarInteger expr1 (.|.) expr2 SInteger
 expToVar' (CC.Binary _ "&" expr1 expr2) = expToVarInteger expr1 (.&.) expr2 SInteger
 expToVar' (CC.Binary _ "^" expr1 expr2) = expToVarInteger expr1 xor expr2 SInteger
@@ -1717,6 +1744,7 @@ expToVar' (CC.Binary _ "<" expr1 expr2) = do
   logVals val1 val2
   case (val1, val2) of
     (SInteger i1, SInteger i2) -> return $ Constant $ SBool $ i1 < i2
+    (SDecimal v1, SDecimal v2) -> return $ Constant $ SBool $ v1 < v2
     _ -> typeError "binary '<' on non-ints" (val1, val2)
 expToVar' (CC.Binary _ ">" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
@@ -1725,6 +1753,7 @@ expToVar' (CC.Binary _ ">" expr1 expr2) = do
   logVals val1 val2
   case (val1, val2) of
     (SInteger i1, SInteger i2) -> return $ Constant $ SBool $ i1 > i2
+    (SDecimal v1, SDecimal v2) -> return $ Constant $ SBool $ v1 > v2
     _ -> typeError "binary '>' on non-ints" (val1, val2)
 expToVar' (CC.Binary _ ">=" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
@@ -1733,6 +1762,7 @@ expToVar' (CC.Binary _ ">=" expr1 expr2) = do
   logVals val1 val2
   case (val1, val2) of
     (SInteger i1, SInteger i2) -> return $ Constant $ SBool $ i1 >= i2
+    (SDecimal v1, SDecimal v2) -> return $ Constant $ SBool $ v1 >= v2
     _ -> typeError "binary '>=' used on non-ints" (val1, val2)
 expToVar' (CC.Binary _ "<=" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
@@ -1741,6 +1771,7 @@ expToVar' (CC.Binary _ "<=" expr1 expr2) = do
   logVals val1 val2
   case (val1, val2) of
     (SInteger i1, SInteger i2) -> return $ Constant $ SBool $ i1 <= i2
+    (SDecimal v1, SDecimal v2) -> return $ Constant $ SBool $ v1 <= v2
     _ -> typeError "binary '<=' used on non-ints" (val1, val2)
 expToVar' (CC.Binary _ "&&" expr1 expr2) = do
   b1 <- getBool =<< expToVar expr1
@@ -1797,7 +1828,7 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   (hsh, cc) <- getCurrentCodeCollection
   newAddress <- getNewAddress creator
   (issuerAcct, originAddress, issuerName) <- getCreator creator
-  execResults <- create' creator originAddress issuerAcct issuerName newAddress hsh cc contractName' args False
+  execResults <- create' creator Nothing originAddress issuerAcct issuerName newAddress hsh cc contractName' args False
   return $
     Constant $
       SContract contractName' $
@@ -1816,7 +1847,7 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   newAddress <- getNewAddressWithSalt creator salt hsh $ show args'
   $logDebugS "DEBUG" $ T.pack $ (show hsh) ++ "  " ++ show newAddress
   (issuerAcct, originAddress, issuerName) <- getCreator creator
-  execResults <- create' creator originAddress issuerAcct issuerName newAddress hsh cc contractName' args False
+  execResults <- create' creator Nothing originAddress issuerAcct issuerName newAddress hsh cc contractName' args False
   onTraced $ do
     liftIO $
       putStrLn $
@@ -2017,6 +2048,7 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
                     (SString _, SVMType.Bytes _ _) -> pure True
                     (SString _, SVMType.Address _) -> pure True
                     (SString _, SVMType.Account _) -> pure True
+                    (SDecimal _, SVMType.Decimal) -> pure True
                     (SBool _, SVMType.Bool) -> pure True
                     (SAccount _ _, SVMType.Address _) -> pure True
                     (SAccount _ _, SVMType.Account _) -> pure True
@@ -2386,13 +2418,48 @@ expToVarAdd expr1 expr2 = do
   case (i1, i2) of
     (SInteger a, SInteger b) -> return . Constant . SInteger $ a + b
     (SString a, SString b) -> return . Constant . SString $ a ++ b
+    (SDecimal a, SDecimal b) -> return . Constant . SDecimal $ a + b
+    (SDecimal a, SInteger b) -> return . Constant . SDecimal $ a + (Decimal 0 b)
+    (SInteger a, SDecimal b) -> return . Constant . SDecimal $ (Decimal 0 a) + b
     _ -> typeError "expToVarAdd" (i1, i2)
+
+--decMod operation, implements % w Data.Decimal library functions
+decMod :: Decimal -> Decimal -> Decimal
+decMod a b = fromRational (toRational a `mod'` toRational b)
+  where
+    mod' x y = x - (fromIntegral (floor (x / y) :: Integer)) * y
+
+expToVarArith :: MonadSM m => (Integer -> Integer -> Integer) -> (Decimal -> Decimal -> Decimal) -> CC.Expression -> CC.Expression -> m Variable
+expToVarArith intOp decOp expr1 expr2 = do
+  i1 <- getVar =<< expToVar expr1
+  i2 <- getVar =<< expToVar expr2
+  case (i1, i2) of
+    (SInteger a, SInteger b) -> return . Constant . SInteger $ a `intOp` b
+    (SDecimal a, SDecimal b) -> return . Constant . SDecimal $ a `decOp` b
+    (SDecimal a, SInteger b) -> return . Constant . SDecimal $ a `decOp` (Decimal 0 b)
+    (SInteger a, SDecimal b) -> return . Constant . SDecimal $ (Decimal 0 a) `decOp` b
+    _ -> typeError "expToVarArith" (i1, i2)
 
 expToVarInteger :: MonadSM m => CC.Expression -> (Integer -> Integer -> a) -> CC.Expression -> (a -> Value) -> m Variable
 expToVarInteger expr1 o expr2 retType = do
   i1 <- getInt =<< expToVar expr1
   i2 <- getInt =<< expToVar expr2
   return . Constant . retType $ i1 `o` i2
+
+binopAssign' :: MonadSM m => (Integer -> Integer -> Integer) -> (Decimal -> Decimal -> Decimal) -> CC.Expression -> CC.Expression -> m Variable
+binopAssign' intOp decOp lhs rhs = do
+  let readVal e = getVar =<< expToVar e
+  delta <- readVal rhs
+  curValue <- readVal lhs
+  varToAssign <- expToVar lhs
+  next <- case (curValue, delta) of
+    (SInteger c, SInteger d) -> pure . SInteger $ c `intOp` d
+    (SDecimal c, SDecimal d) -> pure . SDecimal $ c `decOp` d
+    (SDecimal a, SInteger b) -> pure . SDecimal $ a `decOp` (Decimal 0 b)
+    (SInteger a, SDecimal b) -> pure . SDecimal $ (Decimal 0 a) `decOp` b
+    _ -> typeError "binopAssign'" (curValue, delta)
+  setVar varToAssign next
+  return $ Constant next
 
 addAndAssign :: MonadSM m => CC.Expression -> CC.Expression -> m Variable
 addAndAssign lhs rhs = do
@@ -2403,6 +2470,9 @@ addAndAssign lhs rhs = do
   next <- case (curValue, delta) of
     (SInteger c, SInteger d) -> pure . SInteger $ c + d
     (SString c, SString d) -> pure . SString $ c ++ d
+    (SDecimal c, SDecimal d) -> pure . SDecimal $ c + d
+    (SDecimal a, SInteger b) -> pure . SDecimal $ a + (Decimal 0 b)
+    (SInteger a, SDecimal b) -> pure . SDecimal $ (Decimal 0 a) + b
     _ -> typeError "addAndAssign" (curValue, delta)
   setVar varToAssign next
   return $ Constant next
@@ -2420,6 +2490,7 @@ binopAssign oper lhs rhs = do
 intBuiltin :: [Value] -> Value
 intBuiltin [SEnumVal _ _ enumNum] = SInteger $ fromIntegral enumNum
 intBuiltin [SInteger n] = SInteger n
+intBuiltin [SDecimal v] = SInteger (decimalMantissa $ roundTo 0 v)
 intBuiltin [SString hex] = integerToValue $ parseBaseInt hex 16
 intBuiltin [SString hex, SInteger 16] = integerToValue $ parseBaseInt hex 16
 intBuiltin [SString dec, SInteger 10] = integerToValue $ parseBaseInt dec 10
@@ -2428,6 +2499,15 @@ intBuiltin args = typeError "numeric cast - invalid args" args
 integerToValue :: Either String Integer -> Value
 integerToValue (Right n) = SInteger n
 integerToValue (Left err) = typeError err ("" :: String)
+
+decimalBuiltin :: [Value] -> Value
+decimalBuiltin [SInteger n] = SDecimal $ Decimal 0 n
+decimalBuiltin [SString str] =
+  let stringToDecimal = (readEither str :: Either String Decimal)
+  in case stringToDecimal of
+    Right deci -> SDecimal deci
+    Left e -> typeError e str
+decimalBuiltin args = typeError "decimal cast - invalid args" args
 
 parseBaseInt :: String -> Integer -> Either String Integer
 parseBaseInt s n =
@@ -2533,6 +2613,7 @@ callBuiltin "byte" [SInteger n] _ = return $ SInteger (n .&. 0xff)
 callBuiltin "byte" vs _ = typeError "byte cast" vs
 callBuiltin "uint" args _ = return $ intBuiltin args
 callBuiltin "int" args _ = return $ intBuiltin args
+callBuiltin "decimal" args _ = return $ decimalBuiltin args
 callBuiltin "push" [v] (Just o) = typeError "push (called as func, not as method)" (v, o)
 callBuiltin "call" [v] (Just o) = typeError "call (called as a function, not as a method)" (v, o)
 callBuiltin "identity" [v] Nothing = return v
@@ -2702,10 +2783,11 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
       maybeUseWallet = M.lookup "useWallet" =<< metadata
       !useWallet = maybe False (const True) maybeUseWallet
   (ctr, _, ctrName) <- getCreator origin --not sure if this should be there instead
-  execResults <- create' creator (accountToNamedAccount' newAddress) ctr ctrName newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) pragmaCheck
+  execResults <- create' creator Nothing (accountToNamedAccount' newAddress) ctr ctrName newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) pragmaCheck
   case erNewContractAccount execResults of
     Just nca -> do
       when (not isRunningTests) $ 
+      
         void $ VME.produceVMEvents [ VME.CodeCollectionAdded 
                                      (const () <$> cc)
                                      (SolidVMCode contractName' hsh) 
@@ -2747,7 +2829,7 @@ callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SS
       maybeUseWallet = M.lookup "useWallet" =<< metadata
       !useWallet = maybe False (const True) maybeUseWallet
   (ctr, originAddress, ctrName) <- getCreator creator
-  execResults <- create' creator originAddress ctr ctrName newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) pragmaCheck
+  execResults <- create' creator Nothing originAddress ctr ctrName newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) pragmaCheck
   case erNewContractAccount execResults of
     Just nca -> do
       when (not isRunningTests) $ 
@@ -3152,6 +3234,7 @@ encodeForReturn' (STuple items) = do
   encodedItems <- mapM (encodeForReturn' <=< getVar) $ V.toList items
 
   return $ "(" ++ (intercalate "," encodedItems) ++ ")"
+encodeForReturn' (SDecimal d) = return $ show d 
 encodeForReturn' x = todo "Cannot encode this return type: " x
 
 --formatAddressWithoutColor : padded the address with 40 bytes

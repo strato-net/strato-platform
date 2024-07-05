@@ -229,7 +229,9 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
           let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
               xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) $ _constructor contract
           (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just args) xabiArgs
-
+          let codeOrCodePtr = case hasCodePtr of
+                                Just x -> x 
+                                Nothing -> (Code $ Text.encodeUtf8 $ serializeSourceMap src)
           let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("name", name), ("args", argsAsSource)]
           tx <- lift . signAndPrepare jwt addr metadata' $
               TransactionHeader
@@ -379,12 +381,14 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
           let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
               xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) $ _constructor contract
           (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just args) xabiArgs
-
+          let codeOrCodePtr = case hasCodePtr of
+                                Just x -> x 
+                                Nothing -> (Code $ Text.encodeUtf8 $ serializeSourceMap src)
           let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("name", name), ("args", argsAsSource)]
           lift . prepareUnsignedRawTx metadata' $
               TransactionHeader
                 Nothing
-                addr
+                addr  
                 (fromMaybe emptyTxParams params)
                 (Wei (maybe 0 fromIntegral $ fmap unStrung value))
                 -- (Code $ Text.encodeUtf8 $ serializeSourceMap src)
@@ -894,7 +898,9 @@ postUsersContractSolidVM' cacheNonce ContractParameters {..} jwtToken = do
   (_, argsAsSource) <- constructArgValuesAndSource args xabiArgs
 
   let metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("name", Text.pack _contractName), ("args", argsAsSource)]
-
+  let codeOrCodePtr = case hasCodePtr of
+                                Just x -> x 
+                                Nothing -> (Code $ Text.encodeUtf8 $ serializeSourceMap src)
   tx <-
     signAndPrepare jwtToken fromAddr metadata' $
       TransactionHeader
@@ -944,7 +950,9 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters {..} jwtToken = do
       let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
           xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) $ _constructor contract
       (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just args) xabiArgs
-
+      let codeOrCodePtr = case hasCodePtr of
+                                Just x -> x 
+                                Nothing -> (Code $ Text.encodeUtf8 $ serializeSourceMap src)
       let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("name", name), ("args", argsAsSource)]
       tx <-
         lift . signAndPrepare jwtToken fromAddr metadata' $
@@ -1143,7 +1151,9 @@ preparePostTx time from tx =
       (fromIntegral gasLimit)
       toAddr
       (fromIntegral value)
-      code
+      codeBytes
+      cName
+      cpa
       chainId
       (fromIntegral r)
       (fromIntegral s)
@@ -1161,7 +1171,15 @@ preparePostTx time from tx =
     Wei gasPrice = transactionGasPrice tx
     Nonce nonce' = transactionNonce tx
     Wei value = transactionValue tx
-    code = transactionInitOrData tx
+    codeBytes = case transactionInitOrData tx of
+      Code bytes -> Just bytes
+      _ -> Nothing
+    cName = case transactionInitOrData tx of
+      PtrToCode (CodeAtAccount (Account _ _) codePtrName) -> Just codePtrName
+      _ -> Nothing
+    cpa = case transactionInitOrData tx of
+      PtrToCode (CodeAtAccount (Account codePtrAddress _) _) -> Just codePtrAddress
+      _ -> Nothing
     toAddr = transactionTo tx
     chainId = fromMaybe 0 . fmap (\(ChainId c) -> c) $ transactionChainId tx
     metadata = Map.toList <$> transactionMetadata tx
@@ -1181,7 +1199,9 @@ preparePostUnsignedRawTx time tx md =
       (fromIntegral gasLimit)
       toAddr
       (fromIntegral value)
-      code
+      codeBytes
+      cName
+      cpa
       chainId
       0
       0
@@ -1195,7 +1215,15 @@ preparePostUnsignedRawTx time tx md =
     Wei gasPrice = unsignedTransactionGasPrice tx
     Nonce nonce' = unsignedTransactionNonce tx
     Wei value = unsignedTransactionValue tx
-    code = unsignedTransactionInitOrData tx
+    codeBytes = case unsignedTransactionInitOrData tx of
+      Code bytes -> Just bytes
+      _ -> Nothing
+    cName = case unsignedTransactionInitOrData tx of
+      PtrToCode (CodeAtAccount (Account _ _) codePtrName) -> Just codePtrName
+      _ -> Nothing
+    cpa = case unsignedTransactionInitOrData tx of
+      PtrToCode (CodeAtAccount (Account codePtrAddress _) _) -> Just codePtrAddress
+      _ -> Nothing
     toAddr = unsignedTransactionTo tx
     chainId = fromMaybe 0 . fmap (\(ChainId c) -> c) $ unsignedTransactionChainId tx
     metadata = Map.toList <$> md
@@ -1433,6 +1461,7 @@ getSolidityType av (Xabi.Array _ _) = Left $ Text.pack $ "Expected Array but got
 getSolidityType (ArgObject _) Xabi.Mapping {} = Right $ TypeStruct "s"
 getSolidityType av Xabi.Mapping {} = Left $ Text.pack $ "Expected Object for Mapping type, but got " ++ show av
 getSolidityType _ Xabi.Variadic = Right $ TypeVariadic
+getSolidityType _ Xabi.Decimal = Right . SimpleType $ TypeDecimal
 
 getResultAndRespond ::
   ( A.Selectable Account AddressState m,
