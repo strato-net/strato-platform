@@ -103,6 +103,9 @@ export const PAYMENT_TYPES = {
   "visa": "5",
 }
 
+// Orders: No comments initially
+export const DEFAULT_COMMENT = "";
+
 export const SERVICE_PROVIDERS = {}
 SERVICE_PROVIDERS[SERVICE_PROVIDERS['STRIPE'] = 1] = 'STRIPE';
 SERVICE_PROVIDERS[SERVICE_PROVIDERS['PAYPAL'] = 2] = 'PAYPAL';
@@ -119,10 +122,13 @@ export const calculatePriceFluctuation = (records) => {
 }
 
 export const calculateVolumeTraded = (records) => {
+  // Omit Locked Quantity
+  const filteredRecords = records.filter(record => record.totalLockedQuantity === 0);
+  
   // Create a map to track the latest quantity for each address
   const addressQuantityMap = new Map();
 
-  return records.reduce((acc, record) => {
+  return filteredRecords.reduce((acc, record) => {
     // Get the previous quantity for this address, if any
     const previousQuantity = addressQuantityMap.get(record.address) || record.quantity;
 

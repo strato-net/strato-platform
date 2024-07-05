@@ -236,7 +236,7 @@ async function getAll(admin, args = {}, options) {
     const uniqueOrderArgs = {
       ...args,
       queryOptions: {
-        status: 'neq.1',
+        status: 'not.in.(1,5)',
         select: 'id:id.max(),orderHash,createdDate',
       }
     };

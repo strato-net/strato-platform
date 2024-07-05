@@ -15,7 +15,7 @@ import {
   initializePayment,
   cancelOrder
 } from '../helpers/utils.js';
-import { PAYMENT_STATUS, STRIPE_CONTRACT_ADDRESS } from '../helpers/constants.js';
+import { PAYMENT_STATUS, STRIPE_CONTRACT_ADDRESS, PAYMENT_RECEIVED_MESSAGE } from '../helpers/constants.js';
 
 class StripeServiceController {
 
@@ -193,6 +193,7 @@ class StripeServiceController {
           quantities: orderEvent[0].quantities,
           currency: 'USD',
           createdDate: orderEvent[0].createdDate,
+          comments: PAYMENT_RECEIVED_MESSAGE,
         } 
         returnStatus = await completeOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
 
@@ -211,7 +212,8 @@ class StripeServiceController {
           saleAddresses: orderEvent[0].saleAddresses,
           quantities: orderEvent[0].quantities,
           currency: 'USD',
-          createdDate: orderEvent[0].createdDate
+          createdDate: orderEvent[0].createdDate,
+          comments: orderEvent[0].comments,
         } 
         returnStatus = await initializePayment(STRIPE_CONTRACT_ADDRESS, callArgs);
 
@@ -240,7 +242,7 @@ class StripeServiceController {
       // Get the payment event from Cirrus
       const orderEvent = await getOrderEvent(orderHash);
 
-      // Construct completeOrder args
+      // Construct cancelOrder args to discard the order
       const callArgs = {
         orderHash: orderEvent[0].orderHash,
         orderId: orderEvent[0].orderId,
@@ -248,14 +250,15 @@ class StripeServiceController {
         saleAddresses: orderEvent[0].saleAddresses,
         quantities: orderEvent[0].quantities,
         currency: 'USD',
-        createdDate: orderEvent[0].createdDate
+        createdDate: orderEvent[0].createdDate,
+        comments: orderEvent[0].comments,
       } 
 
       const cancelOrderStatus = await cancelOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
       console.log("cancelOrderStatus", cancelOrderStatus);
 
       // Update payment status in DB
-      const updateResult = await updateStripePayment(orderHash, "CANCELED");
+      const updateResult = await updateStripePayment(orderHash, "DISCARDED");
 
       // Redirect back to marketplace
       res.redirect(`${redirectUrl}`);
@@ -288,13 +291,44 @@ class StripeServiceController {
               saleAddresses: orderEvent[0].saleAddresses,
               quantities: orderEvent[0].quantities,
               currency: 'USD',
-              createdDate: orderEvent[0].createdDate
+              createdDate: orderEvent[0].createdDate,
+              comments: PAYMENT_RECEIVED_MESSAGE,
             } 
             const returnStatus = await completeOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
 
             // Update payment status in DB
             const updateResult = await updateStripePayment(p.orderhash, 'PAID');
             statuses[p.orderhash] = PAYMENT_STATUS['PAID'];
+          }
+          else{
+          /////////////////////////////////// ACH Cancellation Flow ////////////////////////////////////////////////////////////////  
+          
+          const intent = await stripeService.getPaymentIntent(session.payment_intent, p.accountid);
+          const ERROR_MESSAGE = intent?.last_payment_error?.message;
+          const paymentErrorAndRequiresPaymentMethod = ERROR_MESSAGE && intent.status === 'requires_payment_method';
+
+
+          if(paymentErrorAndRequiresPaymentMethod)
+            {
+              const orderEvent = await getOrderEvent(p.orderhash);
+              
+              const callArgs = {
+                orderHash: orderEvent[0].orderHash,
+                orderId: orderEvent[0].orderId,
+                purchaser: orderEvent[0].purchaser,
+                saleAddresses: orderEvent[0].saleAddresses,
+                quantities: orderEvent[0].quantities,
+                currency: 'USD',
+                createdDate: orderEvent[0].createdDate,
+                comments: ERROR_MESSAGE,
+              } 
+        
+              const cancelOrderStatus = await cancelOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
+              console.log("cancelOrderStatus", cancelOrderStatus);
+        
+              // Update payment status in DB
+              const updateResult = await updateStripePayment(p.orderHash, "CANCELED");
+            }
           }
         }
         statuses[p.orderhash] = PAYMENT_STATUS[p.status];

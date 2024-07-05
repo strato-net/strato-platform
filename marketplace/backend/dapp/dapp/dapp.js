@@ -11,7 +11,8 @@ import constants, {
   timeFilterForOneYear,
   timeFilterForSixMonths,
   ASSET_STATUS,
-  REDEMPTION_STATUS
+  REDEMPTION_STATUS,
+  DEFAULT_COMMENT,
 } from "/helpers/constants";
 import { yamlWrite, yamlSafeDumpSync, getYamlFile } from "/helpers/config";
 import { pollingHelper } from "/helpers/utils";
@@ -560,7 +561,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         console.log('Invalid timeFilter');
         return;
       }
-      console.log(getSixMonthsAgoTime(), " months ago")
 
       const timeRangeSales = await saleJs.getAll(rawAdmin, {
         assetToBeSold: assetsAddressArr,
@@ -576,7 +576,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         //Fetch histories for each sale
         const historyPromises = sales.map(sale => {
           //Fetch saleHistory
-          if (filter.assetToBeSold) {
+          if (filter.order) {
             //If timeFilter is applied, also add those filters
             return saleJs.getAllSaleHistory(rawAdmin, { ...filter, assetToBeSold: sale.assetToBeSold }, options);
           } else {
@@ -586,12 +586,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           }
         });
         const histories = await Promise.all(historyPromises);
-        console.log("Histories fetched, checking for block_timestamp...");
-        histories.flat().forEach((record, index) => {
-          if (!record.block_timestamp) {
-            console.log(`Record at index ${index} is missing block_timestamp:`, record);
-          }
-        });
 
         if(shouldAggregate)
         {
@@ -619,14 +613,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         processSalesHistory(allAssetSales, {}, false) // for 12-month historical data
       ]);
 
-      // Handling Promise.allSettled results (Logging purposes)
-      processedSalesResults.forEach((result, index) => {
-        if (result.status === 'fulfilled') {
-          console.log(`Result ${index} fulfilled with value:`, result.value);
-        } else {
-          console.error(`Result ${index} rejected with reason:`, result.reason);
-        }
-      });
 
       // Time Filter Records  
       const originRecordsSorted = processedSalesResults[0].status === 'fulfilled' ?
@@ -1054,7 +1040,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         orderId: util.uid(),
         saleAddresses,
         quantities,
-        createdDate
+        createdDate,
+        comments: DEFAULT_COMMENT,
       }
       const orderHashAndAssets = await paymentProviderJs.createPayment(rawAdmin, paymentParameters, options);
       return orderHashAndAssets;
