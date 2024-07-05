@@ -11,7 +11,8 @@ import constants, {
   timeFilterForOneYear,
   timeFilterForSixMonths,
   ASSET_STATUS,
-  REDEMPTION_STATUS
+  REDEMPTION_STATUS,
+  DEFAULT_COMMENT,
 } from "/helpers/constants";
 import { yamlWrite, yamlSafeDumpSync, getYamlFile } from "/helpers/config";
 import { pollingHelper } from "/helpers/utils";
@@ -978,7 +979,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         orderId: util.uid(),
         saleAddresses,
         quantities,
-        createdDate
+        createdDate,
+        comments: DEFAULT_COMMENT,
       }
       const orderHashAndAssets = await paymentProviderJs.createPayment(rawAdmin, paymentParameters, options);
       return orderHashAndAssets;
