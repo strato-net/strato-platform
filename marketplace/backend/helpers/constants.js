@@ -103,6 +103,9 @@ export const PAYMENT_TYPES = {
   "visa": "5",
 }
 
+// Orders: No comments initially
+export const DEFAULT_COMMENT = "";
+
 export const SERVICE_PROVIDERS = {}
 SERVICE_PROVIDERS[SERVICE_PROVIDERS['STRIPE'] = 1] = 'STRIPE';
 SERVICE_PROVIDERS[SERVICE_PROVIDERS['PAYPAL'] = 2] = 'PAYPAL';
