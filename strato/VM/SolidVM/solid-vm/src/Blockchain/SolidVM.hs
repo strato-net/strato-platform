@@ -3157,48 +3157,69 @@ encodeForReturn' x = todo "Cannot encode this return type: " x
 --formatAddressWithoutColor : padded the address with 40 bytes
 solidityExceptionHandlerHelper :: (MonadSM m, Ord k, IsString k) => M.Map k (Maybe (SolidString, SVMType.Type), [CC.Statement]) -> t1 -> t2 -> Integer-> (t1 -> t2 -> m (Maybe Value))-> m (Maybe Value)
 solidityExceptionHandlerHelper cbm s1 s2 errCode errFunc = do
-        case M.lookup "Panic" cbm of
-          Nothing -> do
-            case M.lookup "Nill" cbm of
-              Nothing -> errFunc s1 s2
-              Just (_, stmts) -> do
-                res' <-  runStatementBlock stmts
-                return res'
-          Just (mVar, block) -> do
-            case mVar of
-              Nothing -> do
-                res' <-  runStatementBlock block
-                return res'
-              Just (varName, varType) -> do
-                addLocalVariable varType varName (SInteger errCode)
-                res <- runStatementBlock block
-                return res
+  case M.lookup "Panic" cbm of
+    Nothing -> do
+      case M.lookup "Nill" cbm of
+        Nothing -> errFunc s1 s2
+        Just (_, stmts) -> do
+          res' <-  runStatementBlock stmts
+          return res'
+    Just (mVar, block) -> do
+      case mVar of
+        Nothing -> do
+          res' <-  runStatementBlock block
+          return res'
+        Just (varName, varType) -> do
+          addLocalVariable varType varName (SInteger errCode)
+          res <- runStatementBlock block
+          return res
 
 solidityExceptionHandlerHelper' :: (MonadSM m, Ord k, IsString k) => M.Map k (Maybe (SolidString, SVMType.Type), [CC.Statement]) -> t1 -> Integer-> (t1 -> m (Maybe Value))-> m (Maybe Value)
 solidityExceptionHandlerHelper' cbm s1 errCode errFunc = do
-        case M.lookup "Panic" cbm of
-          Nothing -> do
-            case M.lookup "Nill" cbm of
-              Nothing -> errFunc s1
-              Just (_, stmts) -> do
-                res' <-  runStatementBlock stmts
-                return res'
-          Just (mVar, block) -> do
-            case mVar of
-              Nothing -> do
-                res' <-  runStatementBlock block
-                return res'
-              Just (varName, varType) -> do
-                addLocalVariable varType varName (SInteger errCode)
-                res <- runStatementBlock block
-                return res
+  case M.lookup "Panic" cbm of
+    Nothing -> do
+      case M.lookup "Nill" cbm of
+        Nothing -> errFunc s1
+        Just (_, stmts) -> do
+          res' <-  runStatementBlock stmts
+          return res'
+    Just (mVar, block) -> do
+      case mVar of
+        Nothing -> do
+          res' <-  runStatementBlock block
+          return res'
+        Just (varName, varType) -> do
+          addLocalVariable varType varName (SInteger errCode)
+          res <- runStatementBlock block
+          return res
 
 solidityExceptionHandlerHelper'' :: (MonadSM m, Ord k, IsString k) => M.Map k (Maybe (SolidString, SVMType.Type), [CC.Statement]) -> t1 -> t2 -> t3-> Integer-> (t1 -> t2 -> t3 -> m (Maybe Value))-> m (Maybe Value)
 solidityExceptionHandlerHelper'' cbm s1 s2 vals errCode errFunc = do
-        case M.lookup "Panic" cbm of
+  case M.lookup "Panic" cbm of
+    Nothing -> do
+      case M.lookup "Nill" cbm of
+        Nothing -> errFunc s1 s2 vals
+        Just (_, stmts) -> do
+          res' <-  runStatementBlock stmts
+          return res'
+    Just (mVar, block) -> do
+      case mVar of
+        Nothing -> do
+          res' <-  runStatementBlock block
+          return res'
+        Just (varName, varType) -> do
+          addLocalVariable varType varName (SInteger errCode)
+          res <- runStatementBlock block
+          return res
+
+solidityExceptionHandlerHelperRequire :: (MonadSM m, Ord k, IsString k) => M.Map k (Maybe (SolidString, SVMType.Type), [CC.Statement]) -> Maybe String -> m (Maybe Value)
+solidityExceptionHandlerHelperRequire cbm s1  = do
+  case M.lookup "Error" cbm of
           Nothing -> do
             case M.lookup "Nill" cbm of
-              Nothing -> errFunc s1 s2 vals
+              Nothing -> do
+                _ <- require False s1
+                return Nothing
               Just (_, stmts) -> do
                 res' <-  runStatementBlock stmts
                 return res'
@@ -3208,13 +3229,33 @@ solidityExceptionHandlerHelper'' cbm s1 s2 vals errCode errFunc = do
                 res' <-  runStatementBlock block
                 return res'
               Just (varName, varType) -> do
-                addLocalVariable varType varName (SInteger errCode)
+                addLocalVariable varType varName (SString (fromMaybe "Require Error" s1))
                 res <- runStatementBlock block
                 return res
 
+solidityExceptionHandlerHelperAssert :: (MonadSM m, Ord k, IsString k) => M.Map k (Maybe (SolidString, SVMType.Type), [CC.Statement]) -> m (Maybe Value)
+solidityExceptionHandlerHelperAssert cbm  = do
+  case M.lookup "Error" cbm of
+        Nothing -> do
+          case M.lookup "Nill" cbm of
+            Nothing -> do
+              _ <- assert False
+              return Nothing
+            Just (_, stmts) -> do
+              res' <-  runStatementBlock stmts
+              return res'
+        Just (mVar, block) -> do
+          case mVar of
+            Nothing -> do
+              res' <-  runStatementBlock block
+              return res'
+            Just (varName, varType) -> do
+              addLocalVariable varType varName (SString "Assertion Error")
+              res <- runStatementBlock block
+              return res
 {- BEN WILL REFACTOR THIS SOMEDAY -}
 solidityExceptionHandler :: MonadSM m => (M.Map String (Maybe (String, SVMType.Type), [CC.Statement])) -> SolidException -> m (Maybe Value)
-solidityExceptionHandler catchBlockMap ex = do
+solidityExceptionHandler catchBlockMap ex = 
   case ex of
     (InternalError s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 1 internalError
@@ -3241,22 +3282,8 @@ solidityExceptionHandler catchBlockMap ex = do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 8 duplicateDefinition
       return res
     (ArityMismatch s1 i1 i2) -> do
-      case M.lookup "Panic" catchBlockMap of
-        Nothing -> do
-          case M.lookup "Nill" catchBlockMap of
-            Nothing -> arityMismatch s1 i1 i2
-            Just (_, stmts) -> do
-              res' <-  runStatementBlock stmts
-              return res'
-        Just (mVar, block) -> do
-          case mVar of
-            Nothing -> do
-              res' <-  runStatementBlock block
-              return res'
-            Just (varName, varType) -> do
-              addLocalVariable varType varName (SInteger 9)
-              res <- runStatementBlock block
-              return res
+      res <- solidityExceptionHandlerHelper'' catchBlockMap s1 i1 i2 9 arityMismatch
+      return res
     (UnknownFunction s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 10 unknownFunction
       return res
@@ -3264,60 +3291,14 @@ solidityExceptionHandler catchBlockMap ex = do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 11 unknownVariable
       return res
     (DivideByZero s1) -> do
-      case M.lookup "Panic" catchBlockMap of
-        Nothing -> do
-          case M.lookup "Nill" catchBlockMap of
-            Nothing -> divideByZero s1
-            Just (_, stmts) -> do
-              res' <-  runStatementBlock stmts
-              return res'
-        Just (mVar, block) -> do
-          case mVar of
-            Nothing -> do
-              res' <-  runStatementBlock block
-              return res'
-            Just (varName, varType) -> do
-              addLocalVariable varType varName (SInteger 12)
-              res <- runStatementBlock block
-              return res
+      res <- solidityExceptionHandlerHelper' catchBlockMap s1 12 divideByZero
+      return res
     (Require s1) -> do
-      case M.lookup "Error" catchBlockMap of
-        Nothing -> do
-          case M.lookup "Nill" catchBlockMap of
-            Nothing -> do
-              _ <- require False s1
-              return Nothing
-            Just (_, stmts) -> do
-              res' <-  runStatementBlock stmts
-              return res'
-        Just (mVar, block) -> do
-          case mVar of
-            Nothing -> do
-              res' <-  runStatementBlock block
-              return res'
-            Just (varName, varType) -> do
-              addLocalVariable varType varName (SString (fromMaybe "Require Error" s1))
-              res <- runStatementBlock block
-              return res
+      res <- solidityExceptionHandlerHelperRequire catchBlockMap s1
+      return res
     (Assert) -> do
-      case M.lookup "Error" catchBlockMap of
-        Nothing -> do
-          case M.lookup "Nill" catchBlockMap of
-            Nothing -> do
-              _ <- assert False
-              return Nothing
-            Just (_, stmts) -> do
-              res' <-  runStatementBlock stmts
-              return res'
-        Just (mVar, block) -> do
-          case mVar of
-            Nothing -> do
-              res' <-  runStatementBlock block
-              return res'
-            Just (varName, varType) -> do
-              addLocalVariable varType varName (SString "Assertion Error")
-              res <- runStatementBlock block
-              return res
+      res <- solidityExceptionHandlerHelperAssert catchBlockMap 
+      return res
     (MissingCodeCollection s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 13 missingCodeCollection
       return res
@@ -3379,35 +3360,22 @@ solidityExceptionHandler catchBlockMap ex = do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 32 missingCertificate
       return res
     (RevertError s1 s2) -> do
-      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 36 revertError
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 33 revertError
       return res
     (CustomError s1 s2 vals) -> do
       let name = T.unpack $ T.replace "\"" "" $ T.pack s2
       case M.lookup name catchBlockMap of
-        Nothing -> solidityExceptionHandlerHelper'' catchBlockMap s1 name vals 37 customError 
-        Just (args, block) -> do
-          ctract <- getCurrentContract
-          (_, cc) <- getCurrentCodeCollection
-          let basicToVals = map (\x -> fromBasic x) vals
-              zipped = case M.lookup name $ CC._errors ctract of
-                Just e -> zip e basicToVals
-                Nothing -> case M.lookup name $ CC._flErrors cc of
-                  Just e -> zip e basicToVals
-                  Nothing -> invalidArguments "Invalid error type." name
-              argsToSolidString = case args of
-                Just (a,_) -> map stringToLabel [a]
-                Nothing -> []
-          _ <-
-            if length args > 0
-              then mapM (\(x, ((_, (CC.IndexedType _ y), _), z)) -> addLocalVariable y x z) $ zip argsToSolidString zipped
-              else pure $ [()]
+        Nothing -> solidityExceptionHandlerHelper'' catchBlockMap s1 name vals 34 customError 
+        Just (Nothing, _) -> solidityExceptionHandlerHelper'' catchBlockMap s1 name vals 34 customError 
+        Just (Just (name', type'), block) -> do
+          mapM_ (\x -> addLocalVariable type' name' x) $ map fromBasic vals
           res <- runStatementBlock block
           return res
     (DuplicateContract s1) -> do
-      res <- solidityExceptionHandlerHelper' catchBlockMap s1 38 duplicateContract
+      res <- solidityExceptionHandlerHelper' catchBlockMap s1 35 duplicateContract
       return res
     (OldForeignPragmaError s1 s2) -> do
-      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 39 oldForeignPragmaError
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 36 oldForeignPragmaError
       return res
 
 solidVMExceptionHelper :: (MonadSM m) => M.Map String (Maybe [String], [CC.Statement]) -> m (Maybe Value) -> m (Maybe Value)
@@ -3418,8 +3386,7 @@ solidVMExceptionHelper x y = case M.lookup "" x of
     return res
 
 solidVMExceptionHandler :: (MonadSM m) => (M.Map String (Maybe [String], [CC.Statement])) -> SolidException -> m (Maybe Value)
-solidVMExceptionHandler catchBlockMap ex = do
-  $logInfoS "solidVMExceptionHandler" . T.pack $ "the exception is " <> show ex
+solidVMExceptionHandler catchBlockMap ex =
   case ex of
     (InternalError s1 s2) -> do
       case M.lookup "InternalError" catchBlockMap of
