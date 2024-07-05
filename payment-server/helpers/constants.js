@@ -31,7 +31,10 @@ const PAYMENT_STATUS = {
   'INITIALIZED': '2',
   'PAID': '3',
   'CANCELED': '4',
+  'DISCARDED': '5',
 }
+
+const PAYMENT_RECEIVED_MESSAGE = "Thank you for your payment.";
 
 export { 
   STRIPE_ENV,
@@ -45,4 +48,5 @@ export {
   SELLER_ONBOARDED_TABLE,
   PAYMENT_STATUS,
   TABLE_PREFIX,
+  PAYMENT_RECEIVED_MESSAGE,
 }
