@@ -4,23 +4,21 @@ pragma strict;
 import <509>;
 import "../Assets/Asset.sol";
 import "../Enums/RestStatus.sol";
-import "../Orders/Order.sol";
-import "../Payments/BasePaymentProvider.sol";
 import "../Utils/Utils.sol";
 
 abstract contract Sale is Utils { 
     Asset public assetToBeSold;
-    uint public price;
+    decimal public price;
     uint public quantity;
     address[] public paymentProviders;
     mapping (address => uint) paymentProvidersMap;
-    mapping (address => uint) lockedQuantity;
+    mapping (address => mapping (address => uint)) lockedQuantity;
     uint totalLockedQuantity;
     bool isOpen;
 
     constructor(
         address _assetToBeSold,
-        uint _price,
+        decimal _price,
         uint _quantity,
         address[] _paymentProviders
     ) {    
@@ -41,28 +39,25 @@ abstract contract Sale is Utils {
                    + " can perform "
                    + action
                    + ".";
-        string commonName = getCommonName(tx.origin);
+        string commonName = getCommonName(msg.sender);
         require(commonName == sellersCommonName, err);
     }
 
-    modifier requireSellerOrBuyer(string action) {
-        string sellersCommonName = assetToBeSold.ownerCommonName();
-        Order order = Order(msg.sender);
-        string purchasersCommonName = order.purchasersCommonName();
-        string err = "Only "
-                   + sellersCommonName
-                   + ","
-                   + purchasersCommonName
-                   + " can perform "
-                   + action
-                   + ".";
-        string commonName = getCommonName(tx.origin);
-
-        require((commonName == purchasersCommonName || commonName == sellersCommonName), err);
-
+    modifier requirePaymentProvider(string action) {
+        require(isPaymentProvider(msg.sender), "Only whitelisted payment providers can perform " + action + ".");
+        _;
     }
 
-    function changePrice(uint _price) public requireSeller("change price"){
+    modifier requireSellerOrPaymentProvider(string action) {
+        string sellersCommonName = assetToBeSold.ownerCommonName();
+        string commonName = getCommonName(msg.sender);
+        bool isAuthorized = commonName == sellersCommonName
+                         || isPaymentProvider(msg.sender);
+        require(isAuthorized, "Only the seller, or payment provider can perform " + action + ".");
+        _;
+    }
+
+    function changePrice(decimal _price) public requireSeller("change price"){
         price=_price;
     }
 
@@ -98,17 +93,20 @@ abstract contract Sale is Utils {
     }
 
     function completeSale(
-    ) public requireSellerOrBuyer("complete sale") returns (uint) {
-        Order order = Order(msg.sender);
-        address purchaser = order.purchasersAddress();
-        uint orderQuantity = takeLockedQuantity(msg.sender);
+        address purchaser
+    ) public requirePaymentProvider("complete sale") returns (uint) {
+        uint orderQuantity = takeLockedQuantity(purchaser);
         // regular transfer - isUserTransfer: false, transferNumber: 0, transferPrice: 0
-        assetToBeSold.transferOwnership(purchaser, orderQuantity, false, 0, 0);
+        try {
+            assetToBeSold.transferOwnership(purchaser, orderQuantity, false, 0, 0);
+        } catch { // Backwards compatibility for old assets
+            address(assetToBeSold).call("transferOwnership", purchaser, orderQuantity, false, 0);
+        }
         closeSaleIfEmpty();
         return RestStatus.OK;
     }
 
-    function automaticTransfer(address _newOwner, uint _price, uint _quantity, uint _transferNumber) public returns (uint) {
+    function automaticTransfer(address _newOwner, decimal _price, uint _quantity, uint _transferNumber) public returns (uint) {
         require(msg.sender == address(assetToBeSold), "Only the underlying Asset can call automaticTransfer.");
         uint assetQuantity = assetToBeSold.quantity();
         require(_quantity <= assetQuantity - totalLockedQuantity, "Cannot transfer more units than are available.");
@@ -118,7 +116,11 @@ abstract contract Sale is Utils {
             quantity -= _quantity;
         }
         // transfer feature - isUserTransfer: true, transferNumber: _transferNumber, transferPrice: _price
-        assetToBeSold.transferOwnership(_newOwner, _quantity, true, _transferNumber, _price);
+        try {
+            assetToBeSold.transferOwnership(_newOwner, _quantity, true, _transferNumber, _price);
+        } catch { // Backwards compatibility for old assets
+            address(assetToBeSold).call("transferOwnership", _newOwner, _quantity, true, _transferNumber);
+        }
         closeSaleIfEmpty();
         return RestStatus.OK;
     }
@@ -144,35 +146,46 @@ abstract contract Sale is Utils {
         }
     }
 
-    function lockQuantity(uint quantityToLock) public {
+    function lockQuantity(
+        uint quantityToLock,
+        address purchaser
+    ) requirePaymentProvider("lock quantity") public {
         require(quantityToLock <= quantity, "Not enough quantity to lock");
-        require(lockedQuantity[msg.sender] == 0, "Order has already locked quantity in this asset.");
+        require(lockedQuantity[msg.sender][purchaser] == 0, "Order has already locked quantity in this asset.");
         quantity -= quantityToLock;
-        lockedQuantity[msg.sender] = quantityToLock;
+        lockedQuantity[msg.sender][purchaser] = quantityToLock;
         totalLockedQuantity += quantityToLock;
     }
 
     function takeLockedQuantity(address orderAddress) internal returns (uint) {
-        uint quantityToUnlock = lockedQuantity[orderAddress];
+        uint quantityToUnlock = lockedQuantity[msg.sender][orderAddress];
         require(quantityToUnlock > 0, "There are no quantity to unlock for address " + string(orderAddress));
-        lockedQuantity[orderAddress] = 0;
+        lockedQuantity[msg.sender][orderAddress] = 0;
         totalLockedQuantity -= quantityToUnlock;
         return quantityToUnlock;
     }
 
-    function unlockQuantity() public {
-        uint quantityToReturn = takeLockedQuantity(msg.sender);
+    function getLockedQuantity(address orderAddress) public returns (uint) {
+        return lockedQuantity[msg.sender][orderAddress];
+    }
+
+    function unlockQuantity(
+        address purchaser
+    ) requireSellerOrPaymentProvider("unlock quantity") public {
+        uint quantityToReturn = takeLockedQuantity(purchaser);
         quantity += quantityToReturn;
     }
 
-    function cancelOrder() public requireSeller("cancel order") returns (uint) {
-        unlockQuantity();
+    function cancelOrder(
+        address purchaser
+    ) public requireSellerOrPaymentProvider("cancel order") returns (uint) {
+        unlockQuantity(purchaser);
         return RestStatus.OK;
     }
 
     function update(
         uint _quantity,
-        uint _price,
+        decimal _price,
         address[] _paymentProviders,
         uint _scheme
     ) returns (uint) {

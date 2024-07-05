@@ -40,8 +40,6 @@ GLOBAL_ADMIN_PASSWORD=<globalAdminPassword>
 
 SENDGRID_API_KEY=<sendgridApiKey>
 
-STRIPE_PAYMENT_SERVER_URL=<stripePaymentServerURL>
-
 ### VARS USED IN BACKEND TESTS ONLY: ###
 #  accounts for testing user roles:
 CERTIFIER_NAME=<certifierUserName>

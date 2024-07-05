@@ -43,7 +43,7 @@ const UserProfile = ({user}) => {
   const { cartList } = useMarketplaceState();
   const [api, contextHolder] = notification.useNotification();
   const marketplaceDispatch = useMarketplaceDispatch();
-  const { userInventories, isUserInventoriesLoading, inventories, isInventoriesLoading, message, success, isLoadingStripeStatus, stripeStatus, inventoriesTotal } = useInventoryState();
+  const { userInventories, isUserInventoriesLoading, inventories, isInventoriesLoading, message, success, inventoriesTotal } = useInventoryState();
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   const { TabPane } = Tabs;
   const orderDispatch = useOrderDispatch();
@@ -127,13 +127,6 @@ const UserProfile = ({user}) => {
         }
       }, [dispatch, limit, offset, category, isOwner]);
 
-    // Seller Stripe Status fetch to preview options of listing
-    useEffect(() => {
-      if(isAuthenticated && hasChecked)
-        {
-          inventoryActions.sellerStripeStatus(dispatch, commonName);
-        }
-    }, [dispatch, category, user, commonName]);
 
     // Fetch Categories
     useEffect(() => {
@@ -418,9 +411,6 @@ const UserProfile = ({user}) => {
                             category={category}
                             key={index}
                             // debouncedSearchTerm={debouncedSearchTerm}
-                            paymentProviderAddress={
-                              stripeStatus ? stripeStatus.paymentProviderAddress : undefined
-                            }
                             allSubcategories={allSubcategories}
                           />
                         );
@@ -447,9 +437,6 @@ const UserProfile = ({user}) => {
                             category={category}
                             key={index}
                             // debouncedSearchTerm={debouncedSearchTerm}
-                            paymentProviderAddress={
-                              stripeStatus ? stripeStatus.paymentProviderAddress : undefined
-                            }
                             allSubcategories={allSubcategories}
                           />
                         );
@@ -476,9 +463,6 @@ const UserProfile = ({user}) => {
                             category={category}
                             key={index}
                             // debouncedSearchTerm={debouncedSearchTerm}
-                            paymentProviderAddress={
-                              stripeStatus ? stripeStatus.paymentProviderAddress : undefined
-                            }
                             allSubcategories={allSubcategories}
                           />
                         );

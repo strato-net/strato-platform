@@ -1,7 +1,6 @@
 import { rest, util, importer } from "blockapps-rest";
 const { createContract } = rest;
 import constants, {
-  STRIPE_PAYMENT_SERVER_URL,
   calculatePriceFluctuation,
   calculateAveragePrice,
   calculateVolumeTraded,
@@ -12,7 +11,8 @@ import constants, {
   timeFilterForOneYear,
   timeFilterForSixMonths,
   ASSET_STATUS,
-  REDEMPTION_STATUS
+  REDEMPTION_STATUS,
+  DEFAULT_COMMENT,
 } from "/helpers/constants";
 import { yamlWrite, yamlSafeDumpSync, getYamlFile } from "/helpers/config";
 import { pollingHelper } from "/helpers/utils";
@@ -39,6 +39,7 @@ import saleOrderJs from "/dapp/orders/saleOrder";
 import inventoryJs from "/dapp/products/inventory";
 import marketplaceJs from "/dapp/marketplace/marketplace.js";
 import paymentProviderJs from '/dapp/payments/paymentProvider';
+import redemptionServiceJs from '/dapp/redemptions/redemptionService';
 
 import strats from "../strats/strats";
 
@@ -298,40 +299,42 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return await inventoryJs.updateInventory(rawAdmin, contract, restArgs, options);
   }
 
+  contract.getRedemptionServices = async function (args, options = defaultOptions) {
+    const redemptionServices = await redemptionServiceJs.getAll(rawAdmin, args, options);
+    return redemptionServices;
+  }
+
   contract.requestRedemption = async function (args, options = defaultOptions) {
-    try {
-      const { assetAddresses, quantity, ...restArgs } = args;
+    const { assetAddresses, redemptionService, quantity, ...restArgs } = args;
 
-      const contract = { address: assetAddresses[0] };
-      const [requestRedemptionStatus, assetAddress] = await inventoryJs.requestRedemption(rawAdmin, contract, { quantity: quantity }, options);
+    const contract = { address: assetAddresses[0] };
+    const redemptionId = util.uid();
+    const contractArgs = { quantity, redemptionId };
+    const [requestRedemptionStatus, assetAddress] = await inventoryJs.requestRedemption(rawAdmin, contract, contractArgs, options);
 
-      const finalArgs = { redemption_id: parseInt(util.uid()), assetAddresses: [assetAddress], quantity, ...restArgs }
+    const finalArgs = { redemption_id: parseInt(redemptionId), assetAddresses: [assetAddress], quantity, ...restArgs }
 
-      if (requestRedemptionStatus) {
-        try {
-          await axios.post(new URL(`/redemption/create`, STRIPE_PAYMENT_SERVER_URL).href, { ...finalArgs })
-            .then(function (res) {
-              if (res.status === 200) {
-                console.log(res.data);
-              } else {
-                throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
-              }
-            });
-          return {}
-        } catch (error) {
-          // The AssetStaus is initially switched to PENDING_REDEMPTION but must be reverted if Redemption creation fails
-          const [updateStatus] = await inventoryJs.updateAssetStatus(rawAdmin, { address: assetAddress }, { status: ASSET_STATUS.ACTIVE }, options);
+    if (requestRedemptionStatus) {
+      try {
+        const { serviceURL, createRedemptionRoute = '' } = await redemptionServiceJs.get(rawAdmin, { address: redemptionService }, options);
+        await axios.post(new URL(createRedemptionRoute, serviceURL).href, { ...finalArgs })
+          .then(function (res) {
+            if (res.status === 200) {
+              console.log(res.data);
+            } else {
+              throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+            }
+          });
+        return {}
+      } catch (error) {
+        // The AssetStaus is initially switched to PENDING_REDEMPTION but must be reverted if Redemption creation fails
+        const [updateStatus] = await inventoryJs.updateAssetStatus(rawAdmin, { address: assetAddress }, { status: ASSET_STATUS.ACTIVE }, options);
 
-          if (error.response) {
-            throw new rest.RestError(error.response.status, error.response.statusText);
-          }
-          throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while creating redemption record: ${JSON.stringify(error)} `);
+        if (error.response) {
+          throw new rest.RestError(error.response.status, error.response.statusText);
         }
-      } else {
-        throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while requesting redemption");
+        throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while creating redemption record: ${JSON.stringify(error)} `);
       }
-    } catch (error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Please contact sales@blockapps.net to redeem this item")
     }
   }
 
@@ -343,13 +346,34 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     }).toString();
 
     try {
-      const redemptions = await axios.get(new URL(`/redemption/outgoing/${userCert.commonName}?${queryParams}`, STRIPE_PAYMENT_SERVER_URL).href).then(function (res) {
-        if (res.status === 200) {
-          return res.data.data;
-        } else {
-          throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+      let redemptions = [];
+      let redemptionServiceAddresses = [];
+      const redemptionEvents = await redemptionServiceJs.getRedemptions(rawAdmin, { owner: userCert.commonName }, options);
+      redemptionEvents.map(r => {
+        if (!redemptionServiceAddresses.includes(r.address)) {
+          redemptionServiceAddresses.push(r.address);
         }
       });
+      const redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { address: redemptionServiceAddresses }, options);
+      
+      const redemptionPromises = redemptionServices.map(async (rs) => {
+        const serviceUrl = rs.serviceURL || rs.data.serviceURL;
+        const getOutgoingRedemptionRoute = rs.outgoingRedemptionsRoute || rs.data.outgoingRedemptionsRoute;
+        const res = await axios.get(new URL(`${serviceUrl}${getOutgoingRedemptionRoute}/${userCert.commonName}?${queryParams}`).href);
+        if (res.status === 200)
+          return res.data.data;
+        else
+          return [];
+      });
+
+      const allRedemptions = await Promise.all(redemptionPromises);
+      redemptions = allRedemptions.flat();
+
+      if (order && order === 'ASC')
+        redemptions.sort((a, b) => a.createdDate - b.createdDate);
+      else
+        redemptions.sort((a, b) => b.createdDate - a.createdDate);
+      
       return redemptions;
     } catch (error) {
       if (error.response) {
@@ -367,13 +391,31 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     }).toString();
 
     try {
-      const redemptions = await axios.get(new URL(`/redemption/incoming/${userCert.commonName}?${queryParams}`, STRIPE_PAYMENT_SERVER_URL).href).then(function (res) {
+      let redemptions = [];
+      const redemptionEvents = await redemptionServiceJs.getRedemptions(rawAdmin, { issuer: userCert.commonName }, options);
+      const redemptionServiceAddresses = redemptionEvents.map(r => r.address);
+      const redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { address: redemptionServiceAddresses }, options);
+      
+      const redemptionPromises = redemptionServices.map(async (rs) => {
+        const serviceUrl = rs.serviceURL || rs.data.serviceURL;
+        const getIncomingRedemptionRoute = rs.incomingRedemptionsRoute || rs.data.incomingRedemptionsRoute;
+        const res = await axios.get(new URL(`${serviceUrl}${getIncomingRedemptionRoute}/${userCert.commonName}?${queryParams}`).href);
         if (res.status === 200) {
           return res.data.data;
         } else {
-          throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+          return [];
         }
       });
+
+      const allRedemptions = await Promise.all(redemptionPromises);
+      redemptions = allRedemptions.flat();
+
+      if (order && order === 'ASC')
+        redemptions.sort((a, b) => a.createdDate - b.createdDate);
+      else
+        redemptions.sort((a, b) => b.createdDate - a.createdDate);
+      
+
       return redemptions;
     } catch (error) {
       if (error.response) {
@@ -384,8 +426,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getRedemption = async function (args, options = optionsNoChainIds) {
+    const { redemptionService } = args;
     try {
-      const redemption = await axios.get(new URL(`/redemption/${args.id}`, STRIPE_PAYMENT_SERVER_URL).href).then(function (res) {
+      const { serviceURL, getRedemptionRoute = '' } = await redemptionServiceJs.get(rawAdmin, { address: redemptionService }, options);
+      const redemption = await axios.get(new URL(`${getRedemptionRoute}/${args.id}`, serviceURL).href).then(function (res) {
         if (res.status === 200) {
           return res.data.data;
         } else {
@@ -402,7 +446,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.closeRedemption = async function (args, options = optionsNoChainIds) {
-    const { id, assetAddresses, status, ...restArgs } = args;
+    const { id, assetAddresses, redemptionService, status, ...restArgs } = args;
 
     let assetStatus;
     if (status === REDEMPTION_STATUS.FULFILLED) {
@@ -418,7 +462,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
     if (updateStatus) {
       try {
-        const redemption = await axios.put(new URL(`/redemption/close/${id}`, STRIPE_PAYMENT_SERVER_URL).href, { ...finalArgs })
+        const { serviceURL, closeRedemptionRoute = '' } = await redemptionServiceJs.get(rawAdmin, { address: redemptionService }, options);
+        const redemption = await axios.put(new URL(`${closeRedemptionRoute}/${id}`, serviceURL).href, { ...finalArgs })
           .then(function (res) {
             if (res.status === 200) {
               return res.data.data;
@@ -516,7 +561,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         console.log('Invalid timeFilter');
         return;
       }
-      console.log(getSixMonthsAgoTime(), " months ago")
 
       const timeRangeSales = await saleJs.getAll(rawAdmin, {
         assetToBeSold: assetsAddressArr,
@@ -532,7 +576,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         //Fetch histories for each sale
         const historyPromises = sales.map(sale => {
           //Fetch saleHistory
-          if (filter.assetToBeSold) {
+          if (filter.order) {
             //If timeFilter is applied, also add those filters
             return saleJs.getAllSaleHistory(rawAdmin, { ...filter, assetToBeSold: sale.assetToBeSold }, options);
           } else {
@@ -542,12 +586,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           }
         });
         const histories = await Promise.all(historyPromises);
-        console.log("Histories fetched, checking for block_timestamp...");
-        histories.flat().forEach((record, index) => {
-          if (!record.block_timestamp) {
-            console.log(`Record at index ${index} is missing block_timestamp:`, record);
-          }
-        });
 
         if(shouldAggregate)
         {
@@ -575,14 +613,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         processSalesHistory(allAssetSales, {}, false) // for 12-month historical data
       ]);
 
-      // Handling Promise.allSettled results (Logging purposes)
-      processedSalesResults.forEach((result, index) => {
-        if (result.status === 'fulfilled') {
-          console.log(`Result ${index} fulfilled with value:`, result.value);
-        } else {
-          console.error(`Result ${index} rejected with reason:`, result.reason);
-        }
-      });
 
       // Time Filter Records  
       const originRecordsSorted = processedSalesResults[0].status === 'fulfilled' ?
@@ -786,37 +816,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   // ------------------------------ SALE TEST STARTS ------------------------------
 
-  contract.createSaleOrder = async function (args, options = defaultOptions) {
-    const createdDate = Math.floor(Date.now() / 1000);
-    const { items, ...restArgs } = args;
-    const saleAddresses = items.map(item => {
-      return item.saleAddress;
-    })
-    const quantities = items.map(item => {
-      return item.quantity;
-    })
-
-    const newArgs = {
-      ...restArgs,
-      saleAddresses,
-      quantities,
-      orderId: util.uid(),
-      createdDate: createdDate,
-      shippingAddressId: 1   // placeholder
-    }
-    return saleOrderJs.uploadContract(rawAdmin, newArgs, options);
-  }
-
   contract.cancelSaleOrder = async function (args, options = defaultOptions) {
-    const { saleOrderAddress, comments, ...restArgs } = args;
-    const contract = { name: saleOrderJs.contractName, address: saleOrderAddress }
-    return saleOrderJs.cancelOrder(rawAdmin, contract, options, comments);
-  }
-
-  contract.updateOrderStatus = async function (args, options = defaultOptions) {
-    const { saleOrderAddress, status, ...restArgs } = args;
-    const contract = { name: saleOrderJs.contractName, address: saleOrderAddress }
-    return saleOrderJs.updateOrderStatus(rawAdmin, contract, options, status);
+    const { paymentProvider, ...restArgs } = args;
+    const contract = { name: saleOrderJs.paymentServiceContractName, address: paymentProvider.address }
+    return saleOrderJs.cancelOrder(rawAdmin, contract, restArgs, options);
   }
 
   contract.getSaleOrders = async function (args, options = defaultOptions) {
@@ -834,7 +837,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const order = await saleOrderJs.get(rawAdmin, args, options);
 
       // Extracting the sale addresses
-      const saleAddresses = order["BlockApps-Mercata-Order-saleAddresses"].map(item => item.value);
+      const saleAddresses = order.saleAddresses ? order.saleAddresses : order["BlockApps-Mercata-Order-saleAddresses"].map(item => item.value);
       const sales = await saleJs.getAll(rawAdmin, { saleAddresses: saleAddresses }, options);
       let assets = [];
 
@@ -864,12 +867,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while fetching the order");
     }
   };
-
-  contract.cancelSaleOrder = async function (args, options = defaultOptions) {
-    const { saleOrderAddress, comments, ...restArgs } = args;
-    const contract = { name: saleOrderJs.contractName, address: saleOrderAddress }
-    return saleOrderJs.cancelOrder(rawAdmin, contract, options, comments);
-  }
 
   contract.completeOrder = async function (args, options = defaultOptions) {
     return saleOrderJs.completeOrder(rawAdmin, args, options);
@@ -997,145 +994,25 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   /* ------------------------ User Activity Ends------------------------ */
 
-
-  /* ------------------------ Stripe account connect starts here ------------------------ */
-  contract.stripeOnboarding = async function (args, options = defaultOptions) {
-    try {
-      const getOptions = { ...options, app: contractName };
-      let userStripeAccount, connectLink;
-      // get user paymentProvider details from cirrus
-      const sellerStripeDetails = await paymentProviderJs.get(rawAdmin, { name: 'STRIPE', accountDeauthorized: false, ownerCommonName: userCert.commonName }, getOptions)
-      if (sellerStripeDetails.length == 0 || Object.keys(sellerStripeDetails[0]).length == 0) {
-        await axios.get(new URL('/stripe/onboard', STRIPE_PAYMENT_SERVER_URL).href)
-          .then(async function (res) {
-            if (res.status === 200) {
-              const { accountDetails } = res.data;
-              userStripeAccount = accountDetails.accountId;
-              await paymentProviderJs.uploadContract(rawAdmin, accountDetails, options);
-              connectLink = res.data.connectLink;
-            } else {
-              throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
-            }
-          });
-      } else {
-        await axios.get(new URL(`/stripe/onboard/${sellerStripeDetails[0].accountId}`, STRIPE_PAYMENT_SERVER_URL).href)
-          .then(function (res) {
-            if (res.status === 200) {
-              connectLink = res.data.connectLink;
-            } else {
-              throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
-            }
-          });
-      }
-      return connectLink
-    } catch (error) {
-      console.error(`${error}`)
-      throw new rest.RestError(RestStatus.BAD_REQUEST, `${error.message}`)
-    }
-  }
-
-  contract.getStripeOnboardingStatus = async function (args, options = defaultOptions) {
-    try {
-      const getOptions = { ...options, app: contractName };
-
-      // get user paymentProvider details from cirrus
-      const paymentProviders = await paymentProviderJs.get(rawAdmin, { name: 'STRIPE', accountDeauthorized: false, ...args }, getOptions);
-      /* TODO check if the provider contract exists on then initiate a update */
-      if (paymentProviders.length == 0 || Object.keys(paymentProviders[0]).length == 0) {
-        // throw new rest.RestError(RestStatus.NOT_FOUND, "User hasn't started their stripe setup.")
-        return {}
-      }
-
-      let returnedStripeAccountStatus = paymentProviders[0];
-      let paymentMethodsChecked = [];
-      for (const paymentProvider of paymentProviders) {
-        if (paymentProvider.name in paymentMethodsChecked) {
-          continue;
-        }
-        else {
-          const connectedStripeAccountStatus = { chargesEnabled: false, detailsSubmitted: false, payoutsEnabled: false, accountDeauthorized: false, eventTime: Date.now() }
-          const paymentProviderContract = { name: paymentProviderJs.contractName, address: paymentProvider.address }
-          try {
-            await axios.get(new URL(`/stripe/status/${paymentProvider.accountId}`, STRIPE_PAYMENT_SERVER_URL).href)
-              .then(function (res) {
-                if (res.status === 200) {
-                  connectedStripeAccountStatus.chargesEnabled = res.data.chargesEnabled;
-                  connectedStripeAccountStatus.detailsSubmitted = res.data.detailsSubmitted;
-                  connectedStripeAccountStatus.payoutsEnabled = res.data.payoutsEnabled;
-                } else {
-                  throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
-                }
-              }, (error) => {
-                console.log(error);
-              });
-          } catch (error) {
-            if (error.code == 'account_invalid') {
-              connectedStripeAccountStatus.accountDeauthorized = true
-            }
-          }
-          const { detailsSubmitted, chargesEnabled, payoutsEnabled, accountDeauthorized } = connectedStripeAccountStatus;
-          if (paymentProvider.detailsSubmitted !== detailsSubmitted || paymentProvider.chargesEnabled !== chargesEnabled || paymentProvider.payoutsEnabled !== payoutsEnabled || paymentProvider.accountDeauthorized !== accountDeauthorized) {
-            await paymentProviderJs.updatePaymentProvider(rawAdmin, paymentProviderContract, connectedStripeAccountStatus, options);
-          }
-
-          if (connectedStripeAccountStatus.detailsSubmitted
-            && connectedStripeAccountStatus.chargesEnabled
-            && connectedStripeAccountStatus.payoutsEnabled
-          ) {
-            returnedStripeAccountStatus = {
-              accountId: paymentProvider.accountId,
-              paymentProviderAddress: paymentProvider.address,
-              ...connectedStripeAccountStatus
-            }
-          }
-
-          paymentMethodsChecked.push(paymentProvider.name);
-        }
-
-        return returnedStripeAccountStatus
-      }
-    } catch (error) {
-      console.error(`${error}`)
-      throw new rest.RestError(RestStatus.BAD_REQUEST, `${error.message}`)
-    }
-  }
-
-  contract.updateStripeOnboardingStatus = async function (args, options = defaultOptions) {
-    try {
-      // get user paymentProvider details from cirrus
-      const { accountId, ...restArgs } = args
-
-      const getOptions = { ...options, app: contractName };
-      const chainOptions = { ...options, chainIds: [contract.chainId] };
-
-      const paymentProvider = await paymentProviderJs.get(rawAdmin, { name: 'STRIPE', accountId }, getOptions);
-
-      /* TODO check if the provider contract exists on then initiate a update */
-      if (!paymentProvider) {
-        // throw new rest.RestError(RestStatus.NOT_FOUND, "User hasn't started their stripe setup.")
-        return false
-      }
-
-      if (paymentProvider[0].eventTime > eventTime) {
-        return true;
-      }
-
-      const paymentProviderContract = { name: paymentProviderJs.contractName, address: paymentProvider.address }
-      await paymentProviderJs.updatePaymentProvider(rawAdmin, paymentProviderContract, restArgs, chainOptions);
-
-    } catch (error) {
-      console.error(error);
-      throw new rest.RestError(error.response.status, error.response.statusText)
-    }
-  }
   // //-----------------------------PAYMENT starts here -------------------------------
+
+  contract.getPaymentServices = async function (args, options = defaultOptions) {
+      const paymentServices = await paymentProviderJs.getAll(rawAdmin, args, options);
+      return paymentServices;
+  }
+
+  contract.getNotOnboardedPaymentServices = async function (args, options = defaultOptions) {
+      const paymentServices = await paymentProviderJs.getNotOnboarded(rawAdmin, args, options);
+      return paymentServices;
+  }
 
   contract.paymentCheckout = async function (originUrl, args, options = defaultOptions) {
     try {
 
-      const { orderList, orderTotal: recievedOrderTotal } = args;
+      const { paymentProvider, orderList, orderTotal: recievedOrderTotal } = args;
 
       const assetAddresses = orderList.map(o => o.assetAddress);
+      const quantities = orderList.map(o => o.quantity);
 
       const assets = await inventoryJs.getAll(rawAdmin, { assetAddresses: assetAddresses }, options);
 
@@ -1157,141 +1034,32 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           throw new rest.RestError(RestStatus.BAD_REQUEST, "Cannot buy products from multiple sellers in the same Order/Checkout",);
         }
       }
-      // const chainOptions = { ...options, chainIds: [contract.chainId] };
-      const sellerStripeDetails = await paymentProviderJs.get(rawAdmin,
-        {
-          name: 'STRIPE', ownerCommonName: sellerName,
-          accountDeauthorized: false
-        },
-        options)
-
-      /*  check if an accountId already exists for the user org */
-      if (sellerStripeDetails.length === 0 || !sellerStripeDetails[0].chargesEnabled || !sellerStripeDetails[0].detailsSubmitted || !sellerStripeDetails[0].payoutsEnabled) {
-        throw new rest.RestError(RestStatus.CONFLICT, "Seller hasn't activated this payment method");
-      }
-
-      const invoices = [];
-      let calculatedOrderTotal = 0;
-
-      orderList.forEach(item => {
-        const inventoryItem = assets.find(asset => asset.address == item.assetAddress);
-        invoices.push({ productName: decodeURIComponent(inventoryItem.name), unitPrice: inventoryItem.price, quantity: item.quantity });
-
-        calculatedOrderTotal += (inventoryItem.price * item.quantity);
-      })
-
-      if (calculatedOrderTotal != recievedOrderTotal) {
-        throw new rest.RestError(RestStatus.BAD_REQUEST, "Incorrect order value.");
-      }
-      let stripePaymentSession;
-      const { paymentList, ...restArgs } = args;
-      const newArgs = { shippingAddressId: 1, ...restArgs };  // placeholder
-
-      try {
-        const checkoutBody = {
-          paymentTypes: paymentList,
-          cartData: newArgs,
-          orderDetail: invoices,
-          accountId: sellerStripeDetails[0].accountId,
-        }
-        stripePaymentSession = await axios.post(new URL('/stripe/checkout', STRIPE_PAYMENT_SERVER_URL).href, checkoutBody, {
-          headers: {
-            'referer': `${originUrl}`
-          }
-        })
-          .then(function (res) {
-            if (res.status === 200) {
-              return res.data;
-            } else {
-              throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
-            }
-          });
-      } catch (err) {
-        throw new rest.RestError(err.statusCode, err.message);
-      }
+      const createdDate = Math.floor(Date.now() / 1000);
       const paymentParameters = {
-        address: sellerStripeDetails[0].address,
+        address: paymentProvider.address,
+        orderId: util.uid(),
         saleAddresses,
-        paymentSessionId: stripePaymentSession.id,
-        paymentStatus: stripePaymentSession.payment_status,
-        sessionStatus: stripePaymentSession.status,
-        amount: stripePaymentSession.amount_total.toString(),
-        expiresAt: stripePaymentSession.expires_at,
-        createdDate: stripePaymentSession.created,
+        quantities,
+        createdDate,
+        comments: DEFAULT_COMMENT,
       }
-      await paymentProviderJs.createPayment(rawAdmin, paymentParameters, options);
-      return stripePaymentSession;
+      const orderHashAndAssets = await paymentProviderJs.createPayment(rawAdmin, paymentParameters, options);
+      return orderHashAndAssets;
 
     } catch (error) {
       console.log(error);
       if (error.response) {
-        throw new rest.RestError(error.response.status, error.response.statusText);
+        throw new rest.RestError(error.response.status, error.response.data);
       }
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while updating the order");
     }
   };
 
-  // Stripe Webhook TODO
-
-  contract.updatePayment = async function (args, options = defaultOptions, token) {
-    try {
-      return paymentProviderJs.finalizePayment(args, options)
-    } catch (error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while updating payment status", { message: "Error while updating payment status" })
-    }
-  };
-
-  // Stripe Webhook End
-
-  contract.getPaymentSession = async function (args, options = defaultOptions) {
-    try {
-      const { session_id, sellersCommonName } = args;
-      const paymentDetail = await paymentProviderJs.get(rawAdmin,
-        { name: 'STRIPE', ownerCommonName: sellersCommonName, accountDeauthorized: false },
-        options);
-      if (paymentDetail.length === 0) {
-        throw new rest.RestError(RestStatus.CONFLICT, "Seller payment details cannot be found.");
-      }
-      const paymentSession = await axios.get(new URL(`/stripe/session/${session_id}/${paymentDetail[0].accountId}`, STRIPE_PAYMENT_SERVER_URL).href)
-        .then(function (res) {
-          if (res.status === 200) {
-            return res.data;
-          } else {
-            throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
-          }
-        });
-      return { ...paymentSession }
-    } catch (error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while fetching payment session", { message: "Error while fetching payment" })
-    }
-  };
-
-  contract.getPaymentIntent = async function (args, options = defaultOptions) {
-    try {
-      const { session_id, sellersCommonName } = args;
-      const paymentDetail = await paymentProviderJs.get(rawAdmin,
-        { name: 'STRIPE', ownerCommonName: sellersCommonName, accountDeauthorized: false },
-        options);
-      if (paymentDetail.length === 0) {
-        throw new rest.RestError(RestStatus.CONFLICT, "Seller payment details cannot be found.");
-      }
-      const paymentIntent = await axios.get(new URL(`/stripe/intent/${session_id}/${paymentDetail[0].accountId}`, STRIPE_PAYMENT_SERVER_URL).href)
-        .then(function (res) {
-          if (res.status === 200) {
-            return res.data;
-          } else {
-            throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
-          }
-        });
-      return { ...paymentIntent }
-    } catch (error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while fetching payment intent", { message: "Error while fetching payment intent" })
-    }
-  };
-
   contract.createUserAddress = async function (args, options = defaultOptions) {
+    const { redemptionService, ...restArgs } = args;
     try {
-      await axios.post(new URL(`/customer/address`, STRIPE_PAYMENT_SERVER_URL).href, { commonName: userCert.commonName, ...args })
+      const { serviceURL, createCustomerAddressRoute = '' } = await redemptionServiceJs.get(rawAdmin, { address: redemptionService }, options);
+      await axios.post(new URL(createCustomerAddressRoute, serviceURL).href, { commonName: userCert.commonName, ...restArgs })
         .then(function (res) {
           if (res.status === 200) {
             console.log(res.data);
@@ -1309,8 +1077,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getAllUserAddress = async function (args, options = optionsNoChainIds) {
+    const { redemptionService } = args;
     try {
-      const userAddresses = await axios.get(new URL(`/customer/address/${userCert.commonName}`, STRIPE_PAYMENT_SERVER_URL).href).then(function (res) {
+      const { serviceURL, getCustomerAddressRoute = '' } = await redemptionServiceJs.get(rawAdmin, { address: redemptionService }, options);
+      const userAddresses = await axios.get(new URL(`${getCustomerAddressRoute}/${userCert.commonName}`, serviceURL).href).then(function (res) {
         if (res.status === 200) {
           return res.data.data;
         } else {
@@ -1323,25 +1093,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         throw new rest.RestError(error.response.status, error.response.statusText);
       }
       throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching addresses: ${JSON.stringify(error)} `);
-    }
-  };
-
-  contract.getAddressFromId = async function (args, options = defaultOptions) {
-    try {
-      const { id } = args;
-      const userAddress = await axios.get(new URL(`/customer/address/id/${id}`, STRIPE_PAYMENT_SERVER_URL).href).then(function (res) {
-        if (res.status === 200) {
-          return res.data.data;
-        } else {
-          throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
-        }
-      });
-      return userAddress;
-    } catch (error) {
-      if (error.response) {
-        throw new rest.RestError(error.response.status, error.response.statusText);
-      }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching address: ${JSON.stringify(err)} `);
     }
   };
 
