@@ -1,5 +1,6 @@
 import client from '../db/index.js';
 import Joi from '@hapi/joi';
+import { REDEMPTION_CONTRACT_ADDRESS } from '../helpers/constants.js';
 class RedemptionsController {
 
     static async getOutgoingRedemptionRequests(req, res, next) {
@@ -38,6 +39,7 @@ class RedemptionsController {
                     assetAddresses: row["assetaddresses"],
                     assetName: row["assetname"],
                     shippingAddressId: row["shippingaddressid"],
+                    redemptionService: REDEMPTION_CONTRACT_ADDRESS,
                     createdDate: formattedDate
                 }
                 const { ownercomments, issuercomments, ownercommonname, issuercommonname, assetaddresses, assetname, shippingaddressid, createddate, ...rest } = newRow;
@@ -92,6 +94,7 @@ class RedemptionsController {
                     assetAddresses: row["assetaddresses"],
                     assetName: row["assetname"],
                     shippingAddressId: row["shippingaddressid"],
+                    redemptionService: REDEMPTION_CONTRACT_ADDRESS,
                     createdDate: formattedDate
                 }
                 const { ownercomments, issuercomments, ownercommonname, issuercommonname, assetaddresses, assetname, shippingaddressid, createddate, ...rest } = newRow;
@@ -139,6 +142,7 @@ class RedemptionsController {
                     assetAddresses: row["assetaddresses"],
                     assetName: row["assetname"],
                     shippingAddressId: row["shippingaddressid"],
+                    redemptionService: REDEMPTION_CONTRACT_ADDRESS,
                     createdDate: formattedDate
                 }
                 const { ownercomments, issuercomments, ownercommonname, issuercommonname, assetaddresses, assetname, shippingaddressid, createddate, ...rest } = newRow;

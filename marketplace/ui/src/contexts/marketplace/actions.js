@@ -444,12 +444,13 @@ const actions = {
     }
   },
 
-  fetchUserAddresses: async (dispatch) => {
+  fetchUserAddresses: async (dispatch, redemptionService) => {
     dispatch({ type: actionDescriptors.fetchUserAddresses });
 
+    const redemptionArg = redemptionService ? `/${redemptionService}` : '';
     try {
       const response = await fetch(
-        `${apiUrl}/order/userAddresses/user`,
+        `${apiUrl}/order/userAddresses/user${redemptionArg}`,
         {
           method: HTTP_METHODS.GET,
         }

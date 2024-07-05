@@ -9,11 +9,13 @@ import winston from 'winston';
 import { 
   clientErrorHandler, 
   commonErrorHandler, 
-  validatePaymentServiceContract 
+  validatePaymentServiceContract ,
+  validateRedemptionServiceContract,
 } from './helpers/utils.js';
 import { 
   STRIPE_CONTRACT_ADDRESS, 
   METAMASK_CONTRACT_ADDRESS, 
+  REDEMPTION_CONTRACT_ADDRESS,
 } from './helpers/constants.js';
 import routes from './routes.js';
 
@@ -101,5 +103,6 @@ app.listen(config.port, async (e) => {
   if (!process.env.SKIP_CONTRACT_VALIDATION) {
     await validatePaymentServiceContract(STRIPE_CONTRACT_ADDRESS);
     await validatePaymentServiceContract(METAMASK_CONTRACT_ADDRESS);
+    await validateRedemptionServiceContract(REDEMPTION_CONTRACT_ADDRESS);
   }
 });

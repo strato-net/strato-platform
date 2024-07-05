@@ -150,7 +150,7 @@ export const Order = {
   create: '/',
   payment: '/payment',
   userAddress: '/userAddress',
-  getAllUserAddress: '/userAddresses/user',
+  getAllUserAddress: '/userAddresses/user/:redemptionService?',
   cancelSaleOrder: '/sale/cancel',
   checkSaleQuantity: '/saleQuantity',
   executeSale: '/closeSale',
