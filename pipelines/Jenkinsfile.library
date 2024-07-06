@@ -1382,6 +1382,7 @@ def spinUpPaymentServer() {
     string(credentialsId: 'STRIPE_SECRET_KEY_TESTNET2', variable:'STRIPE_SECRET_KEY_TESTNET2'),
     usernamePassword(credentialsId: 'AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV', passwordVariable: 'AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV_PASSWORD', usernameVariable: 'AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV_USER'),
     string(credentialsId: 'AWS_RDS_PAYMENT_SERVER_URL_DEV', variable:'AWS_RDS_PAYMENT_SERVER_URL_DEV'),
+    usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
   ]) {
     writeFile file: "run-payment-server.sh", text: """#!/bin/bash
       sudo \\
