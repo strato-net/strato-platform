@@ -1,4 +1,7 @@
+import { Images } from "../images";
 import { AMEX, Discover, Mastercard, VISA, BANK } from "../images/SVGComponents";
+import { SEO } from "./seoConstant";
+
 
 export const apiUrl = process.env.REACT_APP_URL
   ? process.env.REACT_APP_URL + "/api/v1"
@@ -232,8 +235,8 @@ export const ASSET_STATUS = {
 export const ISSUER_STATUS = {
   "UNAUTHORIZED": "1",
   "PENDING_REVIEW": "2",
-  "AUTHORIZED": "3" 
- }
+  "AUTHORIZED": "3"
+}
 
 export const availabilityOptions = [
   { label: 'For Sale', value: 'forSale' },
@@ -246,4 +249,86 @@ export const STRATS_CONVERSION = 100;
 export const navItems = [
   { label: <div id="Orders">Orders</div>, key: '0' },
   { label: <div id="Inventory">My Items</div>, key: '1' }
+];
+
+const metaImg = SEO.IMAGE_META
+
+export const BANNER = [
+  {
+    label: "Collectibles",
+    link: '/c/Collectibles?sc=Collectibles',
+    text: <div className="collectible_banner_text banner-text ">
+      <h1> Own Digital </h1>
+      <h1>Tokenized Collectibles!</h1>
+    </div>,
+    desktopText: "Explore More",
+    mobileText: "Explore",
+    alt: metaImg,
+    title: metaImg,
+    desktopImg: Images.CollectiblesX1600,
+    laptopImg: Images.CollectiblesX1440,
+    tabletImg: Images.CollectiblesX768,
+    mobileImg: Images.CollectiblesX394,
+  },
+  {
+    label: "Clothing",
+    link: '/c/Clothing?sc=Clothing',
+    text: <div className="clothing_banner_text banner-text">
+      <h1> Step into Future 
+      With Tokenized Clothing </h1>
+    </div>,
+    desktopText: "Explore More",
+    mobileText: "Explore",
+    alt: metaImg,
+    title: metaImg,
+    desktopImg: Images.ClothingX1600,
+    laptopImg: Images.ClothingX1440,
+    tabletImg: Images.ClothingX768,
+    mobileImg: Images.ClothingX394,
+  },
+  {
+    label: "Metal",
+    link: "/c/Metals?sc=Metals",
+    text: <div className="metal_banner_text banner-text">
+      <h1>Tokenized Metals</h1>
+      <h1>Vault-Secure</h1>
+    </div>,
+    desktopText: "Explore More",
+    mobileText: "Explore",
+    alt: metaImg,
+    title: metaImg,
+    desktopImg: Images.MetalX1600,
+    laptopImg: Images.MetalX1440,
+    tabletImg: Images.MetalX768,
+    mobileImg: Images.MetalX394,
+  },
+  {
+    label: "Token",
+    link: "/c/Tokens?sc=Tokens",
+    text: <div className="token_banner_text_box banner-text">
+      <h1 className="token_banner_text1">The Coin with Real Stakes for <span style={{color:'#FFA011'}}>Real Dogs</span> </h1>
+      <h1 className="token_banner_text2"> Save Dog Lives with $SADDOGS Token </h1>
+    </div>,
+    desktopText: "Save Dogs Now",
+    mobileText: "Save Dogs Now",
+    alt: metaImg,
+    title: metaImg,
+    desktopImg: Images.TokenX1600,
+    laptopImg: Images.TokenX1440,
+    tabletImg: Images.TokenX768,
+    mobileImg: Images.TokenX394,
+  },
+  {
+    label: "How",
+    link: "/c/All",
+    text: <h1 className="how_banner_text_box banner-text"> How It Works </h1>,
+    desktopText: "Explore More",
+    mobileText: "Explore",
+    alt: metaImg,
+    title: metaImg,
+    desktopImg: Images.HowX1600,
+    laptopImg: Images.HowX1440,
+    tabletImg: Images.HowX768,
+    mobileImg: Images.HowX394,
+  }
 ];
