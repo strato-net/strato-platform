@@ -8927,34 +8927,34 @@ contract qq {
   }
 }
 |]) `shouldThrow` anyTypeError
+
   it "can error handle improperly referenced overloaded contracts" $ runTest ( do 
     let getAddressFromResult :: ExecResults -> Maybe Address 
         getAddressFromResult res = _accountAddress <$> erNewContractAccount res
 
     res <- runBS' [r|
-  contract qq{
-      bool public myVal;
+pragma typecheck;
+contract qq {
+    bool public myVal;
 
-      function changeMyVal(bool b){
-          myVal = b;
-      }
-  }|]
+    function changeMyVal(bool b){
+        myVal = b;
+    }
+}|]
 
     case getAddressFromResult res of
       Nothing -> error "No address returned"
       Just address -> runCall' "changeMyValOfTest" (T.pack $ "(0x"++ formatAddressWithoutColor address ++", 3 )" ) [r|
+contract Test {
+    int public myVal;
 
-  contract Test{
-      int public myVal;
-
-      function changeMyVal(int b){
-          myVal = b;
-      }
-  }
-  contract qq {
-      function changeMyValOfTest(address a, int v) returns (int) {
-          Test(a).changeMyVal(v);
-          return Test(a).myVal();
-
-      }
+    function changeMyVal(int b){
+        myVal = b;
+    }
+}
+contract qq {
+    function changeMyValOfTest(address a, int v) returns (int) {
+        Test(a).changeMyVal(v);
+        return Test(a).myVal();
+    }
 }|]) `shouldThrow` anyTypeError
