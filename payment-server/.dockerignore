@@ -1,0 +1,7 @@
+config.yaml
+**/*.deploy.yaml
+yarn-error.log
+logs/
+temp/
+node_modules/
+.env

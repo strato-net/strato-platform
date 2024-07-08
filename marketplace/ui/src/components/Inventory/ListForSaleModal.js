@@ -1,15 +1,17 @@
-import { Button, Input, InputNumber, Modal, Select, Tag, Table, Typography } from "antd";
+import { Button, Input, InputNumber, Modal, Select, Spin, Tag, Table, Typography } from "antd";
 import { useEffect, useState } from "react";
 import { actions } from "../../contexts/inventory/actions";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
-import { PAYMENT_TYPE } from "../../helpers/constants";
+import { usePaymentServiceDispatch, usePaymentServiceState } from "../../contexts/payment";
+import { actions as paymentServiceActions } from "../../contexts/payment/actions";
 
 const { Option } = Select;
 
-const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddress, categoryName, limit, offset }) => {
+const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, offset, user }) => {
     const [data, setData] = useState([inventory]);
     const [quantity, setQuantity] = useState(inventory.saleAddress ? inventory.saleQuantity : inventory.quantity);
-    const [paymentTypes, setPaymentTypes] = useState([PAYMENT_TYPE[0].value]);
+    const [paymentTypes, setPaymentTypes] = useState([]);
+    const [availablePaymentProviders, setAvailablePaymentProviders] = useState([]);
     const [pricePerUnit, setpricePerUnit] = useState(inventory.price ? inventory.price : inventory.pricePerUnit);
     const inventoryDispatch = useInventoryDispatch();
     const [canList, setCanList] = useState(true);
@@ -17,6 +19,18 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
         isListing,
         issaleUpdating
     } = useInventoryState();
+    const {
+        paymentServices,
+        arePaymentServicesLoading,
+        notOnboarded,
+        areNotOnboardedLoading
+    } = usePaymentServiceState();
+    const paymentServiceDispatch = usePaymentServiceDispatch();
+
+    useEffect(() => {
+      paymentServiceActions.getPaymentServices(paymentServiceDispatch);
+      paymentServiceActions.getNotOnboarded(paymentServiceDispatch, user?.commonName, 10, 0);
+    }, [paymentServiceDispatch, user]);
 
     useEffect(() => {
         if ( inventory.saleAddress ? quantity > (inventory.quantity - inventory.totalLockedQuantity) : quantity > inventory.quantity || quantity <= 0 || pricePerUnit <= 0) {
@@ -27,44 +41,42 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
         };
     }, [quantity, pricePerUnit])
 
+    useEffect(() => {
+        const diff = paymentServices.filter(ps => 
+          !notOnboarded.some(x => x.address === ps.address)
+        );
+        setAvailablePaymentProviders(diff);
+      }, [paymentServices, notOnboarded]);
+
+    const renderImg = (service) => {
+        return service.imageURL && service.imageURL !== ''
+            ? <img src={service.imageURL} alt={service.serviceName} height="16px" width="16px"/>
+            : ''
+    }
+
     const tagRender = (props) => {
         const { value, closable, onClose } = props;
+        const service = availablePaymentProviders[value];
         const onPreventMouseDown = (event) => {
             event.preventDefault();
             event.stopPropagation();
         };
-        return (
+        return <> { service ? (
             <Tag
                 onMouseDown={onPreventMouseDown}
                 closable={closable}
                 onClose={onClose}
                 className="flex items-center mr-1"
             >
-                {PAYMENT_TYPE[0].name}
-                {/* {renderIcon(value)} */}
-                {/* (...) Indicates More options in addition to available icons */}
-                {/* <p className="ml-1">...</p> */}
+                {service.serviceName}&nbsp;
+                {renderImg(service)}
             </Tag>
-        );
-    };
-    const renderIcon = (value) => {
-        const paymentType = PAYMENT_TYPE.find(type => type.value === value);
-
-        if (paymentType) {
-            if (paymentType.name === "Credit Card / ACH") {
-                return paymentType.options.map((IconComponent, index) => (
-                    <span key={index} className="ml-1">{IconComponent}</span>
-                ));
-            } else {
-                return paymentType.icon ? paymentType.icon : <></>;
-            }
-        }
+        ) : '' }
+        </>;
     };
 
-    const handleSelectAll = () => {
-        const allValues = PAYMENT_TYPE.filter(type => type.value !== 0).map(type => type.value);
-        setPaymentTypes(allValues);
-        return allValues;
+    const handleSelect = (values) => {
+        setPaymentTypes(values);
     };
 
     const columns = () => {
@@ -81,15 +93,24 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
                         name="paymentTypes"
                         maxTagCount="responsive"
                         value={paymentTypes}
-                        onChange={handleSelectAll}
+                        onChange={handleSelect}
                         showSearch={false}
                         className="w-64"
                     >
-                        {PAYMENT_TYPE.map((e, index) => (
-                            <Option value={e.value} key={index}>
-                                {e.name}
-                            </Option>
-                        ))}
+                        {!arePaymentServicesLoading ? (
+                            availablePaymentProviders.map((e, index) => (
+                                <Option value={index}>
+                                    <div className="flex items-center mr-1">
+                                        {e.serviceName}&nbsp;
+                                        {renderImg(e)}
+                                    </div>
+                                </Option>
+                            ))
+                        ) : (
+                          <div className="absolute left-[50%] md:top-4">
+                            <Spin size="large" />
+                          </div>
+                        )}
                     </Select>
                 )
             },
@@ -150,7 +171,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
 
     const handleSubmit = async () => {
         let body = {
-            paymentProviders: paymentProviderAddress ? [paymentProviderAddress] : [],
+            paymentProviders: paymentTypes.map((p) => availablePaymentProviders[p].address),
             price: pricePerUnit,
         };
         if (inventory.saleAddress) {
@@ -208,13 +229,16 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
                         name="paymentTypes"
                         maxTagCount="responsive"
                         value={paymentTypes}
-                        onChange={handleSelectAll}
+                        onChange={handleSelect}
                         showSearch={false}
                         className="w-full"
                     >
-                        {PAYMENT_TYPE.map((e, index) => (
-                            <Option value={e.value} key={index}>
-                                {e.name}
+                        {availablePaymentProviders.map((e, index) => (
+                            <Option value={index}>
+                                <div className="flex items-center mr-1">
+                                    {e.serviceName}&nbsp;
+                                    {renderImg(e)}
+                                </div>
                             </Option>
                         ))}
                     </Select>

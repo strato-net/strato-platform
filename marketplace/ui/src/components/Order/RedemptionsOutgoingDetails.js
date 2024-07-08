@@ -34,6 +34,7 @@ import { ResponsiveOrderDetailCard } from "./ResponsiveOrderDetailCard";
 
 const RedemptionsOutgoingDetails = ({ user }) => {
     const [id, setId] = useState(undefined);
+    const [redemptionService, setRedemptionService] = useState(undefined);
     const [data, setdata] = useState([]);
     const dispatch = useRedemptionDispatch();
     const { Text } = Typography;
@@ -51,16 +52,17 @@ const RedemptionsOutgoingDetails = ({ user }) => {
 
     useEffect(() => {
         setId(routeMatch?.params?.id);
+        setRedemptionService(routeMatch?.params?.redemptionService);
     }, [routeMatch]);
 
     useEffect(() => {
-        if (id !== undefined) {
+        if (id !== undefined && redemptionService !== undefined) {
             const getData = async () => {
-                await actions.fetchRedemptionDetail(dispatch, id)
+                await actions.fetchRedemptionDetail(dispatch, redemptionService, id)
             };
             getData();
         }
-    }, [id, dispatch]);
+    }, [id, redemptionService, dispatch]);
 
     useEffect(() => {
         if (redemption) {

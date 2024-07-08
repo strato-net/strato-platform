@@ -2,7 +2,9 @@ import {
   Row,
   notification,
   Spin,
-  Modal
+  Modal,
+  Select,
+  Button
 } from "antd";
 import {
   useMarketplaceState,
@@ -20,24 +22,26 @@ import {
 } from "../../contexts/inventory";
 import DataTableComponent from "../DataTableComponent";
 import "./index.css";
-import { PAYMENT_LIST } from "../../helpers/constants";
+import { HTTP_METHODS, PAYMENT_LIST } from "../../helpers/constants";
 import TagManager from "react-gtm-module";
 import { setCookie } from "../../helpers/cookie";
 
-const ConfirmOrder = ({ data, columns }) => {
+const { Option } = Select;
+
+const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const orderDispatch = useOrderDispatch();
   const [api, contextHolder] = notification.useNotification();
   const { user, hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
-  const userOrganization = user?.organization
+  const userOrganization = user?.organization;
   const { isCreateOrderSubmitting, message, success, isCreatePaymentSubmitting } = useOrderState();
   const [tax, setTax] = useState(0);
   const [total, setTotal] = useState(0);
   const inventoryDispatch = useInventoryDispatch();
-  const { stripeStatus } = useInventoryState();
   const { success: marketplaceSuccess, message: marketplaceMessage } = useMarketplaceState();
   const [modal, contextHolderForModal] = Modal.useModal();
   const [cartData, setCartData] = useState(data);
+  const [selectedProvider, setSelectedProvider] = useState(paymentProviders.find(provider => provider.serviceName === 'Stripe') || paymentProviders[0]);
 
   useEffect(() => {
     setCartData(data);
@@ -114,7 +118,7 @@ const ConfirmOrder = ({ data, columns }) => {
     }
   };
 
-  const handlePaymentConfirm = async () => {
+  const handlePaymentConfirm = async (paymentProvider) => {
     actions.addItemToConfirmOrder(marketplaceDispatch, cartData);
     let orderList = [];
     cartData.forEach((item) => {
@@ -125,9 +129,9 @@ const ConfirmOrder = ({ data, columns }) => {
         unitPrice: item.unitPrice
       });
     });
-    // These additional fields need to be sent to form the request after stripe. 
+
     let body = {
-      paymentList: PAYMENT_LIST,
+      paymentProvider: { address: paymentProvider.address },
       buyerOrganization: userOrganization,
       orderList,
       orderTotal: total + tax,
@@ -146,17 +150,28 @@ const ConfirmOrder = ({ data, columns }) => {
         event: 'pay_now_button',
       },
     });
-    let data = await orderActions.createPayment(orderDispatch, body);
-    if (data != null && data.url !== undefined) {
-      window.location.replace(data.url);
+    let orderHashAndAssets = await orderActions.createPayment(orderDispatch, body);
+    if (orderHashAndAssets && orderHashAndAssets !== false) {
+      const [orderHash, assets] = orderHashAndAssets;
+      let serviceURL = paymentProvider.serviceURL || paymentProvider.data.serviceURL;
+      let checkoutRoute = paymentProvider.checkoutRoute || paymentProvider.data.checkoutRoute;
+      if (serviceURL
+            && serviceURL !== ''
+            && checkoutRoute
+            && checkoutRoute !== ''
+         ) {
+        const url = `${serviceURL}${checkoutRoute}?orderHash=${orderHash}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
+        window.location.replace(url);
+      } else {
+        window.location.replace(`/order/status?assets=${assets}`);
+      }
     }
   };
 
-  useEffect(() => {
-    if (cartData.length !== 0) {
-      inventoryAction.sellerStripeStatus(inventoryDispatch, cartData[0]["sellersCommonName"]);
-    }
-  }, [inventoryDispatch, cartData]);
+  const handleChange = value => {
+    const provider = paymentProviders.find(provider => provider.serviceName === value);
+    setSelectedProvider(provider);
+  };
 
   return (
     <>
@@ -203,49 +218,69 @@ const ConfirmOrder = ({ data, columns }) => {
                 </div>
               </div>
               <div id="review-and-submit" className="flex md:pb-2 items-center mr-4">
-                {stripeStatus && <button id="pay-now-button" className={`p-1 md:p-3 h-max rounded-lg border ${stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled ? 'border-primary bg-primary hover:bg-primaryHover text-white' : 'cursor-not-allowed border-[#999999] rounded bg-[#cccccc] text-[#666666]'}`}
+                <div className="mr-4">
+                  <Select
+                    defaultValue={selectedProvider.serviceName}
+                    style={{ width: 200, height: 40 }}
+                    onChange={handleChange}
+                  >
+                    {paymentProviders.map(provider => (
+                      <Option key={provider.serviceName} value={provider.serviceName}>
+                        {provider.checkoutText}
+                      </Option>
+                    ))}
+                  </Select>
+                </div>
+                <Button
+                  id="pay-now-button"
+                  style={{ height: 40, padding: '0 16px' }}
+                  className="rounded-lg border border-primary bg-primary hover:bg-primaryHover text-white flex items-center"
+                  loading={isCreatePaymentSubmitting}
                   onClick={async () => {
                     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                       countDown();
                     } else {
-                      if (stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled) {
-                        const saleAddresses = [];
-                        const quantities = [];
-                        cartData.forEach((item) => {
-                          saleAddresses.push(item.saleAddress)
-                          quantities.push(item.qty)
-                        })
-                        const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities)
-                        if (checkQuantity === true) {
-                          handlePaymentConfirm();
-                        } else {
-                          let insufficientQuantityMessage = "";
-                          let outOfStockMessage = "";
+                      const saleAddresses = [];
+                      const quantities = [];
+                      cartData.forEach((item) => {
+                        saleAddresses.push(item.saleAddress);
+                        quantities.push(item.qty);
+                      });
+                      const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities);
+                      if (checkQuantity === true) {
+                        handlePaymentConfirm(selectedProvider);
+                      } else {
+                        let insufficientQuantityMessage = "";
+                        let outOfStockMessage = "";
 
-                          checkQuantity.forEach(detail => {
-                            if (detail.availableQuantity === 0) {
-                              outOfStockMessage += `Product ${detail.assetName}\n`;
-                            } else {
-                              insufficientQuantityMessage += `Product ${detail.assetName}: ${detail.availableQuantity}\n`;
-                            }
-                          });
+                        checkQuantity.forEach(detail => {
+                          if (detail.availableQuantity === 0) {
+                            outOfStockMessage += `Product ${detail.assetName}\n`;
+                          } else {
+                            insufficientQuantityMessage += `Product ${detail.assetName}: ${detail.availableQuantity}\n`;
+                          }
+                        });
 
-                          let errorMessage = "";
-                          if (insufficientQuantityMessage) {
-                            errorMessage += `The following item(s) in your cart have limited quantity available and will need to be adjusted. Please reduce the quantity to proceed:\n${insufficientQuantityMessage}`;
-                          }
-                          if (outOfStockMessage) {
-                            if (errorMessage) errorMessage += "\n"; // Add a new line if there's already an error message
-                            errorMessage += `The following item(s) are temporarily out of stock and should be removed:\n${outOfStockMessage}`;
-                          }
-                          openToastOrder("bottom", errorMessage);
+                        let errorMessage = "";
+                        if (insufficientQuantityMessage) {
+                          errorMessage += `The following item(s) in your cart have limited quantity available and will need to be adjusted. Please reduce the quantity to proceed:\n${insufficientQuantityMessage}`;
                         }
+                        if (outOfStockMessage) {
+                          if (errorMessage) errorMessage += "\n"; // Add a new line if there's already an error message
+                          errorMessage += `The following item(s) are temporarily out of stock and should be removed:\n${outOfStockMessage}`;
+                        }
+                        openToastOrder("bottom", errorMessage);
                       }
                     }
                   }}
                 >
-                  Review and Submit
-                </button>}
+                  <div className="flex items-center mr-1">
+                    {selectedProvider.checkoutText}&nbsp; 
+                    {selectedProvider.imageURL && selectedProvider.imageURL !== '' ? (
+                      <img src={selectedProvider.imageURL} alt={selectedProvider.serviceName} height="16px" width="16px" />
+                    ) : ''}
+                  </div>
+                </Button>
               </div>
             </div>
           </div>
@@ -256,6 +291,5 @@ const ConfirmOrder = ({ data, columns }) => {
     </>
   );
 };
-
 
 export default ConfirmOrder;
