@@ -62,6 +62,23 @@ contract StratPaymentService is PaymentService {
             } catch { // Support for legacy sales
                 _saleAddresses[i].call("lockQuantity", quantity);
             }
+            emit Order(
+                _orderHash,
+                _orderId,
+                _purchaser,
+                _purchasersCommonName,
+                seller,
+                _saleAddresses,
+                _quantities,
+                totalAmountGross,
+                0,
+                0,
+                _unitsPerDollar(),
+                "STRAT",
+                PaymentStatus.AWAITING_FULFILLMENT,
+                _createdDate,
+                _comments
+            );
 
             // Calculate gross, net, and fee amounts in dollars
             decimal gross = s.price() * decimal(quantity); 
