@@ -78,7 +78,6 @@ const SoldOrderDetails = ({ user, users }) => {
       if (parseInt(orderDetails.order.status) === 3) {
         const formattedDate = dayjs(orderDetails.order.block_timestamp);
         setSelectedDate(formattedDate);
-        console.log(dayjs(orderDetails.order.block_timestamp))
       } else {
         setSelectedDate(null);
       } 
