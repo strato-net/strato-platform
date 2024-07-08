@@ -123,7 +123,6 @@ constructor (
 
             // Calculate gross, net, and fee amounts in dollars
             decimal gross = s.price() * decimal(quantity); 
-            decimal net = gross;
             decimal fee = 0.0;
             totalAmountGross += gross;
             if (address(a) == address(a.root)) {
@@ -131,7 +130,7 @@ constructor (
             } else {
                 fee = (gross * secondarySaleFeePercentage) / 100;
             }
-            net -= fee;
+            decimal net = gross - fee;
             totalAmountNet += net;
             totalFee += fee;
 
