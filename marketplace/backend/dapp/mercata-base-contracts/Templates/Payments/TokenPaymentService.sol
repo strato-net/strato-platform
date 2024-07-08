@@ -116,9 +116,13 @@ constructor (
 
             // Lock assets
             try {
-                Sale(_saleAddresses[i]).lockQuantity(quantity, _purchaser);
+                s.lockQuantity(quantity, _orderHash, _purchaser);
             } catch { // Support for legacy sales
-                _saleAddresses[i].call("lockQuantity", quantity);
+                try {
+                    address(s).call("lockQuantity", quantity, _purchaser);
+                } catch {
+                    address(s).call("lockQuantity", quantity);
+                }
             }
             emit Order(
                 _orderHash,
@@ -163,9 +167,13 @@ constructor (
 
             // Transfer assets
             try {
-                s.completeSale(_purchaser);
-            } catch { // Support for legacy sales
-                address(s).call("completeSale");
+                s.completeSale(_orderHash, _purchaser);
+            } catch {
+                try {
+                    address(s).call("completeSale", _purchaser);
+                } catch { // Support for legacy sales
+                    address(s).call("completeSale");
+                }
             }
         }
         emit Order(
