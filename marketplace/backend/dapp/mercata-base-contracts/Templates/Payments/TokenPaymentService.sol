@@ -23,7 +23,7 @@ constructor (
         string _serviceName,
         uint _supply,
         uint _decimals,
-        uint _tokensPerDollar,
+        decimal _tokensPerDollar,
         string _imageURL,
         string _checkoutText,
         decimal _primarySaleFeePercentage,
