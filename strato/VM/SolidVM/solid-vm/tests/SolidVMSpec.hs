@@ -8639,7 +8639,7 @@ contract qq {
                       BDecimal "3.123123",
                       BDecimal "-0.876877",
                       BDecimal "2.246246",
-                      BDecimal "0.5615615",
+                      BDecimal "0.561562",
                       BDecimal "-2"
                      ])
 
@@ -8665,7 +8665,7 @@ contract qq {
                       BDecimal "5.3",
                       BDecimal "1.3",
                       BDecimal "6.6",
-                      BDecimal "1.65"
+                      BDecimal "1.6"
                      ])
 
   it "can use decimal literals in expressions" $ runTest ( do
@@ -8705,9 +8705,9 @@ contract qq {
                       BDecimal "0.8",
                       BDecimal "2.1",
                       BDecimal "6.4",
-                      BDecimal "-2.76",
-                      BDecimal "0.869565217391304347826086956521739130434782608695652173913043478260869565217391304347826086956521739130434782608695652173913043478260869565217391304347826086956521739130434782608695652173913043478260869565217391304347826086956521739130434782608695652173913",
-                      BDecimal "2",
+                      BDecimal "-2.8",
+                      BDecimal "0.9",
+                      BDecimal "2.0",
                       BDecimal "6.25"
                      ])
 
@@ -8927,3 +8927,43 @@ contract qq {
   }
 }
 |]) `shouldThrow` anyTypeError
+
+  it "respects the number of decimal places during arithmetic operations" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal a;
+  decimal b;
+  decimal c;
+  decimal d;
+  decimal e;
+  decimal f;
+  decimal g;
+  decimal h;
+  decimal i;
+  decimal j;
+
+  constructor() {
+    a = 1 + 1;
+    b = 1 + 1.0;
+    c = 1 - 0.1;
+    d = 1 - 0.10;
+    e = 1 * 2.00;
+    f = 1.0 * 2.00;
+    g = 3.14159 * 2.5;
+    h = 1.0 / 3;
+    i = 1.00 / 3;
+    j = 1 / 3;
+  }
+}
+|]
+    getFields ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"]
+      `shouldReturn` [BInteger 2, 
+                      BDecimal "2.0",
+                      BDecimal "0.9",
+                      BDecimal "0.90",
+                      BDecimal "2.00",
+                      BDecimal "2.00",
+                      BDecimal "7.85398",
+                      BDecimal "0.3",
+                      BDecimal "0.33",
+                      BDefault])
