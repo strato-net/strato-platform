@@ -170,11 +170,15 @@ async function get(user, args, options) {
   const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
   let order;
 
-  let searchArgs = setSearchQueryOptions( { ...restArgs }, {
-    key: "transaction_hash",
-    value: address,
-  });
-  order = await searchOne(paymentTableName, searchArgs, newOptions, user);
+  let searchArgs = {
+    limit: 1,
+    queryOptions: {
+      transaction_hash: `eq.${address}`,
+      status: 'not.in.(1,5)',
+      select: 'id:id.max(),*',
+    }
+  }
+  order = await searchAllWithQueryArgs(paymentTableName, searchArgs, newOptions, user);
 
   if (!order) {
 

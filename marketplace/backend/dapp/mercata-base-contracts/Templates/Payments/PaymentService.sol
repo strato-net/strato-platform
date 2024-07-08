@@ -16,6 +16,9 @@ abstract contract PaymentService is Utils {
     string public imageURL;
     string public checkoutText;
 
+    decimal public primarySaleFeePercentage;
+    decimal public secondarySaleFeePercentage;
+
     event SellerOnboarded (
         string sellersCommonName,
         bool isActive
@@ -34,7 +37,7 @@ abstract contract PaymentService is Utils {
         uint[] quantities,            // List of quantities for each asset being bought
         decimal amount,               // Total price of the order
         decimal tax,                  // Tax
-        int grossMargin,             // Gross margin used to calcualte cost basis
+        decimal fee,                  // Fee payment (in dollar value)
         decimal unitsPerDollar,       // Amount of units per dollar for the currency (Ex: STRAT is 100 units per dollar)
         string currency,              // The type of currency used for the purchase
         PaymentStatus status,         // Status of the payment
@@ -48,7 +51,9 @@ abstract contract PaymentService is Utils {
     constructor (
         string _serviceName,
         string _imageURL,
-        string _checkoutText
+        string _checkoutText,
+        decimal _primarySaleFeePercentage,
+        decimal _secondaySaleFeePercentage
     ) public {
         owner = msg.sender;
         ownerCommonName = getCommonName(msg.sender);
@@ -62,6 +67,9 @@ abstract contract PaymentService is Utils {
         } else {
             checkoutText = "Checkout with " + serviceName;
         }
+
+        primarySaleFeePercentage = _primarySaleFeePercentage;
+        secondarySaleFeePercentage = _secondaySaleFeePercentage;
     }
 
     modifier requireOwner(string action) {
@@ -83,6 +91,14 @@ abstract contract PaymentService is Utils {
     function transferOwnership(address _newOwner) requireOwner("transfer ownership") external {
         owner = _newOwner;
         ownerCommonName = getCommonName(owner);
+    }
+
+    function updateFees(
+        decimal _primarySaleFeePercentage,
+        decimal _secondaySaleFeePercentage
+    ) requireOwner("update fee percentages") external {
+        primarySaleFeePercentage = _primarySaleFeePercentage;
+        secondarySaleFeePercentage = _secondaySaleFeePercentage;
     }
 
     function deactivate() requireOwner("deactivate the payment service") external {
@@ -175,9 +191,13 @@ abstract contract PaymentService is Utils {
             totalAmount += s.price() * decimal(quantity);
             seller = getCommonName(a.owner());
             try {
-                s.lockQuantity(quantity, _purchaser);
+                s.lockQuantity(quantity, _orderHash, _purchaser);
             } catch { // Support for legacy sales
-                _saleAddresses[i].call("lockQuantity", quantity);
+                try {
+                    address(a).call("unlockQuantity", quantity, _purchaser);
+                } catch {
+                    _saleAddresses[i].call("lockQuantity", quantity);
+                }
             }
         }
         emit Order(
@@ -309,16 +329,27 @@ abstract contract PaymentService is Utils {
         decimal totalAmount = 0;
         address[] assets;
         string seller;
+        decimal totalFee = 0.0;
         for (uint i = 0; i < _saleAddresses.length; i++) {
             Sale s = Sale(_saleAddresses[i]);
             Asset a = s.assetToBeSold();
             assets.push(address(a));
             seller = getCommonName(a.owner());
-            totalAmount += s.price() * _quantities[i];
+            decimal saleAmount = s.price() * _quantities[i];
+            totalAmount += saleAmount;
+            if (address(a) == address(a.root)) {
+                totalFee += (saleAmount * primarySaleFeePercentage) / 100;
+            } else {
+                totalFee += (saleAmount * secondarySaleFeePercentage) / 100;
+            }
             try {
-                s.completeSale(_purchaser);
+                s.completeSale(_orderHash, _purchaser);
             } catch { // Support for legacy sales
-                address(s).call("completeSale");
+                try {
+                    address(a).call("unlockQuantity", _purchaser);
+                } catch {
+                    address(s).call("completeSale");
+                }
             }
         }
         emit Order(
@@ -331,7 +362,7 @@ abstract contract PaymentService is Utils {
             _quantities,
             totalAmount,
             0,
-            0,
+            totalFee,
             _unitsPerDollar(),
             _currency,
             PaymentStatus.CLOSED,
@@ -392,9 +423,13 @@ abstract contract PaymentService is Utils {
             assets.push(address(a));
             seller = getCommonName(a.owner());
             try {
-                s.unlockQuantity(_purchaser);
+                s.unlockQuantity(_orderHash, _purchaser);
             } catch { // Support for legacy sales
-                address(s).call("unlockQuantity");
+                try {
+                    address(a).call("unlockQuantity", _purchaser);
+                } catch {
+                    address(s).call("unlockQuantity");
+                }
             }
         }
         emit Order(

@@ -7,13 +7,25 @@ contract StratPaymentService is PaymentService {
     address public stratAddress;
     decimal public stratsPerDollar;
 
+    address public feeRecipient;
+
     constructor (
         address _stratAddress,
-        uint _stratsPerDollar,
-        string _imageURL
-    ) PaymentService("STRAT", _imageURL, "Checkout with STRAT") public {
+        decimal _stratsPerDollar,
+        string _imageURL,
+        decimal _primarySaleFeePercentage,
+        decimal _secondaySaleFeePercentage,
+        address _feeRecipient
+    ) PaymentService(
+        "STRAT",
+        _imageURL,
+        "Checkout with STRAT",
+        _primarySaleFeePercentage,
+        _secondaySaleFeePercentage
+    ) public {
         stratAddress = _stratAddress;
         stratsPerDollar = _stratsPerDollar;
+        feeRecipient = _feeRecipient;
     }
 
     function _createOrder (
@@ -23,34 +35,87 @@ contract StratPaymentService is PaymentService {
         string _purchasersCommonName,
         address[] _saleAddresses,
         uint[] _quantities,
-        uint _createdDate
+        uint _createdDate,
+        string _comments
     ) internal override returns (string, address[]) {
         address[] assets;
-        decimal totalAmount = 0;
+        decimal totalAmountGross = 0.0;
+        decimal totalAmountNet = 0.0;
+        decimal totalFee = 0.0;
         string seller;
         string err = "Your STRAT balance is not high enough to cover the purchase.";
+        string feeErr = "Your STRAT balance is not high enough to cover the fee.";
         purchasersAddress = msg.sender; // Support for legacy sales
         purchasersCommonName = getCommonName(tx.origin);
+
         for (uint i = 0; i < _saleAddresses.length; i++) {
             Sale s = Sale(_saleAddresses[i]);
             Asset a = s.assetToBeSold();
             assets.push(address(a));
-            uint quantity = _quantities[i];
-            uint amount = uint(s.price() * decimal(quantity) * stratsPerDollar * 100);
-            totalAmount += decimal(amount);
             address sellerAddress = a.owner();
             seller = getCommonName(sellerAddress);
+            uint quantity = _quantities[i];
+
+            // Lock assets
             try {
-                Sale(_saleAddresses[i]).lockQuantity(quantity, _purchaser);
+                s.lockQuantity(quantity, _orderHash, _purchaser);
             } catch { // Support for legacy sales
-                _saleAddresses[i].call("lockQuantity", quantity);
+                try {
+                    address(s).call("lockQuantity", quantity, _purchaser);
+                } catch {
+                    address(s).call("lockQuantity", quantity);
+                }
             }
-            bool success = stratAddress.call("transfer", sellerAddress, amount);
+            emit Order(
+                _orderHash,
+                _orderId,
+                _purchaser,
+                _purchasersCommonName,
+                seller,
+                _saleAddresses,
+                _quantities,
+                totalAmountGross,
+                0,
+                0,
+                _unitsPerDollar(),
+                "STRAT",
+                PaymentStatus.AWAITING_FULFILLMENT,
+                _createdDate,
+                _comments
+            );
+
+            // Calculate gross, net, and fee amounts in dollars
+            decimal gross = s.price() * decimal(quantity); 
+            decimal fee = 0.0;
+            if (address(a) == address(a.root)) {
+                fee = (gross * primarySaleFeePercentage) / 100;
+            } else {
+                fee = (gross * secondarySaleFeePercentage) / 100;
+            }
+            decimal net = gross - fee;
+            totalAmountGross += gross;
+            totalAmountNet += net;
+            totalFee += fee;
+
+            // Calculate net and fee amounts in STRATs
+            uint stratAmountNet = uint(net * stratsPerDollar * 100);
+            uint stratFee = uint(fee * stratsPerDollar * 100);
+
+            // Transfer strats
+            bool success = stratAddress.call("transfer", sellerAddress, stratAmountNet);
             require(success, err);
+            success = stratAddress.call("transfer", feeRecipient, stratFee);
+            require(success, feeErr);
+
+            // Transfer assets
             try {
-                s.completeSale(_purchaser);
-            } catch { // Support for legacy sales
-                address(s).call("completeSale");
+                s.completeSale(_orderHash, _purchaser);
+            } catch {
+                try {
+                    address(s).call("completeSale", _purchaser);
+                } catch { // Support for legacy sales
+                    address(s).call("completeSale");
+                }
             }
         }
         emit Order(
@@ -61,16 +126,24 @@ contract StratPaymentService is PaymentService {
             seller,
             _saleAddresses,
             _quantities,
-            totalAmount,
+            totalAmountGross,
             0,
+            totalFee,
             _unitsPerDollar(),
             "STRAT",
             PaymentStatus.CLOSED,
-            _createdDate
+            _createdDate,
+            _comments
         );
         purchasersAddress = address(0); // Support for legacy sales
         purchasersCommonName = "";
         return (_orderHash, assets);
+    }
+
+    function updateFeeRecipient(
+        address _feeRecipient
+    ) requireOwner("update fee recipient") external {
+        feeRecipient = _feeRecipient;
     }
 
     function _initializePayment (
@@ -81,7 +154,8 @@ contract StratPaymentService is PaymentService {
         address[] _saleAddresses,
         uint[] _quantities,
         string _currency,
-        uint _createdDate
+        uint _createdDate,
+        string _comments
     ) internal override returns (address[]) {
         require(false, "Cannot call initializePayment for STRAT payments.");
         return [];
@@ -95,7 +169,8 @@ contract StratPaymentService is PaymentService {
         address[] _saleAddresses,
         uint[] _quantities,
         string _currency,
-        uint _createdDate
+        uint _createdDate,
+        string _comments
     ) internal override returns (address[]) {
         require(false, "Cannot call completeOrder for STRAT payments.");
         return [];
@@ -109,7 +184,8 @@ contract StratPaymentService is PaymentService {
         address[] _saleAddresses,
         uint[] _quantities,
         string _currency,
-        uint _createdDate
+        uint _createdDate,
+        string _comments
     ) internal override {
         require(false, "Cannot call cancelOrder for STRAT payments.");
     }
