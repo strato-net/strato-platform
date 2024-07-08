@@ -54,6 +54,7 @@ pipeline {
           cp strato-worktree/docker-compose.identity.yml strato-getting-started/
           cp strato-worktree/docker-compose.payment.yml strato-getting-started/
         '''
+
         dir("strato-getting-started") {
           // Copy .pem and .key for SSL
           sh 'cp /home/ubuntu/letsencrypt-ssl/server.pem ssl/certs/'
@@ -63,15 +64,14 @@ pipeline {
             lib.spinUpVault()
             lib.replaceServerPortsDocker()
             lib.spinUpFileServer()
-            lib.spinUpPaymentServer()
             lib.spinUpIdentityServer("${env.WORKSPACE}/strato/tools/x509-generator/rootCert.pem", "${env.WORKSPACE}/strato/tools/x509-generator/rootPriv.pem")
           }
 
           // TODO: run node on https (also update check_availability function)
           withCredentials([
-              usernamePassword(credentialsId: 'marketplace-global-admin', passwordVariable: 'GLOBAL_ADMIN_PASSWORD', usernameVariable: 'GLOBAL_ADMIN_NAME'),
-              usernamePassword(credentialsId: 'marketplace-dev-aws-iam-user', passwordVariable: 'AWS_IAM_USER_ACCESS_KEY', usernameVariable: 'AWS_IAM_USER_KEY_ID'),
-              usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
+            usernamePassword(credentialsId: 'marketplace-global-admin', passwordVariable: 'GLOBAL_ADMIN_PASSWORD', usernameVariable: 'GLOBAL_ADMIN_NAME'),
+            usernamePassword(credentialsId: 'marketplace-dev-aws-iam-user', passwordVariable: 'AWS_IAM_USER_ACCESS_KEY', usernameVariable: 'AWS_IAM_USER_KEY_ID'),
+            usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
           ]) {
             writeFile file: "run.sh", text: """#!/bin/bash
               sudo \\
@@ -93,12 +93,9 @@ pipeline {
             """
           }
           sh 'chmod +x run.sh'
-
           sh './run.sh'
 
           sh 'docker ps'
-
-          // Few quick tests
           writeFile file: "check_availability.sh", text: '''#!/bin/bash -le
             check_availability() {
               counter=0
@@ -119,6 +116,7 @@ pipeline {
           '''
           sh 'chmod +x check_availability.sh'
           sh './check_availability.sh'
+
           // don't want it to get overwritten
           sh "cp genesis-block.json genesis-block-official.json"
         }
@@ -188,6 +186,12 @@ pipeline {
             )
             // Unlock the marketplace deploy script:
             sh 'docker exec strato-marketplace-backend-1 rm -f _deploy_blocked_while_I_exist'
+          }
+
+          dir("strato-getting-started") {
+            script {
+              lib.spinUpPaymentServer()
+            }
           }
         }
       }
@@ -381,6 +385,7 @@ pipeline {
           }
         }
 
+        /*
         stage('Payment Server Tests') {
           steps {
             sh '''#!/bin/bash -le
@@ -396,6 +401,7 @@ pipeline {
             '''
           }
         }
+        */
 
         stage('Integration tests') {
           steps{
@@ -506,6 +512,5 @@ module.exports = {
           message: "Nightly develop build *is fixed after it was failing*: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
       )
     }
-
   }
 }

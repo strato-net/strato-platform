@@ -80,7 +80,6 @@ pipeline {
             lib.spinUpVault()
             lib.replaceServerPortsDocker()
             lib.spinUpFileServer()
-            lib.spinUpPaymentServer()
             lib.spinUpIdentityServer("${env.WORKSPACE}/strato/tools/x509-generator/rootCert.pem", "${env.WORKSPACE}/strato/tools/x509-generator/rootPriv.pem")
           }
 
@@ -184,6 +183,11 @@ pipeline {
             )
             // Unlock the marketplace deploy script:
             sh 'docker exec strato-marketplace-backend-1 rm -f _deploy_blocked_while_I_exist'
+          }
+          dir("strato-getting-started") {
+            script {
+              lib.spinUpPaymentServer()
+            }
           }
         }
       }
