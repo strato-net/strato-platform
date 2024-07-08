@@ -1887,6 +1887,13 @@ tcExpr (FunctionCall x (MemberAccess _ var "derive") args) = do
     (OrderedArgs [], _) -> pure $ bottom $ "derive() requires at least one argument" <$ x
     (OrderedArgs (a : _), _) -> (stringType' x) ~> tcExpr a !> (pure $ topType' x)
     _ -> pure $ bottom $ "derive() does not take named arguments" <$ x
+tcExpr (FunctionCall x (MemberAccess _ var "truncate") args) = do
+  res <- decimalType' x ~> tcExpr var
+  case (args, res) of
+    (_, Bottom _) -> pure $ bottom $ "Can only use truncate() as a method on a decimal number" <$ x
+    (OrderedArgs [], _) -> pure $ bottom $ "truncate() requires at least one argument" <$ x
+    (OrderedArgs (a : _), _) -> (intType' x) ~> tcExpr a !> (pure $ topType' x)
+    _ -> pure $ bottom $ "truncate() does not take named arguments" <$ x
 tcExpr (FunctionCall x expr args) = do
   e <- tcExpr expr
   a <- case args of
