@@ -79,6 +79,7 @@ pipeline {
           // Copy .pem and .key for SSL
           sh 'cp /home/ubuntu/letsencrypt-ssl/server.pem ssl/certs/'
           sh 'cp /home/ubuntu/letsencrypt-ssl/server.key ssl/private/'
+
           script {
             lib.spinUpVault()
             lib.replaceServerPortsDocker()
@@ -111,7 +112,6 @@ pipeline {
                 ./strato --single
             """
           }
-
           sh 'chmod +x run.sh'
           sh './run.sh'
 
@@ -140,6 +140,7 @@ pipeline {
           // don't want it to get overwritten
           sh "cp genesis-block.json genesis-block-official.json"
         }
+
         script {
           lib.generateGenesisBlock('.', 'strato-getting-started', null)
         }
@@ -153,13 +154,14 @@ pipeline {
 
           // Few quick tests
           sh './check_availability.sh'
-          
+
           echo "Restarting docker containers to simulate computer reboot..."
           sh 'docker compose -p strato stop'
           sh 'docker compose -p strato start'
-          
+
           sh './check_availability.sh'
         }
+        
         withCredentials([
           usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
           usernamePassword(credentialsId: 'keycloak-strato-devel-dev-testing1-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEVTESTING1_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEVTESTING1_ID'),
@@ -212,10 +214,9 @@ pipeline {
             }
           }
         }
-
       }
     }
-    
+
     stage('Test & Push') {
       parallel {
         stage(' ') { //sequentially push images then test sync
