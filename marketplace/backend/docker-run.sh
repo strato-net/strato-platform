@@ -6,7 +6,7 @@ export CONFIG_DIR_PATH=/config
 export DEPLOY_FILE_NAME=marketplace.deploy.yaml
 export STRATO_NODE_PROTOCOL=${STRATO_NODE_PROTOCOL:-http}
 export STRATO_NODE_HOST=${STRATO_NODE_HOST:-nginx}
-export BASE_CODE_COLLECTION=${BASE_CODE_COLLECTION:-d979d67877db869f18283e93ea4bf2d256df92d2} # Current deployment address on prod
+export BASE_CODE_COLLECTION=${BASE_CODE_COLLECTION:-e2890e18efc8c1aaea1d7a2ab56c05ca7cf92afb} # Current deployment address on prod
 export STRATO_HOSTNAME=${STRATO_HOSTNAME:-strato}
 export STRATO_PORT_API=${STRATO_PORT_API:-3000}
 
@@ -24,15 +24,9 @@ METADATA=$(curl --silent --fail ${ETH_ENDPOINT}/metadata)
 # Set env vars with values from metadata (exporting and declaring separately - see https://github.com/koalaman/shellcheck/wiki/SC2155)
 networkID=$(echo ${METADATA} | jq -r .networkID)
 export networkID
-STRIPE_PAYMENT_SERVER_URL=$(echo ${METADATA} | jq -r .urls.paymentServer)
-export STRIPE_PAYMENT_SERVER_URL
 if [ -z "${networkID}" ]; then
   echo "Could not get networkID from strato api, but it is a required value"
   exit 19
-fi
-if [ -z "${STRIPE_PAYMENT_SERVER_URL}" ]; then
-  echo "Could not get payment server url from strato api, but it is a required value"
-  exit 20
 fi
 
 # Validate configuration

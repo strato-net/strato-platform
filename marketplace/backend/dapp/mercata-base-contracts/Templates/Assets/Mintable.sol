@@ -2,10 +2,10 @@ pragma es6;
 pragma strict;
 
 import <509>;
-import "UTXO.sol";
+import "Redeemable.sol";
 import "../Enums/RestStatus.sol";
 
-abstract contract Mintable is UTXO {
+abstract contract Mintable is Redeemable {
     uint public mintableMagicNumber = 0x4d696e7461626c65; // 'Mintable'
     address public minterAddress;
     string public minterCommonName;
@@ -19,8 +19,9 @@ abstract contract Mintable is UTXO {
         string[] _fileNames,
         uint _createdDate,
         uint _quantity,
-        AssetStatus _status
-    ) UTXO(
+        AssetStatus _status,
+        address _redemptionService
+    ) Redeemable(
         _name,
         _description,
         _images,
@@ -28,7 +29,8 @@ abstract contract Mintable is UTXO {
         _fileNames,
         _createdDate,
         _quantity,
-        _status
+        _status,
+        _redemptionService
     ) {
         try {
             assert(Mintable(msg.sender).mintableMagicNumber() == mintableMagicNumber);
@@ -44,8 +46,8 @@ abstract contract Mintable is UTXO {
     }
 
     function mint(uint _quantity) internal virtual override returns (UTXO) {
-        Mintable m = new Mintable(name, description, images, files, fileNames, createdDate, _quantity, status);
-        return UTXO(m);
+        Mintable m = new Mintable(name, description, images, files, fileNames, createdDate, _quantity, status, address(redemptionService));
+        return UTXO(address(m));
     }
 
     function mintNewUnits(uint _quantity) public returns (uint) {

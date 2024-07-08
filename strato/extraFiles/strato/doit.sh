@@ -227,9 +227,6 @@ function newnode {
   if [ -n "${FILE_SERVER_URL}" ]; then
       fsFlag="--fileServerUrl=${FILE_SERVER_URL}"
   fi
-  if [ -n "${STRIPE_PAYMENT_SERVER_URL}" ]; then
-      psFlag="--paymentServerUrl=${STRIPE_PAYMENT_SERVER_URL}"
-  fi
 
   if [ "${STRATO_MODE}" != "CLIENT" ]; then
       echo "Starting vm-runner"
@@ -280,8 +277,7 @@ function newnode {
     "${ubFlag}" \
     "${udFlag}" \
     "${fsFlag}" \
-    "${apiFlag}" \
-    "${psFlag}" +RTS -N1 >> logs/strato-api 2>&1
+    "${apiFlag}" +RTS -N1 >> logs/strato-api 2>&1
 
   if [ "${STRATO_MODE}" != "CLIENT" ]; then
       SLIPSTREAM_CMD="slipstream \

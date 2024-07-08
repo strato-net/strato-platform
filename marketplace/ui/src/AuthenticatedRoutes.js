@@ -8,6 +8,7 @@ import Product from "./components/Product";
 import { ProductsProvider } from "./contexts/product";
 import Inventory from "./components/Inventory";
 import { InventoriesProvider } from "./contexts/inventory";
+import { PaymentServicesProvider } from "./contexts/payment";
 import Item from "./components/Item";
 import { ItemsProvider } from "./contexts/item";
 import Order from "./components/Order";
@@ -20,7 +21,6 @@ import { UsersProvider } from "./contexts/users";
 import { UserActivityProvider } from "./contexts/userActivity";
 import AuthorizeIssuer from "./components/AuthorizeIssuer";
 import { IssuerStatusProvider } from "./contexts/issuerStatus";
-import OnboardingIntermediate from "./components/Inventory/OnboardingIntermediate";
 import ProductDetails from "./components/MarketPlace/ProductDetails";
 import Checkout from "./components/MarketPlace/Checkout";
 import ConfirmOrder from "./components/MarketPlace/ConfirmOrder";
@@ -65,7 +65,9 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
             <CategorysProvider>
               <OrdersProvider>
                 <InventoriesProvider>
-                  <Checkout />
+                  <PaymentServicesProvider>
+                    <Checkout />
+                  </PaymentServicesProvider>
                 </InventoriesProvider>
               </OrdersProvider>
             </CategorysProvider>
@@ -80,7 +82,9 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
             <CategorysProvider>
               <OrdersProvider>
                 <InventoriesProvider>
+                  <PaymentServicesProvider>
                   <ConfirmOrder user={user} users={users} />
+                  </PaymentServicesProvider>
                 </InventoriesProvider>
               </OrdersProvider>
             </CategorysProvider>
@@ -184,9 +188,11 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
                   <ProductsProvider>
                     <InventoriesProvider>
                       <RedemptionsProvider>
-                        <IssuerStatusProvider>
-                          <Inventory user={user} users={users} />
-                        </IssuerStatusProvider>
+                        <PaymentServicesProvider>
+                          <IssuerStatusProvider>
+                            <Inventory user={user} users={users} />
+                          </IssuerStatusProvider>
+                        </PaymentServicesProvider>
                       </RedemptionsProvider>
                     </InventoriesProvider>
                   </ProductsProvider>
@@ -233,17 +239,6 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
                 </InventoriesProvider>
               </SubCategorysProvider>
             </CategorysProvider>
-          </UsersProvider>
-        }
-      />
-      <Route
-        exact
-        path={routes.OnboardingSellerToStripe.url}
-        element={
-          <UsersProvider>
-            <InventoriesProvider>
-              <OnboardingIntermediate user={user} users={users} />
-            </InventoriesProvider>
           </UsersProvider>
         }
       />

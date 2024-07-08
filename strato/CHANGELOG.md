@@ -16,6 +16,17 @@ so that they could be properly moved to their respective version's subsection.
 
 ## [Unreleased] 
 ### Added
+
+### Changed
+- In Slipstream, index arrays in event tables within the event table, otherwise index them in a separate array table.
+
+### Fixed
+
+### Removed
+- Removed strato-api paymentServerUrl flag
+
+## [11.3.0] - 7/2/2024
+### Added
 - <address>.nonce accessor in SolidVM
 - Upgraded PostgREST to version 12.0
 - Support for `decimal` numbers type

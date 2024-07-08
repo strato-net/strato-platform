@@ -46,9 +46,11 @@ export const ResponsiveRedemptionsCard = ({ data, isLoading, category }) => {
                             <Typography
                                 onClick={() => {
                                     if (category === "outgoing") {
-                                        navigate(routes.RedemptionsOutgoingDetails.url.replace(":id", item.key));
+                                        navigate(routes.RedemptionsOutgoingDetails.url.replace(":id", item.key)
+                                                       .replace(":redemptionService", item.redemptionService));
                                     } else {
-                                        navigate(routes.RedemptionsIncomingDetails.url.replace(":id", item.key))
+                                        navigate(routes.RedemptionsIncomingDetails.url.replace(":id", item.key)
+                                                       .replace(":redemptionService", item.redemptionService));
                                     }
                                 }}
                                 className={`text-[#13188A] cursor-pointer`}
@@ -77,9 +79,11 @@ export const ResponsiveRedemptionsCard = ({ data, isLoading, category }) => {
                         <Button
                             onClick={() => {
                                 if (category === "outgoing") {
-                                    navigate(routes.RedemptionsOutgoingDetails.url.replace(":id", item.key));
+                                    navigate(routes.RedemptionsOutgoingDetails.url.replace(":id", item.key)
+                                                   .replace(":redemptionService", item.redemptionService));
                                 } else {
-                                    navigate(routes.RedemptionsIncomingDetails.url.replace(":id", item.key))
+                                    navigate(routes.RedemptionsIncomingDetails.url.replace(":id", item.key)
+                                                   .replace(":redemptionService", item.redemptionService));
                                 }
                             }}
                             className="w-1/3 text-blue border-blue cursor-pointer"

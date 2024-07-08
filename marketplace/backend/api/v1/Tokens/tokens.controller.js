@@ -45,6 +45,7 @@ class TokensController {
         images: Joi.array().items(Joi.string()).required(),
         files: Joi.array().items(Joi.string()).required(),
         fileNames: Joi.array().items(Joi.string()).required(),
+        redemptionService: Joi.string().required(),
       }).required()
     });
 

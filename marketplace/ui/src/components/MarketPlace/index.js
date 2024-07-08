@@ -13,6 +13,9 @@ import { Carousel } from "react-responsive-carousel";
 import { Fade } from "react-awesome-reveal";
 import HelmetComponent from "../Helmet/HelmetComponent";
 import { SEO } from "../../helpers/seoConstant";
+import { BANNER } from "../../helpers/constants";
+import { bannerArrow } from "../../images/SVGComponents";
+
 
 const MarketPlace = ({ user, isAuthenticated }) => {
   const limit = 10, offset = 0;
@@ -20,7 +23,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
   const dispatch = useCategoryDispatch();
   const debouncedSearchTerm = useDebounce("", 1000);
   const { iscategorysLoading } = useCategoryState();
-  
+
   useEffect(() => {
     if (isAuthenticated) {
       const loginCount = localStorage.getItem('loginCount');
@@ -35,7 +38,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
               type="primary"
               onClick={() => navigateToUserProfile()}
               style={{
-                borderRadius: '20px', 
+                borderRadius: '20px',
                 color: '#fff',
               }}
             >
@@ -62,144 +65,98 @@ const MarketPlace = ({ user, isAuthenticated }) => {
   }, [dispatch, limit, offset, debouncedSearchTerm]);
 
   const linkUrl = window.location.href;
-  const metaImg = SEO.IMAGE_META
   const navRoute = routes.MarketplaceCategoryProductList.url.replace(':category', 'All');
-  
+
+  const ButtonElement = ({ desktopText, mobileText }) => <div className="relative flex top-[156px] sm:top-[250px] xl:top-[65%] 3xl:top-[70%] left-[4%] sm:left-[7.5%] md:left-[7%] md:top-60 z-50">
+    <Button
+      id="viewMore"
+      onClick={() => {
+        navigate(navRoute);
+        sessionStorage.setItem('scrollPosition', 0);
+      }}
+      className="gradient-button border-0 h-auto md:h-11 border-primary bg-white text-primary hover:text-white"
+    >
+      <div className="flex items-center">
+        <div className="hidden sm:block font-semibold text-lg">
+          {desktopText}
+        </div>
+        <div className="sm:hidden font-semibold text-base">
+          {mobileText}
+        </div>
+        <span className="ml-1">{bannerArrow}</span>
+      </div>
+    </Button>
+  </div>
+
+  const CarouselElement = ({ scrollT }) =>
+    <Carousel autoPlay centerSlidePercentage={95} showArrows={false} infiniteLoop showStatus={false} swipeable emulateTouch autoFocus centerMode
+      preventMovementUntilSwipeScrollTolerance={true} swipeScrollTolerance={scrollT}
+    >
+      {BANNER.map((item, index) => (
+        <div key={index} className="no-select relative p-2 h-[222px] sm:h-[380px] 3xl:h-[480px] mx-1 md:mx-2 md:mt-6 lg:mx-3">
+          <ButtonElement desktopText={item.desktopText} mobileText={item.mobileText} />
+            {item.text}
+          <div className="sm:hidden">
+            <img
+              alt={item.alt}
+              title={item.title}
+              className="no-select absolute inset-0 z-10 h-[222px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+              height={380}
+              width="100%"
+              src={item.mobileImg}
+              preview={false}
+            />
+          </div>
+          <div className="hidden sm:block md:hidden">
+            <img
+              alt={item.alt}
+              title={item.title}
+              className="no-select absolute inset-0 z-10 h-[380px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+              height={380}
+              width="100%"
+              src={item.tabletImg}
+              preview={false}
+            />
+          </div>
+          <div className="hidden md:block lg:hidden">
+            <img
+              alt={item.alt}
+              title={item.title}
+              className="no-select absolute inset-0 z-10 md:h-[330px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+              height={380}
+              width="100%"
+              src={item.laptopImg}
+              preview={false}
+            />
+          </div>
+          <div className="hidden lg:block">
+            <img
+              alt={item.alt}
+              title={item.title}
+              className="no-select absolute inset-0 z-10 lg:h-[330px] 3xl:h-[480px] md:w-[90%] rounded-md md:rounded-[14px] drop-shadow-md"
+              height={380}
+              width="100%"
+              src={item.desktopImg}
+              preview={false}
+            />
+          </div>
+        </div>
+      ))}
+    </Carousel>
+
   return (
     <>
-    <HelmetComponent 
-          title={SEO.TITLE_META}
-          description={SEO.DESCRIPTION_META} 
-          link={linkUrl} />
-    <Fade triggerOnce>
-      <Carousel autoPlay centerSlidePercentage={95} showArrows={false} infiniteLoop showStatus={false} swipeable emulateTouch autoFocus centerMode>
-        <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2 md:mt-6 lg:mx-3">
-          <div  className="flex flex-col gap-3 backdrop-blur-2xl text-left p-4 px-3 md:px-8 h-[67%] sm:h-32 md:h-40 w-[92%] sm:w-[70%] md:w-[500px] rounded-md md:rounded-2xl absolute left-2 md:left-10 top-10 sm:top-20 md:top-44 bg-[rgba(256,256,256,0.17)] z-50">
-            <Typography.Text className="text-base md:text-2xl md:leading-[40px] text-white font-semibold">
-              Welcome to Mercata Marketplace!
-            </Typography.Text>
-            <Typography.Text className="md:text-sm text-white pr-0">
-              Explore trending real-world assets
-            </Typography.Text>
-            <Button
-              id="viewMore"
-              onClick={() => {
-                navigate(navRoute);
-                sessionStorage.setItem('scrollPosition', 0);
-              }}
-              className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
-              <div className="text-primary font-semibold md:text-lg">
-                View More
-              </div>
-            </Button>
-          </div>
-          <img 
-          alt={metaImg}
-          title={metaImg}
-          className="absolute inset-0 z-10 h-[222px] md:h-[380px] md:w-[90%] rounded-md md:rounded-[14px]" 
-          height={380} width="100%" src={Images.art_card} preview={false} />
+      <HelmetComponent
+        title={SEO.TITLE_META}
+        description={SEO.DESCRIPTION_META}
+        link={linkUrl} />
+      <Fade triggerOnce>
+        <div className="hidden md:block">
+          <CarouselElement scrollT={130} />
         </div>
-        <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2  md:mt-6 lg:mx-3">
-          <div  className="flex flex-col gap-3 backdrop-blur-2xl text-left p-4 px-3 md:px-8 h-[67%] sm:h-32 md:h-40 w-[92%] sm:w-[70%] md:w-[500px] rounded-md md:rounded-2xl absolute left-2 md:left-10 top-10 sm:top-20 md:top-44 bg-[rgba(256,256,256,0.17)] z-50">
-            <Typography.Text className="text-base md:text-2xl md:leading-[40px] text-white font-semibold">
-              Welcome to Mercata Marketplace!
-            </Typography.Text>
-            <Typography.Text className="md:text-sm text-white pr-0">
-              Explore trending real-world assets
-            </Typography.Text>
-            <Button
-              id="viewMore"
-              onClick={() => {
-                navigate(navRoute);
-                sessionStorage.setItem('scrollPosition', 0);              
-              }}
-              className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
-              <div className="text-primary font-semibold md:text-lg">
-                View More
-              </div>
-            </Button>
-          </div>
-          <img 
-          alt={metaImg}
-          title={metaImg}
-          className="absolute inset-0 z-10 h-[222px] md:h-[380px] md:w-[90%] rounded-md md:rounded-[14px]" height={380} width="100%" src={Images.carousel_first} preview={false} />
+        <div className="md:hidden">
+          <CarouselElement scrollT={50} />
         </div>
-        <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2  md:mt-6 lg:mx-3">
-          <div  className="flex flex-col gap-3 backdrop-blur-2xl text-left p-4 px-3 md:px-8 h-[67%] sm:h-32 md:h-40 w-[92%] sm:w-[70%] md:w-[500px] rounded-md md:rounded-2xl absolute left-2 md:left-10 top-10 sm:top-20 md:top-44 bg-[rgba(256,256,256,0.17)] z-50">
-            <Typography.Text className="text-base md:text-2xl md:leading-[40px] text-white font-semibold">
-              Welcome to Mercata Marketplace!
-            </Typography.Text>
-            <Typography.Text className="md:text-sm text-white pr-0">
-              Explore trending real-world assets
-            </Typography.Text>
-            <Button
-              id="viewMore"
-              onClick={() => {
-                navigate(navRoute);
-                sessionStorage.setItem('scrollPosition', 0);              
-              }}
-              className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
-              <div className="text-primary font-semibold md:text-lg">
-                View More
-              </div>
-            </Button>
-          </div>
-          <img 
-          alt={metaImg}
-          title={metaImg}
-          className="absolute inset-0 z-10 h-[222px] md:h-[380px] md:w-[90%] rounded-md md:rounded-[14px]" height={380} width="100%" src={Images.carbon_card} preview={false} />
-        </div>
-        <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2  md:mt-6 lg:mx-3">
-          <div  className="flex flex-col gap-3 backdrop-blur-2xl text-left p-4 px-3 md:px-8 h-[67%] sm:h-32 md:h-40 w-[92%] sm:w-[70%] md:w-[500px] rounded-md md:rounded-2xl absolute left-2 md:left-10 top-10 sm:top-20 md:top-44 bg-[rgba(256,256,256,0.17)] z-50">
-            <Typography.Text className="text-base md:text-2xl md:leading-[40px] text-white font-semibold">
-              Welcome to Mercata Marketplace!
-            </Typography.Text>
-            <Typography.Text className="md:text-sm text-white pr-0">
-              Explore trending real-world assets
-            </Typography.Text>
-            <Button
-              id="viewMore"
-              onClick={() => {
-                navigate(navRoute);
-                sessionStorage.setItem('scrollPosition', 0);              
-              }}
-              className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
-              <div className="text-primary font-semibold md:text-lg">
-                View More
-              </div>
-            </Button>
-          </div>
-          <img 
-          alt={metaImg}
-          title={metaImg}
-          className="absolute inset-0 object-cover z-10 h-[222px] md:h-[380px] md:w-[90%] rounded-md md:rounded-[14px]" height={380} width="100%" src={Images.Metal_card} preview={false} />
-        </div>
-        <div className="relative p-2 h-[222px] md:h-[380px] mx-1 md:mx-2  md:mt-6 lg:mx-3">
-          <div  className="flex flex-col gap-3 backdrop-blur-2xl text-left p-4 px-3 md:px-8 h-[67%] sm:h-32 md:h-40 w-[92%] sm:w-[70%] md:w-[500px] rounded-md md:rounded-2xl absolute left-2 md:left-10 top-10 sm:top-20 md:top-44 bg-[rgba(256,256,256,0.17)] z-50">
-            <Typography.Text className="text-base md:text-2xl md:leading-[40px] text-white font-semibold">
-              Welcome to Mercata Marketplace!
-            </Typography.Text>
-            <Typography.Text className="md:text-sm text-white pr-0">
-              Explore trending real-world assets
-            </Typography.Text>
-            <Button
-              id="viewMore"
-              onClick={() => {
-                navigate(navRoute);
-                sessionStorage.setItem('scrollPosition', 0);              
-              }}
-              className="group w-[106px] md:w-[135px] h-8 md:h-11 border border-primary bg-white opacity-80">
-              <div className="text-primary font-semibold md:text-lg">
-                View More
-              </div>
-            </Button>
-          </div>
-          <img 
-          alt={metaImg}
-          title={metaImg}
-          className="absolute inset-0 object-cover z-10 h-[222px] md:h-[380px] md:w-[90%] rounded-md md:rounded-[14px]" height={380} width="100%" src={Images.collectibles} preview={false} />
-        </div>
-      </Carousel>
       </Fade>
       {iscategorysLoading ? (
         <div className="h-96 flex justify-center items-center">

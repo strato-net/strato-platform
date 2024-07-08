@@ -59,4 +59,30 @@ export const Images = {
   'Remove_filter' : require('./resources/remove-filter.png'),
   'calender' : require('./resources/Calendar.png'),
   'logo_white' : require('./resources/logo_white.png'),
+
+  'CollectiblesX394': require("./resources/Banner/CollectiblesX394.png"),
+  'CollectiblesX768': require("./resources/Banner/CollectiblesX768.png"),
+  'CollectiblesX1440': require("./resources/Banner/CollectiblesX1440.png"),
+  'CollectiblesX1600': require("./resources/Banner/CollectiblesX1600.png"),
+
+  'ClothingX394': require("./resources/Banner/ClothingX394.png"),
+  'ClothingX768': require("./resources/Banner/ClothingX768.png"),
+  'ClothingX1440': require("./resources/Banner/ClothingX1440.png"),
+  'ClothingX1600': require("./resources/Banner/ClothingX1600.png"),
+
+  'MetalX394': require("./resources/Banner/MetalX394.png"),
+  'MetalX768': require("./resources/Banner/MetalX768.png"),
+  'MetalX1440': require("./resources/Banner/MetalX1440.png"),
+  'MetalX1600': require("./resources/Banner/MetalX1600.png"),
+
+  'TokenX394': require("./resources/Banner/TokenX394.png"),
+  'TokenX768': require("./resources/Banner/TokenX768.png"),
+  'TokenX1440': require("./resources/Banner/TokenX1440.png"),
+  'TokenX1600': require("./resources/Banner/TokenX1600.png"),
+
+  'HowX394': require("./resources/Banner/HowX394.png"),
+  'HowX768': require("./resources/Banner/HowX768.png"),
+  'HowX1440': require("./resources/Banner/HowX1440.png"),
+  'HowX1600': require("./resources/Banner/HowX1600.png"),
+
 };
