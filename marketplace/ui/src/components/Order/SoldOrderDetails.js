@@ -74,12 +74,14 @@ const SoldOrderDetails = ({ user, users }) => {
         setPaid("Canceled");
       }
       setComment(orderDetails.order.comments);
-      // Fulfillment date is sometimes coming in as 0. a unix of 0 sets the date to 1969. So we need to check for 0 and null, I added undefined just in case too. 
-      if (orderDetails.order.fulfillmentDate === 0 || orderDetails.order.fulfillmentDate === null || orderDetails.order.fulfillmentDate === undefined) {
-        setSelectedDate(null);
+      // Order Close Date is represented by block_timestamp when the Order Status is 3(CLOSED). This is consistent across legacy orders and new orders as there wouldn't be updates/methods invoked when the Order Status reaches Closed.
+      if (parseInt(orderDetails.order.status) === 3) {
+        const formattedDate = dayjs(orderDetails.order.block_timestamp);
+        setSelectedDate(formattedDate);
+        console.log(dayjs(orderDetails.order.block_timestamp))
       } else {
-        setSelectedDate(dayjs.unix(orderDetails.order.fulfillmentDate));
-      }
+        setSelectedDate(null);
+      } 
 
       let items = [];
       const orderQuantities = orderDetails.order.quantities ? orderDetails.order.quantities : orderDetails.order["BlockApps-Mercata-Order-quantities"].map(item => item.value);
