@@ -162,6 +162,7 @@ constructor (
             totalAmountGross,
             0,
             totalFee,
+            0, // gross margin
             _unitsPerDollar(),
             serviceName,
             PaymentStatus.CLOSED,

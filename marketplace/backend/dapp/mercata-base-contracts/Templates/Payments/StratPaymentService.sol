@@ -11,7 +11,7 @@ contract StratPaymentService is PaymentService {
 
     constructor (
         address _stratAddress,
-        uint _stratsPerDollar,
+        decimal _stratsPerDollar,
         string _imageURL,
         decimal _primarySaleFeePercentage,
         decimal _secondaySaleFeePercentage,
@@ -104,6 +104,7 @@ contract StratPaymentService is PaymentService {
             totalAmountGross,
             0,
             totalFee,
+            0, // gross margin
             _unitsPerDollar(),
             "STRAT",
             PaymentStatus.CLOSED,
