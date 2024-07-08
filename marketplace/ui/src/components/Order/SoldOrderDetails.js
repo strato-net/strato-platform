@@ -74,8 +74,8 @@ const SoldOrderDetails = ({ user, users }) => {
         setPaid("Canceled");
       }
       setComment(orderDetails.order.comments);
-      // Order Close Date is represented by block_timestamp when the Order Status is 3(CLOSED). This is consistent across legacy orders and new orders as there wouldn't be updates/methods invoked when the Order Status reaches Closed.
-      if (parseInt(orderDetails.order.status) === 3) {
+      // Order Close Date is represented by block_timestamp when the Order Status is 3(CLOSED) or 4(CANCELED). This is consistent across legacy orders and new orders as there wouldn't be updates/methods invoked when the Order Status reaches Closed.
+      if (parseInt(orderDetails.order.status) === 3 || parseInt(orderDetails.order.status) === 4) {
         const formattedDate = dayjs(orderDetails.order.block_timestamp);
         setSelectedDate(formattedDate);
       } else {
