@@ -12,7 +12,7 @@ abstract contract Sale is Utils {
     uint public quantity;
     address[] public paymentProviders;
     mapping (address => uint) paymentProvidersMap;
-    mapping (address => mapping (address => uint)) lockedQuantity;
+    mapping (string => uint) lockedQuantity;
     uint totalLockedQuantity;
     bool isOpen;
 
@@ -57,6 +57,17 @@ abstract contract Sale is Utils {
         _;
     }
 
+    function getLock (
+        string _orderHash,
+        address _purchaser
+    ) internal returns (string) {
+        return keccak256(
+            string(this),
+            _orderHash,
+            string(_purchaser)
+        );
+    }
+
     function changePrice(decimal _price) public requireSeller("change price"){
         price=_price;
     }
@@ -93,9 +104,10 @@ abstract contract Sale is Utils {
     }
 
     function completeSale(
+        string orderHash,
         address purchaser
     ) public requirePaymentProvider("complete sale") returns (uint) {
-        uint orderQuantity = takeLockedQuantity(purchaser);
+        uint orderQuantity = takeLockedQuantity(orderHash, purchaser);
         // regular transfer - isUserTransfer: false, transferNumber: 0, transferPrice: 0
         try {
             assetToBeSold.transferOwnership(purchaser, orderQuantity, false, 0, 0);
@@ -148,38 +160,44 @@ abstract contract Sale is Utils {
 
     function lockQuantity(
         uint quantityToLock,
+        string orderHash,
         address purchaser
     ) requirePaymentProvider("lock quantity") public {
         require(quantityToLock <= quantity, "Not enough quantity to lock");
-        require(lockedQuantity[msg.sender][purchaser] == 0, "Order has already locked quantity in this asset.");
+        string lock = getLock(orderHash, purchaser);
+        require(lockedQuantity[lock] == 0, "Order has already locked quantity in this asset.");
         quantity -= quantityToLock;
-        lockedQuantity[msg.sender][purchaser] = quantityToLock;
+        lockedQuantity[lock] = quantityToLock;
         totalLockedQuantity += quantityToLock;
     }
 
-    function takeLockedQuantity(address orderAddress) internal returns (uint) {
-        uint quantityToUnlock = lockedQuantity[msg.sender][orderAddress];
-        require(quantityToUnlock > 0, "There are no quantity to unlock for address " + string(orderAddress));
-        lockedQuantity[msg.sender][orderAddress] = 0;
+    function takeLockedQuantity(string orderHash, address purchaser) internal returns (uint) {
+        string lock = getLock(orderHash, purchaser);
+        uint quantityToUnlock = lockedQuantity[lock];
+        require(quantityToUnlock > 0, "There are no quantity to unlock for address " + string(purchaser));
+        lockedQuantity[lock] = 0;
         totalLockedQuantity -= quantityToUnlock;
         return quantityToUnlock;
     }
 
-    function getLockedQuantity(address orderAddress) public returns (uint) {
-        return lockedQuantity[msg.sender][orderAddress];
+    function getLockedQuantity(string orderHash, address purchaser) public returns (uint) {
+        string lock = getLock(orderHash, purchaser);
+        return lockedQuantity[lock];
     }
 
     function unlockQuantity(
+        string orderHash,
         address purchaser
     ) requireSellerOrPaymentProvider("unlock quantity") public {
-        uint quantityToReturn = takeLockedQuantity(purchaser);
+        uint quantityToReturn = takeLockedQuantity(orderHash, purchaser);
         quantity += quantityToReturn;
     }
 
     function cancelOrder(
+        string orderHash,
         address purchaser
     ) public requireSellerOrPaymentProvider("cancel order") returns (uint) {
-        unlockQuantity(purchaser);
+        unlockQuantity(orderHash, purchaser);
         return RestStatus.OK;
     }
 

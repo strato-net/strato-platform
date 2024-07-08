@@ -191,9 +191,13 @@ abstract contract PaymentService is Utils {
             totalAmount += s.price() * decimal(quantity);
             seller = getCommonName(a.owner());
             try {
-                s.lockQuantity(quantity, _purchaser);
+                s.lockQuantity(quantity, _orderHash, _purchaser);
             } catch { // Support for legacy sales
-                _saleAddresses[i].call("lockQuantity", quantity);
+                try {
+                    address(a).call("unlockQuantity", quantity, _purchaser);
+                } catch {
+                    _saleAddresses[i].call("lockQuantity", quantity);
+                }
             }
         }
         emit Order(
@@ -339,9 +343,13 @@ abstract contract PaymentService is Utils {
                 totalFee += (saleAmount * secondarySaleFeePercentage) / 100;
             }
             try {
-                s.completeSale(_purchaser);
+                s.completeSale(_orderHash, _purchaser);
             } catch { // Support for legacy sales
-                address(s).call("completeSale");
+                try {
+                    address(a).call("unlockQuantity", _purchaser);
+                } catch {
+                    address(s).call("completeSale");
+                }
             }
         }
         emit Order(
@@ -415,9 +423,13 @@ abstract contract PaymentService is Utils {
             assets.push(address(a));
             seller = getCommonName(a.owner());
             try {
-                s.unlockQuantity(_purchaser);
+                s.unlockQuantity(_orderHash, _purchaser);
             } catch { // Support for legacy sales
-                address(s).call("unlockQuantity");
+                try {
+                    address(a).call("unlockQuantity", _purchaser);
+                } catch {
+                    address(s).call("unlockQuantity");
+                }
             }
         }
         emit Order(
