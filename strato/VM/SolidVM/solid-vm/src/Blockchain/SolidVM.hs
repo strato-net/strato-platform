@@ -2989,7 +2989,9 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
   let !theModifiers = catMaybes theModifiers'
 
   -- check the signature
-  unlessM (validateFunctionArguments theFunction argVals) $ do
+  let pragmaCheck = isJust $ find ((== "typecheck") . fst) $ CC._pragmas cc
+  when pragmaCheck $ do
+   unlessM (validateFunctionArguments theFunction argVals) $
     typeError
       "the argument values do not match up with the function signature" 
       (let valList' = case argVals of OrderedVals xs -> xs; NamedVals ys -> map snd ys 
