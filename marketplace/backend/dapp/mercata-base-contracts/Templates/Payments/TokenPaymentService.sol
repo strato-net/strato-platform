@@ -17,18 +17,36 @@ contract TokenPaymentService is PaymentService {
     decimal public tokensPerDollar;
     mapping (string => uint) public record balances;
 
-    constructor (
+    string public feeRecipient;
+
+constructor (
         string _serviceName,
         uint _supply,
         uint _decimals,
         uint _tokensPerDollar,
         string _imageURL,
-        string _checkoutText
-    ) PaymentService(_serviceName, _imageURL, _checkoutText) public {
+        string _checkoutText,
+        decimal _primarySaleFeePercentage,
+        decimal _secondaySaleFeePercentage,
+        string _feeRecipient
+    ) PaymentService(
+        _serviceName,
+        _imageURL,
+        _checkoutText,
+        _primarySaleFeePercentage,
+        _secondaySaleFeePercentage
+    ) public {
         decimals = _decimals;
         reserve = _supply * (10 ** decimals);
         tokensPerDollar = _tokensPerDollar;
+        feeRecipient = _feeRecipient;
         emit Receipt(ReceiptType.MINT, "", "", _supply, block.timestamp);
+    }
+
+    function updateFeeRecipient(
+        string _feeRecipient
+    ) requireOwner("update fee recipient") external {
+        feeRecipient = _feeRecipient;
     }
 
     // OWNER/PROVIDER FUNCTIONS
@@ -80,26 +98,54 @@ contract TokenPaymentService is PaymentService {
         string _comments
     ) internal override returns (string, address[]) {
         address[] assets;
-        decimal totalAmount = 0;
+        decimal totalAmountGross = 0.0;
+        decimal totalAmountNet = 0.0;
+        decimal totalFee = 0.0;
         string seller;
         string err = "Your " + serviceName + " balance is not high enough to cover the purchase.";
+        string feeErr = "Your " + serviceName + " balance is not high enough to cover the fee.";
         purchasersAddress = msg.sender; // Support for legacy sales
         purchasersCommonName = getCommonName(tx.origin);
+
         for (uint i = 0; i < _saleAddresses.length; i++) {
             Sale s = Sale(_saleAddresses[i]);
             Asset a = s.assetToBeSold();
             assets.push(address(a));
-            uint quantity = _quantities[i];
-            uint amount = uint(s.price() * decimal(quantity) * tokensPerDollar * (10 ** decimals));
-            totalAmount += decimal(amount);
             seller = getCommonName(a.owner());
+            uint quantity = _quantities[i];
+
+            // Lock assets
             try {
                 Sale(_saleAddresses[i]).lockQuantity(quantity, _purchaser);
             } catch { // Support for legacy sales
                 _saleAddresses[i].call("lockQuantity", quantity);
             }
-            bool success = transfer(seller, amount);
+
+            // Calculate gross, net, and fee amounts in dollars
+            decimal gross = s.price() * decimal(quantity); 
+            decimal net = gross;
+            decimal fee = 0.0;
+            totalAmountGross += gross;
+            if (address(a) == address(a.root)) {
+                fee = (gross * primarySaleFeePercentage) / 100;
+            } else {
+                fee = (gross * secondarySaleFeePercentage) / 100;
+            }
+            net -= fee;
+            totalAmountNet += net;
+            totalFee += fee;
+
+            // Calculate net and fee amounts in tokens
+            uint tokenAmountNet = uint(net * tokensPerDollar * (10 ** decimals));
+            uint tokenFee = uint(fee * tokensPerDollar * (10 ** decimals));
+
+            // Transfer tokens
+            bool success = transfer(seller, tokenAmountNet);
             require(success, err);
+            success = transfer(feeRecipient, tokenFee);
+            require(success, feeErr);
+
+            // Transfer assets
             try {
                 s.completeSale(_purchaser);
             } catch { // Support for legacy sales
@@ -114,8 +160,9 @@ contract TokenPaymentService is PaymentService {
             seller,
             _saleAddresses,
             _quantities,
-            totalAmount,
+            totalAmountGross,
             0,
+            totalFee,
             _unitsPerDollar(),
             serviceName,
             PaymentStatus.CLOSED,
