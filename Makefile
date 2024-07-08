@@ -37,7 +37,7 @@ build_all: strato apex highway highway-nginx nginx postgrest prometheus smd mark
 
 build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx hydra-nginx identity-provider identity-nginx stripe-ps stripe-ps-nginx
 
-.PHONY: strato apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx hydra-nginx identity-provider identity-nginx stripe-ps stripe-ps-nginx build_buildbase build_common build_common_profiled eks
+.PHONY: strato apex highway highway-nginx ory nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx hydra-nginx identity-provider identity-nginx stripe-ps stripe-ps-nginx build_buildbase build_common build_common_profiled eks
 
 apex:
 	@echo Now building apex...
@@ -171,6 +171,9 @@ vault-nginx:
 hydra-nginx:
 	@echo Now building hydra-nginx...
 	BASIL_DOCKER_TAG=${REPO_URL}hydra-nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}hydra-nginx:${VERSION} make --directory=hydra-nginx/
+
+ory:
+	cd ory && stack install
 
 identity-provider: build_common
 	@echo Now building Identity Server...
