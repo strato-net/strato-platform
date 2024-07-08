@@ -38,7 +38,6 @@ abstract contract PaymentService is Utils {
         decimal amount,               // Total price of the order
         decimal tax,                  // Tax
         decimal fee,                  // Fee payment (in dollar value)
-        int grossMargin,             // Gross margin used to calcualte cost basis
         decimal unitsPerDollar,       // Amount of units per dollar for the currency (Ex: STRAT is 100 units per dollar)
         string currency,              // The type of currency used for the purchase
         PaymentStatus status,         // Status of the payment
@@ -208,7 +207,6 @@ abstract contract PaymentService is Utils {
             totalAmount,
             0,
             0,
-            0,
             _unitsPerDollar(),
             "",
             PaymentStatus.AWAITING_FULFILLMENT,
@@ -275,7 +273,6 @@ abstract contract PaymentService is Utils {
             _saleAddresses,
             _quantities,
             totalAmount,
-            0,
             0,
             0,
             _unitsPerDollar(),
@@ -358,7 +355,6 @@ abstract contract PaymentService is Utils {
             totalAmount,
             0,
             totalFee,
-            0,
             _unitsPerDollar(),
             _currency,
             PaymentStatus.CLOSED,
@@ -433,7 +429,6 @@ abstract contract PaymentService is Utils {
             _saleAddresses,
             _quantities,
             totalAmount,
-            0,
             0,
             0,
             _unitsPerDollar(),

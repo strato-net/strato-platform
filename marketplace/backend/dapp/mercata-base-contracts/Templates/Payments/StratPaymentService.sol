@@ -104,7 +104,6 @@ contract StratPaymentService is PaymentService {
             totalAmountGross,
             0,
             totalFee,
-            0, // gross margin
             _unitsPerDollar(),
             "STRAT",
             PaymentStatus.CLOSED,
