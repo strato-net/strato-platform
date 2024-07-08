@@ -160,7 +160,7 @@ abstract contract Sale is Utils {
 
     function lockQuantity(
         uint quantityToLock,
-        string orderHash
+        string orderHash,
         address purchaser
     ) requirePaymentProvider("lock quantity") public {
         require(quantityToLock <= quantity, "Not enough quantity to lock");
@@ -174,14 +174,15 @@ abstract contract Sale is Utils {
     function takeLockedQuantity(string orderHash, address purchaser) internal returns (uint) {
         string lock = getLock(orderHash, purchaser);
         uint quantityToUnlock = lockedQuantity[lock];
-        require(quantityToUnlock > 0, "There are no quantity to unlock for address " + string(orderAddress));
+        require(quantityToUnlock > 0, "There are no quantity to unlock for address " + string(purchaser));
         lockedQuantity[lock] = 0;
         totalLockedQuantity -= quantityToUnlock;
         return quantityToUnlock;
     }
 
-    function getLockedQuantity(address orderAddress) public returns (uint) {
-        return lockedQuantity[msg.sender][orderAddress];
+    function getLockedQuantity(string orderHash, address purchaser) public returns (uint) {
+        string lock = getLock(orderHash, purchaser);
+        return lockedQuantity[lock];
     }
 
     function unlockQuantity(
