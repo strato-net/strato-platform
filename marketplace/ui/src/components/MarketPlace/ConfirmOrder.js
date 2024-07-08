@@ -41,7 +41,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   const { success: marketplaceSuccess, message: marketplaceMessage } = useMarketplaceState();
   const [modal, contextHolderForModal] = Modal.useModal();
   const [cartData, setCartData] = useState(data);
-  const [selectedProvider, setSelectedProvider] = useState(paymentProviders.find(provider => provider.serviceName === 'Stripe') || paymentProviders[0]);
+  const [selectedProvider, setSelectedProvider] = useState(paymentProviders.find(provider => provider?.serviceName === 'Stripe') || paymentProviders[0]);
 
   useEffect(() => {
     setCartData(data);
@@ -169,7 +169,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   };
 
   const handleChange = value => {
-    const provider = paymentProviders.find(provider => provider.serviceName === value);
+    const provider = paymentProviders.find(provider => provider?.serviceName === value);
     setSelectedProvider(provider);
   };
 
@@ -220,13 +220,13 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
               <div id="review-and-submit" className="flex md:pb-2 items-center mr-4">
                 <div className="mr-4">
                   <Select
-                    defaultValue={selectedProvider.serviceName}
+                    defaultValue={selectedProvider?.serviceName}
                     style={{ width: 200, height: 40 }}
                     onChange={handleChange}
                   >
                     {paymentProviders.map(provider => (
-                      <Option key={provider.serviceName} value={provider.serviceName}>
-                        {provider.checkoutText}
+                      <Option key={provider?.serviceName} value={provider?.serviceName}>
+                        {provider?.checkoutText}
                       </Option>
                     ))}
                   </Select>
@@ -275,9 +275,9 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
                   }}
                 >
                   <div className="flex items-center mr-1">
-                    {selectedProvider.checkoutText}&nbsp; 
-                    {selectedProvider.imageURL && selectedProvider.imageURL !== '' ? (
-                      <img src={selectedProvider.imageURL} alt={selectedProvider.serviceName} height="16px" width="16px" />
+                    {selectedProvider?.checkoutText}&nbsp; 
+                    {selectedProvider?.imageURL && selectedProvider?.imageURL !== '' ? (
+                      <img src={selectedProvider?.imageURL} alt={selectedProvider?.serviceName} height="16px" width="16px" />
                     ) : ''}
                   </div>
                 </Button>
