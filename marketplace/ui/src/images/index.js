@@ -59,6 +59,7 @@ export const Images = {
   'Remove_filter' : require('./resources/remove-filter.png'),
   'calender' : require('./resources/Calendar.png'),
   'logo_white' : require('./resources/logo_white.png'),
+  'banner_arrow': require('./resources/banner_arrow.png'),
 
   'CollectiblesX394': require("./resources/Banner/CollectiblesX394.png"),
   'CollectiblesX768': require("./resources/Banner/CollectiblesX768.png"),
@@ -84,5 +85,11 @@ export const Images = {
   'HowX768': require("./resources/Banner/HowX768.png"),
   'HowX1440': require("./resources/Banner/HowX1440.png"),
   'HowX1600': require("./resources/Banner/HowX1600.png"),
+
+
+  'Icon_1': require("./resources/Banner/banner_icon_1.png"),
+  'Icon_2': require("./resources/Banner/banner_icon_2.png"),
+  'Icon_3': require("./resources/Banner/banner_icon_3.png"),
+  'Icon_4': require("./resources/Banner/banner_icon_4.png"),
 
 };
