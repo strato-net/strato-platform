@@ -8933,7 +8933,7 @@ contract qq {
         getAddressFromResult res = _accountAddress <$> erNewContractAccount res
 
     res <- runBS' [r|
-pragma typecheck;
+pragma safeExternalCalls;
 contract qq {
     bool public myVal;
 

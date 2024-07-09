@@ -2988,8 +2988,9 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
       Nothing -> if name `elem` contract' ^. CC.parents then return Nothing else missingField "modifier not found" name
   let !theModifiers = catMaybes theModifiers'
 
-  -- check the signature
-  let pragmaCheck = isJust $ find ((== "typecheck") . fst) $ CC._pragmas cc
+  -- 'pragma safeExternalCalls' is used for contracts that may receive external calls
+  -- and want to enforce a typecheck on arguments given by other contracts
+  let pragmaCheck = isJust $ find ((== "safeExternalCalls") . fst) $ CC._pragmas cc
   when pragmaCheck $ do
    unlessM (validateFunctionArguments theFunction argVals) $
     typeError
