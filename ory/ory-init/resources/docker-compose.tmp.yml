@@ -31,7 +31,7 @@ services:
       - POSTGRES_USER=hydra
       - POSTGRES_PASSWORD=secret
       - POSTGRES_DB=hydra
-  hydra-nginx:
+  nginx:
     depends_on:
       - hydra
       - kratos
@@ -39,7 +39,7 @@ services:
     environment:
     - ssl=true
     - sslCertFileType=${sslCertFileType}
-    image: ${image:hydra-nginx}
+    image: nginx
     ports:
     - "4444:4444"
     - "4433:4433"

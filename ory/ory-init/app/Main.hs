@@ -71,6 +71,7 @@ main = do
   processFile (basePath options </> "kratos.yml") vars kratosConfig
   processFile (basePath options </> "hydra.yml") vars hydraConfig
   processFile (basePath options </> "default.schema.json") vars defaultSchema
+  processFile (basePath options </> "nginx.conf") vars nginxConfig
 
 
 processFile :: FilePath -> Vars -> Text -> IO ()

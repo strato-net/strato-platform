@@ -22,3 +22,6 @@ kratosConfig = decodeUtf8Lenient $(embedFile "resources/kratos.yml")
 
 defaultSchema :: Text
 defaultSchema = decodeUtf8Lenient $(embedFile "resources/default.schema.json")
+
+nginxConfig :: Text
+nginxConfig = decodeUtf8Lenient $(embedFile "resources/nginx.tpl.conf")
