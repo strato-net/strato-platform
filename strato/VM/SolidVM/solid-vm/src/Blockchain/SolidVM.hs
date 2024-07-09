@@ -270,44 +270,32 @@ create _ _ _ blockData _ sender' origin' _ _ availableGas newAddress code txHash
     (issuerAcct, _, issuerName) <- getCreator origin'
     create' sender' (Just code) (accountToNamedAccount' newAddress) issuerAcct issuerName newAddress hsh cc contractName' args False
 
-create' :: MonadSM m => Account -> Maybe Code -> NamedAccount -> Account -> String -> Account -> Keccak256 -> CC.CodeCollection -> SolidString -> CC.ArgList -> Bool -> m ExecResults
-create' creator maybeCodePtr originAddress issuerAcct issuerName newAccount ch cc contractName' argExps createBuiltinCall = do
- 
-  $logInfoS "create': creator" . T.pack $ show $ creator
-  $logInfoS "create': issuerAcct " . T.pack $ show $ issuerAcct
-  
-  $logInfoS "create': CC " . T.pack $ show $ cc
-  
-  -- Get parentName and cc_creator from maybeCodePtr or creator
-  (parentName, cc_creator) <- case maybeCodePtr of
-                  (Just(PtrToCode (CodeAtAccount codePtrAcc _))) -> do
-                      parentName <- fromMaybeM (return "") $
+getParentName :: MonadSM m => Account -> m String
+getParentName acc = fromMaybeM (return "") $
                         runMaybeT $
-                          pure codePtrAcc -- Code pointer's address
+                          pure acc -- Code pointer's address
                             >>= MaybeT . A.lookup (A.Proxy @AddressState) -- Address's state
                             >>= pure . addressStateCodeHash -- state's Acodehash/CodePtr
-                            >>= MaybeT . resolveCodePtrParent (codePtrAcc ^. accountChainId) -- CodePtr's parent
+                            >>= MaybeT . resolveCodePtrParent (acc ^. accountChainId) -- CodePtr's parent
                             >>= ( \case
                                     SolidVMCode name _ -> pure name -- Name of the parent
                                     _ -> pure ""
                             )
+
+create' :: MonadSM m => Account -> Maybe Code -> NamedAccount -> Account -> String -> Account -> Keccak256 -> CC.CodeCollection -> SolidString -> CC.ArgList -> Bool -> m ExecResults
+create' creator maybeCodePtr originAddress issuerAcct issuerName newAccount ch cc contractName' argExps createBuiltinCall = do
+  
+  -- Get parentName and cc_creator from maybeCodePtr or creator
+  (parentName, cc_creator) <- case maybeCodePtr of
+                  (Just(PtrToCode (CodeAtAccount codePtrAcc _))) -> do
+                      parentName <- getParentName codePtrAcc
                       appCreator <- getSolidStorageKeyVal' codePtrAcc $ MS.StoragePath [MS.Field ":creator"]
-                        
                       let cc_creator = case appCreator of
                                         MS.BString cn' -> Just (BC.unpack cn')
                                         _ -> Nothing
                       return (parentName, cc_creator)
                   _ -> do
-                      parentName <- fromMaybeM (return "") $
-                        runMaybeT $
-                          pure creator -- Creator's address
-                            >>= MaybeT . A.lookup (A.Proxy @AddressState) -- Address's state
-                            >>= pure . addressStateCodeHash -- state's codehash/CodePtr
-                            >>= MaybeT . resolveCodePtrParent (creator ^. accountChainId) -- CodePtr's parent
-                            >>= ( \case
-                                    SolidVMCode name _ -> pure name -- Name of the parent
-                                    _ -> pure ""
-                            )
+                      parentName <- getParentName creator
                       return (parentName, Nothing)
   
 

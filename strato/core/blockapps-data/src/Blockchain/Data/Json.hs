@@ -575,12 +575,12 @@ isAddr a = case a of
   Nothing -> False
 
 rawTransactionSemantics :: RawTransaction -> TransactionType
-rawTransactionSemantics (RawTransaction _ _ _ _ _ ta _ code _ _ _ _ _ _ _ _ _ _) = work
+rawTransactionSemantics rawtx = work
   where
     work
-      | (not (isAddr ta)) = Contract
-      | (isAddr ta) && ((B.length cod) > 0) = FunctionCall
+      | (not (isAddr (rawTransactionToAddress rawtx))) = Contract
+      | (isAddr (rawTransactionToAddress rawtx)) && ((B.length cod) > 0) = FunctionCall
       | otherwise = Transfer
-    cod = case code of
+    cod = case (rawTransactionCodeOrData rawtx) of
       Just c -> c
       _ -> ""
