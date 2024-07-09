@@ -272,7 +272,12 @@ create _ _ _ blockData _ sender' origin' _ _ availableGas newAddress code txHash
 
 create' :: MonadSM m => Account -> Maybe Code -> NamedAccount -> Account -> String -> Account -> Keccak256 -> CC.CodeCollection -> SolidString -> CC.ArgList -> Bool -> m ExecResults
 create' creator maybeCodePtr originAddress issuerAcct issuerName newAccount ch cc contractName' argExps createBuiltinCall = do
-
+ 
+  $logInfoS "create': creator" . T.pack $ show $ creator
+  $logInfoS "create': issuerAcct " . T.pack $ show $ issuerAcct
+  
+  $logInfoS "create': CC " . T.pack $ show $ cc
+  
   --check if codeptr tx and then pass in codeptr acc instead of creator
   parentName <- case maybeCodePtr of
                   (Just(PtrToCode (CodeAtAccount codePtrAcc _))) -> do
@@ -297,13 +302,31 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAccount ch c
                                     SolidVMCode name _ -> pure name -- Name of the parent
                                     _ -> pure ""
                             )
-                  
+  
+
   let !contract' = fromMaybe (missingType "create'/contract" contractName') (cc ^. CC.contracts . at contractName')
       !abstracts' = getAbstractParentsFromContract contract' cc
       !mappings = getMapNamesFromContract contract'
       !arrays = getArrayNamesFromContract contract'
-
+  -- $logInfoS "create': contract' " . T.pack $ show $ contract'
+  -- $logInfoS "create': abstracts1' " . T.pack $ show $ abstracts'
   !abstracts <- M.fromList <$> traverse (resolveNameParts newAccount (T.pack issuerName) (T.pack parentName)) abstracts'
+  $logInfoS "create': newAccount " . T.pack $ show $ newAccount
+  $logInfoS "create': issuerName " . T.pack $ show $ issuerName
+  $logInfoS "create': parent name " . T.pack $ show $ parentName   
+  $logInfoS "create': abstracts " . T.pack $ show $ abstracts
+
+  multilineLog "create'/abstracts" $
+    boringBox
+      [ 
+        "Getting abstracts: ",
+        "creator: " ++ (show creator),
+        "contract': " ++ (show contract'),
+        "Account: " ++ (format newAccount),
+        "issuerName: " ++ (show issuerName) ,
+        "parent name: " ++ (show parentName),
+        "abstracts: " ++ (C.red $ show (abstracts))
+      ]
 
   initializeAction newAccount (labelToString contractName') issuerName (show $ _namedAccountAddress originAddress) parentName ch cc abstracts mappings arrays
 
@@ -348,6 +371,9 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAccount ch c
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapAdjust (Action.actionDataCreator .~ (T.pack issuerName)) newAccount
 
+  -- Mod.modifyStatefully_ (Mod.Proxy @Action) $
+  --   Action.actionData %= Action.omapAdjust (Action.actionDataCreator .~ (T.pack issuerName)) newAccount
+    
   when (useWallet && parentName == "User") $ Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapAdjust (Action.actionDataApplication .~ (T.pack "")) newAccount
   -- I'm showing these strings because I like them to be in quotes in the logs :)

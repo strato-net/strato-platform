@@ -416,7 +416,7 @@ processTheMessages env conn messages = do
                     aiChain = cid
                   }
               cont = error "internal error: contract should be unused for SolidVM"
-          $logDebugLS "Contract name is: " $ T.pack $ show name
+          $logInfoLS "Contract name is: " $ T.pack $ show name
           oldState <- readPreviousSolidVMState g acct
           indexContract <- rowToInsert g abiid row cont oldState
           let fkeysForThisContract = getContractsFromPC indexContract
@@ -426,7 +426,7 @@ processTheMessages env conn messages = do
               collectionNames = mapNames ++ arrNames
               abstracts = actionAbstracts row
           --get columns for abstract table
-          $logDebugLS "abstractColumns" $ T.pack $ "Getting abstract columns from " ++ (show abstracts)
+          $logInfoLS "abstractColumns" $ T.pack $ "Getting abstract columns from " ++ (show abstracts)
           abstractColumns' <- fmap catMaybes . for (Map.toList abstracts) $ \((_, n'), (cr', ap')) -> do
             let tableName = AbstractTableName cr' ap' n'
                 tableNameText = tableNameToDoubleQuoteText tableName
