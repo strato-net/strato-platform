@@ -180,7 +180,7 @@ async function get(user, args, options) {
   }
   order = await searchAllWithQueryArgs(paymentTableName, searchArgs, newOptions, user);
 
-  if (!order) {
+  if (order.length === 0) {
 
     // Legacy orders need to join array tables. 
     let legacyArgs = {
