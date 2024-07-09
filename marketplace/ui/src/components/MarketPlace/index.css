@@ -153,6 +153,7 @@ img.ant-image-preview-img {
   text-shadow: 0px 2px 6px darkgrey;
   font-family: "Bricolage Grotesque", sans-serif !important;
   font-weight: 900;
+  position: relative;
 }
 
 .token_banner_text1 {
@@ -161,10 +162,165 @@ img.ant-image-preview-img {
 }
 
 .token_banner_text2 {
-  background: linear-gradient(90deg, #FFA010 0%, #5D10FF 100%);
+  background: linear-gradient(90deg, #ffa010 0%, #5d10ff 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   font-weight: 900;
+}
+
+.banner-block-container {
+  z-index: 24;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+}
+
+.banner-block {
+  position: relative;
+  background-color: white;
+  z-index: 22;
+  box-shadow: 0px 3px 12px darkgrey;
+}
+
+.banner-step {
+  color: #c2c0c0;
+  font-weight: 600;
+  font-family: "Bricolage Grotesque", sans-serif !important;
+}
+
+.banner-step-description {
+  color: #2e51cd;
+  max-width: 120px;
+  font-family: "Bricolage Grotesque", sans-serif !important;
+}
+
+.banner-arrow{
+  z-index: 24;  
+ }
+
+@media (min-width: 1600px) {
+
+  .banner-block-container {
+    margin-top: 30px;
+  }
+
+  .banner-block {
+    width: 200px;
+    height: 200px;
+    border-radius: 0px 84px 0px 0px;
+    padding: 28px;
+    text-align: left;
+    line-height: 20px;
+  }
+
+  .banner-step {
+    font-size: 12px;
+    color: #c2c0c0;
+    margin-top: 12px;
+    font-weight: 600;
+    font-family: "Bricolage Grotesque", sans-serif !important;
+  }
+
+  .banner-step-description {
+    font-size: 16px;
+    color: #2e51cd;
+    margin-top: 2px;
+    max-width: 120px;
+    font-weight: 600;
+    font-family: "Bricolage Grotesque", sans-serif !important;
+  }
+
+  .banner-icons {
+    width: 42px !important;
+    height: 48px;
+  }
+
+  .banner-arrow{
+   width: 27px !important; 
+   height: 27px !important;  
+  }
+
+}
+
+@media (min-width: 1400px) and (max-width: 1600px) {
+  .banner-block-container {
+    margin-top: 50px;
+  }
+
+  .banner-block {
+    width: 166px;
+    height: 166px;
+    border-radius: 0px 84px 0px 0px;
+    padding: 20px;
+    text-align: left;
+    line-height: 20px;
+  }
+
+  .banner-step {
+    font-size: 10.5px;
+    color: #c2c0c0;
+    margin-top: 12px;
+    font-weight: 600;
+    font-family: "Bricolage Grotesque", sans-serif !important;
+  }
+
+  .banner-step-description {
+    font-size: 13px;
+    color: #2e51cd;
+    margin-top: 2px;
+    font-weight: 600;
+    font-family: "Bricolage Grotesque", sans-serif !important;
+  }
+
+  .banner-icons {
+    width: 35px !important;
+    height: 40px;
+  }
+
+  .banner-arrow{
+    width: 27px !important; 
+    height: 27px !important;  
+   }
+}
+
+@media (min-width: 1201px) and (max-width: 1399px) {
+  .banner-block-container {
+    margin-top: 50px;
+  }
+
+  .banner-block {
+    width: 150px;
+    height: 150px;
+    border-radius: 0px 64px 0px 0px;
+    padding: 20px;
+    text-align: left;
+    line-height: 20px;
+  }
+
+  .banner-step {
+    font-size: 10.5px;
+    color: #c2c0c0;
+    margin-top: 12px;
+    font-weight: 600;
+    font-family: "Bricolage Grotesque", sans-serif !important;
+  }
+
+  .banner-step-description {
+    font-size: 13px;
+    color: #2e51cd;
+    margin-top: 2px;
+    font-family: "Bricolage Grotesque", sans-serif !important;
+  }
+
+  .banner-icons {
+    width: 35px !important;
+    height: 40px;
+  }
+
+  .banner-arrow{
+    width: 27px !important; 
+    height: 27px !important;  
+   }
 }
 
 @media (min-width: 1200px) {
@@ -173,7 +329,6 @@ img.ant-image-preview-img {
     font-size: 48px;
     left: 7%;
     top: 15%;
-    
   }
 
   .clothing_banner_text {
@@ -212,7 +367,7 @@ img.ant-image-preview-img {
 
   .how_banner_text_box {
     top: 15%;
-    left: 7%;
+    left: 20%;
     font-size: 44px;
     font-weight: 900;
   }
@@ -236,7 +391,7 @@ img.ant-image-preview-img {
   }
 
   .metal_banner_text {
-     width: 420px;
+    width: 420px;
     font-size: 48px;
     left: 7%;
     top: 10%;
@@ -263,9 +418,48 @@ img.ant-image-preview-img {
 
   .how_banner_text_box {
     top: 15%;
-    left: 7%;
+    left: 20%;
     font-size: 36px;
     font-weight: 900;
+  }
+
+
+  .banner-block-container {
+    margin-top: 50px;
+  }
+
+  .banner-block {
+    width:  130px;
+    height: 130px;
+    border-radius: 0px 44px 0px 0px;
+    padding: 10px;
+    text-align: left;
+  }
+
+  .banner-step {
+    font-size: 10px;
+    color: #c2c0c0;
+    margin-top: 8px;
+    font-weight: 700;
+    font-family: "Bricolage Grotesque", sans-serif !important;
+  }
+
+  .banner-step-description {
+    font-size: 12px;
+    color: #2e51cd;
+    margin-top: 5px;
+    font-weight: 600;
+    font-family: "Bricolage Grotesque", sans-serif !important;
+  }
+
+  .banner-icons {
+    width:  20px !important;
+    height: 24px;
+  }
+
+  .banner-arrow {
+    width:  12px !important;
+    height: 12px !important;
   }
 }
 
@@ -314,9 +508,49 @@ img.ant-image-preview-img {
 
   .how_banner_text_box {
     top: 15%;
-    left: 6%;
-    font-size: 32px;
+    left: 7%;
+    font-size: 28px;
     font-weight: 900;
+  }
+
+  .banner-block-container {
+    margin-top: 30px;
+    width: 80%;
+    margin-left: 5%;
+  }
+
+  .banner-block {
+    width:  90px;
+    height: 90px;
+    border-radius: 0px 24px 0px 0px;
+    padding: 10px;
+    text-align: left;
+  }
+
+  .banner-step {
+    font-size: 6px;
+    color: #c2c0c0;
+    margin-top: 2px;
+    font-weight: 700;
+    font-family: "Bricolage Grotesque", sans-serif !important;
+  }
+
+  .banner-step-description {
+    font-size: 7px;
+    color: #2e51cd;
+    margin-top: 2px;
+    font-weight: 600;
+    font-family: "Bricolage Grotesque", sans-serif !important;
+  }
+
+  .banner-icons {
+    width:  14px !important;
+    height: 14px;
+  }
+
+  .banner-arrow {
+    width: 12px !important;
+    height: 12px !important;
   }
 }
 
@@ -369,6 +603,46 @@ img.ant-image-preview-img {
     font-size: 48px;
     font-weight: 900;
   }
+
+  .banner-block-container {
+    margin-top: 20px;
+    width: 90%;
+    margin-left: 5%;
+  }
+
+  .banner-block {
+    width:  90px;
+    height: 90px;
+    border-radius: 0px 24px 0px 0px;
+    padding: 10px;
+    text-align: left;
+  }
+
+  .banner-step {
+    font-size: 6px;
+    color: #c2c0c0;
+    margin-top: 2px;
+    font-weight: 700;
+    font-family: "Bricolage Grotesque", sans-serif !important;
+  }
+
+  .banner-step-description {
+    font-size: 7px;
+    color: #2e51cd;
+    margin-top: 2px;
+    font-weight: 600;
+    font-family: "Bricolage Grotesque", sans-serif !important;
+  }
+
+  .banner-icons {
+    width:  14px !important;
+    height: 14px;
+  }
+
+  .banner-arrow {
+    width: 12px !important;
+    height: 12px !important;
+  }
 }
 
 @media (min-width: 481px) and (max-width: 599px) {
@@ -396,7 +670,7 @@ img.ant-image-preview-img {
     line-height: 36px;
   }
 
-  .metal_banner_text > h1:first-child{
+  .metal_banner_text > h1:first-child {
     width: 120px;
   }
 
@@ -425,6 +699,47 @@ img.ant-image-preview-img {
     font-size: 36px;
     font-weight: 900;
   }
+
+
+  .banner-block-container {
+    margin-top: 40px;
+    width: 85%;
+    margin-left: 5%;
+  }
+
+  .banner-block {
+    width:  80px;
+    height: 80px;
+    border-radius: 0px 24px 0px 0px;
+    padding: 10px;
+    text-align: left;
+  }
+
+  .banner-step {
+    font-size: 6px;
+    color: #c2c0c0;
+    margin-top: 2px;
+    font-weight: 700;
+    font-family: "Bricolage Grotesque", sans-serif !important;
+  }
+
+  .banner-step-description {
+    font-size: 7px;
+    color: #2e51cd;
+    margin-top: 2px;
+    font-weight: 600;
+    font-family: "Bricolage Grotesque", sans-serif !important;
+  }
+
+  .banner-icons {
+    width: 11px !important;
+    height: 11px;
+  }
+
+  .banner-arrow {
+    width: 12px !important;
+    height: 12px !important;
+  }
 }
 
 @media (min-width: 400px) and (max-width: 480px) {
@@ -452,7 +767,7 @@ img.ant-image-preview-img {
     line-height: 24px;
   }
 
-  .metal_banner_text > h1:first-child{
+  .metal_banner_text > h1:first-child {
     width: 120px;
   }
 
@@ -485,6 +800,45 @@ img.ant-image-preview-img {
     font-size: 20px;
     font-weight: 900;
   }
+
+  .banner-block-container {
+    width: 85%;
+    margin-left: 4%;
+  }
+
+  .banner-block {
+    width: 70px;
+    height: 70px;
+    border-radius: 0px 24px 0px 0px;
+    padding: 4px;
+    text-align: left;
+  }
+
+  .banner-step {
+    font-size: 6px;
+    color: #c2c0c0;
+    margin-top: 2px;
+    font-weight: 700;
+    font-family: "Bricolage Grotesque", sans-serif !important;
+  }
+
+  .banner-step-description {
+    font-size: 7px;
+    color: #2e51cd;
+    margin-top: 2px;
+    font-weight: 600;
+    font-family: "Bricolage Grotesque", sans-serif !important;
+  }
+
+  .banner-icons {
+    width: 11px !important;
+    height: 11px;
+  }
+
+  .banner-arrow {
+    width: 12px !important;
+    height: 12px !important;
+  }
 }
 
 @media (max-width: 399px) {
@@ -512,7 +866,7 @@ img.ant-image-preview-img {
     line-height: 24px;
   }
 
-  .metal_banner_text > h1:first-child{
+  .metal_banner_text > h1:first-child {
     width: 120px;
   }
 
@@ -543,5 +897,44 @@ img.ant-image-preview-img {
     top: -10px;
     left: 4%;
     font-size: 20px;
+  }
+
+  .banner-block-container {
+    width: 90%;
+    margin-left: 4%;
+  }
+
+  .banner-block {
+    width: 70px;
+    height: 70px;
+    border-radius: 0px 24px 0px 0px;
+    padding: 4px;
+    text-align: left;
+  }
+
+  .banner-step {
+    font-size: 6px;
+    color: #c2c0c0;
+    margin-top: 2px;
+    font-weight: 700;
+    font-family: "Bricolage Grotesque", sans-serif !important;
+  }
+
+  .banner-step-description {
+    font-size: 7px;
+    color: #2e51cd;
+    margin-top: 2px;
+    font-weight: 600;
+    font-family: "Bricolage Grotesque", sans-serif !important;
+  }
+
+  .banner-icons {
+    width: 11px !important;
+    height: 11px;
+  }
+
+  .banner-arrow {
+    width: 12px !important;
+    height: 12px !important;
   }
 }
