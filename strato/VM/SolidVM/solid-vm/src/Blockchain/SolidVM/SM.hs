@@ -888,6 +888,7 @@ initializeAction :: MonadSM m
                  => Account
                  -> String
                  -> String
+                 -> Maybe String
                  -> String
                  -> String
                  -> Keccak256
@@ -896,8 +897,8 @@ initializeAction :: MonadSM m
                  -> [T.Text]
                  -> [T.Text]
                  -> m ()
-initializeAction acct name crtr root appName hsh cc ab maps arrs = do
-  let newData = Action.ActionData (SolidVMCode name hsh) cc (T.pack crtr) (T.pack root) (T.pack appName) SolidVM (Action.SolidVMDiff M.empty) ab maps arrs []
+initializeAction acct name crtr cc_crtr root appName hsh cc ab maps arrs = do
+  let newData = Action.ActionData (SolidVMCode name hsh) cc (T.pack crtr) (fmap T.pack cc_crtr) (T.pack root) (T.pack appName) SolidVM (Action.SolidVMDiff M.empty) ab maps arrs []
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapInsertWith Action.mergeActionData acct newData
 

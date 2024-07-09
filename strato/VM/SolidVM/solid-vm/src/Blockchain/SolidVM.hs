@@ -278,12 +278,12 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAccount ch c
   
   $logInfoS "create': CC " . T.pack $ show $ cc
   
-  --check if codeptr tx and then pass in codeptr acc instead of creator
-  parentName <- case maybeCodePtr of
+  -- Get parentName and cc_creator from maybeCodePtr or creator
+  (parentName, cc_creator) <- case maybeCodePtr of
                   (Just(PtrToCode (CodeAtAccount codePtrAcc _))) -> do
-                      fromMaybeM (return "") $
+                      parentName <- fromMaybeM (return "") $
                         runMaybeT $
-                          pure codePtrAcc -- Creator's address
+                          pure codePtrAcc -- Code pointer's address
                             >>= MaybeT . A.lookup (A.Proxy @AddressState) -- Address's state
                             >>= pure . addressStateCodeHash -- state's Acodehash/CodePtr
                             >>= MaybeT . resolveCodePtrParent (codePtrAcc ^. accountChainId) -- CodePtr's parent
@@ -291,8 +291,14 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAccount ch c
                                     SolidVMCode name _ -> pure name -- Name of the parent
                                     _ -> pure ""
                             )
+                      appCreator <- getSolidStorageKeyVal' codePtrAcc $ MS.StoragePath [MS.Field ":creator"]
+                        
+                      let cc_creator = case appCreator of
+                                        MS.BString cn' -> Just (BC.unpack cn')
+                                        _ -> Nothing
+                      return (parentName, cc_creator)
                   _ -> do
-                      fromMaybeM (return "") $
+                      parentName <- fromMaybeM (return "") $
                         runMaybeT $
                           pure creator -- Creator's address
                             >>= MaybeT . A.lookup (A.Proxy @AddressState) -- Address's state
@@ -302,6 +308,7 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAccount ch c
                                     SolidVMCode name _ -> pure name -- Name of the parent
                                     _ -> pure ""
                             )
+                      return (parentName, Nothing)
   
 
   let !contract' = fromMaybe (missingType "create'/contract" contractName') (cc ^. CC.contracts . at contractName')
@@ -311,24 +318,8 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAccount ch c
   -- $logInfoS "create': contract' " . T.pack $ show $ contract'
   -- $logInfoS "create': abstracts1' " . T.pack $ show $ abstracts'
   !abstracts <- M.fromList <$> traverse (resolveNameParts newAccount (T.pack issuerName) (T.pack parentName)) abstracts'
-  $logInfoS "create': newAccount " . T.pack $ show $ newAccount
-  $logInfoS "create': issuerName " . T.pack $ show $ issuerName
-  $logInfoS "create': parent name " . T.pack $ show $ parentName   
-  $logInfoS "create': abstracts " . T.pack $ show $ abstracts
 
-  multilineLog "create'/abstracts" $
-    boringBox
-      [ 
-        "Getting abstracts: ",
-        "creator: " ++ (show creator),
-        "contract': " ++ (show contract'),
-        "Account: " ++ (format newAccount),
-        "issuerName: " ++ (show issuerName) ,
-        "parent name: " ++ (show parentName),
-        "abstracts: " ++ (C.red $ show (abstracts))
-      ]
-
-  initializeAction newAccount (labelToString contractName') issuerName (show $ _namedAccountAddress originAddress) parentName ch cc abstracts mappings arrays
+  initializeAction newAccount (labelToString contractName') issuerName cc_creator (show $ _namedAccountAddress originAddress) parentName ch cc abstracts mappings arrays
 
   A.adjustWithDefault_ (A.Proxy @AddressState) newAccount $ \newAddressState ->
     pure
@@ -371,8 +362,8 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAccount ch c
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapAdjust (Action.actionDataCreator .~ (T.pack issuerName)) newAccount
 
-  -- Mod.modifyStatefully_ (Mod.Proxy @Action) $
-  --   Action.actionData %= Action.omapAdjust (Action.actionDataCreator .~ (T.pack issuerName)) newAccount
+  Mod.modifyStatefully_ (Mod.Proxy @Action) $
+    Action.actionData %= Action.omapAdjust (Action.actionDataCCCreator .~ (fmap T.pack cc_creator)) newAccount
     
   when (useWallet && parentName == "User") $ Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapAdjust (Action.actionDataApplication .~ (T.pack "")) newAccount
@@ -533,7 +524,7 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
   (ctr, oAddr, ctrName) <- getCreator cnAccount
   !abstracts <- M.fromList <$> traverse (resolveNameParts to' (T.pack ctrName) (T.pack parentName')) abstracts'
 
-  initializeAction to (labelToString $ CC._contractName contract) (labelToString ctrName) (show $ _namedAccountAddress oAddr) (labelToString parentName') hsh cc abstracts mappings arrays
+  initializeAction to (labelToString $ CC._contractName contract) (labelToString ctrName) Nothing (show $ _namedAccountAddress oAddr) (labelToString parentName') hsh cc abstracts mappings arrays
 
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapAdjust (Action.actionDataCreator .~ (T.pack ctrName)) to

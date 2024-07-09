@@ -120,14 +120,15 @@ data ABIID = ABIID
 
 processedContract ::
   ABIID ->
+  Text ->
   Map.Map Text Value ->
   AggregateAction ->
   E.ProcessedContract
-processedContract ABIID {..} state AggregateAction {..} =
+processedContract ABIID {..} cregator state AggregateAction {..} =
   E.ProcessedContract
     { address = actionAccount ^. accountAddress,
       codehash = actionCodeHash,
-      creator = actionCreator,
+      creator = cregator,
       root = actionRoot,
       application = actionApplication,
       contractName = aiName,
@@ -151,16 +152,17 @@ rowToInsert ::
   MonadIO m =>
   IORef Globals ->
   ABIID ->
+  Text ->
   AggregateAction ->
   OLD.Contract ->
   [(Text, Value)] ->
   m E.ProcessedContract
-rowToInsert gref abiid row cont oldState = do
+rowToInsert gref abiid cregator row cont oldState = do
   let newState = case actionStorage row of
         Action.EVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp) oldState
         Action.SolidVMDiff mp -> SolidVM.decodeCacheValues mp oldState
   setContractState gref (actionAccount row) newState
-  return $ processedContract abiid (Map.fromList $ newState) row
+  return $ processedContract abiid cregator (Map.fromList $ newState) row
 
 rowToCollections :: MonadIO m => AggregateAction -> m (Map.Map Text Value)
 rowToCollections row = do
@@ -201,17 +203,18 @@ rowToHistories ::
   (MonadIO m) =>
   IORef Globals ->
   ABIID ->
+  Text ->
   [AggregateAction] ->
   OLD.Contract ->
   [(Text, Value)] ->
   m [E.ProcessedContract]
-rowToHistories _ abiId actions cont oldState = do
+rowToHistories _ abiId cregator actions cont oldState = do
   flip evalStateT oldState . forM actions $ \hRow -> do
     modify $ case actionStorage hRow of
       Action.EVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp)
       Action.SolidVMDiff mp -> SolidVM.decodeCacheValues mp
     newMap <- gets Map.fromList
-    return $ processedContract abiId newMap hRow
+    return $ processedContract abiId cregator newMap hRow
 
 processedCollectionRow :: Text -> Text -> AggregateAction -> ABIID -> Value -> Value -> ProcessedCollectionRow
 processedCollectionRow collection ttype AggregateAction {..} ABIID {..} k v =
@@ -418,9 +421,10 @@ processTheMessages env conn messages = do
               cont = error "internal error: contract should be unused for SolidVM"
           $logInfoLS "Contract name is: " $ T.pack $ show name
           oldState <- readPreviousSolidVMState g acct
-          indexContract <- rowToInsert g abiid row cont oldState
+          let cregator' = fromMaybe (actionCreator row) (actionCCCreator row) -- override cr' if actionCCCreator is Just 
+          indexContract <- rowToInsert g abiid cregator' row cont oldState
           let fkeysForThisContract = getContractsFromPC indexContract
-          hs <- rowToHistories g abiid actions cont oldState
+          hs <- rowToHistories g abiid cregator' actions cont oldState
           let mapNames = actionMappings row --recorded mappings
               arrNames = actionArrays row --all
               collectionNames = mapNames ++ arrNames
@@ -428,8 +432,11 @@ processTheMessages env conn messages = do
           --get columns for abstract table
           $logInfoLS "abstractColumns" $ T.pack $ "Getting abstract columns from " ++ (show abstracts)
           abstractColumns' <- fmap catMaybes . for (Map.toList abstracts) $ \((_, n'), (cr', ap')) -> do
-            let tableName = AbstractTableName cr' ap' n'
+            let cregator = fromMaybe cr' (actionCCCreator row)
+                tableName = AbstractTableName cregator ap' n'
                 tableNameText = tableNameToDoubleQuoteText tableName
+            $logDebugLS "actionCCCreator" $ T.pack (show (actionCCCreator row))
+            $logDebugLS "cregator" $ T.pack (show cregator)
             $logInfoS "Row will be inserted into abstract table: " tableNameText
             mCols <- getTableColumns g tableName
             pure $ (indexContract, fkeysForThisContract, tableNameText, (cr',ap',n'),) . map extractTextInsideQuotes <$> mCols
