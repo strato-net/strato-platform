@@ -1194,7 +1194,9 @@ decimalArgs :: SourceAnnotation Text -> Type'
 decimalArgs x =
   Sum $
     intType' x
-      :| [ stringType' x ]
+      :| [ stringType' x,
+           decimalType' x 
+         ]
 
 stringArgs :: SourceAnnotation Text -> Type'
 stringArgs x =
@@ -1892,7 +1894,8 @@ tcExpr (FunctionCall x (MemberAccess _ var "truncate") args) = do
   case (args, res) of
     (_, Bottom _) -> pure $ bottom $ "Can only use truncate() as a method on a decimal number" <$ x
     (OrderedArgs [], _) -> pure $ bottom $ "truncate() requires at least one argument" <$ x
-    (OrderedArgs (a : _), _) -> (intType' x) ~> tcExpr a !> (pure $ topType' x)
+    (OrderedArgs [a], _) -> (intType' x) ~> tcExpr a !> (pure $ topType' x)
+    (OrderedArgs (_ : _), _) -> pure $ bottom $ "truncate() only takes one argument" <$ x
     _ -> pure $ bottom $ "truncate() does not take named arguments" <$ x
 tcExpr (FunctionCall x expr args) = do
   e <- tcExpr expr

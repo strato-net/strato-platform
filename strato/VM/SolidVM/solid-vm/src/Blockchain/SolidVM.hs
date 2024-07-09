@@ -1948,6 +1948,9 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) _ = do
                 Just a -> return $ Constant a
                 Nothing -> return $ Constant SNULL
             (SAccount addr _, itemName) -> regularFunctionCall $ Just (return $ Constant $ SContractItem addr itemName)
+            (SDecimal v, "truncate") -> case convertedFirstArg of
+              SInteger n -> return . Constant $ SDecimal $ roundTo (fromInteger n) v
+              _ -> invalidArguments ("truncate() called with non-integer value as argument") convertedFirstArg
             _ -> regularFunctionCall Nothing
         _ -> regularFunctionCall Nothing
       where
@@ -2589,6 +2592,7 @@ decimalBuiltin [SString str] =
   in case stringToDecimal of
     Right deci -> SDecimal deci
     Left e -> typeError e str
+decimalBuiltin [SDecimal v] = SDecimal v
 decimalBuiltin args = typeError "decimal cast - invalid args" args
 
 parseBaseInt :: String -> Integer -> Either String Integer

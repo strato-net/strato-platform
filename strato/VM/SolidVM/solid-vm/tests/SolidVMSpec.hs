@@ -8967,3 +8967,32 @@ contract qq {
                       BDecimal "0.3",
                       BDecimal "0.33",
                       BDefault])
+
+  it "can use built-in truncate functions on decimals" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal a = 5.2825;
+  decimal b = 5.2825;
+  decimal c;
+  decimal d;
+  decimal e;
+  decimal f;
+  uint g = 1;
+
+  constructor() {
+    a = a.truncate(3);
+    b = b.truncate(g);
+    c = decimal(3.256).truncate(2);
+    d = decimal(6.27).truncate(g);
+    e = decimal(3.24).truncate(5);
+    f = decimal(3.24).truncate(300);
+  }
+}
+|]
+    getFields ["a", "b", "c", "d", "e", "f"]
+      `shouldReturn` [BDecimal "5.282", 
+                      BDecimal "5.3", 
+                      BDecimal "3.26", 
+                      BDecimal "6.3",
+                      BDecimal "3.24000",
+                      BDecimal "3.24000000000000000000000000000000000000000000"])
