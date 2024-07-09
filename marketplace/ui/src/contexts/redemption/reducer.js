@@ -14,6 +14,23 @@ const reducer = (state, action) => {
                 success: action.success,
                 message: action.message
             };
+        case actionDescriptors.fetchRedemptionServices:
+            return {
+                ...state,
+                isFetchingRedemptionServices: true
+            };
+        case actionDescriptors.fetchRedemptionServicesSuccessful:
+            return {
+                ...state,
+                redemptionServices: action.payload,
+                isFetchingRedemptionServices: false
+            };
+        case actionDescriptors.fetchRedemptionServicesFailed:
+            return {
+                ...state,
+                error: action.error,
+                isFetchingRedemptionServices: false
+            };
         case actionDescriptors.requestRedemption:
             return {
                 ...state,

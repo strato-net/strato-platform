@@ -33,6 +33,7 @@ import { ResponsiveOrderDetailCard } from "./ResponsiveOrderDetailCard";
 
 const RedemptionsIncomingDetails = ({ user }) => {
     const [id, setId] = useState(undefined);
+    const [redemptionService, setRedemptionService] = useState(undefined);
     const [data, setdata] = useState([]);
     const dispatch = useRedemptionDispatch();
     const inventoryDispatch = useInventoryDispatch();
@@ -52,12 +53,13 @@ const RedemptionsIncomingDetails = ({ user }) => {
 
     useEffect(() => {
         setId(routeMatch?.params?.id);
+        setRedemptionService(routeMatch?.params?.redemptionService);
     }, [routeMatch]);
 
     useEffect(() => {
-        if (id !== undefined) {
+        if (id !== undefined && redemptionService !== undefined) {
             const getData = async () => {
-                await actions.fetchRedemptionDetail(dispatch, id)
+                await actions.fetchRedemptionDetail(dispatch, redemptionService, id)
             };
             getData();
         }
@@ -173,13 +175,14 @@ const RedemptionsIncomingDetails = ({ user }) => {
             status,
             issuerComments: comments,
             id: redemption.redemption_id,
-            assetAddresses: redemption.assetAddresses
+            assetAddresses: redemption.assetAddresses,
+            redemptionService
         }
 
         const isDone = await actions.closeRedemption(dispatch, body);
 
         if (isDone) {
-            await actions.fetchRedemptionDetail(dispatch, id)
+            await actions.fetchRedemptionDetail(dispatch, redemptionService, id)
         }
     }
 
