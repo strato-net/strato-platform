@@ -3766,7 +3766,6 @@ validateFunctionArguments func argVals = do
         (_, SVMType.Variadic) -> pure True
         (SReference addressedPath, _) -> do
           refType <- getXabiValueType addressedPath
-          $logInfoS "testNameAndTypes" . T.pack $ (printf "refType: %s, t: %s" (show refType) (show t))
           if (refType == t)
             then pure $ True
             else case (refType, t) of
