@@ -16,6 +16,7 @@ so that they could be properly moved to their respective version's subsection.
 
 ## [Unreleased] 
 ### Added
+- Added `pragma safeExternalCalls` for contracts that want to enforce extra type safety on external calls from other contracts
 
 ### Changed
 - In Slipstream, index arrays in event tables within the event table, otherwise index them in a separate array table.
