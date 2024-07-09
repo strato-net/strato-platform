@@ -100,3 +100,9 @@ tests:
       - unliftio
       - vm-tools
       - ordered-containers
+      - monad-alter
+      - core-api2
+      - blockapps-haskoin
+      - blockapps-mpdbs
+      - data-default
+      - blockapps-data

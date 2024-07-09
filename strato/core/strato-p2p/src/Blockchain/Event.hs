@@ -209,7 +209,7 @@ handleEvents peer = awaitForever $ \case
     -- check if blockheaders we recieved have parents.
     let parents = map BlockHeader.parentHash headers
     existingParents <- lift $ lookupMany (Proxy @BlockHeader) parents
-    let missingParents = S.fromList parents S.\\ M.keysSet existingParents
+    let missingParents = S.fromList parents S.\\ (M.keysSet existingParents `S.union` S.fromList (blockHeaderHash <$> bHeaders))
     unless (S.null missingParents) $ do
       bestBlock <- lift $ Mod.get (Proxy @BestBlock)
       let fetchNumber = numberFromBestBlock bestBlock + 1

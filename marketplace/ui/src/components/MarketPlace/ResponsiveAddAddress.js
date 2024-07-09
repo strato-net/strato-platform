@@ -6,7 +6,7 @@ import * as yup from "yup";
 import { actions } from "../../contexts/marketplace/actions";
 import { useMarketplaceDispatch } from "../../contexts/marketplace";
 
-const ResponsiveAddAddress = ({ close }) => {
+const ResponsiveAddAddress = ({ close, redemptionService }) => {
   const [showAddress, setshowAddress] = useState(false);
   const marketplaceDispatch = useMarketplaceDispatch();
   const ShippingDetailsSchema = () => {
@@ -37,6 +37,7 @@ const ResponsiveAddAddress = ({ close }) => {
       country: encodeURIComponent(values.country),
       addressLine1: encodeURIComponent(values.addressLine1),
       addressLine2: encodeURIComponent(values.addressLine2),
+      redemptionService: encodeURIComponent(redemptionService),
     };
 
     window.LOQ.push([
@@ -55,7 +56,7 @@ const ResponsiveAddAddress = ({ close }) => {
     console.log(body, "body")
     let res = await actions.addShippingAddress(marketplaceDispatch, body);
     if (res != null) {
-      await actions.fetchUserAddresses(marketplaceDispatch);
+      await actions.fetchUserAddresses(marketplaceDispatch, redemptionService);
     }
   };
   const formik = useFormik({

@@ -169,7 +169,7 @@ defaultMinBytes = MinBytes 0
 
 -- | Default: @32 * 1024 * 1024@
 defaultMaxBytes :: MaxBytes
-defaultMaxBytes = 100 * 1024 * 1024
+defaultMaxBytes = 32 * 1024 * 1024
 
 -- | Default: @0@
 defaultMaxWaitTime :: MaxWaitTime

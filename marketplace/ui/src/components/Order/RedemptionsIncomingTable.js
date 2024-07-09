@@ -29,6 +29,7 @@ const RedemptionsIncomingTable = ({ user, download, isAllOrdersLoading }) => {
     const [order, setOrder] = useState("DESC");
     const [search, setSearch] = useState("");
     const [data, setData] = useState([]);
+    const [dataMap, setDataMap] = useState({});
 
     useEffect(() => {
         if (user?.commonName) {  // add type in conditional
@@ -51,22 +52,27 @@ const RedemptionsIncomingTable = ({ user, download, isAllOrdersLoading }) => {
 
     useEffect(() => {
         let items = [];
+        let itemMap = {};
         if (incomingRedemptions) {
             incomingRedemptions.forEach((redemption) => {
-                items.push({
+                const item = {
                     key: redemption.redemption_id,
-                    assetAddress: redemption.assetAddresses[0],
+                    assetAddress: redemption.asset,
                     assetName: redemption.assetName,
                     requestor: redemption.ownerCommonName,
                     issuer: redemption.issuerCommonName,
                     quantity: redemption.quantity,
                     redemptionDate: redemption.createdDate,
                     redemptionNumber: redemption.redemption_id,
-                    status: redemption.status
-                });
+                    status: redemption.status,
+                    redemptionService: redemption.redemptionService,
+                };
+                items.push(item);
+                itemMap[redemption.redemption_id] = item;
             });
         }
         setData(items);
+        setDataMap(itemMap);
     }, [incomingRedemptions]);
 
     const statusComponent = (status) => {
@@ -106,7 +112,8 @@ const RedemptionsIncomingTable = ({ user, download, isAllOrdersLoading }) => {
                     id={record}
                     onClick={() => {
                         navigate(
-                            `${routes.RedemptionsIncomingDetails.url.replace(":id", record)}`
+                            `${routes.RedemptionsIncomingDetails.url.replace(":id", record)
+                                     .replace(":redemptionService", dataMap[record].redemptionService)}`
                         );
                     }}
                     className="text-[#13188A] hover:text-primaryHover cursor-pointer"

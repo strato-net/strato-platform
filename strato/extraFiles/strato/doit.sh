@@ -116,6 +116,7 @@ function newnode {
   seqMinLogLevel=LevelInfo
   slipMinLogLevel=LevelInfo
   vmMinLogLevel=LevelInfo
+  p2pMinLogLevel=LevelInfo
 
   if ${API_DEBUG_LOG:-false} || ${FULL_DEBUG_LOG:-false}; 
   then apiDebugMode=LevelDebug
@@ -133,6 +134,10 @@ function newnode {
   then vmMinLogLevel=LevelDebug
   fi
 
+  if ${P2P_DEBUG_LOG:-false} || ${FULL_DEBUG_LOG:-false}; 
+  then p2pMinLogLevel=LevelDebug
+  fi
+
   echo "Starting ethereum-discover"
   runBackgroundProcess ethereum-discover  &>> logs/ethereum-discover
 
@@ -146,6 +151,7 @@ function newnode {
      --networkID=${networkID:--1} \
      --sqlPeers=true \
      --txGossipFanout=${txGossipFanount:-3} \
+     --minLogLevel=$p2pMinLogLevel \
      ${networkFlag} &>> logs/strato-p2p
 
   echo "Starting strato-sequencer"
@@ -203,9 +209,6 @@ function newnode {
   if [ -n "${FILE_SERVER_URL}" ]; then
       fsFlag="--fileServerUrl=${FILE_SERVER_URL}"
   fi
-  if [ -n "${STRIPE_PAYMENT_SERVER_URL}" ]; then
-      psFlag="--paymentServerUrl=${STRIPE_PAYMENT_SERVER_URL}"
-  fi
 
   echo "Starting vm-runner"
   runBackgroundProcess vm-runner \
@@ -248,8 +251,7 @@ function newnode {
     "${ucFlag}" \
     "${ubFlag}" \
     "${udFlag}" \
-    "${fsFlag}" \
-    "${psFlag}" +RTS -N1 >> logs/strato-api 2>&1
+    "${fsFlag}" +RTS -N1 >> logs/strato-api 2>&1
 
   SLIPSTREAM_CMD="slipstream \
   --database=${postgres_slipstream_db} \

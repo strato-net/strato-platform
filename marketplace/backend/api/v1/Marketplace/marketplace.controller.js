@@ -7,8 +7,8 @@ class MarketplaceController {
   static async getAll(req, res, next) {
     try {
       const { dapp, query } = req
-      const {soldOut, forSale , ...restQuery} =  query  
-      const limit = parseInt(req.headers['limit']) || 10; 
+      const { soldOut, forSale, ...restQuery } = query
+      const limit = parseInt(req.headers['limit']) || 10;
       const offset = (parseInt(req.headers['offset']) - 1 || 0) * limit;
 
       const inventories = await dapp.getMarketplaceInventories({ ...restQuery })
@@ -17,7 +17,7 @@ class MarketplaceController {
 
       rest.response.status200(res, {
         productsWithImageUrl: paginatedInventory,
-        inventoryCount: finalInventory.length 
+        inventoryCount: finalInventory.length
       });
       return next()
     } catch (e) {
@@ -28,17 +28,17 @@ class MarketplaceController {
   static async getAllLoggedIn(req, res, next) {
     try {
       const { dapp, query } = req
-      const {soldOut, forSale , ...restQuery} =  query 
-      const limit = parseInt(req.headers['limit']) || 10; 
+      const { soldOut, forSale, ...restQuery } = query
+      const limit = parseInt(req.headers['limit']) || 10;
       const offset = (parseInt(req.headers['offset']) - 1 || 0) * limit;
       const inventories = await dapp.getMarketplaceInventoriesLoggedIn({ ...restQuery })
       let finalInventory = MarketplaceController.getFinalInventory(inventories, forSale, soldOut)
-      
+
       const paginatedInventory = finalInventory.slice(offset, offset + limit);
 
       rest.response.status200(res, {
-          productsWithImageUrl: paginatedInventory,
-          inventoryCount: finalInventory.length 
+        productsWithImageUrl: paginatedInventory,
+        inventoryCount: finalInventory.length
       });
 
       return next()
@@ -88,7 +88,18 @@ class MarketplaceController {
 
       return rest.response.status200(res, stratsBalance)
     } catch (e) {
-      console.log("Couldn't load STRATS");
+      return next(e)
+    }
+  }
+
+  static async getStratsTransactionHistory(req, res, next) {
+    try {
+      const { dapp, address: userAddress } = req
+
+      const stratsTransactionHistory = await dapp.getStratsTransactionHistory({ userAddress: userAddress });
+
+      return rest.response.status200(res, stratsTransactionHistory)
+    } catch (e) {
       return next(e)
     }
   }
@@ -102,7 +113,6 @@ class MarketplaceController {
 
       return rest.response.status200(res)
     } catch (e) {
-      console.log("Couldn't transfer STRATS");
       return next(e)
     }
   }

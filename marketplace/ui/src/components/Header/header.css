@@ -54,3 +54,14 @@
 input[type="search"]::-webkit-search-cancel-button {
   display: none;
 }
+
+.ant-row.relative {
+  flex-flow: unset;
+}
+
+.ant-col.logo {
+  max-width: 100%;
+  .logo-image {
+    max-width: 170px;
+  }
+}
