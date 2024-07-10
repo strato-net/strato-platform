@@ -8927,3 +8927,43 @@ contract qq {
   }
 }
 |]) `shouldThrow` anyTypeError
+
+  it "can typecheck decimals assigned to decimals" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal b;
+  decimal _b;
+  constructor() {
+    _b = 1.0;
+    b = _b;
+  }
+}
+|]
+    getFields ["b"]
+      `shouldReturn` [BDecimal "1.0"])
+
+  it "can typecheck ints assigned to ints" $ runTest ( do
+    runBS [r|
+contract qq {
+  uint b;
+  uint _b;
+  constructor() {
+    _b = 1;
+    b = _b;
+  }
+}
+|]
+    getFields ["b"]
+      `shouldReturn` [BInteger 1])
+
+  it "can typecheck ints assigned to decimals" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal b;
+  uint _b;
+  constructor() {
+    _b = 1;
+    b = _b;
+  }
+}
+|]) `shouldThrow` anyTypeError
