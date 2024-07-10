@@ -29,6 +29,7 @@ const RedemptionsOutgoingTable = ({ user, download, isAllOrdersLoading }) => {
     const [order, setOrder] = useState("DESC");
     const [search, setSearch] = useState("");
     const [data, setData] = useState([]);
+    const [dataMap, setDataMap] = useState({});
 
     useEffect(() => {
         if (user?.commonName) {  // add type in conditional
@@ -51,22 +52,27 @@ const RedemptionsOutgoingTable = ({ user, download, isAllOrdersLoading }) => {
 
     useEffect(() => {
         let items = [];
+        let itemMap = {};
         if (outgoingRedemptions) {
             outgoingRedemptions.forEach((redemption) => {
-                items.push({
+                const item = {
                     key: redemption.redemption_id,
-                    assetAddress: redemption.assetAddresses[0],
+                    assetAddress: redemption.asset,
                     assetName: redemption.assetName,
                     requestor: redemption.ownerCommonName,
                     issuer: redemption.issuerCommonName,
                     quantity: redemption.quantity,
                     redemptionDate: redemption.createdDate,
                     redemptionNumber: redemption.redemption_id,
-                    status: redemption.status
-                });
+                    status: redemption.status,
+                    redemptionService: redemption.redemptionService,
+                };
+                items.push(item);
+                itemMap[redemption.redemption_id] = item;
             });
         }
         setData(items);
+        setDataMap(itemMap);
     }, [outgoingRedemptions]);
 
     const statusComponent = (status) => {
@@ -106,7 +112,8 @@ const RedemptionsOutgoingTable = ({ user, download, isAllOrdersLoading }) => {
                     id={record}
                     onClick={() => {
                         navigate(
-                            `${routes.RedemptionsOutgoingDetails.url.replace(":id", record)}`
+                            `${routes.RedemptionsOutgoingDetails.url.replace(":id", record)
+                                     .replace(":redemptionService", dataMap[record].redemptionService)}`
                         );
                     }}
                     className="text-[#13188A] hover:text-primaryHover cursor-pointer"
@@ -252,14 +259,14 @@ const RedemptionsOutgoingTable = ({ user, download, isAllOrdersLoading }) => {
                     isLoading={isFetchingOutgoingRedemptions}
                     pagination={false}
                     scrollX="100%"
-                    rowKey={record => record.redemptionNumber}
+                    rowKey={record => (record.redemptionId)}
                     onChange={onChange}
                 />
             </div>
             <Pagination
                 current={pageNo}
                 onChange={onPageChange}
-                total={outgoingRedemptions.length}
+                total={outgoingRedemptions ? outgoingRedemptions.length : 0}
                 showSizeChanger={false}
                 className="flex justify-center my-5 "
             />

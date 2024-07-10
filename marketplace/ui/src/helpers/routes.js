@@ -26,8 +26,8 @@ export default {
   InventoryDetail: { label: "Inventory Detail", url: "/inventories/:id/:name" },
   Items: { label: "Item", url: "/items" },
   Orders: { label: "Order", url: "/order/:type" },
-  RedemptionsOutgoingDetails: { label: "Redemption Outgoing Detail", url: "/redemptions-outgoing/:id" },
-  RedemptionsIncomingDetails: { label: "Redemption Incoming Detail", url: "/redemptions-incoming/:id" },
+  RedemptionsOutgoingDetails: { label: "Redemption Outgoing Detail", url: "/redemptions-outgoing/:redemptionService/:id" },
+  RedemptionsIncomingDetails: { label: "Redemption Incoming Detail", url: "/redemptions-incoming/:redemptionService/:id" },
   SoldOrderDetails: { label: "Sold Order Detail", url: "/sold-orders/:id" },
   BoughtOrderDetails: {
     label: "Bought Order Detail",
@@ -48,7 +48,6 @@ export default {
   Admin: { label: "Admin ", url: "/admin" },
   ProcessingOrder: { label: "Processing Order", url: "/order/status" },
   Invoice: { label: "Invoice", url: "/orders/invoice/:id" },
-  OnboardingSellerToStripe: { label: "Onboarding Seller to Stripe", url: "/myItems/stripe/onboarding" },
   Error: { label: "Error", url: "/404" },
   FAQ: { label: "FAQ", url: "/frequently-asked-questions" },
 };
