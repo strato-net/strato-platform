@@ -19,9 +19,20 @@ so that they could be properly moved to their respective version's subsection.
 - Added `pragma safeExternalCalls` for contracts that want to enforce extra type safety on external calls from other contracts
 
 ### Changed
+
+### Fixed
+
+### Removed
+
+
+## [11.3.1] - 7/10/2024 
+### Added
+
+### Changed
 - In Slipstream, index arrays in event tables within the event table, otherwise index them in a separate array table.
 
 ### Fixed
+- try-catch exception handler in solidVM will throw excpetion in all cases instead of potentially `error`ing so node does not crash
 
 ### Removed
 - Removed strato-api paymentServerUrl flag
