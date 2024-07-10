@@ -8930,7 +8930,7 @@ contract qq {
 
   it "respects the number of decimal places during arithmetic operations" $ runTest ( do
     runBS [r|
-pragma strict;
+pragma strictDecimals;
 contract qq {
   decimal a;
   decimal b;
