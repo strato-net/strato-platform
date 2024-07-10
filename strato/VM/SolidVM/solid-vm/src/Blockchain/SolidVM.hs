@@ -122,7 +122,6 @@ import Text.Read (readEither, readMaybe)
 import Text.Tools
 import UnliftIO hiding (assert)
 
-
 type SolidVMBase m = VMBase m
 
 onTraced :: Monad m => m () -> m ()
@@ -2428,6 +2427,8 @@ expToVarArith :: MonadSM m =>
   Maybe SVMType.Type ->
   m Variable
 expToVarArith intOp decOp expr1 expr2 valType = do
+  (_, parentCC) <- getCurrentCodeCollection
+  let pragmaCheck = isJust $ find ((== "strict") . fst) $ CC._pragmas parentCC
   i1 <- getVar =<< expToVar expr1 Nothing
   i2 <- getVar =<< expToVar expr2 Nothing
   let valType' = fromMaybe (SVMType.Int (Just True) Nothing) valType 
@@ -2437,15 +2438,15 @@ expToVarArith intOp decOp expr1 expr2 valType = do
     (SDecimal a, SDecimal b, _) -> do
       let maxDecimalPlaces = max (decimalPlaces a) (decimalPlaces b)
           result = a `decOp` b
-      return . Constant . SDecimal $ roundTo maxDecimalPlaces result
+      return $ bool (Constant $ SDecimal result) (Constant $ SDecimal $ roundTo maxDecimalPlaces result) pragmaCheck
     (SDecimal a, SInteger b, _) -> do
       let maxDecimalPlaces = decimalPlaces a
           result = a `decOp` (Decimal 0 b)
-      return . Constant . SDecimal $ roundTo maxDecimalPlaces result
+      return $ bool (Constant $ SDecimal result) (Constant $ SDecimal $ roundTo maxDecimalPlaces result) pragmaCheck
     (SInteger a, SDecimal b, _) -> do
       let maxDecimalPlaces = decimalPlaces b
           result = (Decimal 0 a) `decOp` b
-      return . Constant . SDecimal $ roundTo maxDecimalPlaces result
+      return $ bool (Constant $ SDecimal result) (Constant $ SDecimal $ roundTo maxDecimalPlaces result) pragmaCheck
     _ -> typeError "expToVarArith" (i1, i2)
   
 expToVarDivide :: MonadSM m => 
@@ -2456,24 +2457,27 @@ expToVarDivide :: MonadSM m =>
   Maybe SVMType.Type ->
   m Variable
 expToVarDivide intOp decOp expr1 expr2 valType = do
+  (_, parentCC) <- getCurrentCodeCollection
+  let pragmaCheck = isJust $ find ((== "strict") . fst) $ CC._pragmas parentCC
   i1 <- getVar =<< expToVar expr1 Nothing
   i2 <- getVar =<< expToVar expr2 Nothing
   let valType' = fromMaybe (SVMType.Int (Just True) Nothing) valType 
   case (i1, i2, valType') of
     (SInteger a, SInteger b, (SVMType.Int _ _)) -> return . Constant . SInteger $ a `intOp` b
-    (SInteger a, SInteger b, SVMType.Decimal) -> return . Constant . SDecimal $ roundTo 0 ((Decimal 0 a) `decOp` (Decimal 0 b))
+    (SInteger a, SInteger b, SVMType.Decimal) -> 
+      return $ bool (Constant $ SDecimal $ (Decimal 0 a) `decOp` (Decimal 0 b)) (Constant $ SDecimal $ roundTo 0 ((Decimal 0 a) `decOp` (Decimal 0 b))) pragmaCheck
     (SDecimal a, SDecimal b, _) -> do
       let maxDecimalPlaces = max (decimalPlaces a) (decimalPlaces b)
           result = a `decOp` b
-      return . Constant . SDecimal $ roundTo maxDecimalPlaces result
+      return $ bool (Constant $ SDecimal result) (Constant $ SDecimal $ roundTo maxDecimalPlaces result) pragmaCheck
     (SDecimal a, SInteger b, _) -> do
       let maxDecimalPlaces = decimalPlaces a
           result = a `decOp` (Decimal 0 b)
-      return . Constant . SDecimal $ roundTo maxDecimalPlaces result
+      return $ bool (Constant $ SDecimal result) (Constant $ SDecimal $ roundTo maxDecimalPlaces result) pragmaCheck
     (SInteger a, SDecimal b, _) -> do
       let maxDecimalPlaces = decimalPlaces b
           result = (Decimal 0 a) `decOp` b
-      return . Constant . SDecimal $ roundTo maxDecimalPlaces result
+      return $ bool (Constant $ SDecimal result) (Constant $ SDecimal $ roundTo maxDecimalPlaces result) pragmaCheck
     _ -> typeError "expToVarArith" (i1, i2)
 
 expToVarInteger :: MonadSM m => CC.Expression -> (Integer -> Integer -> a) -> CC.Expression -> (a -> Value) -> m Variable
@@ -2490,6 +2494,8 @@ binopAssign' :: MonadSM m =>
   Maybe SVMType.Type ->
   m Variable
 binopAssign' intOp decOp lhs rhs valType = do
+  (_, parentCC) <- getCurrentCodeCollection
+  let pragmaCheck = isJust $ find ((== "strict") . fst) $ CC._pragmas parentCC
   let readVal e = getVar =<< expToVar e Nothing
   delta <- readVal rhs
   curValue <- readVal lhs
@@ -2501,15 +2507,15 @@ binopAssign' intOp decOp lhs rhs valType = do
     (SDecimal a, SDecimal b, _) -> do
       let maxDecimalPlaces = max (decimalPlaces a) (decimalPlaces b)
           result = a `decOp` b
-      pure . SDecimal $ roundTo maxDecimalPlaces result
+      pure $ bool (SDecimal result) (SDecimal $ roundTo maxDecimalPlaces result) pragmaCheck
     (SDecimal a, SInteger b, _) -> do
       let maxDecimalPlaces = decimalPlaces a
           result = a `decOp` (Decimal 0 b)
-      pure . SDecimal $ roundTo maxDecimalPlaces result
+      return $ bool (SDecimal result) (SDecimal $ roundTo maxDecimalPlaces result) pragmaCheck
     (SInteger a, SDecimal b, _) -> do
       let maxDecimalPlaces = decimalPlaces b
           result = (Decimal 0 a) `decOp` b
-      pure . SDecimal $ roundTo maxDecimalPlaces result
+      return $ bool (SDecimal result) (SDecimal $ roundTo maxDecimalPlaces result) pragmaCheck
     _ -> typeError "binopAssign'" (curValue, delta)
   setVar varToAssign next
   return $ Constant next
@@ -2522,6 +2528,8 @@ binopDivide :: MonadSM m =>
   Maybe SVMType.Type ->
   m Variable
 binopDivide intOp decOp lhs rhs valType = do
+  (_, parentCC) <- getCurrentCodeCollection
+  let pragmaCheck = isJust $ find ((== "strict") . fst) $ CC._pragmas parentCC
   let readVal e = getVar =<< expToVar e Nothing
   delta <- readVal rhs
   curValue <- readVal lhs
@@ -2529,19 +2537,20 @@ binopDivide intOp decOp lhs rhs valType = do
   let valType' = fromMaybe (SVMType.Int (Just True) Nothing) valType
   next <- case (curValue, delta, valType') of
     (SInteger c, SInteger d, (SVMType.Int _ _)) -> pure . SInteger $ c `intOp` d
-    (SInteger a, SInteger b, SVMType.Decimal) -> pure . SDecimal $ roundTo 0 ((Decimal 0 a) `decOp` (Decimal 0 b))
+    (SInteger a, SInteger b, SVMType.Decimal) -> 
+      return $ bool (SDecimal $ (Decimal 0 a) `decOp` (Decimal 0 b)) (SDecimal $ roundTo 0 ((Decimal 0 a) `decOp` (Decimal 0 b))) pragmaCheck
     (SDecimal a, SDecimal b, _) -> do
       let maxDecimalPlaces = max (decimalPlaces a) (decimalPlaces b)
           result = a `decOp` b
-      pure . SDecimal $ roundTo maxDecimalPlaces result
+      return $ bool (SDecimal result) (SDecimal $ roundTo maxDecimalPlaces result) pragmaCheck
     (SDecimal a, SInteger b, _) -> do
       let maxDecimalPlaces = decimalPlaces a
           result = a `decOp` (Decimal 0 b)
-      pure . SDecimal $ roundTo maxDecimalPlaces result
+      return $ bool (SDecimal result) (SDecimal $ roundTo maxDecimalPlaces result) pragmaCheck
     (SInteger a, SDecimal b, _) -> do
       let maxDecimalPlaces = decimalPlaces b
           result = (Decimal 0 a) `decOp` b
-      pure . SDecimal $ roundTo maxDecimalPlaces result
+      return $ bool (SDecimal result) (SDecimal $ roundTo maxDecimalPlaces result) pragmaCheck
     _ -> typeError "binopAssign'" (curValue, delta)
   setVar varToAssign next
   return $ Constant next

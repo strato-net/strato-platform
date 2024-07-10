@@ -8639,7 +8639,7 @@ contract qq {
                       BDecimal "3.123123",
                       BDecimal "-0.876877",
                       BDecimal "2.246246",
-                      BDecimal "0.561562",
+                      BDecimal "0.5615615",
                       BDecimal "-2"
                      ])
 
@@ -8665,7 +8665,7 @@ contract qq {
                       BDecimal "5.3",
                       BDecimal "1.3",
                       BDecimal "6.6",
-                      BDecimal "1.6"
+                      BDecimal "1.65"
                      ])
 
   it "can use decimal literals in expressions" $ runTest ( do
@@ -8705,9 +8705,9 @@ contract qq {
                       BDecimal "0.8",
                       BDecimal "2.1",
                       BDecimal "6.4",
-                      BDecimal "-2.8",
-                      BDecimal "0.9",
-                      BDecimal "2.0",
+                      BDecimal "-2.76",
+                      BDecimal "0.869565217391304347826086956521739130434782608695652173913043478260869565217391304347826086956521739130434782608695652173913043478260869565217391304347826086956521739130434782608695652173913043478260869565217391304347826086956521739130434782608695652173913",
+                      BDecimal "2",
                       BDecimal "6.25"
                      ])
 
@@ -8930,6 +8930,7 @@ contract qq {
 
   it "respects the number of decimal places during arithmetic operations" $ runTest ( do
     runBS [r|
+pragma strict;
 contract qq {
   decimal a;
   decimal b;
