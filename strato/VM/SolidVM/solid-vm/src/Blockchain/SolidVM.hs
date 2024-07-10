@@ -307,13 +307,17 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAccount ch c
   -- $logInfoS "create': abstracts1' " . T.pack $ show $ abstracts'
   !abstracts <- M.fromList <$> traverse (resolveNameParts newAccount (T.pack issuerName) (T.pack parentName)) abstracts'
 
+  let ptr2InitialContract = case maybeCodePtr of
+        Just (PtrToCode (CodeAtAccount cp _)) -> cp
+        _ -> creator
+
   initializeAction newAccount (labelToString contractName') issuerName cc_creator (show $ _namedAccountAddress originAddress) parentName ch cc abstracts mappings arrays
 
   A.adjustWithDefault_ (A.Proxy @AddressState) newAccount $ \newAddressState ->
     pure
       newAddressState
         { addressStateContractRoot = MP.emptyTriePtr,
-          addressStateCodeHash = if (contractName' /= stringToLabel parentName && not (null parentName) && not createBuiltinCall) then CodeAtAccount creator (labelToString contractName') else SolidVMCode (labelToString contractName') ch
+          addressStateCodeHash = if (contractName' /= stringToLabel parentName && not (null parentName) && not createBuiltinCall) then CodeAtAccount ptr2InitialContract (labelToString contractName') else SolidVMCode (labelToString contractName') ch
         }
 
   -- get the gasLeft from the environment
