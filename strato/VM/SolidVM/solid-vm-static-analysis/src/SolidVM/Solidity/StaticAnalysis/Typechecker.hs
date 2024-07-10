@@ -540,7 +540,7 @@ typecheckStatic (SVMType.Bytes d1 b1) (SVMType.Bytes d2 b2) =
       (Just a, Just b) | a /= b -> Left "Mismatched length between bytes values"
       _ -> Right $ SVMType.Bytes (d1 <|> d2) (b1 <|> b2)
 typecheckStatic SVMType.Decimal SVMType.Decimal = Right $ SVMType.Decimal
-typecheckStatic SVMType.Decimal (SVMType.Int _ _) = Right $ SVMType.Decimal
+--typecheckStatic SVMType.Decimal (SVMType.Int _ _) = Right $ SVMType.Decimal
 typecheckStatic SVMType.Bool SVMType.Bool = Right SVMType.Bool
 typecheckStatic (SVMType.Address a) (SVMType.Address b) = Right $ SVMType.Account (a && b)
 typecheckStatic (SVMType.Address a) (SVMType.Account b) = Right $ SVMType.Account (a && b)
@@ -1745,8 +1745,11 @@ tcExpr (Binary x ">=" a b) =
   sumType' (intType' x) (decimalType' x) ~> tcExpr a <~> tcExpr b !> pure (boolType' x)
 tcExpr (Binary x "<=" a b) =
   sumType' (intType' x) (decimalType' x) ~> tcExpr a <~> tcExpr b !> pure (boolType' x)
+--need change 
 tcExpr (Binary _ "=" a b) =
-  (checkIfImmuteOperationValid a) <~> tcExpr b
+ (checkIfImmuteOperationValid a) <~> tcExpr b
+
+
 tcExpr (Binary _ _ a b) =
   (tcExpr a <~> tcExpr b)
 tcExpr (PlusPlus x a) =
@@ -1871,7 +1874,7 @@ tcExpr (Unitary _ _ a) = tcExpr a
 tcExpr (Ternary x a b c) =
   boolType' x ~> tcExpr a !> tcExpr b <~> tcExpr c
 tcExpr (BoolLiteral x _) = pure $ boolType' x
-tcExpr (NumberLiteral x _ _) = pure $ intType' x
+tcExpr (NumberLiteral x _ _) = pure $ sumType' (intType' x) (decimalType' x)
 tcExpr (DecimalLiteral x _) = pure $ decimalType' x
 tcExpr (StringLiteral x _) = pure $ stringType' x
 tcExpr (AccountLiteral x _) = pure $ accountType' x
@@ -1885,3 +1888,4 @@ tcExpr (ArrayExpression x es) = do
     _ -> t'
 tcExpr (Variable x name) = getVarType' (labelToString name) x
 tcExpr (ObjectLiteral x _) = pure . bottom $ "Cannot use object literals within contract definitions" <$ x
+
