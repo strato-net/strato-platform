@@ -20,6 +20,7 @@ so that they could be properly moved to their respective version's subsection.
 ### Changed
 
 ### Fixed
+- patched rare race condition where node updates sync status to true before running the last few blocks left in the sync
 
 ### Removed
 
