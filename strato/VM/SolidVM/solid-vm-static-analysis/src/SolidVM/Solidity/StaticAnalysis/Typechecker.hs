@@ -48,7 +48,8 @@ data R = R
   { codeCollection :: Annotated CodeCollectionF,
     contract :: Annotated ContractF,
     function :: Maybe (Annotated FuncF),
-    functName :: String,
+    functName :: Maybe String,
+    modifier :: Maybe (Annotated ModifierF),
     immutableValNames :: [(String, Bool)]
   }
 
@@ -158,6 +159,9 @@ showType' (MultiVariate a _) =
       showType' a,
       ")"
     ]
+showType' (SolidVM.Solidity.StaticAnalysis.Typechecker.Modifier _ _ _) =
+  T.empty
+
 
 varDefsToType' :: Annotated VarDefEntryF -> Type' -> Type'
 varDefsToType' BlankEntry t = Product [topType' (context' t), t] (context' t)
@@ -396,6 +400,7 @@ context' Product {..} = productContext
 context' Function {..} = functionContext
 context' (Sum (a :| _)) = context' a
 context' MultiVariate {..} = multiVariateContext
+context' Modifier {..} = modifierContext
 
 typecheck' :: Monad m => (SourceAnnotation Text -> SolidString -> Type -> m Type') -> Type' -> Type' -> m Type'
 typecheck' unify r1 r2 = case (r1, r2) of
@@ -875,13 +880,12 @@ contractHelper ::
   Type'
 contractHelper cc c =
   let constr = maybe M.empty (M.singleton "constructor") $ _constructor c
-      funcsAndConstr = constr <> _functions c
-      modifiersAndConstr = constr <> _modifiers cc
+      funcsAndConstr = constr <> _functions c 
       varTypes' = reduceType' (_contractContext c) $ varDeclHelper cc c <$> M.elems (_storageDefs c)
       constTypes' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_constants c)
       constTypes'' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_flConstants cc)
       funcTypes' = reduceType' (_contractContext c) $ uncurry (functionHelper cc c) <$> M.toList funcsAndConstr
-      modifierTypes' = reduceType' (_contractContext c) $ uncurry (modifierHelper cc c) <$> M.toList modifiersAndConstr
+      modifierTypes' = reduceType' (_contractContext c) $ modifierHelper cc c <$> M.elems (_modifiers c)
    in reduceType' (_contractContext c) [varTypes', constTypes', funcTypes', constTypes'', modifierTypes']
 
 varDeclHelper ::
@@ -894,7 +898,7 @@ varDeclHelper cc c VariableDecl {..} =
    in case _varInitialVal of
         Nothing -> ty
         Just e ->
-          let r = R cc c Nothing "Nothing" []
+          let r = R cc c Nothing (Just "Nothing") Nothing []
            in runReader (evalStateT (ty ~> tcExpr e) ((Nothing, M.empty) :| [])) r
 
 constDeclHelper ::
@@ -904,7 +908,7 @@ constDeclHelper ::
   Type'
 constDeclHelper cc c ConstantDecl {..} =
   let ty = Static _constType _constContext
-      r = R cc c Nothing "Nothing" []
+      r = R cc c Nothing (Just "Nothing") Nothing []
    in runReader (evalStateT (ty ~> tcExpr _constInitialVal) ((Nothing, M.empty) :| [])) r
 
 checkOverrides ::
@@ -1001,52 +1005,35 @@ checkOverrides cc c funcName f =
 modifierHelper ::
   Annotated CodeCollectionF ->
   Annotated ContractF ->
-  String ->
   Annotated ModifierF ->
   Type'
-modifierHelper cc c modifierName m@Modifier {..} =
-   in unlessBottom check $ \t' -> case f ^. funcContents of
-        Nothing -> t'
-        Just stmts ->
-          if (funcName == "modifier")
-            then case (_funcArgs, _funcVals, _funcVisibility) of
-              (_, [fVal], _) ->
-                bottom $
-                  ( T.concat
-                      [ "Function `modifier` must have no return values, but has been given ",
-                        T.pack $ show fVal
-                      ]
-                  )
-                    <$ _funcContext
-                                
-
-
-
-
-
-            else
-              let r =
-                    R cc c (Just f) funcName $
-                      map
-                        (fmap $ isJust . _varInitialVal)
-                        (filter (_isImmutable . snd) . M.toList $ _storageDefs c)
-                  swap = uncurry $ flip (,)
-                  args =
-                    ( \(it, n) ->
-                        ( n,
-                          VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
-                        )
-                    )
-                      <$> (catMaybes $ sequence . swap <$> _funcArgs)
-                  vals =
-                    ( \(it, n) ->
-                        ( n,
-                          VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
-                        )
-                    )
-                      <$> (catMaybes $ sequence . swap <$> _funcVals)
-                  argVals = M.fromList $ args ++ vals
-               in runReader (statementsHelper argVals stmts) r
+modifierHelper cc c m@SolidVM.Model.CodeCollection.Modifier {..} = do
+  let r =
+        R cc c Nothing Nothing (Just m) $
+          map
+            (fmap $ isJust . _varInitialVal)
+            (filter (_isImmutable . snd) . M.toList $ _storageDefs c)
+      swap = uncurry $ flip (,)
+      args =
+        ( \(it, n) ->
+            ( T.unpack n,
+              VarDefEntry (Just $ indexedTypeType it) Nothing (T.unpack n) _modifierContext
+            )
+        )
+          <$> (swap <$> M.toList _modifierArgs)
+      contents' = case m ^. modifierContents of
+                    Nothing       -> []
+                    Just contents -> contents
+      --vals =
+      --  ( \(it, n) ->
+      --      ( n,
+      --        VarDefEntry (Just $ indexedTypeType it) Nothing n _modifierContext
+      --      )
+      --  )
+      --    <$> (catMaybes $ sequence . swap <$> _funcVals)
+      --argVals = M.fromList $ args ++ vals
+   --in runReader (statementsHelper argVals stmts) r
+     in runReader (statementsHelper (M.fromList args) contents') r
 
 functionHelper ::
   Annotated CodeCollectionF ->
@@ -1066,7 +1053,7 @@ functionHelper cc c funcName f@Func {..} =
             then case (_funcArgs, _funcVals, _funcStateMutability, _funcVisibility) of
               ([], [], Just Payable, Just External) ->
                 let r =
-                      R cc c (Just f) funcName $
+                      R cc c (Just f) (Just funcName) Nothing $
                         map
                           (fmap $ isJust . _varInitialVal)
                           (filter (_isImmutable . snd) . M.toList $ _storageDefs c)
@@ -1109,7 +1096,7 @@ functionHelper cc c funcName f@Func {..} =
                 then case (_funcArgs, _funcVals, _funcVisibility) of
                   ([], [], Just External) ->
                     let r =
-                          R cc c (Just f) funcName $
+                          R cc c (Just f) (Just funcName) Nothing $
                             map
                               (fmap $ isJust . _varInitialVal)
                               (filter (_isImmutable . snd) . M.toList $ _storageDefs c)
@@ -1148,45 +1135,28 @@ functionHelper cc c funcName f@Func {..} =
                         <$ _funcContext
                   _ -> bottom $ "Function `fallback` must be External, but has not been declared so " <$ _funcContext
             else
-              if (funcName == "modifier")
-                then case (_funcArgs, _funcVals, _funcVisibility) of
-                  (_, [fVal], _) ->
-                    bottom $
-                      ( T.concat
-                          [ "Function `modifier` must have no return values, but has been given ",
-                            T.pack $ show fVal
-                          ]
-                      )
-                        <$ _funcContext
-                                    
-
-
-
-
-    
-                else
-                  let r =
-                        R cc c (Just f) funcName $
-                          map
-                            (fmap $ isJust . _varInitialVal)
-                            (filter (_isImmutable . snd) . M.toList $ _storageDefs c)
-                      swap = uncurry $ flip (,)
-                      args =
-                        ( \(it, n) ->
-                            ( n,
-                              VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
-                            )
+              let r =
+                    R cc c (Just f) (Just funcName) Nothing $
+                      map
+                        (fmap $ isJust . _varInitialVal)
+                        (filter (_isImmutable . snd) . M.toList $ _storageDefs c)
+                  swap = uncurry $ flip (,)
+                  args =
+                    ( \(it, n) ->
+                        ( n,
+                          VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
                         )
-                          <$> (catMaybes $ sequence . swap <$> _funcArgs)
-                      vals =
-                        ( \(it, n) ->
-                            ( n,
-                              VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
-                            )
+                    )
+                      <$> (catMaybes $ sequence . swap <$> _funcArgs)
+                  vals =
+                    ( \(it, n) ->
+                        ( n,
+                          VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
                         )
-                          <$> (catMaybes $ sequence . swap <$> _funcVals)
-                      argVals = M.fromList $ args ++ vals
-                   in runReader (statementsHelper argVals stmts) r
+                    )
+                      <$> (catMaybes $ sequence . swap <$> _funcVals)
+                  argVals = M.fromList $ args ++ vals
+               in runReader (statementsHelper argVals stmts) r
 
 statementsHelper ::
   (M.Map SolidString (Annotated VarDefEntryF)) ->
@@ -1676,8 +1646,8 @@ checkIfImmuteOperationValid (Variable y a) = do
     else do
       thisFuncName <- asks functName
       let namesOfImmutesOnly = map (\x -> fst x) lstImmutNames
-      let notConstructAndImmuteAissgnedValue = (thisFuncName /= "constructor") && (a `elem` namesOfImmutesOnly)
-      let constructorAndImmuteValueOverwritten = (thisFuncName == "constructor") && ((a, True) `elem` lstImmutNames)
+      let notConstructAndImmuteAissgnedValue = ((fromMaybe "" thisFuncName) /= "constructor") && (a `elem` namesOfImmutesOnly)
+      let constructorAndImmuteValueOverwritten = ((fromMaybe "" thisFuncName) == "constructor") && ((a, True) `elem` lstImmutNames)
       if notConstructAndImmuteAissgnedValue || constructorAndImmuteValueOverwritten
         then pure . bottom $ "Immutable assignment error at" <$ y
         else tcExpr (Variable y a)

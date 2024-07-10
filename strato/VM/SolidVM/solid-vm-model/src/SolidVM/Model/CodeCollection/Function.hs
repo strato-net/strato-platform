@@ -34,10 +34,10 @@ module SolidVM.Model.CodeCollection.Function
     funcContext,
     funcIsFree,
     funcOverload,
-    modifierArgs,
-    modifierSelector,
-    modifierContents,
-    modifierContext,
+    modifierFArgs,
+    modifierFSelector,
+    modifierFContents,
+    modifierFContext,
     usingContract,
     usingType,
     usingContext,
@@ -191,10 +191,10 @@ instance FromJSON a => FromJSON (FuncF a)
 type Func = Positioned FuncF
 
 data ModifierF a = Modifier
-  { _modifierArgs :: Map Text SolidVM.IndexedType,
-    _modifierSelector :: Text,
-    _modifierContents :: Maybe [StatementF a],
-    _modifierContext :: a
+  { _modifierFArgs     :: Map Text SolidVM.IndexedType,
+    _modifierFSelector :: Text,
+    _modifierFContents :: Maybe [StatementF a],
+    _modifierFContext  :: a
   }
   deriving (Eq, Show, Generic, NFData, Functor, Foldable, Traversable)
 
