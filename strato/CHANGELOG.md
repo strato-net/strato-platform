@@ -16,6 +16,8 @@ so that they could be properly moved to their respective version's subsection.
 
 ## [Unreleased] 
 ### Added
+- `strictDecimal` pragma for decimal precision strictness
+- `truncate(uint)` built-in method for decimal numbers
 
 ### Changed
 - In Slipstream, index arrays in event tables within the event table, otherwise index them in a separate array table.
