@@ -83,7 +83,7 @@ contract A {
 }
 |]
 
-    length anns `shouldBe` 7
+    length anns `shouldBe` 9
   it "can declare constants with the correct type" $ do
     anns <-
       liftIO $
@@ -127,7 +127,7 @@ contract A {
 }
 |]
 
-    length anns `shouldBe` 7
+    length anns `shouldBe` 9
   it "can call contract functions" $ do
     anns <-
       liftIO $
@@ -394,7 +394,7 @@ contract A {
 }
 |]
 
-    length anns `shouldBe` 7
+    length anns `shouldBe` 9
   it "can declare tuple types" $ do
     anns <-
       liftIO $
@@ -848,7 +848,7 @@ contract qq {
 
 }|]
 
-    length anns `shouldBe` 1
+    length anns `shouldBe` 2
 
   it "can typecheck account(this, \"self\").chainId" $ do
     anns <-
@@ -904,7 +904,7 @@ contract A {
 }
 |]
 
-    length anns `shouldBe` 1
+    length anns `shouldBe` 2
 
   it "cannot assign an immutable a new value inside a function" $ do
     anns <-
@@ -921,7 +921,7 @@ contract A {
 }
 |]
 
-    length anns `shouldBe` 2
+    length anns `shouldBe` 3
   it "cannot incrument an immutable already assigned within the constructor" $ do
     anns <-
       liftIO $
@@ -1663,7 +1663,7 @@ contract B {
     bool shouldThrowError   = UBool.wrap(true);         //Error           -- assigning user defined to bool variable
 }
 |]
-      length anns `shouldBe` 7
+      length anns `shouldBe` 8
 
     it "can use user defined unwrap and unwrap" $ do
       anns <-
