@@ -29,7 +29,7 @@ import Data.String (IsString, fromString)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Traversable (for)
-import SolidVM.Model.CodeCollection
+import SolidVM.Model.CodeCollection hiding (modifierContext)
 import qualified SolidVM.Model.CodeCollection.Contract as Con
 import SolidVM.Model.SolidString
 import SolidVM.Model.Type (Type)
@@ -85,10 +85,10 @@ data TypeF' a
         functionArrayGetter :: Bool
       }
   | Modifier
-      { modifierArgs:: Map Text SolidVM.IndexedType,
-        modifierContext :: a,
+      { modifierArgs :: M.Map Text IndexedType,
         modifierSelector :: Text,
-        modifierContents :: Maybe [StatementF a]
+        modifierContents :: Maybe [StatementF a],
+        modifierContext :: a
       }
   deriving (Eq, Show, Functor)
 
@@ -160,7 +160,7 @@ showType' (MultiVariate a _) =
       showType' a,
       ")"
     ]
-showType' (SolidVM.Solidity.StaticAnalysis.Typechecker.Modifier _ _ _) =
+showType' (SolidVM.Solidity.StaticAnalysis.Typechecker.Modifier _ _ _ _) =
   T.empty
 
 
@@ -401,7 +401,7 @@ context' Product {..} = productContext
 context' Function {..} = functionContext
 context' (Sum (a :| _)) = context' a
 context' MultiVariate {..} = multiVariateContext
-context' Modifier {..} = modifierContext
+context' (SolidVM.Solidity.StaticAnalysis.Typechecker.Modifier _ _ _ a) = a
 
 typecheck' :: Monad m => (SourceAnnotation Text -> SolidString -> Type -> m Type') -> Type' -> Type' -> m Type'
 typecheck' unify r1 r2 = case (r1, r2) of
@@ -1022,7 +1022,7 @@ modifierHelper cc c m@SolidVM.Model.CodeCollection.Modifier {..} = do
             )
         )
           <$> (swap <$> M.toList _modifierArgs)
-      contents' = case m ^. modifierContents of
+      contents' = case m ^. SolidVM.Model.CodeCollection.modifierContents of
                     Nothing       -> []
                     Just contents -> contents
       --vals =
