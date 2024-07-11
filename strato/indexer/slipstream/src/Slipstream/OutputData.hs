@@ -106,6 +106,7 @@ data ProcessedCollectionRow = ProcessedCollectionRow
   { address :: Address,
     codehash :: CodePtr,
     creator :: Text,
+    cc_creator :: Text,
     root :: Text,
     application :: Text,
     contractname :: Text,
@@ -999,7 +1000,7 @@ insertCollectionTableQuery ms =
           mappings@((x, list) : _) ->
             let tableName =
                   collectionTableName
-                    (creator x)
+                    (cc_creator x)
                     (application x)
                     (contractname x)
                     (collectionname x)

@@ -221,7 +221,8 @@ processedCollectionRow collection ttype AggregateAction {..} ABIID {..} cregator
   ProcessedCollectionRow
     { address = actionAccount ^. accountAddress,
       codehash = actionCodeHash,
-      creator = cregator,
+      creator = actionCreator,
+      cc_creator = cregator,
       root = actionRoot,
       application = actionApplication,
       contractname = aiName,
