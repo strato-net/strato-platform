@@ -423,15 +423,11 @@ const ProductDetails = ({ user, users }) => {
                 pagination={{
                   clickable: true,
                 }}
-                autoplay={{
-                  delay: 2500,
-                  disableOnInteraction: false,
-                }}
                 modules={[Autoplay, EffectFade, Navigation, Pagination]}
                 className="product-detail-swiper"
               >    
                 {details["BlockApps-Mercata-Asset-images"].length > 0 && details["BlockApps-Mercata-Asset-images"].map((element, index) => {
-                  return (<SwiperSlide><div key={index} className="sm:w-[343px ] h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
+                  return (<SwiperSlide><div key={index} className="mx-auto sm:w-[343px ] h-[212px] lg:h-[348px]  md:h-[250px] lg:w-[417px] w-full rounded-md ">
                     <img width={"100%"}
                       alt={`${assetName} | Image ${index}`}
                       title={`${assetName} | Image ${index}`}
