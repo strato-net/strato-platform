@@ -19,9 +19,20 @@ so that they could be properly moved to their respective version's subsection.
 - CodePtr transactions can be made
 - RawTransaction now stores CodePtr information
 ### Changed
+
+### Fixed
+
+### Removed
+
+
+## [11.3.1] - 7/10/2024 
+### Added
+
+### Changed
 - In Slipstream, index arrays in event tables within the event table, otherwise index them in a separate array table.
 
 ### Fixed
+- try-catch exception handler in solidVM will throw excpetion in all cases instead of potentially `error`ing so node does not crash
 
 ### Removed
 - Removed strato-api paymentServerUrl flag
