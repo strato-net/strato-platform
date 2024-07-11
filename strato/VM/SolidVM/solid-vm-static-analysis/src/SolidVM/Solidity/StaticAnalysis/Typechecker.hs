@@ -1150,6 +1150,47 @@ functionHelper cc c funcName f@Func {..} =
                   argVals = M.fromList $ args ++ vals
                in runReader (statementsHelper argVals stmts) r
 
+statementsHelperM ::
+  (M.Map SolidString (Annotated VarDefEntryF)) ->
+  [Annotated StatementF] ->
+  Reader R Type'
+statementsHelperM args ss = do
+  fm <- asks modifier
+  case fm of
+    Nothing -> do
+      x <- asks $ _contractContext . contract
+      pure . bottom $ "Cannot use keyword 'return' outside of a function" <$ x
+    Just m -> do
+      let x = _modifierContext m
+      ~(ts', s) <- flip runStateT ((Nothing, args) :| []) $ do
+        cCalls <- for (M.assocs $ _funcConstructorCalls f) $ \(cName, exprs) -> do
+          let constructorArgs = getConstructorType' x cName
+              givenArgs = flip Product x <$> traverse tcExpr exprs
+              givenFunc = (\t -> Function t (Static (SVMType.Contract cName) x) x [] [] False) <$> givenArgs
+          constructorArgs <~> givenFunc
+        stmts' <- traverse statementHelper ss
+        pure $ concat [stmts', cCalls]
+      let ret = case fst $ NE.head s of
+            Nothing -> Product [] x
+            Just (Sum rs) ->
+              runIdentity $
+                foldr
+                  ( \a mb ->
+                      mb >>= \b -> case (a, b) of
+                        (Bottom es, Bottom ess) -> pure $ Bottom (es <> ess)
+                        (Bottom es, _) -> pure $ Bottom es
+                        (_, Bottom ess) -> pure $ Bottom ess
+                        _ -> do
+                          t' <- typecheck' ignoreTops a b
+                          case t' of
+                            Bottom _ -> pure . bottom $ "not all paths return a value." <$ x
+                            _ -> pure t'
+                  )
+                  (pure $ topType' x)
+                  (NE.toList rs)
+            Just r -> r
+      pure $ reduceType' x $ ret : ts'   
+
 statementsHelper ::
   (M.Map SolidString (Annotated VarDefEntryF)) ->
   [Annotated StatementF] ->
