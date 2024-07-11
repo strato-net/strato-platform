@@ -1025,15 +1025,6 @@ modifierHelper cc c m@SolidVM.Model.CodeCollection.Modifier {..} = do
       contents' = case m ^. SolidVM.Model.CodeCollection.modifierContents of
                     Nothing       -> []
                     Just contents -> contents
-      --vals =
-      --  ( \(it, n) ->
-      --      ( n,
-      --        VarDefEntry (Just $ indexedTypeType it) Nothing n _modifierContext
-      --      )
-      --  )
-      --    <$> (catMaybes $ sequence . swap <$> _funcVals)
-      --argVals = M.fromList $ args ++ vals
-   --in runReader (statementsHelper argVals stmts) r
      in runReader (statementsHelper (M.fromList args) contents') r
 
 functionHelper ::
