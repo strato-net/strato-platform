@@ -115,9 +115,9 @@ img.ant-image-preview-img {
   font-family: "Bricolage Grotesque", sans-serif !important;
 }
 
-.banner-btn-text{
+.banner-btn-text {
   font-family: "Inter", sans-serif;
-  color: #0439F2;
+  color: #0439f2;
   line-height: 22px;
 }
 
@@ -200,12 +200,11 @@ img.ant-image-preview-img {
   font-family: "Bricolage Grotesque", sans-serif !important;
 }
 
-.banner-arrow{
-  z-index: 24;  
- }
+.banner-arrow {
+  z-index: 24;
+}
 
 @media (min-width: 1600px) {
-
   .banner-block-container {
     margin-top: 30px;
   }
@@ -230,7 +229,7 @@ img.ant-image-preview-img {
   .banner-step-description {
     font-size: 16px;
     color: #2e51cd;
-    margin-top: 2px;
+    margin-top: 5px;
     max-width: 120px;
     font-weight: 600;
     font-family: "Bricolage Grotesque", sans-serif !important;
@@ -241,11 +240,14 @@ img.ant-image-preview-img {
     height: 48px;
   }
 
-  .banner-arrow{
-   width: 27px !important; 
-   height: 27px !important;  
+  .banner-arrow {
+    width: 27px !important;
+    height: 27px !important;
   }
 
+  .rwa-class {
+    width: 80px;
+  }
 }
 
 @media (min-width: 1400px) and (max-width: 1600px) {
@@ -273,7 +275,7 @@ img.ant-image-preview-img {
   .banner-step-description {
     font-size: 13px;
     color: #2e51cd;
-    margin-top: 2px;
+    margin-top: 5px;
     font-weight: 600;
     font-family: "Bricolage Grotesque", sans-serif !important;
   }
@@ -283,10 +285,14 @@ img.ant-image-preview-img {
     height: 40px;
   }
 
-  .banner-arrow{
-    width: 27px !important; 
-    height: 27px !important;  
-   }
+  .banner-arrow {
+    width: 27px !important;
+    height: 27px !important;
+  }
+
+  .rwa-class {
+    width: 80px;
+  }
 }
 
 @media (min-width: 1201px) and (max-width: 1399px) {
@@ -314,7 +320,8 @@ img.ant-image-preview-img {
   .banner-step-description {
     font-size: 13px;
     color: #2e51cd;
-    margin-top: 2px;
+    margin-top: 5px;
+    font-weight: 600;
     font-family: "Bricolage Grotesque", sans-serif !important;
   }
 
@@ -323,10 +330,14 @@ img.ant-image-preview-img {
     height: 40px;
   }
 
-  .banner-arrow{
-    width: 27px !important; 
-    height: 27px !important;  
-   }
+  .banner-arrow {
+    width: 27px !important;
+    height: 27px !important;
+  }
+
+  .rwa-class {
+    width: 80px;
+  }
 }
 
 @media (min-width: 1200px) {
@@ -373,10 +384,24 @@ img.ant-image-preview-img {
 
   .how_banner_text_box {
     top: 15%;
-    left: 20%;
+    left: 5%;
     font-size: 44px;
     font-weight: 900;
   }
+
+  .rwa-class {
+    width: 80px;
+  }
+
+  .swiper-pagination-bullets {
+    margin-top: -40px;
+    position: relative !important;
+  }
+
+  .product-detail-swiper {
+    max-width: 450px;
+  }
+
 }
 
 @media (min-width: 1000px) and (max-width: 1199px) {
@@ -424,18 +449,17 @@ img.ant-image-preview-img {
 
   .how_banner_text_box {
     top: 15%;
-    left: 20%;
+    left: 5%;
     font-size: 36px;
     font-weight: 900;
   }
-
 
   .banner-block-container {
     margin-top: 50px;
   }
 
   .banner-block {
-    width:  130px;
+    width: 130px;
     height: 130px;
     border-radius: 0px 44px 0px 0px;
     padding: 10px;
@@ -459,13 +483,26 @@ img.ant-image-preview-img {
   }
 
   .banner-icons {
-    width:  20px !important;
+    width: 20px !important;
     height: 24px;
   }
 
   .banner-arrow {
-    width:  12px !important;
+    width: 12px !important;
     height: 12px !important;
+  }
+
+  .rwa-class {
+    width: 80px;
+  }
+
+  .swiper-pagination-bullets {
+    margin-top: -40px;
+    position: relative !important;
+  }
+
+  .product-detail-swiper {
+    max-width: 450px;
   }
 }
 
@@ -514,19 +551,19 @@ img.ant-image-preview-img {
 
   .how_banner_text_box {
     top: 15%;
-    left: 7%;
+    left: 2%;
     font-size: 28px;
     font-weight: 900;
   }
 
   .banner-block-container {
     margin-top: 30px;
-    width: 80%;
-    margin-left: 5%;
+    width: 90%;
+    margin-left: 0%;
   }
 
   .banner-block {
-    width:  90px;
+    width: 90px;
     height: 90px;
     border-radius: 0px 24px 0px 0px;
     padding: 10px;
@@ -536,7 +573,7 @@ img.ant-image-preview-img {
   .banner-step {
     font-size: 6px;
     color: #c2c0c0;
-    margin-top: 2px;
+    margin-top: 10px;
     font-weight: 700;
     font-family: "Bricolage Grotesque", sans-serif !important;
   }
@@ -544,13 +581,13 @@ img.ant-image-preview-img {
   .banner-step-description {
     font-size: 7px;
     color: #2e51cd;
-    margin-top: 2px;
+    margin-top: 5px;
     font-weight: 600;
     font-family: "Bricolage Grotesque", sans-serif !important;
   }
 
   .banner-icons {
-    width:  14px !important;
+    width: 14px !important;
     height: 14px;
   }
 
@@ -558,6 +595,15 @@ img.ant-image-preview-img {
     width: 12px !important;
     height: 12px !important;
   }
+
+  .rwa-class {
+    width: 55px;
+  }
+
+  .product-detail-swiper {
+    max-width: 500px;
+  }
+
 }
 
 @media (min-width: 600px) and (max-width: 768px) {
@@ -605,7 +651,7 @@ img.ant-image-preview-img {
 
   .how_banner_text_box {
     top: 10px;
-    left: 6%;
+    left: 2%;
     font-size: 48px;
     font-weight: 900;
   }
@@ -613,11 +659,11 @@ img.ant-image-preview-img {
   .banner-block-container {
     margin-top: 20px;
     width: 90%;
-    margin-left: 5%;
+    margin-left: 1%;
   }
 
   .banner-block {
-    width:  90px;
+    width: 90px;
     height: 90px;
     border-radius: 0px 24px 0px 0px;
     padding: 10px;
@@ -627,7 +673,7 @@ img.ant-image-preview-img {
   .banner-step {
     font-size: 6px;
     color: #c2c0c0;
-    margin-top: 2px;
+    margin-top: 10px;
     font-weight: 700;
     font-family: "Bricolage Grotesque", sans-serif !important;
   }
@@ -635,13 +681,13 @@ img.ant-image-preview-img {
   .banner-step-description {
     font-size: 7px;
     color: #2e51cd;
-    margin-top: 2px;
+    margin-top: 5px;
     font-weight: 600;
     font-family: "Bricolage Grotesque", sans-serif !important;
   }
 
   .banner-icons {
-    width:  14px !important;
+    width: 14px !important;
     height: 14px;
   }
 
@@ -649,6 +695,15 @@ img.ant-image-preview-img {
     width: 12px !important;
     height: 12px !important;
   }
+
+  .rwa-class {
+    width: 55px;
+  }
+
+  .product-detail-swiper {
+    max-width: 600px;
+  }
+
 }
 
 @media (min-width: 481px) and (max-width: 599px) {
@@ -701,20 +756,19 @@ img.ant-image-preview-img {
 
   .how_banner_text_box {
     top: 10px;
-    left: 6%;
+    left: 1%;
     font-size: 36px;
     font-weight: 900;
   }
 
-
   .banner-block-container {
     margin-top: 40px;
-    width: 85%;
-    margin-left: 5%;
+    width: 95%;
+    margin-left: 1%;
   }
 
   .banner-block {
-    width:  80px;
+    width: 80px;
     height: 80px;
     border-radius: 0px 24px 0px 0px;
     padding: 10px;
@@ -724,7 +778,7 @@ img.ant-image-preview-img {
   .banner-step {
     font-size: 6px;
     color: #c2c0c0;
-    margin-top: 2px;
+    margin-top: 10px;
     font-weight: 700;
     font-family: "Bricolage Grotesque", sans-serif !important;
   }
@@ -732,7 +786,7 @@ img.ant-image-preview-img {
   .banner-step-description {
     font-size: 7px;
     color: #2e51cd;
-    margin-top: 2px;
+    margin-top: 5px;
     font-weight: 600;
     font-family: "Bricolage Grotesque", sans-serif !important;
   }
@@ -746,6 +800,15 @@ img.ant-image-preview-img {
     width: 12px !important;
     height: 12px !important;
   }
+
+  .rwa-class {
+    width: 55px;
+  }
+
+  .product-detail-swiper {
+    max-width: 480px;
+  }
+
 }
 
 @media (min-width: 400px) and (max-width: 480px) {
@@ -802,14 +865,14 @@ img.ant-image-preview-img {
 
   .how_banner_text_box {
     top: -10px;
-    left: 4%;
+    left: -1%;
     font-size: 20px;
     font-weight: 900;
   }
 
   .banner-block-container {
-    width: 85%;
-    margin-left: 4%;
+    width: 95%;
+    margin-left: -1%;
   }
 
   .banner-block {
@@ -823,7 +886,7 @@ img.ant-image-preview-img {
   .banner-step {
     font-size: 6px;
     color: #c2c0c0;
-    margin-top: 2px;
+    margin-top: 10px;
     font-weight: 700;
     font-family: "Bricolage Grotesque", sans-serif !important;
   }
@@ -845,6 +908,15 @@ img.ant-image-preview-img {
     width: 12px !important;
     height: 12px !important;
   }
+
+  .rwa-class {
+    width: 55px;
+  }
+
+  .product-detail-swiper {
+    max-width: 400px;
+  }
+
 }
 
 @media (max-width: 399px) {
@@ -901,13 +973,13 @@ img.ant-image-preview-img {
 
   .how_banner_text_box {
     top: -10px;
-    left: 4%;
+    left: -2%;
     font-size: 20px;
   }
 
   .banner-block-container {
-    width: 90%;
-    margin-left: 4%;
+    width: 95%;
+    margin-left: -1%;
   }
 
   .banner-block {
@@ -921,7 +993,7 @@ img.ant-image-preview-img {
   .banner-step {
     font-size: 6px;
     color: #c2c0c0;
-    margin-top: 2px;
+    margin-top: 10px;
     font-weight: 700;
     font-family: "Bricolage Grotesque", sans-serif !important;
   }
@@ -943,5 +1015,52 @@ img.ant-image-preview-img {
     width: 12px !important;
     height: 12px !important;
   }
+
+  .rwa-class {
+    width: 55px;
+  }
+  
+  .product-detail-swiper {
+    max-width: 330px;
+  }
+
 }
+
+.swiper-slide {
+  opacity: 0 !important;
+}
+
+.swiper-slide-active {
+  opacity: 1 !important;
+}
+
+/* .swiper-pagination-bullets{
+  margin-top: -40px;
+  position: relative !important;
+} */
+
+.swiper-button-prev:after{
+  content: '' !important;
+  display: block;
+  width:  24px; 
+  height: 24px; 
+  background-image: url('../../images/resources/carouselArrow.png');
+  background-size: contain; 
+  background-repeat: no-repeat; 
+  transform: scale(2) rotate(180deg);
+  margin-top: 140px;
+}
+
+.swiper-button-next:after {
+  content: '' !important;
+  display: block;
+  width: 24px; 
+  height: 24px; 
+  background-image: url('../../images/resources/carouselArrow.png');
+  background-size: contain; 
+  background-repeat: no-repeat;
+  transform: scale(2);
+  margin-top: 140px;
+}
+
 

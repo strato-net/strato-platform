@@ -346,7 +346,7 @@ export const BANNER = [
     label: "How",
     link: "/c/All",
     text: <>
-      <Row>
+      <Row style={{width:'90%', margin:'auto'}}>
         <Col xs={24} md={24} lg={8} >
           <h1 className="how_banner_text_box banner-text"> How It Works </h1>
         </Col>
@@ -358,11 +358,11 @@ export const BANNER = [
             <img
               src={item.icon}
               // style={{ width: '42px', height: '48px' }}
-              className="flex ml-auto banner-icons"
+              className="flex banner-icons"
               alt={`icon-${index + 1}`}
             />
-            <p className="banner-step">{item.step}</p>
-            <p className="banner-step-description">{item.description}</p>
+            <p className="banner-step">Step {index+1}</p>
+            <p className={`banner-step-description ${index===2 && `rwa-class`}`}>{item.description}</p>
           </div>
           {index < bannerConfig.length - 1 && (
             <img
