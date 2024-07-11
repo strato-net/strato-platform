@@ -31,8 +31,6 @@ import 'swiper/css/autoplay';
 import { EffectFade, Navigation, Pagination, Autoplay } from 'swiper/modules';
 
 
-
-
 const MarketPlace = ({ user, isAuthenticated }) => {
   const limit = 10, offset = 0;
   const navigate = useNavigate();
@@ -114,7 +112,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
         clickable: true,
       }}
       autoplay={{
-        delay: 2500,
+        delay: 4000,
         disableOnInteraction: false,
       }}
       modules={[Autoplay, EffectFade, Navigation, Pagination]}

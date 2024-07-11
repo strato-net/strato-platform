@@ -105,6 +105,7 @@ img.ant-image-preview-img {
 
 .gradient-button:hover {
   background: linear-gradient(90deg, #4f46e5 0%, #fb7185 100%);
+  color: white !important;
 }
 
 .gradient-button:hover .bannerArrow path {
@@ -117,7 +118,6 @@ img.ant-image-preview-img {
 
 .banner-btn-text {
   font-family: "Inter", sans-serif;
-  color: #0439f2;
   line-height: 22px;
 }
 
