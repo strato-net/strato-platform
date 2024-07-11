@@ -106,7 +106,7 @@ data ProcessedCollectionRow = ProcessedCollectionRow
   { address :: Address,
     codehash :: CodePtr,
     creator :: Text,
-    cc_creator :: Text,
+    cc_creator :: Maybe Text,
     root :: Text,
     application :: Text,
     contractname :: Text,
@@ -948,7 +948,13 @@ insertIndexTableQuery :: (E.ProcessedContract, [T.Text]) -> Text -- does not acc
 insertIndexTableQuery cs = 
     let cs' = (\(c@E.ProcessedContract {contractData = contractData}, fkeys) -> ((c, Map.toList $ Map.mapMaybe valueToSQLTextFilterContract $ contractData), fkeys)) cs
         processContract ((contract, list), fkeys) =
-            let tableName = indexTableName (E.creator contract) (E.application contract) (E.contractName contract)
+            let tableName = 
+                  indexTableName 
+                    (case (E.cc_creator contract) of 
+                      Just cc_creator' -> cc_creator' 
+                      Nothing -> (E.creator contract)) 
+                    (E.application contract)
+                    (E.contractName contract)
                 fkeyColumns = [T.pack ((T.unpack k) ++ "_fkey") | k <- fkeys]
                 keysForSQL = map fst list ++ fkeyColumns
                 keySt = wrapAndEscapeDouble . map escapeQuotes $ baseColumns ++ keysForSQL
@@ -1000,7 +1006,9 @@ insertCollectionTableQuery ms =
           mappings@((x, list) : _) ->
             let tableName =
                   collectionTableName
-                    (cc_creator x)
+                    (case (cc_creator x) of 
+                      Just cc_creator' -> cc_creator'
+                      Nothing -> (creator x))
                     (application x)
                     (contractname x)
                     (collectionname x)

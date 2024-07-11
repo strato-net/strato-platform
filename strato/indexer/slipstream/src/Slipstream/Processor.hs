@@ -120,15 +120,15 @@ data ABIID = ABIID
 
 processedContract ::
   ABIID ->
-  Text ->
   Map.Map Text Value ->
   AggregateAction ->
   E.ProcessedContract
-processedContract ABIID {..} cregator state AggregateAction {..} =
+processedContract ABIID {..} state AggregateAction {..} =
   E.ProcessedContract
     { address = actionAccount ^. accountAddress,
       codehash = actionCodeHash,
-      creator = cregator,
+      creator = actionCreator,
+      cc_creator = actionCCCreator,
       root = actionRoot,
       application = actionApplication,
       contractName = aiName,
@@ -152,17 +152,16 @@ rowToInsert ::
   MonadIO m =>
   IORef Globals ->
   ABIID ->
-  Text ->
   AggregateAction ->
   OLD.Contract ->
   [(Text, Value)] ->
   m E.ProcessedContract
-rowToInsert gref abiid cregator row cont oldState = do
+rowToInsert gref abiid row cont oldState = do
   let newState = case actionStorage row of
         Action.EVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp) oldState
         Action.SolidVMDiff mp -> SolidVM.decodeCacheValues mp oldState
   setContractState gref (actionAccount row) newState
-  return $ processedContract abiid cregator (Map.fromList $ newState) row
+  return $ processedContract abiid (Map.fromList $ newState) row
 
 rowToCollections :: MonadIO m => AggregateAction -> m (Map.Map Text Value)
 rowToCollections row = do
@@ -171,7 +170,7 @@ rowToCollections row = do
         _ -> []
   return $ (Map.fromList $ newState)
 
-processedContractToProcessedCollectionRows :: MonadIO m => Map.Map Text Value -> [Text] -> AggregateAction -> ABIID -> Text ->m [ProcessedCollectionRow]
+processedContractToProcessedCollectionRows :: MonadIO m => Map.Map Text Value -> [Text] -> AggregateAction -> ABIID -> Maybe Text ->m [ProcessedCollectionRow]
 processedContractToProcessedCollectionRows state mapAndArrayNames row abiid cregator = do
   let valueCollectionsMap = Map.filter (\value -> case value of 
                                                       ValueMapping _ -> True 
@@ -203,20 +202,19 @@ rowToHistories ::
   (MonadIO m) =>
   IORef Globals ->
   ABIID ->
-  Text ->
   [AggregateAction] ->
   OLD.Contract ->
   [(Text, Value)] ->
   m [E.ProcessedContract]
-rowToHistories _ abiId cregator actions cont oldState = do
+rowToHistories _ abiId actions cont oldState = do
   flip evalStateT oldState . forM actions $ \hRow -> do
     modify $ case actionStorage hRow of
       Action.EVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp)
       Action.SolidVMDiff mp -> SolidVM.decodeCacheValues mp
     newMap <- gets Map.fromList
-    return $ processedContract abiId cregator newMap hRow
+    return $ processedContract abiId newMap hRow
 
-processedCollectionRow :: Text -> Text -> AggregateAction -> ABIID -> Text ->Value -> Value -> ProcessedCollectionRow
+processedCollectionRow :: Text -> Text -> AggregateAction -> ABIID -> Maybe Text -> Value -> Value -> ProcessedCollectionRow
 processedCollectionRow collection ttype AggregateAction {..} ABIID {..} cregator k v =
   ProcessedCollectionRow
     { address = actionAccount ^. accountAddress,
@@ -237,11 +235,11 @@ processedCollectionRow collection ttype AggregateAction {..} ABIID {..} cregator
       collectionDataValue = v
     }
 
-processArrayFixed :: Text -> AggregateAction -> ABIID -> Text -> (Int, Value) -> ProcessedCollectionRow
+processArrayFixed :: Text -> AggregateAction -> ABIID -> Maybe Text -> (Int, Value) -> ProcessedCollectionRow
 processArrayFixed mName row abiid cregator (index, value) =
   processedCollectionRow mName (T.pack "Array") row abiid cregator (SimpleValue (ValueInt False Nothing (fromIntegral index))) value
 
-processArrayDynamic :: Text -> AggregateAction -> ABIID -> Text -> (Int, Value) -> ProcessedCollectionRow
+processArrayDynamic :: Text -> AggregateAction -> ABIID -> Maybe Text -> (Int, Value) -> ProcessedCollectionRow
 processArrayDynamic mName row abiid cregator (index, value) =
   processedCollectionRow mName (T.pack "Array") row abiid cregator (SimpleValue (ValueInt False Nothing (fromIntegral index))) value
 
@@ -422,10 +420,9 @@ processTheMessages env conn messages = do
               cont = error "internal error: contract should be unused for SolidVM"
           $logInfoLS "Contract name is: " $ T.pack $ show name
           oldState <- readPreviousSolidVMState g acct
-          let cregator' = fromMaybe (actionCreator row) (actionCCCreator row) -- override cr' if actionCCCreator is Just 
-          indexContract <- rowToInsert g abiid cregator' row cont oldState
+          indexContract <- rowToInsert g abiid row cont oldState
           let fkeysForThisContract = getContractsFromPC indexContract
-          hs <- rowToHistories g abiid cregator' actions cont oldState
+          hs <- rowToHistories g abiid actions cont oldState
           let mapNames = actionMappings row --recorded mappings
               arrNames = actionArrays row --all
               collectionNames = mapNames ++ arrNames
@@ -447,7 +444,7 @@ processTheMessages env conn messages = do
           stateDiff <- rowToCollections row
           parents' <- pure $ map (\(_,_,_,p ,_)-> p) abstractColumns'
           abstractColumns <- pure $ map (\(a,b,c,_,e) -> (a,b,c,e)) abstractColumns'
-          pCollections <- processedContractToProcessedCollectionRows stateDiff (collectionNames) row abiid cregator' --get all collection rows to insert
+          pCollections <- processedContractToProcessedCollectionRows stateDiff (collectionNames) row abiid (actionCCCreator row) --get all collection rows to insert
           pCollectionsWithAbstracts <- pure $ duplicateForParentsAndIncludeOriginal pCollections parents'
           pure . Right $ BatchedInserts (indexContract, fkeysForThisContract) abstractColumns hs pCollectionsWithAbstracts
 
