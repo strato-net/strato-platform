@@ -1025,7 +1025,7 @@ modifierHelper cc c m@SolidVM.Model.CodeCollection.Modifier {..} = do
       contents' = case m ^. SolidVM.Model.CodeCollection.modifierContents of
                     Nothing       -> []
                     Just contents -> contents
-     in runReader (statementsHelper (M.fromList args) contents') r
+     in runReader (statementsHelperM (M.fromList args) contents') r
 
 functionHelper ::
   Annotated CodeCollectionF ->
@@ -1163,13 +1163,14 @@ statementsHelperM args ss = do
     Just m -> do
       let x = _modifierContext m
       ~(ts', s) <- flip runStateT ((Nothing, args) :| []) $ do
-        cCalls <- for (M.assocs $ _funcConstructorCalls f) $ \(cName, exprs) -> do
-          let constructorArgs = getConstructorType' x cName
-              givenArgs = flip Product x <$> traverse tcExpr exprs
-              givenFunc = (\t -> Function t (Static (SVMType.Contract cName) x) x [] [] False) <$> givenArgs
-          constructorArgs <~> givenFunc
+        --cCalls <- for (M.assocs $ _funcConstructorCalls f) $ \(cName, exprs) -> do
+        --  let constructorArgs = getConstructorType' x cName
+        --      givenArgs = flip Product x <$> traverse tcExpr exprs
+        --      givenFunc = (\t -> Function t (Static (SVMType.Contract cName) x) x [] [] False) <$> givenArgs
+        --  constructorArgs <~> givenFunc
         stmts' <- traverse statementHelper ss
-        pure $ concat [stmts', cCalls]
+        pure stmts'
+        --pure $ concat [stmts', cCalls]
       let ret = case fst $ NE.head s of
             Nothing -> Product [] x
             Just (Sum rs) ->
