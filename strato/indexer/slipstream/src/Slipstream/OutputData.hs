@@ -1188,7 +1188,9 @@ insertHistoryTableQuery cs =
           contracts@((x, list) : _) ->
             let tableName =
                   historyTableName
-                    (E.creator x)
+                    (case (E.cc_creator x) of 
+                      Just cc_creator' -> cc_creator'
+                      Nothing -> (E.creator x))
                     (E.application x)
                     (E.contractName x)
                 keySt = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst (fillFirstEmptyEntries list)
