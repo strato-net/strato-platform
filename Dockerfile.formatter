@@ -7,5 +7,3 @@ RUN stack upgrade # hotfix for issue with stack 2.13.1 (provided in fpco/stack-b
 RUN stack install ormolu implicit-hie
 
 WORKDIR /strato-platform
-
-ADD . .
