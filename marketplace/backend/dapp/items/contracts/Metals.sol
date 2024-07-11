@@ -34,6 +34,7 @@ contract Metals is Mintable, UnitOfMeasurement{
         string _description,
         string[] _images,
         string[] _files,
+        string[] _fileNames,
         uint _createdDate,
         uint _quantity,
         UnitOfMeasurement _unitOfMeasurement,
@@ -46,6 +47,7 @@ contract Metals is Mintable, UnitOfMeasurement{
         _description,
         _images,
         _files,
+        _fileNames,
         _createdDate,
         _quantity,
         _status
@@ -62,6 +64,7 @@ contract Metals is Mintable, UnitOfMeasurement{
                               description, 
                               images, 
                               files, 
+                              fileNames,
                               createdDate, 
                               splitQuantity,
                               unitOfMeasurement,
