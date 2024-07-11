@@ -77,10 +77,10 @@ const MarketPlace = ({ user, isAuthenticated }) => {
       className="gradient-button border-0 h-auto md:h-11 border-primary bg-white text-primary hover:text-white"
     >
       <div className="flex items-center">
-        <div className="hidden sm:block font-semibold text-lg">
+        <div className="hidden sm:block font-semibold text-lg banner-btn-text">
           {desktopText}
         </div>
-        <div className="sm:hidden font-semibold text-base">
+        <div className="sm:hidden font-semibold text-base banner-btn-text">
           {mobileText}
         </div>
         <span className="ml-1">{bannerArrow}</span>

@@ -115,6 +115,12 @@ img.ant-image-preview-img {
   font-family: "Bricolage Grotesque", sans-serif !important;
 }
 
+.banner-btn-text{
+  font-family: "Inter", sans-serif;
+  color: #0439F2;
+  line-height: 22px;
+}
+
 .banner-text > h1 {
   font-family: "Bricolage Grotesque", sans-serif !important;
 }
@@ -938,3 +944,4 @@ img.ant-image-preview-img {
     height: 12px !important;
   }
 }
+
