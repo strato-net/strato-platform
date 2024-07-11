@@ -171,8 +171,8 @@ rowToCollections row = do
         _ -> []
   return $ (Map.fromList $ newState)
 
-processedContractToProcessedCollectionRows :: MonadIO m => Map.Map Text Value -> [Text] -> AggregateAction -> ABIID -> m [ProcessedCollectionRow]
-processedContractToProcessedCollectionRows state mapAndArrayNames row abiid = do
+processedContractToProcessedCollectionRows :: MonadIO m => Map.Map Text Value -> [Text] -> AggregateAction -> ABIID -> Text ->m [ProcessedCollectionRow]
+processedContractToProcessedCollectionRows state mapAndArrayNames row abiid cregator = do
   let valueCollectionsMap = Map.filter (\value -> case value of 
                                                       ValueMapping _ -> True 
                                                       ValueArrayFixed _ _ -> True 
@@ -192,11 +192,11 @@ processedContractToProcessedCollectionRows state mapAndArrayNames row abiid = do
           processRecord (mName, value) = 
             case value of
               Left theMap -> 
-                map (\(k, v) -> processedCollectionRow mName (T.pack "Mapping") row abiid (SimpleValue k) v) (Map.toList theMap)
+                map (\(k, v) -> processedCollectionRow mName (T.pack "Mapping") row abiid cregator (SimpleValue k) v) (Map.toList theMap)
               Right (Left arrayValues) -> 
-                map (processArrayFixed mName row abiid) (zip [0..] arrayValues)
+                map (processArrayFixed mName row abiid cregator) (zip [0..] arrayValues)
               Right (Right intMapValues) -> 
-                map (processArrayDynamic mName row abiid) (I.toList intMapValues)
+                map (processArrayDynamic mName row abiid cregator) (I.toList intMapValues)
       return result
 
 rowToHistories ::
@@ -216,12 +216,12 @@ rowToHistories _ abiId cregator actions cont oldState = do
     newMap <- gets Map.fromList
     return $ processedContract abiId cregator newMap hRow
 
-processedCollectionRow :: Text -> Text -> AggregateAction -> ABIID -> Value -> Value -> ProcessedCollectionRow
-processedCollectionRow collection ttype AggregateAction {..} ABIID {..} k v =
+processedCollectionRow :: Text -> Text -> AggregateAction -> ABIID -> Text ->Value -> Value -> ProcessedCollectionRow
+processedCollectionRow collection ttype AggregateAction {..} ABIID {..} cregator k v =
   ProcessedCollectionRow
     { address = actionAccount ^. accountAddress,
       codehash = actionCodeHash,
-      creator = actionCreator,
+      creator = cregator,
       root = actionRoot,
       application = actionApplication,
       contractname = aiName,
@@ -236,13 +236,13 @@ processedCollectionRow collection ttype AggregateAction {..} ABIID {..} k v =
       collectionDataValue = v
     }
 
-processArrayFixed :: Text -> AggregateAction -> ABIID -> (Int, Value) -> ProcessedCollectionRow
-processArrayFixed mName row abiid (index, value) =
-  processedCollectionRow mName (T.pack "Array") row abiid (SimpleValue (ValueInt False Nothing (fromIntegral index))) value
+processArrayFixed :: Text -> AggregateAction -> ABIID -> Text -> (Int, Value) -> ProcessedCollectionRow
+processArrayFixed mName row abiid cregator (index, value) =
+  processedCollectionRow mName (T.pack "Array") row abiid cregator (SimpleValue (ValueInt False Nothing (fromIntegral index))) value
 
-processArrayDynamic :: Text -> AggregateAction -> ABIID -> (Int, Value) -> ProcessedCollectionRow
-processArrayDynamic mName row abiid (index, value) =
-  processedCollectionRow mName (T.pack "Array") row abiid (SimpleValue (ValueInt False Nothing (fromIntegral index))) value
+processArrayDynamic :: Text -> AggregateAction -> ABIID -> Text -> (Int, Value) -> ProcessedCollectionRow
+processArrayDynamic mName row abiid cregator (index, value) =
+  processedCollectionRow mName (T.pack "Array") row abiid cregator (SimpleValue (ValueInt False Nothing (fromIntegral index))) value
 
 -- Prioritizing with-source actions prevents the issue where updates to contracts
 -- at different addresses are lost because the schema has not been seen yet.
@@ -446,7 +446,7 @@ processTheMessages env conn messages = do
           stateDiff <- rowToCollections row
           parents' <- pure $ map (\(_,_,_,p ,_)-> p) abstractColumns'
           abstractColumns <- pure $ map (\(a,b,c,_,e) -> (a,b,c,e)) abstractColumns'
-          pCollections <- processedContractToProcessedCollectionRows stateDiff (collectionNames) row abiid --get all collection rows to insert
+          pCollections <- processedContractToProcessedCollectionRows stateDiff (collectionNames) row abiid cregator' --get all collection rows to insert
           pCollectionsWithAbstracts <- pure $ duplicateForParentsAndIncludeOriginal pCollections parents'
           pure . Right $ BatchedInserts (indexContract, fkeysForThisContract) abstractColumns hs pCollectionsWithAbstracts
 
