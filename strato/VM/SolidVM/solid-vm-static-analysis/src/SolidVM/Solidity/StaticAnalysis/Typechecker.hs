@@ -1163,14 +1163,8 @@ statementsHelperM args ss = do
     Just m -> do
       let x = _modifierContext m
       ~(ts', s) <- flip runStateT ((Nothing, args) :| []) $ do
-        --cCalls <- for (M.assocs $ _funcConstructorCalls f) $ \(cName, exprs) -> do
-        --  let constructorArgs = getConstructorType' x cName
-        --      givenArgs = flip Product x <$> traverse tcExpr exprs
-        --      givenFunc = (\t -> Function t (Static (SVMType.Contract cName) x) x [] [] False) <$> givenArgs
-        --  constructorArgs <~> givenFunc
         stmts' <- traverse statementHelper ss
         pure stmts'
-        --pure $ concat [stmts', cCalls]
       let ret = case fst $ NE.head s of
             Nothing -> Product [] x
             Just (Sum rs) ->
