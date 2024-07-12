@@ -15,7 +15,8 @@ abstract contract SemiFungible is Mintable {
         string[] _fileNames,
         uint _createdDate,
         uint _quantity,
-        AssetStatus _status
+        AssetStatus _status,
+        address _redemptionService
     ) Mintable (
         _name,
         _description,
@@ -24,7 +25,8 @@ abstract contract SemiFungible is Mintable {
         _fileNames,
         _createdDate,
         _quantity,
-        _status
+        _status,
+        _redemptionService
     ) {
     }
 
@@ -36,7 +38,8 @@ abstract contract SemiFungible is Mintable {
                               fileNames,
                               createdDate, 
                               splitQuantity,
-                              status
+                              status,
+                              address(redemptionService)
                               );
         return UTXO(address(sf)); // Typechecker won't let me cast directly to UTXO
     }

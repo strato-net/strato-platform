@@ -93,7 +93,9 @@ const InvoiceComponent = ({ invoice }) => {
     settotalTax(tax);
     setSubtotal(invoice.order.totalPrice - tax);
   }, [invoice])
-  const orderQuantities = invoice.order["BlockApps-Mercata-Order-quantities"].map(item => item.value);
+  const orderQuantities = invoice.order["BlockApps-Mercata-Order-quantities"] ?
+                          invoice.order["BlockApps-Mercata-Order-quantities"].map(item => item.value) :
+                          invoice.order.quantities;
   return (
     <Document>
       <Page size="A4" style={styles.page}>
