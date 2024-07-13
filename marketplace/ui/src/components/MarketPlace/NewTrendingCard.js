@@ -88,8 +88,6 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
         setIsModalVisible(false);
     };
 
-    const googleFormBaseURL = "https://docs.google.com/forms/d/e/1FAIpQLSfEWqALizqd-Rg3OPTwxD5O6xJKqT0xEgHeKpSpnaWzZ7tn1Q/viewform?usp=pp_url";
-    const preFilledFormURL = `${googleFormBaseURL}&entry.8090980=${encodeURIComponent(topSellingProduct?.name)}&entry.1160788377=${encodeURIComponent(topSellingProduct?.ownerCommonName)}&entry.1571372307=${encodeURIComponent(user?.commonName)}`;
 
     return (
         <>
@@ -135,9 +133,10 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     {topSellingProduct?.price &&
                         <Typography className="font-semibold">
-                            {`$${topSellingProduct?.price} `}
-                            <a href={preFilledFormURL} target="_blank" rel="noreferrer noopener" className="font-normal text-xs mr-2">{`(${topSellingProduct?.price * STRATS_CONVERSION} STRATS)`}</a>
-                        </Typography>}
+                        {`$${topSellingProduct?.price} `} <span className="font-normal text-xs mr-2 text-primary"><b> {`(${topSellingProduct?.price * STRATS_CONVERSION} STRATS)`} </b></span>
+                    </Typography>
+                    
+                    }
                     {isAvailableForSale && <Text type="danger" strong> Sold Out </Text>}
                     {topSellingProduct?.contract_name.toLowerCase().includes("clothing") && (
                         <Typography className='font-normal text-black'>Size: {topSellingProduct?.data?.size ? topSellingProduct?.data?.size : "N/A"}</Typography>

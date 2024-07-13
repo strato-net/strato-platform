@@ -89,6 +89,10 @@ build_buildbase:
 	@echo building buildbase...
 	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=strato-buildbase:${STACK_RESOLVER} - < Dockerfile.buildbase
 
+build_formatter:
+	@echo building code formatter...
+	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=strato-formatter:${STACK_RESOLVER} - < Dockerfile.formatter
+
 build_common: build_buildbase
 	@echo building haskell libraries and creating directories
 	mkdir -p ${HIGHWAYDIR}
@@ -121,11 +125,13 @@ build_common_fast: build_buildbase
 		--fast --no-run-tests \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
 
-pretty: build_buildbase
+pretty: build_formatter
 	@echo formatting STRATO Haskell code...
-	cd strato && \
-		gen-hie > hie.yaml && \
-		ormolu --mode inplace `git ls-files '*.hs'`
+	docker run --rm -v .:/strato-platform strato-formatter:${STACK_RESOLVER} ormolu --mode inplace `git ls-files '*.hs'`
+
+gen-hie: build_formatter develop
+	@echo generating hie.yaml file...
+	docker run --rm -v .:/strato-platform strato-formatter:${STACK_RESOLVER} `cd strato && gen-hie > hie.yaml`
 
 hoogle: build_buildbase
 	@echo generating and serving STRATO documentation...
