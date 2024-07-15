@@ -133,6 +133,12 @@ if __name__ == "__main__":
     discrepancies_sale, count_sale_discrepancy = check_table("BlockApps-Mercata-Order")
     discrepancies_order, count_order_discrepancy = check_table("BlockApps-Mercata-Sale")
 
+    #Event tables
+    discrepancies_asset_its, count_asset_its_discrepancy = check_table("BlockApps-Mercata-Asset.ItemTransfers")
+
+    #Colletion tables
+    discrepancies_asset_files, count_asset_files_discrepancy = check_table("BlockApps-Mercata-Asset-files")
+
     # Print the results
     print("\nFinal check summary:")
     print(f"Asset Discrepancies: {'Yes' if discrepancies_asset else 'No'}")
