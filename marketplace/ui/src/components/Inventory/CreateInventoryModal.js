@@ -6,7 +6,6 @@ import {
   Select,
   Button,
   Upload,
-  notification,
 } from "antd";
 import TagManager from "react-gtm-module";
 
@@ -17,11 +16,11 @@ import {
 import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
 import { actions as redemptionActions } from "../../contexts/redemption/actions";
 import { actions } from "../../contexts/inventory/actions";
-import TextArea from "antd/es/input/TextArea";
 import { INVENTORY_MODAL_INITIAL_VALUES, SIZES, unitOfMeasures, unitOfSpiritMeasures } from "../../helpers/constants";
 import { categoricalProperties } from "./CategoryFields";
 import RichEditor from "../RichEditor";
 import { UPLOAD_ERROR } from "../../helpers/msgConstants";
+import { showToast } from "../Notification/ToastComponent";
 
 const { Option } = Select;
 
@@ -36,7 +35,6 @@ const CreateInventoryModal = ({
 }) => {
   const [form] = Form.useForm();
   const dispatch = useInventoryDispatch();
-  const [api, contextHolder] = notification.useNotification();
   const { isCreateInventorySubmitting, isUploadImageSubmitting } =
     useInventoryState();
 
@@ -181,15 +179,6 @@ const CreateInventoryModal = ({
     }
   };
 
-  const openToast = (placement) => {
-    api.error({
-      message: uploadErr,
-      onClose: setUploadErr(""),
-      placement,
-      key: 1,
-    });
-  };
-
   const handleClothingTypeChange = (value) => {
     setClothingType(value);
     form.setFieldValue("clothingType", value);
@@ -265,7 +254,6 @@ const CreateInventoryModal = ({
 
   return (
     <>
-      {contextHolder}
       <Modal
         open={open}
         centered
@@ -421,7 +409,12 @@ const CreateInventoryModal = ({
           </div>
         </Form>
       </Modal>
-      {uploadErr && openToast("bottom")}
+      {uploadErr && showToast({
+        message: uploadErr,
+        onClose: setUploadErr(""),
+        success: false,
+        placement: 'bottom',
+      })}
     </>
   );
 };

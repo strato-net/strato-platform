@@ -37,6 +37,7 @@ import RedemptionsOutgoingTable from "./RedemptionsOutgoingTable";
 import RedemptionsIncomingTable from "./RedemptionsIncomingTable";
 import { ResponsiveOrderDetailCard } from "./ResponsiveOrderDetailCard";
 import { LeftArrow } from "../../images/SVGComponents";
+import { showToast } from "../Notification/ToastComponent";
 
 
 const BoughtOrderDetails = ({ user, users }) => {
@@ -45,7 +46,6 @@ const BoughtOrderDetails = ({ user, users }) => {
   const [data, setdata] = useState([]);
   const dispatch = useOrderDispatch();
   const { Text } = Typography;
-  const [api, contextHolder] = notification.useNotification();
   const [status, setStatus] = useState(getStatus(0));
   const { TextArea } = Input;
   const [paid, setPaid] = useState("Processing");
@@ -53,24 +53,6 @@ const BoughtOrderDetails = ({ user, users }) => {
   const { state } = useLocation()
 
   const navigate = useNavigate();
-
-  const openToastOrder = (placement) => {
-    if (success) {
-      api.success({
-        message: message,
-        onClose: actions.resetMessage(dispatch),
-        placement,
-        key: 1,
-      });
-    } else {
-      api.error({
-        message: message,
-        onClose: actions.resetMessage(dispatch),
-        placement,
-        key: 2,
-      });
-    }
-  };
 
   const {
     orderDetails,
@@ -341,7 +323,6 @@ const BoughtOrderDetails = ({ user, users }) => {
 
   return (
     <div>
-      {contextHolder}
         <div>
           <Breadcrumb className="text-sm ml-4 md:ml-20 mt-4 md:mt-5 mb-2">
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
@@ -512,7 +493,12 @@ const BoughtOrderDetails = ({ user, users }) => {
           />
         </div>
 
-      {message && openToastOrder("bottom")}
+      {message && showToast({
+          message: message,
+          onClose: actions.resetMessage(dispatch),
+          success: success,
+          placement: 'bottom',
+        })}
     </div>
   );
 };

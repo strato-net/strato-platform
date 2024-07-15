@@ -27,13 +27,13 @@ import { actions as categoryActions } from "../../contexts/category/actions";
 import InventoryCard from "../Inventory/InventoryCard";
 import { useItemDispatch, useItemState } from "../../contexts/item";
 import { actions as itemActions } from "../../contexts/item/actions";
-import ClickableCell from "../ClickableCell";
+// import ClickableCell from "../ClickableCell";
 import { homeUrl, soldOrderDetailssBaseUrl, soldOrdersBaseUrl, boughtOrderDetailssBaseUrl, boughtOrdersBaseUrl, transfersBaseUrl } from "../../helpers/constants";
-
+import { showToast } from "../Notification/ToastComponent";
+import { TOAST_MSG } from "../../helpers/msgConstants";
 
 
 const UserProfile = ({user}) => {
-
 
   const [commonName, setCommonName] = useState(undefined);
   const [activeTab, setActiveTab] = useState('1');
@@ -41,7 +41,6 @@ const UserProfile = ({user}) => {
   const categoryDispatch = useCategoryDispatch();
   const [category, setCategory] = useState(undefined);
   const { cartList } = useMarketplaceState();
-  const [api, contextHolder] = notification.useNotification();
   const marketplaceDispatch = useMarketplaceDispatch();
   const { userInventories, isUserInventoriesLoading, inventories, isInventoriesLoading, message, success, inventoriesTotal } = useInventoryState();
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
@@ -65,7 +64,6 @@ const UserProfile = ({user}) => {
   const [breadcrumbs, setBreadcrumbs] = useState([{ text: 'Home', path: homeUrl }]);
   
   const params = useParams();
-
 
     //items
   const itemDispatch = useItemDispatch();
@@ -204,49 +202,15 @@ const UserProfile = ({user}) => {
       setBreadcrumbs(initialBreadcrumbs);
     }, [location, isOwner]);
   
-    
-    //helper
-    const itemToast = (placement) => {
-      if (itemSuccess) {
-        api.success({
-          message: itemMsg,
-          onClose: itemActions.resetMessage(itemDispatch),
-          placement,
-          key: 3,
-        });
-      } else {
-        api.error({
-          message: itemMsg,
-          onClose: itemActions.resetMessage(itemDispatch),
-          placement,
-          key: 4,
-        });
-      }
-    };
-
-    //helper
-    const openToast = (placement) => {
-      if (success) {
-        api.success({
-          message: message,
-          onClose: inventoryActions.resetMessage(dispatch),
-          placement,
-          key: 1,
-        });
-      } else {
-        api.error({
-          message: message,
-          onClose: inventoryActions.resetMessage(dispatch),
-          placement,
-          key: 2,
-        });
-      }
-    };
 
     //helper
     const addItemToCart = async (product, quantity) => {
       if (product.ownerCommonName === user?.commonName) {
-        openToast("bottom", true, "Cannot buy your own item");
+        showToast({
+          message: TOAST_MSG.CANNOT_BUY_OWN_ITEM,
+          success: false,
+          placement: 'bottom',
+        });
         return false;
       }
 
@@ -261,11 +225,19 @@ const UserProfile = ({user}) => {
           // Quantity check passed, add new item to the cart
           items.push({ product, qty: quantity });
           marketplaceActions.addItemToCart(marketplaceDispatch, items);
-          openToast("bottom", false, "Item added to cart");
+          showToast({
+            message: TOAST_MSG.ITEM_ADDED_TO_CART,
+            success: true,
+            placement: 'bottom',
+          });
           return true;
         } else {
           // Not enough quantity, inform the user
-          openToast("bottom", true, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantity to continue.`);
+          showToast({
+            message: `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantity to continue.`,
+            success: false,
+            placement: 'bottom',
+          });
           return false;
         }
       } else {
@@ -276,11 +248,19 @@ const UserProfile = ({user}) => {
           // Quantity check passed, update item quantity in the cart
           items[foundIndex].qty = potentialNewQty;
           marketplaceActions.addItemToCart(marketplaceDispatch, items);
-          openToast("bottom", false, "Item updated in cart");
+          showToast({
+            message: TOAST_MSG.ITEM_UPDATED_IN_CART,
+            success: true,
+            placement: 'bottom',
+          });
           return true;
         } else {
           // Not enough quantity, inform the user
-          openToast("bottom", true, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantity to continue.`);
+          showToast({
+            message: `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantity to continue.`,
+            success: false,
+            placement: 'bottom',
+          });
           return false;
         }
       }
@@ -496,19 +476,15 @@ const UserProfile = ({user}) => {
 
 
         {!isOwner && (
-
         <TabPane tab="Assets For Sale" key="1">
-          
             {/* Assets of the User */}
-
-            {isUserInventoriesLoading ?
-              <div className="h-96 w-full flex justify-center items-center">
+            {isUserInventoriesLoading 
+            ? <div className="h-96 w-full flex justify-center items-center">
                 <Spin spinning={isUserInventoriesLoading} size="large" />
               </div>
-              :
-              <div className="mt-4 md:mt-4 mb-8 w-full" id="product-list">
-                {userInventories?.length > 0 ? (
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            : <div className="mt-4 md:mt-4 mb-8 w-full" id="product-list">
+                {userInventories?.length > 0 
+                ? (<div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {userInventories.map((product, index) => (
                       <NewTrendingCard
                         topSellingProduct={product}
@@ -517,15 +493,14 @@ const UserProfile = ({user}) => {
                         isUserProfile={true}
                       />
                     ))}
-                  </div>
-                ) : (
+                  </div>) 
+                : (
                   <div className="h-96 flex justify-center items-center">
                     No Assets Found
                   </div>
                 )}
               </div>
             }
-
         </TabPane>
         )}
 
@@ -533,8 +508,8 @@ const UserProfile = ({user}) => {
         {isOwner && (
           <TabPane tab="Wishlist" key="3">
             <div className="mt-4 md:mt-4 mb-8 w-full" id="wishlist">
-              {wishlistData.length > 0 ? (
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {wishlistData.length > 0 
+              ? (<div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                   {wishlistData.map((product, index) => (
                     <NewTrendingCard
                       topSellingProduct={product}
@@ -542,9 +517,8 @@ const UserProfile = ({user}) => {
                       addItemToCart={addItemToCart}
                     />
                   ))}
-                </div>
-              ) : (
-                <div className="h-96 flex justify-center items-center">
+                </div>) 
+                : (<div className="h-96 flex justify-center items-center">
                   Your wishlist is empty.
                 </div>
               )}
@@ -556,8 +530,8 @@ const UserProfile = ({user}) => {
         {isOwner && (
           <TabPane tab="My Activity" key="2">
               {/* Activity Content */}
-              {userActivity && userActivity.length > 0 ? (
-              <div className="activity-list">
+              {userActivity && userActivity.length > 0 
+              ? (<div className="activity-list">
                 {userActivity.map((activity, index) => {
                   let description;
                   let href;
@@ -600,9 +574,19 @@ const UserProfile = ({user}) => {
       )}
       </Tabs>
 
-      {/* TABS End */}
-      {message && openToast("bottom")}
-      {itemMsg && itemToast("bottom")}
+      {/* TABS End */} 
+      {message && showToast({
+          message: message,
+          success: false,
+          onClose: inventoryActions.resetMessage(dispatch),
+          placement: 'bottom',
+        })} 
+      {itemMsg && showToast({
+          message: itemMsg,
+          success: itemSuccess,
+          onClose: itemActions.resetMessage(itemDispatch),
+          placement: 'bottom',
+        })}
     </div>
   );
 };

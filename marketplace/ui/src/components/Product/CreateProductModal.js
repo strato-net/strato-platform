@@ -10,6 +10,7 @@ import { actions } from "../../contexts/product/actions";
 import { useProductDispatch, useProductState } from "../../contexts/product";
 import { unitOfMeasures } from "../../helpers/constants";
 import TagManager from "react-gtm-module";
+import { showToast } from "../Notification/ToastComponent";
 
 
 const { Option } = Select;
@@ -48,7 +49,7 @@ const CreateProductModal = ({
     leastSellableUnit: "",
     description: "",
     active: true,
-    userUniqueProductCode:""
+    userUniqueProductCode: ""
   };
 
   const formik = useFormik({
@@ -77,7 +78,7 @@ const CreateProductModal = ({
           isActive: values.active,
           category: values.category.name,
           subCategory: values.subCategory.name,
-          userUniqueProductCode:values.userUniqueProductCode,
+          userUniqueProductCode: values.userUniqueProductCode,
         },
       };
       window.LOQ.push(['ready', async LO => {
@@ -113,25 +114,24 @@ const CreateProductModal = ({
   function beforeUpload(file) {
     const isJpgOrPng = file.type === 'image/jpeg' || file.type === 'image/png';
     if (!isJpgOrPng) {
-      openToast("bottom","Image must be of jpeg or png format");
+      showToast({
+        message: 'Image must be of jpeg or png format',
+        onClose: actions.resetMessage(dispatch),
+        success: false,
+        placement: 'bottom',
+      })
     }
     const isLt1M = file.size / 1024 / 1024 < 1;
     if (!isLt1M) {
-      openToast("bottom","Cannot upload an image of size more than 1mb");
+      showToast({
+        message: 'Cannot upload an image of size more than 1mb',
+        onClose: actions.resetMessage(dispatch),
+        success: false,
+        placement: 'bottom',
+      })
     }
     return isJpgOrPng && isLt1M;
   }
-
-  const [api, contextHolder] = notification.useNotification();
-
-  const openToast = (placement, message) => {
-    api.error({
-      message: message,
-      onClose: actions.resetMessage(dispatch),
-      placement,
-      key: 2,
-    });
-  };
 
   return (
     <Modal
@@ -154,7 +154,6 @@ const CreateProductModal = ({
         </div>,
       ]}
     >
-      {contextHolder}
       <h1
         id="modal-title"
         className="text-center font-semibold text-lg text-primaryB"
@@ -370,22 +369,22 @@ const CreateProductModal = ({
               )}
             </Form.Item>
             <div className="flex justify-between mt-4 items-center">
-            <Form.Item label="Active" name="active">
-              <Radio.Group
-                value={formik.values.active}
-                onChange={formik.handleChange}
-                name="active"
-              >
-                <Radio value={true}>Yes</Radio>
-                <Radio value={false}>No</Radio>
-              </Radio.Group>
+              <Form.Item label="Active" name="active">
+                <Radio.Group
+                  value={formik.values.active}
+                  onChange={formik.handleChange}
+                  name="active"
+                >
+                  <Radio value={true}>Yes</Radio>
+                  <Radio value={false}>No</Radio>
+                </Radio.Group>
 
-              {formik.touched.active && formik.errors.active && (
-                <span className="text-error text-xs">
-                  {formik.errors.active}
-                </span>
-              )}
-            </Form.Item>
+                {formik.touched.active && formik.errors.active && (
+                  <span className="text-error text-xs">
+                    {formik.errors.active}
+                  </span>
+                )}
+              </Form.Item>
               <Form.Item
                 label="Unique Product Code"
                 name="userUniqueProductCode"
@@ -405,7 +404,6 @@ const CreateProductModal = ({
                 )}
               </Form.Item>
             </div>
-           
           </div>
         </div>
       </Form>

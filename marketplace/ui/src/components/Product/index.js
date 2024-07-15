@@ -26,6 +26,7 @@ import { Images } from "../../images";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import { useAuthenticateState } from "../../contexts/authentication";
+import { showToast } from "../Notification/ToastComponent";
 
 const { Search } = Input;
 const { Title, Text } = Typography;
@@ -33,7 +34,6 @@ const { Title, Text } = Typography;
 const Product = () => {
   const [open, setOpen] = useState(false);
   const dispatch = useProductDispatch();
-  const [api, contextHolder] = notification.useNotification();
   const [queryValue, setQueryValue] = useState("");
   const limit = 10;
   const [offset, setOffset] = useState(0);
@@ -46,7 +46,6 @@ const Product = () => {
   const categoryDispatch = useCategoryDispatch();
 
   //Sub-categories
-
   const { categorys, iscategorysLoading } = useCategoryState();
   const { subCategorys, issubCategorysLoading } = useSubCategoryState();
 
@@ -55,24 +54,6 @@ const Product = () => {
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
   }, [categoryDispatch]);
-
-  const openToast = (placement) => {
-    if (success) {
-      api.success({
-        message: message,
-        onClose: actions.resetMessage(dispatch),
-        placement,
-        key: 1,
-      });
-    } else {
-      api.error({
-        message: message,
-        onClose: actions.resetMessage(dispatch),
-        placement,
-        key: 2,
-      });
-    }
-  };
 
   const { products, isProductsLoading, message, success, productsTotal } = useProductState();
 
@@ -114,7 +95,6 @@ const Product = () => {
 
   return (
     <>
-      {contextHolder}
       {isProductsLoading || iscategorysLoading || issubCategorysLoading ? (
         <div className="h-screen flex justify-center items-center">
           <Spin spinning={isProductsLoading} size="large" />
@@ -220,7 +200,12 @@ const Product = () => {
           debouncedSearchTerm={debouncedSearchTerm}
         />
       )}
-      {message && openToast("bottom")}
+      {message && showToast({
+        message: message,
+        onClose: actions.resetMessage(dispatch),
+        success: success,
+        placement: 'bottom',
+      })}
     </>
   );
 };

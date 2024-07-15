@@ -1,7 +1,8 @@
 import React from "react";
-import { Button, Form, Input, Radio, notification } from "antd";
+import { Button, Form, Input, Radio } from "antd";
 import { actions } from "../../contexts/issuerStatus/actions";
 import { useIssuerStatusState, useIssuerStatusDispatch } from "../../contexts/issuerStatus";
+import { showToast } from "../Notification/ToastComponent";
 
 export default function AuthorizeIssuer(){
     const { changingIssuerStatus, changingAdminStatus, success, message } = useIssuerStatusState();
@@ -23,28 +24,8 @@ export default function AuthorizeIssuer(){
         }
     }
 
-    const [api, contextHolder] = notification.useNotification();
-    const openToast = (placement) => {
-        if (success) {
-            api.success({
-            message: message,
-            onClose: actions.resetMessage(dispatch),
-            placement,
-            key: 1,
-            });
-        } else {
-            api.error({
-            message: message,
-            onClose: actions.resetMessage(dispatch),
-            placement,
-            key: 2,
-            });
-        }
-        };
-
     return (
         <>
-        {contextHolder}
         <Form 
             onFinish={onFinish} 
             style={{
@@ -94,7 +75,13 @@ export default function AuthorizeIssuer(){
             Change Issuer Approver Status
             </Button>
         </Form>
-        {message && openToast("bottom")}
+        {message && showToast({
+        message: message,
+        onClose: actions.resetMessage(dispatch),
+        success: success,
+        placement: 'bottom',
+      })
+      }
         </>
     )
 }

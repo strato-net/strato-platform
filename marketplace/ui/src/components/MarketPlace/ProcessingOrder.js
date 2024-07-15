@@ -6,6 +6,7 @@ import { actions as orderActions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import { actions } from "../../contexts/marketplace/actions";
 import { useMarketplaceDispatch } from "../../contexts/marketplace";
+import { showToast } from "../Notification/ToastComponent";
 
 function useQuery() {
   const { search } = useLocation();
@@ -21,7 +22,6 @@ const ProcessingOrder = ({ user }) => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const [error, setError] = useState(null)
   const { message, success } = useOrderState();
-  const [api, contextHolder] = notification.useNotification();
   const [called, setCalled] = useState(false);
 
 
@@ -81,46 +81,27 @@ const ProcessingOrder = ({ user }) => {
     }
   }
 
-  const openToastMarketplace = (placement) => {
-    if (error != null) {
-      api.error({
-        message: error.message,
-        onClose: setError(null),
-        placement,
-        key: 2,
-      });
-    }
-  };
-
-  const openToastOrder = (placement) => {
-    if (success) {
-      api.success({
-        message: message,
-        onClose: orderActions.resetMessage(orderDispatch),
-        placement,
-        key: 1,
-      });
-    } else {
-      api.error({
-        message: message,
-        onClose: orderActions.resetMessage(orderDispatch),
-        placement,
-        key: 2,
-      });
-    }
-  };
 
 
 
   return (
     <div>
-      {contextHolder}
       <div className="h-96 flex flex-col justify-center items-center">
         <Spin spinning={true} size="large" />
         <p className="mt-4">Please wait while your order is being processed</p>
       </div>
-      {error && openToastMarketplace("bottom")}
-      {message && openToastOrder("bottom")}
+      {error && showToast({
+        message: error.message,
+        onClose: setError(null),
+        success: false,
+        placement: 'bottom',
+      })}
+      {message && showToast({
+        message: message,
+        onClose: orderActions.resetMessage(orderDispatch),
+        success: success,
+        placement: 'bottom',
+      })}
     </div>
   );
 };

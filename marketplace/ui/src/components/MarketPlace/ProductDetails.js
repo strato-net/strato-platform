@@ -37,10 +37,10 @@ import { Images } from "../../images";
 import { SEO } from "../../helpers/seoConstant";
 import { STRATS_CONVERSION } from "../../helpers/constants";
 import { TOAST_MSG } from "../../helpers/msgConstants";
+import { showToast } from "../Notification/ToastComponent";
 
 
 const ProductDetails = ({ user, users }) => {
-  const [api, contextHolder] = notification.useNotification();
   const { Text, Paragraph, Title } = Typography;
   const { state, pathname } = useLocation();
   const navigate = useNavigate();
@@ -222,22 +222,6 @@ const ProductDetails = ({ user, users }) => {
     }
   };
 
-  const openToast = (placement, isError, msg) => {
-    if (isError) {
-      api.error({
-        message: msg,
-        placement,
-        key: 1,
-      });
-    } else {
-      api.success({
-        message: msg,
-        placement,
-        key: 1,
-      });
-    }
-  };
-
   const addItemToCart = () => {
     let found = false;
     for (var i = 0; i < cartList.length; i++) {
@@ -252,7 +236,11 @@ const ProductDetails = ({ user, users }) => {
 
       marketPlaceActions.addItemToCart(marketplaceDispatch, items);
       setQty(1);
-      openToast("bottom", false, TOAST_MSG.ITEM_ADDED_TO_CART);
+      showToast({
+        message: TOAST_MSG.ITEM_ADDED_TO_CART,
+        success: true,
+        placement: 'bottom',
+      });
     } else {
       items = [...cartList];
       cartList.forEach((element, index) => {
@@ -260,7 +248,11 @@ const ProductDetails = ({ user, users }) => {
           items[index].qty += qty;
           marketPlaceActions.addItemToCart(marketplaceDispatch, items);
           setQty(1);
-          openToast("bottom", false, TOAST_MSG.ITEM_UPDATED_IN_CART);
+          showToast({
+            message: TOAST_MSG.ITEM_UPDATED_IN_CART,
+            success: true,
+            placement: 'bottom',
+          });
         }
       });
     }
@@ -355,7 +347,6 @@ const ProductDetails = ({ user, users }) => {
 
   return (
     <>
-      {contextHolder}
       {details === null ||
         isInventoryDetailsLoading ||
         iscategorysLoading ? (
@@ -525,9 +516,17 @@ const ProductDetails = ({ user, users }) => {
                           navigate("/checkout");
                         } else {
                           if (checkQuantity[0].availableQuantity === 0) {
-                            openToast("bottom", true, TOAST_MSG.OUT_OF_STOCK(details));
+                            showToast({
+                              message: TOAST_MSG.OUT_OF_STOCK(details),
+                              success: false,
+                              placement: 'bottom',
+                            });
                           } else { // Case 2: We are trying to add too much quantity
-                            openToast("bottom", true, TOAST_MSG.TOO_MUCH_QUANTITY(checkQuantity, details));
+                            showToast({
+                              message: TOAST_MSG.TOO_MUCH_QUANTITY(checkQuantity, details),
+                              success: false,
+                              placement: 'bottom',
+                            });
                           }
                         }
                       }}
@@ -568,9 +567,17 @@ const ProductDetails = ({ user, users }) => {
                             addItemToCart();
                           } else {
                             if (checkQuantity[0].availableQuantity === 0) {
-                              openToast("bottom", true, TOAST_MSG.OUT_OF_STOCK(details));
+                              showToast({
+                                message: TOAST_MSG.OUT_OF_STOCK(details),
+                                success: false,
+                                placement: 'bottom',
+                              });
                             } else { // Case 2: We are trying to add too much quantity
-                              openToast("bottom", true, TOAST_MSG.TOO_MUCH_QUANTITY(checkQuantity, details));
+                              showToast({
+                                message: TOAST_MSG.TOO_MUCH_QUANTITY(checkQuantity, details),
+                                success: false,
+                                placement: 'bottom',
+                              });
                             }
                           }
                         }}
@@ -605,9 +612,17 @@ const ProductDetails = ({ user, users }) => {
                             addItemToCart();
                           } else {
                             if (checkQuantity[0].availableQuantity === 0) {
-                              openToast("bottom", true, TOAST_MSG.OUT_OF_STOCK(details));
+                              showToast({
+                                message: TOAST_MSG.OUT_OF_STOCK(details),
+                                success: false,
+                                placement: 'bottom',
+                              });
                             } else { // Case 2: We are trying to add too much quantity
-                              openToast("bottom", true, TOAST_MSG.TOO_MUCH_QUANTITY(checkQuantity, details));
+                              showToast({
+                                message: TOAST_MSG.TOO_MUCH_QUANTITY(checkQuantity, details),
+                                success: false,
+                                placement: 'bottom',
+                              });
                             }
                           }
                         }}

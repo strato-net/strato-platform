@@ -35,6 +35,7 @@ import HelmetComponent from "../Helmet/HelmetComponent";
 import { SEO } from "../../helpers/seoConstant";
 import RequestBeAuthorizedIssuerModal from "./RequestBeAuthorizedIssuerModal";
 import { ISSUER_STATUS } from '../../helpers/constants';
+import { showToast } from "../Notification/ToastComponent";
 
 const { Option } = Select;
 
@@ -48,7 +49,6 @@ const Inventory = ({ user }) => {
   const [page, setPage] = useState(1);
   const [selectedService, setSelectedService] = useState(null);
   const dispatch = useInventoryDispatch();
-  const [api, contextHolder] = notification.useNotification();
   const [isSearch, setIsSearch] = useState(false);
   const [category, setCategory] = useState(undefined);
   const linkUrl = window.location.href;
@@ -140,23 +140,6 @@ const Inventory = ({ user }) => {
     setReqModOpen(false);
   };
 
-  const openToast = (placement) => {
-    if (success) {
-      api.success({
-        message: message,
-        onClose: actions.resetMessage(dispatch),
-        placement,
-        key: 1,
-      });
-    } else {
-      api.error({
-        message: message,
-        onClose: actions.resetMessage(dispatch),
-        placement,
-        key: 2,
-      });
-    }
-  };
 
   const queryHandle = (e) => {
     setIsSearch(e.length > 0);
@@ -168,60 +151,6 @@ const Inventory = ({ user }) => {
   const onPageChange = (page) => {
     setOffset((page - 1) * limit);
     setPage(page);
-  };
-
-  const itemToast = (placement) => {
-    if (itemSuccess) {
-      api.success({
-        message: itemMsg,
-        onClose: itemActions.resetMessage(itemDispatch),
-        placement,
-        key: 3,
-      });
-    } else {
-      api.error({
-        message: itemMsg,
-        onClose: itemActions.resetMessage(itemDispatch),
-        placement,
-        key: 4,
-      });
-    }
-  };
-
-  const redemptionToast = (placement) => {
-    if (redemptionSuccess) {
-      api.success({
-        message: redemptionMsg,
-        onClose: redemptionActions.resetMessage(redemptionDispatch),
-        placement,
-        key: 5,
-      });
-    } else {
-      api.error({
-        message: redemptionMsg,
-        onClose: redemptionActions.resetMessage(redemptionDispatch),
-        placement,
-        key: 6,
-      });
-    }
-  };
-
-  const issuerStatusToast = (placement) => {
-    if (issuerStatusSuccess) {
-      api.success({
-        message: issuerStatusMsg,
-        onClose: issuerStatusActions.resetMessage(issuerStatusDispatch),
-        placement,
-        key: 7,
-      });
-    } else {
-      api.error({
-        message: issuerStatusMsg,
-        onClose: issuerStatusActions.resetMessage(issuerStatusDispatch),
-        placement,
-        key: 8,
-      });
-    }
   };
 
   const navigate = useNavigate();
@@ -260,7 +189,6 @@ const Inventory = ({ user }) => {
         description={SEO.DESCRIPTION_META} 
         link={linkUrl} 
       />
-      {contextHolder}
       <>
         <Breadcrumb className="mx-5 md:mx-14 mt-2 lg:mt-4">
           <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
@@ -432,10 +360,30 @@ const Inventory = ({ user }) => {
           setIssuerStatus={setIssuerStatus}
         />
       )}
-      {message && openToast("bottom")}
-      {itemMsg && itemToast("bottom")}
-      {redemptionMsg && redemptionToast("bottom")}
-      {issuerStatusMsg && issuerStatusToast("bottom")}
+      {message && showToast({
+        message:message,
+        onClose: actions.resetMessage(dispatch),
+        success:success,
+        placement: 'bottom',
+      })}
+      {itemMsg &&  showToast({
+        message: itemMsg,
+        onClose: itemActions.resetMessage(itemDispatch),
+        success:itemSuccess,
+        placement: 'bottom',
+      })}
+      {redemptionMsg && showToast({
+        message: redemptionMsg,
+        onClose: redemptionActions.resetMessage(redemptionDispatch),
+        success: redemptionSuccess,
+        placement: 'bottom',
+      })}
+      {issuerStatusMsg && showToast({
+        message: issuerStatusMsg,
+        onClose: issuerStatusActions.resetMessage(issuerStatusDispatch),
+        success: issuerStatusSuccess,
+        placement: 'bottom',
+      })}
     </>
   );
 };

@@ -34,6 +34,7 @@ import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import { Images } from "../../images";
 import './index.css'
+import { showToast } from "../Notification/ToastComponent";
 
 const { Panel } = Collapse;
 const { Text } = Typography;
@@ -261,7 +262,12 @@ const CategoryProductList = ({ user }) => {
   }
   const addItemToCart = async (product, quantity) => {
     if (product.ownerCommonName === user?.commonName) {
-      openToast("bottom", true, TOAST_MSG.CANNOT_BUY_OWN_ITEM);
+
+      showToast({
+        message: TOAST_MSG.CANNOT_BUY_OWN_ITEM,
+        success: false,
+        placement: 'bottom',
+      });
       return false;
     }
 
@@ -277,15 +283,30 @@ const CategoryProductList = ({ user }) => {
         // Quantity check passed, add new item to the cart
         items.push({ product, qty: quantity });
         marketplaceActions.addItemToCart(marketplaceDispatch, items);
-        openToast("bottom", false, TOAST_MSG.ITEM_ADDED_TO_CART);
+
+        showToast({
+          message: TOAST_MSG.ITEM_ADDED_TO_CART,
+          success: true,
+          placement: 'bottom',
+        });
         return true;
       } else {
         // Not enough quantity, inform the user
         // Case 1: Item is out of stock
         if (checkQuantity[0].availableQuantity === 0) {
-          openToast("bottom", true, TOAST_MSG.OUT_OF_STOCK(product));
+
+          showToast({
+            message: TOAST_MSG.OUT_OF_STOCK(product),
+            success: false,
+            placement: 'bottom',
+          });
         } else { // Case 2: We are trying to add too much quantity
-          openToast("bottom", true, TOAST_MSG.TOO_MUCH_QUANTITY(checkQuantity, product));
+
+          showToast({
+            message: TOAST_MSG.TOO_MUCH_QUANTITY(checkQuantity, product),
+            success: false,
+            placement: 'bottom',
+          });
         }
         return false;
       }
@@ -297,28 +318,33 @@ const CategoryProductList = ({ user }) => {
         // Quantity check passed, update item quantity in the cart
         items[foundIndex].qty = potentialNewQty;
         marketplaceActions.addItemToCart(marketplaceDispatch, items);
-        openToast("bottom", false, TOAST_MSG.ITEM_UPDATED_IN_CART);
+
+        showToast({
+          message: TOAST_MSG.ITEM_UPDATED_IN_CART,
+          success: true,
+          placement: 'bottom',
+        });
         return true;
       } else {
         // Not enough quantity, inform the user
         if (checkQuantity[0].availableQuantity === 0) {
-          openToast("bottom", true, TOAST_MSG.OUT_OF_STOCK(product));
+          showToast({
+            message: TOAST_MSG.OUT_OF_STOCK(product),
+            success: false,
+            placement: 'bottom',
+          });
         } else { // Case 2: We are trying to add too much quantity
-          openToast("bottom", true, TOAST_MSG.TOO_MUCH_QUANTITY(checkQuantity, product));
+          showToast({
+            message: TOAST_MSG.TOO_MUCH_QUANTITY(checkQuantity, product),
+            success: false,
+            placement: 'bottom',
+          });
         }
         return false;
       }
     }
   };
 
-  const openToast = (placement, isError, msg) => {
-    let msgObj = {
-      message: msg,
-      placement,
-      key: 1,
-    }
-    isError ? api.error(msgObj) : api.success(msgObj)
-  };
 
   const BreadCrumbComponent = () =>
     <Breadcrumb className="text-xs ml-4 md:ml-14 mt-14 lg:mt-5">

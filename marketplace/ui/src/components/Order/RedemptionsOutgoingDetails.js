@@ -40,7 +40,6 @@ const RedemptionsOutgoingDetails = ({ user }) => {
     const { Text } = Typography;
     const [selectedDate, setSelectedDate] = useState("");
     const { TextArea } = Input;
-    const [api, contextHolder] = notification.useNotification();
     const { redemption, isFetchingRedemptionDetails } = useRedemptionState();
     const inventoryDispatch = useInventoryDispatch();
     let { inventoryDetails, isInventoryDetailsLoading } = useInventoryState();
@@ -155,7 +154,6 @@ const RedemptionsOutgoingDetails = ({ user }) => {
 
     return (
         <div>
-            {contextHolder}
             {redemption === undefined || inventoryDetails == undefined || isFetchingRedemptionDetails || isInventoryDetailsLoading ? (
                 <div className="h-screen flex justify-center items-center">
                     <Spin

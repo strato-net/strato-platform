@@ -30,6 +30,7 @@ import SoldOrdersTable from "./SoldOrdersTable";
 import TransfersTable from "./TransfersTable";
 import RedemptionsOutgoingTable from "./RedemptionsOutgoingTable";
 import { ResponsiveOrderDetailCard } from "./ResponsiveOrderDetailCard";
+import { showToast } from "../Notification/ToastComponent";
 
 const RedemptionsIncomingDetails = ({ user }) => {
     const [id, setId] = useState(undefined);
@@ -42,7 +43,6 @@ const RedemptionsIncomingDetails = ({ user }) => {
     const navigate = useNavigate();
     const [comments, setComments] = useState("");
     const { TextArea } = Input;
-    const [api, contextHolder] = notification.useNotification();
     const { redemption, isFetchingRedemptionDetails, isClosingRedemption, message, success, } = useRedemptionState();
     let { inventoryDetails, isInventoryDetailsLoading } = useInventoryState();
 
@@ -122,7 +122,7 @@ const RedemptionsIncomingDetails = ({ user }) => {
     };
 
 
-    inventoryDetails={...inventoryDetails, images: inventoryDetails && Array.isArray(inventoryDetails["BlockApps-Mercata-Asset-images"]) ? inventoryDetails["BlockApps-Mercata-Asset-images"][0].value: []}
+    inventoryDetails = { ...inventoryDetails, images: inventoryDetails && Array.isArray(inventoryDetails["BlockApps-Mercata-Asset-images"]) ? inventoryDetails["BlockApps-Mercata-Asset-images"][0].value : [] }
     let column = [
         {
             title: "",
@@ -152,23 +152,6 @@ const RedemptionsIncomingDetails = ({ user }) => {
         },
     ];
 
-    const openToastOrder = (placement) => {
-        if (success) {
-            api.success({
-                message: message,
-                onClose: actions.resetMessage(dispatch),
-                placement,
-                key: 1,
-            });
-        } else {
-            api.error({
-                message: message,
-                onClose: actions.resetMessage(dispatch),
-                placement,
-                key: 2,
-            });
-        }
-    };
 
     const handleSubmit = async (status, comments) => {
         const body = {
@@ -188,7 +171,6 @@ const RedemptionsIncomingDetails = ({ user }) => {
 
     return (
         <div>
-            {contextHolder}
             {redemption === undefined || inventoryDetails == undefined || isFetchingRedemptionDetails || isInventoryDetailsLoading ? (
                 <div className="h-screen flex justify-center items-center">
                     <Spin
@@ -359,7 +341,12 @@ const RedemptionsIncomingDetails = ({ user }) => {
 
                 </div>
             )}
-            {message && openToastOrder("bottom")}
+            {message && showToast({
+                message: message,
+                onClose: actions.resetMessage(dispatch),
+                success: success,
+                placement: 'bottom',
+            })}
         </div>
     );
 };

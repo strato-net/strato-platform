@@ -26,6 +26,7 @@ import image_placeholder from "../../images/resources/image_placeholder.png";
 import ResponsiveCart from "./ResponsiveCart";
 import { usePaymentServiceDispatch, usePaymentServiceState } from "../../contexts/payment";
 import { actions as paymentServiceActions } from "../../contexts/payment/actions";
+import { showToast } from "../Notification/ToastComponent";
 
 const { Title, Text } = Typography;
 
@@ -34,7 +35,6 @@ const Checkout = () => {
   const orderDispatch = useOrderDispatch();
   const { paymentServices, arePaymentServicesLoading } = usePaymentServiceState();
   const paymentServiceDispatch = usePaymentServiceDispatch();
-  const [api, contextHolder] = notification.useNotification();
   const { cartList } = useMarketplaceState();
   const { isCreateOrderSubmitting, message, success } = useOrderState();
 
@@ -206,24 +206,6 @@ const Checkout = () => {
     });
   };
 
-  const openToastOrder = (placement, message) => {
-    if (success) {
-      api.success({
-        message: message,
-        onClose: actions.resetMessage(orderDispatch),
-        placement,
-        key: 1,
-      });
-    } else {
-      api.error({
-        message: message,
-        onClose: actions.resetMessage(orderDispatch),
-        placement,
-        key: 2,
-      });
-    }
-  };
-
   const columns = [
     {
       title: (
@@ -366,7 +348,6 @@ const Checkout = () => {
 
   return (
     <div className="mx-4 my-2 lg:mx-8 xl:mx-14">
-      {contextHolder}
       {isCreateOrderSubmitting || arePaymentServicesLoading ? (
         <div className="flex justify-center items-center min-h-screen">
           <Spin spinning={isCreateOrderSubmitting} size="large" />
@@ -415,7 +396,12 @@ const Checkout = () => {
                       MinusQty={MinusQty}
                       ValueQty={ValueQty}
                       removeCartList={removeCartList}
-                      openToastOrder={openToastOrder}
+                      openToastOrder={showToast({
+                        message: message,
+                        onClose: actions.resetMessage(orderDispatch),
+                        success: success,
+                        placement: 'bottom',
+                      })}
                     />
                   </div>
                 </React.Fragment>
@@ -424,7 +410,12 @@ const Checkout = () => {
           </div>
         </div>
       )}
-      {message && openToastOrder("bottom", message)}
+      {message && showToast({
+        message: message,
+        onClose: actions.resetMessage(orderDispatch),
+        success: success,
+        placement: 'bottom',
+      })}
     </div>
   );
 };

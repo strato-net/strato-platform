@@ -5,6 +5,7 @@ import { actions } from "../../contexts/marketplace/actions";
 import { actions as userActions } from "../../contexts/users/actions";
 import { useUsersDispatch, useUsersState } from "../../contexts/users";
 import { useAuthenticateState } from "../../contexts/authentication";
+import { showToast } from '../Notification/ToastComponent';
 
 const TransferStratsModal = ({ visible, onCancel }) => {
   const marketplaceDispatch = useMarketplaceDispatch();
@@ -22,25 +23,6 @@ const TransferStratsModal = ({ visible, onCancel }) => {
   const [searchInput, setSearchInput] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [canTransfer, setCanTransfer] = useState(true);
-  const [api, contextHolder] = notification.useNotification();
-
-  const openToast = (placement) => {
-    if (success) {
-      api.success({
-        message: message,
-        onClose: actions.resetMessage(marketplaceDispatch),
-        placement,
-        key: 1,
-      });
-    } else {
-      api.error({
-        message: message,
-        onClose: actions.resetMessage(marketplaceDispatch),
-        placement,
-        key: 2,
-      });
-    }
-  };
 
   const usersList = (users || []).map((record) => ((user || {}).commonName !== record.commonName ? { label: `${record.commonName} - ${record.organization}`, value: record.userAddress } : {}));
   const filterDuplicateUserAddresses = (arr) => {
@@ -114,7 +96,6 @@ const TransferStratsModal = ({ visible, onCancel }) => {
         </Button>,
       ]}
     >
-      {contextHolder}
       <Card className='h-[200px]'>
         <div className='flex items-center flex-col justify-center'>
           <div>
@@ -152,7 +133,12 @@ const TransferStratsModal = ({ visible, onCancel }) => {
           </div>
         </div>
       </Card>
-      {message && openToast("bottom")}
+      {message && showToast({
+          message: message,
+          onClose: actions.resetMessage(marketplaceDispatch),
+          success: success,
+          placement: 'bottom',
+        })}
     </Modal>
   );
 };

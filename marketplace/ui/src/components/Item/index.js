@@ -1,15 +1,15 @@
 import React, { useEffect, useState, useMemo } from "react";
 import DataTableComponent from "../DataTableComponent";
-import { Breadcrumb, Spin, Input, notification, Pagination } from "antd";
+import { Breadcrumb, Spin, Input, Pagination } from "antd";
 import { actions } from "../../contexts/item/actions";
 import { useItemDispatch, useItemState } from "../../contexts/item";
 import { useLocation } from "react-router-dom";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
+import { showToast } from "../Notification/ToastComponent";
 
 function useQuery() {
   const { search } = useLocation();
-
   return useMemo(() => new URLSearchParams(search), [search]);
 }
 
@@ -20,26 +20,6 @@ const Item = () => {
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(10);
   const [page, setPage] = useState(1);
-
-  const [api, contextHolder] = notification.useNotification();
-
-  const openToast = (placement) => {
-    if (success) {
-      api.success({
-        message: message,
-        onClose: actions.resetMessage(dispatch),
-        placement,
-        key: 1,
-      });
-    } else {
-      api.error({
-        message: message,
-        onClose: actions.resetMessage(dispatch),
-        placement,
-        key: 2,
-      });
-    }
-  };
 
   const dispatch = useItemDispatch();
 
@@ -87,7 +67,6 @@ const Item = () => {
 
   return (
     <div>
-      {contextHolder}
       <div className="mx-16 mt-14">
         <div className="flex justify-between">
           <Breadcrumb>
@@ -135,7 +114,12 @@ const Item = () => {
         </div>
       </div>
 
-      {message && openToast("bottom")}
+      {message && showToast({
+        message: message,
+        onClose: actions.resetMessage(dispatch),
+        success: success,
+        placement: 'bottom',
+      })}
     </div>
   );
 };

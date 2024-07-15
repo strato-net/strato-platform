@@ -25,13 +25,13 @@ import "./index.css";
 import { HTTP_METHODS, PAYMENT_LIST } from "../../helpers/constants";
 import TagManager from "react-gtm-module";
 import { setCookie } from "../../helpers/cookie";
+import { showToast } from "../Notification/ToastComponent";
 
 const { Option } = Select;
 
 const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const orderDispatch = useOrderDispatch();
-  const [api, contextHolder] = notification.useNotification();
   const { user, hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   const userOrganization = user?.organization;
   const { isCreateOrderSubmitting, message, success, isCreatePaymentSubmitting } = useOrderState();
@@ -82,41 +82,6 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
     setTotal(sum);
   }, [marketplaceDispatch, cartData]);
 
-  const openToastOrder = (placement, message) => {
-    if (success) {
-      api.success({
-        message: message,
-        onClose: orderActions.resetMessage(orderDispatch),
-        placement,
-        key: 1,
-      });
-    } else {
-      api.error({
-        message: message,
-        onClose: orderActions.resetMessage(orderDispatch),
-        placement,
-        key: 2,
-      });
-    }
-  };
-
-  const openToastMarketplace = (placement) => {
-    if (marketplaceSuccess) {
-      api.success({
-        message: marketplaceMessage,
-        onClose: actions.resetMessage(marketplaceDispatch),
-        placement,
-        key: 1,
-      });
-    } else {
-      api.error({
-        message: marketplaceMessage,
-        onClose: actions.resetMessage(marketplaceDispatch),
-        placement,
-        key: 2,
-      });
-    }
-  };
 
   const handlePaymentConfirm = async (paymentProvider) => {
     actions.addItemToConfirmOrder(marketplaceDispatch, cartData);
@@ -181,7 +146,6 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
         </div>
       </div>
       <div className="">
-        {contextHolder}
         {contextHolderForModal}
         {isCreateOrderSubmitting || isCreatePaymentSubmitting ? (
           <div className="h-screen flex justify-center items-center">
@@ -269,7 +233,12 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
                           if (errorMessage) errorMessage += "\n"; // Add a new line if there's already an error message
                           errorMessage += `The following item(s) are temporarily out of stock and should be removed:\n${outOfStockMessage}`;
                         }
-                        openToastOrder("bottom", errorMessage);
+                        showToast({
+                          message: errorMessage,
+                          onClose: orderActions.resetMessage(orderDispatch),
+                          success: success,
+                          placement: 'bottom',
+                        })
                       }
                     }
                   }}
@@ -285,8 +254,18 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
             </div>
           </div>
         )}
-        {marketplaceMessage && openToastMarketplace("Bottom")}
-        {message && openToastOrder("bottom", message)}
+        {marketplaceMessage && showToast({
+         message: marketplaceMessage,
+         onClose: actions.resetMessage(marketplaceDispatch),
+          success: marketplaceSuccess,
+          placement: 'bottom',
+        })}
+        {message && showToast({
+          message: message,
+          onClose: orderActions.resetMessage(orderDispatch),
+          success: success,
+          placement: 'bottom',
+        })}
       </div>
     </>
   );

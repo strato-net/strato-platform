@@ -12,6 +12,8 @@ import NewTrendingCard from "./NewTrendingCard";
 import { actions as orderActions } from "../../contexts/order/actions";
 import { useOrderDispatch } from "../../contexts/order";
 import { Fade } from "react-awesome-reveal";
+import { showToast } from "../Notification/ToastComponent";
+import { TOAST_MSG } from "../../helpers/msgConstants";
 
 const { Title } = Typography;
 
@@ -24,7 +26,6 @@ const TopSellingProductCard = () => {
   const { topSellingProducts, isTopSellingProductsLoading, cartList } =
     useMarketplaceState();
   let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
-  const [api, contextHolder] = notification.useNotification();
 
   const orderDispatch = useOrderDispatch();
 
@@ -40,29 +41,18 @@ const TopSellingProductCard = () => {
     }
   }, [marketplaceDispatch, offset, hasChecked, isAuthenticated, loginUrl]);
 
-  const naviroute = routes.MarketplaceProductDetail.url;
+  // const naviroute = routes.MarketplaceProductDetail.url;
 
   const navigate = useNavigate();
 
-  const openToast = (placement, isError, msg) => {
-    if (isError) {
-      api.error({
-        message: msg,
-        placement,
-        key: 1,
-      });
-    } else {
-      api.success({
-        message: msg,
-        placement,
-        key: 1,
-      });
-    }
-  };
 
   const addItemToCart = async (product, quantity) => {
     if (product.ownerCommonName === user?.commonName) {
-      openToast("bottom", true, "Cannot buy your own item");
+      showToast({
+        message: TOAST_MSG.CANNOT_BUY_OWN_ITEM,
+        success: false,
+        placement: 'bottom',
+      });
       return false;
     }
 
@@ -84,23 +74,29 @@ const TopSellingProductCard = () => {
         // Quantity check passed, add new item to the cart
         items.push({ product, qty: quantity });
         actions.addItemToCart(marketplaceDispatch, items);
-        openToast("bottom", false, "Item added to cart");
+        showToast({
+          message: TOAST_MSG.ITEM_ADDED_TO_CART,
+          success: true,
+          placement: 'bottom',
+        });
         return true;
       } else {
         // Not enough quantity, inform the user
         if (checkQuantity[0].availableQuantity === 0) {
-          openToast(
-            "bottom",
-            true,
-            `Unfortunately, ${product.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`
-          );
+
+          showToast({
+            message: `Unfortunately, ${product.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`,
+            success: false,
+            placement: 'bottom',
+          });
         } else {
           // Case 2: We are trying to add too much quantity
-          openToast(
-            "bottom",
-            true,
-            `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${product.name} are available. Please update your cart quantity accordingly.`
-          );
+
+          showToast({
+            message: `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${product.name} are available. Please update your cart quantity accordingly.`,
+            success: false,
+            placement: 'bottom',
+          });
         }
         return false;
       }
@@ -116,23 +112,27 @@ const TopSellingProductCard = () => {
         // Quantity check passed, update item quantity in the cart
         items[foundIndex].qty = potentialNewQty;
         actions.addItemToCart(marketplaceDispatch, items);
-        openToast("bottom", false, "Item updated in cart");
+        showToast({
+          message: TOAST_MSG.ITEM_UPDATED_IN_CART,
+          success: true,
+          placement: 'bottom',
+        });
         return true;
       } else {
         // Not enough quantity, inform the user
         if (checkQuantity[0].availableQuantity === 0) {
-          openToast(
-            "bottom",
-            true,
-            `Unfortunately, ${product.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`
-          );
+          showToast({
+            message: `Unfortunately, ${product.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`,
+            success: false,
+            placement: 'bottom',
+          });
         } else {
           // Case 2: We are trying to add too much quantity
-          openToast(
-            "bottom",
-            true,
-            `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${product.name} are available. Please update your cart quantity accordingly.`
-          );
+          showToast({
+            message: `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${product.name} are available. Please update your cart quantity accordingly.`,
+            success: false,
+            placement: 'bottom',
+          });
         }
         return false;
       }
@@ -171,7 +171,6 @@ const TopSellingProductCard = () => {
   
   return (
     <div>
-      {contextHolder}
       <Fade triggerOnce>
         <div className="pt-5 pr-2 md:pr-10 flex justify-between">
           <Title className="md:px-10 !text-xl md:!text-4xl !text-left">
