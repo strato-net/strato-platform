@@ -426,4 +426,4 @@ const CreateInventoryModal = ({
   );
 };
 
-export default CreateInventoryModal;
+export default CreateInventoryModal;  
