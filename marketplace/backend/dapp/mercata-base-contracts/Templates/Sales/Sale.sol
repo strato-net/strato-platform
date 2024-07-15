@@ -5,7 +5,6 @@ import <509>;
 import "../Assets/Asset.sol";
 import "../Enums/RestStatus.sol";
 import "../Utils/Utils.sol";
-import "../Orders/Order.sol";
 
 abstract contract Sale is Utils { 
     Asset public assetToBeSold;
@@ -142,14 +141,15 @@ abstract contract Sale is Utils {
 
     function completeSale(
         string orderHash,
-        address purchaser
+        address purchaser,
+        uint _orderId
     ) public requirePaymentProvider("complete sale") returns (uint) {
         uint orderQuantity = takeLockedQuantity(orderHash, purchaser);
         // regular transfer - isUserTransfer: false, transferNumber: 0, transferPrice: 0
         try {
-            assetToBeSold.transferOwnership(purchaser, orderQuantity, false, order.orderId(), 0);
+            assetToBeSold.transferOwnership(purchaser, orderQuantity, false, _orderId, price);
         } catch { // Backwards compatibility for old assets
-            address(assetToBeSold).call("transferOwnership", purchaser, orderQuantity, false, 0);
+            address(assetToBeSold).call("transferOwnership", purchaser, orderQuantity, false, _orderId, price);
         }
         closeSaleIfEmpty();
         return RestStatus.OK;

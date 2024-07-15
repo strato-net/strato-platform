@@ -362,7 +362,7 @@ abstract contract PaymentService is Utils {
                 totalFee += (saleAmount * secondarySaleFeePercentage) / 100;
             }
             try {
-                s.completeSale(_orderHash, _purchaser);
+                s.completeSale(_orderHash, _purchaser, uint(_orderId));
             } catch { // Support for legacy sales
                 try {
                     address(s).call("completeSale", _purchaser);

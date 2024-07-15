@@ -286,7 +286,7 @@ class InventoryController {
       ).required(),
       price: Joi.number().greater(0).precision(2).required(),
       quantity: Joi.number().integer().greater(0).optional(),
-      cost: Joi.number().integer().min(0).required(),
+      cost: Joi.number().min(0).required(),
     });
 
     const validation = listItemSchema.validate(args);

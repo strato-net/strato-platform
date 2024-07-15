@@ -33,9 +33,10 @@ abstract contract Redeemable is UTXO {
         return UTXO(new Redeemable(name, description, images, files, fileNames, createdDate, _quantity, status, address(redemptionService)));
     }
 
-    function _callMint(address _newOwner, uint _quantity) internal virtual override {
+    function _callMint(address _newOwner, uint _quantity) internal virtual override returns (address){
         UTXO newAsset = mint(_quantity);
         Asset(newAsset).transferOwnership(_newOwner, _quantity, false, 0, 0);
+        return address(newAsset);
     }
     
     function checkCondition() internal virtual override returns (bool){
