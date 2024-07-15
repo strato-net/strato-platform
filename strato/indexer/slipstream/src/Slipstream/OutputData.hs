@@ -1318,9 +1318,12 @@ insertEventTables evs = do
       where
         createNewEvent :: 
           ((Account, Text), (Text, Text)) -> AggregateEvent
-        createNewEvent ((_, n'), (_, a)) =
+        createNewEvent ((_, n'), (c, a)) =
           ae { eventEvent = (eventEvent ae) {
-            Action.evContractCreator = Action.evContractCreator (eventEvent ae),
+            Action.evContractCreator = 
+              if (Action.evContractApplication (eventEvent ae)) == "" 
+              then T.unpack c
+              else Action.evContractCreator (eventEvent ae),
             Action.evContractApplication = T.unpack a,
             Action.evContractName = T.unpack n'
               }
