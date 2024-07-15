@@ -475,7 +475,7 @@ processTheMessages env conn messages = do
     notifyPostgREST conn
 
   when (length events' > 0) $
-    outputData conn $ insertEventTables g events'
+    outputData conn $ insertEventTables events'
 
   $logInfoS "processTheMessages" . T.pack $ "Inserting " ++ show (length transactionResults) ++ " transaction results"
 

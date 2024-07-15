@@ -1298,13 +1298,12 @@ expandEventTable globalsIORef (creator, a, n) evName ev cc = do
 
 insertEventTables :: 
   OutputM m =>
-  IORef Globals ->
   [AggregateEvent] ->
   ConduitM () Text m ()
-insertEventTables globalsIORef evs = do
+insertEventTables evs = do
   let processedEvents = concatMap getAllEvents evs
   $logInfoS "insertEventTables/processedEvents" . T.pack $ show processedEvents
-  yieldMany . catMaybes =<< lift (mapM (insertEventTable globalsIORef) processedEvents)
+  yieldMany =<< lift (mapM (insertEventTable) processedEvents)
   where
     getAllEvents :: 
       AggregateEvent -> 
@@ -1319,9 +1318,9 @@ insertEventTables globalsIORef evs = do
       where
         createNewEvent :: 
           ((Account, Text), (Text, Text)) -> AggregateEvent
-        createNewEvent ((_, n'), (c, a)) =
+        createNewEvent ((_, n'), (_, a)) =
           ae { eventEvent = (eventEvent ae) {
-            Action.evContractCreator = T.unpack c,
+            Action.evContractCreator = Action.evContractCreator (eventEvent ae),
             Action.evContractApplication = T.unpack a,
             Action.evContractName = T.unpack n'
               }
@@ -1329,23 +1328,12 @@ insertEventTables globalsIORef evs = do
 
 insertEventTable ::
   OutputM m =>
-  IORef Globals ->
   AggregateEvent ->
-  m (Maybe Text)
-insertEventTable globalsIORef agEv@AggregateEvent {eventEvent = ev} = do
-  let (creator, a, cname) =
-        constructTableNameParameters
-          (T.pack $ Action.evContractCreator ev)
-          (T.pack $ Action.evContractApplication ev)
-          (T.pack $ Action.evContractName ev)
-      eventTable = EventTableName creator a cname (escapeQuotes $ T.pack $ Action.evName ev)
-
-  eventExists <- isTableCreated globalsIORef eventTable
+  m (Text)
+insertEventTable agEv = do
   let q = insertEventTableQuery agEv
   multilineDebugLog "insertEventTable/SQL" $ T.unpack q
-  if eventExists
-    then return (Just q)
-    else return Nothing
+  return q
 
 insertEventTableQuery :: AggregateEvent -> Text
 insertEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
