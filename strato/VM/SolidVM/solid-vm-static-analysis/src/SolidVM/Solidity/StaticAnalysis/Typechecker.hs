@@ -36,7 +36,7 @@ import SolidVM.Model.Type (Type)
 import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Solidity.StaticAnalysis.Types
 import Text.Read (readMaybe)
-
+import Blockchain.VM.SolidException
 --import qualified Text.Colors                          as C
 --import           Control.Monad.IO.Class
 --import Debug.Trace
@@ -1164,7 +1164,7 @@ statementsHelperM args ss = do
   case fm of
     Nothing -> do
       x <- asks $ _contractContext . contract
-      pure . bottom $ "Cannot use keyword 'return' outside of a function" <$ x
+      modifierError "you cannot return a value as part of a modifier" (x)
     Just m -> do
       let x = _modifierContext m
       ~(ts', s) <- flip runStateT ((Nothing, args) :| []) $ do
