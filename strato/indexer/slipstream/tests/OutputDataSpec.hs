@@ -782,7 +782,7 @@ spec = do
     value text,
   PRIMARY KEY (address, key));|]
 
-    swissArmyMappingRowInsert `shouldBe` [r|INSERT INTO "creator-SwissArmy-SwissArmyMapping" ("address",
+    swissArmyMappingRowInsert `shouldBe` [r|INSERT INTO "cc_creator-SwissArmy-SwissArmyMapping" ("address",
     "block_hash",
     "block_timestamp",
     "block_number",
