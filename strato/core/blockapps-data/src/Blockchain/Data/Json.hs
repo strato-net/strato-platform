@@ -8,6 +8,7 @@
 module Blockchain.Data.Json where
 
 import Blockchain.Data.Block
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.DataDefs
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction
@@ -327,30 +328,30 @@ blockDataRefToBlock :: BlockDataRef -> [Transaction] -> Block
 blockDataRefToBlock bdr txs =
   Block
     { blockBlockData =
-        BlockData
-          { blockDataParentHash = blockDataRefParentHash bdr,
-            blockDataUnclesHash = blockDataRefUnclesHash bdr,
-            blockDataCoinbase =
+        BlockHeader
+          { parentHash = blockDataRefParentHash bdr,
+            ommersHash = blockDataRefUnclesHash bdr,
+            beneficiary =
               CommonName
                 (blockDataRefCoinbaseOrg bdr)
                 (blockDataRefCoinbaseOrgUnit bdr)
                 (blockDataRefCoinbaseCommonName bdr)
                 True,
-            blockDataStateRoot = blockDataRefStateRoot bdr,
-            blockDataTransactionsRoot = blockDataRefTransactionsRoot bdr,
-            blockDataReceiptsRoot = blockDataRefReceiptsRoot bdr,
-            blockDataLogBloom = blockDataRefLogBloom bdr,
-            blockDataDifficulty = blockDataRefDifficulty bdr,
-            blockDataNumber = blockDataRefNumber bdr,
-            blockDataGasLimit = blockDataRefGasLimit bdr,
-            blockDataGasUsed = blockDataRefGasUsed bdr,
-            blockDataTimestamp = blockDataRefTimestamp bdr,
-            blockDataExtraData = blockDataRefExtraData bdr,
-            blockDataNonce = blockDataRefNonce bdr,
-            blockDataMixHash = blockDataRefMixHash bdr
+            stateRoot = blockDataRefStateRoot bdr,
+            transactionsRoot = blockDataRefTransactionsRoot bdr,
+            receiptsRoot = blockDataRefReceiptsRoot bdr,
+            logsBloom = blockDataRefLogBloom bdr,
+            difficulty = blockDataRefDifficulty bdr,
+            number = blockDataRefNumber bdr,
+            gasLimit = blockDataRefGasLimit bdr,
+            gasUsed = blockDataRefGasUsed bdr,
+            timestamp = blockDataRefTimestamp bdr,
+            extraData = blockDataRefExtraData bdr,
+            nonce = blockDataRefNonce bdr,
+            mixHash = blockDataRefMixHash bdr
           },
       blockReceiptTransactions = txs,
-      blockBlockUncles = blockDataRefBlockUncles bdr
+      blockBlockUncles = []
     }
 
 bToBPrime :: String -> BlockDataRef -> [Transaction] -> Block'
@@ -359,13 +360,14 @@ bToBPrime s x txs = Block' (blockDataRefToBlock x txs) s
 bToBPrime' :: BlockDataRef -> [Transaction] -> Block'
 bToBPrime' x txs = Block' (blockDataRefToBlock x txs) ""
 
+
 bPrimeToB :: Block' -> Block
 bPrimeToB (Block' x _) = x
 
-data BlockData' = BlockData' BlockData deriving (Eq, Show)
+data BlockData' = BlockData' BlockHeader deriving (Eq, Show)
 
 instance ToJSON BlockData' where
-  toJSON (BlockData' (BlockData ph uh a sr tr rr _ d num gl gu ts ed non mh)) =
+  toJSON (BlockData' (BlockHeader ph uh a sr tr rr _ d num gl gu ts ed mh non)) =
     object
       [ "kind" .= ("BlockData" :: String),
         "parentHash" .= ph,
@@ -387,7 +389,7 @@ instance ToJSON BlockData' where
 instance FromJSON BlockData' where
   parseJSON = withObject "BlockData'" $ \v ->
     BlockData'
-      <$> ( BlockData
+      <$> ( BlockHeader
               <$> v .: "parentHash"
               <*> v .: "unclesHash"
               <*> v .: "coinbase"
@@ -401,8 +403,8 @@ instance FromJSON BlockData' where
               <*> v .: "gasUsed"
               <*> v .: "timestamp"
               <*> v .: "extraData"
-              <*> v .: "nonce"
               <*> v .: "mixHash"
+              <*> v .: "nonce"
           )
 
 instance FromJSON Block' where
@@ -413,16 +415,16 @@ instance FromJSON Block' where
     next <- v .: "next"
     pure $ Block' (Block bData bTxs bUncles) next
 
-bdToBdPrime :: BlockData -> BlockData'
+bdToBdPrime :: BlockHeader -> BlockData'
 bdToBdPrime = BlockData'
 
-bdPrimeToBd :: BlockData' -> BlockData
+bdPrimeToBd :: BlockData' -> BlockHeader
 bdPrimeToBd (BlockData' bd) = bd
 
 data BlockDataRef' = BlockDataRef' BlockDataRef deriving (Eq, Show)
 
 instance ToJSON BlockDataRef' where
-  toJSON (BlockDataRef' (BlockDataRef ph uh co cu cc sr tr rr _ d num gl gu ts ed non mh h uncles pow isConf td)) =
+  toJSON (BlockDataRef' (BlockDataRef ph uh co cu cc sr tr rr _ d num gl gu ts ed non mh h pow isConf td)) =
     object
       [ "parentHash" .= ph,
         "unclesHash" .= uh,
@@ -441,7 +443,6 @@ instance ToJSON BlockDataRef' where
         "nonce" .= non,
         "mixHash" .= mh,
         "hash" .= h,
-        "uncles" .= map bdToBdPrime uncles,
         "powVerified" .= pow,
         "isConfirmed" .= isConf,
         "totalDifficulty" .= td

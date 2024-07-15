@@ -1,32 +1,44 @@
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
+
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module Blockchain.Data.BlockHeader
   ( BlockHeader (..),
     headerHash,
-    blockToBlockHeader,
-    blockToBody,
     extraData2TxsLen,
-    txsLen2ExtraData,
-    createBlockFromHeaderAndBody,
+    mixHashlens,
+    extraDataLens,
+    txsLen2ExtraData
   )
 where
 
-import Blockchain.Data.Block
-import Blockchain.Data.DataDefs
 import Blockchain.Data.RLP
-import Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.PositiveInteger
+import Control.DeepSeq
+import Control.Lens
 import Control.Monad
+import Data.Binary
 import Data.Bits (shiftL, shiftR)
 import qualified Data.ByteString as B
+import Data.ByteString.Arbitrary
+import Data.Data
 import Data.Time
 import Data.Time.Clock.POSIX
+import GHC.Generics
 import Numeric
+import Test.QuickCheck
 import qualified Text.Colors as CL
 import Text.Format
 import Text.Tools
+
+
+
 
 data BlockHeader = BlockHeader
   { parentHash :: Keccak256,
@@ -45,7 +57,18 @@ data BlockHeader = BlockHeader
     mixHash :: Keccak256,
     nonce :: Word64
   }
-  deriving (Eq, Read, Show)
+  deriving (Eq, Read, Show, Generic, Data)
+
+instance Binary UTCTime where
+  put = put . (round :: POSIXTime -> Integer) . utcTimeToPOSIXSeconds
+  get = (posixSecondsToUTCTime . fromInteger) <$> get
+
+
+instance Binary BlockHeader
+
+instance NFData BlockHeader
+
+makeLensesFor [("extraData", "extraDataLens"), ("mixHash", "mixHashlens")] ''BlockHeader
 
 instance Format BlockHeader where
   format header@(BlockHeader ph oh b sr tr rr _ d number' gl gu ts ed _ nonce') =
@@ -167,17 +190,6 @@ instance BlockHeaderLike BlockHeader where
 headerHash :: BlockHeader -> Keccak256
 headerHash = blockHeaderHash
 
-blockToBlockHeader :: Block -> BlockHeader
-blockToBlockHeader Block {blockBlockData = bd} = blockDataToBlockHeader bd
-
-blockToBody :: Block -> ([Transaction], [BlockHeader])
-blockToBody Block {blockReceiptTransactions = transactions, blockBlockUncles = uncles} =
-  (transactions, map blockDataToBlockHeader uncles)
-
-blockDataToBlockHeader :: BlockData -> BlockHeader
-blockDataToBlockHeader (BlockData ph oh b sr tr rr lb d number' gl gu ts ed mh nonce') =
-  BlockHeader ph oh b sr tr rr lb d number' gl gu ts ed nonce' mh
-
 txsLen2ExtraData :: Int -> B.ByteString
 txsLen2ExtraData len = B.singleton len1 <> B.singleton len2 <> B.replicate 30 0
   where
@@ -194,9 +206,40 @@ extraData2TxsLen ed = guard (B.length ed >= 32) >> result
       0 -> Nothing
       x -> Just (fromInteger x :: Int)
 
-createBlockFromHeaderAndBody :: BlockHeader -> ([Transaction], [BlockHeader]) -> Block
-createBlockFromHeaderAndBody header (transactions, uncles) =
-  Block (headerToBlockData header) transactions (map headerToBlockData uncles)
-  where
-    headerToBlockData (BlockHeader ph oh b sr tr rr lb d number' gl gu ts ed mh nonce') =
-      BlockData ph oh b sr tr rr lb d number' gl gu ts ed nonce' mh
+instance Arbitrary BlockHeader where
+  arbitrary = do
+    parentHash' <- arbitrary
+    uncleHash' <- arbitrary
+    coinbase' <- arbitrary
+    stateRoot' <- arbitrary
+    transactionsRoot' <- arbitrary
+    receiptsRoot' <- arbitrary
+    logBloom' <- fastRandBs 256 -- 2048-bit bloom filter
+    difficulty' <- unboxPI <$> arbitrary
+    number' <- unboxPI <$> arbitrary
+    gasLimit' <- unboxPI <$> arbitrary
+    gasUsed' <- unboxPI <$> arbitrary `suchThat` (<= PositiveInteger gasLimit')
+    timestamp' <- posixSecondsToUTCTime . fromInteger . unboxPI <$> arbitrary
+    -- TODO(tim): Rather than making an artificial dependent type, guard Block against
+    -- rogue long bytestrings.
+    extraData' <- B.take 32 <$> arbitrary
+    nonce' <- arbitrary
+    mixHash' <- arbitrary
+    return
+      BlockHeader
+        { parentHash = parentHash',
+          ommersHash = uncleHash',
+          beneficiary = coinbase',
+          stateRoot = stateRoot',
+          transactionsRoot = transactionsRoot',
+          receiptsRoot = receiptsRoot',
+          logsBloom = logBloom',
+          difficulty = difficulty',
+          number = number',
+          gasLimit = gasLimit',
+          gasUsed = gasUsed',
+          timestamp = timestamp',
+          extraData = extraData',
+          nonce = nonce',
+          mixHash = mixHash'
+        }

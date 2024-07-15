@@ -87,7 +87,7 @@ def check_table(table):
         else:
             if assets1[a] != assets2[a]:
                 print("inconsistency at ", a)
-                for k in assets1[a].keys():
+                for k in assets2[a].keys():
                     if assets1[a][k] != assets2[a][k]:
                         #Only on contract name for now
                         if k=='contract_name':

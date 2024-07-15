@@ -26,8 +26,7 @@ import Blockchain.DB.ChainDB
 import qualified Blockchain.DB.MemAddressStateDB as Mem
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.AddressStateRef (updateSQLBalanceAndNonce)
-import Blockchain.Data.BlockHeader (extraData2TxsLen)
-import Blockchain.Data.DataDefs (BlockData (..), blockDataExtraData)
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.GenesisBlock
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Database.MerklePatricia as MP
@@ -142,7 +141,7 @@ outputBlockToEvmCheckpoint block =
       txL = length txs
       uncL = length (obBlockUncles block)
       cbbi = ContextBestBlockInfo sha header td txL uncL
-      sr = blockDataStateRoot header
+      sr = stateRoot header
    in EVMCheckpoint sha header cbbi sr
 
 logEventSummaries :: MonadLogger m => [VmEvent] -> m ()
@@ -162,6 +161,7 @@ logEventSummaries events = do
     getNames (VmPrivateTx _) = "PrivateTx"
     getNames (VmGetMPNodesRequest _ _) = "GetMPNodesRequest"
     getNames (VmMPNodesReceived _) = "MPNodesReceived"
+    getNames (VmRunPreprepare _) = "VmRunPreprepare"
 
     numberIt :: Int -> String -> String
     numberIt 1 x = "1 " ++ x
@@ -233,6 +233,7 @@ sendOutEvent (OutBlock o) = void . execKafka $ writeUnseqEvents [IEBlock $ block
 sendOutEvent (OutStateRootMismatch _) = pure ()
 sendOutEvent (OutGetMPNodes mpNodes) = void . execKafka $ writeUnseqEvents [IEGetMPNodes mpNodes]
 sendOutEvent (OutMPNodesResponse o nds) = void . execKafka $ writeUnseqEvents [IEMPNodesResponse o nds]
+sendOutEvent (OutPreprepareResponse dec) = void . execKafka $ writeUnseqEvents [IEPreprepareResponse dec]
 
 consumerGroup :: KP.ConsumerGroup
 consumerGroup = lookupConsumerGroup "ethereum-vm"
@@ -294,7 +295,7 @@ getUnprocessedKafkaEvents offset = do
         VmBlock OutputBlock {..} ->
           fromMaybe (length obReceiptTransactions)
             . extraData2TxsLen
-            $ blockDataExtraData obBlockData
+            $ extraData obBlockData
         _ -> 1
 
       !ret' = eventLimit . countLimit $ ret

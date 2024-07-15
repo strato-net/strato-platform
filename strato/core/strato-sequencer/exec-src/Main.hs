@@ -105,7 +105,7 @@ main = do
         ckpt <- runGregorM gregorCfg' $ initializeCheckpoint validators
         putStrLn $ "Checkpoint: " ++ show ckpt
 
-        return $ Just $ newContext ckpt (Just selfAddress) flags_validatorBehavior Nothing
+        return $ Just $ newContext flags_network ckpt (Just selfAddress) flags_validatorBehavior Nothing
 
   cht <- atomically newTMChan
 

@@ -10,7 +10,7 @@
 module Slipstream.Globals
   ( setTableCreated,
     getTableColumns,
-    getMappingTables,
+    getCollectionTables,
     isTableCreated,
     setContractState,
     flushPendingWrites,
@@ -74,17 +74,17 @@ isTableCreated globalsIORef tableName = do
       createdTables' <- scrapeFor globalsIORef tableName
       return $ tableName `M.member` createdTables'
 
-getMappingTables :: MonadIO m => IORef Globals -> T.Text -> T.Text -> T.Text -> m [T.Text]
-getMappingTables globalsIORef crtr app contract = do
-  createdTables <- scrapeFor globalsIORef (MappingTableName crtr app contract "") -- empty map name to get all map tables
-  let mappingTables = M.filterWithKey isMappingTableName createdTables
+getCollectionTables :: MonadIO m => IORef Globals -> T.Text -> T.Text -> T.Text -> m [T.Text]
+getCollectionTables globalsIORef crtr app contract = do
+  createdTables <- scrapeFor globalsIORef (CollectionTableName crtr app contract "") -- empty map name to get all map tables
+  let collectionTables = M.filterWithKey isCollectionTableName createdTables
         where
-          isMappingTableName :: TableName -> TableColumns -> Bool
-          isMappingTableName (MappingTableName c a n _) _ =
+          isCollectionTableName :: TableName -> TableColumns -> Bool
+          isCollectionTableName (CollectionTableName c a n _) _ =
             crtr == c && app == a && n == contract
-          isMappingTableName _ _ = False
-  let mapNames = map mtMappingName (M.keys mappingTables)
-  return mapNames
+          isCollectionTableName _ _ = False
+  let collectionNames = map mtCollectionName (M.keys collectionTables)
+  return collectionNames
 
 getTableColumns :: MonadIO m => IORef Globals -> TableName -> m (Maybe TableColumns)
 getTableColumns globalsIORef tableName = do
@@ -103,9 +103,9 @@ scrapeFor globalsIORef tableName = do
   case cirrusHandle of
     FakeCirrusHandle -> return createdTables
     CirrusHandle {..} -> case tableName of
-      MappingTableName c a contract _ | (c, a, contract) `S.member` queriedMaps -> return createdTables
-      MappingTableName c a contract "" -> do
-        let theMapTablesQuery = queryForMatchingTables $ MappingTableName c a contract ""
+      CollectionTableName c a contract _ | (c, a, contract) `S.member` queriedMaps -> return createdTables
+      CollectionTableName c a contract "" -> do
+        let theMapTablesQuery = queryForMatchingTables $ CollectionTableName c a contract ""
         results :: [PGValues] <- liftIO $ pgQuery cirrusConn theMapTablesQuery
         forM_
           results
@@ -113,7 +113,7 @@ scrapeFor globalsIORef tableName = do
               [PGTextValue tn] -> do
                 cols <- scrapeForCols (wrapSingleQuotes $ decodeUtf8 tn) cirrusConn
                 let mapName = last $ T.splitOn "." (decodeUtf8 tn)
-                setTableCreated globalsIORef (MappingTableName c a contract mapName) cols
+                setTableCreated globalsIORef (CollectionTableName c a contract mapName) cols
               _ -> return ()
           )
         g@Globals {createdTables = createdTables'} <- readIORef globalsIORef -- need to read again so have current ver of createdTables

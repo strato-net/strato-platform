@@ -37,7 +37,6 @@ library:
   - swagger2
   - text
   - type-lits
-  - x509-certs
 
 tests:
   blockapps-strato-api-test:

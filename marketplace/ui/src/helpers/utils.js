@@ -14,7 +14,7 @@ export function arrayToStr(arr) {
   let valueString = "";
   arr.map((value) => (valueString += value + ","));
   valueString = valueString.slice(0, valueString.length - 1);
-  
+
   return valueString;
 }
 export function arrayToCsv(data) {

@@ -56,6 +56,7 @@ import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember hiding (commonName, orgName, orgUnit)
 import Blockchain.Strato.Model.Secp256k1
+import Control.Applicative ((<|>))
 import Control.DeepSeq
 import qualified Control.Lens as Lens
 import Control.Lens.Operators hiding ((.=))
@@ -247,7 +248,7 @@ instance FromJSON Subject where
     o <- obj .: "organization"
     ou <- obj .:? "organizationUnit"
     c <- obj .:? "country"
-    pub <- obj .: "pubKey"
+    pub <- (either fail pure . bsToPub . C8.pack =<< (obj .: "pubKey")) <|> (obj .: "pubKey")
     return $ Subject cn o ou c pub
   parseJSON x = fail $ "could not decode JSON subject info: " ++ show x
 

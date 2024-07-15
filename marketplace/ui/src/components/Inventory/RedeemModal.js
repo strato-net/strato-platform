@@ -39,7 +39,7 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
     }
 
     useEffect(() => {
-        marketplaceActions.fetchUserAddresses(marketplaceDispatch);
+        marketplaceActions.fetchUserAddresses(marketplaceDispatch, inventory.data.redemptionService);
     }, [marketplaceDispatch])
 
     useEffect(() => {
@@ -76,6 +76,7 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
     const handleSubmit = async () => {
         const body = {
             assetAddresses: [inventory.address],
+            redemptionService: inventory.data.redemptionService,
             assetName: inventory.name,
             status: REDEMPTION_STATUS.PENDING,
             quantity: quantity,
@@ -134,7 +135,7 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
                         </>
                     }
                 </div>
-                {showModal && <AddAddressModal open={showModal} close={closeAddressModel} />}
+                {showModal && <AddAddressModal open={showModal} close={closeAddressModel} redemptionService={inventory.data.redemptionService}/>}
                 {isLoadingUserAddresses ?
                     <div className="h-80 flex justify-center items-center">
                         <Spin spinning={isLoadingUserAddresses} size="large" />
@@ -228,7 +229,7 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
                         </div>
                     </>
                 }
-                {showResponsiveForm && <ResponsiveAddAddress open={showResponsiveForm} close={closeResponsiveAddressModel}/>}
+                {showResponsiveForm && <ResponsiveAddAddress open={showResponsiveForm} close={closeResponsiveAddressModel} redemptionService={inventory.data.redemptionService}/>}
             </div>
         </Modal>
     )

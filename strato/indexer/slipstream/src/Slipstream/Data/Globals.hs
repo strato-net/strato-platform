@@ -63,11 +63,11 @@ data TableName
         etContractName :: T.Text,
         etEventName :: T.Text
       }
-  | MappingTableName
+  | CollectionTableName
       { mtCreator :: T.Text,
         mtApplication :: T.Text,
         mtContractName :: T.Text,
-        mtMappingName :: T.Text
+        mtCollectionName :: T.Text
       }
   | AbstractTableName
       { atCreator :: T.Text,

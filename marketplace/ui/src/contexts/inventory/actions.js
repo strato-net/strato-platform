@@ -40,12 +40,6 @@ const actionDescriptors = {
   fetchItemTransfersFailed: "fetch_item_transfers_failed",
   resetMessage: "reset_message",
   setMessage: "set_message",
-  onboardSellerToStripe: "onboard_seller_to_stripe",
-  onboardSellerToStripeSuccessful: "onboard_seller_to_stripe_successful",
-  onboardSellerToStripeFailed: "onboard_seller_to_stripe_failed",
-  sellerStripeStatus: "seller_stripe_status",
-  sellerStripeStatusSuccessful: "seller_stripe_status_successful",
-  sellerStripeStatusFailed: "seller_stripe_status_failed",
   uploadImage: "upload_image",
   uploadImageSuccessful: "upload_image_successful",
   uploadImageFailed: "upload_image_failed",
@@ -703,96 +697,20 @@ const actions = {
           type: actionDescriptors.fetchInventoryOwnershipHistoryFailed,
           error: "Unauthorized while fetching ownership history"
         });
-      }
-
-      dispatch({
-        type: actionDescriptors.fetchInventoryOwnershipHistoryFailed,
-        error: "Error while fetching ownership history",
-      });
-      return false;
-    } catch (err) {
-      dispatch({
-        type: actionDescriptors.fetchInventoryOwnershipHistoryFailed,
-        error: "Error while fetching ownership history",
-      });
-      return false;
-    }
-  },
-
-  onboardSellerToStripe: async (dispatch) => {
-    dispatch({ type: actionDescriptors.onboardSellerToStripe });
-
-    try {
-      const response = await fetch(`${apiUrl}/payment/stripe/account`, {
-        // const response = await fetch(`${apiUrl}/inventory`, {
-        method: HTTP_METHODS.GET,
-      });
-
-      const body = await response.json();
-
-      if (response.status === RestStatus.OK) {
-        dispatch({
-          type: actionDescriptors.onboardSellerToStripeSuccessful,
-          payload: body.data,
-        });
-        return body.data;
-      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
-        dispatch({
-          type: actionDescriptors.onboardSellerToStripeFailed,
-          error: "Error while trying to onboard to Stripe",
-        });
-        actions.setMessage(dispatch, "Error while trying to onboard to Stripe");
-        return null;
-      } else if (response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({
-          type: actionDescriptors.onboardSellerToStripeFailed,
-          error: "Unauthorized while trying to onboard to Stripe"
-        });
         window.location.href = body.error.loginUrl;
       }
 
       dispatch({
-        type: actionDescriptors.onboardSellerToStripeFailed,
-        error: body.error,
-      });
-      actions.setMessage(dispatch, body.error);
-      return null;
-    } catch (err) {
-      dispatch({
-        type: actionDescriptors.onboardSellerToStripeFailed,
-        error: "Error while trying to onboard to Stripe",
-      });
-    }
-  },
-
-  sellerStripeStatus: async (dispatch, username) => {
-    dispatch({ type: actionDescriptors.sellerStripeStatus });
-
-    try {
-      const response = await fetch(`${apiUrl}/payment/stripe/account/status/${username}`, {
-        method: HTTP_METHODS.GET,
-      });
-
-      const body = await response.json();
-
-      if (response.status === RestStatus.OK) {
-        dispatch({
-          type: actionDescriptors.sellerStripeStatusSuccessful,
-          payload: body.data,
-        });
-        return body.data;
-      }
-
-      dispatch({
-        type: actionDescriptors.sellerStripeStatusFailed,
-        error: "Error while trying to get Stripe status",
+        type: actionDescriptors.fetchInventoryOwnershipHistoryFailed,
+        error: "Error while fetching ownership history",
       });
       return false;
     } catch (err) {
       dispatch({
-        type: actionDescriptors.sellerStripeStatusFailed,
-        error: "Error while trying to get Stripe status",
+        type: actionDescriptors.fetchInventoryOwnershipHistoryFailed,
+        error: "Error while fetching ownership history",
       });
+      return false;
     }
   },
 
@@ -826,6 +744,12 @@ const actions = {
         });
         actions.setMessage(dispatch, "Error while uploading Image");
         return false;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.uploadImageFailed,
+          error: "Unauthorized while trying to upload image"
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -874,6 +798,12 @@ const actions = {
         dispatch({ type: actionDescriptors.createItemFailed, error: "Error while creating Item" });
         actions.setMessage(dispatch, "Error while creating Item")
         return false;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.createItemFailed,
+          error: "Unauthorized while trying to create Item"
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -905,7 +835,7 @@ const actions = {
           type: actionDescriptors.fetchPriceHistoryFailed,
           payload: "Error while fetching price history",
         });
-        return;
+        window.location.href = body.error.loginUrl;
       }
       if (response.status === RestStatus.OK) {
         dispatch({

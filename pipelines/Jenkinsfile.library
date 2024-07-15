@@ -15,7 +15,6 @@ def deployStratoWithS3(nodeData, versionTag) {
     sh "sudo ./strato --pull"
 
     withCredentials([
-      usernamePassword(credentialsId: 'stripe-key', passwordVariable: 'STRIPE_SECRET_KEY', usernameVariable: 'STRIPE_PUBLISHABLE_KEY'),
       usernamePassword(credentialsId: 'marketplace-testnet2-aws-iam-user', passwordVariable: 'AWS_IAM_USER_ACCESS_KEY', usernameVariable: 'AWS_IAM_USER_KEY_ID')
     ]) {
       writeFile file: "run.sh", text: """#!/bin/bash
@@ -26,8 +25,6 @@ def deployStratoWithS3(nodeData, versionTag) {
           OAUTH_CLIENT_ID="${nodeData.OAUTH_CLIENT_ID}" \\
           OAUTH_CLIENT_SECRET="${nodeData.OAUTH_CLIENT_SECRET}" \\
           VAULT_URL="https://vault.blockapps.net:8093" \\
-          STRIPE_PUBLISHABLE_KEY='${STRIPE_PUBLISHABLE_KEY}' \\
-          STRIPE_SECRET_KEY='${STRIPE_SECRET_KEY}' \\
           CLIENT_URL="https://${nodeData.STRATO_HOSTNAME}" \\
           ssl="true" \\
           connectionTimeout=300 \\
@@ -1382,28 +1379,32 @@ def spinUpFileServer() {
 
 def spinUpPaymentServer() {
   withCredentials([
-    string(credentialsId: 'STRIPE_PUBLISHABLE_KEY_TESTNET2', variable:'STRIPE_PUBLISHABLE_KEY_TESTNET2'),
     string(credentialsId: 'STRIPE_SECRET_KEY_TESTNET2', variable:'STRIPE_SECRET_KEY_TESTNET2'),
     usernamePassword(credentialsId: 'AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV', passwordVariable: 'AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV_PASSWORD', usernameVariable: 'AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV_USER'),
     string(credentialsId: 'AWS_RDS_PAYMENT_SERVER_URL_DEV', variable:'AWS_RDS_PAYMENT_SERVER_URL_DEV'),
+    usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
   ]) {
-    writeFile file: "run-stripe-ps.sh", text: """#!/bin/bash
+    writeFile file: "run-payment-server.sh", text: """#!/bin/bash
       sudo \\
-        STRIPE_PUBLISHABLE_KEY='${STRIPE_PUBLISHABLE_KEY_TESTNET2}' \\
+        SERVER_HOST=http://172.17.0.1:8018 \\
+        HTTP_PORT=8018 \\
+        HTTPS_PORT=44301 \\
+        OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \\
+        OAUTH_CLIENT_ID="${KEYCLOAK_STRATODEVEL_DEV_ID}" \\
+        OAUTH_CLIENT_SECRET="${KEYCLOAK_STRATODEVEL_DEV_SECRET}" \\
+        STRIPE_CONTRACT_ADDRESS="358af3a0499239c00aad8eaa8e40cdd7f74dc293" \\
+        METAMASK_CONTRACT_ADDRESS="358af3a0499239c00aad8eaa8e40cdd7f74dc293" \\
+        STRATO_HOST="http://172.17.0.1" \\
         STRIPE_SECRET_KEY='${STRIPE_SECRET_KEY_TESTNET2}' \\
         ssl=true \\
-        HTTPS_PORT=44301 \\
-        POSTGRESQL_SERVER_URL='${AWS_RDS_PAYMENT_SERVER_URL_DEV}' \\
-        POSTGRESQL_PORT=5432 \\
-        POSTGRESQL_USER='${AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV_USER}' \\
-        POSTGRESQL_PASSWORD='${AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV_PASSWORD}' \\
-        POSTGRESQL_DBNAME=postgres \\
-        ./stripe-ps
+        TABLE_PREFIX="Test-Mercata-" \\
+        SKIP_CONTRACT_VALIDATION="true" \\
+        ./payment-server
     """
   }
 
-  sh 'chmod +x run-stripe-ps.sh'
-  sh './run-stripe-ps.sh'
+  sh 'chmod +x run-payment-server.sh'
+  sh './run-payment-server.sh'
   sh 'docker ps'
 
   writeFile file: "check_availability_payment.sh", text: '''#!/bin/bash -le
@@ -1435,12 +1436,13 @@ def spinUpIdentityServer(rootCert, rootPriv) {
     string(credentialsId: 'SENDGRID_APIKEY_TESTNET2', variable:'SENDGRID_APIKEY_TESTNET2'),
     usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID')
   ]) {
+  def hostname=sh(returnStdout: true, script: "cat </host")
   writeFile file: "identity-provider/idconf.yaml", text: """
     - realmName: strato-devel
       discoveryUrl: https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration
       clientId: ${KEYCLOAK_STRATODEVEL_DEV_ID}
       clientSecret: ${KEYCLOAK_STRATODEVEL_DEV_SECRET}
-      nodeUrl: https://\$(</host)
+      nodeUrl: https://${hostname}
   """
   writeFile file: "run-identity.sh", text: """#!/bin/bash
     sudo \\
@@ -1502,7 +1504,7 @@ def replaceServerPortsDocker() {
   '''
 
   sh 'chmod +x replace_server_ports_docker.sh'
-  sh './replace_server_ports_docker.sh docker-compose.highway.yml docker-compose.stripe-ps.yml'
+  sh './replace_server_ports_docker.sh docker-compose.highway.yml docker-compose.payment.yml'
 }
 
 return this

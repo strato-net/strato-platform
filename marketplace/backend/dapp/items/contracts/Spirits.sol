@@ -6,7 +6,7 @@ import <BASE_CODE_COLLECTION>;
 contract UnitOfMeasurement {
 enum UnitOfMeasurement {
     NULL,
-    BARRELL,
+    BARREL,
     BOTTLE  
 }
 }
@@ -28,12 +28,14 @@ contract Spirits is Mintable, UnitOfMeasurement {
         string _description,
         string[] _images,
         string[] _files,
+        string[] _fileNames,
         uint _createdDate,
         uint _quantity,
         string _spiritType,
         UnitOfMeasurement _unitOfMeasurement,
-        AssetStatus _status
-    ) public Mintable(_name, _description, _images, _files, _createdDate, _quantity, _status) {
+        AssetStatus _status,
+        address _redemptionService
+    ) public Mintable(_name, _description, _images, _files, _fileNames, _createdDate, _quantity, _status, _redemptionService) {
         unitOfMeasurement = _unitOfMeasurement;
         spiritType = _spiritType;
     }
@@ -44,11 +46,13 @@ contract Spirits is Mintable, UnitOfMeasurement {
             description,
             images,
             files,
+            fileNames,
             createdDate,
             _quantity,
             spiritType,
             unitOfMeasurement, 
-            status
+            status,
+            address(redemptionService)
         );
         return UTXO(address(newAsset));
     }

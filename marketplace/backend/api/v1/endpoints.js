@@ -4,6 +4,14 @@ export const Authentication = {
   logout: '/logout',
 }
 
+export const IssuerStatus = {
+  prefix: '/issuerstatus',
+  requestReview: '/requestReview',
+  authorizeIssuer: '/authorizeIssuer',
+  deauthorizeIssuer: '/deauthorizeIssuer',
+  admin: '/admin',
+}
+
 export const Users = {
   prefix: '/users',
   me: '/me',
@@ -62,6 +70,7 @@ export const Redemption = {
   prefix: '/redemption',
   get: '/:id',
   create: '/',
+  getRedemptionServices: '/services',
   getOutgoingRedemptionRequests: '/outgoing',
   getIncomingRedemptionRequests: '/incoming',
   close: '/close'
@@ -139,53 +148,14 @@ export const Order = {
   get: '/:address',
   getAll: '/',
   create: '/',
-  updateOrderStatus: '/update',
-  updateBuyerDetails: '/updateBuyerDetails',
-  updateSellerDetails: '/updateSellerDetails',
   payment: '/payment',
-  paymentSession: '/payment/session/:session_id/:sellersCommonName',
-  paymentIntent: '/payment/intent/:session_id/:sellersCommonName',
   userAddress: '/userAddress',
-  getAllUserAddress: '/userAddresses/user',
-  getAddressFromId: '/userAddress/:id',
-  createSaleOrder: '/sale',
+  getAllUserAddress: '/userAddresses/user/:redemptionService?',
   cancelSaleOrder: '/sale/cancel',
   checkSaleQuantity: '/saleQuantity',
   executeSale: '/closeSale',
   updateOrderComment: '/updateComment',
   export: '/exportOrders'
-}
-
-export const OrderLine = {
-  prefix: '/orderLine',
-  get: '/:address'
-}
-
-export const OrderLineItem = {
-  prefix: '/orderLineItem',
-  get: '/:orderLineId',
-  getAll: '/',
-  create: '/',
-  update: '/update',
-  audit: '/:address/:chainId/audit',
-  transferOwnership: '/transferOwnership',
-}
-
-export const EventType = {
-  prefix: '/eventType',
-  getAll: '/',
-  create: '/'
-}
-
-export const Event = {
-  prefix: '/event',
-  getInventoryEventTypes: '/:inventoryId',
-  getInventoryEventTypeDetails: '/:inventoryId/:eventTypeId',
-  getAll: '/',
-  create: '/',
-  certifyEvent: '/update',
-  audit: '/:address/:chainId/audit',
-  transferOwnership: '/transferOwnership',
 }
 
 export const Marketplace = {
@@ -194,15 +164,15 @@ export const Marketplace = {
   getAllLoggedIn: '/all',
   getTopSellingProducts: '/topselling',
   getTopSellingProductsLoggedIn: '/user/topselling',
-  getStratsBalance: '/strats'
+  transferStrats: '/strats/transfer',
+  getStratsBalance: '/strats',
+  getStratsTransactionHistory: '/strats/history'
 }
 
 export const PaymentService = {
   prefix: '/payment',
-  stripeOnboarding: '/stripe/account',
-  stripeConnectStatus: '/stripe/account/status/:ownerCommonName',
-  stripeWebhook: '/stripe/webhook',
-  stripeWebhookConnect: '/stripe/webhook/connect',
+  getAll: '/',
+  getNotOnboarded: '/onboarding',
 }
 
 export const UserActivity = {

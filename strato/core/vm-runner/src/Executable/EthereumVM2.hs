@@ -22,15 +22,18 @@ import BlockApps.Logging
 import qualified Blockchain.Bagger as Bagger
 import qualified Blockchain.Bagger.BaggerState as B
 import Blockchain.BlockChain
+import Blockchain.Blockstanbul (PreprepareDecision(..))
 import Blockchain.DB.BlockSummaryDB
 import Blockchain.DB.ChainDB
 import Blockchain.DB.CodeDB (CodeKind (..), getCode)
 import qualified Blockchain.DB.MemAddressStateDB as Mem
 import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
+import Blockchain.Data.Block
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.ChainInfo
-import Blockchain.Data.DataDefs (BlockData (..), TransactionResult (..), blockDataNumber)
+import Blockchain.Data.DataDefs (TransactionResult (..))
 import Blockchain.Data.ExecResults
 import Blockchain.Data.GenesisBlock
 import Blockchain.Data.TransactionResultStatus
@@ -101,6 +104,41 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
   numPoolable <- uncurry (*>) . (yieldMany *** pure) =<< lift (processTransactions txPairs)
   yieldMany $ outputPrivateTransactions privateTxs
   processBlocksAndNewChains blocksAndNewChains
+
+  mPreDec <- lift $ do
+    case preprepareBlock of
+      Nothing -> pure Nothing
+      Just block -> do
+        let bHeader = blockBlockData block
+            bHash = blockHeaderHash bHeader
+            -- bro if there are any maybes in this list thaz BAD
+            -- private txs don't affect stateroot we compute
+            otxs = catMaybes $ wrapIngestBlockTransaction  bHash <$> [t | t <- blockReceiptTransactions block, txType t /= PrivateHash]
+        mSumm <- A.lookup (A.Proxy @BlockSummary) (parentHash bHeader)
+        case mSumm of 
+          Nothing -> pure Nothing
+          Just summ -> do
+            res <- Bagger.runFromStateRoot 
+              mineTransactions 
+              (bSumGasLimit summ) 
+              bHeader { -- immitate parent block as closely as possible (most important is the stateroot)
+                parentHash = bSumParentHash summ,
+                stateRoot = bSumStateRoot summ,
+                number = bSumNumber summ,
+                gasLimit = bSumGasLimit summ
+              } 
+              otxs 
+            case res of 
+              Right (sr, _, _) -> do 
+                let  desiredSR = stateRoot bHeader
+                $logDebugS "handleVmEvents/preprepareBlock" . T.pack $ "Stateroot we got: " <> format sr
+                $logDebugS "handleVmEvents/preprepareBlock" . T.pack $ "Stateroot in block: " <> format desiredSR
+                if sr == desiredSR 
+                  then pure . Just $ AcceptPreprepare bHash
+                  else pure $ Just RejectPreprepare
+              _ -> pure $ Just RejectPreprepare
+  $logDebugS "handleVmEvents/mPreDec" . T.pack $ format mPreDec
+  traverse_ (yield . OutPreprepareResponse) mPreDec
 
   mNewBlock <- lift $ do
     Mod.modify_ (Mod.Proxy @ContextState) $ pure . (blockRequested ||~ createBlock)
@@ -290,13 +328,13 @@ processBlockSummaries ::
   [OutputBlock] ->
   m ()
 processBlockSummaries = mapM_ $ \b -> do
-  let number = blockDataNumber $ obBlockData b
+  let number' = number $ obBlockData b
       txCount = length $ obReceiptTransactions b
-  recordMaxBlockNumber "vm_seqevents" number
+  recordMaxBlockNumber "vm_seqevents" number'
   $logDebugS "evm/processBlockSummaries" . T.pack $
     concat
       [ "Received block number ",
-        show number,
+        show number',
         " with ",
         show txCount,
         " transactions from seqEvents"
@@ -376,7 +414,7 @@ runChainConstructors cId cInfo = do
           False --noValueTransfer
           True -- isRunChainConstructors
           S.empty --pre-existing suicide list
-          ( BlockData
+          ( BlockHeader
               (Keccak256.unsafeCreateKeccak256FromWord256 0)
               (Keccak256.unsafeCreateKeccak256FromWord256 0)
               emptyChainMember
@@ -390,8 +428,8 @@ runChainConstructors cId cInfo = do
               0
               (bSumTimestamp curBlockSummary)
               ""
-              0
               (Keccak256.unsafeCreateKeccak256FromWord256 0)
+              0
           )
           0 --callDepth
           (Account 0 $ Just cId) --receiveAddress

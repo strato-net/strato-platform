@@ -484,6 +484,7 @@ getVariableOfName name = do
                        "account",
                        "uint",
                        "int",
+                       "decimal",
                        "bool",
                        "byte",
                        "bytes",
@@ -801,6 +802,7 @@ hintFromType = \case
   SVMType.Bytes {} -> return TString
   SVMType.Int {} -> return TInteger
   SVMType.String {} -> return TString
+  SVMType.Decimal {} -> return TDecimal
   (SVMType.UserDefined _ SVMType.Bool {}) -> return TBool
   (SVMType.UserDefined _ SVMType.Int {}) -> return TString
   SVMType.UnknownLabel s _ -> do
@@ -886,14 +888,15 @@ initializeAction :: MonadSM m
                  -> String
                  -> String
                  -> String
+                 -> String
                  -> Keccak256
                  -> CC.CodeCollection
                  -> Map (Account, T.Text) (T.Text, T.Text)
                  -> [T.Text]
                  -> [T.Text]
                  -> m ()
-initializeAction acct name crtr appName hsh cc ab maps arrs = do
-  let newData = Action.ActionData (SolidVMCode name hsh) cc (T.pack crtr) (T.pack appName) SolidVM (Action.SolidVMDiff M.empty) ab maps arrs []
+initializeAction acct name crtr root appName hsh cc ab maps arrs = do
+  let newData = Action.ActionData (SolidVMCode name hsh) cc (T.pack crtr) (T.pack root) (T.pack appName) SolidVM (Action.SolidVMDiff M.empty) ab maps arrs []
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapInsertWith Action.mergeActionData acct newData
 
@@ -981,13 +984,13 @@ getMapNamesFromContract c =
       listOfMappingsWithRecords = filter (\(_, vd) -> CC._isRecord vd) listOfMappings
    in T.pack . fst <$> listOfMappingsWithRecords
 
+--also needs to be changed for testnet3 to be only record
 getArrayNamesFromContract :: CC.Contract -> [T.Text]
 getArrayNamesFromContract c =
   let storageDefs' = c ^. CC.storageDefs
       storageDefsList = M.toList storageDefs'
       listOfArrays = filter (\(_, vd) -> case (CC._varType vd) of SVMType.Array _ _ -> True; _ -> False) storageDefsList
-      listOfArraysWithRecords = filter (\(_, vd) -> CC._isRecord vd) listOfArrays
-   in T.pack . fst <$> listOfArraysWithRecords
+   in T.pack . fst <$> listOfArrays -- we need to change this to filter on _isRecord on testnet3
 
 resolveNameParts ::
   MonadSM m =>

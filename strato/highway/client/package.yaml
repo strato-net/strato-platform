@@ -23,7 +23,6 @@ dependencies:
 - blockapps-highway-api
 - bytestring
 - http-types
-- servant
 - servant-client
 - servant-multipart
 - servant-multipart-client
