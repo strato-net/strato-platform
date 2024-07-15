@@ -396,7 +396,7 @@ const Checkout = () => {
                       MinusQty={MinusQty}
                       ValueQty={ValueQty}
                       removeCartList={removeCartList}
-                      openToastOrder={showToast({
+                      openToastOrder={message && showToast({
                         message: message,
                         onClose: actions.resetMessage(orderDispatch),
                         success: success,
