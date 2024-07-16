@@ -4,7 +4,8 @@ module Resources (
   dockerComposeTemplate,
   hydraConfig,
   kratosConfig,
-  defaultSchema
+  defaultSchema,
+  nginxConfig
   ) where
 
 import Data.FileEmbed
