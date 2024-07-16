@@ -525,8 +525,8 @@ export const BreadCrumb_VALUES = {
   'sold' : 'Sold',
   'bought' : 'Bought',
   'transfers' : 'Transfers',
-  'redemptions-outgoing' : 'Redemptions-Outgoing',
-  'redemptions-incoming' : 'Redemptions-Incoming',
+  'redemptions-outgoing' : 'Redemptions (OutGoing)',
+  'redemptions-incoming' : 'Redemptions (InComing)',
 
 }
 
@@ -551,6 +551,6 @@ export const BREADCRUMB_ROUTES = {
   'sold' : '/sold',
   'bought' : '/bought',
   'transfers' : '/transfers',
-  'redemptions-outgoing' : '/redemptions-outgoing',
-  'redemptions-incoming' : '/redemptions-incoming',
+  'redemptions-outgoing' : '/order/redemptions-outgoing',
+  'redemptions-incoming' : '/order/redemptions-incoming',
 }

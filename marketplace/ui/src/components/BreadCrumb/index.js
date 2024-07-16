@@ -29,7 +29,7 @@ const BreadcrumbComponent = ({ indexNo, idNum }) => {
           </p>
         }
         if (idNum && pathSnippets.length - 1 === index) {
-          return <Breadcrumb.Item href=''> <p className="text-sm text-[#202020] font-medium ">
+          return <Breadcrumb.Item > <p className="text-sm text-[#202020] font-medium ">
             {idNum}
           </p></Breadcrumb.Item>
         }

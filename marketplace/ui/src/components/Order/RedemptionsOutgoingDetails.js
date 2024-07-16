@@ -164,22 +164,7 @@ const RedemptionsOutgoingDetails = ({ user }) => {
                 </div>
             ) : (
                 <div>
-                    <Breadcrumb className="text-sm ml-4 md:ml-20  mt-0 md:mt-5 mb-2">
-                        <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-                            <ClickableCell href={routes.Marketplace.url}>
-                                <p className="text-sm text-primary font-semibold">Home</p>
-                            </ClickableCell>
-                        </Breadcrumb.Item>
-                        <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-                            <div onClick={() => { navigate(routes.Orders.url.replace(':type', 'redemptions-outgoing')); }}>
-                                <p className="text-sm text-primary font-semibold">Redemptions (outgoing)</p>
-                            </div>
-                        </Breadcrumb.Item>
-                        <Breadcrumb.Item className="text-sm text-[#202020] font-medium">
-                            {redemption.redemption_id}
-                        </Breadcrumb.Item>
-                    </Breadcrumb>
-                   {/* <BreadcrumbComponent idNum={redemption.redemption_id} /> */}
+                   <div className="relative md:left-5">{redemption.redemption_id && <BreadcrumbComponent indexNo={1} idNum={redemption.redemption_id} />}</div>
                     <Tabs
                         className="mx-4 md:mx-20 mt-0 md:mt-5"
                         defaultActiveKey={"redemptions-outgoing"}
