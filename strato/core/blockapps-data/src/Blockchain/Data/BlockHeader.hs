@@ -1,5 +1,8 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -13,6 +16,7 @@ module Blockchain.Data.BlockHeader
   )
 where
 
+import BlockApps.X509.Certificate
 import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Strato.Model.ChainMember
@@ -20,9 +24,12 @@ import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.PositiveInteger
+import Blockchain.Strato.Model.Secp256k1
+import Blockchain.Strato.Model.Validator
 import Control.DeepSeq
 import Control.Lens
 import Control.Monad
+import Data.Aeson
 import Data.Binary
 import Data.Bits (shiftL, shiftR)
 import qualified Data.ByteString as B
@@ -37,11 +44,14 @@ import qualified Text.Colors as CL
 import Text.Format
 import Text.Tools
 
+newtype DummyCertRevocation = DummyCertRevocation String deriving (Show, Read, Eq, Generic, Data, ToJSON, RLPSerializable)
 
+instance Binary DummyCertRevocation
+instance NFData DummyCertRevocation
 
-
-data BlockHeader = BlockHeader
-  { parentHash :: Keccak256,
+data BlockHeader =
+  BlockHeader {
+    parentHash :: Keccak256,
     ommersHash :: Keccak256,
     beneficiary :: ChainMemberParsedSet,
     stateRoot :: MP.StateRoot,
@@ -56,13 +66,27 @@ data BlockHeader = BlockHeader
     extraData :: B.ByteString,
     mixHash :: Keccak256,
     nonce :: Word64
+  } |
+  BlockHeaderV2 {
+    parentHash :: Keccak256,
+    stateRoot :: MP.StateRoot,
+    transactionsRoot :: MP.StateRoot,
+    receiptsRoot :: MP.StateRoot,
+    logsBloom :: B.ByteString,
+    number :: Integer,
+    timestamp :: UTCTime,
+    extraData :: B.ByteString,
+    newValidators :: [Validator],
+    removedValidators :: [Validator],
+    newCerts :: [X509Certificate],
+    revokedCerts :: [DummyCertRevocation],
+    signatures :: [Signature]
   }
-  deriving (Eq, Read, Show, Generic, Data)
+  deriving (Eq, Show, Generic)
 
 instance Binary UTCTime where
   put = put . (round :: POSIXTime -> Integer) . utcTimeToPOSIXSeconds
   get = (posixSecondsToUTCTime . fromInteger) <$> get
-
 
 instance Binary BlockHeader
 
@@ -75,39 +99,32 @@ instance Format BlockHeader where
     CL.blue ("BlockHeader #" ++ show number') ++ " " ++ format (headerHash header)
       ++ tab'
         ( "\nparentHash: " ++ format ph ++ "\n"
-            ++ "ommersHash: "
-            ++ format oh
-            ++ (if oh == hash (B.pack [0xc0]) then " (the empty array)\n" else "\n")
-            ++ "beneficiary: "
-            ++ format b
-            ++ "\n"
-            ++ "stateRoot: "
-            ++ format sr
-            ++ "\n"
-            ++ "transactionsRoot: "
-            ++ format tr
-            ++ "\n"
-            ++ "receiptsRoot: "
-            ++ format rr
-            ++ "\n"
-            ++ "difficulty: "
-            ++ show d
-            ++ "\n"
-            ++ "gasLimit: "
-            ++ show gl
-            ++ "\n"
-            ++ "gasUsed: "
-            ++ show gu
-            ++ "\n"
-            ++ "timestamp: "
-            ++ show ts
-            ++ "\n"
-            ++ "extraData: "
-            ++ show ed
-            ++ "\n"
-            ++ "nonce: "
-            ++ showHex nonce' ""
-            ++ "\n"
+          ++ "ommersHash: " ++ format oh ++ (if oh == hash (B.pack [0xc0]) then " (the empty array)\n" else "\n")
+          ++ "beneficiary: " ++ format b ++ "\n"
+          ++ "stateRoot: " ++ format sr ++ "\n"
+          ++ "transactionsRoot: " ++ format tr ++ "\n"
+          ++ "receiptsRoot: " ++ format rr ++ "\n"
+          ++ "difficulty: " ++ show d ++ "\n"
+          ++ "gasLimit: " ++ show gl ++ "\n"
+          ++ "gasUsed: " ++ show gu ++ "\n"
+          ++ "timestamp: " ++ show ts ++ "\n"
+          ++ "extraData: " ++ show ed ++ "\n"
+          ++ "nonce: " ++ showHex nonce' "" ++ "\n"
+        )
+  format header@BlockHeaderV2{..} =
+    CL.blue ("BlockHeader (version 2) #" ++ show number) ++ " " ++ format (headerHash header)
+      ++ tab'
+        ( "\nparentHash: " ++ format parentHash ++ "\n"
+            ++ "stateRoot: " ++ format stateRoot ++ "\n"
+            ++ "transactionsRoot: " ++ format transactionsRoot ++ "\n"
+            ++ "receiptsRoot: " ++ format receiptsRoot ++ "\n"
+            ++ "timestamp: " ++ show timestamp ++ "\n"
+            ++ "extraData: " ++ show extraData ++ "\n"
+            ++ "newValidators: " ++ show newValidators ++ "\n"
+            ++ "removedValidators: " ++ show removedValidators ++ "\n"
+            ++ "newCerts: " ++ show newCerts ++ "\n"
+            ++ "revokedCerts: " ++ show revokedCerts ++ "\n"
+            ++ "signatures: " ++ show signatures ++ "\n"
         )
 
 instance RLPSerializable BlockHeader where
@@ -129,24 +146,60 @@ instance RLPSerializable BlockHeader where
         rlpEncode mh,
         rlpEncode $ B.pack $ word64ToBytes nonce'
       ]
+  rlpEncode BlockHeaderV2{..} =
+    RLPArray $
+      [ rlpEncode (2::Integer), -- BlockHeader version number
+        rlpEncode parentHash,
+        rlpEncode stateRoot,
+        rlpEncode transactionsRoot,
+        rlpEncode receiptsRoot,
+        rlpEncode logsBloom,
+        rlpEncode number,
+        rlpEncode (round $ utcTimeToPOSIXSeconds timestamp :: Integer),
+        rlpEncode extraData,
+        rlpEncode newValidators,
+        rlpEncode removedValidators,
+        rlpEncode newCerts,
+        rlpEncode revokedCerts,
+        rlpEncode signatures
+      ]
   rlpDecode (RLPArray [ph, oh, b, sr, tr, rr, lb, d, number', gl, gu, ts, ed, mh, nonce']) =
-    BlockHeader
-      { parentHash = rlpDecode ph,
-        ommersHash = rlpDecode oh,
-        beneficiary = rlpDecode b,
-        stateRoot = rlpDecode sr,
-        transactionsRoot = rlpDecode tr,
-        receiptsRoot = rlpDecode rr,
-        logsBloom = rlpDecode lb,
-        difficulty = rlpDecode d,
-        number = rlpDecode number',
-        gasLimit = rlpDecode gl,
-        gasUsed = rlpDecode gu,
-        timestamp = posixSecondsToUTCTime $ fromInteger $ rlpDecode ts,
-        extraData = rlpDecode ed,
-        mixHash = rlpDecode mh,
-        nonce = bytesToWord64 $ B.unpack $ rlpDecode nonce'
-      }
+        BlockHeader
+        { parentHash = rlpDecode ph,
+          ommersHash = rlpDecode oh,
+          beneficiary = rlpDecode b,
+          stateRoot = rlpDecode sr,
+          transactionsRoot = rlpDecode tr,
+          receiptsRoot = rlpDecode rr,
+          logsBloom = rlpDecode lb,
+          difficulty = rlpDecode d,
+          number = rlpDecode number',
+          gasLimit = rlpDecode gl,
+          gasUsed = rlpDecode gu,
+          timestamp = posixSecondsToUTCTime $ fromInteger $ rlpDecode ts,
+          extraData = rlpDecode ed,
+          mixHash = rlpDecode mh,
+          nonce = bytesToWord64 $ B.unpack $ rlpDecode nonce'
+        }
+  rlpDecode (RLPArray [v, ph, sr, tr, rr, lb, number', ts, ed, nv, rv, nc, rc, s]) =
+    case rlpDecode v of
+      (2 :: Integer) ->
+        BlockHeaderV2
+        { parentHash = rlpDecode ph,
+          stateRoot = rlpDecode sr,
+          transactionsRoot = rlpDecode tr,
+          receiptsRoot = rlpDecode rr,
+          logsBloom = rlpDecode lb,
+          number = rlpDecode number',
+          timestamp = posixSecondsToUTCTime $ fromInteger $ rlpDecode ts,
+          extraData = rlpDecode ed,
+          newValidators = rlpDecode nv,
+          removedValidators = rlpDecode rv,
+          newCerts = rlpDecode nc,
+          revokedCerts = rlpDecode rc,
+          signatures = rlpDecode s
+        }
+      versionNumber -> error $ "malformed block format: unknown version number: " ++ show versionNumber
   rlpDecode x = error $ "can not run rlpDecode on BlockHeader for value " ++ show x
 
 instance BlockHeaderLike BlockHeader where

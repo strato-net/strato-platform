@@ -72,7 +72,7 @@ data TrustedMessage
   | Prepare View Keccak256
   | Commit View Keccak256 Signature
   | RoundChange {roundchangeView :: View, roundchangeNonce :: Word256}
-  deriving (Eq, Show, Generic, Binary, NFData, Data)
+  deriving (Eq, Show, Generic, Binary, NFData)
 
 instance Format TrustedMessage where
   format (Preprepare v theBlock) = CL.blue "PRE_PREPARE " ++ format v ++ " " ++ format (blockHash theBlock)
@@ -93,7 +93,7 @@ data WireMessage = WireMessage
   { _msgAuth :: MsgAuth,
     _message :: TrustedMessage
   }
-  deriving (Eq, Show, Generic, Binary, NFData, Data)
+  deriving (Eq, Show, Generic, Binary, NFData)
 
 makeLenses ''WireMessage
 

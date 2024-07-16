@@ -26,7 +26,6 @@ import Control.DeepSeq
 import Control.Lens
 import Data.Binary
 import qualified Data.ByteString as BS
-import Data.Data
 import Data.List
 import GHC.Generics
 import qualified Text.Colors as CL
@@ -38,7 +37,7 @@ data Block = Block
     blockReceiptTransactions :: [Transaction],
     blockBlockUncles :: [BlockHeader]
   }
-  deriving (Eq, Read, Show, Generic, Binary, NFData, Data)
+  deriving (Eq, Show, Generic, Binary, NFData)
 
 makeLensesFor [("blockBlockData", "blockHeaderLens")] ''Block
 

@@ -212,7 +212,7 @@ instance NFData RBDB.RedisConnection where
   rnf (RBDB.RedisConnection c) = c `seq` ()
 
 data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo !Keccak256 !BlockHeader !Integer !Int !Int
-  deriving (Eq, Read, Show, Generic, NFData)
+  deriving (Eq, Show, Generic, NFData)
 
 instance Binary ContextBestBlockInfo
 

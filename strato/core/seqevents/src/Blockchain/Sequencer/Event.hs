@@ -170,7 +170,7 @@ data IngestBlock = IngestBlock
     ibReceiptTransactions :: [TX.Transaction],
     ibBlockUncles :: [BlockHeader]
   }
-  deriving (Eq, Read, Show, GHCG.Generic)
+  deriving (Eq, Show, GHCG.Generic)
 
 data IngestGenesis = IngestGenesis
   { igOrigin :: TO.TXOrigin,
@@ -185,7 +185,7 @@ data SequencedBlock = SequencedBlock
     sbReceiptTransactions :: [OutputTx],
     sbBlockUncles :: [BlockHeader]
   }
-  deriving (Read, Show, GHCG.Generic)
+  deriving (Show, GHCG.Generic)
 
 data JsonRpcCommand
   = JRCGetBalance {jrcAddress :: A.Address, jrcId :: String, jrcBlockString :: String}
@@ -299,7 +299,7 @@ data OutputBlock = OutputBlock
     obReceiptTransactions :: [OutputTx],
     obBlockUncles :: [BlockHeader]
   }
-  deriving (Eq, Read, Show, GHCG.Generic, Data)
+  deriving (Eq, Show, GHCG.Generic)
 
 data OutputBlock' = OutputBlock'
   { ob'Origin :: TO.TXOrigin,

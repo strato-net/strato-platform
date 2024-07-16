@@ -61,6 +61,7 @@ library:
   - unliftio
   - unliftio-core
   - vector
+  - x509-certs
 
 tests:
   blockapps-data-test:

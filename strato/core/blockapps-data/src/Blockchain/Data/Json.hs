@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 --TODO : Take this next line out
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -384,6 +385,23 @@ instance ToJSON BlockData' where
         "extraData" .= ed,
         "nonce" .= non,
         "mixHash" .= mh
+      ]
+
+  toJSON (BlockData' (BlockHeaderV2{..})) = 
+    object
+      [ "kind" .= ("BlockData" :: String),
+        "parentHash" .= parentHash,
+        "stateRoot" .= stateRoot,
+        "transactionsRoot" .= transactionsRoot,
+        "receiptsRoot" .= receiptsRoot,
+        "number" .= number,
+        "timestamp" .= timestamp,
+        "extraData" .= extraData,
+        "newValidators" .= newValidators,
+        "removedValidators" .= removedValidators,
+        "newCerts" .= newCerts,
+        "revokedCerts" .= revokedCerts,
+        "signatures" .= signatures
       ]
 
 instance FromJSON BlockData' where
