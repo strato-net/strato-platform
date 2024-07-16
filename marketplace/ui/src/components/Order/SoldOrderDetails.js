@@ -37,6 +37,7 @@ import RedemptionsIncomingTable from "./RedemptionsIncomingTable";
 import { ResponsiveOrderDetailCard } from "./ResponsiveOrderDetailCard";
 import { LeftArrow } from "../../images/SVGComponents";
 import { showToast } from "../Notification/ToastComponent";
+import BreadcrumbComponent from "../BreadCrumb";
 
 const SoldOrderDetails = ({ user, users }) => {
   const [Id, setId] = useState(undefined);
@@ -302,25 +303,12 @@ const SoldOrderDetails = ({ user, users }) => {
     },
   ];
 
+  const orderNumber = `${details?.order?.orderId || ''}`.substring(0,6)
+
   return (
     <div>
         <div>
-          <Breadcrumb className="text-sm ml-4 md:ml-20  mt-0 md:mt-5 mb-2">
-            <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-              <ClickableCell href={routes.Marketplace.url}>
-                <p className="text-sm text-primary font-semibold">Home</p>
-              </ClickableCell>
-            </Breadcrumb.Item>
-            <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-              <div onClick={() => { navigate(routes.Orders.url.replace(':type', 'sold')); }}>
-                <p className="text-sm text-primary font-semibold">Orders (sold)</p>
-              </div>
-            </Breadcrumb.Item>
-            <Breadcrumb.Item className="text-sm text-[#202020] font-medium">
-              {`${details?.order?.orderId || ''}`.substring(0,6)}
-            </Breadcrumb.Item>
-          </Breadcrumb>
-
+          <div className="md:px-6"> {orderNumber && <BreadcrumbComponent number={orderNumber} />}</div>
           <Tabs
             className="mx-4 md:mx-20 mt-0 md:mt-5"
             defaultActiveKey={"sold"}

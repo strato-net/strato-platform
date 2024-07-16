@@ -30,6 +30,7 @@ import SoldOrdersTable from "./SoldOrdersTable";
 import TransfersTable from "./TransfersTable";
 import RedemptionsIncomingTable from "./RedemptionsIncomingTable";
 import { ResponsiveOrderDetailCard } from "./ResponsiveOrderDetailCard";
+import BreadcrumbComponent from "../BreadCrumb";
 
 
 const RedemptionsOutgoingDetails = ({ user }) => {
@@ -178,7 +179,7 @@ const RedemptionsOutgoingDetails = ({ user }) => {
                             {redemption.redemption_id}
                         </Breadcrumb.Item>
                     </Breadcrumb>
-
+                   {/* <BreadcrumbComponent number={redemption.redemption_id} /> */}
                     <Tabs
                         className="mx-4 md:mx-20 mt-0 md:mt-5"
                         defaultActiveKey={"redemptions-outgoing"}

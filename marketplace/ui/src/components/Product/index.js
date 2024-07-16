@@ -27,6 +27,7 @@ import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import { useAuthenticateState } from "../../contexts/authentication";
 import { showToast } from "../Notification/ToastComponent";
+import BreadcrumbComponent from "../BreadCrumb";
 
 const { Search } = Input;
 const { Title, Text } = Typography;
@@ -138,6 +139,7 @@ const Product = () => {
                     </p>
                   </Breadcrumb.Item>
                 </Breadcrumb>
+                {/* <BreadcrumbComponent /> */}
                 <div className="flex">
                   <Search
                     placeholder="Search"

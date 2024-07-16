@@ -38,6 +38,7 @@ import { SEO } from "../../helpers/seoConstant";
 import { STRATS_CONVERSION } from "../../helpers/constants";
 import { TOAST_MSG } from "../../helpers/msgConstants";
 import { showToast } from "../Notification/ToastComponent";
+import BreadcrumbComponent from "../BreadCrumb";
 
 
 const ProductDetails = ({ user, users }) => {
@@ -360,35 +361,7 @@ const ProductDetails = ({ user, users }) => {
             description={details?.description}
             link={linkUrl} />
           <Row>
-            <Breadcrumb className="text-xs   mb-4 md:mt-5  md:mb-6 lg:mb-[44px] ml-4 lg:ml-16">
-              <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-                <ClickableCell href={routes.Marketplace.url}>
-                  <p
-                    className="text-[#13188A]  text-sm font-semibold "
-                  >
-                    Home
-                  </p>
-                </ClickableCell>
-              </Breadcrumb.Item>
-              {
-                isCalledFromInventory ?
-                  <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-                    <ClickableCell href={routes.MyItems.url}>
-                      <p
-                        className="text-[#13188A]  text-sm font-semibold "
-                      >
-                        My Items
-                      </p>
-                    </ClickableCell>
-                  </Breadcrumb.Item> : null
-              }
-              <Breadcrumb.Item className="text-[#202020]  text-sm font-semibold ">
-                Product Detail
-              </Breadcrumb.Item>
-              <Breadcrumb.Item className="text-[#202020]  text-sm font-semibold ">
-                {decodeURIComponent(details.name)}
-              </Breadcrumb.Item>
-            </Breadcrumb>
+            <BreadcrumbComponent indexNo={1}/>
           </Row>
           <div className="flex w-full flex-col lg:leading-12 px-4 sm:px-8 md:px-0  items-center lg:items-start  md:w-[750px] lg:w-[835px] xl:w-[858px]  md:mx-auto ">
             <div className="flex md:justify-center gap-[15px] lg:gap-6 flex-col lg:flex-row   ">

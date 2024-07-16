@@ -31,6 +31,7 @@ import TransfersTable from "./TransfersTable";
 import RedemptionsOutgoingTable from "./RedemptionsOutgoingTable";
 import { ResponsiveOrderDetailCard } from "./ResponsiveOrderDetailCard";
 import { showToast } from "../Notification/ToastComponent";
+import BreadcrumbComponent from "../BreadCrumb";
 
 const RedemptionsIncomingDetails = ({ user }) => {
     const [id, setId] = useState(undefined);
@@ -180,7 +181,7 @@ const RedemptionsIncomingDetails = ({ user }) => {
                 </div>
             ) : (
                 <div>
-                    <Breadcrumb className="text-sm ml-4 md:ml-20  mt-0 md:mt-5 mb-2">
+                       <Breadcrumb className="text-sm ml-4 md:ml-20  mt-0 md:mt-5 mb-2">
                         <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
                             <ClickableCell href={routes.Marketplace.url}>
                                 <p className="text-sm text-primary font-semibold">Home</p>
@@ -195,7 +196,7 @@ const RedemptionsIncomingDetails = ({ user }) => {
                             {redemption.redemption_id}
                         </Breadcrumb.Item>
                     </Breadcrumb>
-
+                    {/* <BreadcrumbComponent number={redemption.redemption_id} /> */}
                     <Tabs
                         className="mx-4 md:mx-20 mt-0 md:mt-5"
                         defaultActiveKey={"redemptions-incoming"}

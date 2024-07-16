@@ -36,6 +36,7 @@ import { SEO } from "../../helpers/seoConstant";
 import RequestBeAuthorizedIssuerModal from "./RequestBeAuthorizedIssuerModal";
 import { ISSUER_STATUS } from '../../helpers/constants';
 import { showToast } from "../Notification/ToastComponent";
+import BreadcrumbComponent from "../BreadCrumb";
 
 const { Option } = Select;
 
@@ -190,20 +191,7 @@ const Inventory = ({ user }) => {
         link={linkUrl} 
       />
       <>
-        <Breadcrumb className="mx-5 md:mx-14 mt-2 lg:mt-4">
-          <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-            <ClickableCell href={routes.Marketplace.url}>
-              <p className="text-sm text-[#13188A] font-semibold">
-                Home
-              </p>
-            </ClickableCell>
-          </Breadcrumb.Item>
-          <Breadcrumb.Item>
-            <p className="text-sm text-[#202020] font-medium">
-              My Items
-            </p>
-          </Breadcrumb.Item>
-        </Breadcrumb>
+      <BreadcrumbComponent  />
         <div className="w-full h-[160px] py-4 px-4 md:h-[96px] bg-[#F6F6F6] flex flex-col md:flex-row md:px-14 justify-between items-center mt-6 lg:mt-8">
           <div className="flex justify-between w-full">
             <Button className="!px-1 md:!px-0 flex items-center flex-row-reverse gap-[6px] text-lg md:text-2xl font-semibold !text-[#13188A] " 

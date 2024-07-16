@@ -512,3 +512,45 @@ export const FOOTER_NAVIGATION = {
   ],
 };
 
+export const BreadCrumb_VALUES = {
+  '/' : 'Home',
+  'myitems' : 'My Items',
+  'inventories' : 'Product Detail',
+  'profile' : 'My Profile',
+  'c' : 'Category',
+  'dp' : 'Product Detail',
+  'checkout' : 'My Cart',
+  'sold-orders' : 'Orders (Sold)',
+  'bought-orders' : 'Orders (Bought)',
+  'sold' : 'Sold',
+  'bought' : 'Bought',
+  'transfers' : 'Transfers',
+  'redemptions-outgoing' : 'Redemptions-Outgoing',
+  'redemptions-incoming' : 'Redemptions-Incoming',
+
+}
+
+export const BREADCRUMB_ROUTES = {
+  '/' : '/Home',
+  'myitems' : '/myitems',
+  'inventories' : '/myitems',
+  'profile' : '/profile',
+  'c' : '/c/All',
+  'All' : '/c/All',
+  'Carbon' : '/c/Carbon?sc=CarbonOffset%2CCarbonDAO',
+  'Metals' : '/c/Metals?sc=Metals',
+  'Clothing' : '/c/Clothing?sc=Clothing',
+  'Collectibles' : '/c/Collectibles?sc=Collectibles',
+  'Tokens' : '/c/Tokens?sc=Tokens',
+  'Art' : '/c/Art?sc=Art',
+  'Membership' : '/c/Membership?sc=Membership',
+  'dp' : '/c/All',
+  'checkout' : '/checkout',
+  'sold-orders' : '/order/sold',
+  'bought-orders' : '/order/bought',
+  'sold' : '/sold',
+  'bought' : '/bought',
+  'transfers' : '/transfers',
+  'redemptions-outgoing' : '/redemptions-outgoing',
+  'redemptions-incoming' : '/redemptions-incoming',
+}

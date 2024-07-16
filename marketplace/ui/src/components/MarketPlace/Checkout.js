@@ -27,6 +27,7 @@ import ResponsiveCart from "./ResponsiveCart";
 import { usePaymentServiceDispatch, usePaymentServiceState } from "../../contexts/payment";
 import { actions as paymentServiceActions } from "../../contexts/payment/actions";
 import { showToast } from "../Notification/ToastComponent";
+import BreadcrumbComponent from "../BreadCrumb";
 
 const { Title, Text } = Typography;
 
@@ -354,17 +355,7 @@ const Checkout = () => {
         </div>
       ) : (
         <div className="pb-8">
-          <Breadcrumb>
-            <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
-              <ClickableCell href={routes.Marketplace.url}>
-                <p className="text-sm text-[#13188A] font-semibold">Home</p>
-              </ClickableCell>
-            </Breadcrumb.Item>
-            <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
-              <p className="text-sm text-[#202020] font-medium">My Cart</p>
-            </Breadcrumb.Item>
-          </Breadcrumb>
-
+          <div className="relative md:right-14" > <BreadcrumbComponent /> </div>
           <div className="pt-[18px] lg:pt-6">
             <p className="text-base md:text-xl lg:text-2xl font-bold lg:font-semibold leading-9">
               My Cart

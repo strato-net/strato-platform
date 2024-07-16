@@ -35,6 +35,7 @@ import routes from "../../helpers/routes";
 import { Images } from "../../images";
 import './index.css'
 import { showToast } from "../Notification/ToastComponent";
+import BreadcrumbComponent from "../BreadCrumb";
 
 const { Panel } = Collapse;
 const { Text } = Typography;
@@ -345,24 +346,6 @@ const CategoryProductList = ({ user }) => {
     }
   };
 
-
-  const BreadCrumbComponent = () =>
-    <Breadcrumb className="text-xs ml-4 md:ml-14 mt-14 lg:mt-5">
-      <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-        <ClickableCell href={routes.Marketplace.url}>
-          <p href={routes.Marketplace.url} className="text-[#13188A] font-semibold hover:bg-transparent text-sm">
-            Home
-          </p>
-        </ClickableCell>
-      </Breadcrumb.Item>
-      <Breadcrumb.Item className="text-[#202020] font-medium text-sm">
-        Category
-      </Breadcrumb.Item>
-      {category && <Breadcrumb.Item className="text-[#202020] font-medium text-sm">
-        {category}
-      </Breadcrumb.Item>}
-    </Breadcrumb>
-
   const ClearFilterComponent = () =>
     <div className="flex justify-between flex-wrap m-2 max-[768px]:px-7 max-[768px]:py-4">
       <div className="flex items-center">
@@ -516,7 +499,7 @@ const AvailabilityFilter = () =>
         link={linkUrl} />
     <div className={`${mobileOpenFilter ? 'overflow-y-hidden h-[100vh] w-[100vw] bg-[#00000020] relative mt-0 md:bg-white md:mt-[auto] md:overflow-scroll trending_cards' : ' '}`}>
       <div className="fixed bg-white w-full top-7 z-10 md:static">
-        {BreadCrumbComponent()}
+        <BreadcrumbComponent />
         <div className="flex justify-between items-center ml-4 px-2 mt-2 md:ml-14 md:hidden">
           <div className="flex items-center">
           </div>
