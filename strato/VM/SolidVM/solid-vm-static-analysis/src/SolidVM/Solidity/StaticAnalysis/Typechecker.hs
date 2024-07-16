@@ -1658,7 +1658,8 @@ statementHelper (Return mExpr x) = do
         _ -> (ret, locals) :| rest
       pure t'
     (Just _,Nothing) ->
-      pure . bottom $ "Cannot use keyword 'return' inside of a modifier." <$ x
+      modifierError "you cannot return a value as part of a modifier" (x)
+      --pure . bottom $ "Cannot use keyword 'return' inside of a modifier." <$ x
     (Just _,Just _)  ->
       pure . bottom $ "Cannot use keyword 'return' inside of a modifier." <$ x
 statementHelper (Throw e x) = do
