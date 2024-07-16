@@ -1657,7 +1657,8 @@ statementHelper (Return mExpr x) = do
         Just (Sum _) -> (Just t', locals) :| rest
         _ -> (ret, locals) :| rest
       pure t'
-    (Just m,Nothing) -> do
+    (Just _,Nothing) -> --do
+    {-
       let mRets = flip Product x $ flip Static x . indexedTypeType . snd <$> map (\(a,b) -> (T.unpack a,b)) (M.toList $ _modifierArgs m)
       t' <- mRets ~> maybe (pure $ Product [] x) tcExpr mExpr
       modify $ \((ret, locals) :| rest) -> case ret of
@@ -1665,6 +1666,8 @@ statementHelper (Return mExpr x) = do
         Just (Sum _) -> (Just t', locals) :| rest
         _ -> (ret, locals) :| rest
       pure t'
+    -}
+      pure . bottom $ "Cannot use keyword 'return' inside of a modifier," <$ x
     (Just _,Just f)  -> do
       let fRets = flip Product x $ flip Static x . indexedTypeType . snd <$> _funcVals f
       t' <- fRets ~> maybe (pure $ Product [] x) tcExpr mExpr
