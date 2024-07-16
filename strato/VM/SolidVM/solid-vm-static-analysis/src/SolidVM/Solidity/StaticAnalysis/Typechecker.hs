@@ -1646,9 +1646,26 @@ statementHelper (Continue x) = pure $ topType' x
 statementHelper (Break x) = pure $ topType' x
 statementHelper (Return mExpr x) = do
   mf <- asks function
-  case mf of
-    Nothing -> pure . bottom $ "Cannot use keyword 'return' outside of a function" <$ x
-    Just f -> do
+  fm <- asks modifier
+  case (fm,mf) of
+    (Nothing,Nothing) -> pure . bottom $ "Cannot use keyword 'return' outside of a function" <$ x
+    (Nothing,Just f) -> do
+      let fRets = flip Product x $ flip Static x . indexedTypeType . snd <$> _funcVals f
+      t' <- fRets ~> maybe (pure $ Product [] x) tcExpr mExpr
+      modify $ \((ret, locals) :| rest) -> case ret of
+        Nothing -> (Just t', locals) :| rest
+        Just (Sum _) -> (Just t', locals) :| rest
+        _ -> (ret, locals) :| rest
+      pure t'
+    (Just m,Nothing) -> do
+      let mRets = flip Product x $ flip Static x . indexedTypeType . snd <$> map (\(a,b) -> (T.unpack a,b)) (M.toList $ _modifierArgs m)
+      t' <- mRets ~> maybe (pure $ Product [] x) tcExpr mExpr
+      modify $ \((ret, locals) :| rest) -> case ret of
+        Nothing -> (Just t', locals) :| rest
+        Just (Sum _) -> (Just t', locals) :| rest
+        _ -> (ret, locals) :| rest
+      pure t'
+    (Just _,Just f)  -> do
       let fRets = flip Product x $ flip Static x . indexedTypeType . snd <$> _funcVals f
       t' <- fRets ~> maybe (pure $ Product [] x) tcExpr mExpr
       modify $ \((ret, locals) :| rest) -> case ret of
