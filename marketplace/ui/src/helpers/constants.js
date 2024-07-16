@@ -512,7 +512,7 @@ export const FOOTER_NAVIGATION = {
   ],
 };
 
-export const BreadCrumb_VALUES = {
+export const BREADCRUMB_VALUES = {
   '/' : 'Home',
   'myitems' : 'My Items',
   'inventories' : 'Product Detail',
