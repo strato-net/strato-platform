@@ -18,9 +18,12 @@ so that they could be properly moved to their respective version's subsection.
 ### Added
 - CodePtr transactions can be made
 - RawTransaction now stores CodePtr information
+- Added `pragma safeExternalCalls` for contracts that want to enforce extra type safety on external calls from other contracts
+
 ### Changed
 
 ### Fixed
+- patched rare race condition where node updates sync status to true before running the last few blocks left in the sync
 
 ### Removed
 
