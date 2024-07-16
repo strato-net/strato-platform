@@ -308,7 +308,7 @@ const SoldOrderDetails = ({ user, users }) => {
   return (
     <div>
         <div>
-          <div className="md:px-6"> {orderNumber && <BreadcrumbComponent number={orderNumber} />}</div>
+          <div className="md:px-6"> {orderNumber && <BreadcrumbComponent idNum={orderNumber} />}</div>
           <Tabs
             className="mx-4 md:mx-20 mt-0 md:mt-5"
             defaultActiveKey={"sold"}

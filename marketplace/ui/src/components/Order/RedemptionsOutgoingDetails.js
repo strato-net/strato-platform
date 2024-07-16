@@ -179,7 +179,7 @@ const RedemptionsOutgoingDetails = ({ user }) => {
                             {redemption.redemption_id}
                         </Breadcrumb.Item>
                     </Breadcrumb>
-                   {/* <BreadcrumbComponent number={redemption.redemption_id} /> */}
+                   {/* <BreadcrumbComponent idNum={redemption.redemption_id} /> */}
                     <Tabs
                         className="mx-4 md:mx-20 mt-0 md:mt-5"
                         defaultActiveKey={"redemptions-outgoing"}

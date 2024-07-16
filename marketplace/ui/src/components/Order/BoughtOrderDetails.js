@@ -326,7 +326,7 @@ const BoughtOrderDetails = ({ user, users }) => {
   return (
     <div>
         <div>
-          {order_id && <div className="relative md:left-6"> <BreadcrumbComponent number={order_id} /> </div>}
+          {order_id && <div className="relative md:left-6"> <BreadcrumbComponent idNum={order_id} /> </div>}
           <Tabs
             className="mx-4 md:mx-20 mt-5"
             onChange={onChange}

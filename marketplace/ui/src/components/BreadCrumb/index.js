@@ -5,7 +5,7 @@ import ClickableCell from '../ClickableCell';
 import { BREADCRUMB_ROUTES, BreadCrumb_VALUES } from '../../helpers/constants';
 import routes from '../../helpers/routes';
 
-const BreadcrumbComponent = ({ indexNo, number }) => {
+const BreadcrumbComponent = ({ indexNo, idNum }) => {
   const location = useLocation();
   const params = useParams();
   const { type } = params;
@@ -28,9 +28,9 @@ const BreadcrumbComponent = ({ indexNo, number }) => {
             {`${snippet}s (${BreadCrumb_VALUES[type]})`}
           </p>
         }
-        if (number && pathSnippets.length - 1 === index) {
+        if (idNum && pathSnippets.length - 1 === index) {
           return <Breadcrumb.Item href=''> <p className="text-sm text-[#202020] font-medium ">
-            {number}
+            {idNum}
           </p></Breadcrumb.Item>
         }
         return <>
