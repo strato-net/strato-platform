@@ -8,6 +8,7 @@ abstract contract UTXO is Asset {
         string _description,
         string[] _images,
         string[] _files,
+        string[] _fileNames,
         uint _createdDate,
         uint _quantity,
         AssetStatus _status
@@ -16,6 +17,7 @@ abstract contract UTXO is Asset {
         _description,
         _images,
         _files,
+        _fileNames,
         _createdDate,
         _quantity,
         _status
@@ -23,11 +25,11 @@ abstract contract UTXO is Asset {
     }
 
     function mint(uint _quantity) internal virtual returns (UTXO) {
-        return new UTXO(name, description, images, files, createdDate, _quantity, status);
+        return new UTXO(name, description, images, files, fileNames, createdDate, _quantity, status);
     }
 
     // Quantity is already checked by transferOwnership function
-    function _transfer(address _newOwner, uint _quantity, bool _isUserTransfer, uint _transferNumber, uint _price) internal override {
+    function _transfer(address _newOwner, uint _quantity, bool _isUserTransfer, uint _transferNumber, decimal _price) internal override {
         require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
         require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
         require(checkCondition(), "Condition is not met");
@@ -79,18 +81,5 @@ abstract contract UTXO is Asset {
 
     function checkCondition() internal virtual returns (bool){
         return true;
-    }
-
-    function requestRedemption(uint _quantity) public returns (uint, address) {
-        require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
-        require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
-        require(getCommonName(msg.sender) == ownerCommonName, "Only the owner of the Asset can request for redemption");
-
-        UTXO newAsset = mint(_quantity);
-        Asset(newAsset).transferOwnership(owner, _quantity, false, 0, 0);
-        Asset(newAsset).updateStatus(AssetStatus.PENDING_REDEMPTION);
-        quantity -= _quantity;
-
-        return (RestStatus.OK, address(newAsset));
     }
 }

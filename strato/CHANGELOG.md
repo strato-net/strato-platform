@@ -16,12 +16,41 @@ so that they could be properly moved to their respective version's subsection.
 
 ## [Unreleased] 
 ### Added
-- <address>.nonce accessor in SolidVM
-- Upgraded PostgREST to version 12.0
 
 ### Changed
 
 ### Fixed
+
+### Removed
+
+
+## [11.3.1] - 7/10/2024 
+### Added
+
+### Changed
+- In Slipstream, index arrays in event tables within the event table, otherwise index them in a separate array table.
+
+### Fixed
+- try-catch exception handler in solidVM will throw excpetion in all cases instead of potentially `error`ing so node does not crash
+
+### Removed
+- Removed strato-api paymentServerUrl flag
+
+## [11.3.0] - 7/2/2024
+### Added
+- <address>.nonce accessor in SolidVM
+- Upgraded PostgREST to version 12.0
+- Support for `decimal` numbers type
+
+### Changed
+- Allow public keys to be passed to x509-generator in PEM format
+- default `accountNonceLimit` is 2,000
+- max kafka bytes returned to 32MB
+
+### Fixed
+- fixed logic for how p2p calculates if it is missing parents blocks and needs to backtrack its sync
+- `creator` and `root` get populated in collection tables
+- validators run block before voting for it
 
 ### Removed
 

@@ -20,6 +20,7 @@ import Blockchain.Strato.Model.Class (blockHash)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
+import Blockchain.Strato.Model.Validator
 import Control.DeepSeq
 import Control.Lens
 import Control.Monad (liftM2)
@@ -110,6 +111,13 @@ data ForcedValidatorChange = ForcedValidator ValidatorRestriction
 instance Format ForcedValidatorChange where
   format = show
 
+data PreprepareDecision = AcceptPreprepare Keccak256 | RejectPreprepare
+  deriving (Eq, Show, Generic, Binary, NFData, Data)
+
+instance Format PreprepareDecision where
+  format (AcceptPreprepare h) = "AcceptPreprepare " <> format h
+  format dec = show dec
+
 blockstanbulSender :: WireMessage -> ChainMemberParsedSet
 blockstanbulSender (WireMessage a _) = sender a
 
@@ -131,6 +139,9 @@ instance Arbitrary ForcedConfigChange where
 instance Arbitrary ForcedValidatorChange where
   arbitrary = genericArbitrary
 
+instance Arbitrary PreprepareDecision where
+  arbitrary = genericArbitrary
+
 instance Format WireMessage where
   format (WireMessage (MsgAuth s _) msg) = format msg ++ " " ++ format s
 
@@ -147,9 +158,10 @@ data InEvent
     CommitResult (Either Text Keccak256)
   | UnannouncedBlock Block
   | PreviousBlock Block
+  | PreprepareResponse PreprepareDecision
   | ForcedConfigChange ForcedConfigChange
   | ValidatorBehaviorChange ForcedValidatorChange
-  | ValidatorChange ChainMemberParsedSet Bool
+  | ValidatorChange Validator Bool
   deriving (Eq, Show)
 
 instance Format InEvent where
@@ -158,6 +170,7 @@ instance Format InEvent where
   format (CommitResult (Left text)) = unpack $ "CommitResult Error: " <> text
   format (CommitResult (Right sha)) = "CommitResult Success: " ++ format sha
   format (UnannouncedBlock blk) = "UnannouncedBlock " ++ format (blockHash blk)
+  format (PreprepareResponse rspns) = "Preprepare Response " ++ format rspns
   format (PreviousBlock blk) = "PreviousBlock " ++ format (blockHash blk)
   format (ForcedConfigChange cc) = "ForcedConfigChange " ++ format cc
   format (ValidatorBehaviorChange theBool) = "ValidatorBehaviorChange " ++ format theBool
@@ -175,6 +188,7 @@ data OutEvent
     GapFound {have :: Integer, require :: Integer, peer :: ChainMemberParsedSet}
   | LeadFound {weHave :: Integer, theyHave :: Integer, peer :: ChainMemberParsedSet}
   | NewCheckpoint Checkpoint
+  | RunPreprepare Block
   deriving (Eq, Show, Generic)
 
 type EOutEvent = Either OutEvent OutEvent
@@ -191,6 +205,7 @@ instance Format OutEvent where
   format (GapFound we they p) = "GapFound " ++ show (we, they, p)
   format (LeadFound we they p) = "LeadFound " ++ show (we, they, p)
   format (NewCheckpoint ckpt) = "NewCheckpoint " ++ show ckpt
+  format (RunPreprepare blk) = "RunPreprepare " ++ format (blockHash blk)
 
 blkNum :: Block -> String
 blkNum = show . number . blockBlockData
@@ -208,6 +223,7 @@ inShortLog loc iev = $logInfoS loc . pack $
     CommitResult (Left err) -> CL.red "COMMIT_RESULT " ++ show err
     CommitResult (Right hsh) -> CL.blue "COMMIT_RESULT " ++ format hsh
     UnannouncedBlock blk -> CL.blue "UNANNOUNCED_BLOCK " ++ blkNum blk
+    PreprepareResponse rspns -> CL.blue "PRE_PREPARE_RESPONSE " ++ format rspns
     PreviousBlock blk -> CL.blue "PREVIOUS_BLOCK " ++ blkNum blk
     ForcedConfigChange cc -> CL.blue "FORCED_CONFIG_CHANGE " ++ format cc
     ValidatorBehaviorChange vc -> CL.blue "VALIDATOR_BEHAVIOR_CHANGE " ++ show vc
@@ -226,6 +242,7 @@ outShortLog loc eoev = do
       GapFound h r p -> prefix ++ CL.blue "GAP_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
       LeadFound h r p -> prefix ++ CL.blue "LEAD_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
       NewCheckpoint ckpt -> prefix ++ CL.blue "NEW_CHECKPOINT " ++ show ckpt
+      RunPreprepare blk -> prefix ++ CL.blue "RUN_PRE_PREPARE " ++ format (blockHash blk)
 
 instance NFData OutEvent
 
@@ -332,7 +349,7 @@ data AuthResult = AuthSuccess | AuthFailure String deriving (Show, Eq)
 
 data Checkpoint = Checkpoint
   { checkpointView :: View,
-    checkpointValidators :: [ChainMemberParsedSet]
+    checkpointValidators :: [Validator]
   }
   deriving (Show, Eq, Generic, NFData, Ae.ToJSON, Ae.FromJSON, Data)
 

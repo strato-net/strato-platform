@@ -9,6 +9,7 @@ import Control.Exception.Lifted
 data EventException
   = PeerDisconnected
   | PeerNonResponsive
+  | CurrentlyTooManyPeers
   | EventBeforeHandshake Message
   | WrongGenesisBlock
   | NetworkIDMismatch

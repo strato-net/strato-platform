@@ -6,7 +6,7 @@ import <BASE_CODE_COLLECTION>;
 contract SimpleSale is Sale {
     constructor(
         address _assetToBeSold,
-        uint _price,
+        decimal _price,
         uint _quantity,
         address[] _paymentProviders
     ) Sale(_assetToBeSold, _price, _quantity, _paymentProviders) {

@@ -5,7 +5,7 @@ const Statistics = ({ priceHistory }) => {
 // Origin Asset Statistics
 const originFluctuation = priceHistory.records.originFluctuation;
 const originVolume = priceHistory.records.originVolume;
-const originAveragePrice = priceHistory.records.originAveragePrice;
+const originAveragePrice = priceHistory.records.originAveragePrice.toFixed(2);
 
 return (
   <div className="container">

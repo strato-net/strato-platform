@@ -16,12 +16,12 @@ import ResellModal from "./ResellModal";
 import TransferModal from "./TransferModal";
 import RedeemModal from "./RedeemModal";
 import routes from "../../helpers/routes";
-import { ASSET_STATUS } from "../../helpers/constants";
+import { ASSET_STATUS, STRATS_CONVERSION } from "../../helpers/constants";
 import image_placeholder from "../../images/resources/image_placeholder.png";
 import "react-responsive-carousel/lib/styles/carousel.min.css";
 import { SEO } from "../../helpers/seoConstant";
 
-const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentProviderAddress, allSubcategories, limit, offset }) => {
+const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcategories, limit, offset, user }) => {
   const textRef = useRef(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [open, setOpen] = useState(false);
@@ -105,7 +105,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
    * @returns {boolean} True if the button should be disabled, false otherwise.
    */
   function isEditSellDisabled() {
-    return !paymentProviderAddress || (getCategory() === "Carbon Offset" && !(itemData.isMint && itemData.isMint === "True"));
+    return (getCategory() === "Carbon Offset" && !(itemData.isMint && itemData.isMint === "True"));
   }
 
   /**
@@ -207,8 +207,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
               alt={imgMeta}
               title={imgMeta}
               src={
-                inventory.images && inventory.images.length > 0
-                  ? inventory.images[0]
+                inventory["BlockApps-Mercata-Asset-images"] && inventory["BlockApps-Mercata-Asset-images"].length > 0
+                  ? inventory["BlockApps-Mercata-Asset-images"][0].value
                   : image_placeholder}
 
             />
@@ -262,7 +262,15 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
           </div>
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Price</p>
-            <p className="text-[#202020] font-semibold">{inventory?.price || "N/A"}</p>
+            <p className="text-[#202020] font-semibold">
+              {inventory?.price ? (
+                <>
+                  ${inventory?.price} <span className="text-xs">({inventory?.price * STRATS_CONVERSION} STRATS)</span>
+                </>
+              ) : (
+                "N/A"
+              )}
+            </p>
           </div>
 
         </div>
@@ -283,8 +291,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
           limit={limit}
           offset={offset}
           inventory={inventory}
-          paymentProviderAddress={paymentProviderAddress}
           categoryName={category}
+          user={user}
         />
       )}
       {unlistModalOpen && (

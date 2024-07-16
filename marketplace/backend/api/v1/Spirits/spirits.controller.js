@@ -43,6 +43,8 @@ class SpiritsController {
         unitOfMeasurement: Joi.number().integer().min(0).max(8).required(),
         images: Joi.array().items(Joi.string().allow(null)).required(),
         files: Joi.array().items(Joi.string().allow(null)).required(),
+        fileNames: Joi.array().items(Joi.string().allow(null)).required(),
+        redemptionService: Joi.string().required(),
       }).required()
     });
 

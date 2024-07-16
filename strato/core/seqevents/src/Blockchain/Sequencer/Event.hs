@@ -27,6 +27,7 @@ import Blockchain.Strato.Model.ExtendedWord (Word256)
 import Blockchain.Strato.Model.Keccak256 (Keccak256)
 import Blockchain.Strato.Model.MicroTime
 import Blockchain.Strato.Model.StateRoot
+import Blockchain.Strato.Model.Validator
 import Control.DeepSeq
 import Control.Lens
 import Data.Aeson hiding (encode)
@@ -64,8 +65,8 @@ data IngestEvent
   | IENewCertRegistered A.Address X509CertInfoState
   | IECertRevoked A.Address
   | IENewChainOrgName Word256 ChainMemberParsedSet
-  | IEValidatorAdded Keccak256 ChainMemberParsedSet
-  | IEValidatorRemoved Keccak256 ChainMemberParsedSet
+  | IEValidatorAdded Keccak256 Validator
+  | IEValidatorRemoved Keccak256 Validator
   | IEBlockstanbul PBFT.WireMessage
   | IEForcedConfigChange PBFT.ForcedConfigChange
   | IEValidatorBehavior PBFT.ForcedValidatorChange
@@ -74,11 +75,13 @@ data IngestEvent
   | IEGetMPNodesRequest TO.TXOrigin [StateRoot]
   | IEMPNodesResponse TO.TXOrigin [NodeData]
   | IEMPNodesReceived [NodeData]
+  | IEPreprepareResponse PBFT.PreprepareDecision
   deriving (Eq, Show, GHCG.Generic)
 
 data IngestEventType
   = IETTransaction
   | IETBlock
+  | IETPreprepareResponse
   | IETGenesis
   | IETNewCertRegistered
   | IETCertRevoked
@@ -113,6 +116,7 @@ iEventType = \case
   IEGetMPNodesRequest {} -> IETGetMPNodesRequest
   IEMPNodesResponse {} -> IETMPNodesResponse
   IEMPNodesReceived {} -> IETMPNodesReceived
+  IEPreprepareResponse {} -> IETPreprepareResponse
 
 instance Format IngestEvent where
   format (IETx ts o) = show ts ++ " " ++ format o
@@ -131,6 +135,7 @@ instance Format IngestEvent where
   format (IEGetMPNodesRequest o s) = format o ++ "requested: " ++ format s
   format (IEMPNodesResponse o n) = "Response to " ++ format o ++ ": " ++ show n
   format (IEMPNodesReceived o) = show o
+  format (IEPreprepareResponse d) = format d
 
 instance ShowConstructor IngestEvent where
   showConstructor IETx{} = "IETx"
@@ -149,6 +154,7 @@ instance ShowConstructor IngestEvent where
   showConstructor IEGetMPNodesRequest{} = "IEGetMPNodesRequest"
   showConstructor IEMPNodesResponse{} = "IEMPNodesResponse"
   showConstructor IEMPNodesReceived{} = "IEMPNodesReceived"
+  showConstructor IEPreprepareResponse{} = "IEPreprepareResponse"
 
 type Timestamp = Microtime
 
@@ -238,6 +244,7 @@ data VmEvent
   | VmPrivateTx OutputTx
   | VmGetMPNodesRequest TO.TXOrigin [StateRoot]
   | VmMPNodesReceived [NodeData]
+  | VmRunPreprepare BDB.Block
   deriving (Eq, Show, GHCG.Generic)
 
 instance Format VmEvent where
@@ -257,6 +264,7 @@ instance ShowConstructor VmEvent where
   showConstructor VmPrivateTx{} = "VmPrivateTx"
   showConstructor VmGetMPNodesRequest{} = "VmGetMPNodesRequest"
   showConstructor VmMPNodesReceived{} = "VmMPNodesReceived"
+  showConstructor VmRunPreprepare{} = "VmRunPreprepare"
 
 data OutputTx = OutputTx
   { otOrigin :: TO.TXOrigin,

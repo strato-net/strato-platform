@@ -257,13 +257,6 @@ main = do
               ("", _) -> error "File server url was not provided and cannot be derived"
               (fileServer, _) -> fileServer
           ),
-          ( "paymentServer",
-            case (flags_paymentServerUrl, computeNetworkID) of
-              ("", 7596898649924658542) -> "https://payments.mercata-testnet2.blockapps.net"
-              ("", 6909499098523985262) -> "https://payments.mercata.blockapps.net"
-              ("", _) -> error "Payment server url was not provided and cannot be derived"
-              (paymentServer, _) -> paymentServer
-          ),
           ( "monitor",
             case computeNetworkID of
               7596898649924658542 -> "https://monitor.mercata-testnet2.blockapps.net:18080"

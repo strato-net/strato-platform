@@ -16,6 +16,7 @@ module Blockchain.Blockstanbul
     OutEvent (..),
     ForcedConfigChange (..),
     ForcedValidatorChange (..),
+    PreprepareDecision (..),
     finalHash,
     currentView,
     blockstanbulRunning,
