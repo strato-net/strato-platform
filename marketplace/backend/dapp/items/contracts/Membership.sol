@@ -16,8 +16,9 @@ contract Membership is SemiFungible {
         uint _createdDate,
         uint _quantity,
         uint _expirationPeriodInMonths,
-        AssetStatus _status
-    ) public SemiFungible(_name, _description, _images, _files, _fileNames, _createdDate, _quantity, _status) {
+        AssetStatus _status,
+        address _redemptionService
+    ) public SemiFungible(_name, _description, _images, _files, _fileNames, _createdDate, _quantity, _status, _redemptionService) {
         expirationPeriodInMonths = _expirationPeriodInMonths;
         expirationDate = block.timestamp + (expirationPeriodInMonths*2592000);
     }
@@ -32,7 +33,8 @@ contract Membership is SemiFungible {
             createdDate,
             _quantity,
             expirationPeriodInMonths,
-            status
+            status,
+            address(redemptionService)
         );
         return UTXO(address(newAsset));
     }

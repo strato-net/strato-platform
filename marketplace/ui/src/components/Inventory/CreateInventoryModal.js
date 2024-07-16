@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Form,
   Modal,
@@ -14,6 +14,8 @@ import {
   useInventoryDispatch,
   useInventoryState,
 } from "../../contexts/inventory";
+import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
+import { actions as redemptionActions } from "../../contexts/redemption/actions";
 import { actions } from "../../contexts/inventory/actions";
 import TextArea from "antd/es/input/TextArea";
 import { INVENTORY_MODAL_INITIAL_VALUES, SIZES, unitOfMeasures, unitOfSpiritMeasures } from "../../helpers/constants";
@@ -46,6 +48,14 @@ const CreateInventoryModal = ({
   const [categoryValue, setCategoryValue] = useState("Art");
   const [subCategoryValue, setSubCategoryValue] = useState(form.getFieldValue("subCategory"));
   const [measureUnit, setMeasureUnit] = useState(unitOfMeasures);
+
+
+  const redemptionDispatch = useRedemptionDispatch();
+  const { redemptionServices, isFetchingRedemptionServices } = useRedemptionState();
+
+  useEffect(() => {
+    redemptionActions.fetchRedemptionServices(redemptionDispatch);
+  }, [redemptionDispatch]);
 
   const beforeImageUpload = (file) => {
     const isJpgOrPng = file.type === "image/jpeg" || file.type === "image/png";
@@ -128,11 +138,13 @@ const CreateInventoryModal = ({
     }
 
     const { category, subCategory, images, files, ...body } = values;
+    const redemptionService = redemptionServices ? (redemptionServices[0] || {}).address : undefined;
     const newBody = {
       itemArgs: {
         images: imageKeys || [],
         files: fileKeys || [],
         fileNames: fileNamesArr || [],
+        redemptionService,
         ...body
       },
     };
@@ -270,7 +282,7 @@ const CreateInventoryModal = ({
                   handleCreateFormSubmit(values);
                 })
               }}
-              loading={isCreateInventorySubmitting || isUploadImageSubmitting}
+              loading={isCreateInventorySubmitting || isUploadImageSubmitting || isFetchingRedemptionServices}
             >
               Create Item
             </Button>

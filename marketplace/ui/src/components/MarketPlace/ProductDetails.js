@@ -39,6 +39,19 @@ import { STRATS_CONVERSION } from "../../helpers/constants";
 import { TOAST_MSG } from "../../helpers/msgConstants";
 
 
+import { Swiper, SwiperSlide } from 'swiper/react';
+
+// Import Swiper styles
+import 'swiper/css';
+import 'swiper/css/effect-fade';
+import 'swiper/css/navigation';
+import 'swiper/css/pagination';
+import 'swiper/css/autoplay';
+
+// import required modules
+import { EffectFade, Navigation, Pagination, Autoplay } from 'swiper/modules';
+
+
 const ProductDetails = ({ user, users }) => {
   const [api, contextHolder] = notification.useNotification();
   const { Text, Paragraph, Title } = Typography;
@@ -351,8 +364,6 @@ const ProductDetails = ({ user, users }) => {
   const contractName = getCategoryName(decodeURIComponent(details?.contract_name))
   const linkUrl = window.location.href;
 
-  const googleFormBaseURL = "https://docs.google.com/forms/d/e/1FAIpQLSfEWqALizqd-Rg3OPTwxD5O6xJKqT0xEgHeKpSpnaWzZ7tn1Q/viewform?usp=pp_url";
-  const preFilledFormURL = `${googleFormBaseURL}&entry.8090980=${encodeURIComponent(details?.name)}&entry.1160788377=${encodeURIComponent(details?.ownerCommonName)}&entry.1571372307=${encodeURIComponent(user?.commonName)}`;
 
 
   return (
@@ -403,23 +414,34 @@ const ProductDetails = ({ user, users }) => {
           </Row>
           <div className="flex w-full flex-col lg:leading-12 px-4 sm:px-8 md:px-0  items-center lg:items-start  md:w-[750px] lg:w-[835px] xl:w-[858px]  md:mx-auto ">
             <div className="flex md:justify-center gap-[15px] lg:gap-6 flex-col lg:flex-row   ">
-              <Carousel showIndicators={
-                details["BlockApps-Mercata-Asset-images"].length > 1 ? true : false
-              } className="product_detail w-full  sm:w-[417px]   lg:h-[348px] md:w-[343px] lg:w-[417px]" showStatus={false} showArrows swipeable emulateTouch infiniteLoop >
-                {details["BlockApps-Mercata-Asset-images"].length > 0 ? details["BlockApps-Mercata-Asset-images"].map((element, index) => {
-                  return (<><div key={index} className="sm:w-[343px ] h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
+              { details["BlockApps-Mercata-Asset-images"].length > 0 
+              ?  <Swiper
+                spaceBetween={30}
+                effect={'fade'}
+                navigation={true}
+                centeredSlides={true}
+                pagination={{
+                  clickable: true,
+                }}
+                modules={[Autoplay, EffectFade, Navigation, Pagination]}
+                className="product-detail-swiper"
+              >    
+                {details["BlockApps-Mercata-Asset-images"].length > 0 && details["BlockApps-Mercata-Asset-images"].map((element, index) => {
+                  return (<SwiperSlide><div key={index} className="mx-auto sm:w-[343px ] h-[212px] lg:h-[348px]  md:h-[250px] lg:w-[417px] w-full rounded-md ">
                     <img width={"100%"}
                       alt={`${assetName} | Image ${index}`}
                       title={`${assetName} | Image ${index}`}
-                      className="object-contain rounded-md h-full " src={element.value ? element.value : image_placeholder} />
-                  </div></>)
-                }) : <><div className="sm:w-[343px ] sm:h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
-                  <img width={"100%"}
-                    alt={`${assetName} | Image`}
-                    title={`${assetName} | Image`}
-                    className="object-contain rounded-md h-full " src={image_placeholder} />
-                </div></>}
-              </Carousel>
+                      className="object-contain rounded-md h-full" src={element.value ? element.value : image_placeholder} />
+                  </div></SwiperSlide>)
+                })}
+              </Swiper>
+              : <div className="sm:w-[343px ] sm:h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
+              <img width={"100%"}
+                alt={`${assetName} | Image`}
+                title={`${assetName} | Image`}
+                className="object-contain rounded-md h-full " src={image_placeholder} />
+            </div>
+              }
               <div className=" w-full lg:w-1/2">
                 {!ownerSameAsUser() &&
                   <div className="flex justify-end">
@@ -461,7 +483,7 @@ const ProductDetails = ({ user, users }) => {
                   <Paragraph level={4} id="price" className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold">
                     {details?.price ? (
                       <>
-                        ${details?.price} <a className="text-xs" href={preFilledFormURL} target="_blank" rel="noreferrer noopener">({details?.price * STRATS_CONVERSION} STRATS)</a>
+                        ${details?.price} <span className="font-normal text-xs mr-2 text-primary"><b>({details?.price * STRATS_CONVERSION} STRATS)</b></span>
                       </>
                     ) : (
                       "No Price Available"
@@ -693,7 +715,7 @@ const ProductDetails = ({ user, users }) => {
                         </div>
                       ) : (
                         <div className="text-center p-4">
-                          <p>Please{' '}
+                          <p>Please
                             <span
                               className="text-blue hover:text-blue cursor-pointer hover:underline"
                               onClick={() => {
@@ -703,7 +725,7 @@ const ProductDetails = ({ user, users }) => {
                             >
                               login
                             </span>
-                            {' '}to view ownership history.
+                            to view ownership history.
                           </p>
                         </div>
                       ),

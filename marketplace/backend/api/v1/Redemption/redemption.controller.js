@@ -4,16 +4,25 @@ import RestStatus from 'http-status-codes'
 
 class RedemptionController {
 
+    static async getRedemptionServices(req, res, next) {
+        try {
+            const { dapp, query } = req
+            const redemptionServices = await dapp.getRedemptionServices(query)
+            rest.response.status200(res, redemptionServices)
+
+            return next()
+        } catch (e) {
+            return next(e)
+        }
+    }
+
     static async get(req, res, next) {
         try {
-            const { dapp, params } = req
+            const { dapp, params, query } = req
             const { id } = params
+            const { redemptionService } = query
 
-            let args
-
-            if (id) {
-                args = { id }
-            }
+            let args = { id, redemptionService }
 
             const redemption = await dapp.getRedemption(args)
             rest.response.status200(res, redemption)
@@ -91,7 +100,8 @@ class RedemptionController {
             shippingAddressId: Joi.number().integer().required(),
             ownerCommonName: Joi.string().required(),
             issuerCommonName: Joi.string().required(),
-            ownerComments: Joi.string().allow("")
+            ownerComments: Joi.string().allow(""),
+            redemptionService: Joi.string(),
         });
 
         const validation = requestRedemptionSchema.validate(args);
@@ -109,7 +119,8 @@ class RedemptionController {
             id: Joi.number().integer().required(),
             assetAddresses: Joi.array().items(Joi.string()),
             status: Joi.number().integer().min(2).max(3).required(),
-            issuerComments: Joi.string().allow("")
+            issuerComments: Joi.string().allow(""),
+            redemptionService: Joi.string(),
         });
 
         const validation = requestRedemptionSchema.validate(args);
