@@ -194,7 +194,7 @@ abstract contract PaymentService is Utils {
                 s.lockQuantity(quantity, _orderHash, _purchaser);
             } catch { // Support for legacy sales
                 try {
-                    address(a).call("lockQuantity", quantity, _purchaser);
+                    _saleAddresses[i].call("lockQuantity", quantity, _purchaser);
                 } catch {
                     _saleAddresses[i].call("lockQuantity", quantity);
                 }
@@ -346,7 +346,7 @@ abstract contract PaymentService is Utils {
                 s.completeSale(_orderHash, _purchaser);
             } catch { // Support for legacy sales
                 try {
-                    address(a).call("completeSale", _purchaser);
+                    address(s).call("completeSale", _purchaser);
                 } catch {
                     address(s).call("completeSale");
                 }
@@ -426,7 +426,7 @@ abstract contract PaymentService is Utils {
                 s.unlockQuantity(_orderHash, _purchaser);
             } catch { // Support for legacy sales
                 try {
-                    address(a).call("unlockQuantity", _purchaser);
+                    address(s).call("unlockQuantity", _purchaser);
                 } catch {
                     address(s).call("unlockQuantity");
                 }
