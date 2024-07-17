@@ -17,9 +17,9 @@ contract StratPaymentService is PaymentService {
         decimal _secondaySaleFeePercentage,
         address _feeRecipient
     ) PaymentService(
-        "STRAT",
+        "STRATs",
         _imageURL,
-        "Checkout with STRAT",
+        "Checkout with STRATs",
         _primarySaleFeePercentage,
         _secondaySaleFeePercentage
     ) public {
@@ -43,8 +43,8 @@ contract StratPaymentService is PaymentService {
         decimal totalAmountNet = 0.0;
         decimal totalFee = 0.0;
         string seller;
-        string err = "Your STRAT balance is not high enough to cover the purchase.";
-        string feeErr = "Your STRAT balance is not high enough to cover the fee.";
+        string err = "Your STRATs balance is not high enough to cover the purchase.";
+        string feeErr = "Your STRATs balance is not high enough to cover the fee.";
         purchasersAddress = msg.sender; // Support for legacy sales
         purchasersCommonName = getCommonName(tx.origin);
 
@@ -78,7 +78,7 @@ contract StratPaymentService is PaymentService {
                 0,
                 0,
                 _unitsPerDollar(),
-                "STRAT",
+                "STRATs",
                 PaymentStatus.AWAITING_FULFILLMENT,
                 _createdDate,
                 _comments
@@ -130,7 +130,7 @@ contract StratPaymentService is PaymentService {
             0,
             totalFee,
             _unitsPerDollar(),
-            "STRAT",
+            "STRATs",
             PaymentStatus.CLOSED,
             _createdDate,
             _comments
@@ -157,7 +157,7 @@ contract StratPaymentService is PaymentService {
         uint _createdDate,
         string _comments
     ) internal override returns (address[]) {
-        require(false, "Cannot call initializePayment for STRAT payments.");
+        require(false, "Cannot call initializePayment for STRATs payments.");
         return [];
     }
 
@@ -172,7 +172,7 @@ contract StratPaymentService is PaymentService {
         uint _createdDate,
         string _comments
     ) internal override returns (address[]) {
-        require(false, "Cannot call completeOrder for STRAT payments.");
+        require(false, "Cannot call completeOrder for STRATs payments.");
         return [];
     }
 
@@ -187,7 +187,7 @@ contract StratPaymentService is PaymentService {
         uint _createdDate,
         string _comments
     ) internal override {
-        require(false, "Cannot call cancelOrder for STRAT payments.");
+        require(false, "Cannot call cancelOrder for STRATs payments.");
     }
 
     function _unitsPerDollar() internal override returns (decimal) {
