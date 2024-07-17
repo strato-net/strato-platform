@@ -130,7 +130,16 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                             title: "Set Price Per Unit",
                             align: "center",
                             render: () => (
-                                <InputNumber value={pricePerUnit} controls={false} min={1} onChange={(value) => setpricePerUnit(value)} />
+                                <InputNumber 
+                                  value={pricePerUnit}
+                                  controls={false} 
+                                  min={0.01} 
+                                  onChange={(value) => {
+                                    if (value !== null && value > 0) {
+                                      setpricePerUnit(parseFloat(value.toFixed(2)));
+                                    }
+                                  }} 
+                                />
                             )
                         }
                     ])
@@ -142,7 +151,16 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                             title: "Set Price Per Unit",
                             align: "center",
                             render: () => (
-                                <InputNumber value={pricePerUnit} controls={false} min={1} onChange={(value) => setpricePerUnit(value)} />
+                                <InputNumber 
+                                  value={pricePerUnit} 
+                                  controls={false} 
+                                  min={0.01}
+                                  onChange={(value) => {
+                                    if (value !== null && value > 0) {
+                                      setpricePerUnit(parseFloat(value.toFixed(2)));
+                                    }
+                                  }}
+                                />
                             )
                         }
                     ])
@@ -152,7 +170,17 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                     title: "Set Price",
                     align: "center",
                     render: () => (
-                        <InputNumber id="sellPrice" value={pricePerUnit} controls={false} min={1} onChange={(value) => setpricePerUnit(value)} />
+                        <InputNumber 
+                          id="sellPrice" 
+                          value={pricePerUnit} 
+                          controls={false} 
+                          min={0.01} 
+                          onChange={(value) => {
+                            if (value !== null && value > 0) {
+                              setpricePerUnit(parseFloat(value.toFixed(2)));
+                            }
+                          }}
+                        />
                     )
                 })
                 break;
