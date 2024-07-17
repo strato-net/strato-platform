@@ -353,7 +353,7 @@ class InventoryController {
       assetAddress: Joi.string().required(),
       newOwner: Joi.string().required(),
       quantity: Joi.number().integer().greater(0).required(),
-      price: Joi.number().min(0).required(),
+      price: Joi.number().greater(0).precision(2).required(),
     });
 
     const validation = transferItemSchema.validate(args);

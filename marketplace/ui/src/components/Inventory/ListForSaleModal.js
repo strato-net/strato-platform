@@ -118,7 +118,16 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                 title: "Quantity",
                 align: "center",
                 render: () => (
-                    <InputNumber value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
+                    <InputNumber 
+                      value={quantity} 
+                      controls={false} 
+                      min={1}
+                      onChange={(value) => {
+                        if (value) {
+                          setQuantity(parseInt(value, 10));
+                        }
+                      }}
+                    />
                 )
             },
         ]
@@ -135,7 +144,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                                   controls={false} 
                                   min={0.01} 
                                   onChange={(value) => {
-                                    if (value !== null && value > 0) {
+                                    if (value && value > 0) {
                                       setpricePerUnit(parseFloat(value.toFixed(2)));
                                     }
                                   }} 
@@ -156,7 +165,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                                   controls={false} 
                                   min={0.01}
                                   onChange={(value) => {
-                                    if (value !== null && value > 0) {
+                                    if (value && value > 0) {
                                       setpricePerUnit(parseFloat(value.toFixed(2)));
                                     }
                                   }}
@@ -176,7 +185,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                           controls={false} 
                           min={0.01} 
                           onChange={(value) => {
-                            if (value !== null && value > 0) {
+                            if (value && value > 0) {
                               setpricePerUnit(parseFloat(value.toFixed(2)));
                             }
                           }}
