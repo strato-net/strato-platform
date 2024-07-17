@@ -109,7 +109,6 @@ const Inventory = ({ user }) => {
     } else {
       const serviceURL = service.serviceURL || service.data.serviceURL;
       const onboardingRoute = service.onboardingRoute || service.data.onboardingRoute;
-      console.log(serviceURL, onboardingRoute);
       if (serviceURL && onboardingRoute) {
         const url = `${serviceURL}${onboardingRoute}?username=${user.commonName}&redirectUrl=${window.location.protocol}//${window.location.host}${window.location.pathname}`;
         window.location.replace(url);
