@@ -262,7 +262,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
                     defaultValue={selectedProvider?.serviceName}
                     className="w-[250px] h-8 text-center selected-payment-option"
                     onChange={handleChange}
-                    placeholder="Select a provider"
+                    placeholder="Select Payment Option"
                   >
                     {paymentProviders && paymentProviders.map(provider => (
                       provider && <Option className='payment-dropdown' key={provider?.serviceName} value={provider?.serviceName}>
