@@ -82,7 +82,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
     const columns = () => {
         let finalColumns = [
             {
-                title: "Payment Type(s)",
+                title: "Payment Type (s)",
                 align: "center",
                 render: () => (
                     <Select
@@ -191,7 +191,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
             </div>
             <div className="flex gap-5 flex-col justify-center md:hidden mt-5">
                 <div className="w-full">
-                    <Typography className="text-[#202020] text-sm font-medium">Payment Type(s)</Typography>
+                    <Typography className="text-[#202020] text-sm font-medium">Payment Type (s)</Typography>
                     <Select
 
                         id="paymentTypes"
