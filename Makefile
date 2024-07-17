@@ -132,10 +132,11 @@ gen-hie: build_formatter develop
 hoogle_generate: build_buildbase
 	@echo generating STRATO documentation...
 	cd strato && \
-		stack build --haddock && \
-		stack hoogle generate --rebuild -- --local
+		stack haddock --haddock-internal && \
+		stack hoogle generate -- --local
 	
 hoogle_serve:
+	@echo serving the pregenerated STRATO documentation...
 	cd strato && \
 		stack hoogle -- server --local
 
