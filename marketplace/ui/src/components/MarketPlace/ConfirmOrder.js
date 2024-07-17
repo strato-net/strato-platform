@@ -151,6 +151,9 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
       },
     });
     let orderHashAndAssets = await orderActions.createPayment(orderDispatch, body);
+    if(!orderHashAndAssets){
+      setSelectedProvider('')
+    }
     if (orderHashAndAssets && orderHashAndAssets !== false) {
       const [orderHash, assets] = orderHashAndAssets;
       let serviceURL = paymentProvider.serviceURL || paymentProvider.data.serviceURL;
