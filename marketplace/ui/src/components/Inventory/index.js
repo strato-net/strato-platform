@@ -64,6 +64,17 @@ const Inventory = ({ user }) => {
       areNotOnboardedLoading
   } = usePaymentServiceState();
   const paymentServiceDispatch = usePaymentServiceDispatch();
+  const [sortedPaymentServices, setSortedPaymentServices] = useState([]);
+
+  const isNotOnboarded = (service) => notOnboarded.some(n => n.serviceName === service.serviceName);
+
+  useEffect(() => {
+    // Sort paymentServices array so that not onboarded services come first
+    const sortedServices = [...paymentServices].sort((a, b) => {
+      return isNotOnboarded(a) - isNotOnboarded(b);
+    });
+    setSortedPaymentServices(sortedServices);
+  }, [paymentServices, notOnboarded]);
 
   useEffect(() => {
     if (user && user.commonName) {
@@ -285,7 +296,7 @@ const Inventory = ({ user }) => {
                   value={'Onboard'}
                   disabled={notOnboarded.length === 0}
                 >
-                  {paymentServices.map(service => (
+                  {sortedPaymentServices.map(service => (
                     <Option 
                       key={service.serviceName} 
                       value={service.serviceName}
