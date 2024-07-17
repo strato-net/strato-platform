@@ -31,7 +31,7 @@ pipeline {
       steps {
         sh '''#!/bin/bash -le
           set -x
-          sudo fuser -k 8080/tcp
+          sudo fuser -k 8080/tcp || true
           nohup sudo make hoogle_generate >> ~/hoogle.log &
           # Let some time to process to return an exit code if it crashed before disowning it
           sleep 5
