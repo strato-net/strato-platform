@@ -24,7 +24,7 @@ abstract contract PaymentService is Utils {
         bool isActive
     );
 
-    enum PaymentStatus { NULL, AWAITING_FULFILLMENT, PAYMENT_PENDING, CLOSED, CANCELED, DISCARDED }
+    enum PaymentStatus { NULL, AWAITING_FULFILLMENT, PAYMENT_PENDING, CLOSED, CANCELED }
 
     event AssetLocked (
         string orderHash,             /* Unique hash of the order details for payment server lookup to
@@ -391,6 +391,85 @@ abstract contract PaymentService is Utils {
         return assets;
     }
 
+    function discardOrder (
+        string _orderHash,
+        string _orderId,
+        address _purchaser,
+        address[] _saleAddresses,
+        uint[] _quantities,
+        string _currency,
+        uint _createdDate,
+        string _comments
+    ) requireActive("discard order") external {
+        require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
+        string _purchasersCommonName = getCommonName(_purchaser);
+        string orderHash = getOrderHash(_orderId, _purchasersCommonName, _saleAddresses, _quantities);
+        require(orderHash == _orderHash, "Invalid order data to discard");
+        string err = "Only the purchaser or owner can dicard the order.";
+        string commonName = getCommonName(msg.sender);
+        require(commonName == ownerCommonName, err);
+        return _discardOrder(
+            _orderHash,
+            _orderId,
+            _purchaser,
+            _purchasersCommonName,
+            _saleAddresses,
+            _quantities,
+            _currency,
+            _createdDate,
+            _comments
+        );
+    }
+    
+    function _discardOrder (
+        string _orderHash,
+        string _orderId,
+        address _purchaser,
+        string _purchasersCommonName,
+        address[] _saleAddresses,
+        uint[] _quantities,
+        string _currency,
+        uint _createdDate,
+        string _comments
+    ) internal virtual {
+        decimal totalAmount = 0;
+        string seller;
+        address[] assets;
+        for (uint i = 0; i < _saleAddresses.length; i++) {
+            Sale s = Sale(_saleAddresses[i]);
+            totalAmount += s.price() * _quantities[i];
+            Asset a = s.assetToBeSold();
+            assets.push(address(a));
+            seller = getCommonName(a.owner());
+            try {
+                s.unlockQuantity(_orderHash, _purchaser);
+            } catch { // Support for legacy sales
+                try {
+                    address(a).call("unlockQuantity", _purchaser);
+                } catch {
+                    address(s).call("unlockQuantity");
+                }
+            }
+        }
+        emit AssetLocked(
+            _orderHash,
+            _orderId,
+            _purchaser,
+            _purchasersCommonName,
+            seller,
+            _saleAddresses,
+            _quantities,
+            totalAmount,
+            0,
+            0,
+            _unitsPerDollar(),
+            "",
+            PaymentStatus.CANCELED,
+            _createdDate,
+            "Order has been discarded"
+        );
+    }
+
     function cancelOrder (
         string _orderHash,
         string _orderId,
@@ -407,7 +486,7 @@ abstract contract PaymentService is Utils {
         require(orderHash == _orderHash, "Invalid order data");
         string err = "Only the purchaser or owner can cancel the order.";
         string commonName = getCommonName(msg.sender);
-        require(commonName == ownerCommonName || commonName == _purchasersCommonName, err);
+        require(commonName == ownerCommonName, err);
         return _cancelOrder(
             _orderHash,
             _orderId,
@@ -464,7 +543,7 @@ abstract contract PaymentService is Utils {
             0,
             _unitsPerDollar(),
             _currency,
-            _isOrderDiscardedOrCanceled(_comments),
+            PaymentStatus.CANCELED,
             _createdDate,
             _comments
         );
@@ -474,9 +553,7 @@ abstract contract PaymentService is Utils {
         return 1.0;
     }
 
-    function _isOrderDiscardedOrCanceled(string _comments) internal virtual returns (PaymentStatus){
-        return _comments == "" ? PaymentStatus.DISCARDED : PaymentStatus.CANCELED;
-    }
+                            
 
     function update(
         string _imageURL

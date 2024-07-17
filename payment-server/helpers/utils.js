@@ -246,8 +246,20 @@ const cancelOrder = async (address, args) => {
     method: "cancelOrder",
     args: util.usc({ ...args }),
   };
-  const completeOrderStatus = await rest.call(ADMIN.getUser(), callArgs, DEFAULT_OPTIONS);
-  return completeOrderStatus;
+  const cancelOrderStatus = await rest.call(ADMIN.getUser(), callArgs, DEFAULT_OPTIONS);
+  return cancelOrderStatus;
+}
+
+const discardOrder = async (address, args) => {
+  // Make the call and return results
+  const contract = { name: "PaymentService", address };
+  const callArgs = {
+    contract,
+    method: "discardOrder",
+    args: util.usc({ ...args }),
+  };
+  const discardOrderStatus = await rest.call(ADMIN.getUser(), callArgs, DEFAULT_OPTIONS);
+  return discardOrderStatus;
 }
 
 export {
@@ -268,4 +280,5 @@ export {
   completeOrder,
   initializePayment,
   cancelOrder,
+  discardOrder,
 }
