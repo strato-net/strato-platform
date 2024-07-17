@@ -1,0 +1,66 @@
+pipeline {
+  agent {
+    label "hoogle"
+  }
+  stages {
+    stage('Prepare') {
+      steps {
+        wrap([$class: 'BuildUser']) {
+          script {
+            BUILD_USER=''
+            try {
+              BUILD_USER="${BUILD_USER_FIRST_NAME}"
+            } catch (Exception e) {
+              BUILD_USER="github"
+            }
+            MAIN_AGENT_NAME="${env.NODE_NAME}"
+            currentBuild.description = "${MAIN_AGENT_NAME} //${BUILD_USER}"
+          }
+        }
+      }
+    }
+    
+    
+    stage('Build') {
+      steps {
+        sh 'sudo make hoogle_generate'
+      }
+    }
+    
+    stage('Deploy') {
+      steps {
+        sh '''#!/bin/bash -le
+          set -x
+          sudo fuser -k 8080/tcp || true
+          nohup sudo make hoogle_serve >> /home/ec2-user/hoogle.log &
+          # Let some time to process to return an exit code if it crashed before disowning it
+          sleep 5
+          disown -a
+        '''
+      }
+    }
+  }
+
+  post {
+
+    success {
+      slackSend (
+        color: 'good',
+        message: "Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}) on node ${env.NODE_NAME}"
+      )
+    }
+
+    failure {
+      slackSend (
+        color: 'danger',
+        message: "Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL} on node ${env.NODE_NAME})"
+      )
+      
+      slackSend(
+        channel: '#engineering',
+        color: 'danger',
+        message: "Hoogle docs failed to rebuild from develop: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL} on node ${env.NODE_NAME})"
+      )
+    }
+  }
+}
