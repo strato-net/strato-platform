@@ -101,7 +101,11 @@ app.listen(config.port, async (e) => {
   `)
   console.log(`Listening on port ${config.port}...`);
   console.log(`Running database connection verification...`);
-  await verifyDatabaseConnection();
+  try {
+    await verifyDatabaseConnection();
+  } catch (e) {
+    throw new Error('Database connection cannot be verified.');
+  }
   console.log(`SKIP_CONTRACT_VALIDATION: ${process.env.SKIP_CONTRACT_VALIDATION}`);
   if (!process.env.SKIP_CONTRACT_VALIDATION) {
     await validatePaymentServiceContract(STRIPE_CONTRACT_ADDRESS);
