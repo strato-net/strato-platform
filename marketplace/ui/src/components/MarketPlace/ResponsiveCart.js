@@ -1,15 +1,12 @@
-import { Button, Row, Typography, InputNumber, Select } from "antd";
+import { Button, Row, Typography, InputNumber, Select, Spin } from "antd";
 import { useState, useEffect } from "react";
 import { Images } from "../../images";
-import { useMarketplaceState, useMarketplaceDispatch } from "../../contexts/marketplace";
+import { useMarketplaceDispatch } from "../../contexts/marketplace";
 import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
 import { actions } from "../../contexts/marketplace/actions";
 import { actions as orderActions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
-import { actions as inventoryAction } from "../../contexts/inventory/actions";
-import { useInventoryDispatch } from "../../contexts/inventory";
-import { PAYMENT_LIST, HTTP_METHODS } from "../../helpers/constants";
 
 const { Option } = Select;
 
@@ -25,13 +22,11 @@ const ResponsiveCart = ({
 }) => {
   const [tax, setTax] = useState(0);
   const [selectedProvider, setSelectedProvider] = useState("");
-  const { cartList } = useMarketplaceState();
   const marketplaceDispatch = useMarketplaceDispatch();
-  const inventoryDispatch = useInventoryDispatch();
   const [total, setTotal] = useState(0);
   const orderDispatch = useOrderDispatch();
   let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
-  const { isCreatePaymentSubmitting } = useOrderState();
+  const { isCreatePaymentSubmitting, isCreateOrderSubmitting } = useOrderState();
   const userOrganization = user?.organization;
   const [cartData, setCartData] = useState(data);
   const [faqOpenState, setFaqOpenState] = useState(Array(cartData.length).fill(false));
@@ -122,6 +117,7 @@ const ResponsiveCart = ({
       const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities);
       if (checkQuantity === true) {
         handlePaymentConfirm(provider);
+        setSelectedProvider("");
       } else {
         let insufficientQuantityMessage = "";
         let outOfStockMessage = "";
@@ -143,6 +139,7 @@ const ResponsiveCart = ({
           errorMessage += `The following item(s) are temporarily out of stock and should be removed:\n${outOfStockMessage}`;
         }
         openToastOrder("bottom", errorMessage);
+        setSelectedProvider("");
       }
     }
   };
@@ -291,7 +288,11 @@ const ResponsiveCart = ({
         </div>
 
         {!confirm && (
-          <>
+          isCreateOrderSubmitting || isCreatePaymentSubmitting ? (
+            <div className="flex justify-center items-center">
+              <Spin spinning={isCreateOrderSubmitting || isCreatePaymentSubmitting} size="large"/>
+            </div>
+          ) : (
             <Row className="flex justify-center mt-4">
               <Select
                 defaultValue={selectedProvider?.serviceName}
@@ -307,7 +308,7 @@ const ResponsiveCart = ({
                 ))}
               </Select>
             </Row>
-          </>
+          )
         )}
       </div>
     </div>
