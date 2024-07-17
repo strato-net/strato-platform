@@ -8,6 +8,7 @@ import {
   Select,
   Tabs
 } from "antd";
+import { CheckCircleOutlined } from '@ant-design/icons';
 import InventoryCard from "./InventoryCard";
 import CreateInventoryModal from "./CreateInventoryModal";
 import { actions as categoryActions } from "../../contexts/category/actions";
@@ -69,10 +70,17 @@ const Inventory = ({ user }) => {
   const isNotOnboarded = (service) => notOnboarded.some(n => n.serviceName === service.serviceName);
 
   useEffect(() => {
+    // Create a set of not onboarded service names for quick lookup
+    const notOnboardedNames = new Set(notOnboarded.map(n => n.serviceName));
+
     // Sort paymentServices array so that not onboarded services come first
     const sortedServices = [...paymentServices].sort((a, b) => {
       return isNotOnboarded(a) - isNotOnboarded(b);
-    });
+    }).map(service => ({
+      ...service,
+      isNotOnboarded: notOnboardedNames.has(service.serviceName),
+    }));
+
     setSortedPaymentServices(sortedServices);
   }, [paymentServices, notOnboarded]);
 
@@ -291,18 +299,19 @@ const Inventory = ({ user }) => {
               {!areNotOnboardedLoading ? (
                 <Select
                   className="items-select"
-                  style={{ width: 200, height: 40 }}
+                  style={{ width: 250, height: 40 }}
                   onChange={handleChange}
-                  value={'Onboard'}
+                  value={'Connect to Payment Provider'}
                   disabled={notOnboarded.length === 0}
                 >
                   {sortedPaymentServices.map(service => (
                     <Option 
                       key={service.serviceName} 
                       value={service.serviceName}
-                      disabled={!notOnboarded.some(n => n.serviceName === service.serviceName)}
+                      disabled={!service.isNotOnboarded}
                     >
-                      {service.onboardingText || service.data.onboardingText}
+                      {service.serviceName}
+                      {!service.isNotOnboarded && <CheckCircleOutlined style={{ color: '#28a745',position: 'absolute', right: '10px' }} />}
                     </Option>
                   ))}
                 </Select>
@@ -314,7 +323,7 @@ const Inventory = ({ user }) => {
               <Button
                 type="primary"
                 id="createItem"
-                className="w-40 flex items-center justify-center gap-[6px]"
+                className="w-[250px] sm:w-40 flex items-center justify-center gap-[6px]"
                 style={{ height: 40 }}
                 onClick={() => {
                   if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
