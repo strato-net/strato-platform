@@ -1,0 +1,15 @@
+version: "3"
+
+services:
+  nginx:
+    environment:
+    - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
+    - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+    build: ./
+    image: openresty-proxy:latest
+    ports:
+    - 443:443
+    volumes:
+    - ./dummy-ssl/server.pem:/etc/ssl/server.pem:ro
+    - ./dummy-ssl/server.key:/etc/ssl/server.key:ro
+    restart: unless-stopped
