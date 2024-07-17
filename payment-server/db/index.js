@@ -92,7 +92,7 @@ const connectToDB = async () => {
 } 
 
 if (host && password) {
-    connectToDB();
+    await connectToDB();
 } else {
     console.error('CRITICAL ERROR: Missing Postgres URL and/or password');
     process.exit(1)

@@ -28,6 +28,12 @@ const commonErrorHandler = (err, req, res, next) => {
   return next(err);
 }
 
+const verifyDatabaseConnection = async () => {
+  const query = 'SELECT * FROM stripe_accounts LIMIT 1';
+  const result = await client.query(query);
+  console.log(result);
+}
+
 const getStripeAccountForUser = async (commonName) => {
   const query = 'SELECT * FROM stripe_accounts WHERE commonName = $1';
   const values = [ commonName ];
@@ -250,6 +256,7 @@ const cancelOrder = async (address, args) => {
 export {
   clientErrorHandler,
   commonErrorHandler,
+  verifyDatabaseConnection,
   getStripeAccountForUser,
   getStripePaymentFromToken,
   getStripePaymentsFromTokens,
