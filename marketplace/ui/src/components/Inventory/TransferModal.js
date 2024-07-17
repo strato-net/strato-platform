@@ -80,7 +80,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
             )
         },
         {
-            title: "Set Price ($)",
+            title: "Unit Price ($)",
             align: "center",
             render: () => (
                 <InputNumber value={price} controls={false} min={1} onChange={(value) => setPrice(value)} />
@@ -165,7 +165,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
                     </div>
                 </div>
                 <div>
-                    <p className="text-[#202020] font-medium text-sm">Set Price ($)</p>
+                    <p className="text-[#202020] font-medium text-sm">Unit Price ($)</p>
                     <div className="inventory_card">
                         <InputNumber className="w-full pl-5" value={price} controls={false} min={1} onChange={(value) => setPrice(value)} />
                     </div>

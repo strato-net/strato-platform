@@ -122,7 +122,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                 )
             },
             {
-                title: "Set Price ($)",
+                title: "Unit Price ($)",
                 align: "center",
                 render: () => (
                     <InputNumber value={pricePerUnit} controls={false} min={1} onChange={(value) => setpricePerUnit(value)} />
@@ -220,7 +220,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                     <InputNumber className="w-full h-9" value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
                 </div>
                 <div>
-                    <Typography className="text-[#202020] text-sm font-medium">Set Price ($)</Typography>
+                    <Typography className="text-[#202020] text-sm font-medium">Unit Price ($)</Typography>
                     <InputNumber className="w-full h-9" value={pricePerUnit} controls={false} min={1} onChange={(value) => setpricePerUnit(value)} />
                 </div>
 
