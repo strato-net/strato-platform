@@ -24,7 +24,7 @@ const ResponsiveCart = ({
   openToastOrder
 }) => {
   const [tax, setTax] = useState(0);
-  const [selectedProvider, setSelectedProvider] = useState(paymentProviders.find(provider => provider?.serviceName === 'Stripe') || paymentProviders[0]);
+  const [selectedProvider, setSelectedProvider] = useState("");
   const { cartList } = useMarketplaceState();
   const marketplaceDispatch = useMarketplaceDispatch();
   const inventoryDispatch = useInventoryDispatch();
@@ -106,9 +106,45 @@ const ResponsiveCart = ({
     }
   };
 
-  const handleChange = value => {
+  const handleChange = async (value) => {
     const provider = paymentProviders.find(provider => provider?.serviceName === value);
     setSelectedProvider(provider);
+
+    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+      window.location.href = loginUrl;
+    } else {
+      const saleAddresses = [];
+      const quantities = [];
+      cartData.forEach((item) => {
+        saleAddresses.push(item.saleAddress);
+        quantities.push(item.qty);
+      });
+      const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities);
+      if (checkQuantity === true) {
+        handlePaymentConfirm(provider);
+      } else {
+        let insufficientQuantityMessage = "";
+        let outOfStockMessage = "";
+
+        checkQuantity.forEach(detail => {
+          if (detail.availableQuantity === 0) {
+            outOfStockMessage += `Product ${detail.assetName}\n`;
+          } else {
+            insufficientQuantityMessage += `Product ${detail.assetName}: ${detail.availableQuantity}\n`;
+          }
+        });
+
+        let errorMessage = "";
+        if (insufficientQuantityMessage) {
+          errorMessage += `The following item(s) in your cart have limited quantity available and will need to be adjusted. Please reduce the quantity to proceed:\n${insufficientQuantityMessage}`;
+        }
+        if (outOfStockMessage) {
+          if (errorMessage) errorMessage += "\n"; // Add a new line if there's already an error message
+          errorMessage += `The following item(s) are temporarily out of stock and should be removed:\n${outOfStockMessage}`;
+        }
+        openToastOrder("bottom", errorMessage);
+      }
+    }
   };
 
   return (
@@ -256,82 +292,17 @@ const ResponsiveCart = ({
 
         {!confirm && (
           <>
-            <Row className="justify-center mt-4">
-              <Button
-                type="primary"
-                id="submit-order-button"
-                style={{ width: "210px", height: "40px" }}
-                className="!bg-[#13188A] flex items-center justify-center"
-                loading={isCreatePaymentSubmitting}
-                onClick={async () => {
-                  if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                    window.location.href = loginUrl;
-                  } else {
-                    const saleAddresses = [];
-                    const quantities = [];
-                    cartData.forEach((item) => {
-                      saleAddresses.push(item.saleAddress)
-                      quantities.push(item.qty)
-                    })
-                    const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities)
-                    if (checkQuantity === true) {
-                      // Proceed with order submission
-                      window.LOQ.push(['ready', async LO => {
-                        // Track an event
-                        await LO.$internal.ready('events')
-                        LO.events.track('Submit Order (from cart)')
-                      }])
-                      TagManager.dataLayer({
-                        dataLayer: {
-                          event: 'submit_order_from_cart',
-                        },
-                      });
-                      handlePaymentConfirm(selectedProvider);
-                    } else {
-                      let insufficientQuantityMessage = "";
-                      let outOfStockMessage = "";
-
-                      // Generate the messages of products with too little or no quantity
-                      checkQuantity.forEach(detail => {
-                        if (detail.availableQuantity === 0) {
-                          outOfStockMessage += `Product ${detail.assetName}\n`;
-                        } else {
-                          insufficientQuantityMessage += `Product ${detail.assetName}: ${detail.availableQuantity}\n`;
-                        }
-                      });
-
-                      // Throw the appropriate error messages. Throw both if applicable. 
-                      let errorMessage = "";
-                      if (insufficientQuantityMessage) {
-                        errorMessage += `The following item(s) in your cart have limited quantity available and will need to be adjusted. Please reduce the quantity to proceed:\n${insufficientQuantityMessage}`;
-                      }
-                      if (outOfStockMessage) {
-                        if (errorMessage) errorMessage += "\n"; // Add a new line if there's already an error message
-                        errorMessage += `The following item(s) are temporarily out of stock and should be removed:\n${outOfStockMessage}`;
-                      }
-                      openToastOrder("bottom", errorMessage);
-                    }
-                  }
-                }}
-                disabled={cartData.length === 0}
-              >
-                <div className="flex items-center mr-1">
-                  {selectedProvider?.checkoutText}&nbsp;
-                  {selectedProvider?.imageURL && selectedProvider?.imageURL !== '' ? (
-                    <img src={selectedProvider?.imageURL} alt={selectedProvider?.serviceName} height="16px" width="16px" />
-                  ) : ''}
-                </div>
-              </Button>
-            </Row>
             <Row className="flex justify-center mt-4">
               <Select
                 defaultValue={selectedProvider?.serviceName}
-                style={{ width: "210px", height: "40px" }}
+                className="w-[250px] text-center selected-payment-option"
                 onChange={handleChange}
+                placeholder="Select Payment Option"
               >
-                {paymentProviders.map(provider => (
-                  <Option key={provider?.serviceName} value={provider?.serviceName}>
+                {paymentProviders && paymentProviders.map(provider => (
+                  provider && <Option className='payment-dropdown' key={provider?.serviceName} value={provider?.serviceName}>
                     {provider?.checkoutText}
+                    <img src={provider?.imageURL} alt={provider?.serviceName} style={{ width: 20, height: 20, marginRight: 8 }} />
                   </Option>
                 ))}
               </Select>
