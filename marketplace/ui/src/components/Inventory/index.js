@@ -46,7 +46,6 @@ const Inventory = ({ user }) => {
   const limit = 10;
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState(1);
-  const [selectedService, setSelectedService] = useState(null);
   const dispatch = useInventoryDispatch();
   const [api, contextHolder] = notification.useNotification();
   const [isSearch, setIsSearch] = useState(false);
@@ -72,16 +71,6 @@ const Inventory = ({ user }) => {
       paymentServiceActions.getNotOnboarded(paymentServiceDispatch, user.commonName, 10, 0);
     }
   }, [paymentServiceDispatch, user]);
-
-  useEffect(() => {
-    const stripeServiec = notOnboarded.some(service => service.serviceName === 'Stripe');
-    if (stripeServiec) {
-      setSelectedService(notOnboarded.find(service => service.serviceName === 'Stripe'));
-    } else {
-      setSelectedService(notOnboarded[0]);
-    }
-  }, [paymentServices, notOnboarded]);
-
 
   const itemDispatch = useItemDispatch();
   const { message: itemMsg, success: itemSuccess } = useItemState();
@@ -120,6 +109,7 @@ const Inventory = ({ user }) => {
     } else {
       const serviceURL = service.serviceURL || service.data.serviceURL;
       const onboardingRoute = service.onboardingRoute || service.data.onboardingRoute;
+      console.log(serviceURL, onboardingRoute);
       if (serviceURL && onboardingRoute) {
         const url = `${serviceURL}${onboardingRoute}?username=${user.commonName}&redirectUrl=${window.location.protocol}//${window.location.host}${window.location.pathname}`;
         window.location.replace(url);
@@ -129,7 +119,7 @@ const Inventory = ({ user }) => {
 
   const handleChange = value => {
     const service = notOnboarded.find(service => service.serviceName === value);
-    setSelectedService(service);
+    handleOnboard(service);
   };
 
   const showReqModModal = () => {
@@ -290,10 +280,10 @@ const Inventory = ({ user }) => {
             <div className="flex gap-3 items-center">
               {!areNotOnboardedLoading ? (
                 <Select
+                  className="items-select"
                   style={{ width: 200, height: 40 }}
                   onChange={handleChange}
-                  defaultValue={notOnboarded[0]?.serviceName}
-                  value={selectedService?.serviceName}
+                  value={'Onboard'}
                   disabled={notOnboarded.length === 0}
                 >
                   {paymentServices.map(service => (
@@ -309,14 +299,6 @@ const Inventory = ({ user }) => {
               ) : (
                 <Spin size="large" />
               )}
-              <Button
-                type="primary"
-                style={{ height: 40 }}
-                disabled={!selectedService}
-                onClick={() => handleOnboard(selectedService)}
-              >
-                {selectedService ? `Connect to ${selectedService.serviceName}` : "Select a service"}
-              </Button>
             </div>
             <div className="flex gap-3 items-center">
               <Button
