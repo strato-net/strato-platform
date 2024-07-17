@@ -6132,7 +6132,7 @@ contract qq {
 }|]
           )
     )
-      `shouldThrow` anyModifierError
+      `shouldThrow` anyTypeError
 
   it "can use a modifier as part of a function" . runTest $ do
     runCall'
