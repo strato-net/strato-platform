@@ -244,9 +244,9 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
                     <p className="text-base text-[#6A6A6A]">Sub Total:</p>
                     <p className="text-xl text-[#202020] md:ml-5 text-right">${total} <span className="ml-1">({total * 100} STRATS)</span></p>
                   </Row>
-                  <Row className="justify-between items-center ">
+                  <Row className="justify-start items-center ">
                     <p className="text-base text-[#6A6A6A]">Tax:</p>
-                    <p className="text-xl text-[#202020] md:ml-5 text-right">${tax}</p>
+                    <p className="text-xl text-[#202020] md:ml-20 text-left">${tax}</p>
                   </Row>
                   <Row className="justify-between items-center">
                     <p className="text-base text-[#6A6A6A]">Total:</p>
