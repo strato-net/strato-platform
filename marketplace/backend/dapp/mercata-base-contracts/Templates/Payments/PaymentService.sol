@@ -26,6 +26,25 @@ abstract contract PaymentService is Utils {
 
     enum PaymentStatus { NULL, AWAITING_FULFILLMENT, PAYMENT_PENDING, CLOSED, CANCELED, DISCARDED }
 
+    event AssetLocked (
+        string orderHash,             /* Unique hash of the order details for payment server lookup to
+                                         avoid having to send all the order details in the request. */
+        string orderId,               // Same orderId funtionality as the current marketplace
+        address purchaser,            // Purchaser address on the blockchain for ownershipTransfer
+        string purchasersCommonName,  // Purchaser common name for lookup purposes
+        string sellersCommonName,     // Seller common name for lookup purposes
+        address[] saleAddresses,      // List of the sale contracts for the assets in the order
+        uint[] quantities,            // List of quantities for each asset being bought
+        decimal amount,               // Total price of the order
+        decimal tax,                  // Tax
+        decimal fee,                  // Fee payment (in dollar value)
+        decimal unitsPerDollar,       // Amount of units per dollar for the currency (Ex: STRAT is 100 units per dollar)
+        string currency,              // The type of currency used for the purchase
+        PaymentStatus status,         // Status of the payment
+        uint createdDate,              // Date at the time of fresh order creation
+        string comments               // Comments for the order
+    );
+
     event Order (
         string orderHash,             /* Unique hash of the order details for payment server lookup to 
                                          avoid having to send all the order details in the request. */
@@ -200,7 +219,7 @@ abstract contract PaymentService is Utils {
                 }
             }
         }
-        emit Order(
+        emit AssetLocked(
             _orderHash,
             _orderId,
             _purchaser,

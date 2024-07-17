@@ -2,7 +2,7 @@ import client from '../db/index.js';
 import { rest, util } from "blockapps-rest";
 import { 
   DEFAULT_OPTIONS, 
-  ORDER_EVENT_TABLE, 
+  ASSET_LOCKED_EVENT_TABLE,
   SELLER_ONBOARDED_TABLE, 
   TABLE_PREFIX, 
   STRIPE_CONTRACT_ADDRESS } from "./constants.js";
@@ -132,7 +132,7 @@ const emitOnboardSeller = async (address, args) => {
 
 const getOrderEvent = async (orderHash) => {
   const tableArgs = {
-    name: ORDER_EVENT_TABLE,
+    name: ASSET_LOCKED_EVENT_TABLE,
   };
   
   const searchOptions = {
