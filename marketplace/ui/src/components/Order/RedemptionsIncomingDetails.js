@@ -3,14 +3,12 @@ import {
     Card,
     Row,
     Col,
-    Breadcrumb,
     Typography,
     Divider,
     Select,
     Input,
     Button,
     Spin,
-    notification,
     Tabs,
 } from "antd";
 import { useMatch } from "react-router-dom";
@@ -24,7 +22,6 @@ import classNames from "classnames";
 import { useNavigate } from "react-router-dom";
 import DataTableComponent from "../DataTableComponent";
 import dayjs from "dayjs";
-import ClickableCell from "../ClickableCell";
 import BoughtOrdersTable from "./BoughtOrdersTable";
 import SoldOrdersTable from "./SoldOrdersTable";
 import TransfersTable from "./TransfersTable";

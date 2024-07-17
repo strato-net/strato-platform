@@ -1,4 +1,4 @@
-import { Tabs, DatePicker, Breadcrumb, Button, Dropdown, Space, notification } from "antd";
+import { Tabs, DatePicker, Button, Dropdown, Space, notification } from "antd";
 import { DownloadOutlined } from '@ant-design/icons';
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -9,7 +9,6 @@ import RedemptionsOutgoingTable from "./RedemptionsOutgoingTable";
 import RedemptionsIncomingTable from "./RedemptionsIncomingTable";
 import dayjs from "dayjs";
 import routes from "../../helpers/routes";
-import ClickableCell from "../ClickableCell";
 import { Images } from "../../images";
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';

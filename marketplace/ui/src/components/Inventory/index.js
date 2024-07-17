@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
-  Breadcrumb,
   Button,
   Pagination,
-  notification,
   Spin,
   Select,
   Tabs
@@ -27,8 +25,6 @@ import { actions as redemptionActions } from "../../contexts/redemption/actions"
 import { actions as issuerStatusActions } from "../../contexts/issuerStatus/actions";
 import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
 import { useIssuerStatusState, useIssuerStatusDispatch } from "../../contexts/issuerStatus";
-import ClickableCell from "../ClickableCell";
-import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
 import { useAuthenticateState } from "../../contexts/authentication";
 import HelmetComponent from "../Helmet/HelmetComponent";

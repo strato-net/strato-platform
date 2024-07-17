@@ -1,8 +1,6 @@
 import React from "react";
 import {
-  Breadcrumb,
   Typography,
-  notification,
   Spin,
   Image,
   InputNumber,
@@ -18,8 +16,6 @@ import { Images } from "../../images";
 import { useState, useEffect, useMemo } from "react";
 import "./index.css";
 import { CHARGES } from "../../helpers/constants";
-import ClickableCell from "../ClickableCell";
-import routes from "../../helpers/routes";
 import ConfirmOrder from "./ConfirmOrder";
 import TagManager from "react-gtm-module";
 import image_placeholder from "../../images/resources/image_placeholder.png";

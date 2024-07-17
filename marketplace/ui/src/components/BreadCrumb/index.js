@@ -22,7 +22,6 @@ const BreadcrumbComponent = ({ indexNo, idNum }) => {
         </ClickableCell>
       </Breadcrumb.Item>
       {pathSnippets?.map((snippet, index) => {
-        // const url = `/${pathSnippets.slice(0, index + 1).join('/')}`;
 
         if (index === indexNo) return null;
         if (indexNo && snippet === 'order') {
@@ -38,7 +37,7 @@ const BreadcrumbComponent = ({ indexNo, idNum }) => {
         return (
           <React.Fragment key={index}>
             {snippet === 'inventories' && index === 0 && (
-              <Breadcrumb.Item href="">
+              <Breadcrumb.Item href="/myitems">
                 <ClickableCell href="" onClick={e => e.preventDefault()}>
                   <p className="text-sm text-[#13188A] font-semibold">
                     My Items

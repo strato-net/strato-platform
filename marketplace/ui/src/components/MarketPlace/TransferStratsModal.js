@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Card, InputNumber, Modal, Select, notification } from 'antd';
+import { Button, Card, InputNumber, Modal, Select } from 'antd';
 import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/marketplace";
 import { actions } from "../../contexts/marketplace/actions";
 import { actions as userActions } from "../../contexts/users/actions";

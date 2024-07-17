@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import {
-  Breadcrumb,
   Collapse,
   Divider,
   Typography,
@@ -30,8 +29,6 @@ import { TOAST_MSG } from "../../helpers/msgConstants";
 import HelmetComponent from "../Helmet/HelmetComponent";
 import NewTrendingCard from "./NewTrendingCard";
 import { SEO } from "../../helpers/seoConstant";
-import ClickableCell from "../ClickableCell";
-import routes from "../../helpers/routes";
 import { Images } from "../../images";
 import './index.css'
 import { showToast } from "../Notification/ToastComponent";

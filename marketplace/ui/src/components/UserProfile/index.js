@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Button, Avatar, Tabs, Spin, notification, Row, Col, Typography, Pagination, Breadcrumb } from "antd";
+import { Button, Avatar, Tabs, Spin, Row, Col, Typography, Pagination, Breadcrumb } from "antd";
 import { UserOutlined, EditOutlined } from "@ant-design/icons";
 import { Images } from "../../images";
 import routes from "../../helpers/routes";
@@ -27,7 +27,6 @@ import { actions as categoryActions } from "../../contexts/category/actions";
 import InventoryCard from "../Inventory/InventoryCard";
 import { useItemDispatch, useItemState } from "../../contexts/item";
 import { actions as itemActions } from "../../contexts/item/actions";
-// import ClickableCell from "../ClickableCell";
 import { homeUrl, soldOrderDetailssBaseUrl, soldOrdersBaseUrl, boughtOrderDetailssBaseUrl, boughtOrdersBaseUrl, transfersBaseUrl } from "../../helpers/constants";
 import { showToast } from "../Notification/ToastComponent";
 import { TOAST_MSG } from "../../helpers/msgConstants";

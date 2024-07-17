@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Typography, Spin, notification, Button } from "antd";
+import { Typography, Spin, Button } from "antd";
 import { actions } from "../../contexts/marketplace/actions";
 import {
   useMarketplaceDispatch,
@@ -41,10 +41,7 @@ const TopSellingProductCard = () => {
     }
   }, [marketplaceDispatch, offset, hasChecked, isAuthenticated, loginUrl]);
 
-  // const naviroute = routes.MarketplaceProductDetail.url;
-
   const navigate = useNavigate();
-
 
   const addItemToCart = async (product, quantity) => {
     if (product.ownerCommonName === user?.commonName) {

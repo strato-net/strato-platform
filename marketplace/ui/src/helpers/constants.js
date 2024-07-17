@@ -525,8 +525,8 @@ export const BREADCRUMB_VALUES = {
   'sold' : 'Sold',
   'bought' : 'Bought',
   'transfers' : 'Transfers',
-  'redemptions-outgoing' : 'Redemptions (OutGoing)',
-  'redemptions-incoming' : 'Redemptions (InComing)',
+  'redemptions-outgoing' : 'Redemptions (Outgoing)',
+  'redemptions-incoming' : 'Redemptions (Incoming)',
 
 }
 
