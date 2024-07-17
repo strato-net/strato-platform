@@ -5,7 +5,7 @@ local opts = {
   -- unless the scheme was overridden using opts.redirect_uri_scheme or an X-Forwarded-Proto header in the incoming request
   -- redirect_uri = "https://internal.blockapps.net/oauth2/callback",
   -- up until version 1.6.1 you'd specify
-  redirect_uri_path = "/oauth2/callback",
+  redirect_uri = "/oauth2/callback",
   -- and could not set the hostname
 
   -- The discovery endpoint of the OP. Enable to get the URI of all endpoints (Token, introspection, logout...)

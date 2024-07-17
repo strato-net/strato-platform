@@ -7,8 +7,7 @@ services:
     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
     build: ./
     image: openresty-proxy:latest
-    ports:
-    - 443:443
+    network_mode: "host"
     volumes:
     - ./dummy-ssl/server.pem:/etc/ssl/server.pem:ro
     - ./dummy-ssl/server.key:/etc/ssl/server.key:ro
