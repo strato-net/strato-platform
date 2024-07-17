@@ -32,7 +32,7 @@ pipeline {
         sh '''#!/bin/bash -le
           set -x
           sudo fuser -k 8080/tcp || true
-          nohup sudo make hoogle_generate >> ~/hoogle.log &
+          nohup sudo make hoogle_serve >> /home/ec2-user/hoogle.log &
           # Let some time to process to return an exit code if it crashed before disowning it
           sleep 5
           disown -a
