@@ -46,7 +46,17 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
           !notOnboarded.some(x => x.address === ps.address)
         );
         setAvailablePaymentProviders(diff);
-      }, [paymentServices, notOnboarded]);
+        
+
+        const inventoryPaymentProviders = inventory.paymentProviders 
+                                            ? inventory.paymentProviders.filter(provider => provider.value).map(provider => provider.value)
+                                            : [];
+        const selectedPaymentServiceIndices = inventoryPaymentProviders.map(address => 
+            diff.findIndex(ps => ps.address === address)
+        );
+        setPaymentTypes(selectedPaymentServiceIndices);
+
+      }, [paymentServices, notOnboarded, inventory.paymentProviders]);
 
     const renderImg = (service) => {
         return service.imageURL && service.imageURL !== ''
