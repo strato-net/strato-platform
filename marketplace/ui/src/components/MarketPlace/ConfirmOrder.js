@@ -200,19 +200,19 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
             </div>
             <div className="flex justify-between bg-[#EEEFFA]">
               <div className="rounded-b-md py-[15px] px-4 ml-4 hidden lg:flex lg:justify-end ">
-                <div className="w-[235px] flex flex-col gap-[10px]">
-                  <Row className="justify-between ">
+                <div className="w-max flex flex-col gap-[10px]">
+                  <Row className="justify-between items-center ">
                     <p className="text-base text-[#6A6A6A]">Sub Total:</p>
-                    <p className="text-xl text-[#202020]   text-right">${total}</p>
+                    <p className="text-xl text-[#202020] md:ml-5 text-right">${total} <span className="ml-1">({total*100} STRATS)</span></p>
                   </Row>
-                  <Row className="justify-between ">
+                  <Row className="justify-between items-center ">
                     <p className="text-base text-[#6A6A6A]">Tax:</p>
-                    <p className="text-xl text-[#202020]   text-right">${tax}</p>
+                    <p className="text-xl text-[#202020] md:ml-5 text-right">${tax}</p>
                   </Row>
-                  <Row className="justify-between">
+                  <Row className="justify-between items-center">
                     <p className="text-base text-[#6A6A6A]">Total:</p>
-                    <p id="totalPrice" className="text-xl text-[#202020] text-right">
-                      ${total + tax}
+                    <p id="totalPrice" className="text-xl text-[#202020] md:ml-5 text-right">
+                      ${total + tax} <span className="ml-1">({(total + tax)*100} STRATS)</span>
                     </p>
                   </Row>
                 </div>

@@ -239,7 +239,7 @@ const ResponsiveCart = ({
         <div className="flex flex-col gap-3">
           <div className="flex justify-between">
             <p className="text-sm font-medium">Sub Total:</p>
-            <p className="text-sm text-right font-semibold">${total}</p>
+            <p className="text-sm text-right font-semibold">${total} <span className="ml-1">({total * 100} STRATS)</span></p>
           </div>
           <div className="flex justify-between">
             <p className="text-sm font-medium">Tax:</p>
@@ -249,7 +249,7 @@ const ResponsiveCart = ({
           <div className="flex justify-between">
             <p className="text-sm font-medium">Total:</p>
             <p className="text-sm font-semibold text-right">
-              ${total + tax}
+              ${total + tax} <span className="ml-1">({(total + tax) * 100} STRATS)</span>
             </p>
           </div>
         </div>
@@ -326,7 +326,7 @@ const ResponsiveCart = ({
             <Row className="flex justify-center mt-4">
               <Select
                 defaultValue={selectedProvider?.serviceName}
-                style={{ width: "210px", height: "40px"}}
+                style={{ width: "210px", height: "40px" }}
                 onChange={handleChange}
               >
                 {paymentProviders.map(provider => (
