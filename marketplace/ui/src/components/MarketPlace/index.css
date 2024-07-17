@@ -201,6 +201,19 @@ img.ant-image-preview-img {
   z-index: 24;
 }
 
+.payment-dropdown > .ant-select-item-option-content{
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+}
+
+.selected-payment-option > .ant-select-selector > .ant-select-selection-item{
+  height: 40px;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+}
+
 @media (min-width: 1600px) {
   .banner-block-container {
     margin-top: 30px;
