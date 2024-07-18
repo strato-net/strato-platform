@@ -1,11 +1,13 @@
-import { Typography } from "antd";
-import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
-import { useCategoryState } from "../../contexts/category";
-import { Images } from "../../images";
-import TagManager from "react-gtm-module";
 import { Fade } from "react-awesome-reveal";
+import TagManager from "react-gtm-module";
+import { Typography } from "antd";
+// states
+import { useCategoryState } from "../../contexts/category";
+// other
 import { SEO } from "../../helpers/seoConstant";
+import routes from "../../helpers/routes";
+import { Images } from "../../images";
 
 const { Title, Text } = Typography;
 

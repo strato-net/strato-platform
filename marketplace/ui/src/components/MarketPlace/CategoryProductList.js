@@ -1,19 +1,9 @@
 import { useEffect, useState } from "react";
-import {
-  Collapse,
-  Divider,
-  Typography,
-  Checkbox,
-  Spin,
-  InputNumber,
-  Space,
-  Avatar,
-  Pagination,
-  notification,
-} from "antd";
-import { debounce } from 'lodash';
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { Collapse, Divider, Typography, Checkbox, Spin, InputNumber, 
+         Space, Avatar, Pagination, notification } from "antd";
 import { CloseOutlined, DeleteOutlined } from "@ant-design/icons";
+import { debounce } from 'lodash';
 // Actions
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
@@ -25,14 +15,14 @@ import { useAuthenticateState } from "../../contexts/authentication";
 import { useOrderDispatch } from "../../contexts/order";
 // other
 import { MAX_PRICE, availabilityOptions } from "../../helpers/constants";
-import { TOAST_MSG } from "../../helpers/msgConstants";
+import { showToast } from "../Notification/ToastComponent";
 import HelmetComponent from "../Helmet/HelmetComponent";
+import { TOAST_MSG } from "../../helpers/msgConstants";
+import BreadcrumbComponent from "../BreadCrumb";
 import NewTrendingCard from "./NewTrendingCard";
 import { SEO } from "../../helpers/seoConstant";
 import { Images } from "../../images";
 import './index.css'
-import { showToast } from "../Notification/ToastComponent";
-import BreadcrumbComponent from "../BreadCrumb";
 
 const { Panel } = Collapse;
 const { Text } = Typography;

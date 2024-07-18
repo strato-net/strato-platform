@@ -1,47 +1,50 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Typography, Spin, Button } from "antd";
-import { actions } from "../../contexts/marketplace/actions";
-import {
-  useMarketplaceDispatch,
-  useMarketplaceState,
-} from "../../contexts/marketplace";
 import { useNavigate } from "react-router-dom";
-import routes from "../../helpers/routes";
-import { useAuthenticateState } from "../../contexts/authentication";
-import NewTrendingCard from "./NewTrendingCard";
-import { actions as orderActions } from "../../contexts/order/actions";
-import { useOrderDispatch } from "../../contexts/order";
+import { Typography, Spin, Button } from "antd";
 import { Fade } from "react-awesome-reveal";
+// Actions
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
+import { actions as orderActions } from "../../contexts/order/actions";
+// Dispatch and States
+import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/marketplace";
+import { useAuthenticateState } from "../../contexts/authentication";
+import { useOrderDispatch } from "../../contexts/order";
+// Components
 import { showToast } from "../Notification/ToastComponent";
+import NewTrendingCard from "./NewTrendingCard";
+// Other
+import routes from "../../helpers/routes";
 import { TOAST_MSG } from "../../helpers/msgConstants";
 
 const { Title } = Typography;
+const limit = 25;
+
 
 const TopSellingProductCard = () => {
+  const navigate = useNavigate();
   const containerRef = useRef(null);
-  const [offset, setOffset] = useState(0);
-  const limit = 25;
-
+  // Dispatch 
   const marketplaceDispatch = useMarketplaceDispatch();
-  const { topSellingProducts, isTopSellingProductsLoading, cartList } =
-    useMarketplaceState();
-  let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
-
   const orderDispatch = useOrderDispatch();
+  // States
+  const { topSellingProducts, isTopSellingProductsLoading, cartList } = useMarketplaceState();
+  let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
+  // useStates
+  const [offset, setOffset] = useState(0);
+  const [prevVisible, setPrevVisible] = useState(false);
+  const [nextVisible, setNextVisible] = useState(true);
 
   useEffect(() => {
     if (hasChecked && !isAuthenticated) {
-      actions.fetchTopSellingProducts(marketplaceDispatch, offset, limit);
+      marketplaceActions.fetchTopSellingProducts(marketplaceDispatch, offset, limit);
     } else if (hasChecked && isAuthenticated) {
-      actions.fetchTopSellingProductsLoggedIn(
+      marketplaceActions.fetchTopSellingProductsLoggedIn(
         marketplaceDispatch,
         offset,
         limit
       );
     }
   }, [marketplaceDispatch, offset, hasChecked, isAuthenticated, loginUrl]);
-
-  const navigate = useNavigate();
 
   const addItemToCart = async (product, quantity) => {
     if (product.ownerCommonName === user?.commonName) {
@@ -70,7 +73,7 @@ const TopSellingProductCard = () => {
       if (checkQuantity === true) {
         // Quantity check passed, add new item to the cart
         items.push({ product, qty: quantity });
-        actions.addItemToCart(marketplaceDispatch, items);
+        marketplaceActions.addItemToCart(marketplaceDispatch, items);
         showToast({
           message: TOAST_MSG.ITEM_ADDED_TO_CART,
           success: true,
@@ -88,7 +91,6 @@ const TopSellingProductCard = () => {
           });
         } else {
           // Case 2: We are trying to add too much quantity
-
           showToast({
             message: `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${product.name} are available. Please update your cart quantity accordingly.`,
             success: false,
@@ -108,7 +110,7 @@ const TopSellingProductCard = () => {
       if (checkQuantity === true) {
         // Quantity check passed, update item quantity in the cart
         items[foundIndex].qty = potentialNewQty;
-        actions.addItemToCart(marketplaceDispatch, items);
+        marketplaceActions.addItemToCart(marketplaceDispatch, items);
         showToast({
           message: TOAST_MSG.ITEM_UPDATED_IN_CART,
           success: true,
@@ -136,8 +138,7 @@ const TopSellingProductCard = () => {
     }
   };
 
-  const [prevVisible, setPrevVisible] = useState(false);
-  const [nextVisible, setNextVisible] = useState(true);
+
 
   useEffect(() => {
     const parent = containerRef.current;

@@ -1,15 +1,5 @@
-import React, { useState } from "react";
-import {
-  Typography,
-  Row,
-  Button,
-  Form,
-  Input,
-  Modal,
-  Divider,
-  Checkbox,
-  Spin,
-} from "antd";
+import React from "react";
+import { Typography, Row, Button, Form, Input, Modal, Divider, Spin } from "antd";
 import { useFormik } from "formik";
 import * as yup from "yup";
 
@@ -115,18 +105,12 @@ const GetShippingDetailsModal = ({
       ...billingAddr
     };
 
-   
-
-
     let res = await actions.addShippingAddress(dispatch, body);
     if (res != null) {
       setShippingDetailsModalOpen(false)
       await actions.fetchUserAddresses(dispatch);
     }
-
-   
   };
-
 
   return (
     <Modal

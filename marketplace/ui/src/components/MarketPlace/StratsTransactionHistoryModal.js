@@ -1,26 +1,26 @@
 import React, { useEffect } from "react";
 import { Modal, Spin } from "antd";
-import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/marketplace";
-import { actions } from "../../contexts/marketplace/actions";
-import { actions as userActions } from "../../contexts/users/actions";
-import { useUsersDispatch, useUsersState } from "../../contexts/users";
-import DataTableComponent from "../DataTableComponent";
 import moment from "moment"
+// Actions
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
+import { actions as userActions } from "../../contexts/users/actions";
+// Dispatch and States
+import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/marketplace";
+import { useUsersDispatch, useUsersState } from "../../contexts/users";
+// Components
+import DataTableComponent from "../DataTableComponent";
 
 
 const StratsTransactionHistoryModal = ({ visible, onCancel }) => {
+    // Dispatch
     const marketplaceDispatch = useMarketplaceDispatch();
     const userDispatch = useUsersDispatch();
-    const {
-        isFetchingStratsTransactionHistory,
-        stratsTransactionHistory
-    } = useMarketplaceState();
-    const {
-        users
-    } = useUsersState();
+    // States
+    const { isFetchingStratsTransactionHistory, stratsTransactionHistory } = useMarketplaceState();
+    const { users } = useUsersState();
 
     useEffect(() => {
-        actions.fetchStratsTransactionHistory(marketplaceDispatch);
+        marketplaceActions.fetchStratsTransactionHistory(marketplaceDispatch);
     }, [marketplaceDispatch]);
 
     useEffect(() => {
@@ -94,6 +94,5 @@ const StratsTransactionHistoryModal = ({ visible, onCancel }) => {
         </Modal>
     );
 }
-
 
 export default StratsTransactionHistoryModal;

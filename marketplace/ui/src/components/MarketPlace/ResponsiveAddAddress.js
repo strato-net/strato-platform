@@ -3,12 +3,17 @@ import TagManager from "react-gtm-module";
 import { Button, Form, Input } from "antd";
 import { useFormik } from "formik";
 import * as yup from "yup";
-import { actions } from "../../contexts/marketplace/actions";
+// Actions
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
+// Dispatch and States
 import { useMarketplaceDispatch } from "../../contexts/marketplace";
 
 const ResponsiveAddAddress = ({ close, redemptionService }) => {
-  const [showAddress, setshowAddress] = useState(false);
+  // Dispatch
   const marketplaceDispatch = useMarketplaceDispatch();
+  // useStates
+  const [showAddress, setshowAddress] = useState(false);
+
   const ShippingDetailsSchema = () => {
     return yup.object().shape({
       name: yup.string().required("Name is required"),
@@ -54,9 +59,9 @@ const ResponsiveAddAddress = ({ close, redemptionService }) => {
       },
     });
     console.log(body, "body")
-    let res = await actions.addShippingAddress(marketplaceDispatch, body);
+    let res = await marketplaceActions.addShippingAddress(marketplaceDispatch, body);
     if (res != null) {
-      await actions.fetchUserAddresses(marketplaceDispatch, redemptionService);
+      await marketplaceActions.fetchUserAddresses(marketplaceDispatch, redemptionService);
     }
   };
   const formik = useFormik({

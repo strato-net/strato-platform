@@ -1,23 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { Button, Card, InputNumber, Modal, Select } from 'antd';
-import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/marketplace";
-import { actions } from "../../contexts/marketplace/actions";
+// Actions
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
 import { actions as userActions } from "../../contexts/users/actions";
+// Dispatch and States
+import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/marketplace";
 import { useUsersDispatch, useUsersState } from "../../contexts/users";
 import { useAuthenticateState } from "../../contexts/authentication";
+// Components
 import { showToast } from '../Notification/ToastComponent';
 
 const TransferStratsModal = ({ visible, onCancel }) => {
+  // Dispatch
   const marketplaceDispatch = useMarketplaceDispatch();
-  const { isTransferringStrats, strats, message, success } = useMarketplaceState();
   const userDispatch = useUsersDispatch();
-  const {
-    user
-  } = useAuthenticateState();
-  const {
-    users
-  } = useUsersState();
-
+  // States
+  const { isTransferringStrats, strats, message, success } = useMarketplaceState();
+  const { user } = useAuthenticateState();
+  const { users } = useUsersState();
+  // useStates
   const [receiverAddress, setReceiverAddress] = useState('');
   const [amount, setAmount] = useState(0);
   const [searchInput, setSearchInput] = useState('');
@@ -48,9 +49,7 @@ const TransferStratsModal = ({ visible, onCancel }) => {
     setDropdownOpen(!!value);
   }
 
-  const handleChange = (value) => {
-    setAmount(value);
-  }
+  const handleChange = (value) => setAmount(value)
 
   const handleSelect = (e) => {
     setReceiverAddress(e);
@@ -64,10 +63,10 @@ const TransferStratsModal = ({ visible, onCancel }) => {
     };
 
     if (amount > 0 && amount <= strats && receiverAddress) {
-      let isDone = await actions.transferStrats(marketplaceDispatch, payload);
+      let isDone = await marketplaceActions.transferStrats(marketplaceDispatch, payload);
       if (isDone) {
         handleCancel();
-        await actions.fetchStratsBalance(marketplaceDispatch);
+        await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
       }
     }
   };
@@ -135,7 +134,7 @@ const TransferStratsModal = ({ visible, onCancel }) => {
       </Card>
       {message && showToast({
           message: message,
-          onClose: actions.resetMessage(marketplaceDispatch),
+          onClose: marketplaceActions.resetMessage(marketplaceDispatch),
           success: success,
           placement: 'bottom',
         })}

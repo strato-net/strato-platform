@@ -1,43 +1,39 @@
-import React from "react";
-import {
-  Typography,
-  Spin,
-  Image,
-  InputNumber,
-  Button,
-} from "antd";
-import {
-  useMarketplaceState,
-  useMarketplaceDispatch,
-} from "../../contexts/marketplace";
-import { useOrderState, useOrderDispatch } from "../../contexts/order";
-import { actions } from "../../contexts/marketplace/actions";
-import { Images } from "../../images";
-import { useState, useEffect, useMemo } from "react";
-import "./index.css";
-import { CHARGES } from "../../helpers/constants";
-import ConfirmOrder from "./ConfirmOrder";
+import React, { useState, useEffect, useMemo } from "react";
+import { Typography, Spin, Image, InputNumber, Button } from "antd";
 import TagManager from "react-gtm-module";
-import image_placeholder from "../../images/resources/image_placeholder.png";
-import ResponsiveCart from "./ResponsiveCart";
-import { usePaymentServiceDispatch, usePaymentServiceState } from "../../contexts/payment";
+// Actions
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
 import { actions as paymentServiceActions } from "../../contexts/payment/actions";
-import { showToast } from "../Notification/ToastComponent";
+// Dispatch and States
+import { useMarketplaceState, useMarketplaceDispatch } from "../../contexts/marketplace";
+import { usePaymentServiceDispatch, usePaymentServiceState } from "../../contexts/payment";
+import { useOrderState, useOrderDispatch } from "../../contexts/order";
+// Components
 import BreadcrumbComponent from "../BreadCrumb";
+import ResponsiveCart from "./ResponsiveCart";
+import ConfirmOrder from "./ConfirmOrder";
+import { showToast } from "../Notification/ToastComponent";
+// Other
+import image_placeholder from "../../images/resources/image_placeholder.png";
+import { CHARGES } from "../../helpers/constants";
+import { Images } from "../../images";
+import "./index.css";
 
 const { Title, Text } = Typography;
 
 const Checkout = () => {
+  // Dispatch
+  const paymentServiceDispatch = usePaymentServiceDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
   const orderDispatch = useOrderDispatch();
+  // States
   const { paymentServices, arePaymentServicesLoading } = usePaymentServiceState();
-  const paymentServiceDispatch = usePaymentServiceDispatch();
-  const { cartList } = useMarketplaceState();
   const { isCreateOrderSubmitting, message, success } = useOrderState();
-
-  const [tax, setTax] = useState(0);
-  const [total, setTotal] = useState(0);
+  const { cartList } = useMarketplaceState();
+  // useStates
   const [mapData, setmapData] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [tax, setTax] = useState(0);
 
   const calculateTax = (item) => {
     return (item.product.price * CHARGES.TAX) / 100;
@@ -61,7 +57,7 @@ const Checkout = () => {
   }, []);
 
   useEffect(() => {
-    actions.fetchCartItems(marketplaceDispatch, storedData);
+    marketplaceActions.fetchCartItems(marketplaceDispatch, storedData);
   }, [marketplaceDispatch, storedData]);
 
   useEffect(() => {
@@ -139,7 +135,7 @@ const Checkout = () => {
     cartList.forEach((element, index) => {
       if (element.product.address === product.key) {
         items[index].qty -= 1;
-        actions.addItemToCart(marketplaceDispatch, items);
+        marketplaceActions.addItemToCart(marketplaceDispatch, items);
       }
     });
   };
@@ -151,7 +147,7 @@ const Checkout = () => {
         const availableQuantity = product.quantity ? product.quantity : 1;
         if (items[index].qty + 1 <= availableQuantity) {
           items[index].qty += 1;
-          actions.addItemToCart(marketplaceDispatch, items);
+          marketplaceActions.addItemToCart(marketplaceDispatch, items);
         }
       }
     });
@@ -184,7 +180,7 @@ const Checkout = () => {
       }),
       1
     );
-    actions.deleteCartItem(marketplaceDispatch, items);
+    marketplaceActions.deleteCartItem(marketplaceDispatch, items);
   };
 
   const ValueQty = (product, e) => {
@@ -194,10 +190,10 @@ const Checkout = () => {
         const availableQuantity = product.quantity ? product.quantity : 1;
         if (e <= availableQuantity) {
           items[index].qty = e;
-          actions.addItemToCart(marketplaceDispatch, items);
+          marketplaceActions.addItemToCart(marketplaceDispatch, items);
         } else {
           items[index].qty = availableQuantity;
-          actions.addItemToCart(marketplaceDispatch, items);
+          marketplaceActions.addItemToCart(marketplaceDispatch, items);
         }
       }
     });
@@ -385,7 +381,7 @@ const Checkout = () => {
                       removeCartList={removeCartList}
                       openToastOrder={message && showToast({
                         message: message,
-                        onClose: actions.resetMessage(orderDispatch),
+                        onClose: marketplaceActions.resetMessage(orderDispatch),
                         success: success,
                         placement: 'bottom',
                       })}
@@ -399,7 +395,7 @@ const Checkout = () => {
       )}
       {message && showToast({
         message: message,
-        onClose: actions.resetMessage(orderDispatch),
+        onClose: marketplaceActions.resetMessage(orderDispatch),
         success: success,
         placement: 'bottom',
       })}

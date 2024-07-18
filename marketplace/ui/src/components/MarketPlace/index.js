@@ -1,25 +1,22 @@
-import { Button, Image, Typography, Spin, notification } from "antd";
-import CategoryCard from "./CategoryCard";
-import TopSellingProductCard from "./TopSellingProductCard";
-import { Images } from "../../images";
 import React, { useEffect } from "react";
-import { actions } from "../../contexts/category/actions";
-import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
-import useDebounce from "../UseDebounce";
+import { EffectFade, Navigation, Pagination, Autoplay } from 'swiper/modules';
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { Button, Spin, notification } from "antd";
 import { useNavigate } from "react-router-dom";
-import routes from "../../helpers/routes";
-import "react-responsive-carousel/lib/styles/carousel.min.css";
-import { Carousel } from "react-responsive-carousel";
 import { Fade } from "react-awesome-reveal";
+// Actions
+import { actions as categoryActions } from "../../contexts/category/actions";
+// Dispatch and States
+import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
+// Components
+import TopSellingProductCard from "./TopSellingProductCard";
+// other
+import useDebounce from "../UseDebounce";
+import routes from "../../helpers/routes";
 import HelmetComponent from "../Helmet/HelmetComponent";
 import { SEO } from "../../helpers/seoConstant";
 import { BANNER } from "../../helpers/constants";
 import { bannerArrow } from "../../images/SVGComponents";
-
-// ----------------------------------------------------------
-
-import { Swiper, SwiperSlide } from 'swiper/react';
-
 // Import Swiper styles
 import 'swiper/css';
 import 'swiper/css/effect-fade';
@@ -27,16 +24,15 @@ import 'swiper/css/navigation';
 import 'swiper/css/pagination';
 import 'swiper/css/autoplay';
 
-// import required modules
-import { EffectFade, Navigation, Pagination, Autoplay } from 'swiper/modules';
-
-
 const MarketPlace = ({ user, isAuthenticated }) => {
   const limit = 10, offset = 0;
   const navigate = useNavigate();
+  // Dispatch
   const dispatch = useCategoryDispatch();
-  const debouncedSearchTerm = useDebounce("", 1000);
+  // States
   const { iscategorysLoading } = useCategoryState();
+  // Other
+  const debouncedSearchTerm = useDebounce("", 1000);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -75,7 +71,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
   };
 
   useEffect(() => {
-    actions.fetchCategories(dispatch, limit, offset, debouncedSearchTerm);
+    categoryActions.fetchCategories(dispatch, limit, offset, debouncedSearchTerm);
   }, [dispatch, limit, offset, debouncedSearchTerm]);
 
   const linkUrl = window.location.href;

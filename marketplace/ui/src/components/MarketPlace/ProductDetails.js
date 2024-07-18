@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Row, Button, Typography, Tabs, Space, Spin, InputNumber, List, } from "antd";
 import { HeartTwoTone, HeartFilled, FilePdfOutlined } from '@ant-design/icons';
+import { EffectFade, Navigation, Pagination, Autoplay } from 'swiper/modules';
 import { useMatch, useNavigate, useLocation } from "react-router-dom";
-import { Carousel } from "react-responsive-carousel"
+import { Swiper, SwiperSlide } from 'swiper/react';
 import TagManager from "react-gtm-module";
 //actions
 import { actions as inventoryActions } from "../../contexts/inventory/actions";
@@ -16,12 +17,13 @@ import { useOrderDispatch } from "../../contexts/order";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
 import { useAuthenticateState } from "../../contexts/authentication";
 // components
+import { showToast } from "../Notification/ToastComponent";
 import HelmetComponent from "../Helmet/HelmetComponent";
 import DataTableComponent from "../DataTableComponent";
 import ProductItemDetails from "./ProductItemDetails";
 import PriceChartAndStats from "./PriceChartAndStats";
 import PreviewMode from "../RichEditor/PreviewMode";
-import ClickableCell from "../ClickableCell";
+import BreadcrumbComponent from "../BreadCrumb";
 import TimeRangeTabs from "./TimeRangeTabs";
 import Statistics from "./Statistics";
 import LoginModal from './LoginModal';
@@ -29,20 +31,12 @@ import LoginModal from './LoginModal';
 import { setCookie } from "../../helpers/cookie";
 import routes from "../../helpers/routes";
 import "./index.css";
-
 import image_placeholder from "../../images/resources/image_placeholder.png";
-import "react-responsive-carousel/lib/styles/carousel.min.css"; // requires a loader
 
 import { Images } from "../../images";
 import { SEO } from "../../helpers/seoConstant";
 import { STRATS_CONVERSION } from "../../helpers/constants";
 import { TOAST_MSG } from "../../helpers/msgConstants";
-import { showToast } from "../Notification/ToastComponent";
-import BreadcrumbComponent from "../BreadCrumb";
-
-
-import { Swiper, SwiperSlide } from 'swiper/react';
-
 // Import Swiper styles
 import 'swiper/css';
 import 'swiper/css/effect-fade';
@@ -50,29 +44,25 @@ import 'swiper/css/navigation';
 import 'swiper/css/pagination';
 import 'swiper/css/autoplay';
 
-// import required modules
-import { EffectFade, Navigation, Pagination, Autoplay } from 'swiper/modules';
-
 
 const ProductDetails = ({ user, users }) => {
   const { Text, Paragraph, Title } = Typography;
   const { state, pathname } = useLocation();
   const navigate = useNavigate();
 
-  const { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   // dispatch
   const dispatch = useInventoryDispatch();
   const categoryDispatch = useCategoryDispatch();
   const orderDispatch = useOrderDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
   // state
-  const { categorys, iscategorysLoading } = useCategoryState();
   const { inventoryDetails, isInventoryDetailsLoading, isInventoryOwnershipHistoryLoading,
     inventoryOwnershipHistory, priceHistory, isFetchingPriceHistory
   } = useInventoryState();
+  const { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
+  const { categorys, iscategorysLoading } = useCategoryState();
   const { cartList } = useMarketplaceState();
-
-
+   // useStates
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [timeFilter, setTimeFilter] = useState('1');
   const [itemData, setItemData] = useState({});
@@ -96,7 +86,6 @@ const ProductDetails = ({ user, users }) => {
   });
 
   const routeMatch1 = useMatch({
-
     path: routes.InventoryDetail.url,
     strict: true,
   });
@@ -133,9 +122,7 @@ const ProductDetails = ({ user, users }) => {
     }
   }, [Id, dispatch, timeFilter]);
 
-  const handleTimeFilterChange = (key) => {
-    setTimeFilter(key);
-  };
+  const handleTimeFilterChange = (key) => setTimeFilter(key);
 
   useEffect(() => {
     if (inventoryDetails) {

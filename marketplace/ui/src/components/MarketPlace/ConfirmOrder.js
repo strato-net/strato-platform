@@ -1,43 +1,34 @@
-import {
-  Row,
-  Spin,
-  Modal,
-  Select,
-  Button
-} from "antd";
-import {
-  useMarketplaceState,
-  useMarketplaceDispatch,
-} from "../../contexts/marketplace";
+import { useState, useEffect } from "react";
+import { Row, Spin, Modal, Select, Button } from "antd";
+import TagManager from "react-gtm-module";
+// Actions
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
+import { actions as orderActions } from "../../contexts/order/actions";
+// Dispatch and States
+import { useMarketplaceState, useMarketplaceDispatch } from "../../contexts/marketplace";
 import { useOrderState, useOrderDispatch } from "../../contexts/order";
 import { useAuthenticateState } from "../../contexts/authentication";
-import { actions } from "../../contexts/marketplace/actions";
-import { actions as orderActions } from "../../contexts/order/actions";
-import { useState, useEffect } from "react";
-import { actions as inventoryAction } from "../../contexts/inventory/actions";
-import {
-  useInventoryDispatch,
-  useInventoryState,
-} from "../../contexts/inventory";
-import DataTableComponent from "../DataTableComponent";
-import "./index.css";
-import { HTTP_METHODS, PAYMENT_LIST } from "../../helpers/constants";
-import TagManager from "react-gtm-module";
-import { setCookie } from "../../helpers/cookie";
+// Components
 import { showToast } from "../Notification/ToastComponent";
+import DataTableComponent from "../DataTableComponent";
+// Other
+import { setCookie } from "../../helpers/cookie";
+import "./index.css";
 
 const { Option } = Select;
 
 const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
+  // Dispatch
   const marketplaceDispatch = useMarketplaceDispatch();
   const orderDispatch = useOrderDispatch();
-  const { user, hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
-  const userOrganization = user?.organization;
+  // States
   const { isCreateOrderSubmitting, message, success, isCreatePaymentSubmitting } = useOrderState();
+  const { success: marketplaceSuccess, message: marketplaceMessage } = useMarketplaceState();
+  const { user, hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
+  // useStates
+  const userOrganization = user?.organization;
   const [tax, setTax] = useState(0);
   const [total, setTotal] = useState(0);
-  const inventoryDispatch = useInventoryDispatch();
-  const { success: marketplaceSuccess, message: marketplaceMessage } = useMarketplaceState();
   const [modal, contextHolderForModal] = Modal.useModal();
   const [cartData, setCartData] = useState(data);
   const [selectedProvider, setSelectedProvider] = useState('');
@@ -83,7 +74,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
 
 
   const handlePaymentConfirm = async (paymentProvider) => {
-    actions.addItemToConfirmOrder(marketplaceDispatch, cartData);
+    marketplaceActions.addItemToConfirmOrder(marketplaceDispatch, cartData);
     let orderList = [];
     cartData.forEach((item) => {
       orderList.push({
@@ -246,7 +237,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
         )}
         {marketplaceMessage && showToast({
          message: marketplaceMessage,
-         onClose: actions.resetMessage(marketplaceDispatch),
+         onClose: marketplaceActions.resetMessage(marketplaceDispatch),
           success: marketplaceSuccess,
           placement: 'bottom',
         })}

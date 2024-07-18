@@ -1,36 +1,37 @@
-import { Spin } from "antd";
 import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate, useMatch, useLocation } from "react-router-dom";
-import routes from "../../helpers/routes";
+import { Spin } from "antd";
+// Actions
 import { actions as orderActions } from "../../contexts/order/actions";
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
+// Dispatch and States
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
-import { actions } from "../../contexts/marketplace/actions";
 import { useMarketplaceDispatch } from "../../contexts/marketplace";
+// Components
 import { showToast } from "../Notification/ToastComponent";
+// Other
+import routes from "../../helpers/routes";
 
 function useQuery() {
   const { search } = useLocation();
-
   return useMemo(() => new URLSearchParams(search), [search]);
 }
 
 const ProcessingOrder = ({ user }) => {
-
   const navigate = useNavigate();
-  const [assetAddresses, setAssetAddresses] = useState([]);
-  const orderDispatch = useOrderDispatch();
+  // Dispatch
   const marketplaceDispatch = useMarketplaceDispatch();
-  const [error, setError] = useState(null)
+  const orderDispatch = useOrderDispatch();
+  // States
   const { message, success } = useOrderState();
+  // useStates
+  const [assetAddresses, setAssetAddresses] = useState([]);
+  const [error, setError] = useState(null)
   const [called, setCalled] = useState(false);
 
 
   const storedData = useMemo(() => {
     return JSON.parse(window.localStorage.getItem("cartList") ?? []);
-  }, []);
-
-  const storedConfirmList = useMemo(() => {
-    return JSON.parse(window.localStorage.getItem("confirmOrderList") ?? []);
   }, []);
 
   const routeMatch = useMatch({
@@ -67,7 +68,7 @@ const ProcessingOrder = ({ user }) => {
             updatedCart.push(cart);
           }
         });
-        actions.addItemToCart(marketplaceDispatch, updatedCart);
+        marketplaceActions.addItemToCart(marketplaceDispatch, updatedCart);
         setTimeout(() => {
           navigate(routes.Orders.url.replace(':type', 'bought'));
         }, 500);
@@ -80,9 +81,6 @@ const ProcessingOrder = ({ user }) => {
       setError(err);
     }
   }
-
-
-
 
   return (
     <div>

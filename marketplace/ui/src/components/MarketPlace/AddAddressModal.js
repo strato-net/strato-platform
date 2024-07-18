@@ -3,19 +3,14 @@ import TagManager from "react-gtm-module";
 import { Modal , Form, Input, Typography } from "antd";
 import { useFormik } from "formik";
 import * as yup from "yup";
-
-import { actions } from "../../contexts/marketplace/actions";
-import { actions as orderActions } from "../../contexts/order/actions";
-import {
-  useMarketplaceState,
-  useMarketplaceDispatch,
-} from "../../contexts/marketplace";
-
-
+// Actions 
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
+import { useMarketplaceDispatch } from "../../contexts/marketplace";
 
 const AddAddressModal = ({open , close, redemptionService}) => {
     const [showAddress, setshowAddress] = useState(false);
     const marketplaceDispatch = useMarketplaceDispatch();
+
     const ShippingDetailsSchema = () => {
       return yup.object().shape({
         name: yup.string().required("Name is required"),
@@ -103,9 +98,9 @@ const AddAddressModal = ({open , close, redemptionService}) => {
           event: 'add_shipping_address',
         },
       });
-      let res = await actions.addShippingAddress(marketplaceDispatch, body);
+      let res = await marketplaceActions.addShippingAddress(marketplaceDispatch, body);
       if (res != null) {
-        await actions.fetchUserAddresses(marketplaceDispatch, redemptionService);
+        await marketplaceActions.fetchUserAddresses(marketplaceDispatch, redemptionService);
       }
     };
     const { TextArea } = Input;

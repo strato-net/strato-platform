@@ -63,7 +63,6 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
       }
     }
 
-  
     return filledData;
   };
 

@@ -1,12 +1,15 @@
-import { Button, Row, Typography, InputNumber, Select, Spin } from "antd";
 import { useState, useEffect } from "react";
-import { Images } from "../../images";
-import { useMarketplaceDispatch } from "../../contexts/marketplace";
-import { useAuthenticateState } from "../../contexts/authentication";
+import { Button, Row, Typography, InputNumber, Select, Spin } from "antd";
 import TagManager from "react-gtm-module";
-import { actions } from "../../contexts/marketplace/actions";
+
+import { Images } from "../../images";
+// Actions
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
 import { actions as orderActions } from "../../contexts/order/actions";
+// Dispatch and States
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
+import { useAuthenticateState } from "../../contexts/authentication";
+import { useMarketplaceDispatch } from "../../contexts/marketplace";
 
 const { Option } = Select;
 
@@ -20,13 +23,16 @@ const ResponsiveCart = ({
   removeCartList,
   openToastOrder
 }) => {
+  // Dispatch
+  const marketplaceDispatch = useMarketplaceDispatch();
+  const orderDispatch = useOrderDispatch();
+  // States
+  const { isCreatePaymentSubmitting, isCreateOrderSubmitting } = useOrderState();
+  let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
+  // useStates
   const [tax, setTax] = useState(0);
   const [selectedProvider, setSelectedProvider] = useState("");
-  const marketplaceDispatch = useMarketplaceDispatch();
   const [total, setTotal] = useState(0);
-  const orderDispatch = useOrderDispatch();
-  let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
-  const { isCreatePaymentSubmitting, isCreateOrderSubmitting } = useOrderState();
   const userOrganization = user?.organization;
   const [cartData, setCartData] = useState(data);
   const [faqOpenState, setFaqOpenState] = useState(Array(cartData.length).fill(false));
@@ -56,7 +62,7 @@ const ResponsiveCart = ({
   };
 
   const handlePaymentConfirm = async (paymentProvider) => {
-    actions.addItemToConfirmOrder(marketplaceDispatch, cartData);
+    marketplaceActions.addItemToConfirmOrder(marketplaceDispatch, cartData);
     let orderList = [];
     cartData.forEach((item) => {
       orderList.push({

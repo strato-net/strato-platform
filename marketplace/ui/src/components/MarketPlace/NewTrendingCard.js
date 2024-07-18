@@ -6,6 +6,8 @@ import TagManager from "react-gtm-module";
 import DOMPurify from 'dompurify';
 // State
 import { useAuthenticateState } from "../../contexts/authentication";
+// Components
+import LoginModal from './LoginModal';
 // Assets
 import images_placeholder from "../../images/resources/image_placeholder.png";
 import { Images } from '../../images';
@@ -14,15 +16,15 @@ import { STRATS_CONVERSION } from '../../helpers/constants';
 import { setCookie } from "../../helpers/cookie";
 import { SEO } from '../../helpers/seoConstant';
 import routes from "../../helpers/routes";
-import LoginModal from './LoginModal';
 
 const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, contextHolder, isUserProfile = false }) => {
+    // States
+    const { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
+
     const navigate = useNavigate();
     const location = useLocation();
     const { Text } = Typography;
-
-    const { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
-
+    // useStates
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [isWishlisted, setIsWishlisted] = useState(false);
     const [quantity, setQuantity] = useState(1);
@@ -76,9 +78,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
         }
     };
 
-    const handleCancel = () => {
-        setIsModalVisible(false);
-    };
+    const handleCancel = () => setIsModalVisible(false);
 
     const handleLogin = () => {
         if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
