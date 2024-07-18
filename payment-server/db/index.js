@@ -80,18 +80,19 @@ const connectToDB = async () => {
         })
         .catch(async (error) => {
             console.error('Error creating table:', error);
-            client.end();
             if (error.code === 'ECONNREFUSED') {
                 console.log('Attempting to reconnect to DB after 3 seconds...');
-                const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
-                await sleep(3000);
-                connectToDB();
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                await connectToDB();
+            } else {
+                client.end();
+                process.exit(1);
             }
         })
 } 
 
 if (host && password) {
-    connectToDB();
+    await connectToDB();
 } else {
     console.error('CRITICAL ERROR: Missing Postgres URL and/or password');
     process.exit(1)

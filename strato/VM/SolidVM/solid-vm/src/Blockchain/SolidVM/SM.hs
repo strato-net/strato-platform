@@ -792,7 +792,7 @@ getCurrentCodeCollection = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
     (currentCallInfo : _) -> return (collectionHash currentCallInfo, codeCollection currentCallInfo)
-    _ -> internalError "getCurrentContract called with an empty stack" ()
+    _ -> internalError "getCurrentCodeCollection called with an empty stack" ()
 
 hintFromType :: MonadSM m => SVMType.Type -> m BasicType
 hintFromType = \case

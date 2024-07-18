@@ -236,7 +236,6 @@ const Inventory = ({ user }) => {
                 id="createItem"
                 className="w-40 flex items-center justify-center gap-[6px]"
                 style={{ height: 40 }}
-                disabled={notOnboarded.length === paymentServices.length - 2} // Subtract two to account for STRATS and Sad Dogs
                 onClick={() => {
                   if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                     window.location.href = loginUrl;
