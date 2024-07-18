@@ -1,37 +1,36 @@
-import { Button, Select, InputNumber, Modal, Table } from "antd";
 import { useEffect, useState } from "react";
-import { actions } from "../../contexts/inventory/actions";
+import { Button, Select, InputNumber, Modal, Table } from "antd";
+// Actions
+import { actions as inventoryActions } from "../../contexts/inventory/actions";
 import { actions as userActions } from "../../contexts/users/actions";
+// States
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import { useUsersDispatch, useUsersState } from "../../contexts/users";
 import { useAuthenticateState } from "../../contexts/authentication";
+// other
 import { SearchOutlined } from '@ant-design/icons';
 
 const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, offset }) => {
+    // Dispatch
+    const inventoryDispatch = useInventoryDispatch();
+    const userDispatch = useUsersDispatch();
+    // States
+    const { isTransferring } = useInventoryState();
+    const { user } = useAuthenticateState();
+    const { users } = useUsersState();
+    // useStates
     const [data, setData] = useState([inventory]);
     const [quantity, setQuantity] = useState(1);
     const [price, setPrice] = useState(0);
     const [userAddress, setUserAddress] = useState("");
-    const inventoryDispatch = useInventoryDispatch();
-    const userDispatch = useUsersDispatch();
     const [canTransfer, setCanTransfer] = useState(true);
-    const {
-        user
-    } = useAuthenticateState();
-    const {
-        users
-    } = useUsersState();
-    const {
-        isTransferring
-    } = useInventoryState();
-
+    const [searchInput, setSearchInput] = useState('');
+    const [dropdownOpen, setDropdownOpen] = useState(false);
+    
     const filterDuplicateUserAddresses = (arr) => {
         return [...new Map(arr.map((u) => [u.value, u])).values()];
     };
     
-    const [searchInput, setSearchInput] = useState('');
-    const [dropdownOpen, setDropdownOpen] = useState(false);
-
     const handleSearchChange = (value) => {
         setSearchInput(value);
         setDropdownOpen(!!value);
@@ -42,7 +41,6 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
 
     const handleSelect = (userAddress) => {
         setUserAddress(userAddress);
-
         setDropdownOpen(false);
     }
 
@@ -51,12 +49,8 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
     }, [])
 
     useEffect(() => {
-        if (quantity > inventory.quantity || quantity <= 0 || !userAddress) {
-            setCanTransfer(false);
-        }
-        else {
-            setCanTransfer(true);
-        };
+        const isTransfer = (quantity > inventory.quantity || quantity <= 0 || !userAddress) ? false : true;
+        setCanTransfer(isTransfer);
     }, [quantity, userAddress])
     
     const filteredOptions = searchInput
@@ -120,10 +114,10 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
         };
 
         if (quantity > 0 && quantity <= inventory.quantity && userAddress) {
-            let isDone = await actions.transferInventory(inventoryDispatch, body);
+            let isDone = await inventoryActions.transferInventory(inventoryDispatch, body);
             if (isDone) {
-                await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
-                await actions.fetchInventoryForUser(inventoryDispatch, user.commonName);
+                await inventoryActions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
+                await inventoryActions.fetchInventoryForUser(inventoryDispatch, user.commonName);
                 handleCancel();
             }
         }
@@ -154,7 +148,6 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
             <div className="flex flex-col gap-[18px] md:hidden mt-5">
                 <div> <p className="text-[#202020] font-medium text-sm">Quantity Available</p>
                     <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center ">
-
                         <p className="px-5 "> {inventory?.quantity}</p>
                     </div>
                 </div>
@@ -189,11 +182,9 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
                         popupClassName="custom-select-dropdown"
                     />
                 </div>
-
             </div>
         </Modal>
     )
 }
-
 
 export default TransferModal;

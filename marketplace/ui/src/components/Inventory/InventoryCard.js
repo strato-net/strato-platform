@@ -1,27 +1,24 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Button, Typography, Tooltip } from "antd";
-import {
-  DollarOutlined,
-  EditOutlined,
-  SendOutlined,
-  PieChartOutlined,
-  StopOutlined,
-  SwapOutlined
-} from "@ant-design/icons";
-import PreviewInventoryModal from "./PreviewInventoryModal";
 import { useNavigate } from "react-router-dom";
+import { DollarOutlined, EditOutlined, SendOutlined, PieChartOutlined, StopOutlined, 
+         SwapOutlined } from "@ant-design/icons";
+// Componenets
+import PreviewInventoryModal from "./PreviewInventoryModal";
 import ListForSaleModal from "./ListForSaleModal";
+import TransferModal from "./TransferModal";
 import UnlistModal from "./UnlistModal";
 import ResellModal from "./ResellModal";
-import TransferModal from "./TransferModal";
 import RedeemModal from "./RedeemModal";
-import routes from "../../helpers/routes";
-import { ASSET_STATUS, STRATS_CONVERSION } from "../../helpers/constants";
+// Other
 import image_placeholder from "../../images/resources/image_placeholder.png";
+import { ASSET_STATUS, STRATS_CONVERSION } from "../../helpers/constants";
 import "react-responsive-carousel/lib/styles/carousel.min.css";
 import { SEO } from "../../helpers/seoConstant";
+import routes from "../../helpers/routes";
 
 const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcategories, limit, offset, user }) => {
+  
   const textRef = useRef(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [open, setOpen] = useState(false);
@@ -36,49 +33,17 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
 
   const itemData = inventory.data;
 
-  const handleCancel = () => {
-    setOpen(false);
-  };
-
-  const showListModal = () => {
-    setListModalOpen(true);
-  };
-
-  const handleListModalClose = () => {
-    setListModalOpen(false);
-  };
-
-  const showUnlistModal = () => {
-    setUnlistModalOpen(true);
-  };
-
-  const handleUnlistModalClose = () => {
-    setUnlistModalOpen(false);
-  };
-
-  const showResellModal = () => {
-    setResellModalOpen(true);
-  };
-
-  const handleResellModalClose = () => {
-    setResellModalOpen(false);
-  };
-
-  const showTransferModal = () => {
-    setTransferModalOpen(true);
-  };
-
-  const handleTransferModalClose = () => {
-    setTransferModalOpen(false);
-  };
-
-  const showRedeemModal = () => {
-    setRedeemModalOpen(true);
-  };
-
-  const handleRedeemModalClose = () => {
-    setRedeemModalOpen(false);
-  };
+  const handleCancel = () => setOpen(false);
+  const showListModal = () => setListModalOpen(true);
+  const handleListModalClose = () => setListModalOpen(false);
+  const showUnlistModal = () => setUnlistModalOpen(true);
+  const handleUnlistModalClose = () => setUnlistModalOpen(false);
+  const showResellModal = () => setResellModalOpen(true);
+  const handleResellModalClose = () => setResellModalOpen(false);
+  const showTransferModal = () => setTransferModalOpen(true);
+  const handleTransferModalClose = () => setTransferModalOpen(false);
+  const handleRedeemModalClose = () => setRedeemModalOpen(false);
+  const showRedeemModal = () => setRedeemModalOpen(true);
 
   const callDetailPage = () => {
     navigate(`${naviroute.replace(":id", inventory.address).replace(":name", encodeURIComponent(inventory.name))}`, {
@@ -210,10 +175,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
                 inventory["BlockApps-Mercata-Asset-images"] && inventory["BlockApps-Mercata-Asset-images"].length > 0
                   ? inventory["BlockApps-Mercata-Asset-images"][0].value
                   : image_placeholder}
-
             />
           </div>
-
 
           <div className="pt-[7px] lg:pt-0 items-center gap-[5px]">
             {inventory.price ?

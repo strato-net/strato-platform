@@ -1,31 +1,28 @@
-import { Button, Input, InputNumber, Modal, Select, Spin, Tag, Table, Typography } from "antd";
 import { useEffect, useState } from "react";
-import { actions } from "../../contexts/inventory/actions";
+import { Button, InputNumber, Modal, Select, Spin, Tag, Table, Typography } from "antd";
+// Actions
+import { actions as paymentServiceActions } from "../../contexts/payment/actions";
+import { actions as inventoryActions } from "../../contexts/inventory/actions";
+// Dispatch & States
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import { usePaymentServiceDispatch, usePaymentServiceState } from "../../contexts/payment";
-import { actions as paymentServiceActions } from "../../contexts/payment/actions";
 
 const { Option } = Select;
 
 const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, offset, user }) => {
+    // Dispatch
+    const paymentServiceDispatch = usePaymentServiceDispatch();
+    const inventoryDispatch = useInventoryDispatch();
+    // States
+    const { paymentServices, arePaymentServicesLoading, notOnboarded } = usePaymentServiceState();
+    const { isListing, issaleUpdating } = useInventoryState();
+    // useStates 
     const [data, setData] = useState([inventory]);
     const [quantity, setQuantity] = useState(inventory.saleAddress ? inventory.saleQuantity : inventory.quantity);
     const [paymentTypes, setPaymentTypes] = useState([]);
     const [availablePaymentProviders, setAvailablePaymentProviders] = useState([]);
     const [pricePerUnit, setpricePerUnit] = useState(inventory.price ? inventory.price : inventory.pricePerUnit);
-    const inventoryDispatch = useInventoryDispatch();
     const [canList, setCanList] = useState(true);
-    const {
-        isListing,
-        issaleUpdating
-    } = useInventoryState();
-    const {
-        paymentServices,
-        arePaymentServicesLoading,
-        notOnboarded,
-        areNotOnboardedLoading
-    } = usePaymentServiceState();
-    const paymentServiceDispatch = usePaymentServiceDispatch();
 
     useEffect(() => {
       paymentServiceActions.getPaymentServices(paymentServiceDispatch);
@@ -161,9 +158,6 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
         return finalColumns;
     };
 
-
-
-
     const getCategory = () => {
         const parts = inventory.contract_name.split('-');
         return parts[parts.length - 1];
@@ -179,19 +173,16 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
         } else {
             body = { ...body, assetToBeSold: inventory.address }
         }
-        body = {
-            ...body,
-            quantity,
-        }
+        body = { ...body, quantity }
         let isDone
         
         if (inventory.saleAddress) {
-            isDone = await actions.updateSale(inventoryDispatch, body);
+            isDone = await inventoryActions.updateSale(inventoryDispatch, body);
         } else {
-            isDone = await actions.listInventory(inventoryDispatch, body);
+            isDone = await inventoryActions.listInventory(inventoryDispatch, body);
         }
         if ( isDone ) {
-            await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
+            await inventoryActions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
             handleCancel();
         }
     }
@@ -221,7 +212,6 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                 <div className="w-full">
                     <Typography className="text-[#202020] text-sm font-medium">Set Payment Types</Typography>
                     <Select
-
                         id="paymentTypes"
                         mode="multiple"
                         tagRender={tagRender}
@@ -251,11 +241,9 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                     <Typography className="text-[#202020] text-sm font-medium">{getCategory() === "CarbonOffset" || getCategory() === "Metals" ? "Set Price Per Unit" : "Set Price"}</Typography>
                     <InputNumber className="w-full h-9" value={pricePerUnit} controls={false} min={1} onChange={(value) => setpricePerUnit(value)} />
                 </div>
-
             </div>
         </Modal>
     )
 }
-
 
 export default ListForSaleModal;

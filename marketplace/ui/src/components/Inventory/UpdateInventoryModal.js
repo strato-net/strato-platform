@@ -2,18 +2,14 @@ import React, { useEffect, useState } from "react";
 import { useFormik, getIn } from "formik";
 import { Form, Modal, Input, Select, Radio, Button, Spin, Tag } from "antd";
 import getSchema from "./UpdateInventorySchema";
-import { actions } from "../../contexts/inventory/actions";
-import {
-  useInventoryDispatch,
-  useInventoryState,
-} from "../../contexts/inventory";
-import {
-  useCategoryDispatch,
-  useCategoryState,
-} from "../../contexts/category";
-import { actions as categoryActions } from "../../contexts/category/actions";
-import { useProductState } from "../../contexts/product";
 import TagManager from "react-gtm-module";
+// Actions
+import { actions as inventoryActions} from "../../contexts/inventory/actions";
+import { actions as categoryActions } from "../../contexts/category/actions";
+// Dispatch & States
+import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
+import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
+import { useProductState } from "../../contexts/product";
 import { useAuthenticateState } from "../../contexts/authentication";
 
 
@@ -28,18 +24,17 @@ const UpdateInventoryModal = ({
   limit,
   offset
 }) => {
+  // Dispatch
+  const categoryDispatch = useCategoryDispatch();
+  const dispatch = useInventoryDispatch();
+  // States
+  const { categorys, iscategorysLoading } = useCategoryState();
+  const { categoryBasedProducts, isCategoryBasedProductsLoading } = useProductState();
+  const { user } = useAuthenticateState();
+  const { isinventoryUpdating, isReselling } = useInventoryState();
+  // useStates
   const schema = getSchema();
   const [formState, setFormState] = useState(null);
-  const dispatch = useInventoryDispatch();
-  const categoryDispatch = useCategoryDispatch();
-
-  const { categorys, iscategorysLoading } = useCategoryState();
-  const { categoryBasedProducts, isCategoryBasedProductsLoading } =
-    useProductState();
-  
-  const { user } = useAuthenticateState();
-  const { isinventoryUpdating, isReselling } =
-    useInventoryState();
 
   const initialValues = {
     category: {
@@ -86,7 +81,6 @@ const UpdateInventoryModal = ({
         availableQuantity: data?.quantity ?? null,
         batchId: inventoryToUpdate.inventory.batchId,
       };
-    
       setFormState(nextState);
     }
   }, [inventoryToUpdate]);
@@ -111,11 +105,11 @@ const UpdateInventoryModal = ({
         event: 'update_inventory',
       },
     });
-    let isDone = await actions.updateInventory(dispatch, body);
+    let isDone = await inventoryActions.updateInventory(dispatch, body);
 
     if (isDone) {
-      await actions.fetchInventory(dispatch, limit, offset, debouncedSearchTerm, categoryName);
-      await actions.fetchInventoryForUser(dispatch, user.commonName);
+      await inventoryActions.fetchInventory(dispatch, limit, offset, debouncedSearchTerm, categoryName);
+      await inventoryActions.fetchInventoryForUser(dispatch, user.commonName);
 
       handleCancel();
     }

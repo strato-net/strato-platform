@@ -1,25 +1,23 @@
-import { Button, InputNumber, Modal, Table } from "antd";
 import { useEffect, useState } from "react";
-import { actions } from "../../contexts/inventory/actions";
+import { Button, InputNumber, Modal, Table } from "antd";
+// Actions
+import { actions as inventoryActions } from "../../contexts/inventory/actions";
+//  Dispatch and States
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import { useAuthenticateState } from "../../contexts/authentication";
 
 const ResellModal = ({ open, handleCancel, inventory, categoryName, limit, offset }) => {
+    // States
+    const { isReselling } = useInventoryState();
+    const { user } = useAuthenticateState();
+    // useStates    
     const [quantity, setQuantity] = useState(1);
     const inventoryDispatch = useInventoryDispatch();
     const [canResell, setCanResell] = useState(true);
-    const {
-        isReselling
-    } = useInventoryState();
-    const { user } = useAuthenticateState();
 
     useEffect(() => {
-        if (quantity <= 0) {
-            setCanResell(false);
-        }
-        else {
-            setCanResell(true);
-        };
+        const isResell = (quantity <= 0) ? false : true;
+        setCanResell(isResell);
     }, [quantity])
 
     const columns = () => {
@@ -39,10 +37,10 @@ const ResellModal = ({ open, handleCancel, inventory, categoryName, limit, offse
             assetAddress: inventory.address,
             quantity
         };
-        let isDone = await actions.resellInventory(inventoryDispatch, body);
+        let isDone = await inventoryActions.resellInventory(inventoryDispatch, body);
         if (isDone) {
-            await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
-            await actions.fetchInventoryForUser(inventoryDispatch, user.commonName);
+            await inventoryActions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
+            await inventoryActions.fetchInventoryForUser(inventoryDispatch, user.commonName);
             handleCancel();
         }
     }
@@ -60,7 +58,6 @@ const ResellModal = ({ open, handleCancel, inventory, categoryName, limit, offse
             ]}
         >
             <div className="head">
-
                 <Table
                     columns={columns()}
                     dataSource={[inventory]}
@@ -70,6 +67,5 @@ const ResellModal = ({ open, handleCancel, inventory, categoryName, limit, offse
         </Modal>
     )
 }
-
 
 export default ResellModal;

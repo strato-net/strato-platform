@@ -1,8 +1,4 @@
-import {
-    Form,
-    Input,
-    Select
-} from "antd";
+import { Form, Input, Select } from "antd";
 import { CLOTHING_TYPES, spiritTypes } from "../../helpers/constants";
 
 const { Option } = Select;

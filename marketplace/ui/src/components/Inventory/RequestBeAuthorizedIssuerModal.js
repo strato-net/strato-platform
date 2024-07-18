@@ -1,8 +1,5 @@
 import React from "react";
-import {
-  Modal,
-  Button,
-} from "antd";
+import { Modal, Button } from "antd";
 import { actions } from "../../contexts/issuerStatus/actions";
 import { useIssuerStatusState, useIssuerStatusDispatch } from "../../contexts/issuerStatus";
 import { ISSUER_STATUS } from '../../helpers/constants';

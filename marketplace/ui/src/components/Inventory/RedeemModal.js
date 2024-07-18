@@ -1,54 +1,50 @@
-import { Button, InputNumber, Modal, Table, Input, Spin } from "antd";
 import { useEffect, useState } from "react";
-import { actions } from "../../contexts/inventory/actions";
-import { useInventoryDispatch } from "../../contexts/inventory";
+import { Button, InputNumber, Modal, Table, Input, Spin } from "antd";
+import { MinusCircleOutlined } from '@ant-design/icons';
+// Actions
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
 import { actions as redemptionActions } from "../../contexts/redemption/actions";
+import { actions as inventoryActions } from "../../contexts/inventory/actions";
+// Dispatch & States
+import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/marketplace";
 import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
 import { useAuthenticateState } from "../../contexts/authentication";
-import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
-import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/marketplace";
-import { MinusCircleOutlined } from '@ant-design/icons';
+import { useInventoryDispatch } from "../../contexts/inventory";
+// Components
+import ResponsiveAddAddress from "../MarketPlace/ResponsiveAddAddress"
 import AddressComponent from "../MarketPlace/AddressComponent";
 import AddAddressModal from "../MarketPlace/AddAddressModal";
-import ResponsiveAddAddress from "../MarketPlace/ResponsiveAddAddress"
-import { Images } from "../../images";
+// other
 import { REDEMPTION_STATUS } from "../../helpers/constants";
+import { Images } from "../../images";
 
 const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offset }) => {
-    const [data, setData] = useState([inventory]);
-    const [quantity, setQuantity] = useState(1);
-    const [comments, setComments] = useState("");
+    // Dispatch
     const inventoryDispatch = useInventoryDispatch();
     const redemptionDispatch = useRedemptionDispatch();
     const marketplaceDispatch = useMarketplaceDispatch();
+    // States
+    const { user } = useAuthenticateState();
+    const { isRequestingRedemption } = useRedemptionState();
+    const { userAddresses, isLoadingUserAddresses } = useMarketplaceState();
+    // useStates
+    const [data, setData] = useState([inventory]);
+    const [quantity, setQuantity] = useState(1);
+    const [comments, setComments] = useState("");
     const [canRedeem, setCanRedeem] = useState(true);
     const [selectedAddress, setSelectedAddress] = useState(0);
     const [showModal, setshowModal] = useState(false);
     const [showResponsiveForm, setShowResponsiveForm] = useState(false);
-    const { user } = useAuthenticateState();
-    const { isRequestingRedemption } = useRedemptionState();
-    const { userAddresses, isLoadingUserAddresses } = useMarketplaceState();
+ 
     const { TextArea } = Input;
-
-    const closeAddressModel = () => {
-        setshowModal(false);
-    }
-
-    const closeResponsiveAddressModel = () => {
-        setShowResponsiveForm(false);
-    }
 
     useEffect(() => {
         marketplaceActions.fetchUserAddresses(marketplaceDispatch, inventory.data.redemptionService);
     }, [marketplaceDispatch])
 
     useEffect(() => {
-        if (quantity > inventory.quantity || quantity <= 0) {
-            setCanRedeem(false);
-        }
-        else {
-            setCanRedeem(true);
-        };
+        const isRedeem = (quantity > inventory.quantity || quantity <= 0) ? false : true;
+        setCanRedeem(isRedeem)
     }, [quantity])
 
     const columns = [
@@ -89,8 +85,8 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
         if (quantity > 0 && quantity <= inventory.quantity) {
             let isDone = await redemptionActions.requestRedemption(redemptionDispatch, body);
             if (isDone) {
-                await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
-                await actions.fetchInventoryForUser(inventoryDispatch, user.commonName);
+                await inventoryActions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
+                await inventoryActions.fetchInventoryForUser(inventoryDispatch, user.commonName);
                 handleCancel();
             }
         }
@@ -121,21 +117,16 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
                     <p className="text-base md:text-xl lg:text-2xl text-[#202020] font-semibold ">Address Details</p>
                     {showModal ?
                         <MinusCircleOutlined className="text-xl text-primary"
-                            onClick={() => {
-                                setshowModal(false);
-                            }}
-                        />
+                            onClick={() => { setshowModal(false)}} />
                         :
                         <>
                             <div className="hidden md:block"><Button type="link" icon={<img src={Images.AddBlack} className="w-4 h-4 lg:w-6 lg:h-6 " alt="add" />}
-                                onClick={() => {
-                                    setshowModal(true);
-                                }}
+                                onClick={() => { setshowModal(true) }}
                             /></div>
                         </>
                     }
                 </div>
-                {showModal && <AddAddressModal open={showModal} close={closeAddressModel} redemptionService={inventory.data.redemptionService}/>}
+                {showModal && <AddAddressModal open={showModal} close={()=>{setshowModal(false)}} redemptionService={inventory.data.redemptionService}/>}
                 {isLoadingUserAddresses ?
                     <div className="h-80 flex justify-center items-center">
                         <Spin spinning={isLoadingUserAddresses} size="large" />
@@ -191,18 +182,13 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
                             <p className="text-base md:text-xl lg:text-2xl text-[#202020] font-semibold">Address Details</p>
                             {showResponsiveForm ?
                                 <MinusCircleOutlined className="text-xl text-primary"
-                                    onClick={() => {
-                                        setShowResponsiveForm(false);
-                                    }}
-                                />
+                                    onClick={() => { setShowResponsiveForm(false) }} />
                                 :
                                 <div className="md:hidden">
                                     <Button
                                         type="link"
                                         icon={<img src={Images.AddBlack} className=" w-4 h-4 lg:w-6 lg:h-6 " alt="add" />}
-                                        onClick={() => {
-                                            setShowResponsiveForm(true)
-                                        }}
+                                        onClick={() => { setShowResponsiveForm(true) }}
                                     />
                                 </div>
                             }
@@ -229,11 +215,10 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
                         </div>
                     </>
                 }
-                {showResponsiveForm && <ResponsiveAddAddress open={showResponsiveForm} close={closeResponsiveAddressModel} redemptionService={inventory.data.redemptionService}/>}
+                {showResponsiveForm && <ResponsiveAddAddress open={showResponsiveForm} close={()=>{setShowResponsiveForm(false)}} redemptionService={inventory.data.redemptionService}/>}
             </div>
         </Modal>
     )
 }
-
 
 export default RedeemModal;

@@ -1,26 +1,18 @@
 import React, { useEffect, useState } from "react";
-import {
-  Form,
-  Modal,
-  Input,
-  Select,
-  Button,
-  Upload,
-} from "antd";
+import { Form, Modal, Input, Select, Button, Upload } from "antd";
 import TagManager from "react-gtm-module";
-
-import {
-  useInventoryDispatch,
-  useInventoryState,
-} from "../../contexts/inventory";
+// Dispatch & States
 import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
+import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
+// Actions
 import { actions as redemptionActions } from "../../contexts/redemption/actions";
-import { actions } from "../../contexts/inventory/actions";
+import { actions as inventoryActions } from "../../contexts/inventory/actions";
+// other
 import { INVENTORY_MODAL_INITIAL_VALUES, SIZES, unitOfMeasures, unitOfSpiritMeasures } from "../../helpers/constants";
+import { showToast } from "../Notification/ToastComponent";
+import { UPLOAD_ERROR } from "../../helpers/msgConstants";
 import { categoricalProperties } from "./CategoryFields";
 import RichEditor from "../RichEditor";
-import { UPLOAD_ERROR } from "../../helpers/msgConstants";
-import { showToast } from "../Notification/ToastComponent";
 
 const { Option } = Select;
 
@@ -34,10 +26,13 @@ const CreateInventoryModal = ({
   categoryName,
 }) => {
   const [form] = Form.useForm();
+  // Dispatch
   const dispatch = useInventoryDispatch();
-  const { isCreateInventorySubmitting, isUploadImageSubmitting } =
-    useInventoryState();
-
+  const redemptionDispatch = useRedemptionDispatch();
+  // States
+  const { isCreateInventorySubmitting, isUploadImageSubmitting } = useInventoryState();
+  const { redemptionServices, isFetchingRedemptionServices } = useRedemptionState();
+  // useStates
   const [uploadErr, setUploadErr] = useState("");
   const [selectedImages, setSelectedImages] = useState(null);
   const [selectedFiles, setSelectedFiles] = useState(null);
@@ -47,10 +42,7 @@ const CreateInventoryModal = ({
   const [subCategoryValue, setSubCategoryValue] = useState(form.getFieldValue("subCategory"));
   const [measureUnit, setMeasureUnit] = useState(unitOfMeasures);
 
-
-  const redemptionDispatch = useRedemptionDispatch();
-  const { redemptionServices, isFetchingRedemptionServices } = useRedemptionState();
-
+  
   useEffect(() => {
     redemptionActions.fetchRedemptionServices(redemptionDispatch);
   }, [redemptionDispatch]);
@@ -110,7 +102,7 @@ const CreateInventoryModal = ({
       for (const img of values.images) {
         const formData = new FormData();
         formData.append(img.name, img);
-        const imageData = await actions.uploadImage(dispatch, formData);
+        const imageData = await inventoryActions.uploadImage(dispatch, formData);
         if (imageData) {
           imageKeys.push(imageData);
         } else {
@@ -125,7 +117,7 @@ const CreateInventoryModal = ({
       for (const file of values.files) {
         const formData = new FormData();
         formData.append(file.name, file);
-        const fileData = await actions.uploadImage(dispatch, formData);
+        const fileData = await inventoryActions.uploadImage(dispatch, formData);
         if (fileData) {
           fileKeys.push(fileData);
           fileNamesArr.push(file.name);
@@ -165,7 +157,7 @@ const CreateInventoryModal = ({
       },
     });
 
-    let isDone = await actions.createItem(
+    let isDone = await inventoryActions.createItem(
       dispatch,
       newBody,
       subCategory
@@ -173,7 +165,7 @@ const CreateInventoryModal = ({
 
     if (isDone) {
       if (page === 1)
-        await actions.fetchInventory(dispatch, 10, 0, debouncedSearchTerm, categoryName);
+        await inventoryActions.fetchInventory(dispatch, 10, 0, debouncedSearchTerm, categoryName);
       resetPage(1);
       handleCancel();
     }
@@ -187,11 +179,8 @@ const CreateInventoryModal = ({
   };
 
   const updateSizeOptions = (type) => {
-    if (type === "Shoes") {
-      setSizeOptions(SIZES.shoes);
-    } else {
-      setSizeOptions(SIZES.other);
-    }
+    const shoesSize = type === "Shoes" ? SIZES.shoes : SIZES.other
+    setSizeOptions(shoesSize);
   };
 
   const handleCategory = (value) => {

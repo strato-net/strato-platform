@@ -1,23 +1,23 @@
 import { Button, Modal } from "antd";
-import { actions } from "../../contexts/inventory/actions";
+// Actions
+import { actions as inventoryActions } from "../../contexts/inventory/actions";
+// States
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import { useAuthenticateState } from "../../contexts/authentication";
 
 const UnlistModal = ({ open, handleCancel, inventory, saleAddress, categoryName, limit, offset }) => {
+    // Dispatch
     const inventoryDispatch = useInventoryDispatch();
-    const {
-        isUnlisting
-    } = useInventoryState();
+    // States
+    const { isUnlisting } = useInventoryState();
     const { user } = useAuthenticateState();
 
     const handleSubmit = async () => {
-        let body = {
-            saleAddress
-        };
-        let isDone = await actions.unlistInventory(inventoryDispatch, body);
+        let body = { saleAddress };
+        let isDone = await inventoryActions.unlistInventory(inventoryDispatch, body);
         if (isDone) {
-            await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
-            await actions.fetchInventoryForUser(inventoryDispatch, user.commonName);
+            await inventoryActions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
+            await inventoryActions.fetchInventoryForUser(inventoryDispatch, user.commonName);
             handleCancel();
         }
     }
@@ -37,6 +37,5 @@ const UnlistModal = ({ open, handleCancel, inventory, saleAddress, categoryName,
         </Modal>
     )
 }
-
 
 export default UnlistModal;

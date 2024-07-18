@@ -1,15 +1,14 @@
 import React, { useState } from "react";
 import { Modal, Tabs, Button } from "antd";
 import { MinusOutlined, PlusOutlined } from "@ant-design/icons";
+
 import { useAuthenticateState } from "../../contexts/authentication";
 import image_placeholder from "../../images/resources/image_placeholder.png";
 
 
 const PreviewInventoryModal = ({ open, handleCancel, inventory, category }) => {
+  let { user } = useAuthenticateState();
   const [quantity, setQuantity] = useState(1);
-
-  let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
-
 
   const subtract = () => {
     if (quantity > 1) {

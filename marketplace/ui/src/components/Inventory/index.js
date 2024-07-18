@@ -1,68 +1,66 @@
 import React, { useState, useEffect } from "react";
-import {
-  Button,
-  Pagination,
-  Spin,
-  Select,
-  Tabs
-} from "antd";
+import { Button, Pagination, Spin, Select, Tabs } from "antd";
 import InventoryCard from "./InventoryCard";
 import CreateInventoryModal from "./CreateInventoryModal";
+// Actions
 import { actions as categoryActions } from "../../contexts/category/actions";
-import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
-import useDebounce from "../UseDebounce";
-import { actions } from "../../contexts/inventory/actions";
-import {
-  useInventoryDispatch,
-  useInventoryState,
-} from "../../contexts/inventory";
-import { usePaymentServiceDispatch, usePaymentServiceState } from "../../contexts/payment";
+import { actions as inventoryActions } from "../../contexts/inventory/actions";
 import { actions as paymentServiceActions } from "../../contexts/payment/actions";
-import { Images } from "../../images";
-import { useItemDispatch, useItemState } from "../../contexts/item";
 import { actions as itemActions } from "../../contexts/item/actions";
 import { actions as redemptionActions } from "../../contexts/redemption/actions";
 import { actions as issuerStatusActions } from "../../contexts/issuerStatus/actions";
-import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
+// Dispatch & States
+import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
+import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import { useIssuerStatusState, useIssuerStatusDispatch } from "../../contexts/issuerStatus";
-import { useNavigate } from "react-router-dom";
-import { useAuthenticateState } from "../../contexts/authentication";
-import HelmetComponent from "../Helmet/HelmetComponent";
-import { SEO } from "../../helpers/seoConstant";
+import { usePaymentServiceDispatch, usePaymentServiceState } from "../../contexts/payment";
+import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
+import { useItemDispatch, useItemState } from "../../contexts/item";
+// Components
 import RequestBeAuthorizedIssuerModal from "./RequestBeAuthorizedIssuerModal";
-import { ISSUER_STATUS } from '../../helpers/constants';
 import { showToast } from "../Notification/ToastComponent";
+import HelmetComponent from "../Helmet/HelmetComponent";
 import BreadcrumbComponent from "../BreadCrumb";
+// other
+import { useAuthenticateState } from "../../contexts/authentication";
+import { ISSUER_STATUS } from '../../helpers/constants';
+import { SEO } from "../../helpers/seoConstant";
+import useDebounce from "../UseDebounce";
+import { Images } from "../../images";
 
 const { Option } = Select;
+const limit = 10;
 
 const Inventory = ({ user }) => {
+  // Dispatch
+  const paymentServiceDispatch = usePaymentServiceDispatch();
+  const categoryDispatch = useCategoryDispatch();
+  const dispatch = useInventoryDispatch();
+
+  const itemDispatch = useItemDispatch();
+  const redemptionDispatch = useRedemptionDispatch();
+  const issuerStatusDispatch = useIssuerStatusDispatch();
+  // States
+  const { inventories, isInventoriesLoading, message, success, inventoriesTotal } = useInventoryState();
+  const { paymentServices, notOnboarded, areNotOnboardedLoading } = usePaymentServiceState();
+  const { message: issuerStatusMsg, success: issuerStatusSuccess } = useIssuerStatusState();
+  const { message: redemptionMsg, success: redemptionSuccess } = useRedemptionState();
+  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
+  const { message: itemMsg, success: itemSuccess } = useItemState();
+  const { categorys } = useCategoryState();
+  // useStates
   const [open, setOpen] = useState(false);
   const [reqModOpen, setReqModOpen] = useState(false);
   const [queryValue, setQueryValue] = useState("");
   const debouncedSearchTerm = useDebounce(queryValue, 1000);
-  const limit = 10;
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState(1);
   const [selectedService, setSelectedService] = useState(null);
-  const dispatch = useInventoryDispatch();
   const [isSearch, setIsSearch] = useState(false);
   const [category, setCategory] = useState(undefined);
   const linkUrl = window.location.href;
-  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
-  const categoryDispatch = useCategoryDispatch();
-  const { categorys } = useCategoryState();
-  const { inventories, isInventoriesLoading, message, success, inventoriesTotal } =
-    useInventoryState();
-  const {
-      paymentServices,
-      arePaymentServicesLoading,
-      notOnboarded,
-      areNotOnboardedLoading
-  } = usePaymentServiceState();
-  const paymentServiceDispatch = usePaymentServiceDispatch();
-
+  
   useEffect(() => {
     if (user && user.commonName) {
       paymentServiceActions.getPaymentServices(paymentServiceDispatch);
@@ -78,20 +76,12 @@ const Inventory = ({ user }) => {
       setSelectedService(notOnboarded[0]);
     }
   }, [paymentServices, notOnboarded]);
-
-
-  const itemDispatch = useItemDispatch();
-  const { message: itemMsg, success: itemSuccess } = useItemState();
-  const redemptionDispatch = useRedemptionDispatch();
-  const { message: redemptionMsg, success: redemptionSuccess } = useRedemptionState();
+  
   const [issuerStatus, setIssuerStatus] = useState(user?.issuerStatus);
 
   useEffect(() => {
     setIssuerStatus(user?.issuerStatus);
   }, [user]);
-
-  const issuerStatusDispatch = useIssuerStatusDispatch();
-  const { message: issuerStatusMsg, success: issuerStatusSuccess } = useIssuerStatusState();
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
@@ -99,17 +89,11 @@ const Inventory = ({ user }) => {
 
   useEffect(() => {
     if (isSearch) {
-      actions.fetchInventorySearch(dispatch, limit, offset, debouncedSearchTerm);
-    } else actions.fetchInventory(dispatch, limit, offset, "", category);
+      inventoryActions.fetchInventorySearch(dispatch, limit, offset, debouncedSearchTerm);
+    } else inventoryActions.fetchInventory(dispatch, limit, offset, "", category);
   }, [dispatch, limit, offset, debouncedSearchTerm, category]);
 
-  const showModal = () => {
-    setOpen(true);
-  };
-
-  const handleCancel = () => {
-    setOpen(false);
-  };
+  const handleCancel = () => setOpen(false);
 
   const handleOnboard = async (service) => {
     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
@@ -129,28 +113,12 @@ const Inventory = ({ user }) => {
     setSelectedService(service);
   };
 
-  const showReqModModal = () => {
-    setReqModOpen(true);
-  };
-
-  const handleReqModCancel = () => {
-    setReqModOpen(false);
-  };
-
-
-  const queryHandle = (e) => {
-    setIsSearch(e.length > 0);
-    setQueryValue(e);
-    setOffset(0);
-    setPage(1);
-  };
+  const handleReqModCancel = () => setReqModOpen(false);
 
   const onPageChange = (page) => {
     setOffset((page - 1) * limit);
     setPage(page);
   };
-
-  const navigate = useNavigate();
 
   const getAllSubcategories = (categories) => {
     let subcategories = [];
@@ -172,12 +140,6 @@ const Inventory = ({ user }) => {
   };
 
   const metaImg = category ? category : SEO.IMAGE_META;
-
-  const renderImg = (service) => {
-    return service.imageURL && service.imageURL !== ''
-        ? <img src={service.imageURL} alt={service.serviceName} height="16px" width="16px"/>
-        : ''
-  };
 
   return (
     <>
@@ -240,7 +202,7 @@ const Inventory = ({ user }) => {
                   if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                     window.location.href = loginUrl;
                   } else {
-                    showModal();
+                    setOpen(true)
                   }
                 }}
               >
@@ -345,7 +307,7 @@ const Inventory = ({ user }) => {
       )}
       {message && showToast({
         message:message,
-        onClose: actions.resetMessage(dispatch),
+        onClose: inventoryActions.resetMessage(dispatch),
         success:success,
         placement: 'bottom',
       })}
