@@ -1,7 +1,7 @@
-import dotenv from "dotenv";
-import { Client } from "pg";
-dotenv.config();
-
+require("dotenv").config();
+const fs = require("fs");
+const { Client } = require("pg");
+console.log("POSTGRES_PASSWORD:", process.env.POSTGRES_PASSWORD);
 const host = process.env.POSTGRES_SERVER_URL || "localhost";
 const port = process.env.POSTGRES_PORT || "5432";
 const user = process.env.POSTGRES_USER || "postgres";
@@ -19,6 +19,11 @@ const client = new Client({
   user,
   password,
   database,
+  ssl: {
+    require: true,
+    rejectUnauthorized: true,
+    ca: fs.readFileSync("./src/dbCert/us-east-1-bundle.cer").toString(),
+  },
 });
 
 const connectToDB = async () => {
@@ -51,4 +56,4 @@ const connectToDB = async () => {
 
 connectToDB();
 
-export default client;
+module.exports = client;
