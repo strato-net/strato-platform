@@ -886,15 +886,27 @@ contractHelper ::
   Annotated CodeCollectionF ->
   Annotated ContractF ->
   Type'
-contractHelper cc c =
-  let constr = maybe M.empty (M.singleton "constructor") $ _constructor c
-      funcsAndConstr = constr <> _functions c 
-      varTypes' = reduceType' (_contractContext c) $ varDeclHelper cc c <$> M.elems (_storageDefs c)
-      constTypes' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_constants c)
-      constTypes'' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_flConstants cc)
-      funcTypes' = reduceType' (_contractContext c) $ uncurry (functionHelper cc c) <$> M.toList funcsAndConstr
-      modifierTypes' = reduceType' (_contractContext c) $ modifierHelper cc c <$> M.elems (_modifiers c)
-   in reduceType' (_contractContext c) [varTypes', constTypes', funcTypes', constTypes'', modifierTypes']
+contractHelper cc c = do
+  let isStrict = isJust $ find ((== "strict") . fst) $ CC._pragmas cc
+  -- print $ CC._pragmas cc
+  if isStrict 
+    then
+      let constr = maybe M.empty (M.singleton "constructor") $ _constructor c
+          funcsAndConstr = constr <> _functions c 
+          varTypes' = reduceType' (_contractContext c) $ varDeclHelper cc c <$> M.elems (_storageDefs c)
+          constTypes' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_constants c)
+          constTypes'' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_flConstants cc)
+          funcTypes' = reduceType' (_contractContext c) $ uncurry (functionHelper cc c) <$> M.toList funcsAndConstr
+          modifierTypes' = reduceType' (_contractContext c) $ modifierHelper cc c <$> M.elems (_modifiers c)
+      in reduceType' (_contractContext c) [varTypes', constTypes', funcTypes', constTypes'', modifierTypes']
+    else 
+      let constr = maybe M.empty (M.singleton "constructor") $ _constructor c
+          funcsAndConstr = constr <> _functions c 
+          varTypes' = reduceType' (_contractContext c) $ varDeclHelper cc c <$> M.elems (_storageDefs c)
+          constTypes' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_constants c)
+          constTypes'' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_flConstants cc)
+          funcTypes' = reduceType' (_contractContext c) $ uncurry (functionHelper cc c) <$> M.toList funcsAndConstr
+      in reduceType' (_contractContext c) [varTypes', constTypes', funcTypes', constTypes'']
 
 varDeclHelper ::
   Annotated CodeCollectionF ->
@@ -1015,7 +1027,7 @@ modifierHelper ::
   Annotated ContractF ->
   Annotated ModifierF ->
   Type'
-modifierHelper cc c m@SolidVM.Model.CodeCollection.Modifier {..} = do
+modifierHelper cc c m@SolidVM.Model.CodeCollection.Modifier {..} = 
   let r =
         R cc c Nothing Nothing (Just m) $
           map
@@ -1032,7 +1044,7 @@ modifierHelper cc c m@SolidVM.Model.CodeCollection.Modifier {..} = do
       contents' = case m ^. SolidVM.Model.CodeCollection.modifierContents of
                     Nothing       -> []
                     Just contents -> contents
-     in runReader (statementsHelperM (M.fromList args) contents') r
+    in runReader (statementsHelperM (M.fromList args) contents') r
 
 functionHelper ::
   Annotated CodeCollectionF ->
@@ -1649,7 +1661,7 @@ statementHelper (Break x) = pure $ topType' x
 statementHelper (Return mExpr x) = do
   cc <- asks codeCollection
   mf <- asks function
-  let isStrict = isJust $ find ((== "strict-modifier") . fst) $ CC._pragmas cc
+  let isStrict = isJust $ find ((== "strict") . fst) $ CC._pragmas cc
   if isStrict
     then do 
       fm <- asks modifier

@@ -6117,7 +6117,7 @@ contract qq {
     ( runTest $ do
         ( runBS
             [r|
-
+pragma strict;
 contract qq {
   modifier myModifier() {  // line 4
     return 7;
