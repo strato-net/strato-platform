@@ -1961,9 +1961,6 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) _ = do
           argVals <- case args of
             CC.OrderedArgs as -> OrderedVals <$> mapM (getVar <=< flip expToVar Nothing) as
             CC.NamedArgs ns -> NamedVals <$> mapM (mapM $ getVar <=< flip expToVar Nothing) ns
-          let argCount = case args of
-                CC.OrderedArgs as -> length as
-                CC.NamedArgs ns -> length ns
           case var of
             Constant (SReference (AccountPath address (MS.StoragePath pieces))) -> do
               val' <- getVar $ Constant $ SReference $ AccountPath address $ MS.StoragePath $ init pieces
