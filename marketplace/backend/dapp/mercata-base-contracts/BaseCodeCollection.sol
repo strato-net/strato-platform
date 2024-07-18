@@ -1,6 +1,7 @@
 pragma es6;
 pragma strict;
 pragma builtinCreates;
+pragma strict-modifier;
 
 import <509>;
 import "Templates/Assets/Asset.sol";

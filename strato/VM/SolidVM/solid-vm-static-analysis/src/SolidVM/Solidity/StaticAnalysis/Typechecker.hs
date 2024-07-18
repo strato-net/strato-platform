@@ -37,6 +37,8 @@ import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Solidity.StaticAnalysis.Types
 import Text.Read (readMaybe)
 import Blockchain.VM.SolidException
+import qualified SolidVM.Model.CodeCollection as CC
+import Data.List (find)
 --import qualified Text.Colors                          as C
 --import           Control.Monad.IO.Class
 --import Debug.Trace
@@ -1645,23 +1647,38 @@ statementHelper (DoWhileStatement body cond x) = do
 statementHelper (Continue x) = pure $ topType' x
 statementHelper (Break x) = pure $ topType' x
 statementHelper (Return mExpr x) = do
+  cc <- asks codeCollection
   mf <- asks function
-  fm <- asks modifier
-  case (fm,mf) of
-    (Nothing,Nothing) -> pure . bottom $ "Cannot use keyword 'return' outside of a function" <$ x
-    (Nothing,Just f) -> do
-      let fRets = flip Product x $ flip Static x . indexedTypeType . snd <$> _funcVals f
-      t' <- fRets ~> maybe (pure $ Product [] x) tcExpr mExpr
-      modify $ \((ret, locals) :| rest) -> case ret of
-        Nothing -> (Just t', locals) :| rest
-        Just (Sum _) -> (Just t', locals) :| rest
-        _ -> (ret, locals) :| rest
-      pure t'
-    (Just _,Nothing) ->
-      -- modifierError "you cannot return a value as part of a modifier" (x)
-      pure . bottom $ "Cannot use keyword 'return' inside of a modifier." <$ x
-    (Just _,Just _)  ->
-      pure . bottom $ "Cannot use keyword 'return' inside of a modifier." <$ x
+  let isStrict = isJust $ find ((== "strict-modifier") . fst) $ CC._pragmas cc
+  if isStrict
+    then do 
+      fm <- asks modifier
+      case (fm,mf) of
+        (Nothing,Nothing) -> pure . bottom $ "Cannot use keyword 'return' outside of a function" <$ x
+        (Nothing,Just f) -> do
+          let fRets = flip Product x $ flip Static x . indexedTypeType . snd <$> _funcVals f
+          t' <- fRets ~> maybe (pure $ Product [] x) tcExpr mExpr
+          modify $ \((ret, locals) :| rest) -> case ret of
+            Nothing -> (Just t', locals) :| rest
+            Just (Sum _) -> (Just t', locals) :| rest
+            _ -> (ret, locals) :| rest
+          pure t'
+        (Just _,Nothing) ->
+          pure . bottom $ "Cannot use keyword 'return' inside of a modifier." <$ x       
+        (Just _,Just _)  -> 
+          pure . bottom $ "Cannot use keyword 'return' inside of a modifier." <$ x
+    else
+      case mf of 
+        Nothing -> pure . bottom $ "Cannot use keyword 'return' inside of a modifier." <$ x
+        Just f -> do
+          let fRets = flip Product x $ flip Static x . indexedTypeType . snd <$> _funcVals f
+          t' <- fRets ~> maybe (pure $ Product [] x) tcExpr mExpr
+          modify $ \((ret, locals) :| rest) -> case ret of
+            Nothing -> (Just t', locals) :| rest
+            Just (Sum _) -> (Just t', locals) :| rest
+            _ -> (ret, locals) :| rest
+          pure t'
+
 statementHelper (Throw e x) = do
   et <- tcExpr e
   pure $ reduceType' x [et]
