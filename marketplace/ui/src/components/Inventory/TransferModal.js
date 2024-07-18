@@ -28,7 +28,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
     const filterDuplicateUserAddresses = (arr) => {
         return [...new Map(arr.map((u) => [u.value, u])).values()];
     };
-    
+
     const [searchInput, setSearchInput] = useState('');
     const [dropdownOpen, setDropdownOpen] = useState(false);
 
@@ -58,12 +58,12 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
             setCanTransfer(true);
         };
     }, [quantity, userAddress])
-    
+
     const filteredOptions = searchInput
-    ? filteredUsersList.filter(option =>
-        option.label && option.label.toLowerCase().includes(searchInput.toLowerCase())
-      )
-    : [];
+        ? filteredUsersList.filter(option =>
+            option.label && option.label.toLowerCase().includes(searchInput.toLowerCase())
+        )
+        : [];
 
 
     const columns = [
@@ -76,15 +76,15 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
             title: "Set Quantity",
             align: "center",
             render: () => (
-                <InputNumber 
-                  value={quantity}
-                  controls={false} 
-                  min={1} 
-                  onChange={(value) => {
-                    if (value) {
-                        setQuantity(parseInt(value, 10));
-                    }
-                  }}
+                <InputNumber
+                    value={quantity}
+                    controls={false}
+                    min={1}
+                    onChange={(value) => {
+                        if (value) {
+                            setQuantity(parseInt(value, 10));
+                        }
+                    }}
                 />
             )
         },
@@ -92,15 +92,15 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
             title: "Unit Price ($)",
             align: "center",
             render: () => (
-                <InputNumber 
-                  value={price} 
-                  controls={false} 
-                  min={0.01} 
-                  onChange={(value) => {
-                    if (value && value > 0) {
-                      setPrice(parseFloat(value.toFixed(2)));
-                    }
-                  }}
+                <InputNumber
+                    value={price}
+                    controls={false}
+                    min={0.01}
+                    onChange={(value) => {
+                        if (value && value > 0) {
+                            setPrice(parseFloat(value.toFixed(2)));
+                        }
+                    }}
                 />
             )
         },
@@ -171,21 +171,40 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
             </div>
             <div className="flex flex-col gap-[18px] md:hidden mt-5">
                 <div> <p className="text-[#202020] font-medium text-sm">Quantity Available</p>
-                    <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center ">
-
-                        <p className="px-5 "> {inventory?.quantity}</p>
+                    <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center justify-center">
+                        <p> {inventory?.quantity}</p>
                     </div>
                 </div>
                 <div>
                     <p className="text-[#202020] font-medium text-sm">Set Quantity</p>
-                    <div className="inventory_card">
-                        <InputNumber className="w-full pl-5" value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
+                    <div>
+                        <InputNumber
+                            className="w-full h-9"
+                            value={quantity}
+                            controls={false}
+                            min={1}
+                            onChange={(value) => {
+                                if (value) {
+                                    setQuantity(parseInt(value, 10));
+                                }
+                            }}
+                        />
                     </div>
                 </div>
                 <div>
                     <p className="text-[#202020] font-medium text-sm">Unit Price ($)</p>
-                    <div className="inventory_card">
-                        <InputNumber className="w-full pl-5" value={price} controls={false} min={1} onChange={(value) => setPrice(value)} />
+                    <div>
+                        <InputNumber
+                            className="w-full h-9"
+                            value={price}
+                            controls={false}
+                            min={.01}
+                            onChange={(value) => {
+                                if (value && value > 0) {
+                                    setPrice(parseFloat(value.toFixed(2)));
+                                }
+                            }}
+                        />
                     </div>
                 </div>
                 <div>

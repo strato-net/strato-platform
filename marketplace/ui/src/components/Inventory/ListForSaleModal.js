@@ -28,29 +28,42 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
     const paymentServiceDispatch = usePaymentServiceDispatch();
 
     useEffect(() => {
-      paymentServiceActions.getPaymentServices(paymentServiceDispatch);
-      paymentServiceActions.getNotOnboarded(paymentServiceDispatch, user?.commonName, 10, 0);
+        paymentServiceActions.getPaymentServices(paymentServiceDispatch);
+        paymentServiceActions.getNotOnboarded(paymentServiceDispatch, user?.commonName, 10, 0);
     }, [paymentServiceDispatch, user]);
 
     useEffect(() => {
-        if ( inventory.saleAddress ? quantity > (inventory.quantity - inventory.totalLockedQuantity) : quantity > inventory.quantity || quantity <= 0 || pricePerUnit <= 0) {
+        if (inventory.saleAddress ? quantity > (inventory.quantity - inventory.totalLockedQuantity) : quantity > inventory.quantity) {
+            setCanList(false);
+        }
+        else if (quantity < 1 || pricePerUnit < 0.01 || !pricePerUnit || paymentTypes.length < 1 || (paymentTypes.length == 1 && paymentTypes[0] === -1)) {
             setCanList(false);
         }
         else {
             setCanList(true);
         };
-    }, [quantity, pricePerUnit])
+    }, [quantity, pricePerUnit, paymentTypes])
 
     useEffect(() => {
-        const diff = paymentServices.filter(ps => 
-          !notOnboarded.some(x => x.address === ps.address)
+        const diff = paymentServices.filter(ps =>
+            !notOnboarded.some(x => x.address === ps.address)
         );
         setAvailablePaymentProviders(diff);
-      }, [paymentServices, notOnboarded]);
+
+
+        const inventoryPaymentProviders = inventory.paymentProviders
+            ? inventory.paymentProviders.filter(provider => provider.value).map(provider => provider.value)
+            : [];
+        const selectedPaymentServiceIndices = inventoryPaymentProviders.map(address =>
+            diff.findIndex(ps => ps.address === address)
+        );
+        setPaymentTypes(selectedPaymentServiceIndices);
+
+    }, [paymentServices, notOnboarded, inventory.paymentProviders]);
 
     const renderImg = (service) => {
         return service.imageURL && service.imageURL !== ''
-            ? <img src={service.imageURL} alt={service.serviceName} height="16px" width="16px"/>
+            ? <img src={service.imageURL} alt={service.serviceName} height="16px" width="16px" />
             : ''
     }
 
@@ -61,7 +74,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
             event.preventDefault();
             event.stopPropagation();
         };
-        return <> { service ? (
+        return <> {service ? (
             <Tag
                 onMouseDown={onPreventMouseDown}
                 closable={closable}
@@ -71,7 +84,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                 {service.serviceName}&nbsp;
                 {renderImg(service)}
             </Tag>
-        ) : '' }
+        ) : ''}
         </>;
     };
 
@@ -107,9 +120,9 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                                 </Option>
                             ))
                         ) : (
-                          <div className="absolute left-[50%] md:top-4">
-                            <Spin size="large" />
-                          </div>
+                            <div className="absolute left-[50%] md:top-4">
+                                <Spin size="large" />
+                            </div>
                         )}
                     </Select>
                 )
@@ -118,15 +131,15 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                 title: "Quantity",
                 align: "center",
                 render: () => (
-                    <InputNumber 
-                      value={quantity} 
-                      controls={false} 
-                      min={1}
-                      onChange={(value) => {
-                        if (value) {
-                          setQuantity(parseInt(value, 10));
-                        }
-                      }}
+                    <InputNumber
+                        value={quantity}
+                        controls={false}
+                        min={1}
+                        onChange={(value) => {
+                            if (value) {
+                                setQuantity(parseInt(value, 10));
+                            }
+                        }}
                     />
                 )
             },
@@ -134,29 +147,21 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                 title: "Unit Price ($)",
                 align: "center",
                 render: () => (
-                    <InputNumber 
-                      value={pricePerUnit}
-                      controls={false} 
-                      min={0.01} 
-                      onChange={(value) => {
-                        if (value && value > 0) {
-                          setpricePerUnit(parseFloat(value.toFixed(2)));
-                        }
-                      }} 
+                    <InputNumber
+                        value={pricePerUnit}
+                        controls={false}
+                        min={0.01}
+                        onChange={(value) => {
+                            if (value && value > 0) {
+                                setpricePerUnit(parseFloat(value.toFixed(2)));
+                            }
+                        }}
                     />
                 )
             }
         ];
 
         return finalColumns;
-    };
-
-
-
-
-    const getCategory = () => {
-        const parts = inventory.contract_name.split('-');
-        return parts[parts.length - 1];
     };
 
     const handleSubmit = async () => {
@@ -174,13 +179,13 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
             quantity,
         }
         let isDone
-        
+
         if (inventory.saleAddress) {
             isDone = await actions.updateSale(inventoryDispatch, body);
         } else {
             isDone = await actions.listInventory(inventoryDispatch, body);
         }
-        if ( isDone ) {
+        if (isDone) {
             await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
             handleCancel();
         }
@@ -193,10 +198,10 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
             title={`${inventory.saleAddress ? 'Update' : 'List'} - ${decodeURIComponent(inventory.name)}`}
             width={650}
             footer={[
-                <div className="flex justify-center md:block">   
-                  <Button id="asset-update-list" type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canList} loading={inventory.saleAddress ? issaleUpdating : isListing}>
-                      {inventory.saleAddress ? 'Update' : 'List' }
-                  </Button>
+                <div className="flex justify-center md:block">
+                    <Button id="asset-update-list" type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canList} loading={inventory.saleAddress ? issaleUpdating : isListing}>
+                        {inventory.saleAddress ? 'Update' : 'List'}
+                    </Button>
                 </div>
             ]}
         >
@@ -211,7 +216,6 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                 <div className="w-full">
                     <Typography className="text-[#202020] text-sm font-medium">Payment Type (s)</Typography>
                     <Select
-
                         id="paymentTypes"
                         mode="multiple"
                         tagRender={tagRender}
@@ -235,15 +239,35 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                 </div>
                 <div className="w-full">
                     <Typography className="text-[#202020] text-sm font-medium">Quantity</Typography>
-                    <InputNumber className="w-full h-9" value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
+                    <InputNumber
+                        className="w-full h-9"
+                        value={quantity}
+                        controls={false}
+                        min={1}
+                        onChange={(value) => {
+                            if (value) {
+                                setQuantity(parseInt(value, 10));
+                            }
+                        }}
+                    />
                 </div>
                 <div>
                     <Typography className="text-[#202020] text-sm font-medium">Unit Price ($)</Typography>
-                    <InputNumber className="w-full h-9" value={pricePerUnit} controls={false} min={1} onChange={(value) => setpricePerUnit(value)} />
-                </div>
+                    <InputNumber
+                        className="w-full h-9"
+                        value={pricePerUnit}
+                        controls={false}
+                        min={.01}
+                        onChange={(value) => {
+                            if (value && value > 0) {
+                                setpricePerUnit(parseFloat(value.toFixed(2)));
+                            }
+                        }}
+                    />
+                </div >
 
-            </div>
-        </Modal>
+            </div >
+        </Modal >
     )
 }
 
