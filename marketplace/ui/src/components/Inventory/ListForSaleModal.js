@@ -132,15 +132,15 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                 title: "Quantity",
                 align: "center",
                 render: () => (
-                    <InputNumber 
-                      value={quantity} 
-                      controls={false} 
-                      min={1}
-                      onChange={(value) => {
-                        if (value) {
-                          setQuantity(parseInt(value, 10));
-                        }
-                      }}
+                    <InputNumber
+                        value={quantity}
+                        controls={false}
+                        min={1}
+                        onChange={(value) => {
+                            if (value) {
+                                setQuantity(parseInt(value, 10));
+                            }
+                        }}
                     />
                 )
             },
@@ -153,15 +153,15 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                             title: "Set Price Per Unit",
                             align: "center",
                             render: () => (
-                                <InputNumber 
-                                  value={pricePerUnit}
-                                  controls={false} 
-                                  min={0.01} 
-                                  onChange={(value) => {
-                                    if (value && value > 0) {
-                                      setpricePerUnit(parseFloat(value.toFixed(2)));
-                                    }
-                                  }} 
+                                <InputNumber
+                                    value={pricePerUnit}
+                                    controls={false}
+                                    min={0.01}
+                                    onChange={(value) => {
+                                        if (value && value > 0) {
+                                            setpricePerUnit(parseFloat(value.toFixed(2)));
+                                        }
+                                    }}
                                 />
                             )
                         }
@@ -174,15 +174,15 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                             title: "Set Price Per Unit",
                             align: "center",
                             render: () => (
-                                <InputNumber 
-                                  value={pricePerUnit} 
-                                  controls={false} 
-                                  min={0.01}
-                                  onChange={(value) => {
-                                    if (value && value > 0) {
-                                      setpricePerUnit(parseFloat(value.toFixed(2)));
-                                    }
-                                  }}
+                                <InputNumber
+                                    value={pricePerUnit}
+                                    controls={false}
+                                    min={0.01}
+                                    onChange={(value) => {
+                                        if (value && value > 0) {
+                                            setpricePerUnit(parseFloat(value.toFixed(2)));
+                                        }
+                                    }}
                                 />
                             )
                         }
@@ -193,16 +193,16 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                     title: "Set Price",
                     align: "center",
                     render: () => (
-                        <InputNumber 
-                          id="sellPrice" 
-                          value={pricePerUnit} 
-                          controls={false} 
-                          min={0.01} 
-                          onChange={(value) => {
-                            if (value && value > 0) {
-                              setpricePerUnit(parseFloat(value.toFixed(2)));
-                            }
-                          }}
+                        <InputNumber
+                            id="sellPrice"
+                            value={pricePerUnit}
+                            controls={false}
+                            min={0.01}
+                            onChange={(value) => {
+                                if (value && value > 0) {
+                                    setpricePerUnit(parseFloat(value.toFixed(2)));
+                                }
+                            }}
                         />
                     )
                 })
@@ -295,11 +295,31 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                 </div>
                 <div className="w-full">
                     <Typography className="text-[#202020] text-sm font-medium">Quantity</Typography>
-                    <InputNumber className="w-full h-9" value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
+                    <InputNumber
+                        className="w-full h-9"
+                        value={quantity}
+                        controls={false}
+                        min={1}
+                        onChange={(value) => {
+                            if (value) {
+                                setQuantity(parseInt(value, 10));
+                            }
+                        }}
+                    />
                 </div>
                 <div>
                     <Typography className="text-[#202020] text-sm font-medium">{getCategory() === "CarbonOffset" || getCategory() === "Metals" ? "Set Price Per Unit" : "Set Price"}</Typography>
-                    <InputNumber className="w-full h-9" value={pricePerUnit} controls={false} min={1} onChange={(value) => setpricePerUnit(value)} />
+                    <InputNumber
+                        className="w-full h-9"
+                        value={pricePerUnit}
+                        controls={false}
+                        min={.01}
+                        onChange={(value) => {
+                            if (value && value > 0) {
+                                setpricePerUnit(parseFloat(value.toFixed(2)));
+                            }
+                        }}
+                    />
                 </div>
 
             </div>
