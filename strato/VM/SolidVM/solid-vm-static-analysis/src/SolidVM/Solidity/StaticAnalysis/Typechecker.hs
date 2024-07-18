@@ -888,7 +888,6 @@ contractHelper ::
   Type'
 contractHelper cc c = do
   let isStrict = isJust $ find ((== "strict") . fst) $ CC._pragmas cc
-  -- print $ CC._pragmas cc
   if isStrict 
     then
       let constr = maybe M.empty (M.singleton "constructor") $ _constructor c
