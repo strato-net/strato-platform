@@ -459,3 +459,20 @@ body{
   user-select: none;         /* Standard syntax */
 }
 
+.items-select .ant-select-selector {
+  background-color: #181EAC !important;
+  color: white;
+}
+
+.items-select .ant-select-selector:hover {
+  background-color: #101481 !important;
+}
+
+.items-select.ant-select-open .ant-select-selection-item {
+  color: white !important;
+}
+
+.items-select .ant-select-arrow {
+  color: white;
+}
+
