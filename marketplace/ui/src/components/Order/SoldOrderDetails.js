@@ -465,7 +465,7 @@ const SoldOrderDetails = ({ user, users }) => {
                               selectedDate
                             }
                             onChange={onDateChange}
-                            disabled={ status === getStatus(2) || status === getStatus(3) || status === getStatus(4) }
+                            disabled={ true }
                           />
                         
                           
@@ -488,7 +488,7 @@ const SoldOrderDetails = ({ user, users }) => {
                               <DatePicker
                                 value={selectedDate}
                                 onChange={onDateChange}
-                                disabled={status === getStatus(2) || status === getStatus(3) || status === getStatus(4)}
+                                disabled={true}
                                 />} 
                               />
                               
@@ -508,9 +508,7 @@ const SoldOrderDetails = ({ user, users }) => {
                             rows={2}
                             placeholder="Enter Comments"
                             value={decodeURIComponent(comment)}
-                            disabled={
-                              status === getStatus(2) || status === getStatus(3) || status === getStatus(4) 
-                            }
+                            disabled={true}
                             onChange={(event) => {
                               setComment(encodeURIComponent(event.target.value));
                             }}

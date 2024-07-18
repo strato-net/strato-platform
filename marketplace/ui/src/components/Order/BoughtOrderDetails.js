@@ -450,7 +450,7 @@ const BoughtOrderDetails = ({ user, users }) => {
                             rows={2}
                             placeholder="Enter Comments"
                             value={decodeURIComponent(comment)}
-                            disabled={status !== getStatus(1)}
+                            disabled={true}
                             onChange={(event) => {
                               setcomment(event.target.value);
                             }}
