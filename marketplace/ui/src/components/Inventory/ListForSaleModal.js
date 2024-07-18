@@ -89,7 +89,6 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
     };
 
     const handleSelect = (values) => {
-        console.log(values)
         setPaymentTypes(values);
     };
 
