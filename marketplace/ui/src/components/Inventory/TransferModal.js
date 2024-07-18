@@ -76,14 +76,32 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
             title: "Set Quantity",
             align: "center",
             render: () => (
-                <InputNumber value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
+                <InputNumber 
+                  value={quantity}
+                  controls={false} 
+                  min={1} 
+                  onChange={(value) => {
+                    if (value) {
+                        setQuantity(parseInt(value, 10));
+                    }
+                  }}
+                />
             )
         },
         {
             title: "Unit Price ($)",
             align: "center",
             render: () => (
-                <InputNumber value={price} controls={false} min={1} onChange={(value) => setPrice(value)} />
+                <InputNumber 
+                  value={price} 
+                  controls={false} 
+                  min={0.01} 
+                  onChange={(value) => {
+                    if (value && value > 0) {
+                      setPrice(parseFloat(value.toFixed(2)));
+                    }
+                  }}
+                />
             )
         },
         {

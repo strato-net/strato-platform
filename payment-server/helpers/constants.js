@@ -24,7 +24,7 @@ const SERVER_CONFIRM_URL = `${SERVER_URL}/stripe/checkout/confirm`;
 
 const SERVER_CANCEL_URL = `${SERVER_URL}/stripe/checkout/cancel`;
 
-const ORDER_EVENT_TABLE = `${TABLE_PREFIX}PaymentService.Order`;
+const ASSET_LOCKED_EVENT_TABLE = `${TABLE_PREFIX}PaymentService.AssetLocked`;
 
 const SELLER_ONBOARDED_TABLE = `${TABLE_PREFIX}PaymentService.SellerOnboarded`;
 
@@ -46,7 +46,7 @@ export {
   REDEMPTION_CONTRACT_ADDRESS,
   SERVER_URL,
   DEFAULT_OPTIONS,
-  ORDER_EVENT_TABLE,
+  ASSET_LOCKED_EVENT_TABLE,
   SELLER_ONBOARDED_TABLE,
   PAYMENT_STATUS,
   TABLE_PREFIX,
