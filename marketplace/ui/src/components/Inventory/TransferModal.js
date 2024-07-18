@@ -89,7 +89,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
             )
         },
         {
-            title: "Set Price",
+            title: "Unit Price ($)",
             align: "center",
             render: () => (
                 <InputNumber
@@ -152,7 +152,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
             open={open}
             onCancel={handleCancel}
             title={`Transfer - ${decodeURIComponent(inventory.name)}`}
-            width={825}
+            width={1000}
             footer={[
                 <div className="flex justify-center md:block">
                     <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canTransfer} loading={isTransferring}>
@@ -192,7 +192,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
                     </div>
                 </div>
                 <div>
-                    <p className="text-[#202020] font-medium text-sm">Set Price</p>
+                    <p className="text-[#202020] font-medium text-sm">Unit Price ($)</p>
                     <div>
                         <InputNumber
                             className="w-full h-9"
