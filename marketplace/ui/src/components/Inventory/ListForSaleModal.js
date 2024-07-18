@@ -82,7 +82,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
     const columns = () => {
         let finalColumns = [
             {
-                title: "Set Payment Types",
+                title: "Payment Type (s)",
                 align: "center",
                 render: () => (
                     <Select
@@ -130,70 +130,23 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                     />
                 )
             },
-        ]
-        switch (getCategory()) {
-            case 'CarbonOffset':
-                finalColumns = finalColumns.concat(
-                    [
-                        {
-                            title: "Set Price Per Unit",
-                            align: "center",
-                            render: () => (
-                                <InputNumber 
-                                  value={pricePerUnit}
-                                  controls={false} 
-                                  min={0.01} 
-                                  onChange={(value) => {
-                                    if (value && value > 0) {
-                                      setpricePerUnit(parseFloat(value.toFixed(2)));
-                                    }
-                                  }} 
-                                />
-                            )
+            {
+                title: "Unit Price ($)",
+                align: "center",
+                render: () => (
+                    <InputNumber 
+                      value={pricePerUnit}
+                      controls={false} 
+                      min={0.01} 
+                      onChange={(value) => {
+                        if (value && value > 0) {
+                          setpricePerUnit(parseFloat(value.toFixed(2)));
                         }
-                    ])
-                break;
-            case 'Metals':
-                finalColumns = finalColumns.concat(
-                    [
-                        {
-                            title: "Set Price Per Unit",
-                            align: "center",
-                            render: () => (
-                                <InputNumber 
-                                  value={pricePerUnit} 
-                                  controls={false} 
-                                  min={0.01}
-                                  onChange={(value) => {
-                                    if (value && value > 0) {
-                                      setpricePerUnit(parseFloat(value.toFixed(2)));
-                                    }
-                                  }}
-                                />
-                            )
-                        }
-                    ])
-                break;
-            default:
-                finalColumns.push({
-                    title: "Set Price",
-                    align: "center",
-                    render: () => (
-                        <InputNumber 
-                          id="sellPrice" 
-                          value={pricePerUnit} 
-                          controls={false} 
-                          min={0.01} 
-                          onChange={(value) => {
-                            if (value && value > 0) {
-                              setpricePerUnit(parseFloat(value.toFixed(2)));
-                            }
-                          }}
-                        />
-                    )
-                })
-                break;
-        }
+                      }} 
+                    />
+                )
+            }
+        ];
 
         return finalColumns;
     };
@@ -256,7 +209,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
             </div>
             <div className="flex gap-5 flex-col justify-center md:hidden mt-5">
                 <div className="w-full">
-                    <Typography className="text-[#202020] text-sm font-medium">Set Payment Types</Typography>
+                    <Typography className="text-[#202020] text-sm font-medium">Payment Type (s)</Typography>
                     <Select
 
                         id="paymentTypes"
@@ -285,7 +238,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                     <InputNumber className="w-full h-9" value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
                 </div>
                 <div>
-                    <Typography className="text-[#202020] text-sm font-medium">{getCategory() === "CarbonOffset" || getCategory() === "Metals" ? "Set Price Per Unit" : "Set Price"}</Typography>
+                    <Typography className="text-[#202020] text-sm font-medium">Unit Price ($)</Typography>
                     <InputNumber className="w-full h-9" value={pricePerUnit} controls={false} min={1} onChange={(value) => setpricePerUnit(value)} />
                 </div>
 
