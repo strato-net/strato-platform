@@ -4,6 +4,9 @@ const cors = require('cors');
 const helmet = require('helmet');
 const bodyParser = require('body-parser');
 
+const subscriptionRoutes = require("./src/routes/subscriptionRoutes");
+const notifyRoutes = require("./src/routes/notifyRoutes");
+
 const app = express();
 const port = process.env.PORT || 3000;
 
@@ -18,13 +21,8 @@ app.use(bodyParser.json()); // To parse JSON bodies
 app.use(bodyParser.urlencoded({ extended: true })); // To parse URL-encoded bodies
 
 // Routes
-app.get('/', (req, res) => {
-  res.send('Hello World!');
-});
-// app.post('/data', (req, res) => {
-//   console.log(req.body); // Log the parsed body
-//   res.send('Data received');
-// });
+app.use("/api", subscriptionRoutes);
+app.use("/api", notifyRoutes);
 
 app.listen(port, () => {
   console.log(`Server is running at http://localhost:${port}`);
