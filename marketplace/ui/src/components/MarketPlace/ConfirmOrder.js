@@ -208,6 +208,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
           errorMessage += `The following item(s) are temporarily out of stock and should be removed:\n${outOfStockMessage}`;
         }
         openToastOrder("bottom", errorMessage);
+        setSelectedProvider('')
       }
     }
   };
@@ -259,7 +260,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
               <div id="review-and-submit" className="flex md:pb-2 items-center mr-4">
                 <div className="mr-4">
                   <Select
-                    defaultValue={selectedProvider?.serviceName}
+                    value={selectedProvider?.serviceName}
                     className="w-[250px] text-center selected-payment-option"
                     onChange={handleChange}
                     placeholder="Select Payment Option"

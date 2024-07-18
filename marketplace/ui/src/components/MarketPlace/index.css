@@ -214,6 +214,11 @@ img.ant-image-preview-img {
   align-items: center;
 }
 
+.selected-payment-option > .ant-select-selector > .ant-select-selection-placeholder {
+  color: black;
+  font-weight: 600;
+}
+
 @media (min-width: 1600px) {
   .banner-block-container {
     margin-top: 30px;
