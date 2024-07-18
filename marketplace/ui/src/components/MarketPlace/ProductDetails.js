@@ -512,19 +512,13 @@ const ProductDetails = ({ user, users }) => {
                           addItemToCart();
                           navigate("/checkout");
                         } else {
-                          if (checkQuantity[0].availableQuantity === 0) {
-                            showToast({
-                              message: TOAST_MSG.OUT_OF_STOCK(details),
-                              success: false,
-                              placement: 'bottom',
-                            });
-                          } else { // Case 2: We are trying to add too much quantity
-                            showToast({
-                              message: TOAST_MSG.TOO_MUCH_QUANTITY(checkQuantity, details),
-                              success: false,
-                              placement: 'bottom',
-                            });
-                          }
+                          showToast({
+                            message:  checkQuantity[0].availableQuantity === 0 
+                            ? TOAST_MSG.OUT_OF_STOCK(details) 
+                            : TOAST_MSG.TOO_MUCH_QUANTITY(checkQuantity, details),
+                            success: false,
+                            placement: 'bottom',
+                          });
                         }
                       }}
                       disabled={ownerSameAsUser() || isAvailableForSale}
@@ -563,19 +557,13 @@ const ProductDetails = ({ user, users }) => {
                           if (checkQuantity === true) {
                             addItemToCart();
                           } else {
-                            if (checkQuantity[0].availableQuantity === 0) {
-                              showToast({
-                                message: TOAST_MSG.OUT_OF_STOCK(details),
-                                success: false,
-                                placement: 'bottom',
-                              });
-                            } else { // Case 2: We are trying to add too much quantity
-                              showToast({
-                                message: TOAST_MSG.TOO_MUCH_QUANTITY(checkQuantity, details),
-                                success: false,
-                                placement: 'bottom',
-                              });
-                            }
+                            showToast({
+                              message:  checkQuantity[0].availableQuantity === 0 
+                              ? TOAST_MSG.OUT_OF_STOCK(details) 
+                              : TOAST_MSG.TOO_MUCH_QUANTITY(checkQuantity, details),
+                              success: false,
+                              placement: 'bottom',
+                            });
                           }
                         }}
                       />
