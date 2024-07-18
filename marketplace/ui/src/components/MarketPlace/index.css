@@ -73,11 +73,6 @@ img.ant-image-preview-img {
   border: 2px solid #181eac;
 }
 
-:where(.css-dev-only-do-not-override-9ntgx0).ant-input-number
-  .ant-input-number-input {
-  padding: 0;
-}
-
 .confirm-order-body {
   position: sticky;
   top: 200px;
@@ -199,6 +194,19 @@ img.ant-image-preview-img {
 
 .banner-arrow {
   z-index: 24;
+}
+
+.payment-dropdown > .ant-select-item-option-content{
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+}
+
+.selected-payment-option > .ant-select-selector > .ant-select-selection-item{
+  height: 40px;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
 }
 
 @media (min-width: 1600px) {

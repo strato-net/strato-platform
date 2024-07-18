@@ -13,7 +13,8 @@ import {
   validateAndGetOrderDetails ,
   completeOrder,
   initializePayment,
-  cancelOrder
+  cancelOrder,
+  discardOrder
 } from '../helpers/utils.js';
 import { PAYMENT_STATUS, STRIPE_CONTRACT_ADDRESS, PAYMENT_RECEIVED_MESSAGE } from '../helpers/constants.js';
 
@@ -254,7 +255,7 @@ class StripeServiceController {
         comments: orderEvent[0].comments,
       } 
 
-      const cancelOrderStatus = await cancelOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
+      const cancelOrderStatus = await discardOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
       console.log("cancelOrderStatus", cancelOrderStatus);
 
       // Update payment status in DB
