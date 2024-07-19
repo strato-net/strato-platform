@@ -1,30 +1,33 @@
-import sgMail from "@sendgrid/mail";
 import dotenv from "dotenv";
-
 dotenv.config({ path: "../../../.env" });
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 async function sendEmail(to, subject, htmlContent) {
+  const endpointUrl = process.env.NOTIFICATION_SERVER_URL;
 
-  const msg = {
-    to: to,
-    from: { email: "no_reply@blockapps.net", name: "BlockApps.net" },
-    subject: subject,
-    html: htmlContent,
-    // Remove sales from these emails for testnet testing. This needs to be included for production. 
-    bcc: 'sales@blockapps.net',
-    // attachments: [
-    //   {
-    //     content: pdf.toString("base64"),
-    //     filename: "certificate.pdf",
-    //     type: "application/pdf",
-    //     disposition: "attachment",
-    //   },
-    // ],
+  if (!endpointUrl) {
+    throw new Error("Notification server URL is not set");
+  }
+
+  const payload = {
+    usernames: [to],
+    message: {
+      subject: subject,
+      htmlContent: htmlContent
+    }
   };
 
   try {
-    await sgMail.send(msg);
+    const response = await fetch(`${endpointUrl}/api/notify?method=email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error: ${response.statusText}`);
+    }
     console.log("Email sent successfully!");
   } catch (error) {
     console.error("Error sending email:", error);
