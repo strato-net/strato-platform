@@ -259,7 +259,7 @@ const UserProfile = ({user}) => {
         const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity]);
         if (checkQuantity === true) {
           // Quantity check passed, add new item to the cart
-          items.push({ product, qty: quantity });
+          items = [{ product, qty: quantity }];
           marketplaceActions.addItemToCart(marketplaceDispatch, items);
           openToast("bottom", false, "Item added to cart");
           return true;

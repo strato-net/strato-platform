@@ -380,7 +380,7 @@ const Checkout = () => {
               </ClickableCell>
             </Breadcrumb.Item>
             <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
-              <p className="text-sm text-[#202020] font-medium">My Cart</p>
+              <p className="text-sm text-[#202020] font-medium">Checkout</p>
             </Breadcrumb.Item>
           </Breadcrumb>
 

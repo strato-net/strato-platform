@@ -82,7 +82,7 @@ const TopSellingProductCard = () => {
       );
       if (checkQuantity === true) {
         // Quantity check passed, add new item to the cart
-        items.push({ product, qty: quantity });
+        items = [{ product, qty: quantity }]
         actions.addItemToCart(marketplaceDispatch, items);
         openToast("bottom", false, "Item added to cart");
         return true;

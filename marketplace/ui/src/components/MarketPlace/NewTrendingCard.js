@@ -218,33 +218,6 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                     >
                         Buy Now
                     </Button>
-                    <Button
-                        className={`h-9 w-9 flex items-center justify-center ${isAvailableForSale ? '!bg-[#808080]' : '!bg-[#13188A]'} ${ownerSameAsUser() ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-                        disabled={isAvailableForSale || ownerSameAsUser()}
-                        onClick={() => {
-                            window.LOQ.push(['ready', async LO => {
-                                await LO.$internal.ready('events')
-                                LO.events.track('Add To Cart (from Top Selling Product)', {
-                                    product: topSellingProduct.name,
-                                    category: topSellingProduct.category,
-                                    productId: topSellingProduct.productId
-                                })
-                            }])
-                            TagManager.dataLayer({
-                                dataLayer: {
-                                    event: 'add_to_cart_from_top_selling_product',
-                                    product_name: topSellingProduct.name,
-                                    category: topSellingProduct.category,
-                                    productId: topSellingProduct.productId
-                                },
-                            });
-                            addItemToCart(topSellingProduct, quantity);
-                        }}
-                        type='primary'
-                    >
-
-                        <img alt={imgMeta} title={imgMeta} src={Images.Cart} width={18} height={18} className='max-w-[18px]' />
-                    </Button>
                 </div>
             </div>
             <LoginModal

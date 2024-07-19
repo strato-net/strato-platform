@@ -275,7 +275,7 @@ const CategoryProductList = ({ user }) => {
       const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity]);
       if (checkQuantity === true) {
         // Quantity check passed, add new item to the cart
-        items.push({ product, qty: quantity });
+        items = [{ product, qty: quantity }];
         marketplaceActions.addItemToCart(marketplaceDispatch, items);
         openToast("bottom", false, TOAST_MSG.ITEM_ADDED_TO_CART);
         return true;
