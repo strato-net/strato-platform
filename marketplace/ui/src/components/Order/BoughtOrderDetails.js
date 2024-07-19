@@ -394,31 +394,11 @@ const BoughtOrderDetails = ({ user, users }) => {
                       <div className="flex flex-col md:flex-row md:justify-between">
                         <div className="flex flex-col">
                           <div className="flex">
-                            <Text className="bg-[#E9E9E9] md:bg-white py-2 px-3 w-full md:w-2/5 md:bg-none font-semibold text-sm md:text-lg text-primaryB flex gap-4 items-center">Order Details</Text>
+                            <Text className="bg-[#E9E9E9] md:bg-white py-2 px-3 w-full md:w-3.5/5 md:bg-none font-semibold text-sm md:text-lg text-primaryB flex gap-4 items-center">Order Details</Text>
                             <Text className="hidden md:flex mt-2">{statusComponentForPayment(paid)}</Text>
                           </div>
-                          <Text className="text-[#6A6A6A] md:text-black px-3 my-2 text-xs md:text-sm md:font-semibold">Please enter the fulfillment date to close the order</Text>
                         </div>
-                        <Button
-                          id="cancel-order-button"
-                          type="primary"
-                          className="min-w-max w-max h-9 px-[2%] ml-2 bg-primary !hover:bg-primaryHover"
-                          disabled={status !== getStatus(1) || comment === ""}
-                          onClick={() => {
-                            handleCancelOrder()
-                            window.LOQ.push(['ready', async LO => {
-                              await LO.$internal.ready('events')
-                              LO.events.track('Order Details: Cancel Order')
-                            }])
-                            TagManager.dataLayer({
-                              dataLayer: {
-                                event: 'orderDetails_bought_cancel_click',
-                              },
-                            });
-                          }}
-                        >
-                          Cancel Order
-                        </Button>
+
                       </div>
                       <Row className="hidden md:flex my-6 justify-between bg-[#F6F6F6] p-4 pb-2 rounded">
                         <OrderData title="Order Number" value={`#${`${details.order.orderId}`.substring(0,6)}`} />
@@ -470,7 +450,7 @@ const BoughtOrderDetails = ({ user, users }) => {
                             rows={2}
                             placeholder="Enter Comments"
                             value={decodeURIComponent(comment)}
-                            disabled={status !== getStatus(1)}
+                            disabled={true}
                             onChange={(event) => {
                               setcomment(event.target.value);
                             }}

@@ -61,7 +61,16 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
             title: "Set Quantity",
             align: "center",
             render: () => (
-                <InputNumber value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
+                <InputNumber
+                    value={quantity}
+                    controls={false}
+                    min={1}
+                    onChange={(value) => {
+                        if (value) {
+                            setQuantity(parseInt(value, 10));
+                        }
+                    }}
+                />
             )
         },
         {
@@ -135,7 +144,7 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
                         </>
                     }
                 </div>
-                {showModal && <AddAddressModal open={showModal} close={closeAddressModel} redemptionService={inventory.data.redemptionService}/>}
+                {showModal && <AddAddressModal open={showModal} close={closeAddressModel} redemptionService={inventory.data.redemptionService} />}
                 {isLoadingUserAddresses ?
                     <div className="h-80 flex justify-center items-center">
                         <Spin spinning={isLoadingUserAddresses} size="large" />
@@ -165,20 +174,35 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
             <div className="flex flex-col gap-[18px] md:hidden mt-5">
                 <div>
                     <p className="text-[#202020] font-medium text-sm">Quantity Available</p>
-                    <div className="inventory_card">
-                        <InputNumber className="w-full pl-5" value={data[0].quantity} min={1} disabled />
+                    <div>
+                        <InputNumber
+                            className="w-full h-9"
+                            value={data[0].quantity}
+                            min={1}
+                            disabled
+                        />
                     </div>
                 </div>
                 <div>
                     <p className="text-[#202020] font-medium text-sm">Set Quantity</p>
-                    <div className="inventory_card">
-                        <InputNumber className="w-full pl-5" value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
+                    <div>
+                        <InputNumber
+                            className="w-full h-9"
+                            value={quantity}
+                            controls={false}
+                            min={1}
+                            onChange={(value) => {
+                                if (value) {
+                                    setQuantity(parseInt(value, 10));
+                                }
+                            }}
+                        />
                     </div>
                 </div>
                 <div>
                     <p className="text-[#202020] font-medium text-sm">Additional comments</p>
-                    <div className="inventory_card">
-                        <TextArea className="w-full pl-5" value={comments} onChange={(e) => setComments(e.target.value)} />
+                    <div>
+                        <TextArea className="w-full" value={comments} onChange={(e) => setComments(e.target.value)} />
                     </div>
                 </div>
                 {isLoadingUserAddresses ?
@@ -229,7 +253,7 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
                         </div>
                     </>
                 }
-                {showResponsiveForm && <ResponsiveAddAddress open={showResponsiveForm} close={closeResponsiveAddressModel} redemptionService={inventory.data.redemptionService}/>}
+                {showResponsiveForm && <ResponsiveAddAddress open={showResponsiveForm} close={closeResponsiveAddressModel} redemptionService={inventory.data.redemptionService} />}
             </div>
         </Modal>
     )

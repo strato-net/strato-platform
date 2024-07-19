@@ -330,7 +330,7 @@ class InventoryController {
       paymentProviders: Joi.array().min(1).items(
         Joi.string().min(0).required(),
       ).required(),
-      price: Joi.number().greater(0).required(),
+      price: Joi.number().greater(0).precision(2).required(),
       quantity: Joi.number().integer().greater(0).optional(),
     });
 
@@ -400,7 +400,7 @@ class InventoryController {
       assetAddress: Joi.string().required(),
       newOwner: Joi.string().required(),
       quantity: Joi.number().integer().greater(0).required(),
-      price: Joi.number().min(0).required(),
+      price: Joi.number().greater(0).precision(2).required(),
     });
 
     const validation = transferItemSchema.validate(args);
@@ -439,7 +439,7 @@ class InventoryController {
       paymentProviders: Joi.array().min(1).items(
         Joi.string().min(0).required(),
       ).optional(),
-      price: Joi.number().greater(0).optional(),
+      price: Joi.number().greater(0).precision(2).optional(),
       quantity: Joi.number().integer().greater(0).optional(),
     });
 

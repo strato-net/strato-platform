@@ -30,7 +30,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
     const filterDuplicateUserAddresses = (arr) => {
         return [...new Map(arr.map((u) => [u.value, u])).values()];
     };
-    
+
     const [searchInput, setSearchInput] = useState('');
     const [dropdownOpen, setDropdownOpen] = useState(false);
 
@@ -60,12 +60,12 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
             setCanTransfer(true);
         };
     }, [quantity, userAddress])
-    
+
     const filteredOptions = searchInput
-    ? filteredUsersList.filter(option =>
-        option.label && option.label.toLowerCase().includes(searchInput.toLowerCase())
-      )
-    : [];
+        ? filteredUsersList.filter(option =>
+            option.label && option.label.toLowerCase().includes(searchInput.toLowerCase())
+        )
+        : [];
 
 
     const renderTransfer = () => (

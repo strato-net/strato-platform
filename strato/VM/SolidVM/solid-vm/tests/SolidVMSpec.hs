@@ -8209,7 +8209,7 @@ contract qq {
 }
 |]
     getFields ["x"] `shouldReturn` [BInteger 4]
-
+    
   it "can use libraries" . runTest $ do
     runBS
       [r|
@@ -8515,6 +8515,7 @@ contract qq {
       SomeContract p = new SomeContract();
       b = p.x()[0];
   }
+
 }
 |]) `shouldThrow` anyTypeError
 
@@ -8534,7 +8535,6 @@ contract qq {
     delete arr2;
     delete xyz;
     delete b;
-    delete yy;
   }
 }|]
       getFields ["res", "arr2"] `shouldReturn` [BDefault, BDefault]) 
@@ -8927,3 +8927,34 @@ contract qq {
   }
 }
 |]) `shouldThrow` anyTypeError
+
+  it "can error handle improperly referenced overloaded contracts" $ runTest ( do 
+    let getAddressFromResult :: ExecResults -> Maybe Address 
+        getAddressFromResult res = _accountAddress <$> erNewContractAccount res
+
+    res <- runBS' [r|
+pragma safeExternalCalls;
+contract qq {
+    bool public myVal;
+
+    function changeMyVal(bool b){
+        myVal = b;
+    }
+}|]
+
+    case getAddressFromResult res of
+      Nothing -> error "No address returned"
+      Just address -> runCall' "changeMyValOfTest" (T.pack $ "(0x"++ formatAddressWithoutColor address ++", 3 )" ) [r|
+contract Test {
+    int public myVal;
+
+    function changeMyVal(int b){
+        myVal = b;
+    }
+}
+contract qq {
+    function changeMyValOfTest(address a, int v) returns (int) {
+        Test(a).changeMyVal(v);
+        return Test(a).myVal();
+    }
+}|]) `shouldThrow` anyTypeError

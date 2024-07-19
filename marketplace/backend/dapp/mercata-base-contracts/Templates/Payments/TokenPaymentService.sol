@@ -124,7 +124,7 @@ constructor (
                     address(s).call("lockQuantity", quantity);
                 }
             }
-            emit Order(
+            emit AssetLocked(
                 _orderHash,
                 _orderId,
                 _purchaser,

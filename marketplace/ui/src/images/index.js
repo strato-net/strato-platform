@@ -60,6 +60,7 @@ export const Images = {
   'calender' : require('./resources/Calendar.png'),
   'logo_white' : require('./resources/logo_white.png'),
   'banner_arrow': require('./resources/banner_arrow.png'),
+  'carousel_arrow': require('./resources/carouselArrow.png'),
 
   'CollectiblesX394': require("./resources/Banner/CollectiblesX394.png"),
   'CollectiblesX768': require("./resources/Banner/CollectiblesX768.png"),
