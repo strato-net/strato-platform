@@ -461,7 +461,7 @@ body{
 
 .items-select .ant-select-selector {
   background-color: #181EAC !important;
-  color: white;
+  color: white !important;
 }
 
 .items-select .ant-select-selector:hover {

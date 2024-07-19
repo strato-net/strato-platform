@@ -295,7 +295,7 @@ const ResponsiveCart = ({
           ) : (
             <Row className="flex justify-center mt-4">
               <Select
-                defaultValue={selectedProvider?.serviceName}
+                value={selectedProvider?.serviceName}
                 className="w-[250px] text-center selected-payment-option"
                 onChange={handleChange}
                 placeholder="Select Payment Option"
