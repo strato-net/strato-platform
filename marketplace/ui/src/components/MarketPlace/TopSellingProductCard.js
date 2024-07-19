@@ -110,7 +110,7 @@ const TopSellingProductCard = () => {
       const checkQuantity = await orderActions.fetchSaleQuantity(
         orderDispatch,
         [product.saleAddress],
-        [quantity]
+        [potentialNewQty]
       );
       if (checkQuantity === true) {
         // Quantity check passed, update item quantity in the cart
