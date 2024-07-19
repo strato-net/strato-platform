@@ -598,27 +598,26 @@ buildNextBlockHeader ::
   ChainMemberParsedSet ->
   Word64 ->
   BlockHeader
-buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT coinbaseAddr nonce =
+buildNextBlockHeader parentHeader parentHash _ stateRoot txs time _ _ _ =
   let --parentDiff = difficulty parentHeader
       parentNum = number parentHeader
    in --parentTS   = timestamp parentHeader
       --nextDiff   = nextDifficulty flags_difficultyBomb flags_testnet parentNum parentDiff parentTS time
-      BlockHeader
-        { parentHash = parentHash,
-          ommersHash = V.ommersVerificationValue uncles,
-          beneficiary = coinbaseAddr, -- TODO?: Removed case for PoW because it relied on ethConf, but should really come from Vault now
+      BlockHeaderV2
+        {
+          parentHash = parentHash,
           stateRoot = stateRoot,
           transactionsRoot = V.transactionsVerificationValue (otBaseTx <$> txs),
           receiptsRoot = V.receiptsVerificationValue (),
           logsBloom = "0000000000000000000000000000000000000000000000000000000000000000",
-          difficulty = 1, --nextDiff
           number = parentNum + 1,
-          gasLimit = nextGasLimit $ gasLimit parentHeader,
-          gasUsed = 0,
           timestamp = time,
           extraData = txsLen2ExtraData (length txs),
-          mixHash = if isPBFT then blockstanbulMixHash else unsafeCreateKeccak256FromWord256 0x0,
-          nonce = nonce
+          newValidators = [],
+          removedValidators = [],
+          newCerts = [],
+          revokedCerts = [],
+          signatures = []
         }
 
 buildRewardedBlockHeader :: MonadBagger m => BlockHeader -> m BlockHeader
