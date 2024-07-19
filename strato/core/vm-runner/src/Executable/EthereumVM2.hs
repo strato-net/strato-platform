@@ -118,15 +118,22 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
         case mSumm of 
           Nothing -> pure Nothing
           Just summ -> do
+            let bHeader' = case bHeader of
+                            BlockHeader {} -> bHeader { -- immitate parent block as closely as possible (most important is the stateroot)
+                              parentHash = bSumParentHash summ,
+                              stateRoot = bSumStateRoot summ,
+                              number = bSumNumber summ,
+                              gasLimit = bSumGasLimit summ
+                            }
+                            BlockHeaderV2 {} -> bHeader { -- immitate parent block as closely as possible (most important is the stateroot)
+                              parentHash = bSumParentHash summ,
+                              stateRoot = bSumStateRoot summ,
+                              number = bSumNumber summ
+                            }
             res <- Bagger.runFromStateRoot 
               mineTransactions 
               (bSumGasLimit summ) 
-              bHeader { -- immitate parent block as closely as possible (most important is the stateroot)
-                parentHash = bSumParentHash summ,
-                stateRoot = bSumStateRoot summ,
-                number = bSumNumber summ,
-                gasLimit = bSumGasLimit summ
-              } 
+              bHeader'
               otxs 
             case res of 
               Right (sr, _, _) -> do 
