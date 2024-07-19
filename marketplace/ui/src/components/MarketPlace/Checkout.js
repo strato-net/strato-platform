@@ -96,8 +96,8 @@ const Checkout = () => {
           item: {
             name: item.product.name,
             image: (item.product["BlockApps-Mercata-Asset-images"] && item.product["BlockApps-Mercata-Asset-images"].length > 0)
-            ? item.product["BlockApps-Mercata-Asset-images"][0].value
-            : image_placeholder,
+              ? item.product["BlockApps-Mercata-Asset-images"][0].value
+              : image_placeholder,
             status: "Active",
           },
           category: parts[parts.length - 1],
@@ -109,8 +109,8 @@ const Checkout = () => {
           saleAddress: item.product.saleAddress,
           tax: calculateTax(item),
           amount:
-            item.product.price * item.qty +
-            calculateTax(item),
+            parseFloat((item.product.price * item.qty +
+              calculateTax(item)).toFixed(2)),
           action: item.product.address,
           qty: item.qty,
         });
